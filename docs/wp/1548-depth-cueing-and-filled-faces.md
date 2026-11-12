@@ -182,9 +182,15 @@ visual questions. Bring each with a picture:
   ChimeraX, VMD, Mol\*, Jmol, VESTA and Mercury manuals. Replace the
   "recalled" list above with what they say, and add the survey to
   `docs/practice.md`. Never open ChimeraX's source (WP-1537, 1538).
-- [ ] Fog in the numpy raster path, with unit tests: the near and far
+- [x] Fog in the numpy raster path, with unit tests: the near and far
   copies of one atom differ by the expected blend, and fog off is
-  bit-identical to today.
+  bit-identical to today. *(2026-11-12: `raster.draw(fog=(z_start, z_end,
+  f_max, colour))`, every depth-tested path; a fogged call runs numpy on
+  either tier until the wheel has a kernel that fogs, see the next item.)*
+- [ ] The compiled kernel: `render_rows_cued` in `kernels/src/raster.rs`,
+  bit-identical to the numpy path, shipped as rietx-kernels 1.5.0
+  (`docs/RELEASING.md` § The kernel wheel). The floor rises and `draw` stops
+  taking the numpy path for fog only once the maintainer publishes it.
 - [ ] Fog in `gl3d.ts`, and the parity case with fog on.
 - [ ] Ring perception and the planarity test, with unit tests on
   paracetamol (`tests/data/cod_2104364.cif`, one benzene ring) and on a

@@ -613,6 +613,57 @@ def test_the_options_reach_the_picture(nac):
 # letters (D8)
 # ----------------------------------------------------------------------
 
+def _near_and_far() -> tuple[dict, list[np.ndarray]]:
+    """One ball twice, 6 Å apart along the line of sight and 3 Å apart
+    across it, seen down z: the near copy and the far copy of one atom."""
+    geo = _one_atom(_general_ellipsoid())
+    atom = geo["atoms"][0]
+    pos = np.asarray(atom["pos"], dtype=float)
+    shifted = (pos + [3.0, 0.0, -6.0]).tolist()
+    geo["atoms"] = [atom, dict(atom, pos=shifted)]
+    scene = sc.build_scene(geo, "ball")
+    return scene, [pos, np.asarray(shifted)]
+
+
+@pytest.mark.parametrize("path", [True, False], ids=["compiled", "numpy"])
+def test_fog_blends_each_copy_of_an_atom_by_its_own_depth(path, monkeypatch):
+    """WP-1548 D1: f rises linearly from 0 at z_start to f_max at z_end, and
+    a sample becomes mix(colour, fog colour, f).  A ball's centre sample is
+    its front, at z = centre + radius, so each copy's expected pixel follows
+    from the unfogged picture and its own depth, to the rounding of two
+    8-bit images."""
+    monkeypatch.setattr(compiled, "_ENABLED", path)
+    scene, centres = _near_and_far()
+    R = np.eye(3)
+    frame = render.gui_frame(scene, R, 240, 240, 240)
+    radius = scene["atoms"][0]["shape"][0]
+    fronts = [c[2] + radius for c in centres]
+    fog_colour = np.array([0.2, 0.4, 0.9])
+    fog = (fronts[0] + 0.5, fronts[1] - 0.5, 0.8, fog_colour)
+    bare = raster.draw(scene, R, frame, supersample=1)
+    cued = raster.draw(scene, R, frame, supersample=1, fog=fog)
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    _png(OUTPUT / "fog_near_far_off.png", bare, None)
+    _png(OUTPUT / "fog_near_far_on.png", cued, None)
+    seen = []
+    for c, front in zip(centres, fronts):
+        px = int((c[0] - frame.x0) * frame.ppa)
+        py = int((frame.y0 - c[1]) * frame.ppa)
+        f = 0.8 * min(max((fog[0] - front) / (fog[0] - fog[1]), 0.0), 1.0)
+        want = (1 - f) * bare[py, px, :3] / 255 + f * fog_colour
+        assert np.abs(cued[py, px, :3] / 255 - want).max() <= 1.5 / 255, (f, cued[py, px])
+        seen.append(f)
+    # the near copy is barely fogged and the far one nearly to f_max
+    assert seen[0] < 0.1 < 0.7 < seen[1]
+
+
+def test_fog_ending_in_front_of_its_start_is_refused():
+    scene, _ = _near_and_far()
+    frame = render.gui_frame(scene, np.eye(3), 40, 40, 40)
+    with pytest.raises(ValueError, match="not in front of"):
+        raster.draw(scene, np.eye(3), frame, fog=(0.0, 1.0, 0.5, (1.0, 1.0, 1.0)))
+
+
 def test_the_font_ships_with_its_acknowledgement():
     from importlib import resources
 

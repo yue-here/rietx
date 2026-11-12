@@ -266,7 +266,24 @@ def _grid(box, ext0, he):
     return iy0, iy1, iy, ix
 
 
-def _flat_numpy(seg, depth, ext0, he, zb, pm, al):
+def _fogged(col, z, fog):
+    """``col`` blended toward the fog colour by its depth ``z`` (WP-1548 D1).
+
+    ``fog`` is ``(z_start, z_end, f_max, colour)`` in view coordinates, z
+    toward the viewer: the factor is 0 in front of ``z_start``, rises linearly
+    to ``f_max`` at ``z_end`` and stays there behind it.  The blend is GLSL's
+    ``mix(col, colour, f)``, ``col·(1 − f) + colour·f``, spelled as the GUI's
+    shader spells it.  ``None`` returns ``col`` itself, so a picture without
+    fog runs no arithmetic it did not run before.
+    """
+    if fog is None:
+        return col
+    z_start, z_end, f_max, colour = fog
+    f = f_max * np.minimum(np.maximum((z_start - z) / (z_start - z_end), 0.0), 1.0)
+    return col * (1.0 - f)[..., None] + colour * f[..., None]
+
+
+def _flat_numpy(seg, depth, ext0, he, zb, pm, al, fog=None):
     p, half, direction, length, z, col, box = seg
     for i in range(len(p)):
         g = _grid(box[i], ext0, he)
@@ -281,11 +298,13 @@ def _flat_numpy(seg, depth, ext0, he, zb, pm, al):
         hit = ~((np.abs(across) > h) | (along < -h) | (along > length[i] + h))
         rows = slice(iy0 - ext0, iy1 - ext0)
         cols = slice(box[i, 2], box[i, 3])
+        ink = col[i]
         if depth:
             zz = z[i, 0] + (z[i, 1] - z[i, 0]) * ((along + h) / (length[i] + 2.0 * h))
             hit &= ~(zz < zb[rows, cols])
             zb[rows, cols] = np.where(hit, zz, zb[rows, cols])
-        pm[rows, cols] = np.where(hit[..., None], col[i], pm[rows, cols])
+            ink = _fogged(ink, zz, fog)
+        pm[rows, cols] = np.where(hit[..., None], ink, pm[rows, cols])
         al[rows, cols] = np.where(hit, 1.0, al[rows, cols])
 
 
@@ -310,7 +329,7 @@ def _shade(base, n0, n1, n2, look):
                      base[2] * k + look[5] * spec], axis=-1)
 
 
-def _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm):
+def _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm, fog=None):
     """``_outline`` in numpy: one shifted comparison per offset in the disc."""
     rows = slice(sr0 - ext0, sr0 - ext0 + hs)
     core = zb[rows]
@@ -328,10 +347,12 @@ def _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm):
             q = zb[np.clip(ys - ext0, 0, zb.shape[0] - 1)][:, np.clip(xs, 0, ws - 1)]
             edge |= okr[:, None] & okc[None, :] & (q < core - otau)
     edge &= core != -np.inf
-    pm[rows] = np.where(edge[..., None], ocol, pm[rows])
+    # the ink fades with the surface it is drawn over
+    ink = ocol if fog is None else _fogged(ocol, np.where(edge, core, 0.0), fog)
+    pm[rows] = np.where(edge[..., None], ink, pm[rows])
 
 
-def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out):
+def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None):
     """Rows ``r0`` to ``r1`` of ``out``: each primitive's per-sample
     expressions, evaluated over its whole box at once."""
     hs, ws, sr0 = (r1 - r0) * s, frame.width * s, r0 * s
@@ -379,7 +400,7 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out):
             ring = np.minimum(np.abs(u0), np.minimum(np.abs(u1), np.abs(u2))) < look[8]
             ink = col + look[10] * (1.0 - col) if atom_lum[i] < look[9] else col * look[11]
             col = np.where(ring[..., None], ink, col)
-        col = np.minimum(np.maximum(col, 0.0), 1.0)
+        col = _fogged(np.minimum(np.maximum(col, 0.0), 1.0), z, fog)
         zb[rows, cols] = np.where(hit, z, zb[rows, cols])
         pm[rows, cols] = np.where(hit[..., None], col, pm[rows, cols])
         al[rows, cols] = np.where(hit, 1.0, al[rows, cols])
@@ -413,14 +434,14 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out):
         n2 = q2 + z * f2
         nn = np.sqrt(n0 * n0 + n1 * n1 + n2 * n2)
         nn = np.where(hit, nn, 1.0)
-        col = np.minimum(np.maximum(_shade(half_col[i], n0 / nn, n1 / nn, n2 / nn, look),
-                                    0.0), 1.0)
+        col = _fogged(np.minimum(np.maximum(_shade(half_col[i], n0 / nn, n1 / nn, n2 / nn,
+                                                   look), 0.0), 1.0), z, fog)
         zb[rows, cols] = np.where(hit, z, zb[rows, cols])
         pm[rows, cols] = np.where(hit[..., None], col, pm[rows, cols])
         al[rows, cols] = np.where(hit, 1.0, al[rows, cols])
     if ow > 0:
-        _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm)
-    _flat_numpy(pk["line"], True, ext0, he, zb, pm, al)
+        _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm, fog)
+    _flat_numpy(pk["line"], True, ext0, he, zb, pm, al, fog)
     tri_v, tri_area, tri_tie, tri_col, tri_box = pk["tri"]
     for i in range(len(tri_v)):
         g = _grid(tri_box[i], ext0, he)
@@ -441,7 +462,8 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out):
         cols = slice(tri_box[i, 2], tri_box[i, 3])
         hit &= ~(z < zb[rows, cols])
         pm[rows, cols] = np.where(hit[..., None],
-                                  alpha * tri_col[i] + (1.0 - alpha) * pm[rows, cols],
+                                  alpha * _fogged(tri_col[i], z, fog)
+                                  + (1.0 - alpha) * pm[rows, cols],
                                   pm[rows, cols])
         al[rows, cols] = np.where(hit, alpha + (1.0 - alpha) * al[rows, cols], al[rows, cols])
     _flat_numpy(pk["text"], False, ext0, he, zb, pm, al)
@@ -469,13 +491,19 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out):
 
 def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
          background=(1.0, 1.0, 1.0), text: list | None = None,
-         outline: tuple | None = None) -> np.ndarray:
+         outline: tuple | None = None, fog: tuple | None = None) -> np.ndarray:
     """The picture, ``frame.height × frame.width × 4`` ``uint8``, straight alpha.
 
     ``background`` is three channels in 0..1, or ``None`` for transparent.
     ``text`` is strokes drawn over everything: ``((u0, v0, u1, v1), half-width,
     colour)`` in image pixels.  ``outline`` is ``(radius in image pixels,
-    depth step in Å, colour)``, or ``None``.
+    depth step in Å, colour)``, or ``None``.  ``fog`` is ``(z_start, z_end,
+    f_max, colour)`` in view coordinates (:func:`_fogged`), or ``None``.
+
+    A fogged picture is drawn by the numpy path whichever path the process
+    runs, until the wheel carries a kernel that fogs (WP-1548): the wheel's
+    ``render_rows`` has no fog argument, and an old kernel handed one would
+    draw without it.
     """
     s = int(supersample)
     pk = _pack(scene, rotation, frame, s, text)
@@ -486,11 +514,19 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
         ow = max(1, round(outline[0] * s))
         otau, ocol = float(outline[1]), np.asarray(outline[2], dtype=np.float64)
     rows = max(1, BAND_SAMPLES // (frame.width * s * s))
-    kernel = _kernel("render_rows")
+    if fog is not None:
+        z_start, z_end, f_max, colour = fog
+        if not z_start > z_end:
+            raise ValueError(f"fog starts at z = {z_start!r}, which is not in front of "
+                             f"where it ends, z = {z_end!r}")
+        fog = (float(z_start), float(z_end), float(f_max),
+               np.asarray(colour, dtype=np.float64))
+    kernel = None if fog is not None else _kernel("render_rows")
     if kernel is None:
+        cue = {} if fog is None else {"fog": fog}
         for r0 in range(0, frame.height, rows):
             _band_numpy(r0, min(frame.height, r0 + rows), s, frame, pk, POLY_ALPHA,
-                        background, (ow, otau, ocol), out)
+                        background, (ow, otau, ocol), out, **cue)
         return out
     bg = None if background is None else np.asarray(background, dtype=np.float64)
     args = (s, frame.height, frame.x0, frame.y0, frame.ppa * s, frame.width, pk["look"],
