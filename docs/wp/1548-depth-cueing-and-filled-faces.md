@@ -202,10 +202,17 @@ visual questions. Bring each with a picture:
   bit-identical to today. *(2026-11-12: `raster.draw(fog=(z_start, z_end,
   f_max, colour))`, every depth-tested path; a fogged call runs numpy on
   either tier until the wheel has a kernel that fogs, see the next item.)*
-- [ ] The compiled kernel: `render_rows_cued` in `kernels/src/raster.rs`,
+- [x] The compiled kernel: `render_rows_cued` in `kernels/src/raster.rs`,
   bit-identical to the numpy path, shipped as rietx-kernels 1.5.0
   (`docs/RELEASING.md` § The kernel wheel). The floor rises and `draw` stops
   taking the numpy path for fog only once the maintainer publishes it.
+  *(2026-11-12, the maintainer's ruling: kernel and floor in this WP, the PR
+  waits for the publish. `render_rows` and `render_rows_cued` share one
+  checker and one `Option<Fog>` path, so 1.4's kernel is unchanged; the
+  floor is 1.5 and the pin `>=1.5,<2`. Held to `_band_numpy`'s bits in every
+  arm, banded and whole; built locally with maturin. **Not on PyPI yet**, so
+  a fresh `.[dev]` install and CI fail to resolve until `kernels-v1.5.0` is
+  tagged from `main`.)*
 - [x] Fog in `gl3d.ts`, and the parity case with fog on. *(2026-11-12:
   `scene.fog_span`/`fogSpan` twins held equal by 8 corpus cases; a FOG
   chunk in all four fragment shaders, clamping before it blends as the

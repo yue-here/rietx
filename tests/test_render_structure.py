@@ -331,12 +331,15 @@ def _general_ellipsoid() -> dict:
 @pytest.mark.parametrize("kw", [
     {"mode": "ball", "polyhedra": True, "atom_labels": True},
     {"mode": "ellipsoid", "background": None, "outline": True},
-])
+    {"mode": "ball", "polyhedra": True, "atom_labels": True, "outline": True,
+     "depth_cue": True},
+], ids=["ball", "ellipsoid", "cued"])
 def test_the_two_paths_draw_the_same_bits_in_any_banding(nac, kw, monkeypatch):
     """The wheel's kernel and its numpy oracle call no library function, so
     the bar between them is the bit (D1).  A band boundary moves nothing on
     either path: the outline reads across one through its halo.  The numpy
-    half runs without the wheel too."""
+    half runs without the wheel too.  A depth-cued picture is the wheel's
+    ``render_rows_cued`` on the compiled side (WP-1548)."""
     images = {}
     was = compiled.set_enabled(False)
     try:
@@ -646,8 +649,17 @@ def test_fog_blends_each_copy_of_an_atom_by_its_own_depth(path, monkeypatch):
     a sample becomes mix(colour, fog colour, f).  A ball's centre sample is
     its front, at z = centre + radius, so each copy's expected pixel follows
     from the unfogged picture and its own depth, to the rounding of two
-    8-bit images."""
+    8-bit images.  The compiled row draws with the wheel's
+    ``render_rows_cued`` wherever the wheel loaded, never the numpy band."""
     monkeypatch.setattr(compiled, "_ENABLED", path)
+    numpy_bands = []
+    band = raster._band_numpy
+
+    def counted(*a, **kw):
+        numpy_bands.append(a[:2])
+        band(*a, **kw)
+
+    monkeypatch.setattr(raster, "_band_numpy", counted)
     scene, centres = _near_and_far()
     R = np.eye(3)
     frame = render.gui_frame(scene, R, 240, 240, 240)
@@ -657,6 +669,7 @@ def test_fog_blends_each_copy_of_an_atom_by_its_own_depth(path, monkeypatch):
     fog = (fronts[0] + 0.5, fronts[1] - 0.5, 0.8, fog_colour)
     bare = raster.draw(scene, R, frame, supersample=1)
     cued = raster.draw(scene, R, frame, supersample=1, fog=fog)
+    assert bool(numpy_bands) == (not (path and compiled.available()))
     OUTPUT.mkdir(parents=True, exist_ok=True)
     _png(OUTPUT / "fog_near_far_off.png", bare, None)
     _png(OUTPUT / "fog_near_far_on.png", cued, None)

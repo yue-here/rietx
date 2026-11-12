@@ -21,7 +21,8 @@ GUI draws on an opaque canvas.
 
 **Two paths, one picture.**  The wheel's ``render_rows``
 (``kernels/src/raster.rs``, ``rietx-kernels`` from 1.1.0) draws a band of rows,
-and the bands spread over the compiled tier's shared pool.  :func:`_band_numpy`
+and the bands spread over the compiled tier's shared pool; a fogged picture
+calls its twin ``render_rows_cued`` (from 1.5.0, WP-1548) the same way.  :func:`_band_numpy`
 is the same arithmetic vectorised over each primitive's box.  It is the oracle
 the kernel is held to, and the path wherever the wheel did not load.  Neither
 calls a library function: ``sqrt`` is an IEEE operation, the specular power is
@@ -500,10 +501,10 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
     depth step in Å, colour)``, or ``None``.  ``fog`` is ``(z_start, z_end,
     f_max, colour)`` in view coordinates (:func:`_fogged`), or ``None``.
 
-    A fogged picture is drawn by the numpy path whichever path the process
-    runs, until the wheel carries a kernel that fogs (WP-1548): the wheel's
-    ``render_rows`` has no fog argument, and an old kernel handed one would
-    draw without it.
+    Fog runs on whichever path the process runs: the wheel's
+    ``render_rows_cued`` (``rietx-kernels`` from 1.5.0, WP-1548) is
+    ``render_rows`` with the fog, held to :func:`_band_numpy`'s bits like it,
+    and a picture without fog calls ``render_rows`` as before.
     """
     s = int(supersample)
     pk = _pack(scene, rotation, frame, s, text)
@@ -520,8 +521,8 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
             raise ValueError(f"fog starts at z = {z_start!r}, which is not in front of "
                              f"where it ends, z = {z_end!r}")
         fog = (float(z_start), float(z_end), float(f_max),
-               np.asarray(colour, dtype=np.float64))
-    kernel = None if fog is not None else _kernel("render_rows")
+               np.ascontiguousarray(colour, dtype=np.float64))
+    kernel = _kernel("render_rows" if fog is None else "render_rows_cued")
     if kernel is None:
         cue = {} if fog is None else {"fog": fog}
         for r0 in range(0, frame.height, rows):
@@ -529,9 +530,10 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
                         background, (ow, otau, ocol), out, **cue)
         return out
     bg = None if background is None else np.asarray(background, dtype=np.float64)
+    # render_rows_cued takes the fog between the primitives and the picture
     args = (s, frame.height, frame.x0, frame.y0, frame.ppa * s, frame.width, pk["look"],
             POLY_ALPHA, bg, ow, otau, ocol, pk["atom"], pk["half"], pk["line"], pk["tri"],
-            pk["text"], out)
+            pk["text"], *(() if fog is None else fog), out)
     pool = compiled._pool()
     workers = compiled._POOL_WORKERS     # the pool's own count, as ``_spread`` reads it
     if workers <= 1:
