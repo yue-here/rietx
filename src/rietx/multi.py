@@ -47,6 +47,7 @@ from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
+    _joint_aux_counts,
     _joint_aux_paths,
     _longest_line_wavelength,
     _multi_closures,
@@ -2617,7 +2618,7 @@ class MultiHistogramRefinement:
             np.concatenate([m.y_obs for m in models]),
             np.concatenate(per_ycalc),
             np.concatenate([m.sigma for m in models]),
-            n_free=len(mt.free_paths) + len(_joint_aux_paths(models)),
+            n_free=len(mt.free_paths) + sum(_joint_aux_counts(models)),
             y_background=np.concatenate(per_ybkg))
         # the joint solve's convergence figure, copied and never derived
         # (WP-1341; ``_final_shift_over_esd_multi`` says why it is defined)
