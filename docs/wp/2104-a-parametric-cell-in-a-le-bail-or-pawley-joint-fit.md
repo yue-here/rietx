@@ -136,10 +136,15 @@ mode lands, this file says so, and 2108's second route waits on the Pawley arm.
   *Measured.* § Measured above holds the scaling table. Acceptance: twelve seeds of the
   ten-pattern ramp, mean z 0.20 (intercept, spread 0.65) and 0.13 (slope, spread 1.01),
   bar 0.5; the slow test ran in 109 s alone. Fast suite on main merged in (506289499),
-  `[dev]` venv, darwin/arm64, machine shared with other runners: FAST_COUNTS. Collected
+  `[dev]` venv, darwin/arm64, machine shared with other runners: 14 569 passed, 1 failed, 428 skipped, 32 xfailed in one 8:45 run. The
+  failure was the equation guide quoting the Rietveld form test's statistic
+  from before the review's form-test fix (9.3 now 9.4; 501.5 now 504.2; neither
+  verdict moves). The guide and its page now quote the new figures, and that
+  test passes alone. Collected
   fast items in the three touched files moved 411 → 421 (+10: four parametric-series
   tests, six cross-backend Pawley rows) and slow 22 → 23. Added-test times
-  (`tests.added_test_times`, local): ADDED_TIMES. `tests.reader_output` exit 0
+  (`tests.added_test_times`, local): 1.71 s over the five added or renamed tests, the slowest 0.81 s; none joins
+  the fast tier's slow tail. `tests.reader_output` exit 0
   (unchanged against the merge-base). Sphinx `-W` exit 0. Vale: no warning on a line
   this branch wrote. jax and torch rows not run locally (not installed); CI's jax job
   selects the `pawley` row.
