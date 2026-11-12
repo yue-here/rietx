@@ -176,7 +176,10 @@ def hump_curve(two_theta, position, height, fwhm, xp):
     **only** one: :meth:`rietx.model.forward.CompiledModel.background` calls it
     for the numpy path and, through ``get_backend()``, for every traced backend,
     so there is no twin to drift (``backend/traced.py``'s reason for existing,
-    satisfied by having nothing to copy).
+    satisfied by having nothing to copy).  Its derivative has a second spelling,
+    :func:`hump_partials`, which the numpy Jacobian reads.  A change to the form
+    here changes that function too, and a complex-step test in
+    ``tests/test_extra_components.py`` fails until it does.
 
     Empirical basis function, not a peak shape — see
     :class:`~rietx.schemas.instrument.HumpComponent` for the citation of the

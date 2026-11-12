@@ -654,12 +654,15 @@ def _state_extra_components_tied():
       column sums two humps' partials at two coefficients;
     * a named variable driving both positions, so the column is named by what
       it reaches rather than by a hump path;
-    * one hump's height driving the zero shift, a reach outside every
-      component, which must keep the whole-model FD column.
+    * one hump's height driving the zero shift and a P-spline coefficient,
+      a reach outside every component, which must keep the whole-model FD
+      column and still write that coefficient's penalty rows;
+    * a third hump's height set by an expression of a variable, so its
+      coefficient is a derived row's and moves with θ.
     """
     from rietx.schemas.instrument import (
         HUMP_FWHM_MIN,
-        BackgroundChebyshev,
+        BackgroundPSpline,
         HumpComponent,
     )
     from tests.test_coordinates import make_rutile
@@ -669,15 +672,17 @@ def _state_extra_components_tied():
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.source.dispersion = None    # declined, not inherited
     ins.profile.w.value = 8e-3
-    ins.background = BackgroundChebyshev.with_terms(3)
-    ins.background.coefficients[0].value = 20.0
+    ins.background = BackgroundPSpline.for_range(15.0, 90.0, knot_step_deg=8.0)
+    for k, coef in enumerate(ins.background.coefficients):
+        coef.value = 20.0 + 0.5 * k
     ins.extra_components = [
         HumpComponent(label=f"hump{k}",
                       position=Parameter(value=pos, unit="deg"),
                       height=Parameter(value=height, min=0.0, unit="counts"),
                       fwhm=Parameter(value=fwhm, min=HUMP_FWHM_MIN, unit="deg"))
         for k, (pos, height, fwhm) in enumerate(((34.0, 120.0, 9.0),
-                                                (54.0, 80.0, 14.0)))]
+                                                (54.0, 80.0, 14.0),
+                                                (74.0, 60.0, 10.0)))]
 
     grid = np.arange(15.0, 90.0, 0.02)
     empty = PatternData(two_theta=grid.tolist(),
@@ -699,7 +704,12 @@ def _state_extra_components_tied():
                   AffineTie(terms=((f"{h0}.fwhm", 1.5),), const=0.5))
     table.set_tie("instrument.zero_shift",
                   AffineTie(terms=((f"{h1}.height", 1e-4),), const=-0.008))
+    table.set_tie("instrument.background.c2",
+                  AffineTie(terms=((f"{h1}.height", 0.05),), const=17.0))
     table.refresh_ties()
+    table.add_parameter(f"{VAR_PREFIX}W", 60.0 ** 0.5, vary=True, lo=0.0)
+    table.add_expression("instrument.extra_components.2.height", "W^2",
+                         variables={"W": f"{VAR_PREFIX}W"})
     for path in ("phases.0.scale", "instrument.background.c0",
                  f"{h0}.height", f"{h0}.fwhm", f"{h1}.height"):
         assert table.set_vary([path], True), path
@@ -2327,9 +2337,10 @@ def test_every_fd_column_meets_a_converged_oracle(config, monkeypatch):
 
     Measured on 2026-10-21 (macOS arm64, ``[dev]``): every column but two
     within 2.0e-5 of the oracle, most within 1.3e-6 (the cell).  The two are
-    the whole-model fallback on ``extra_peak``'s background-peak centre,
-    2.3e-4 (the oracle agrees with itself to 2.4e-10), and the SRM 660c
-    state's extinction, 2.5e-4 against an oracle good to 2.6e-4.
+    ``extra_peak``'s background-peak centre, 2.3e-4 (the oracle agrees with
+    itself to 2.4e-10), and the SRM 660c state's extinction, 2.5e-4 against an
+    oracle good to 2.6e-4.  The centre was then the whole-model fallback.
+    Since WP-2116 it differences the peak curve alone, at the same step.
 
     Made to fail on 2026-10-21: ``FD_STEP`` patched to 1e-4 failed 13 of the
     23 configs, ``extra_peak`` among them.

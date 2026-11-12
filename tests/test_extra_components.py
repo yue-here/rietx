@@ -479,6 +479,37 @@ def test_a_peak_column_is_exactly_zero_on_every_row_below_the_data():
     assert np.any(jac[n_data:, free.index("instrument.background.c3")])
 
 
+@pytest.mark.parametrize("follower", [PEAK_PATHS[1], "instrument.zero_shift"])
+def test_a_tied_background_column_keeps_its_penalty_rows(follower):
+    """A background coefficient whose tie reaches past the linear block.
+
+    Its column takes the whole-model FD, since no closed form sees the whole
+    reach.  That difference writes the data rows only, and the coefficient
+    also moves its own P-spline penalty rows, which are linear in it.  So the
+    fallback writes those rows exactly, from the penalty matrix.  Left at
+    zero they were short (WP-1070's failure): found in WP-2116's review, for
+    a hump's height and for the zero shift alike, and older than either.
+    """
+    coef = "instrument.background.c3"
+    _s, _i, _d, table, model = _state(
+        peaks=(_peak(vary=False),),
+        background=BackgroundPSpline.for_range(15.0, 110.0, knot_step_deg=8.0),
+        free=(coef,))
+    table.set_vary(["*"], False)
+    assert table.set_vary([coef], True) == [coef]
+    table.set_tie(follower, AffineTie(terms=((coef, 1e-3),), const=0.0
+                                      if follower.endswith("zero_shift") else 400.0))
+    table.refresh_ties()
+    model = compile_model(_s, _i, _d, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    n_data, n_pen = len(model.tt), model.bkg_penalty.shape[0]
+    n = list(model.bkg_paths).index(coef)
+    assert np.any(model.bkg_penalty[:, n])
+    assert np.array_equal(jac[n_data:n_data + n_pen, 0], model.bkg_penalty[:, n])
+
+
 def test_the_residual_sees_the_peak():
     """A sanity floor under the Jacobian tests: the term reaches the residual."""
     _s, _i, _d, table, model = _state(peaks=(_peak(),))

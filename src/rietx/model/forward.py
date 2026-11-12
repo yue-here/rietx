@@ -2958,14 +2958,15 @@ class CompiledModel:
         # is the class of bug WP-1070 filed — a column that comes back
         # **short** rather than raising).
         #
-        # Short is exactly what does not happen on any of those routes, and
-        # that is checkable rather than hopeful: each writes ``J[:n_data, c]``
-        # only, and a component parameter's derivative on every row below the
-        # data block is *identically* zero — the P-spline penalty rows are
-        # w·D₂·c in the background *coefficients*, the Pawley rows are in the
-        # intensity block, and a restraint row is a function of coordinates
-        # and cell.  So the rows left at their zero initialisation are the
-        # rows whose true value is zero.
+        # Short is what the component routes cannot be, and that is checkable
+        # rather than hopeful: each writes ``J[:n_data, c]`` only, and a
+        # component parameter's derivative on every row below the data block
+        # is *identically* zero — the P-spline penalty rows are w·D₂·c in the
+        # background *coefficients*, the Pawley rows are in the intensity
+        # block, and a restraint row is a function of coordinates and cell.
+        # A tie can carry a column onto a background coefficient as well,
+        # and then the whole-model FD writes that coefficient's penalty rows
+        # from the penalty matrix (``bkg_part`` in ``_make_jacobian``).
         if path.startswith("instrument.extra_components."):
             return False
         # A *declared sharp peak* widens what two instrument names reach, and

@@ -1264,7 +1264,7 @@ def fd_step(theta_c: float, typical: float = 1.0) -> float:
     ``FD_STEP · max(typical, |θ_c|)``: relative to the coordinate's size, and
     absolute at ``typical`` near zero (Dennis & Schnabel 1996, *Numerical
     Methods for Unconstrained Optimization and Nonlinear Equations*, SIAM,
-    § 5.4).  Both FD sites call it, so one rule sizes every column, and
+    § 5.4).  Every FD site calls it, so one rule sizes every column, and
     :func:`_fd_typicals` says what ``typical`` is.
     """
     return FD_STEP * max(typical, abs(theta_c))
@@ -2222,6 +2222,17 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                          for q in (path, *extra)])
                if all(q in bkg_cols for q in (path, *extra)) else None
                for c, (path, extra, _) in enumerate(identities)]
+    # The background coefficients a column moves when it also moves something
+    # else, so the whole-model FD below can write their penalty rows.  Those
+    # rows are linear in the coefficients, so they are written exactly from
+    # the penalty matrix.  The FD writes the data rows alone, and a column
+    # reaching a P-spline coefficient through a tie came back short on its
+    # penalty rows before WP-2116's review found it.
+    bkg_part = [None if bkg_mix[c] is not None or not any(
+                    q in bkg_cols for q in (path, *extra))
+                else np.array([[bkg_cols[q], coef_c[table._paths[q], c]]
+                               for q in (path, *extra) if q in bkg_cols])
+                for c, (path, extra, _) in enumerate(identities)]
 
     typicals = _fd_typicals(table, identities)
     hump_reach, peak_cols = _component_columns(model, table, identities)
@@ -2345,7 +2356,10 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
             # A hump moves no penalty, Pawley or restraint row, so the rows
             # below the data stay at their zero initialisation, which is
             # their true value.
-            lj = table.local_jacobian(np.asarray(theta_t, dtype=np.float64)).tocsc()
+            # C itself unless a derived row (an expression) sets a hump field,
+            # whose coefficient then moves with θ
+            lj = (coef_c if not table.derived else table.local_jacobian(
+                np.asarray(theta_t, dtype=np.float64)).tocsc())
             partials: dict[int, tuple[np.ndarray, ...]] = {}
             for c in hump_cols:
                 col = np.zeros(n_data, dtype=np.float64)
@@ -2377,9 +2391,11 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
         if fd_cols:
             # The declared fallback, for every column no branch above claims:
             # an unrecognised path, a column whose tie reaches past its
-            # branch, an aperture column off its smooth side.  Writing only
-            # ``[:n_data]`` is exact for each of them by the reach argument in
-            # ``scalar_chain_supported``.  Each column costs one whole-model
+            # branch, an aperture column off its smooth side.  The difference
+            # covers the data rows.  A background coefficient in the reach
+            # adds its penalty rows, exactly, from ``bkg_part``.  The restraint
+            # and origin rows are written below for every column, and no
+            # table column moves a Pawley row.  Each column costs one whole-model
             # evaluation, every Bragg window included, plus ``r0``.  That cost
             # is why the extra components left this loop (WP-2116): on
             # acridine form IX at the closing windows, a free hump's three
@@ -2392,6 +2408,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 tp[c] += h
                 rp = sqrt_w * (model.y_obs - model.evaluate(table.decode(tp), intens))
                 J[:n_data, c] = (rp - r0) / h
+                if n_bkg_pen and bkg_part[c] is not None:
+                    n, w = bkg_part[c][:, 0].astype(np.intp), bkg_part[c][:, 1]
+                    J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
 
         if model.pawley is not None:
             _pawley_intensity_columns(model, get_bases(), values, sqrt_w, J,

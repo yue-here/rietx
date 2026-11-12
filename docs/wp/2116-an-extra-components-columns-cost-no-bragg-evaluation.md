@@ -75,7 +75,8 @@ body's default plan.
 
 - [x] Compute the hump's three columns from the component, keeping the whole-model route for any tie reaching outside it.
   Done 2026-11-12: `background.models.hump_partials` is the closed form, and `least_squares._component_columns` gates it on the column's whole reach. A tie between two humps or a named variable driving one keeps the closed form, through the local Jacobian's coefficients. A tie reaching any other path keeps the whole-model FD. The sibling member, a declared sharp peak, now differences `extra_peak_curve` alone, at the same step.
-- [ ] Reuse `r0` where the spelling allows it, or record why not.
+- [x] Reuse `r0` where the spelling allows it, or record why not.
+  Recorded why not, 2026-11-12. The spelling would allow it: `rows._data_rows` builds the data rows as the fallback does, from the same Le Bail snapshot. But `r0` is computed only when some column still takes the whole-model FD, and after task 2 a hump fit has none. Measured on acridine IX, the fallback ran in 0 of 84 Jacobians (336 Bragg evaluations before). On the other four fixtures it ran once in total (cpd-1a's `axial_sl`, task 1's table). A cache would share mutable state between the residual and Jacobian closures to save one evaluation in that one call. Settled by Claude under the smallest-change rule; reopen if a common fit is measured paying `r0`.
 - [x] A cross-backend row, and a test that the component columns match the whole-model FD column to the bar the step allows.
   Done 2026-11-12: the `extra_components_tied` row in `tests/test_cross_backend.py` (two tied humps, a variable, a hump driving the zero shift), and five tests in `tests/test_extra_components.py`. The closed form meets a complex-step derivative to 1e-14 of each column's scale, and the whole-model FD at 0.50 of a bar measured from the step.
 - [x] Rewrite the "not worth writing" comment with the measurement.
