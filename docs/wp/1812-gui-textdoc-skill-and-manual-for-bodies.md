@@ -23,6 +23,28 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 
 ### Inherited
 
+- **2026-11-12, from the issue triage (issue #1508): the manual owes a line
+  on rings in a Z-matrix body.** A Z-matrix is a spanning tree, so a bond
+  that closes a ring is no line of it and no internal controls it.
+  Refining a tree bond of the ring moves the closing bond and the ring
+  angles, and the refined value depends on which tree the user declared.
+  *Checked against the tree at `a86dcf9d4`* with `from_zmatrix` on a regular
+  six-ring declared as the chain 0-1-2-3-4-5 (bonds 1.39 Å, angles 120°,
+  dihedrals 0°): raising bond 0-1 to 1.43 Å moves the closing bond 5-0 to
+  1.37044 Å (−0.0196) and the angle 1-0-5 to 118.552° (−1.45°), and leaves
+  the other four tree bonds at 1.39. The issue's numbers reproduce. The
+  reporter's proposed line, for the Z-matrix part of the Part 1 chapter:
+  "A ring in a Z-matrix body is described by a spanning tree. The bonds
+  that close the ring are not internals. Refining a tree bond of the ring
+  also moves the closing bond and the ring angles. If the closing bond must
+  stay near a value, restrain that atom pair." **It is untrue until
+  WP-1814's Z-matrix bodies land**: on `a86dcf9d4` no internal refines, and
+  PR #1510 (WP-1814 chunk C1, open) gives a Z-matrix body no structural
+  restraint refusal, which is what makes the restraint advice hold. So the
+  line lands with or after WP-1814's Z-matrix chunk, and WP-1814's
+  acceptance test records the tree it used (the reporter's plan on the
+  issue).
+
 - **2026-11-06, from the issue triage (issue #1417): the manual owes a
   paragraph on where a body's origin goes. Ruled by Yue, 2026-11-07: docs
   only.** A body's origin is the point it turns about.
@@ -96,6 +118,8 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 - [ ] Manual: Part 1 chapter, Part 2 frame section
 - [ ] Manual: the origin paragraph in the Part 1 chapter (issue #1417, Ruled by
       Yue 2026-11-07; Inherited)
+- [ ] Manual: the ring line for Z-matrix bodies (issue #1508; Inherited),
+      once WP-1814's Z-matrix bodies land
 - [ ] GUI: a body shown in the parameter and structure panels
 
 ## Acceptance

@@ -159,6 +159,51 @@ npm --prefix gui test
 - CLAUDE.md: site-symmetry DOF and ADP conventions; instrument ⊕ sample
   split (calibrate/freeze/refine).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**Import and model editing** (WP-1014, `src/rietx/gui/imports.py`,
+`gui/src/panels/Model.svelte`, `gui/src/lib/{model,wizard}.ts`) is how data gets
+*in* from a browser and how the model is edited once it is. Its founding rule is a
+split: **if the parameter table has the path, the parameter table owns it** — a
+cell edge, an occupancy, a Biso, a profile term, a coordinate DOF go through
+`PATCH /api/params`, where the tie/lock/mode/bound rules already live, while a
+species, a label, an atom added or removed, a geometry, a wavelength or a
+background family go as a whole validated model, because each changes what the
+table *contains*. Coordinates are therefore never typed as x/y/z (they are affine
+ties onto `…dof.k`); the editor offers the DOFs, so a site-symmetry violation is
+unrepresentable rather than refused, and a fully fixed special position gets no
+coordinate control at all — `GET /api/structure`'s **`sites` arm** is what says
+which is which, deliberately without the Wyckoff letter (spglib per atom on a
+route that refetches on every head move). Uploads are **two-phase** — a file is
+staged and read before anything is created, and only an opaque token crosses back,
+never a path — and they are the one route family whose body is not JSON (raw
+bytes; filename and reader options in the query string, `UPLOAD_ROUTES`). Two
+previews are judgements rather than descriptions: a pattern names the *reader*
+that claimed it in the reader's own words, and a CIF's `aniso_available` is
+**measured** by reading it a second time with `aniso=True`. A pattern preview
+also carries an `instrument_hint` — the anode and goniometer radius its header
+already states, matched **server-side** (`imports.suggest_instrument`) because
+deciding that 1.5418 Å is a Cu doublet is a physics judgement against the
+package's radiation table, and a client-side match would be a second copy of that
+table in TypeScript; a header whose name and wavelength disagree sends **null**,
+and the form is then left alone, because a wrong pre-fill looks like it was read.
+The scan picker splits the same way for a different reason: `scan_count` rides
+along in the preview's metadata from the read that already happened, while
+*labelling* the scans costs a second walk of the ranges, so it is its own route
+(`GET /api/upload/pattern/scans`) fetched when someone opens the control. `POST
+/api/structure/aniso` exists because both directions are physics
+(`AnisoU.isotropic` on, U_eq → Biso off). Three browser-only traps are recorded in
+code: `structuredClone` **throws on a Svelte 5 `$state` proxy** (use
+`lib/model.ts:clone`), a verb's refusal and a panel's load error **must not share
+one field** (the reload after a failed apply wiped it), and `axialWarning` stays
+silent on the S/L = H/L pair that is 0-and-held, because that is the shipped
+default and a warning on every fresh lab instrument is a warning nobody reads.
+
 ## Handover log
 
 - **2026-07-29** — created from the v1.0 GUI plan. Reader dispatch and the

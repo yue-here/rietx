@@ -1,8 +1,9 @@
 """The pattern at parameter values nobody has applied (WP-2125).
 
 ``POST /api/preview`` serves the Interactive tab's sliders: the calculated
-pattern, its background, each phase's contribution and the reflection ticks
-at values the person is dragging, with the Rwp there. **Nothing is written.**
+pattern, its background, each phase's contribution, the three residuals the
+curves route sends and the reflection ticks at values the person is dragging,
+with the Rwp there. **Nothing is written.**
 The project directory, the history and the refinement's models stay as they
 were; the values pass through the working table and the table is put back.
 
@@ -286,9 +287,18 @@ def evaluate(project, body: Any) -> Packed:
         # cost more than the curve itself on the fluorapatite example
         ticks, tick_hkl, _support = _tick_rows(model, project.refinement.structure,
                                                values, support=False)
+    # The three residuals the curves route sends (``viz.packed.curve_arrays``),
+    # so the residual pane under a preview draws the server's numbers. Δ/σ
+    # divides by the compile's own σ, the one the Rwp above is taken over, and
+    # the Σχ² is accumulated over every channel here, so a client drawing a
+    # subset of the channels still reads exact values (WP-2128).
+    raw = np.asarray(model.y_obs, dtype=np.float64) - y_calc
+    delta = raw / np.asarray(model.sigma, dtype=np.float64)
     arrays = {"two_theta": np.asarray(model.tt, dtype=np.float64),
               "y_calc": y_calc,
-              "y_background": np.asarray(y_bkg, dtype=np.float64)}
+              "y_background": np.asarray(y_bkg, dtype=np.float64),
+              "delta": delta, "delta_raw": raw,
+              "cumulative_chi2": np.cumsum(delta**2)}
     for ip, part in enumerate(parts):
         arrays[f"phase_{ip}"] = np.asarray(part, dtype=np.float64)
     header = {"evaluated": evaluated, "head": base.key[0], "rwp": stats.rwp,

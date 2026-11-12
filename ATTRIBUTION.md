@@ -349,19 +349,26 @@ they were built from. Their licence texts ship in the wheel and sdist as
 | uPlot | MIT | **Vendored** (WP-1461) — `src/rietx/viz/static/uPlot.iife.min.js` and `uPlot.min.css`, unmodified, with the licence beside them as `uPlot.LICENSE`. `npm run build` copies them from the exact pin in `gui/package.json` (`gui/scripts/vendor.py`), and `tests/test_gui_dist.py` holds the file's banner version equal to that pin. The page `viz.html.write_html` writes inlines the code with the licence as a comment beside it, because a written file leaves the package. |
 | svgcanvas (Zeno Zeng; canvas2svg, Gliffy Inc.) | MIT | **Vendored** (WP-1461) — `src/rietx/viz/static/svgcanvas.esm.js`, unmodified, with the licence beside it as `svgcanvas.LICENSE`, whose notice names both copyright holders. The charts' SVG export redraws each pane through it, loading it on the first export. `npm run build` copies it from the exact pin in `gui/package.json` (`gui/scripts/vendor.py`), records the version in `VENDORED.json` beside it, and `tests/test_gui_dist.py` holds that equal to the pin. The page `viz.html.write_html` writes inlines it with the licence as a comment. |
 
-## Fonts the manual serves
+## Fonts the manual and the GUI serve
 
 The manual carries its two faces rather than loading them from a font service
 (WP-2021), so they are redistributed: in the repository, on rietx.org and in the
-sdist, which carries `docs/`. They are not in the wheel. Both are unmodified
-Fontsource 5.3.0 builds, from npm, under `docs/docs/_static/fonts/`, each with
-its licence text beside it as the OFL requires. The landing page loads the same
-two faces from Google Fonts and redistributes nothing.
+sdist, which carries `docs/`. Both are unmodified Fontsource 5.3.0 builds, from
+npm, under `docs/docs/_static/fonts/`, each with its licence text beside it as
+the OFL requires. The landing page loads the same two faces from Google Fonts
+and redistributes nothing.
+
+The rebuilt GUI (`/next`, WP-2215) serves the same files, byte for byte, and a
+Greek-only subset of IBM Plex Sans for the Greek letters Instrument Sans lacks.
+They sit under `gui/src/next/static/fonts/` and are copied into the committed
+dist's `src/rietx/gui/static/fonts/`, so these three faces **are in the wheel**,
+each with its licence text beside it.
 
 | Face | License | Relationship |
 |---|---|---|
-| Instrument Sans (The Instrument Sans Project Authors) | SIL OFL 1.1 | **Redistributed** — the variable woff2 files, latin and latin-ext, upright and italic; licence `OFL-InstrumentSans.txt` |
-| IBM Plex Mono (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — regular, italic and semibold woff2 files, latin and latin-ext; licence `OFL-IBMPlexMono.txt` |
+| Instrument Sans (The Instrument Sans Project Authors) | SIL OFL 1.1 | **Redistributed** — the variable woff2 files, latin and latin-ext, upright and italic; licence `OFL-InstrumentSans.txt`. In the manual and the GUI |
+| IBM Plex Mono (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — regular, italic and semibold woff2 files, latin and latin-ext; licence `OFL-IBMPlexMono.txt`. In the manual and the GUI |
+| IBM Plex Sans (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — the Greek subset only, regular, medium and semibold woff2 files, unmodified from Fontsource's `@fontsource/ibm-plex-sans` 5.3.0 on npm (tarball sha256 `232592af20ae413026cc705fc9c104135fb760432fd710f06a02c39e062d3213`); licence `OFL-IBMPlexSans.txt`, the package's own `LICENSE`. In the GUI only |
 
 ## Data tables
 

@@ -2172,7 +2172,7 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # ``CellCandidate.n_search_unindexed`` and ``.unindexed_two_theta`` share,
     # WP-2042's ``RefinementResult.radiation`` 0.60, and WP-1419's
     # ``Phase.distortion_modes``, in the same number, and WP-1944's optional
-    # ``Phase.extinction`` 0.61.
+    # ``Phase.extinction`` 0.61, which WP-1419 C2's ``Phase.parent_cell`` shares.
     assert caps.schema_version == "0.61"
 
 

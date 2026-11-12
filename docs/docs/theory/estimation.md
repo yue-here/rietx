@@ -16,15 +16,14 @@ S(\theta) \;=\; \sum_i w_i \bigl(y_{\mathrm{obs},i}
 {source}`rietx.optimize.least_squares`
 
 minimised over the residual rows of {eq}`fm-rows` {cite}`rietveld1969`.
-Weights come from the data file's esd column whenever it is present;
+Weights come from the data file's esd column when it has one;
 Poisson $\sigma = \sqrt{\max(y, 1)}$ is only the fallback for bare counts.
 
-The Jacobian is assembled column by column, taking exact work wherever it
-exists: linear background columns, analytic peak-chain columns (everything
-flowing through per-peak position, width, mixing and intensity), analytic
+The Jacobian is assembled column by column, exact wherever it can be: linear background columns, analytic peak-chain columns (per-peak
+position, width, mixing and intensity), analytic
 site-DOF columns for coordinates and anisotropic ADPs over the frozen operator
-subsets, analytic columns for magnetic-moment moduli, analytic axial columns for the FCJ apertures, and plain forward
-differences as the fallback.
+subsets, analytic columns for magnetic-moment moduli, analytic axial columns for the FCJ apertures, and forward
+differences otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
 count {cite}`nocedal2006`; every backend is held to per-column agreement

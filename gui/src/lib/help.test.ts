@@ -232,10 +232,13 @@ describe("every key the app writes down names something", () => {
         .map((m) => `${rel}: ${m[1]}`));
     expect(interpolated.sort()).toEqual([
       "panels/Model.svelte: parameters:phases.*.cell.{edge}",
-      // the wizard's typed cell (WP-1206) draws only the parameters the setting
-      // leaves free, so its loop runs over names rather than all six edges
-      "panels/Model.svelte: parameters:phases.*.cell.{name}",
-      "panels/Model.svelte: reader_options:{opt.name}",
+      // the New project dialog's typed cell (WP-1206, WP-2131) draws only the
+      // parameters the setting leaves free, so its loop runs over names
+      "panels/NewProject.svelte: parameters:phases.*.cell.{name}",
+      "panels/NewProject.svelte: reader_options:{opt.name}",
+      "panels/Peaks.svelte: diagnostics:{d.code}",
+      // the indexing run's own diagnostics, said above the candidate list
+      // whatever it found (WP-2130), name their codes as the picker's do
       "panels/Peaks.svelte: diagnostics:{d.code}",
       "panels/Peaks.svelte: peak_flags:{f}",
       // the origin chip (WP-1209): `ObservedPeak.origin`'s Literal, keyed both
@@ -279,7 +282,6 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Console.svelte": 1,      // the event ring's size
     "panels/History.svelte": 4,      // node vocabulary — WP-1217
     "panels/Model.svelte": 3,        // the space-group box, two splitters
-    "panels/Params.svelte": 4,       // the table's own affordances
     // The add-at-2θ box, plus nine on the candidate and extinction tables.
     // **Unowned**, and deliberately not WP-1211's, which this line used to name:
     // 1211 drew a candidate's lines on the plot and added no `title=`, while
@@ -293,17 +295,23 @@ describe("`title=` is no longer how this app explains a name", () => {
     // docs/reference_pages.py `_VOCABULARIES`, the regenerated help_keys.json),
     // and a WP of its own.
     "panels/Peaks.svelte": 10,
-    "panels/Plan.svelte": 2,         // the reorder grip, correlation_guard
+    "panels/Plan.svelte": 7,         // the reorder handle, the two add fields, an unapplied
+                                     // stage, the closing stage, set-aside, correlation_guard
     "panels/Plot.svelte": 3,         // fit-range fields — WP-1212
     "panels/Report.svelte": 4,       // report statistics
     "panels/Series.svelte": 11,      // series settings and status chips
     "panels/Structure3D.svelte": 4,  // drawing thresholds, not physics
+    "next/Console.svelte": 1,        // the event ring's size, as panels/Console's
+    "next/Frame.svelte": 2,          // the two splitters' drag gesture
   };
 
   function markupFiles(): Array<[string, string]> {
+    // the rebuilt page's files too (WP-2215): the budget is per file, and a
+    // second page is not a way around it
     const files = ["App.svelte",
-                   ...readdirSync(`${SRC}panels`).filter((f) => f.endsWith(".svelte"))
-                     .sort().map((f) => `panels/${f}`)];
+                   ...["panels", "next"].flatMap((dir) =>
+                     readdirSync(`${SRC}${dir}`).filter((f) => f.endsWith(".svelte"))
+                       .sort().map((f) => `${dir}/${f}`))];
     return files.map((rel) => [rel, readFileSync(`${SRC}${rel}`, "utf-8")]);
   }
 
