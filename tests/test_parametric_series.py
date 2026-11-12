@@ -1682,6 +1682,38 @@ def test_a_pawley_joint_fit_shares_a_parametric_cell():
         "PAWLEY_OVERLAP_UNRESOLVED", "PAWLEY_OFF_DATA_RIDGED"}
 
 
+def test_a_pawley_joint_stage_drops_what_it_cannot_fit(monkeypatch):
+    """A plan that frees scales and atoms under ``mode="pawley"`` runs without
+    them, the single runner's drop (``_joint_mode_fixed``).  The default
+    Pawley plan frees neither, so this stage names them to make the drop fire."""
+    from rietx import multi
+    from rietx.strategy.staged import RefinementPlan
+
+    dropped: list[str] = []
+    real = multi._joint_mode_fixed
+
+    def spy(mtable, mode):
+        out = real(mtable, mode)
+        dropped.extend(out)
+        return out
+
+    monkeypatch.setattr(multi, "_joint_mode_fixed", spy)
+    from tests.test_sequential import _start_models
+
+    patterns, coords, equation, _ = pawley_ramp(3, tt_max=10.0)
+    s, ins = _start_models()
+    ref = _Probe(s, [ins] * 3, sharing=_RAMP_SHARING, coordinates=coords,
+                 parametric=[equation])
+    plan = RefinementPlan(stages=[Stage(name="all", turn_on=[
+        "vars.*", "*phases.*.scale", "*phases.*.atoms.*.biso"])])
+    result = ref.fit(patterns, mode="pawley", plan=plan, telemetry=False)
+    assert any(p.endswith(".scale") for p in dropped), dropped
+    assert any(".atoms." in p for p in dropped), dropped
+    freed = result.stages[-1].freed
+    assert "vars.a_1" in freed
+    assert not [p for p in freed if p.endswith(".scale") or ".atoms." in p]
+
+
 def test_a_pawley_joint_step_on_blocks_is_the_dense_one():
     """The intensity blocks are each histogram's own columns of the arrow
     (``optimize/blocked.py``), so the blocked solve lands where the dense one
