@@ -440,7 +440,7 @@
   function readColors() {
     const style = getComputedStyle(document.documentElement);
     const read = (name: string) => style.getPropertyValue(name);
-    return { ...curveColors(read), warn: read("--warn").trim() || "#b7791f",
+    return { ...curveColors(read), warn: read("--warn").trim() || "#7d5f00",
              fg: read("--fg").trim() || "#222222" };
   }
   let colors = readColors();
@@ -589,7 +589,9 @@
     legend = trajectoryLegend(traj, marks, trace);
     figKind = "trajectory";
     fig = chart.mountTrajectory(plotNode, traj, {
-      colors: () => ({ tone: colors.diff, warn: colors.warn, muted: colors.edge }),
+      // a refined value is data, so it wears the observed ink; the difference
+      // grey is the backward chain's `--muted` on the light theme (WP-2200)
+      colors: () => ({ tone: colors.obs, warn: colors.warn, muted: colors.edge }),
       ...marks,
       xLabel: traj.x_label,
       yLabel: axisTitle(traj),
@@ -1297,7 +1299,7 @@ different starting point could not fix">hard</span>
   }
 
   .nodes .kind {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   .strip li {

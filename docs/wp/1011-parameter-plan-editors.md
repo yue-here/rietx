@@ -249,6 +249,42 @@ instead`; `set_values` on `a` carrying `c` with it; one stage run through
 0.04153** (WP-1010's figure, unchanged); 13 rows coming back with esds; and
 `ui.simple` surviving a `Project.open`.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **editors** (WP-1011) are the parameter table and the plan editor, and their
+logic is in `gui/src/lib/` as pure functions (`table.ts`, `fnmatch.ts`,
+`palette.ts`) so it can be asserted without a DOM. Four rules. **The filter box
+is the selection**: a bulk free/fix sends the *glob*, because `set_vary` takes one
+and records **one** history node for it — a per-row multi-select would be N globs
+and N nodes — and `asGlob` wraps a bare word as `*word*` so the string previewed
+and the string sent are the same one. **A held row gets no vary checkbox at all**,
+with `held_because` as its tooltip and every reason it has drawn as its own
+mark (`mode_fixed` is not `locked`; five — WP-1214, and WP-1435's `held`). **A typed number is compared to the *rendered*
+value**, WP-1009's rule reused, so a cell showing `4.1568(2)` cannot truncate a
+parameter on a click-in/click-out. And the client's matcher is a **preview only**
+— it is `fnmatch.fnmatchcase` ported, held to Python by a committed corpus
+(`tests/test_gui_fnmatch.py` writes `tests/data/gui/fnmatch_cases.json` from the
+live parameter vocabulary; `fnmatch.test.ts` replays it), so a divergence is a
+wrong count, never the wrong parameters freed. **`JSON.parse` rejects Python's
+bare `Infinity`**, which `json.dumps` writes by default and every parameter row
+carries: `gui/server.py` spells non-finite floats as the schemas do
+(`ser_json_inf_nan="strings"`) on responses *and* SSE frames, and the client reads
+them back with `lib/table.ts`'s `num()`. jsdom lacks `ResizeObserver` (which
+`bind:clientHeight` compiles to, so its absence throws *during mount*);
+`gui/src/test-setup.ts` is the one place that gap is filled. jsdom lacks
+`DragEvent` too, so a drag test dispatches a plain `Event` (`App.test.ts`). It
+has no canvas either, and uPlot draws in its constructor, so `test-setup.ts`
+mocks `uplot` with `test-uplot.ts`'s `StubPlot`: uPlot's state, the chart
+module's hooks fired, and every stroke recorded with the style it was made in,
+so **a drawn colour is asserted from the record, never from the option handed
+in** (WP-1461). What uPlot paints from it is `tests/test_gui_browser.py`'s
+question.
+
 ## Handover log
 
 - **2026-07-29** — created from the v1.0 GUI plan.

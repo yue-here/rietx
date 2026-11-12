@@ -538,6 +538,30 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 ("rietx.crystallography.magnetic.isotropy.distortion_candidates",
                  "rietx.crystallography.magnetic.isotropy.DistortionCandidate"),
             ),
+            (
+                "The cell of a child, through its parent's",
+                "A child phase with `parent_cell` set (`rx.ParentCell`: the "
+                "parent's `space_group`, the parent → child `transform`, the "
+                "parent's `cell`, one `strain` per Γ strain the child's group "
+                "allows) refines the parent's cell under the parent's "
+                "constraints, and its own a, b, c, α, β, γ are derived and "
+                "locked: G′ = Pᵀ·(G_parent + 2·L·E·L)·P, E the dimensionless "
+                "Green–Lagrange strain in the parent's axes. "
+                "`magnetic_supercell` states a child this way wherever its "
+                "group names no tabulated type in the child's axes (a C-centred "
+                "type in a primitive doubled cell, refused before), and for "
+                "every child with `parent_cell=True`; `False` keeps the old "
+                "refusal. `phases.*.cell.*` frees the parent's edges, never a "
+                "strain: free `phases.*.parent_cell.strain.*` by name, and "
+                "seed it off zero first with `set_values`, since zero is a "
+                "stationary point while the child's atoms and moments keep "
+                "the parent's symmetry (a distortion gives the strain a small "
+                "gradient there). The sign of a strain the "
+                "parent's symmetry reverses is a domain; the sign of one it "
+                "does not (a tetragonal strain of a cubic parent) is physical.",
+                ("rietx.crystallography.magnetic.supercell.magnetic_supercell",
+                 "rx.ParentCell"),
+            ),
         ),
     ),
 }
@@ -552,7 +576,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: ``tests/api_surface_deferred.txt`` defers them from the manual (WP-1805: no
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
-    "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
+    "rx.Phase": frozenset({"rigid_bodies", "distortion_modes", "parent_cell"}),
     "rx.RefinementResult": frozenset({"distortion_totals"}),
     "rx.ParameterRow": frozenset({"body"}),
 }

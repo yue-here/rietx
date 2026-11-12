@@ -29,6 +29,7 @@
            type Slots } from "../lib/numslot";
   import { buildTree, triState, type AtomRow, type Group, type Line,
            type Section } from "../lib/paramtree";
+  import type { ParamsDraft } from "../lib/recovery";
   import { typesetSpaceGroup } from "../lib/spacegroup";
   import { asGlob, editState, heldGlyph, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
@@ -337,6 +338,33 @@
     picked = new Set();
     error = "";
     refusal = "";
+  }
+
+  /** The pending edits as plain data, for the recovery copy (WP-2209), or
+   *  `null` when nothing is pending.  Reading the six maps here is what lets
+   *  the shell's writer follow every change, a retyped value included. */
+  export function draft(): ParamsDraft | null {
+    const all = [edits, varyEdits, holdEdits, limitEdits, restraintEdits, positionEdits];
+    if (all.every((m) => m.size === 0)) return null;
+    return {
+      edits: Object.fromEntries(edits),
+      vary: Object.fromEntries(varyEdits),
+      hold: Object.fromEntries(holdEdits),
+      limits: Object.fromEntries(limitEdits),
+      restraints: Object.fromEntries(restraintEdits),
+      positions: Object.fromEntries(positionEdits),
+    };
+  }
+
+  /** Put recovered edits back as pending edits, in place of any on screen. */
+  export function restoreDraft(d: ParamsDraft) {
+    closeEditor(false);
+    edits = new Map(Object.entries(d.edits ?? {}));
+    varyEdits = new Map(Object.entries(d.vary ?? {}));
+    holdEdits = new Map(Object.entries(d.hold ?? {}));
+    limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
+    restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
+    positionEdits = new Map(Object.entries(d.positions ?? {}));
   }
 
   export function focusFilter() {

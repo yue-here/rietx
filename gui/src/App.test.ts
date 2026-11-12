@@ -734,8 +734,8 @@ const MASKED_CURVES = {
 /** The theme's plot inks as `curveColors` falls back to them: jsdom loads no
  *  stylesheet, so these are what the panel paints with here. */
 const INK = {
-  obs: "#8a8a8a", calc: "#c23b22", diff: "#1f5fa8", mask: "#1b1b1b14", edge: "#6b6b66",
-  peak: "#8c257e", peakfit: "#c158b0", candidate: "#1a8f45",
+  obs: "#1c1917", calc: "#c65d0a", diff: "#6b6259", mask: "#1c191714", edge: "#6b6259",
+  peak: "#0072b2", peakfit: "#6f83e6", candidate: "#1a8f45",
   phase: ["#009e73", "#cc79a7"],
 };
 
@@ -1448,7 +1448,7 @@ describe("the plan editor", () => {
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
 
-    const put = stub.calls.find((call) => call.method === "PUT");
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.path).toBe("/api/plan");
     expect(put?.body).toEqual({ preset: "profile_only" });
   });
@@ -1504,7 +1504,7 @@ describe("the plan editor", () => {
 
     bar("Apply")!.click();
     await flush();
-    const put = stub.calls.find((call) => call.method === "PUT");
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.body.plan.stages.map((s: any) => s.name)).toEqual(["cell", "scale+bkg"]);
     expect(put?.body.plan.correlation_guard).toBe(0.98);
   });
@@ -1517,7 +1517,7 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(3);
     expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
       .toBe("stage 3");
-    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add")[2];
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add:not(.fix)")[2];
     add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
     add.dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -1536,6 +1536,90 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(1);
     expect(host.querySelector<HTMLButtonElement>(
       'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
+  });
+
+  it("fixes in a stage: a row of its own, stored as turn_off, undone by ⌘Z", async () => {
+    // WP-2208: a stage fixes its turn_off after it frees its turn_on
+    const stub = await openPlan(PROJECT, {
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+    });
+    const second = () => host.querySelector("ol.stages > li.stage:nth-child(2)")!;
+    // a stage that fixes nothing has no Fixes row, as in the workshop
+    // prototype; `+ Fix` opens one and puts the cursor in its field
+    expect(second().querySelector(".fixing")).toBeNull();
+    const open = [...second().querySelectorAll<HTMLButtonElement>(".frees button.ghost")]
+      .find((b) => b.textContent?.trim() === "+ Fix")!;
+    open.click();
+    await flush();
+    const row = second().querySelector(".fixing")!;
+    expect(row.textContent).toContain("Fixes");
+    expect(row.querySelectorAll(".chip")).toHaveLength(0);
+    // opening a row is no edit
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    const fix = second().querySelector<HTMLInputElement>("input.add.fix")!;
+    expect(document.activeElement).toBe(fix);
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...second().querySelectorAll(".fixing .chip")].map((n) => n.textContent))
+      .toEqual(["instrument.profile.*"]);
+    // the frees row is untouched, and the stage has lost its resolved facts
+    expect([...second().querySelectorAll(".frees:not(.fixing) .chip")]
+      .map((n) => n.textContent)).toEqual(["phases.*.cell.*"]);
+    expect(summaries()[1]).toBe("not applied");
+
+    // the open row has no `+ Fix` beside the frees any more
+    expect([...second().querySelectorAll(".frees button")].map((b) => b.textContent?.trim()))
+      .not.toContain("+ Fix");
+
+    // ⌘Z takes the fix back, and the plan is the stored one again
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(second().querySelectorAll(".fixing .chip")).toHaveLength(0);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // typed again and applied: the PUT carries the fix
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    bar("Apply")!.click();
+    await flush();
+    // by path: the recovery copy (WP-2209) is a PUT too, sent on a 500 ms timer,
+    // so on a slow machine it lands before Apply's
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
+    expect(put?.body.plan.stages[1].turn_off).toEqual(["instrument.profile.*"]);
+    expect(put?.body.plan.stages[1].turn_on).toEqual(["phases.*.cell.*"]);
+  });
+
+  it("counts what a stage fixed in its rung and in the closing stage", async () => {
+    const resolve = structuredClone(PLAN_RESOLVE) as any;
+    resolve.stages[1].turn_off = ["instrument.zero_shift"];
+    resolve.stages[1].fixes = ["instrument.zero_shift"];
+    resolve.closing = { name: "closing", window_area_tol: 0.001,
+                        fixes: ["instrument.zero_shift"], rwp: 0.44 };
+    const plan = structuredClone(PLAN) as any;
+    plan.plan.stages[1].turn_off = ["instrument.zero_shift"];
+    await openPlan(PROJECT, {
+      "/api/plan": () => ({ body: plan }),
+      "/api/plan/resolve": () => ({ body: resolve }),
+    });
+    expect(summaries()[1]).toContain("+1 −1 → 3 free");
+    // a stored fix draws its row with no `+ Fix` press
+    expect([...host.querySelectorAll("ol.stages > li.stage:nth-child(2) .fixing .chip")]
+      .map((n) => n.textContent)).toEqual(["instrument.zero_shift"]);
+    expect(host.querySelector("ol.stages > li.stage:nth-child(1) .fixing")).toBeNull();
+    const body = host.querySelector("ol.stages > li.stage:nth-child(2) .rung .body")!;
+    expect(body.textContent).toContain("fixed here");
+    expect(body.textContent).toContain("instrument.zero_shift");
+    expect(host.querySelector("li.closing")!.textContent!.replace(/\s+/g, " "))
+      .toContain("keeps 1 fixed");
   });
 });
 
@@ -2042,7 +2126,7 @@ describe("disclosure and the command palette", () => {
       expect(ink("main", 1)).toBe("#112233");
       expect(ink("resid", 1)).toBe(INK.diff);
       // …and the zero line under the residual, in a token of its own
-      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#88888888"))
+      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#cfcfcf"))
         .toBe(true);
 
       const fetched = curvesFetched(stub);
@@ -2393,10 +2477,10 @@ describe("the text pane", () => {
     });
     await typeInto(TEXTDOC_MOVED);
     expect(host.textContent).toContain("edited");
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);  // still debouncing
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);  // still debouncing
 
     await settle();
-    const put = stub.calls.find((call) => call.method === "PUT")!;
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/textdoc")!;
     expect(put.body).toEqual({ text: TEXTDOC_MOVED, base_revision: "r1", validate_only: true });
     expect(host.textContent).toContain("ready to apply");
   });
@@ -2417,7 +2501,8 @@ describe("the text pane", () => {
     button("Apply ⌘⏎")!.click();
     await flush();
 
-    const applied = stub.calls.filter((c) => c.method === "PUT" && !c.body.validate_only);
+    const applied = stub.calls.filter(
+      (c) => c.method === "PUT" && c.path === "/api/textdoc" && !c.body.validate_only);
     expect(applied).toHaveLength(1);
     expect(applied[0].body.base_revision).toBe("r1");
     // the same verbs a form calls, so the console reads the same either way
@@ -2539,7 +2624,7 @@ describe("the text pane", () => {
     // no validate is even attempted: the server would answer RUN_IN_FLIGHT, and
     // the state refusal outranking a parse complaint is only useful if the pane
     // does not ask a question it knows the answer to
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);
     expect((button("Apply ⌘⏎") as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -4951,6 +5036,46 @@ describe("the peaks tab (WP-1027)", () => {
     expect(host.querySelector<HTMLElement>(".rx-ring")!.style.borderColor).toBe(probe.style.color);
   });
 
+  it("clips every layer it draws to the plot area, at a zoom that cuts one", async () => {
+    // the report (WP-2200): zoomed into a peak, the peak fit's dashes ran left
+    // of the y axis into its gutter. uPlot clips its own series and leaves a
+    // hook's strokes alone, so every layer is held to the pane's plot area.
+    const withGroups = {
+      ...PEAKS_PAYLOAD,
+      groups: [{ two_theta: [8.5, 9.5, 10.5], y_fit: [1, 5, 1], delta: [0, 0, 0] }],
+    };
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/result/curves": fitCurves({
+        two_theta: [3, 6, 9, 9.4, 10, 12, 14, 18, 23.995], y_obs: [1, 2, 1, 2, 5, 3, 4, 1, 1],
+        header: { ticks: { NAC: [9.1, 12], CaF2: [9.3] } } }),
+      "/api/peaks": () => ({ body: withGroups }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await dragOver(9, 14);
+
+    const box = (u: StubPlot) => [u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height];
+    /** Every pane's strokes and fills beyond uPlot's own series, each under its pane's clip. */
+    const unclipped = () => (["main", "ticks", "resid"] as const).flatMap((key) =>
+      pane(key).marks.filter((m) => m.op !== "series" && JSON.stringify(m.clip) !== JSON.stringify(box(pane(key))))
+        .map((m) => `${key} ${m.op} ${m.style}`));
+    // the model's view: the tick rows and the residual's zero line
+    expect(tickInks().length).toBeGreaterThan(0);
+    expect(pane("resid").marks.some((m) => m.op === "stroke")).toBe(true);
+    expect(unclipped()).toEqual([]);
+
+    button("Peaks")!.click();
+    await flush();
+    const main = pane("main");
+    const fit = main.marks.find((m) => m.op === "stroke" && m.style === INK.peakfit)!;
+    // the zoom cut the group: its first point is left of the plot area
+    expect(fit.points!.some(([x]) => x < main.bbox.left)).toBe(true);
+    expect(main.marks.some((m) => m.style === INK.peak)).toBe(true);
+    expect(unclipped()).toEqual([]);
+  });
+
   it("clears the plot to the data and puts back what was there before", async () => {
     // "an easy way to hide everything except the data" — and the way back is
     // the state the plot was in, not everything on: a user who had already
@@ -5576,7 +5701,7 @@ describe("the series panel", () => {
   }
 
   /** `--warn` as the panel falls back to it: jsdom loads no stylesheet. */
-  const WARN = "#b7791f";
+  const WARN = "#7d5f00";
 
   /** The panel's icon buttons, which have no label to search by. */
   function icons(glyph: string): HTMLButtonElement[] {
@@ -5631,7 +5756,7 @@ describe("the series panel", () => {
     expect(icons("↑")[0].disabled).toBe(true);
     icons("↑")[0].click();
     await flush();
-    expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
+    expect(stub.calls.some((c) => c.method === "PUT" && c.path === "/api/series")).toBe(false);
   });
 
   it("puts the forward/backward gap where it cannot be missed", async () => {
@@ -5694,7 +5819,7 @@ describe("the series panel", () => {
     // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.obs).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
     expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);
@@ -5906,7 +6031,7 @@ describe("the series panel", () => {
     carry.value = "phases.* instrument.zero_shift";
     carry.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
-    const put = stub.calls.filter((c) => c.method === "PUT").at(-1);
+    const put = stub.calls.filter((c) => c.method === "PUT" && c.path === "/api/series").at(-1);
     expect(put?.body.carry).toEqual(["phases.*", "instrument.zero_shift"]);
   });
 });
@@ -6419,5 +6544,162 @@ describe("the Interactive tab (WP-2128)", () => {
     await flush();
     // the two-channel fixture has no ticks, so the graph says why it is empty
     expect(host.textContent).toContain("No fitted peaks to frame yet.");
+  });
+});
+
+describe("unapplied edits kept across a close (WP-2209)", () => {
+  const KEPT_PARAMS = { edits: { "phases.0.cell.a": "4.2" }, vary: {}, hold: {}, limits: {},
+                        restraints: {}, positions: {} };
+  const KEPT = { count: 1, params: KEPT_PARAMS, interactive: null, plan: null };
+  const wait = async (ms = 600) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await flush();
+  };
+  const recoveryPuts = (stub: { calls: Call[] }) =>
+    stub.calls.filter((c) => c.path === "/api/recovery" && c.method === "PUT");
+  const dialog = () => document.querySelector<HTMLElement>(".rc-dialog");
+  function kept(answer: unknown) {
+    return { "/api/recovery": (call: Call) => ({ body: call.method === "GET" ? answer : {} }) };
+  }
+
+  it("offers the kept edits on open, and Restore puts them back as pending", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: "2026-11-10T09:05:00+00:00", head: "n0000", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
+    expect(dialog()?.textContent).not.toContain("since");
+
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    // the server holds exactly these, so nothing is written until they change
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("says when the project has moved since, and Discard deletes the copy", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: null, head: "n0099", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.textContent).toContain(
+      "The project has been refined or edited since. Restored values will replace the current ones.");
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Discard")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(recoveryPuts(stub).map((c) => c.body))
+      .toEqual([{ project: "/tmp/lab6.rex", head: null, draft: null }]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+  });
+
+  it("closes on Escape keeping the copy, and offers it again at the next open", async () => {
+    // the maintainer's ruling of 2026-11-10: Escape restores nothing,
+    // discards nothing, and the offer returns when the project next opens
+    const stub = server({
+      ...boot(), ...kept({ draft: KEPT, saved_utc: null, head: "n0000", head_now: "n0000" }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/lab6.rex", name: "lab6.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: PROJECT }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeTruthy();
+    const cancels = stub.calls.filter((c) => c.path === "/api/cancel").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(dialog()).toBeNull();
+    // nothing restored, and the shell's Escape never heard it
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    expect(stub.calls.filter((c) => c.path === "/api/cancel")).toHaveLength(cancels);
+    // an edit made meanwhile never overwrites the copy set aside
+    await editValue("phases.0.cell.a", "4.3");
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "lab6")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("keeps an edit as it is made, and deletes the copy once it is reverted", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeNull();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(recoveryPuts(stub)).toEqual([]);   // half a second after the last change
+    await wait();
+    const [first] = recoveryPuts(stub);
+    expect(first.body.project).toBe("/tmp/lab6.rex");
+    expect(first.body.head).toBe("n0000");
+    expect(first.body.draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+
+    button("Revert")!.click();
+    await wait();
+    expect(recoveryPuts(stub).map((c) => c.body.draft)).toEqual([first.body.draft, null]);
+  });
+
+  it("leaves the pending edits behind as the project's copy when it closes", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }),
+                          "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/close": () => ({ body: { closed: "/tmp/lab6.rex" } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    host.querySelector<HTMLButtonElement>("header .fm-name")!.click();
+    await flush();
+    [...host.querySelectorAll<HTMLButtonElement>(".fm-menu button.item")]
+      .find((b) => b.querySelector(".label")?.textContent === "Close project")!.click();
+    await flush();
+    // written at once, not half a second later
+    expect(recoveryPuts(stub)).toHaveLength(1);
+    await wait();
+    expect(host.querySelector(".start")).toBeTruthy();
+    // and never followed by a delete as the panels empty
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts).toHaveLength(1);
+    expect(puts[0].project).toBe("/tmp/lab6.rex");
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+  });
+
+  it("opens another project with no pending edit carried over", async () => {
+    const other = { ...PROJECT, path: "/tmp/nac.rex",
+                    data: { ...PROJECT.data, filename: "nac.fxye" } };
+    const stub = server({
+      ...boot(), ...kept({ draft: null }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: other }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(host.textContent).toContain("nac.fxye");
+    // one project's pending value is never the next project's Apply
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
   });
 });

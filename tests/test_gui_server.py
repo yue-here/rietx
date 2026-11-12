@@ -405,6 +405,19 @@ def test_the_built_app_is_served_and_plotly_is_not(blank):
     assert client.get("/assets/nope.js")[0] == 404
 
 
+def test_the_rebuilt_page_is_served_beside_todays(blank):
+    """`/next` serves the rebuild's page (WP-2215) and `/` stays today's."""
+    _, client = blank
+    for path in ("/next", "/next/"):
+        status, payload = client.get(path)
+        assert status == 200
+        assert 'src="/assets/next.js"' in payload["raw"]
+        assert "/assets/app.js" not in payload["raw"]
+    assert 'src="/assets/app.js"' in client.get("/")[1]["raw"]
+    assert client.get("/assets/next.js")[0] == 200
+    assert client.get("/assets/next.css")[0] == 200
+
+
 def test_the_placeholder_explains_itself_when_the_dist_is_absent(blank, tmp_path,
                                                                 monkeypatch):
     """A checkout without the built assets must still say what is going on."""
@@ -2182,6 +2195,32 @@ def test_plan_resolve_is_the_ladder_a_cumulative_plan_climbs(blank, tmp_path,
     assert all(h["held_because"] for h in cell["held"])
     tied = next(h for h in cell["held"] if h["path"] == "phases.0.cell.b")
     assert tied["held_because"].startswith("tied: =")
+
+
+def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
+    """A stage's ``turn_off`` (WP-2208): ``fixes`` names the free paths it took,
+    the free count falls by them, and the buckets still partition the frees."""
+    session, client = blank
+    _open(session, tmp_path / "fixes.rex", pattern_file)
+    plan = {"stages": [
+        {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
+                                    "instrument.zero_shift"]},
+        {"name": "two", "turn_on": ["phases.*.cell.*"],
+         "turn_off": ["instrument.zero_shift"]}]}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
+    ladder = _ladder(client)
+    one, two = ladder["stages"]
+    # the closing stage keeps the fix, as a literal path
+    assert ladder["closing"]["fixes"] == ["instrument.zero_shift"]
+    assert one["fixes"] == [] and "instrument.zero_shift" in one["frees"]
+    assert two["fixes"] == ["instrument.zero_shift"]
+    assert two["turn_off"] == ["instrument.zero_shift"]
+    assert two["n_free"] == one["n_free"] + len(two["frees"]) - 1
+    for stage in (one, two):
+        assert (len(stage["frees"]) + len(stage["already"]) + len(stage["held"])
+                == stage["n_matched"]), stage["name"]
 
 
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,

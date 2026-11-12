@@ -700,9 +700,9 @@ def test_the_only_colours_the_page_still_declares_are_the_ten_variant_hues():
     hues at one lightness and chroma cannot clear the 0.13 floor those five
     were chosen for.  Inventing a ten-colour palette is a WP of its own.
 
-    One other, and it is not a colour this page chose: `#fff` is the ink on a
-    filled accent button, which `app.css` writes the same way and for the same
-    reason — it is white in both themes.
+    The `#fff` that inked the filled button left with WP-2200: white on the
+    orange accent is 2.06:1 on the dark theme, so the button takes `app.css`'s
+    `--accent-ink` fill and `--panel` ink.
     """
     script = (compare_app.STATIC_DIR / "compare.mjs").read_text(encoding="utf-8")
     variant_hues = set(re.findall(r'"(#[0-9a-fA-F]{6})"',
@@ -713,7 +713,7 @@ def test_the_only_colours_the_page_still_declares_are_the_ten_variant_hues():
     for name in compare_app.STATIC_FILES:
         found |= set(literal.findall(
             (compare_app.STATIC_DIR / name).read_text(encoding="utf-8")))
-    assert found - variant_hues == {"#fff"}, sorted(found - variant_hues)
+    assert found - variant_hues == set(), sorted(found - variant_hues)
 
 
 def test_server_runs_caches_and_reports(server):

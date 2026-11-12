@@ -1,0 +1,3950 @@
+{
+ "counts": {
+  "codes_total": 74,
+  "codes_in_refine_py": 69,
+  "codes_outside_refine_py": 5,
+  "raise_sites": 78,
+  "codes_by_level": {
+   "warning": 50,
+   "info": 16,
+   "computed: 'warning' if low else 'info'": 1,
+   "computed: 'warning' if bound else 'info'": 1,
+   "computed: 'warning' if worst >= DISPERSION_NEGLECT_SEVERE else 'info'": 1,
+   "computed: 'warning' if implausible else 'info'": 1,
+   "computed: 'info' if reason == 'converged' else 'warning'": 1,
+   "error": 1,
+   "computed: 'warning' if worst >= RESONANT_ABSORBER_SEVERE_BARN else 'info'": 1,
+   "info/warning": 1
+  },
+  "codes_by_kind": {
+   "the data settle it": 59,
+   "the data can rank it": 4,
+   "the data cannot settle it": 11
+  },
+  "codes_by_audit_tier": {
+   "unaudited": 64,
+   "3": 2,
+   "1": 8
+  },
+  "codes_on_unaudited_baseline": 64,
+  "codes_with_a_suggestion_site": 71,
+  "codes_no_test_names": 0,
+  "named_constants_read": 39,
+  "literals_total": 34,
+  "literals_by_role": {
+   "arithmetic": 8,
+   "count": 3,
+   "listing cap": 3,
+   "numerical floor": 3,
+   "threshold": 5,
+   "unit": 12
+  }
+ },
+ "codes": [
+  {
+   "name": "ABSORPTION_ESTIMATE_UNAVAILABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8850",
+     "function": "_absorption_diagnostics",
+     "level": "warning",
+     "guards": [
+      "record.skipped is not None"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "CYLINDER_MU_R_MAX": {
+     "row": "rietx.model.absorption.CYLINDER_MU_R_MAX",
+     "tier": "2",
+     "value": 1.0
+    },
+    "FLAT_PLATE_BIAS_MIN": {
+     "row": "rietx.refine.FLAT_PLATE_BIAS_MIN",
+     "tier": "unaudited",
+     "value": 0.05
+    }
+   },
+   "explanation": "You gave a specimen radius or thickness, but the package could not estimate the absorption from it.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_absorption.py",
+     "tests/test_neutron_cw.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "A capillary radius or plate thickness was declared and the absorption estimate recorded why it was skipped (`record.skipped`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "ABSORPTION_MU_R_OUT_OF_RANGE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8863",
+     "function": "_absorption_diagnostics",
+     "level": "warning",
+     "guards": [
+      "record.out_of_range"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "CYLINDER_MU_R_MAX": {
+     "row": "rietx.model.absorption.CYLINDER_MU_R_MAX",
+     "tier": "2",
+     "value": 1.0
+    },
+    "FLAT_PLATE_BIAS_MIN": {
+     "row": "rietx.refine.FLAT_PLATE_BIAS_MIN",
+     "tier": "unaudited",
+     "value": 0.05
+    }
+   },
+   "explanation": "The estimated absorption of the capillary lies beyond the range of the published fit used to correct it.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_absorption.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "The estimated µR lies past `CYLINDER_MU_R_MAX`, the end of the published fit the capillary correction uses.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The published fit's range is a fact about the correction, not a judgement about the data."
+  },
+  {
+   "name": "ABSORPTION_PLATE_THICKNESS",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8890",
+     "function": "_absorption_diagnostics",
+     "level": "info",
+     "guards": [
+      "record.method == 'flat_plate_transmission' and record.intensity_fraction_of_optimal is not None and (record.intensity_fraction_of_optimal < 0.7)"
+     ],
+     "suggestion": false
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "CYLINDER_MU_R_MAX": {
+     "row": "rietx.model.absorption.CYLINDER_MU_R_MAX",
+     "tier": "2",
+     "value": 1.0
+    },
+    "FLAT_PLATE_BIAS_MIN": {
+     "row": "rietx.refine.FLAT_PLATE_BIAS_MIN",
+     "tier": "unaudited",
+     "value": 0.05
+    }
+   },
+   "explanation": "A transmission plate gives the most counts at one thickness, set by its absorption.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": null,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_flat_plate.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "Under `flat_plate_transmission`, the declared thickness gives under 0.7 of the counts the optimal thickness would (the inline literal 0.7).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The fraction of the optimal counts is arithmetic on the declared µt; the threshold decides only when it is said, and the code suggests nothing.",
+   "note": "Gated by an inline literal (0.7), one of the two the WP names."
+  },
+  {
+   "name": "ABSORPTION_THICKNESS_MATTERS",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8878",
+     "function": "_absorption_diagnostics",
+     "level": "info",
+     "guards": [
+      "flat and abs(record.equivalent_delta_biso) > FLAT_PLATE_BIAS_MIN"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "CYLINDER_MU_R_MAX": {
+     "row": "rietx.model.absorption.CYLINDER_MU_R_MAX",
+     "tier": "2",
+     "value": 1.0
+    },
+    "FLAT_PLATE_BIAS_MIN": {
+     "row": "rietx.refine.FLAT_PLATE_BIAS_MIN",
+     "tier": "unaudited",
+     "value": 0.05
+    }
+   },
+   "explanation": "For a flat specimen the absorption correction depends on the thickness you declared.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_flat_plate.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "Under a flat-plate geometry, the declared thickness moves the equivalent Biso by more than `FLAT_PLATE_BIAS_MIN`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The equivalent ΔBiso is arithmetic on the declared µt; the threshold decides only when it is said."
+  },
+  {
+   "name": "ADP_NOT_POSITIVE_DEFINITE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7476",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A refined anisotropic displacement tensor has a negative eigenvalue, so it does not describe an ellipsoid.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_aniso_adp.py",
+     "tests/test_capabilities.py",
+     "tests/test_structure3d.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "A refined anisotropic displacement tensor has a negative eigenvalue (`staged.check_adp_positive_definite`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Raised from a guard finding; its test is in `strategy/staged.py` (WP-2002's walk)."
+  },
+  {
+   "name": "AIR_SCATTER_UNDECLARED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10788",
+     "function": "_air_scatter_undeclared_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (model.bkg_penalty is None or any((p.endswith('background.air') for p in model.bkg_paths)))",
+      "not (not (total > 0.0 and stats.chi2 > 0.0))",
+      "not (not (norm > 0.0 and lean > 0.0))",
+      "not (fraction < AIR_SCATTER_UNDECLARED_FRACTION or removed / stats.chi2 < AIR_SCATTER_UNDECLARED_SCORE)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "AIR_SCATTER_UNDECLARED_FRACTION": {
+     "row": "rietx.refine.AIR_SCATTER_UNDECLARED_FRACTION",
+     "tier": "unaudited",
+     "value": 0.005
+    },
+    "AIR_SCATTER_UNDECLARED_SCORE": {
+     "row": "rietx.refine.AIR_SCATTER_UNDECLARED_SCORE",
+     "tier": "unaudited",
+     "value": 25.0
+    }
+   },
+   "explanation": "The spline background declares no term for air scatter.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_air_scatter_undeclared.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "A spline background with no air-scatter term, where a 1/(2θ) column would remove at least `AIR_SCATTER_UNDECLARED_FRACTION` of χ² at a score of at least `AIR_SCATTER_UNDECLARED_SCORE`.",
+   "kind": 2,
+   "kind_name": "the data can rank it",
+   "kind_reason": "Issue #1215 names a second explanation, a background too stiff at the low edge; the alternatives are enumerable and a refit scores each, while the code names one.",
+   "note": "Issue #1215 (in the WP's Inherited): fires on 20/20 clean synthetic patterns under the P-spline, by the issue's count."
+  },
+  {
+   "name": "BACKGROUND_ABSORPTION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7596",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The background is flexible enough to reproduce most of the effect of a structural parameter, such as a scale or a displacement parameter.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/eval_skill_placement/runner.py",
+     "tests/eval_skill_placement/test_placement.py",
+     "tests/test_background_auto.py",
+     "tests/test_background_measured.py",
+     "tests/test_capabilities.py",
+     "tests/test_extra_components.py",
+     "tests/test_report_apply.py"
+    ],
+    "test_functions": 8
+   },
+   "condition": "The projection R² of a structural column onto the background span exceeds `staged.BACKGROUND_ABSORPTION_GUARD` (0.25).",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Whether a given overlap biases the quantity the caller wants depends on the purpose, which the pattern does not carry.",
+   "note": "Threshold in `strategy/staged.py` (WP-2002's walk), unaudited there."
+  },
+  {
+   "name": "BACKGROUND_ORDER_AT_CAP",
+   "sites": [
+    {
+     "where": "src/rietx/background/select.py:186",
+     "function": "select_chebyshev_order",
+     "level": "info",
+     "guards": [
+      "not (m < max_order * 4)",
+      "not stopped and best.complexity == max_order"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "CHEBYSHEV_MAX_ORDER": {
+     "row": "rietx.background.select.CHEBYSHEV_MAX_ORDER",
+     "tier": "3",
+     "value": 16
+    },
+    "DW_STOP": {
+     "row": "rietx.background.select.DW_STOP",
+     "tier": "3",
+     "value": 1.8
+    },
+    "PEAK_MASK_BASELINE_LAMBDA": {
+     "row": "rietx.background.select.PEAK_MASK_BASELINE_LAMBDA",
+     "tier": "3",
+     "value": 10000000.0
+    },
+    "PEAK_MASK_SIGMA": {
+     "row": "rietx.background.select.PEAK_MASK_SIGMA",
+     "tier": "3",
+     "value": 3.0,
+     "via": "peak_mask"
+    }
+   },
+   "explanation": "The scan for the Chebyshev order reached its largest allowed order.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_background_auto.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "The Chebyshev order scan ended at `CHEBYSHEV_MAX_ORDER` without its Durbin-Watson stop firing.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "BISO_NEGATIVE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7561",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A refined isotropic displacement parameter is below zero.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_srm1976a_texture.py",
+     "tests/test_distortion_totals.py",
+     "tests/test_file_biso_bounds.py",
+     "tests/test_joint_report.py",
+     "tests/test_magnetic_series.py",
+     "tests/test_walking_bounds.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 11
+   },
+   "condition": "A refined isotropic displacement parameter is below zero (`staged.check_biso_negative`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Raised from a guard finding in `strategy/staged.py`."
+  },
+  {
+   "name": "BISO_UNUSUALLY_LARGE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7549",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A refined isotropic displacement parameter exceeds the amplitude at which a solid with this cell would melt.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_file_biso_bounds.py",
+     "tests/test_issue_900_restated_bound.py",
+     "tests/test_joint_report.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "A refined Biso exceeds the Lindemann melting amplitude for the cell (`staged.LINDEMANN_RHO`).",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Static disorder or a wrong site can exceed the thermal bound in a sound model; which one holds is a fact about the sample.",
+   "note": "Raised from a guard finding; `LINDEMANN_RHO` is tier 2 there."
+  },
+  {
+   "name": "BOUND_HIT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7468",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (finding.code == 'FLOOR_HIT')"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The refined value finished on its minimum or maximum, and the data were pushing it further.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/api_surface.py",
+     "tests/silence.py",
+     "tests/test_absent_phase.py",
+     "tests/test_bound_hit_at_convergence.py",
+     "tests/test_capabilities.py",
+     "tests/test_data_support.py",
+     "tests/test_diagnostics_summary.py",
+     "tests/test_display.py",
+     "tests/test_docs_consistency.py",
+     "tests/test_held_phase.py",
+     "tests/test_help.py",
+     "tests/test_high_correlation_dedup.py",
+     "tests/test_multi_histogram.py",
+     "tests/test_named_variables.py",
+     "tests/test_result_rows.py",
+     "tests/test_site_twins_merged.py",
+     "tests/test_strain_cap.py",
+     "tests/test_suite_alarms.py",
+     "tests/test_summary_levels.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 50
+   },
+   "condition": "A refined value finished on a declared limit that carried load (`staged.bound_findings`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Its tests are `staged.BOUND_HIT_*`, tiered in WP-2002's walk."
+  },
+  {
+   "name": "BRINDLEY_OUTSIDE_REGIME",
+   "sites": [
+    {
+     "where": "src/rietx/optimize/qpa.py:348",
+     "function": "microabsorption_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (qpa.microabsorption_skipped is not None)",
+      "offenders"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "BRINDLEY_MU_R_FENCE": {
+     "row": "rietx.optimize.qpa.BRINDLEY_MU_R_FENCE",
+     "tier": "2",
+     "value": 0.05
+    }
+   },
+   "explanation": "A phase absorbs too strongly for the Brindley correction.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_qpa_roundrobin.py",
+     "tests/test_neutron_cw.py",
+     "tests/test_qpa.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "A phase's µR exceeds `qpa.BRINDLEY_MU_R_FENCE`, the regime the Brindley correction was published for.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The regime is the correction's published range, a fact about the method."
+  },
+  {
+   "name": "CAPILLARY_OFFSET_UNAVAILABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8835",
+     "function": "_capillary_offset_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (model.geometry_kind != 'debye_scherrer')",
+      "not (not any((f'instrument.geometry.{name}' in locked for name in CAPILLARY_OFFSETS)))"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "The capillary geometry has no goniometer radius, so the specimen-offset aberrations cannot be modelled and are held at zero.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_diagnostics_geometry.py",
+     "tests/test_diagnostics_summary.py",
+     "tests/test_summary_levels.py"
+    ],
+    "test_functions": 13
+   },
+   "condition": "A capillary geometry carries no goniometer radius, so the specimen-offset terms are held at zero.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "CELL_DEGENERATE_PROBE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8007",
+     "function": "_degenerate_cell_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not hits)"
+     ],
+     "suggestion": false
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "During the cell search the optimiser tried trial cells with zero or negative volume.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": null,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_issue_283_cell_bounds.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "The solver tried at least one trial cell with zero or negative volume during the stage.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "CELL_RUNAWAY",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:2087",
+     "function": "_cell_runaway_diagnostic",
+     "level": "warning",
+     "guards": [
+      "not (not cell_runaway and (not unresolved))"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "CELL_SAFETY_ANGLE_DEG": {
+     "row": "rietx.params.vector.CELL_SAFETY_ANGLE_DEG",
+     "tier": "3",
+     "value": 6.0
+    },
+    "CELL_SAFETY_FRACTION": {
+     "row": "rietx.params.vector.CELL_SAFETY_FRACTION",
+     "tier": "3",
+     "value": 0.15
+    }
+   },
+   "explanation": "A free cell parameter left its safety window around the starting cell while the solver worked.",
+   "audit_row": {
+    "tier": "3",
+    "response": null,
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "3"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/skill_caps.py",
+     "tests/test_audit_delta.py",
+     "tests/test_cell_runaway_safety.py",
+     "tests/test_joint_report.py",
+     "tests/test_lebail_alternation.py",
+     "tests/test_multi_histogram.py",
+     "tests/test_non_finite_stage.py",
+     "tests/test_reported_rows_move.py",
+     "tests/test_skill_surface.py",
+     "tests/test_summary_levels.py"
+    ],
+    "test_functions": 24
+   },
+   "condition": "A free cell parameter left the window `CELL_SAFETY_FRACTION` / `CELL_SAFETY_ANGLE_DEG` around its starting value.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 3, approved); copied here, not re-judged."
+  },
+  {
+   "name": "CONSTRAINT_ACTIVE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7937",
+     "function": "_constraint_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not n)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "In the final stage the optimiser held some steps against a built-in inequality constraint.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_cross_backend.py",
+     "tests/test_gaussian_width_floor.py",
+     "tests/test_lorentzian_width_floor.py",
+     "tests/test_solver_seam.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "In the final stage the LM driver held at least one step against a built-in inequality (the Stephens cone or Γ_G² ≥ 1e-8).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "COVARIANCE_DIRECTION_DISCARDED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7539",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The data do not constrain one combination of several parameters.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_lab6_cbn.py",
+     "tests/test_discarded_direction.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "The covariance build discarded a direction several parameters share (`staged.check_discarded_directions`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "COVARIANCE_UNAVAILABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7977",
+     "function": "_covariance_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (error is None)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The solver returned, but the calculation of the esds raised an error afterwards.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_covariance_scaling.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "The solver returned and the esd calculation raised afterwards.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "DATA_SUPPORT_LOW",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10459",
+     "function": "_data_support_diagnostics",
+     "level": "computed: 'warning' if low else 'info'",
+     "guards": [
+      "ratio is not None and ratio < OBS_PER_PARAMETER_PREFERRED"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'warning' if low else 'info'"
+   ],
+   "constants_read": {
+    "OBS_PER_PARAMETER_MIN": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_MIN",
+     "tier": "unaudited",
+     "value": 3.0
+    },
+    "OBS_PER_PARAMETER_PREFERRED": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED",
+     "tier": "unaudited",
+     "value": 5.0
+    },
+    "STEPS_PER_FWHM_MIN": {
+     "row": "rietx.background.diagnostics.STEPS_PER_FWHM_MIN",
+     "tier": "2",
+     "value": 5.0
+    }
+   },
+   "explanation": "The number of independent reflections is low compared with the number of structural parameters refined.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_data_support.py",
+     "tests/test_summary_levels.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "Independent reflections per structural parameter fall below `OBS_PER_PARAMETER_PREFERRED` (info) or `OBS_PER_PARAMETER_MIN` (warning).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The count is arithmetic and the bands are quoted from the literature (CLAUDE.md, WP-1071); they set the level alone."
+  },
+  {
+   "name": "DECLARED_RANGE_NOT_RESTORED",
+   "sites": [
+    {
+     "where": "src/rietx/schemas/migrate.py:342",
+     "function": "_not_restored_note",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "An older release stored this parameter with no limits, because it was set by hand.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_project.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "An older file stored a hand-set parameter with no limits, and migration found no declared range to restore.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "DECLARED_RANGE_RESTORED",
+   "sites": [
+    {
+     "where": "src/rietx/schemas/migrate.py:324",
+     "function": "_restored_note",
+     "level": "computed: 'warning' if bound else 'info'",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'warning' if bound else 'info'"
+   ],
+   "constants_read": {},
+   "explanation": "An older release stored this parameter with no limits, because it was set by hand.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_project.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "An older file stored a hand-set parameter with no limits, and migration restored its declared range (a warning where the value sits on it).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "DISPERSION_NEGLECTED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9843",
+     "function": "_dispersion_diagnostics",
+     "level": "computed: 'warning' if worst >= DISPERSION_NEGLECT_SEVERE else 'info'",
+     "guards": [
+      "not (instrument.source.kind != 'xray_cw')",
+      "not (instrument.source.dispersion is not None)",
+      "not (not flagged)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'warning' if worst >= DISPERSION_NEGLECT_SEVERE else 'info'"
+   ],
+   "constants_read": {
+    "DISPERSION_NEGLECT_FRAC": {
+     "row": "rietx.refine.DISPERSION_NEGLECT_FRAC",
+     "tier": "unaudited",
+     "value": 0.02
+    },
+    "DISPERSION_NEGLECT_SEVERE": {
+     "row": "rietx.refine.DISPERSION_NEGLECT_SEVERE",
+     "tier": "unaudited",
+     "value": 0.05
+    }
+   },
+   "explanation": "The model has anomalous scattering turned off, yet at this wavelength it changes the scattering power of at least one element noticeably.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_absent_phase.py",
+     "tests/test_acceptance_dispersion.py",
+     "tests/test_compare_ui.py",
+     "tests/test_dispersion.py",
+     "tests/test_held_phase.py",
+     "tests/test_joint_xray_neutron.py",
+     "tests/test_multi_diagnostics.py",
+     "tests/test_neutron_cw.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 12
+   },
+   "condition": "Anomalous scattering is off, and |f|² at this wavelength differs from Z² by at least `DISPERSION_NEGLECT_FRAC` for some element (a warning from `DISPERSION_NEGLECT_SEVERE`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The relative change is arithmetic on tabulated f′ and f″; the thresholds set when and how loudly."
+  },
+  {
+   "name": "EXTRA_PEAK_NO_INTENSITY",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10409",
+     "function": "_extra_peak_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (not model.peak_components)",
+      "not (area <= 0.0 and area_path not in moving)",
+      "at_zero"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "BOUND_HIT_RTOL": {
+     "row": "rietx.strategy.staged.BOUND_HIT_RTOL",
+     "tier": "1",
+     "value": 1e-10
+    },
+    "LAYER0_MATCH_TOL_DEG": {
+     "row": "rietx.report.layer0.LAYER0_MATCH_TOL_DEG",
+     "tier": "unaudited",
+     "value": 0.08
+    }
+   },
+   "explanation": "The area of a declared peak finished at zero.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_extra_components.py",
+     "tests/test_skill.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "A declared extra peak's area finished on its zero floor (`BOUND_HIT_RTOL`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "EXTRA_PEAK_ON_REFLECTION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10423",
+     "function": "_extra_peak_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (not model.peak_components)",
+      "not (area <= 0.0 and area_path not in moving)",
+      "not (at_zero)",
+      "len(predicted_arr)",
+      "gap <= LAYER0_MATCH_TOL_DEG"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "BOUND_HIT_RTOL": {
+     "row": "rietx.strategy.staged.BOUND_HIT_RTOL",
+     "tier": "1",
+     "value": 1e-10
+    },
+    "LAYER0_MATCH_TOL_DEG": {
+     "row": "rietx.report.layer0.LAYER0_MATCH_TOL_DEG",
+     "tier": "unaudited",
+     "value": 0.08
+    }
+   },
+   "explanation": "A declared peak lies close enough to a reflection the model already predicts that the two describe one peak between them.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_extra_peaks.py",
+     "tests/test_extra_components.py",
+     "tests/test_skill.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "A declared extra peak lies within `LAYER0_MATCH_TOL_DEG` (0.08°) of a predicted reflection.",
+   "kind": 2,
+   "kind_name": "the data can rank it",
+   "kind_reason": "A duplicate of the reflection and an impurity line at nearly the same angle are both possible, and a refit with and without the peak scores them.",
+   "note": "The tolerance is a fixed angle, not a fraction of the local FWHM."
+  },
+  {
+   "name": "FLAT_DIRECTION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7529",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "Two parameters are correlated so completely that the data measure only one combination of them.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/eval_skill_placement/runner.py",
+     "tests/eval_skill_placement/test_placement.py",
+     "tests/test_background_auto.py",
+     "tests/test_capillary_displacement.py",
+     "tests/test_discarded_direction.py",
+     "tests/test_floating_origin.py",
+     "tests/test_magnetic.py",
+     "tests/test_resolved_correlation.py",
+     "tests/test_v02_core.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 19
+   },
+   "condition": "Two free parameters are correlated at or above `staged.FLAT_DIRECTION_RHO` (1 − 5e-4).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "`FLAT_DIRECTION_RHO` is tier 1 in WP-2002's walk."
+  },
+  {
+   "name": "FLOOR_HIT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7461",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [
+      "finding.code == 'FLOOR_HIT'"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A scale, a width or a similar quantity finished on its lower limit of zero, because the data push it lower than it can go.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": "warning",
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/api_surface.py",
+     "tests/silence.py",
+     "tests/test_absent_phase.py",
+     "tests/test_acceptance_lab6_cbn.py",
+     "tests/test_bound_hit_at_convergence.py",
+     "tests/test_data_support.py",
+     "tests/test_diagnostics_summary.py",
+     "tests/test_display.py",
+     "tests/test_held_phase.py",
+     "tests/test_multi_histogram.py",
+     "tests/test_parameter_interval.py",
+     "tests/test_planted_series.py",
+     "tests/test_result_rows.py",
+     "tests/test_suite_alarms.py",
+     "tests/test_summary_levels.py",
+     "tests/test_termination_view.py"
+    ],
+    "test_functions": 44
+   },
+   "condition": "A scale, width or similar quantity finished on its zero floor and the data push it lower (`staged.bound_findings`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "FROZEN_COMPILE_STALE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9624",
+     "function": "_frozen_compile_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not rel > FROZEN_COMPILE_CHI2_REL)"
+     ],
+     "suggestion": false
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "FROZEN_COMPILE_CHI2_REL": {
+     "row": "rietx.refine.FROZEN_COMPILE_CHI2_REL",
+     "tier": "unaudited",
+     "value": 0.01
+    }
+   },
+   "explanation": "The final stage fixes its peak windows at the values it started from.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": null,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_absent_phase.py",
+     "tests/test_joint_report.py",
+     "tests/test_multi_histogram.py",
+     "tests/test_result_reproduces_itself.py",
+     "tests/test_rigid_body_special.py"
+    ],
+    "test_functions": 8
+   },
+   "condition": "A fresh compile at the returned parameters changes χ² by more than `FROZEN_COMPILE_CHI2_REL` of itself.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The relative change is measured directly; the threshold decides only when it is said."
+  },
+  {
+   "name": "HARMONIC_ABSENT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10091",
+     "function": "_harmonic_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (path not in free_paths)",
+      "frac < HARMONIC_ABSENT_FRAC"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "HARMONIC_ABSENT_FRAC": {
+     "row": "rietx.refine.HARMONIC_ABSENT_FRAC",
+     "tier": "unaudited",
+     "value": 0.001
+    },
+    "HARMONIC_IMPLAUSIBLE_FRAC": {
+     "row": "rietx.refine.HARMONIC_IMPLAUSIBLE_FRAC",
+     "tier": "unaudited",
+     "value": 0.15
+    }
+   },
+   "explanation": "A declared wavelength harmonic refined to a fraction indistinguishable from zero.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_harmonics.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "A declared harmonic's refined fraction is below `HARMONIC_ABSENT_FRAC`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "Whether a fraction is distinguishable from zero is a statistical question the data settle; the code answers it with a fixed fraction rather than the esd, which is the threshold's question for part 2.",
+   "note": "An absolute fraction, not a significance test."
+  },
+  {
+   "name": "HARMONIC_FRACTION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10099",
+     "function": "_harmonic_diagnostics",
+     "level": "computed: 'warning' if implausible else 'info'",
+     "guards": [
+      "not (path not in free_paths)",
+      "not (frac < HARMONIC_ABSENT_FRAC)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'warning' if implausible else 'info'"
+   ],
+   "constants_read": {
+    "HARMONIC_ABSENT_FRAC": {
+     "row": "rietx.refine.HARMONIC_ABSENT_FRAC",
+     "tier": "unaudited",
+     "value": 0.001
+    },
+    "HARMONIC_IMPLAUSIBLE_FRAC": {
+     "row": "rietx.refine.HARMONIC_IMPLAUSIBLE_FRAC",
+     "tier": "unaudited",
+     "value": 0.15
+    }
+   },
+   "explanation": "A declared wavelength harmonic refined to a measurable fraction of the fundamental.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_harmonics.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A declared harmonic refined to a measurable fraction; a warning above `HARMONIC_IMPLAUSIBLE_FRAC`.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Whether a fraction is plausible depends on the monochromator and the detector's energy window, facts outside the pattern."
+  },
+  {
+   "name": "HARMONIC_HELD",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10083",
+     "function": "_harmonic_diagnostics",
+     "level": "info",
+     "guards": [
+      "path not in free_paths"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "HARMONIC_ABSENT_FRAC": {
+     "row": "rietx.refine.HARMONIC_ABSENT_FRAC",
+     "tier": "unaudited",
+     "value": 0.001
+    },
+    "HARMONIC_IMPLAUSIBLE_FRAC": {
+     "row": "rietx.refine.HARMONIC_IMPLAUSIBLE_FRAC",
+     "tier": "unaudited",
+     "value": 0.15
+    }
+   },
+   "explanation": "The weight of a declared wavelength harmonic was held, so it did not enter the fit.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_harmonics.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "A declared harmonic's weight was not free, so it did not enter the fit.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "HIGH_CORRELATION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7448",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "Two refined parameters are strongly correlated, so the data constrain their combination better than either one alone.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/eval_skill_placement/runner.py",
+     "tests/test_absent_phase.py",
+     "tests/test_acceptance_lab6_cbn.py",
+     "tests/test_acceptance_powderline.py",
+     "tests/test_acceptance_si640c.py",
+     "tests/test_background_auto.py",
+     "tests/test_background_measured.py",
+     "tests/test_capabilities.py",
+     "tests/test_capillary_displacement.py",
+     "tests/test_covariance_scaling.py",
+     "tests/test_floating_origin.py",
+     "tests/test_high_correlation_dedup.py",
+     "tests/test_magnetic.py",
+     "tests/test_magnetic_solve.py",
+     "tests/test_manual.py",
+     "tests/test_phase_significance.py",
+     "tests/test_skill_claims.py",
+     "tests/test_surface_roughness.py",
+     "tests/test_v02_core.py",
+     "tests/test_walking_bounds.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 37
+   },
+   "condition": "Two free parameters are correlated above the stage's `correlation_guard` (`schemas.plan.CORRELATION_GUARD`, 0.98).",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Whether a correlation of this size harms the quantity the caller wants depends on the purpose; WP-2037's response column is the package's answer to that.",
+   "note": "The threshold is in `schemas/plan.py` (WP-2002's walk), unaudited there; B13 handed it here."
+  },
+  {
+   "name": "HOLD_BLOCKED_PLAN",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8205",
+     "function": "_hold_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not by_path)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "A stage of the plan asked to refine a parameter that you had held.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/skill_caps.py",
+     "tests/test_floating_origin.py",
+     "tests/test_params_surface.py",
+     "tests/test_rigid_body.py",
+     "tests/test_sequential.py"
+    ],
+    "test_functions": 8
+   },
+   "condition": "A stage's `turn_on` glob matched a parameter the caller had held, so it stayed fixed.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "HUMP_TOO_NARROW",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7585",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A declared background peak has narrowed towards the instrumental resolution.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_si640c.py",
+     "tests/test_compare_ui.py",
+     "tests/test_extinction_halo.py",
+     "tests/test_extra_components.py",
+     "tests/test_multi_histogram.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 7
+   },
+   "condition": "A declared background hump narrowed below `staged.HUMP_MIN_WIDTH_MULT` times the instrumental width.",
+   "kind": 2,
+   "kind_name": "the data can rank it",
+   "kind_reason": "An unindexed Bragg line and a real narrow diffuse feature are both possible, and the data can score a peak against a hump.",
+   "note": "`HUMP_MIN_WIDTH_MULT` is in `strategy/staged.py`, unaudited; B13 handed it here."
+  },
+  {
+   "name": "LEBAIL_ALTERNATION_STOPPED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9459",
+     "function": "_lebail_stop_diagnostic",
+     "level": "computed: 'info' if reason == 'converged' else 'warning'",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'info' if reason == 'converged' else 'warning'"
+   ],
+   "constants_read": {},
+   "explanation": "A Le Bail fit alternates between extracting intensities and refining the other parameters.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_lebail_alternation.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "The Le Bail alternation stopped; info when it converged, a warning for any other reason.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "LEBAIL_CYCLES_AT_CAP",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10990",
+     "function": "_lebail_cap_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (last is None or last.lebail_settled is not False)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The partition repeats until the intensities stop moving, under the cap `lebail_cycles`.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_extinction_symbol.py",
+     "tests/test_lebail_cycles.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "The intensity partition reached the cap `lebail_cycles` before the intensities stopped moving.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "LOW_ANGLE_UNMODELLED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10703",
+     "function": "_low_angle_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (first is None)",
+      "not (n < LOW_ANGLE_MIN_CHANNELS)",
+      "not (not chi2_red > 0.0)",
+      "not (ratio <= LOW_ANGLE_UNMODELLED_RATIO)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "LOW_ANGLE_MIN_CHANNELS": {
+     "row": "rietx.refine.LOW_ANGLE_MIN_CHANNELS",
+     "tier": "unaudited",
+     "value": 10
+    },
+    "LOW_ANGLE_UNMODELLED_RATIO": {
+     "row": "rietx.refine.LOW_ANGLE_UNMODELLED_RATIO",
+     "tier": "unaudited",
+     "value": 3.0
+    },
+    "PHASE_SUPPORT_SIGMA": {
+     "row": "rietx.schemas.plan.PHASE_SUPPORT_SIGMA",
+     "tier": "3",
+     "value": 3.0,
+     "via": "_first_reflection_fwhm"
+    }
+   },
+   "explanation": "The region below the first reflection has a larger residual than the rest of the pattern.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_air_scatter_undeclared.py",
+     "tests/test_harmonics.py",
+     "tests/test_low_angle_region.py",
+     "tests/test_multi_diagnostics.py"
+    ],
+    "test_functions": 12
+   },
+   "condition": "Below the first reflection less two FWHM, the mean (Δ/σ)² over at least `LOW_ANGLE_MIN_CHANNELS` channels exceeds `LOW_ANGLE_UNMODELLED_RATIO` times χ²_red.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Issue #1219 names three competent responses (air scatter, a beam-stop cut, a real diffuse component), and which applies depends on the measurement, outside the pattern.",
+   "note": "Two inline literals: the 2 FWHM region edge and the 2σ channel test that places the suggested lower limit. Issue #1219 proposes dropping the suggestion."
+  },
+  {
+   "name": "MAGNETIC_WIDTH_MOVED_MOMENT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7851",
+     "function": "_moved_moment_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (path not in released)",
+      "not (not bars)",
+      "not (z <= MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA": {
+     "row": "rietx.report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA",
+     "tier": "unaudited",
+     "value": 1.0
+    }
+   },
+   "explanation": "Freeing the magnetic broadening moved the refined moment by more than its esd.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_magnetic_width.py",
+     "tests/test_magnetic_width_k_half.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "Freeing the magnetic broadening moved a released moment by more than `MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA` esds.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The shift is measured in its own esd; the threshold decides only when it is said."
+  },
+  {
+   "name": "MICROABSORPTION_SKIPPED",
+   "sites": [
+    {
+     "where": "src/rietx/optimize/qpa.py:333",
+     "function": "microabsorption_diagnostics",
+     "level": "warning",
+     "guards": [
+      "qpa.microabsorption_skipped is not None"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "BRINDLEY_MU_R_FENCE": {
+     "row": "rietx.optimize.qpa.BRINDLEY_MU_R_FENCE",
+     "tier": "2",
+     "value": 0.05
+    }
+   },
+   "explanation": "A particle radius was given for at least one phase, but the correction could not run.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_qpa.py",
+     "tests/test_scale_b_ridge.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A particle radius was given for at least one phase and the Brindley correction could not run (`qpa.microabsorption_skipped`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "MODEL_FAR_FROM_DATA",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10320",
+     "function": "_far_from_data_diagnostics",
+     "level": "error",
+     "guards": [
+      "not (stats.rwp <= MODEL_FAR_FROM_DATA_RWP)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "error"
+   ],
+   "constants_read": {
+    "MODEL_FAR_FROM_DATA_RWP": {
+     "row": "rietx.refine.MODEL_FAR_FROM_DATA_RWP",
+     "tier": "3",
+     "value": 0.8
+    }
+   },
+   "explanation": "Rwp is so high that the model does no better than one that predicts no intensity.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_fit_usable.py",
+     "tests/test_gui_server.py",
+     "tests/test_robustness_external.py",
+     "tests/test_sequential.py",
+     "tests/test_site_twins_merged.py",
+     "tests/test_solve_cost.py",
+     "tests/test_summary_levels.py"
+    ],
+    "test_functions": 11
+   },
+   "condition": "Rwp exceeds `MODEL_FAR_FROM_DATA_RWP` (0.8), at an error level.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "No competent refiner reads an Rwp near that of a model predicting no intensity as a fit; the threshold row is tier 3 on its own.",
+   "note": "Error level: a series escalates and quarantines on it (WP-2003, the WP's Inherited)."
+  },
+  {
+   "name": "NEUTRON_RESONANT_ABSORBER",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9921",
+     "function": "_resonant_absorber_diagnostics",
+     "level": "computed: 'warning' if worst >= RESONANT_ABSORBER_SEVERE_BARN else 'info'",
+     "guards": [
+      "not (instrument.source.kind == 'xray_cw')",
+      "not (not flagged)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "computed: 'warning' if worst >= RESONANT_ABSORBER_SEVERE_BARN else 'info'"
+   ],
+   "constants_read": {
+    "RESONANT_ABSORBER_SEVERE_BARN": {
+     "row": "rietx.refine.RESONANT_ABSORBER_SEVERE_BARN",
+     "tier": "unaudited",
+     "value": 1000.0
+    }
+   },
+   "explanation": "The structure contains an element whose scattering length is complex and varies with wavelength near a nuclear resonance.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_joint_xray_neutron.py",
+     "tests/test_multi_diagnostics.py",
+     "tests/test_neutron_cw.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "Under a neutron source, the structure holds an element with a complex scattering length near a resonance; a warning from `RESONANT_ABSORBER_SEVERE_BARN`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The tabulated absorption is a nuclear fact; the threshold sets the level alone."
+  },
+  {
+   "name": "OCCUPANCY_ABOVE_ONE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11823",
+     "function": "_occupancy_flag_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (path not in moving or occ is None or (not occ > 1.0))"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "A refined site occupancy is above 1, so the model puts more scatterers on the site than it holds.",
+   "audit_row": {
+    "tier": "1",
+    "response": null,
+    "ambiguity": 3
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_joint_report.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "A refined site occupancy is above 1.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "The audit row already carries ambiguity 3 (tier 1); copied here, not re-judged.",
+   "note": "No significance gate; whether to add one is the maintainer's (WP-2002's handover, in the WP's Inherited)."
+  },
+  {
+   "name": "ORIGIN_FIXED_ON_POLAR_AXIS",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8150",
+     "function": "_centroid_finding",
+     "level": "info",
+     "guards": [],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:8082",
+     "function": "_origin_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not phases)",
+      "held and report_held"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "_CENTROID_SITES_NAMED": {
+     "row": "rietx.refine._CENTROID_SITES_NAMED",
+     "tier": "unaudited",
+     "value": 12
+    }
+   },
+   "explanation": "The space group has an axis along which shifting every atom changes no intensity, so the data cannot fix the position along it.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_floating_origin.py"
+    ],
+    "test_functions": 10
+   },
+   "condition": "The space group is polar and the package held the origin along the polar axis (`_origin_diagnostics`, `_centroid_finding`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "ORIGIN_NOT_FIXED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8094",
+     "function": "_origin_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (not phases)",
+      "lost and report_lost"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "_CENTROID_SITES_NAMED": {
+     "row": "rietx.refine._CENTROID_SITES_NAMED",
+     "tier": "unaudited",
+     "value": 12,
+     "via": "_centroid_finding"
+    }
+   },
+   "explanation": "The space group has an axis along which the whole structure can slide without changing any intensity.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_floating_origin.py"
+    ],
+    "test_functions": 7
+   },
+   "condition": "The space group is polar and nothing holds the origin along its polar axis.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "Symmetry fixes it."
+  },
+  {
+   "name": "PATTERN_DEAD_CHANNELS",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10496",
+     "function": "_data_support_diagnostics",
+     "level": "warning",
+     "guards": [
+      "model.sigma_measured"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "OBS_PER_PARAMETER_MIN": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_MIN",
+     "tier": "unaudited",
+     "value": 3.0
+    },
+    "OBS_PER_PARAMETER_PREFERRED": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED",
+     "tier": "unaudited",
+     "value": 5.0
+    },
+    "STEPS_PER_FWHM_MIN": {
+     "row": "rietx.background.diagnostics.STEPS_PER_FWHM_MIN",
+     "tier": "2",
+     "value": 5.0
+    }
+   },
+   "explanation": "A short run of channels reads far below the local background, and its error bars shrank with it.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_data_support.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "With a measured σ, a short run of fitted channels reads far below the local background and its σ shrank with it (`background.diagnostics.dead_channels`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "Counts below a smooth background with σ shrinking alongside are a detector fault; no diffraction physics produces the pair.",
+   "note": "Thresholds in `background/diagnostics.py` (WP-2002's walk)."
+  },
+  {
+   "name": "PATTERN_UNDERSAMPLED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10477",
+     "function": "_data_support_diagnostics",
+     "level": "warning",
+     "guards": [
+      "steps is not None and steps < STEPS_PER_FWHM_MIN"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "OBS_PER_PARAMETER_MIN": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_MIN",
+     "tier": "unaudited",
+     "value": 3.0
+    },
+    "OBS_PER_PARAMETER_PREFERRED": {
+     "row": "rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED",
+     "tier": "unaudited",
+     "value": 5.0
+    },
+    "STEPS_PER_FWHM_MIN": {
+     "row": "rietx.background.diagnostics.STEPS_PER_FWHM_MIN",
+     "tier": "2",
+     "value": 5.0
+    }
+   },
+   "explanation": "The typical peak is covered by too few measured points across its width.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": "warning",
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/eval_skill_placement/runner.py",
+     "tests/silence.py",
+     "tests/test_audit_delta.py",
+     "tests/test_data_support.py",
+     "tests/test_diagnostics_summary.py",
+     "tests/test_fitreport_layers.py",
+     "tests/test_landing.py",
+     "tests/test_low_angle_region.py",
+     "tests/test_summary_levels.py"
+    ],
+    "test_functions": 16
+   },
+   "condition": "The typical peak spans fewer than `STEPS_PER_FWHM_MIN` points per FWHM.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The band is quoted from the literature (tier 2); it sets the level alone."
+  },
+  {
+   "name": "PAWLEY_OFF_DATA_RIDGED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9704",
+     "function": "_pawley_off_data_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (pb is None or not pb.off_data)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "Some reflections have no emission line centred inside the fitted data.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_pawley.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "Some Pawley reflections have no emission line centred inside the fitted data, and their intensities are ridged.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "PAWLEY_OVERLAP_UNRESOLVED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9674",
+     "function": "_pawley_unresolved_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (pb is None or pb.stderr is None or (not pb.groups))",
+      "not (float(np.max(rel)) < PAWLEY_UNRESOLVED_REL)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "PAWLEY_UNRESOLVED_REL": {
+     "row": "rietx.refine.PAWLEY_UNRESOLVED_REL",
+     "tier": "unaudited",
+     "value": 0.3
+    }
+   },
+   "explanation": "Several reflections overlap so strongly that the data fix their summed intensity but not how it divides among them.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_held_phase.py",
+     "tests/test_pawley.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "In an overlap group the largest esd/|I| reaches `PAWLEY_UNRESOLVED_REL`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The relative esd is measured; the threshold decides only when it is said."
+  },
+  {
+   "name": "PHASE_UNCONSTRAINED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11338",
+     "function": "_phase_support_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (not (unconstrained or held or lacks or instrument_held))",
+      "not (support >= sigma and (not lacks))",
+      "not (n_phases < 2 and (not (held or lacks or instrument_held)))"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "PHASE_SUPPORT_SIGMA": {
+     "row": "rietx.schemas.plan.PHASE_SUPPORT_SIGMA",
+     "tier": "3",
+     "value": 3.0
+    }
+   },
+   "explanation": "The scale of a phase is too close to zero for the data to tell it from an absent phase, or none of its reflections lie in the fitted range.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/planted_series.py",
+     "tests/test_absent_phase.py",
+     "tests/test_acceptance_qpa_roundrobin.py",
+     "tests/test_held_phase.py",
+     "tests/test_history.py",
+     "tests/test_joint_phase_significance.py",
+     "tests/test_joint_report.py",
+     "tests/test_low_angle_region.py",
+     "tests/test_parametric_series.py",
+     "tests/test_phase_significance.py",
+     "tests/test_planted_series.py",
+     "tests/test_scale_b_ridge.py",
+     "tests/test_walking_bounds.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 43
+   },
+   "condition": "A phase with free non-scale paths, held paths or no measured scale has a scale under `PHASE_SUPPORT_SIGMA` of its counting-noise esd, or no line in range (a single-phase model only where something was held); the message says what was held, the instrument included.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The hold passes the judgement ground (milestone § The rule); only its 3σ is on trial, and that is WP-2002's.",
+   "note": "The action is WP-2002's; this WP owns the code."
+  },
+  {
+   "name": "PLAN_FREES_NO_MOMENT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7765",
+     "function": "_held_moment_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (mode != 'rietveld')",
+      "not (not sites)",
+      "not (ip in moving)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The structure carries a magnetic moment and no stage of the plan frees it.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_magnetic_structural_preset.py"
+    ],
+    "test_functions": 7
+   },
+   "condition": "The structure carries a magnetic moment and no stage of the plan frees it.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "QPA_ESD_UNAVAILABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10900",
+     "function": "_qpa_esd_unavailable_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A phase scale refined to a value at which its uncertainty could not be measured, usually zero.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_absent_phase.py",
+     "tests/test_scale_b_ridge.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "A phase scale refined to a value where its esd could not be measured.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "QPA_UNAVAILABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10927",
+     "function": "_qpa_unavailable_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The refined scales, weighted by the cell contents, sum to zero or less, so there is nothing to normalise into weight fractions.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_robustness_external.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "The weighted scales sum to zero or less, so no weight fractions exist.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "RESOLUTION_NOT_POSITIVE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7572",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "An instrument width is negative somewhere in the fitted range.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_gaussian_width_floor.py",
+     "tests/test_lorentzian_width_floor.py",
+     "tests/test_multi_diagnostics.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "An instrument width is negative somewhere in the fitted range (`staged.check_resolution_positive`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "RESOLUTION_UNCONSTRAINED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7518",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The Gaussian resolution terms were refined on a pattern whose peaks are mostly Lorentzian.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": "warning",
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/eval_skill_placement/runner.py",
+     "tests/silence.py",
+     "tests/test_diagnostics_summary.py",
+     "tests/test_summary_deliverables.py",
+     "tests/test_summary_levels.py",
+     "tests/test_walking_bounds.py"
+    ],
+    "test_functions": 19
+   },
+   "condition": "Gaussian resolution terms were free while more than half the fitted channels are Lorentzian-dominated (`staged.check_resolution_supported`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The Lorentzian share is arithmetic on the refined widths.",
+   "note": "The 'more than half' is an inline literal in `strategy/staged.py` (`lorentzian.sum() * 2 <= tt.size`), outside this WP's file."
+  },
+  {
+   "name": "RESTRAINT_PAIRS_STALE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:12008",
+     "function": "_restraint_pairs_stale_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (start is None or _contact_geometry(start) == _contact_geometry(phase))",
+      "not (not stale)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "RESTRAINT_PAIRS_STALE_LISTED": {
+     "row": "rietx.refine.RESTRAINT_PAIRS_STALE_LISTED",
+     "tier": "invariant",
+     "value": 5
+    }
+   },
+   "explanation": "At the end of the run, a phase's anti-bump restraints were checked against the final coordinates, and some contacts closer than their minimum distance have no row in the pair list.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_planarity_restraints.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "At the end of the run a phase's anti-bump restraints missed contacts closer than their minimum distance.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "RESTRAINT_TENSION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10244",
+     "function": "_restraint_tension_diagnostics",
+     "level": "warning",
+     "guards": [
+      "k < len(rows)",
+      "not (found is None)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "RESTRAINT_TENSION_SIGMA": {
+     "row": "rietx.refine.RESTRAINT_TENSION_SIGMA",
+     "tier": "unaudited",
+     "value": 3.0
+    }
+   },
+   "explanation": "A soft restraint, such as a bond length, finished well away from its target in units of its own uncertainty.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_planarity_restraints.py",
+     "tests/test_restraints.py",
+     "tests/test_scale_b_ridge.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "A soft restraint finished more than `RESTRAINT_TENSION_SIGMA` of its own σ from its target.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Whether the restraint or the data is wrong depends on chemistry outside the pattern."
+  },
+  {
+   "name": "RIGID_BODY_UNSUPPORTED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11703",
+     "function": "_rigid_body_unsupported",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A free rotation or shift of a rigid body has no effect on the pattern.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_rigid_body.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "A free rotation or shift of a rigid body has a zero column.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "ROUGHNESS_ABSORPTION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7607",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "Surface roughness cannot be separated from the displacement parameters, the scale and the background over this range.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_surface_roughness.py"
+    ],
+    "test_functions": 1
+   },
+   "condition": "The roughness column's projection R² onto displacement, scale and background exceeds `staged.ROUGHNESS_ABSORPTION_GUARD` (0.9).",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "As for `BACKGROUND_ABSORPTION`: whether the overlap harms the quantity wanted depends on the purpose.",
+   "note": "Threshold in `strategy/staged.py`, unaudited there."
+  },
+  {
+   "name": "ROUGHNESS_OUTSIDE_REGIME",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11895",
+     "function": "_roughness_regime_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (model.roughness is None or not len(model.tt))",
+      "not (not positions.size)",
+      "model.roughness == 'pitschke'",
+      "tau > sin_min"
+     ],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:11906",
+     "function": "_roughness_regime_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (model.roughness is None or not len(model.tt))",
+      "not (not positions.size)",
+      "model.roughness == 'pitschke'",
+      "not (tau > sin_min)",
+      "tau > 0.5 * sin_min"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info",
+    "warning"
+   ],
+   "constants_read": {
+    "ROUGHNESS_MIN_DEPRESSION": {
+     "row": "rietx.refine.ROUGHNESS_MIN_DEPRESSION",
+     "tier": "unaudited",
+     "value": 0.01
+    }
+   },
+   "explanation": "The Pitschke roughness model holds only above a limiting angle that depends on its parameter.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_seed_invariance.py",
+     "tests/test_surface_roughness.py",
+     "tests/test_tick_positions.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "Under the Pitschke model, τ exceeds sin θ_min (a warning) or half of it (info).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The model's regime is from its paper; the half that sets the info band is an inline literal.",
+   "note": "Inline literal 0.5 for the info band."
+  },
+  {
+   "name": "ROUGHNESS_UNCONSTRAINED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11926",
+     "function": "_roughness_regime_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (model.roughness is None or not len(model.tt))",
+      "not (not positions.size)",
+      "depression < ROUGHNESS_MIN_DEPRESSION"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "ROUGHNESS_MIN_DEPRESSION": {
+     "row": "rietx.refine.ROUGHNESS_MIN_DEPRESSION",
+     "tier": "unaudited",
+     "value": 0.01
+    }
+   },
+   "explanation": "The refined roughness correction changes the intensity of every modelled reflection by almost nothing.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_surface_roughness.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "The refined roughness changes every modelled reflection's intensity by less than `ROUGHNESS_MIN_DEPRESSION`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The depression is arithmetic on the refined model; the threshold decides only when it is said."
+  },
+  {
+   "name": "SCALE_B_INSEPARABLE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11489",
+     "function": "_scale_b_ridge_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "SCALE_B_SEPARATION_FLOOR": {
+     "row": "rietx.refine.SCALE_B_SEPARATION_FLOOR",
+     "tier": "1",
+     "value": 6.324555320336758e-08
+    }
+   },
+   "explanation": "Over the fitted range the scale of a phase and its displacement parameters act on the data in the same way.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_joint_report.py",
+     "tests/test_scale_b_ridge.py"
+    ],
+    "test_functions": 13
+   },
+   "condition": "Over the fitted range a phase's scale and Biso columns separate by less than `SCALE_B_SEPARATION_FLOOR`.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "`SCALE_B_SEPARATION_FLOOR` is tier 1 (2√rcond)."
+  },
+  {
+   "name": "SITE_DOFS_RENUMBERED",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:2906",
+     "function": "_carry_twin_moves",
+     "level": "warning",
+     "guards": [
+      "not ('_user_holds' not in self.__dict__)",
+      "not (not notes)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A site's coordinates moved onto or off a special position so that its coordinate degrees of freedom changed (`dof.1` is y on the general position and z on a mirror at y = 1/4, in either direction), and a hold, tie or free path sat on one of them.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_site_twins_merged.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "A site moved onto or off a special position and a hold, tie or free path sat on one of its renumbered DOFs.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "SIZE_UNUSUALLY_SMALL",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11764",
+     "function": "_size_flag_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (lam is None)",
+      "not (coeff is None or not coeff > 0.0)",
+      "not (not size_a < SIZE_FLAG_SIZE_A)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "SCHERRER_K": {
+     "row": "rietx.model.profiles.caglioti.SCHERRER_K",
+     "tier": "2",
+     "value": 0.9
+    },
+    "SIZE_FLAG_SIZE_A": {
+     "row": "rietx.refine.SIZE_FLAG_SIZE_A",
+     "tier": "unaudited",
+     "value": 50.0
+    }
+   },
+   "explanation": "A phase's refined size broadening implies a crystallite size below the range seen in solved refinements.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_fit_usable.py",
+     "tests/test_strain_cap.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A phase's size broadening implies a crystallite size below `SIZE_FLAG_SIZE_A` (Scherrer, `SCHERRER_K`).",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "A small crystallite is a real outcome of synthesis or milling; whether it is a defect depends on the sample.",
+   "note": "Calibrated on one 1 213-record archive (the WP's Families): one family."
+  },
+  {
+   "name": "SPECIES_FALLBACK_NEUTRAL",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:9996",
+     "function": "_species_fallback_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (instrument.source.kind == 'neutron_cw')",
+      "not (delta is not None and abs(delta) < SPECIES_FALLBACK_MIN_DELTA_FRAC)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "SPECIES_FALLBACK_MIN_DELTA_FRAC": {
+     "row": "rietx.refine.SPECIES_FALLBACK_MIN_DELTA_FRAC",
+     "tier": "1",
+     "value": 0.0
+    }
+   },
+   "explanation": "The ion named for a site has no entry in the form-factor table.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_joint_xray_neutron.py",
+     "tests/test_multi_diagnostics.py",
+     "tests/test_species_fallback.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "An ion named for a site has no form-factor entry, so the neutral atom's was used.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7695",
+     "function": "_stage_order_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (float(start.get(widths[ip], 0.0)) > 0.0)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A stage frees the magnetic broadening in the same stage that first frees the moment.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_magnetic_width.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "A stage frees the magnetic broadening in the stage that first frees the moment.",
+   "kind": 2,
+   "kind_name": "the data can rank it",
+   "kind_reason": "The two orders are enumerable and a refit of each scores them; the code asserts one."
+  },
+  {
+   "name": "STAGE_MAX_ITER",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10966",
+     "function": "_max_iter_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (not hit)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A stage ran out of iterations before it converged.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_budget_and_tolerance_invariance.py",
+     "tests/test_issue_900_restated_bound.py",
+     "tests/test_multi_diagnostics.py",
+     "tests/test_robustness_external.py",
+     "tests/test_slow_descent.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A stage ran out of iterations before it converged.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  {
+   "name": "STAGE_NOT_FINITE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:2112",
+     "function": "_non_finite_diagnostic",
+     "level": "warning",
+     "guards": [
+      "not (stop is None)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The model held a NaN or an infinity at a point the solver reached, so the solver had no step left to take.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_cell_runaway_safety.py",
+     "tests/test_non_finite_stage.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "The model held a NaN or an infinity at a point the solver reached.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "STAGE_PATH_NOT_FREE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8348",
+     "function": "_fixed_literal_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:8469",
+     "function": "_site_glob_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A stage asked to refine a parameter that symmetry or the model fixes, or that follows another parameter.",
+   "audit_row": {
+    "tier": "1",
+    "response": "warning",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_joint_report.py",
+     "tests/test_params_surface.py"
+    ],
+    "test_functions": 13
+   },
+   "condition": "A stage asked to refine a path that symmetry or the model fixes, or that follows another.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "STAGE_PATH_UNKNOWN",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8591",
+     "function": "_unknown_path_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (current is not None)"
+     ],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:8581",
+     "function": "_unknown_path_diagnostics",
+     "level": "warning",
+     "guards": [
+      "current is not None"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "A stage asked to refine a parameter by a name that no parameter of the model has.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_joint_report.py",
+     "tests/test_multi_histogram.py",
+     "tests/test_params_surface.py"
+    ],
+    "test_functions": 12
+   },
+   "condition": "A stage named a path no parameter of the model has.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "STAGE_SLOW_DESCENT",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11020",
+     "function": "_slow_descent_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not slow)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {
+    "lm.SLOW_DESCENT_ESD": {
+     "row": "rietx.optimize.lm.SLOW_DESCENT_ESD",
+     "tier": "3",
+     "value": 1.0
+    },
+    "lm._SLOW_DESCENT_HORIZON": {
+     "row": "rietx.optimize.lm._SLOW_DESCENT_HORIZON",
+     "tier": "3",
+     "value": 300
+    }
+   },
+   "explanation": "The stage's cost was still falling when it stopped, but so slowly that another 300 evaluations would have moved its parameters by less than one esd.",
+   "audit_row": {
+    "tier": "1",
+    "response": "info",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "1"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/test_sequential.py",
+     "tests/test_slow_descent.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 2
+   },
+   "condition": "The stage stopped with its cost still falling, too slowly to move a parameter by one esd in 300 more evaluations.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  {
+   "name": "STAGE_WINDOWS_STALE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8514",
+     "function": "_window_loss_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (sr.window_loss is None or not sr.window_loss > tol)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "Each stage computes every peak over a window of points, sized when the stage starts.",
+   "audit_row": {
+    "tier": "3",
+    "response": "warning",
+    "ambiguity": 3
+   },
+   "suggestion_row": {
+    "tier": "3"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/silence.py",
+     "tests/test_acceptance_sequential.py",
+     "tests/test_window_domain.py",
+     "tests/test_window_loss.py"
+    ],
+    "test_functions": 4
+   },
+   "condition": "The last declared stage (and the closing stage) ended with a peak-area share outside its frozen windows above the window tolerance it ran at.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "The audit row already carries ambiguity 3 (tier 3, approved); copied here, not re-judged."
+  },
+  {
+   "name": "STEPHENS_STRAIN_NOT_POSITIVE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7487",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The refined anisotropic strain coefficients give a negative variance at some reflections.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_stephens.py",
+     "tests/test_gaussian_width_floor.py",
+     "tests/test_stephens.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 6
+   },
+   "condition": "The refined Stephens coefficients give a negative variance at some reflections (`staged.check_stephens_positive`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "STRAIN_UNUSUALLY_LARGE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:11574",
+     "function": "_strain_flag_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (width is None or not width > STRAIN_FLAG_WIDTH)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {
+    "STRAIN_FLAG_WIDTH": {
+     "row": "rietx.refine.STRAIN_FLAG_WIDTH",
+     "tier": "unaudited",
+     "value": 1.5
+    }
+   },
+   "explanation": "A phase's refined strain broadening is far above the range seen in solved refinements.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_fit_usable.py",
+     "tests/test_strain_cap.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A phase's strain width exceeds `STRAIN_FLAG_WIDTH`.",
+   "kind": 3,
+   "kind_name": "the data cannot settle it",
+   "kind_reason": "Large strain is a real outcome of deformation or composition gradients; whether it is a defect depends on the sample.",
+   "note": "Calibrated on one 1 213-record archive (the WP's Families): one family."
+  },
+  {
+   "name": "TEXTURE_NOT_POSITIVE",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:7507",
+     "function": "_guard_diagnostics",
+     "level": "warning",
+     "guards": [],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "warning"
+   ],
+   "constants_read": {},
+   "explanation": "The truncated spherical-harmonics series goes below zero somewhere on the sphere.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_qpa_roundrobin.py",
+     "tests/test_acceptance_srm1976a_texture.py",
+     "tests/test_texture.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 5
+   },
+   "condition": "The truncated spherical-harmonics series goes below zero on the sphere (`staged.check_texture_positive`).",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  {
+   "name": "WAVELENGTH_CALIBRATION",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:10173",
+     "function": "_wavelength_calibration_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (not (_is_wavelength(e.path) and e.vary))"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "You freed the wavelength, and it moved from its declared value by the amount shown.",
+   "audit_row": {
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
+   },
+   "suggestion_row": {
+    "tier": "unaudited"
+   },
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
+   "tests": {
+    "files": [
+     "tests/test_acceptance_si640c.py",
+     "tests/test_acceptance_wavelength.py",
+     "tests/test_params_surface.py",
+     "tests/test_wavelength_freedom.py",
+     "tests/validation_matrix.py"
+    ],
+    "test_functions": 8
+   },
+   "condition": "A wavelength was free in the fit; the message gives its shift from the declared value in ppm, with no test on its size.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  }
+ ],
+ "literals": [
+  {
+   "key": "_bic|1e-300|max(rss, 1e-300)",
+   "function": "src/rietx/background/select.py:_bic",
+   "lines": [
+    93
+   ],
+   "value": 1e-300,
+   "in_comparison": false,
+   "expression": "max(rss, 1e-300)",
+   "role": "numerical floor",
+   "reason": "Keeps log(RSS) finite for an exact fit."
+  },
+  {
+   "key": "select_chebyshev_order|4|m < max_order * 4",
+   "function": "src/rietx/background/select.py:select_chebyshev_order",
+   "lines": [
+    154
+   ],
+   "value": 4,
+   "in_comparison": true,
+   "expression": "m < max_order * 4",
+   "role": "threshold",
+   "reason": "Refuses an order scan with fewer than four background channels per order; it raises a ValueError, not a code, so no verdict of this WP rests on it."
+  },
+  {
+   "key": "select_chebyshev_order|2|range(2, max_order + 1)",
+   "function": "src/rietx/background/select.py:select_chebyshev_order",
+   "lines": [
+    169
+   ],
+   "value": 2,
+   "in_comparison": false,
+   "expression": "range(2, max_order + 1)",
+   "role": "count",
+   "reason": "The scan's lowest order."
+  },
+  {
+   "key": "_absorption_diagnostics|100|100 * residue",
+   "function": "src/rietx/refine.py:_absorption_diagnostics",
+   "lines": [
+    8882
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * residue",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_absorption_diagnostics|0.7|record.intensity_fraction_of_optimal < 0.7",
+   "function": "src/rietx/refine.py:_absorption_diagnostics",
+   "lines": [
+    8889
+   ],
+   "value": 0.7,
+   "in_comparison": true,
+   "expression": "record.intensity_fraction_of_optimal < 0.7",
+   "role": "threshold",
+   "reason": "Gates `ABSORPTION_PLATE_THICKNESS`: the plate gives under 70 % of the optimal thickness's counts. To lift into a named constant at part 2."
+  },
+  {
+   "key": "_absorption_diagnostics|100|100 * record.intensity_fraction_of_optimal",
+   "function": "src/rietx/refine.py:_absorption_diagnostics",
+   "lines": [
+    8894
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * record.intensity_fraction_of_optimal",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_air_scatter_undeclared_diagnostics|0.001|np.maximum(model.tt, 0.001)",
+   "function": "src/rietx/refine.py:_air_scatter_undeclared_diagnostics",
+   "lines": [
+    10775
+   ],
+   "value": 0.001,
+   "in_comparison": false,
+   "expression": "np.maximum(model.tt, 0.001)",
+   "role": "numerical floor",
+   "reason": "Keeps 1/(2θ) finite at 2θ = 0; a fitted range never reaches 0.001°."
+  },
+  {
+   "key": "_dispersion_diagnostics|2|abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)",
+   "function": "src/rietx/refine.py:_dispersion_diagnostics",
+   "lines": [
+    9836
+   ],
+   "value": 2,
+   "in_comparison": false,
+   "expression": "abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)",
+   "role": "arithmetic",
+   "reason": "The squares in |f|² / Z²."
+  },
+  {
+   "key": "_first_reflection_fwhm|2.0|first_tick / 2.0",
+   "function": "src/rietx/refine.py:_first_reflection_fwhm",
+   "lines": [
+    10612
+   ],
+   "value": 2.0,
+   "in_comparison": false,
+   "expression": "first_tick / 2.0",
+   "role": "arithmetic",
+   "reason": "θ from 2θ."
+  },
+  {
+   "key": "_frozen_compile_diagnostics|100|100 * rel",
+   "function": "src/rietx/refine.py:_frozen_compile_diagnostics",
+   "lines": [
+    9630
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * rel",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_harmonic_diagnostics|100.0|100.0 * frac",
+   "function": "src/rietx/refine.py:_harmonic_diagnostics",
+   "lines": [
+    10077
+   ],
+   "value": 100.0,
+   "in_comparison": false,
+   "expression": "100.0 * frac",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_harmonic_diagnostics|100.0|100.0 * esd",
+   "function": "src/rietx/refine.py:_harmonic_diagnostics",
+   "lines": [
+    10079
+   ],
+   "value": 100.0,
+   "in_comparison": false,
+   "expression": "100.0 * esd",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_hold_diagnostics|5|n > 5",
+   "function": "src/rietx/refine.py:_hold_diagnostics",
+   "lines": [
+    8211
+   ],
+   "value": 5,
+   "in_comparison": true,
+   "expression": "n > 5",
+   "role": "listing cap",
+   "reason": "The message lists the first five held paths (`where[:5]`) and marks the rest with an ellipsis; `where` carries them all."
+  },
+  {
+   "key": "_intensity_weighted_s2|0.25|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
+   "function": "src/rietx/refine.py:_intensity_weighted_s2",
+   "lines": [
+    11405
+   ],
+   "value": 0.25,
+   "in_comparison": false,
+   "expression": "np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
+   "role": "arithmetic",
+   "reason": "s² = 1/(4d²)."
+  },
+  {
+   "key": "_intensity_weighted_s2|2|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
+   "function": "src/rietx/refine.py:_intensity_weighted_s2",
+   "lines": [
+    11405
+   ],
+   "value": 2,
+   "in_comparison": false,
+   "expression": "np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
+   "role": "arithmetic",
+   "reason": "The square in s² = 1/(4d²)."
+  },
+  {
+   "key": "_lebail_stop_diagnostic|100|100 * r",
+   "function": "src/rietx/refine.py:_lebail_stop_diagnostic",
+   "lines": [
+    9455
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * r",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_low_angle_diagnostics|2.0|first_tick - 2.0 * fwhm",
+   "function": "src/rietx/refine.py:_low_angle_diagnostics",
+   "lines": [
+    10672
+   ],
+   "value": 2.0,
+   "in_comparison": false,
+   "expression": "first_tick - 2.0 * fwhm",
+   "role": "threshold",
+   "reason": "Sets the low-angle region's upper edge at two FWHM below the first reflection, so it decides which channels `LOW_ANGLE_UNMODELLED` reads. To lift at part 2."
+  },
+  {
+   "key": "_low_angle_diagnostics|2|np.mean(weighted ** 2)",
+   "function": "src/rietx/refine.py:_low_angle_diagnostics",
+   "lines": [
+    10682
+   ],
+   "value": 2,
+   "in_comparison": false,
+   "expression": "np.mean(weighted ** 2)",
+   "role": "arithmetic",
+   "reason": "The square in the mean of (Δ/σ)²."
+  },
+  {
+   "key": "_low_angle_diagnostics|2.0|np.abs(weighted) >= 2.0",
+   "function": "src/rietx/refine.py:_low_angle_diagnostics",
+   "lines": [
+    10696
+   ],
+   "value": 2.0,
+   "in_comparison": true,
+   "expression": "np.abs(weighted) >= 2.0",
+   "role": "threshold",
+   "reason": "The 2σ channel test placing the suggested lower limit in `LOW_ANGLE_UNMODELLED`'s suggestion, the second literal the WP names; issue #1219 proposes dropping that suggestion. To lift at part 2, or to go with it."
+  },
+  {
+   "key": "_pawley_unresolved_diagnostics|1e-10|np.maximum(np.abs(inten), 1e-10)",
+   "function": "src/rietx/refine.py:_pawley_unresolved_diagnostics",
+   "lines": [
+    9665
+   ],
+   "value": 1e-10,
+   "in_comparison": false,
+   "expression": "np.maximum(np.abs(inten), 1e-10)",
+   "role": "numerical floor",
+   "reason": "Keeps esd/|I| finite at a zero intensity."
+  },
+  {
+   "key": "_phase_support_diagnostics|2|n_phases < 2",
+   "function": "src/rietx/refine.py:_phase_support_diagnostics",
+   "lines": [
+    11241
+   ],
+   "value": 2,
+   "in_comparison": true,
+   "expression": "n_phases < 2",
+   "role": "count",
+   "reason": "A single-phase model."
+  },
+  {
+   "key": "_renumber_atoms|4|stacklevel=4",
+   "function": "src/rietx/refine.py:_renumber_atoms",
+   "lines": [
+    2949
+   ],
+   "value": 4,
+   "in_comparison": false,
+   "expression": "stacklevel=4",
+   "role": "count",
+   "reason": "The `warnings.warn` stack level, so the warning names the caller's line."
+  },
+  {
+   "key": "_roughness_regime_diagnostics|0.5|np.radians(0.5 * tt_min)",
+   "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
+   "lines": [
+    11893
+   ],
+   "value": 0.5,
+   "in_comparison": false,
+   "expression": "np.radians(0.5 * tt_min)",
+   "role": "arithmetic",
+   "reason": "θ from 2θ."
+  },
+  {
+   "key": "_roughness_regime_diagnostics|2|drawn(2 * np.degrees(np.arcsin(min(tau, 1.0))))",
+   "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
+   "lines": [
+    11902
+   ],
+   "value": 2,
+   "in_comparison": false,
+   "expression": "drawn(2 * np.degrees(np.arcsin(min(tau, 1.0))))",
+   "role": "arithmetic",
+   "reason": "2θ from θ in the message."
+  },
+  {
+   "key": "_roughness_regime_diagnostics|0.5|tau > 0.5 * sin_min",
+   "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
+   "lines": [
+    11905
+   ],
+   "value": 0.5,
+   "in_comparison": true,
+   "expression": "tau > 0.5 * sin_min",
+   "role": "threshold",
+   "reason": "The info band of `ROUGHNESS_OUTSIDE_REGIME`: τ above half of sin θ_min. To lift at part 2."
+  },
+  {
+   "key": "_scale_b_ridge_diagnostics|3|n > 3",
+   "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
+   "lines": [
+    11480
+   ],
+   "value": 3,
+   "in_comparison": true,
+   "expression": "n > 3",
+   "role": "listing cap",
+   "reason": "Marks with an ellipsis the held displacement paths the message lists, cut at three (`held[:3]`); `where` carries them all."
+  },
+  {
+   "key": "_scale_b_ridge_diagnostics|100.0|100.0 * math.expm1(2.0 * s2)",
+   "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
+   "lines": [
+    11486
+   ],
+   "value": 100.0,
+   "in_comparison": false,
+   "expression": "100.0 * math.expm1(2.0 * s2)",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_scale_b_ridge_diagnostics|2.0|math.expm1(2.0 * s2)",
+   "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
+   "lines": [
+    11486
+   ],
+   "value": 2.0,
+   "in_comparison": false,
+   "expression": "math.expm1(2.0 * s2)",
+   "role": "arithmetic",
+   "reason": "The 2 of the Debye-Waller factor exp(−2B s²) for intensity."
+  },
+  {
+   "key": "_size_flag_diagnostics|10.0|SIZE_FLAG_SIZE_A / 10.0",
+   "function": "src/rietx/refine.py:_size_flag_diagnostics",
+   "lines": [
+    11751
+   ],
+   "value": 10.0,
+   "in_comparison": false,
+   "expression": "SIZE_FLAG_SIZE_A / 10.0",
+   "role": "unit",
+   "reason": "Å to nm in the message."
+  },
+  {
+   "key": "_size_flag_diagnostics|10.0|size_a / 10.0",
+   "function": "src/rietx/refine.py:_size_flag_diagnostics",
+   "lines": [
+    11762
+   ],
+   "value": 10.0,
+   "in_comparison": false,
+   "expression": "size_a / 10.0",
+   "role": "unit",
+   "reason": "Å to nm in the message."
+  },
+  {
+   "key": "_wavelength_calibration_diagnostics|1000000.0|1000000.0 * (lam - lam0) / lam0",
+   "function": "src/rietx/refine.py:_wavelength_calibration_diagnostics",
+   "lines": [
+    10166
+   ],
+   "value": 1000000.0,
+   "in_comparison": false,
+   "expression": "1000000.0 * (lam - lam0) / lam0",
+   "role": "unit",
+   "reason": "Relative shift to ppm in the message."
+  },
+  {
+   "key": "_window_loss_diagnostics|100|100 * sr.window_loss",
+   "function": "src/rietx/refine.py:_window_loss_diagnostics",
+   "lines": [
+    8517
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * sr.window_loss",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_window_loss_diagnostics|100|100 * tol",
+   "function": "src/rietx/refine.py:_window_loss_diagnostics",
+   "lines": [
+    8519
+   ],
+   "value": 100,
+   "in_comparison": false,
+   "expression": "100 * tol",
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  {
+   "key": "_in|3|len(ids) <= 3",
+   "function": "src/rietx/schemas/migrate.py:_in",
+   "lines": [
+    311
+   ],
+   "value": 3,
+   "in_comparison": true,
+   "expression": "len(ids) <= 3",
+   "role": "listing cap",
+   "reason": "Names up to three documents in full, beyond that the first and the last with the count."
+  }
+ ]
+}
