@@ -73,9 +73,11 @@ body's default plan.
   | NAC | no | none, in any of 7 stages | 0 / 0 | 0 |
   | acridine IX | `HumpComponent` | its 3 parameters, in every Jacobian of all 5 stages | 37 % / 12 % | 24 % (hump 18 %, `r0` 6 %) |
 
-- [ ] Compute the hump's three columns from the component, keeping the whole-model route for any tie reaching outside it.
+- [x] Compute the hump's three columns from the component, keeping the whole-model route for any tie reaching outside it.
+  Done 2026-11-12: `background.models.hump_partials` is the closed form, and `least_squares._component_columns` gates it on the column's whole reach. A tie between two humps or a named variable driving one keeps the closed form, through the local Jacobian's coefficients. A tie reaching any other path keeps the whole-model FD. The sibling member, a declared sharp peak, now differences `extra_peak_curve` alone, at the same step.
 - [ ] Reuse `r0` where the spelling allows it, or record why not.
-- [ ] A cross-backend row, and a test that the component columns match the whole-model FD column to the bar the step allows.
+- [x] A cross-backend row, and a test that the component columns match the whole-model FD column to the bar the step allows.
+  Done 2026-11-12: the `extra_components_tied` row in `tests/test_cross_backend.py` (two tied humps, a variable, a hump driving the zero shift), and five tests in `tests/test_extra_components.py`. The closed form meets a complex-step derivative to 1e-14 of each column's scale, and the whole-model FD at 0.50 of a bar measured from the step.
 - [ ] Rewrite the "not worth writing" comment with the measurement.
 - [ ] Skill: none, since no surface changes.
 
