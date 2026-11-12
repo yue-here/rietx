@@ -58,7 +58,7 @@ The two peak-list refusals and the total-scattering refusal come next, then the 
 | Powder CIF | `pdcif` | `.cif` | `block`, `nonpositive_sigma` | an `_su` or `_esd` loop, then an uncertainty in parentheses on every intensity, then `_pd_proc_ls_weight` read as 1/σ², else Poisson |
 | GSAS raw powder data | `gsas` | `.fxye`, `.gsas`, `.gda`, `.xra`, `.raw` | `bank`, `nonpositive_sigma` | the third column of an `FXYE` record or the second of an `ESD` record; Poisson for `STD` |
 | FIT2D or pyFAI integrated pattern | `chi` | `.chi` | `nonpositive_sigma` | the third column where written, else Poisson |
-| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | `axis`, `nonpositive_sigma` | the third column where present and positive, else Poisson |
+| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | `axis`, `nonpositive_sigma` | the third column where present, else Poisson |
 
 | Refused format | `name` | Suffix | Why |
 |---|---|---|---|

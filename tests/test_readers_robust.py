@@ -1050,6 +1050,8 @@ def test_a_nonpositive_sigma_leaves_the_fit_and_is_reported(kind, tmp_path):
     assert ("2 of 12 points have a σ of zero or below (1 zero and 1 negative)"
             in d.message)
     assert "at 2θ 10.1°, 10.14°" in d.message
+    # the number the suggestion's condition turns on: none of the two counted 0
+    assert "0 of them record an intensity of zero" in d.message
     assert d.where == ["10.100-10.100", "10.140-10.140"]
     # the placeholder σ is finite and never a weight the fit reads
     assert np.all(pat.sig() > 0)
@@ -1084,12 +1086,23 @@ def test_a_format_with_a_derived_sigma_reports_the_option_unused(tmp_path):
     assert "READER_OPTION_IGNORED" in {d.code for d in found}
 
 
-def test_a_column_with_no_positive_sigma_is_not_read(tmp_path):
+@pytest.mark.parametrize("kind", ["xy", "chi", "gsas_esd"])
+def test_a_column_with_no_positive_sigma_is_not_read(kind, tmp_path):
     """Every σ ≤ 0 states no weight anywhere: excluding every point would leave
-    nothing to fit, so the column is declined, as xy and pdCIF decline one."""
+    nothing to fit, so the column is declined, and said to be. The xy and chi
+    readers declined one in silence until WP-1952."""
+    if kind == "chi":
+        from tests.test_readers import write_chi
+
+        path = write_chi(tmp_path / "a.chi", "2-Theta Angle (Degrees)", _NF_TT, _NF_Y)
+        text = path.read_text(encoding="utf-8").splitlines()
+        n_head = len(text) - _NF_N
+        text[n_head:] = [f"{line}  0.0" for line in text[n_head:]]
+        path.write_text("\n".join(text) + "\n", encoding="utf-8")
+    else:
+        path = _sigma_file(kind, [0.0] * _NF_N, tmp_path)
     found = []
-    pat = rx.read_pattern(_sigma_file("gsas_esd", [0.0] * _NF_N, tmp_path),
-                          diagnostics=found)
+    pat = rx.read_pattern(path, diagnostics=found)
     assert pat.sigma is None
     (d,) = [d for d in found if d.code == "PATTERN_SIGMA_NONPOSITIVE"]
     assert ("every one of its 12 σ values is zero or negative (12 zero)"

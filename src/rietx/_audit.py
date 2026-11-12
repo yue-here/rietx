@@ -999,10 +999,11 @@ ROWS: tuple[Row, ...] = (
     Row("PATTERN_ROWS_DROPPED", "code"),
     Row("PATTERN_SCAN_REVERSED", "code"),
     Row("PATTERN_SIGMA_CONSTANT", "code"),
-    Row("PATTERN_SIGMA_NONPOSITIVE", "code", tier=2, ambiguity=1,
-        evidence=("warning; fires exactly when a file's σ column holds an entry of zero or "
-                  "below, the count and the 2θ runs in the message, or when every entry is, "
-                  "and the column is not read. An esd of zero claims an exact intensity and a "
+    Row("PATTERN_SIGMA_NONPOSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("warning; arithmetic, no threshold: fires exactly when a file's σ column "
+                  "holds an entry of zero or below, the count, how many record y = 0 and the "
+                  "2θ runs in the message, or when every entry is, and the column is not "
+                  "read. An esd of zero claims an exact intensity and a "
                   "negative one has no meaning, so neither is a weight. GSAS-II 5.8.4's fxye "
                   "reader zero-weights such a channel (G2pwd_fxye.py:86-91, checked "
                   "2026-10-19); its xye reader and FullProf 8.20 replace it silently, and "
@@ -1818,7 +1819,7 @@ ROWS: tuple[Row, ...] = (
                   "stable random ID rather than its number (G2VarObj, GSASIIobj.py 937-963). "
                   "A file written before 1.11 stores no names, so it opens as written "
                   "(pattern_paths None) rather than being converted at read")),
-    Row("rietx.schemas.results.RefinementResult.sigma_rule", "action", tier=2, ambiguity=1,
+    Row("rietx.schemas.results.RefinementResult.sigma_rule", "action", tier=2, ambiguity=3,
         evidence=("records how many fitted channels the file's σ, the Poisson fallback "
                   "√max(y, 1) and the σ <= 0 exclusion each covered (WP-1952, B14 ruled "
                   "2026-10-20). The exclusion is GSAS-II 5.8.4's fxye rule for σ <= 0 "
@@ -1829,7 +1830,14 @@ ROWS: tuple[Row, ...] = (
         grounds=("The default is one program's rule, GSAS-II's fxye reader; its xye reader "
                  "and FullProf replace such a σ instead, so the choice among them was the "
                  "maintainer's: no weight by default, warn at ingestion, an option to correct "
-                 "(B5, ruled 2026-10-19). On a synthetic LaB6 with one σ = 0 at the strongest "
+                 "(B5, ruled 2026-10-19). Kind 3: what a zero means (a zero count, an "
+                 "unmeasured channel, a writer's error) is a fact about the writing software, "
+                 "outside the pattern, and some weight must be chosen, so the default acts, "
+                 "the warning names the points and how many record y = 0, and the option "
+                 "reverses it. Measured against the deleted floor, not against Poisson: on "
+                 "the two ILL D1B files that carry σ = 0 the points are unmeasured channels "
+                 "at y = 0, where Poisson's σ = 1 would weigh each ~3000x its neighbours "
+                 "(inferred, not fitted). On a synthetic LaB6 with one σ = 0 at the strongest "
                  "channel, the old floor stopped the fit at max_iter 1.75e-3 Å from the true "
                  "cell; the rule converges within 2e-4 Å (tests/test_schemas.py)."),
         approved="2026-10-19"),
@@ -4100,7 +4108,8 @@ ROWS: tuple[Row, ...] = (
                   "section 6.2, docs/wp/2002-batch/rulings.md B5); GSAS-II 5.8.4's xye reader "
                   "gives w = 0 at y <= 0 instead (imports/G2pwd_xye.py:172-185, checked); one "
                   "rule for PatternData.sig, RefinementResult.sig, background.diagnostics and "
-                  "io.formats.base.sigma_from_scaled, four literals until the B14 lift")),
+                  "io.formats.base.sigma_from_scaled, four literals until the B14 lift; since "
+                  "WP-1952 also the σ <= 0 points under nonpositive_sigma='poisson'")),
     Row("rietx.schemas.plan.CLOSING_WINDOW_TOL", "constant", tier=1, value=0.001,
         evidence=("numerical setting with a domain test (tests/test_window_domain.py, "
                   "test_the_closing_stage_meets_the_bar): its windows are within 0.1 sigma of "
@@ -5333,12 +5342,13 @@ ROWS: tuple[Row, ...] = (
                   "of baseline otherwise) and names each reading's fix; it prescribes "
                   "neither branch, so no dissenter is left; takes no action itself")),
     Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=3),
-    Row("PATTERN_SIGMA_NONPOSITIVE.suggestion", "suggestion", value=2, tier=2, ambiguity=1,
+    Row("PATTERN_SIGMA_NONPOSITIVE.suggestion", "suggestion", value=2, tier=2, ambiguity=3,
         evidence=("names the reader option that weights a zero count at one count, "
                   "√max(y, 1), the fallback rietx and TOPAS (1/Max(Yobs, 1), Technical "
                   "Reference section 6.2) apply to a file with no esd; for the column case, "
-                  "that the Poisson σ is the counts' and not a rate's. It moves nothing by "
-                  "itself")),
+                  "that the Poisson σ is the counts' and not a rate's. Kind 3: whether the "
+                  "points counted zero is the writer's fact, so the message gives how many "
+                  "record y = 0 for the reader to weigh. It moves nothing by itself")),
     Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", value=1),
     Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),

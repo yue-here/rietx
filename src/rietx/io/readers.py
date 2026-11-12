@@ -101,7 +101,7 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     ``PATTERN_SIGMA_CONSTANT`` is here for the dead-channel reason: a σ
     identical on every point makes the fit unweighted whichever reader
     produced it, so it is a property of the answer and not of one format.
-    Issue #266 met it in ``xy``, which adopts any positive third column; on
+    Issue #266 met it in ``xy``, which adopts any third column; on
     this hook it also reaches a GSAS esd column, a pdCIF weight loop and a
     ``.chi`` third column.  The σ is kept, because a uniform σ is legal.
 
@@ -114,8 +114,9 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     √max(y, 1) instead, one count at a zero count, for a file that wrote √0 for
     a channel that counted nothing; the caller asked, so nothing is reported,
     and ``RefinementResult.sigma_rule`` counts them.  A column with no positive
-    σ at all states no weight anywhere and is not read, as the ``xy`` and pdCIF
-    readers already decline one.
+    σ at all states no weight anywhere and is not read, and the same code says
+    so.  The ``xy`` and ``chi`` readers declined one in silence until WP-1952;
+    they now hand it here.
     """
     p = Path(path)
     fmt = identify_format(p)
@@ -180,11 +181,13 @@ def _apply_nonpositive_sigma(data: PatternData, rule: str,
     more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
     n = int(bad.sum())
     has = "has" if n == 1 else "have"
+    n_y0 = int((data.y()[bad] == 0).sum())
     return [Diagnostic(
         level="warning", code="PATTERN_SIGMA_NONPOSITIVE",
         message=(f"{name}: {n} of {sigma.size} points {has} a σ of zero or "
-                 f"below ({what}), at {label} {shown}{more}. Such a σ states no "
-                 f"weight, so these points are left out of the fit."),
+                 f"below ({what}), at {label} {shown}{more}. {n_y0} of them "
+                 f"record an intensity of zero. Such a σ states no weight, so "
+                 f"these points are left out of the fit."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans],
         value=float(n),
         suggestion=("If these are channels that counted zero and the file "
@@ -286,10 +289,10 @@ def _dead_channel_diagnostics(data: PatternData, name: str) -> list[Diagnostic]:
 
     if data.sigma is None or data.axis != "two_theta":
         return []  # the run and window lengths are degrees of 2θ
-    # a channel the σ ≤ 0 rule already left out of the fit is not a dead cell
-    # to exclude: PATTERN_SIGMA_NONPOSITIVE has named it (WP-1952)
-    keep = (~data.nonpositive_sigma_mask() if data.nonpositive_sigma == "exclude"
-            else np.ones(len(data.intensity), dtype=bool))
+    # a σ ≤ 0 channel carries no file σ to judge: under "exclude" it has left
+    # the fit and PATTERN_SIGMA_NONPOSITIVE named it, and under "poisson" its σ
+    # is the stand-in dead_channels refuses to read (WP-1952)
+    keep = ~data.nonpositive_sigma_mask()
     out = []
     for run in dead_channels(data.tt()[keep], data.y()[keep], data.sig()[keep]):
         lo, hi = _dead_interval(run)

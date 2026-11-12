@@ -857,6 +857,28 @@ def _lab6_monitor_normalised(*, dead: tuple[int, ...] = (), seed: int = 0):
                         sigma=sigma.tolist()), structure, instrument)
 
 
+@pytest.mark.parametrize("rule", ["exclude", "poisson"])
+def test_a_nonpositive_sigma_channel_is_not_read_as_a_dead_cell(rule, tmp_path):
+    """A channel the file gives σ = 0 carries no σ of the file's to judge. Under
+    ``"exclude"`` it has left the fit and ``PATTERN_SIGMA_NONPOSITIVE`` named
+    it; under ``"poisson"`` its σ is the stand-in √max(y, 1), which
+    ``dead_channels`` refuses to read (WP-1952). Either way no dead cell."""
+    from rietx.io.readers import read_pattern
+
+    data = _monitor_normalised()
+    y, sig = data.y().copy(), data.sig().copy()
+    y[600], sig[600] = 0.0, 0.0
+    path = tmp_path / "zero_sigma.xye"
+    path.write_text("\n".join(
+        f"{a:.4f} {b:.4f} {c:.4f}" for a, b, c in zip(data.tt(), y, sig))
+        + "\n", encoding="utf-8")
+    found: list = []
+    read_pattern(str(path), diagnostics=found, nonpositive_sigma=rule)
+    codes = [d.code for d in found]
+    assert "PATTERN_DEAD_CHANNELS" not in codes
+    assert ("PATTERN_SIGMA_NONPOSITIVE" in codes) == (rule == "exclude")
+
+
 def test_dead_channels_reach_the_reader_and_the_fit(tmp_path):
     """Both channels the finding travels on, and the reason for the first: a
     dead cell reaches the person as parameters at their bounds several minutes
