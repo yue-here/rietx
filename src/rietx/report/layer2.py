@@ -1100,19 +1100,31 @@ def apply_strategy_veto(actions: list[SuggestedAction], plan, *,
     An action whose parameters the plan refines (in any stage) is redundant;
     one whose parameters are already free in the current fit is likewise not
     news.  Both are annotated rather than removed, so the report still shows
-    *why* the engine thinks the misfit is explained.
+    *why* the engine thinks the misfit is explained.  A path the plan frees
+    and a ``turn_off`` then fixes (WP-2208) is not refined by it: the last
+    stage glob to match decides, the order ``staged.fixed_at_end`` reads.
     """
     import fnmatch
 
-    planned: set[str] = set()
-    for stage in getattr(plan, "stages", []):
-        planned.update(stage.turn_on)
+    stages = list(getattr(plan, "stages", []))
     free = set(free_paths or [])
+
+    def matches(path: str, globs) -> bool:
+        return any(fnmatch.fnmatchcase(g, path) or fnmatch.fnmatchcase(path, g)
+                   for g in globs)
+
+    def planned(path: str) -> bool:
+        last = False
+        for stage in stages:
+            if matches(path, stage.turn_on):
+                last = True
+            if matches(path, getattr(stage, "turn_off", ())):
+                last = False
+        return last
 
     for action in actions:
         for path in action.parameter_paths:
-            if any(fnmatch.fnmatchcase(g, path) or fnmatch.fnmatchcase(path, g)
-                   for g in planned):
+            if planned(path):
                 action.vetoed_by = f"already refined by the staged plan ({path})"
                 break
             if any(fnmatch.fnmatchcase(f, path) for f in free):

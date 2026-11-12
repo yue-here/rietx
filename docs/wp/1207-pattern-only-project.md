@@ -213,6 +213,32 @@ whatever `fit` decides.
 
 - WP-1076 (declared names), WP-1117 (the preview promise).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**A project without a phase** (WP-1207) is the *third* answer to step 2 and the
+fifth `structure` form, `null` — decided ahead of the inline branch, where it
+used to fall through and be refused as a malformed model. Four rules.
+**Null is an answer; an absent key is not**: `dict.get` cannot tell them apart,
+so `project_new` requires the key and only the explicit null creates a
+phase-free project. It is the one route that **moves the mode nowhere** — a CIF
+implies `rietveld` and a typed cell `lebail` because each says what can be
+refined, and with no phase the run is refused whatever the mode says, so Adopt
+sets it on the way out. **`n_phases` rides on `project_doc`** — a derived
+summary beside `head`, never a second authority — because a client must know a
+run is refused *before* it offers one, and `moved()` reloads the document as
+well as the curves, since a move can add or remove the last phase (Adopt, a
+structure replace, a checkout across either). And the refusal is **on the verb,
+never on the model**: `Structure` takes `phases=[]`, so peak picking, indexing
+and `PATCH /api/structure` all work over one, while every run route raises
+`NoPhasesError` (`code = "NO_PHASES"`, the agent envelope's fourth) **in the
+route rather than the worker** — a run started is a 200 whose failure reaches
+only the event stream, and the caller asked a question that has an answer now.
+
 ## Handover log
 
 - **2026-08-26** — **Closed.** A pattern is already a project. `Project.create`

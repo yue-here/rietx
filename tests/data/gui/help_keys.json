@@ -181,6 +181,7 @@
   "diagnostics:PARAMETRIC_FORM_REJECTED",
   "diagnostics:PARAMETRIC_OUT_OF_RANGE",
   "diagnostics:PARAMETRIC_TARGET_UNSEEN",
+  "diagnostics:PARENT_STRAIN_HELD",
   "diagnostics:PATTERN_DEAD_CHANNELS",
   "diagnostics:PATTERN_DUPLICATE_POINTS",
   "diagnostics:PATTERN_INTENSITY_NET",
@@ -382,6 +383,7 @@
   "parameters:phases.*.magnetic_lor_strain",
   "parameters:phases.*.microstrain.dof.*",
   "parameters:phases.*.microstrain.s*",
+  "parameters:phases.*.parent_cell.strain.*",
   "parameters:phases.*.preferred_orientation.r",
   "parameters:phases.*.rigid_bodies.*.origin.dof.*",
   "parameters:phases.*.rigid_bodies.*.origin.x",
@@ -514,6 +516,7 @@
   "result_fields:StageResult.collapsed",
   "result_fields:StageResult.cost_final",
   "result_fields:StageResult.cost_initial",
+  "result_fields:StageResult.fixed",
   "result_fields:StageResult.freed",
   "result_fields:StageResult.ftol",
   "result_fields:StageResult.held",
@@ -574,6 +577,7 @@
   "stage_fields:restraint_weight_scale",
   "stage_fields:seed",
   "stage_fields:strain_seed",
+  "stage_fields:turn_off",
   "stage_fields:turn_on",
   "stage_fields:window_slack_deg"
  ]

@@ -88,7 +88,7 @@ Document-level keywords:
 | `passes` | the Le Bail cap (`lebail_passes`); written only above 1, and absent means one pass |
 | `support` | the absent-phase hold's threshold in esds (`phase_support_sigma`), or `none` for no significance hold (a phase with no line in range is still held); written only away from 3, and absent means 3 |
 | `closing` | the closing stage's window area fraction (`closing_window_tol`), or `none` for no closing stage; always written, and absent means 1e-3 |
-| `stage` | one stage: its name, then `free` and a comma-separated glob list |
+| `stage` | one stage: its name, then `free` and a comma-separated glob list, then optionally `fix` and the globs the stage fixes after its frees (`turn_off`) |
 | `phase` | opens a phase block: its index, then its name quoted |
 | `instrument` | opens the instrument block |
 | `peaks` | opens the picked-line block |
@@ -248,6 +248,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/copy` | copy the `.rex` folder, history included, to a `directory` under a `name`; the session stays on the original |
 | `POST /api/project/rename` · `POST /api/project/move` | rename the folder in place; move it into another `directory` |
 | `POST /api/project/close` | close the project; the next launch shows the start screen |
+| `GET /api/recovery` · `PUT /api/recovery` | the open project's pending edits, kept in the state directory apart from the project; `PUT` takes `{project, head, draft}` for any project folder, including the one that closed a moment ago, and `draft: null` deletes the copy; not behind the 409 |
 | `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary, hold, limit and restraint edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |

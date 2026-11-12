@@ -1013,11 +1013,11 @@
   }
 
   .arming {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   .arming strong {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   /* A register of its own, and deliberately not `.knobs`: a rule above the

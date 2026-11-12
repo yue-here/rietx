@@ -12,8 +12,10 @@ invariant — they stay frozen *within* a stage).
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
 import functools
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -188,6 +190,17 @@ class Stage:
     #: (``indexing.workflow.VALIDATION_WINDOW_SLACK_DEG``).  ``None`` = the
     #: default; frozen at stage compile like every other discrete choice.
     window_slack_deg: float | None = None
+    #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
+    #: ruled 2026-11-09), so ``turn_on=["phases.*"]`` with
+    #: ``turn_off=["phases.*.atoms.*.biso"]`` frees a phase but its
+    #: displacements.  GSAS-II's scripted ``clear``, applied after its ``set``
+    #: in the same order (``docs/practice.md`` § A stage that fixes a
+    #: parameter).  The flags carry, so a fix lasts until a later stage's
+    #: ``turn_on`` frees the path again, and the closing stage re-solves that
+    #: end state (:func:`fixed_at_end`).  Fixing a held, locked or force-fixed
+    #: row changes nothing: a fix only ever sets ``vary`` to False.  Last of
+    #: the fields, so a stage built positionally reads as it always did.
+    turn_off: list[str] = field(default_factory=list)
 
     def __getattr__(self, name: str):
         if name in _PYDANTIC_SURFACE:
@@ -340,6 +353,36 @@ MAGNETIC_WIDTH_STAGE_PATHS: tuple[tuple[str, ...], ...] = (
 )
 
 
+def fixed_at_end(stages: Iterable[Stage],
+                 paths: Iterable[str | tuple[str, ...]]) -> list[str]:
+    """The paths a run of ``stages`` leaves fixed by a ``turn_off``, in ``paths`` order.
+
+    Read stage by stage as the runner applies them: ``turn_on`` frees, then
+    ``turn_off`` fixes, and the flags carry (WP-2208).  A path is in the answer
+    when the last glob to match it, in that order, is a ``turn_off``; a path a
+    later ``turn_on`` freed again is not.  Matching is ``set_vary``'s fnmatch
+    on the path, and nothing else: whether a row is tied, locked or held is
+    the table's to decide when the closing stage fixes these.
+
+    A tuple is one row under several names, the joint table's scoped and bare
+    spellings (``MultiParameterTable.set_vary`` matches either); a glob
+    matching any of them matches the row, and the first is the one returned.
+    """
+    stages = list(stages)
+    out = []
+    for path in paths:
+        names = (path,) if isinstance(path, str) else tuple(path)
+        last = None
+        for stage in stages:
+            if any(fnmatch.fnmatchcase(n, g) for n in names for g in stage.turn_on):
+                last = True
+            if any(fnmatch.fnmatchcase(n, g) for n in names for g in stage.turn_off):
+                last = False
+        if last is False:
+            out.append(names[0])
+    return out
+
+
 @dataclass
 class RefinementPlan:
     stages: list[Stage]
@@ -385,7 +428,7 @@ class RefinementPlan:
     #: field, bit for bit.
     closing_window_tol: float | None = CLOSING_WINDOW_TOL
 
-    def closing_stage(self) -> Stage | None:
+    def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
 
         It frees every glob any declared stage freed, in first-seen order,
@@ -395,24 +438,40 @@ class RefinementPlan:
         at the answer is where the data put it.  Its window fraction is
         :attr:`closing_window_tol`, which :meth:`stage_window_tols` carries.
         ``None`` when that is ``None`` or the plan declares no stage.
+
+        **A plan that fixes** (``Stage.turn_off``, WP-2208) leaves some freed
+        paths fixed at its end, and the closing stage fixes them again after
+        its frees: :func:`fixed_at_end` over ``paths``, the model's parameter
+        paths, as literals.  Two globs that overlap cannot be compared without
+        the paths, so a runner passes its table's.  Without ``paths`` the
+        closing stage's ``turn_off`` is every glob a declared stage fixed,
+        which is the end state while no later stage frees again what an
+        earlier one fixed; that reading serves callers that use the stage's
+        name or frees alone.  A plan with no ``turn_off`` builds the closing
+        stage it built before the field, whatever ``paths`` is.
         """
         if check_closing_window_tol(self.closing_window_tol) is None or not self.stages:
             return None
         last = self.stages[-1]
         globs = list(dict.fromkeys(g for s in self.stages for g in s.turn_on))
+        fixes: list[str] = []
+        if any(s.turn_off for s in self.stages):
+            fixes = (fixed_at_end(self.stages, paths) if paths is not None
+                     else list(dict.fromkeys(g for s in self.stages for g in s.turn_off)))
         return Stage(CLOSING_STAGE_NAME, globs, max_iter=last.max_iter, ftol=last.ftol,
                      lebail_cycles=last.lebail_cycles, lebail_tol=last.lebail_tol,
                      restraint_weight_scale=last.restraint_weight_scale,
-                     window_slack_deg=last.window_slack_deg)
+                     window_slack_deg=last.window_slack_deg, turn_off=fixes)
 
-    def run_stages(self) -> list[Stage]:
+    def run_stages(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> list[Stage]:
         """The stages a fit runs, in order: the declared ones, then :meth:`closing_stage`.
 
         Every runner iterates this, never :attr:`stages`, together with
         :meth:`stage_ftols` and :meth:`stage_window_tols`, which are parallel
-        to it.
+        to it.  A runner passes its table's ``paths``, which the closing stage
+        of a plan that fixes needs (:meth:`closing_stage`).
         """
-        closing = self.closing_stage()
+        closing = self.closing_stage(paths)
         return [*self.stages, closing] if closing is not None else list(self.stages)
 
     def stage_window_tols(self) -> list[float | None]:

@@ -685,9 +685,9 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   the calculated curve" for itself, on two different darks. The values cannot live in
   `gui/src`, which is a build input the wheel does not ship, so the module owns them, the two
   Python servers render a `/tokens.css` route, `gui/src/tokens.css` is **generated and
-  committed** and a test holds it equal to the emitter. A page's extra roles — a hover, a
-  focus ring, a state pill — are `color-mix` over the nine chrome tokens, never a token of
-  their own: one the GUI never reads is a declared name with no writer. The **theme** has one
+  committed** and a test holds it equal to the emitter. A page's extra roles — a focus
+  ring, a state pill — are `color-mix` over the chrome tokens; a token is added only where a
+  register reads it and no mix gives it (WP-2200). The **theme** has one
   home and every page that shows it may set it (`state_dir/settings.json`, through
   `theme.theme_choice`/`set_theme_choice`; WP-1438 widened 1429's GUI-only writer, which left
   the choice unreachable for a fit driven from a script and watched in a browser). A change

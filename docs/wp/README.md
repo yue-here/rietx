@@ -15,7 +15,6 @@ names hard dependencies, and *soft* marks a preferred order.
 |---|---|---|---|---|
 | [1132](1132-neutron-specimen-absorption.md) | A neutron µR, from the table this package already ships | 2026-10-01 | P2 | [Unscheduled](#unscheduled-the-specimen-is-not-an-angle-and-the-neutron-follow-through) |
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
-| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 2026-11-09 | P2 | [parametric](#parametric) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
@@ -24,7 +23,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-02 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
-| [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | 2026-11-06 | P3 | [rigid-bodies](#rigid-bodies) |
+| [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 2026-11-09 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-11-03 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
@@ -41,28 +40,26 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-11-05 | P2 | [structure-solution](#structure-solution) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-11-03 | P2 | [generality](#generality-the-audits) |
+| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 2026-11-09 | P3 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
+| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 2026-11-09 | P3 | [generality](#generality-the-audits) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | 2026-11-10 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2127](2127-the-plan-tab.md) | The Plan tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2129](2129-the-background-tab.md) | The Background tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2133](2133-the-file-menu.md) | The File menu on the project name | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -87,6 +84,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -429,7 +427,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1803](1803-the-body-seam-spike.md) | The body seam: a derived block, or a linearisation inside C | ✅ 2026-10-06 | — | [1801](1801-rotation-mathematics.md) |
 | [1804](1804-the-derived-block.md) | The derived block: a nonlinear map applied after the affine one | ✅ 2026-10-23 | — | [1801](1801-rotation-mathematics.md), [1803](1803-the-body-seam-spike.md) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 🔄 2026-10-08 | P2 | [1802](1802-the-fragment-type.md), [1804](1804-the-derived-block.md) |
-| [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | 🔄 2026-11-06 | P3 | [1805](1805-the-rigid-body.md) |
+| [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | ✅ 2026-11-12 | — | [1805](1805-the-rigid-body.md) |
 | [1807](1807-a-body-on-a-special-position.md) | A body on a special position | ✅ 2026-10-31 | — | [1805](1805-the-rigid-body.md) |
 | [1808](1808-torsions-on-named-rotatable-bonds.md) | Torsions on named rotatable bonds | ✅ 2026-10-11 | — | [1802](1802-the-fragment-type.md), [1805](1805-the-rigid-body.md) |
 | [1809](1809-tether-planarity-and-anti-bump-restraints.md) | Tether, planarity and anti-bump restraints, pairs frozen per plan | ✅ 2026-11-01 | — | — |
@@ -437,7 +435,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1811](1811-bodies-in-a-series.md) | Bodies in a series | ⬜ | P3 | [1805](1805-the-rigid-body.md), [1333](1333-a-series-survives-one-pattern.md) |
 | [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | ⬜ | P4 | [1805](1805-the-rigid-body.md) |
 | [1813](1813-fragment-io.md) | Fragment I/O: XYZ, Z-matrix write, SMILES behind an extra | ⬜ | P4 | [1802](1802-the-fragment-type.md) |
-| [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | ⬜ | P3 | [1815](1815-derived-geometry-torsions-and-a-request-form.md), [1805](1805-the-rigid-body.md) |
+| [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 🔄 2026-11-09 | P3 | [1815](1815-derived-geometry-torsions-and-a-request-form.md), [1805](1805-the-rigid-body.md) |
 | [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | ✅ 2026-11-02 | — | [1804](1804-the-derived-block.md) |
 
 ## <a id="structure-solution"></a>structure-solution — a map, a cost and a search
@@ -468,14 +466,14 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2002](2002-the-single-fit-actions.md) | The single-fit actions: what one stage decides for the caller | ✅ 2026-10-23 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 🔄 2026-11-03 | P2 | [2002](2002-the-single-fit-actions.md), [2037](2037-attention-is-a-cost.md) |
 | [2004](2004-the-fitreport-reasons-for-the-caller.md) | The FitReport reasons for the caller: its gates, actions and thresholds | ⬜ | P2 | [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md) |
-| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | ⬜ | P3 | [2002](2002-the-single-fit-actions.md) |
+| [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | 🔄 2026-11-09 | P3 | [2002](2002-the-single-fit-actions.md) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 🔄 2026-10-24 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2007](2007-indexing-codes-constants-and-gates.md) | Indexing: its codes, constants and gates | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 🔄 2026-11-01 | P3 | — |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | ⬜ | P2 | — |
 | [2016](2016-a-cif-adp-off-symmetry-by-rounding-is-projected.md) | A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so | ✅ 2026-11-02 | — | — |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 🔄 2026-11-05 | P2 | [2002](2002-the-single-fit-actions.md) |
-| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | ⬜ | P3 | — |
+| [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | 🔄 2026-11-09 | P3 | — |
 
 ### <a id="generality-the-prose"></a>The prose
 
@@ -488,7 +486,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 🔄 2026-11-09 | P2 | — ([1119](1119-named-variables.md) soft) |
+| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | ✅ 2026-11-12 | — | — ([1119](1119-named-variables.md) soft) |
 | [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | ✅ 2026-11-06 | — | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 | [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md) | A parametric equation declared by condition and glob | ⬜ | P3 | [1325](1325-parametric-series.md) ([1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
@@ -505,16 +503,25 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
+| [2123](2123-the-layout-shell.md) | The layout shell | ✅ 2026-11-09 | — | — |
 | [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ✅ 2026-11-09 | — | — ([2123](2123-the-layout-shell.md) soft) |
-| [2126](2126-the-parameters-panel.md) | The Parameters panel | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
-| [2127](2127-the-plan-tab.md) | The Plan tab | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
+| [2126](2126-the-parameters-panel.md) | The Parameters panel | ✅ 2026-11-09 | — | [2123](2123-the-layout-shell.md) |
+| [2127](2127-the-plan-tab.md) | The Plan tab | ✅ 2026-11-09 | — | [2123](2123-the-layout-shell.md) |
 | [2128](2128-the-model-moved-by-hand.md) | The model moved by hand: the Interactive tab and the previews | ✅ 2026-11-09 | — | [2123](2123-the-layout-shell.md), [2125](2125-the-pattern-at-values-nobody-has-applied.md) |
-| [2129](2129-the-background-tab.md) | The Background tab | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md), [2125](2125-the-pattern-at-values-nobody-has-applied.md) |
-| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
-| [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
-| [2133](2133-the-file-menu.md) | The File menu on the project name | 🔄 2026-11-09 | P2 | [2131](2131-the-start-screen-and-new-project.md) |
-| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 🔄 2026-11-09 | P2 | — |
+| [2129](2129-the-background-tab.md) | The Background tab | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md), [2125](2125-the-pattern-at-values-nobody-has-applied.md) |
+| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row | ✅ 2026-11-09 | — | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
+| [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md) |
+| [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
+| [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
+| [2200](2200-the-palette.md) | The palette | 🔄 2026-11-10 | P2 | [2142](2142-the-gui-style-guide.md) |
+| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 🔄 2026-11-10 | P2 | [2127](2127-the-plan-tab.md) |
+| [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 🔄 2026-11-10 | P2 | [2133](2133-the-file-menu.md) |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
+| [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
+| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 🔄 2026-11-11 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-11 | P2 | [2215](2215-the-frame.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
@@ -655,13 +662,13 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
 | [2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) | The result records its fit range, and what lies outside it | ⬜ | P3 | — ([2005](2005-refine-py-codes-and-literals.md) soft) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-07 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 🔄 2026-11-05 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
+| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 🔄 2026-11-12 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | ✅ 2026-11-03 | — | — |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
 | [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
 | [2086](2086-a-zero-scale-holds-the-instrument-only-where-the-residual-is-noise.md) | A zero scale holds the instrument only where the residual is noise | ✅ 2026-11-04 | — | — |
-| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | 🔄 2026-11-10 | P3 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
+| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | ✅ 2026-11-12 | — | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
 | [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | ✅ 2026-11-07 | — | — |
 | [2112](2112-an-engines-first-cell-stays-in-the-reported-list.md) | An engine's first cell stays in the reported list | ⬜ | P3 | — |
 | [2113](2113-a-background-band-read-as-unmatched-peaks.md) | A background band read as unmatched peaks | ⬜ | P3 | — |
@@ -672,6 +679,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
+| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ⬜ | P3 | — ([1814](1814-refinable-z-matrix-internals.md) soft) |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -841,6 +849,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
+| [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
