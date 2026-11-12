@@ -113,6 +113,16 @@ of issue #561, sized M.
   eight noise seeds of the simulated arm, the heavy atoms' mean z error ran −1.02 to
   +0.19 esd, rms 0.44, so esds on this pattern may run conservative.
 
+  *Gates*, on this branch with origin/main merged in (`a6e3ead25`), same venv. Fast
+  suite: 14 564 passed, 424 skipped, 32 xfailed in 12:28, through the shared
+  machine's suite queue. The added test is `slow`, so it moves no fast count, and
+  `tests.added_test_times` has nothing to rank. The acridine file with its slow rows:
+  6 passed in 9:00, the four part-1 slow rows included. Lint as CI runs it is clean: ruff, the tutorials' format,
+  `audit_delta`, and Vale at 0 errors. `test_docs_consistency.py` with
+  `test_validation_matrix.py`: 801 passed. `tests.reader_output` exits 0. The full
+  suite did not run: the change is a test and its records, which tests/CLAUDE.md
+  exempts.
+
   *The c-shift reading, settled by Claude under the 2026-11-05 ruling.* The ruling
   said: the body is cleared if the free atoms show its shift along c, and the WP
   stops to investigate if they land on the deposited z and the body does not. It
