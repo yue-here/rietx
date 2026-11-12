@@ -2340,8 +2340,12 @@ class MultiHistogramRefinement:
         models, recompiled = self._final_compiles(models, outcome, data, limits,
                                                   window_tol)
         opening_diags = [*opening_diags, *recompiled]
+        # an intensity model reads the screen alone (``_joint_answer_significance``
+        # returns it unmeasured), so the result does not call it decided, the
+        # single fit's rule (``StageResult.significance``)
         return (models, outcome, stage_results, cell_runaway_diags,
-                answer_runaway, opening_diags, answer_significance)
+                answer_runaway, opening_diags,
+                answer_significance if mode == "rietveld" else None)
 
     def _final_compiles(self, models, outcome, data, limits, window_tol):
         """One compile per histogram at the values the result returns.
