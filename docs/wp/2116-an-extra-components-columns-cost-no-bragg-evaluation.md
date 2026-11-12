@@ -78,8 +78,9 @@ body's default plan.
 - [ ] Reuse `r0` where the spelling allows it, or record why not.
 - [x] A cross-backend row, and a test that the component columns match the whole-model FD column to the bar the step allows.
   Done 2026-11-12: the `extra_components_tied` row in `tests/test_cross_backend.py` (two tied humps, a variable, a hump driving the zero shift), and five tests in `tests/test_extra_components.py`. The closed form meets a complex-step derivative to 1e-14 of each column's scale, and the whole-model FD at 0.50 of a bar measured from the step.
-- [ ] Rewrite the "not worth writing" comment with the measurement.
-- [ ] Skill: none, since no surface changes.
+- [x] Rewrite the "not worth writing" comment with the measurement.
+  Done 2026-11-12: the fallback loop's comment in `_make_jacobian` now names what still takes it and quotes issue #1418's 49 % and 24 %. The `scalar_chain_supported` comment in `model/forward.py` names the component branch instead of the whole-model FD.
+- [x] Skill: none, since no surface changes. Confirmed 2026-11-12: no name, output or field changed, and `tests.reader_output` exits 0.
 
 ## Acceptance
 
