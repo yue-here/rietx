@@ -64,7 +64,11 @@ is the precedent: both renderers, off by default, one parity case.
   from their mean plane at most. The cyclohexane chairs of C₁₆H₂₆ sit
   0.226–0.235 Å. A tolerance near 0.1 Å has a factor of four on either side.
   Only one phase gives non-planar six-rings, so the 21-phase pass should add
-  more before the number is fixed.
+  more before the number is fixed. *2026-11-12, the 21 CIFs on disk*
+  (`1548-measure/rings_planarity.txt`): eight carry carbon, and the gap holds
+  at 0.025 Å flat (396 rings, five phases) against 0.226 Å puckered (52
+  chairs, C₁₆H₂₆ alone). No five-ring exists on disk; widening the puckered
+  side needs new CIFs (a sugar, proline, a cyclophane).
 - **Depth is already a number per sample.** Both renderers keep a z-buffer.
   The GUI writes `gl_FragDepth` from view-space z over `uDepth`, the scene's
   depth span. A fog factor is a function of that value, applied after
@@ -119,9 +123,10 @@ ChimeraX turns depth cueing on unasked. What bears on the decisions:
   within a tolerance of their mean plane, and fill those. Testing planarity
   goes past what any surveyed program does, which only caps the size
   (ChimeraX at six), so the test is new judgement and needs its own
-  measurement. The planarity
-  tolerance is a heuristic number, so it gets a row in `rietx._audit` with
-  its measurement. The surface must not call the result aromatic, because
+  measurement, kept in `rings.PLANAR_RING_TOLERANCE`'s docstring and
+  `1548-measure/`. *No `_audit` row* (the maintainer's ruling, 2026-11-12):
+  the visualisation package stays out of the audit whole, as `_audit.NOT_WALKED`
+  already has it. The surface must not call the result aromatic, because
   the package cannot tell (fragments.py). *The surface name is the
   maintainer's call* (see "Waits on the maintainer").
 - **D3. A transparent background fades alpha, or declines fog.** With
@@ -208,11 +213,15 @@ visual questions. Bring each with a picture:
   box, R3 not having landed. Parity 0.81 levels cued, 0.87 plain; the cued
   row also asserts the viewer fogged, since fog moves the canvas less than
   the bar. A transparent export draws without fog until D3 is ruled.)*
-- [ ] Ring perception and the planarity test, with unit tests on
+- [x] Ring perception and the planarity test, with unit tests on
   paracetamol (`tests/data/cod_2104364.cif`, one benzene ring) and on a
   structure with no rings. Measure the planarity spread on the organic
   phases in `tests/data` before fixing the tolerance, and add its `_audit`
-  row.
+  row. *(2026-11-12: `viz/figure3d/rings.py`, the union of minimum cycle
+  bases on the position-matched bond graph, rings of 5 and 6 within 0.1 Å
+  of their plane; 10 tests in `tests/test_figure_rings.py`. The no-ring case
+  is C₄H₂, since fluorapatite closes non-planar Ca–O–P rings. The `_audit`
+  row was dropped by the maintainer's ruling, D2.)*
 - [ ] Named faces from `cut.py` masks (D4), drawn by both renderers, with
   the parity case.
 - [ ] Before-and-after pairs on the 21 phases and paracetamol, committed
