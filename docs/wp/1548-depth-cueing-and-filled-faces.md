@@ -49,8 +49,22 @@ is the precedent: both renderers, off by default, one parity case.
   over the geometry's atoms in crystallographic terms (`select`, `plane`,
   `sphere`, `component`) and combines them with `&`, `|` and `~`. A named
   face takes such a mask, so no second selection language is needed.
-- **The bond graph exists.** `gui/structure3d.build` returns `bonds` as atom
-  index pairs over the tiled atoms. Ring perception runs on that graph.
+- **The bond graph exists, keyed by position rather than by `i`/`j`.**
+  *Superseded in part 2026-11-12:* `gui/structure3d.build` returns `bonds`
+  whose `j` is the far end's in-cell representative, not always the drawn
+  image the bond reaches, so paracetamol's `i`/`j` graph closes "rings" with
+  6.1 Å and 10.9 Å edges. Ring perception matches each bond's end positions
+  `a`/`b` to drawn atoms instead (`1548-measure/rings_probe.py`). The default
+  one-cell drawing also closes no ring a cell edge cuts: paracetamol's
+  benzene appears only in a block (`extent`), since the cell adds one bonded
+  shell and no more.
+- **Planarity, measured** (`1548-measure/rings_*.txt`, 2026-11-12). On the
+  drawn bonds of the eight organic and hybrid phases in `tests/data`, the
+  flat rings (benzene and pyridine rings in four phases) sit 0.001–0.025 Å
+  from their mean plane at most. The cyclohexane chairs of C₁₆H₂₆ sit
+  0.226–0.235 Å. A tolerance near 0.1 Å has a factor of four on either side.
+  Only one phase gives non-planar six-rings, so the 21-phase pass should add
+  more before the number is fixed.
 - **Depth is already a number per sample.** Both renderers keep a z-buffer.
   The GUI writes `gl_FragDepth` from view-space z over `uDepth`, the scene's
   depth span. A fog factor is a function of that value, applied after
