@@ -1,6 +1,6 @@
 # WP-1806 — first public case: acridine form IX
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-06 — Part 1 merged (PR #1416); open: Part 2, the free-atom control
+Milestone: rigid-bodies · Status: 🔄 2026-11-12 — claimed by ghostshift MacBook-Air-c4aacd (Part 2, the free-atom control)
 Depends on: 1805
 Priority: P3 2026-10-23 — the first real-data proof of the body; 1810 closed without it (PR #955), and 1989 waits on it soft for its public case and pdCIF reader
 
