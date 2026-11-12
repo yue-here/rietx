@@ -1,6 +1,6 @@
 # WP-2104 — a parametric cell in a Le Bail or Pawley joint fit
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-12 — claimed by ghostshift runner (MacBook-Air-c4aacd)
 Depends on: 1325 soft (the joint path has landed, and its open tasks are separate); 1964 soft (an equation on the cell)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: a cell series is often fitted before a structure is known or trusted
 
