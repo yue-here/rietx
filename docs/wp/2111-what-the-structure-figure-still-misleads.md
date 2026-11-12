@@ -73,6 +73,11 @@ row with its evidence. WP-1957's reviewers and the agent round below are that ev
   background) to both renderers. Fog and the `DIM_BOUNDARY` shade both change the far side's
   colour, so a reader could not tell them apart. WP-1548 waits on this WP's ruling on the shade
   (its D6). Whoever brings that ruling to the maintainer should mention that fog is coming.
+- **2026-11-12, from WP-1548 (fog landed, off by default).** Fog is now drawn
+  (`render_structure(depth_cue=True)`, the GUI drawer's "depth cue" box). On a white ground it
+  *lightens* the far atoms, while `DIM_BOUNDARY` *darkens* the images outside the cell, so the two
+  pull apart there. On a dark ground both darken, and that is where they could read as one cue.
+  A picture pair on a dark ground is the evidence the shade's ruling should be shown with.
 
 ## Non-goals
 

@@ -1,6 +1,6 @@
 # WP-1548 — depth cueing, and filled rings and faces, in the structure figure
 
-Milestone: rietview · Status: 🔄 2026-11-12 — claimed by @yue-here
+Milestone: rietview · Status: 🔄 2026-11-12 — fog in both renderers and the kernel, rings perceived; faces, pairs and docs open; waits on rietx-kernels 1.5.0
 Depends on: 2111 soft (its ruling on `DIM_BOUNDARY`, D6)
 Priority: P3 2026-11-12 — the maintainer asked for it; nothing waits on it, and a ray tracer through WP-1537 would give fog once that lands
 
@@ -264,6 +264,96 @@ looked at.
   36, 986-991. Recalled, not read.
 
 ## Handover log
+
+### 2026-11-12 (2nd session) — fog drawn everywhere, rings found, the kernel waits on a release
+
+A structure figure can now fade its far side toward the background, in the
+Python renderer, in the GUI viewer and in the compiled kernel, and the three
+draw the same picture. It is off unless asked. Rings can now be found and
+judged flat or puckered, but nothing fills one yet: the filled faces, the
+before-and-after pictures for the maintainer and the docs are still to do.
+The fog depends on a kernel wheel (rietx-kernels 1.5.0) that is not on PyPI,
+so this branch cannot go green, or merge, until the maintainer publishes it.
+The manuals were read, and several recalled claims were wrong.
+
+**Done** (commits `a3c4bcc1`..this one):
+- Survey into `docs/practice.md` § Depth cueing, and filled rings and faces.
+  The session's network blocked the manual hosts, so the maintainer approved a
+  new personal cloud environment `rietx` allowing them. VMD's host still failed
+  TLS through the proxy and is absent.
+- Fog: `raster.draw(fog=...)` (numpy oracle), `render_structure(depth_cue=)`,
+  `scene.fog_span`/`fogSpan` (held equal by 8 corpus cases), a FOG chunk in
+  every fragment shader, the drawer's "depth cue" box, the parity row with fog
+  on. The ramp runs from half-way back through the drawn atoms' centres to the
+  rearmost, reaching `LOOK["fog_max"]` = 0.7 (a look value, mine, for the pairs
+  to judge).
+- `render_rows_cued` in `kernels/` (1.5.0), sharing one checker and one
+  `Option<Fog>` path with `render_rows`, which is unchanged; `KERNEL_FLOOR`
+  1.5, pin `>=1.5,<2`, `docs/docs` pages quoting the pin updated.
+- `viz/figure3d/rings.py`: smallest rings (the union of minimum cycle bases)
+  on the bond graph matched by end position, kept at 5-6 atoms within 0.1 Å of
+  their plane.
+- Review (`/code-review high --fix`): the stale skill index regenerated,
+  `depth_cue` added to the manual's options table, the `background=None` and
+  fog-colour refusals moved to entry so both paths refuse alike, three long
+  docstring lines. **Declined**: a transparent PNG export from the GUI drops the
+  fog silently while the canvas shows it (refuse or notice is a behaviour call,
+  folded into D3 below); `rings._cycles_up_to` is exponential in coordination
+  number (latent; bound it when the scene calls it, see Next); `cue = {...}` is
+  positional on purpose for a test stub.
+
+**Rulings this session** (the maintainer, 2026-11-12):
+- No `_audit` rows: `viz` stays out of the audit whole (D2 records it). The
+  lane had stamped two tier-3 rows with an approval nobody gave; reverted.
+- The kernel lands in this WP and the PR waits for 1.5.0.
+
+**Measured** (`[dev]` venv, worktree, Linux x86-64, rietx-kernels 1.5.0 built
+locally with maturin):
+- Planarity on all 21 CIFs on disk (`1548-measure/rings_planarity.txt`): flat
+  rings ≤ 0.025 Å (396 rings, five phases), chairs 0.226-0.235 Å (52, C₁₆H₂₆
+  alone), no five-ring on disk. One puckered family is thin evidence.
+- Parity, chromium-1243 headless, 507×300 canvas: 0.87 levels plain, 0.81
+  cued (bar 2.0). Fog moves the whole canvas only 1.23 levels, so the cued row
+  also asserts the viewer fogged: 5.9 levels from Python's fogged picture
+  against 13.8 from its plain one on drawn pixels, and it went red (13.9
+  against 6.4) with the box unticked.
+- Fast suite: FAST_COUNTS.
+- vitest 795 passed (40 files); svelte-check clean.
+- Lanes (`session_usage.py lanes`):
+
+  | lane | est | requests | main at dispatch | lane $ | saved $ |
+  |---|---|---|---|---|---|
+  | ring-perception | 25 | 38 | 382K | 3.18 | -2.19 |
+  | render_rows_cued | 30 | 41 | 408K | 3.75 | +1.47 |
+
+  Trial row appended to `docs/milestones/process.md`; actual/estimated 1.44.
+  Selective-policy baseline for this session: -16 %.
+
+**Gotchas**:
+- `structure3d.build`'s bond `j` is the far end's in-cell representative, not
+  the drawn image: build any graph from `a`/`b` positions (`rings.bond_edges`).
+- The one-cell drawing closes no ring a cell edge cuts; paracetamol's benzene
+  needs a block (`extent`).
+- Browser rows need python playwright in the venv (`uv pip install playwright`,
+  not a project dependency) and `PLAYWRIGHT_CHROMIUM=/opt/pw-browsers/
+  chromium-1243/chrome-linux64/chrome` in a cloud container, or they skip.
+- The kernel wheel in this venv is a local maturin build; a fresh `.[dev]`
+  install fails to resolve `rietx-kernels>=1.5` until it is published.
+
+**Next**, in order:
+1. The maintainer settles the release order: 1.5.0 must be tagged from a
+   `main` commit, but this PR cannot merge before 1.5.0 exists. Either split
+   the kernels commit into its own PR first (tag, publish, then this one), or
+   land this PR with the floor commit held back and raise it after.
+2. Named faces and filled rings (task 5, D4): the second kind of face entry
+   in `scene["faces"]`, `report.py` counting it, both renderers; bound
+   `rings._cycles_up_to` (a coordination cap or a per-atom budget) when
+   `build_scene` calls it, since a 12-coordinate metal block is exponential.
+3. Before-and-after pairs (task 6) with the open questions: the ring option's
+   name, D3 (fog over a transparent ground, and the GUI's silent drop on a
+   transparent export), D5 (ring colour), `fog_max`, and D6 on a dark ground
+   (WP-2111's Inherited has the observation).
+4. Docs, figure pairs, the skill clause (tasks 7-9).
 
 ### 2026-11-12 — filed
 
