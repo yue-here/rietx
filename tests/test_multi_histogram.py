@@ -405,7 +405,7 @@ def test_a_joint_plan_that_reaches_one_histogram_says_which_it_missed(two_patter
         1: ["instrument.extra_components.*"]}
 
 
-def test_rietveld_only():
+def test_a_joint_fit_refuses_lebail():
     structure, instruments = perturbed_inputs()
     ref = MultiHistogramRefinement(structure, instruments)
     dummy = PatternData(two_theta=[1.0, 2.0], intensity=[1.0, 1.0])

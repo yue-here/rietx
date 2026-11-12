@@ -41,9 +41,9 @@ table (`ABSENT`, "a joint fit is Rietveld-only"). Those rows change with this WP
 - [ ] Measure first: on a synthetic ramp of 10 patterns, what does Le Bail alternation
   through the joint path cost against N single fits, and does Pawley's blocked step
   hold at N = 100? Decide whether one mode lands first, and write it here.
-- [ ] Lift the refusal for the mode or modes built. A joint fit with nothing shared in
+- [x] Lift the refusal for the mode or modes built. A joint fit with nothing shared in
   these modes keeps a message saying it is N single fits.
-- [ ] `multi.py`'s diagnostic rows, and `force-fix` of intensity paths under
+- [x] `multi.py`'s diagnostic rows, and `force-fix` of intensity paths under
   `mode_fixed` across histograms.
 - [ ] A cross-backend config, if a new derivative path appears.
 - [ ] Manual: `reference/joint.md`, `reference/parametric.md`.
