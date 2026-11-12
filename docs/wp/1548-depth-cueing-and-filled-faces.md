@@ -225,4 +225,8 @@ measured.
 - **Found in the code:** faces are already a primitive both renderers draw,
   and `cut.py`'s masks already name atom sets. So the ring and face half is
   mostly scene-building. Fog touches every shading path in both renderers.
+- **Forwarded:** WP-2111's `### Inherited` notes that this WP waits on its
+  `DIM_BOUNDARY` ruling (D6).
+- **Reviewed:** prose-only branch, so no `/code-review`. Docs-consistency
+  tests pass.
 - **Next:** the manual survey, then fog in the numpy raster.
