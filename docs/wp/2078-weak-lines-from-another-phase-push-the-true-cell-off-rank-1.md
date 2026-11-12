@@ -152,7 +152,100 @@ none is settled by this file.
 
 **Cost.** The reporter ran each list under its own 120 s ceiling. A second
 arm inside one `quick` run shares one whole-run ceiling, so it either halves
-each arm's search or cuts trailing systems. That cost is unmeasured.
+each arm's search or cuts trailing systems. Measured 2026-11-12 (below): the
+arm roughly doubles a search's wall time, and on one held-out list the
+ceiling then cut the run that had found the truth.
+
+**The families (task 3, 2026-11-12).** Nineteen lists, plus four reruns with
+only the host's crystal system declared.
+- *Fixtures*, development data: (a), (b), (c) of task 2, and (d), the flat
+  synthetic silicon of #1382 (10 usable lines, 8 its own), searched with no
+  system declared, as the issue reproduced it.
+- *Certified rows of the indexing acceptance corpus*, development data, since
+  the indexer's rules were tuned on them: corundum (SRM 676a), zincite,
+  zircon, brucite, magnetite, fluorite, NAC, FAP and SRM 660c LaB₆. Each is
+  searched over the systems and volume its acceptance row declares.
+- *IUCr CPD round-robin mixtures, host plus traces*: cpd-1a (95 % fluorite;
+  development data, it is the acceptance corpus's abstention row), cpd-1b (94 %
+  corundum) and cpd-1c (94 % zincite), both held out, since no indexing test
+  searches them. Truth is each phase's cell; the host is the one that matters.
+- *11-BM SRM 660b LaB₆ + cBN*, held out (no indexing test searches it).
+- *Controls*: HL2-1 (`hl2_peaks.txt`, the unidentified pattern; development)
+  and cpd-1g (three phases at about a third each; held out). A control "gains"
+  when a candidate is graded `medium` or `high`.
+
+**Measured (task 4, 2026-11-12).** The harness was session scratch, so each candidate's construction is stated here. `[dev]`, arm64 Mac,
+`preset="quick"` (120 s whole-run ceiling), all three engines (plus single-engine rows on (a) and (d)), 187 runs, none raising. The
+machine was shared with other runners at a load of 25-105 on 10 cores, so every
+wall time is a loaded one, and a run the ceiling cut (`*`) reads machine load,
+not the data (WP-1449). Candidates: (1) nothing; (2) the floored list searched
+and scored; (3) the floored list driven and the full list scored, by flagging
+each line under the floor `weak_line` (the #934 seam); (4) a second search per
+engine unit on the floored list, its candidates mapped back onto the full list
+and merged under the engine's own name; (5) `n_unindexed="inliers"`. The
+truth's rank, then its grade's initial (`l` low, `m` medium, `h` high); `—`
+absent.
+
+| list | (1) | (5) | (2) 0.5 % | (3) 0.5 % | (4) 0.5 % | (2) 1 % | (3) 1 % | (4) 1 % | (2) 2 % | (3) 2 % | (4) 2 % |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| (a) Mo + MoO₃ trace | — | — | 1m | 2l | 5l | 1m | 3l | 9l | 1m | 3l | 9l |
+| (b) double perovskite | 1m | 1m | 1m | 1m | 1m | 2l | 1m | 1m | 3l | 1l | 1l |
+| (c) Si + planted | — | — | — | — | — | — | — | — | — | — | — |
+| (d) flat Si, picker splits | 2l | 2l | 1m | 1l | 1l | 1m | 1l | 1l | 1m | 1l | 1l |
+| SRM 660c LaB₆ | 1l | 4l | 1l | 1l | | 1h | 1l | 1l | 2l | 1l | |
+| zincite | 1l | 1l | | | | 1l | 1l | 1l* | | | |
+| zircon | 1l* | 1l | 1l | 1l | | 1l | 1l | 1l* | 1l | 1l | |
+| brucite | 1l | 1l | 1l | 1l | | 1l* | 1l* | 1l* | 1m* | 1l* | |
+| magnetite | 1m | 1m | | | | 1m | 1m | 1m | | | |
+| FAP | 1l | 1l | 1l | 1l | | 1l | 1l | 1l* | 1l | 1l | |
+| fluorite, cubic only | 1m | 1m | | | | 1m | 1m | 1m | | | |
+| corundum, trigonal only | 1l* | 1l* | | | | 1l* | 1l* | 1l* | | | |
+| NAC | 1l* | 1l* | | | | 1m* | 1l* | 1l* | | | |
+| cpd-1a host, cubic only | 1l | 1l | | | | 1m | 1l | 1l | | | |
+| cpd-1b host, trigonal only | 1l* | 1l* | | | | 1l* | 1l* | —* | | | |
+| cpd-1c host | 1l* | 1l | 1l* | 1l* | | 1l* | 1l* | 1l* | 1l* | 1l* | |
+| LaB₆ + cBN, either phase | — | — | | | | — | — | — | | | |
+
+Blank cells were not run. The 1 % floor removes 0-4 lines from a certified
+list (FAP 43 of 135 and NAC 144 of 262, both synchrotron-like long lists),
+31 of 38 from (a), 19 of 35 from (b), 4 of 29 from (c) and 1 of 10 from (d).
+What the table says:
+- **Only the hard floor (2) puts (a)'s truth first.** (3) and (4) find it
+  (every engine does) but rank it 2nd-9th: scored on the full list, cells that
+  also index the oxide's 29 lines outrank the host's. So the gain is in which
+  lines *score*, not only which drive, and the #934 seam cannot deliver it.
+- **The hard floor costs (b)'s supercell from 1 %** (the cubic subcell ranks
+  first), while (3) and (4) keep it at every floor. That is the trade the
+  reporter saw on a pyrochlore, reproduced on a public fixture.
+- **(d) is fixed by every floor in every form**; (c) by none, since its planted
+  lines sit at 1-5 % of the strongest.
+- **The hard floor moves SRM 660c LaB₆**, the absolute anchor. At 1 % it removes
+  one line, flagged `kalpha2_residual` (71.94°, 0.6 % of the strongest), and the
+  grades go from all `low` to the truth `high` *and* the tetragonal a/√2 rival
+  `high` beside it, nine candidates at `medium` or above
+  (`INDEX_MULTIPLE_SOLUTIONS`). At 2 % it also removes an
+  `asymmetry_unmodelled` line (1.75 %) and the tetragonal rival ranks first.
+  A run, not cut. The rival is the known isospectral one positions alone
+  cannot separate (`test_positions_alone_cannot_separate_lab6_from_a_half_volume_rival`).
+- **The inlier rule (5) helps no list** and drops SRM 660c to 4th, as WP-1969
+  measured.
+- **The second arm (4) costs time**: zincite 60 → 108 s, zircon 62 → 100 s,
+  FAP 73 → 124 s, corundum (trigonal) 66 → 110 s. On cpd-1b (trigonal only)
+  the ceiling then cut it, and its corundum, first under (1), went missing.
+- **Controls**: no candidate graded `medium` or above on HL2-1 or cpd-1g under
+  any candidate (both runs ceiling-cut).
+- **Per engine** (single-engine runs on (a) and (d); a single engine grades
+  `low` by construction): under (1) no engine finds (a)'s truth; under (2) at
+  1 % each ranks it first. Under (3) svd ranks it 1st, trial_error 2nd and
+  dichotomy not at all; under (4) 3rd, 4th and absent. On (d) svd ranks Si
+  first unfloored, dichotomy and trial_error second; every engine ranks it
+  first under (2), (3) and (4) except trial_error (2nd) under (3) and (4).
+- **Not measured**: the reporter's controls question on real patterns that
+  contain a lattice; a finished search on the cut real lists (a quiet machine,
+  or a declared ceiling, would give one).
+- **Side finding**: on LaB₆ + cBN (held out, two major phases, 92 usable lines)
+  no candidate finds either phase, in 8-17 s, with `INDEX_INLIER_RETRY` and
+  `INDEX_SEARCH_INCOMPLETE`. A floor is no answer there; it goes to WP-1969.
 
 **Licensing.** Concepts only from papers. No program code is consulted.
 
@@ -191,11 +284,12 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
       not lose the true cell. (c) WP-1969's synthetic Si with twelve lines
       planted at 1-5 % of the strongest, which a 1 % floor mostly keeps.
       Record the truth's rank on `main` under the default.
-- [ ] Public measurement families for the tier-3 mechanical ground: the
+- [x] Public measurement families for the tier-3 mechanical ground: the
       indexing acceptance corpus (`tests/test_acceptance_indexing.py`'s
       certified rows), the IUCr CPD round-robin mixtures (`qarr/`), and the
       11-BM LaB₆ + cBN mixture. Say which are development data.
-- [ ] Measure the candidates on the fixtures and the families, every engine,
+      *Done 2026-11-12: Context, "The families".*
+- [x] Measure the candidates on the fixtures and the families, every engine,
       under `preset="quick"` with one shared ceiling: (1) nothing; (2) the
       floored list searched and scored (the issue's form); (3) the floored
       list driven and the full list scored, through the `PEAK_UNDRIVEN_FLAGS`
@@ -203,6 +297,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
       names only; (5) WP-1969's inlier rule as the default. For each: truth
       rank, grade, wall time, controls gaining a `medium` candidate, and
       SRM 660c LaB₆ at rank 1. Floors at 0.5, 1 and 2 %.
+      *Done 2026-11-12 at 0.5, 1 and 2 % on the fixtures, at 1 % on every family; Context, "Measured".*
 - [ ] Decision (maintainer): the design, the floor's value and its tier, from
       the brief tasks 1-4 produce. Recorded here as `Decided YYYY-MM-DD:` and
       answered on #1291.
