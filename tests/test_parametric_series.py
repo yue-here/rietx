@@ -1675,6 +1675,8 @@ def test_a_pawley_joint_fit_shares_a_parametric_cell():
     rows = {r.path: r for r in ref.parameters()}
     assert rows["hist.0.phases.0.scale"].mode_fixed
     assert not rows["vars.a_1"].mode_fixed
+    # no fraction off a force-fixed scale, the single Pawley fit's rule
+    assert all(result.for_histogram(h).qpa is None for h in range(n))
     # the Pawley findings are each histogram's own, never the fit's
     assert not {d.code for d in result.diagnostics} & {
         "PAWLEY_OVERLAP_UNRESOLVED", "PAWLEY_OFF_DATA_RIDGED"}

@@ -2464,13 +2464,16 @@ class MultiHistogramRefinement:
             stats = compute_statistics(model.y_obs, y_calc, model.sigma,
                                        n_free=n_free_h, y_background=y_bkg)
             # the single fit's builder, blind-scale rule and finding included
-            # (WP-1463); rows are addressed as this surface spells them
-            qpa, qpa_diags = _quantify_phases(
+            # (WP-1463); rows are addressed as this surface spells them.
+            # Rietveld only, as there (``refine._build_result``): a Pawley
+            # fit force-fixes every scale, so a fraction would be the start's
+            qpa, qpa_diags = (_quantify_phases(
                 table, thetas[h], s_h, corr_h, struct, values, model,
                 unmeasured=joint_unmeasured[h],
                 held=(_held_scale_phases(stage_results[-1], h)
                       if stage_results else None),
                 where_of=lambda p, h=h: mt._canonical(h, p))
+                if model.mode == "rietveld" else (None, []))
 
             diags: list[Diagnostic] = []
             j0, j1 = data_off[h], data_off[h] + n_data[h]
