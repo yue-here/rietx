@@ -125,13 +125,13 @@ of issue #561, sized M.
 - [x] pdCIF reader: accept the net-intensity and weight columns, with a diagnostic where it repairs
 - [x] The data file and a provenance row in `tests/data/README.md`
 - [x] The authors' profile; the template-superposition floor, measured and recorded
-- [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
+- [x] The acceptance test + obs/calc/diff PNGs to `tests/output/`
 - [x] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
 - [x] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
 - [x] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
 - [x] Part 1: the per-atom table goes to `tests/output/` as a record
-- [ ] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
-- [ ] Part 2: the cell joins the per-atom record table (|Δ|, published esd, rietx esd, ratio), asserting nothing
+- [x] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
+- [x] Part 2: the cell joins the per-atom record table (|Δ|, published esd, rietx esd, ratio), asserting nothing
 - [ ] Skill: none expected; say why at handover
 
 ## Acceptance
