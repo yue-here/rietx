@@ -1,6 +1,6 @@
 # WP-1548 — depth cueing, and filled rings and faces, in the structure figure
 
-Milestone: rietview · Status: ⬜
+Milestone: rietview · Status: 🔄 2026-11-12 — claimed by @yue-here
 Depends on: 2111 soft (its ruling on `DIM_BOUNDARY`, D6)
 Priority: P3 2026-11-12 — the maintainer asked for it; nothing waits on it, and a ray tracer through WP-1537 would give fog once that lands
 
