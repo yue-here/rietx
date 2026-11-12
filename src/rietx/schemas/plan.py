@@ -193,6 +193,12 @@ class StageSpec(Base):
     turn_on: list[str] = Field(
         default_factory=list,
         description="dot-path globs freed this stage, e.g. 'phases.*.cell.*'")
+    turn_off: list[str] = Field(
+        default_factory=list,
+        description=(
+            "dot-path globs this stage fixes after it frees turn_on, e.g. "
+            "'instrument.profile.*'; the flag carries to later stages until "
+            "a later turn_on frees the path again"))
     max_iter: int = Field(100, description=(
         "approximate solver iterations for this stage; both drivers cap "
         "evaluations rather than iterations, so it is scaled by the "
@@ -237,6 +243,7 @@ class StageSpec(Base):
     @classmethod
     def from_stage(cls, stage: Any) -> "StageSpec":
         return cls(name=stage.name, turn_on=list(stage.turn_on),
+                   turn_off=list(stage.turn_off),
                    max_iter=stage.max_iter, ftol=stage.ftol,
                    lebail_cycles=stage.lebail_cycles, lebail_tol=stage.lebail_tol,
                    seed=stage.seed, strain_seed=stage.strain_seed,
@@ -247,6 +254,7 @@ class StageSpec(Base):
         from ..strategy.staged import Stage
 
         return Stage(name=self.name, turn_on=list(self.turn_on),
+                     turn_off=list(self.turn_off),
                      max_iter=self.max_iter, ftol=self.ftol,
                      lebail_cycles=self.lebail_cycles, lebail_tol=self.lebail_tol,
                      seed=self.seed, strain_seed=self.strain_seed,

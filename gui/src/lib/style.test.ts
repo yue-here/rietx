@@ -206,3 +206,71 @@ describe("the title bar gives ground before it overflows", () => {
     expect(rule).not.toMatch(/flex:\s*0 0 /);
   });
 });
+
+/**
+ * Every `<button …>` opening tag in a file, attributes whole.
+ *
+ * Scanned rather than matched with `<button[^>]*>`, because an attribute such
+ * as `onclick={() => go()}` holds a `>` and a regex would end the tag there.
+ */
+function buttonTags(source: string): string[] {
+  const out: string[] = [];
+  let from = 0;
+  for (;;) {
+    const start = source.indexOf("<button", from);
+    if (start < 0) return out;
+    let depth = 0;
+    let quote = "";
+    let i = start + 7;
+    for (; i < source.length; i++) {
+      const c = source[i];
+      if (quote) {
+        if (c === quote) quote = "";
+      } else if (depth === 0 && (c === '"' || c === "'")) quote = c;
+      else if (c === "{") depth++;
+      else if (c === "}") depth--;
+      else if (c === ">" && depth === 0) break;
+    }
+    out.push(source.slice(start, i + 1));
+    from = i + 1;
+  }
+}
+
+describe("one filled primary per view", () => {
+  it("draws every button outlined, a segmented option or a register of its own", () => {
+    // The maintainer's ruling of 2026-11-06: one filled primary per view, in
+    // the accent, and every other button outlined.  The shell's action bar
+    // shows its filled Refine under every panel (WP-2123), so a panel's own
+    // filled button is always a second one.  Three are allowed: the start
+    // screen's New project…, which is the whole view and has no bar under it
+    // (WP-2131), and two dialogs over the window whose own primary is the
+    // dialog's, the New project dialog's Create project and the folder
+    // browser's Use this directory.  The File menu's Save a copy and Export
+    // dialog is a fourth over the window (WP-2133), one primary for both.
+    // The offer of kept edits is a fifth (WP-2209), whose primary is Restore.
+    const ALLOWED: Record<string, number> = {
+      "panels/ActionBar.svelte": 1,
+      "panels/Browse.svelte": 1,
+      "panels/FileMenu.svelte": 1,
+      "panels/NewProject.svelte": 1,
+      "panels/Recovery.svelte": 1,
+      "panels/Start.svelte": 1,
+    };
+    // `.ink` is the Parameters panel's number (WP-2126): the value itself,
+    // tinted because it can be edited, whose press opens the editor over it.
+    // It carries no fill of the accent, so it is no second primary.
+    const OTHER = /\bclass="[^"]*\b(ghost|tab|pick|link|help|ink)\b/;
+    const filled: Record<string, number> = {};
+    const tags: string[] = [];
+    for (const rel of styledFiles()) {
+      for (const tag of buttonTags(read(rel))) {
+        tags.push(tag);
+        if (OTHER.test(tag) || /\bclass:(ghost|on)=/.test(tag)) continue;
+        filled[rel] = (filled[rel] ?? 0) + 1;
+      }
+    }
+    // the scanner read real tags: one of them holds an arrow function's `>`
+    expect(tags.some((tag) => tag.includes("=>"))).toBe(true);
+    expect(filled).toEqual(ALLOWED);
+  });
+});

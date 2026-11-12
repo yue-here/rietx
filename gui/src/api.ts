@@ -87,8 +87,10 @@ async function upload(kind: string, file: File | null,
  * A route answering float64 arrays rather than JSON (WP-1461, D4): the curves,
  * every channel once. A refusal is still the JSON error envelope.
  */
-async function arrays(path: string): Promise<ArrayBuffer> {
-  const response = await fetch(path);
+async function arrays(path: string, body?: unknown): Promise<ArrayBuffer> {
+  const response = await fetch(path, body === undefined ? undefined : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
   if (response.ok) return response.arrayBuffer();
   const text = await response.text();
   let payload: any = null;
@@ -114,6 +116,9 @@ export const api = {
   spacegroup: (symbol: string) =>
     call("GET", `/api/spacegroup?space_group=${encodeURIComponent(symbol)}`),
   recent: () => call("GET", "/api/recent"),
+  /** Drop one entry from the recent list; the project itself is untouched. */
+  removeRecent: (path: string) => call("POST", "/api/recent/remove", { path }),
+  clearRecent: () => call("POST", "/api/recent/clear"),
 
   /** The example projects shipped in the wheel (WP-1204).  `built` says
    *  whether opening one is a plain open or a build first, which is what lets
@@ -127,6 +132,23 @@ export const api = {
    *  and it persists on the verb rather than on a save. */
   settings: () => call("GET", "/api/settings"),
   patchSettings: (ui: Record<string, unknown>) => call("POST", "/api/settings", { ui }),
+
+  /** The open project's kept unapplied edits (WP-2209): `draft` is `null`
+   *  when there are none; `head` is the node they were made against and
+   *  `head_now` the project's. */
+  recovery: () => call("GET", "/api/recovery"),
+  /** Keep a project's pending edits, or delete the copy with `null`.  The
+   *  write names its project, so the last one for a project just left lands. */
+  putRecovery: (project: string, head: string | null, draft: unknown) =>
+    call("PUT", "/api/recovery", { project, head, draft }),
+  /** The same write from a page being closed: `keepalive` lets it outlive the
+   *  page, and nobody is left to read its answer. */
+  putRecoveryOnHide: (project: string, head: string | null, draft: unknown) => {
+    fetch("/api/recovery", {
+      method: "PUT", keepalive: true, headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project, head, draft }),
+    }).catch(() => {});
+  },
 
   /** Stage a file and get it back described — phase one of an import. */
   uploadFile: (kind: string, file: File, options: Record<string, string> = {}) =>
@@ -153,9 +175,25 @@ export const api = {
   /** A flush a client may call and never must: every settings verb already
    *  saved and the model was on disk the moment its node was appended. */
   save: () => call("POST", "/api/project/save"),
+  /** The File menu's folder verbs (WP-2133): each refused while a run is in
+   *  flight, and none replaces a folder that is already there. */
+  copyProject: (directory: string, name: string) =>
+    call("POST", "/api/project/copy", { directory, name }),
+  renameProject: (name: string) => call("POST", "/api/project/rename", { name }),
+  moveProject: (directory: string) => call("POST", "/api/project/move", { directory }),
+  closeProject: () => call("POST", "/api/project/close"),
 
   params: () => call("GET", "/api/params"),
-  patchParams: (delta: { values?: Record<string, number>; vary?: Record<string, boolean> }) =>
+  /** Values, vary flags and (WP-2126) holds, limits and value restraints, in
+   *  one call; the server applies limits and restraints first, as one model
+   *  edit, then values, unholds, vary flags and holds. */
+  patchParams: (delta: {
+    values?: Record<string, number>;
+    vary?: Record<string, boolean>;
+    hold?: Record<string, boolean>;
+    limits?: Record<string, [number | null, number | null]>;
+    restraints?: Record<string, { target: number; sigma: number } | null>;
+  } | Record<string, unknown>) =>
     call("PATCH", "/api/params", delta),
   plan: () => call("GET", "/api/plan"),
   /** Either `{preset: name}` or `{plan: spec}` — a preset is stored *expanded
@@ -237,6 +275,13 @@ export const api = {
   /** The pattern's every channel and the fit's curves on the ones it kept, as
    *  `rxplot.mjs`'s `unpack` reads them; before a fit, the pattern alone. */
   curves: () => arrays("/api/result/curves"),
+  /** The background curve, the observed pattern and the curve's esd at each
+   *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
+  background: () => arrays("/api/background"),
+  /** The curves at values nobody has applied, writing nothing (WP-2125): the
+   *  fitted channels, the model, its background, each phase, the three
+   *  residuals and the ticks, with the Rwp there. */
+  preview: (values: Record<string, number>) => arrays("/api/preview", { values }),
   /** The three layers **plus** an `apply` arm parallel to `suggested_actions`:
    *  whether the server would act on each one, and what it would run.  Idle-only
    *  (Layers 1-2 read the compiled model a stage would be rewriting), so this
@@ -330,6 +375,9 @@ export const api = {
   seriesHistory: (index: number) =>
     call("GET", `/api/series/history?index=${index}`),
 
-  export: (kind: string) => call("POST", `/api/export/${kind}`),
+  /** One export kind; with `directory` it is written there rather than into
+   *  `exports/`, and an existing file is refused unless `overwrite` (WP-2133). */
+  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean } = {}) =>
+    call("POST", `/api/export/${kind}`, body),
   events: (since: number) => call("GET", `/api/events?poll=1&since=${since}`),
 };

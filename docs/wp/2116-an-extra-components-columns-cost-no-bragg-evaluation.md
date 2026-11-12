@@ -1,9 +1,9 @@
 # WP-2116 — an extra component's columns cost no Bragg evaluation
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — task 1 done (PR #1441). Ruled by Yue 2026-11-09, "many users fit humps": the WP stays open and unscheduled for the analytic hump columns (tasks 2-5)
 Track: A long run is not one fit
 Depends on: —
-Priority: P3 2026-11-05 — a cost-only item with no user at the wall: 22 % of one acridine fit, on fits that declare `extra_components`
+Priority: P3 2026-11-09 — a cost-only item: 18-24 % of a fit that frees a hump (acridine), on a path many users run (Yue, 2026-11-09); it changes no number
 
 ## Goal
 
@@ -62,7 +62,17 @@ body's default plan.
 
 ## Tasks
 
-- [ ] Cost it on the other four fixtures (LaB6, FAP, cpd-1a, NAC), which the issue has not done. Stop if no fit but a hump-bearing one gains.
+- [x] Cost it on the other four fixtures (LaB6, FAP, cpd-1a, NAC), which the issue has not done. Stop if no fit but a hump-bearing one gains.
+  Done 2026-11-06: none of the four declares an extra component, so only acridine gains and the WP stops here.
+
+  | fit | declares `extra_components` | columns in `fd_cols` | hump FD / `r0`, share of the closing Jacobian | hump FD + `r0`, share of the fit |
+  |---|---|---|---|---|
+  | LaB6 | no | none, in any of 8 stages | 0 / 0 | 0 |
+  | FAP | no | none, in any of 7 stages | 0 / 0 | 0 |
+  | cpd-1a | no | `axial_sl` in 1 of 23 `lines_axial` Jacobians | 0 / 0 | 0 (that call 0.1 %, not a component column) |
+  | NAC | no | none, in any of 7 stages | 0 / 0 | 0 |
+  | acridine IX | `HumpComponent` | its 3 parameters, in every Jacobian of all 5 stages | 37 % / 12 % | 24 % (hump 18 %, `r0` 6 %) |
+
 - [ ] Compute the hump's three columns from the component, keeping the whole-model route for any tie reaching outside it.
 - [ ] Reuse `r0` where the spelling allows it, or record why not.
 - [ ] A cross-backend row, and a test that the component columns match the whole-model FD column to the bar the step allows.
@@ -82,4 +92,8 @@ body's default plan.
 
 ## Handover log
 
+- **2026-11-09** — the maintainer ruled, and the WP stays open. Yue's words, 2026-11-09: "many users fit humps". So the stop rule of task 1 does not close the WP. The analytic hump columns (tasks 2-5) stay here, unscheduled, for whoever takes them next. Issue #1418 stays open with the WP. *Done.* Status line records the ruling. The priority line keeps P3 and drops "no user at the wall", which the ruling contradicts. That re-rating was settled by Claude under the template's rubric: a cost-only item with no wrong number is P3 whoever pays it. No task, code or test changed. Bookkeeping PR: #1513. Next: tasks 2-5 in order, starting with the hump's three columns computed from the component alone. Check first whether Michael's side still holds the work (Context, Source).
+- **2026-11-09** — bookkeeping: task 1 is on main. Michael's PR #1441 (docs only, this file and the index) merged on 2026-11-09 at 10:42 UTC as `9979cee7c`. It carried both of his 2026-11-06 entries and the task-1 tick (`9e05e742c`), so task 1 was already ticked and nothing else here changes. A reviewer proposed closing the WP as 🛑 under its stop rule, together with issue #1418. That rule was written by the 2026-11-05 triage session (`0a011a5ad`), a Claude session, so it is evidence and not a ruling: the close waits on the maintainer, and the status stays 🔄. Bookkeeping PR: #1500. Next: the maintainer closes the WP (🛑, with its record move and #1418) or keeps it open for the next hump-bearing fit.
+- **2026-11-06** — task 1 done, and the WP stops here by its own rule. LaB6, FAP, cpd-1a and NAC (the `tests/test_window_domain._protocol` fits, closing stage at 1e-3) declare no extra component. The FD fallback never runs on LaB6, FAP or NAC. On cpd-1a it runs once, for `axial_sl` while `axial_ok` is false in `lines_axial`, a column no component-only evaluation could replace. The `r0` repeat happens only when `fd_cols` is non-empty, so on these fits it costs something only where a hump is free. Acridine, re-run as the positive arm on `263227986` with #1416's `_fit`, reproduced the issue: hump FD + `r0` 49 % of the closing Jacobian (`r0` 12 %), 24 % of the fit. Sum check: FD seconds within 1.3 % of 4 × the median residual per Jacobian. Method: the first `evaluate` in a Jacobian is `r0`, and each later one is a column, classed by the decoded paths it moves. Measured on darwin arm64, 4 threads, 1-min load 4.4–6.9. Table and setup on #1418. Not done: tasks 2–5. Next: the maintainer closes the WP (🛑, with its record move) or keeps it for the next hump-bearing fit.
+- **2026-11-06** — taken by Michael's side for task 1, the cost on LaB6, FAP, cpd-1a and NAC, measured on the Mac at `263227986` with acridine re-run as the positive arm. Nothing in `src/` changes in task 1. Next: the per-fixture table, then the stop rule.
 - **2026-11-05** — created, from the 2026-11-05 issue triage (issue #1418). Checked against the tree at `541f0daf7`: read the `fd_cols` loop and its comment at `least_squares.py:2131-2149`, which do what the issue says; the timings were not re-run; no open WP owns it: WP-2045 is the runaway stop, and WP-1806 is the acceptance fit. Next: the four-fixture cost, which decides whether the WP is worth building.

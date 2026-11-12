@@ -221,6 +221,21 @@ change here can fail a suite over there.
 - WP-1029 (the GUI's resize rules), WP-1423 (the panels), WP-1430 (the module
   the port lives in).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**`lib/resize.ts`'s cases are copied out, and `gui/src` is hashed whole**
+(WP-1425). `rietx watch` cannot import TypeScript, so it ports
+`clampSize`/`dragged`/`axisOf` and `tests/test_watch_app.py` compares
+`resize.test.ts`'s `ported cases` block against `tests/watch_core.test.mjs` **as
+text**, comments included: edit them here and the copy fails until it follows.
+`build_info.py` hashes `gui/src/**/*`, test files included, so editing any test
+here marks the committed dist stale and costs an `npm run build`.
+
 ## Handover log
 
 ### 2026-09-16 — the two seams are the reader's, and the picture finally hears them move

@@ -461,6 +461,8 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "phases.*.magnetic_lor_strain": 5,
   "phases.*.microstrain.dof.*": 3,
   "phases.*.microstrain.s*": 3,
+  // WP-1419: a parent-cell strain is a dimensionless amplitude of 1e-4 to 1e-2
+  "phases.*.parent_cell.strain.*": 5,
   "phases.*.preferred_orientation.r": 4,
   "phases.*.texture.*": 4,
   // WP-1805: a rigid body's origin is fractional like an atom's x, y, z, and

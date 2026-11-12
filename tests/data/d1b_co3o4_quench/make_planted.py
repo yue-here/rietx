@@ -86,15 +86,15 @@ def nan_block() -> bytes:
 
 
 def wrong_sample() -> bytes:
-    """The garnet standard's pattern, titled as a Co₃O₄ quench pattern.
+    """The YIG standard's pattern, titled as a Co₃O₄ quench pattern.
 
-    Every number is the real standard's (a garnet measured at 300 K in the
+    Every number is the real standard's (YIG measured at 300 K in the
     same experiment); only the title changes, as when a file is put in the
     wrong slot of a series.
     """
-    head, body, tail = _split("standard_garnet_300K_1.dat")
-    head[0] = _title("PLANTED wrong sample: the garnet standard "
-                     "standard_garnet_300K_1.dat titled as Co3O4-quenched_300K")
+    head, body, tail = _split("standard_YIG_300K_1.dat")
+    head[0] = _title("PLANTED wrong sample: the YIG standard "
+                     "standard_YIG_300K_1.dat titled as Co3O4-quenched_300K")
     return _join(head, body, tail)
 
 

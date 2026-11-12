@@ -85,7 +85,7 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 
 | Program | Staging | Held during a fit |
 |---|---|---|
-| rietx | plans of cumulative stages; the last frees everything the plan freed | reflection list, windows, FCJ nodes: per stage |
+| rietx | plans of cumulative stages; a stage may also fix (WP-2208); the closing stage re-solves the declared stages' end state | reflection list, windows, FCJ nodes: per stage |
 | RIETAN-FP | `NAUTO = 2`: early cycles refine subsets (background and scale; widths; asymmetry; widths and asymmetry; cell; atoms), then everything together to convergence. `NAUTO = 1`: the user lists the early cycles | windows follow every evaluation; Le Bail intensities per cycle |
 | BGMN | automatic: isotropic models first, anisotropic ones added, then a closing run with everything free restarted from the answer; a weak anisotropic term is switched off | the ray-traced instrument function for the whole fit |
 | MAUD | the refinement wizard: cumulative stages (scales and background; cell, zero, B; size and strain; atoms), no final all-free cycle | windows follow every evaluation; texture, strain, Le Bail intensities and structure factors per iteration |
@@ -476,6 +476,18 @@ the file?
 Dropping and zero weight give the same χ². The two differ in what the pattern holds afterwards:
 GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
 excluded region.
+
+## Separators, trailing comments and text lines in a column file
+
+Surveyed 2026-11-09 for WP-1952 (issue #897). The question: in a plain two- or three-column
+file, which characters separate the columns, what happens to a comment after a row's numbers, a
+text line inside the data and a decimal comma?
+
+| Program | What it does |
+|---|---|
+| rietx | Whitespace, `,` and `;` separate, and a `;` line is a comment. A field opening with `#` or `!` ends the row, without a report. A line between the first and last data row that is not a row of numbers is dropped and reported by line (`PATTERN_ROWS_DROPPED`); a header above the data and a footer below it are skipped silently. Quoted fields and a comma inside a number (a decimal comma or a thousands separator) are refused by name (checked, `io/formats/xy.py`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma or a thousands separator splits the number in two, as rietx did before (checked by reading, not run) |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
 
 ## A magCIF in a non-standard orientation
 
@@ -983,6 +995,127 @@ Stinton & Evans (2007) use both shapes: a second-order 2θ calibration polynomia
 
 Of the Durham tutorials, ZrP₂O₇ writes a two-coefficient curve in `Xo` on `th2_offset`, and ZrMo₂O₈ writes a tanθ width scaled by `spherical_harmonics_hkl` with fixed coefficients. WO₃'s two lines need neither: one is an overall B and one a sample height. Incidence over a larger set is not measured, since the private archive was not on the machine that ran this, and since 2026-11-04 it decides nothing here.
 
+## The window layout of a GUI
+
+Surveyed 2026-11-06 to 2026-11-08 for the gui-overhaul milestone, and restated 2026-11-08 for
+WP-2123. Desktop applications rather than refinement programs, because the question is how a
+window lets a person hide, resize and stack its panels. Each row is marked checked (read in the
+product's documentation) or recall (from use, not re-read).
+
+| Program | Panel toggles | Resizing | A narrow window | A choice among views |
+|---|---|---|---|---|
+| VS Code | a layout control for each side bar and the panel, at the matching end of the title bar; each never moves (checked, user interface docs) | a sash between parts; drag, double-click resets (recall) | parts stay side by side; the window has a minimum width (recall) | — |
+| Xcode | the navigator toggle at the toolbar's left end, the inspector toggle at its right (recall) | drag the divider (recall) | panes stay side by side (recall) | segmented controls in the toolbar and inspectors (recall) |
+| Claude desktop app | the side panel's toggle sits on its own side (recall) | drag the divider (recall) | drops to one panel below a width (recall) | — |
+| macOS and iOS | — | — | — | a segmented control draws its choices on one track, the chosen one raised (recall, Apple Human Interface Guidelines) |
+| GSAS-II 5.8.4 | none: the data tree on the left and the notebook on the right are fixed (recall) | a splitter between them (recall) | — | — |
+
+The practice these add up to: each side's toggle sits on its own side and does not move, a sash
+resizes and a double-click resets it, and a segmented choice is drawn on a track rather than as
+a row of buttons. Only the Claude app drops to one column below a width; the maintainer chose
+that behaviour on 2026-11-07. The refinement programs offer no model for any of this: TOPAS works
+through a text editor, and FullProf's and GSAS-II's windows are fixed panes (recall).
+
+## Where a GUI keeps its secondary controls
+
+Gathered 2026-11-11 for WP-2214, the GUI rebuild's inventory, which gives every control of the
+old GUI a home in the new design. Every row is recall (from use, not re-read).
+
+| Program | Commands | An object's actions | Facts and live state | A plot's options and export |
+|---|---|---|---|---|
+| VS Code | a command palette holding every command with its key | a right-click menu on every item | the status bar: language mode, encoding and the Problems count on the right, each opening a menu or its panel | — |
+| Figma | a quick-actions search | a right-click menu on every object; a properties panel showing only what fits the selection | — | — |
+| Origin, Igor Pro | the menu bar | — | Origin's status bar reads the cursor's coordinates | a right-click menu on the plot (copy, export, axis options) and a plot-details dialog |
+| ImageJ, QGIS, GIMP | the menu bar | — | the status bar reads the pointer's coordinates and the value under it | — |
+| GraphPad Prism | the menu bar | — | — | a format dialog opened from the graph; the graph window shows only the graph |
+| GSAS-II 5.8.4 | the menu bar | a right-click menu on a plot for a few actions | — | — |
+| Gmail, GitHub | single-letter keys for frequent verbs; `?` lists them | — | — | — |
+| macOS | ⌘. cancels the operation in progress (Human Interface Guidelines) | — | — | — |
+
+The practice these add up to: the window shows the work and few controls. An object's actions
+sit on that object, behind a right-click or a selection. A command palette or a list of keys
+holds every command. The status bar carries facts about the document and the pointer. No
+refinement program draws its window this way, so the rebuild follows the desktop applications.
+
+## The start screen and the New project flow
+
+Surveyed 2026-11-08 for the maintainer's round-9 GUI design and restated 2026-11-09 for WP-2131.
+Desktop applications again, because no diffraction program has a start screen: GSAS-II,
+FullProf's WinPLOTR, TOPAS and Profex each open on an empty main window (recall, not re-read).
+Each row is marked checked (read in source or documentation) or recall (from use, not re-read).
+
+| Program | The first screen | At launch | A new project asks first |
+|---|---|---|---|
+| VS Code | Welcome: Start (New, Open), Recent, Walkthroughs (recall) | reopens the last folder (recall) | a folder; no name step (recall) |
+| JetBrains IDEs | New Project, Open, a recent list with a ⋯ menu and Remove from list, Learn (recall) | reopens the last project, a setting (recall) | the name and the location, then the language (recall) |
+| Xcode | Create, Clone, Open, and the recent list beside them (recall) | the welcome window, a setting (recall) | a template, then the name, then the place (recall) |
+| Blender | the splash: New File, Open, Recent, links to the manual and the release notes (recall) | the splash over a default scene (recall) | — |
+| Obsidian | Create, Open folder, the vault list (recall) | reopens the last vault (recall) | the vault's name and location in one dialog (recall) |
+| Profex 5 | — | an empty main window (recall) | one dialog: the pattern, then the device's instrument file (recall) |
+| GSAS-II 5.8.4 | — | an empty data tree (recall) | importing a pattern with no instrument file offers a list of default instrument files, the first `CuKa lab data`; Cancel imports nothing (checked, `defaultIparms.py:31`, `GSASIIdataGUI.py:1840-1860`) |
+
+Interface guidance read the same day, from recall: Apple's Human Interface Guidelines and
+Microsoft's Fluent 2 both advise onboarding that can be skipped and is brief, and Nielsen Norman
+Group's articles advise a wizard only where a later step depends on an earlier answer. The four
+answers here are independent, which is the case for one dialog.
+
+The practice these add up to: New, Open, a recent list and a small learning area, with no tour;
+reopen the last project at launch; ask for the name and the place before anything else. The
+round-9 design follows all three. Its departure is the instrument: no surveyed program assumes one
+silently, and GSAS-II makes the person pick from a list. rietx assumes the first entry of that list
+and tags the line `assumed`. Claude settled that call in the round-9 design of 2026-11-08, and it
+is reversible.
+
+## A pattern recalculated while a control moves
+
+Surveyed 2026-11-09 for WP-2125, lightly: a minor decision, so one search and recall. The
+question is whether a program redraws the calculated pattern while a person drags a value, and
+how fast a drag must be answered. Each row is marked checked (read in the product's
+documentation) or recall (from use, not re-read).
+
+| Program | Live recalculation while a value moves | Where the model runs |
+|---|---|---|
+| CrystalDiffract 6 (CrystalMaker) | real-time parameter controls for diffraction and sample settings, with instant feedback (checked, a university software catalogue quoting the version 6 description, tigerware.lsu.edu); which parameters have sliders is not established | in the program |
+| Diamond 5 (Crystal Impact) | the powder diagram updates automatically when structure parameters change (checked, crystalimpact.com, the Diamond 5 manual page on powder patterns) | in the program |
+| PowderCell | the cell and the pattern are edited interactively and redrawn (recall) | in the program |
+| TOPAS, GSAS-II, FullProf | none: a value changes by editing the input or a table, and the pattern is recalculated by a refinement or a calculate step (recall) | — |
+
+The latency bar comes from web practice rather than from crystallography. Google's RAIL model
+counts a drag as an animation, budgets 10 ms of work per frame at 60 frames a second, and
+allows 100 ms for a response to feel immediate (web.dev, "Measure performance with the RAIL
+model", checked). The practice these add up to: the simulation programs redraw at every step
+of a control, inside the program that owns the physics, and no refinement program offers it.
+rietx's GUI serves the curve from the package's own forward model through a local route, so
+the page draws numbers and computes none (WP-2125).
+
+## A stage that fixes a parameter
+
+Surveyed 2026-11-10 for WP-2208, one agent. GSAS-II 5.8.4 source and scripting manual read (checked), TOPAS Technical Reference v9 fetched and grepped (checked), FullProf 8.20 manual and RIETAN-FP manual converted with pdftotext and grepped (checked). MAUD 3.07 was read only as compiled jars with no Java source (class strings only, inferred); nothing was run.
+
+| Program | How a step fixes a parameter | Order within a step | Carried to the next step |
+|---|---|---|---|
+| rietx | `StageSpec.turn_off` since WP-2208, a `fix` clause in `.rxt`; before it a stage only freed, and a plan starts every fit from nothing free (WP-1208) | `turn_on` first, then `turn_off`, as GSAS-II | Yes: the flags carry, so a fix lasts until a later stage frees the path again. The closing stage re-solves the end state of the declared stages |
+| GSAS-II scripting (`do_refinements`) | A step dict has `set`, `clear`, `once` and `skip`. `clear` switches a refine flag off, for example `{"clear": {"LeBail": True}, "set": {"Atoms": ...}}` in the manual's own recipe (checked: `GSASIIscriptable.py:2013-2105`, `:2190-2230`; `docs/source/GSASIIscriptable.rst` § Refinement recipe) | `set` for the whole step first, then `clear`, then (in `iter_refinements`) `once` is applied as a `set` before the refinement and cleared after it. A `once` entry therefore wins over a `clear` of the same key (checked: `:2085-2106`; `set_refinement` runs all `set` code before `clear`, `:2166-2230`) | Yes. The flags live in the project, so a flag set in step k stays set in step k+1 unless a later step clears it. `once` is the only auto-reverting form, and it reverts at the end of its own step (checked: `:2100-2104`) |
+| GSAS-II GUI and refinement engine | Three layers. (1) An unticked refine flag. (2) A `Hold` constraint, whose dialog legend reads "Will not be varied, even if vary flag is set" (checked: `GSASIIconstrGUI.py:845-866`; `GSASIImapvars.py:52`). (3) In a sequential refinement, per-histogram "Fix FXU" and `FixedSeqVars` lists strip phase variables from one histogram's vary list (checked: `GSASIIstrMain.py:850-872`). Out-of-range variables are also frozen automatically in `parmFrozen` (checked: `GSASIIstrMain.py:1066-1073`, `:1198-1215`) | Not applicable (state, not a step) | A `Hold` is stored with the constraints and applies to every later refinement until deleted. A sequential refinement builds the vary list per histogram from that histogram's own flags (`varyList = rbVary+redphaseVary+hapVary+histVary`, `:961`) and stores the union in the result (`:974`). So the varied set can differ between histograms (checked) |
+| TOPAS (Technical Reference v9) | No keyword turns a refined parameter into a fixed one between convergences inside one INP. A parameter refines unless it is written `prm !b1` (checked: § 2.2 "User defined parameters", `prm !b1 0.2`). The `Constant(expr)` function evaluates once and freezes the number (checked: `Constant(expression)` entry). `quick_refine_remove` drops parameters temporarily inside a cycle and reinstates them at the start of the next cycle (checked: § quick_refine). `val_on_continue` changes a parameter's value after convergence, not its flag (checked: attribute list in § 2.3) | Not applicable | `num_runs` restarts the INP, and the INP is re-read each run. State crosses a run only through the OUT file and `#include`. "Equations may simplify to a constant during a run" is the documented way a parameter stops refining in a later run (checked: § `num_runs`). `Run_Number` and `Cycle` are readable in equations and `#if`, so a run can branch on them (checked) |
+| FullProf 8.20 | A refinement code of 0 means "not refined"; the code is `sign(a)(10p + a)` (checked: manual lines 589-596 of the text dump). A run does not change codes. The user edits `CODFIL.pcr` between runs. `Aut=1` renumbers the codes automatically so that zeroing one in the middle leaves no hole, but it only renumbers what the user edited (checked: `Aut` description, text lines 3494-3508) | Not applicable | The program writes `CODFIL.new` or rewrites the PCR on every run, codes included, so edits persist (checked: text line 326). In sequential mode (`CYC`) pattern n+1 starts from the PCR updated by pattern n, with the same codes for every pattern (checked: text lines 285-296). The manual's staged order is advice for the user's own edits (scale, then zero/background/cell, then positions, then profile, and so on; checked: text lines 618-640) |
+| RIETAN-FP | With `NAUTO=1` the user lists the parameters refined in each of the first cycles, one line per cycle, ended by `/`. The manual's example lists background and scale in cycle 1, cell in cycle 2, profile in cycle 3, structure in cycle 4. Read plainly, each listed cycle refines only its own list, so cycle 2 holds the background fixed that cycle 1 refined (checked: § 17.3.17, text line 8625; the exclusive reading is from the wording and was not run) | The listed groups run in order. After the last listed cycle, all parameters with `ID(I)=1` refine together (checked: § 17.3.17) | Not applicable. The schedule lives in the input file and is the whole recipe. `NAUTO=2` picks the groups automatically (checked: § 17.3.17, § 4.1.4) |
+| MAUD 3.07 | Not reached. Only compiled jars are on disk. The class `launchRefineWizard` calls `FilePar.prepareWizard` and prints "Start first cycle ... Start last cycle". `FilePar` has `freeAll*Parameters` and `fixAll*ParametersPreserveBound` methods, so fixing is available to it. Whether the wizard fixes a parameter an earlier step freed was not determined (inferred from class strings, not source) | not determined | not determined |
+
+### Pawley or Le Bail first, then Rietveld
+
+| Program | How the documentation does it | One job or two |
+|---|---|---|
+| GSAS-II | The scripting manual's example recipe sets `LeBail` and the cell, then profile terms (`Instrument Parameters` U V W X Y), then a step with `{"clear": {"LeBail": True}, "set": {"Atoms": ...}}`. The profile flags stay set in that example, so the profile keeps refining in the structure steps. To lock it one would add `clear` of those terms (checked: `GSASIIscriptable.rst` § Refinement recipe). | One job, several steps, flags carried. |
+| TOPAS | Le Bail and Pawley extraction use the `hkl_Is` block with `lebail` (§ 20.2, examples `lebail1.inp`, `pawley1.inp`). A structure refinement uses a `str` block. The TR documents no switch inside one INP, and an INP re-run takes its flags from the text (checked). That the usual practice is to edit the INP between the two jobs is from memory (inferred). | Two INP files, or two edits of one. |
+| FullProf | The manual says to analyse by profile matching first ("to determine accurately the profile shape function, background and cell parameters before running the Rietveld method"; text lines 610-613). Its recipe for `Jbt=2` is: run with zero refined parameters and `Aut=0`, rename `CODFIL.new` to `CODFIL.pcr`, then edit the codes (checked: text lines 674-692). | Two runs of the program with an edited PCR in between. |
+| RIETAN-FP | Le Bail is a mode (`NMODE=4`). The manual's Le Bail template says to comment out the structure parameters in the same `.ins` file (checked: § 11.3, text lines 5116-5122). Rietveld is the same file with `NMODE` changed back. | Two runs of one edited input file. |
+| MAUD | Not reached. | not determined |
+
+### Practice adds up to
+
+No program has a plan whose steps declare "fix this" as a separate list from "free this". GSAS-II comes closest and is the only one with the shape the maintainer describes: a step dict with both `set` and `clear`, flags kept in the project and carried forward, and `set` applied before `clear` within a step. `once` is its way to make a flag last for one step only. TOPAS, FullProf and RIETAN-FP all keep the recipe outside the program, as an edit of the input file between runs, except that RIETAN-FP's `NAUTO=1` list is a built-in schedule in which each cycle refines only its own group, which fixes the earlier groups. For a series, GSAS-II builds the vary list per histogram and has per-histogram fix lists, FullProf reuses one set of codes for every pattern, and TOPAS rereads the INP each run. For Pawley then Rietveld, the three documented routes are two runs with a file edit between them, with GSAS-II alone doing it as steps of one job.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
@@ -1014,3 +1147,14 @@ Sequential refinement (WP-2003, read 2026-10-24):
 Found beside the questions, for rietx-bench rather than rietx: its BGMN case names
 `LAMBDA=cu_hoelzer97`, which has no `.ano` table, so that run has no anomalous dispersion
 (12 % of |F| on Pb (101)), while its `engine.toml` says it uses `cu.ano`.
+
+A stage that fixes a parameter (WP-2208, read 2026-11-10):
+
+- `~/Code/rietx-bench/tools/gsas2/GSAS-II-5.8.4/GSASII/GSASIIscriptable.py:2013-2105` (`do_refinements`, `iter_refinements`: `once`, `skip`), `:2108-2230` (`set_refinement`: set then clear), `:4107`, `:4190` (histogram `set_refinements`, `clear_refinements`)
+- `~/Code/rietx-bench/tools/gsas2/GSAS-II-5.8.4/docs/source/GSASIIscriptable.rst:589-690` (Refinement recipe, key table, LeBail example)
+- `~/Code/rietx-bench/tools/gsas2/GSAS-II-5.8.4/GSASII/GSASIIconstrGUI.py:845-866` (Hold), `GSASIImapvars.py:52`, `:1002` (`StoreHold`)
+- `~/Code/rietx-bench/tools/gsas2/GSAS-II-5.8.4/GSASII/GSASIIstrMain.py:850-872` (`phaseCheck`, Fix FXU, FixedSeqVars), `:961-974` (per-histogram vary list), `:1066-1073`, `:1198` (frozen variables), `:912` (lattice refused in sequential)
+- TOPAS Technical Reference v9, https://topas-academic.com/technical_reference: § 2.2 (`prm !`), § 2.3 (attributes, `val_on_continue`), § `num_runs`, § `Constant`, § quick_refine, § 20.2 Pawley and Le Bail extraction
+- FullProf 8.20 manual `~/Code/rietx-bench/tools/fullprof/files/Docs/FullProf_Manual.pdf`, lines of its `pdftotext` dump: 285-296 (CYC sequential), 326 (`.new`), 589-596 (codewords), 610-640 (staged order, profile matching first), 674-692 (`Jbt=2` recipe), 3494-3508 (`Aut`)
+- RIETAN-FP manual `~/Code/rietx-bench/tools/rietan/RIETAN_VENUS/documents/RIETAN-FP_manual.pdf`: § 4.1.4 (text line 2830), § 11.3 (5116), § 17.3.17 (8625)
+- MAUD: `~/Code/rietx-bench/tools/maud/Maud.app/Contents/Java/Maud.jar`, classes `it/unitn/ing/rista/comp/launchRefineWizard` and `it/unitn/ing/rista/diffr/FilePar`, string table only (no Java runtime on this Mac, no source)
