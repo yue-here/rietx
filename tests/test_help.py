@@ -243,6 +243,11 @@ def _variant_models() -> list[tuple[Structure, Instrument]]:
         # other model declares
         (Structure(phases=[_distortion_phase()]),
          Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
+        # A parent-cell child (WP-1419): the parent's cell edges and one Γ
+        # strain are paths no other model declares.  A tetragonal child of a
+        # cubic parent through the identity transform, the strain at its default.
+        (Structure(phases=[_parent_cell_phase()]),
+         Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
         (structure, Instrument(
             source=TOFSource(
                 difc=5123.45, two_theta_bank_deg=90.0,
@@ -260,6 +265,18 @@ def _variant_models() -> list[tuple[Structure, Instrument]]:
                     + [Parameter(value=0.0), Parameter(value=0.0)])),
             geometry=Geometry(kind="debye_scherrer"))),
     ]
+
+
+def _parent_cell_phase() -> Phase:
+    from rietx.schemas.structure import ParentCell
+
+    cubic = Cell.cubic(4.0)
+    return Phase(
+        name="child", space_group="P 4/m m m", cell=cubic.model_copy(deep=True),
+        atoms=[Atom(label="M1", species="Fe", x=Parameter(value=0.0),
+                    y=Parameter(value=0.0), z=Parameter(value=0.0))],
+        parent_cell=ParentCell(space_group="P m -3 m", transform="a,b,c;0,0,0",
+                               cell=cubic, strain=[Parameter(value=0.0)]))
 
 
 def _body_phase() -> Phase:
@@ -401,6 +418,25 @@ def test_every_parameter_path_matches_exactly_one_family():
         "description depend on declaration order")
 
 
+def test_a_parent_cell_path_is_described_as_what_it_is():
+    """The strain has a family of its own; the parent's edges are cell lengths.
+
+    ``phases.*.cell.a`` claims ``phases.0.parent_cell.cell.a`` because
+    fnmatch's ``*`` spans dots.  That is right (a cell length), so it is pinned
+    as deliberate; the strain would otherwise have no family (``None``).
+    """
+    from rietx.help import help_key_for
+
+    assert help_key_for("phases.0.parent_cell.cell.a") == "phases.*.cell.a"
+    assert help_key_for("phases.0.parent_cell.cell.beta") == "phases.*.cell.beta"
+    assert help_key_for(
+        "phases.0.parent_cell.strain.0") == "phases.*.parent_cell.strain.*"
+    paths = [e.path for e in ParameterTable(
+        Structure(phases=[_parent_cell_phase()]),
+        Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))).entries]
+    assert "phases.0.parent_cell.strain.0" in paths
+
+
 def test_every_family_glob_describes_a_real_path():
     """The other direction: a family matching nothing describes a dead name.
 
@@ -445,6 +481,9 @@ NOT_OPT_IN: dict[str, str] = {
     "phases.*.distortion_modes.modes.*.amplitude":
         "a distortion-mode description's: built from a parent and a child "
         "structure, never one assignment",
+    "phases.*.parent_cell.strain.*":
+        "a parent-cell child's: magnetic_supercell builds it from a parent and a "
+        "transform, never one assignment",
     "vars.*": "a named variable: Refinement.add_variable declares it, outside the model",
 }
 

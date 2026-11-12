@@ -352,7 +352,7 @@
   function readColors() {
     const style = getComputedStyle(document.documentElement);
     const read = (name: string) => style.getPropertyValue(name);
-    return { ...curveColors(read), warn: read("--warn").trim() || "#b7791f" };
+    return { ...curveColors(read), warn: read("--warn").trim() || "#7d5f00" };
   }
   let colors = readColors();
 
@@ -421,7 +421,9 @@
     const unrecovered = unrecoveredFlags(traj, entries, rejected);
     legend = trajectoryLegend(traj, reseeded, unrecovered);
     fig = chart.mountTrajectory(plotNode, traj, {
-      colors: () => ({ tone: colors.diff, warn: colors.warn, muted: colors.edge }),
+      // a refined value is data, so it wears the observed ink; the difference
+      // grey is the backward chain's `--muted` on the light theme (WP-2200)
+      colors: () => ({ tone: colors.obs, warn: colors.warn, muted: colors.edge }),
       rings: reseeded,
       crosses: unrecovered,
       xLabel: traj.x_label,
@@ -1026,7 +1028,7 @@ here">restaged</span>
   }
 
   .nodes .kind {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   .strip li {

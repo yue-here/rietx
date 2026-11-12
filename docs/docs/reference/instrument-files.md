@@ -285,6 +285,7 @@ The reader holds to the layout the GSAS manual documents and refuses anything el
 - A non-zero `POLA`, `IPOLA` or `KRATIO` on `ICONS` is refused, naming its columns, since the manual says they are absent for neutron data.
   Each field may be blank or zero, which the record's Fortran format reads identically.
 - A bank with no `PRCF` set keeps its calibration and gets an all-zero `ProfileTOF`, reported as `GSAS_IPARM_PROFILE_DECLINED`.
+  A `PRCF` set written without its set number, as some older files are, is treated the same way: it is declined, not read as set 1.
 
 Fields with no place in the schema, such as the incident spectrum's `CHKSUM` and `IECOR`, are reported as [`GSAS_IPARM_FIELD_DROPPED`](diagnostics-files.md#gsas_iparm_field_dropped).
 

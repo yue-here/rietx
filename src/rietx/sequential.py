@@ -487,6 +487,10 @@ def _labels_for(patterns: Sequence[PatternData],
 def _collapse(plan: RefinementPlan) -> RefinementPlan:
     """One stage freeing everything the plan would free, in one solve.
 
+    Never for a plan that fixes (``Stage.turn_off``, WP-2208): one stage
+    frees then fixes, and cannot replay a fix that a later stage undid, so
+    :meth:`SequentialRefinement.fit` refits such a plan stage by stage.
+
     The default ``refit="single"`` strategy: with a converged neighbour as the
     starting point the staged turn-on order has already done its job of keeping
     early stages well conditioned, so re-walking it per pattern is mostly
@@ -1322,7 +1326,8 @@ class SequentialRefinement:
             ``plan`` runs on the first pattern (cold) and on any reseeded one.
             ``refit="single"`` (default) collapses it into one stage freeing
             the same set for every subsequent pattern; ``refit="stages"``
-            re-walks the whole staged plan from the warm state.  Measured on
+            re-walks the whole staged plan from the warm state, and so does a
+            plan with a ``turn_off`` under either (WP-2208).  Measured on
             the eight round-robin sample-1 mixtures (WP-0505 acceptance): 904
             iterations against 1623 staged and 2863 unchained, with the QPA
             error identical to three decimals (RMS |ΔW| 2.26 vs 2.27 wt %).
@@ -1554,9 +1559,12 @@ class SequentialRefinement:
         if x is not None and x_label == "index":
             x_label = "x"
         base_plan = resolve_plan(plan, mode)
-        warm_plan = (_unseeded(base_plan) if refit == "stages"
-                     else _collapse(base_plan))
-        ladder = _ladder(base_plan, warm_plan, staged=refit == "stages")
+        # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
+        # replay a fix a later stage undoes, so the collapse would free what
+        # the plan left fixed.  The entry's ``rung`` reads "warm_staged".
+        staged = refit == "stages" or any(s.turn_off for s in base_plan.stages)
+        warm_plan = _unseeded(base_plan) if staged else _collapse(base_plan)
+        ladder = _ladder(base_plan, warm_plan, staged=staged)
 
         order = list(range(len(patterns)))
         if direction == "backward":

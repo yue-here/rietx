@@ -206,6 +206,43 @@ than no band at all.
 - `docs/wp/1005-project-container.md` — why `excluded_regions` lives in the
   document and not in a history node.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**What is fitted, shaded and selectable** (WP-1033, `lib/plot.ts`,
+`panels/Plot.svelte`, `session.result_curves`, `Project.fitted_mask`) is the fit
+range and the excluded regions made visible, and its founding measurement is
+that **a mask is invisible in a picture of its own output**: `compile_model`
+masks before a result exists, so both payloads carried only the surviving
+channels — a band would have shaded a hole, and a fit range had no *outside* at
+all, the axis autoranging inside it. So the masked channels travel beside the
+fitted ones (the curves payload's `kept`) and `Project.fitted_mask` is the one
+authority for which channels the next run fits, pinned to `compile_model` by
+asserting `len(result.two_theta)` against it. Four rules. **Protocol is not a
+drawing choice and may not wear its clothes** — the residual selector and the
+scale are session-local and unpersisted, while a region changes Rwp and persists
+on the verb, so it lives in a strip of its own with typed fields and chips, and
+that strip carries the **channel count**, because a band drawn over points still
+in the residual is worse than no band. **Settings persist on the verb and curves
+move only on a run**, so between the two the picture contradicts the setting: the
+route says `stale` by comparing the fitted 2θ *values*, not their count. **The
+shading spans every pane's full height and is clipped to the measured extent**
+— full height because a rectangle in log space is not the rectangle in linear
+space, and an excluded channel is missing from the residual too; clipped
+because outside the measured pattern there is nothing to exclude (under plotly
+a shape took part in the autorange, and bands drawn past the data *became* the
+range: −40 to 100 on a 0.5–59.99° pattern). And **a new pointer
+meaning that is ambiguous everywhere is a mode, not an arbitration**: WP-1027
+could make the peak grab radius readable because the ambiguity was local, but a
+region drag is a zoom drag at every distance — so arming is explicit, hands the
+drag to the chart's select mode (x only, zooming nothing), *suspends* the peak
+verbs, and disarms after one selection. `viz/` deliberately does not shade (grounds in the WP): a result
+cannot say what was excluded, so the exported figure shows it as absence.
+
 ## Handover log
 
 - **2026-08-05** — **closed.** Branch `wp1033-plot-range-regions`, six commits.

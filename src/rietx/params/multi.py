@@ -1179,6 +1179,19 @@ class MultiParameterTable:
         """The scoped name of ``path`` in histogram ``h`` (bare if shared)."""
         return path if self.sharing.is_shared(path) else f"hist.{h}.{path}"
 
+    def row_names(self) -> list[tuple[str, str]]:
+        """Every row as ``(scoped, bare)``, the two names :meth:`set_vary` matches.
+
+        A shared row is listed once.  ``staged.fixed_at_end`` reads it for the
+        closing stage of a plan that fixes (WP-2208), so that replay matches a
+        glob the way this table does.
+        """
+        out: dict[str, str] = {}
+        for h, table in enumerate(self.tables):
+            for e in table.entries:
+                out.setdefault(self._canonical(h, e.path), e.path)
+        return list(out.items())
+
     def set_vary(self, path_globs: list[str], vary: bool) -> list[str]:
         """Free/fix by glob across every histogram; returns scoped hits.
 

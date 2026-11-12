@@ -898,6 +898,18 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
     "phases.*.cell.alpha": _CELL_ANGLE,
     "phases.*.cell.beta": _CELL_ANGLE,
     "phases.*.cell.gamma": _CELL_ANGLE,
+    # the parent cell's edges are cell lengths and angles too: ``phases.*.cell.a``
+    # claims them on purpose, since fnmatch's ``*`` spans the dots
+    # (``phases.0.parent_cell.cell.a``), and ``tests/test_help.py`` pins that
+    "phases.*.parent_cell.strain.*": HelpEntry(
+        title="Strain",
+        description=(
+            "Strain the parent forbids; seed it off zero."
+        ),
+        unit=None, default="0.0",
+        typical="1e-4 to 1e-2",
+        anchor="theory/peak-positions.html#a-child-s-cell-through-its-parent",
+    ),
     "phases.*.scale": HelpEntry(
         title="Phase scale",
         description=(
@@ -3502,6 +3514,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "patterns that see the phase."
         ),
     ),
+    "PARENT_STRAIN_HELD": HelpEntry(
+        title="A parent cell refined with its strain held",
+        description=(
+            "A stage freed the cell edges of a phase whose cell is stated through its "
+            "parent (`Phase.parent_cell`) while one of its lattice strains stayed held. "
+            "The cell glob frees the parent's edges and never a strain, because while "
+            "the child's atoms and moments keep the parent's symmetry a strain at zero is a "
+            "stationary point, and a distortion gives it only a small gradient there. The child's cell is then the "
+            "parent's carried through the transform with no shear beyond the held value. "
+            "To test for a shear, seed the strain off zero with `set_values` and free "
+            "`phases.*.parent_cell.strain.*` in a stage's `turn_on`."
+        ),
+    ),
     "PATTERN_DEAD_CHANNELS": HelpEntry(
         title="A run of channels measured nothing",
         description=(
@@ -4809,11 +4834,26 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "Wildcard patterns for the parameter paths that the stage frees when it "
             "starts. For example, `phases.*.cell.*` frees every lattice parameter of "
             "every phase. Staging is cumulative, so a parameter freed here keeps "
-            "refining in every later stage. Paths contain no square brackets, because "
+            "refining in every later stage unless a later stage's `turn_off` fixes it. Paths contain no square brackets, because "
             "the matching reads brackets as a character class."
         ),
         default="[]",
         typical="one or two patterns per stage",
+        anchor="theory/parameterisation.html#from-tree-to-vector",
+    ),
+    "turn_off": HelpEntry(
+        title="Parameters fixed this stage",
+        description=(
+            "Wildcard patterns for the parameter paths that the stage fixes after it "
+            "frees its `turn_on` patterns. For example, `instrument.profile.*` keeps "
+            "the profile a Pawley fit settled while the structure refines. A fixed "
+            "parameter stays fixed in later stages until a later stage frees it again, "
+            "and the closing stage keeps it fixed too. The `.rxt` document writes the "
+            "patterns as a `fix` clause. To keep a parameter fixed in every plan, "
+            "use `Refinement.hold` instead."
+        ),
+        default="[]",
+        typical="empty; one pattern where a stage takes back what an earlier one freed",
         anchor="theory/parameterisation.html#from-tree-to-vector",
     ),
     "max_iter": HelpEntry(
@@ -5971,6 +6011,14 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Paths this stage's `turn_on` matched and did not free, because the caller "
             "declared a hold on them with `Refinement.hold`. A hold outranks a plan's "
             "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`."
+        ),
+    ),
+    "StageResult.fixed": HelpEntry(
+        title="Parameters fixed",
+        description=(
+            "The parameter paths this stage's `turn_off` patterns fixed after its "
+            "frees: the free paths they took, never a row that was already fixed. "
+            "Empty when the stage declares no `turn_off`."
         ),
     ),
     "StageResult.unknown_paths": HelpEntry(
