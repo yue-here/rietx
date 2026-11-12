@@ -1722,9 +1722,9 @@ WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotro
 
 **Claims:** the same model with the 14 heavy atoms free and unrestrained (H riding on their carriers), refined under the same data, profile, background and plan, lands where the rigid body does: every heavy-atom coordinate and the molecule's mean position along each axis within four esds of the body-control difference
 
-**Referenced to:** the free-atom control fit of the same pattern (Yue's bar, 2026-11-05); the esd of each difference is sqrt(sigma_control^2 - sigma_body^2) for nested fits (Hausman 1978), and four of them over 45 statistics is a 0.3 % union false-alarm rate under Gaussian errors
+**Referenced to:** the free-atom control fit of the same pattern (Yue's bar, 2026-11-05); the esd of each difference is sqrt(sigma_control^2 - sigma_body^2) for nested fits on one sigma scale (Hausman 1978), and four of them over 45 statistics is a 0.3 % union false-alarm rate under Gaussian errors.  The bar can fail: a regular-hexagon body on the same pattern breaks it at 8.7, 7 of 42 components over 4
 
-**Measured:** worst |delta|/esd 2.29 (C8 along b; bar 4), median 0.62 over 42 components; mean along c: body 0.0019(19) A below the control, the control 0.0027(31) A below the deposit; Rwp 0.05842 body, 0.05780 control
+**Measured:** worst |delta|/esd 2.29 (C8 along b; bar 4), median 0.62 over 42 components; mean along c 0.97: the body 0.0019 A below the control, the control 0.0027(31) A below the deposit; Rwp 0.05842 body, 0.05780 control
 
 #### `test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd`
 

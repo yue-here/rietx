@@ -107,12 +107,19 @@ RIDES_ON = {f"H{i}": f"C{i}" for i in range(1, 10)}
 #: control's own esds): every heavy-atom coordinate of the body, and the
 #: molecule's mean position along each axis, within this many esds of the
 #: control's.  The esd is that of the *difference* of two nested fits of one
-#: pattern, √(σ²_control − σ²_body) (Hausman 1978, *Econometrica* 46, 1251):
-#: where the body is right, both estimate the same coordinates and the body,
-#: the restricted fit, is the efficient one.  So |Δ|/esd ≈ |N(0, 1)| per
-#: statistic, and the same 4 as the known answer's bar fails a correct body
-#: over 45 statistics with probability ≤ 0.3 %.  The control's own start
-#: spread is 0.016 of an esd, so the bar senses no solver termination.
+#: pattern, √(σ²_control − σ²_body) (Hausman 1978, *Econometrica* 46, 1251),
+#: with the body's σ put on the control's GoF and Bérar-Lelann scale so the
+#: two share one σ²: where the body is right, both estimate the same
+#: coordinates and the body, the restricted fit, is the efficient one.  The
+#: nesting is not exact: the body turns each H with the molecule, while the
+#: control's H takes only its carrier's shift, a difference of at most
+#: 0.0015 Å on an atom of one electron (WP-1806, 2026-11-12).  The bar can
+#: fail: the regular-hexagon body on this pattern breaks it at 8.7 esds.
+#: So |Δ|/esd ≈ |N(0, 1)| per statistic, and the same 4 as the known
+#: answer's bar fails a correct body over 45 statistics with probability
+#: ≤ 0.3 %.  The control's two starts (the deposit, the body's answer) land
+#: 0.0002 Å apart, 0.02 of the difference's esd, so the bar senses no solver
+#: termination.
 CONTROL_BOUND = 4.0
 
 _SU = re.compile(r"([-+]?\d*\.?(\d*))\((\d+)\)")
@@ -256,7 +263,9 @@ def _fit(structure: Structure, pattern: rx.PatternData):
     atoms = structure.phases[0].atoms
     idx = {a.label: i for i, a in enumerate(atoms)}
     heavy = [f"phases.0.atoms.{idx[lab]}.biso" for lab in HEAVY]
-    ref.tie_equal(heavy)
+    # named: tie_equal's default source is the first match in *table* order,
+    # and the H ties and the biso stage below both lean on heavy[0] being it
+    ref.tie_equal(heavy, source=heavy[0])
     for h in HYDROGENS:
         ref.tie(f"phases.0.atoms.{idx[h]}.biso", heavy[0], scale=1.5)
     if structure.phases[0].rigid_bodies:
@@ -300,11 +309,11 @@ def _ratios(phase: Phase) -> dict[str, list[float]]:
 
 def _deposit_table(phase: Phase, rwp: float) -> str:
     """The per-atom table against the deposit: a record, not a bar."""
-    pub, _ = _published()
+    pub, cell = _published()
     lines = ["# Acridine form IX, deposited start: the deposit record (not asserted)",
              "", f"Rwp {rwp:.5f}.  ratio = |Δ| / max(published esd, rietx esd), "
-             "per component.  A record: it asserts nothing, and part 2's bar is a "
-             "free-atom control in rietx.", "",
+             "per component.  A record: it asserts nothing, and the bar is the "
+             "free-atom control in rietx (acridine_ix_control_table.md).", "",
              "| atom | axis | |Δ| frac | published esd | rietx esd | ratio |",
              "|---|---|---|---|---|---|"]
     for lab, (xyz, esd) in _heavy(phase).items():
@@ -316,7 +325,6 @@ def _deposit_table(phase: Phase, rwp: float) -> str:
                          f"{'None' if esd[k] is None else f'{esd[k]:.5f}'} | {r:.2f} |")
     # the cell joins the record and asserts nothing either (Yue, 2026-11-07):
     # the published cell is the authors' answer under their own protocol
-    _, cell = _published()
     cell_esd = _published_cell_esds()
     lines += ["", "| cell | unit | |Δ| | published esd | rietx esd | ratio |",
               "|---|---|---|---|---|---|"]
@@ -330,46 +338,68 @@ def _deposit_table(phase: Phase, rwp: float) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _mean_position(ref) -> list[tuple[float, float]]:
+def _mean_position(ref, result) -> list[tuple[float, float]]:
     """The heavy atoms' mean fractional coordinate along x, y and z, each
     with its variance through the fit's whole covariance (J·Cov·Jᵀ)."""
-    _, table, theta, stderr_internal, correlation = ref._answer_covariance
-    jac = table.local_jacobian(theta).toarray()
-    cov = table._cov_free(theta, stderr_internal, correlation)
+    kept = ref._answer_covariance
+    # the covariance of *this* answer, correlated: a diagonal-only one would
+    # pass for the whole covariance silently (magnetic._moment_correlations)
+    assert kept is not None and kept[0] is result, "no covariance kept for this result"
+    _, table, theta, stderr_internal, correlation = kept
+    assert stderr_internal is not None and correlation is not None
     row = {e.path: i for i, e in enumerate(table.entries)}
-    atoms = ref.fitted_structure.phases[0].atoms
+    heavy = [(i, a) for i, a in enumerate(ref.fitted_structure.phases[0].atoms)
+             if a.label in HEAVY]
+    w = np.full(len(heavy), 1.0 / len(heavy))
     out = []
     for c in "xyz":
-        w = np.zeros(jac.shape[0])
-        vals = []
-        for i, a in enumerate(atoms):
-            if a.label in HEAVY:
-                w[row[f"phases.0.atoms.{i}.{c}"]] = 1.0 / len(HEAVY)
-                vals.append(getattr(a, c).value)
-        g = w @ jac
-        out.append((float(np.mean(vals)), float(g @ cov @ g)))
+        paths = [f"phases.0.atoms.{i}.{c}" for i, _ in heavy]
+        # a column that measured nothing is zeroed in the covariance, which
+        # would understate the variance rather than make it absent
+        assert not table.unmeasured_rows(theta, stderr_internal,
+                                         np.array([row[p] for p in paths])).any(), c
+        cov = table.physical_covariance(theta, stderr_internal, correlation, paths)
+        out.append((float(np.mean([getattr(a, c).value for _, a in heavy])),
+                    float(w @ cov @ w)))
     return out
 
 
-def _against_control(body_ref, control_ref) -> tuple[list[tuple], list[tuple]]:
+def _esd_scale(result) -> float:
+    """The factor a fit's esds carry over √((JᵀJ)⁻¹): GoF × Bérar-Lelann."""
+    return result.statistics.gof * (result.statistics.esd_inflation or 1.0)
+
+
+def _against_control(body, control) -> tuple[list[tuple], list[tuple]]:
     """Per heavy-atom component and per mean axis: (label, axis, Δ in Å,
-    control esd in Å, esd of the difference in Å, |Δ| / that esd)."""
+    control esd in Å, esd of the difference in Å, |Δ| / that esd).  ``body``
+    and ``control`` are each a fit's (ref, result)."""
+    body_ref, control_ref = body[0], control[0]
     pb = body_ref.fitted_structure.phases[0]
     pc = control_ref.fitted_structure.phases[0]
     lengths = [pc.cell.a.value, pc.cell.b.value, pc.cell.c.value]
     hb, hc = _heavy(pb), _heavy(pc)
+    # Hausman's subtraction needs one σ² for both covariances, and each fit
+    # scales its esds by its own GoF and Bérar-Lelann factor: put the body's
+    # on the control's scale (a worse body has the larger GoF, and on its own
+    # scale its esd can exceed the control's)
+    scale = (_esd_scale(control[1]) / _esd_scale(body[1])) ** 2
     atoms = []
     for lab in HEAVY:
         for k, c in enumerate("xyz"):
             eb, ec = hb[lab][1][k], hc[lab][1][k]
-            diff = math.sqrt(ec * ec - eb * eb)
+            var = ec * ec - scale * eb * eb
+            assert var > 0.0, (lab, c, eb, ec, scale)
+            diff = math.sqrt(var)
             d = float(hb[lab][0][k] - hc[lab][0][k])
             atoms.append((lab, c, d * lengths[k], ec * lengths[k], diff * lengths[k],
                           abs(d) / diff))
     means = []
-    for k, ((mb, vb), (mc, vc)) in enumerate(zip(_mean_position(body_ref),
-                                                 _mean_position(control_ref))):
-        diff = math.sqrt(vc - vb)
+    for k, ((mb, vb), (mc, vc)) in enumerate(zip(_mean_position(*body),
+                                                 _mean_position(*control))):
+        # the nested-fit premise, as the test asserts it per atom: without it
+        # the difference has no esd, and sqrt would raise a bare ValueError
+        assert vc > scale * vb, ("mean", "xyz"[k], vb, vc, scale)
+        diff = math.sqrt(vc - scale * vb)
         means.append(("mean", "xyz"[k], (mb - mc) * lengths[k], math.sqrt(vc) * lengths[k],
                       diff * lengths[k], abs(mb - mc) / diff))
     return atoms, means
@@ -379,9 +409,10 @@ def _control_table(atoms, means, rwp_body: float, rwp_control: float) -> str:
     """The body against the free-atom control, the bar's own numbers."""
     lines = ["# Acridine form IX: the rigid body against the free-atom control", "",
              f"Rwp {rwp_body:.5f} (body) and {rwp_control:.5f} (control, unrestrained, "
-             f"H riding).  Δ = body − control along each axis, in Å.  ratio = |Δ| / "
-             f"√(σ²_control − σ²_body); the bar is {CONTROL_BOUND:g}.", "",
-             "| atom | axis | Δ (Å) | control esd (Å) | esd of Δ (Å) | ratio |",
+             f"H riding).  Δ = body − control in fractional units times the cell "
+             f"edge (a, b or c), in Å.  ratio = |Δ| / √(σ²_control − σ²_body), the "
+             f"body's σ on the control's scale; the bar is {CONTROL_BOUND:g}.", "",
+             "| atom | axis | Δ·edge (Å) | control esd (Å) | esd of Δ (Å) | ratio |",
              "|---|---|---|---|---|---|"]
     for lab, c, d, ec, ed, r in atoms + means:
         lines.append(f"| {lab} | {c} | {d:+.5f} | {ec:.5f} | {ed:.5f} | {r:.2f} |")
@@ -547,9 +578,9 @@ def test_the_body_agrees_with_the_free_atom_control(real_deposited, free_control
     # the control refined every heavy coordinate: each carries an esd larger
     # than the body's, so the difference's esd is real
     hb, hc = _heavy(ref_b.fitted_structure.phases[0]), _heavy(ref_c.fitted_structure.phases[0])
-    assert all(hc[lab][1][k] is not None and hc[lab][1][k] > hb[lab][1][k]
-               for lab in HEAVY for k in range(3))
-    atoms, means = _against_control(ref_b, ref_c)
+    assert all(hb[lab][1][k] is not None and hc[lab][1][k] is not None
+               and hc[lab][1][k] > hb[lab][1][k] for lab in HEAVY for k in range(3))
+    atoms, means = _against_control(real_deposited, free_control)
     OUT.mkdir(exist_ok=True)
     (OUT / "acridine_ix_control_table.md").write_text(
         _control_table(atoms, means, res_b.statistics.rwp, res_c.statistics.rwp),
