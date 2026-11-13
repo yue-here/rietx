@@ -9,8 +9,9 @@ The kernels are Rust, shipped as the ``rietx-kernels`` wheel and built from
 above this module may branch on whether they ran.
 
 The wheel carries two more, the structure figure's rasteriser
-(``render_rows`` and ``id_plane``, from 1.1.0).  They load, decline and switch
-off with the model's five, so a process takes one path for both, and
+(``render_rows`` and ``id_plane``, from 1.1.0), and from 1.5.0 a third,
+``render_rows_cued``, which is ``render_rows`` with depth cueing (WP-1548).
+They load, decline and switch off with the model's five, so a process takes one path for both, and
 ``viz/figure3d/raster.py`` calls them through :func:`_kernels` and
 :func:`_pool`.  They call no library function, so their bar against the numpy
 oracle is the bit on every platform (``tests/test_raster_kernels.py``).
@@ -158,18 +159,21 @@ KERNEL_ABI = 1
 
 #: The oldest wheel this rietx calls: the F of ``pyproject``'s
 #: ``rietx-kernels>=F,<N+1`` pin.  It is the minor that added the newest name in
-#: :data:`KERNEL_NAMES`, 1.4 for the structure-solution engine's three.
-KERNEL_FLOOR = "1.4"
+#: :data:`KERNEL_NAMES`, 1.5 for the structure figure's depth-cued
+#: ``render_rows_cued`` (WP-1548).
+KERNEL_FLOOR = "1.5"
 
 #: The kernels the wheel must export, under the names ``_KERNELS`` keys them
 #: by.  A wheel lacking one is declined like a wrong :data:`KERNEL_ABI`.  The
 #: first five are the model's, the next two the structure figure's (1.1.0),
-#: the next two the dichotomy indexer's (1.3.0, WP-1959), and the last three
-#: the structure-solution engine's (1.4.0, WP-1997).
+#: the next two the dichotomy indexer's (1.3.0, WP-1959), the next three
+#: the structure-solution engine's (1.4.0, WP-1997), and the last the
+#: structure figure's depth-cued twin of ``render_rows`` (1.5.0, WP-1548).
 KERNEL_NAMES = ("accum", "omega_sym", "omega_fcj", "bases_sym", "bases_fcj",
                 "render_rows", "id_plane",
                 "dichotomy_box_test", "dichotomy_child_key",
-                "solve_orbit_sums", "solve_orbit_sums_one", "solve_clash")
+                "solve_orbit_sums", "solve_orbit_sums_one", "solve_clash",
+                "render_rows_cued")
 
 #: Ω spelled as :func:`~rietx.model.profiles.pseudovoigt.pseudo_voigt` — the
 #: forward model's own arithmetic.
