@@ -1,6 +1,6 @@
 # WP-1986 — Guides and Theory move over, and the old tree retires
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the old tree retired (one manual; its 47 URLs redirect); guide 24 and the README and landing links on `/docs/stable/` landed (PR #1347); open for guide 18, which waits on WP-1910 and WP-2030
+Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by ghostshift (the glossary stub's fragments); the old tree retired (one manual; its 47 URLs redirect); guide 24 and the README and landing links on `/docs/stable/` landed (PR #1347); open for guide 18, which waits on WP-1910 and WP-2030
 Track: The repo's own process
 Depends on: 1978 (the new tree); 1985 (the report text the guides show); 1979 (redirect stubs)
 Priority: P2 2026-10-16 — unblocked: WP-1979 built the redirect stubs (PR #1023)
