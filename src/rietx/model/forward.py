@@ -2952,24 +2952,26 @@ class CompiledModel:
         axial ratios (they move the quadrature nodes — see
         ``derivative_bases``), and anything unknown (falls back to FD).
         """
-        # A background peak is outside **every** analytic branch's reach, and
-        # this line is the declaration rather than the accident.  The default
-        # for an unrecognised path is already False, so this changes no
-        # dispatch; what it changes is that the exclusion is now stated where
-        # the reach is claimed, next to the ``surface_roughness`` clause that
-        # exists for the mirror-image reason (an unstated *inclusion* costs a
-        # slow test, an unstated *exclusion* is the class of bug WP-1070 filed
-        # — a column that comes back **short** rather than raising).
+        # An extra component is outside the per-peak scalar chain, and this
+        # line is the declaration rather than the accident.  Its columns have
+        # their own branch in ``optimize.least_squares._component_columns``
+        # (WP-2116): a hump's closed form, a declared peak's difference of its
+        # own curve, and the whole-model FD for a tie reaching anything else.
+        # The exclusion is stated where the reach is claimed, next to the
+        # ``surface_roughness`` clause that exists for the mirror-image reason
+        # (an unstated *inclusion* costs a slow test, an unstated *exclusion*
+        # is the class of bug WP-1070 filed — a column that comes back
+        # **short** rather than raising).
         #
-        # Short is exactly what does not happen here, and that is checkable
-        # rather than hopeful: the whole-model FD writes ``J[:n_data, c]`` only,
-        # and a peak parameter's derivative on every row below the data block is
-        # *identically* zero — the P-spline penalty rows are w·D₂·c in the
-        # background *coefficients*, the Pawley rows are in the intensity block,
-        # and a restraint row is a function of coordinates and cell.  So the
-        # rows the FD leaves at their zero initialisation are the rows whose
-        # true value is zero, and the FD column is exact because it decodes
-        # through C like the residual does.
+        # Short is what the component routes cannot be, and that is checkable
+        # rather than hopeful: each writes ``J[:n_data, c]`` only, and a
+        # component parameter's derivative on every row below the data block
+        # is *identically* zero — the P-spline penalty rows are w·D₂·c in the
+        # background *coefficients*, the Pawley rows are in the intensity
+        # block, and a restraint row is a function of coordinates and cell.
+        # A tie can carry a column onto a background coefficient as well,
+        # and then the whole-model FD writes that coefficient's penalty rows
+        # from the penalty matrix (``bkg_part`` in ``_make_jacobian``).
         if path.startswith("instrument.extra_components."):
             return False
         # A *declared sharp peak* widens what two instrument names reach, and

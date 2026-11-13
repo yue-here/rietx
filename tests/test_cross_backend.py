@@ -581,12 +581,13 @@ def _state_capillary_offsets():
 def _state_extra_components():
     """An additive background peak, all three parameters free.
 
-    A new derivative path with no row of its own: the peak is a term *added* to
-    the pattern rather than a factor inside the peak chain, so no analytic
-    branch claims it and the numpy reference column is the whole-model FD.  That
-    is exactly why it needs a matrix row — an FD column is only "exact because
-    it decodes through C like the residual" if the traced backends agree that it
-    is, and nothing else here evaluates a parameter the numpy path declines.
+    The peak is a term *added* to the pattern rather than a factor inside the
+    peak chain, so its columns are their own branch: the closed form of
+    ``background.models.hump_partials``, read off the hump alone (WP-2116).
+    Until WP-2116 the numpy reference here was the whole-model FD.  Every
+    column of this state is now exact, which ``NO_FD_CONFIGS`` asserts, and
+    the fd, jax and torch rows are the independent opinions on the closed
+    form.
 
     Freed **beside** the background coefficients on purpose: the peak and the
     low-order Chebyshev terms both raise the same region of the curve, so this
@@ -635,6 +636,84 @@ def _state_extra_components():
                   "instrument.extra_components.0.position",
                   "instrument.extra_components.0.height",
                   "instrument.extra_components.0.fwhm"])
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+
+def _state_extra_components_tied():
+    """Two humps whose columns reach past one field (WP-2116).
+
+    The hump's columns are a closed form read off the hump alone, gated on the
+    column's whole reach.  So this row holds the three shapes the gate has to
+    tell apart, each against the fd, jax and torch opinions:
+
+    * a hump width tied to the other hump's, at 1.5 and a constant, so one
+      column sums two humps' partials at two coefficients;
+    * a named variable driving both positions, so the column is named by what
+      it reaches rather than by a hump path;
+    * one hump's height driving the zero shift and a P-spline coefficient,
+      a reach outside every component, which must keep the whole-model FD
+      column and still write that coefficient's penalty rows;
+    * a third hump's height set by an expression of a variable, so its
+      coefficient is a derived row's and moves with θ.
+    """
+    from rietx.schemas.instrument import (
+        HUMP_FWHM_MIN,
+        BackgroundPSpline,
+        HumpComponent,
+    )
+    from tests.test_coordinates import make_rutile
+
+    structure = make_rutile()
+    structure.phases[0].scale.value = 8.0e-3
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.source.dispersion = None    # declined, not inherited
+    ins.profile.w.value = 8e-3
+    ins.background = BackgroundPSpline.for_range(15.0, 90.0, knot_step_deg=8.0)
+    for k, coef in enumerate(ins.background.coefficients):
+        coef.value = 20.0 + 0.5 * k
+    ins.extra_components = [
+        HumpComponent(label=f"hump{k}",
+                      position=Parameter(value=pos, unit="deg"),
+                      height=Parameter(value=height, min=0.0, unit="counts"),
+                      fwhm=Parameter(value=fwhm, min=HUMP_FWHM_MIN, unit="deg"))
+        for k, (pos, height, fwhm) in enumerate(((34.0, 120.0, 9.0),
+                                                (54.0, 80.0, 14.0),
+                                                (74.0, 60.0, 10.0)))]
+
+    grid = np.arange(15.0, 90.0, 0.02)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim = compile_model(structure, ins, empty, mode="rietveld",
+                        window_area_tol=WINDOW_AREA_TOL)
+    sim_table = ParameterTable(structure, ins)
+    y = sim.evaluate(sim_table.decode(sim_table.x0()))
+    pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
+
+    h0, h1 = "instrument.extra_components.0", "instrument.extra_components.1"
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    table.add_parameter(f"{VAR_PREFIX}P", 34.0, vary=True)
+    table.set_tie(f"{h0}.position", AffineTie.identity(f"{VAR_PREFIX}P"))
+    table.set_tie(f"{h1}.position",
+                  AffineTie(terms=((f"{VAR_PREFIX}P", 1.0),), const=20.0))
+    table.set_tie(f"{h1}.fwhm",
+                  AffineTie(terms=((f"{h0}.fwhm", 1.5),), const=0.5))
+    table.set_tie("instrument.zero_shift",
+                  AffineTie(terms=((f"{h1}.height", 1e-4),), const=-0.008))
+    table.set_tie("instrument.background.c2",
+                  AffineTie(terms=((f"{h1}.height", 0.05),), const=17.0))
+    table.refresh_ties()
+    table.add_parameter(f"{VAR_PREFIX}W", 60.0 ** 0.5, vary=True, lo=0.0)
+    table.add_expression("instrument.extra_components.2.height", "W^2",
+                         variables={"W": f"{VAR_PREFIX}W"})
+    for path in ("phases.0.scale", "instrument.background.c0",
+                 f"{h0}.height", f"{h0}.fwhm", f"{h1}.height"):
+        assert table.set_vary([path], True), path
+    table.apply_to_models(structure, ins)
     model = compile_model(structure, ins, pattern, mode="rietveld",
                           moving_paths=set(table.moving_paths),
                           window_area_tol=WINDOW_AREA_TOL)
@@ -1346,6 +1425,7 @@ CONFIGS = {"families": _state_families,
            "toy_torsion": _state_toy_torsion,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
+           "extra_components_tied": _state_extra_components_tied,
            "extra_peak": _state_extra_peak,
            "magnetic": _state_magnetic,
            "magnetic_width": _state_magnetic_width,
@@ -1388,6 +1468,7 @@ CONFIG_PARAMS = [
     _config("toy_torsion"),
     _config("capillary_offsets"),
     _config("extra_components"),
+    _config("extra_components_tied"),
     _config("extra_peak"),
     _config("magnetic"),
     _config("magnetic_width"),
@@ -2195,6 +2276,11 @@ FD_COLUMN_BAR = 1e-3
 #: stopping point, (JᵀJ)⁻¹·Eᵀr, in esd, and the esd ratio
 FD_ANSWER_ESD_BAR = 0.01
 FD_ESD_RATIO_BAR = 0.01
+#: configs whose every column is exact, so no column takes a finite difference.
+#: ``extra_components`` joined when the hump's columns became the closed form
+#: (WP-2116): its other columns are a phase scale and background coefficients.
+#: Listed rather than skipped, so a column that falls back to FD here fails.
+NO_FD_CONFIGS = frozenset({"extra_components"})
 
 
 def _fd_taken(model, table, theta, monkeypatch):
@@ -2251,9 +2337,10 @@ def test_every_fd_column_meets_a_converged_oracle(config, monkeypatch):
 
     Measured on 2026-10-21 (macOS arm64, ``[dev]``): every column but two
     within 2.0e-5 of the oracle, most within 1.3e-6 (the cell).  The two are
-    the whole-model fallback on ``extra_peak``'s background-peak centre,
-    2.3e-4 (the oracle agrees with itself to 2.4e-10), and the SRM 660c
-    state's extinction, 2.5e-4 against an oracle good to 2.6e-4.
+    ``extra_peak``'s background-peak centre, 2.3e-4 (the oracle agrees with
+    itself to 2.4e-10), and the SRM 660c state's extinction, 2.5e-4 against an
+    oracle good to 2.6e-4.  The centre was then the whole-model fallback.
+    Since WP-2116 it differences the peak curve alone, at the same step.
 
     Made to fail on 2026-10-21: ``FD_STEP`` patched to 1e-4 failed 13 of the
     23 configs, ``extra_peak`` among them.
@@ -2261,6 +2348,10 @@ def test_every_fd_column_meets_a_converged_oracle(config, monkeypatch):
     model, table = _state(config)
     theta = _theta(model, table)
     jac, fd = _fd_taken(model, table, theta, monkeypatch)
+    if config in NO_FD_CONFIGS:
+        labels = _labels(model, table)
+        assert not fd, f"{config}: {[labels[c] for c in fd]} take a finite difference"
+        return
     assert fd, f"{config}: no column takes a finite difference"
     ref, ref_2h = _richardson(config, model, table, theta)
     bound, own, label = _column_errors(jac, ref, ref_2h, fd, _labels(model, table))

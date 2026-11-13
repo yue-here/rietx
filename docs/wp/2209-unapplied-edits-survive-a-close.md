@@ -128,6 +128,15 @@ The maintainer's answers to the five open questions of the first handover entry.
 No rule here reads a pattern. The retention ceiling and floor are storage constants in
 `gui/`, which `_audit.NOT_WALKED` declares out of the generality walk.
 
+### Inherited
+
+- **2026-11-12, from WP-2143: `recovery.move` keys the old copy by the path it is given.**
+  It used to resolve that path again. On Windows a path resolves to the spelling on disk,
+  so after a case-only rename (`sample.rex` → `Sample.rex`) the old name resolved to the
+  new folder, and the copy stayed under a key nothing reads. A caller passes the resolved
+  path taken before the move, as `_relocate` does.
+  `test_a_move_keys_the_old_copy_by_the_path_it_was_given` pins it on every platform.
+
 ## Non-goals
 
 - The Model panel's forms and the Text panel's buffer: they apply through their own buttons.

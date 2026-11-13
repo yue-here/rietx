@@ -98,6 +98,14 @@ None reads the data or decides for a fit. `turn_off` is the caller's declaration
 closing stage's fixes are its replay. Design 4 changes how a series refits a plan that fixes,
 which is machinery choosing a route to the same answer, not a judgement about the data.
 
+### Inherited
+
+- From WP-2217 (2026-11-13): GSAS-II's scripting docs (`GSASIIscriptable.rst` § Refinement recipe) do
+  not state that `set` runs before `clear`; only its source does. `staged.py`'s `turn_off` comment and
+  practice.md's rietx row now ground the order on free-then-fix (a narrow fix inside a broad free acts
+  only in that order), with GSAS-II's source as agreement. Design item 1's "follows GSAS-II's `clear`"
+  should say the same when this WP is next handed over.
+
 ## Non-goals
 
 - A mode per stage. Pawley then Rietveld stays two fits (design 3).
