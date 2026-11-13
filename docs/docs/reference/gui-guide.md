@@ -793,6 +793,20 @@ records. When the series ran with `verify_steps`, a column gives the cold ratio
 of the largest steps: the same two patterns refitted cold and independently,
 over the step. Near 1 the step is in the data, and near 0 the chain made it.
 
+### The trace
+
+Above the plot, a strip draws the series coordinate against the pattern index. Marks, from the series answer:
+
+| mark | label | meaning |
+|---|---|---|
+| `SERIES_PATTERN_FAILED` | failed | no fit |
+| `SEQUENTIAL_UNRECOVERED` | unrecovered | diverged |
+| `SEQUENTIAL_RESEED` | reseeded | fit cold |
+| `findings` | findings | bar: codes raised |
+| `largest_step` | largest step | a rank, no verdict |
+
+Drag the strip to scrub; the plot keeps your zoom.
+
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need
 from it before you close it.

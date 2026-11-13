@@ -13,7 +13,7 @@ names hard dependencies, and *soft* marks a preferred order.
 
 | WP | Title | Since | Priority | Section |
 |---|---|---|---|---|
-| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
+| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-11-04 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
@@ -719,7 +719,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 🔄 2026-10-21 | P3 | — |
+| [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 🔄 2026-11-04 | P3 | — |
 | [1318](1318-strain-surface.md) | The Stephens strain surface, rendered | ⬜ | P3 | — |
 | [1322](1322-events-aggregator.md) | The run is instrumentable, and nothing says so | ✅ 2026-10-23 | — | — |
 | [1339](1339-where-the-improvement-lives.md) | Where the improvement lives | ✅ 2026-11-02 | — | — |

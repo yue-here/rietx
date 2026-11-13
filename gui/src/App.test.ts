@@ -556,6 +556,23 @@ const SERIES_ANSWER = {
   curves: [true, true],
   rejected: [false, false],
   running: false,
+  // `rietx.gui.series.trace` over the result above (WP-1317)
+  trace: {
+    x_label: "T",
+    points: [
+      { index: 0, label: "T300", x: 300, status: "converged", rwp: 0.091, marks: [],
+        findings: [] },
+      { index: 1, label: "T400", x: 400, status: "converged", rwp: 0.094,
+        marks: ["SEQUENTIAL_RESEED"], findings: [{ code: "BOUND_HIT", level: "warning" }] },
+    ],
+    largest_steps: { "phases.0.cell.a": { indices: [0, 1], size_esd: 21, cold_ratio: null } },
+    vocabulary: [
+      ["SERIES_PATTERN_FAILED", "bar", "failed"], ["SEQUENTIAL_UNRECOVERED", "cross", "unrecovered"],
+      ["SEQUENTIAL_RESEED", "ring", "reseeded"],
+      ["findings", "count", "findings"], ["largest_step", "band", "largest step"],
+    ].map(([key, mark, label]) => ({ key, mark, label, source: "", means: "" })),
+    other_mark: "tick",
+  },
 };
 
 /** What `GET /api/examples` answers (WP-1204): the shipped example projects,
@@ -5675,8 +5692,10 @@ describe("the series panel", () => {
 
   /** The Series panel's figure's pane `key`, never the pattern panel's. */
   function seriesPane(key: string): StubPlot {
-    const box = host.querySelector(".plotbox");
-    const u = StubPlot.instances.find((p) => p.key === key && !p.destroyed && box?.contains(p.root));
+    // the trace's box and the plot's: the panel has two figures since WP-1317
+    const boxes = [...host.querySelectorAll(".plotbox")];
+    const u = StubPlot.instances.find((p) => p.key === key && !p.destroyed
+                                      && boxes.some((b) => b.contains(p.root)));
     if (!u) throw new Error(`no ${key} pane is drawn in the series panel`);
     return u;
   }
@@ -5828,6 +5847,90 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("scrubs along the trace: one figure, each pattern fetched once", async () => {
+    // WP-1317: dragging along the trace shows each pattern's own fit, keeping
+    // the reader's view, and the only server cost is each pattern's first fetch
+    const stub = await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+      "/api/series/curves": fitCurves({ header: { index: 1, label: "T400", x: 400 } }),
+    });
+    const trace = seriesPane("trace");
+    // the verdict the answer serves is drawn: T400's reseed, a ring in --warn
+    expect(trace.marks.some((m) => m.op === "stroke" && m.style === WARN)).toBe(true);
+    expect([...host.querySelectorAll(".key li")].map((li) => li.textContent?.trim()))
+      .toEqual(["reseeded", "findings"]);   // no band: the panel opens on the zero shift, which has no esd step in this answer
+
+    const fetched = () => stub.calls.filter((c) => c.path === "/api/series/curves")
+      .map((c) => c.url.split("index=")[1]);
+    // after the press the drag is the window's, as a drag off the strip still scrubs
+    const at = (clientX: number, type: string) =>
+      window.dispatchEvent(new MouseEvent(type, { clientX, button: 0 }));
+    // a press on the plot area, inside `over`, at T400's end of the axis
+    trace.over.dispatchEvent(new MouseEvent("mousedown", { clientX: 1000, button: 0,
+                                                           bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    const member = seriesPane("main");
+    at(0, "mousemove");
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    at(1000, "mousemove");
+    at(1000, "mouseup");
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    // back over a pattern already seen: no second fetch, and the same figure
+    expect(fetched()).toEqual(["1", "0"]);
+    expect(seriesPane("main")).toBe(member);
+    // scrubbing fetched no history tree: that stays a click away
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(false);
+    expect(button("History")).toBeTruthy();
+
+    // the arrow keys step one pattern, and stop at the end
+    const strip = host.querySelector<HTMLElement>(".trace")!;
+    strip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    strip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 0 — T300");
+    expect(fetched()).toEqual(["1", "0"]);
+  });
+
+  it("opens a scrubbed pattern's history from its row, which a scrub left unopened", async () => {
+    // review of #1395: a scrub selects a pattern and leaves its tree unloaded, so
+    // the row's button must open it (it read the selection as "already open" and
+    // closed back to the trajectory) and must not show the open glyph meanwhile
+    const stub = await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+      "/api/series/curves": fitCurves({ header: { index: 1, label: "T400", x: 400 } }),
+      "/api/series/history": () => ({ body: { index: 1, label: "T400",
+        checkout: false, tree_id: "t2", head: "n0000", root: "n0000",
+        n_nodes: 1, nodes: [
+          { id: "n0000", parents: [], label: "root", kind: "root", name: "",
+            action: {}, api_call: "", status: null, n_iterations: 0, rwp: null,
+            gof: null, n_free: null, n_diagnostics: 0, diagnostics: [],
+            tags: [], children: [], scores: {}, notes: {} }] } }),
+    });
+    seriesPane("trace").over.dispatchEvent(new MouseEvent("mousedown",
+      { clientX: 1000, button: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent("mouseup", { clientX: 1000, button: 0 }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(false);
+    expect(icons("▾")).toHaveLength(0);
+    icons("▸").at(-1)!.click();
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(true);
+    expect(host.textContent).toContain("History — T400");
+    expect(icons("▾")).toHaveLength(1);
+    // and a second click closes it, as before
+    icons("▾")[0].click();
+    await flush();
+    expect(host.textContent).not.toContain("History — T400");
   });
 
   it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {

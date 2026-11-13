@@ -375,6 +375,7 @@ Ungaretti
 [uU]nphysical
 [uU]npolarised
 [uU]nprimed
+[uU]nrecovered
 [uU]nscaled
 [uU]ntransposed
 Villars

@@ -6,17 +6,24 @@ import {
   memberLegend,
   moveBy,
   pointText,
+  largestStep,
+  markedFlags,
+  markOf,
   esdText,
   gapLine,
   rankTrajectories,
   rejectedBecause,
-  reseededFlags,
   rungNote,
   sortByX,
+  stepTo,
+  traceData,
+  traceKey,
+  traceText,
   stepCells,
   stepRows,
   topGapPath,
   trajectoryLegend,
+  trajectoryMarks,
   trajectoryNote,
   unrecoveredFlags,
   type DirectionGap,
@@ -25,8 +32,34 @@ import {
   type SeriesEntry,
   type SeriesStep,
   type SeriesPattern,
+  type Trace,
   type Trajectory,
 } from "./series";
+
+/** A served trace (`rietx.gui.series.trace`): a reseed at 1, a failure at 2,
+ *  a pattern unrecovered at 3 that also carries a code no row names. */
+const trace = (): Trace => ({
+  x_label: "T",
+  points: [
+    { index: 0, label: "T300", x: 300, status: "converged", rwp: 0.05, marks: [], findings: [] },
+    { index: 1, label: "T310", x: 310, status: "converged", rwp: 0.051,
+      marks: ["SEQUENTIAL_RESEED"],
+      findings: [{ code: "BOUND_HIT", level: "warning" },
+                 { code: "HIGH_CORRELATION", level: "warning" }] },
+    { index: 2, label: "T320", x: null, status: "failed", rwp: null,
+      marks: ["SERIES_PATTERN_FAILED"], findings: [] },
+    { index: 3, label: "T330", x: 330, status: "converged", rwp: 0.2,
+      marks: ["SEQUENTIAL_UNRECOVERED", "SOME_FUTURE_CODE"],
+      findings: [{ code: "PHASE_UNCONSTRAINED", level: "warning" }] },
+  ],
+  largest_steps: { "phases.0.cell.a": { indices: [2, 3], size_esd: 40, cold_ratio: null } },
+  vocabulary: [
+    ["SERIES_PATTERN_FAILED", "bar", "failed"], ["SEQUENTIAL_UNRECOVERED", "cross", "unrecovered"],
+    ["SEQUENTIAL_RESEED", "ring", "reseeded"],
+    ["findings", "count", "findings"], ["largest_step", "band", "largest step"],
+  ].map(([key, mark, label]) => ({ key, mark, label, source: "", means: "" })),
+  other_mark: "tick",
+});
 
 const member = (over: Partial<SeriesPattern> = {}): SeriesPattern => ({
   upload: "tok", filename: "p.xye", label: "p", x: null, reader: "xy",
@@ -278,10 +311,12 @@ describe("the legend", () => {
     // a ring is a good fit reached from a different starting model; a cross is
     // a fit that diverged on every rung, so its value is not a measurement at
     // all (WP-1051) — the same mark for both would collapse the two into "odd"
-    const rows = trajectoryLegend(traj(), [false, true, false], [false, false, true]);
+    const rows = trajectoryLegend(traj(), { rings: [false, true, false],
+                                            crosses: [false, false, true] });
     expect(rows.slice(-2).map((e) => [e.id, e.label, e.mark]))
       .toEqual([["rings", "reseeded", "ring"], ["crosses", "unrecovered", "cross"]]);
-    expect(ids(trajectoryLegend(traj(), [false, false, false], [false, false, false])))
+    expect(ids(trajectoryLegend(traj(), { rings: [false, false, false],
+                                          crosses: [false, false, false] })))
       .toEqual(["forward", "esd"]);
   });
 
@@ -318,7 +353,74 @@ describe("what the pointer says", () => {
   });
 });
 
-describe("matching the reseed flags to a trajectory", () => {
+describe("the trace", () => {
+  it("draws each verdict with its vocabulary row's glyph, and an unknown code too", () => {
+    // the codes are an open vocabulary: a new fence is drawn, never dropped
+    const d = traceData(trace());
+    expect(d.index).toEqual([0, 1, 2, 3]);
+    expect(d.marks).toEqual([[], ["ring"], ["bar"], ["cross", "tick"]]);
+    expect(d.findings).toEqual([0, 2, 0, 1]);
+    expect(d.y).toEqual([300, 310, null, 330]);
+    expect(markOf(trace(), "SOME_FUTURE_CODE")).toBe("tick");
+  });
+
+  it("draws a series with no coordinate on its index alone", () => {
+    const t = trace();
+    t.points = t.points.map((p) => ({ ...p, x: null }));
+    expect(traceData(t).y).toBeNull();
+  });
+
+  it("keys only what this series uses, an unknown code named by itself", () => {
+    const keys = (path: string | null) => traceKey(trace(), path).map((r) => r.key);
+    expect(keys(null)).toEqual(["SERIES_PATTERN_FAILED", "SEQUENTIAL_UNRECOVERED",
+                                "SEQUENTIAL_RESEED", "findings", "SOME_FUTURE_CODE"]);
+    // the band belongs to the parameter on show, so it is keyed only with one
+    expect(keys("phases.0.cell.a")).toContain("largest_step");
+    expect(keys("phases.0.scale")).not.toContain("largest_step");
+  });
+
+  it("shades the largest step of the parameter on show, and nothing for another", () => {
+    expect(largestStep(trace(), "phases.0.cell.a")).toEqual([2, 3]);
+    expect(largestStep(trace(), "phases.0.scale")).toBeNull();
+    expect(largestStep(trace(), null)).toBeNull();
+  });
+
+  it("names a pattern by its coordinate, its verdicts' labels and its findings", () => {
+    expect(traceText(trace(), 1)).toBe(
+      "T310 · T 310 · Rwp 5.10% · reseeded · 2 findings: BOUND_HIT, HIGH_CORRELATION");
+    expect(traceText(trace(), 2)).toBe("T320 · #2 · no fit · failed");
+    expect(traceText(trace(), 9)).toBe("");
+  });
+
+  it("steps by one and stops at the ends", () => {
+    expect(stepTo(trace(), 1, 1)).toBe(2);
+    expect(stepTo(trace(), 3, 1)).toBe(3);
+    expect(stepTo(trace(), 0, -1)).toBe(0);
+    expect(stepTo(trace(), null, 1)).toBe(0);
+    expect(stepTo(trace(), null, -1)).toBe(3);
+    expect(stepTo({ ...trace(), points: [] }, null, 1)).toBe(-1);
+  });
+
+  it("puts the trajectory's marks where the trace's verdicts are, by label", () => {
+    // `SeriesResult.trajectory` does not fill gaps: a parameter absent from
+    // the first pattern starts the trajectory at the second, so index
+    // alignment would ring the wrong point
+    const partial = traj({ labels: ["T310", "T330"], x: [310, 330],
+                           value: [4.2, 4.3], stderr: [null, null] });
+    const row = (label: string, index: number): SeriesEntry => ({
+      index, label, x: null, status: "converged", statistics: { rwp: 0.1, gof: 1 },
+      n_iterations: 1, reseeded: false, rwp_warm: null, rung: "warm",
+      rungs_tried: ["warm"], node_id: null, tree_id: null, diagnostics: [] });
+    // rings come from the trace's verdicts, crosses from the server's `rejected`
+    // by position (T300, T310, T330 have entries; T320 failed)
+    const rows = [row("T300", 0), row("T310", 1), row("T330", 3)];
+    expect(trajectoryMarks(partial, trace(), rows, [false, false, true])).toEqual({
+      rings: [true, false], crosses: [false, true] });
+    expect(markedFlags(partial, null, "SEQUENTIAL_RESEED")).toEqual([false, false]);
+  });
+});
+
+describe("matching the rejection flags to a trajectory", () => {
   const entries = (over: Array<Partial<SeriesEntry>>): SeriesEntry[] =>
     over.map((o, i) => ({
       index: i, label: `p${i}`, x: null, status: "converged",
@@ -326,19 +428,6 @@ describe("matching the reseed flags to a trajectory", () => {
       rwp_warm: null, rung: "warm", rungs_tried: ["warm"], node_id: null,
       tree_id: null, diagnostics: [], ...o,
     }));
-
-  it("matches on the label, because a trajectory skips the patterns it misses", () => {
-    // `SeriesResult.trajectory` does not fill gaps: a parameter absent from
-    // pattern 0 makes the trajectory start at pattern 1, so index alignment
-    // would ring the wrong point
-    const rows = entries([{ label: "p0" }, { label: "p1", reseeded: true },
-                          { label: "p2" }]);
-    const partial = traj({ labels: ["p1", "p2"], x: [400, 500],
-                           value: [4.2, 4.3], stderr: [null, null] });
-    expect(reseededFlags(partial, rows)).toEqual([true, false]);
-    const whole = traj({ labels: ["p0", "p1", "p2"] });
-    expect(reseededFlags(whole, rows)).toEqual([false, true, false]);
-  });
 
   it("marks what the library rejected, not only what diverged", () => {
     // `rejected` is the server's answer from the chain's own quarantine test:

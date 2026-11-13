@@ -152,6 +152,7 @@ translationengleiche
 triclinic
 trigonal
 trirutile
+unrecovered
 uncentred
 uniaxial
 unindexed

@@ -315,7 +315,9 @@ export interface LegendEntry {
  * WP-1051). The two marks say opposite things: a ring is a good fit reached
  * from a different starting model, a cross a diverged fit whose value is not a
  * measurement. The crossed point is still plotted, because a gap reads as data
- * nobody collected.
+ * nobody collected. Both are named by the trace's vocabulary labels
+ * (`trajectoryMarks`), so the trajectory and the trace cannot call one pattern
+ * two things.
  *
  * A point with no esd carries no whisker at all, which the figure owns. A
  * well-determined trajectory then shows no visible whisker, and that is the
@@ -324,8 +326,11 @@ export interface LegendEntry {
  * 0.5 px. Scaling it up to be seen would be WP-1029's "an exaggeration is not
  * a probability" one panel over.
  */
-export function trajectoryLegend(traj: Trajectory, reseeded: boolean[] = [],
-                                 unrecovered: boolean[] = []): LegendEntry[] {
+export function trajectoryLegend(traj: Trajectory, marks: Partial<TrajectoryMarks> = {},
+                                 trace: Trace | null = null): LegendEntry[] {
+  const { rings: reseeded = [], crosses: unrecovered = [] } = marks;
+  const name = (code: string, fallback: string) =>
+    trace?.vocabulary.find((r) => r.key === code)?.label ?? fallback;
   const tone = "--plot-diff";
   const out: LegendEntry[] = [
     { id: "forward", label: "forward", ink: tone, mark: "line" },
@@ -337,10 +342,12 @@ export function trajectoryLegend(traj: Trajectory, reseeded: boolean[] = [],
     out.push({ id: "backward", label: "backward", ink: "--muted", mark: "dot" });
   }
   if (reseeded.some(Boolean)) {
-    out.push({ id: "rings", label: "reseeded", ink: "--warn", mark: "ring" });
+    out.push({ id: "rings", label: name("SEQUENTIAL_RESEED", "reseeded"),
+               ink: "--warn", mark: "ring" });
   }
   if (unrecovered.some(Boolean)) {
-    out.push({ id: "crosses", label: "unrecovered", ink: "--warn", mark: "cross" });
+    out.push({ id: "crosses", label: name("SEQUENTIAL_UNRECOVERED", "unrecovered"),
+               ink: "--warn", mark: "cross" });
   }
   return out;
 }
@@ -414,20 +421,166 @@ export function memberLegend(masked: boolean, background = true): LegendEntry[] 
   ];
 }
 
-/** Which series entries carry a flag, by trajectory position.
- *
- * A trajectory skips patterns where its path is absent (`SeriesResult.trajectory`
- * does not fill gaps), so the flags are matched on **label** rather than on
- * index — the two are the same list only when every pattern carried the path. */
+// ---------------------------------------------------------------- the trace
+
+/** One row of `rietx.gui.series.TRACE_VOCABULARY`: a mark, what it is
+ *  called, the field of the series answer it reads, and what it says. */
+export interface TraceRow {
+  key: string;
+  mark: string;
+  label: string;
+  source: string;
+  means: string;
+}
+
+/** One pattern on the trace, a failed one included. */
+export interface TracePoint {
+  index: number;
+  label: string;
+  /** the series coordinate, `null` where the pattern has none */
+  x: number | null;
+  /** the fit's status, or `"failed"` for a pattern with no fit */
+  status: string;
+  rwp: number | null;
+  /** the codes of the series verdicts naming this pattern */
+  marks: string[];
+  /** this pattern's own fit's codes, each at its worst level */
+  findings: Array<{ code: string; level: string }>;
+}
+
+export interface TraceStep {
+  indices: [number, number];
+  size_esd: number;
+  cold_ratio: number | null;
+}
+
+/** `/api/series/result`'s `trace` (WP-1317, `rietx.gui.series.trace`). */
+export interface Trace {
+  x_label: string;
+  points: TracePoint[];
+  /** each path's largest step in its esds, read off `SeriesResult.steps` */
+  largest_steps: Record<string, TraceStep>;
+  vocabulary: TraceRow[];
+  /** the mark of a verdict whose code the vocabulary has no row for */
+  other_mark: string;
+}
+
+/** The glyph a verdict's code is drawn with: its vocabulary row's, or the
+ *  served fallback for a code the table does not list, which is drawn rather
+ *  than dropped because the codes are an open vocabulary. */
+export function markOf(trace: Trace, code: string): string {
+  return trace.vocabulary.find((r) => r.key === code)?.mark ?? trace.other_mark;
+}
+
+/**
+ * What the trace figure draws, from the served trace and nothing else: each
+ * pattern's index, its coordinate, the glyphs of its verdicts and the count of
+ * its own findings. A series with no coordinate on any pattern is drawn on its
+ * index alone (`y: null`), since a line of index against index says nothing.
+ */
+export function traceData(trace: Trace) {
+  const y = trace.points.some((p) => p.x !== null)
+    ? trace.points.map((p) => p.x) : null;
+  return {
+    index: trace.points.map((p) => p.index),
+    y,
+    marks: trace.points.map((p) => [...new Set(p.marks.map((c) => markOf(trace, c)))]),
+    findings: trace.points.map((p) => p.findings.length),
+  };
+}
+
+/** The key under the trace: one entry per vocabulary row this series uses,
+ *  then one per code the vocabulary does not list, named by its code. The
+ *  largest step is listed only when the parameter on show has one. */
+export function traceKey(trace: Trace, path: string | null): TraceRow[] {
+  const used = new Set(trace.points.flatMap((p) => p.marks));
+  const rows = trace.vocabulary.filter((r) => {
+    if (r.key === "findings") return trace.points.some((p) => p.findings.length);
+    if (r.key === "largest_step") return !!(path && trace.largest_steps[path]);
+    return used.has(r.key);
+  });
+  const known = new Set(trace.vocabulary.map((r) => r.key));
+  for (const code of [...used].filter((c) => !known.has(c)).sort()) {
+    rows.push({ key: code, mark: trace.other_mark, label: code,
+                source: "SeriesResult.diagnostics", means: code });
+  }
+  return rows;
+}
+
+/** The parameter on show's largest step as the pair the trace shades, or null. */
+export function largestStep(trace: Trace, path: string | null): [number, number] | null {
+  const step = path ? trace.largest_steps[path] : undefined;
+  return step ? [step.indices[0], step.indices[1]] : null;
+}
+
+/** What the pointer on one pattern of the trace says: its label and
+ *  coordinate, its Rwp, the verdicts by their vocabulary labels, and its
+ *  own findings by code. */
+export function traceText(trace: Trace, i: number): string {
+  const p = trace.points[i];
+  if (!p) return "";
+  const at = p.x === null ? `#${p.index}` : `${trace.x_label} ${sig(p.x, 6)}`;
+  const label = (c: string) => trace.vocabulary.find((r) => r.key === c)?.label ?? c;
+  const parts = [`${p.label} · ${at}`];
+  if (p.status === "failed") parts.push("no fit");
+  else if (p.rwp !== null) parts.push(`Rwp ${(p.rwp * 100).toFixed(2)}%`);
+  if (p.marks.length) parts.push(p.marks.map(label).join(", "));
+  if (p.findings.length) {
+    parts.push(`${p.findings.length} finding${p.findings.length === 1 ? "" : "s"}: `
+               + p.findings.map((f) => f.code).join(", "));
+  }
+  return parts.join(" · ");
+}
+
+/** The trace position `delta` patterns on from `at` (a position in
+ *  `trace.points`), clamped to the series; an end when nothing is on show. */
+export function stepTo(trace: Trace, at: number | null, delta: number): number {
+  const last = trace.points.length - 1;
+  if (last < 0) return -1;
+  if (at === null) return delta < 0 ? last : 0;
+  return Math.max(0, Math.min(last, at + delta));
+}
+
+/** Which series entries carry a flag, by trajectory position, matched on
+ *  **label**: a trajectory skips patterns where its path is absent
+ *  (`SeriesResult.trajectory` does not fill gaps), so index and position are the
+ *  same list only when every pattern carried the path. */
 function flagsFor(traj: Trajectory, entries: SeriesEntry[],
                   flagged: (e: SeriesEntry) => boolean): boolean[] {
   const marked = new Set(entries.filter(flagged).map((e) => e.label));
   return traj.labels.map((label) => marked.has(label));
 }
 
-/** Which entries the reseed fence refitted cold. */
-export function reseededFlags(traj: Trajectory, entries: SeriesEntry[]): boolean[] {
-  return flagsFor(traj, entries, (e) => e.reseeded);
+/** Which trajectory points a verdict names, by trajectory position.
+ *
+ * A trajectory skips patterns where its path is absent (`SeriesResult.trajectory`
+ * does not fill gaps), so a point is matched on **label** rather than on index —
+ * the two are the same list only when every pattern carried the path. The
+ * verdict is read off the trace, so the trajectory's rings and crosses
+ * and the trace's glyphs are one vocabulary and cannot disagree. */
+export function markedFlags(traj: Trajectory, trace: Trace | null,
+                            code: string): boolean[] {
+  const marked = new Set((trace?.points ?? []).filter((p) => p.marks.includes(code))
+    .map((p) => p.label));
+  return traj.labels.map((label) => marked.has(label));
+}
+
+/** The trajectory's per-point marks, each from the verdict it draws. */
+export interface TrajectoryMarks {
+  rings: boolean[];
+  crosses: boolean[];
+}
+
+/** A reseed is ringed and an unrecovered fit crossed. A ring is read off the
+ *  trace's verdicts; a cross off `rejected`, the server's own answer from the
+ *  chain's test, so the trajectory marks exactly what the library quarantined. */
+export function trajectoryMarks(traj: Trajectory, trace: Trace | null,
+                                entries: SeriesEntry[],
+                                rejected: boolean[]): TrajectoryMarks {
+  return {
+    rings: markedFlags(traj, trace, "SEQUENTIAL_RESEED"),
+    crosses: unrecoveredFlags(traj, entries, rejected),
+  };
 }
 
 /** Which entries the library quarantined (`SEQUENTIAL_UNRECOVERED`, WP-1051).
@@ -459,3 +612,4 @@ export function rejectedBecause(e: SeriesEntry): string {
   }
   return parts.join(" and ");
 }
+

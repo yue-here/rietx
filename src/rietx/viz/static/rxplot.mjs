@@ -1402,3 +1402,189 @@ export function trajectory(uPlot, host, traj, spec) {
 
   return group;
 }
+
+// ---------------------------------------------------------------- the trace
+
+/** The glyphs a trace can draw for a series verdict, as `marks` names them. */
+const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
+
+/**
+ * A series on the experiment's own axis, for scrubbing (WP-1317): the series
+ * coordinate against the pattern index, a row of glyphs over each pattern a
+ * verdict names, a bar per pattern for its own findings, the band of one
+ * step, and the cursor at the pattern on show.
+ *
+ * `data`:
+ *
+ * - `index`, ascending: every pattern's place in the chain.
+ * - `y`: each pattern's coordinate, null where it has none, or null for a
+ *   series on its index alone, whose trace is then the marks over a bare axis.
+ * - `marks`: per pattern, the glyphs to draw, each one of "bar", "cross",
+ *   "ring" and "tick", stacked down from the top in that order.
+ * - `findings`: per pattern, a count, drawn as a bar up from the bottom whose
+ *   height is its share of the largest count.
+ *
+ * `spec`:
+ *
+ * - `colors()`: `{ line, warn, muted, cursor }`, read at every draw.
+ * - `at`: the index on show, or null. `step`: `[i0, i1]` shaded, or null.
+ * - `xLabel`, `yLabel`: the axis titles.
+ *
+ * **A drag scrubs, and never zooms**: a press and every move after it call
+ * `onScrub(i)` with the pattern nearest the pointer, once per pattern
+ * crossed. The press is taken in the capture phase, as alt-drag's is, so
+ * uPlot never starts a select. The wheel and alt-drag still zoom and pan, and
+ * a double click resets.
+ *
+ * The figure is the pane group (`panes`) with `setAt`, `setStep`, `onScrub`
+ * and `onPoint`, which is called with `{ i, left, top }` for the pattern under
+ * the pointer, `i` its position in `index`, or with null.
+ */
+export function trace(uPlot, host, data, spec) {
+  const n = data.index.length, xs = Float64Array.from(data.index);
+  const y = (i) => (data.y ? finite(data.y[i]) : null);
+  const most = Math.max(1, ...data.findings);
+  const state = { at: spec.at ?? null, step: spec.step ?? null };
+
+  function extent() {
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const v = y(i);
+      if (v != null) { min = Math.min(min, v); max = Math.max(max, v); }
+    }
+    return Number.isFinite(min) ? uPlot.rangeNum(min, max, 0.1, true) : [0, 1];
+  }
+
+  function draw(u) {
+    const c = spec.colors(), r = devicePixelRatio, { ctx } = u, { left, top, width, height } = u.bbox;
+    const X = (i) => u.valToPos(xs[i], "x", true);
+    const wide = n > 1 ? Math.abs(X(1) - X(0)) : width;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
+    ctx.setLineDash([]);
+    if (state.step) {
+      const a = u.valToPos(state.step[0], "x", true), b = u.valToPos(state.step[1], "x", true);
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = c.line;
+      ctx.fillRect(Math.min(a, b), top, Math.max(Math.abs(b - a), 2 * r), height);
+      ctx.globalAlpha = 1;
+    }
+    // the findings, up from the bottom, at most a third of the pane
+    ctx.fillStyle = c.muted;
+    const bar = Math.max(r, Math.min(6 * r, 0.6 * wide));
+    for (let i = 0; i < n; i++) {
+      const k = data.findings[i];
+      if (!k) continue;
+      const h = (k / most) * height / 3;
+      ctx.fillRect(X(i) - bar / 2, top + height - h, bar, h);
+    }
+    if (data.y) {
+      ctx.strokeStyle = c.line;
+      ctx.lineWidth = 1.4 * r;
+      ctx.beginPath();
+      let open = false;
+      for (let i = 0; i < n; i++) {
+        const v = y(i);
+        if (v == null) { open = false; continue; }
+        const Y = u.valToPos(v, "y", true);
+        if (open) ctx.lineTo(X(i), Y); else ctx.moveTo(X(i), Y);
+        open = true;
+      }
+      ctx.stroke();
+    }
+    // the verdicts, stacked down from the top in glyph order
+    ctx.strokeStyle = c.warn;
+    ctx.fillStyle = c.warn;
+    const d = 4 * r, gap = 11 * r;
+    for (let i = 0; i < n; i++) {
+      const glyphs = TRACE_GLYPHS.filter((g) => data.marks[i]?.includes(g));
+      glyphs.forEach((g, k) => {
+        const cx = X(i), cy = top + 7 * r + k * gap;
+        ctx.lineWidth = 1.6 * r;
+        ctx.beginPath();
+        if (g === "bar") {
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(cx - bar / 2, top, bar, height);
+          ctx.globalAlpha = 1;
+          return;
+        }
+        if (g === "ring") ctx.arc(cx, cy, d, 0, 2 * Math.PI);
+        else if (g === "cross") {
+          ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx - d, cy + d); ctx.lineTo(cx + d, cy - d);
+        } else { ctx.moveTo(cx, cy - d); ctx.lineTo(cx, cy + d); }
+        ctx.stroke();
+      });
+    }
+    if (state.at != null) {
+      const at = u.valToPos(state.at, "x", true);
+      ctx.strokeStyle = c.cursor;
+      ctx.lineWidth = 1.5 * r;
+      ctx.beginPath();
+      ctx.moveTo(at, top);
+      ctx.lineTo(at, top + height);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  const none = () => ({ stroke: null, fill: null, clip: null, band: null, gaps: null, flags: 0 });
+  const group = panes(uPlot, host, {
+    x: xs,
+    panes: [{ key: "trace", share: 1, xLabels: true, xLabel: spec.xLabel ?? "", label: spec.yLabel ?? "",
+              auto: extent, series: [{ paths: none, points: { show: false } }],
+              data: [Array.from({ length: n }, (_, i) => y(i))], hooks: { draw: [draw] } }],
+  });
+  const u = group.panes.trace;
+
+  group.onScrub = null;
+  group.onPoint = null;
+  /** The pattern nearest a pointer `clientX`, as its position in `index`. */
+  const under = (clientX) => {
+    const v = u.posToVal(clientX - u.over.getBoundingClientRect().left, "x");
+    return nearest(xs, v, (w) => w, Infinity);
+  };
+  u.root.addEventListener("mousedown", (e) => {
+    if (e.altKey || e.button !== 0) return;
+    if (!u.over.contains(e.target)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    // the default a press would have done, and preventDefault cancels: a
+    // focusable host takes focus, so the keys step on from where the drag ended
+    if (host.tabIndex >= 0) host.focus({ preventScroll: true });
+    let last = -1;
+    const scrub = (ev) => {
+      const i = under(ev.clientX);
+      if (i >= 0 && i !== last) { last = i; group.onScrub?.(i); }
+    };
+    const up = () => { removeEventListener("mousemove", scrub); removeEventListener("mouseup", up); };
+    addEventListener("mousemove", scrub);
+    addEventListener("mouseup", up);
+    scrub(e);
+  }, true);
+
+  group.onCursor = (hit) => {
+    if (!group.onPoint) return;
+    if (!hit) { group.onPoint(null); return; }
+    const i = nearest(xs, hit.x, (w) => u.valToPos(w, "x"), Infinity);
+    const v = y(i);
+    group.onPoint({ i, left: u.valToPos(xs[i], "x"), top: v == null ? hit.top : u.valToPos(v, "y") });
+  };
+
+  /** Put the cursor on pattern `at` (an `index` value), or take it off with null. */
+  group.setAt = (at) => { state.at = at; u.redraw(false, true); };
+  /** Shade the step between two patterns, or none. */
+  group.setStep = (step) => { state.step = step; u.redraw(false, true); };
+
+  /** Every pattern in view: its index, its coordinate and its findings count. */
+  group.table = () => {
+    const { min, max } = u.scales.x, rows = [];
+    for (let i = 0; i < n; i++) {
+      if (xs[i] >= min && xs[i] <= max) rows.push([xs[i], y(i), data.findings[i]]);
+    }
+    return { names: ["pattern", "x", "findings"], rows };
+  };
+
+  return group;
+}
