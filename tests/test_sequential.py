@@ -1690,6 +1690,227 @@ def test_a_high_rwp_is_recorded_and_climbs_no_rung(thermal_patterns, tmp_path):
     assert "specimen or the model changed" in reseed.suggestion
 
 
+# -- the GoF step (WP-2080, option B) ----------------------------------------
+
+def _dictate_gof(runner, gofs):
+    """Force each rung's reported GoF, ``gofs`` mapping a label to one value
+    per rung (the last repeats), leaving the fits real: whether the step fires
+    is then a deterministic assertion, as :func:`_dictate`'s Rwp is."""
+    real = runner._fit_one
+    seen: dict[str, int] = {}
+
+    def dictated(*args, **kw):
+        ref, result = real(*args, **kw)
+        label = args[1]
+        n = seen.get(label, 0)
+        seen[label] = n + 1
+        if label in gofs:
+            told = gofs[label]
+            result.status = "converged"
+            result.statistics.gof = told[min(n, len(told) - 1)]
+            result.diagnostics = [d for d in result.diagnostics
+                                  if d.level != "error"]
+        return ref, result
+
+    runner._fit_one = dictated
+    return runner
+
+
+def test_a_gof_step_climbs_to_warm_staged_and_never_cold(thermal_patterns):
+    """A clean warm rung at twice its seed's GoF climbs one rung and no
+    further, whatever the staged rung reports; it is neither reseeded nor
+    quarantined.  Its successor's reference is its own kept GoF."""
+    structure, ins = _start_models()
+    gofs = {"p000": [1.0], "p001": [2.0, 2.0, 2.0], "p002": [1.0]}
+    series = _dictate_gof(SequentialRefinement(structure, ins), gofs).fit(
+        thermal_patterns[:3], plan=_CHEAP)
+
+    stepped = series[1]
+    assert series[0].warm_gof_over_seed is None            # no warm start
+    assert stepped.rungs_tried == ["warm", "warm_staged"]
+    assert stepped.escalated_on_gof and not stepped.reseeded
+    assert stepped.warm_gof_over_seed == pytest.approx(2.0)
+    assert stepped.rwp_warm is not None                    # the ladder ran
+    assert {d.code for d in series.diagnostics}.isdisjoint(
+        {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"})
+    assert series[2].rungs_tried == ["warm"]
+    assert series[2].warm_gof_over_seed == pytest.approx(0.5)
+    assert not series[2].escalated_on_gof
+
+
+@pytest.mark.parametrize("gof, kw", [
+    (1.25, {}),                     # at the factor: strictly above it fires
+    (2.0, {"reseed": False}),       # the caller declined every escalation
+    (2.0, {"refit": "stages"}),     # the first rung already is warm_staged
+])
+def test_the_gof_step_is_recorded_where_it_does_not_act(thermal_patterns, gof, kw):
+    structure, ins = _start_models()
+    gofs = {"p000": [1.0], "p001": [gof]}
+    series = _dictate_gof(SequentialRefinement(structure, ins), gofs).fit(
+        thermal_patterns[:2], plan=_CHEAP, **kw)
+    first = "warm_staged" if kw.get("refit") == "stages" else "warm"
+    assert series[1].rungs_tried == [first]
+    assert series[1].warm_gof_over_seed == pytest.approx(gof)
+    assert not series[1].escalated_on_gof
+
+
+def test_a_caller_fence_past_the_gof_step_is_not_called_a_gof_escalation(
+        thermal_patterns):
+    """A first rung over the caller's ``reseed_factor`` climbs on the fence,
+    so the GoF step it also crosses is recorded and not credited."""
+    structure, ins = _start_models()
+    script = {"p000": [("converged", 0.10)], "p001": [("converged", 0.30)]}
+    runner = _dictate(SequentialRefinement(structure, ins), script)
+    runner = _dictate_gof(runner, {"p000": [1.0], "p001": [3.0]})
+    series = runner.fit(thermal_patterns[:2], plan=_CHEAP, reseed_factor=1.25)
+    assert series[1].rungs_tried[:2] == ["warm", "warm_staged"]
+    assert series[1].warm_gof_over_seed == pytest.approx(3.0)
+    assert not series[1].escalated_on_gof
+
+
+def test_a_rejected_rung_past_the_gof_step_is_not_called_a_gof_escalation(
+        thermal_patterns):
+    """A warm rung the ladder climbs past anyway (here diverged) records its
+    ratio, and the flag stays for the step alone."""
+    structure, ins = _start_models()
+    gofs = {"p000": [1.0], "p001": [3.0]}
+    runner = _dictate_gof(SequentialRefinement(structure, ins), gofs)
+    real = runner._fit_one
+    calls = []
+
+    def diverge_first(*args, **kw):
+        ref, result = real(*args, **kw)
+        if args[1] == "p001":
+            calls.append(1)
+            if len(calls) == 1:
+                result.status = "diverged"
+        return ref, result
+
+    runner._fit_one = diverge_first
+    series = runner.fit(thermal_patterns[:2], plan=_CHEAP)
+    assert series[1].rungs_tried[:2] == ["warm", "warm_staged"]
+    assert series[1].warm_gof_over_seed == pytest.approx(3.0)
+    assert not series[1].escalated_on_gof
+
+
+def test_the_gof_steps_factor_is_the_one_its_prose_quotes():
+    """The help entries and the series guide spell the factor; a retune of
+    ``GOF_STEP_FACTOR`` fails here until they say the new number."""
+    from pathlib import Path
+
+    from rietx.help import help_registry
+    from rietx.sequential import GOF_STEP_FACTOR
+    factor = f"{GOF_STEP_FACTOR:g}"
+    fields = help_registry()["result_fields"]
+    assert factor in fields["SeriesEntry.warm_gof_over_seed"]["description"]
+    assert factor in fields["SeriesEntry.escalated_on_gof"]["description"]
+    guide = Path(__file__).parents[1] / "docs" / "docs" / "reference" / "series-ladder.md"
+    assert f"more than {factor} times the GoF" in guide.read_text(encoding="utf-8")
+
+
+#: Issue #1214's chain (contributor mustachefeeling, its ``repro.py``): a
+#: wurtzite-type AB phase and its orthohexagonal Cmc2_1 subgroup, both
+#: simulated by rietx with Poisson noise; pattern 1 moves and broadens the
+#: orthorhombic cell.  The hexagonal ``c`` is 5.202 Å in pattern 1.
+_W_TT = np.arange(15.0, 90.0, 0.02)
+_W_A, _W_C = 3.25, 5.20
+
+
+def _w_phase(name, a, b, c, scale, strain):
+    P = rx.Parameter
+    hexa = name == "hex"
+    atoms = [rx.Atom(label=s, species=sp,
+                     x=P(value=0.0 if not hexa else 1 / 3, vary=False),
+                     y=P(value=1 / 3 if not hexa else 2 / 3, vary=False),
+                     z=P(value=z, vary=False), occ=P(value=1.0, vary=False),
+                     biso=P(value=0.5, vary=False))
+             for s, sp, z in (("Zn", "Zn2+", 0.0), ("O", "O2-", 0.375))]
+    cell = rx.Cell(a=P(value=a, vary=False, min=2.9, max=3.6),
+                   b=P(value=b, vary=False, min=2.9 if hexa else 5.0,
+                       max=3.6 if hexa else 6.2),
+                   c=P(value=c, vary=False, min=4.7, max=5.7),
+                   alpha=P(value=90.0, vary=False), beta=P(value=90.0, vary=False),
+                   gamma=P(value=120.0 if hexa else 90.0, vary=False))
+    return rx.Phase(name=name, space_group="P63mc" if hexa else "Cmc21", cell=cell,
+                    atoms=atoms, scale=P(value=scale, vary=False, min=0.0),
+                    lor_size=P(value=0.0, vary=False),
+                    lor_strain=P(value=strain, vary=False, min=0.0, max=0.5),
+                    gauss_size=P(value=0.0, vary=False),
+                    gauss_strain=P(value=0.0, vary=False))
+
+
+def _w_hex(a, c, s, e):
+    return _w_phase("hex", a, a, c, s, e)
+
+
+def _w_orth(a, b3, c, s, e):
+    return _w_phase("ortho", a, b3 * 3 ** 0.5, c, s, e)
+
+
+def _w_instrument():
+    P = rx.Parameter
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa", goniometer_radius_mm=240.0)
+    ins.background = BackgroundChebyshev(coefficients=[
+        P(value=v, vary=False) for v in (300.0, 20.0, -10.0, 0, 0, 0)])
+    pr = ins.profile
+    pr.x, pr.y = (P(value=0.0, vary=False, min=0.0, max=1.0),
+                  P(value=0.0, vary=False, min=0.0, max=1.0))
+    pr.v = P(value=0.0, vary=False, min=-0.5, max=0.5)
+    pr.u = P(value=0.005, vary=False, min=-0.05, max=1.0)
+    pr.w = P(value=0.005, vary=False, min=0.0, max=1.0)
+    ins.geometry.sample_displacement = P(value=0.0, vary=False, min=-1.0, max=1.0)
+    return ins
+
+
+def _w_simulate(phases, seed):
+    y = np.asarray(rx.Refinement(rx.Structure(phases=phases), _w_instrument(),
+                                 history=False).predict(_W_TT), float)
+    y = np.random.default_rng(seed).poisson(
+        np.maximum(y * 20000.0 / y.max(), 0)).astype(float)
+    return rx.PatternData(two_theta=_W_TT.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(np.maximum(y, 1)).tolist())
+
+
+_W_PLAN = staged.RefinementPlan(stages=[
+    staged.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+    staged.Stage("displ", ["instrument.geometry.sample_displacement"]),
+    staged.Stage("cell", ["phases.*.cell.*"]),
+    staged.Stage("strain", ["phases.*.lor_strain"]),
+])
+
+
+def test_issue_1214s_warm_fit_in_a_wrong_basin_climbs_and_lands_on_the_truth():
+    """Noise draw 2 of the issue: on main before WP-2080 the collapsed warm rung
+    converged clean at GoF 2.05, twice its seed's 1.02, with the hexagonal c
+    0.34 Å short, and was kept (macOS arm64).  The GoF step takes it to the
+    staged plan from the same start, which lands c within its esd of the truth
+    (measured 5.20194(11) against 5.202).  The assertion is the kept answer,
+    and the step is checked wherever the first rung landed high, since which
+    basin a local solver's first rung reaches is a platform's rounding."""
+    p0 = _w_simulate([_w_hex(_W_A, _W_C, 1.0, 0.03),
+                      _w_orth(_W_A + 0.005, _W_A - 0.003, _W_C - 0.01, 0.4, 0.05)],
+                     seed=1)
+    p1 = _w_simulate([_w_hex(_W_A + 0.003, _W_C + 0.002, 0.15, 0.03),
+                      _w_orth(_W_A + 0.04, _W_A - 0.03, _W_C - 0.06, 1.0, 0.45)],
+                     seed=2)
+    start = [_w_hex(_W_A + 0.01, _W_C + 0.01, 1e-4, 0.03),
+             _w_orth(_W_A + 0.01, _W_A, _W_C, 1e-4, 0.01)]
+    series = SequentialRefinement(rx.Structure(phases=start), _w_instrument(),
+                                  carry=("*",), history=False).fit(
+        [p0, p1], x=[0.0, 1.0], plan=_W_PLAN)
+
+    entry = series[1]
+    from rietx.sequential import GOF_STEP_FACTOR
+    assert entry.warm_gof_over_seed is not None
+    if entry.warm_gof_over_seed > GOF_STEP_FACTOR:
+        assert entry.escalated_on_gof
+        assert entry.rungs_tried == ["warm", "warm_staged"]
+        assert entry.rung == "warm_staged" and not entry.reseeded
+    assert entry.statistics.gof < 1.2
+    c, esd = entry.value("phases.0.cell.c"), entry.stderr("phases.0.cell.c")
+    assert esd is not None and abs(c - (_W_C + 0.002)) < esd
+
+
 @pytest.mark.slow
 def test_a_blank_frame_no_longer_reads_as_a_point_or_hides_a_step():
     """Issue #481 as a fixture, all three gaps at once.

@@ -759,14 +759,15 @@ reached Rwp {((e.rwp_warm ?? 0) * 100).toFixed(2)}%) and this pattern was refitt
 initial model. A good fit — but its starting values did not come from its
 neighbour, so it is not evidence that the trajectory is continuous here.">reseeded</span>
                 {:else if e.rung === "warm_staged"}
-                  <span class="chip" title="the quick warm refit was rejected (it
-reached Rwp {((e.rwp_warm ?? 0) * 100).toFixed(2)}%) and the full staged plan recovered
-it — still starting from the neighbour's answer, so the chain is unbroken
+                  <span class="chip" title="{e.escalated_on_gof
+  ? `the quick warm refit converged at ${(e.warm_gof_over_seed ?? 0).toFixed(2)}× its seed pattern's GoF, so the full staged plan was tried from the same start and fitted better`
+  : `the quick warm refit was rejected (it reached Rwp ${((e.rwp_warm ?? 0) * 100).toFixed(2)}%) and the full staged plan recovered it`}
+— still starting from the neighbour's answer, so the chain is unbroken
 here">restaged</span>
                 {:else if e.rwp_warm !== null}
-                  <span class="chip warn" title="the reseed guard fired and no restart
-rescued it (tried: {e.rungs_tried.join(" → ")}): this pattern was hard for a reason a
-different starting point could not fix">hard</span>
+                  <span class="chip" class:warn={!e.escalated_on_gof} title="{e.escalated_on_gof
+  ? `the quick warm refit converged at ${(e.warm_gof_over_seed ?? 0).toFixed(2)}× its seed pattern's GoF, so the full staged plan was tried from the same start; the quick refit still fitted better and was kept`
+  : `the reseed guard fired and no restart rescued it (tried: ${e.rungs_tried.join(" → ")}): this pattern was hard for a reason a different starting point could not fix`}">{e.escalated_on_gof ? "GoF step" : "hard"}</span>
                 {/if}
               </td>
               <td title={e.statistics ? `GoF ${e.statistics.gof.toFixed(3)}` : ""}>

@@ -140,6 +140,7 @@ Gaultois
 Gaussian
 Gaussians
 [gG]emmi
+GoF
 [gG]oniometer
 GSAS
 Guinier

@@ -176,12 +176,15 @@ class SeriesEntry(Base):
     #: both set means a cold restart rescued the pattern, ``rwp_warm`` alone
     #: means the ladder escalated but a warm attempt was still the best of the
     #: ones tried — worth seeing, since it marks a pattern the series found
-    #: hard for a reason no restart could fix.  ``None`` when that first
+    #: hard for a reason no restart could fix, unless :attr:`escalated_on_gof`
+    #: says the climb was the GoF step's, which often finds nothing to
+    #: rescue (WP-2080).  ``None`` when that first
     #: attempt raised rather than returned: it reached no Rwp, and
     #: :attr:`rungs_raised` says what it raised.
     rwp_warm: float | None = None
     #: Which attempt produced the values on this entry (WP-1051).  The chain
-    #: escalates only on failure: ``"warm"`` is the collapsed warm refit
+    #: escalates on failure, and to ``"warm_staged"`` also on the GoF step
+    #: (:attr:`escalated_on_gof`, WP-2080): ``"warm"`` is the collapsed warm refit
     #: (``refit="single"``'s first rung), ``"warm_staged"`` the full staged plan
     #: from the warm state, ``"cold"`` the full staged plan from the initial
     #: models.  The **first** pattern of a chain is always ``"cold"`` — it has
@@ -222,6 +225,29 @@ class SeriesEntry(Base):
     #: had been accepted, and in a document written before the field.
     #: Written by ``SequentialRefinement._chain``.
     rwp_over_median: float | None = None
+    #: The **first** warm attempt's GoF over the GoF of the pattern its warm
+    #: start came from (:attr:`seeded_from`), the fact the GoF step reads
+    #: (WP-2080).  Above ``sequential.GOF_STEP_FACTOR`` (1.25) a collapsed
+    #: warm rung climbs to ``"warm_staged"`` and the better attempt is kept,
+    #: so on an escalated entry this is the ratio that sent it up, not the
+    #: kept attempt's (that one is :attr:`statistics`' GoF over the seed
+    #: entry's).  GoF and not Rwp because it divides the misfit by the
+    #: pattern's own noise: issue #1214's first rung sat under the Rwp fence at
+    #: 2.01 times its seed's GoF, with a minor phase's ``c`` 0.34 Å off.
+    #: Recorded under ``refit="stages"`` and ``reseed=False`` too, where the
+    #: step cannot act.  ``None`` where there was no warm start, where the
+    #: first attempt raised, and in a document written before the field.
+    #: Written by ``SequentialRefinement._chain``.
+    warm_gof_over_seed: float | None = None
+    #: True when the GoF step alone sent this pattern from the collapsed warm
+    #: rung to ``"warm_staged"`` (WP-2080): :attr:`warm_gof_over_seed` was
+    #: above ``sequential.GOF_STEP_FACTOR`` while the attempt was neither
+    #: rejected nor over a caller's ``reseed_factor`` nor cut by the first-rung
+    #: bound, any of which would have climbed anyway.  It says why the ladder
+    #: ran; :attr:`rung` says which attempt won.  ``False`` where the step did
+    #: not fire or was not what escalated, and in a document written before
+    #: the field.  Written by ``SequentialRefinement._chain``.
+    escalated_on_gof: bool = False
     #: The series index of the pattern whose fitted state seeded this
     #: pattern's warm rungs (WP-2003): the last pattern accepted before it in
     #: the walk.  That is not the pattern walked just before it when that one

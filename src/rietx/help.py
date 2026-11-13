@@ -6277,6 +6277,32 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "and an unmodelled phase GoF 16.7. `None` for the first pattern walked."
         ),
     ),
+    "SeriesEntry.warm_gof_over_seed": HelpEntry(
+        title="Warm GoF over its seed",
+        description=(
+            "The first warm attempt's GoF divided by the GoF of the pattern its warm "
+            "start came from. Above 1.25 the collapsed warm refit climbs to the staged "
+            "plan from the same start, and the better of the two fits is kept, so on an "
+            "escalated entry this is the ratio that sent it up. GoF divides the misfit "
+            "by the pattern's own noise, so falling counts do not raise it the way they "
+            "raise Rwp, but more counts at the same systematic misfit do: compare the "
+            "counts before reading a jump as a worse fit. A warm fit that kept a minor "
+            "phase's c 0.34 Å off read 2.01, where a right fit reads about 1. Recorded under `refit=\"stages\"` and "
+            "`reseed=False` too, where nothing acts on it. `None` without a warm start "
+            "or when the first attempt raised."
+        ),
+    ),
+    "SeriesEntry.escalated_on_gof": HelpEntry(
+        title="Escalated on GoF",
+        description=(
+            "Whether the GoF step alone sent this pattern from the collapsed warm refit "
+            "to the staged plan from the same start: `warm_gof_over_seed` was above "
+            "1.25 while nothing else would have climbed: the attempt was not "
+            "rejected, not over your `reseed_factor` and not cut by the first-rung "
+            "bound. The step never reaches the cold "
+            "restart, so it never sets `reseeded`. `rung` says which attempt won."
+        ),
+    ),
     "SeriesEntry.seeded_from": HelpEntry(
         title="Warm start from",
         description=(

@@ -105,7 +105,7 @@ The temperature also appears in its `label`, since the scans of a reel are other
 | `refit` | `"single"` | `"single"` collapses the plan into one stage for a warm-started pattern; `"stages"` walks it again |
 | `two_theta_limits` | `None` | one fit range, applied to every pattern |
 | `direction` | `"forward"` | `"forward"`, `"backward"` or `"both"` ([Forward and backward chains](#forward-and-backward-chains)) |
-| `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
+| `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start, or one past the GoF step, climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
 | `first_rung_factor` | `None` | your own bound on the first attempt, a multiple of the dearest one this chain has converged; none by default |
 | `verify_steps` | 0 | how many of the largest steps to re-measure, each by refitting its two patterns cold and independently ([Steps between patterns](#steps-between-patterns)) |
 | `prepare` | `None` | `(index, data, structure, instrument) -> None`, called on the warmed models before each pattern's fit |
@@ -237,6 +237,8 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.rungs_tried` | every attempt made, in ladder order |
 | `SeriesEntry.rungs_raised` | the attempts among those whose fit raised, each with `repr` of the exception |
 | `SeriesEntry.rwp_over_median` | the kept attempt's Rwp over the median Rwp of the patterns accepted before it in the walk, with no threshold; `None` where no median existed, on the first pattern walked or after every earlier pattern was quarantined |
+| `SeriesEntry.warm_gof_over_seed` | the first warm attempt's GoF over the GoF of the pattern its warm start came from, what the GoF step reads; `None` without a warm start or when that attempt raised |
+| `SeriesEntry.escalated_on_gof` | the GoF step alone sent this pattern from the collapsed warm refit to `"warm_staged"` ([Restart ladder](#restart-ladder)) |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
 | `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
@@ -523,63 +525,15 @@ A path whose value is a step from where its fit began, in `SeriesResult.relative
 
 ### Restart ladder
 
-A rejected warm fit escalates one attempt at a time: the collapsed warm refit, then the full staged plan from the warm state, then the full staged plan from the starting models.
-Under `refit="stages"` the first attempt already is the staged warm fit, so the ladder has two attempts, `"warm_staged"` and `"cold"`, and `"warm"` never appears.
-Each attempt runs only when the trigger still fires on the best attempt so far, and the entry keeps the best.
-Best is an accepted attempt over a rejected one, then one that finished over one the bound cut, then the lower least-squares cost.
-`SeriesEntry.rungs_tried` names the attempts, and `SeriesEntry.n_iterations` sums those that returned a fit.
-The middle attempt matters most, because throwing a warm start away roughly triples the work.
-
-What triggers the ladder is a warm attempt that raised or was rejected: it diverged, or carries an `error` diagnostic such as `MODEL_FAR_FROM_DATA`.
-A `max_iter` attempt is not rejected.
-Each trigger is a property of this pattern's own fit, readable once it finishes, that a different start could fix.
-An Rwp comparison is not a default trigger.
-`reseed_factor` sets one if you want it: a warm attempt above that multiple of the median Rwp of the accepted patterns climbs the ladder.
-The 1.25 fence that was the default before 1.11 escalated 116 patterns across eight measured series and moved no value by more than 7.2e-4 of its esd.
-On a series where an unmodelled phase appears part-way, it refitted every later pattern for 4.1 times the evaluations.
-A guard finding such as `HIGH_CORRELATION` is neither, since it fires on converged patterns and no attempt changes the model or data behind it.
-
-The first attempt is unbounded unless you pass `first_rung_factor`.
-Each stage of it, the closing one included, may then spend that multiple of the dearest stage of the first attempts this chain has converged, once three have.
-An attempt with any stage stopped there escalates, even if its closing stage converged.
-The bound does nothing under `refit="stages"` or `reseed=False`.
-It is not the default because it can move an answer: at 3.0 on the planted ramp it cut a winning first attempt, 9.8 times the dearest before it, moving a zero shift 6.06 esd, to save 49 evaluations of 13 083.
-
-An attempt whose fit raises has lost in the same sense as a diverged one, and the ladder escalates past it the same way.
-`SeriesEntry.rungs_raised` records what each such attempt raised, and `SeriesEntry.rwp_warm` is `None` when the warm attempt was one of them.
-The case that needs this is a neighbour that converged with a cell far outside the physical range.
-Every warm attempt inherits that cell, and the reflection enumerator refuses it before the fit starts, while the cold attempt starts from the starting models.
-
-A pattern on which every attempt raised has no entry.
-It is recorded in `SeriesResult.failures` with a [`SERIES_PATTERN_FAILED`](diagnostics-series.md#series_pattern_failed) warning, and the `on_error` policy decides what the chain does next.
-Each `SeriesFailure` carries the pattern's `SeriesFailure.index` and `SeriesFailure.label`, and `SeriesFailure.exception` is the last attempt's exception as `repr`.
-`SeriesResult.n_failed` counts them, and `SequentialRefinement.failures_` is the same list on the runner, where to read it after catching the exception `on_error="raise"` lets through.
-Under the default, `"carry"`, the successor warm-starts from the last accepted pattern, because what failed was this pattern and not the state its neighbour handed it.
-A chain that fitted no pattern at all still raises, whatever the policy.
-Your own `prepare` and `constrain` are never guarded: a raise there ends the series.
+A warm fit that diverged, raised or carries an `error` code climbs a ladder of attempts: the collapsed warm refit, the full staged plan from the warm state, then the full staged plan from the starting models.
+A clean warm fit at more than 1.25 times its seed pattern's GoF climbs to the middle attempt only.
+The entry keeps the best attempt, and `SeriesEntry.rung` says which one it was.
+[Restart ladder and quarantine](series-ladder.md#restart-ladder) gives the triggers, the first-rung bound and the attempts that raise.
 
 ### Quarantine
 
-A fit still rejected after the last attempt is quarantined, and [`SEQUENTIAL_UNRECOVERED`](diagnostics-series.md#sequential_unrecovered) names it and its `error` code.
-Its successor warm-starts from the last accepted pattern, and the accepted median never sees the failure.
-Otherwise one failure would seed its neighbour with a bad start and drag the median that `rwp_over_median` and your `reseed_factor` read.
-
-A pattern that converged at a high Rwp with no `error` code is not quarantined, and nothing calls it an outlier.
-`SeriesEntry.rwp_over_median` records how far its Rwp sits above the median of the patterns accepted before it, and it seeds its successor and joins the median like any accepted pattern.
-Rwp cannot say why it rose.
-Near a converged fit Rwp is GoF times R<sub>exp</sub>, and three measured causes divide between the two factors:
-
-- A blank frame has a GoF like its neighbours' (1.00 against 1.06) and an R<sub>exp</sub> four times theirs (0.159 against 0.040), because it is background and noise, fitted perfectly.
-- A correct model over counts that fell 4× also keeps its GoF and doubles its R<sub>exp</sub>. It is a sound measurement.
-- An unmodelled phase raises the GoF: 16.7 against 1.04.
-
-So compare a high ratio's GoF and R<sub>exp</sub> with an accepted neighbour's before reading its values.
-The first patterns walked are compared against a median of only one or two values.
-
-Quarantined, a lasting change could never become the chain's new normal.
-On a 24-pattern ramp whose counts fell from pattern 6, quarantining the patterns over a 1.25× fence made every later pattern climb the ladder, with 55 % more iterations.
-With an unmodelled phase from pattern 6 the extra was 107 %.
-On the blank frame, quarantine saved 2-8 % of the chain, and the values were identical either way.
+A fit still rejected after the last attempt is quarantined: it seeds no successor and joins no median.
+[Restart ladder and quarantine](series-ladder.md#quarantine) says why a high Rwp alone is not quarantined.
 
 ### Forward and backward chains
 
