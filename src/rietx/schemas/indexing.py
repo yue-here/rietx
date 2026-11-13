@@ -278,7 +278,11 @@ PEAK_POSITION_ESD_MAX_DEG = 180.0
 #: ``index_pattern`` returned no cubic cell; cropped above the flank it returned
 #: the F-centred 5.431 Å cell.  Over the 798 usable lines of the 16 IUCr
 #: round-robin lab patterns the floor drops 6 (0.75 %); the 5th
-#: percentile is 4.9.
+#: percentile is 4.9.  Re-measured under 1.12 (WP-1909), after
+#: ``width_capped`` and the merged splits took their share: 3 of 785
+#: (I/σ_I 0.16–0.90), and 1 of 263 on 11-BM NAC (0.15).  The flank's four
+#: components now carry ``width_capped`` as well, so the floor is one of two
+#: flags keeping them out of ``usable()`` there.
 PEAK_NO_INTENSITY_SIGMA = 1.0
 
 #: False-discovery rate a picked list is held to: the expected fraction of the

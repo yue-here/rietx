@@ -1,9 +1,8 @@
 # WP-1909 — a line on a falling flank, at a third of its own esd
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — the 1σ floor (PR #741) and #878's alias step (PR #880) landed from outside; the 1σ floor's dossier line, the census and the PNGs remain
+Milestone: unscheduled · Status: ✅ 2026-11-03 — PR #1380; the 1σ floor (#741) is the repair, the census rules out the envelope, leftovers in issue #1382
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-05 — a defect that fires wrongly: three unflagged false lines cost the indexer the true cell, and cropping the range is the workaround; indexing is a path few fits run
 
 ## Goal
 
@@ -87,40 +86,47 @@ is graded `medium` at rank 3 while the true cubic F is `low`
 table, and the regenerated skill `api.md`. `tests/test_acceptance_indexing.py`
 runs before close, since the peak list feeds every engine.
 
-### Inherited
+### The census (task 2), 2026-11-03
 
-- **2026-10-14, from the issue triage: issue #934 is filed as WP-1968, and
-  its PR #947 moves this WP's census baseline.** #947 tests each component's
-  I/σ_I against a per-pattern Benjamini–Hochberg bar and flags a component
-  under it `weak_line`, reported and left in `usable()`. That is the 1σ
-  floor's per-pattern successor on the same statistic. #948 (WP-1968 too)
-  merges unresolved splits and flags `width_capped`, both unusable, and moves
-  the 16 round-robin lists from 789 to 782 usable components. The census here
-  should say which of the two had merged on the tree it ran on.
+On `origin/main` `5d7622d6` (`[dev]` venv, macOS arm64), so #880's alias
+step, #947's `weak_line` and #948's `width_capped` and merged splits had all
+merged. Every arm is a full `pick_peaks` on the default range (the silicon on
+10-110°); the probe patches `pick.PEAK_NO_INTENSITY_SIGMA` and
+`peaks._debiased_envelope`. *Base* is the floor off (only the zero-bound test);
+**(a)** the shipped 1σ floor, so `main` itself; **(b)** the floor off and a
+SNIP envelope (`background.estimators.snip`, half-window half of
+`ENVELOPE_WINDOW_DEG`) under the same median debias; **(ab)** both. Counts are
+`usable()`. A component "moves" when no component of the other arm sits within
+0.01°.
 
-- **2026-10-11, from the issue triage: issue #878 is in PR #880 (theirs),
-  and it moves this WP's census baseline.** A sibling false line by another
-  mechanism. `_drop_kalpha2_aliases` compares two channel maxima against
-  0.3 FWHM, and where a FWHM spans under ~3.3 channels the sampling error
-  exceeds the tolerance, so a resolved Kα2 maximum survives as a line. PR
-  #880 (fork, head `fix/878-alias-step`) adds one sampling step in both
-  alias checks and moves two pins: IUCr CPD corundum 2 → 1 `no_intensity`
-  phantoms, and cpd-4 77 → 76 usable lines (146.13°, the Kα2 of corundum's
-  145.21°). SRM 660c is unchanged per the PR. The census task here takes
-  its "before" from whichever tree it runs on, so say whether #880 had
-  merged. Read against `f11e22d3`: the PR does not bump
-  `INDEXING_THRESHOLDS_VERSION`, though 1.7 was bumped for a `usable()`
-  change of the same size (cpd-4 78 → 77). That is `/pr-review`'s to raise.
+| pattern | base | (a) | (b) | (ab) | what (a) removes (2θ, I/σ_I) |
+|---|---|---|---|---|---|
+| 16 IUCr round-robin lab lists | 785 | 782 | 806 | 803 | cpd-2 101.10° (0.89), magnetite 62.07° (0.90), zircon 118.34° (0.16) |
+| SRM 660c | 30 | 30 | 32 | 32 | none |
+| 11-BM NAC | 263 | 262 | 248 | 248 | 10.92° (0.15) |
+| silicon, steep | 8 | 8 | 8 | 8 | none: the four flank components are `width_capped` too |
+| silicon, gentle | 10 | 10 | 10 | 10 | none |
 
-- **2026-10-07, from WP-1545: a reproducible synthetic fixture.**
-  `examples/tutorials/03_peaks_indexing_lebail.py` synthesises aragonite
-  (Cu Kα, 10-80°, seed 0) and calls `pick_peaks` with a default instrument.
-  Of 59 usable lines, 5 sit more than 0.03° from every reflection of the
-  refined true cell, all weak (areas 9-39 against a strongest line of about
-  2200): 26.619° (0.33° from the nearest), 53.371° (0.18°), 79.334°, 56.202° and
-  46.013°. The index of that list ranks the truth first with
-  `indexed_fraction_low` (50/59). If this WP's census needs a pattern whose
-  truth is known exactly, this one is.
+Per round-robin list, base / (a) / (b): brucite 28/28/30, corundum 46/46/47,
+cpd-1a 30/30/30, 1b 65/65/66, 1c 39/39/44, 1d 55/55/56, 1e 67/67/67,
+1f 58/58/61, 1g 61/61/63, 1h 69/69/67, cpd-2 74/73/77, cpd-4 75/75/76,
+fluorite 17/17/17, magnetite 18/17/17, zincite 27/27/32, zircon 56/55/56.
+
+- **(a) removes only what it was built to remove**: four components over the 20
+  patterns, each under I/σ_I 0.9.
+- **(b) is not a local repair.** It moves components on all 16 lists, from
+  one line shifted 0.011° (cpd-1a) to 12 out and 12 in (zircon). It adds 5
+  lines at I/σ_I 2.9-10.5 to zincite and 7 to cpd-1c, and on NAC it takes 18
+  off (I/σ_I 0.15-9.2) for 5 new ones. It would also move the refinement's
+  width census, the q-screen and the extinction test, which share
+  `_debiased_envelope`. On
+  the steep fixture it removes nothing that (a) and `width_capped` have not
+  already removed.
+- **The merge made the choice.** #741 shipped (a), and the maintainer merged
+  it on 2026-10-07; this table is the evidence the task owed that choice. The
+  recommendation is to keep (a) and not build (b): (b) buys nothing on the
+  fixture and moves dozens of real components. So task 4 (the width census,
+  if the envelope changed) is moot.
 
 ## Non-goals
 
@@ -130,25 +136,36 @@ runs before close, since the peak list feeds every engine.
 
 ## Tasks
 
-- [ ] The fixture: the issue's generator under `tests/`, and a test that
+- [x] The fixture: the issue's generator under `tests/`, and a test that
       counts usable lines below 28° on the steep pattern (3 today, red).
-- [ ] Measure repairs (a) and (b) on the fixture and on the 16 IUCr
+      *Landed in #741:* `tests/_synthetic_silicon.py`,
+      `tests/test_peak_picking_flank.py`.
+- [x] Measure repairs (a) and (b) on the fixture and on the 16 IUCr
       round-robin lab lists, SRM 660c and 11-BM NAC: usable counts per
       pattern and which components each removes. Record the table here and
-      take the choice to the maintainer.
-- [ ] Land the chosen repair, with the threshold's measured basis in its
+      take the choice to the maintainer. *2026-11-03:* § The census above;
+      the maintainer's merge of #741 chose (a).
+- [x] Land the chosen repair, with the threshold's measured basis in its
       docstring, `INDEXING_THRESHOLDS_VERSION` bumped, and the mirrors above.
-- [ ] If the envelope changed: the refinement width census on the same
-      patterns, before and after.
-- [ ] Tests, with obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: none beyond the new flag's `help.py` entry, which is where an
+      *Landed in #741* (1.7's "Also in 1.7" clause). It adds no `PeakFlag`,
+      so the one mirror is `no_intensity`'s `help.py` entry, which #741
+      rewrote. *2026-11-03:* the docstring's census re-measured under 1.12.
+- [x] If the envelope changed: the refinement width census on the same
+      patterns, before and after. *Moot:* the envelope did not change.
+- [x] Tests, with obs/calc/diff PNGs to `tests/output/`. *2026-11-03:* the
+      tests are #741's `tests/test_peak_picking_flank.py`; the PNGs go through
+      `tests/indexing_gallery.py` (`silicon_steep_peaks`, `silicon_steep`:
+      peak list, candidates, Le Bail obs/calc/diff), and the index row now
+      asserts cubic F first rather than present.
+- [x] Skill: none beyond the new flag's `help.py` entry, which is where an
       agent reads a flag (WP-1338's cheapest place); a `references/` row only
-      if the flag needs a judgement the entry cannot carry.
+      if the flag needs a judgement the entry cannot carry. *No new flag:*
+      `no_intensity`'s `help.py` entry carries the floor (#741).
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_indexing*.py -n auto --dist loadgroup -m "not slow"
+.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_peak_picking_flank.py tests/test_indexing*.py -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m pytest tests/test_acceptance_indexing.py -n auto --dist loadgroup
 .venv/bin/python -m ruff check src tests examples
 ```
@@ -165,6 +182,55 @@ round-robin table shows which real lines, if any, the repair removed.
   WP-1110 item 14 (`no_intensity`); WP-1510 (`duplicate_line`).
 
 ## Handover log
+
+- **2026-11-03** — closed, PR #1380 (a ghostshift runner, one session).
+  The repair this WP asked for had already shipped in #741. What this session
+  adds is the evidence for it. Measured on today's tree, the 1σ floor takes
+  out four components across 18 real patterns, each under I/σ_I 0.9. The
+  other repair, an envelope that follows the flank, would have changed dozens
+  of real lines on the round-robin lists and taken 15 net off NAC, so it is
+  ruled out. The steep pattern now indexes to cubic F first, and the test
+  asserts that and draws it. What is left belongs to other consumers and is
+  in issue #1382.
+  - *Done.* § The census (task 2). The dossier line on the zero-bound
+    bullet of `src/rietx/indexing/CLAUDE.md`, cap 361 → 366.
+    `PEAK_NO_INTENSITY_SIGMA`'s docstring re-measured under 1.12. The flank
+    test draws `silicon_steep_peaks` and `silicon_steep` through
+    `tests/indexing_gallery.py` (new `synthetic` tier, kept off the
+    scoreboard), asserts cubic F first, and asserts `no_intensity` on
+    *every* flank component. Tasks 1, 3 and 6 were ticked as #741's work,
+    and task 4 as moot. `### Inherited` was deleted: #880, #947 and #948
+    are all merged and the census says so, and the aragonite fixture was
+    not needed once the silicon's truth was exact.
+  - *Measured.* The census probe is a scratch script patching
+    `pick.PEAK_NO_INTENSITY_SIGMA` and `peaks._debiased_envelope`, outside
+    the repo. Fast suite (`-m "not slow"`, `[dev]` venv, macOS arm64,
+    alone through ghostshift's serial queue, main unmoved at `5d7622d6`):
+    13717 passed, 318 skipped, 34 xfailed, in 8:11. In that run's junit the
+    flank file costs about 4.5 s, of which 3.9 s is the index row with its
+    Le Bail refit and its PNGs. Slow rows run:
+    `test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival`
+    and `test_the_phantom_lines_are_what_had_blocked_it`, 2 passed. The rest
+    of `tests/test_acceptance_indexing.py` was not run, because no engine
+    or picker code changed: in `src/` the diff is a docstring and a
+    CLAUDE.md line. `python -m tests.reader_output` exited 0. No test was
+    added, so passed+skipped should not move.
+  - *Review.* `/code-review high --fix`, with seven fixes applied in
+    `c29501402`. The dossier line had named the background diagnostics as
+    a consumer of `_debiased_envelope`; they read `background_envelope`,
+    and the real co-consumers are the width census, `screen.py` and
+    `extinction.py`. Declined: dropping the gallery's Le Bail refit (it is
+    the obs/calc/diff panel task 5 asked for), and sharing one
+    `pick_peaks` across the flank tests (about 0.2 s).
+  - *Generality.* Not dispatched: `_audit.py` is untouched, and no
+    threshold, flag or action was added.
+  - *Gotchas.* On the steep pattern the floor is now one of two flags. Since
+    #948 all four flank components are `width_capped` as well, so a test
+    of the floor alone has to check `no_intensity` itself, which this one
+    now does.
+  - *Next:* none here. Issue #1382: Layer 0 reads the Pawley validation's
+    background misfit on the flank as 72 unmatched observed peaks, and the
+    gentle control ranks trigonal R above cubic F.
 
 - **2026-10-12** — PR #880 merged from outside as `f47c728e` and closed #878.
   This WP's census baseline has moved under it. `pick_peaks` now drops a
