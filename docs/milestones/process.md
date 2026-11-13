@@ -1303,6 +1303,7 @@ lanes, the ten trial sessions first:
 | 2026-11-02 | 7d134759 | 3 | 1 | 0K | 12 | 25K | 3.56 | 2 / 0 | +17.19 | +29% |
 | 2026-11-05 | 534f4819 | 2 | 0 | 0K | 6 | 22K | 1.05 | 2 / 0 | -0.26 | -2% |
 | 2026-11-12 | d64d4e39 | 2 | 0 | 0K | 9 | 19K | 1.44 | 0 / 0 | -0.72 | -3% |
+| 2026-11-13 | 3f3ab8ac | 1 | 4 | 0K | 5 | 6K | 1.00 | 1 / 0 | +0.28 | +5% |
 
 Session 38257a74 (WP-1523) resumed its one lane by `SendMessage` with a
 revised design after the first report. The tool counts that as no redo, and the

@@ -294,6 +294,33 @@ looked at.
 
 ## Handover log
 
+### 2026-11-13 — the kernel half merged (reconstructed post hoc)
+
+The compiled rasteriser can now draw depth cueing, so the wheel the Python
+renderer needs for fog is published. Nothing on `main` uses it yet: rietx's
+pin still allows 1.4, and the Python and GUI fog, ring perception and the
+survey sit on draft PR #1554. This entry was written by the close-only
+bookkeeping batch of 2026-11-13 (PR #1563), because PR #1557 merged a
+`WP-1548:` commit without touching this file. It records what that commit
+shows. PR #1554's own entries describe the session that wrote it, and they
+supersede this one where the two overlap.
+
+- **Done** (`c079d0927`, PR #1557, merged 2026-11-13): `render_rows_cued` in
+  `kernels/src/raster.rs`, the depth-cued twin of `render_rows`. Both share one
+  argument checker and one `Option<Fog>` drawing path, and `render_rows` is
+  unchanged. The crate goes to 1.5.0, a minor bump. `kernels.yml` asserts that
+  the run's wheel carries `render_rows_cued`, so the fog cases in
+  `test_raster_kernels.py` cannot skip on a wheel that lacks it.
+- **State of the tree:** tag `kernels-v1.5.0` points at the merge commit
+  `e2c5e6a42`, and PyPI lists rietx-kernels 1.5.0. On `main`, rietx still
+  pins `>=1.4,<2`, and the fog cases are not in `test_raster_kernels.py`.
+- **Merge note for #1554:** this entry and the status line conflict with that
+  branch's edits to the same lines. Keep #1554's status line, and keep both
+  sets of entries, newest first.
+- **Next:** rebase #1554 on `main` so its kernel files drop out of its diff,
+  then its own next actions (filled faces, the before-and-after pairs and the
+  maintainer's three look questions).
+
 ### 2026-11-13 — the session's fast suite, past midnight
 
 The same session, finishing its handover after midnight: the fast suite ran to
