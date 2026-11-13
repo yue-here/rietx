@@ -710,6 +710,10 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
 #: document loads and refines as before; an older build refuses a phase
 #: carrying it.
+#: Also in 0.61 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+#: only by ``index_residue`` on a pick standing on the subtracted phase's
+#: profile.  Additive: no existing list carries it, and an older build refuses
+#: a list that does.
 #: Also in 0.61 (WP-1952, WP-2002 B5 and B14): ``PatternData.nonpositive_sigma``
 #: (``"exclude"`` or ``"poisson"``, default ``"exclude"``), what a σ ≤ 0
 #: becomes, and ``RefinementResult.sigma_rule`` / ``HistogramResult.sigma_rule``,
