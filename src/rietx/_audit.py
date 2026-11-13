@@ -4984,8 +4984,11 @@ ROWS: tuple[Row, ...] = (
                   "refined_ones)"),
         grounds=("The warm start is what a refiner of an in-situ ramp does, and it keeps a "
                  "held setup value from pattern to pattern (WP-2081); GSAS-II's default "
-                 "restarts each histogram unless Copy2Next is ticked, the dissent, kept as "
-                 "carry=(). Ruled by the maintainer 2026-11-03 (2003-batch/batch.md, C9 q1)."),
+                 "restarts each histogram from its own parameters unless 'Copy results to "
+                 "next histogram?' (Copy2Next) is ticked (GSAS-II SeqRefine tutorial, "
+                 "SequentialTutorial.htm; the box off by default, GSASIIobj.py:22, "
+                 "checked in source), the dissent, kept as carry=(). Ruled by the "
+                 "maintainer 2026-11-03 (2003-batch/batch.md, C9 q1)."),
         approved="2026-11-03"),
     Row("rietx.sequential.refine_sequential:carry_hkl_intensities", "default", tier=3,
         ambiguity=1, value=True,
