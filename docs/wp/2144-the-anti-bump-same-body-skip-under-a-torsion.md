@@ -1,6 +1,6 @@
 # WP-2144 — the anti-bump same-body skip, now that a torsion moves the pair
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by ghostshift runner (MacBook-Air-c4aacd)
 Track: What fires, and what stays silent
 Depends on: 1814 soft (its chunk C1 writes the torsion test this reuses, PR #1510)
 Priority: P3 2026-11-12 — was P2 (a clash nothing flags, on a path few fits run): waits on the maintainer's choice on #1507
