@@ -1208,10 +1208,20 @@ class Geometry(_InheritsDeclaredDefaults):
     instead is the Biso bias it removed, which for a flat plate is large:
     −1.5 Å² at µt = 0.2 over a Cu Kα range, an order of magnitude past the
     capillary case.
+
+    ``unstated`` (WP-2015, the maintainer's B9 ruling of 2026-10-19): the
+    caller has not said which of the three it is, which is what a hand-built
+    ``Geometry()`` means.  The package then acts on nothing geometry-specific:
+    no displacement, transparency, offset, absorption or texture ψ, and the
+    default plan frees nothing a geometry would add.  A fit says so
+    (``GEOMETRY_UNSTATED``).  Before 1.11 the default was ``debye_scherrer``,
+    which read every hand-built instrument as a capillary; a stored document
+    without the key still reads that way
+    (:meth:`_stored_kind_was_a_capillary`).
     """
 
-    kind: Literal["debye_scherrer", "bragg_brentano",
-                  "flat_plate_transmission"] = "debye_scherrer"
+    kind: Literal["unstated", "debye_scherrer", "bragg_brentano",
+                  "flat_plate_transmission"] = "unstated"
     goniometer_radius_mm: float | None = None
     surface_roughness: SurfaceRoughness | None = None
     #: How far the specimen sits off the goniometer axis (mm).
@@ -1277,6 +1287,23 @@ class Geometry(_InheritsDeclaredDefaults):
     #: Estimator input only.
     packing_fraction: float = Field(default=PACKING_FRACTION, gt=0.0, le=1.0)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _stored_kind_was_a_capillary(cls, data: Any, info: ValidationInfo) -> Any:
+        """A stored geometry without ``kind`` reads as the capillary it was.
+
+        Every writer here has always written the key, so such a document was
+        written by hand or by another tool, and when it was written an absent
+        key meant ``debye_scherrer``.  Under
+        :data:`~rietx.schemas.common.STORED_DOCUMENT` it keeps that reading.
+        A caller's own dict or constructor call without one is ``unstated``
+        (WP-2015, the ``HumpComponent.position`` precedent of WP-2013).
+        """
+        if (isinstance(data, dict) and "kind" not in data
+                and reading_stored_document(info)):
+            return {**data, "kind": "debye_scherrer"}
+        return data
+
     @model_validator(mode="after")
     def _bb_needs_radius(self) -> "Geometry":
         if self.kind == "bragg_brentano" and not self.goniometer_radius_mm:
@@ -1334,6 +1361,16 @@ class Geometry(_InheritsDeclaredDefaults):
                         f"{name} is a flat-specimen quantity; this geometry is "
                         f"{self.kind!r} (a capillary uses mu_r / "
                         "capillary_radius_mm)")
+        if self.kind == "unstated":
+            # Which flat-plate factor applies, reflection or transmission, is
+            # the geometry's to say, and here it has not said (WP-2015).
+            for name in ("mu_t", "thickness_mm"):
+                if getattr(self, name) is not None:
+                    raise ValueError(
+                        f"{name} is a flat-specimen quantity and this geometry "
+                        f"is unstated; set kind='bragg_brentano' or "
+                        f"'flat_plate_transmission' to say which correction "
+                        f"applies")
         if self.thickness_mm is not None and self.thickness_mm <= 0.0:
             raise ValueError("thickness_mm must be positive")
         if self.mu_t is not None:
@@ -2371,6 +2408,22 @@ class Instrument(_InheritsDeclaredDefaults):
     #: underscore puts the paths outside that glob by construction instead of
     #: by retightening seven presets.
     extra_components: list[ExtraComponent] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _stored_geometry_was_a_capillary(cls, data: Any,
+                                         info: ValidationInfo) -> Any:
+        """A stored instrument with no ``geometry`` reads as a capillary.
+
+        The default factory builds an ``unstated`` geometry and never crosses
+        :meth:`Geometry._stored_kind_was_a_capillary`, so a stored document
+        that omits the whole block is given an empty one to read there
+        (WP-2015).
+        """
+        if (isinstance(data, dict) and "geometry" not in data
+                and reading_stored_document(info)):
+            return {**data, "geometry": {}}
+        return data
 
     @model_validator(mode="before")
     @classmethod

@@ -81,7 +81,16 @@ from .schemas import (
 #: action* rather than as a suggestion that answers 409.  The templates stay
 #: in layer 1 because the diagnosis is right (a flat specimen off the axis);
 #: only the advice was wrong.
+#:
+#: ``unstated`` (WP-2015, the B7 ruling) maps the same two: a cos θ,
+#: sin 2θ or cos 2θ trend has a cause on some geometry and a parameter on
+#: none of them until the geometry is stated, so it is reported as a shape,
+#: and ``GEOMETRY_UNSTATED`` asks for the geometry.
 _POSITION_ACTIONS_BY_GEOMETRY: dict[str, dict[str, tuple[ActionKind, str]]] = {
+    "unstated": {
+        "constant": ("refine_zero_shift", "instrument.zero_shift"),
+        "tan_theta": ("refine_cell", "phases.*.cell.*"),
+    },
     "bragg_brentano": {
         "constant": ("refine_zero_shift", "instrument.zero_shift"),
         "cos_theta": ("refine_sample_displacement",

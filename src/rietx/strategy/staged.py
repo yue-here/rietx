@@ -866,8 +866,56 @@ _MODE_SUBSTITUTES: dict[tuple[str, str], str] = {
     ("mccusker_default", "pawley"): "pawley_default",
 }
 
+#: (preset name, geometry kind) -> the globs the declared geometry adds to the
+#: stage that frees the zero, under every mode the name runs as (WP-2015, the
+#: maintainer's B7 ruling of 2026-10-19).  Data for the same reason as
+#: :data:`_MODE_SUBSTITUTES`: the plan page says what each name runs as.
+#:
+#: A Bragg-Brentano specimen's displacement moves every peak by −(2s/R)·cos θ
+#: (Wilson 1963), the dominant lab-goniometer error, so the default frees it
+#: with the zero, where the zero alone would carry a cos θ error into the cell
+#: (NIST SRM 660c: 70 ppm above its reference with the zero alone, 20 below
+#: with both; on IUCr CPD corundum the Le Bail cell moved away instead, the
+#: zero and displacement trading — WP-2015's handover).  Nothing else of
+#: ``lab_bragg_brentano`` comes with it: the Kα2 ratio and the axial ratios
+#: stay at the caller's values, which on a calibrated instrument are its
+#: calibration.  An unstated geometry, a capillary and a transmission plate
+#: add nothing, so they run the name as it stands: TOPAS and FullProf refine
+#: no geometry-specific term unless one is named, and the capillary offsets
+#: are a deliberate act (``Geometry``'s docstring).
+_GEOMETRY_ADDITIONS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("mccusker_default", "bragg_brentano"): (
+        "instrument.geometry.sample_displacement",),
+}
 
-def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> RefinementPlan:
+#: The glob naming the stage a geometry's additions join.
+_ZERO_GLOB = "instrument.zero_shift"
+
+
+def _with_geometry_additions(plan: RefinementPlan,
+                             globs: tuple[str, ...]) -> RefinementPlan:
+    """``plan`` with ``globs`` freed in the stage that frees the zero.
+
+    The stage is renamed ``zero_disp``, the name ``lab_bragg_brentano`` and
+    ``lab_calibrate`` give the same pair.  Every preset a name in
+    :data:`_GEOMETRY_ADDITIONS` runs as frees the zero in a stage of its own,
+    and a test holds each of them to it, so a preset without one is a
+    ``ValueError`` here rather than an addition that went nowhere.
+    """
+    for i, stage in enumerate(plan.stages):
+        if _ZERO_GLOB in stage.turn_on:
+            stages = list(plan.stages)
+            stages[i] = dataclasses.replace(
+                stage, name="zero_disp",
+                turn_on=[*stage.turn_on,
+                         *(g for g in globs if g not in stage.turn_on)])
+            return dataclasses.replace(plan, stages=stages)
+    raise ValueError(f"no stage of this plan frees {_ZERO_GLOB!r}, so the "
+                     f"geometry's {list(globs)} has no stage to join")
+
+
+def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode,
+                 geometry: str | None = None) -> RefinementPlan:
     """A preset name, a plan or its serializable mirror, as a concrete plan.
 
     ``"mccusker_default"`` is the name every caller passes without thinking, and
@@ -889,6 +937,14 @@ def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> Refinem
     types agreeing, not a contract, and it ends the first time a stage grows a
     field or a consumer calls a method; converting states it instead.
     ``PlanSpec._accept_the_dataclass`` is this crossing in the other direction.
+
+    **The declared geometry picks too** (WP-2015).  ``geometry`` is the
+    instrument's ``Geometry.kind``; a name in :data:`_GEOMETRY_ADDITIONS`
+    under that kind gains its globs in the zero's stage, after the mode's
+    substitution, so a Le Bail or Pawley run of ``"mccusker_default"`` gains
+    them too.  ``None`` makes no claim and adds nothing, which is what a
+    caller without an instrument passes.  A plan object or a ``PlanSpec`` is
+    run as given: only a name is resolved.
     """
     if isinstance(plan, PlanSpec):
         return plan.to_plan()
@@ -896,10 +952,12 @@ def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> Refinem
         return plan
     name = _MODE_SUBSTITUTES.get((plan, mode), plan)
     try:
-        return PLAN_PRESETS[name]()
+        built = PLAN_PRESETS[name]()
     except KeyError:
         raise ValueError(f"unknown plan preset {plan!r}; "
                          f"available: {sorted(PLAN_PRESETS)}") from None
+    added = _GEOMETRY_ADDITIONS.get((plan, geometry)) if geometry else None
+    return _with_geometry_additions(built, added) if added else built
 
 
 @dataclass(frozen=True)
@@ -985,9 +1043,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "A lab pattern where something outside the fit pins the zero shift "
             "or the specimen displacement, such as a calibrated goniometer or "
             "an internal standard. This plan frees both in one stage. Unpinned, "
-            "they are collinear with the lattice parameters. On one "
-            "uncalibrated pattern, use `mccusker_default` or "
-            "`mccusker_structural`, which free the zero shift alone. This plan "
+            "they are collinear with the lattice parameters. "
+            "`mccusker_default` frees the zero shift, and on a stated "
+            "Bragg-Brentano geometry the specimen displacement with it, but "
+            "never the emission-line weights or S/L. This plan "
             "refines specimen and instrument effects together, so read the "
             "correlation guards before quoting a width."),
     ),

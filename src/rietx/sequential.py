@@ -1525,7 +1525,7 @@ class SequentialRefinement:
         xs = [None] * len(patterns) if x is None else [float(v) for v in x]
         if x is not None and x_label == "index":
             x_label = "x"
-        base_plan = resolve_plan(plan, mode)
+        base_plan = resolve_plan(plan, mode, self.instrument.geometry.kind)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".

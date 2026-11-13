@@ -187,7 +187,8 @@ def orbit_layout(orbits: list[np.ndarray]
 #: J. Appl. Cryst. 26, 525, Table I; Ahtee et al., 1989, J. Appl. Cryst. 22,
 #: 261).  GSAS-II's ``Bragg`` uses 90° instead, so its coefficients differ by
 #: P_l(0) (WP-1960 § Pinned by Task 1).  ``tests/test_texture.py`` holds the
-#: keys equal to ``Geometry.kind``'s members.
+#: keys equal to ``Geometry.kind``'s members but ``"unstated"``, which has no
+#: ψ to give: the compile refuses texture there (WP-2015).
 TEXTURE_SAMPLE_PSI_DEG = {
     "bragg_brentano": 0.0,
     "flat_plate_transmission": 90.0,

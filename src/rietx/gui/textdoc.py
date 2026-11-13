@@ -389,7 +389,7 @@ def render(project) -> str:
     lines.append("excluded none" if not doc.excluded_regions else "excluded " +
                  "  ".join(f"{_fmt(a)} {_fmt(b)}" for a, b in doc.excluded_regions))
 
-    lines.extend(["", *_render_plan(doc)])
+    lines.extend(["", *_render_plan(doc, ref.instrument.geometry.kind)])
     rows = project.parameters()
     if not ref.structure.phases:
         # Said rather than left blank (WP-1207): a document with no phase block
@@ -450,12 +450,12 @@ def _render_peaks(project) -> list[str]:
     return lines
 
 
-def _render_plan(doc: ProjectDoc) -> list[str]:
+def _render_plan(doc: ProjectDoc, geometry: str | None = None) -> list[str]:
     spec = doc.plan
     if spec is None:
         return ["plan none".ljust(34)
                 + "# nothing selected; a run would use mccusker_default"]
-    name = spec.preset_name()
+    name = spec.preset_name(doc.mode, geometry)
     lines = [f"plan {name or 'custom'}"]
     if spec.correlation_guard != PlanSpec().correlation_guard:
         lines.append(f"guard {_fmt(spec.correlation_guard)}")
@@ -943,7 +943,8 @@ def changes(parsed: ParsedDocument, project) -> tuple[Delta, list[TextError]]:
             doc.excluded_regions):
         delta.settings["excluded_regions"] = [list(r) for r in parsed.excluded]
 
-    _plan_changes(parsed, doc, delta, fail)
+    _plan_changes(parsed, doc, delta, fail,
+                  project.refinement.instrument.geometry.kind)
 
     # Blocks before their rows, and a bad block *suppresses* its rows: a
     # mistyped 'phase 7' otherwise reports itself once and then twenty
@@ -982,7 +983,7 @@ def _regions(regions) -> list[tuple[float, float]]:
 
 
 def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
-                  fail) -> None:
+                  fail, geometry: str | None = None) -> None:
     """The ``plan`` line names a preset; the ``stage`` lines are the plan itself.
 
     Both can be edited, and they can contradict each other, so the rule is
@@ -991,7 +992,8 @@ def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
     discarding the stage lines the user is looking at is the worse failure.
     """
     current = doc.plan
-    current_name = None if current is None else current.preset_name()
+    current_name = (None if current is None
+                    else current.preset_name(doc.mode, geometry))
     named = parsed.plan_name
     name_changed = named is not None and named not in (
         current_name, "custom", "none")
@@ -1308,10 +1310,13 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     calls: list[str] = verbs(project.refinement)
     if delta.plan is not None:
         # a preset is stored expanded through the mode the project will run
-        # in, as the GUI's preset route stores it, because a project's plan
-        # runs verbatim (WP-2102); a mode edited in the same delta is that mode
+        # in and the instrument's geometry, as the GUI's preset route stores
+        # it, because a project's plan runs verbatim (WP-2102, WP-2015); a mode
+        # edited in the same delta is that mode
         mode = delta.settings.get("mode", project.doc.mode)
-        spec = (PlanSpec.from_plan(resolve_plan(delta.plan["preset"], mode))
+        spec = (PlanSpec.from_plan(resolve_plan(
+                    delta.plan["preset"], mode,
+                    project.refinement.instrument.geometry.kind))
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))
         project.doc.plan = spec

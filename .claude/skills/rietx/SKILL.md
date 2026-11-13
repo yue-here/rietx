@@ -54,7 +54,7 @@ Rietveld refinement locally fits a model you already believe. Check each row bef
 | Every crystalline phase is modelled | `rx.Structure.from_cif` per phase, joined as `rx.Structure(phases=[*a.phases, *b.phases])`. A missing phase shows as `unmatched_obs` (rule 11) |
 | The starting cell is within ~1 % | the CIF, or `rx.index_pattern` (§7d). Peak windows are fixed per stage, so a peak further off is out of reach; the report answers `reindex_or_recheck_cell` |
 | The wavelength is right | the file header, an instrument file (api-io), or `rx.Instrument.bragg_brentano(radiation=...)`: `"CrKa"`, `"FeKa"`, `"CoKa"`, `"CuKa"`, `"MoKa"`, `"AgKa"`, suffix `1` for Kα1 only. No fit detects a wrong one. Never hand-enter a textbook value (§8.11) |
-| The geometry is right | `rx.Instrument.bragg_brentano`, or `rx.Instrument.debye_scherrer(wavelength)` for a capillary. Each aberration exists only in its own geometry |
+| The geometry is right | `rx.Instrument.bragg_brentano`, or `rx.Instrument.debye_scherrer(wavelength)` for a capillary. Each aberration exists in one geometry only. By hand: `unstated` |
 | Intensities are raw counts | `rx.read_pattern` reads the file's esd column. Wrong weights make every esd wrong |
 | The starting width is within ×2 | `W` is the squared Gaussian FWHM at low angle (Γ_G² = U·tan²θ + V·tanθ + W; `rx.help_for("instrument.profile.w")`). Its default, 1e-3 deg², is a 0.03° synchrotron line. Seed `W ≈ (0.6·H)²`, `X ≈ 0.6·H`, with H the median `fwhm` of the strongest `rx.pick_peaks` peaks (§10): Gaussian and Lorentzian halves of 0.6·H combine to about H |
 | The fitted range is yours | `fit(two_theta_limits=(lo, hi))`, and the same tuple to `rx.auto_background`. `PatternData.excluded_regions` drops intervals |

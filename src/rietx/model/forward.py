@@ -4599,6 +4599,14 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # reason.  The basis and each term's weight at this geometry's ψ are
         # frozen here; K follows the cell at evaluation.
         if mode == "rietveld" and phase.texture is not None and n:
+            if instrument.geometry.kind not in TEXTURE_SAMPLE_PSI_DEG:
+                # ψ is where the specimen's axis sits, which only a stated
+                # geometry says (WP-2015); 0° and 90° give different answers.
+                raise ValueError(
+                    f"phases.{ip}.texture needs the specimen geometry, and "
+                    f"instrument.geometry.kind is "
+                    f"{instrument.geometry.kind!r}; state it as one of "
+                    f"{sorted(TEXTURE_SAMPLE_PSI_DEG)}")
             basis = texture_basis(group, phase.texture.order, cell)
             cp.tex_basis = basis
             cp.tex_paths = tuple(f"phases.{ip}.texture.{name}" for name in basis.names)

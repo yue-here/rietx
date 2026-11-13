@@ -280,6 +280,17 @@ describe("the instrument form follows the geometry it is editing", () => {
     expect(paths(instrument())).not.toContain("geometry.mu_r");
   });
 
+  it("offers neither to an unstated geometry, which has no specimen to correct", () => {
+    const unstated = instrument();
+    delete unstated.geometry.kind;      // a hand-built one reads unstated (WP-2015)
+    const paths = instrumentFields(unstated).map((f) => f.path);
+    for (const path of ["geometry.mu_r", "geometry.mu_t", "geometry.thickness_mm",
+                        "geometry.capillary_radius_mm"]) {
+      expect(paths).not.toContain(path);
+    }
+    expect(paths).toContain("geometry.kind");
+  });
+
   it("offers one row per emission line, and no weight for the locked first", () => {
     const paths = instrumentFields(instrument()).map((f) => f.path);
     expect(paths).toContain("source.lines.0.wavelength");
@@ -290,7 +301,8 @@ describe("the instrument form follows the geometry it is editing", () => {
 
 describe("the groups the instrument form is drawn in (WP-1216)", () => {
   /** Every geometry, so no group is asserted on one geometry's fields alone. */
-  const GEOMETRIES = ["debye_scherrer", "bragg_brentano", "flat_plate_transmission"];
+  const GEOMETRIES = ["unstated", "debye_scherrer", "bragg_brentano",
+                      "flat_plate_transmission"];
   const all = () => GEOMETRIES.flatMap((kind) => {
     const ins = instrument();
     ins.geometry.kind = kind;

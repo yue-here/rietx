@@ -683,6 +683,13 @@ from .._nearmiss import did_you_mean
 #: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
 #: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
 #: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
+#: Also in 0.61 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
+#: document that omits the key (or the whole geometry) reads at the old
+#: ``"debye_scherrer"`` through the same readers.  Every writer here writes
+#: the key, so only a hand-written file meets this.  The new field
+#: ``RefinementResult.assumed_instrument`` is additive and defaults to
+#: ``None``, "a result stored before the field".
 #: Also in 0.61 (WP-1964, the maintainer's rulings of 2026-11-05):
 #: ``ParametricEquation.basis`` gains ``"expression"``, with
 #: ``ParametricEquation.expression``, the formula's text, and

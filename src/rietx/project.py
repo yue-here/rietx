@@ -191,7 +191,7 @@ class Project:
                 tuple(r) for r in excluded_regions
                 if tuple(r) not in data.excluded_regions]
 
-        plan_spec = _as_plan_spec(plan, mode)
+        plan_spec = _as_plan_spec(plan, mode, instrument.geometry.kind)
         doc = ProjectDoc(
             package_version=_VERSION,
             created_utc=_utcnow(),
@@ -473,19 +473,21 @@ def fitted_mask(data: PatternData,
     return np.asarray(mask, dtype=bool)
 
 
-def _as_plan_spec(plan: Any, mode: Mode) -> PlanSpec | None:
+def _as_plan_spec(plan: Any, mode: Mode, geometry: str) -> PlanSpec | None:
     """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec.
 
-    A preset name is expanded through ``mode``, by ``resolve_plan``: a project
-    records the plan that will run, verbatim (``PlanSpec.preset_name``), so
-    ``"mccusker_default"`` in a Le Bail project is ``profile_only``'s stages,
-    as ``Refinement.fit`` and the GUI's preset route read it (WP-2102).
+    A preset name is expanded through ``mode`` and the instrument's geometry,
+    by ``resolve_plan`` (WP-2102, WP-2015): a project records the plan that
+    will run, verbatim (``PlanSpec.preset_name``), so ``"mccusker_default"``
+    in a Le Bail project is ``profile_only``'s stages, as ``Refinement.fit``
+    and the GUI's preset route read it, and a Bragg-Brentano project's carries
+    its displacement from here.
     """
     if plan is None or isinstance(plan, PlanSpec):
         return plan
     from .strategy.staged import resolve_plan
 
-    return PlanSpec.from_plan(resolve_plan(plan, mode))
+    return PlanSpec.from_plan(resolve_plan(plan, mode, geometry))
 
 
 def _data_ref(path: Path, data: PatternData, reader: str,

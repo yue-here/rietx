@@ -624,3 +624,12 @@ def test_a_negative_variance_is_refused(tmp_path):
     with pytest.raises(ValueError, match="negative"):
         read_gsas2_instprm(write(tmp_path, INSTPRM.replace("sig-1:10.0", "sig-1:-10.0"),
                                  "b.instprm"))
+
+
+def test_both_tof_readers_state_the_preset_s_geometry(tmp_path):
+    """A read bank is in the geometry ``Instrument.tof_neutron_bank`` states,
+    never the hand-built ``unstated`` (WP-2015): neither file format has a
+    geometry field for a fit to ask about."""
+    banks = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1))))
+    ins = read_gsas2_instprm(write(tmp_path, INSTPRM, "b.instprm"))
+    assert banks[1].geometry.kind == ins.geometry.kind == "debye_scherrer"

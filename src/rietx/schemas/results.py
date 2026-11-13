@@ -2235,6 +2235,23 @@ class RefinementResult(Base):
     # what the correction buys.
     absorption: AbsorptionCorrection | None = None
 
+    #: The instrument facts this fit used at a value the package supplies
+    #: rather than one the caller's instrument stated (WP-2015, the B9
+    #: ruling): dot-path → the value.  Three can appear.
+    #: ``instrument.geometry.kind`` when it is ``"unstated"``;
+    #: ``instrument.polarization`` when held at 0.5 (the unpolarised beam
+    #: every preset but the capillary one seeds) or at 0.99
+    #: (``DEBYE_SCHERRER_POLARIZATION``, APS 11-BM's); and each
+    #: ``instrument.source.lines.k.weight`` (k ≥ 1) held at ``KA2_RATIO``.
+    #: Read off the values, so a caller who states one of these numbers is
+    #: listed too: the entry says the fit rests on the package's number,
+    #: whoever typed it.  A refined value is measured and never listed.  An
+    #: empty dict is "nothing assumed"; ``None`` is "not recorded": a
+    #: result stored before the field, or a joint fit's, since
+    #: ``MultiHistogramRefinement`` does not write it yet.  Written by
+    #: ``refine._build_result``.
+    assumed_instrument: dict[str, float | str] | None = None
+
     # Soft-restraint summary (bond/angle/value deviations, pooled restraint χ²);
     # present only when a phase declared restraints (Rietveld-only), None
     # otherwise.  Deviations in units of σ surface an over-tight restraint

@@ -44,6 +44,6 @@ except rx.RefinementCancelled as cancelled:
 # guide: end
 
 assert stopped is not None, "the fit finished: the token never stopped it"
-assert stopped.stage == "zero"
+assert stopped.stage == "zero_disp"
 assert [stage.name for stage in stopped.completed_stages] == ["scale_bkg"]
 assert stopped.node_id is not None

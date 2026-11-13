@@ -1208,7 +1208,8 @@ class GuiSession:
         effective = PlanSpec.from_plan(self._effective_plan())
         return {"plan": effective.model_dump(mode="json"),
                 "selected": p.doc.plan is not None,
-                "preset": effective.preset_name(),
+                "preset": effective.preset_name(
+                    p.doc.mode, p.refinement.instrument.geometry.kind),
                 "mode": p.doc.mode}
 
     def plan_put(self, body: dict) -> dict:
@@ -1222,7 +1223,8 @@ class GuiSession:
             # profile_only's stages — the same mapping ``fit`` would apply, made
             # visible in the editor instead of happening at run time
             spec = PlanSpec.from_plan(
-                resolve_plan(_as_plan_argument(body["preset"]), p.doc.mode))
+                resolve_plan(_as_plan_argument(body["preset"]), p.doc.mode,
+                             p.refinement.instrument.geometry.kind))
         elif "plan" in body:
             spec = _validate(PlanSpec, body["plan"], "plan")
         else:
@@ -3462,10 +3464,12 @@ class GuiSession:
         """The plan a run would use: an override, the document's, or the default."""
         p = self._need_project()
         if override is not None:
-            return resolve_plan(_as_plan_argument(override), p.doc.mode)
+            return resolve_plan(_as_plan_argument(override), p.doc.mode,
+                                p.refinement.instrument.geometry.kind)
         if p.doc.plan is not None:
             return p.doc.plan.to_plan()
-        return resolve_plan("mccusker_default", p.doc.mode)
+        return resolve_plan("mccusker_default", p.doc.mode,
+                            p.refinement.instrument.geometry.kind)
 
 
 # ----------------------------------------------------------------------

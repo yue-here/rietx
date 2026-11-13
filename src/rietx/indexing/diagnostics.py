@@ -946,18 +946,23 @@ def _cell_systematic(instrument, have_candidates: bool) -> Diagnostic | None:
     """
     if not have_candidates:
         return None
-    if instrument is None:
+    if instrument is None or instrument.geometry.kind == "unstated":
+        # WP-2015: an instrument stating no geometry knows no more about the
+        # systematic error than no instrument does, so one variant serves both
+        missing, act = (("No instrument was supplied", "Pass instrument= to "
+                         "index_pattern") if instrument is None else
+                        ("The instrument states no geometry",
+                         "Set instrument.geometry.kind"))
         return Diagnostic(
             level="info", code="INDEX_CELL_SYSTEMATIC_UNQUANTIFIED",
-            message=("No instrument was supplied, so the geometry that sets "
-                     "the cell's systematic error is unknown. The reported "
-                     "cell_esd is a precision from the line positions and says "
-                     "nothing about accuracy."),
+            message=(f"{missing}, so the geometry that sets the cell's "
+                     "systematic error is unknown. The reported cell_esd is a "
+                     "precision from the line positions and says nothing "
+                     "about accuracy."),
             where=["geometry unknown"],
-            suggestion=("Pass instrument= to index_pattern. On a "
-                        "Bragg-Brentano diffractometer the goniometer radius "
-                        f"alone carries about ±{BRAGG_BRENTANO_CELL_PPM:.0f} "
-                        "ppm onto the cell."))
+            suggestion=(f"{act}. On a Bragg-Brentano diffractometer the "
+                        "goniometer radius alone carries about "
+                        f"±{BRAGG_BRENTANO_CELL_PPM:.0f} ppm onto the cell."))
     if instrument.geometry.kind != "bragg_brentano":
         return None
     return Diagnostic(

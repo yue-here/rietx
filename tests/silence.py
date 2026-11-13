@@ -947,6 +947,44 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+# ------------------------------------------------------- the unstated geometry
+
+
+def _geometry_diagnostics(*kinds: str) -> list:
+    """``refine._geometry_unstated_diagnostics`` on the suite's LaB6 compiled
+    under each geometry kind, never fitted: the code reads the compiled kind
+    alone."""
+    from rietx.model.forward import compile_model
+    from rietx.refine import _geometry_unstated_diagnostics
+    from rietx.schemas.instrument import Instrument
+    from tests.test_data_support import _lab6, _sampled
+
+    structure, _ = _lab6()
+    data = _sampled(0.005, 2.5e-4)
+    out: list = []
+    for kind in kinds:
+        instrument = {
+            "unstated": lambda: Instrument(source=Instrument.bragg_brentano().source),
+            "bragg_brentano": Instrument.bragg_brentano,
+            "debye_scherrer": lambda: Instrument.debye_scherrer(wavelength=0.4139),
+            "flat_plate_transmission": Instrument.flat_plate_transmission,
+        }[kind]()
+        model = compile_model(structure, instrument, data, mode="rietveld")
+        out += _geometry_unstated_diagnostics(model)
+    return out
+
+
+def _geometry_unstated_fires() -> list:
+    """A hand-built instrument, which states no geometry (WP-2015)."""
+    return _geometry_diagnostics("unstated")
+
+
+def _geometry_unstated_silent() -> list:
+    """Each of the three presets, every one of which states its geometry."""
+    return _geometry_diagnostics("bragg_brentano", "debye_scherrer",
+                                 "flat_plate_transmission")
+
+
 def _sigma_xye(sigma: list[float], **options) -> list:
     """Twelve points of an ``.xye`` whose σ column is ``sigma``, read."""
     from rietx.io.readers import read_pattern
@@ -993,6 +1031,9 @@ SILENCE: dict[str, Pair] = {
     "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
         _rhombohedral_axes_fires, _rhombohedral_axes_silent,
         "tests/test_projects_fullprof.py"),
+    "GEOMETRY_UNSTATED": Pair(
+        _geometry_unstated_fires, _geometry_unstated_silent,
+        "tests/test_geometry_unstated.py"),
     "GSAS2_INSTPRM_GEOMETRY_ASSUMED": Pair(
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(

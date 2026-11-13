@@ -2470,6 +2470,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "message names the call."
         ),
     ),
+    "GEOMETRY_UNSTATED": HelpEntry(
+        title="The instrument states no geometry",
+        description=(
+            "The instrument was built without saying whether it is a flat plate in "
+            "reflection, a flat plate in transmission or a capillary. Each geometry has "
+            "its own peak-position errors and its own absorption, so with none stated "
+            "the fit applied and refined none of them, and the default plan freed "
+            "nothing a geometry would add. An unmodelled specimen displacement on a "
+            "flat plate moves the cell. Set the geometry, or build the instrument with "
+            "one of the three presets."
+        ),
+    ),
     "GSAS2_CIF_DEUTERIUM_AS_D": HelpEntry(
         title="Deuterium was written as D for GSAS-II",
         description=(
@@ -5681,6 +5693,18 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "flat plate, with the change in Biso it is equivalent to. That change, not "
             "Rwp, is what the correction buys. `None` when no correction applied, and "
             "outside Rietveld mode."
+        ),
+    ),
+    "RefinementResult.assumed_instrument": HelpEntry(
+        title="Instrument values the package supplied",
+        description=(
+            "The instrument facts this fit used at a value the package supplies rather "
+            "than one read from your instrument, keyed by path: an unstated geometry, a "
+            "polarisation held at 0.5 or 0.99, a Kα2/Kα1 ratio held at 0.5. A value "
+            "you typed that equals one of these is listed too, since the fit cannot "
+            "tell. A refined value is measured and never listed. Empty when nothing was "
+            "assumed; `None` when not recorded: a result stored before the field, or a "
+            "joint fit's, which does not record it yet."
         ),
     ),
     "RefinementResult.restraints": HelpEntry(
