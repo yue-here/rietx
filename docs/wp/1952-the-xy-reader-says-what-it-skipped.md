@@ -1,6 +1,6 @@
 # WP-1952 — the xy reader says what it skipped
 
-Milestone: unscheduled · Status: 🔄 2026-11-12 — σ ≤ 0 rule and record field in PR #1541; B5.2, the second TEMP value and the pdCIF naming remain
+Milestone: unscheduled · Status: 🔄 2026-11-13 — σ ≤ 0 rule and record field in PR #1541, ruled by Yue; B5.2, the second TEMP value and the pdCIF naming remain
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a decimal-comma file reads as a different pattern with no word, and a dropped mid-file row goes unreported; a fine step usually trips the duplicate-2θ refusal, and the reporter keeps their own reader
@@ -163,8 +163,24 @@ same arrays and no new diagnostic.
 ## References
 
 - Issue #897.
+- Issue #1448, fixed by PR #1541.
 
 ## Handover log
+
+### 2026-11-13 — Yue's rulings recorded, main merged (PR #1541, ghostshift runner)
+
+Ruled by Yue 2026-11-13, on PR #1541:
+- The reader output is approved as built, under the 2026-11-01 ruling on reader output. That covers the two forms of `PATTERN_SIGMA_NONPOSITIVE`, the `nonpositive_sigma=` refusal, the changed "fewer than 10 points" refusal and the three new fields. The lead's wording nit on "states no weight" was not taken, so the text ships as built.
+- The default stays "no weight": a point whose σ ≤ 0 is left out of the fit, and the reader warns. Yue's reason: practitioners rarely think about weights, so the package must catch a gross weight error itself. It must not invent a σ, because √y is wrong by an unknown factor on a rescaled file. This answers the 2026-11-12 entry's decision for the maintainer.
+- The option name `nonpositive_sigma` is accepted.
+
+The audit row `RefinementResult.sigma_rule` now quotes that reason in its grounds, and its `approved` date moves from 2026-10-19 to 2026-11-13. The generality review had noted that the earlier date quoted no sentence of the maintainer's naming the default.
+
+PR #1541 also fixes issue #1448, as ruled 2026-11-13 under the triage of PR #1471. That issue reports that the `gsas` reader dropped every zero-esd point in silence, and returned no σ in silence when the whole bank had zero esd. Since this WP the reader keeps those points, the fit leaves them out with the warning, and an all-zero column falls back to the Poisson σ with the warning. The PR body carries "Closes #1448".
+
+`origin/main` (about 80 commits) merged into the branch without a conflict.
+
+*Next*: unchanged from the 2026-11-12 entry.
 
 ### 2026-11-12 — the σ ≤ 0 rule and its record field land (PR #1541, ghostshift runner)
 

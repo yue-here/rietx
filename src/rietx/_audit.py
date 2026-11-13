@@ -1830,7 +1830,10 @@ ROWS: tuple[Row, ...] = (
         grounds=("The default is one program's rule, GSAS-II's fxye reader; its xye reader "
                  "and FullProf replace such a σ instead, so the choice among them was the "
                  "maintainer's: no weight by default, warn at ingestion, an option to correct "
-                 "(B5, ruled 2026-10-19). Kind 3: what a zero means (a zero count, an "
+                 "(B5, ruled 2026-10-19). Yue named the default 2026-11-13: practitioners "
+                 "rarely think about weights, so the package must catch a gross weight "
+                 "error itself and must not invent a σ (√y is wrong by an unknown factor "
+                 "on a rescaled file). Kind 3: what a zero means (a zero count, an "
                  "unmeasured channel, a writer's error) is a fact about the writing software, "
                  "outside the pattern, and some weight must be chosen, so the default acts, "
                  "the warning names the points and how many record y = 0, and the option "
@@ -1840,7 +1843,7 @@ ROWS: tuple[Row, ...] = (
                  "(inferred, not fitted). On a synthetic LaB6 with one σ = 0 at the strongest "
                  "channel, the old floor stopped the fit at max_iter 1.75e-3 Å from the true "
                  "cell; the rule converges within 2e-4 Å (tests/test_schemas.py)."),
-        approved="2026-10-19"),
+        approved="2026-11-13"),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
