@@ -173,7 +173,7 @@ The milestone's row 10: the maintainer looks at the offer on screen before the m
 
 ## Handover log
 
-- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #PRNUM), a
+- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #1563), a
   repair. PR #1523 merged on 2026-11-11 with every task ticked, and two `WP-2209:` commits of
   that day never reached this log. The GUI now keeps edits a person has made but not applied
   in a recovery copy outside the project, and offers them again when the project reopens after

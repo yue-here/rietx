@@ -122,7 +122,7 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-- **2026-11-13** — re-rated by the close-only bookkeeping batch of 2026-11-13 (PR #PRNUM),
+- **2026-11-13** — re-rated by the close-only bookkeeping batch of 2026-11-13 (PR #1563),
   which closed WP-2209. Its recovery copy merged in PR #1523 on 2026-11-11, so nothing this WP
   builds on is waiting any more. The tier stays P2. Next: as below.
 
