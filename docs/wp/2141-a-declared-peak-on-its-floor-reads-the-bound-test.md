@@ -1,6 +1,6 @@
 # WP-2141 — A declared peak on its floor reads the bound test
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 1914 soft (PR #1506 lands the same reading for widths)
 Priority: P3 2026-11-09 — a diagnostic that can stay silent under `solver="trf"` on a declared peak with no area; the default LM solver lands the area exactly on its floor, so default fits are right
