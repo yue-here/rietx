@@ -4290,10 +4290,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The series locates where a moment stops being supported by the data. The "
             "result is a bracket between two patterns, set by their spacing. It is no "
-            "fitted critical point. The bracket is less reliable when the forward and "
-            "backward chains disagree, when the verdicts switch back and forth, or when "
-            "the supported side stopped early. Run both directions and compare before "
-            "you quote a transition value."
+            "fitted critical point. When `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` names "
+            "the same site, do not quote the bracket. Otherwise run both directions "
+            "and compare before you quote a transition value."
+        ),
+    ),
+    "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED": HelpEntry(
+        title="The magnetic onset cannot be quoted",
+        description=(
+            "The series gives no onset to quote for this site. One of four things "
+            "happened. The supported side of the bracket stopped at its iteration cap, "
+            "so its modulus had not finished falling. The verdicts switch back and "
+            "forth, so there is no single bracket. Under `direction=\"both\"`, the "
+            "forward and backward chains disagree, or one of them gave no verdict at "
+            "all. The message says which. Disagreement means one chain's warm start "
+            "carried a moment across the transition that the other did not."
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(

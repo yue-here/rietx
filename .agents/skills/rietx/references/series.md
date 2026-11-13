@@ -425,7 +425,7 @@ These nine arrive on a `SeriesResult` — the series' own `diagnostics`, or a
 pattern's entry — and a single `fit()` never emits one, so their rows live
 here rather than in §7's table, which carries what a fit is likely to say.
 Branch on the code, as §7 says; the manual's *Refining many patterns* chapter explains each.
-The two moment codes, `SEQUENTIAL_MOMENT_HOLD` and `SEQUENTIAL_MOMENT_ONSET`, are the magnetic family's, so their rows are in §7j, [magnetic](magnetic.md) (maintainer ruling, issue #286: one order-parameter question, one file).
+The moment codes, `SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET` and `_ONSET_UNRESOLVED`, are the magnetic family's, so their rows are in §7j, [magnetic](magnetic.md) (maintainer ruling, issue #286: one order-parameter question, one file).
 
 | Code | What it means you must not do |
 |---|---|

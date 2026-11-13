@@ -1197,7 +1197,38 @@ ROWS: tuple[Row, ...] = (
                   "reports the requested act, n of N patterns, and moves no value "
                   "(sequential.py:2153-2167, WP-1016)")),
     Row("SEQUENTIAL_MOMENT_HOLD", "code"),
-    Row("SEQUENTIAL_MOMENT_ONSET", "code"),
+    Row("SEQUENTIAL_MOMENT_ONSET", "code", tier=1, ambiguity=3,
+        response="info",
+        responds=("read the bracket as where the per-pattern moment verdicts switch, its ± "
+                  "half the pattern spacing and no fitted esd; quote it as the onset only "
+                  "when no SEQUENTIAL_MOMENT_ONSET_UNRESOLVED row names the same site"),
+        evidence=("arithmetic on the per-pattern verdicts, never on the |m| column "
+                  "(schemas.sequential.locate_onset: the midpoint and half-gap of the two "
+                  "patterns where the verdict switches; sequential._moment_diagnostics). It "
+                  "reports a statistic and decides nothing, so it raises at info at its one "
+                  "site; the verdicts' own threshold is MOMENT_SUPPORT_SIGMA's row (WP-2004). "
+                  "Split from SEQUENTIAL_MOMENT_ONSET_UNRESOLVED (WP-2003 batch C8), since the "
+                  "one code used to raise at a level computed between the two "
+                  "(tests/test_magnetic_series.py, the ramp and the hand-built verdict "
+                  "columns)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no onset temperature and no ordered moment at the bracket for the "
+                  "site `where` names; the message says which of the four reasons holds"),
+        evidence=("arithmetic on the verdicts the bracket is read from, with no threshold of "
+                  "its own: (1) a supported side of the bracket whose fit did not converge "
+                  "(MagneticOnset.bracket_verdicts_final, a solver status), (2) verdicts that "
+                  "switch more than once, so there is no single bracket, and under "
+                  "direction='both' (3) two chains whose brackets do not overlap, order "
+                  "opposite sides or exist on one side only, or (4) a chain that gave no "
+                  "verdict, so nothing was checked (sequential._moment_diagnostics, "
+                  "_with_onset_agreement, _fold_onset). Unanimity: no competent refiner "
+                  "quotes a transition two readings of the same data place differently, or "
+                  "one whose ordered side had not finished refining; none found. The "
+                  "verdicts' threshold is MOMENT_SUPPORT_SIGMA's row (WP-2004). Split off "
+                  "SEQUENTIAL_MOMENT_ONSET (WP-2003 batch C8); the batch proposed tier 3 "
+                  "on MOMENT_SUPPORT_SIGMA, and this row argues tier 1 for the maintainer to "
+                  "rule (tests/test_magnetic_series.py)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE", "code", tier="caller", ambiguity=1,
         response="info",
         responds=("treat the patterns or paths `where` names as unchecked by the "
@@ -4995,9 +5026,30 @@ ROWS: tuple[Row, ...] = (
                   "Gauss-Newton with relaxation factors")),
     Row("rietx.sequential.refine_sequential:history", "default", tier="invariant", ambiguity=1, value=False,
         evidence=("answer-invariant: one history tree per pattern; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
-    Row("rietx.sequential.SequentialRefinement.fit:x", "default", value=None),
-    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", value="index"),
-    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", value=None),
+    Row("rietx.sequential.SequentialRefinement.fit:x", "default", tier="invariant", ambiguity=1,
+        value=None,
+        evidence=("answer-invariant: the series axis, the pattern index without one; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with an axis given, and "
+                  "that the axis reached the entries (WP-2003 C11). By design the magnetic "
+                  "onset is read along the axis (schemas.sequential.locate_onset sorts the "
+                  "verdicts by x), so where the given x is not monotone in the list order the "
+                  "bracket, and which onset code fires, follow the caller's axis; every "
+                  "fitted value stays invariant")),
+    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", tier="invariant",
+        ambiguity=1, value="index",
+        evidence=("answer-invariant: the axis's name; tests/test_answer_invariant_defaults.py "
+                  "asserts a three-pattern chain's every kept value, esd, rung, code and step "
+                  "equal with a name given, and that it reached the result (WP-2003 C11)")),
+    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", tier="invariant",
+        ambiguity=1, value=None,
+        evidence=("answer-invariant: each pattern's name, its file's stem else p000.., which "
+                  "also names its history file and pairs the two chains; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with labels given, "
+                  "compared blind to the names, under direction='forward' and under 'both' "
+                  "(the latter also every direction gap, which pairs the chains by label), "
+                  "and that the names reached the record (WP-2003 C11)")),
     Row("rietx.sequential.SequentialRefinement.fit:mode", "default", tier=2, ambiguity=1,
         value="rietveld",
         evidence=("the single fit's default (rietx.refine.Refinement.fit:mode), handed to each "
@@ -5419,7 +5471,18 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in, as its code: says the one way to extend a trajectory the caller "
                   "stopped, re-running it (sequential.py:2166)")),
     Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", value=1),
-    Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", value=6),
+    Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the check that compares the bracket with the reverse "
+                  "chain (direction='both'), or the unresolved row when the bracket's "
+                  "supported side stopped early; folded, it names the unresolved row or says "
+                  "to quote the bracket with its spacing (sequential._moment_diagnostics, "
+                  "_with_onset_agreement)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=7,
+        evidence=("arithmetic: each names the record to open for the reason given — the "
+                  "moment stage's max_iter, the patterns either side of each switch, the two "
+                  "chains' magnetic rows, or the entries that gave no verdict — and picks "
+                  "no reading (sequential._moment_diagnostics, _with_onset_agreement)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion", "suggestion", tier="caller", ambiguity=1,
         value=2,
         evidence=("opt-in, as its code: treat the named patterns as unchecked, or read both "
@@ -5871,8 +5934,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE.suggestion",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
-    "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_MOMENT_ONSET.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
@@ -6347,10 +6408,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:refit",
-    "rietx.sequential.SequentialRefinement.fit:x",
-    "rietx.sequential.SequentialRefinement.fit:x_label",
     "rietx.sequential.WIDTH_GROWTH_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_SIGMA",
@@ -6576,7 +6634,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "ROUGHNESS_UNCONSTRAINED",
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
-    "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
