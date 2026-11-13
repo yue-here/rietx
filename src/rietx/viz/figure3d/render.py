@@ -825,11 +825,14 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         raise ValueError("depth_cue=True fades toward the background, and "
                          "background=None has no colour to fade toward; "
                          "give an opaque background")
-    if not (isinstance(planar_rings, bool) or isinstance(planar_rings, str)):
+    if not isinstance(planar_rings, (bool, str)):
         raise ValueError(f"planar_rings {planar_rings!r}: True, False or a colour "
                          "'#rrggbb'")
     ring_colour = (cut.site_colour(planar_rings) if isinstance(planar_rings, str)
                    else None)
+    if isinstance(faces, np.ndarray):
+        raise ValueError("faces: a list of masks, or of (mask, colour) pairs; one mask "
+                         "is faces=[mask]")
     if dpi is not None and not 0 < float(dpi) < 1e6:
         raise ValueError(f"dpi {dpi!r}: a positive resolution, in dots per inch")
     if (isinstance(stick, bool) or not isinstance(stick, (int, float, np.integer, np.floating))
@@ -899,14 +902,23 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         # images, a polyhedron's own vertex) leaves it, and the report says so
         named_atoms = [int(i) for i in np.flatnonzero(mask)]
         kept = [i for i in named_atoms if i in drawn_atoms]
-        if len(kept) < len(named_atoms):
-            fill_warnings.append(
-                f"faces[{k}]: {len(named_atoms) - len(kept)} of its {len(named_atoms)} "
-                "atoms are not drawn" + (", leaving too few to fill, so it is not drawn"
-                                         if len(kept) < 3 else " and are left out of it"))
-        if len(named_atoms) < 3 or len(kept) >= 3:
-            fills.append(rings.face_fill(geometry, kept if len(kept) >= 3 else named_atoms,
-                                         color=colour))
+        if len(kept) == len(named_atoms):
+            fills.append(rings.face_fill(geometry, named_atoms, color=colour))
+            continue
+        # the set as named is the caller's and raises whatever is drawn; what
+        # the hiding leaves of it, too few atoms or a line, is said and skipped
+        rings.face_fill(geometry, named_atoms)
+        fill, reason = None, ", leaving too few to fill, so it is not drawn"
+        if len(kept) >= 3:
+            try:
+                fill = rings.face_fill(geometry, kept, color=colour)
+            except ValueError:
+                reason = ", leaving them on one line, so it is not drawn"
+        if fill is not None:
+            fills.append(fill)
+        fill_warnings.append(
+            f"faces[{k}]: {len(named_atoms) - len(kept)} of its {len(named_atoms)} "
+            "atoms are not drawn" + (reason if fill is None else " and are left out of it"))
     if fills:
         scene = sc.build_scene(framed, mode, fills=fills, **drawing)
     asked_axis_labels, axis_labels = axis_labels, bool(axis_labels) and bool(cell)

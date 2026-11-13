@@ -757,11 +757,38 @@ def test_named_faces_draw_a_mask_and_replay(nac):
     assert np.array_equal(render_structure(geometry, **again).image, faced.image)
 
 
+def test_a_face_the_hiding_leaves_on_one_line_is_said_never_raised():
+    """WP-1548 D4: three Ca on one line and a P off it make a face, and
+    hiding P leaves a line, which is a warning like too few atoms, never the
+    raise a set the caller named on a line gets."""
+    import itertools
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        geometry = s3.build(structure_from_cif(str(DATA / "fluorapatite.cif")))
+    pos = np.array([a["pos"] for a in geometry["atoms"]], dtype=np.float64)
+    element = [geometry["sites"][a["site"]]["element"] for a in geometry["atoms"]]
+    ca = [k for k, e in enumerate(element) if e == "Ca"]
+    line = next(t for t in itertools.combinations(ca, 3)
+                if np.linalg.norm(np.cross(pos[t[1]] - pos[t[0]], pos[t[2]] - pos[t[0]]))
+                < 1e-6 * np.linalg.norm(pos[t[1]] - pos[t[0]])
+                * np.linalg.norm(pos[t[2]] - pos[t[0]]))
+    mask = np.zeros(len(pos), dtype=bool)
+    mask[[*line, element.index("P")]] = True
+    fig = render_structure(geometry, size=120, hidden=["P"], polyhedra=False, faces=[mask])
+    assert fig.report.warnings == [
+        "faces[0]: 1 of its 4 atoms are not drawn, leaving them on one line, "
+        "so it is not drawn"]
+    with pytest.raises(ValueError, match="one line"):
+        render_structure(geometry, size=120, faces=[mask & (np.array(element) == "Ca")])
+
+
 @pytest.mark.parametrize("kw, says", [
+    ({"faces": np.zeros(3, dtype=bool)}, "faces=\\[mask\\]"),
     ({"planar_rings": 1}, "planar_rings"),
     ({"planar_rings": "teal"}, "colour"),
     ({"faces": [np.zeros(3, dtype=bool)]}, r"faces\[0\]"),
-], ids=["not-bool", "bad-colour", "bad-mask"])
+], ids=["bare-mask", "not-bool", "bad-colour", "bad-mask"])
 def test_fill_arguments_are_refused_by_name(nac, kw, says):
     with pytest.raises(ValueError, match=says):
         render_structure(nac, size=60, **kw)
