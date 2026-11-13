@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair merged (PR #1460); a raised fit now abstains, and the prefit's partition settles like every Le Bail fit's; measuring the margin tightening is next (PR #1461 open)
+Milestone: unscheduled · Status: 🔄 2026-11-13 — option (c)'s allowance measured (2·ln N + d). Ruled by Yue 2026-11-13: option (a); the landing task is open (PR #1466)
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -292,8 +292,12 @@ diagnosed further. WP-1077's fence covers that test.
 
 ## Questions for the maintainer
 
-Both answered by Yue on 2026-11-07, in § Handover log's newest entry. The questions and their
-measurements are in the entry of 2026-11-05.
+Questions 1 and 2 were answered by Yue on 2026-11-07 (handover entry of that date); the
+questions and their measurements are in the entry of 2026-11-05. Question 3, the allowance's
+`_audit` row, was answered by Yue on 2026-11-13: **option (a)**. `best_or_none()` names the leading
+class only when its lead over the runner-up strictly exceeds max(`DECISIVE_DELTA_BIC`, 2·ln N + d),
+d the tested positions where the two classes differ. The tier-3 row is approved, dated 2026-11-13.
+The question and its measurements are in the handover entry of 2026-11-08 (second session).
 
 ## Non-goals
 
@@ -346,10 +350,17 @@ measurements are in the entry of 2026-11-05.
       The measurement separated nothing, and the constant was removed: the prefit's
       partition now settles like every other Le Bail fit's. Settled by Claude under
       Yue's delegation of 2026-11-07 ("whatever best fits our design ethos").
-- [ ] Measure option (c)'s allowance (2·ln N plus an allowance derived from the
+- [x] Measure option (c)'s allowance (2·ln N plus an allowance derived from the
       count of silent positions) and real patterns from the eleven groups that
       abstain on every row at margin 18, then bring the allowance's `_audit` row
       to the maintainer before any margin moves. Ruled 2026-11-07.
+      *Measured 2026-11-08 (handover entry of that day, second session): the
+      allowance is d, the count of tested positions where the two leading classes
+      differ. The row is Question 3 below; no margin moved.*
+- [ ] Ruled by Yue 2026-11-13: option (a). Land the margin in
+      `ExtinctionScreen.best_or_none` with its `_audit` row, flip PbSO₄'s pinned
+      row to `None`, and rewrite the acceptance clause to match. The row carries
+      `approved="2026-11-13"` and the grounds quoted in the handover entry of 2026-11-13.
 
 ## Acceptance
 
@@ -378,6 +389,166 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
   WP-2062 (Le Bail against Pawley).
 
 ## Handover log
+
+### 2026-11-08 (second session) — option (c)'s allowance, measured; its row goes to the maintainer (PR #1466)
+
+Option (c) now has a value that is derived rather than tuned: the screen names a class only when
+it beats the runner-up by more than two silent positions' worth (2·ln N) plus d, where d is the
+number of tested positions at which the two classes differ. On a rebuilt 41-group synthetic
+sweep it gives the same answers as the fixed 18 at this N, while scaling with N. It stops the
+certified PbSO₄ miss and one real wrong answer (CuCr₂O₄ at 289 K), and it costs real Si 640c its
+right answer. It does not fix the synthetic P 2₁/c at ×0.995, which wins on three silent
+positions. Nothing in `src` moved. The row below is for the maintainer to rule on before any
+margin changes.
+
+*The derivation.* Under the nested Pawley scoring a tested forbidden position p moves its class's
+ΔBIC by z_p² − ln N, where z_p is the position's Pawley intensity over its esd. So between two
+unrefuted classes W (leading) and R (runner-up), D = ΔBIC_R − ΔBIC_W is a sum over the positions
+where they differ only: (ln N − z²) for each position W alone forbids, (z² − ln N) for each R alone
+forbids. Every such position is silent (an unrefuted class carries no intensity at a position it
+forbids), so with no line anywhere D = (net count)·ln N plus chance in the z² terms. Option (c)
+says a net count of two never decides. The allowance covers the chance: d silent positions carry
+χ²_d by chance, whose mean is d. So the bar is 2·ln N + d, strictly exceeded. Strict matters:
+P 4/m b m's `P - 21 -` rows win by exactly 2·ln N, to 1e-6 relative, because the winner's two
+0k0 intensities sit at their Pawley bound of zero.
+
+*Measured* (this worktree's `[dev]` venv, macOS arm64, main `63d7c120a`; pearl did not answer
+two wake attempts, so everything ran on the Mac, two processes, ~25 min). The 2026-11-01 sweep's
+files are on the maintainer's machine, so the sweep was rebuilt from § Context:
+`~/.cache/ghostshift/rietx-src/wp-2076/probe/sweep.py` on the contributor's machine. It covers
+41 groups (the 25 this WP names plus 16 chosen to cover the remaining extinction situations), five
+arms (`clean`, `profile`, `zero`, `clean+bkg`, `zero+bkg`) and six factors (×0.985 to ×1.0075),
+with seed 11 and the five specimens' own builder in `tests/test_extinction_nesting.py`. That gives
+1230 rows, 974 of them with the prefit cell within 600 ppm, all at N = 3501 (2·ln N = 16.3).
+`replay.py` replays `best_or_none()` from the stored class tables. Its positive arm is that at
+margin 10 the replay returns the package's own answer on all 1230 rows.
+
+| margin rule (974 rows) | right | none | wrong |
+|---|---|---|---|
+| 10, main | 858 | 105 | 11 |
+| 18, fixed | 634 | 339 | 1 |
+| 2·ln N, strict | 640 | 328 | 6 |
+| **2·ln N + d** | **634** | **339** | **1** |
+| 2·ln N + χ²_d at Φ(1) | 632 | 341 | 1 |
+| 2·ln N + χ²_d at 3 σ (`ABSENT_SIGMA`) | 506 | 467 | 1 |
+| 2·ln N + χ² of R's own positions only, at 1 σ or 3 σ | 640 / 638 | 328 / 330 | 6 |
+
+The rebuilt sweep reproduces the shape of § Findings (main 914 / 158 / 10, 18: 720 / 360 / 2 on
+1082 rows), with different groups. The ten wrong rows at 10 that the rule stops are all P 4/m b m
+naming `P - 21 -` on two silent 0k0 positions, its true class refuted in the zero-shift arms. The
+one wrong row no margin stops is P -3 c 1 (`zero`, ×0.995): every class but `P - - -` is refuted.
+At 2·ln N + d the 339 abstentions all come from the margin, and the true class leads the ranked
+list on 329 of them. Twelve groups abstain on every row: F d -3 m, F d d d, I 4₁/a m d, I a -3 d,
+P 2₁/c, P 2₁/m, P 4/n m m, P 4₁22, P 4₂/m, P 4₂/n m c, P 6₁22 and P a -3. Nine of these are among
+§ Findings' eleven. C m c e and P m m m answer here, so which groups fall is
+structure-dependent. The rule that counts only R's own positions leaves the P 4/m b m ties
+standing, because with no such position it adds nothing and a solver-tolerance difference
+decides. So the allowance counts both sides.
+
+Certified and real rows (`real.py`, `real_table.txt`; class tables of the screen as it stands,
+×1.0 unless stated). D is the runner-up's ΔBIC minus the leader's. "Need" is 2·ln N + d.
+
+| pattern | N | leader, D, d | 10 | 18 | 2·ln N + d (need) |
+|---|---|---|---|---|---|
+| SRM 676a corundum | 3501 | `R - c -`, 45.9, 6 | right | right | right (22.3) |
+| 11-BM NAC | 22 003 | `I - - -`, alone | right | right | right |
+| FAP | 3751 | `P 63 - -`, 8.2, 1 | none | none | none |
+| synthetic Si (gate test) | 11 976 | `F d - -`, 9.4, 1 | none | none | none |
+| PbSO₄ X-ray | 5800 | `P c - a`, 17.0, 2 | **wrong** | none | none (19.3) |
+| synthetic P 2₁/c (test) | 2750 | `P 1 21/c 1`, 21.8, 3 | right | right | right (18.8) |
+| same, ×0.995 | 2750 | `P 1 21 1`, 23.6, 3; true refuted | **wrong** | **wrong** | **wrong** (18.8) |
+| Si 640c, 11-BM, ×0.995/1/1.0075 | 40 001 | `F d - -`, 19.7, 3 | right | right | none (24.2) |
+| CuCr₂O₄ 289 K, 11-BM, ×0.995/1 | 11 001 | `I 41 - -`, 11.1/17.2, 2; true refuted | **wrong** | none | none (20.6) |
+| zircon, CPD lab, ×3 | 3751 | `I 41/a - d`, 8.2, 1 | none | none | none |
+| magnetite, CPD lab, ×3 | 3751 | `F 41 - -`, 8.2, 1; true refuted | none | none | none |
+| Nd₂Ru₂O₇ 11-BM ×1/1.0075, BT-1 ×3 | 27 001 / 3001 | `F 41 - -`, 8.0-9.9, 1; true refuted | none | none | none |
+| Nd₂Ru₂O₇ 11-BM ×0.995; Co₃O₄ and YIG garnet D1B 300 K ×3; CuCr₂O₄ 7 K ×3 | | the absence-free class alone | **wrong** | **wrong** | **wrong** |
+
+The real patterns cover four of the eleven groups (F d -3 m ×5 patterns, I a -3 d, I 4₁/a m d ×2,
+F d d d). The other seven have no committed real pattern. Zircon behaves like its synthetic rows:
+the true class leads by one silent position and abstains at every margin tried. The ten real
+rows wrong at every margin are not margin failures. In each, the true class is refuted by
+intensity at a forbidden position: (2 0 0) on the D1B patterns at λ = 2.52 Å, where λ/2 puts
+(4 0 0) intensity; (1 1 0) at 5.55° on CuCr₂O₄, beside its CuO impurity; (4 2 0) on the CPD
+magnetite; (6 4 0) on BT-1 Nd₂Ru₂O₇. Those causes are read off positions and not tested. The
+absence test is WP-1077's fence, and a declared λ/2 is the caller's (`harmonics=`). Si 640c is the
+"fixed 18 slips with N" case, seen from the other side: at N = 40 001 two silent positions buy
+21.2, and `F d - -` leads `F 41 - -` by 19.7 on three positions with χ² 12 against it.
+
+**Question 3: the allowance's `_audit` row.**
+
+- *The decision.* Whether `best_or_none()` demands max(`DECISIVE_DELTA_BIC`, 2·ln N + d), strictly
+  exceeded, in place of 10. It comes to the maintainer because the 2 is tier 3, which needs a dated
+  approval, and because the change withholds right answers.
+- *Why it matters.* At margin 10 a user sees a wrong class on 11 of 974 rebuilt rows, on PbSO₄ and
+  on CuCr₂O₄ 289 K, and nothing fires. At 2·ln N + d they see 1 wrong row, and None on 234 more
+  rows, 224 of which were right at 10; the true class leads the list on 329 of the 339 abstentions. Importance: serious.
+- *Options.*
+  (a) 2·ln N + d, the recommendation. 634 / 339 / 1. PbSO₄ and CuCr₂O₄ 289 K give None, while Si
+  640c, FAP and the synthetic Si give None too. Corundum, NAC and the test's P 2₁/c keep their
+  answers.
+  (b) 2·ln N + the 3 σ quantile of χ²_d (`ABSENT_SIGMA`, no new number). 506 / 467 / 1. It also
+  stops the P 2₁/c ×0.995 miss (need 31.5), and costs that pattern its ×1.0 answer (D 21.8 against
+  the same 31.5) and 128 more synthetic rows.
+  (c) Keep 10. 858 / 105 / 11. PbSO₄ stays wrong, as ruled 2026-11-07.
+  Dropped: a fixed 18 (identical tallies here, but it slips with N, as Si 640c shows), and counting
+  only the runner-up's positions (it leaves the ties at exactly 2·ln N to the solver).
+- *Practice.* None found. ExtSym reports ranked probabilities and leaves the bar to its reader
+  (§ Questions of 2026-11-05). Kass & Raftery's 10 assumes the evidence is in the likelihood, and
+  under nested scoring a silent position's evidence is the count alone.
+- *Unanimity.* Would every competent refiner decline to name a class whose lead is two positions
+  showing nothing? Not every one. A refiner who reads ΔBIC > 10 as "very strong" names `P c - a`,
+  and on an ExtSym-style reading the more absent class is the more probable. So the action is
+  withholding the singleton while keeping the ranked list, which is a report and not a decision,
+  per DESIGN.md § Rules, 1.
+- *Recommendation.* (a). It meets the ruling's form (2·ln N plus an allowance from the count),
+  has no fitted number beyond the 2 the ruling chose, and stops every wrong row a margin can
+  reach except the three-position one, which (c) excludes by construction.
+- *The row as proposed* (constant name to be settled at landing):
+
+  ```python
+  Row("rietx.indexing.extinction.SILENT_POSITIONS_UNDECIDED", "constant", tier=3, value=2,
+      evidence=("best_or_none() names the leading class only when the runner-up's ΔBIC exceeds "
+                "it by more than max(DECISIVE_DELTA_BIC, value·ln N + d), d the tested positions "
+                "where the two differ. Under nested Pawley scoring each such position moves ΔBIC "
+                "by z² − ln N, so a silent one buys ln N and nothing else (Schwarz 1978), and d "
+                "is the mean of the χ²_d chance gives d silent positions: arithmetic. The value is "
+                "ours: PbSO4 X-ray (Hill 1992) names P c - a over P c - n on two silent positions "
+                "(17.0 at N 5800). Rebuilt WP-2076 sweep, 974 rows within 600 ppm: right/none/"
+                "wrong 858/105/11 at 10, 634/339/1 here. Real: PbSO4 and CuCr2O4 289 K (11-BM) "
+                "wrong -> None; Si 640c (11-BM, N 40 001) right -> None; corundum (SRM 676a), "
+                "NAC keep. Measured on one synthetic family (rietx forward model, Cu Bragg-Brentano, "
+                "Ca/Si/O) and thirteen real patterns, untested beyond."),
+      grounds="...", approved=None)  # as proposed 2026-11-08; the ruled form is in the entry of 2026-11-13
+  ```
+
+*Not done.* No code, so no test suite ran beyond step 10's checks, and `/code-review` did not
+run (prose-only branch). The generality judge was not dispatched, because no `_audit` row changed;
+the row above is a proposal for the maintainer. The sweep has one seed per group, where § Findings'
+task 1 used five on five groups.
+
+*Next.* The maintainer answers Question 3. On (a) or (b): the open task above, which lands the
+margin in `ExtinctionScreen.best_or_none` with d read off `tested_two_theta` (rounded to 1e-3°,
+as the replay did, because two classes can name different hkl at one position), adds the row,
+and flips `test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit` to `None`. The suite's
+FAP and synthetic Si rows already abstain, and its corundum, NAC and P 2₁/c rows keep their
+answers under both. On (c): close the WP.
+
+- **2026-11-13** — Yue ruled Question 3 on PR #1466: **option (a)**. `best_or_none()` names the leading
+  class only when its lead over the runner-up strictly exceeds max(`DECISIVE_DELTA_BIC`,
+  2·ln N + d), d the tested positions where the two classes differ. The tier-3 row is approved, dated
+  2026-11-13. The row for the landing task, with the ruling in place of the proposal's
+  `approved=None` and `grounds="..."`:
+
+  ```python
+  approved="2026-11-13",
+  grounds="Ruled by Yue 2026-11-13: 2·ln N + d, strictly exceeded, as max(DECISIVE_DELTA_BIC, 2·ln N + d)",
+  ```
+
+  The constant name is still to be settled at landing. Correction to the PR #1466 description: Si 640c
+  at N = 40 001 needs 2·ln N + d = 21.2 + 3 = 24.2 against a lead of 19.7, as this file has it; the
+  description's 21.2 omitted the d. No code moved. *Next:* the open task above lands the margin, adds
+  the row, and flips PbSO₄'s pinned row to `None`.
 
 - **2026-11-08** — CI on PR #1461 failed one row on both Linux legs: FAP at a start ×0.99 read
   `failed` where the gate test expects `unreliable`. The cause predates this branch. Outside the
