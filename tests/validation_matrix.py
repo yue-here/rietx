@@ -237,6 +237,20 @@ DATASETS: dict[str, Dataset] = {
         "relative intensities on another instrument, not this texture, so "
         "every row referenced to it is cross-code",
         "cross_code"),
+    "pbso4_rr": Dataset(
+        "gsas2_pbso4.gpx",
+        "The IUCr CPD Rietveld round robin on PbSO4, Hill (1992) J. Appl. "
+        "Cryst. 25, 589-610 (doi:10.1107/S0021889892003649): one ILL D1A "
+        "neutron pattern (lambda 1.909 A as given to the participants) and one "
+        "Cu Ka Bragg-Brentano pattern of one specimen, the two histograms of "
+        "the vendored GSAS-II tutorial project, read through the gsas2_gpx "
+        "pattern reader.  The only published inter-laboratory spread of "
+        "Rietveld parameters: 23 participants' 18 X-ray and 20 neutron "
+        "refinements with 11 programs, each parameter's range, weighted mean "
+        "(over 16 and 17 of them) and sigma_ext "
+        "(Tables 7-9, hill1992_pbso4_round_robin.json).  Every reference is "
+        "other programs' answers to the same data, so it is cross-code",
+        "cross_code"),
     "acridine_ix": Dataset(
         "cod_2242872.cif",
         "Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & "
@@ -2954,6 +2968,58 @@ CLAIMS: tuple[Claim, ...] = (
         measured="worst |delta|/esd 38.7, 29 of 42 components over 4; "
                  "Rwp 0.0389 against 0.0282, GoF 1.37",
     ),
+    # ---- IUCr CPD round robin on PbSO4 (Hill 1992): WP-1943 ---------------
+    Claim(
+        "test_acceptance_pbso4_round_robin",
+        "test_every_table7_value_lies_inside_the_participants_envelope",
+        "pbso4_rr", ("spread", "ceiling"),
+        "a single-radiation refinement from the published single-crystal "
+        "model, neutron and X-ray each, puts every cell edge, coordinate and B "
+        "of Hill's Table 7 inside the participants' range and within 3 spreads "
+        "of their weighted mean",
+        reference="Hill (1992) Table 7 p. 601: the range and the weighted mean "
+                  "of 16 X-ray and 17 neutron refinements; a spread is "
+                  "sigma_ext*sqrt(n) (Table 8), the participants' own standard "
+                  "deviation, so 3 spreads passes a participant-like fit on all "
+                  "19 values with probability ~95 %",
+        measured="neutron 19/19 inside, worst 1.52 spreads (O3 x); X-ray 19/19 "
+                 "inside, worst 1.26 spreads (B O1); bar 3 spreads",
+    ),
+    Claim(
+        "test_acceptance_pbso4_round_robin",
+        "test_the_agreement_indices_are_a_participants",
+        "pbso4_rr", ("ceiling",),
+        "Rwp and GoF of each single-radiation fit inside Table 5's participant "
+        "ranges",
+        measured="neutron Rwp 4.27 % in 2.4-12.3, GoF 2.20 in 1.0-3.1; X-ray "
+                 "Rwp 9.36 % in 8.2-20.0, GoF 1.94 in 1.3-7.4",
+    ),
+    Claim(
+        "test_acceptance_pbso4_round_robin",
+        "test_an_axial_model_raises_the_neutron_cell_towards_the_xray_cell",
+        "pbso4_rr", ("characterisation", "spread"),
+        "freeing the FCJ axial model (one SH/L) on the neutron pattern raises "
+        "every cell edge toward, and not past, the X-ray mean cell, while the "
+        "values stay inside the neutron range: Hill's Simpson's-rule finding",
+        reference="Hill (1992) p. 605: the participants who modelled the "
+                  "detector-height asymmetry physically reported larger "
+                  "neutron cells, nearer the X-ray ones; the X-ray mean cell "
+                  "of Table 7 is the ceiling",
+        measured="each edge +0.08 %; b and c then 5.5 spreads above the "
+                 "neutron mean, still inside its range",
+    ),
+    Claim(
+        "test_acceptance_pbso4_round_robin",
+        "test_the_joint_fit_finds_the_wavelength_hill_back_calculated",
+        "pbso4_rr", ("spread",),
+        "a joint neutron + X-ray fit with the X-ray wavelength held and the "
+        "neutron one free measures lambda_N inside the band Hill's own cells "
+        "imply, and above the nominal 1.909 A by more than 10 esd",
+        reference="Hill (1992) p. 605 ('closer to 1.912 A'); the band is "
+                  "1.909 * (X-ray mean edge) / (neutron edge) over every "
+                  "neutron edge in Table 7's range, 1.91083-1.91290 A",
+        measured="lambda_N 1.91252(5) A",
+    ),
 )
 
 
@@ -3239,6 +3305,22 @@ SUITE_INTROS: dict[str, str] = {
     "test_acceptance_nac":
         "The synchrotron vertical slice, and the FitReport's impurity claim: "
         "CaF2 is found from unmatched peaks rather than declared.",
+    "test_acceptance_pbso4_round_robin": (
+        "WP-1943: the IUCr CPD Rietveld round robin on PbSO4 (Hill 1992), the "
+        "**inter-laboratory reference** for refined parameters.  Both "
+        "round-robin patterns, read from the vendored GSAS-II project through "
+        "the gsas2_gpx pattern reader, are refined from the published "
+        "single-crystal model under a protocol frozen in the module docstring, "
+        "and every cell edge, coordinate and B is asserted against the "
+        "envelope the 16 X-ray and 17 neutron refinements bracket: inside "
+        "their range and within 3 of their own standard deviations of their "
+        "mean.  Two of Hill's qualitative findings ride on top: a physical "
+        "axial model raises the neutron cell toward the X-ray cell, and a "
+        "joint fit measures the neutron wavelength above the nominal 1.909 A, "
+        "where Hill's cells put it.  No esd is compared with the spread: "
+        "Hill's spread is one dataset refined many ways, not replicate "
+        "measurements."
+    ),
     "test_acceptance_qpa_roundrobin":
         "Quantitative phase analysis against weighed truth, at tolerances "
         "referenced to what the round robin's participants achieved.",

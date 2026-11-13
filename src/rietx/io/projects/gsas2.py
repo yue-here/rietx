@@ -1032,10 +1032,108 @@ SAMPLE_PARAMETERS: tuple[str, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class Gsas2Arrays:
+    """One ``PWDR`` item's stored arrays, as the file holds them.
+
+    GSAS-II stores six arrays per powder histogram (``objvarorg.rst``,
+    § Powder Diffraction Tree Items, ``data[1]``): the abscissa, the observed
+    intensity, the least-squares **weight** w = 1/σ², the calculated pattern,
+    the background and the difference.  The first three are the measurement;
+    the calculated one is GSAS-II's own last answer, which is what makes the
+    weight's scale checkable against the project's stored Rwp before any fit
+    uses it (WP-1943).
+
+    A ``numpy.ma`` mask, where the file carries one, is GSAS-II's record of the
+    points its *protocol* excluded (limits and excluded regions), so it is not
+    kept here: the project's ranges are on :class:`Gsas2Histogram`, and a
+    pattern is the measurement, never a protocol (root ``CLAUDE.md``, Project).
+    """
+
+    x: np.ndarray
+    y: np.ndarray
+    w: np.ndarray
+    calc: np.ndarray | None = None
+
+
+def histogram_arrays(payload: Any) -> Gsas2Arrays | None:
+    """The stored arrays of one ``PWDR`` item's payload, or ``None``.
+
+    **The one histogram read**: :func:`read_gsas2_gpx` takes its point count
+    from here and the ``.gpx`` pattern reader (:mod:`rietx.io.formats.gpx`)
+    its x, y and w, so the two cannot come to disagree about which array is
+    which.  ``None`` means the payload does not hold three non-empty numeric
+    arrays of one size (each read flat), which a caller reports in its own
+    words.
+    """
+    arrays = payload[1] if isinstance(payload, (list, tuple)) and len(payload) > 1 else None
+    if not isinstance(arrays, (list, tuple, np.ndarray)) or len(arrays) < 3:
+        return None
+    try:
+        x, y, w = (np.ma.getdata(arrays[i]).astype(np.float64).ravel() for i in range(3))
+        calc = (np.ma.getdata(arrays[3]).astype(np.float64).ravel()
+                if len(arrays) > 3 else None)
+    except (TypeError, ValueError):
+        return None
+    if not (x.size == y.size == w.size) or x.size == 0:
+        return None
+    if calc is not None and calc.size != x.size:
+        calc = None
+    return Gsas2Arrays(x=x, y=y, w=w, calc=calc)
+
+
+def powder_items(path: str | Path) -> list[tuple[str, Any, dict[str, Any]]]:
+    """Every ``PWDR`` item of a ``.gpx`` as ``(label, payload, children)``, in
+    file order — the order a pattern reader's ``scan=`` counts in.
+
+    Read through the same allow-listed unpickler as :func:`read_gsas2_gpx`, so
+    opening a ``.gpx`` as a *pattern* crosses the same trust boundary
+    (:data:`ALLOWED_GLOBALS`) and refuses the same names.
+    """
+    out = []
+    for item in _read_tree(Path(path)):
+        headed = _labelled(item)
+        if headed is None or item_kind(headed[0]) != "PWDR":
+            continue
+        children = {str(c[0]): c[1] for c in item[1:]
+                    if isinstance(c, (list, tuple)) and len(c) == 2}
+        out.append((headed[0], headed[1], children))
+    return out
+
+
+#: The tree-item labels a ``.gpx`` head carries, as bytes.  Every corpus file's
+#: first 4 kB holds at least one: 33 of 34 open on ``Notebook`` and the
+#: thirty-fourth on ``Phases``.  They are matched as bytes because the file is
+#: one, and pickled strings carry a length prefix rather than a quote, so a
+#: decoded head would only add a way to lose a byte.
+GPX_LABELS = (b"Notebook", b"Controls", b"Covariance", b"Constraints",
+              b"Restraints", b"Rigid bodies", b"Phases", b"PWDR ")
+
+
+def looks_gpx(raw: bytes) -> bool:
+    """A ``.gpx`` head: a pickle whose first item is a labelled tree item.
+
+    Two tests, because neither alone is safe.  The stream has to **open as a
+    pickle**: either the protocol-2 header byte, or the list opcode that a tree
+    item starts with directly.  And one of GSAS-II's own top-level labels has to
+    appear in the head.  A file passing both is not plausibly anything else; a
+    file passing only the first is any pickle at all, which is exactly what this
+    reader must not open on the strength of a suffix.
+
+    **The header byte is not enough on its own, and that is measured**: 11 of
+    the 34 tutorial projects carry no protocol header at all, so a sniff written
+    to the protocol-2 magic alone would have declined a third of them.
+
+    One test for both registries — the project reader's and the pattern
+    reader's — taking the bounded head each already read.
+    """
+    return raw[:1] in (b"\x80", b"]") and any(k in raw for k in GPX_LABELS)
+
+
 def _histogram(label: str, payload: Any, children: dict[str, Any]) -> Gsas2Histogram:
     """One ``PWDR`` item and its children."""
     data = payload[0] if isinstance(payload, (list, tuple)) and payload else {}
-    arrays = payload[1] if isinstance(payload, (list, tuple)) and len(payload) > 1 else None
+    arrays = histogram_arrays(payload)
     instrument = children.get("Instrument Parameters", [{}])
     values = instrument[0] if isinstance(instrument, (list, tuple)) and instrument else {}
     kind = ""
@@ -1061,12 +1159,7 @@ def _histogram(label: str, payload: Any, children: dict[str, Any]) -> Gsas2Histo
         if entry is not None:
             collected[name] = entry
 
-    n_points = None
-    if arrays is not None:
-        try:
-            n_points = int(len(arrays[0]))
-        except (TypeError, IndexError):
-            n_points = None
+    n_points = None if arrays is None else int(arrays.x.size)
 
     return Gsas2Histogram(
         number=int(data.get("hId", -1)) if isinstance(data, dict) else -1,

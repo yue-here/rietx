@@ -293,31 +293,10 @@ def _matches_gsas_exp(path: Path) -> bool:
     return any(ln.startswith(_EXP_KEYS) for ln in lines)
 
 
-#: The tree-item labels a ``.gpx`` head carries, as bytes.  Every corpus file's
-#: first 4 kB holds at least one: 33 of 34 open on ``Notebook`` and the
-#: thirty-fourth on ``Phases``.  They are matched as bytes because the file is
-#: one, and pickled strings carry a length prefix rather than a quote, so a
-#: decoded head would only add a way to lose a byte.
-_GPX_LABELS = (b"Notebook", b"Controls", b"Covariance", b"Constraints",
-               b"Restraints", b"Rigid bodies", b"Phases", b"PWDR ")
-
-
 def _matches_gsas2_gpx(path: Path) -> bool:
-    """A ``.gpx`` is a pickle whose first item is a labelled tree item.
-
-    Two tests, because neither alone is safe.  The stream has to **open as a
-    pickle**: either the protocol-2 header byte, or the list opcode that a tree
-    item starts with directly.  And one of GSAS-II's own top-level labels has to
-    appear in the head.  A file passing both is not plausibly anything else; a
-    file passing only the first is any pickle at all, which is exactly what this
-    reader must not open on the strength of a suffix.
-
-    **The header byte is not enough on its own, and that is measured**: 11 of
-    the 34 tutorial projects carry no protocol header at all, so a sniff written
-    to the protocol-2 magic alone would have declined a third of them.
-    """
-    raw = head(path, HEAD_BYTES).raw
-    return raw[:1] in (b"\x80", b"]") and any(k in raw for k in _GPX_LABELS)
+    """A ``.gpx`` head, by the one test both registries share
+    (:func:`gsas2.looks_gpx`, which says why it takes two clauses)."""
+    return gsas2.looks_gpx(head(path, HEAD_BYTES).raw)
 
 
 def _matches_topas_inp(path: Path) -> bool:

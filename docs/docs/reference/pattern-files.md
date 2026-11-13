@@ -49,6 +49,7 @@ The two peak-list refusals and the total-scattering refusal come next, then the 
 |---|---|---|---|---|
 | Bruker/Siemens DIFFRAC binary, versions 2, 3 and 4 | `bruker_raw` | `.raw` | `scan` | measured per file: whole numbers are counts, a rate whose product with the step time is whole gets √(y·t)/t, anything else withholds σ |
 | Philips PC-APD binary scan | `philips_rd` | `.rd`, `.sd` | none | Poisson on the decoded counts |
+| GSAS-II project, one powder histogram | `gsas2_gpx` | `.gpx` | `scan` | σ = 1/√w from the histogram's stored least-squares weight |
 | Rigaku SmartLab Studio II measurement | `rasx` | `.rasx` | `scan` | measured per file, as for `.ras` |
 | Bruker DIFFRAC.MEASUREMENT experiment | `brml` | `.brml` | `scan` | through the automatic absorber factor a, σ = √(y/a)·a |
 | Rigaku SmartLab or MiniFlex scan | `ras` | `.ras` | `scan` | measured per file: Poisson for whole counts, √(y·t)/t for a rate, withheld otherwise |
@@ -76,9 +77,9 @@ from rietx import capabilities
 
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
-    "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
-    "raw_unclaimed"]
+    "bruker_raw", "philips_rd", "gsas2_gpx", "rasx", "brml", "ras", "uxd", "xrdml",
+    "udf", "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering",
+    "xy", "raw_unclaimed"]
 assert [opt.name for opt in caps.reader_options] == [
     "axis", "bank", "block", "nonpositive_sigma", "scan"]
 ```
@@ -89,6 +90,7 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 
 - `bruker_raw` reads versions 2 (`RAW2`), 3 (`RAW1.01`) and 4 (`RAW4.00`). Version 1 is refused by name, because no description of it exists. A version 2 file is read when it holds one range and its header and counts account for its size exactly; a version 2 file with more than one range is refused by name. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
+- `gsas2_gpx` reads the observed data of one powder histogram in a GSAS-II project; `scan` counts the project's histograms from 0 in file order, and `list_scans` names them. The file is opened through the same allow-list of names as `rx.read_gsas2_gpx`, which refuses any other name the pickle stream carries. σ is 1/√w from the histogram's stored weight, a scale checked against the project's own stored Rwp; a zero weight excludes its point, as `pdcif`'s does. The project's limits and excluded regions are its protocol and stay on the `read_gsas2_gpx` model. Only constant-wavelength histograms are read; a time-of-flight one is refused by name.
 - `rasx` and `ras` read an attenuator column and never apply it. [`RAS_ATTENUATOR_PRESENT`](diagnostics-files.md#ras_attenuator_present) names the 2θ range it covers.
 - `brml` locates every column from the file's own data views. A detector frame (a recorded view longer than one point) is refused.
 - `xrdml` applies the beam attenuation factor and reports [`XRDML_ATTENUATOR_APPLIED`](diagnostics-files.md#xrdml_attenuator_applied).

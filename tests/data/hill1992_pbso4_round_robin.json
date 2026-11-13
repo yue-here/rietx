@@ -1,0 +1,1026 @@
+{
+ "citation": "Hill, R. J. (1992). Rietveld refinement round robin. I. Analysis of standard X-ray and neutron data for PbSO4. J. Appl. Cryst. 25, 589-610. doi:10.1107/S0021889892003649",
+ "setting": "P n m a (No. 62), a 8.48, b 5.40, c 6.96 A; Pb, S, O1, O2 at (x, 1/4, z), O3 general (Table 7)",
+ "transcribed": "2026-11-09 from page images of pp. 601 and 604 (200 dpi whole page, 400-500 dpi table crops), cross-checked against the PDF text layer and an earlier image-checked transcription; checks in tests/test_projects_gsas2.py",
+ "determinations": {
+  "xray": 16,
+  "neutron": 17,
+  "neutron_anisotropic": 6,
+  "source": "Table 7 footnote p. 601 (16 X-ray, 17 neutron values in each weighted mean); Table 9 and Fig. 8 p. 604 (six anisotropic neutron refinements, participants 9, 12, 15, 21, 34, 37)"
+ },
+ "agreement_indices": {
+  "source": "Table 5 p. 595, background included",
+  "xray": {
+   "rwp_percent": [
+    8.2,
+    20.0
+   ],
+   "gof": [
+    1.3,
+    7.4
+   ]
+  },
+  "neutron": {
+   "rwp_percent": [
+    2.4,
+    12.3
+   ],
+   "gof": [
+    1.0,
+    3.1
+   ]
+  }
+ },
+ "beta_ij": "dimensionless, beta_ij = 2 pi^2 a*_i a*_j U_ij; Table 9's caption prints A^2. sigma columns printed x 1e5",
+ "table7": [
+  {
+   "key": "cell.a",
+   "label": "a (Å)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     8.4764,
+     8.4859
+    ],
+    "mean": 8.4804,
+    "mean_as_printed": "8.4804 (4)",
+    "sigma_ext": 0.00036399999999999996,
+    "sigma_int": 2.6e-05,
+    "variance_ratio": 201.0
+   },
+   "single_crystal": {
+    "value": 8.482,
+    "as_printed": "8.482 (2)"
+   },
+   "neutron": {
+    "range": [
+     8.4646,
+     8.4723
+    ],
+    "mean": 8.4667,
+    "mean_as_printed": "8.4667 (6)",
+    "sigma_ext": 0.0006389999999999999,
+    "sigma_int": 2.6e-05,
+    "variance_ratio": 609.0
+   }
+  },
+  {
+   "key": "cell.b",
+   "label": "b (Å)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     5.3962,
+     5.4024
+    ],
+    "mean": 5.3989,
+    "mean_as_printed": "5.3989 (3)",
+    "sigma_ext": 0.000288,
+    "sigma_int": 1.8999999999999998e-05,
+    "variance_ratio": 220.0
+   },
+   "single_crystal": {
+    "value": 5.398,
+    "as_printed": "5.398 (2)"
+   },
+   "neutron": {
+    "range": [
+     5.3879,
+     5.393
+    ],
+    "mean": 5.3889,
+    "mean_as_printed": "5.3889 (2)",
+    "sigma_ext": 0.00015999999999999999,
+    "sigma_int": 9e-06,
+    "variance_ratio": 302.0
+   }
+  },
+  {
+   "key": "cell.c",
+   "label": "c (Å)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     6.9568,
+     6.965
+    ],
+    "mean": 6.9605,
+    "mean_as_printed": "6.9605 (4)",
+    "sigma_ext": 0.000412,
+    "sigma_int": 2.4e-05,
+    "variance_ratio": 292.0
+   },
+   "single_crystal": {
+    "value": 6.959,
+    "as_printed": "6.959 (2)"
+   },
+   "neutron": {
+    "range": [
+     6.9466,
+     6.953
+    ],
+    "mean": 6.9477,
+    "mean_as_printed": "6.9477 (2)",
+    "sigma_ext": 0.000214,
+    "sigma_int": 9e-06,
+    "variance_ratio": 522.0
+   }
+  },
+  {
+   "key": "Pb.x",
+   "label": "Pb x",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.1875,
+     0.1883
+    ],
+    "mean": 0.18783,
+    "mean_as_printed": "0.18783 (4)",
+    "sigma_ext": 4.4e-05,
+    "sigma_int": 2.3e-05,
+    "variance_ratio": 3.6
+   },
+   "single_crystal": {
+    "value": 0.1879,
+    "as_printed": "0.1879 (1)"
+   },
+   "neutron": {
+    "range": [
+     0.1874,
+     0.1881
+    ],
+    "mean": 0.18773,
+    "mean_as_printed": "0.18773 (5)",
+    "sigma_ext": 5.2e-05,
+    "sigma_int": 2.4e-05,
+    "variance_ratio": 4.6
+   }
+  },
+  {
+   "key": "Pb.z",
+   "label": "Pb z",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.1669,
+     0.1683
+    ],
+    "mean": 0.16752,
+    "mean_as_printed": "0.16752 (9)",
+    "sigma_ext": 8.599999999999999e-05,
+    "sigma_int": 3.2999999999999996e-05,
+    "variance_ratio": 6.7
+   },
+   "single_crystal": {
+    "value": 0.1667,
+    "as_printed": "0.1667 (1)"
+   },
+   "neutron": {
+    "range": [
+     0.167,
+     0.1677
+    ],
+    "mean": 0.16731,
+    "mean_as_printed": "0.16731 (5)",
+    "sigma_ext": 4.7e-05,
+    "sigma_int": 3.9e-05,
+    "variance_ratio": 1.5
+   }
+  },
+  {
+   "key": "S.x",
+   "label": "S x",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.0621,
+     0.0673
+    ],
+    "mean": 0.0642,
+    "mean_as_printed": "0.0642 (2)",
+    "sigma_ext": 0.00024000000000000003,
+    "sigma_int": 0.00014000000000000001,
+    "variance_ratio": 2.9
+   },
+   "single_crystal": {
+    "value": 0.0633,
+    "as_printed": "0.0633 (6)"
+   },
+   "neutron": {
+    "range": [
+     0.0638,
+     0.0666
+    ],
+    "mean": 0.0649,
+    "mean_as_printed": "0.06490 (17)",
+    "sigma_ext": 0.00017,
+    "sigma_int": 8e-05,
+    "variance_ratio": 4.9
+   }
+  },
+  {
+   "key": "S.z",
+   "label": "S z",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.6799,
+     0.686
+    ],
+    "mean": 0.6838,
+    "mean_as_printed": "0.6838 (4)",
+    "sigma_ext": 0.0004,
+    "sigma_int": 0.00019,
+    "variance_ratio": 4.4
+   },
+   "single_crystal": {
+    "value": 0.6842,
+    "as_printed": "0.6842 (7)"
+   },
+   "neutron": {
+    "range": [
+     0.6804,
+     0.6866
+    ],
+    "mean": 0.68443,
+    "mean_as_printed": "0.68443 (28)",
+    "sigma_ext": 0.00028000000000000003,
+    "sigma_int": 0.0001,
+    "variance_ratio": 7.8
+   }
+  },
+  {
+   "key": "O1.x",
+   "label": "O1 x",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.902,
+     0.924
+    ],
+    "mean": 0.9083,
+    "mean_as_printed": "0.9083 (13)",
+    "sigma_ext": 0.0013200000000000002,
+    "sigma_int": 0.00032,
+    "variance_ratio": 16.7
+   },
+   "single_crystal": {
+    "value": 0.908,
+    "as_printed": "0.908 (2)"
+   },
+   "neutron": {
+    "range": [
+     0.9069,
+     0.9093
+    ],
+    "mean": 0.90857,
+    "mean_as_printed": "0.90857 (14)",
+    "sigma_ext": 0.00014000000000000001,
+    "sigma_int": 5e-05,
+    "variance_ratio": 9.9
+   }
+  },
+  {
+   "key": "O1.z",
+   "label": "O1 z",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.585,
+     0.601
+    ],
+    "mean": 0.5945,
+    "mean_as_printed": "0.5945 (7)",
+    "sigma_ext": 0.00072,
+    "sigma_int": 0.00038,
+    "variance_ratio": 3.6
+   },
+   "single_crystal": {
+    "value": 0.596,
+    "as_printed": "0.596 (3)"
+   },
+   "neutron": {
+    "range": [
+     0.5946,
+     0.5958
+    ],
+    "mean": 0.59535,
+    "mean_as_printed": "0.59535 (7)",
+    "sigma_ext": 7.000000000000001e-05,
+    "sigma_int": 5e-05,
+    "variance_ratio": 2.4
+   }
+  },
+  {
+   "key": "O2.x",
+   "label": "O2 x",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.177,
+     0.2
+    ],
+    "mean": 0.185,
+    "mean_as_printed": "0.1850 (11)",
+    "sigma_ext": 0.0011500000000000002,
+    "sigma_int": 0.00036,
+    "variance_ratio": 10.4
+   },
+   "single_crystal": {
+    "value": 0.194,
+    "as_printed": "0.194 (2)"
+   },
+   "neutron": {
+    "range": [
+     0.193,
+     0.1947
+    ],
+    "mean": 0.19366,
+    "mean_as_printed": "0.19366 (12)",
+    "sigma_ext": 0.00012000000000000002,
+    "sigma_int": 5e-05,
+    "variance_ratio": 6.6
+   }
+  },
+  {
+   "key": "O2.z",
+   "label": "O2 z",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.523,
+     0.548
+    ],
+    "mean": 0.5398,
+    "mean_as_printed": "0.5398 (13)",
+    "sigma_ext": 0.00127,
+    "sigma_int": 0.00048000000000000007,
+    "variance_ratio": 7.0
+   },
+   "single_crystal": {
+    "value": 0.543,
+    "as_printed": "0.543 (2)"
+   },
+   "neutron": {
+    "range": [
+     0.5425,
+     0.5438
+    ],
+    "mean": 0.54329,
+    "mean_as_printed": "0.54329 (8)",
+    "sigma_ext": 8e-05,
+    "sigma_int": 6.000000000000001e-05,
+    "variance_ratio": 1.6
+   }
+  },
+  {
+   "key": "O3.x",
+   "label": "O3 x",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.071,
+     0.08
+    ],
+    "mean": 0.0778,
+    "mean_as_printed": "0.0778 (5)",
+    "sigma_ext": 0.00048000000000000007,
+    "sigma_int": 0.00021,
+    "variance_ratio": 5.4
+   },
+   "single_crystal": {
+    "value": 0.082,
+    "as_printed": "0.082 (1)"
+   },
+   "neutron": {
+    "range": [
+     0.0806,
+     0.0812
+    ],
+    "mean": 0.08084,
+    "mean_as_printed": "0.08084 (4)",
+    "sigma_ext": 4e-05,
+    "sigma_int": 3.0000000000000004e-05,
+    "variance_ratio": 1.6
+   }
+  },
+  {
+   "key": "O3.y",
+   "label": "O3 y",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.018,
+     0.041
+    ],
+    "mean": 0.0262,
+    "mean_as_printed": "0.0262 (13)",
+    "sigma_ext": 0.0013000000000000002,
+    "sigma_int": 0.00029,
+    "variance_ratio": 20.6
+   },
+   "single_crystal": {
+    "value": 0.026,
+    "as_printed": "0.026 (2)"
+   },
+   "neutron": {
+    "range": [
+     0.0264,
+     0.0272
+    ],
+    "mean": 0.02701,
+    "mean_as_printed": "0.02701 (5)",
+    "sigma_ext": 5e-05,
+    "sigma_int": 4e-05,
+    "variance_ratio": 1.6
+   }
+  },
+  {
+   "key": "O3.z",
+   "label": "O3 z",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.806,
+     0.819
+    ],
+    "mean": 0.8139,
+    "mean_as_printed": "0.8139 (7)",
+    "sigma_ext": 0.0007300000000000001,
+    "sigma_int": 0.00030000000000000003,
+    "variance_ratio": 5.7
+   },
+   "single_crystal": {
+    "value": 0.809,
+    "as_printed": "0.809 (2)"
+   },
+   "neutron": {
+    "range": [
+     0.808,
+     0.8092
+    ],
+    "mean": 0.80852,
+    "mean_as_printed": "0.80852 (8)",
+    "sigma_ext": 8e-05,
+    "sigma_int": 4e-05,
+    "variance_ratio": 4.7
+   }
+  },
+  {
+   "key": "Pb.biso",
+   "label": "B Pb (Å²)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.9,
+     2.39
+    ],
+    "mean": 1.42,
+    "mean_as_printed": "1.42 (11)",
+    "sigma_ext": 0.115,
+    "sigma_int": 0.005,
+    "variance_ratio": 487.0
+   },
+   "single_crystal": {
+    "value": 1.48,
+    "as_printed": "1.48"
+   },
+   "neutron": {
+    "range": [
+     1.18,
+     1.78
+    ],
+    "mean": 1.59,
+    "mean_as_printed": "1.59 (3)",
+    "sigma_ext": 0.029,
+    "sigma_int": 0.006,
+    "variance_ratio": 21.2
+   }
+  },
+  {
+   "key": "S.biso",
+   "label": "B S (Å²)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.29,
+     1.37
+    ],
+    "mean": 0.98,
+    "mean_as_printed": "0.98 (8)",
+    "sigma_ext": 0.081,
+    "sigma_int": 0.022,
+    "variance_ratio": 14.0
+   },
+   "single_crystal": {
+    "value": 0.74,
+    "as_printed": "0.74"
+   },
+   "neutron": {
+    "range": [
+     0.36,
+     0.97
+    ],
+    "mean": 0.67,
+    "mean_as_printed": "0.67 (4)",
+    "sigma_ext": 0.037,
+    "sigma_int": 0.015,
+    "variance_ratio": 6.2
+   }
+  },
+  {
+   "key": "O1.biso",
+   "label": "B O1 (Å²)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.5,
+     4.2
+    ],
+    "mean": 1.24,
+    "mean_as_printed": "1.24 (10)",
+    "sigma_ext": 0.1,
+    "sigma_int": 0.032,
+    "variance_ratio": 9.7
+   },
+   "single_crystal": {
+    "value": 1.87,
+    "as_printed": "1.87"
+   },
+   "neutron": {
+    "range": [
+     1.8,
+     2.33
+    ],
+    "mean": 2.11,
+    "mean_as_printed": "2.11 (3)",
+    "sigma_ext": 0.026000000000000002,
+    "sigma_int": 0.012,
+    "variance_ratio": 5.2
+   }
+  },
+  {
+   "key": "O2.biso",
+   "label": "B O2 (Å²)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.1,
+     5.8
+    ],
+    "mean": 1.31,
+    "mean_as_printed": "1.31 (13)",
+    "sigma_ext": 0.132,
+    "sigma_int": 0.032,
+    "variance_ratio": 16.6
+   },
+   "single_crystal": {
+    "value": 1.76,
+    "as_printed": "1.76"
+   },
+   "neutron": {
+    "range": [
+     1.3,
+     2.05
+    ],
+    "mean": 1.67,
+    "mean_as_printed": "1.67 (3)",
+    "sigma_ext": 0.033,
+    "sigma_int": 0.01,
+    "variance_ratio": 10.1
+   }
+  },
+  {
+   "key": "O3.biso",
+   "label": "B O3 (Å²)",
+   "source": "Hill (1992), Table 7 p. 601; sigma_ext and R from Table 8 p. 601",
+   "xray": {
+    "range": [
+     0.8,
+     4.6
+    ],
+    "mean": 1.27,
+    "mean_as_printed": "1.27 (11)",
+    "sigma_ext": 0.105,
+    "sigma_int": 0.029,
+    "variance_ratio": 12.9
+   },
+   "single_crystal": {
+    "value": 1.34,
+    "as_printed": "1.34"
+   },
+   "neutron": {
+    "range": [
+     1.31,
+     1.7
+    ],
+    "mean": 1.55,
+    "mean_as_printed": "1.55 (3)",
+    "sigma_ext": 0.025,
+    "sigma_int": 0.006,
+    "variance_ratio": 16.3
+   }
+  }
+ ],
+ "table9": [
+  {
+   "atom": "Pb",
+   "ij": "11",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0038,
+     0.0043
+    ],
+    "mean": 0.0041,
+    "sigma_ext": 9e-05,
+    "sigma_int": 5e-05,
+    "variance_ratio": 3.2
+   },
+   "xray_range": [
+    0.0027,
+    0.0044
+   ],
+   "single_crystal": 0.0039
+  },
+  {
+   "atom": "Pb",
+   "ij": "22",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0179,
+     0.02
+    ],
+    "mean": 0.0187,
+    "sigma_ext": 0.00030000000000000003,
+    "sigma_int": 0.00015000000000000001,
+    "variance_ratio": 3.8
+   },
+   "xray_range": [
+    0.0124,
+    0.014
+   ],
+   "single_crystal": 0.0166
+  },
+  {
+   "atom": "Pb",
+   "ij": "33",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0067,
+     0.008
+    ],
+    "mean": 0.0072,
+    "sigma_ext": 0.00024000000000000003,
+    "sigma_int": 9e-05,
+    "variance_ratio": 6.3
+   },
+   "xray_range": [
+    0.0075,
+    0.009
+   ],
+   "single_crystal": 0.0072
+  },
+  {
+   "atom": "Pb",
+   "ij": "13",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0003,
+     0.0015
+    ],
+    "mean": 0.0006,
+    "sigma_ext": 0.00016,
+    "sigma_int": 5e-05,
+    "variance_ratio": 9.5
+   },
+   "xray_range": [
+    -0.0004,
+    0.0004
+   ],
+   "single_crystal": 0.0004
+  },
+  {
+   "atom": "S",
+   "ij": "11",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0012,
+     0.0032
+    ],
+    "mean": 0.0025,
+    "sigma_ext": 0.00029,
+    "sigma_int": 0.00015000000000000001,
+    "variance_ratio": 3.6
+   },
+   "xray_range": [
+    -0.0014,
+    0.0036
+   ],
+   "single_crystal": 0.0025
+  },
+  {
+   "atom": "S",
+   "ij": "22",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0071,
+     0.0098
+    ],
+    "mean": 0.0083,
+    "sigma_ext": 0.00046,
+    "sigma_int": 0.00034,
+    "variance_ratio": 1.8
+   },
+   "xray_range": [
+    0.001,
+    0.003
+   ],
+   "single_crystal": 0.007
+  },
+  {
+   "atom": "S",
+   "ij": "33",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0018,
+     0.0058
+    ],
+    "mean": 0.0044,
+    "sigma_ext": 0.0006100000000000001,
+    "sigma_int": 0.00023,
+    "variance_ratio": 7.0
+   },
+   "xray_range": [
+    0.006,
+    0.014
+   ],
+   "single_crystal": 0.0035
+  },
+  {
+   "atom": "S",
+   "ij": "13",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     -0.0008,
+     0.0014
+    ],
+    "mean": 0.0003,
+    "sigma_ext": 0.00028000000000000003,
+    "sigma_int": 0.0002,
+    "variance_ratio": 1.9
+   },
+   "xray_range": [
+    0.0005,
+    0.002
+   ],
+   "single_crystal": -0.0003
+  },
+  {
+   "atom": "O1",
+   "ij": "11",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0038,
+     0.0052
+    ],
+    "mean": 0.0044,
+    "sigma_ext": 0.00023,
+    "sigma_int": 0.0001,
+    "variance_ratio": 5.8
+   },
+   "xray_range": null,
+   "single_crystal": 0.004
+  },
+  {
+   "atom": "O1",
+   "ij": "22",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.026,
+     0.0291
+    ],
+    "mean": 0.0269,
+    "sigma_ext": 0.00046,
+    "sigma_int": 0.00024000000000000003,
+    "variance_ratio": 3.5
+   },
+   "xray_range": null,
+   "single_crystal": 0.025
+  },
+  {
+   "atom": "O1",
+   "ij": "33",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0101,
+     0.0119
+    ],
+    "mean": 0.0112,
+    "sigma_ext": 0.00026000000000000003,
+    "sigma_int": 0.00014000000000000001,
+    "variance_ratio": 3.7
+   },
+   "xray_range": null,
+   "single_crystal": 0.008
+  },
+  {
+   "atom": "O1",
+   "ij": "13",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     -0.0041,
+     0.0046
+    ],
+    "mean": -0.0014,
+    "sigma_ext": 0.00143,
+    "sigma_int": 9e-05,
+    "variance_ratio": 277.0
+   },
+   "xray_range": null,
+   "single_crystal": 0.003
+  },
+  {
+   "atom": "O2",
+   "ij": "11",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0053,
+     0.0067
+    ],
+    "mean": 0.0059,
+    "sigma_ext": 0.00023,
+    "sigma_int": 0.0001,
+    "variance_ratio": 5.9
+   },
+   "xray_range": null,
+   "single_crystal": 0.004
+  },
+  {
+   "atom": "O2",
+   "ij": "22",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0165,
+     0.0217
+    ],
+    "mean": 0.0182,
+    "sigma_ext": 0.00088,
+    "sigma_int": 0.00024000000000000003,
+    "variance_ratio": 13.2
+   },
+   "xray_range": null,
+   "single_crystal": 0.027
+  },
+  {
+   "atom": "O2",
+   "ij": "33",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0073,
+     0.0088
+    ],
+    "mean": 0.0079,
+    "sigma_ext": 0.00021,
+    "sigma_int": 0.00012000000000000002,
+    "variance_ratio": 3.0
+   },
+   "xray_range": null,
+   "single_crystal": 0.005
+  },
+  {
+   "atom": "O2",
+   "ij": "13",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     -0.0033,
+     0.0035
+    ],
+    "mean": 0.001,
+    "sigma_ext": 0.00136,
+    "sigma_int": 0.0001,
+    "variance_ratio": 199.0
+   },
+   "xray_range": null,
+   "single_crystal": -0.002
+  },
+  {
+   "atom": "O3",
+   "ij": "11",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.005,
+     0.0065
+    ],
+    "mean": 0.0056,
+    "sigma_ext": 0.00018,
+    "sigma_int": 5e-05,
+    "variance_ratio": 11.8
+   },
+   "xray_range": null,
+   "single_crystal": 0.006
+  },
+  {
+   "atom": "O3",
+   "ij": "22",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0093,
+     0.013
+    ],
+    "mean": 0.0109,
+    "sigma_ext": 0.0005200000000000001,
+    "sigma_int": 0.00014000000000000001,
+    "variance_ratio": 14.4
+   },
+   "xray_range": null,
+   "single_crystal": 0.008
+  },
+  {
+   "atom": "O3",
+   "ij": "33",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0076,
+     0.0094
+    ],
+    "mean": 0.0083,
+    "sigma_ext": 0.00023,
+    "sigma_int": 9e-05,
+    "variance_ratio": 6.6
+   },
+   "xray_range": null,
+   "single_crystal": 0.007
+  },
+  {
+   "atom": "O3",
+   "ij": "12",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     0.0002,
+     0.0011
+    ],
+    "mean": 0.0008,
+    "sigma_ext": 0.00015000000000000001,
+    "sigma_int": 5e-05,
+    "variance_ratio": 8.1
+   },
+   "xray_range": null,
+   "single_crystal": -0.001
+  },
+  {
+   "atom": "O3",
+   "ij": "13",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     -0.0007,
+     0.0009
+    ],
+    "mean": 0.0003,
+    "sigma_ext": 0.00028000000000000003,
+    "sigma_int": 5e-05,
+    "variance_ratio": 30.2
+   },
+   "xray_range": null,
+   "single_crystal": -0.001
+  },
+  {
+   "atom": "O3",
+   "ij": "23",
+   "source": "Hill (1992), Table 9 p. 604",
+   "neutron": {
+    "range": [
+     -0.0033,
+     0.0031
+    ],
+    "mean": 0.0006,
+    "sigma_ext": 0.0013000000000000002,
+    "sigma_int": 9e-05,
+    "variance_ratio": 231.0
+   },
+   "xray_range": null,
+   "single_crystal": -0.001
+  }
+ ]
+}

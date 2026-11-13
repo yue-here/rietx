@@ -318,3 +318,37 @@ def write_philips_rd(path: Path, counts, *, start=5.0, step=0.02,
     out += trailing
     path.write_bytes(bytes(out))
     return path
+
+
+def write_gpx(path: Path, histograms) -> Path:
+    """A GSAS-II ``.gpx``: one ``pickle.dump`` per tree item, end to end.
+
+    Each histogram is a dict with ``x``, ``y``, ``w`` and optionally ``type``
+    (``"PXC"`` by default) and ``label``.  The layout is the data tree's
+    (``objvarorg.rst`` § GSAS-II Data Tree; § Powder Diffraction Tree Items for
+    ``data[1]``'s six arrays and the ``Instrument Parameters`` ``Type`` entry),
+    written here from that description and not from the reader: a
+    ``[[label, data], [child label, child data], …]`` list per item, protocol 2,
+    a ``Notebook`` first as 33 of the 34 tutorial projects have it.  The real
+    fixture ``tests/data/gsas2_pbso4.gpx`` is the evidence about the format;
+    this exists to reach the reader's failure paths.
+    """
+    import pickle
+
+    import numpy as np
+
+    with path.open("wb") as fh:
+        pickle.dump([["Notebook", ["synthesized"]]], fh, protocol=2)
+        for i, h in enumerate(histograms):
+            x = np.asarray(h["x"], dtype=float)
+            arrays = [x, np.asarray(h["y"], dtype=float),
+                      np.asarray(h["w"], dtype=float)] + [np.zeros_like(x)] * 3
+            label = h.get("label", f"PWDR synth{i}.xye Bank 1")
+            pickle.dump([[label, [{"hId": i, "ranId": 1000 + i}, arrays]],
+                         ["Limits", [(float(x[0]), float(x[-1])),
+                                     [float(x[0]), float(x[-1])]]],
+                         ["Instrument Parameters",
+                          [{"Type": [h.get("type", "PXC")] * 2,
+                            "Lam": [1.54, 1.54, False]}, {}]]],
+                        fh, protocol=2)
+    return path

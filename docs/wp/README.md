@@ -538,7 +538,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 🔄 2026-11-03 | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 🔄 2026-10-09 | P2 | [1319](1319-structure-interchange.md) |
 | [1942](1942-a-soft-restraint-on-a-sum-across-phases.md) | A soft restraint on a sum of parameters across phases | ⬜ | P3 | — |
-| [1943](1943-the-pbso4-round-robin-as-an-acceptance-case.md) | The PbSO₄ round robin as an acceptance case | ⬜ | P3 | — |
+| [1943](1943-the-pbso4-round-robin-as-an-acceptance-case.md) | The PbSO₄ round robin as an acceptance case | ✅ 2026-11-09 | — | — |
 | [1973](1973-a-topas-spherical-harmonics-texture-reads-in.md) | A TOPAS spherical-harmonics texture reads in | ⬜ | P3 | [1960](1960-spherical-harmonics-texture.md), #131 |
 | [2057](2057-the-o2-form-factor-names-its-source.md) | The O²⁻ form factor names the fit it came from | ✅ 2026-10-30 | — | — |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 🔄 2026-11-01 | P3 | — |

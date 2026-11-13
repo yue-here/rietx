@@ -50,6 +50,7 @@ from .brml import BRML, read_brml
 from .bruker_raw import BRUKER_RAW, read_bruker_raw
 from .chi import CHI, read_chi
 from .dif import DIF, read_dif
+from .gpx import GPX, list_gpx_scans, read_gpx_pattern
 from .gsas import GSAS, GSASBank, gsas_banks, read_gsas
 from .pdcif import PDCIF, read_pdcif
 from .peaklist import PEAK_LIST, read_peaklist
@@ -74,6 +75,10 @@ from .xy import XY, read_xy
 #: pair is disjoint by construction — ``RAW…`` against ``V3RD``/``V5RD`` — which
 #: matters more here than usual, since ``.raw`` is written by six unrelated
 #: vendors and ``.rd`` by two, so neither reader may trust a suffix.
+#: ``GPX`` is third (WP-1943): a ``.gpx`` is a binary pickle stream, so it
+#: takes the binary-first position; its two-clause test (a pickle opcode at
+#: byte 0 *and* a GSAS-II tree label in the head) overlaps neither magic above
+#: it.
 #: ``RASX`` and ``BRML`` follow, sharing a zip's magic and
 #: separated by their manifests rather than by it; then ``RAS``, ``UXD``,
 #: ``XRDML`` and ``UDF``, each recognised by a first line, a root element or a
@@ -86,7 +91,7 @@ from .xy import XY, read_xy
 #: copies; ``TOTAL_SCATTERING`` (issue #1240) beside both and directly above
 #: ``XY``, the one entry its files fell to, so it can shadow no reader;
 #: ``RAW_UNKNOWN`` sits below ``XY``, for the reason in the module docstring.
-PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, RASX, BRML,
+PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, GPX, RASX, BRML,
                                               RAS, UXD, XRDML, UDF, PDCIF, GSAS,
                                               CHI, DIF, PEAK_LIST,
                                               TOTAL_SCATTERING, XY,
@@ -115,7 +120,9 @@ __all__ = [
     "read_brml",
     "read_bruker_raw",
     "read_chi",
+    "list_gpx_scans",
     "read_dif",
+    "read_gpx_pattern",
     "read_gsas",
     "read_pdcif",
     "read_peaklist",

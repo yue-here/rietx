@@ -232,7 +232,7 @@ def test_every_reader_format_appears_in_dispatch_order(caps):
     # every reader that can hold several measurements offers the same keyword,
     # which is what makes ``scan`` a vocabulary rather than one format's quirk
     assert {r.name for r in caps.reader_formats if "scan" in r.options} == {
-        "bruker_raw", "rasx", "brml", "ras", "uxd", "xrdml"}
+        "bruker_raw", "gsas2_gpx", "rasx", "brml", "ras", "uxd", "xrdml"}
 
 
 def test_the_reader_option_allowlist_is_exactly_what_the_formats_take(caps):

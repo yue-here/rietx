@@ -1248,3 +1248,200 @@ def test_a_cubic_order_2_entry_loses_nothing_and_says_so(tmp_path):
     assert structure.phases[0].texture is None
     (note,) = [d for d in notes if d.code == "GSAS2_GPX_TEXTURE_NOT_CARRIED"]
     assert note.level == "info"
+
+
+# ------------------------------------------- a .gpx histogram as a pattern (WP-1943)
+#: GSAS-II's stored agreement on the PbSO₄ project: ``Covariance['Rvals']`` for
+#: the whole fit and each histogram's own ``wR``/``Nobs``, as the file states
+#: them (read by the probe recorded in WP-1943's handover, 2026-11-09).
+PBSO4_RWP_PERCENT, PBSO4_NOBS = 6.170720107795502, 8739
+
+
+def _stored(path, index):
+    """One ``PWDR`` item's stored arrays and the project's protocol for it."""
+    from rietx.io.projects.gsas2 import histogram_arrays, powder_items
+
+    label, payload, _children = powder_items(path)[index]
+    hist = read_gsas2_gpx(path).histograms[index]
+    assert hist.name == label
+    return payload[0], histogram_arrays(payload), hist
+
+
+def test_a_gpx_is_claimed_as_a_pattern_and_lists_its_histograms():
+    from rietx.io.readers import identify_format, list_scans
+
+    assert identify_format(PBSO4).name == "gsas2_gpx"
+    scans = list_scans(PBSO4)
+    assert [s.n_points for s in scans] == [2918, 6000]
+    assert scans[0].two_theta_range == pytest.approx((10.0, 155.85))
+    assert scans[1].two_theta_range == pytest.approx((10.0, 159.975))
+    assert "neutron" in scans[0].label and "X-ray" in scans[1].label
+
+
+def test_each_histogram_reads_whole_and_a_default_scan_says_so():
+    found = []
+    neutron = rx.read_pattern(PBSO4, diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_MULTISCAN_DEFAULTED"]
+    found = []
+    xray = rx.read_pattern(PBSO4, scan=1, diagnostics=found)
+    assert found == []
+    assert len(neutron.two_theta) == 2918 and len(xray.two_theta) == 6000
+    # the pattern is the measurement: GSAS-II's X-ray lower limit of 14.45°
+    # is protocol and stays on the project model, not on the pattern
+    assert xray.two_theta[0] == pytest.approx(10.0)
+    assert neutron.metadata["wavelength"] == "1.909"
+    assert (xray.metadata["wavelength"], xray.metadata["wavelength_alpha2"]) == (
+        "1.5405", "1.5443")
+    assert xray.metadata["format"] == "gsas2_gpx" and xray.metadata["scan"] == "1"
+    with pytest.raises(ValueError, match="scan=2 is not one of them"):
+        rx.read_pattern(PBSO4, scan=2)
+
+
+@pytest.mark.parametrize("index,wr_percent,nobs", [
+    (0, 4.205359741907082, 2918), (1, 10.107759512479893, 5821)])
+def test_sigma_reproduces_each_histograms_stored_rwp(index, wr_percent, nobs):
+    """The weight's **scale**, measured against GSAS-II's own output before any
+    fit reads it (WP-1943 task 1; ``io/CLAUDE.md`` § Adding a format): the
+    weighted residual of the stored calculated pattern, inside the project's
+    own limits, under the σ the reader returns, is the ``wR`` GSAS-II wrote."""
+    data0, arrays, hist = _stored(PBSO4, index)
+    assert (data0["wR"], data0["Nobs"]) == (pytest.approx(wr_percent), nobs)
+    pat = rx.read_pattern(PBSO4, scan=index)
+    tt, y, s = (np.asarray(v) for v in (pat.two_theta, pat.intensity, pat.sigma))
+    lo, hi = hist.limits
+    used = (tt >= lo) & (tt <= hi)
+    for a, b in hist.excluded_regions:
+        used &= ~((tt >= a) & (tt <= b))
+    assert used.sum() == nobs
+    r = (y - arrays.calc) / s
+    rwp = 100.0 * math.sqrt(np.sum(r[used] ** 2) / np.sum((y[used] / s[used]) ** 2))
+    assert rwp == pytest.approx(wr_percent, rel=1e-12)
+
+
+def test_sigma_reproduces_the_projects_stored_rwp_over_both_histograms():
+    model = read_gsas2_gpx(PBSO4)
+    assert model.rwp == pytest.approx(PBSO4_RWP_PERCENT)
+    assert model.n_observations == PBSO4_NOBS
+    num = den = 0.0
+    n = 0
+    for index in (0, 1):
+        _data0, arrays, hist = _stored(PBSO4, index)
+        pat = rx.read_pattern(PBSO4, scan=index)
+        tt, y, s = (np.asarray(v) for v in (pat.two_theta, pat.intensity, pat.sigma))
+        used = (tt >= hist.limits[0]) & (tt <= hist.limits[1])
+        num += float(np.sum(((y - arrays.calc) / s)[used] ** 2))
+        den += float(np.sum((y / s)[used] ** 2))
+        n += int(used.sum())
+    assert n == PBSO4_NOBS
+    assert 100.0 * math.sqrt(num / den) == pytest.approx(PBSO4_RWP_PERCENT, rel=1e-12)
+
+
+def test_the_neutron_weight_is_the_counter_number_over_the_count():
+    """What the issue read off the file, asserted: w·y is a whole number of
+    D1A counters on every neutron point (1 to 10; Hill 1992 p. 592 averages
+    10 counters), and exactly 1 on every X-ray point, so σ² = y/N and y."""
+    for index, expected in ((0, set(range(1, 11))), (1, {1})):
+        pat = rx.read_pattern(PBSO4, scan=index)
+        y, s = np.asarray(pat.intensity), np.asarray(pat.sigma)
+        n = y / s ** 2
+        assert np.allclose(n, np.round(n), atol=1e-9)
+        assert set(np.round(n).astype(int)) == expected
+
+
+def test_a_zero_weight_is_excluded_as_pdcifs_is():
+    found = []
+    pat = rx.read_pattern(MAGNETIC, diagnostics=found)
+    (zero,) = [d for d in found if d.code == "PATTERN_ZERO_WEIGHT_EXCLUDED"]
+    assert zero.value == 4.0
+    assert len(pat.excluded_regions) == 1
+    lo, hi = pat.excluded_regions[0]
+    assert 167.75 < lo < 167.8 and 167.95 < hi < 168.0
+    assert len(pat.two_theta) == 3300           # excluded, not dropped
+
+
+def test_a_time_of_flight_histogram_is_refused_by_name():
+    with pytest.raises(ValueError, match="'PNT' \\(time-of-flight neutron\\)") as exc:
+        rx.read_pattern(SETTING, scan=0)
+    assert SETTING.name in str(exc.value)
+
+
+def test_a_non_finite_weight_drops_its_row(tmp_path):
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = 1.0 / y
+    w[5] = np.nan
+    found = []
+    pat = rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]),
+                          diagnostics=found)
+    assert len(pat.two_theta) == 11
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+    assert "NaN σ" in found[0].message
+
+
+def test_a_negative_weight_sets_the_column_aside(tmp_path):
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = 1.0 / y
+    w[3] = -1.0
+    found = []
+    pat = rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]),
+                          diagnostics=found)
+    assert pat.sigma is None
+    assert [d.code for d in found] == ["PATTERN_WEIGHT_UNUSABLE"]
+    assert "1 negative weight(s)" in found[0].message
+
+
+def test_a_project_can_point_at_a_gpx_histogram(tmp_path):
+    """The reason for a registry entry rather than a method (issue #875): the
+    ``.rex`` records which format read its pattern and with which ``scan``."""
+    proj = rx.Project.create(
+        tmp_path / "pbso4.rex", pattern=PBSO4,
+        structure=to_structure(read_gsas2_gpx(PBSO4)),
+        instrument=rx.Instrument.bragg_brentano(radiation="CuKa"),
+        reader_options={"scan": 1})
+    assert (proj.data_ref.reader, proj.data_ref.options) == ("gsas2_gpx", {"scan": "1"})
+    assert len(proj.data.two_theta) == 6000
+    reopened = rx.Project.open(tmp_path / "pbso4.rex")
+    assert reopened.data.two_theta == proj.data.two_theta
+
+
+def test_a_negative_zero_weight_is_a_zero_weight(tmp_path):
+    """1/√(−0.0) is −∞, which the zero-weight path would not see (review of
+    WP-1943): −0.0 is read as the zero weight it is."""
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = 1.0 / y
+    w[4] = -0.0
+    found = []
+    pat = rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]),
+                          diagnostics=found)
+    assert len(pat.two_theta) == 12 and len(pat.excluded_regions) == 1
+    assert [d.code for d in found] == ["PATTERN_ZERO_WEIGHT_EXCLUDED"]
+
+
+def test_a_histogram_with_nothing_left_to_fit_is_refused(tmp_path):
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = np.zeros(12)
+    w[3] = 1.0 / y[3]
+    y = y.copy()
+    y[3] = np.nan                    # the one weighted point has no count
+    with pytest.raises(ValueError, match="no point of non-zero weight") as exc:
+        rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]))
+    assert "a.gpx" in str(exc.value)
+
+
+def test_a_tof_histogram_lists_no_two_theta_span():
+    from rietx.io.readers import list_scans
+
+    scans = list_scans(SETTING)
+    assert all(s.two_theta_range == (0.0, 0.0) for s in scans)
+    assert all("time-of-flight" in s.label for s in scans)

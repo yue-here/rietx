@@ -49,6 +49,7 @@ REAL_FIXTURES = [
     ("bruker_absorber.brml", "brml"),           # a zip of XML, 4.5 MB unread
     ("bruker_raw4_scrambled.raw", "bruker_raw"),  # binary TLV, one range, 7134 pts
     ("qarr/corundum.rd", "philips_rd"),    # Philips V3, 250-byte header, packed
+    ("gsas2_pbso4.gpx", "gsas2_gpx"),      # GSAS-II pickle stream, two histograms
 ]
 
 #: Formats with **no vendorable real file**, built here instead.  Kept apart from
@@ -764,7 +765,7 @@ _NF_BAD = (float("nan"), float("inf"), float("-inf"))
 #: from a start and a step has no ``x``.
 _NF_COLUMNS = {"xy": "xys", "chi": "xy", "gsas_fxye": "xys", "gsas_esd": "ys",
                "ras": "xy", "uxd": "xy", "xrdml": "y", "udf": "y", "rasx": "xy",
-               "brml": "xy", "pdcif": "xys"}
+               "brml": "xy", "pdcif": "xys", "gsas2_gpx": "xy"}
 #: Bruker RAW stores float32 counts, and a non-finite one is its evidence that
 #: the stride is wrong: the reader refuses the file, and that refusal stays.
 _NF_REFUSED = {"raw4": "y", "raw3": "x"}
@@ -786,7 +787,7 @@ def _nonfinite_file(kind: str, column: str, bad: float, d: Path) -> Path:
         write_xrdml,
         write_xy,
     )
-    from tests.writers_xrd import write_raw3, write_raw4
+    from tests.writers_xrd import write_gpx, write_raw3, write_raw4
 
     def put(seq, col):
         return [bad if (i == _NF_AT and col == column) else v
@@ -822,6 +823,10 @@ def _nonfinite_file(kind: str, column: str, bad: float, d: Path) -> Path:
         return _write_pdcif(d / "a.cif", {"_pd_meas_2theta_scan": tt,
                                           "_pd_meas_counts_total": y,
                                           "_pd_meas_counts_total_su": s})
+    if kind == "gsas2_gpx":
+        # the weight column is w = 1/σ²; a non-finite *weight* is its own test
+        # (test_projects_gsas2.py), since σ is derived from it, not stored
+        return write_gpx(d / "a.gpx", [dict(x=tt, y=y, w=[1.0 / v ** 2 for v in _NF_S])])
     if kind == "raw4":
         return write_raw4(d / "a.raw", [dict(start=10.0, step=0.02, intensity=y)])
     assert kind == "raw3"
