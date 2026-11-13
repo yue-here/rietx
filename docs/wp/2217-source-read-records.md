@@ -1,6 +1,7 @@
 # WP-2217 — Records of what was read in another program's source
 
 Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by @yue-here
+Track: The repo's own process
 Depends on: —
 Priority: P4 2026-11-13 — bookkeeping: changes no number and no decision, only which evidence a reader can check
 
@@ -64,12 +65,12 @@ or automatic action.
 - [x] `ATTRIBUTION.md`: a paragraph opening § Open-source software stating the reading rule by
   licence; the CrysPy, MAUD and EasyDiffraction rows say "behavioural reference, source read as
   specification, no code ported".
-- [ ] `docs/practice.md`: the legend splits "checked" into "checked (source)" and "checked
+- [x] `docs/practice.md`: the legend splits "checked" into "checked (source)" and "checked
   (manual)" (docs, help pages and tutorials count as manual); every occurrence relabelled; the
   memory pointer replaced by the public versions and tags already given.
-- [ ] `docs/practice.md` § A volume window from the formula: attribute the source check to the
+- [x] `docs/practice.md` § A volume window from the formula: attribute the source check to the
   maintainer's #1121 comment, and say the entry was written from that comment.
-- [ ] Stage order: `staged.py`'s `turn_off` comment and practice.md's rietx row ground the order
+- [x] Stage order: `staged.py`'s `turn_off` comment and practice.md's rietx row ground the order
   on free-then-fix, with GSAS-II's source as agreement and its docs' silence noted.
 - [x] `_audit.py` carry row: cite the GSAS-II SeqRefine tutorial for `Copy2Next` once its wording
   is checked.

@@ -59,7 +59,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 2026-11-13 | P4 | [Unscheduled](#unscheduled) |
+| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 2026-11-13 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -526,10 +526,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 ## <a id="unscheduled"></a>Unscheduled
 
-| WP | Title | Status | Priority | Depends on |
-|---|---|---|---|---|
-| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 🔄 2026-11-13 | P4 | — |
-
 ### <a id="unscheduled-coming-from-another-code"></a>Coming from another code
 
 | WP | Title | Status | Priority | Depends on |
@@ -856,6 +852,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
+| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 🔄 2026-11-13 | P4 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
