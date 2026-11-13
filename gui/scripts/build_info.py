@@ -37,7 +37,7 @@ from pathlib import Path
 #: alter the output without touching a single component.
 SOURCE_GLOBS = ("src/**/*",)
 SOURCE_FILES = ("package.json", "package-lock.json", "vite.config.ts",
-                "tsconfig.json", "index.html", "scripts/build_info.py",
+                "tsconfig.json", "index.html", "next.html", "scripts/build_info.py",
                 "scripts/vendor.py")
 
 #: Directories outside ``gui/`` whose every file counts. ``scripts/vendor.py``

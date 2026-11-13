@@ -1,8 +1,7 @@
-# WP-2130 — the Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour
+# WP-2130 — the Peaks panel's gaps: the search coverage always said, Adopt on every row
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour is deferred to a palette piece that adopts the site theme (ruled 2026-11-09); PR #1490
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the coverage line and Adopt on every row merged in #1490; the peak-mark colour moved to the milestone's palette row (ruled 2026-11-09)
 Depends on: 2123, 2124 (the shell it draws in, and the adopt arm's `picked` and `why`)
-Priority: P2 2026-11-09 — three of the gui-overhaul record's "owed to the port" defects, all in the existing Peaks panel
 
 ## Goal
 
@@ -233,6 +232,24 @@ npm --prefix gui ci && npm --prefix gui run build && npm --prefix gui test && np
 - The gui-overhaul milestone record, `docs/milestones/gui-overhaul.md` § Owed to the port.
 
 ## Handover log
+
+### 2026-11-10 — closed; the colour moved to the palette piece
+
+PR #1490 merged on 2026-11-09. The Peaks panel on `main` says what an indexing search covered
+whatever it found, and every candidate row offers Adopt. The third task, the peak-mark colour,
+was never built here. The maintainer ruled on 2026-11-09 that it moves with the palette piece,
+because the ruled blue was chosen against an orange fit that `main` does not have yet. The WP's
+title no longer names the colour, so the index row says what this WP shipped.
+
+- *Leftovers, and where each went.* The mark colour: the row "The palette" in
+  `docs/milestones/gui-overhaul.md` § Designed, not yet filed, which already lists it. The
+  `--plot-peak` item in § Owed to the port now points at that row. The panel's look, the lens
+  mark and the candidate table are the row "Peaks and indexing". Per-line curves, the
+  right-click menu, undo for peak edits and the Le Bail check's absent lines as tick indices
+  were already items in § Owed to the port. The narrative went to `docs/milestones/v1.12.md`.
+- Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+- Next: none here. The palette piece re-measures the mark colour under WP-1210's 0.13 OKLab
+  floor.
 
 ### 2026-11-09 — two of three in; the colour waits on the maintainer (PR #1490)
 

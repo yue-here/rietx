@@ -1,4 +1,4 @@
-"""WP-1806 part 1: acridine form IX, the checks the rigid body owns (#561).
+"""WP-1806: acridine form IX, the rigid body on real data (#561).
 
 The case is COD 2242872 (CC0): acridine form IX, C₁₃H₉N, P2₁/n, from Stephens,
 Schur, Lapidus & Bernstein (2019) *Acta Cryst.* E75, 489,
@@ -9,6 +9,11 @@ deposited heavy atoms (``body_from_atoms``) plus 9 riding H, and only its origin
 This file asserts what the body machinery owns, and nothing about the
 published esds:
 
+* **the free-atom control** (part 2, Yue's bar of 2026-11-05) — the same
+  model with the 14 heavy atoms free and unrestrained, each H riding on its
+  carrier, refined under the same data, profile, background and plan, lands
+  where the body does: every coordinate and the mean position along each
+  axis within ``CONTROL_BOUND`` esds of the difference;
 * **the template round trip** — declaring the body moves no atom;
 * **start-independence** — the deposited pose and one 10° / 0.3 Å away reach
   one minimum on the real data;
@@ -23,9 +28,10 @@ published esds:
 
 The deposited coordinates are another model's answer under another protocol
 (``docs/DESIGN.md`` Rule 2), so they judge nothing here: the per-atom table
-against the deposit (|Δ|, published esd, rietx esd, ratio) is written to
-``tests/output/acridine_ix_deposit_table.md`` as a record and asserts nothing.
-Part 2's bar is a free-atom control in rietx (WP-1806 ``### Inherited``).
+against the deposit (|Δ|, published esd, rietx esd, ratio), with the cell
+in rows of its own, is written to ``tests/output/acridine_ix_deposit_table.md``
+as a record and asserts nothing.  The bar is the free-atom control in rietx,
+and its table goes to ``tests/output/acridine_ix_control_table.md``.
 
 **The protocol** is the authors' profile as the 2026-10-16 measurement read it
 from the paper: Debye-Scherrer, a 10-term Chebyshev plus one broad Gaussian
@@ -93,10 +99,45 @@ START_TOL_ANG = 1e-3
 KNOWN_ANSWER_BOUND = 4.0
 NOISE_SEED = 1806
 
+#: each H's carrier, by the deposit's own numbering (Hi on Ci; the nearest
+#: heavy atom to every H in the deposit, checked 2026-11-12)
+RIDES_ON = {f"H{i}": f"C{i}" for i in range(1, 10)}
+
+#: the free-atom control's bar (Yue's 2026-11-05 ruling, read off the
+#: control's own esds): every heavy-atom coordinate of the body, and the
+#: molecule's mean position along each axis, within this many esds of the
+#: control's.  The esd is that of the *difference* of two nested fits of one
+#: pattern, √(σ²_control − σ²_body) (Hausman 1978, *Econometrica* 46, 1251),
+#: with the body's σ put on the control's GoF and Bérar-Lelann scale so the
+#: two share one σ²: where the body is right, both estimate the same
+#: coordinates and the body, the restricted fit, is the efficient one.  The
+#: nesting is not exact: the body turns each H with the molecule, while the
+#: control's H takes only its carrier's shift, a difference of at most
+#: 0.0015 Å on an atom of one electron (WP-1806, 2026-11-12).  The bar can
+#: fail: the regular-hexagon body on this pattern breaks it at 8.7 esds.
+#: So |Δ|/esd ≈ |N(0, 1)| per statistic, and the same 4 as the known
+#: answer's bar fails a correct body over 45 statistics with probability
+#: ≤ 0.3 %.  The control's two starts (the deposit, the body's answer) land
+#: 0.0002 Å apart, 0.02 of the difference's esd, so the bar senses no solver
+#: termination.
+CONTROL_BOUND = 4.0
+
 _SU = re.compile(r"([-+]?\d*\.?(\d*))\((\d+)\)")
+#: the deposit's refined cell items, and the rietx cell field each one is
+CELL = {"length_a": "a", "length_b": "b", "length_c": "c", "angle_beta": "beta"}
 
 
 # ------------------------------------------------------------------ helpers
+def _published_cell_esds() -> dict[str, float]:
+    """The deposit's cell esds, as typed (``11.28453(11)`` → 1.1e-4)."""
+    block = gemmi.cif.read(str(FIXTURE)).sole_block()
+    out = {}
+    for key in CELL:
+        m = _SU.fullmatch(block.find_value("_cell_" + key))
+        out[key] = float(f"{m[3]}e-{len(m[2])}")
+    return out
+
+
 def _published() -> tuple[dict, dict]:
     """The deposit's heavy-atom coordinates and esds, and its cell, as typed."""
     block = gemmi.cif.read(str(FIXTURE)).sole_block()
@@ -109,7 +150,7 @@ def _published() -> tuple[dict, dict]:
             esds.append(float(f"{m[3]}e-{len(m[2])}") if m else None)
         atoms[row[0]] = (vals, esds)
     cell = {}
-    for key in ("length_a", "length_b", "length_c", "angle_beta"):
+    for key in CELL:
         m = _SU.fullmatch(block.find_value("_cell_" + key))
         cell[key] = float(m[1])
     return atoms, cell
@@ -215,17 +256,32 @@ _POSE = ["phases.*.rigid_bodies.*.origin.dof.*", "phases.*.rigid_bodies.*.rotati
 
 
 def _fit(structure: Structure, pattern: rx.PatternData):
+    """The authors' profile in four cumulative stages.  A phase carrying the
+    body refines its pose; one without a body is the free-atom control and
+    refines the heavy atoms' coordinates, each H riding on its carrier."""
     ref = rx.Refinement(structure, _instrument(), history=False)
     atoms = structure.phases[0].atoms
-    heavy = [f"phases.0.atoms.{i}.biso" for i, a in enumerate(atoms) if a.label in HEAVY]
-    ref.tie_equal(heavy)
-    for i, a in enumerate(atoms):
-        if a.label in HYDROGENS:
-            ref.tie(f"phases.0.atoms.{i}.biso", heavy[0], scale=1.5)
+    idx = {a.label: i for i, a in enumerate(atoms)}
+    heavy = [f"phases.0.atoms.{idx[lab]}.biso" for lab in HEAVY]
+    # named: tie_equal's default source is the first match in *table* order,
+    # and the H ties and the biso stage below both lean on heavy[0] being it
+    ref.tie_equal(heavy, source=heavy[0])
+    for h in HYDROGENS:
+        ref.tie(f"phases.0.atoms.{idx[h]}.biso", heavy[0], scale=1.5)
+    if structure.phases[0].rigid_bodies:
+        moving, stage = _POSE, "pose"
+    else:
+        # riding in SHELX's sense: the H takes its carrier's coordinate shift,
+        # so it starts where the body put it and keeps the C-H vector
+        for h in HYDROGENS:
+            for k in range(3):
+                ref.tie(f"phases.0.atoms.{idx[h]}.dof.{k}",
+                        f"phases.0.atoms.{idx[RIDES_ON[h]]}.dof.{k}")
+        moving, stage = [f"phases.0.atoms.{idx[lab]}.dof.*" for lab in HEAVY], "atoms"
     stages = [rx.Stage("scale_bkg", _BKG, max_iter=200),
               rx.Stage("profile_cell", _BKG + _PROFILE, max_iter=300, strain_seed=1000.0),
-              rx.Stage("pose", _BKG + _PROFILE + _POSE, max_iter=2000),
-              rx.Stage("biso", _BKG + _PROFILE + _POSE + [heavy[0]], max_iter=2000)]
+              rx.Stage(stage, _BKG + _PROFILE + moving, max_iter=2000),
+              rx.Stage("biso", _BKG + _PROFILE + moving + [heavy[0]], max_iter=2000)]
     # the shipped schedule and closing stage, declared: these numbers are what
     # a user's own run of this plan produces
     plan = rx.RefinementPlan(stages=stages, intermediate_ftol=INTERMEDIATE_FTOL,
@@ -253,11 +309,11 @@ def _ratios(phase: Phase) -> dict[str, list[float]]:
 
 def _deposit_table(phase: Phase, rwp: float) -> str:
     """The per-atom table against the deposit: a record, not a bar."""
-    pub, _ = _published()
+    pub, cell = _published()
     lines = ["# Acridine form IX, deposited start: the deposit record (not asserted)",
              "", f"Rwp {rwp:.5f}.  ratio = |Δ| / max(published esd, rietx esd), "
-             "per component.  A record: it asserts nothing, and part 2's bar is a "
-             "free-atom control in rietx.", "",
+             "per component.  A record: it asserts nothing, and the bar is the "
+             "free-atom control in rietx (acridine_ix_control_table.md).", "",
              "| atom | axis | |Δ| frac | published esd | rietx esd | ratio |",
              "|---|---|---|---|---|---|"]
     for lab, (xyz, esd) in _heavy(phase).items():
@@ -267,7 +323,108 @@ def _deposit_table(phase: Phase, rwp: float) -> str:
             r = d / max(p or 0.0, esd[k] or 0.0)
             lines.append(f"| {lab} | {c} | {d:.5f} | {'None' if p is None else f'{p:g}'} | "
                          f"{'None' if esd[k] is None else f'{esd[k]:.5f}'} | {r:.2f} |")
+    # the cell joins the record and asserts nothing either (Yue, 2026-11-07):
+    # the published cell is the authors' answer under their own protocol
+    cell_esd = _published_cell_esds()
+    lines += ["", "| cell | unit | |Δ| | published esd | rietx esd | ratio |",
+              "|---|---|---|---|---|---|"]
+    for key, name in CELL.items():
+        par = getattr(phase.cell, name)
+        d = abs(float(par.value) - cell[key])
+        r = d / max(cell_esd[key], par.stderr or 0.0)
+        unit = "deg" if name == "beta" else "Å"
+        lines.append(f"| {name} | {unit} | {d:.5f} | {cell_esd[key]:g} | "
+                     f"{'None' if par.stderr is None else f'{par.stderr:.5f}'} | {r:.2f} |")
     return "\n".join(lines) + "\n"
+
+
+def _mean_position(ref, result) -> list[tuple[float, float]]:
+    """The heavy atoms' mean fractional coordinate along x, y and z, each
+    with its variance through the fit's whole covariance (J·Cov·Jᵀ)."""
+    kept = ref._answer_covariance
+    # the covariance of *this* answer, correlated: a diagonal-only one would
+    # pass for the whole covariance silently (magnetic._moment_correlations)
+    assert kept is not None and kept[0] is result, "no covariance kept for this result"
+    _, table, theta, stderr_internal, correlation = kept
+    assert stderr_internal is not None and correlation is not None
+    row = {e.path: i for i, e in enumerate(table.entries)}
+    heavy = [(i, a) for i, a in enumerate(ref.fitted_structure.phases[0].atoms)
+             if a.label in HEAVY]
+    w = np.full(len(heavy), 1.0 / len(heavy))
+    out = []
+    for c in "xyz":
+        paths = [f"phases.0.atoms.{i}.{c}" for i, _ in heavy]
+        # a column that measured nothing is zeroed in the covariance, which
+        # would understate the variance rather than make it absent
+        assert not table.unmeasured_rows(theta, stderr_internal,
+                                         np.array([row[p] for p in paths])).any(), c
+        cov = table.physical_covariance(theta, stderr_internal, correlation, paths)
+        out.append((float(np.mean([getattr(a, c).value for _, a in heavy])),
+                    float(w @ cov @ w)))
+    return out
+
+
+def _esd_scale(result) -> float:
+    """The factor a fit's esds carry over √((JᵀJ)⁻¹): GoF × Bérar-Lelann."""
+    return result.statistics.gof * (result.statistics.esd_inflation or 1.0)
+
+
+def _against_control(body, control) -> tuple[list[tuple], list[tuple]]:
+    """Per heavy-atom component and per mean axis: (label, axis, Δ in Å,
+    control esd in Å, esd of the difference in Å, |Δ| / that esd).  ``body``
+    and ``control`` are each a fit's (ref, result)."""
+    body_ref, control_ref = body[0], control[0]
+    pb = body_ref.fitted_structure.phases[0]
+    pc = control_ref.fitted_structure.phases[0]
+    lengths = [pc.cell.a.value, pc.cell.b.value, pc.cell.c.value]
+    hb, hc = _heavy(pb), _heavy(pc)
+    # Hausman's subtraction needs one σ² for both covariances, and each fit
+    # scales its esds by its own GoF and Bérar-Lelann factor: put the body's
+    # on the control's scale (a worse body has the larger GoF, and on its own
+    # scale its esd can exceed the control's)
+    scale = (_esd_scale(control[1]) / _esd_scale(body[1])) ** 2
+    atoms = []
+    for lab in HEAVY:
+        for k, c in enumerate("xyz"):
+            eb, ec = hb[lab][1][k], hc[lab][1][k]
+            var = ec * ec - scale * eb * eb
+            assert var > 0.0, (lab, c, eb, ec, scale)
+            diff = math.sqrt(var)
+            d = float(hb[lab][0][k] - hc[lab][0][k])
+            atoms.append((lab, c, d * lengths[k], ec * lengths[k], diff * lengths[k],
+                          abs(d) / diff))
+    means = []
+    for k, ((mb, vb), (mc, vc)) in enumerate(zip(_mean_position(*body),
+                                                 _mean_position(*control))):
+        # the nested-fit premise, as the test asserts it per atom: without it
+        # the difference has no esd, and sqrt would raise a bare ValueError
+        assert vc > scale * vb, ("mean", "xyz"[k], vb, vc, scale)
+        diff = math.sqrt(vc - scale * vb)
+        means.append(("mean", "xyz"[k], (mb - mc) * lengths[k], math.sqrt(vc) * lengths[k],
+                      diff * lengths[k], abs(mb - mc) / diff))
+    return atoms, means
+
+
+def _control_table(atoms, means, rwp_body: float, rwp_control: float) -> str:
+    """The body against the free-atom control, the bar's own numbers."""
+    lines = ["# Acridine form IX: the rigid body against the free-atom control", "",
+             f"Rwp {rwp_body:.5f} (body) and {rwp_control:.5f} (control, unrestrained, "
+             f"H riding).  Δ = body − control in fractional units times the cell "
+             f"edge (a, b or c), in Å.  ratio = |Δ| / √(σ²_control − σ²_body), the "
+             f"body's σ on the control's scale; the bar is {CONTROL_BOUND:g}.", "",
+             "| atom | axis | Δ·edge (Å) | control esd (Å) | esd of Δ (Å) | ratio |",
+             "|---|---|---|---|---|---|"]
+    for lab, c, d, ec, ed, r in atoms + means:
+        lines.append(f"| {lab} | {c} | {d:+.5f} | {ec:.5f} | {ed:.5f} | {r:.2f} |")
+    return "\n".join(lines) + "\n"
+
+
+def _draw_zoom(result, stem: str) -> None:
+    """The strong low-angle peaks, 6.5-12.5°, where the residual sits."""
+    from rietx.viz.plots import plot_result
+
+    OUT.mkdir(exist_ok=True)
+    plot_result(result, path=str(OUT / f"{stem}_zoom.png"), two_theta_range=(6.5, 12.5))
 
 
 def _simulate(ref, result, pattern: rx.PatternData) -> tuple[rx.PatternData, Phase]:
@@ -304,6 +461,7 @@ def real_deposited(pattern):
     ref, result = _fit(_start(_with(_deposited_phase(), _deposited_body(_deposited_phase()),
                                     perturb=False)), pattern)
     _draw(result, "acridine_ix_real_deposited_start")
+    _draw_zoom(result, "acridine_ix_real_deposited_start")
     OUT.mkdir(exist_ok=True)
     (OUT / "acridine_ix_deposit_table.md").write_text(
         _deposit_table(ref.fitted_structure.phases[0], result.statistics.rwp), encoding="utf-8")
@@ -315,6 +473,18 @@ def real_perturbed(pattern):
     ref, result = _fit(_start(_with(_deposited_phase(), _deposited_body(_deposited_phase()),
                                     perturb=True)), pattern)
     _draw(result, "acridine_ix_real_perturbed_start")
+    return ref, result
+
+
+@pytest.fixture(scope="module")
+def free_control(pattern):
+    """The free-atom control: the body's starting atoms with the body taken
+    away, so the 14 heavy atoms refine their own coordinates under the same
+    data, profile, background and plan, and no restraint holds them."""
+    placed = _with(_deposited_phase(), _deposited_body(_deposited_phase()), perturb=False)
+    ref, result = _fit(_start(placed.model_copy(update={"rigid_bodies": []})), pattern)
+    _draw(result, "acridine_ix_real_free_atom_control")
+    _draw_zoom(result, "acridine_ix_real_free_atom_control")
     return ref, result
 
 
@@ -390,6 +560,33 @@ def test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd(
                if d.stderr_diagonal), "every inter-body esd equals its diagonal-only one"
     heavy = [d for d in inter if d.atom_1 in HEAVY and d.atom_2 in HEAVY]
     assert heavy and all(math.isfinite(d.stderr) for d in heavy)
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("acridine-ix")
+def test_the_body_agrees_with_the_free_atom_control(real_deposited, free_control):
+    """Yue's bar (2026-11-05): the same model with the heavy atoms free,
+    unrestrained, refined under the same data, profile, background and plan,
+    lands where the body does.  Every heavy-atom coordinate and the
+    molecule's mean position along each axis agree within ``CONTROL_BOUND``
+    esds of their difference.  The mean along c is the one the 2026-10-27
+    comparison with the deposit read as the body's own shift; the table goes
+    to ``tests/output/acridine_ix_control_table.md``."""
+    (ref_b, res_b), (ref_c, res_c) = real_deposited, free_control
+    assert res_b.status == "converged" and res_c.status == "converged"
+    assert res_c.restraints is None or not res_c.restraints.rows, "the control is unrestrained"
+    # the control refined every heavy coordinate: each carries an esd larger
+    # than the body's, so the difference's esd is real
+    hb, hc = _heavy(ref_b.fitted_structure.phases[0]), _heavy(ref_c.fitted_structure.phases[0])
+    assert all(hb[lab][1][k] is not None and hc[lab][1][k] is not None
+               and hc[lab][1][k] > hb[lab][1][k] for lab in HEAVY for k in range(3))
+    atoms, means = _against_control(real_deposited, free_control)
+    OUT.mkdir(exist_ok=True)
+    (OUT / "acridine_ix_control_table.md").write_text(
+        _control_table(atoms, means, res_b.statistics.rwp, res_c.statistics.rwp),
+        encoding="utf-8")
+    worst = max(atoms + means, key=lambda r: r[-1])
+    assert worst[-1] <= CONTROL_BOUND, worst
 
 
 @pytest.mark.slow

@@ -516,6 +516,44 @@ def test_a_stage_line_carries_its_seeds(project):
     assert (stage["seed"], stage["strain_seed"]) == (0.0001, 1e-06)
 
 
+def test_a_stage_line_carries_its_fixes(project):
+    """``fix <globs>`` is a stage's ``turn_off`` (WP-2208): parsed after the
+    frees, rendered back the same way, and a stage may fix without freeing."""
+    text = td.render(project)
+    edited = _edit(text, "stage", "stage locked  free phases.*.cell.*, instrument.*   "
+                                  "fix instrument.profile.*, instrument.zero_shift   "
+                                  "max_iter 40", which=0)
+    delta, errors = _changes(edited, project)
+    assert errors == []
+    stage = delta.plan["plan"]["stages"][0]
+    assert stage["turn_on"] == ["phases.*.cell.*", "instrument.*"]
+    assert stage["turn_off"] == ["instrument.profile.*", "instrument.zero_shift"]
+    assert stage["max_iter"] == 40
+    only = _edit(text, "stage", "stage only  free   fix instrument.profile.*", which=0)
+    delta, errors = _changes(only, project)
+    assert errors == []
+    assert delta.plan["plan"]["stages"][0]["turn_on"] == []
+    empty = _edit(text, "stage", "stage none  free   fix", which=0)
+    assert _changes(empty, project)[1]
+    # the clause may follow a `<key> <number>` pair too
+    late = _edit(text, "stage", "stage late  free phases.*.scale   max_iter 40   "
+                                "fix instrument.zero_shift", which=0)
+    delta, errors = _changes(late, project)
+    assert errors == []
+    stage = delta.plan["plan"]["stages"][0]
+    assert stage["turn_off"] == ["instrument.zero_shift"] and stage["max_iter"] == 40
+    # rendered back after the frees, and absent from a stage that fixes nothing
+    from rietx.schemas.plan import PlanSpec, StageSpec
+
+    spec = PlanSpec(stages=[StageSpec(name="a", turn_on=["phases.*.scale"]),
+                            StageSpec(name="b", turn_on=["phases.*.cell.*"],
+                                      turn_off=["instrument.zero_shift"])])
+    lines = td._render_plan(project.doc.model_copy(update={"plan": spec}))
+    stage_lines = [line for line in lines if line.startswith("stage ")]
+    assert "fix" not in stage_lines[0].split()
+    assert stage_lines[1].split()[3:6] == ["phases.*.cell.*", "fix", "instrument.zero_shift"]
+
+
 def test_the_tolerance_line_is_always_shown_and_switches_the_schedule(project):
     """The plan-level ``tolerance`` line (WP-1123) is the exact-mode switch.
 
@@ -623,7 +661,7 @@ def test_a_stage_line_round_trips_every_key_stage_spec_has(project):
     """
     from rietx.schemas.plan import StageSpec
 
-    assert set(td.STAGE_KEYS) | {"name", "turn_on"} == set(StageSpec.model_fields)
+    assert set(td.STAGE_KEYS) | {"name", "turn_on", "turn_off"} == set(StageSpec.model_fields)
     non_default = {"max_iter": 40, "ftol": 1e-06, "lebail_cycles": 5, "lebail_tol": 0.0,
                    "seed": 0.0001, "strain_seed": 1e-06,
                    "restraint_weight_scale": 25.0, "window_slack_deg": 2.5}
@@ -887,9 +925,12 @@ def test_the_highlighter_quotes_the_parsers_words():
     # (WP-1027); a new PeakFlag member fails here until rxt.ts restates it
     assert set(words("PEAK_FLAGS")) == set(td._PEAK_FLAG_WORDS)
     # a stage line's keys are `StageSpec`'s own fields, minus the two that are
-    # positional (`stage <name>  free <globs>`), plus the `free` that introduces them
-    stage_keys = set(StageSpec.model_fields) - {"name", "turn_on"}
+    # positional (`stage <name>  free <globs>`), plus the `free` that introduces them;
+    # `turn_off` is its own `fix <globs>` clause (WP-2208), pinned beside them
+    stage_keys = set(StageSpec.model_fields) - {"name", "turn_on", "turn_off"}
     assert set(words("STAGE_WORDS")) == stage_keys | {"free"}
+    fix = re.search(r'export const STAGE_FIX_WORD = "([^"]+)";', text)
+    assert fix and fix.group(1) == td.STAGE_FIX_WORD
     # …and the two properties the plan editor's boxes need of each of them
     # (WP-1208): which take an integer, and which admit an empty box.  Same
     # bargain as the vocabulary above — restated there, pinned from here, so a

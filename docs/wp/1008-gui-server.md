@@ -153,6 +153,35 @@ same machinery as a refinement run even though it is not one.
 - `compare_app.py` — `_State`, `_plotly_js`, port; `tests/test_compare_ui.py`
   `server` fixture (`:211`) — the port-0 live-server test recipe to copy.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **GUI** (WP-1008, `gui/`) is `rietx gui [PROJECT.rex]` — stdlib
+`http.server` on 127.0.0.1, the third such app here after `watch` and `compare`.
+`gui/session.py` holds `GuiSession`, where **every verb is a plain method and
+nothing knows about HTTP**; `gui/server.py` parses a path, calls one, serialises
+the answer, and is the layer a Tauri host would replace. Its route table plus
+`RESERVED_ROUTES` (paths settled here, behaviour owed by a later WP, 404 naming
+it) are the complete wire surface, held disjoint by test. Four rules: mutating
+verbs return **409 while a run is in flight** — frozen-per-stage discreteness
+enforced structurally rather than by discipline, and that refusal outranks body
+validation; **settings persist on the verb**, not on `save`, which is what keeps
+WP-1005's "nothing to warn about on close" true; the **run state is not an
+event** (a failed fit emits no `fit_end`, and `EventKind` is closed) so it
+travels beside them as its own SSE frame type while `live/events.jsonl` stays the
+one stream `watch` tails; and `/api/result` omits the curves, which
+`/api/result/curves` sends once over every channel as float64 arrays (WP-1461,
+D4), decimating past `CURVES_CEILING` through the *same*
+`viz.compare.decimation_index` the comparison UI uses — whose count is a
+budget, not a ceiling. **A multi-verb route is all or nothing** (WP-2126): its
+verbs run on `session.rehearse`'s copy first. `strategy.staged.resolve_plan` (preset name + mode → plan)
+is likewise one function, previously inline in `fit` and duplicated in
+`sequential`.
+
 ## Handover log
 
 - **2026-07-30 — complete.** 30 tests in `tests/test_gui_server.py` (2.6 s

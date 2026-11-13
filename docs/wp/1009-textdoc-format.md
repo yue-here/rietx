@@ -161,6 +161,35 @@ methods to `GuiSession` — no routing work. Three things that shape the format:
 - Parameter path conventions: dot-separated, fnmatch globs, no brackets
   (CLAUDE.md Conventions).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **text document** (WP-1009, `gui/textdoc.py`, `rxt 1`) is the line-oriented
+view of a project — settings, plan, and every parameter row, where `@` frees and a
+bare value holds. `render` → `parse` → `changes` → `apply`, and the rule that
+makes it safe is that **a delta is diffed against the live project, never against
+the old text**: an untouched document emits no verbs, a read-only field is an
+error only when it *differs* (so everything can be shown without a "look, don't
+touch" syntax), and a typed number is compared to the **rendered** value, which is
+what lets values render lossily at 12 significant digits. Everything applies
+through the same verbs a form calls — same history nodes — and every refusal is
+the verb's own words (`held_because`, `TieSpec.describe`) with a line number
+attached, never restated. Three grammar facts are load-bearing: a `tie` renders
+**last** on its line (it contains spaces, so `=` runs to end-of-line); column
+widths are **per block** (a fixed width made the renderer emit
+`polarization 0.99min 0`, which its own parser refused); and a **stage line's
+keys are derived from `StageSpec`** (`textdoc.STAGE_KEYS`), never listed, so a
+new field on the schema reaches the renderer, the parser and — via
+`test_textdoc`'s pin against `model_fields` — `lib/rxt.ts` too. Listed, it was
+the same tuple in two places, and a field missing from both is not a rendering
+gap but a value dropped on every save. An added key is not a `FORMAT_VERSION`
+bump, on the events precedent: no line's *meaning* changed. Comments parse but do not
+survive a re-render, on purpose: storing one would be a second authority.
+
 ## Handover log
 
 - **2026-07-30 — complete.** 20 tests in `tests/test_textdoc.py`, fast suite

@@ -242,11 +242,11 @@ DATASETS: dict[str, Dataset] = {
         "Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & "
         "Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data "
         "at lambda 0.699789 A deposited with the structure in one CC0 COD "
-        "file.  A molecular crystal refined as one rigid body; no row asserts "
-        "against the deposited coordinates or their esds, which are another "
-        "model's answer under another protocol (docs/DESIGN.md Rule 2), so "
-        "every row referenced to it is about the body machinery, not the "
-        "structure's accuracy",
+        "file.  A molecular crystal refined as one rigid body and as free "
+        "atoms; no row asserts against the deposited coordinates, cell or "
+        "esds, which are another model's answer under another protocol "
+        "(docs/DESIGN.md Rule 2), so every row referenced to it is about the "
+        "body machinery, not the structure's accuracy",
         "characterisation"),
 }
 
@@ -2896,6 +2896,26 @@ CLAIMS: tuple[Claim, ...] = (
         starts=2,
     ),
     Claim(
+        "test_acceptance_acridine_ix", "test_the_body_agrees_with_the_free_atom_control",
+        "acridine_ix", ("own_result", "ceiling"),
+        "the same model with the 14 heavy atoms free and unrestrained (H "
+        "riding on their carriers), refined under the same data, profile, "
+        "background and plan, lands where the rigid body does: every heavy-atom "
+        "coordinate and the molecule's mean position along each axis within "
+        "four esds of the body-control difference",
+        reference="the free-atom control fit of the same pattern (Yue's bar, "
+                  "2026-11-05); the esd of each difference is "
+                  "sqrt(sigma_control^2 - sigma_body^2) for nested fits on one "
+                  "sigma scale (Hausman 1978), and four of them over 45 "
+                  "statistics is a 0.3 % union false-alarm rate under Gaussian "
+                  "errors.  The bar can fail: a regular-hexagon body on the "
+                  "same pattern breaks it at 8.7, 7 of 42 components over 4",
+        measured="worst |delta|/esd 2.29 (C8 along b; bar 4), median 0.62 over "
+                 "42 components; mean along c 0.97: the body 0.0019 A below the "
+                 "control, the control 0.0027(31) A below the deposit; "
+                 "Rwp 0.05842 body, 0.05780 control",
+    ),
+    Claim(
         "test_acceptance_acridine_ix", "test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd",
         "acridine_ix", ("identity", "ceiling"),
         "a distance inside the rigid body is held exactly, so it reports no "
@@ -3138,17 +3158,17 @@ GAPS: tuple[tuple[str, str], ...] = (
 #: ``Claim`` objects; this is the sentence that says what the *dataset* is for.
 SUITE_INTROS: dict[str, str] = {
     "test_acceptance_acridine_ix": (
-        "WP-1806 part 1: what the rigid body itself owns, on acridine form IX "
-        "(COD 2242872, CC0), whose synchrotron pattern is deposited with the "
-        "structure.  The body is the 14 deposited heavy atoms plus 9 riding H, "
-        "and only its pose refines, under the authors' profile as read from "
-        "the paper.  Four checks: the template round trip; start-independence "
-        "on the real data; the esd rules (an intra-body distance is absent, an "
-        "inter-body one is full); and a simulated known answer whose positive "
-        "arm, a regular-hexagon template, must fail.  The per-atom table "
-        "against the deposit is written to tests/output/ as a record and "
-        "asserts nothing; part 2's bar is a free-atom control in rietx "
-        "(WP-1806 Inherited)."
+        "WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose "
+        "synchrotron pattern is deposited with the structure.  The body is the "
+        "14 deposited heavy atoms plus 9 riding H, and only its pose refines, "
+        "under the authors' profile as read from the paper.  Its bar is a "
+        "free-atom control in rietx: the same model with the heavy atoms free "
+        "lands where the body does.  Four more checks: the template round "
+        "trip; start-independence on the real data; the esd rules (an "
+        "intra-body distance is absent, an inter-body one is full); and a "
+        "simulated known answer whose positive arm, a regular-hexagon "
+        "template, must fail.  The per-atom and cell table against the deposit "
+        "is written to tests/output/ as a record and asserts nothing."
     ),
     "test_acceptance_extra_peaks": (
         "WP-1103's design case on real data: the SRM 660c protocol, "

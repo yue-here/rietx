@@ -898,6 +898,18 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
     "phases.*.cell.alpha": _CELL_ANGLE,
     "phases.*.cell.beta": _CELL_ANGLE,
     "phases.*.cell.gamma": _CELL_ANGLE,
+    # the parent cell's edges are cell lengths and angles too: ``phases.*.cell.a``
+    # claims them on purpose, since fnmatch's ``*`` spans the dots
+    # (``phases.0.parent_cell.cell.a``), and ``tests/test_help.py`` pins that
+    "phases.*.parent_cell.strain.*": HelpEntry(
+        title="Strain",
+        description=(
+            "Strain the parent forbids; seed it off zero."
+        ),
+        unit=None, default="0.0",
+        typical="1e-4 to 1e-2",
+        anchor="theory/peak-positions.html#a-child-s-cell-through-its-parent",
+    ),
     "phases.*.scale": HelpEntry(
         title="Phase scale",
         description=(
@@ -1304,6 +1316,111 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         anchor="guides/tie.html#tie-to-a-quantity-of-your-own",
     ),
 }
+
+
+@dataclass(frozen=True)
+class OptIn:
+    """An opt-in correction whose parameters exist only once it is declared.
+
+    ``owner`` is the glob of the object that carries the declaration, and each
+    of ``families`` is a :data:`PARAMETER_HELP` key under it.  ``declaration``
+    is the code a user runs, in the spelling the help entries use;
+    ``tests/test_help.py`` executes it against a model that lacks the
+    correction and checks that every family then has a row.  ``geometry``
+    and ``source`` are the only ``Geometry.kind`` and ``Source.kind`` the
+    schema accepts the declaration on, where it refuses the others.
+    """
+
+    name: str
+    owner: str
+    families: tuple[str, ...]
+    declaration: str
+    geometry: str | None = None
+    source: str | None = None
+
+
+#: The opt-in corrections, for answering an unknown path with the declaration
+#: that would create it rather than with the nearest real path (WP-2087).
+#: On a phase without extinction, ``phases.0.extinction`` was answered with
+#: ``phases.0.lor_strain``.  ``tests/test_help.py`` crosses this list with
+#: the families a model declaring nothing lacks, both ways, so a new opt-in
+#: correction adds a row here or a reason there.
+OPT_IN: tuple[OptIn, ...] = (
+    OptIn("extinction", "phases.*", ("phases.*.extinction",),
+          "phase.extinction = 0.0"),
+    OptIn("March-Dollase preferred orientation", "phases.*",
+          ("phases.*.preferred_orientation.r",),
+          # the axis is the crystallites' habit, so it prints as a placeholder
+          "phase.preferred_orientation = PreferredOrientation(axis=(h, k, l))"),
+    # order 4 is what report.layer2 already prints for a texture action
+    OptIn("spherical-harmonics texture", "phases.*", ("phases.*.texture.*",),
+          "phase.texture = SphericalHarmonicTexture(order=4)"),
+    OptIn("Stephens anisotropic strain", "phases.*",
+          ("phases.*.microstrain.s*", "phases.*.microstrain.dof.*"),
+          "phase.microstrain = StephensStrain.isotropic(1000, phase.cell)"),
+    # the tensor replaces biso, and the assignment raises while biso is free
+    OptIn("an anisotropic displacement tensor", "phases.*.atoms.*",
+          (*(f"phases.*.atoms.*.u{ij}" for ij in ("11", "22", "33", "12", "13", "23")),
+           "phases.*.atoms.*.adp.*"),
+          "atom.biso.vary = False; atom.aniso = AnisoU.isotropic("
+          "atom.biso.value / (8 * math.pi**2), phase.cell)"),
+    OptIn("Suortti surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.a",
+           "instrument.geometry.surface_roughness.b"),
+          "instrument.geometry.surface_roughness = RoughnessSuortti()",
+          geometry="bragg_brentano", source="xray_cw"),
+    OptIn("Pitschke surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.c",
+           "instrument.geometry.surface_roughness.tau"),
+          "instrument.geometry.surface_roughness = RoughnessPitschke()",
+          geometry="bragg_brentano", source="xray_cw"),
+)
+
+
+def family_matches(path: str, glob: str) -> bool:
+    """Whether ``glob``, a :data:`PARAMETER_HELP` key, names ``path`` at its depth.
+
+    :func:`fnmatch.fnmatchcase` alone lets ``*`` cross dots, so
+    ``phases.*.extinction`` would claim ``phases.0.atoms.1.extinction``.
+    """
+    return path.count(".") == glob.count(".") and fnmatchcase(path, glob)
+
+
+def undeclared_opt_in(path: str, known, instrument=None) -> tuple[OptIn, str] | None:
+    """The opt-in correction an unknown ``path`` belongs to, and its owner's path.
+
+    ``None`` unless the owner exists among the ``known`` paths and declares
+    none of the correction's families.  A declared correction answers a typo
+    in one of its own paths with the nearest real path, as any other path
+    does, and so does an owner the model lacks (``phases.7`` on one phase).
+    A row the schema accepts on one geometry or source only answers when
+    ``instrument`` is given and is of that kind, since a path cannot say
+    which geometry it is on.  A joint fit's ``hist.N.`` prefix is carried
+    onto the owner, and a shared row is read bare.
+    """
+    parts = path.split(".")
+    scope = ""
+    if len(parts) > 2 and parts[0] == "hist" and parts[1].isdigit():
+        scope, parts = f"hist.{parts[1]}.", parts[2:]
+    bare = ".".join(parts)
+    known = {k[len(scope):] if scope and k.startswith(scope) else k for k in known}
+    for row in OPT_IN:
+        if not any(family_matches(bare, f) for f in row.families):
+            continue
+        if row.geometry is not None and (
+                instrument is None or instrument.geometry.kind != row.geometry):
+            return None
+        if row.source is not None and (
+                instrument is None or instrument.source.kind != row.source):
+            return None
+        owner = ".".join(parts[:row.owner.count(".") + 1])
+        if not any(k.startswith(owner + ".") for k in known):
+            return None
+        tails = [owner + f[len(row.owner):] for f in row.families]
+        if any(family_matches(k, t) for k in known for t in tails):
+            return None
+        return row, scope + owner
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -3397,6 +3514,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "patterns that see the phase."
         ),
     ),
+    "PARENT_STRAIN_HELD": HelpEntry(
+        title="A parent cell refined with its strain held",
+        description=(
+            "A stage freed the cell edges of a phase whose cell is stated through its "
+            "parent (`Phase.parent_cell`) while one of its lattice strains stayed held. "
+            "The cell glob frees the parent's edges and never a strain, because while "
+            "the child's atoms and moments keep the parent's symmetry a strain at zero is a "
+            "stationary point, and a distortion gives it only a small gradient there. The child's cell is then the "
+            "parent's carried through the transform with no shear beyond the held value. "
+            "To test for a shear, seed the strain off zero with `set_values` and free "
+            "`phases.*.parent_cell.strain.*` in a stage's `turn_on`."
+        ),
+    ),
     "PATTERN_DEAD_CHANNELS": HelpEntry(
         title="A run of channels measured nothing",
         description=(
@@ -3504,6 +3634,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "weight and the fit is unweighted. The reader kept the values, because a "
             "uniform error is legal. Goodness of fit and χ² mean something only if every "
             "point has that error. A placeholder in the error field is the usual cause."
+        ),
+    ),
+    "PATTERN_SIGMA_NONPOSITIVE": HelpEntry(
+        title="Points with an error estimate of zero or below",
+        description=(
+            "The file's error column gives some points an esd of zero or a negative "
+            "one. Zero claims an exact intensity and a negative esd has no meaning, so "
+            "neither gives a weight. These points are left out of the fit, and the "
+            "file's numbers are kept as written. The message counts them, says how "
+            "many record an intensity of zero and gives their 2θ; the code's value is "
+            "the count. A column with no positive esd at "
+            "all is not read, and the Poisson σ = √max(y, 1) is used instead. Where "
+            "the points are channels that counted zero, and the writer computed "
+            "σ = √0, read the file with `nonpositive_sigma='poisson'` to keep them at "
+            "σ = √max(y, 1), one count at a zero count. "
+            "`RefinementResult.sigma_rule` counts what the fit weighted by each rule."
         ),
     ),
     "PATTERN_TOTAL_SCATTERING": HelpEntry(
@@ -4411,11 +4557,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A stage named a parameter the model lacks",
         description=(
             "A stage asked to refine a parameter by a name that no parameter of the "
-            "model has. The usual cause is a typing slip or a retired spelling. Nothing "
+            "model has. The usual causes are a typing slip, a retired spelling and an "
+            "opt-in correction the model does not declare. Nothing "
             "was freed, yet the fit converged. A wildcard pattern that matches nothing "
-            "stays silent, because some models lack a component. Correct the name, or "
-            "use a wildcard if the stage should reach a component that only some models "
-            "declare."
+            "stays silent, because some models lack a component. Correct the name, "
+            "declare the correction, or use a wildcard if the stage should reach a "
+            "component that only some models declare."
         ),
     ),
     "STAGE_SLOW_DESCENT": HelpEntry(
@@ -4703,11 +4850,26 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "Wildcard patterns for the parameter paths that the stage frees when it "
             "starts. For example, `phases.*.cell.*` frees every lattice parameter of "
             "every phase. Staging is cumulative, so a parameter freed here keeps "
-            "refining in every later stage. Paths contain no square brackets, because "
+            "refining in every later stage unless a later stage's `turn_off` fixes it. Paths contain no square brackets, because "
             "the matching reads brackets as a character class."
         ),
         default="[]",
         typical="one or two patterns per stage",
+        anchor="theory/parameterisation.html#from-tree-to-vector",
+    ),
+    "turn_off": HelpEntry(
+        title="Parameters fixed this stage",
+        description=(
+            "Wildcard patterns for the parameter paths that the stage fixes after it "
+            "frees its `turn_on` patterns. For example, `instrument.profile.*` keeps "
+            "the profile a Pawley fit settled while the structure refines. A fixed "
+            "parameter stays fixed in later stages until a later stage frees it again, "
+            "and the closing stage keeps it fixed too. The `.rxt` document writes the "
+            "patterns as a `fix` clause. To keep a parameter fixed in every plan, "
+            "use `Refinement.hold` instead."
+        ),
+        default="[]",
+        typical="empty; one pattern where a stage takes back what an earlier one freed",
         anchor="theory/parameterisation.html#from-tree-to-vector",
     ),
     "max_iter": HelpEntry(
@@ -4854,6 +5016,21 @@ READER_OPTION_HELP: dict[str, HelpEntry] = {
             "beside the file name."
         ),
         typical="`_meas` for measured data in a pdCIF",
+    ),
+    "nonpositive_sigma": HelpEntry(
+        title="Zero or negative esds",
+        description=(
+            "What a point whose esd in the file is zero or negative becomes. Such an "
+            "esd gives no weight. `exclude` leaves the point out of the fit and "
+            "reports it as `PATTERN_SIGMA_NONPOSITIVE`. `poisson` weights it by "
+            "σ = √max(y, 1), which is one count at a zero count: use it for a file "
+            "that wrote σ = √0 for a channel that counted nothing. The file's numbers "
+            "are kept either way, and `RefinementResult.sigma_rule` counts the points "
+            "each rule weighted. Taken by the formats whose σ is a column of the file: "
+            "plain columns, GSAS, pdCIF and `.chi`."
+        ),
+        default="exclude",
+        typical="`exclude`; `poisson` for raw counts with zeros written as σ = 0",
     ),
     "scan": HelpEntry(
         title="Scan index",
@@ -5630,6 +5807,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "two Rwp values needs to see. `0` means none; `None` means nothing counted."
         ),
     ),
+    "RefinementResult.sigma_rule": HelpEntry(
+        title="Which σ weighted the fit",
+        description=(
+            "How many fitted points the file's own esd weighted (`n_file_sigma`), how "
+            "many the Poisson σ = √max(y, 1) weighted (`n_poisson_sigma`), and how "
+            "many points inside the fitted range left the fit because their esd was "
+            "zero or negative (`n_nonpositive_excluded`). The first two add up to the "
+            "fit's point count. `None` means nothing counted: a joint fit, which "
+            "counts per histogram, or a result recorded before the field existed."
+        ),
+    ),
     "RefinementResult.histograms": HelpEntry(
         title="Per-histogram results",
         description=(
@@ -5865,6 +6053,14 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Paths this stage's `turn_on` matched and did not free, because the caller "
             "declared a hold on them with `Refinement.hold`. A hold outranks a plan's "
             "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`."
+        ),
+    ),
+    "StageResult.fixed": HelpEntry(
+        title="Parameters fixed",
+        description=(
+            "The parameter paths this stage's `turn_off` patterns fixed after its "
+            "frees: the free paths they took, never a row that was already fixed. "
+            "Empty when the stage declares no `turn_off`."
         ),
     ),
     "StageResult.unknown_paths": HelpEntry(

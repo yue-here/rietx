@@ -241,13 +241,20 @@ describe("one filled primary per view", () => {
     // The maintainer's ruling of 2026-11-06: one filled primary per view, in
     // the accent, and every other button outlined.  The shell's action bar
     // shows its filled Refine under every panel (WP-2123), so a panel's own
-    // filled button is always a second one.  Two are allowed: the import
-    // wizard's Create project, filled only when no project is open (then it is
-    // the whole view and no bar shows), and the folder browser, a dialog over
-    // the window whose own primary is the dialog's.
+    // filled button is always a second one.  Three are allowed: the start
+    // screen's New project…, which is the whole view and has no bar under it
+    // (WP-2131), and two dialogs over the window whose own primary is the
+    // dialog's, the New project dialog's Create project and the folder
+    // browser's Use this directory.  The File menu's Save a copy and Export
+    // dialog is a fourth over the window (WP-2133), one primary for both.
+    // The offer of kept edits is a fifth (WP-2209), whose primary is Restore.
     const ALLOWED: Record<string, number> = {
       "panels/ActionBar.svelte": 1,
       "panels/Browse.svelte": 1,
+      "panels/FileMenu.svelte": 1,
+      "panels/NewProject.svelte": 1,
+      "panels/Recovery.svelte": 1,
+      "panels/Start.svelte": 1,
     };
     // `.ink` is the Parameters panel's number (WP-2126): the value itself,
     // tinted because it can be edited, whose press opens the editor over it.

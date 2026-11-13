@@ -11,6 +11,9 @@
 export interface Stage {
   name: string;
   turn_on: string[];
+  /** what the stage fixes after it frees `turn_on` (WP-2208); a stored plan
+   *  always carries it, a stage typed here may not yet */
+  turn_off?: string[];
   [key: string]: unknown;
 }
 
@@ -50,11 +53,14 @@ export function slideOffset(k: number, from: number, to: number, height: number)
   return 0;
 }
 
-/** Two stages are the same stage when every field agrees, key order aside. */
+/** Two stages are the same stage when every field agrees, key order aside.
+ *  An empty `turn_off` is the field's default, so it equals an absent one. */
 export function sameStage(a: Stage, b: Stage): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  const value = (s: Stage, key: string) =>
+    key === "turn_off" && !(s.turn_off ?? []).length ? null : (s[key] ?? null);
   for (const key of keys) {
-    if (JSON.stringify(a[key] ?? null) !== JSON.stringify(b[key] ?? null)) return false;
+    if (JSON.stringify(value(a, key)) !== JSON.stringify(value(b, key))) return false;
   }
   return true;
 }

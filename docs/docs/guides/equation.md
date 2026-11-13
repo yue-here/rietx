@@ -20,7 +20,7 @@ This fits a straight line a(T) = a₀ + a₁(T − T<sub>ref</sub>) to the seven
 ```text
 [1] 4.1628327119 +/- 1.6e-06 Å
 [T] 0.0000207819 +/- 8.0e-09 Å/K
-form rejected: False (statistic 9.3, cut 11.1)
+form rejected: False (statistic 9.4, cut 11.1)
 ```
 
 Each term in `terms` is a list of coordinate names: `[]` is the intercept, `["T"]` is linear in T, and `["T", "T"]` would add T².
@@ -53,7 +53,7 @@ To show a rejection, the script fits a second ramp whose true cell edge bows 9.4
 
 <!-- output of examples/guides/equation.py -->
 ```text
-form rejected: True (statistic 501.5, cut 11.1)
+form rejected: True (statistic 504.2, cut 11.1)
 ['PARAMETRIC_FORM_REJECTED']
 ```
 

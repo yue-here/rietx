@@ -1,8 +1,7 @@
 # WP-2126 — the Parameters panel
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — checklist done; PR #1484 awaits review
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the Parameters panel merged in #1484; its five follow-ups and a duplicated space-group typesetter are in the milestone's owed list
 Depends on: WP-2123
-Priority: P2 2026-11-09 — piece 2 of the open gui-overhaul milestone; it builds inside WP-2123's shell
 
 ## Goal
 
@@ -214,6 +213,28 @@ acceptance row 7).
 - `docs/practice.md` § The window layout of a GUI.
 
 ## Handover log
+
+- **2026-11-10** — closed. PR #1484 merged on 2026-11-09, so the rebuilt Parameters panel and
+  the all-or-nothing `PATCH /api/params` are on `main`. Five things this WP named as follow-ups
+  had no WP, and one duplicate appeared after it merged. All six are now items in
+  `docs/milestones/gui-overhaul.md` § Owed to the port, so they wait where the port's next
+  pieces look.
+
+  *Leftovers, and where each went* (all to § Owed to the port):
+  (1) the formula routes for `add_variable` and expression ties, then the popover's "=" button;
+  (2) limits on a coordinate DOF and on a texture or background coefficient, one item, since
+  both need the path-to-model map that lives inside `ParameterTable`'s write-back;
+  (3) a `positions` arm on the PATCH, so the panel's Apply is one rehearsed request;
+  (4) plan-stage badges on the group toggles, which this WP left to the Plan tab and WP-2127
+  left back to this panel, so neither built them;
+  (5) `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (this WP) and
+  `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) parse a Hermann-Mauguin symbol by the same
+  rules into two token types, and should be one function. Read on the tree at `ddabab7d3`. The
+  sixteen settled calls were reviewed with the PR at its merge. The narrative went to
+  `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here. The formula routes are the largest of the owed items above.
 
 - **2026-11-09, fix round** — one `PATCH /api/params` now applies whole or not at all. Before,
   each arm committed its own node in the route's order (limits and restraints, unholds, values,

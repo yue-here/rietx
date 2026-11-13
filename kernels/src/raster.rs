@@ -1,6 +1,14 @@
 //! The structure figure's rasteriser (WP-1940 § Decisions item 9).  numba
 //! compiled it until WP-1940, from `rietx/viz/figure3d/_kernels_numba.py`;
-//! these are that file's two kernels, `render_rows` and `id_plane`.
+//! these are that file's two kernels, `render_rows` and `id_plane`, and
+//! `render_rows_cued` (1.5.0, WP-1548), `render_rows` with depth cueing.
+//!
+//! **Fog is one function, not a second rasteriser.**  `render_rows` and
+//! `render_rows_cued` both check their arguments in [`render`] and draw in
+//! [`band`], which takes the fog as an `Option`: `None` is `render_rows`, and
+//! every site that fogs passes its colour through [`fogged`], which hands
+//! `None` its colour back untouched.  So the unfogged picture runs no
+//! arithmetic it did not run in 1.4.0, and the two kernels cannot drift.
 //!
 //! `rietx/viz/figure3d/raster.py` owns the packing, the banding and every rule
 //! about the picture; read its docstring first.  Its `_pack` and `pack_ids`
@@ -118,6 +126,30 @@ fn npmin(a: f64, b: f64) -> f64 {
 /// `np.minimum(np.maximum(v, 0.0), 1.0)`, a NaN kept.
 fn clamp01(v: f64) -> f64 {
     npmin(npmax(v, 0.0), 1.0)
+}
+
+/// Depth cueing (WP-1548 D1), `raster._fogged`'s `fog`: the factor is 0 in
+/// front of `z_start`, rises linearly to `f_max` at `z_end`, and stays there
+/// behind it.  View coordinates, z toward the viewer.
+#[derive(Clone, Copy)]
+struct Fog {
+    z_start: f64,
+    z_end: f64,
+    f_max: f64,
+    colour: [f64; 3],
+}
+
+/// `raster._fogged` for one sample: `col` blended toward the fog colour by
+/// its depth `z`, `col·(1 − f) + colour·f` in that association.  `None`
+/// returns `col` itself, so a picture without fog runs no arithmetic it did
+/// not run before.
+fn fogged(col: [f64; 3], z: f64, fog: Option<Fog>) -> [f64; 3] {
+    let Some(Fog { z_start, z_end, f_max, colour }) = fog else {
+        return col;
+    };
+    let f = f_max * clamp01((z_start - z) / (z_start - z_end));
+    [col[0] * (1.0 - f) + colour[0] * f, col[1] * (1.0 - f) + colour[1] * f,
+     col[2] * (1.0 - f) + colour[2] * f]
 }
 
 // --- the primitives ----------------------------------------------------
@@ -309,7 +341,7 @@ struct View<'a> {
 }
 
 /// Atoms: |M⁻¹(p − c)| = 1 along the view's z, the GUI's atom shader.
-fn draw_atoms(g: &mut Planes, v: View<'_>, at: Atoms<'_>) {
+fn draw_atoms(g: &mut Planes, v: View<'_>, at: Atoms<'_>, fog: Option<Fog>) {
     let Atoms { n, c, m, a: aa, col: acol, lum, ring, bx } = at;
     let View { x0, y0, pxs, look } = v;
     let (ext0, ext1, ws) = (g.ext0, g.ext0 + g.he, g.ws);
@@ -366,9 +398,9 @@ fn draw_atoms(g: &mut Planes, v: View<'_>, at: Atoms<'_>) {
                         }
                     }
                 }
-                for (ch, v) in col.iter().enumerate() {
-                    g.pm[3 * k + ch] = clamp01(*v);
-                }
+                // clamped, then fogged at the sample's own depth
+                let col = fogged([clamp01(col[0]), clamp01(col[1]), clamp01(col[2])], z, fog);
+                g.pm[3 * k..3 * k + 3].copy_from_slice(&col);
                 g.al[k] = 1.0;
             }
         }
@@ -376,7 +408,7 @@ fn draw_atoms(g: &mut Planes, v: View<'_>, at: Atoms<'_>) {
 }
 
 /// Bond halves: open finite cylinders, the GUI's half shader.
-fn draw_halves(g: &mut Planes, v: View<'_>, hv: Halves<'_>) {
+fn draw_halves(g: &mut Planes, v: View<'_>, hv: Halves<'_>, fog: Option<Fog>) {
     let Halves { n, a: ha, w, len, e, ea, r: hr, col: hcol, bx } = hv;
     let View { x0, y0, pxs, look } = v;
     let (ext0, ext1, ws) = (g.ext0, g.ext0 + g.he, g.ws);
@@ -421,9 +453,8 @@ fn draw_halves(g: &mut Planes, v: View<'_>, hv: Halves<'_>) {
                 let n2 = q2 + z * f2;
                 let nn = (n0 * n0 + n1 * n1 + n2 * n2).sqrt();
                 let col = shade(base, n0 / nn, n1 / nn, n2 / nn, look);
-                for (ch, v) in col.iter().enumerate() {
-                    g.pm[3 * k + ch] = clamp01(*v);
-                }
+                let col = fogged([clamp01(col[0]), clamp01(col[1]), clamp01(col[2])], z, fog);
+                g.pm[3 * k..3 * k + 3].copy_from_slice(&col);
                 g.al[k] = 1.0;
             }
         }
@@ -434,9 +465,12 @@ fn draw_halves(g: &mut Planes, v: View<'_>, hv: Halves<'_>) {
 /// sample within `ow` samples of it: the silhouette from the depth buffer's
 /// discontinuities, read after the atoms and bond halves and before anything
 /// else.  The band carries `ow` rows of halo, so a silhouette crossing a band
-/// boundary is found from both sides.
+/// boundary is found from both sides.  The ink fades with the surface it is
+/// drawn over: it is fogged at the sample's own depth.
+#[allow(clippy::too_many_arguments)]
 fn draw_outline(g: &mut Planes, sr0: usize, hs: usize, total: usize, ow: usize, otau: f64,
-                ocol: &[f64]) {
+                ocol: &[f64], fog: Option<Fog>) {
+    let ink = [ocol[0], ocol[1], ocol[2]];
     let (ext0, ws) = (g.ext0, g.ws);
     let o = ow as i64;
     for iy in sr0..sr0 + hs {
@@ -469,7 +503,7 @@ fn draw_outline(g: &mut Planes, sr0: usize, hs: usize, total: usize, ow: usize, 
             }
             if edge {
                 let k = 3 * (row + ix);
-                g.pm[k..k + 3].copy_from_slice(&ocol[..3]);
+                g.pm[k..k + 3].copy_from_slice(&fogged(ink, z, fog));
             }
         }
     }
@@ -477,8 +511,9 @@ fn draw_outline(g: &mut Planes, sr0: usize, hs: usize, total: usize, ow: usize, 
 
 /// Segments with a width in samples: the cell frame and polyhedron edges
 /// (`depth` true, tested and written like the GUI's line quads), or the
-/// letters (`depth` false, drawn over everything).
-fn draw_flat(g: &mut Planes, sg: Segs<'_>, depth: bool) {
+/// letters (`depth` false, drawn over everything).  Only a depth-tested
+/// segment is fogged, at its own depth; the letters never are.
+fn draw_flat(g: &mut Planes, sg: Segs<'_>, depth: bool, fog: Option<Fog>) {
     let Segs { n, p, half, dir, len, z, col, bx } = sg;
     let (ext0, ext1, ws) = (g.ext0, g.ext0 + g.he, g.ws);
     for i in 0..n {
@@ -505,14 +540,18 @@ fn draw_flat(g: &mut Planes, sg: Segs<'_>, depth: bool) {
                     continue;
                 }
                 let k = row + ix;
-                if depth {
+                let ink = [col[3 * i], col[3 * i + 1], col[3 * i + 2]];
+                let ink = if depth {
                     let zz = za + dz * ((along + h) / span);
                     if zz < g.zb[k] {
                         continue;
                     }
                     g.zb[k] = zz;
-                }
-                g.pm[3 * k..3 * k + 3].copy_from_slice(&col[3 * i..3 * i + 3]);
+                    fogged(ink, zz, fog)
+                } else {
+                    ink
+                };
+                g.pm[3 * k..3 * k + 3].copy_from_slice(&ink);
                 g.al[k] = 1.0;
             }
         }
@@ -520,8 +559,9 @@ fn draw_flat(g: &mut Planes, sg: Segs<'_>, depth: bool) {
 }
 
 /// Polyhedron faces, already in drawing order: blended, depth-tested, and
-/// writing no depth.
-fn draw_tris(g: &mut Planes, v: View<'_>, tr: Tris<'_>, alpha: f64) {
+/// writing no depth.  A face's colour is fogged at the sample's depth before
+/// it is blended.
+fn draw_tris(g: &mut Planes, v: View<'_>, tr: Tris<'_>, alpha: f64, fog: Option<Fog>) {
     let Tris { n, v: tv, area, tie, col, bx } = tr;
     let View { x0, y0, pxs, .. } = v;
     let (ext0, ext1, ws) = (g.ext0, g.ext0 + g.he, g.ws);
@@ -537,7 +577,7 @@ fn draw_tris(g: &mut Planes, v: View<'_>, tr: Tris<'_>, alpha: f64) {
         let (qx, qy, qz) = (t[6], t[7], t[8]);
         let (t0, t1, t2) = (tie[3 * i], tie[3 * i + 1], tie[3 * i + 2]);
         let ar = area[i];
-        let c = &col[3 * i..3 * i + 3];
+        let base = [col[3 * i], col[3 * i + 1], col[3 * i + 2]];
         for iy in iy0..iy1 {
             let y = y0 - (iy as f64 + 0.5) / pxs;
             let row = (iy - ext0) * ws;
@@ -560,6 +600,7 @@ fn draw_tris(g: &mut Planes, v: View<'_>, tr: Tris<'_>, alpha: f64) {
                 if z < g.zb[k] {
                     continue;
                 }
+                let c = fogged(base, z, fog);
                 for ch in 0..3 {
                     g.pm[3 * k + ch] = alpha * c[ch] + (1.0 - alpha) * g.pm[3 * k + ch];
                 }
@@ -622,7 +663,8 @@ unsafe fn resolve(g: &Planes, out: *mut u8, r0: usize, rows: usize, width: usize
 #[allow(clippy::too_many_arguments)]
 unsafe fn band(out: *mut u8, r0: usize, r1: usize, s: usize, height: usize, width: usize,
                v: View<'_>, alpha: f64, bg: Option<&[f64]>, ow: usize, otau: f64, ocol: &[f64],
-               at: Atoms<'_>, hv: Halves<'_>, line: Segs<'_>, tri: Tris<'_>, text: Segs<'_>) {
+               at: Atoms<'_>, hv: Halves<'_>, line: Segs<'_>, tri: Tris<'_>, text: Segs<'_>,
+               fog: Option<Fog>) {
     let (hs, ws, sr0, total) = ((r1 - r0) * s, width * s, r0 * s, height * s);
     let ext0 = sr0.saturating_sub(ow);
     let ext1 = (sr0 + hs).saturating_add(ow).min(total);
@@ -633,29 +675,32 @@ unsafe fn band(out: *mut u8, r0: usize, r1: usize, s: usize, height: usize, widt
         pm: vec![0.0; he * ws * 3],
         al: vec![0.0; he * ws],
     };
-    draw_atoms(&mut g, v, at);
-    draw_halves(&mut g, v, hv);
+    draw_atoms(&mut g, v, at, fog);
+    draw_halves(&mut g, v, hv, fog);
     // the outline reads the surfaces alone, so a line is never inked as one
     if ow > 0 {
-        draw_outline(&mut g, sr0, hs, total, ow, otau, ocol);
+        draw_outline(&mut g, sr0, hs, total, ow, otau, ocol, fog);
     }
-    draw_flat(&mut g, line, true);
-    draw_tris(&mut g, v, tri, alpha);
-    draw_flat(&mut g, text, false);
+    draw_flat(&mut g, line, true, fog);
+    draw_tris(&mut g, v, tri, alpha, fog);
+    draw_flat(&mut g, text, false, None);
     unsafe { resolve(&g, out, r0, r1 - r0, width, s, sr0, bg) };
 }
 
 // --- the bindings ------------------------------------------------------
 
-/// Draw output rows `[r0, r1)` of the picture into `out`, as
-/// `raster._band_numpy` does.  `atom`, `half`, `line`, `tri` and `text` are
-/// `raster._pack`'s tuples of the same names, `look` its shader constants,
-/// `pxs` the samples per Å, and `bg` three channels in 0..1 or `None` for
-/// straight alpha.  `ow` is the outline's radius in samples (0 for none),
-/// `otau` its depth step and `ocol` its colour.
-#[pyfunction]
+/// `render_rows_cued`'s fog as it arrives, before [`render`] checks it.
+struct FogArgs<'py> {
+    z_start: f64,
+    z_end: f64,
+    f_max: f64,
+    colour: PyReadonlyArray1<'py, f64>,
+}
+
+/// Both bindings' checks and their one call of [`band`]; `fog` is `None` for
+/// `render_rows`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn render_rows<'py>(
+fn render<'py>(
     py: Python<'py>,
     r0: usize,
     r1: usize,
@@ -676,6 +721,7 @@ pub(crate) fn render_rows<'py>(
     line: SegArgs<'py>,
     tri: TriArgs<'py>,
     text: SegArgs<'py>,
+    fog: Option<FogArgs<'py>>,
     out: &Bound<'py, PyArray3<u8>>,
 ) -> PyResult<()> {
     if s == 0 {
@@ -727,6 +773,23 @@ pub(crate) fn render_rows<'py>(
         None => None,
     };
     ins.extend([span(look), span(ocol)]);
+    let fog = match &fog {
+        Some(f) => {
+            // the numpy path's refusal, `raster.draw`'s: a NaN end is refused too
+            if f.z_start.is_nan() || f.z_end.is_nan() || f.z_start <= f.z_end {
+                return err(format!("fog starts at z_start = {}, which is not in front of \
+                                    where it ends, z_end = {}", f.z_start, f.z_end));
+            }
+            let (c, nc) = arr("fog_colour", &f.colour, &[])?;
+            if nc != 3 {
+                return err(format!("fog_colour has {nc} entries, not 3"));
+            }
+            ins.push(span(c));
+            Some(Fog { z_start: f.z_start, z_end: f.z_end, f_max: f.f_max,
+                       colour: [c[0], c[1], c[2]] })
+        }
+        None => None,
+    };
     let at = atoms(&atom, &mut ins)?;
     let hv = halves(&half, &mut ins)?;
     let ln = segs("line", &line, &mut ins)?;
@@ -737,9 +800,85 @@ pub(crate) fn render_rows<'py>(
     let o = P(o);
     let v = View { x0, y0, pxs, look };
     py.detach(|| unsafe {
-        band(o.get(), r0, r1, s, height, width, v, alpha, bg, ow, otau, ocol, at, hv, ln, tr, tx)
+        band(o.get(), r0, r1, s, height, width, v, alpha, bg, ow, otau, ocol, at, hv, ln, tr, tx,
+             fog)
     });
     Ok(())
+}
+
+/// Draw output rows `[r0, r1)` of the picture into `out`, as
+/// `raster._band_numpy` does.  `atom`, `half`, `line`, `tri` and `text` are
+/// `raster._pack`'s tuples of the same names, `look` its shader constants,
+/// `pxs` the samples per Å, and `bg` three channels in 0..1 or `None` for
+/// straight alpha.  `ow` is the outline's radius in samples (0 for none),
+/// `otau` its depth step and `ocol` its colour.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_rows<'py>(
+    py: Python<'py>,
+    r0: usize,
+    r1: usize,
+    s: usize,
+    height: usize,
+    x0: f64,
+    y0: f64,
+    pxs: f64,
+    width: usize,
+    look: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    bg: Option<PyReadonlyArray1<'py, f64>>,
+    ow: usize,
+    otau: f64,
+    ocol: PyReadonlyArray1<'py, f64>,
+    atom: AtomArgs<'py>,
+    half: HalfArgs<'py>,
+    line: SegArgs<'py>,
+    tri: TriArgs<'py>,
+    text: SegArgs<'py>,
+    out: &Bound<'py, PyArray3<u8>>,
+) -> PyResult<()> {
+    render(py, r0, r1, s, height, x0, y0, pxs, width, look, alpha, bg, ow, otau, ocol, atom, half,
+           line, tri, text, None, out)
+}
+
+/// [`render_rows`] with depth cueing (WP-1548 D1, 1.5.0), as
+/// `raster._band_numpy` draws with its `fog`: the atoms, bond halves, lines,
+/// outline and faces blend toward `fog_colour` by their own depth, the factor
+/// 0 in front of `z_start`, rising linearly to `f_max` at `z_end` and held
+/// behind it.  The letters are not fogged.  `z_start` must lie in front of
+/// `z_end`, in view coordinates with z toward the viewer.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_rows_cued<'py>(
+    py: Python<'py>,
+    r0: usize,
+    r1: usize,
+    s: usize,
+    height: usize,
+    x0: f64,
+    y0: f64,
+    pxs: f64,
+    width: usize,
+    look: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    bg: Option<PyReadonlyArray1<'py, f64>>,
+    ow: usize,
+    otau: f64,
+    ocol: PyReadonlyArray1<'py, f64>,
+    atom: AtomArgs<'py>,
+    half: HalfArgs<'py>,
+    line: SegArgs<'py>,
+    tri: TriArgs<'py>,
+    text: SegArgs<'py>,
+    z_start: f64,
+    z_end: f64,
+    f_max: f64,
+    fog_colour: PyReadonlyArray1<'py, f64>,
+    out: &Bound<'py, PyArray3<u8>>,
+) -> PyResult<()> {
+    let fog = FogArgs { z_start, z_end, f_max, colour: fog_colour };
+    render(py, r0, r1, s, height, x0, y0, pxs, width, look, alpha, bg, ow, otau, ocol, atom, half,
+           line, tri, text, Some(fog), out)
 }
 
 /// Which atom or bond half is in front at each pixel, as `raster._ids_numpy`

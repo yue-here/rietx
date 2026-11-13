@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * The model pane: an import wizard when there is no project, the structure and
-   * instrument editors when there is.
+   * The model pane: the structure and instrument editors.  Making a project
+   * is the New project dialog's (`NewProject.svelte`, WP-2131), and opening
+   * one is the start screen's.
    *
    * A **mode over the whole window**, not a sixth tab — WP-1013's argument, and
    * for the same reason one rank up: an atom table is eight columns wide and the
-   * sidebar is `clamp(340px, 38%, 560px)`.  It is also the one pane that has to
-   * work with *no project open at all*, which no tab can, so the empty state and
-   * this panel are the same component rather than two that must agree.
+   * sidebar is `clamp(340px, 38%, 560px)`.  (WP-1034 later made it a tab whose
+   * column can take the window.)
    *
    * Every edit here goes one of two ways, and which one is not a taste:
    *
@@ -80,22 +80,8 @@
     varyStillPending,
     type ParamRow,
   } from "../lib/table";
-  import {
-    PRESET_FIELDS,
-    PRESET_TITLES,
-    blocked,
-    createBody,
-    emptyWizard,
-    freeCellFields,
-    patternSummary,
-    presetHelp,
-    seedPreset,
-    typedCellReady,
-    useStructureFrom,
-    structureSummary, applyInstrumentHint, scanCount,} from "../lib/wizard";
   import { MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
   import type { Theme } from "../lib/theme";
-  import Browse from "./Browse.svelte";
   import Splitter from "./Splitter.svelte";
   import Structure3D from "./Structure3D.svelte";
 
@@ -107,13 +93,8 @@
     simple = true,
     active = true,
     columns = null,
-    recent = [],
-    examples = [],
     theme = "light",
     say = (_line: string) => {},
-    onopen = async (_path: string) => "",
-    onexample = async (_name: string, _reset?: boolean) => "",
-    onopened = (_doc: any) => {},
     oncolumns = (_widths: number[], _done: boolean) => {},
     onmoved = () => {},
   }: {
@@ -123,23 +104,12 @@
     busy?: boolean;
     simple?: boolean;
     active?: boolean;
-    /** what `GET /api/recent` last answered — the shell owns the fetch, because
-     *  opening one of these is the shell's verb (WP-1034) */
-    recent?: any[];
-    /** what `GET /api/examples` last answered (WP-1204) — the shipped example
-     *  projects, each with whether it has been built yet */
-    examples?: any[];
     /** the first two columns' widths in px, or `null` while the flex defaults
      *  hold — the shell owns the `ui` key, this pane only reports drags */
     columns?: number[] | null;
     /** passed through to the 3D viewer, whose draw effect depends on it */
     theme?: Theme;
     say?: (line: string) => void;
-    /** open a recent project; resolves to the refusal, or "" if it opened */
-    onopen?: (path: string) => Promise<string>;
-    /** open an example, building it first; `reset` throws the built copy away */
-    onexample?: (name: string, reset?: boolean) => Promise<string>;
-    onopened?: (doc: any) => void;
     oncolumns?: (widths: number[], done: boolean) => void;
     onmoved?: () => void;
   } = $props();
@@ -193,170 +163,6 @@
     widths[i] = next;
     colLocal = widths;
     oncolumns(widths, done);
-  }
-
-  // -- the wizard ----------------------------------------------------
-  let wiz = $state(emptyWizard());
-  let wizardOpen = $state(false);
-  let staging = $state("");
-  let wizError = $state("");
-  /** a refused `Project.open`, in the verb's own words, beside the list that
-   *  asked for it — separate from `wizError`, which is a *staging* failure: a
-   *  verb's refusal and a panel's load error must not share one field (WP-1014) */
-  let openError = $state("");
-  /** `"open"` browses for a project to open, `"pick"` browses for the wizard's
-   *  own directory field — one modal, `null` while closed */
-  let browseMode = $state<"open" | "pick" | null>(null);
-  const showWizard = $derived(!project || wizardOpen);
-
-  /** Open a project and settle the wizard behind it.
-   *
-   * The bug this closes: `onopen` used to be called directly from the
-   * recent-list button with nothing clearing `wizardOpen`, so opening a
-   * *different* project from over an already-open one left the wizard painted
-   * on top of it — `project` stayed truthy the whole time, so nothing ever
-   * re-derived `showWizard`.  Every entry point that can open a project
-   * (the recent list, Browse) now goes through this one function instead of
-   * each carrying its own copy of "and then close the wizard".
-   */
-  async function openPath(path: string): Promise<string> {
-    const refusal = await onopen(path);
-    openError = refusal;
-    if (!refusal) wizardOpen = false;
-    return refusal;
-  }
-
-  /** Browse hands back a *directory to navigate into*, not a project path —
-   *  the browser cannot suggest a new folder's name, only find where it should
-   *  live.  So the trailing name (`<stem>.rex`, already suggested from the
-   *  staged pattern) survives and only its parent moves; a step-4 visit before
-   *  anything is staged has no name to keep, and the picked directory is used
-   *  as-is. */
-  function pickProjectDir(dir: string) {
-    const base = wiz.path.split("/").filter(Boolean).pop();
-    wiz.path = base && wiz.path !== dir ? `${dir}/${base}` : dir;
-    browseMode = null;
-  }
-  const anodes = $derived<any[]>(capabilities?.anodes ?? []);
-  const modes = $derived<string[]>(capabilities?.modes ?? ["rietveld"]);
-  const plans = $derived<any[]>(capabilities?.plans ?? []);
-  /** the reader-keyword vocabulary — a control per option the format declares,
-   *  so a format that adds `scan` gets its picker with no change here */
-  const readerOptions = $derived<any[]>(capabilities?.reader_options ?? []);
-  const cannotCreate = $derived(blocked(wiz));
-
-  async function stage(kind: "pattern" | "cif" | "instrument", event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    staging = kind;
-    wizError = "";
-    try {
-      const options: Record<string, string> =
-        kind === "cif" && wiz.aniso ? { aniso: "1" } : {};
-      const preview = await api.uploadFile(kind, file, options);
-      absorb(kind, preview);
-    } catch (error) {
-      // the reader's own complaint, with its line and column
-      wizError = (error as Error).message;
-    } finally {
-      staging = "";
-      input.value = "";   // so choosing the same file again re-stages it
-    }
-  }
-
-  function absorb(kind: string, preview: any) {
-    if (kind === "pattern") {
-      wiz.pattern = preview;
-      // the *effective* options, so a control cleared by a change of file shows
-      // what this reader honoured rather than what the last one was asked for
-      wiz.readerOptions = { ...(preview.reader_options ?? {}) };
-      // what the file already knows about its instrument. Only on a *new* file:
-      // re-reading for another scan must not undo what a person then typed
-      if (preview.instrument_hint && preview.upload !== hintedUpload) {
-        hintedUpload = preview.upload;
-        wiz = applyInstrumentHint(wiz, preview.instrument_hint);
-      }
-      scanChoices = [];
-      // eager, not on-focus: a count with no labels ("this file holds 3
-      // scans") is half an answer, and the labels cost one extra walk of the
-      // ranges regardless of when they are fetched (WP-1205)
-      if (scanCount(preview) > 1) loadScans();
-      if (!wiz.path) wiz.path = preview.suggested_project;
-      say(`read_pattern("${preview.filename}")  # ${preview.format.name}, `
-        + `${preview.n_points} points`);
-    } else if (kind === "cif") {
-      wiz.structure = preview;
-      say(`structure_from_cif("${preview.filename}", aniso=${preview.aniso ? "True" : "False"})`);
-    } else {
-      wiz.instrument = preview;
-      say(`load_instrument_profile("${preview.filename}")`);
-    }
-  }
-
-  /** Re-read a staged file with different options — no second upload. */
-  /** The staged pattern's scans, labelled — fetched as soon as a multi-scan
-   *  file stages (WP-1205), and empty only while that fetch is in flight. */
-  let scanChoices = $state<any[]>([]);
-  /** which upload the instrument form was seeded from, so re-reading the same
-   *  file for another scan does not overwrite what a person typed since */
-  let hintedUpload = $state("");
-
-  async function loadScans() {
-    if (scanChoices.length || !wiz.pattern) return;
-    try {
-      scanChoices = (await api.patternScans(wiz.pattern.upload)).scans ?? [];
-    } catch {
-      scanChoices = [];        // the numbered fallback below is still a picker
-    }
-  }
-
-  /** Resolve the typed symbol, and take the cell form's boxes from the answer.
-   *
-   * On change rather than on every keystroke: a half-typed symbol is not a
-   * symbol, and a 404 per character would make the error field flicker at
-   * whoever is still typing. What comes back is the same `symbol_facts` the
-   * model panel's phase summary rides on, so what this form says a setting
-   * constrains and what the panel says cannot drift apart.
-   */
-  async function lookupSymbol() {
-    const symbol = wiz.symbol.trim();
-    if (!symbol) { wiz.cellFacts = null; wiz.cellError = ""; return; }
-    try {
-      wiz.cellFacts = await api.spacegroup(symbol);
-      wiz.cellError = "";
-      say(`get_spacegroup("${symbol}")  # ${wiz.cellFacts.constraints}`);
-    } catch (error) {
-      wiz.cellFacts = null;
-      wiz.cellError = (error as Error).message;
-    }
-  }
-
-  async function restage(kind: "pattern" | "cif", options: Record<string, string>) {
-    const held = kind === "pattern" ? wiz.pattern : wiz.structure;
-    if (!held) return;
-    try {
-      absorb(kind, await api.restage(kind, held.upload, options));
-      wizError = "";
-    } catch (error) {
-      wizError = (error as Error).message;
-    }
-  }
-
-  async function create() {
-    wizError = "";
-    try {
-      const body = createBody(wiz);
-      const doc = await api.newProject(body);
-      say(`Project.create("${wiz.path}", pattern=…, structure=…, `
-        + `instrument=${wiz.instrument ? "load_instrument_profile(…)"
-                                       : `Instrument.${wiz.preset}(…)`})`);
-      wizardOpen = false;
-      wiz = emptyWizard();
-      onopened(doc);
-    } catch (error) {
-      wizError = (error as Error).message;
-    }
   }
 
   // -- the editors ---------------------------------------------------
@@ -886,49 +692,18 @@
     return byPath.get(fieldParam(kind, field))?.held_because ?? "";
   }
 
-  /** Open the wizard over an already-open project (the palette's entry). */
-  export function startImport() {
-    wizardOpen = true;
-  }
-
-  /** A preview curve as one SVG path — no plotly, no decimator, 900 points. */
-  function sparkline(curve: any, width = 260, height = 34): string {
-    const xs: number[] = curve?.two_theta ?? [];
-    const ys: number[] = curve?.intensity ?? [];
-    if (xs.length < 2) return "";
-    const x0 = xs[0], x1 = xs[xs.length - 1];
-    const lo = Math.min(...ys), hi = Math.max(...ys);
-    const span = hi - lo || 1;
-    return xs.map((x, i) => {
-      const px = ((x - x0) / (x1 - x0 || 1)) * width;
-      const py = height - ((ys[i] - lo) / span) * height;
-      return `${i ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`;
-    }).join(" ");
-  }
 </script>
 
 <section class="model">
   <header>
-    <h1>{showWizard ? "New project" : "Structure & instrument"}</h1>
-    {#if !showWizard}
-      <button class="ghost" onclick={() => (wizardOpen = true)}>New project…</button>
-    {:else if project}
-      <button class="ghost" onclick={() => (wizardOpen = false)}>Back to the project</button>
-    {:else}
-      <!-- The pure empty state has no App-level header at all (its controls
-           live behind `{#if project}`), so it is the one place "Open…" has
-           nowhere else to point (WP-1205) — with a project open, App's own
-           `Open…` already reaches this same wizard. -->
-      <button class="ghost" disabled={busy} onclick={() => (browseMode = "open")}
-        >Open…</button>
-    {/if}
+    <h1>Structure & instrument</h1>
     <span class="spacer"></span>
-    {#if !showWizard && !noPhases}
+    {#if !noPhases}
       <button class="ghost" class:on={viewer} onclick={() => (viewer = !viewer)}
         title="the cell, the symmetry images, the bonds and the displacement
                ellipsoids — drawn from the model on screen">3D</button>
     {/if}
-    {#if !showWizard && dirty > 0}
+    {#if dirty > 0}
       <span class="muted">{dirty} edit{dirty === 1 ? "" : "s"}</span>
       <button class="ghost" disabled={busy || invalid.length > 0} onclick={apply}>Apply</button>
       <button class="ghost" onclick={revert}>Revert</button>
@@ -1016,354 +791,7 @@
     </div>
   {/snippet}
 
-  {#if showWizard}
-    <!-- ---------------------------------------------------------- -->
-    <div class="wizard">
-      <!-- Opening an existing project belongs where making one is (WP-1034):
-           the empty state used to carry the only recent list, so with a project
-           open there was no route back to it short of restarting the program.
-           Opening one **replaces** this session's project — settings persist on
-           the verb and the history log is already on disk (WP-1005), so there is
-           nothing unsaved to warn about, and a run in flight is refused by
-           `project_open`'s own 409 rather than by a dialog here. -->
-      {#if recent.length}
-        <section class="recent">
-          <h2>Open a recent project</h2>
-          <ul>
-            {#each recent as entry (entry.path)}
-              <li>
-                <button class="ghost" disabled={busy}
-                  onclick={() => openPath(entry.path)}
-                  >{entry.name}</button>
-                <span class="muted mono">{entry.path}</span>
-              </li>
-            {/each}
-          </ul>
-          {#if openError}<p class="bad">{openError}</p>{/if}
-          <p class="muted">
-            Opening one replaces the project in this session; nothing is unsaved.
-          </p>
-        </section>
-      {/if}
-      <!-- The other half of the empty state (WP-1204): projects that already
-           exist, for someone who has nothing of their own to open yet.  The
-           first open copies one into the state directory, so what a person
-           then does to it is theirs and the shipped inputs stay read-only. -->
-      {#if examples.length}
-        <section class="examples">
-          <h2>Open an example</h2>
-          <ul>
-            {#each examples as ex (ex.name)}
-              <li>
-                <button class="pick" disabled={busy}
-                  title="open this example"
-                  onclick={async () => { openError = await onexample(ex.name); }}>
-                  <strong>{ex.title}</strong>
-                  <span class="muted">{ex.description}</span>
-                </button>
-                {#if ex.built}
-                  <button class="ghost" disabled={busy}
-                    title="throw this copy away and build it again"
-                    onclick={async () => {
-                      openError = await onexample(ex.name, true); }}>Reset</button>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-          <p class="muted">
-            The first open makes your own copy, so anything you change stays
-            yours. Reset builds it again.
-          </p>
-        </section>
-      {/if}
-      <!-- The third thing in this block (WP-1205): the recent list only knows
-           what this machine has opened before and the examples are this
-           build's own, so browsing is what reaches everything else. -->
-      <section class="browse">
-        <button class="ghost" disabled={busy} onclick={() => (browseMode = "open")}
-          >Browse for a project…</button>
-      </section>
-      <ol class="steps">
-        <li class:done={!!wiz.pattern}>
-          <h2>1 · Pattern</h2>
-          <label class="file">
-            <input type="file" onchange={(e) => stage("pattern", e)} />
-            <span>{staging === "pattern" ? "reading…" : "Choose a data file"}</span>
-          </label>
-          {#if wiz.pattern}
-            <p class="summary mono">{patternSummary(wiz.pattern)}</p>
-            <svg class="spark" viewBox="0 0 260 34" preserveAspectRatio="none"
-              aria-label="pattern preview">
-              <path d={sparkline(wiz.pattern.curve)} />
-            </svg>
-            <p class="muted">
-              claimed by
-              <Help text="{wiz.pattern.format.sniff} σ: {wiz.pattern.format.sigma}"
-                title="How this file was read">{wiz.pattern.format.name}</Help>
-            </p>
-            {#each readerOptions.filter((o: any) =>
-                wiz.pattern.format.options.includes(o.name)) as opt (opt.name)}
-              <label class="inline">
-                <Help for="reader_options:{opt.name}">{opt.name}</Help>
-                {#if opt.name === "scan" && scanCount(wiz.pattern) > 1}
-                  <!-- a picker, not a number box: "scan 1" tells nobody which
-                       measurement it is, which is why ScanInfo carries a
-                       label — eagerly fetched the moment a multi-scan file
-                       stages (`absorb`), so the numbers below are the normal
-                       case rather than a placeholder waiting for a click. -->
-                  <select class="mono" value={wiz.readerOptions.scan ?? "0"}
-                    onfocus={loadScans} onpointerdown={loadScans}
-                    onchange={(e) => {
-                      const v = (e.currentTarget as HTMLSelectElement).value;
-                      wiz.readerOptions = { ...wiz.readerOptions, scan: v };
-                      restage("pattern", Object.fromEntries(
-                        Object.entries(wiz.readerOptions).filter(([, s]) => s !== "")));
-                    }}>
-                    {#each Array.from({ length: scanCount(wiz.pattern) }, (_, i) => i) as i (i)}
-                      <option value={String(i)}>
-                        {scanChoices[i]?.label ?? `scan ${i}`}
-                      </option>
-                    {/each}
-                  </select>
-                {:else}
-                  <input class="mono" value={wiz.readerOptions[opt.name] ?? ""}
-                    inputmode={opt.kind === "int" ? "numeric" : undefined}
-                    onchange={(e) => {
-                      const v = (e.currentTarget as HTMLInputElement).value.trim();
-                      wiz.readerOptions = { ...wiz.readerOptions, [opt.name]: v };
-                      restage("pattern", Object.fromEntries(
-                        Object.entries(wiz.readerOptions).filter(([, s]) => s !== "")));
-                    }} />
-                {/if}
-              </label>
-              {#if opt.name === "scan" && scanCount(wiz.pattern) > 1}
-                <!-- the count and the default are both stated, never implied
-                     by a picker's starting position (WP-1205) — the reader's
-                     own default is scan 0, flagged server-side by
-                     PATTERN_MULTISCAN_DEFAULTED when nobody chose otherwise -->
-                <p class="muted">
-                  this file holds {scanCount(wiz.pattern)} scans; reading scan
-                  {Number(wiz.readerOptions.scan ?? "0") + 1} of {scanCount(wiz.pattern)}
-                  {#if scanChoices[Number(wiz.readerOptions.scan ?? "0")]?.label}
-                    ({scanChoices[Number(wiz.readerOptions.scan ?? "0")].label})
-                  {/if}
-                </p>
-              {/if}
-            {/each}
-            <!-- what the reader repaired or assumed: a reversed scan, a dropped
-                 duplicate, an option that did not apply. The wizard is where a
-                 human should see a repair, before it becomes a project. -->
-            {#each wiz.pattern.diagnostics ?? [] as note (note.code + note.message)}
-              <p class="{note.level === 'error' ? 'bad' : note.level === 'warning' ? 'warn' : 'info'}">
-                <span class="mono">{note.code}</span> {note.message}
-              </p>
-            {/each}
-          {/if}
-        </li>
-
-        <li class:done={wiz.structureFrom === "none" ? true
-          : wiz.structureFrom === "cell"
-          ? typedCellReady(wiz) : !!wiz.structure}>
-          <h2>2 · Structure</h2>
-          <!-- Three answers to one step (WP-1206, WP-1207). A CIF says where
-               the atoms are; a cell says only where the peaks are, which is all
-               a powder pattern of an unknown phase supports — so it creates the
-               same Le Bail scaffold the indexing panel's Adopt button lands;
-               and "None yet" says neither, which is the honest answer before
-               the pattern has been indexed. The third is marked done as soon as
-               it is chosen: there is nothing left to answer. -->
-          <div class="segmented" role="group" aria-label="structure source">
-            <button class:on={wiz.structureFrom === "cif"}
-              onclick={() => (wiz = useStructureFrom(wiz, "cif"))}>CIF file</button>
-            <button class:on={wiz.structureFrom === "cell"}
-              onclick={() => (wiz = useStructureFrom(wiz, "cell"))}>Type a cell</button>
-            <button class:on={wiz.structureFrom === "none"}
-              onclick={() => (wiz = useStructureFrom(wiz, "none"))}>None yet</button>
-          </div>
-          {#if wiz.structureFrom === "none"}
-            <p class="muted">
-              The project opens on the pattern alone. Pick peaks and index them
-              in the Peaks panel, then adopt a candidate cell — that is what
-              gives the project its phase. Refining is unavailable until it has
-              one.
-            </p>
-          {:else if wiz.structureFrom === "cell"}
-            <label class="inline">
-              <span class="muted">space group</span>
-              <input class="mono sym" bind:value={wiz.symbol}
-                placeholder="R -3 c" onchange={lookupSymbol} />
-            </label>
-            {#if wiz.cellFacts}
-              <!-- the server's own two sentences about this symbol, from the
-                   same `symbol_facts` the model panel's phase summary rides on.
-                   Joined rather than labelled "holds:", which a triclinic
-                   symbol turns into "holds: every cell parameter is free". -->
-              <p class="muted">{wiz.cellFacts.setting}; {wiz.cellFacts.constraints}</p>
-              <div class="grid">
-                {#each freeCellFields(wiz) as name (name)}
-                  <label class="cell">
-                    <span class="muted"><Help for="parameters:phases.*.cell.{name}"
-                      >{CELL_GLYPH[name] ?? name}</Help>{name in CELL_GLYPH
-                        ? " (°)" : " (Å)"}</span>
-                    <!-- no placeholder: the instrument form's say "default",
-                         a word, because a grey *number* reads as a value that
-                         was filled in for you (WP-1014's wrong-pre-fill rule).
-                         There is no default here, so there is nothing to say. -->
-                    <input class="mono" bind:value={wiz.cell[name]} />
-                  </label>
-                {/each}
-              </div>
-              <p class="muted">
-                Only these are yours to give; the rest follow from the symmetry.
-                There are no atoms, so the fit extracts each reflection's
-                intensity instead of computing it.
-              </p>
-            {/if}
-            {#if wiz.cellError}<p class="bad">{wiz.cellError}</p>{/if}
-          {:else}
-          <label class="file">
-            <input type="file" accept=".cif" onchange={(e) => stage("cif", e)} />
-            <span>{staging === "cif" ? "reading…" : "Choose a CIF"}</span>
-          </label>
-          {#if wiz.structure}
-            <p class="summary mono">{structureSummary(wiz.structure)}</p>
-            <label class="inline" title={wiz.structure.aniso_available
-              ? "keeps the file's U^ij instead of collapsing them to U_eq"
-              : "this file carries no _atom_site_aniso_U_ij loop"}>
-              <input type="checkbox" checked={wiz.aniso}
-                disabled={!wiz.structure.aniso_available}
-                onchange={(e) => {
-                  wiz.aniso = (e.currentTarget as HTMLInputElement).checked;
-                  restage("cif", wiz.aniso ? { aniso: "1" } : {});
-                }} />
-              anisotropic ADPs
-              <span class="muted">
-                {#if wiz.structure.aniso_available}
-                  the file has a loop — off by default, because reading a file must
-                  not change what a plan frees
-                {:else}
-                  no aniso loop in this file{wiz.structure.aniso_error
-                    ? ` (${wiz.structure.aniso_error})` : ""}
-                {/if}
-              </span>
-            </label>
-            {#if wiz.structure.unknown_species.length}
-              <p class="bad">
-                {wiz.structure.unknown_species.length} atom(s) carry a species with no
-                form factor here: {wiz.structure.unknown_species
-                  .map((u: any) => `${u.label} (${u.species})`).join(", ")}
-              </p>
-            {/if}
-          {/if}
-          {/if}
-        </li>
-
-        <li class:done={!!wiz.instrument || wiz.preset !== ""}>
-          <h2>3 · Instrument</h2>
-          {#if wiz.instrument}
-            <p class="summary mono">
-              {wiz.instrument.filename} · {wiz.instrument.summary.geometry} ·
-              λ {wiz.instrument.summary.wavelengths.join(", ")} Å · frozen
-            </p>
-            <button class="ghost" onclick={() => (wiz.instrument = null)}>
-              Use the form instead</button>
-          {:else}
-            <!-- there is no default `Instrument` to fall back on silently — an
-                 anode nobody chose would put a wavelength nobody chose into
-                 every refined cell — so the wizard states what it *did*
-                 assume instead: the file's own header when it named one,
-                 otherwise the preset's own initial values (WP-1205). -->
-            {#if wiz.pattern?.instrument_hint}
-              <p class="muted">
-                assumed from the file's own header — {wiz.pattern.instrument_hint.why}
-              </p>
-            {:else if PRESET_FIELDS[wiz.preset].some((f) => f.kind === "anode")}
-              <p class="muted">
-                assumed {PRESET_TITLES[wiz.preset]}; change the anode below if
-                that is not what measured this pattern
-              </p>
-            {/if}
-            <select value={wiz.preset} disabled={busy}
-              onchange={(e) => (wiz = seedPreset(wiz,
-                (e.currentTarget as HTMLSelectElement).value))}>
-              {#each Object.keys(PRESET_FIELDS) as name (name)}
-                <option value={name}>{PRESET_TITLES[name]}</option>
-              {/each}
-            </select>
-            <div class="grid">
-              {#each PRESET_FIELDS[wiz.preset] as field (field.name)}
-                <label class="cell" class:fullrow={field.kind === "anode"}>
-                  <span class="muted"><Help for={presetHelp(field)}
-                    >{field.label}</Help>{field.unit ? ` (${field.unit})` : ""}</span>
-                  {#if field.kind === "anode"}
-                    <select class="mono"
-                      value={wiz.values[field.name] ?? field.initial ?? ""}
-                      onchange={(e) => (wiz.values[field.name] =
-                        (e.currentTarget as HTMLSelectElement).value)}>
-                      {#each anodes as anode (anode.name)}
-                        <option value={anode.name}>
-                          {anode.name} — {anode.wavelengths.map((w: number) => w.toFixed(5)).join(", ")} Å
-                        </option>
-                      {/each}
-                    </select>
-                  {:else}
-                    <input class="mono" value={wiz.values[field.name] ?? ""}
-                      placeholder={field.kind === "optnumber" ? "default" : ""}
-                      oninput={(e) => (wiz.values[field.name] =
-                        (e.currentTarget as HTMLInputElement).value)} />
-                  {/if}
-                </label>
-              {/each}
-            </div>
-            <label class="file">
-              <input type="file" onchange={(e) => stage("instrument", e)} />
-              <span>…or load a saved instrument profile</span>
-            </label>
-          {/if}
-        </li>
-
-        <li class:done={!!wiz.path}>
-          <h2>4 · Project</h2>
-          <label class="inline">
-            <span class="muted">directory</span>
-            <input class="mono wide" bind:value={wiz.path}
-              placeholder="/path/to/my_sample.rex" />
-            <button class="ghost" onclick={() => (browseMode = "pick")}>Browse…</button>
-          </label>
-          <div class="grid">
-            <label class="cell fullrow"><span class="muted">mode</span>
-              <!-- a typed cell carries no atoms, so rietveld is not a mode it
-                   can be created in; the server refuses it rather than
-                   overriding a chosen mode, and this is what makes the refusal
-                   unreachable from the form (WP-1206) -->
-              <select bind:value={wiz.mode}>
-                {#each modes as m (m)}
-                  <option value={m}
-                    disabled={m === "rietveld" && wiz.structureFrom === "cell"}
-                    >{m}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="cell fullrow"><span class="muted">plan</span>
-              <select bind:value={wiz.plan}>
-                {#each plans as p (p.name)}
-                  <option value={p.name} title={p.when_to_use}>{p.title}</option>
-                {/each}
-              </select>
-            </label>
-          </div>
-        </li>
-      </ol>
-
-      {#if wizError}<p class="bad">{wizError}</p>{/if}
-      <div class="create">
-        <button class:ghost={!!project} disabled={!!cannotCreate || busy}
-          onclick={create}>Create project</button>
-        <span class="muted">{cannotCreate
-          || "nothing is written until this — every file has already been read, and the directory above is made now if it does not exist"}</span>
-      </div>
-    </div>
-  {:else if structure && instrument}
+  {#if structure && instrument}
     <!-- ---------------------------------------------------------- -->
     <p class="muted caption">
       A box beside a value frees it for the next fit, through the same
@@ -1814,10 +1242,6 @@
   {/if}
 </section>
 
-{#if browseMode}
-  <Browse mode={browseMode} onclose={() => (browseMode = null)}
-    onopen={openPath} onpick={pickProjectDir} />
-{/if}
 
 <style>
   /* The form's two widths, each written once (WP-1216).  `--w-num` is what a
@@ -1883,129 +1307,37 @@
     margin: var(--s1) 0;
   }
 
-  .wizard {
-    overflow: auto;
-    padding: 10px clamp(12px, 6vw, 80px) 30px;
-  }
 
-  ol.steps {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-width: 90ch;
-  }
 
-  section.recent {
-    max-width: 90ch;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--line);
-  }
 
-  section.recent ul {
-    margin: 2px 0 4px;
-    padding: 0;
-    list-style: none;
-  }
 
-  section.recent li {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin: 2px 0;
-    min-width: 0;
-  }
 
   /* the path is the disambiguator and the name is the target: clip the path */
-  section.recent li span {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
 
-  section.examples {
-    max-width: 90ch;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--line);
-  }
 
-  section.examples ul {
-    margin: 2px 0 4px;
-    padding: 0;
-    list-style: none;
-  }
 
   /* `.pick` gives up its box because the *row* is the target, which means the
      row has to say so — "what says selected is the row's background, not a
      control's chrome" (app.css).  Without this the three examples read as
      three paragraphs of prose that happen to be clickable; found by looking at
      the page, and invisible to jsdom, which has no hover and no cursor. */
-  section.examples li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 1px 0;
-    padding: 4px 6px;
-    border-radius: var(--r-control);
-    min-width: 0;
-  }
 
-  section.examples li:hover:has(.pick:not(:disabled)) {
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
-  }
 
   /* the row is the target, and `.pick` is the one register app.css lets a
      panel lay out — a block, not a flex row, because the description is a
      sentence that has to wrap rather than a label that can be clipped */
-  section.examples li .pick {
-    flex: 1;
-    min-width: 0;
-    display: block;
-  }
 
-  section.examples li .pick strong {
-    display: block;
-  }
 
-  ol.steps li {
-    border-left: 2px solid var(--line);
-    padding: 0 0 10px 14px;
-    margin: 0;
-  }
 
   /* `.segmented` is `display: flex`, and every other use in the app sits in a
      flex row already; a wizard step is a block, so the register stretched to
      the full 90ch and drew a rule across the page (found in a browser, and
      invisible to jsdom, which lays nothing out).  A width, not a size: what the
      register owns is how tall the buttons are and how they are padded. */
-  ol.steps .segmented {
-    width: max-content;
-    max-width: 100%;
-  }
 
-  ol.steps li.done {
-    border-left-color: var(--ok);
-  }
 
-  .summary {
-    margin: var(--s2) 0;
-    font-size: var(--text-sm);
-  }
 
-  svg.spark {
-    width: 100%;
-    max-width: 520px;
-    height: 34px;
-    display: block;
-  }
 
-  svg.spark path {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
 
   .inline-file {
     font-weight: 400;
@@ -2019,13 +1351,6 @@
     flex-wrap: wrap;
   }
 
-  .create {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 14px;
-    max-width: 90ch;
-  }
 
   .editors {
     display: flex;
@@ -2267,10 +1592,6 @@
 
   input.narrow {
     width: 72px;
-  }
-
-  input.wide {
-    width: min(60ch, 100%);
   }
 
   .fixed {
