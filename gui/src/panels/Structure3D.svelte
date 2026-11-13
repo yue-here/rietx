@@ -40,6 +40,7 @@
     buildScene,
     caption,
     elements,
+    fillLabel,
     focusedPolyhedra,
     legend,
     onDarkGround,
@@ -148,6 +149,12 @@
   let polyFormulas = $state(new Map<string, boolean>());
   /** Export the PNG on a transparent background rather than the panel's. */
   let transparent = $state(false);
+  /** depth cueing (WP-1548): off by default, a drawing choice like the rest of
+   *  the drawer, so session-local and never stored in the project */
+  let depthCue = $state(false);
+  /** fill the drawing's planar rings (WP-1548): the server finds them
+   *  (`geometry.rings`), off by default like the depth cue */
+  let planarRings = $state(false);
   /** What is under the pointer: the readout strip's one line (WP-1213's rule —
    *  a box over the picture covers the thing it describes). */
   let reading = $state("");
@@ -196,6 +203,7 @@
     if (!canvas) return;
     renderer = createRenderer(canvas);
     unsupported = renderer === null;
+    renderer?.setDepthCue(untrack(() => depthCue));
     const observer = typeof ResizeObserver === "undefined"
       ? null : new ResizeObserver(() => schedule());
     observer?.observe(canvas);
@@ -217,6 +225,7 @@
     void mode;
     void hidden;
     void showBoundary;
+    void planarRings;
     void exaggeration;
     void theme;
     void shown;
@@ -289,7 +298,8 @@
     // letters take the same colour, so frame and labels read as one object.
     const cell = style.getPropertyValue("--accent").trim() || "#c65d0a";
     scene = buildScene(theme === "dark" ? onDarkGround(geometry) : geometry,
-                       { mode, hidden, showBoundary, exaggeration, cell, polyhedra: shown });
+                       { mode, hidden, showBoundary, exaggeration, cell, polyhedra: shown,
+                         fills: planarRings ? geometry.rings ?? [] : [] });
     renderer?.setScene(scene);
     paint();
   }
@@ -430,7 +440,10 @@
       // a face only where no atom or stick is under the pointer: the faces
       // are translucent, and the centre atom inside them stays readable
       const face = pickFace(scene, view, width, height, x, y);
-      reading = face ? polyhedronLabel(geo, geo.polyhedra[scene.faces[face.faces].index]) : "";
+      const hit = face ? scene.faces[face.faces] : null;
+      reading = !hit ? ""
+        : hit.kind === "polyhedron" ? polyhedronLabel(geo, geo.polyhedra[hit.index])
+        : fillLabel(geo, (geo.rings ?? [])[hit.index]);
     }
   }
 
@@ -502,7 +515,10 @@
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
     say(`# saved ${name}, ${png.width} × ${png.height} px`
-      + (transparent ? " on a transparent background" : ""));
+      + (transparent ? " on a transparent background" : "")
+      // fog fades toward the background, and a transparent one has no colour
+      // to fade toward (WP-1548 D3), so the export says it drew none
+      + (transparent && depthCue ? ", without the depth cue" : ""));
   }
 </script>
 
@@ -682,6 +698,20 @@
           <input type="checkbox" checked={showBoundary}
             onchange={(e) => (showBoundary = (e.currentTarget as HTMLInputElement).checked)} />
           images outside the cell
+        </label>
+        <label class="inline">
+          <input type="checkbox" checked={depthCue}
+            onchange={(e) => {
+              depthCue = (e.currentTarget as HTMLInputElement).checked;
+              renderer?.setDepthCue(depthCue);
+              schedule();
+            }} />
+          depth cue
+        </label>
+        <label class="inline">
+          <input type="checkbox" checked={planarRings}
+            onchange={(e) => (planarRings = (e.currentTarget as HTMLInputElement).checked)} />
+          fill planar rings
         </label>
         <label class="inline">
           <input type="checkbox" checked={transparent}

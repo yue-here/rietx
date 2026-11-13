@@ -1698,7 +1698,7 @@ class GuiSession:
                 raise GuiError(str(exc), where=[what]) from None
         structure = self._need_project().refinement.structure
         try:
-            return geometry.build(
+            built = geometry.build(
                 structure, int(phase), probability=float(probability),
                 bond_tolerance=(geometry.BOND_TOLERANCE if bond_tolerance is None
                                 else float(bond_tolerance)), disorder=disorder,
@@ -1708,6 +1708,13 @@ class GuiSession:
                            where=["phase"]) from None
         except ValueError as exc:
             raise GuiError(str(exc), where=["probability"]) from None
+        # the planar rings ride with the drawing they were found on, for the
+        # drawer's "fill planar rings" (WP-1548); a ring is the server's to find
+        # as a polyhedron is, and the walk is bounded (rings.MAX_RING_DEGREE)
+        from ..viz.figure3d import rings
+
+        built["rings"] = rings.ring_fills(built)
+        return built
 
     def instrument(self) -> dict:
         return {"instrument": self._need_project().refinement.instrument.model_dump(
