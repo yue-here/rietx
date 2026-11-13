@@ -74,9 +74,13 @@ from .model.absorption import (
 )
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import (
+    AXIAL_PATHS,
     PHASE_SUPPORT_SIGMA,
     CompiledModel,
     Mode,
+    apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1603,14 +1607,6 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
         for p in moved)
 
 
-#: The FCJ axial ratios.  They shape every phase reflection and nothing else
-#: (``extra_peak_curve`` applies no FCJ), so they reach the pattern through
-#: phase peaks alone.  Named here because ``scalar_chain_supported`` leaves
-#: them out for a different reason: they move the quadrature nodes, so their
-#: Jacobian column is not the per-peak chain's.
-_AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
-
-
 def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     """Whether instrument entry ``path`` reaches the pattern only through the
     phases' reflections (WP-2049).
@@ -1625,8 +1621,14 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     chain does not claim (a TOF bank's calibration, say) stays free: the
     conservative answer, since a wrong hold freezes a measurement.
     """
+    # The FCJ axial ratios (``forward.AXIAL_PATHS``) shape every phase
+    # reflection and nothing else (``extra_peak_curve`` applies no FCJ), so
+    # they reach the pattern through phase peaks alone.  Named here because
+    # ``scalar_chain_supported`` leaves them out for a different reason: they
+    # move the quadrature nodes, so their Jacobian column is not the per-peak
+    # chain's.
     return path.startswith("instrument.") and (
-        path in _AXIAL_PATHS or model.scalar_chain_supported(path))
+        path in AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
 def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
@@ -5014,7 +5016,8 @@ class Refinement:
                    ftol: float | None = None,
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
-                   window_area_tol: float | None = None):
+                   window_area_tol: float | None = None,
+                   refined_before: frozenset[str] = frozenset()):
         """One stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
@@ -5034,6 +5037,12 @@ class Refinement:
         release, its collapse and the default cell window.  ``None`` switches all four off, and the answer's
         significance is then read against the default for
         ``PHASE_UNCONSTRAINED`` alone.
+
+        ``refined_before`` is every path an earlier stage of this fit left
+        free (WP-1955): the aperture lift below skips those, since a ratio an
+        earlier stage walked back to zero is where the data put it.  A row the
+        caller freed by hand before the call is *not* in it, so
+        :meth:`run_stage`, which passes none, lifts it.
         """
         # the threshold the answer's significance is read against: the hold's
         # own, or the default where there is no hold and only the report reads
@@ -5099,13 +5108,25 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
+        # an FCJ aperture this stage frees on zero starts off it, since its
+        # column there is nearly zero; before the plan's own seed, which then
+        # finds it off its floor.  Not one an earlier stage of this fit
+        # refined, so a closing stage that names it again leaves it where the
+        # data put it, while a row freed by hand and then run is lifted
+        # (WP-1955)
+        lift = apertures_to_lift([p for p in freed if p not in refined_before])
         seeded: dict[str, float] = {}
+        for path in lift:
+            # the partner's live value, so S/L's lift is already in it
+            start = axial_lift_start(
+                path, table.decode(table.x0())[axial_partner(path)])
+            seeded.update(dict.fromkeys(table.seed_floored([path], start), start))
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
             # roughness at b = 0 is the identity, and its stage starts b in
             # the band the data can see (WP-1938)
-            seeded = dict.fromkeys(table.seed_floored(freed, stage.seed),
-                                   stage.seed)
+            seeded.update(dict.fromkeys(
+                table.seed_floored(freed, stage.seed), stage.seed))
         strain_seeded: list[str] = []
         if stage.strain_seed:
             # the Stephens DOFs are unbounded below, so the seed above never
@@ -6229,6 +6250,9 @@ class Refinement:
         #: the closing stage does for every finding the last declared stage
         #: made (WP-2002).  Each stage's own list stays on its report and node.
         restated: dict[tuple, Diagnostic] = {}
+        #: what an earlier stage of this fit left free (the aperture lift's
+        #: gate, WP-1955)
+        refined_before: set[str] = set()
         for k, (stage, ftol, window_tol) in enumerate(
                 zip(stages, ftols, window_tols, strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
@@ -6240,7 +6264,9 @@ class Refinement:
                     # starts from that answer as well as the screen (WP-1523)
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
-                    window_area_tol=window_tol)
+                    window_area_tol=window_tol,
+                    refined_before=frozenset(refined_before))
+            refined_before.update(table.free_paths)
             # WP-1343: the moment's rung at this boundary, and the shift the
             # moment took when the widths were released.  Gated on what the
             # stage actually freed, so an ordinary fit never pays for the

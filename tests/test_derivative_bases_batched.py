@@ -53,7 +53,21 @@ from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
 
-H_POS, H_AX = 1e-5, 1e-7  # the shipped FD steps (derivative_bases)
+H_POS, H_AX = 1e-5, 3e-6  # the shipped FD steps (derivative_bases)
+
+
+def _ax_derivs(pos_k, sl, hl, n_fcj, which, phi, om):
+    """The aperture node derivatives by the scalar routine, written out from
+    ``forward._aperture_node_derivs``' rule: second order, forward, mirrored
+    where the aperture lies under the other by at most 2h (WP-1955)."""
+    own, other = (sl, hl) if which == 0 else (hl, sl)
+    h = (-H_AX if 0.0 < other - own <= 2.0 * H_AX and own >= 2.0 * H_AX
+         else H_AX)
+    f = [fcj_offsets_weights(pos_k, sl + (k * h if which == 0 else 0.0),
+                             hl + (k * h if which == 1 else 0.0), n_fcj)
+         for k in (1.0, 2.0)]
+    return tuple((4.0 * f[0][i] - 3.0 * base - f[1][i]) / (2.0 * h)
+                 for i, base in enumerate((phi, om)))
 
 
 @pytest.fixture(autouse=True)
@@ -132,13 +146,11 @@ def _scalar_reference(model, values, *, axial_derivs=True):
                 d_pos = (dom @ pv) - ((om * dphi) @ d_dx)
                 d_sl = d_hl = None
                 if axial_derivs and fcj_live(sl, hl):
-                    phi2, om2 = fcj_offsets_weights(float(pos[k]),
-                                                    sl + H_AX, hl, n_fcj)
-                    dphi, dom = (phi2 - phi) / H_AX, (om2 - om) / H_AX
+                    dphi, dom = _ax_derivs(float(pos[k]), sl, hl, n_fcj, 0,
+                                           phi, om)
                     d_sl = (dom @ pv) - ((om * dphi) @ d_dx)
-                    phi3, om3 = fcj_offsets_weights(float(pos[k]),
-                                                    sl, hl + H_AX, n_fcj)
-                    dphi, dom = (phi3 - phi) / H_AX, (om3 - om) / H_AX
+                    dphi, dom = _ax_derivs(float(pos[k]), sl, hl, n_fcj, 1,
+                                           phi, om)
                     d_hl = (dom @ pv) - ((om * dphi) @ d_dx)
                 rows.append((il, k, int(i0), int(i1),
                              om @ pv, d_pos, om @ d_dg, om @ d_de, d_sl, d_hl))
@@ -168,15 +180,14 @@ def _term_sizes(model, values, ip, il, k, n_fcj):
         x[None, :] - phi[:, None], float(gamma[k]), float(eta[k])))
     om_abs = np.abs(om)
 
-    def chained(pos_k, sl_k, hl_k, h):
-        phi1, om1 = fcj_offsets_weights(pos_k, sl_k, hl_k, n_fcj)
-        dphi, dom = (phi1 - phi) / h, (om1 - om) / h
+    def mixed(dphi, dom):
         return np.abs(dom) @ pv + np.abs(om * dphi) @ d_dx
 
-    return [om_abs @ pv, chained(float(pos[k]) + H_POS, sl, hl, H_POS),
+    phi1, om1 = fcj_offsets_weights(float(pos[k]) + H_POS, sl, hl, n_fcj)
+    return [om_abs @ pv, mixed((phi1 - phi) / H_POS, (om1 - om) / H_POS),
             om_abs @ d_dg, om_abs @ d_de,
-            chained(float(pos[k]), sl + H_AX, hl, H_AX),
-            chained(float(pos[k]), sl, hl + H_AX, H_AX)], len(om)
+            mixed(*_ax_derivs(float(pos[k]), sl, hl, n_fcj, 0, phi, om)),
+            mixed(*_ax_derivs(float(pos[k]), sl, hl, n_fcj, 1, phi, om))], len(om)
 
 
 def _compare(model, values):

@@ -615,6 +615,15 @@ old polynomial. At x ≥ 1e-3 the two slopes agree to the last digit. The other
 nine states reproduced bit-for-bit and were not re-captured. Both recaptured
 states pass twice over.
 
+**WP-1955 re-baseline (2026-11-02)**: `srm660c` and `toy_rich` again, the two
+states that free the axial apertures, on macOS 26.7.2 arm64 (Python 3.12.10,
+numpy 2.5.4, scipy 1.18.1). The FCJ node derivatives became a second-order
+forward difference at 3e-6 in place of a first-order one at 1e-7. Only the two
+aperture columns of `jacobian` moved: by 1.1e-5 of their norm in `srm660c`,
+and by 6.7e-6 (S/L) and 3.0e-6 (H/L) in `toy_rich`. Every other key is
+bit-identical. The other eight states reproduced bit-for-bit and were not
+re-captured.
+
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  **WP-1002
 measured which half of that sentence is true.**  The *numpy* half is not:

@@ -1621,7 +1621,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
                   " plan glob (WP-1435)")),
     Row("rietx.schemas.results.StageResult.seeded", "action", tier=3, ambiguity=1,
-        evidence=("the one shipped seed is _ROUGHNESS_STAGE's 0.3, recorded per model. Suortti's "
+        evidence=("the one shipped seed of a stage's own is _ROUGHNESS_STAGE's 0.3, recorded per "
+                  "model; the runner also writes a row here itself, an FCJ axial ratio a stage "
+                  "newly frees on zero, started at AXIAL_SL_START / AXIAL_HL_START (WP-1955, "
+                  "whose rows carry that evidence). Suortti's "
                   "b: start-invariant from 0.3 and 0 on five lab patterns from three families "
                   "(NIST LaB6, GSAS-II FAP, CPD corundum, fluorite, zincite), every Biso, scale "
                   "and b within 2.7e-3 of the smaller esd (tests/test_seed_invariance.py). "
@@ -1630,7 +1633,9 @@ ROWS: tuple[Row, ...] = (
                   "esd; no program supplies a Pitschke start (FullProf's examples start at "
                   "1.2-1.5; docs/practice.md). Since B14 the field also records "
                   "Stage.strain_seed's Stephens rows, whose start is STRAIN_SEED_PPM's row"),
-        grounds=("The seeding action is the stage's, recorded in the field; Suortti's start is "
+        grounds=("The seeding action is the stage's, recorded in the field, except the axial "
+                 "lift, which is the runner's own and fires on every stage that newly frees a "
+                 "ratio on zero (WP-1955, amended for the review of #1372); Suortti's start is "
                  "answer-invariant and Pitschke's is kept at 0.3 because from 0.3 the fit reaches "
                  "the switched-off branch inside the model's valid range, while from 0 the lower "
                  "chi2 is one the model flags as invalid (the sixth round's Q3, ruled (c) "
@@ -2696,6 +2701,48 @@ ROWS: tuple[Row, ...] = (
                  "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
                  "floor of its own."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.AXIAL_SL_START", "constant", tier=3, value=0.02,
+        evidence=("where a stage starts S/L when it frees one sitting on zero (WP-1955); no code "
+                  "needs it to equal AXIAL_SIZING_FLOOR, which compile_model reads as "
+                  "max(value, floor): moving the start alone over 0.05, 0.02, 0.01, 0.005, 0.002 "
+                  "and 0.001 returned S/L 0.0453117 +- 0.00018 and Rwp 0.06304 every time (one "
+                  "pattern, #1075 repro 1 under lab_bragg_brentano, the review of #1372); fails "
+                  "where the pair starts equal: synthetic rutile at lab counts (strongest line "
+                  "about 68 000), a stage freeing only the two ratios from 0/0, ended on the "
+                  "S/L = H/L line in 4 of 8 fits when both started at 0.02 (truths 0.05/0.01 and "
+                  "0.035/0.025, four seeds each) and in 0 of 8 from 0.02/0.01 "
+                  "(tests/test_lab_instrument.py::test_two_lifted_apertures_do_not_stop_on_the_"
+                  "equal_line); real data: no number moved by more than 0.02 esd (LaB6, FAP, "
+                  "cpd-1a, the review's table)"),
+        grounds=("A starting value for a degenerate-at-zero column, tier 3: invariance of the "
+                 "answer to the start is measured on one pattern and the equal-line failure on "
+                 "synthetic rutile only, so no real family and no synchrotron one behind it "
+                 "(WP-1955 task 6 owes both).  A literal of its own, not AXIAL_SIZING_FLOOR's "
+                 "row, following the 2026-11-03 ruling on NOMINAL_AXIAL_APERTURE: a retune of "
+                 "the floor by WP-2017 cannot move a start."),
+        ),
+    Row("rietx.model.forward.AXIAL_HL_START", "constant", tier=3, value=0.01,
+        evidence=("where a stage starts H/L when it frees one sitting on zero (WP-1955), half "
+                  "of S/L's so that a pair lifted together does not sit on the S/L = H/L line, "
+                  "where the pattern's symmetry makes the two columns identical and a step keeps "
+                  "them equal; from 0.02/0.01 the true pair was reached in 8 of 8 fits on "
+                  "synthetic rutile at lab counts, against 4 of 8 from 0.02/0.02 (the review of "
+                  "#1372; tests/test_lab_instrument.py); a start that would equal the partner's "
+                  "value takes the other ratio's number (forward.axial_lift_start)"),
+        grounds=("A starting value, tier 3 on the same grounds as AXIAL_SL_START: synthetic "
+                 "evidence only, task 6 owes a real family and a synchrotron one."),
+        ),
+    Row("rietx.model.forward.AXIAL_NODE_STEP", "constant", tier=3, value=3e-06,
+        evidence=("the step of the second-order forward difference giving a node's derivative "
+                  "with respect to an aperture, from a scan against jax's exact column (WP-1955): "
+                  "below it rounding grows as 1/h, above it the h^2 term; at one zero aperture "
+                  "1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4, and at interior apertures "
+                  "every step from 3e-7 to 1e-5 is under 2e-7; it moves fits (the goldens "
+                  "re-captured)"),
+        grounds=("A numerical setting scanned on the apertures the suite carries; tier 3 until "
+                 "task 6 has tested apertures 0.001 to 0.005 and the xi cap, as the review of "
+                 "#1372 asks (the same stance as FD_STEP's row)."),
+        ),
     Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
         evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
                   "share of the point is defined; ten orders under one count, and the partition's "

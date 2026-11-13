@@ -480,7 +480,12 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
 
     ``strain_seed`` does carry over, as the maximum across the plan's
     stages.  ``seed_stephens`` touches only a block that is still all zero,
-    and such a block cannot move without it, warm or cold.
+    and such a block cannot move without it, warm or cold.  So does the
+    runner's own lift of an FCJ aperture freed on zero, for the same reason
+    (``forward.apertures_to_lift``, WP-1955): a neighbour that ended on zero
+    hands the warm refit a column it cannot leave, and on CPD 1b → 1c that
+    collapsed the refit to Rwp 10.7 where the lifted start converges at
+    0.10881 beside the independent fit's 0.10901.
     """
     turn_on: list[str] = []
     for stage in plan.stages:

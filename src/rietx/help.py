@@ -348,9 +348,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
             "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
-            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
-            "either refined, the peaks are computed with windows and integration points "
-            "sized for a ratio of 0.02 (see `axial_hl`)."
+            "`axial_hl`: swapping the two gives the same pattern. Refined from zero, it "
+            "starts at 0.02, where the fit can see which way to move it (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -367,7 +366,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
-            "both held by up to about 5e-5 of the strongest peak."
+            "both held by up to about 5e-5 of the strongest peak. Refined from zero, it "
+            "starts at 0.02."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -6084,7 +6084,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
     "StageResult.seeded": HelpEntry(
         title="Rows lifted before solving",
         description=(
-            "Each row this stage moved before solving, with the value it started at. A "
+            "Each row this stage moved before solving, with the value it started at. An "
+            "axial ratio the stage newly frees at zero starts at 0.02, a "
             "freed row sitting on a floor starts at the stage's `seed`, and an all-zero "
             "Stephens block is put on its isotropic ray by `strain_seed`. An empty "
             "mapping lifted nothing; `None` means a result stored before the field."

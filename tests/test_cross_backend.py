@@ -127,22 +127,8 @@ KINK_PATHS = frozenset({"instrument.geometry.axial_sl",
 #: longer uses it (WP-1955).  Every column under it in the matrix was live: the
 #: aperture at zero (2.6e-8 of the largest) and nac's two Biso and six
 #: background columns (1.3e-9 to 1.3e-7).  Every backend met nac's at its own
-#: scale, within 2.4e-7.  The aperture at zero is a known defect, below.
+#: scale, within 2.4e-7.
 DEAD_COL_FRAC = 1e-6
-
-#: why the numpy column of an aperture at its bound of zero is not yet right.
-#: It sits 0.232 rel-L2 off its one-sided difference, on both apertures.
-#: Ruled by Yue 2026-11-02: the exact column returns with WP-1955 task 5, a
-#: lift off a zero aperture, as one change to what a fit returns.
-ZERO_APERTURE_DEFECT = ("WP-1955 task 5: the numpy column of an aperture at "
-                        "zero is 0.232 rel-L2 off; the exact column lands "
-                        "with the lift off a zero aperture")
-
-#: (config, path) columns the agreement matrix leaves out, each a known defect
-#: that a strict xfail elsewhere still holds.  The reference column is numpy's,
-#: so every backend's row would fail on it.  When the strict xfail turns into
-#: a pass, remove the entry here too.
-KNOWN_DEFECT_COLUMNS = {("axial_one_zero", "instrument.geometry.axial_hl")}
 
 #: the multi-histogram reference's FD step, the v0.2 harness's rule (applied
 #: ±h, centrally); the single-histogram reference takes the package's own
@@ -1731,11 +1717,7 @@ def test_jacobian_matches_analytic(method, config):
 
     J_ref = _analytic_jacobian(config, model, table)(theta)
     J_test = build(config, model, table)(theta)   # may skip (optional backend)
-    labels = _labels(model, table)
-    keep = [c for c, p in enumerate(labels)
-            if (config, p) not in KNOWN_DEFECT_COLUMNS]
-    J_ref, J_test = J_ref[:, keep], J_test[:, keep]
-    _assert_columns(J_ref, J_test, [labels[c] for c in keep],
+    _assert_columns(J_ref, J_test, _labels(model, table),
                     rel_max=rel_max, cos_min=cos_min,
                     kink=_kink_paths(model, table),
                     what=f"{config}/{method} ")
@@ -1820,10 +1802,7 @@ def _zero_aperture_state(path: str):
 @pytest.mark.xdist_group("xb-axial_one_zero")
 @pytest.mark.parametrize("path", ["instrument.geometry.axial_hl",
                                   "instrument.geometry.axial_sl"])
-@pytest.mark.parametrize("name", [
-    pytest.param("numpy", marks=pytest.mark.xfail(
-        strict=True, raises=AssertionError, reason=ZERO_APERTURE_DEFECT)),
-    "jax", "torch"])
+@pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
 def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     """WP-1953, WP-1955: an aperture's column at its bound of zero is the
     feasible side's, measured at its own scale, on every backend.
@@ -1831,19 +1810,19 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     The column's norm is 0.047 against a largest column of 1.8e6, and until
     WP-1955 the matrix skipped any column under ``DEAD_COL_FRAC`` of the
     largest, so this test held it alone.  The matrix now checks small columns,
-    but leaves this one out while its numpy reference is the known defect
-    (``KNOWN_DEFECT_COLUMNS``).
+    this one included.
     Wrong, it was 3360 on jax, because the FCJ kink was capped by ξ_max and the
     two tie at one zero aperture, where jax gives each side half the
     derivative.  Fixed, jax and torch meet the one-sided central difference to
     1.5e-3; the bar leaves 13× room for that difference's own truncation.
 
-    The numpy column is 0.232 rel-L2 off, on both apertures, and its row is a
-    strict xfail.  The column is the small residue of node terms some 1e5
-    times larger that cancel, and a forward difference of the nodes puts its
-    O(h) error, 0.013 in norm, into that residue.  A second-order difference
-    at 3e-6 meets the reference to 1.8e-3, but it also strands a fit at a
-    zero aperture, so it waits for WP-1955 task 5 (ruled by Yue 2026-11-02).
+    The numpy column was 0.232 rel-L2 off, on both apertures.  The column is
+    the small residue of node terms some 1e5 times larger that cancel, and a
+    first-order forward difference of the nodes put its O(h) error, 0.013 in
+    norm, into that residue.  The second-order difference at 3e-6 meets the
+    reference to 1.8e-3.  The exact column strands a fit at a zero aperture,
+    so it landed with the lift off zero (``forward.apertures_to_lift``,
+    WP-1955 task 5, ruled by Yue 2026-11-02).
     """
     config, model, table = _zero_aperture_state(path)
     theta = _theta(model, table)
@@ -1855,6 +1834,27 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     # alone in its own slice, the column is the largest, so it is live
     _assert_columns(ref, col, [path], rel_max=KINK_REL_L2_MAX,
                     cos_min=KINK_COSINE_MIN, what=f"{name} at 0: ")
+
+
+@pytest.mark.parametrize("gap", [1e-6, 5e-6])
+def test_an_aperture_just_under_the_other_is_differenced_on_its_own_side(gap):
+    """WP-1955: the numpy node derivatives stay off the S/L = H/L kink.
+
+    The second-order stencil steps 2h = 6e-6, so an aperture lying under the
+    other by less than that would difference across the kink.  Forward, the
+    H/L column sat 7.7e-5 to 2.2e-3 rel-L2 off jax's at gaps of 1e-6 to
+    5.9e-6; mirrored it sits at 6e-9 to 1.3e-8, as interior apertures do.
+    The bar sits between the two.
+    """
+    pytest.importorskip("jax")
+    model, table, _extras = _families_state(axial_hl=0.02, axial_sl=0.02 + gap)
+    theta = table.x0()
+    path = "instrument.geometry.axial_hl"
+    c = list(table.free_paths).index(path)
+    exact = _jacobian_for(model, table, "jax")(theta)[:, [c]]
+    col = _jacobian_for(model, table, "numpy")(theta)[:, [c]]
+    _assert_columns(exact, col, [path], rel_max=1e-5, cos_min=COSINE_MIN,
+                    what=f"numpy at a gap of {gap:g}: ")
 
 
 @pytest.mark.parametrize("name", ["numpy", "jax", "torch"])

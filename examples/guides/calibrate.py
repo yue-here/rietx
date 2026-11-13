@@ -93,7 +93,9 @@ both = rx.Refinement(lab6(), instrument)
 both.hold("phases.0.cell.*")
 both_result = both.fit(first_standard, plan=both_plan)
 ratios = [both_result.parameter(f"instrument.geometry.axial_{n}") for n in ("sl", "hl")]
-assert [rx.format_su(p.value, p.stderr) for p in ratios] == ["0.02476(78)", "0.01542(87)"]
+# 2026-11-03: since WP-1955 lifts S/L off zero to 0.02, the fit lands on the
+# exchanged pair; on 2026-10-21 it came back in the made order.
+assert [rx.format_su(p.value, p.stderr) for p in ratios] == ["0.01542(87)", "0.02476(78)"]
 assert [d.code for d in both_result.diagnostics] == ["HIGH_CORRELATION"]
 assert "axial" not in str(both_result.diagnostics[0].where)
 widths = [calibrated.parameter(f"instrument.profile.{n}") for n in "uvwxy"]
