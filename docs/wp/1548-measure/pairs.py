@@ -18,7 +18,8 @@ organic CIFs in ``tests/data`` are added for the rings.
 
     .venv/bin/python docs/wp/1548-measure/pairs.py [--cache=DIR]
 
-writes ``docs/wp/1548-measure/pairs/*.png`` and prints one line a sheet.
+writes ``docs/wp/1548-measure/pairs/*.png`` and prints one line a sheet; a
+sheet already on disk is kept unless ``--redraw`` is given.
 """
 
 from __future__ import annotations
@@ -44,6 +45,8 @@ REPO = HERE.parents[2]
 OUT = HERE / "pairs"
 TILE = 420
 GAP = 8
+#: draw every sheet again, not only the missing ones
+REDRAW = "--redraw" in sys.argv
 
 #: the organic phases on disk, drawn as a block so their rings close
 ORGANIC = {
@@ -83,11 +86,13 @@ def _slug(name: str) -> str:
 def four(name: str, drawn) -> str:
     """Shipped, cued, rings, both: one sheet."""
     kw = dict(size=TILE, view="opening")
-    tiles = [render_structure(drawn, **kw).image,
-             render_structure(drawn, depth_cue=True, **kw).image,
-             render_structure(drawn, planar_rings=True, **kw).image,
-             render_structure(drawn, depth_cue=True, planar_rings=True, **kw).image]
-    _png(OUT / f"{_slug(name)}.png", _sheet(tiles), None)
+    sheet = OUT / f"{_slug(name)}.png"
+    if REDRAW or not sheet.exists():        # a sheet on disk is kept unless asked
+        tiles = [render_structure(drawn, **kw).image,
+                 render_structure(drawn, depth_cue=True, **kw).image,
+                 render_structure(drawn, planar_rings=True, **kw).image,
+                 render_structure(drawn, depth_cue=True, planar_rings=True, **kw).image]
+        _png(sheet, _sheet(tiles), None)
     geometry = drawn if isinstance(drawn, dict) else s3.build(drawn)
     return f"{name}: {len(geometry['atoms'])} atoms, {len(rings.planar_rings(geometry))} planar rings"
 
