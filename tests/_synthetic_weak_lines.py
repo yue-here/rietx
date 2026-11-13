@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 import rietx as rx
+from rietx.indexing.engines import weak_line_floor
 from rietx.schemas.indexing import PeakList
 
 #: the synchrotron wavelength of WP-1969's Si reproducer, used for all three
@@ -116,15 +117,11 @@ def floored(peaks: PeakList, fraction: float) -> PeakList:
     """``peaks`` cut to its usable lines at or above ``fraction`` of the strongest.
 
     Issue #1291's treatment, as a list: every usable line whose intensity is at
-    least ``fraction`` × the strongest usable line's, and nothing else.  On a
-    position-only list (one intensity everywhere) it removes nothing.
+    least ``fraction`` × the strongest usable line's, and nothing else usable
+    (flagged lines stay, unusable as before).  On a position-only list (one
+    intensity everywhere) it removes nothing.
     """
-    usable = peaks.usable()
-    top = max(p.intensity for p in usable)
-    keep = [p for p in usable if p.intensity >= fraction * top]
-    return PeakList(peaks=keep, wavelength=peaks.wavelength,
-                    two_theta_min=peaks.two_theta_min,
-                    two_theta_max=peaks.two_theta_max, source=peaks.source)
+    return weak_line_floor(peaks, fraction)
 
 
 def _grid(lo: float, hi: float) -> np.ndarray:

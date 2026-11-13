@@ -151,6 +151,7 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  332 -> 338  for indexing C4 (#933)
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  338 -> 340  for indexing C6
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  340 -> 361  for C3 (issue #916)
+#   2026-11-13  src/rietx/indexing/CLAUDE.md  361 -> 366  for WP-2078's weak-line retry
 #   2026-09-01  tests/CLAUDE.md               253 -> 275  for the placement pass
 #   2026-09-01  docs/ROADMAP.md               589 -> 597  for the roadmap reorder: landed 573, cap landed + 24
 #   2026-09-02  docs/ROADMAP.md               597 -> 621  for the magnetic scattering track (1326-1329, out of
@@ -707,7 +708,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # search-window section (a shift is estimated, never a window) and the
     # ``predicted_but_absent`` bullet (caps; the superset check refutes).
     # The measurements stayed in #941's Acceptance table.  Landed at 361, no headroom.
-    "src/rietx/indexing/CLAUDE.md": 361,
+    "src/rietx/indexing/CLAUDE.md": 366,
     # 300 -> 350 (WP-1407): four per-format rows, and three standing rules the
     # Philips √ encoding taught — that a format may encode its counts rather
     # than store them, that the *permissive* description can be the defective

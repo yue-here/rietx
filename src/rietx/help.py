@@ -3245,6 +3245,23 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measure more lines."
         ),
     ),
+    "INDEX_WEAK_LINE_RETRY": HelpEntry(
+        title="The search was run again without the weak lines",
+        description=(
+            "The full peak list, inlier retry included, gave no lattice that two "
+            "engines agree on. The lines under 5 % of the strongest were set aside and "
+            "the search ran again on the rest. This is the second attempt of the 2004 "
+            "indexing round robin (Bergmann et al.). If that search found agreement, "
+            "the candidates are its own, ranked and scored on the kept lines only. "
+            "Otherwise they are the full list's. A trace second phase, or a peak the "
+            "picker split, adds weak lines the host's cell cannot index. Check the "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
+            "`n_unindexed` forbids both retries."
+        ),
+    ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
         title="Two propagation vectors fit equally well",
         description=(

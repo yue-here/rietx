@@ -127,7 +127,7 @@ The same model is the GUI's search form and the project document's `ProjectDoc.i
 | `SearchSpecSpec.min_d_axis`, `SearchSpecSpec.max_d_axis` | 2 Å, 25 Å | the range of principal d-spacings, a bound on d(100) rather than on a; raising the top costs search volume |
 | `SearchSpecSpec.min_volume` | 15 Å³ | the volume floor |
 | `SearchSpecSpec.max_volume` | `None` | the volume ceiling, taken verbatim; `None` takes 1.5 times Smith's envelope for each system from the quality report, or 8000 Å³ where the report has none |
-| `SearchSpecSpec.n_unindexed` | `None` | driven lines a cell may leave unexplained: `None` is two, with a retry under the inlier rule; `"inliers"` that rule from the start; an integer that count, with no retry |
+| `SearchSpecSpec.n_unindexed` | `None` | driven lines a cell may leave unexplained: `None` is two, with the retries below; `"inliers"` the inlier rule from the start; an integer that count |
 | `SearchSpecSpec.n_search_lines` | 20 | how many lines drive the search, the strongest N |
 | `SearchSpecSpec.k_sigma` | 3 | the matching window, in multiples of each line's σ with the shift allowance added in quadrature |
 | `SearchSpecSpec.shift_allowance_deg` | 0 | a shift amplitude you measured, ° 2θ; 0 lets the run size the window itself |
@@ -177,18 +177,19 @@ A window does not correct a cell; only a shift template does.
 
 #### Driven lines and the inlier rule
 
-A search is driven by the `n_search_lines` strongest usable lines, chosen from a low-angle pool twice that size, and every candidate is then scored against every usable line.
+A search is driven by the `n_search_lines` strongest usable lines, chosen from a low-angle pool twice that size, and every candidate is scored against every usable line.
 Leave `SearchSpecSpec.n_search_lines` alone: raising it is neither free nor safe.
-Under a count, a cell must index all but that many of the driven lines, an absolute budget, so every foreign line admitted can refute the true cell rather than merely rank it lower.
+Under a count, a cell must index all but that many of the driven lines, an absolute budget, so each foreign line admitted can refute the true cell rather than rank it lower.
 
 The default first pass lets a cell leave two driven lines unindexed.
-A run that ends with no lattice two engines agree on is searched again under the inlier rule, the acceptance RANSAC uses {cite}`fischler1981`: a cell is accepted when it indexes at least 60 % of the driven lines (and at least four more than the metric's degrees of freedom), the five strongest among them.
-The retry adds candidates and never removes the first pass's, and [`INDEX_INLIER_RETRY`](diagnostics-indexing.md#index_inlier_retry) says the answer came from it.
-`n_unindexed="inliers"` searches that way from the start, and an integer forbids the retry.
-Only such a run retries, because the inlier rule changes the pool the panel ranks, and the ranking depends on that pool.
-A list whose lines all carry one intensity, such as `PeakList.from_positions` without intensities, has no strongest five to anchor on and keeps the count of two.
+A run with no lattice two engines agree on is searched again under the inlier rule, RANSAC's acceptance {cite}`fischler1981`: a cell must index at least 60 % of the driven lines, the five strongest included, and four more than the metric's degrees of freedom.
+That retry only adds candidates, and [`INDEX_INLIER_RETRY`](diagnostics-indexing.md#index_inlier_retry) says so.
+Only such a run retries, because the inlier rule changes the pool the panel ranks.
+A run still without one searches once more on the lines at or above 5 % of the strongest ([`INDEX_WEAK_LINE_RETRY`](diagnostics-indexing.md#index_weak_line_retry)).
+`n_unindexed="inliers"` uses the inlier rule from the start, and any declared value forbids both retries.
+A list whose lines all carry one intensity, such as `PeakList.from_positions` without intensities, has no strongest five and keeps the count of two.
 
-Under every rule, what a cell leaves is reported rather than hidden: `CellCandidate.n_search_unindexed` counts the driven lines it left, and `CellCandidate.unindexed_two_theta` lists every usable line it left, the residue a second phase would explain.
+Under every rule, what a cell leaves is reported: `CellCandidate.n_search_unindexed` counts the driven lines it left, and `CellCandidate.unindexed_two_theta` lists every usable line it left, the residue a second phase would explain.
 
 #### Priors from a structural analogue
 

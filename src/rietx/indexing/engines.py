@@ -203,6 +203,21 @@ INLIERS = "inliers"
 #: A run whose first pass found a lattice two engines agree on is therefore
 #: left exactly as it was.
 INLIER_FRACTION = 0.6
+#: Fraction of the strongest usable line's intensity below which a line is set
+#: aside for the **weak-line retry** (WP-2078; ruled by the maintainer
+#: 2026-11-13 as a retry, never a floor applied before every search).  When the
+#: full list, inlier retry included, ends with no lattice two engines agree on,
+#: the search runs once more on the lines at or above this fraction and is
+#: scored on those lines alone.  The value is the round robin's: Bergmann, Le
+#: Bail, Shirley & Zlokazov (2004, *Z. Kristallogr.* 219, 783) gave every
+#: program the raw list and the I ≥ 5 % Imax list, and treated removing weak
+#: peaks as a second attempt after the raw list failed.  Measured on the
+#: molybdenum fixture with a trace of its oxide (``tests/_synthetic_weak_lines``,
+#: 38 usable lines, 29 the oxide's): the truth is absent from the full list's
+#: ranking and first at 0.5, 1, 2 and 5 %.  On the 23 runs of WP-2078's 19
+#: lists the trigger fires on no run whose truth ranked first.  A position-only
+#: list (one intensity everywhere) loses no line, so it is never retried.
+WEAK_LINE_RETRY_FLOOR = 0.05
 #: Inliers beyond the metric's own degrees of freedom: a cell with n_dof free
 #: A..F parameters fits any n_dof lines exactly, so the count only means
 #: something past them, and four spare lines is the minimal-subset-plus-
@@ -1342,6 +1357,60 @@ def inlier_retry_diagnostic(n_first: int) -> Diagnostic:
                     "the phase and the residue is a second phase or the "
                     "picker's junk; declare n_unindexed='inliers' to search "
                     "this way from the start, or an int to forbid the retry"))
+
+
+def weak_line_floor(peaks: PeakList,
+                    fraction: float = WEAK_LINE_RETRY_FLOOR) -> PeakList:
+    """``peaks`` without its usable lines under ``fraction`` of the strongest
+    usable line's intensity: the list the weak-line retry searches
+    (:data:`WEAK_LINE_RETRY_FLOOR`).  Lines already flagged unusable stay, as
+    they do on every list, so the quality report still counts them, and so do
+    the list's own records (``instrument_undeclared``, ``diagnostics``).  On a
+    position-only list, where every line carries one intensity, it removes
+    nothing."""
+    usable = peaks.usable()
+    if not usable:
+        return peaks
+    top = max(p.intensity for p in usable)
+    keep = [p for p in peaks.peaks
+            if not p.usable or p.intensity >= fraction * top]
+    return peaks.model_copy(update={"peaks": keep})
+
+
+def weak_line_retry_diagnostic(set_aside: Sequence[float], n_kept: int,
+                               adopted: bool, *, stopped: bool = False) -> Diagnostic:
+    """``INDEX_WEAK_LINE_RETRY`` — the full list gave no lattice two engines
+    agree on, so the lines under :data:`WEAK_LINE_RETRY_FLOOR` of the strongest
+    were set aside and the search ran again (WP-2078).  ``adopted`` says whether
+    the ranked list is that second search's, scored on the kept lines only, or
+    still the full list's because the second search found no agreement either."""
+    tt = sorted(float(t) for t in set_aside)
+    shown = ", ".join(f"{t:.3f}" for t in tt[:12]) + (
+        f" and {len(tt) - 12} more" if len(tt) > 12 else "")
+    head = (f"no lattice two engines agree on came back from the full list, so "
+            f"its {len(tt)} line(s) under {WEAK_LINE_RETRY_FLOOR * 100:g} % of the "
+            f"strongest were set aside and the search ran again on the "
+            f"{n_kept} kept")
+    if adopted:
+        message = (head + "; the candidates are that search's, ranked and "
+                   "scored on the kept lines only, and the set-aside lines at "
+                   f"2θ {shown} are not part of any candidate's count")
+        suggestion = ("check the set-aside lines against the leading "
+                      "candidate's predicted positions: lines it does not "
+                      "predict are a second phase or the picker's artefacts, "
+                      "and a supercell would predict some of them; declare "
+                      "n_unindexed to forbid the retry")
+    else:
+        why = ("which was stopped before it found agreement" if stopped
+               else "which found no agreement either")
+        message = (head + f", {why}, so the candidates are the full list's "
+                   f"(set-aside 2θ {shown})")
+        suggestion = ("the list may hold more than one phase in comparable "
+                      "amounts, or too few of one phase's lines; declare "
+                      "n_unindexed to forbid the retry")
+    return Diagnostic(level="info", code="INDEX_WEAK_LINE_RETRY", message=message,
+                      where=[f"I < {WEAK_LINE_RETRY_FLOOR:g} × I_max (retry)"],
+                      suggestion=suggestion)
 
 
 def shift_from_pairs_diagnostic(shift) -> Diagnostic:
