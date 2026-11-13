@@ -119,6 +119,31 @@ def refuse_distortion_modes(phase, fmt: str) -> None:
             f"record: phase.model_copy(update={{'distortion_modes': None}})")
 
 
+@functools.lru_cache(maxsize=None)
+def ita_standard_setting(number: int, origin_choice: int = 2) -> gemmi.SpaceGroup:
+    """ITA's standard setting of space-group type ``number``, as gemmi's table entry.
+
+    Unique axis b with cell choice 1 for the monoclinic types, hexagonal axes
+    (the obverse triple cell) for the rhombohedral ones, and origin choice
+    ``origin_choice`` for the 24 types ITA gives two origins (choice 2, the
+    origin at a centre of symmetry, unless 1 is asked for).  The same rule is
+    Parthé & Gelato (1984), *Acta Cryst.* A40, 169, p. 172, rule 2(a)-(c), and
+    Stokes (2011) § 5.1(2); gemmi's table lists every type's ITA setting first,
+    and the ``:1``/``:2`` and ``:H``/``:R`` entries beside it.  Shared by the
+    superspace generator and :mod:`rietx.crystallography.setting`.
+    """
+    if origin_choice not in (1, 2):
+        raise ValueError(f"origin_choice is 1 or 2, not {origin_choice!r}")
+    entries = [s for s in gemmi.spacegroup_table() if s.number == number]
+    if not entries:
+        raise ValueError(f"no space group number {number}")
+    for want in (str(origin_choice), "H"):
+        for s in entries:
+            if s.ext == want:
+                return s
+    return entries[0]
+
+
 def restate_in_hexagonal_axes(phase, fmt: str):
     """``(phase, restated)``: an R lattice on rhombohedral axes in hexagonal ones.
 

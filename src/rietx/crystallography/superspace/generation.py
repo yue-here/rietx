@@ -56,6 +56,7 @@ from itertools import product
 import gemmi
 import numpy as np
 
+from ..symmetry import ita_standard_setting
 from .operators import (
     ModulationVector,
     SuperspaceGroup,
@@ -79,18 +80,13 @@ _F0 = Fraction(0)
 # ---------------------------------------------------------------------------
 # basic space groups
 # ---------------------------------------------------------------------------
-@functools.lru_cache(maxsize=None)
 def standard_setting(number: int) -> gemmi.SpaceGroup:
     """The setting the generator works in: ITA's, with origin choice 2,
-    hexagonal axes and unique axis b, cell choice 1 (Stokes 2011 § 5.1(2))."""
-    entries = [s for s in gemmi.spacegroup_table() if s.number == number]
-    if not entries:
-        raise ValueError(f"no space group number {number}")
-    for want in ("2", "H"):
-        for s in entries:
-            if s.ext == want:
-                return s
-    return entries[0]
+    hexagonal axes and unique axis b, cell choice 1 (Stokes 2011 § 5.1(2)).
+
+    The one table of it is :func:`rietx.crystallography.symmetry.ita_standard_setting`,
+    which the structure standardiser shares (Parthé & Gelato 1984 rule 2)."""
+    return ita_standard_setting(number)
 
 
 @dataclass(frozen=True)
