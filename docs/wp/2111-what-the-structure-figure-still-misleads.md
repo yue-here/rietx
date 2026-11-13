@@ -67,6 +67,22 @@ ranks by `hidden - stacked`. Both are in the triage batch of 2026-11-05.
 **Tier.** A change to `DIM_BOUNDARY` or to the `auto` ranking moves a default, so it is an `_audit`
 row with its evidence. WP-1957's reviewers and the agent round below are that evidence.
 
+### Inherited
+
+- **2026-11-12, from WP-1548 (filed).** WP-1548 adds optional depth cueing (fog toward the
+  background) to both renderers. Fog and the `DIM_BOUNDARY` shade both change the far side's
+  colour, so a reader could not tell them apart. WP-1548 waits on this WP's ruling on the shade
+  (its D6). Whoever brings that ruling to the maintainer should mention that fog is coming.
+- **2026-11-12, from WP-1548 (fog landed, off by default).** Fog is now drawn
+  (`render_structure(depth_cue=True)`, the GUI drawer's "depth cue" box). On a white ground it
+  *lightens* the far atoms, while `DIM_BOUNDARY` *darkens* the images outside the cell, so the two
+  pull apart there. On a dark ground both darken, and that is where they could read as one cue.
+  A picture pair on a dark ground is the evidence the shade's ruling should be shown with.
+- **2026-11-13, from WP-1548 (the pair drawn).** That pair is
+  `docs/wp/1548-measure/pairs/q_d6_white_black_plain_cued.png`: NAC in one cell on white and
+  on black, each plain then cued. On black the cued far side and the shaded images both go
+  darker, as predicted. `docs/wp/1548-measure/pairs.py` redraws it.
+
 ## Non-goals
 
 - Any change to the default polyhedra on the 21 measured phases without re-running
