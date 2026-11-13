@@ -37,6 +37,33 @@ def test_a_propagation_vector_off_gamma_is_named_too():
     assert named.message.startswith("class 0 (k = (0.5, 0, 0.5)): ")
 
 
+def _start(label: str, chi2_reduced: float, rwp: float):
+    from types import SimpleNamespace
+
+    stats = SimpleNamespace(chi2=chi2_reduced, n_points=1000,
+                            n_free_parameters=10, rwp=rwp)
+    return (label, f"ref of {label}", SimpleNamespace(statistics=stats))
+
+
+@pytest.mark.parametrize("order", [(0, 1, 2), (2, 1, 0), (1, 2, 0)])
+def test_the_sweep_keeps_the_lowest_chi2_start_whatever_its_order(order):
+    """``_best_start`` picks by absolute χ², and the start's own ref and result
+    travel with it (#1424 (b), ruled 2026-11-12): the two-site test no longer
+    pins which assignment wins, so the pick is pinned here on starts whose
+    order is known."""
+    from rietx.strategy.magnetic import _best_start
+
+    starts = [_start("flat", 3.7101, 0.0810),
+              _start("Mn1 only, then released", 3.7088, 0.0809),
+              _start("Mn2 only, then released", 3.7095, 0.0811)]
+    (label, ref, result), n_starts, _minima = _best_start(
+        [starts[i] for i in order])
+    assert label == "Mn1 only, then released"
+    assert ref == "ref of Mn1 only, then released"
+    assert result.statistics.chi2 == 3.7088
+    assert n_starts == 3
+
+
 @pytest.mark.slow
 @pytest.mark.xdist_group("magnetic-solve-two-site")
 def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
@@ -46,12 +73,22 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
 
     Mn1 (4b) and Mn2 (4a) are related by c/2, so l-even and l-odd reflections
     measure m₁ + m₂ and m₁ − m₂ separately.  Swapping the two moduli leaves
-    the size of each combination unchanged.  The swapped point is a second
-    minimum, χ² higher by only 0.66 (2556.51 against 2555.85, macOS arm64).  The flat start lands on it
-    under both drivers since the floor seed went (WP-1938 D4), so the sweep
-    reports two minima and the released start that reaches the truth wins.
-    Under LM the released starts reach it only because the moduli climb before
-    the angles turn (D12): freed together, they stopped at χ² 454 660.
+    the size of each combination unchanged, so at equal Biso the swapped point
+    is a second minimum the pattern cannot tell from the truth (#1424).  Over
+    24 noise draws polished to their minima, χ²(truth) − χ²(swap) had median
+    −0.11 and sd 0.94, and each start stops about 0.6 above its own minimum, so
+    which assignment wins is decided by the stop and by rounding, not by the
+    data: the truth won 10 of 24 on macOS arm64, and 2 of 8 on the Linux
+    nightly under a 1e-14 nudge.  Under LM the released starts reach either
+    minimum only because the moduli climb before the angles turn (D12): freed
+    together, they stopped at χ² 454 660.
+
+    So the moduli are asserted through what the pattern measures (#1424, ruled
+    2026-11-12): |m₁ + m₂| = 4.20 and |m₁ − m₂| = 2.80 from the winner's signed
+    components along **a**, and the esds by size, not by site.  Not the
+    unordered pair {3.5, 0.7}: a relative-sign error, (3.5, −0.7), gives the
+    same pair and swaps the sum and the difference.  Once ``solve_magnetic``
+    reports a tie as a set, this test asserts that instead.
 
     Both moments lie along **a**, where the pattern is even in every angle, so
     the angle columns vanish there.  Before WP-1929 the covariance kept them,
@@ -102,11 +139,14 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
     winner = next(t for t in solution.trials if t.class_index == 0)
     assert solution.best is not None and solution.best.class_index == 0
     m1, m2 = winner.moments
-    assert m1.magnitude == pytest.approx(3.5, abs=0.01)
-    assert m2.magnitude == pytest.approx(0.7, abs=0.01)
+    a1, a2 = m1.crystalaxis[0], m2.crystalaxis[0]
+    assert abs(a1 + a2) == pytest.approx(4.20, abs=0.02)
+    assert abs(a1 - a2) == pytest.approx(2.80, abs=0.02)
     assert not any(row.paired_with for row in winner.moments)
-    assert m1.esd == pytest.approx(0.00150, rel=0.05)
-    assert m2.esd == pytest.approx(0.00111, rel=0.05)
+    large, small = sorted(winner.moments, key=lambda m: m.magnitude,
+                          reverse=True)
+    assert large.esd == pytest.approx(0.00150, rel=0.05)
+    assert small.esd == pytest.approx(0.00111, rel=0.05)
     (pair,) = taken[id(winner._result)]
     assert pair.rho == pytest.approx(-0.24, abs=0.02)
     # the record that moved them: the winner's last stage left its four
