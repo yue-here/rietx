@@ -22,6 +22,14 @@ The magnetic diagnostic family lives in this one file rather than in §7's table
 | `SatelliteEvidence.excess_on_nuclear_lines` > 0 | Call it magnetic or nuclear from this pattern. A k = 0 structure and a nuclear misfit look alike here; a pattern of the same specimen above its ordering temperature separates them |
 | `SatelliteEvidence.radiation == "xray"` | Call intensity at G ± k magnetic. On X-rays it is a superstructure reflection |
 
+## The k-grid machinery
+
+`rietx.indexing.kvector` (WP-1418 M-8, K1a) scores any k you name against the unexplained peaks and enumerates a rational grid by stratum. It ranks nothing; the radius, denominator, strata, band, and the null's exclusion windows, shuffle count, percentile and seed are all yours to pass. A grid record covers the grid points it lists and claims nothing about a k between them.
+
+| reading or code | what you must not assume, and what to do |
+|---|---|
+| `K_SEARCH_PARTNER` | (info; on `KEquivalents.diagnostics` from `kvector_equivalents`) Choose k over the partner from positions. A near-symmetry of the metric within your `tol` maps k onto a vector no symmetry relates to it, listed in `KEquivalents.rows` as a `partner` with its `metric_deviation`. The map is only near a symmetry, so score the partner's neighbourhood, not the exact image, and keep every k that matches; intensities (a moment or modulation model) or a sharper instrument separate them |
+
 ## The determination verb
 
 `rx.solve_magnetic` (signatures: [`api-magnetic.md`](api-magnetic.md)) answers with a `MagneticSolution`, provisional by declaration. Its codes ride on `MagneticSolution.diagnostics`, never on `result.diagnostics`; `MAGNETIC_ION_ASSUMED` and `LANDE_G_ASSUMED` (interchange rows below) arrive there too when the solve had to resolve a site's ion.

@@ -221,6 +221,12 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.sequential.SequentialRefinement.fit": 2003,
     "rietx.indexing.workflow.index_pattern": 2007,
     "rietx.indexing.engines.SearchSpec": 2007,
+    "rietx.indexing.kvector.kgrid_strata": 2007,
+    "rietx.indexing.kvector.kgrid_positions": 2007,
+    "rietx.indexing.kvector.score_kvector": 2007,
+    "rietx.indexing.kvector.score_kgrid": 2007,
+    "rietx.indexing.kvector.kgrid_null": 2007,
+    "rietx.indexing.kvector.kvector_equivalents": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
 }
 
@@ -845,6 +851,20 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
+    Row("K_SEARCH_PARTNER", "code", tier=1, ambiguity=2,
+        evidence=("a geometric fact of the cell: fires once per image of k under a near-symmetry "
+                  "of the metric (indexing.ambiguity.lattice_point_group at the caller's tol) "
+                  "that is no star arm, -k or G - k of k modulo the centred L*; on a "
+                  "pseudo-tetragonal Pnma cell (5.74 x 7.70 x 5.54 A) a k near the x <-> z "
+                  "image of a general k matched every planted satellite at a 0.12 deg radius "
+                  "(issue #795, the K design's 0.01-grid arm); none on a 5.74 x 7.70 x 6.40 A "
+                  "cell at the same tol (tests/test_indexing_kvector.py)"),
+        grounds=("Arithmetic: W G W^T against G is a statement about the cell alone; the code "
+                 "lists the partner as one equivalence row and never says which k is right "
+                 "(Mighell & Santoro 1975, one rank over)."),
+        response="info",
+        responds=("score the partner's neighbourhood beside k and keep every k that matches "
+                  "as a hypothesis until intensities or a sharper instrument separate them")),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -2511,6 +2531,18 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-21"),
     Row("rietx.indexing.fom._AGGREGATE_FLOOR_RTOL", "constant", value=1e-06),
     Row("rietx.indexing.fom._BOUNDARY_RTOL", "constant", value=1e-09),
+    Row("rietx.indexing.kvector._BLOCK", "constant", tier="invariant", value=2000.0,
+        evidence=("answer-invariant layout: the degrees each k's windows are shifted by so one "
+                  "searchsorted locates a peak in every k's list; any value past the 2θ axis and "
+                  "_PAD gives the same rows (tests/test_indexing_kvector.py holds every grid row "
+                  "equal to score_kvector's single-k answer)")),
+    Row("rietx.indexing.kvector._CHUNK", "constant", tier="invariant", value=2048,
+        evidence=("answer-invariant: the rows scored per vectorised block, bounding working "
+                  "memory; each row's arithmetic is its own, so the grid rows equal "
+                  "score_kvector's per k whatever the block (tests/test_indexing_kvector.py)")),
+    Row("rietx.indexing.kvector._PAD", "constant", tier="invariant", value=900.0,
+        evidence=("answer-invariant layout: where an unused window slot sits, past any 2θ, so "
+                  "no peak locates it; any value in (180, _BLOCK) gives the same rows")),
     Row("rietx.indexing.peakfit._H_POS", "constant", value=1e-05),
     Row("rietx.indexing.peakfit._H_WIDTH", "constant", value=1e-07),
     Row("rietx.indexing.peakfit._SEED_GAUSS_FRACTION", "constant", value=0.8),
@@ -5126,6 +5158,31 @@ ROWS: tuple[Row, ...] = (
         evidence=("answer-invariant: the run recorder, one run a job; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
     Row("rietx.sequential.SequentialRefinement.fit:label", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
+    Row("rietx.indexing.kvector.kgrid_positions:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k the satellite generator "
+                  "builds; another order is another hypothesis the caller names, never added "
+                  "by the package (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.kgrid_null:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "a cut stops every shuffle at one stratum boundary and names strata_left")),
+    Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kgrid:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "a cut is reported as strata_left, never as a smaller search called complete")),
+    Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kvector:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; (2,) or (3,) scores 2k "
+                  "or 3k as its own hypothesis (issue #795, K1a)")),
     Row("rietx.indexing.workflow.index_pattern:peaks", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:data", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:instrument", "default", value=None),
@@ -5291,6 +5348,11 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("K_SEARCH_PARTNER.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: the metric is unchanged within tol by the map between the two "
+                  "k, so the suggestion names the calls that would separate them (score the "
+                  "partner's neighbourhood; a moment or modulation model reading intensities) "
+                  "and ranks neither")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
