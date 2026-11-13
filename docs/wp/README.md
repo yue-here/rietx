@@ -54,6 +54,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | 2026-11-13 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -848,7 +849,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
-| [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ⬜ | P3 | — |
+| [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | 🔄 2026-11-13 | P3 | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement

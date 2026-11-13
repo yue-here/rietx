@@ -1,6 +1,6 @@
 # WP-2145 — the `rietx watch` GUI boot test waits as long as the watcher does
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by @yue-here
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-13 — a false red in every local full suite on this Mac, which runners report as a main failure; CI's Linux runner passes it
