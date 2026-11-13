@@ -2072,6 +2072,34 @@ def test_multi_histogram_restraint_rows_sit_below_every_pattern():
         assert [paths[c] for c in hit] == [f"hist.{h}.instrument.zero_shift"]
 
 
+@pytest.mark.parametrize("mode", MULTI_MODES)
+def test_multi_histogram_restraint_rows_carry_the_weight_only_per_pattern(mode):
+    """The rows below the data carry ``√w_h`` wherever they are a pattern's own.
+    Rietveld: the last three rows are the bond (held once, from pattern 0, no
+    weight) and each pattern's zero-shift row (``√w_h``).  Pawley (WP-2104):
+    soft restraints are compiled in Rietveld mode only, so the restrained state
+    has none, and the rows below the data are each pattern's Pawley-restraint
+    stripe, ``√w_h`` as the data are: a joint Pawley fit meets no soft-restraint
+    row (Yue's review of #1492, 2026-11-13, item 2)."""
+    from rietx.model import rows as row_layout
+
+    models, mtable, theta, _labels = _multi_state(mode, "restrained")
+    res_1, jac_1, _ = _multi_closures(models, mtable)
+    res_w, jac_w, _ = _multi_closures(models, mtable, weights=[4.0, 9.0])
+    if mode == "rietveld":
+        scale = np.array([1.0, 2.0, 3.0])
+    else:
+        sizes = [row_layout.block_sizes(m) for m in models]
+        assert all(sz["soft_restraint"] == 0 and sz["pawley_restraint"] > 0
+                   for sz in sizes), "Pawley compiles no soft restraint"
+        scale = np.concatenate([np.full(sz["pawley_restraint"], w)
+                                for sz, w in zip(sizes, (2.0, 3.0), strict=True)])
+    n = len(scale)
+    np.testing.assert_allclose(res_w(theta)[-n:], scale * res_1(theta)[-n:], rtol=1e-12)
+    np.testing.assert_allclose(jac_w(theta)[-n:], scale[:, None] * jac_1(theta)[-n:],
+                               rtol=1e-12, atol=1e-300)
+
+
 # ----------------------------------------------------------------------
 # stage boundaries: the frozen state, regenerated
 # ----------------------------------------------------------------------
