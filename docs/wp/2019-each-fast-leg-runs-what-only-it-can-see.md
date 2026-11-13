@@ -1,9 +1,8 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — four shards on a per-leg record, projected median 12.9 min; the ten-run read is owed
+Milestone: unscheduled · Status: ✅ 2026-11-02 — every task done: the median main run waits 13.5 min for its slowest fast job on four shards; PR #1354
 Track: The repo's own process
 Depends on: —
-Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
 
 ## Goal
 
@@ -270,9 +269,11 @@ cutting it.
       project to a median 12.9 min, every run of the ten under 14. Settled by
       Claude under the lead's brief and established practice (the newest
       entry says what it costs).*
-- [ ] **Read ten runs again** after these land, by the Acceptance method:
+- [x] **Read ten runs again** after these land, by the Acceptance method:
       the ten successful `ci.yml` push runs on main from the first whose fast
-      jobs are named `fast py3.x K/4`.
+      jobs are named `fast py3.x K/4`. *Read 2026-11-02: the wall holds
+      (median slowest fast job 13.5 min against 15, all ten under it), and so
+      do the counts and the jax job; see the newest entry.*
 
 ## Acceptance
 
@@ -301,6 +302,97 @@ gh run view <id> --json jobs   # each "fast …" job's startedAt to completedAt;
   (10-21).
 
 ## Handover log
+
+### 2026-11-02 (4th session) — four shards meet the bar: the median main run waits 13.5 min for its slowest fast job
+
+Ten per-push runs on main since four shards landed were timed. The median run
+waited 13.5 min for its slowest fast job, and every one of the ten finished
+under the 15 min bar, against 18.2 min on three shards and 25.0 on two. The
+previous entry projected 12.9; the seventeen runs to date give exactly that
+median. The counts hold too: each leg's four shards add up to the same total
+as the other leg's and as one unsharded run. The jax job's selection was
+checked against a whole fast tier run with jax installed at the same commit,
+for the first time, and every case it selects comes out the same. Every
+acceptance line is met, so the WP closes.
+
+- **Done** (PR #1354). The last open task, *Read ten runs again*, is read
+  and ticked. Status ✅, the `Priority:` line deleted, the narrative in
+  `docs/milestones/v1.11.md`. No code changes, and `tests/shard_times.json`
+  is not touched.
+- **Measured: the wall clock.** The ten successful `ci.yml` push runs on main
+  from 41430141218 (892e05fc0, the merge of #1329, 11-02 10:36 UTC), the
+  first with `fast py3.x K/4` jobs, to 41468385391 (a5cd382ff, 15:06). One
+  cancelled run in that span, 41448447852, is left out. A job is `startedAt`
+  to `completedAt` from `gh run view --json jobs`, setup included.
+
+  | Run (head) | Slowest fast job | Min |
+  |---|---|---|
+  | 41468385391 (a5cd382ff) | py3.14 2/4 | 12.9 |
+  | 41464030468 (545997296) | py3.14 3/4 | 12.7 |
+  | 41453219621 (1a648d3a9) | py3.14 4/4 | 14.5 |
+  | 41450585631 (e84a0fced) | py3.14 4/4 | 14.9 |
+  | 41446425023 (ecca7d3eb) | py3.14 4/4 | 12.5 |
+  | 41443148290 (0ad400a73) | py3.14 4/4 | 14.5 |
+  | 41441012873 (1f4be2972) | py3.14 3/4 | 12.8 |
+  | 41438679028 (cce3240c9) | py3.14 4/4 | 14.5 |
+  | 41436335745 (97d5ba274) | py3.14 3/4 | 12.6 |
+  | 41430141218 (892e05fc0) | py3.14 4/4 | 14.1 |
+
+  Median 13.5, range 12.5 to 14.9. Per job over the ten (min / median /
+  max):
+
+  | Job | py3.11 | py3.14 |
+  |---|---|---|
+  | 1/4 | 6.5 / 10.0 / 11.5 | 6.8 / 10.8 / 11.3 |
+  | 2/4 | 7.2 / 10.6 / 11.6 | 7.3 / 12.6 / 12.9 |
+  | 3/4 | 6.8 / 11.5 / 11.9 | 7.3 / 11.8 / 12.8 |
+  | 4/4 | 7.6 / 12.1 / 12.8 | 8.9 / 13.3 / 14.9 |
+
+  `fast jax` was 6.2 / 8.7 / 9.5. py3.14 4/4 is the slowest job in six of
+  the ten runs. Over all seventeen four-shard runs to 41516065012
+  (a5c99e0fe, 20:06 UTC) the median is 12.9 min, range 12.0 to 15.2, and
+  one run is over the bar: 41499337733 (88c317648), py3.14 4/4 at 15.2.
+- **Measured: counts.** Held. On run 41516065012 (a5c99e0fe) both legs sum
+  to 13 919 passed+skipped and 34 xfailed over their four shards: py3.11
+  2 627 + 4 313 + 3 282 + 3 312 passed and 168 + 39 + 165 + 13 skipped;
+  py3.14 3 047 + 3 687 + 4 098 + 2 756 passed and 11 + 3 + 160 + 157
+  skipped. On the tenth run, 41468385391, both legs sum to 13 849. The
+  unsharded fast run at a5c99e0fe (`[dev]`, no jax, macOS arm64, Python
+  3.12.13) gave 13 601 passed, 318 skipped and 34 xfailed in 9:57, the same
+  13 919, with no failure: the kernel-spec fault of the earlier entries did
+  not recur.
+- **Measured: the jax job.** First check of this criterion. At a5c99e0fe, in
+  one `[dev,jax]` venv (jax 0.12.0.1, macOS arm64, Python 3.12.13):
+  `--jax-cases` gave 104 passed and 8 skipped in 2:21, as CI's `fast jax` on
+  run 41516065012 did. The whole fast tier in the same venv gave 13 701
+  passed, 230 skipped and 34 xfailed in 9:09, 13 965 cases. Each of the
+  selection's 112 cases has the same outcome there (junit files compared
+  case by case). Without jax the same selection collects 100 cases (the 12
+  of `test_backend_jax` skip at import) and gives 3 passed and 97 skipped.
+  Outside the selection the two runs differ by one case, the guard's own
+  test, which passes without jax and skips with it ("the guard stands down
+  where jax imports"), by design. So no case outside the selection needs
+  jax, and the criterion holds.
+- **Measured: the slow case in the nightly.** Unchanged since the 11-01
+  entry: green on 10-25 and 10-27, which meets "passes once". The 11-01
+  nightly (f4db77639) failed it with the NaN that WP-2048 fixed, but #1292
+  merged at 16:12 that day, after the nightly ran. The 11-02 `full` job
+  (1a648d3a9) was cancelled at 42 % after 2.5 h and printed no summary, so
+  it gives no reading. WP-2036 owns the nightly.
+- **Review.** `/code-review` skipped: the branch changes this WP file, the
+  index and the milestone record, with no code.
+- **Generality.** Not dispatched: no heuristic added, `_audit.py` untouched.
+- **What a reader receives.** `python -m tests.reader_output`: exit 0,
+  unchanged against a5c99e0fe.
+- **Full suite.** Not run. The branch is prose-only.
+  `tests/test_docs_consistency.py` ran instead.
+- **Gotchas.** This runner's scripts are in
+  `~/.cache/ghostshift/rietx/wp-2019/` under an `r3_` prefix (`r3_walls.py`,
+  `r3_counts.py`, `r3_jaxcompare.py`, `r3_skips.py`). The CI job logs print
+  pytest's summary bare, with no `=` rule around it.
+- **Next.** Nothing on this WP. If the wall drifts back over the bar, the
+  2026-11-01 entry's option (b), cutting the tier's work, is the next lever,
+  starting from py3.14 4/4, the slowest job in six of these ten runs.
 
 ### 2026-11-02 (3rd session) — four shards on a per-leg record; projected to a median 12.9 min against the bar of 15
 
