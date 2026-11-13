@@ -265,6 +265,13 @@ looked at.
 
 ## Handover log
 
+### 2026-11-13 — the session's fast suite, past midnight
+
+The same session, finishing its handover after midnight: the fast suite ran to
+completion only on the third try, two container limits having killed the first
+two. Its counts are in the entry below. Nothing else changed; the next actions
+are that entry's.
+
 ### 2026-11-12 (2nd session) — fog drawn everywhere, rings found, the kernel waits on a release
 
 A structure figure can now fade its far side toward the background, in the
