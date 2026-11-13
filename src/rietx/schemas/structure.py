@@ -154,16 +154,28 @@ class Cell(Base):
     Crystal-system constraints (e.g. cubic ``a=b=c``, α=β=γ=90°) are enforced
     by the parameter-vector compiler from the space group, not stored here.
 
-    The six parameters carry no physical bounds of their own (``min=-inf,
-    max=inf`` by default, like every other bare ``Parameter`` field) — the
-    cell-window / tie-window machinery in :mod:`rietx.params.vector`
-    (``cell_window``, ``freeze_cell_windows``, ``_tie_windows``) reads an
-    infinite stored bound as *no claim made* and this is deliberately left
-    that way (issue #283's own discussion; a schema default here is a design
-    decision for that machinery, not a local fix).  A degenerate cell reached
-    by an unbounded search is refused by
+    The six parameters carry no default box (``min=-inf, max=inf``, like
+    every other bare ``Parameter`` field), on purpose (issue #283, WP-1528).
+    A finite stored bound is the *caller's claim*:
+    :func:`~rietx.params.vector.cell_window` keeps it and skips its own
+    runaway window on that side, and
+    :meth:`~rietx.params.vector.ParameterTable.bounds` is ordered so that
+    nothing makes a side finite ahead of it.  A box here would therefore act
+    on every free cell and switch off the runaway window on its side.  It would
+    also show in ``ParameterRow`` and the ``.rxt`` document as a claim the user
+    never made.  Under ``solver="trf"`` there is a third ground: scipy scales
+    its trust region by the distance to the bounds, so a box changes the step
+    even when it is never reached (windowing every phase took the IUCr
+    ``cpd-1c`` refit from 82 iterations to its 400 budget, and its corundum
+    fraction from 6.30 to 9.04 wt %; those figures are TRF measurements).  The
+    default ``solver="lm"`` reads a box only when a step reaches it.  The limit lives in the solver instead: a
+    window frozen at each stage's start for phases the data cannot see
+    (``freeze_cell_windows``), and the post-solve
+    :func:`~rietx.refine.reset_cell_runaway`, which puts a runaway phase's
+    cell back at the stage's start (``CELL_RUNAWAY``).  A
+    degenerate cell reached by the unbounded search is refused by
     :func:`~rietx.crystallography.lattice.d_spacings` and neutralised by the
-    solver's own guard instead (``CELL_DEGENERATE_PROBE``).
+    solver's own guard (``CELL_DEGENERATE_PROBE``).
     """
 
     a: Parameter
