@@ -2565,8 +2565,9 @@ class MultiHistogramRefinement:
             # reason the absorption and wavelength rows above do — a caller
             # reads one histogram's diagnostics and must not have to know that
             # this one row lives somewhere else.
-            diags.extend(_strain_flag_diagnostics(model, values, struct))
-            diags.extend(_size_flag_diagnostics(model, values, struct))
+            moving_h = set(table.moving_paths)
+            diags.extend(_strain_flag_diagnostics(model, values, struct, moving_h))
+            diags.extend(_size_flag_diagnostics(model, values, struct, moving_h))
             # The data-side width check (WP-1336), per histogram for the same
             # reason: its comparator is this instrument's fitted widths on this
             # pattern's channels, the one place a too-narrow declared profile

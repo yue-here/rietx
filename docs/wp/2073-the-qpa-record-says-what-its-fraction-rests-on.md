@@ -1,6 +1,6 @@
 # WP-2073 — The QPA record says what its fraction rests on, and QPA at given values has a route
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — held-at wording and the docs landed (#1477); the record fields, trajectory flag and QPA-at-values API wait on the rulings in the handover log
 Track: Render what the fit already knows
 Depends on: — (2060 soft: a one-sided limit for a sub-3σ phase is its profile interval)
 Priority: P3 2026-10-31 — a view over what the fit already knows: `PHASE_UNCONSTRAINED` fires on the unseen phase, but the QPA row, the exported table and the series trajectory carry none of it
@@ -91,9 +91,9 @@ The 1b docs recipe rests on one synthetic family and says so.
       `None` where unmeasured.
 - [ ] `write_qpa_table` adds a `#` caveat per such phase; `qpa_trajectory` carries the flag per
       point (mark or skip, as ruled).
-- [ ] `STRAIN_UNUSUALLY_LARGE` and `SIZE_UNUSUALLY_SMALL` say "held at" when the hold kept the
+- [x] `STRAIN_UNUSUALLY_LARGE` and `SIZE_UNUSUALLY_SMALL` say "held at" when the hold kept the
       value.
-- [ ] Docs: `docs/docs/reference/qpa.md` § One basin gains the absorbed case (a profile that
+- [x] Docs: `docs/docs/reference/qpa.md` § One basin gains the absorbed case (a profile that
       confirms the esd does not establish the phase exists; the rival-model refit, measured on
       one synthetic family) and a "Fractions at given values" section (the empty-stage route,
       why its esds are `None`, the `run_stage` trap, the values on `ref.structure`).
@@ -122,6 +122,71 @@ caveat. A QPA at given values with a supplied scale covariance reproduces the fi
 
 ## Handover log
 
+- **2026-11-09** — first build session (ghostshift runner), PR #1477. The two flags that
+  quote a phase's width no longer say a held value was refined: on the issue's unseen phase,
+  whose strain the hold kept at the caller's seed, `STRAIN_UNUSUALLY_LARGE` now says "held
+  lor_strain at" and points at the stage's held list, while a real 3 nm phase's size still reads
+  "refined to". The QPA page now says what a confirming profile cannot establish (the absorbed
+  case and the rival-model refit that separated it, on one synthetic family) and how to get a
+  fraction at given values today. The record fields, the table caveat, the trajectory flag and
+  the QPA-at-values API were not built: each waits on a question below that the WP gives to the
+  maintainer, and the issue's own reply put the stored-format and top-level-API ones there.
+  - *Done.* Task 3 (8fc84697f): `_strain_flag_diagnostics` and `_size_flag_diagnostics` take
+    the answer's `moving_paths` (refine.py `_build_result`; multi.py per histogram, from
+    `mt.tables[h]`); a path outside it reads "held <term> at", adds "The answer stage did not
+    refine it, so this is the value that stage was handed.", and its suggestion names
+    `StageResult.held`, a user hold or an unfreed path instead of `BOUND_HIT`. `None` keeps the old wording (no claim). One
+    `suggestion=` keyword per code still, so the audit rows' value (1) does not move. The two
+    `help.py` entries gain a sentence. Task 4 (a3e9f33ff): `reference/qpa.md` § One basin gains
+    "A profile that confirms the esd"; new § Fractions at given values. Task 6, partly: the
+    issue's four cases are fixtures in `tests/test_qpa.py` (`_i1213_case`), seven tests (one
+    `slow`, the PNGs `tests/output/qpa_issue1213_*.png`); the two docs-route tests pin the
+    empty-stage route (W bit-identical, esd `None`, 0 free, the caller's `Structure` keeps its
+    seed) and the `run_stage` trap.
+  - *Measured* (`.venv` `[dev]`, macOS arm64, 63d7c120a): the issue's reproducer prints its
+    published lines unchanged on this base, digit for digit. Fast selection
+    (`-m "not slow"`, `-n 2`, behind the Mac's suite lock since pearl answered SOCKS error 1):
+    14345 passed, 415 skipped, 32 xfailed, exit 0, on a3e9f33ff of this branch before the review
+    fixes; the six added fast tests cost 1.44 s together on that run, the slowest 0.37 s. After the
+    fixes (message text, docs, one test's asserts; no test added or removed) `test_qpa.py`,
+    `test_strain_cap.py`, `test_audit_table.py`, `test_help.py` re-ran 127 passed, and
+    `test_manual_api.py` with the joint-fit flag tests 37 passed. Full suite not run: the change is
+    message wording, docs and tests, and moves no measured number. `tests.reader_output` exit 0.
+  - *Review.* `/code-review` was not run (it cannot be pointed at this worktree from the shift);
+    an Opus agent reviewed the diff instead. It confirmed the held/refined wiring on every
+    `_build_result` caller and, by running one, on a joint fit, and that the audit's suggestion
+    count stays 1. Its ten findings were all taken (040ec1d4d): the held suggestion covered only
+    `StageResult.held`; the absorbed-case test asserted over an empty list, since that case bounds
+    the widths at the flag thresholds; help text overclaimed where the value came from; three docs
+    sentences overreached the issue; `set_values` refuses a tied path, now said.
+  - *Generality.* No row added or changed in `_audit.py`, and no new threshold, default or action:
+    the wording follows `moving_paths`, a fact. Judge not dispatched.
+  - *Not built, and why.* Tasks 1, 2, 5 and 7 and the rest of 6 rest on rulings (below). Task
+    7's skill row names task 1's field, so it waits with it. No issue filed: the WP stays open
+    and carries them.
+  - *Decisions for the maintainer* (each blocks the task named):
+    1. Tasks 1-2: put `PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` on the
+       record (the issue's lean, so a reader of `result.qpa` alone sees them), or have
+       `write_qpa_table` take the diagnostics? On the record they are a stored-format change:
+       additive and defaulted (`None` where unmeasured), so the proposal is an "Also in 0.61
+       (WP-2073)" note under the unreleased `SCHEMA_VERSION` "0.61", as WP-2076 and WP-2118 did.
+    2. Task 2: should `qpa_trajectory` mark (a per-point flag) or skip a point whose pattern
+       carried `PHASE_UNCONSTRAINED` on that phase?
+    3. Should `QPA_FRACTION_RANGE`'s suggestion name the unmodelled-background reading before
+       "quote the range" when `fit_admissible` is false?
+    4. Task 5: `Refinement.qpa(*, scale_cov=None)`, or export and document
+       `optimize.qpa.compute_qpa` as `rx.compute_qpa`, or both? With either, does a `scale_cov`
+       without the full covariance say it drops the scale-background correlations? And should
+       an empty-stage fit say so with an info record, so that esd `None` is not read as
+       "unmeasured"?
+  - *Gotchas.* `Refinement` deep-copies the `Structure` it is given, so a test reading the
+    fitted values reads `ref.structure`. Strain and size flags fire on held values too, by
+    design: the flag reports the number, and now says where it came from.
+  - *Next.* After the rulings: task 1 (fields, writers named at review, the schema note), then
+    the table caveat and the trajectory flag (task 2), task 5's API in the manual partition, the
+    acceptance tests (`support_sigma` < 3 and `conditional_on` naming `phases.1.lor_strain` on
+    the unseen case; no caveat on real weak; a supplied scale covariance reproducing the fit's
+    esd), and task 7's skill row.
 - **2026-10-31** — created from the issue triage (#1213). No open WP owns the QPA record's
   support fields: WP-1958 is awaiting its close and covered only a phase with no line in range;
   WP-1340 is the molar basis; WP-2060 takes only the upper-limit alternative.

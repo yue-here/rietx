@@ -167,6 +167,50 @@ A wrong Z·M·V is a different failure.
 A wrong site multiplicity or a wrong space-group setting ([`SITE_SNAPPED_TO_SPECIAL_POSITION`](diagnostics-structures.md#site_snapped_to_special_position), [`SPACE_GROUP_SETTING_ASSUMED`](diagnostics-structures.md#space_group_setting_assumed)) moves the Z·M·V factor of one phase by a fixed multiple, at unchanged Rwp.
 A width profile cannot see that, and it finds only the case where the pattern admits several fractions at once.
 
+### A profile that confirms the esd
+
+A profile that confirms the esd does not establish that the phase exists.
+The profile tests whether the pattern admits other fractions, and it cannot test whether the intensity the phase took is its own.
+A phase that is not in the specimen, with lines close to another phase's, can take intensity the model lacks, such as a broad component under the other phase's lines.
+It then reports a fraction with an ordinary esd, [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) stays silent because the phase's lines do carry intensity, and the profile stays inside the esd.
+
+Issue #1213 measured this on rietx's own simulated data.
+The specimen was LaB₆ alone, with a broad LaB₆ component the model lacked, and the model added a cubic perovskite whose lines lie within 0.3 % of LaB₆'s.
+The fit reported the absent perovskite at 17.7 ± 2.2 wt %, with [`BOUND_HIT`](diagnostics-refinement.md#bound_hit) and [`BACKGROUND_ABSORPTION`](diagnostics-refinement.md#background_absorption), and its profile reached an excess of 0.31 with the fit admissible.
+A real CaF₂ phase at 3 nm in the same family draws `BACKGROUND_ABSORPTION` too, and `BOUND_HIT` under the same bounds, so every single-fit rule the issue tested either fired on both or missed the absent phase.
+
+The check that separated them is a rival model.
+Add a broad copy of the phase whose lines coincide (here a second LaB₆ phase with a small size seeded), free its scale and its size, and refit.
+An absent phase that only held the missing component falls to nothing, because the rival describes that component better: 9 of 9 such fits fell to 0.05 wt % or less.
+A real phase keeps its fraction: 0 of 15 fits moved.
+In the negative runs the rival was the component that generated the data, the most favourable case a rival can be.
+These counts come from one synthetic family, LaB₆ with one cubic minor phase under a laboratory Cu Kα source, and are untested beyond it.
+`tests/test_qpa.py` carries the issue's four cases as fixtures (the rival-model refits are not among them).
+
+## Fractions at given values
+
+A weight fraction at values you supply, rather than at a fit's answer, needs a stage that frees nothing.
+`Refinement.set_values` writes the values and leaves `Refinement.result_` at `None`, because no fit has run at them.
+It refuses a tied path, such as a cubic `cell.b` that follows `cell.a`, so `values` names untied paths only: set the source of a tie, and the tie follows.
+`Refinement.fit` with a plan of one empty stage then evaluates the model where it stands and reports `RefinementResult.qpa` there.
+
+<!-- api-doc: no-exec — needs a pattern and a fitted model; tests/test_qpa.py runs this route on issue #1213's real weak case -->
+```python
+ref = rx.Refinement(structure, instrument)
+ref.set_values(values)
+result = ref.fit(data, plan=rx.RefinementPlan(stages=[rx.Stage("evaluate", [])]))
+print(result.statistics.n_free_parameters)       # 0
+print(result.qpa.phases[1].weight_fraction)      # the fit's fraction at these values, bit for bit
+print(result.qpa.phases[1].weight_fraction_stderr)  # None
+```
+
+With nothing free there is no covariance, so every esd on the answer is `None`, `PhaseQuantity.weight_fraction_stderr` included.
+An esd on a fraction comes from the covariance of the scales a fit refined.
+
+Two traps.
+`Refinement.run_stage` with an empty stage does not do this on a refinement that has already fitted: it continues the previous fit's free set, so the values you set are refitted away.
+And `Refinement` copies the `Structure` it is given, so the values live on `Refinement.structure`, while your own `Structure` still holds what you built it with.
+
 ## Scope
 
 `QuantitativePhaseAnalysis.crystalline_only` is `True` on every result.

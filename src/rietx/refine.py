@@ -9560,11 +9560,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 
     # A strain broader than solved refinements normally use — a flag to check,
     # not a bound (the bound is params.vector.strain_cap, one tier up).
-    diagnostics = diagnostics + _strain_flag_diagnostics(model, values, structure)
+    # Both say "held at" for a path the answer did not move (WP-2073):
+    # ``moving``, the set the parameter rows above were read off.
+    diagnostics = diagnostics + _strain_flag_diagnostics(model, values, structure,
+                                                         moving)
 
     # A crystallite smaller than solved refinements normally report — the size
     # twin of the flag above (bound: params.vector.size_cap, one tier up).
-    diagnostics = diagnostics + _size_flag_diagnostics(model, values, structure)
+    diagnostics = diagnostics + _size_flag_diagnostics(model, values, structure,
+                                                       moving)
 
     # A refined occupancy past a full site (WP-2002): Atom.occ has no ceiling,
     # so this is what meets one.
@@ -11771,7 +11775,8 @@ STRAIN_FLAG_WIDTH = 1.5
 
 
 def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
-                             structure: Structure) -> list[Diagnostic]:
+                             structure: Structure,
+                             moving: set[str] | None = None) -> list[Diagnostic]:
     """``STRAIN_UNUSUALLY_LARGE`` — a strain past what solved refinements use.
 
     **The upper of two tiers, and the two do different jobs.**  One tier down,
@@ -11800,6 +11805,14 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
     (``CompiledModel.lor_strain_term``, WP-1467) — so its stored value is no
     width and is not tested; the block's own Λ(hkl) is not an entry with a
     width.
+
+    ``moving`` is the answer's ``ParameterTable.moving_paths``.  A path outside
+    it was not refined — a stage hold (``StageResult.held``: an absent phase,
+    WP-1301), a user hold, or never freed — so the message says the value was
+    *held at* what the stage was handed, never "refined to" it (WP-2073, the
+    rule of WP-1076 that a message naming its discriminator makes the claim).
+    ``None`` makes no claim about which paths moved and keeps the refined
+    wording, which is what a caller with no table has always read.
     """
     out: list[Diagnostic] = []
     for ip in range(len(model.phases)):
@@ -11811,18 +11824,37 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
             if width is None or not width > STRAIN_FLAG_WIDTH:
                 continue
             path = f"phases.{ip}.{term}"
+            held = moving is not None and path not in moving
             out.append(Diagnostic(
                 level="warning", code="STRAIN_UNUSUALLY_LARGE",
                 where=[path], value=float(width),
-                message=(f"Phase {ip} ({name}) refined {term} to a strain "
-                         f"broadening of {width:.4g} deg (FWHM coefficient of "
-                         f"tanθ), {width / STRAIN_FLAG_WIDTH:.0f}× the "
-                         f"flag threshold of {STRAIN_FLAG_WIDTH}."),
-                suggestion="Check whether BOUND_HIT fired on the same path. "
-                           "If the specimen really is this defective, the "
-                           "value stands; this flag changes nothing in the fit.",
+                message=(f"Phase {ip} ({name}) "
+                         + (f"held {term} at" if held else f"refined {term} to")
+                         + f" a strain broadening of {width:.4g} deg (FWHM "
+                         f"coefficient of tanθ), {width / STRAIN_FLAG_WIDTH:.0f}× "
+                         f"the flag threshold of {STRAIN_FLAG_WIDTH}."
+                         + (_HELD_FLAG_CLAUSE if held else "")),
+                suggestion=(_HELD_FLAG_SUGGESTION if held else
+                            "Check whether BOUND_HIT fired on the same path. "
+                            "If the specimen really is this defective, the "
+                            "value stands; this flag changes nothing in the fit."),
             ))
     return out
+
+
+#: The clause :func:`_strain_flag_diagnostics` and :func:`_size_flag_diagnostics`
+#: add when the flagged path did not move in the answer (WP-2073): the number is
+#: the one the answer stage started from — a seed, a user's value, an earlier
+#: stage's value, or where a collapsed phase was restored to — and the answer
+#: did not measure it.  The suggestion covers the three ways a path is still:
+#: a stage hold (``StageResult.held``), a user hold
+#: (``StageResult.blocked_by_hold``), or no stage freed it.
+_HELD_FLAG_CLAUSE = (" The answer stage did not refine it, so this is the "
+                     "value that stage was handed.")
+_HELD_FLAG_SUGGESTION = ("If StageResult.held names the path, PHASE_UNCONSTRAINED "
+                         "says why the stage held it; otherwise your hold or the "
+                         "plan kept it, and the value is yours. This flag changes "
+                         "nothing in the fit.")
 
 
 def _sqrt_or_none(variance: float | None) -> float | None:
@@ -11949,7 +11981,8 @@ def _rigid_body_unsupported(table: ParameterTable,
 
 
 def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
-                           structure: Structure) -> list[Diagnostic]:
+                           structure: Structure,
+                           moving: set[str] | None = None) -> list[Diagnostic]:
     """``SIZE_UNUSUALLY_SMALL`` — a crystallite past what solved refinements use.
 
     The size twin of :func:`_strain_flag_diagnostics`, and the two do the same
@@ -11983,6 +12016,9 @@ def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
     wavelengths.  A source stating none returns no diagnostic, which is where
     this tier's empty state differs from the bound's; that function's docstring
     is where the difference is argued.
+
+    ``moving`` reads as :func:`_strain_flag_diagnostics`' does: a path outside
+    it is reported *held at* its size, never "refined to" it (WP-2073).
     """
     lam = _longest_line_wavelength(model)
     if lam is None:
@@ -12001,19 +12037,23 @@ def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
                 continue
             size_nm = size_a / 10.0
             path = f"phases.{ip}.{term}"
+            held = moving is not None and path not in moving
             out.append(Diagnostic(
                 level="warning", code="SIZE_UNUSUALLY_SMALL",
                 where=[path], value=float(size_nm),
-                message=(f"Phase {ip} ({name}) refined {term} to an apparent "
-                         f"crystallite size of {size_nm:.3g} nm "
+                message=(f"Phase {ip} ({name}) "
+                         + (f"held {term} at" if held else f"refined {term} to")
+                         + f" an apparent crystallite size of {size_nm:.3g} nm "
                          f"(Scherrer K={SCHERRER_K}, λ={lam:.4g} Å), below the "
                          f"flag threshold of {floor_nm:.0f} nm. Below about "
                          f"2 nm a crystallite is a few unit cells, and "
                          f"broadened Bragg peaks may not describe its pattern "
-                         f"(the Debye scattering equation does)."),
-                suggestion="Check whether BOUND_HIT fired on the same path. "
-                           "If the specimen really is this small, the value "
-                           "stands; this flag changes nothing in the fit.",
+                         f"(the Debye scattering equation does)."
+                         + (_HELD_FLAG_CLAUSE if held else "")),
+                suggestion=(_HELD_FLAG_SUGGESTION if held else
+                            "Check whether BOUND_HIT fired on the same path. "
+                            "If the specimen really is this small, the value "
+                            "stands; this flag changes nothing in the fit."),
             ))
     return out
 

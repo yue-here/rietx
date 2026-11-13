@@ -757,3 +757,261 @@ def test_a_source_with_no_table_declines_by_name():
         source_kind="neutron_tof")
     assert mu_r is None
     assert "attenuation unavailable" in reason and "neutron_tof" in reason
+
+
+# --- Issue #1213's four cases (WP-2073) ------------------------------------
+#
+# LaB6 plus one cubic minor phase, lab Cu Ka Bragg-Brentano, 15-100 deg 2theta:
+# rietx simulating its own data, seeds fixed, so every number below is about
+# the run and none is about a specimen.  The issue's reproducer, cut to what
+# the tests read.  ``unseen``: CaF2 absent, a hump the background cannot
+# follow, CaF2 seeded broad.  ``absorbed``: an absent perovskite whose lines
+# sit within 0.3 % of LaB6's takes a broad LaB6 foot the model lacks.
+# ``real nano``: CaF2 present at 3 nm.  ``real weak``: CaF2 present, sharp.
+
+_I1213_TT = np.arange(15.0, 100.0, 0.02)
+_I1213_LAM = 1.5406
+
+
+def _i1213_lab6(k, scale=1e-3):
+    ph = Phase(name="LaB6", space_group="P m -3 m", cell=Cell.cubic(4.1566),
+               atoms=[Atom(label="La", species="La", x=Parameter(value=0.0),
+                           y=Parameter(value=0.0), z=Parameter(value=0.0)),
+                      Atom(label="B", species="B", x=Parameter(value=0.1993),
+                           y=Parameter(value=0.5), z=Parameter(value=0.5))])
+    ph.scale.value = scale * k
+    ph.lor_strain.value = 0.02
+    return ph
+
+
+def _i1213_minor(kind, k, scale, lor_strain=0.05, lor_size=0.0):
+    if kind == "caf2":
+        ph = Phase(name="CaF2", space_group="F m -3 m", cell=Cell.cubic(5.4631),
+                   atoms=[Atom(label="Ca", species="Ca2+", x=Parameter(value=0.0),
+                               y=Parameter(value=0.0), z=Parameter(value=0.0)),
+                          Atom(label="F", species="F1-", x=Parameter(value=0.25),
+                               y=Parameter(value=0.25), z=Parameter(value=0.25))])
+    else:
+        ph = Phase(name="Perov", space_group="P m -3 m", cell=Cell.cubic(4.170),
+                   atoms=[Atom(label="Ba", species="Ba2+", x=Parameter(value=0.0),
+                               y=Parameter(value=0.0), z=Parameter(value=0.0)),
+                          Atom(label="Ti", species="Ti4+", x=Parameter(value=0.5),
+                               y=Parameter(value=0.5), z=Parameter(value=0.5)),
+                          Atom(label="O", species="O2-", x=Parameter(value=0.5),
+                               y=Parameter(value=0.5), z=Parameter(value=0.0))])
+    ph.scale.value = scale * k
+    ph.lor_strain.value = lor_strain
+    ph.lor_size.value = lor_size
+    return ph
+
+
+def _i1213_instrument(k, n):
+    ins = Instrument.bragg_brentano(radiation="CuKa")
+    ins.background = BackgroundChebyshev(coefficients=[
+        Parameter(value=v) for v in [200.0 * k, -60.0 * k, 20.0 * k] + [0.0] * (n - 3)])
+    return ins
+
+
+def _i1213_simulate(phases, k, hump, seed):
+    s, ins = Structure(phases=phases), _i1213_instrument(k, 3)
+    m = compile_model(s, ins, PatternData(two_theta=_I1213_TT.tolist(),
+                                          intensity=[0.0] * len(_I1213_TT)),
+                      mode="rietveld")
+    t = ParameterTable(s, ins)
+    y = np.asarray(m.evaluate(t.decode(t.x0())))
+    y = y + k * hump * np.exp(-4 * np.log(2) * ((np.asarray(m.tt) - 30.0) / 15.0) ** 2)
+    y = np.random.default_rng(seed).poisson(np.maximum(y, 1.0)).astype(float)
+    return PatternData(two_theta=np.asarray(m.tt).tolist(), intensity=y.tolist())
+
+
+def _i1213_plan():
+    from rietx import RefinementPlan, Stage
+
+    free = ["phases.*.scale", "phases.*.cell.*", "instrument.background.*",
+            "instrument.zero_shift", "instrument.profile.w", "phases.*.lor_strain",
+            "phases.1.lor_size"]
+    return RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("cell", ["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage("width", free)])
+
+
+def _i1213_case(name):
+    """``(data, structure, instrument)`` for one of the issue's four cases."""
+    from rietx.model.profiles.caglioti import size_coefficient_for_size as size_coef
+
+    if name == "unseen":
+        k = 1
+        data = _i1213_simulate([_i1213_lab6(k), _i1213_minor("caf2", k, 0.0)], k, 30.0, 3)
+        model = [_i1213_lab6(k),
+                 _i1213_minor("caf2", k, 1e-5, lor_strain=10.0, lor_size=0.02)]
+    elif name == "absorbed":
+        k = 100
+        foot = _i1213_lab6(k, 0.3e-3)
+        foot.name = "foot"
+        foot.lor_size.value = size_coef(60.0, _I1213_LAM)
+        data = _i1213_simulate([_i1213_lab6(k), _i1213_minor("perov", k, 0.0), foot],
+                               k, 0.0, 1)
+        model = [_i1213_lab6(k), _i1213_minor("perov", k, 1e-5, lor_size=0.02)]
+        for ph in model:
+            ph.lor_strain.max = 1.5
+            ph.lor_size.max = size_coef(50.0, _I1213_LAM)
+    elif name == "real nano":
+        k = 100
+        data = _i1213_simulate(
+            [_i1213_lab6(k), _i1213_minor("caf2", k, 3e-5,
+                                          lor_size=size_coef(30.0, _I1213_LAM))],
+            k, 0.0, 1)
+        model = [_i1213_lab6(k), _i1213_minor("caf2", k, 3e-5, lor_size=0.02)]
+    else:
+        assert name == "real weak"
+        k = 1
+        data = _i1213_simulate([_i1213_lab6(k), _i1213_minor("caf2", k, 6e-6)], k, 0.0, 1)
+        model = [_i1213_lab6(k), _i1213_minor("caf2", k, 6e-6, lor_size=0.02)]
+    return data, Structure(phases=model), _i1213_instrument(k, 6)
+
+
+_I1213_FITS: dict = {}
+
+
+def _i1213_fit(name):
+    """The case fitted under the issue's staged plan, once per worker."""
+    if name not in _I1213_FITS:
+        data, s, ins = _i1213_case(name)
+        ref = Refinement(s, ins)
+        result = ref.fit(data, plan=_i1213_plan(), telemetry=False)
+        _I1213_FITS[name] = (data, ref, result)
+    return _I1213_FITS[name]
+
+
+def _on_minor(result, code):
+    return [d for d in result.diagnostics
+            if d.code == code and any(w.startswith("phases.1.") for w in d.where)]
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_a_strain_the_answer_held_is_reported_held_at_not_refined_to():
+    """The unseen case: the hold kept ``lor_strain`` at the caller's seed, so
+    ``STRAIN_UNUSUALLY_LARGE`` says so (WP-2073), and the path is the one the
+    answer stage's record holds."""
+    _, _, result = _i1213_fit("unseen")
+    assert "phases.1.lor_strain" in result.stages[-1].held
+    assert _on_minor(result, "PHASE_UNCONSTRAINED")
+    (flag,) = _on_minor(result, "STRAIN_UNUSUALLY_LARGE")
+    assert flag.where == ["phases.1.lor_strain"]
+    assert "held lor_strain at" in flag.message
+    assert "refined" not in flag.message
+    assert "handed" in flag.message
+    assert "BOUND_HIT" not in flag.suggestion
+    assert "StageResult.held" in flag.suggestion
+    assert flag.value == 10.0
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_a_size_the_answer_refined_is_still_reported_refined_to():
+    """The positive arm: a real 3 nm phase whose size the answer moved keeps
+    the refined wording and its BOUND_HIT advice."""
+    _, _, result = _i1213_fit("real nano")
+    assert "phases.1.lor_size" not in result.stages[-1].held
+    (flag,) = _on_minor(result, "SIZE_UNUSUALLY_SMALL")
+    assert flag.where == ["phases.1.lor_size"]
+    assert "refined lor_size to" in flag.message
+    assert "held" not in flag.message
+    assert flag.suggestion.startswith("Check whether BOUND_HIT fired")
+
+
+def test_the_flags_wording_follows_the_moving_set_and_none_claims_nothing():
+    """Both flags, direct: a path outside ``moving`` is held, inside it is
+    refined, and ``None`` (no table) keeps the refined wording."""
+    from rietx.refine import _size_flag_diagnostics, _strain_flag_diagnostics
+
+    lab6 = _i1213_lab6(1)
+    lab6.lor_strain.value = 3.0
+    lab6.lor_size.value = 2.0
+    s, ins = Structure(phases=[lab6]), _i1213_instrument(1, 3)
+    model = compile_model(s, ins, PatternData(two_theta=_I1213_TT.tolist(),
+                                              intensity=[1.0] * len(_I1213_TT)),
+                          mode="rietveld")
+    t = ParameterTable(s, ins)
+    values = t.decode(t.x0())
+    for fn, path in ((_strain_flag_diagnostics, "phases.0.lor_strain"),
+                     (_size_flag_diagnostics, "phases.0.lor_size")):
+        term = path.rsplit(".", 1)[1]
+        (bare,) = [d for d in fn(model, values, s) if d.where == [path]]
+        (moved,) = [d for d in fn(model, values, s, {path}) if d.where == [path]]
+        (kept,) = [d for d in fn(model, values, s, set()) if d.where == [path]]
+        assert f"refined {term} to" in bare.message
+        assert moved.message == bare.message and moved.suggestion == bare.suggestion
+        assert f"held {term} at" in kept.message
+        assert kept.value == bare.value
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_the_absorbed_case_is_seen_and_its_widths_refined_to_a_bound():
+    """The case the single fit has no rule for (WP-2073 § Context): the absent
+    phase takes the foot, nothing calls it unseen or holds it, and its strain
+    refined onto the bound the case set.  (Its widths are bounded at the flag
+    thresholds, so neither width flag can fire here.)"""
+    _, _, result = _i1213_fit("absorbed")
+    assert not _on_minor(result, "PHASE_UNCONSTRAINED")
+    assert not [p for p in result.stages[-1].held if p.startswith("phases.1.")]
+    assert any("phases.1.lor_strain" in d.where
+               for d in _on_minor(result, "BOUND_HIT"))
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_fractions_at_given_values_through_the_empty_stage_route():
+    """The documented route (``reference/qpa.md`` § Fractions at given values):
+    an empty stage at the fit's values returns its fraction bit for bit, with
+    no esd, 0 free; the caller's own ``Structure`` still holds the seed."""
+    from rietx import RefinementPlan, Stage
+
+    _, _, fitted = _i1213_fit("real weak")
+    values = {p.path: p.value for p in fitted.parameters
+              if not any(x in p.path for x in (".cell.b", ".cell.c", "atoms.1.x"))}
+    data, s, ins = _i1213_case("real weak")
+    seed = s.phases[1].scale.value
+    ref = Refinement(s, ins)
+    ref.set_values(values)
+    assert ref.result_ is None
+    r = ref.fit(data, plan=RefinementPlan(stages=[Stage("evaluate", [])]),
+                telemetry=False)
+    assert r.statistics.n_free_parameters == 0
+    q, q_fit = r.qpa.phases[1], fitted.qpa.phases[1]
+    assert q.weight_fraction == q_fit.weight_fraction
+    assert q.weight_fraction_stderr is None
+    assert s.phases[1].scale.value == seed
+    assert ref.structure.phases[1].scale.value == values["phases.1.scale"]
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_an_empty_run_stage_on_a_fitted_object_refits_its_free_set():
+    """The trap the same section names: ``run_stage`` with an empty stage on
+    a fitted object continues the previous free set, so the value asked for
+    is refitted away (WP-2073 leaves the semantics; this pins the docs)."""
+    from rietx import Stage
+
+    data, s, ins = _i1213_case("real weak")
+    ref = Refinement(s, ins)
+    ref.fit(data, plan=_i1213_plan(), telemetry=False)
+    fitted = ref.structure.phases[1].scale.value
+    ref.set_values({"phases.1.scale": 2 * fitted})
+    r = ref.run_stage(data, Stage("evaluate", []), telemetry=False)
+    assert r.statistics.n_free_parameters > 0
+    assert ref.structure.phases[1].scale.value == pytest.approx(fitted, rel=1e-3)
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_the_issue_1213_fits_are_drawn_for_inspection():
+    """obs/calc/diff for each case, to ``tests/output/`` (gitignored)."""
+    import matplotlib.pyplot as plt
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    for name in ("unseen", "absorbed", "real nano", "real weak"):
+        _, _, result = _i1213_fit(name)
+        path = out / f"qpa_issue1213_{name.replace(' ', '_')}.png"
+        result.plot(path)
+        plt.close("all")
+        assert path.exists()
