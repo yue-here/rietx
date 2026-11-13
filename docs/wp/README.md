@@ -22,6 +22,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-02 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | 2026-11-13 | P3 | [rietview](#rietview) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 2026-11-09 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -55,8 +56,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 
@@ -415,7 +414,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1536](1536-the-structure-figure-as-an-svg.md) | The structure figure as an SVG | ⬜ | P3 | — |
 | [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | ⬜ | P3 | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
 | [1538](1538-ambient-occlusion-in-the-structure-figure.md) | Ambient occlusion in the structure figure | ⬜ | P3 | — |
-| [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | ⬜ | P3 | — ([2111](2111-what-the-structure-figure-still-misleads.md) soft) |
+| [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | 🔄 2026-11-13 | P3 | — ([2111](2111-what-the-structure-figure-still-misleads.md) soft) |
 
 ## <a id="rigid-bodies"></a>rigid-bodies — a fragment refined as one body
 
@@ -513,8 +512,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
 | [2200](2200-the-palette.md) | The palette | 🔄 2026-11-10 | P2 | [2142](2142-the-gui-style-guide.md) |
-| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 🔄 2026-11-10 | P2 | [2127](2127-the-plan-tab.md) |
-| [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 🔄 2026-11-10 | P2 | [2133](2133-the-file-menu.md) |
+| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | ✅ 2026-11-13 | — | [2127](2127-the-plan-tab.md) |
+| [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | ✅ 2026-11-13 | — | [2133](2133-the-file-menu.md) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
@@ -850,6 +849,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
+| [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ⬜ | P3 | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
