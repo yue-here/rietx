@@ -525,7 +525,43 @@ would leave every mode that sub-direction forbids at a stationary point of the
 residual symmetry. The first mode's sign is positive, which chooses one domain;
 the sign of a driving amplitude is a domain label and only the relative signs
 inside a basis are measured {cite}`perezmato2010`. A child that is already
-distorted starts at its own decomposition and is never re-seeded.
+distorted starts at its own decomposition and is never re-seeded. A child
+stated from one of
+{func}`~rietx.crystallography.magnetic.isotropy.distortion_candidates`'
+candidates is seeded in its driving irrep alone, whose isotropy group is $H$ by
+definition, so the irreps it couples to start at zero and move once it has.
+
+The statement's cell is the parent's carried through $P$ plus the Γ strains the
+child's group allows, held, the metric of {eq}`pos-child-metric`. The parent's
+cell is the parent-symmetric part of the child's metric and the strains the
+rest, so a child at its parent's metric holds every strain at zero. A strain shares the parent's stationary point. With every
+non-identity amplitude at zero the atoms keep the parent's symmetry, so the
+pattern is invariant under each parent rotation $R$ acting on the metric
+change $\Delta$, and a Γ strain $\Delta_s$ lies in the kernel of the parent's
+average $\langle\cdot\rangle_{\text{parent}}$ {cite}`campbell2006`:
+
+```{math}
+:label: par-modes-strain
+
+\chi^2\bigl(R^{\mathsf{T}}\Delta R\bigr) = \chi^2(\Delta)
+\;\;\forall R
+\quad\Longrightarrow\quad
+\frac{\partial\chi^2}{\partial s}\Big|_{\Delta = 0}
+= \nabla\chi^2(0)\cdot\langle\Delta_s\rangle_{\text{parent}} = 0 .
+```
+
+{source}`rietx.params.vector.ParameterTable`
+
+The parameter table refuses a stage that frees the strains there too. The
+pattern is even in a strain only where a parent operation maps that strain to
+its negative, as it does for a shear. A tetragonal strain of a cubic parent is
+not mapped to its negative by any parent operation, so its sign is physical and
+not a domain label, and zero is still stationary. With the amplitudes at zero,
+an amplitude whose $\mathbf{k}$ is not Γ also stays stationary under a held non-zero
+strain, because a lost parent translation reverses it without touching the
+metric. The seeded amplitudes lift the strain's stationary point, so no strain
+is seeded, since a held strain moved off zero would bias every fit that keeps
+it held.
 
 ## Soft restraints
 
