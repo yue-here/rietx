@@ -725,3 +725,42 @@ def test_an_element_an_ordered_count_skips_is_named_in_the_note():
     assert line.startswith("ordered: Fe not counted, 3.8 atoms per cell at z=4")
     # only an ordered declaration skips; a disordered one counts the fraction as a site
     assert _uncounted_lines(ExtinctionPrior(z=4, formula="Fe0.95O"), 4) == []
+
+
+OLIVINE = "(Mg0.7Fe0.3)2SiO4"
+
+
+def test_a_bracketed_decimal_count_is_read_exactly_at_z_10():
+    """Review of #1271, round 2: the bracket multiplies Fe 0.3 by 2 in floats,
+    to 0.6000000000000001, so at Z = 10 the float count gave Fe
+    6.000000000000001 per cell and ``ordered`` skipped an element it should
+    count.  The screen reads the parser's exact count, the decimals as written:
+    Fe 3/5, six per cell, counted.  The float count of a bare decimal can be
+    off too (``La0.8Ca0.2MnO3``'s Ca at Z = 5)."""
+    from fractions import Fraction
+
+    from rietx.crystallography.atomic_volume import (
+        _exact_formula_counts,
+        formula_counts,
+    )
+    from rietx.indexing.diagnostics import _uncounted_lines
+    from rietx.indexing.extinction import content_exclusion, uncounted_elements
+
+    exact = _exact_formula_counts(OLIVINE)
+    assert exact == {"Mg": Fraction(7, 5), "Fe": Fraction(3, 5), "Si": 1, "O": 4}
+    # the public float counts are unchanged, and are the case the review found
+    assert formula_counts(OLIVINE)["Fe"] == 0.6000000000000001
+    assert uncounted_elements(10, exact) == {}
+    prior = ExtinctionPrior(z=10, formula=OLIVINE, ordered=True)
+    assert _uncounted_lines(prior, 10) == []
+    # counted, Fe 6 is tested against the orbits: F m -3 m's (4, 8, 24, ...)
+    # make no 6, where the float count skipped Fe and found nothing
+    fm3m = gemmi.find_spacegroup_by_name("F m -3 m")
+    assert "Fe 6 per cell" in content_exclusion(fm3m, 10, {"Fe": exact["Fe"]},
+                                                ordered=True)
+    # no bracket needed: the parser adds count - 1 to the symbol's 1, so a bare
+    # Ca0.2 is 0.19999999999999996 as a float, and one Ca per cell at Z = 5
+    manganite = _exact_formula_counts("La0.8Ca0.2MnO3")
+    assert formula_counts("La0.8Ca0.2MnO3")["Ca"] != 0.2
+    assert manganite["Ca"] == Fraction(1, 5)
+    assert uncounted_elements(5, manganite) == {}

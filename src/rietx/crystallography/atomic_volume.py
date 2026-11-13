@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import math
 import re
+from fractions import Fraction
 
 #: Hofmann (2002), Table 2: element → (v̄, Δv), Å³ at 298 K.  Δv is ``None``
 #: where the table prints a volume and no mean error (Ac, Am).
@@ -157,7 +158,7 @@ def _element(symbol: str, formula: str) -> str:
     raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
 
 
-def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
+def _parse_part(part: str, formula: str, element=None, num=float) -> dict[str, float]:
     stack: list[dict[str, float]] = [{}]
     last: dict[str, float] | None = None
     pos = 0
@@ -169,8 +170,8 @@ def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
         symbol, opening, closing, count, _space = m.groups()
         if symbol:
             el = (element or _element)(symbol, formula)
-            stack[-1][el] = stack[-1].get(el, 0.0) + 1.0
-            last = {el: 1.0}
+            stack[-1][el] = stack[-1].get(el, num(0)) + num(1)
+            last = {el: num(1)}
         elif opening:
             stack.append({})
             last = None
@@ -179,23 +180,25 @@ def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
                 raise ValueError(f"{formula!r}: a closing bracket with no opening one")
             last = stack.pop()
             for el, n in last.items():
-                stack[-1][el] = stack[-1].get(el, 0.0) + n
+                stack[-1][el] = stack[-1].get(el, num(0)) + n
         elif count:
             if last is None:
                 raise ValueError(f"{formula!r}: the count {count} follows no "
                                  "element or bracket")
             for el, n in last.items():
-                stack[-1][el] += n * (float(count) - 1.0)
+                stack[-1][el] += n * (num(count) - num(1))
             last = None
     if len(stack) != 1:
         raise ValueError(f"{formula!r}: an opening bracket is never closed")
     return stack[0]
 
 
-def _parse_formula(formula: str, element=None) -> dict[str, float]:
+def _parse_formula(formula: str, element=None, num=float) -> dict[str, float]:
     """Element counts of a chemical formula; the grammar is in
     :func:`formula_unit_volume`.  ``element`` checks each symbol (default: an
-    element Hofmann's table has a volume for)."""
+    element Hofmann's table has a volume for).  ``num`` reads each count's
+    text and is the type the arithmetic runs in: ``float``, or ``Fraction``
+    for the exact count (:func:`_exact_formula_counts`)."""
     for m in _DOT_TWO_WAYS.finditer(formula):
         if int(m.group(1)) != 0:
             raise ValueError(
@@ -205,12 +208,12 @@ def _parse_formula(formula: str, element=None) -> dict[str, float]:
     counts: dict[str, float] = {}
     for part in re.split(r"[·•*]", formula):
         m = _LEADING_COUNT.match(part)
-        factor = float(m.group(1)) if m else 1.0
+        factor = num(m.group(1)) if m else num(1)
         body = part[m.end():] if m else part
         if not body.strip():
             raise ValueError(f"{formula!r}: an empty part")
-        for el, n in _parse_part(body, formula, element).items():
-            counts[el] = counts.get(el, 0.0) + factor * n
+        for el, n in _parse_part(body, formula, element, num).items():
+            counts[el] = counts.get(el, num(0)) + factor * n
     counts = {el: n for el, n in counts.items() if n != 0.0}
     if not counts or any(n < 0.0 for n in counts.values()):
         raise ValueError(f"{formula!r} holds no positive element count")
@@ -234,6 +237,19 @@ def formula_counts(formula: str) -> dict[str, float]:
     is not an element raises naming it.
     """
     return _parse_formula(formula, _any_element)
+
+
+def _exact_formula_counts(formula: str) -> dict[str, Fraction]:
+    """:func:`formula_counts` as exact fractions: the decimals as written.
+
+    Each count is read from its own text and every bracket, repeat and
+    adduct factor is applied in ``Fraction`` arithmetic, so
+    ``(Mg0.7Fe0.3)2SiO4`` holds Fe 3/5, where the float count is
+    0.6000000000000001.  For a caller that asks whether count × Z is whole
+    (:func:`~rietx.indexing.extinction.content_exclusion`), which a float
+    one ulp off answers wrongly.
+    """
+    return _parse_formula(formula, _any_element, Fraction)
 
 
 def formula_unit_volume(formula: str,
