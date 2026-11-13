@@ -51,10 +51,10 @@ the machine's speed rather than the route's contract.
 
 ## Tasks
 
-- [ ] Give the GUI post a client timeout above the watcher's own deadline, derived from
+- [x] Give the GUI post a client timeout above the watcher's own deadline, derived from
   `rietx.watch.GUI_BOOT_TIMEOUT` rather than a second literal (for example
   `GUI_BOOT_TIMEOUT + 10`). `_post` takes the timeout as an argument; the other callers keep 5 s.
-- [ ] Check for siblings: any other test that sends a request to a route which spawns a
+- [x] Check for siblings: any other test that sends a request to a route which spawns a
   process or waits on one, with a client deadline below the server's. On 2026-11-13 a grep of
   `tests/` for `Popen` and `_gui_argv` found only this test and `test_run_control.py`, which
   waits 120 s.
