@@ -49,6 +49,15 @@ is polished the same way, so the comparison tells a path scatter from a second m
     .venv/bin/python docs/wp/2017-batch/group_a.py summary  # rewrite group_a_summary.md
     .venv/bin/python docs/wp/2017-batch/group_a.py --hard   # the hard starts, resumes
     .venv/bin/python docs/wp/2017-batch/group_a.py --hard summary
+    .venv/bin/python docs/wp/2017-batch/group_a.py --window control  # group H's positive arm
+    .venv/bin/python docs/wp/2017-batch/group_a.py --window summary  # rewrite group_h_summary.md
+
+Since 2026-11-09 (``WP2017_RAW`` names where the rows go, ``WP2017_WORKERS`` the pool) the
+hard starts run all ten constants, ``FTOL``, ``_CONVERGED_RUNS`` and ``_M_LO`` added for the
+failing case they owed, and every fit of both sweeps carries group H's count
+(``window_spied``): per solve, which phases took the support-based cell window, which free cell
+columns it bounded and which ended on an edge.  Each start also runs one ``CELL_WINDOW`` arm,
+``_freeze_cell_windows`` declaring no phase, read like any other arm.
 
 ``--hard`` runs the seven constants the shipped starts rarely reach, on their same arms,
 from nine harder starts (WP-2017 § The list, "Group A's hard starts", fixed 2026-11-05
@@ -116,15 +125,20 @@ from tests import test_window_domain as w  # noqa: E402
 from tests.test_staged_start_invariance import _axial_pair_ordered  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-# The two JSONL files are not committed; the 2026-11-05 rows sit in ~/.cache/rietx/wp-2017/.
-JSONL = HERE / "group_a.jsonl"
-SUMMARY = HERE / "group_a_summary.md"
-HARD_JSONL = HERE / "group_a_hard.jsonl"
-HARD_SUMMARY = HERE / "group_a_hard_summary.md"
+# The JSONL files are not committed; the 2026-11-05 rows sit in ~/.cache/rietx/wp-2017/ on the
+# maintainer's machine.  ``WP2017_RAW`` names a directory outside the tree for the rows and the
+# summaries they rewrite; a rerun's summaries are copied in by hand once read.
+RAW = Path(os.environ.get("WP2017_RAW", HERE))
+RAW.mkdir(parents=True, exist_ok=True)
+JSONL = RAW / "group_a.jsonl"
+SUMMARY = RAW / "group_a_summary.md"
+HARD_JSONL = RAW / "group_a_hard.jsonl"
+HARD_SUMMARY = RAW / "group_a_hard_summary.md"
+WINDOW_SUMMARY = RAW / "group_h_summary.md"
 OUT = ROOT / "tests" / "output"
 FITS = OUT / "wp2017_groupA_fits"
 
-WORKERS = 4
+WORKERS = int(os.environ.get("WP2017_WORKERS", "4"))
 FAMILIES = ("fap", "nac", "cpd1a", "lab6")
 SHIPPED = {"_M_HI": 10.0, "_M_LO": 0.4, "_Q_TRIGGER": 5, "_Q_WINDOW": 10,
            "_LAMBDA_FAIL_FACTOR": 10.0, "_LAMBDA_FAIL_FLOOR": 0.1, "_CONVERGED_RUNS": 3,
@@ -133,10 +147,14 @@ ARMS = {"_M_HI": (5.0, 20.0), "_M_LO": (0.2, 0.8), "_Q_TRIGGER": (3, 7),
         "_Q_WINDOW": (5, 20), "_LAMBDA_FAIL_FACTOR": (5.0, 20.0),
         "_LAMBDA_FAIL_FLOOR": (0.01, 1.0), "_CONVERGED_RUNS": (2, 5),
         "_CURVATURE_GATE": (30.0, 1000.0), "FTOL": (1e-8, 1e-10),
-        "SLOW_DESCENT_ESD": (0.5, 2.0, None)}
+        "SLOW_DESCENT_ESD": (0.5, 2.0, None),
+        # group H (2026-11-09): the support-based cell window switched off, one arm
+        "CELL_WINDOW": ("off",)}
 
-HARD_ARMS = {c: ARMS[c] for c in ("_M_HI", "_Q_TRIGGER", "_Q_WINDOW", "_LAMBDA_FAIL_FACTOR",
-                                   "_LAMBDA_FAIL_FLOOR", "_CURVATURE_GATE", "SLOW_DESCENT_ESD")}
+#: since 2026-11-09 every constant runs from the hard starts: the seven of 2026-11-05, and
+#: ``FTOL``, ``_CONVERGED_RUNS`` and ``_M_LO``, which gave one answer from the shipped starts and
+#: owed the same nine starts for a failing case (WP-2017 § The list), and the group H arm
+HARD_ARMS = ARMS
 #: start name: (family, factor on every phase's cell lengths); no factor is zircon declared
 HARD_STARTS = {**{f"{f}_x{x}": (f, x) for f in FAMILIES for x in (1.01, 1.03)},
                "cpd1a_zircon": ("cpd1a", None)}
@@ -180,6 +198,19 @@ def patched(constant: str | None, value):
     if constant is None:
         yield
         return
+    if constant == "CELL_WINDOW":
+        assert value == "off", value
+        inner = ls._freeze_cell_windows
+
+        def unwindowed(model, table, *args, **kwargs):
+            table.freeze_cell_windows(set())
+
+        ls._freeze_cell_windows = unwindowed
+        try:
+            yield
+        finally:
+            ls._freeze_cell_windows = inner
+        return
     seats = [(lm, constant, getattr(lm, constant))]
     defaults = []
     if constant == "FTOL":
@@ -216,6 +247,71 @@ def spied(solves: list):
         yield
     finally:
         lm.minimize = inner
+
+
+@contextmanager
+def window_spied(records: list):
+    """Group H's count: per solve a stage runs, which phases took the cell window, which free
+    cell columns it bounded, and which of those ended on an edge.
+
+    ``refine`` holds ``run_least_squares`` by name, so the spy sits there; the window is frozen
+    once inside each call (``least_squares._freeze_cell_windows``), at the values the solve
+    starts from, so the edges are computed there with ``cell_window`` itself.  An edge is
+    "reached" within 1e-9 of the window's width, the LM driver landing a value exactly on an
+    active bound (root CLAUDE.md, WP-1938).
+    """
+    import importlib
+
+    from rietx.params import vector as pv
+
+    # ``rietx.refine`` the attribute is the function; the module is reached by name
+    rf = importlib.import_module("rietx.refine")
+
+    inner_run, inner_freeze = rf.run_least_squares, ls._freeze_cell_windows
+
+    def spy(model, table, *args, **kwargs):
+        record: dict = {"stage": kwargs.get("stage", ""), "windowed": [], "applied": [],
+                        "at_edge": [], "min_edge_fraction": None}
+        edges: dict = {}
+
+        def freeze(*fargs, **fkwargs):
+            inner_freeze(*fargs, **fkwargs)
+            phases = getattr(table, "_cell_window_phases", None) or set()
+            record["windowed"] = sorted(phases)
+            by_path = {e.path: e for e in table.entries}
+            for path in table.free_paths:
+                name = pv._cell_parameter_name(path, phases=phases)
+                if name is None:
+                    continue
+                e = by_path[path]
+                lo, hi = pv.cell_window(name, e.value, e.lo, e.hi, path=path)
+                if (lo, hi) != (e.lo, e.hi):
+                    edges[path] = (lo, hi)
+            record["applied"] = sorted(edges)
+
+        ls._freeze_cell_windows = freeze
+        try:
+            outcome = inner_run(model, table, *args, **kwargs)
+        finally:
+            ls._freeze_cell_windows = inner_freeze
+        free = table.free_paths
+        fractions = []
+        for path, (lo, hi) in edges.items():
+            value = float(outcome.theta[free.index(path)])
+            width = hi - lo
+            fraction = min(value - lo, hi - value) / width
+            fractions.append(fraction)
+            if fraction <= 1e-9:
+                record["at_edge"].append(path)
+        record["min_edge_fraction"] = min(fractions) if fractions else None
+        records.append(record)
+        return outcome
+
+    rf.run_least_squares = spy
+    try:
+        yield
+    finally:
+        rf.run_least_squares = inner_run
 
 
 class FitTimeout(BaseException):
@@ -309,6 +405,7 @@ def _png(family: str, constant: str, arm: str) -> Path:
 
 def build_start(family: str) -> str:
     """Pickle the family's start under the shipped constants; its sha256."""
+    FITS.mkdir(parents=True, exist_ok=True)
     path = _start_path(family)
     if not path.exists():
         was = compiled.set_enabled(True)
@@ -437,11 +534,13 @@ def fit_arm(task: dict) -> dict:
         ref = rx.Refinement(st, ins, history=False)
         extra = _nudged(ref, plan) if constant == "noise" else {}
         solves: list = []
-        name = constant if constant in SHIPPED else None
+        windows: list = []
+        name = constant if constant in SHIPPED or constant == "CELL_WINDOW" else None
         lambdas = lambda_spied() if hard and constant == "shipped" else nullcontext()
         with guarded(FIT_GUARD_S if hard else None), patched(name, value), spied(solves), \
-                lambdas as seen:
+                window_spied(windows), lambdas as seen:
             result = ref.fit(data, plan=plan, **kw)
+        extra["cell_window"] = windows
         assert hard or result.stages[-1].name == "closing"
         if seen is not None:
             extra["reach"] = reach_numbers(*seen, solves)
@@ -646,17 +745,29 @@ def verdict(row: dict, answer: dict, shipped: dict | None) -> dict:
     return out
 
 
+def _same_head(meta: dict) -> None:
+    """Resume only rows from this head: an older head's rows carry no group H count, and an arm
+    read against a shipped row from another tree measures the tree, not the constant."""
+    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+    assert meta["head"] == head, (
+        f"{RAW} holds rows from {meta['head'][:9]}, not {head[:9]}: point WP2017_RAW elsewhere")
+
+
 def hard_sweep() -> None:
     OUT.mkdir(exist_ok=True)
     FITS.mkdir(exist_ok=True)
     assert compiled.available(), compiled.unavailable()
     first = read_rows()
     meta0 = next(r for r in first if r.get("kind") == "meta")
+    _same_head(meta0)
     for family in FAMILIES:
         assert build_start(family) == meta0["starts"][family], f"{family}'s start moved"
     answers = {r["family"]: r for r in first
                if r.get("kind", "fit") == "fit" and r["constant"] == "shipped"}
     done = {_key(r): r for r in read_rows(HARD_JSONL)}
+    if ("meta", "", "", "") in done:
+        _same_head(done[("meta", "", "", "")])
     if ("meta", "", "", "") not in done:
         head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
@@ -718,6 +829,8 @@ def sweep() -> None:
     FITS.mkdir(exist_ok=True)
     assert compiled.available(), compiled.unavailable()
     done = {_key(r): r for r in read_rows()}
+    if ("meta", "", "", "") in done:
+        _same_head(done[("meta", "", "", "")])
     if ("meta", "", "", "") not in done:
         head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
@@ -909,7 +1022,7 @@ def hard_summary() -> None:
         here = [r for r in fits if r["family"] == start and "error" not in r]
         pick = {r["constant"]: r["rwp"] for r in here if r["constant"] in ("shipped", "noise")}
         arms = [r["rwp"] for r in here if r["constant"] in HARD_ARMS
-                and not r["measures"]["unreached"]]
+                and not r.get("measures", {}).get("unreached", False)]
         done = {(r["constant"]): r["rwp"] for r in polished
                 if r["family"] == start and r["constant"] in ("shipped", "noise")}
         rest = [r["rwp"] for r in polished
@@ -958,6 +1071,115 @@ def hard_summary() -> None:
     HARD_SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+WINDOW_CONTROL_JSONL = RAW / "group_h_control.jsonl"
+
+
+def window_control() -> None:
+    """The count's positive arm: LaB₆ +1 % with the absent-phase hold off at each stage's start,
+    so the unseen phase's cell is a free column the window must bound.  An arm the count cannot
+    fail on would confirm whatever it read (memory: controls need a positive arm)."""
+    import importlib
+
+    rf = importlib.import_module("rietx.refine")
+    inner = rf._unsupported_phase_paths
+
+    def no_start_hold(*args, **kwargs):
+        return inner(*args, **kwargs) if kwargs.get("at_answer") else []
+
+    for family in FAMILIES:
+        build_start(family)
+    build_hard_start("lab6_x1.01")
+    WINDOW_CONTROL_JSONL.unlink(missing_ok=True)
+    rf._unsupported_phase_paths = no_start_hold
+    try:
+        for constant, arm, value in (("shipped", "no_start_hold", None),
+                                     ("CELL_WINDOW", "no_start_hold_off", "off")):
+            row = fit_arm({"family": "lab6_x1.01", "constant": constant, "arm": arm,
+                           "value": value})
+            row["kind"] = "control"
+            _append(row, WINDOW_CONTROL_JSONL)
+    finally:
+        rf._unsupported_phase_paths = inner
+
+
+def window_summary() -> None:
+    """Rewrite ``group_h_summary.md``: group H's count over every fit of both JSONLs."""
+    lines = ["# WP-2017 group H, the cell window, counted over group A's fits", ""]
+    totals = {"fits": 0, "solves": 0, "windowed": 0, "applied": 0, "at_edge": 0}
+    table = ["| rows | start | fits | solves | a phase windowed | a free cell windowed | "
+             "on an edge | nearest edge, fraction of window | window off: reached | "
+             "window off: model esd |", "|---|---|---|---|---|---|---|---|---|---|"]
+    edges: list = []
+    for label, path in (("shipped starts", JSONL), ("hard starts", HARD_JSONL)):
+        rows = read_rows(path)
+        meta = next((r for r in rows if r.get("kind") == "meta"), None)
+        if meta is not None:
+            lines.append(f"{label}: head {meta['head'][:9]}, rietx {meta['version']}, "
+                         f"{meta['platform']}, {meta['threads']} kernel thread per worker.")
+        every = [r for r in rows if r.get("kind", "fit") == "fit"]
+        fits = [r for r in every if "cell_window" in r]
+        totals["uncounted"] = totals.get("uncounted", []) + [
+            f"{r['family']} {r['constant']} {r['arm']}: {r.get('error', 'no count recorded')}"
+            for r in every if "cell_window" not in r]
+        for start in dict.fromkeys(r["family"] for r in fits):
+            here = [r for r in fits if r["family"] == start and r["constant"] != "CELL_WINDOW"]
+            solves = [s for r in here for s in r["cell_window"]]
+            windowed = [s for s in solves if s["windowed"]]
+            applied = [s for s in solves if s["applied"]]
+            at_edge = [s for s in solves if s["at_edge"]]
+            edges += [(start, r["constant"], r["arm"], s["stage"], s["at_edge"])
+                      for r in here for s in r["cell_window"] if s["at_edge"]]
+            nearest = [s["min_edge_fraction"] for s in applied
+                       if s["min_edge_fraction"] is not None]
+            off = next((r for r in every if r["family"] == start
+                        and r["constant"] == "CELL_WINDOW"), None)
+            m = (off or {}).get("measures")
+            if off is not None and "error" in off:
+                m = None
+            table.append(
+                f"| {label} | {start} | {len(here)} | {len(solves)} | {len(windowed)} | "
+                f"{len(applied)} | {len(at_edge)} | "
+                f"{_fmt(min(nearest), '.3g') if nearest else 'n/a'} | "
+                f"{'n/a' if m is None else ('no, bit-identical' if m['unreached'] else 'yes')} | "
+                f"{'n/a' if m is None else _fmt(m['model'], '.3g')} |")
+            for key, n in (("fits", len(here)), ("solves", len(solves)),
+                           ("windowed", len(windowed)), ("applied", len(applied)),
+                           ("at_edge", len(at_edge))):
+                totals[key] += n
+    lines += ["", f"{totals['fits']} fits (every arm but the window's own), "
+              f"{totals['solves']} solves: a phase took the window in {totals['windowed']}, "
+              f"a free cell column was windowed in {totals['applied']}, and a windowed cell "
+              f"ended on an edge in {totals['at_edge']}.", "",
+              "'Window off' is the arm with ``_freeze_cell_windows`` declaring no phase, read "
+              "against the same start's shipped arm: 'no, bit-identical' means the same "
+              "evaluations and the same answer to the bit.", "",
+              f"Not counted (fits): {len(totals.get('uncounted', []))}, "
+              + ("; ".join(totals.get("uncounted", [])) or "none") + ".", ""] + table
+    controls = read_rows(WINDOW_CONTROL_JSONL)
+    if controls:
+        lines += ["", "## Positive arm", "",
+                  "LaB₆ +1 % with the absent-phase hold off at every stage's start "
+                  "(``window_control``).", "",
+                  "| arm | solves | a phase windowed | a free cell windowed | on an edge | "
+                  "nearest edge | Rwp | evaluations |", "|---|---|---|---|---|---|---|---|"]
+        for r in controls:
+            if "error" in r:
+                lines.append(f"| {r['arm']} | error: {r['error']} |||||||")
+                continue
+            cw = r.get("cell_window", [])
+            nearest = [s["min_edge_fraction"] for s in cw if s["min_edge_fraction"] is not None]
+            lines.append(
+                f"| {r['arm']} | {len(cw)} | {sum(bool(s['windowed']) for s in cw)} | "
+                f"{sum(bool(s['applied']) for s in cw)} | {sum(bool(s['at_edge']) for s in cw)} | "
+                f"{_fmt(min(nearest), '.3g') if nearest else 'n/a'} | "
+                f"{_fmt(r.get('rwp'), '.6f')} | {r.get('n_eval')} |")
+    if edges:
+        lines += ["", "## Solves ending on a window edge", "",
+                  "| start | constant | arm | stage | paths |", "|---|---|---|---|---|"]
+        lines += [f"| {a} | {b} | {c} | {d} | {', '.join(e)} |" for a, b, c, d, e in edges]
+    WINDOW_SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args == ["summary"]:
@@ -966,5 +1188,9 @@ if __name__ == "__main__":
         hard_sweep()
     elif args == ["--hard", "summary"]:
         hard_summary()
+    elif args == ["--window", "control"]:
+        window_control()
+    elif args == ["--window", "summary"]:
+        window_summary()
     else:
         sweep()

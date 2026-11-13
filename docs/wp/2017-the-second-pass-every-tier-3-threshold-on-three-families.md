@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-05 — the list and group A landed (PR #1428); seven rows closed by ruling; 54 hard-start fits and 18 groups open
+Milestone: generality · Status: 🔄 2026-11-09 — group A's hard starts run for all ten rows and group H counted on group A's fits (PR #1494); 17 groups open
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
@@ -93,14 +93,14 @@ different laboratory, instrument and material:
 
 | Group | Rows | Arms | Families | State |
 |---|---|---|---|---|
-| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven closed by ruling |
+| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; seven closed by ruling; the last three's hard starts run 2026-11-09, their failing case stated, approval to re-date |
 | B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | open |
 | C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | open |
 | D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
 | E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
 | F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
 | G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | open |
-| H. Cell window | `vector.CELL_WINDOW_FRACTION`, `_ANGLE_DEG`, `_PAD_A` | count the stages where it binds | every fit of groups A and G | open |
+| H. Cell window | `vector.CELL_WINDOW_FRACTION`, `_ANGLE_DEG`, `_PAD_A` | count the stages where it binds | every fit of groups A and G | group A's 298 fits counted 2026-11-09: binds in none; group G's owed |
 | I. Position bounds | their removal, 2026-10-20 | free over a narrow range | lab flat plate: `fap`, `lab6`, SRM 1976a | open |
 | J. Refined lines | Le Bail and Pawley Kα2/Kα1 | second standard, tabulated ratio | SRM 660c, SRM 1976a, FAP | open |
 | K. Far from data | `refine.MODEL_FAR_FROM_DATA_RWP` | both directions; Rwp beside background-subtracted Rwp and Rwp/Rexp | WP-2086's reach table; a sparse-count family | open |
@@ -122,7 +122,7 @@ the shipped start. Each arm is read against the shipped constants from the same 
 same bar, and also on whether it changes the fit's verdict: reaching the shipped start's answer
 within 0.1 plain esd, or not.
 
-**Group A's open rows, 2026-11-05.** `FTOL`, `_CONVERGED_RUNS` and `_M_LO` gave one answer from shipped starts and owe the same nine hard starts, for a failing case. Seven rows closed by the maintainer's ruling of 2026-11-05: they stay at tier 3 on a named synthetic case, and a later group treats a constant its families barely reach the same way (`docs/milestones/generality.md` § The rule).
+**Group A's open rows, 2026-11-05.** `FTOL`, `_CONVERGED_RUNS` and `_M_LO` gave one answer from shipped starts and owe the same nine hard starts, for a failing case. Run 2026-11-09 (handover): one answer at the answer from every start that reaches it, and a failing case on the starts that miss; their approval dates predate it, so the maintainer re-dates or rules. Seven rows closed by the maintainer's ruling of 2026-11-05: they stay at tier 3 on a named synthetic case, and a later group treats a constant its families barely reach the same way (`docs/milestones/generality.md` § The rule).
 
 **Taken off the list.** `INTERMEDIATE_FTOL` and its default were re-ruled cost-only on
 2026-11-01, so they owe nothing here. `PAWLEY_SPARSE_DENSITY` chooses which arithmetic forms
@@ -253,6 +253,114 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-09** — The three solver stop constants left open on 2026-11-05 now have the evidence their approval asked for. From every harder start that still reaches the right answer, moving `FTOL`, `_CONVERGED_RUNS` or `_M_LO` either way changes no refined number by more than a quarter of the bar, on three families. From the starts that miss, they choose which wrong minimum the fit lands in, which is the failing case the judge asked for. The cell window that guards a barely-seen phase's cell (group H) never bounded anything in group A's 298 fits: the absent-phase hold already holds every cell it would bound, so switching the window off changed no fit by a single bit. Its removal, which the B8 ruling makes the exit, still waits on group G's fits and on one case read off the code.
+
+  *Done.* PR #1494. `group_a.py` extended (commits e6a37b511, fabfe9b3f): the hard starts run all ten constants, every fit records group H's count (`window_spied`: per solve, which phases took the window, which free cell columns it bounded, which ended on an edge), each start gets a `CELL_WINDOW` arm with `_freeze_cell_windows` declaring no phase, and `--window control` is the count's positive arm (LaB₆ +1 % with the start hold off). Rows rewritten in `_audit.py`: `lm.FTOL`, `lm._CONVERGED_RUNS`, `lm._M_LO` (evidence gains the hard starts, failing case and start domain; the WP-2017 sentence in their grounds, written by the 2026-11-05 session, now says what was run) and the three `CELL_WINDOW_*` rows (evidence gains group H's count; grounds untouched). Tier and value unchanged on all six. Summaries committed: `2017-batch/group_a_hard_20261109_summary.md` (all ten constants, nine starts) and `2017-batch/group_h_summary.md`. Raw rows not committed; they sit in the workstation job's return directory on the Mac that ran this (job `wp2017h`), and PNGs went to that job's `tests/output/`.
+
+  *Measured* (the workstation, Linux x86_64, `rietx-py312` venv with this tree on `PYTHONPATH`, rietx-kernels 1.4.0, numpy 2.5.3 against the Mac's 2.5.4, compiled tier on, 12 workers of one kernel thread, at `fabfe9b3f`; 43 min wall, one task, 880 MB peak):
+
+  | Constant | Arms acting at an answer | Worst there, plain esd | No reference moved past | On starts that miss |
+  |---|---|---|---|---|
+  | `FTOL` | 1e-8: FAP, NAC, cpd-1a; 1e-10: NAC, cpd-1a (FAP closes on exhausted fp64 first) | 0.0012 (cpd-1a +1 %, 1e-8) | 3.6e-4 esd | SRM 660c +3 %: 1e-8 moves 0.118 against noise 0.053; polished, shipped and 1e-8 in different wrong minima (Rwp 0.823, 0.861; answer 0.087) |
+  | `_CONVERGED_RUNS` | both on FAP, NAC, cpd-1a | 0.0245 (cpd-1a with zircon at 5, at its noise 0.0245); else 0.0011 | 4.4e-4 esd | NAC +3 %: both arms lose NAC, Rwp 0.139 to 0.80, polished S 33× shipped's; cpd-1a +3 %: polished S 0.65× (2) and 1.40× (5); SRM 660c +3 %: 2 moves 51.4 esd |
+  | `_M_LO` | 0.8: FAP, NAC, cpd-1a; 0.2: FAP +3 %, cpd-1a (third family SRM 660c from its shipped start) | 0.0247 (cpd-1a with zircon at 0.8, at its noise 0.0245); else 1.7e-4 | 2.2e-4 esd | NAC +3 %: 0.8 loses NAC (polished Rwp 0.790), 0.2 within noise; cpd-1a +3 %: 0.8 Rwp 2.18×; SRM 660c +3 %: 0.317 and 0.111 against noise 0.053 |
+
+  Start domain, per family: FAP's cells within 3 %, NAC's and cpd-1a's within 1 %, SRM 660c only its shipped start, since +1 % already misses on every arm. No arm of the ten changed which of the nine starts reach the shipped start's answer. The same five reach it as on 2026-11-05. Reproduction across platforms and heads (macOS arm64 at `1ed7a9517` then, Linux x86_64 at `fabfe9b3f` now): from the shipped starts `_CONVERGED_RUNS` 2 on cpd-1a reads 0.0023 esd (0.0024 then) and `FTOL` 1e-8 0.0011 (the same); the five reaching starts and LaB₆ ±, NAC +3 % agree to the fourth digit in Rwp. cpd-1a +3 %, whose noise arm reads 7.29 esd, lands in a different wrong minimum (Rwp 0.368 against 0.622), so `SLOW_DESCENT_ESD`'s two acting starts are now LaB₆ +3 % and cpd-1a with zircon. One fit hit the 1200 s guard (cpd-1a +3 %, `_M_HI` 5) and one polish round (cpd-1a +3 %, `_M_LO` 0.8).
+
+  Group H: 2432 solves over 298 fits (every arm but the window's own, 4 shipped and 9 hard starts). A phase took the window in 339 solves, all on hard starts, and a free cell column was bounded in none, so no edge was reached. Switched off, all 13 starts are bit-identical in evaluations and answer. The reason is structural: `refine._hold_unsupported_phases` holds every free column moving only phases under `PHASE_SUPPORT_SIGMA` on `phase_support` at the stage's start values, and `least_squares._freeze_cell_windows` then windows those same phases on the same screen at the same values. The positive arm (start hold off, LaB₆ +1 %) windows a free cell in 6 of 14 solves, so the count can see one.
+
+  *Gotchas.* `rietx.refine` as an attribute is the function; the spy reaches the module through `importlib`. The workstation's venv metadata says 1.11.0.dev0, so each result is stamped `1.12.0.dev0+g<sha>` with a warning; harmless. A second wsrun pass on one job leaves the first pass's `DONE` file, so `watch_wsjob.sh` reported done at once; wait on the runner's pid and `results/<id>.json` instead.
+
+  *Not done, and why.* Removing the window from single fits, B8's exit, is not in this PR. The family set fixed before running is groups A and G, and G has not run. Read off the code and not run: a caller's tie whose free column is an unseen phase's cell and also moves a visible phase is declined by the hold (the column reaches a seen phase), while the window, keyed on the path's name, still bounds it. A removal should answer that case first.
+
+  *Review.* `/code-review high --fix` ran in a forked context whose working directory was the main checkout, not this worktree: it reviewed another branch there and left eight uncommitted files in that checkout (saved as a patch in this runner's scratch directory; not reverted, the user's call). The review of this branch was then done by a read-only agent in the worktree. Five findings on `group_a.py`, all fixed in 09758fc43: the window summary now names fits it could not count and prints an errored arm's error, a sweep resumes only rows from its own head, the raw directory is created, the positive arm overwrites its rows, and `hard_summary` tolerates a row with no measures. Two declined: the spy omits the tie-window intersection `bounds()` applies after `cell_window` (reachable only by a caller's tie with a finite-bounded dependent; none in these fits), and no arm exercises the edge test on a window that binds (the positive arm's cell ends mid-window; recorded in the rows).
+
+  *Fast selection* on the tree before the review fixes and row corrections (both touch only the batch script and row text): 14341 passed, 416 skipped, 32 xfailed in 13 min, worktree `[dev]` venv, macOS arm64. No test added. `tests/test_audit_table.py`: 23 passed after the last row edit; `tests.audit_delta` exit 0. Full suite not run: no measured number can move.
+
+  *Generality.* The judge (Opus, reading `.claude/agents/generality-review.md`) on the six rows as first written; the numbers and wording it corrected are fixed in the rows (`_CONVERGED_RUNS`' worst 0.0156 → 0.0245, `FTOL`'s fp64 sentence, the start domain per family, the window rows' single-fit scope, timeout and mid-window positive arm). Its sections, unedited:
+
+  ##### `rietx.optimize.lm.FTOL`
+
+  **Verdict: weak.** The case for keeping the value is stronger. Two problems remain. The tighter side (1e-10) can be read on two families only. The stated start domain is wider than what was measured.
+
+  | Q | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1 | Grounds: "the last tolerance of the schedule" | Sets where the last declared stage and the closing stage stop. | clear |
+  | 2 | `ambiguity` empty, which a constant row may leave empty | First kind for having a stop at all. Only the value is on trial. | fine |
+  | 3 Against | Evidence: on SRM 660c (the LaB₆ standard) +3 %, "1e-8 moves 0.118 esd against a noise arm of 0.053 at 0.69x evaluations… Rwp 0.823 and 0.861; the answer reads 0.087" | Every figure matches the summary (0.1179, 0.0534, 0.686, polished shipped 0.8225, answer 0.0874). After polishing, 1e-8 and shipped end 75.9 esd apart (Polish table). This is one start on one family. On cpd-1a +3 % (IUCr round-robin sample 1a), 1e-8 moves 0.28 esd, which is under that start's noise of 7.29. The 11-05 dissent still stands: GSAS-II and FullProf stop near 1e-3 (not rechecked here). | thin but real |
+  | 4 For | "worst 0.0012 plain esd (cpd-1a +1 % at 1e-8), no reference moved past 3.6e-4 esd" | Raw: 0.001235. The largest reference move is 3.57e-4 (wt_fluorite). Reach is unchanged on every arm, as the per-constant table shows ("verdict changes: none"). | strong |
+  | 5 Tier | 3 | Right. 1e-9 is outside GSAS-II's and FullProf's defaults. No `invariant` claim. | ok |
+  | 6 Families | 1e-8 on FAP, NAC and cpd-1a; 1e-10 on NAC and cpd-1a | Confirmed. **1e-10 reaches two families.** The row says "FAP closing on exhausted fp64 before either tolerance". The raw `terminations_changed` shows that FAP's *shipped* closing stage stops on `ftol_runs` (1e-9). Only the 1e-10 arm hits `exhausted_fp64`, with an identical answer. The conclusion survives but the wording is wrong. **The start domain "cells within 1 % of the answer" is too wide.** SRM 660c +1 % misses on shipped and on every arm, after 9 evaluations. So on SRM 660c the domain is the shipped start only, while FAP holds out to +3 %. All four families are development data. | count short on the tight side; domain overstated |
+  | 7 Record | none given | `StageResult.termination` (`ftol_runs` / `exhausted_fp64`). | adequate |
+
+  What would change the verdict: a third family that reads 1e-10 at an answer (or a synthetic case, per the 2026-11-05 ruling), or a maintainer ruling that exhausting fp64 counts as the floor. Also a domain sentence written per family.
+
+  Author's answer: agreed; wording and domain fixed. The 1e-10 side cannot reach a third family on these fits because fp64 stops first, which is the maintainer's to rule as a floor or not (*Next*, 1).
+
+  ##### `rietx.optimize.lm._CONVERGED_RUNS`
+
+  **Verdict: holds, with one wrong number.** The case for keeping the value is stronger, and the failing case is real and strong.
+
+  | Q | Author's answer | What I found | Verdict |
+  |---|---|---|---|
+  | 1 | "decides where a solve stops" | How many small steps in a row count as converged. | clear |
+  | 2 | empty | First kind; in effect a numerical setting. | fine |
+  | 3 Against | "on NAC +3 % both arms lose NAC, Rwp 0.139 to 0.80… polished S 33x; on cpd-1a +3 % polished S 0.65x (2) and 1.40x (5); on SRM 660c +3 % 2 moves 51.4 esd against… 0.053" | All confirmed: Rwp 0.802 and 0.809, S ratio 33.117, 0.647, 1.400, 51.39. The NAC phase is lost: cell 10.56 Å against 10.25, one Biso near 3×10⁵ Å². Two things are not in the row. Arm 2 also leaves SRM 660c's displacement 24.7 esd further from its reference, so shipped sits nearer there. And the 0.65x polish did not settle (5 rounds, `settled` False). | strong |
+  | 4 For | "worst 0.0156 plain esd (cpd-1a with zircon at 2, under its noise arm's 0.0245)… no reference moved past 4.4e-4" | **0.0156 is not the worst.** On the same start, arm 5 reads **0.02446** (raw and Every-arm table), against a noise arm of 0.02454. The row should say "worst 0.0245 (cpd-1a with zircon at 5, at its noise)". The largest reference move is 4.32e-4 (wt_zincite, zircon arm 5), so the 4.4e-4 bound is true but loose. Both arms act at an answer on FAP, NAC and cpd-1a. | strong; one number wrong |
+  | 5 Tier | 3 | Right. | ok |
+  | 6 Families | three from hard starts (FAP, NAC, cpd-1a), four from the shipped starts | Confirmed. All development data. The start domain is overstated as for `FTOL`. | met |
+  | 7 Record | none given | `StageResult.termination`. | adequate |
+
+  What would change the verdict: nothing, beyond correcting the worst-case figure and the domain sentence.
+
+  ##### `rietx.optimize.lm._M_LO`
+
+  **Verdict: holds.** The case for keeping the value is stronger. The 11-05 gap was that 0.2 reached only two families. FAP +3 % now closes it.
+
+  | Q | Author's answer | What I found | Verdict |
+  |---|---|---|---|
+  | 1 | "decides where a solve stops" | The floor on r_u (actual over predicted decrease) used when λ (the damping) shrinks. It shapes the path. | row's words loose (pre-existing) |
+  | 2 | empty | A solver-path setting. | fine |
+  | 3 Against | "on NAC +3 % 0.8 loses NAC, Rwp 0.139 to 0.79 polished, while 0.2 sits within that start's noise; on cpd-1a +3 % 0.8 reads Rwp 2.18x…; on SRM 660c +3 % 0.8 and 0.2 move 0.317 and 0.111 esd against… 0.053" | All confirmed: polished 0.790, 0.3221 against 0.322, 2.18135, 0.3172 and 0.1113. Not in the row: the 0.790 polish did not settle (5 rounds), and the cpd-1a +3 % 0.8 polish timed out. "Loses NAC" holds in substance (cell 10.63 Å, Biso up to 1.1×10⁴), though its weight fraction still reads 0.93. | strong |
+  | 4 For | "worst 0.0247 (cpd-1a with zircon at 0.8, at its noise arm's 0.0245) and otherwise 1.7e-4, no reference moved past 2.2e-4" | Confirmed: 0.02467, 1.672e-4, 2.20e-4. | strong |
+  | 5 Tier | 3 | Right. Coelho's paper is still unread (11-05 finding). | ok |
+  | 6 Families | 0.8 on FAP, NAC and cpd-1a; 0.2 on FAP +3 %, cpd-1a, and SRM 660c's shipped start | Confirmed. The fabfe9b3f shipped-start rerun has SRM 660c at 0.2 moving 1.0e-7 against a noise of 8.1e-8, so it is reached but sits at noise. FAP +3 % at 0.2 (2.45e-6 against 5.7e-7) is the real third family. The domain is overstated as for `FTOL`. | met |
+  | 7 Record | none given | None; λ never reaches `StageResult`. | acceptable for a path constant |
+
+  What would change the verdict: a reaching start where 0.2 moves an answer past its noise and past the bar.
+
+  ##### `rietx.params.vector.CELL_WINDOW_ANGLE_DEG`
+
+  **Verdict: holds as an interim row.** The evidence for removal (it binds in no measured fit) is now stronger. Deferring removal until group G is run is principled, because the family set was fixed before running.
+
+  | Q | Author's answer | What I found | Verdict |
+  |---|---|---|---|
+  | 1 | Grounds: "a guard on a barely-seen phase's cell" | Bounds the cell of a phase under `PHASE_SUPPORT_SIGMA`, once per stage. | clear |
+  | 2 | empty | First kind (no refiner lets an unseen cell walk). Only the size is on trial. | fine |
+  | 3 Against | "a free cell column was bounded in none… switched off all 13 starts are bit-identical" | Every count checks: 92+206 = 298 fits; 713+1719 = 2432 solves; 161+100+2+23+30+23 = 339 solves where a phase took the window; 0 where a free cell column was windowed; "no, bit-identical" on all 13 starts. The mechanism also checks in the code. `_freeze_cell_windows` (least_squares.py:2944) reads the same `phase_support` screen at the stage's start values that `_unsupported_phase_paths` holds on, and the hold also reads the prior stage, so it holds a superset. Not in the row: "at every arm" omits the one uncounted timeout (cpd-1a +3 %, `_M_HI` 5), which the summary does name. | strong on the fits measured |
+  | 4 For | none given in the row | The handover names one case, read off the code and not run: a caller's tie that moves an unseen cell and also a seen phase. The hold declines it and the window still bounds it. The row omits it. The positive arm shows the count can see a windowed column (6 of 14 solves). But on and off read the same Rwp of 0.861637 and the same 15 evaluations, with the nearest edge at 0.5 (mid-window). So no fit in this change shows the window *binding*. | none measured |
+  | 5 Tier | 3, TOPAS § 2.17 (row says checked) | Unchanged; not rechecked by me. | ok |
+  | 6 Families | four protocol families | A phase was windowed on three (SRM 660c, NAC, cpd-1a), only from hard starts and never on FAP. **Single fits only.** `_freeze_cell_windows_multi` (least_squares.py:3067), the joint-refinement path, was neither patched nor spied, and the row does not say so. Group G is owed. | partial |
+  | 7 Record | none given | No record field reports a window; the count needed a spy. | none |
+
+  What would change the verdict: group G's count. A test for the tie case. For the row to stay kept, an injected case where the window binds, as § The rule asks of a guard that ordinary fits never reach. The tests in `tests/test_absent_phase.py` check only the window's arithmetic.
+
+  ##### `rietx.params.vector.CELL_WINDOW_FRACTION`
+
+  **Verdict: holds as an interim row, as `CELL_WINDOW_ANGLE_DEG`.** The evidence text is identical and every number checks. The same omissions apply: single fits only, the tie case, the one timeout, and no record field. When removal comes, `CELL_SAFETY_FRACTION`'s docstring defines it as three times this value (vector.py:564).
+
+  What would change the verdict: as `CELL_WINDOW_ANGLE_DEG`.
+
+  ##### `rietx.params.vector.CELL_WINDOW_PAD_A`
+
+  **Verdict: holds as an interim row, as `CELL_WINDOW_ANGLE_DEG`.** The text is identical and the numbers check. The same omissions apply. When removal comes, note that `CELL_SAFETY_ANGLE_DEG = 3.0 * CELL_WINDOW_ANGLE_DEG` (vector.py:570) depends on the angle row.
+
+  What would change the verdict: as `CELL_WINDOW_ANGLE_DEG`.
+
+  *Settled by Claude.* Groups A (rest) and H together, H needing no fits beyond group A's own; rerunning all of group A on the workstation rather than only the 54 owed fits, since the hold that decides group H acts per stage on every arm; the three rows' grounds rewritten only in the sentence this WP added on 2026-11-05.
+
+  *Next.* (1) The maintainer re-dates the approval of `FTOL`, `_CONVERGED_RUNS` and `_M_LO` or rules otherwise: the condition they were approved under is met, with `FTOL`'s tighter side readable on two families only, since fp64 stops the others first. (2) Group G (absent phase), whose fits also finish group H's count; then the window's removal from single fits, answering the tie case above, or, if kept, an injected case where it binds; `CELL_SAFETY_FRACTION` and `CELL_SAFETY_ANGLE_DEG` are defined as three times the window's constants and need their own value when it goes. (3) Group B or C next by the list's order.
 
 - **2026-11-05** — On fits that reach their answer, the ten solver stop constants do not matter. Moving each one either side of its value shifted no refined number by more than 0.0084 esd, a twelfth of the bar, on four families from nine harder starts. The same sweep could not clear them, though. Most constants are never read on these fits, and only three acted on three or more families at an answer. On starts that miss the answer, four of the constants choose which wrong minimum the fit lands in, and the shipped values are no better than their neighbours. So nothing was demoted and no value moved. Seven rows go to the maintainer, because no written exit fits a constant that ordinary fits barely reach.
 

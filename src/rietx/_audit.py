@@ -3284,7 +3284,15 @@ ROWS: tuple[Row, ...] = (
                   "lm.minimize and run_least_squares, the last declared and closing stages "
                   "(run_multi_least_squares not exercised): worst 0.0011 plain esd, cpd-1a phases.0.scale at "
                   "1e-8, 0.957-1.043x evaluations, no reference moved past 3.2e-4 esd; at 1e-10 FAP and SRM "
-                  "660c stop on exhausted fp64 with identical answers; shipped starts only"),
+                  "660c stop on exhausted fp64 with identical answers; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer (FAP +1 % and +3 %, NAC +1 %, cpd-1a +1 % and with zircon do); there 1e-8 "
+                  "acts on FAP, NAC and cpd-1a and 1e-10 on NAC and cpd-1a, FAP's 1e-10 arm closing on exhausted "
+                  "fp64 with the shipped answer as SRM 660c's does from its shipped start, so no third family reads "
+                  "the tighter side; worst 0.0012 plain esd (cpd-1a +1 % at 1e-8), no reference moved "
+                  "past 3.6e-4 esd; failing case, the starts that miss: on SRM 660c +3 % 1e-8 moves 0.118 esd against "
+                  "a noise arm of 0.053 at 0.69x evaluations, and polished, shipped and 1e-8 sit in different wrong "
+                  "minima (Rwp 0.823 and 0.861; the answer reads 0.087); start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("The last tolerance of the schedule rietx chose (WP-1123): B7's class went to "
                  "tier 3 once its invariance test failed on cpd-1a (ruled 2026-10-19), and the "
                  "schedule was kept on four families with that failure stated (the sixth "
@@ -3292,8 +3300,9 @@ ROWS: tuple[Row, ...] = (
                  "fixed, so the maintainer delegated this value's tier to the lead on "
                  "2026-10-23: tier 3, with WP-2017 refitting the four start-test families at "
                  "1e-8 and 1e-10."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer from every start that"
+                 " reaches it, on three families at 1e-8 and two at 1e-10, where fp64 stops the rest first; the"
+                 " failing case and start domain stated in the evidence."),
         approved="2026-10-23"),
     Row("rietx.optimize.lm._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428 stops its NIST, Rosenbrock and AntiBump runs at an "
@@ -3303,13 +3312,20 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 2 and 5 on FAP, NAC, cpd-1a and SRM 660c, both arms acting on"
                   " all four: worst 0.0024 plain esd, cpd-1a profile.v, 0.891-1.132x evaluations; no reference "
-                  "moved past 1.8e-4 esd; shipped starts only"),
+                  "moved past 1.8e-4 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there both arms act on FAP, NAC and cpd-1a, worst 0.0245 plain esd "
+                  "(cpd-1a with zircon at 5, at its noise arm's 0.0245) and otherwise 0.0011 (cpd-1a +1 % at 2), no "
+                  "reference moved past 4.4e-4 esd; failing case, the starts that miss: on NAC +3 % both arms lose "
+                  "NAC, Rwp 0.139 to 0.80, a second minimum (polished S 33x shipped's); on cpd-1a +3 % polished S "
+                  "0.65x (2) and 1.40x (5) shipped's; on SRM 660c +3 % 2 moves 51.4 esd against a noise arm of 0.053; "
+                  "start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " from every start that reaches it, the failing case and start domain stated in the evidence."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
@@ -3459,13 +3475,21 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
                   "validate, FAP and NAC verify): 0.8 on FAP, cpd-1a and SRM 660c, 0.2 on cpd-1a and SRM 660c "
                   "(FAP's smallest r_u 0.585; NAC never read it): worst 8.2e-6 plain esd, cpd-1a axial_sl, "
-                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only"),
+                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only; "
+                  "WP-2017 group A's hard starts, 2026-11-09 (docs/wp/2017-batch/group_a_hard_20261109_summary.md; Linux x86_64 at fabfe9b3f; every phase's cell lengths +1 % and +3 % on the four families, and cpd-1a with zircon declared): no arm changed which of the nine starts reach the "
+                  "shipped start's answer; there 0.8 acts on FAP, NAC and cpd-1a and 0.2 on FAP +3 % and cpd-1a, so 0.2 "
+                  "now reaches three families with SRM 660c's shipped start; worst 0.0247 plain esd (cpd-1a with "
+                  "zircon at 0.8, at its noise arm's 0.0245) and otherwise 1.7e-4, no reference moved past 2.2e-4 "
+                  "esd; failing case, the starts that miss: on NAC +3 % 0.8 loses NAC, Rwp 0.139 to 0.79 polished, "
+                  "while 0.2 sits within that start's noise; on cpd-1a +3 % 0.8 reads Rwp 2.18x shipped's; on SRM "
+                  "660c +3 % 0.8 and 0.2 move 0.317 and 0.111 esd against a noise arm of 0.053; start domain, per family: FAP cells within 3 %, NAC and cpd-1a within 1 %, SRM 660c its shipped start (+1 % already misses)"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
-                 " failing case sought, so its hard starts are owed before that condition is met."),
+                 "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
+                 " either side from every start that reaches it, the failing case and start domain stated in"
+                 " the evidence."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm._NULL_CURVATURE", "constant", tier=1, value=1.4901161193847656e-08,
         evidence=("numerical floor: sqrt(eps); at the cut itself three of 1000 random problems "
@@ -3647,7 +3671,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.vector.CELL_WINDOW_ANGLE_DEG", "constant", tier=3, value=2.0,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): angles Val +- "
                   "0.2 deg per iteration, here ten iterations' worth per stage (the ten is "
-                  "rietx's, and no angle was surveyed)"),
+                  "rietx's, and no angle was surveyed); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -3658,7 +3691,16 @@ ROWS: tuple[Row, ...] = (
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c within "
                   "0.995 Val - 0.05 .. 1.005 Val + 0.05, Val re-read each iteration; a stage takes "
                   "one bound pair, so 0.5 % compounds to 5.1 % over ten iterations (the ten is "
-                  "rietx's)"),
+                  "rietx's); "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
@@ -3667,7 +3709,16 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.params.vector.CELL_WINDOW_PAD_A", "constant", tier=3, value=0.05,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): the 0.05 A pad "
-                  "on a, b, c"),
+                  "on a, b, c; "
+                  "WP-2017 group H, 2026-11-09 (docs/wp/2017-batch/group_h_summary.md; Linux x86_64 at fabfe9b3f): "
+                  "on 298 fits of group A, the four protocol families from the shipped starts and the nine hard "
+                  "starts at every arm, a phase took the window in 339 of 2432 solves and a free cell column was "
+                  "bounded in none, so it bound nowhere, and switched off all 13 starts are bit-identical: the "
+                  "absent-phase hold (WP-1301) holds every free column moving only those phases, on the same screen "
+                  "at the same values, before the solve freezes the window; positive arm, that hold off at each "
+                  "stage's start: LaB6 +1 % windows a free cell in 6 of 14 solves, mid-window, so no fit shows it "
+                  "binding; single fits only, the joint path's window not counted; one timed-out fit uncounted; "
+                  "group G's fits not yet counted"),
         grounds=("A guard on a barely-seen phase's cell.  Tier 3, re-tiered from 2 on "
                  "2026-10-20: TOPAS bounds every phase's cell at each iteration, while this "
                  "bounds a barely-seen phase's once per stage, ten iterations' worth, and the "
