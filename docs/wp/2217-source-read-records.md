@@ -61,7 +61,7 @@ or automatic action.
 
 ## Tasks
 
-- [ ] `ATTRIBUTION.md`: a paragraph opening § Open-source software stating the reading rule by
+- [x] `ATTRIBUTION.md`: a paragraph opening § Open-source software stating the reading rule by
   licence; the CrysPy, MAUD and EasyDiffraction rows say "behavioural reference, source read as
   specification, no code ported".
 - [ ] `docs/practice.md`: the legend splits "checked" into "checked (source)" and "checked
