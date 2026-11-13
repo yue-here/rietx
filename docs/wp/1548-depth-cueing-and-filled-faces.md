@@ -219,7 +219,7 @@ The compiled rasteriser can now draw depth cueing, so the wheel the Python
 renderer needs for fog is published. Nothing on `main` uses it yet: rietx's
 pin still allows 1.4, and the Python and GUI fog, ring perception and the
 survey sit on draft PR #1554. This entry was written by the close-only
-bookkeeping batch of 2026-11-13 (PR #PRNUM), because PR #1557 merged a
+bookkeeping batch of 2026-11-13 (PR #1563), because PR #1557 merged a
 `WP-1548:` commit without touching this file. It records what that commit
 shows. PR #1554's own entries describe the session that wrote it, and they
 supersede this one where the two overlap.
