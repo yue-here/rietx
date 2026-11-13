@@ -1386,7 +1386,7 @@ def weak_line_retry_diagnostic(set_aside: Sequence[float], n_kept: int,
     shown = ", ".join(f"{t:.3f}" for t in tt[:12]) + (
         f" and {len(tt) - 12} more" if len(tt) > 12 else "")
     head = (f"no lattice two engines agree on came back from the full list, so "
-            f"its {len(tt)} line(s) under {WEAK_LINE_RETRY_FLOOR:.0%} of the "
+            f"its {len(tt)} line(s) under {WEAK_LINE_RETRY_FLOOR * 100:g} % of the "
             f"strongest were set aside and the search ran again on the "
             f"{n_kept} kept")
     if adopted:

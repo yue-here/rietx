@@ -845,6 +845,29 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
+    Row("INDEX_WEAK_LINE_RETRY", "code", tier=2, ambiguity=1,
+        evidence=("info; fires when the full list, inlier retry included, ends with no lattice "
+                  "two engines agree on (workflow._no_agreement, the inlier retry's own test, "
+                  "asked again), the search was not stopped, the caller declared no "
+                  "n_unindexed, and the floor sets at least one line aside.  WP-2078 measured "
+                  "that trigger on 19 lists (23 runs, preset full): it fired on the "
+                  "molybdenum + trace-oxide fixture (truth absent; the retry ranks it first, "
+                  "medium) and on 11-BM LaB6 + cBN (no candidate before or after), and on no "
+                  "run whose truth ranked first, SRM 660c LaB6 included.  The inlier retry's "
+                  "first-pass test alone fired on four correct mixture runs, which is why the "
+                  "trigger is read after it"),
+        grounds=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783, "
+                 "p. 789): removing weak peaks is not for routine use and is worth a try when "
+                 "the full list gives no clear answer (docs/practice.md, Which lines an "
+                 "indexing search is given).  The action is that retry, taken only where the "
+                 "package has no answer, and the diagnostic says which list the candidates "
+                 "came from (ruled by Yue 2026-11-13: a retry, never a floor before every "
+                 "search)."),
+        response="info",
+        responds=("note that the candidates were searched and scored without the lines under "
+                  "5 % of the strongest, and check those set-aside lines against the leading "
+                  "candidate's predicted positions"),
+        scope=("all",)),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -2412,6 +2435,13 @@ ROWS: tuple[Row, ...] = (
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
         approved="2026-10-28"),
+    Row("rietx.indexing.engines.WEAK_LINE_RETRY_FLOOR", "constant", tier=2, value=0.05,
+        evidence=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783), "
+                  "set B: every line at or above 5 % of the strongest, offered to each "
+                  "program as a second attempt; Table 5, four programs x two entries x two "
+                  "modes, 5 better, 1 worse, 10 unchanged.  WP-2078: the trace-oxide fixture's "
+                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it."),
+),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
     Row("rietx.indexing.engines._INDEX_MARGIN", "constant", value=1e-06),
@@ -5257,6 +5287,10 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
+        evidence=("arithmetic: names the set-aside lines and asks whether the leading cell "
+                  "predicts them, which separates a second phase from a supercell's own lines "
+                  "without ranking either, and names the argument that forbids the retry")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

@@ -188,6 +188,13 @@ The retry adds candidates and never removes the first pass's, and [`INDEX_INLIER
 Only such a run retries, because the inlier rule changes the pool the panel ranks, and the ranking depends on that pool.
 A list whose lines all carry one intensity, such as `PeakList.from_positions` without intensities, has no strongest five to anchor on and keeps the count of two.
 
+A run that still ends with no lattice two engines agree on sets aside every line under 5 % of the strongest and searches once more on the rest, the second attempt of the bethanechol round robin {cite}`bergmann2004`.
+That search is ranked and scored on the kept lines only, because scoring its cells against the full list put a trace phase's lines back in the count.
+If it finds agreement, its candidates are the answer; otherwise the full list's stand.
+[`INDEX_WEAK_LINE_RETRY`](diagnostics-indexing.md#index_weak_line_retry) says which, and names the set-aside lines.
+The floor never applies before the first search, because no floor separates a trace phase's weak lines from a superlattice's own.
+A declared `n_unindexed` forbids this retry too, and a position-only list sets no line aside.
+
 Under every rule, what a cell leaves is reported rather than hidden: `CellCandidate.n_search_unindexed` counts the driven lines it left, and `CellCandidate.unindexed_two_theta` lists every usable line it left, the residue a second phase would explain.
 
 #### Priors from a structural analogue
