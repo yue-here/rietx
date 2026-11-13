@@ -111,6 +111,14 @@ pass.
   practice.md's rietx row ground the order on free-then-fix. GSAS-II's `GSASIIscriptable.rst`
   § Refinement recipe was read at 5.8.4 and does not state the order.
 
+  *Generality* (judge's verdicts, condensed by row): carry row **holds** for this edit, but is
+  "weak on the default half of the citation". The tutorial tells the reader to tick the box and
+  says what happens unticked, but never states the default. Author's answer: the row now names
+  `GSASIIobj.py:22` (checked in source) beside the tutorial for the default. The judge also noted,
+  as outside this edit: a standing tension between `ambiguity=1` and a named dissenter (ruled by
+  the maintainer 2026-11-03, C9 q1); MAUD's and Profex's batches dissent too, but the row names
+  GSAS-II alone; no field records which entries were carried.
+
   *Not done, on purpose.* The other 21 GSAS-II `file:line` citations in `_audit.py` stay: they are
   legitimate under the licence rule, and practice.md's marks now say which kind they are.
   `spherical_harmonics.py`'s C(l, n) names are a convention, so a concept: no change.

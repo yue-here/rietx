@@ -4927,7 +4927,8 @@ ROWS: tuple[Row, ...] = (
                  "held setup value from pattern to pattern (WP-2081); GSAS-II's default "
                  "restarts each histogram from its own parameters unless 'Copy results to "
                  "next histogram?' (Copy2Next) is ticked (GSAS-II SeqRefine tutorial, "
-                 "SequentialTutorial.htm), the dissent, kept as carry=(). Ruled by the "
+                 "SequentialTutorial.htm; the box off by default, GSASIIobj.py:22, "
+                 "checked in source), the dissent, kept as carry=(). Ruled by the "
                  "maintainer 2026-11-03 (2003-batch/batch.md, C9 q1)."),
         approved="2026-11-03"),
     Row("rietx.sequential.refine_sequential:carry_hkl_intensities", "default", tier=3,
