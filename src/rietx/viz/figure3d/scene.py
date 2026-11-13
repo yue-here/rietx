@@ -40,6 +40,10 @@ CELL_WIDTH_PX = 2
 EDGE_WIDTH_PX = 1.25
 #: A polyhedron's faces are drawn at this opacity in the centre's colour.
 POLY_ALPHA = 0.55
+#: A filled ring or named face with no colour of its own (WP-1548 D5): a
+#: neutral grey, since a ring has no centre to take a colour from, drawn at
+#: ``POLY_ALPHA`` like a polyhedron.  A provisional look value, the maintainer's.
+FILL_COLOR = "#8c8c8c"
 #: An image outside the cell is its colour scaled toward black by this, and a
 #: polyhedron's edges are their face colour scaled by the second.
 DIM_BOUNDARY = 0.62
@@ -57,7 +61,12 @@ CELL_INK = "#1f5fa8"
 #: principal ring is where the smallest unit-frame coordinate is under
 #: ``ring_width``, inked lighter (``ring_lighten`` toward white) on an atom
 #: whose luminance is under ``ring_dark`` and darker (``ring_darken``) on the
-#: rest.  ``luma`` is Rec. 709's.
+#: rest.  ``luma`` is Rec. 709's.  Depth cueing (WP-1548 D1, off unless asked)
+#: fades each surface toward the background linearly in depth: from nothing at
+#: ``fog_start`` of the drawn atoms' depth span, measured from the front, to
+#: ``fog_max`` at ``fog_end`` (:func:`fog_span`).  The start and end are
+#: ChimeraX's defaults for its ramp; ``fog_max`` is below 1 so the back layer
+#: stays legible (``docs/practice.md`` § Depth cueing).
 LOOK: dict[str, Any] = {
     "light": [-0.40, 0.55, 0.73],
     "ambient": 0.45,
@@ -70,6 +79,9 @@ LOOK: dict[str, Any] = {
     "ring_lighten": 0.6,
     "ring_darken": 0.3,
     "luma": [0.2126, 0.7152, 0.0722],
+    "fog_start": 0.5,
+    "fog_end": 1.0,
+    "fog_max": 0.7,
 }
 
 #: The opening view's eye and up, before ``look_from`` (``openingView``).
@@ -107,6 +119,31 @@ def _hypot3(v: Sequence[float]) -> float:
 def _cross(u: Sequence[float], v: Sequence[float]) -> list[float]:
     return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
             u[0] * v[1] - u[1] * v[0]]
+
+
+def fog_span(scene: Mapping, rotation: Sequence[float]) -> list[float] | None:
+    """``fogSpan``: where depth cueing starts and ends, as view-space depths.
+
+    ``rotation`` is row-major, nine numbers, as :func:`look_from` returns it.
+    Depths are the GUI's, ``R·(p − center)``'s third component, z toward the
+    viewer; the raster's view coordinates are ``R·p`` and add ``(R·center)``'s.
+    The span is the drawn atoms' centres along the line of sight, front to
+    back.  The fog starts ``fog_start`` of the way from the front and reaches
+    ``fog_max`` ``fog_end`` of the way, so it follows the picture as it turns,
+    as ChimeraX's ramp follows its clip planes (WP-1548 D1).  ``None`` where
+    the atoms span no depth, one atom or a layer seen edge on, since then there
+    is nothing to cue.
+    """
+    r, c = rotation[6:9], scene["center"]
+    depths = [r[0] * (a["pos"][0] - c[0]) + r[1] * (a["pos"][1] - c[1])
+              + r[2] * (a["pos"][2] - c[2]) for a in scene["atoms"]]
+    if not depths:
+        return None
+    front, back = max(depths), min(depths)
+    if not front > back:
+        return None
+    span = front - back
+    return [front - LOOK["fog_start"] * span, front - LOOK["fog_end"] * span]
 
 
 def atom_transform(geometry: Mapping, atom: Mapping, mode: str,
@@ -273,7 +310,8 @@ def drawn_with(geometry: Mapping, polyhedra: Iterable[int]):
 def build_scene(geometry: Mapping, mode: str = "ball", *,
                 hidden: Iterable[str] = (), show_boundary: bool = True,
                 exaggeration: float = 1.0, polyhedra: Sequence[int] = (),
-                cell: str = CELL_INK, stick: float = 1.0) -> dict:
+                cell: str = CELL_INK, stick: float = 1.0,
+                fills: Sequence[Mapping] = ()) -> dict:
     """``buildScene``: everything the renderer draws, in Å.
 
     ``hidden`` is the species switched off, and a bond half belongs to its
@@ -283,6 +321,14 @@ def build_scene(geometry: Mapping, mode: str = "ball", *,
     brings the atoms only it needs, and hides its site's centres outside the
     cell with their sticks (:func:`drawn_with`).  ``center`` and ``radius`` are the fit the
     GUI zooms to, and ``depth`` holds every atom the payload can draw.
+
+    ``fills`` are filled rings and named faces (WP-1548), each a ``kind``
+    (``"ring"`` or ``"face"``), ``vertices`` indexing the payload's atoms,
+    ``faces`` as index triples into ``vertices`` and a ``color`` or ``None``
+    for :data:`FILL_COLOR` (:mod:`rietx.viz.figure3d.rings` builds them).  A
+    fill is drawn only while every one of its atoms is, and joins ``faces``
+    after the polyhedra, its ``index`` its place in ``fills``.  A face entry's
+    ``kind`` says which list its ``index`` reads.
     """
     hidden = set(hidden)
     polys = geometry["polyhedra"]
@@ -324,17 +370,11 @@ def build_scene(geometry: Mapping, mode: str = "ball", *,
     lines = [{"a": list(geometry["corners"][a]), "b": list(geometry["corners"][b]),
               "color": ink, "width": CELL_WIDTH_PX} for a, b in geometry["edges"]]
     faces = []
-    for index in polyhedra:
-        p = polys[index]
-        site = sites[p["site"]]
-        color = dim(site["color"]) if payload_atoms[p["center"]]["boundary"] else site["color"]
-        at = [payload_atoms[v]["pos"] for v in p["vertices"]]
-        for i, j in p["edges"]:
-            lines.append({"a": list(at[i]), "b": list(at[j]),
-                          "color": rgb(dim(color, DIM_EDGE)), "width": EDGE_WIDTH_PX})
+
+    def face_entry(kind: str, index: int, at: list, triangulation, color: str) -> dict:
         triangles: list[float] = []
         normals: list[float] = []
-        for face in p["faces"]:
+        for face in triangulation:
             a, b, c = (at[v] for v in face)
             u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
             w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
@@ -343,8 +383,25 @@ def build_scene(geometry: Mapping, mode: str = "ball", *,
             triangles.extend([*a, *b, *c])
             normals.extend([n[0] / length, n[1] / length, n[2] / length])
         centroid = [sum(q[k] for q in at) / len(at) for k in range(3)]
-        faces.append({"index": index, "triangles": triangles, "normals": normals,
-                      "color": rgb(color), "centroid": centroid})
+        return {"kind": kind, "index": index, "triangles": triangles, "normals": normals,
+                "color": rgb(color), "centroid": centroid}
+
+    for index in polyhedra:
+        p = polys[index]
+        site = sites[p["site"]]
+        color = dim(site["color"]) if payload_atoms[p["center"]]["boundary"] else site["color"]
+        at = [payload_atoms[v]["pos"] for v in p["vertices"]]
+        for i, j in p["edges"]:
+            lines.append({"a": list(at[i]), "b": list(at[j]),
+                          "color": rgb(dim(color, DIM_EDGE)), "width": EDGE_WIDTH_PX})
+        faces.append(face_entry("polyhedron", index, at, p["faces"], color))
+    shown = {a["index"] for a in atoms}
+    for index, fill in enumerate(fills):
+        if not all(v in shown for v in fill["vertices"]):
+            continue
+        at = [payload_atoms[v]["pos"] for v in fill["vertices"]]
+        faces.append(face_entry(fill["kind"], index, at, fill["faces"],
+                                fill.get("color") or FILL_COLOR))
     # the fit reads positions and ball sizes only, over the atoms the default
     # picture can draw
     by_default = drawn_with(geometry, [i for i, p in enumerate(polys) if p["drawn_by_default"]])
