@@ -569,7 +569,7 @@ and the search at plan end always skips those pairs. A rigid body keeps the
 distances of its template, so such a row could never change. A declared
 torsion breaks that. It turns part of the body about a bond, and two atoms on
 either side of the bond can come together. Contacts inside the molecule are
-then not checked, except by a row the caller wrote for that pair. A run in
+then not checked, except by a row written for that pair. A run in
 which a torsion of such a body turned says so
 (`RESTRAINT_BODY_CONTACTS_UNCHECKED`).
 
