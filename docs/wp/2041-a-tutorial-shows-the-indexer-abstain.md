@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-10-24 — example found (a 45° cut); held until WP-1956 lands, by the maintainer's choice
 Track: The repo's own process
 Depends on: 1956
-Priority: P4 2026-10-24 — teaching content, held on WP-1956: that repair changes both the example's caveats and the notebook's confident count
+Priority: P4 2026-11-08 — teaching content; WP-1956, its one blocker, closed on 2026-11-08 (PR #1469)
 
 ## Goal
 
@@ -52,6 +52,21 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
 
 ### Inherited
 
+- **2026-11-08, from WP-1956 (closed, PR #1469): the grades on record after the repair, not
+  re-measured.** WP-1956's repair is complete on `main` (PRs #941, #1177, #1302; #1353 and
+  the 2026-11-07 ruling changed no code). Neither cut was re-run for that close, so this is
+  what the record holds, with its tree. *Full range:* the committed notebook, built by
+  1.11.0's rebuild `3791ef632` (2026-11-04, after all three PRs), prints CELL at `high`,
+  orthorhombic P 5.73930 4.96157 7.97039 Å, 51 of 54 lines indexed, Pawley Rwp 0.0444,
+  24 of 87 lines absent, and no capping caveat. So the repair did not drop the full range to
+  NO CELL, and the confident section stands as WP-2011 rewrote it. *45° cut:* last measured
+  on PR #941's merge (`0070d696`, 2026-10-24, before #1177 and #1302): NO CELL, the true cell
+  `medium`, capped by `fom_panel_reduced` and `shift_allowance_assumed`, 6 of 23 lines absent
+  and none uncancellable. Under #941 an absent count alone caps at `medium` rather than
+  refuting, so the abstention now rests on the two capping caveats. *Caveat for task 3:*
+  `src/rietx/indexing/` has moved since `3791ef632` (WP-2076's extinction-screen prefit among
+  12 commits), so both readings are to be taken again on `main` before the cut goes into the
+  notebook. WP-1956's other follow-ups are issue #1468; none bears on this tutorial.
 - **2026-10-27, from WP-2011: notebook 03's indexing prose was rewritten for the
   Pawley validation.** The candidate now validates at Rwp 0.044 with 0 unmatched
   peaks, so the `INDEX_IMPURITY_LINES` paragraph went, and the row's 24 of 87
