@@ -1,9 +1,8 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
+Milestone: unscheduled · Status: ✅ 2026-11-09 — nightlies green on all six jobs on 11-04 and again from 11-06 (run 42225042080, after #1429); the Mac full suite green but for one row, the two-site solve, which lands on either assignment by rounding on any platform and is fixed by #1559 (#1424 part b, WP-1418; PR #1425)
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
 
 ## Goal
 
@@ -133,35 +132,6 @@ and 2045 on 2026-10-25):
 - **An indexing answer's axis order moves with the platform** (WP-2043):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
-
-### Inherited
-
-- **2026-11-06, from WP-2045 (closed in PR #1440): this WP's dependency on 2045 is met.**
-  The `full` job completed green on `main` twice on 2026-11-04: run 41837816600
-  (`ba3719f06`, 1:35:41) and run 41874118202 (`b1741da64`, 2:47:18). WP-2045 counted the
-  2026-11-05 red row as this WP's, as the bullet below does.
-
-- **2026-11-05, from the issue triage (issue #1424, its wavelength row): the row is a stale
-  pin on every platform, so the nightly is red on main.** The issue reads it as Mac-only, by
-  contrast with the two nightlies of 2026-11-04. Both of those predate the cause. The
-  2026-11-05 nightly (run 42037632923, `d4839e02e`) failed its `full` job on this one row,
-  with `1 failed, 14933 passed, 171 skipped, 53 xfailed` on Linux, `[dev,jax]`. Its value
-  there is 0.010354633004, and an arm64 Mac reads 0.010354633028.
-
-  Bisected over main's merges: passes at `c2da9ae93`, fails from `85ce3f287`, which merged
-  #1391 (WP-1944, extinction opt-in). WP-1944's handover predicted this move: "a pinned width
-  goes from 0.0102922 to 0.0103546". The fast selection does not run the row, so #1391 merged
-  without the repin.
-
-  `tests/test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
-  needs three pins and its docstring, read on an arm64 Mac at `541f0daf7`, four starts:
-  x's esd 0.0103546 (was 0.0102922), y −0.0216150 (was −0.0210949), y's esd 0.0192658 (was
-  0.0190970). The spread of x's esd across starts is 2.8e-9, so that bar still holds. The
-  test stops at its first assert, so only the first of the three shows in the log.
-
-  PR #1425 closes this WP on the reading that both rows are Mac-only. That reading does not
-  hold for this row. PR #1429 carries the same three pins, and holds for the maintainer
-  because it moves an acceptance number.
 
 ## Non-goals
 
@@ -316,6 +286,69 @@ gh run list --workflow nightly.yml --branch main --limit 1
   (the two degeneracies); WP-1930 (the 1e-14 nudge).
 
 ## Handover log
+
+- **2026-11-09** — Closed. `main` is green on every nightly leg: both 11-04
+  runs passed all six jobs, and so did the first nightly after #1429, run
+  42225042080 (2026-11-06, `263227986`, schedule; the 11-07 and 11-08 runs
+  passed too). The one red row on 11-03 belonged to another WP and is fixed.
+  The full suite on an arm64 Mac is green except for one row, the two-site
+  solve, owned by issue #1424 and WP-1418. Michael ruled (2026-11-05 16:2xZ)
+  that this WP closes with its acceptance recorded as met except for it.
+  *Corrected 2026-11-13 (Yue's review of #1425):* that row is not Mac-only and
+  does not reliably pass on Linux. The Linux `full` job failed it on
+  2026-11-11, run 43026125239 (`4c48b890d`), with m1 0.6995 (the Mac's
+  value) against 3.5 ± 0.01, and passed it on run 43234222625 (11-12,
+  `a23d06e14`) with no change to the test or to `strategy/magnetic.py` between
+  them. WP-1418's 2026-11-12 entry measured why: on any platform this row lands
+  on the true assignment or the swap by rounding, so a green `full` job on it
+  says nothing. #1559 changes the test to assert what the pattern measures.
+  The close holds until #1559 has merged and a nightly on `main` after it
+  passes all six jobs; that run is then quoted here.
+
+  *Done* (ghostshift runner and this close, PR #1425). The moot `Priority:`
+  line and the `### Inherited` section went (its notes, on WP-2045's close and on
+  the wavelength row, are consumed below); the narrative moved to
+  `docs/milestones/v1.12.md` § How v1.12 is getting here; the index was
+  regenerated. Filed #1424 for the Mac rows. Yue held the close on #1425 until
+  #1429 landed and a nightly passed (comment of 2026-11-05 22:21Z). #1429
+  merged 2026-11-05 22:18Z (`7dec1f490`); run 42225042080 is the first nightly
+  at a commit that contains it (`git merge-base --is-ancestor`), and all six
+  jobs passed: full suite (Linux, incl. slow acceptance), fast suite (Linux,
+  Python 3.12 and 3.13), torch agreement matrix, macOS (goldens' capture
+  platform) and fast suite (Windows).
+
+  *Measured.* Nightly 11-03 (run 41641923622) failed one row,
+  `tests/test_eval_skill.py::test_the_placement_episode_builds_and_fires_its_codes`,
+  `KeyError: 'instrument.geometry.axial_hl'`: WP-2012's, fixed by its PR
+  #1387 (`ffcfd79aa`), not touched by #1309. Nightlies 11-04, 41837816600
+  (schedule, `ba3719f0`) and 41874118202 (dispatch, `b1741da6`): all six
+  jobs success; their `full` jobs 14 815 passed / 252 skipped / 53 xfailed
+  and 14 839 / 252 / 53 (Linux, `[dev,jax]`), the dispatched one 2 h 47 min
+  of pytest time, inside the new 300-minute limit. Nightly 11-05 (run
+  42037632923, `d4839e02e`) failed its `full` job on the wavelength row alone
+  (1 failed, 14 933 passed, `[dev,jax]`; value 0.010354633004 on Linux, 0.010354633028 on an arm64
+  Mac). Bisected over `main`'s merges: it passes at `c2da9ae93` and fails from `85ce3f287`
+  (#1391, the extinction opt-in, whose handover predicted the move), and the fast selection does
+  not run the row. #1429 repinned it (x's esd 0.0103546, y −0.0216150, y's esd 0.0192658). Mac full
+  suite (darwin/arm64, worktree `[dev]` venv, Python 3.12.13, on `078f10644`,
+  run through the suite lock beside other sessions' suites): 5 failed,
+  14 841 passed, 250 skipped, 53 xfailed. Re-run alone at load ~1.5 all four
+  package rows reproduced. After merging `main` at `541f0daf7`:
+  `test_acceptance_nac.py::test_nac_termination_view_golden_shape` and
+  `test_suite_alarms.py::test_the_standards_fire_what_the_pin_says` pass
+  (#1412 dropped the extinction warning they tripped on); the fifth was this
+  branch's stale WP index. Of the two that failed on `main`, filed as #1424,
+  `test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
+  (x esd 0.010354633 against 0.0102922, rel 1e-4) was a stale pin on every
+  platform and is cleared by #1429. The other stays:
+  `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
+  (m1 0.6995 against 3.5 ± 0.01), in WP-1418.
+
+  *Not done, for its owner.* WP-2045 closed in PR #1440 (2026-11-06), so
+  nothing here waits on it. No full suite was re-run on the merged tree: the
+  branch adds only `docs/` prose over `main`.
+
+  Next: #1559 (#1424 part b), the two-site row's test, in WP-1418; then a nightly on `main` after it, quoted here.
 
 - **2026-11-02** — The Linux full suite was red or cancelled every night from
   10-24 to 11-01, and none of what was left is a defect this WP owns. One red
