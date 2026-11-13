@@ -1,9 +1,8 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls and the dark-theme C colour landed (PR #1342); left are cluster polyhedra on request and the Inherited readings from WP-1504 and #1057
+Milestone: unscheduled · Status: ✅ 2026-11-02 — closed: 14 of 15 tasks landed, the 15th in part (PR #1342 the last); cluster polyhedra, the readings from WP-1504 and issue #1057 moved to issue #1371, now WP-2111
 Track: Render what the fit already knows
 Depends on: 1466
-Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species), waiting on a ruling
 
 ## Goal
 
@@ -113,7 +112,8 @@ Read 2026-09-26 from each program's manual.
   non-goals. An antiperovskite or an oxynitride is read by its anion-centred
   shapes. *Resolved in part 2026-09-28:* anion-centred ones come through the
   lists. A cluster polyhedron has no atom at its centre, which the payload's
-  `center` index cannot say.
+  `center` index cannot say. *Moved 2026-11-02* to issue #1371, to wait there for
+  a user's request.
 
 ### Ties, the cap and the cost
 
@@ -167,18 +167,6 @@ replays the rules over the committed payloads and never rebuilds them, since
 file by itself. A change to `build()` that adds no field does not, so delete
 the file and run the test to refresh the payloads.
 
-### Inherited
-
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): `view="auto"` ranks by `hidden`, stacking included, so it prefers an oblique view to an axis projection.** `FigureReport.stacked` (WP-1533) is the part of `hidden` that sits behind an atom of the same site, within a quarter of its drawn radius. One cell down a cell axis reads 0.53 hidden and 0.53 stacked on HKUST-1, 0.52 and 0.50 on ZSM-5, and 1.00 and 1.00 on YBa₂Cu₃O₇; NAC's opening view reads 0.18 and 0.00. The skill's rule already reads `hidden - stacked`. The evidence for ranking by occlusion is WP-1957's Context 4: three blind reviewers ranked 15 renderings of refined fluorapatite, and the view down c (`hidden` 0.45, nearly all of it stacking) was first for two and second for the third, while `auto` picked about [2 0 1] (`hidden` 0.024) and all three called it "a tangle". The change moves every default `auto` pick, so it is an agent question before it is a code change.
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the darker shade on images outside the cell reads as a second species.** `scene.DIM_BOUNDARY` (0.62, `viz/figure3d/scene.py:45`) dims every image outside the cell. All three of WP-1957's reviewers read one element as two species, and took the shade for a depth cue. Unchanged in the tree on 2026-10-23.
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): `atom_labels=True` prints a stacked pair twice.** WP-1957's reviewers saw `F4 F4` at one corner of fluorapatite down c. `FigureReport.stacked` already finds such pairs, but nothing in `viz/figure3d/` merges their labels (checked 2026-10-23).
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the a and b letters sit under atoms or bonds in a view down c.** WP-1957's reviewers, on fluorapatite.
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): at the default probability, `mode="ellipsoid"` draws the atoms as pinpricks.** That is physically right at Biso ≈ 1 Å² (`structure3d.DEFAULT_PROBABILITY` is 0.50), but WP-1957's reviewers read it as a wire model.
-
-- 2026-10-26 issue triage, **done 2026-11-01 (the three changes below landed; see the handover entry)**: #1056 (maintainer, 2026-10-19): an ellipsoid figure from a CIF read with defaults draws spheres, and nothing says so. `Structure.from_cif(aniso=False)` reads the file's U_ij as U_eq, and `render_structure(mode="ellipsoid")` then draws every site as a sphere. Checked against the tree at c0e32ab29: COD paracetamol (`tests/data/cod_2104364.cif`) read with defaults gives 0 of 20 sites anisotropic, `fig.report.warnings == []`, and `from_cif(diagnostics=d)` appends nothing; with `aniso=True` it gives 11 of 20 (the 9 hydrogens are Uiso in the file). The issue asks for three small changes: an info diagnostic from the CIF reader when it collapses an aniso loop, counting the sites ("N sites carry U_ij in the file and were read as U_eq; pass aniso=True to keep them"; `gui/imports.py:_has_aniso` already detects the loop); a `FigureReport.warnings` line in ellipsoid mode counting the sites drawn as spheres, stated as a count because a file's hydrogens trigger it legitimately; and one line in `docs/skill/rietx/references/api-figure.md`. The reader diagnostic is a new code, so it needs a `rietx._audit` row and will fire on every test CIF with an aniso loop (five in `tests/data` at least), so check `tests/silence.py`.
-
-- 2026-10-26 issue triage: #1057 (maintainer, 2026-10-19): two figure controls an ORTEP needs, and one outline defect. A bond half always takes its atom's site colour (`viz.figure3d.scene.build_scene`), and the renderer has no per-atom draw style, so a group cannot be drawn as wireframe beside ellipsoids and bonds cannot all be grey. `outline=True` also inks the near-side edge of a thin stick, which on a stick is its whole width. Checked against the tree at c0e32ab29: on COD paracetamol (`tests/data/cod_2104364.cif`, `aniso=True`) with four site colours set, the bond halves carry exactly those four colours; `render_structure` has no bond-colour or style parameter; at `stick=0.3, outline=True` the white H bond halves are drawn with black edges (looked at). The issue proposes `rx.viz.restyle(g, mask, "wire")` (no glyph, thin lines in the bond colour, skipped by the outline) and `render_structure(bond_colour=...)` or a `bond_color` key in the build dict, both carried in `.recipe`. Its claim that Mercury and Olex2 set a display style per selection is recalled, not checked; read their manuals before choosing names, as Context § What other viewers do did.
-
 ## Non-goals
 
 - The octant cut-out, Voronoi solid angles, effective coordination numbers
@@ -196,7 +184,7 @@ Independent; take any.
 - [x] Cyanide and carbonyl ligands: find a rule that keeps SiO₄ and PO₄ and gives Prussian blue FeC₆, and measure it on the 21 phases (2026-09-28: a donor is a ligand, and an atom behind a bonded ligand is screened. The 21-phase default picture is unchanged; two hidden gaps moved, pyrite 1.52 → 1.60 and LaB6 1.45 → 1.90)
 - [x] Centre and ligand overrides on the query string, as Mercury's two lists (2026-09-28: `centres=` and `ligands=`, element lists that replace the rule, and the `round` and `corners` rows under `drawing`)
 - [x] One atom's environment on request, for an intermetallic (2026-09-28: a double-click on an atom draws its shell among every element alone, and an element's environments come through the lists; Cu₃Au draws AuCu₁₂ and CuAu₄Cu₈)
-- [~] Anion-centred and cluster polyhedra, if a user asks for them (2026-09-28: anion-centred ones come through the lists, as fluorite's FCa₄. A cluster polyhedron round no atom, B₆, does not)
+- [~] Anion-centred and cluster polyhedra, if a user asks for them (2026-09-28: anion-centred ones come through the lists, as fluorite's FCa₄. A cluster polyhedron round no atom, B₆, does not; 2026-11-02: that half moved to issue #1371)
 - [x] The two-gap tie: find a real case, then decide whether to apply Daams & Villars' rule (2026-09-28: found, COD 1509685's Ag2 and 37 more; the rule declined and the rival reported in the hover, Context § Ties)
 - [x] A hidden shell dropped at the atom cap stays in the legend as unavailable, or the cap stops counting it (2026-09-28: the payload's `polyhedra_dropped` lists each by site and ligands, and the legend greys a formula that has nothing else to draw. The cap still counts every shell: it bounds what the viewer draws)
 - [x] The polyhedra stop recomputing on a bond-slider release — declined on the record 2026-09-28. The recompute is kept and made cheaper (Context). A memo would be keyed on the phase and on every rule constant, and one left out of the key serves a stale picture
@@ -231,6 +219,57 @@ npm --prefix gui test && npm --prefix gui run check
 - Allred, A. L. (1961). *J. Inorg. Nucl. Chem.* 17, 215.
 
 ## Handover log
+
+### 2026-11-02 (3rd session) — closed; what is left moved to issue #1371
+
+**WP-1468 is closed, and nothing it still carried is lost.** Its polyhedra
+now handle disorder, split sites, cyanide and carbonyl ligands, user-chosen
+centres and ligands, one atom's environment, the two-gap tie and the atom
+cap, and the last session gave the figure its ink crop, its polyhedron
+colours and a lighter carbon on a dark ground. What was left was mostly not
+about polyhedra: five readings WP-1957's reviewers made of the structure
+figure (forwarded by WP-1504), issue #1057's two ORTEP controls and its
+outline defect, and a cluster polyhedron that waits for a user to ask. No
+open WP owned them, so they moved to issue #1371 rather than being
+folded somewhere they do not belong. The maintainer's triage filed them as WP-2111 on
+2026-11-05. PR #1355, from a ghostshift runner,
+a close-only job: this session changed no code.
+
+*Done.*
+- Status ✅, the `Priority:` line deleted, the `### Inherited` section
+  deleted as consumed: all seven entries (five from WP-1504, the #1056 note
+  already done on 2026-11-01, the #1057 note) are accounted for. The #1056
+  note was done and is dropped; the other six are restated in issue #1371's
+  Context, each rechecked against the tree at b0c79e12d (`DIM_BOUNDARY` still
+  0.62, no label merge reads `stacked`, `DEFAULT_PROBABILITY` still 0.50, no
+  `restyle` and no bond-colour parameter).
+- The partial task (anion-centred and cluster polyhedra) stays `[~]`: its
+  anion-centred half landed 2026-09-28, and its cluster half is issue #1371's
+  last task.
+- **Where the leftovers went, and why an issue.** Filed as issue #1371
+  (P3 carried from this WP's 2026-10-23 rating). A first draft filed them as
+  a new WP; it was withdrawn to the issue on 2026-11-03, since proposals to
+  this repository go to issues and the maintainer opens WPs. Checked for an owner first (`grep -rln` over `docs/wp/` for the figure
+  code, `DIM_BOUNDARY`, `#1057`, `view="auto"`, `atom_labels`): the open
+  candidates were WP-1505, which moves the figure into its own package and
+  changes nothing on its surface, and WP-1536, 1537 and 1538, which add the
+  SVG, ray-tracer and ambient-occlusion outputs. None owns a reading of the
+  picture or a draw style.
+- The narrative moved to the v1.12 record, § How v1.12 is getting here (1.11.0 is cut).
+
+*Measured* (`[dev]` venv, darwin/arm64, on origin/main b0c79e12d plus this
+close). `tests/test_docs_consistency.py`: 25 passed. ruff clean.
+`python -m tests.reader_output`: exit 0, unchanged against the merge-base.
+`session_start.py` raises no flag for this WP, and
+`closed_wp_writes.py` finds nothing added to a closed WP.
+
+*Not run, and why.* `/code-review` (step 6): a prose-only branch. No
+`CLAUDE.md` edit, no lane, no `_audit.py` change and no new heuristic, so no
+generality judge. No full suite: nothing could move a measured number.
+
+*Next.* None here. WP-2111 (from issue #1371): the label merge or the axis letters first, since
+neither needs a ruling; the `DIM_BOUNDARY` shade waits on the maintainer, and
+the `auto` ranking on an agent round.
 
 ### 2026-11-02 (2nd session) — carbon is lighter on a dark ground, as the maintainer ruled
 

@@ -19,7 +19,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
-| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-02 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 2026-11-09 | P3 | [rigid-bodies](#rigid-bodies) |
@@ -729,7 +728,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1461](1461-every-browser-chart-draws-with-uplot.md) | Every browser chart draws with uPlot | ✅ 2026-09-26 | — | — |
 | [1462](1462-the-structure-viewer-draws-with-its-own-webgl2-renderer.md) | The structure viewer draws with its own WebGL2 renderer | ✅ 2026-09-26 | — | — ([1461](1461-every-browser-chart-draws-with-uplot.md) soft) |
 | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) | The structure viewer draws coordination polyhedra | ✅ 2026-09-26 | — | [1462](1462-the-structure-viewer-draws-with-its-own-webgl2-renderer.md) |
-| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 🔄 2026-11-02 | P3 | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) |
+| [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | ✅ 2026-11-02 | — | [1466](1466-the-structure-viewer-draws-coordination-polyhedra.md) |
 | [1470](1470-a-structure-figure-without-a-browser.md) | A structure figure from Python, drawn without a browser | ✅ 2026-09-27 | — | — |
 | [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | ⬜ | P3 | — |
 | [1531](1531-what-the-promo-figures-found.md) | What the promo figures found: a trimmed cell the report calls fine, a bond through a face, labels on atoms, polyhedra without their far ends | ✅ 2026-10-02 | — | — |
