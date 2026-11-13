@@ -1,8 +1,7 @@
 # WP-1548 — depth cueing, and filled rings and faces, in the structure figure
 
-Milestone: rietview · Status: 🔄 2026-11-13 — every task built, PR #1554 ready; waits on the maintainer confirming the four look choices from the task-6 sheets
+Milestone: rietview · Status: ✅ 2026-11-13 — depth cue, filled rings and named faces in both renderers; the four look choices confirmed
 Depends on: 2111 soft (its ruling on `DIM_BOUNDARY`, D6)
-Priority: P3 2026-11-12 — the maintainer asked for it; nothing waits on it, and a ray tracer through WP-1537 would give fog once that lands
 
 ## Goal
 
@@ -197,6 +196,10 @@ sheets that show each one are in `1548-measure/pairs/`: `q_fog_max_*`,
 `q_d5_*`, `q_d6_*`, and one sheet a phase. The four rulings, confirm or
 change, are what the WP still waits on before it closes.
 
+*2026-11-13, ruled:* the maintainer confirmed all four as recommended:
+`planar_rings=`, the refusal over a transparent ground, the grey default and
+`fog_max` = 0.7.
+
 ## Non-goals
 
 - Deciding aromaticity, bond orders or hybridisation. D2.
@@ -298,6 +301,21 @@ looked at.
   36, 986-991. Recalled, not read.
 
 ## Handover log
+
+### 2026-11-13 (3rd session) — closed: the four look choices confirmed
+
+The maintainer looked at the task-6 sheets and confirmed every provisional
+choice as recommended, so nothing in the code moves and the WP closes. Its
+narrative is in `docs/milestones/v1.12.md`. CI was green on `12ade194` before
+this commit: lint, the fast suite on 3.11 and 3.14, the jax job, and the kernel
+wheels and their tests on five platforms.
+
+- **Done:** the ruling recorded under "Waits on the maintainer"; status ✅,
+  `Priority:` dropped (no `### Inherited` to consume); the milestone entry.
+- **Also this session, after the handover:** CI's Vale step failed on four
+  chemistry words in `reference/figures.md` (pyridine, cyclohexane,
+  aromaticity, chelate); they went into `docs/vale/terms.txt` (`12ade194`).
+- **Next:** none in this WP. WP-2111 holds the dark-ground observation (D6).
 
 ### 2026-11-13 (2nd session) — filled rings and faces, the sheets drawn, every task built
 
