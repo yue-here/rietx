@@ -4045,7 +4045,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The recipe states axial divergence as one combined number, and this package "
             "holds two. The number was halved between them, the symmetric reading. No "
             "recipe available can tell that apart from an uneven split, so treat the two "
-            "values as assumed and not measured."
+            "values as assumed and not measured. Where the recipe flags the number for "
+            "refinement, only `axial_sl` is freed and `axial_hl` holds its half: swapping "
+            "the two gives the same pattern, so a fit freeing both could return either."
         ),
     ),
     "RECIPE_DISPERSION_DECLINED": HelpEntry(
