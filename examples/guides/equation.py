@@ -35,6 +35,16 @@ print(f"form rejected: {form.rejected} (statistic {form.tied.statistic:.1f}, cut
 print(result.parametric_value("a", {"T": 293.0}))
 # guide: value end
 
+# guide: trajectory start
+series = rx.refine_sequential(patterns, *starting_model(), plan="mccusker_default",
+                              x=TEMPERATURES, x_label="T (K)")
+fit = rx.fit_trajectory(series, "phases.0.cell.a", "a0 + k*(T - 600)",
+                        {"a0": rx.Parameter(value=4.163, vary=True),
+                         "k": rx.Parameter(value=0.0, vary=True)},
+                        coordinates=coordinates)
+print(fit)
+# guide: trajectory end
+
 # guide: bowed start
 bowed_a = [a - 9.4e-5 * (1 - ((t - 600) / 300) ** 2) for a, t in zip(TRUE_A, TEMPERATURES)]
 bowed = [simulate(a, seed=11 + k) for k, a in enumerate(bowed_a)]
@@ -64,3 +74,14 @@ assert f"{reading.cut:.1f}" == "11.1" and reading.dof == 5
 value = result.parametric_value("a", {"T": 293.0})
 assert f"{value.value:.7f}" == "4.1564527" and value.outside == ["T"]
 assert form.rejected and f"{form.tied.statistic:.1f}" == "504.2"
+
+# The trajectory's line: the declared line's coefficients to a small fraction of an
+# esd, its unscaled esds the declared line's, its scaled ones wider by sqrt(chi2/nu).
+a0, k = fit.variables
+assert (fit.chain, fit.n_points, fit.dof, fit.skipped) == ("forward", 7, 5, [])
+assert f"{fit.reduced_chi2:.2f}" == "1.49"
+assert f"{a0.value:.9f}" == "4.162832824" and f"{k.value:.7e}" == "2.0781664e-05"
+assert f"{a0.esd:.1e}" == "2.0e-06" and f"{a0.esd_unscaled:.1e}" == "1.6e-06"
+assert f"{k.esd:.1e}" == "9.8e-09" and f"{k.esd_unscaled:.1e}" == "8.0e-09"
+assert f"{abs(a0.value - result.parametric[0].value) / result.parametric[0].esd:.2f}" == "0.07"
+assert f"{abs(k.value - slope.value) / slope.esd:.2f}" == "0.03"

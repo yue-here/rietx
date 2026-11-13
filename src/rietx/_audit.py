@@ -144,6 +144,7 @@ WALKED: dict[str, int] = {
     "schemas": 2002,
     "sequential.py": 2003,
     "multi.py": 2003,
+    "trajectory_fit.py": 2003,
     "report": 2004,
     "purposes.py": 2004,
     "io/readers.py": 2006,

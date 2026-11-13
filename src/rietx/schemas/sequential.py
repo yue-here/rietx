@@ -1753,3 +1753,111 @@ class SeriesResult(Base):
                      "one thing that would have to be wrong for it to be wrong, "
                      "and that thing has been checked")
         return lines
+
+
+class TrajectoryVariable(Base):
+    """One variable of an equation fitted to a trajectory (WP-2106).
+
+    ``esd`` follows the package's convention for every refined esd,
+    √(χ²/ν · (JᵀWJ)⁻¹), so a scatter wider than the trajectory's own esds
+    widens it.  ``esd_unscaled`` is √((JᵀWJ)⁻¹) alone, the reading of a
+    caller who trusts each pattern's esd as it stands.  Neither is chosen for
+    the caller: they differ by √(χ²/ν), :attr:`TrajectoryFit.reduced_chi2`.
+    Both are ``None`` on a held variable, and on one the trajectory does not
+    move, alone or only together with another; ``esd`` is ``None`` too where
+    no degree of freedom is left.  Bérar and Lelann's factor, which a
+    pattern's own esds carry for its correlated residuals, is not applied:
+    the points are separate fits.
+    """
+
+    name: str
+    value: float
+    vary: bool
+    esd: float | None = None
+    esd_unscaled: float | None = None
+    #: whether the solver ended with the variable in its active set, on its
+    #: own ``min`` or ``max`` (scipy's ``active_mask``, a proximity test, not
+    #: a test that the bound carried load); its esds are then marginal, as a
+    #: refined row's are (WP-1929).  ``None`` on a held variable.
+    at_bound: bool | None
+
+
+class TrajectorySkip(Base):
+    """One point of a trajectory the fit left out, and why (WP-2106).
+
+    ``reason`` is ``"quarantined"`` for a pattern the chain rejected
+    (diverged, or carrying an ``error``-level code: the test the chain's
+    median uses), ``"no_value"`` for a point whose value is not finite, and
+    ``"no_esd"`` for a point with no positive, finite esd, which has no
+    weight.  A pattern the path is absent from is no point of the trajectory,
+    so it is not listed.
+    """
+
+    position: int
+    label: str
+    reason: Literal["quarantined", "no_value", "no_esd"]
+
+
+class TrajectoryFit(Base):
+    """An equation fitted to one parameter's trajectory (WP-2106).
+
+    Returned by :func:`rietx.fit_trajectory`.  It is a fit to the
+    **trajectory**, not to the patterns: each point's esd is conditional on
+    the rest of its own pattern's fit, and a chain's values depend on the
+    direction it walked, so :attr:`chain` names the chain read.  A joint fit
+    (:func:`rietx.refine_multi` with a ``ParametricEquation``) fits the same
+    equation to the patterns themselves.
+    """
+
+    path: str
+    expression: str
+    #: the chain whose trajectory was read: ``"forward"`` or ``"backward"``
+    chain: Literal["forward", "backward"]
+    #: :attr:`SeriesResult.direction` of the series read; under ``"both"``
+    #: the other chain is there to fit too
+    series_direction: Literal["forward", "backward", "both"]
+    variables: list[TrajectoryVariable] = Field(default_factory=list)
+    #: over the varied variables in :attr:`variables` order, scaled as
+    #: :attr:`TrajectoryVariable.esd` is; ``None`` with no degree of freedom,
+    #: or where a direction is undetermined
+    covariance: list[list[float]] | None = None
+    #: Σ((value − fitted)/esd)² over the points fitted
+    chi2: float
+    #: points fitted minus varied variables
+    dof: int
+    #: ``chi2 / dof``; ``None`` at no degree of freedom
+    reduced_chi2: float | None = None
+    #: which entry of the chain each fitted point came from, by position
+    positions: list[int] = Field(default_factory=list)
+    #: the equation at each fitted point, aligned with :attr:`positions`
+    fitted: list[float] = Field(default_factory=list)
+    skipped: list[TrajectorySkip] = Field(default_factory=list)
+    #: whether the least-squares solver met a convergence test
+    converged: bool
+    #: the solver's own account of why it stopped
+    message: str = ""
+
+    @property
+    def n_points(self) -> int:
+        """The number of points fitted."""
+        return len(self.positions)
+
+    def __str__(self) -> str:
+        """The fit as a few lines: what was read, then each variable."""
+        skipped = (f", {len(self.skipped)} left out "
+                   f"({', '.join(sorted({s.reason for s in self.skipped}))})"
+                   if self.skipped else "")
+        lines = [f"{self.path} = {self.expression}, fitted to the {self.chain} "
+                 f"chain's trajectory ({self.n_points} points{skipped})"]
+        red = "n/a" if self.reduced_chi2 is None else f"{self.reduced_chi2:.3g}"
+        lines.append(f"  χ² {self.chi2:.4g} on {self.dof} dof, χ²/ν {red}"
+                     + ("" if self.converged else f"; not converged: {self.message}"))
+        for v in self.variables:
+            if not v.vary:
+                lines.append(f"  {v.name} = {v.value:.10g} (held)")
+                continue
+            esd = "n/a" if v.esd is None else f"{v.esd:.1e}"
+            raw = "n/a" if v.esd_unscaled is None else f"{v.esd_unscaled:.1e}"
+            lines.append(f"  {v.name} = {v.value:.10g} ± {esd} (unscaled ± {raw})"
+                         + (" at its bound" if v.at_bound else ""))
+        return "\n".join(lines)

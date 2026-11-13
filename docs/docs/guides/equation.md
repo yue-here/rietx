@@ -81,6 +81,40 @@ a: phases.0.cell.a at T=293 = 4.1564527(29) Å (extrapolating in T; form not rej
 
 293 K lies below the fitted range of 300-900 K, so the line says it is extrapolating.
 
+## Fit the equation to the series trajectory
+
+The other route is GSAS-II's: run the patterns as a series, then fit the equation to the trajectory it gives, weighted by each point's esd.
+`rx.fit_trajectory` takes the series, the path, the equation as [text](../reference/expressions.md), its variables, and the same coordinate table:
+
+```{literalinclude} ../../../examples/guides/equation.py
+:language: python
+:start-after: "# guide: trajectory start"
+:end-before: "# guide: trajectory end"
+```
+
+<!-- output of examples/guides/equation.py -->
+```text
+phases.0.cell.a = a0 + k*(T - 600), fitted to the forward chain's trajectory (7 points)
+  χ² 7.449 on 5 dof, χ²/ν 1.49
+  a0 = 4.162832824 ± 2.0e-06 (unscaled ± 1.6e-06)
+  k = 2.0781664e-05 ± 9.8e-09 (unscaled ± 8.0e-09)
+```
+
+`a0` is the lattice parameter a at 600 K and `k` the slope, the two numbers the declared line gave above.
+They lie 0.07 and 0.03 of the declared line's esds from its values.
+
+Each variable carries two esds, and rietx does not choose between them.
+`esd` is scaled by χ²/ν, as every esd rietx refines is, so it widens when the points scatter more than their esds say.
+`esd_unscaled` trusts each pattern's esd as it stands, and here it is the declared line's esd to two figures.
+With seven points χ²/ν has five degrees of freedom, so the scaled esd moves with the noise: over twenty noise seeds of this ramp it ran from 0.35 to 1.30 times the declared line's, while the unscaled one stayed within 1.1 % of it, and the two lines never differed by more than 0.05 of their combined esds.
+
+The result says which chain it read, because a chain's values depend on the direction it walked.
+A series run with `direction="both"` takes `chain="forward"` or `chain="backward"`, since the gap between the two is the path dependence the series measures.
+A pattern the series quarantined is left out, as is a point with no esd, and `fit.skipped` names each one.
+
+A GSAS-II project's stored equations read straight into this call.
+`rx.read_gsas2_gpx` puts each on `model.sequential_equations`, with its text rewritten in rietx's grammar and its variables as `rx.Parameter`s ([Switching from GSAS-II](../switching/gsas2.md#a-parametric-equation-is-fitted-with-the-patterns)).
+
 ## When to declare an equation instead of fitting a series
 
 The figures in this section come from synthetic LaB6 ramps of ten patterns at 300-1200 K, each fitted over twenty noise seeds.

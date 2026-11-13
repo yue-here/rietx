@@ -58,15 +58,15 @@ What an operator must know, all measured:
   jump survived having no chain, so that one was real — chaining artefacts are
   established or refuted transition by transition.
 - **An equation across the patterns (a(T), a written `basis="expression"`, a
-  library's cell) is a joint fit, not a line through a chain**:
-  `rx.refine_multi(..., coordinates=, variables=, parametric=[...])`,
-  read on `result.parametric`, never the scaled `vars.` rows.  No structure:
-  `mode="pawley"`.  It pays only where a
-  pattern cannot see the parameter alone (slope esd 0.72-0.76× the line's for a
-  minor phase); elsewhere it equals the line, and a shared instrument cut the
-  esd 2.6×.  Its esd assumes the form, which `result.parametric_form` tests
-  where patterns see the target, singly and jointly.  A minor phase stalls a
-  quadratic at `max_iter`.  *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104.)*
+  library's cell) is a joint fit**: `rx.refine_multi(..., coordinates=,
+  variables=, parametric=[...])`, read on `result.parametric`, never the scaled
+  `vars.` rows.  No structure: `mode="pawley"`.  It pays only where a pattern
+  cannot see the parameter alone (slope esd 0.72-0.76× the line's for a minor
+  phase); elsewhere it equals the line (`rx.fit_trajectory(series, path, expr,
+  variables)`); a shared instrument cut the esd 2.6×.  Its esd assumes the
+  form, which `result.parametric_form` tests where patterns see the target,
+  singly and jointly.  A minor phase stalls a quadratic at `max_iter`.
+  *(Measured: WP-1325, WP-2106, synthetic, ZrMo₂O₈; WP-2104.)*
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early
   stages conditioned from a *poor* starting model; a converged neighbour is not
