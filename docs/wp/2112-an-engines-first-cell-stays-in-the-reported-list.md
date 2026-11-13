@@ -1,8 +1,9 @@
 # WP-2112 — an engine's first cell stays in the reported list
 
-Milestone: unscheduled · Status: ✅ 2026-11-08 — closed on the re-run: on main at a 300 s ceiling, svd's rank-1 devitrite cell is the reported list's rank 1
+Milestone: unscheduled · Status: ⬜ — the 2026-11-08 re-run never filled the cap of 12; next, re-run devitrite with a budget that lets all three engines build their lists
 Track: What fires, and what stays silent
 Depends on: —
+Priority: P3 2026-11-05 — a ranking defect on one synthetic list, seen before WP-2079 and WP-2082 changed the ranking key and not re-run; a caller's workaround is a larger `max_candidates`
 
 ## Goal
 
@@ -47,11 +48,12 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
 
 ## Tasks
 
-- [x] Re-run devitrite on current main with the published cell, at a 300 s ceiling with the 30 s slice, and record each engine's rank 1 and the reported list. If the cell is reported, close this WP on that measurement. (2026-11-08: reported, rank 1 of 1; numbers in the handover entry)
-- [x] ~~If it is still dropped: measure how often an engine's rank 1 falls outside the reported 12 on the known-cell corpus~~ — **not needed**: task 1 reported the cell.
-- [x] ~~Decide between a seat per engine, and a sentence in `INDEX_CANDIDATES_TRUNCATED`~~ — **not needed**: no list on hand shows the drop, so neither change has a case.
-- [x] ~~Tests: a synthetic list that fills the cap with corroborated cells~~ — **not needed**: nothing changed to test.
-- [x] Skill: none. The re-run closes this and no text changes.
+- [x] Re-run devitrite on current main with the published cell, at a 300 s ceiling with the 30 s slice, and record each engine's rank 1 and the reported list. (2026-11-08: reported, rank 1 of 1, but trial_error and dichotomy built no candidate, so the merged list held one cell and the cap of 12 never filled; the re-run could not see the defect. Numbers in the handover entry.)
+- [ ] Re-run devitrite with enough budget for all three engines to build their lists: `preset="full"`, or a `total_budget_seconds` well over the first re-run's 271 s wall. Record each engine's rank 1 and the reported list. Close this WP only if the true cell is in the reported list once the cap of 12 is full; a one-cell list proves nothing.
+- [ ] If it is still dropped: measure how often an engine's rank 1 falls outside the reported 12 on the known-cell corpus (`tests/test_acceptance_indexing.py`'s lists and `tests.bethanechol_benchmark`'s).
+- [ ] Decide between a seat per engine, and a sentence in `INDEX_CANDIDATES_TRUNCATED` naming the engine whose first choice went. The second changes no answer.
+- [ ] Tests: a synthetic list that fills the cap with corroborated cells, with the single finder's rank 1 asserted in the list or named in the diagnostic.
+- [ ] Skill: the `INDEX_CANDIDATES_TRUNCATED` row if its text changes, or "none" if the re-run closes this.
 
 ## Acceptance
 
@@ -66,13 +68,13 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
 
 ## Handover log
 
-- **2026-11-08** — closed on task 1's re-run, PR #1470. On current main, devitrite's true cell is
+- **2026-11-08** — task 1's re-run recorded, PR #1470; the WP stays open for the filled-cap run (the maintainer's ruling, 2026-11-13). On current main, devitrite's true cell is
   in the reported list: svd builds it and ranks it first, and the merged list reports it at rank 1.
   It is the only candidate, so the cap of 12 never bites, and it grades `low` because one engine
-  found it. The drop from 2026-10-14 does not reproduce. Nothing in the package changed. The seam
+  found it. The symptom is absent on this list, but the case that drops a cell never arose: the drop needs other engines to fill the cap of 12 with cells two engines agree on, and trial_error and dichotomy built nothing before the ceiling. So this run does not show that WP-2079 and WP-2082 changed the outcome. Nothing in the package changed. The seam
   the Context describes is unchanged: a corroborated cell still ranks above every single-finder
   cell (WP-1046's key), so a list with 12 or more corroborated cells would still report no
-  single-finder cell. No list on hand does that, so this WP builds nothing for it.
+  single-finder cell. This run built no such list, so it says nothing either way.
   - *Measured.* Tree `63d7c120a` (origin/main; this branch differs only in this file and the WP
     index). `.venv` built in this worktree, CPython 3.12, `[dev]`, macOS arm64, 10 cores, load
     average 4.6 at start. The list is `tests.test_indexing_engines.synthetic_peaks` with
@@ -92,10 +94,7 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
     `INDEX_SHIFT_FROM_PAIRS`, `INDEX_CELL_SYSTEMATIC_UNQUANTIFIED`, `PEAK_POSITION_PRECISION`.
   - *Gotcha.* `synthetic_peaks` keys its defaults by system, and `CASES` has no `"triclinic"` row.
     Pass `"monoclinic"` with `sg=` and `cell=` overriding both.
-  - *Not done, on purpose.* Tasks 2-4 were conditional on the drop and are not needed. No
-    follow-up issue was filed: the WP made the seat-per-engine question conditional on a list that
-    shows the drop, and none does.
-  - Next: none. If a list ever shows an engine's rank 1 cut by the cap, file it as a new issue
-    with that list. Task 2 of this WP is the measurement to start from.
+  - *Not done.* Tasks 3-5 stay conditional on a filled-cap run showing the drop. No follow-up issue was filed.
+  - Next: task 2, re-run devitrite with `preset="full"` or a `total_budget_seconds` well over 271 s so that all three engines build their lists. Close only if the true cell is in the reported list once the cap is full. If it is dropped, tasks 3-5 apply.
 
 - **2026-11-05** — created, from the 2026-11-05 issue triage (issue #1375). Checked against the tree at `541f0daf7`: read the seam above, and did not re-run the list, whose cell is not in the tree; no open WP owns it: WP-1924 closes without it in PR #1373, WP-2110 fences it, and WP-2078 is about lines the host does not own. Next: the re-run, which may close this.
