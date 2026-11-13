@@ -54,12 +54,17 @@ def _json(url: str):
     return json.loads(_get(url).decode("utf-8"))
 
 
-def _post(url: str, headers: dict | None = None):
-    """POST, and give back ``(status, payload)`` for a refusal as well as a 200."""
+def _post(url: str, headers: dict | None = None, *, timeout: float = 5):
+    """POST, and give back ``(status, payload)`` for a refusal as well as a 200.
+
+    The 5 s default suits a route that answers at once. A route that waits on
+    something passes a ``timeout`` above that route's own bound, so the test
+    reads the route's answer rather than the machine's speed (WP-2145).
+    """
     request = urllib.request.Request(url, method="POST", data=b"",
                                      headers=headers or {})
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as err:
         return err.code, json.loads(err.read().decode("utf-8"))
@@ -926,7 +931,13 @@ def test_a_real_gui_boots_on_a_scratch_copy_and_the_project_is_untouched(
 
     with _served(tmp_path) as base:
         (row,) = _json(base + "/api/runs")["runs"]
-        status, boot = _post(f"{base}/api/run/{row['run_id']}/gui")
+        # The route holds the request until the child prints its boot line,
+        # up to `GUI_BOOT_TIMEOUT`, then waits up to 5 s more to reap a child
+        # that never did. The client outwaits both, so a slow boot reaches the
+        # route's own answer, a 200 or a 502 naming why (WP-2145). A boot took
+        # 11.7-14.9 s on a loaded Mac, against the client's old 5 s.
+        status, boot = _post(f"{base}/api/run/{row['run_id']}/gui",
+                             timeout=watch.GUI_BOOT_TIMEOUT + 10)
 
     assert status == 200, boot
     try:

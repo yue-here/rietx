@@ -139,6 +139,65 @@ npm --prefix gui test && npm --prefix gui run check
 - `crystallography/adp.py` (three-representation module doc);
   `crystallography/symmetry.py` `expand_positions`; gemmi element tables.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **structure viewer** (WP-1015, WP-1462; `src/rietx/gui/structure3d.py`,
+`gui/src/panels/Structure3D.svelte`, `gui/src/lib/structure3d.ts`,
+`gui/src/lib/gl3d.ts`) is the model as drawable geometry, served by
+`GET /api/structure3d` and drawn by the viewer's own WebGL2 renderer, **no
+library** (plotly cost 4.8 MB for it, three.js would have cost 139 KB gzip, this
+costs 6.2 KB). A third column of the model pane rather than a sixth tab. Its
+founding rule is that **everything hard stays on the server**: the payload is
+Cartesian points, 3×3 matrices and index pairs, and the browser's whole job is
+`pos + M·v` over one unit sphere, which is also why a ball and an ellipsoid are
+one code path. That forced the one new crystallography verb:
+**`symmetry.expand_orbit` returns the operation as well as the position**,
+because U\* → R·U\*·Rᵀ means an image drawn with its parent's tensor is right on
+a cubic site and wrong on every other one; `expand_positions` now delegates to
+it. Four rules. **gemmi has no colour table** — it supplies radii and
+`is_metal`, and the colours are the CPK convention with values chosen here
+(ATTRIBUTION.md), never transcribed. **A radius-sum bond rule needs a chemical
+predicate**: bond a metal to a cation only when the phase has no non-metal in
+it, or LaB6's cell edges become La–La sticks and forsterite grows Mg–Si ones
+(a cation is `_cation_sites`', WP-1466), and **a floor** (`split_floor`, read by
+sticks and shells: 0.7 of the radius sum between non-metals, 0.5 with a metal, uranyl's U=O being 0.67). **A non-positive-definite tensor draws its non-positive axes at
+zero** on the server (a √ of a negative is a NaN), and the client keeps such a
+column at `FLAT_AXIS` = 1 mÅ because the ray-caster solves through M⁻¹. And
+**bond segments complete their partners exactly one level** — a bond to a
+translated image is correct and *reads* as broken — which is the line between a
+coordination and the packing diagram this WP declined. `probability`,
+`bond_tolerance`, `disorder`, `centres` and `ligands` are drawing thresholds on
+the query string, never in `ProjectDoc`. **Polyhedra are chemistry, so the server builds them** (WP-1466):
+cation centres, anion ligands (`_cation_sites`). A rule change re-runs
+`docs/wp/1466-measure/measure.py`, writing the default picture the tests hold.
+**A legend switch is as fine as the default it restores** (per formula, since
+P5 is per shell size), and a hidden polyhedron's `vertex_only` atoms hide too.
+
+Its **look** (the second pass, 2026-07-30, read against VESTA, Jmol and
+3Dmol.js) is crystallography's rather than a plotting library's. **Parallel
+projection** (perspective converges a cubic cell's far edges), **no Cartesian
+axis box** (the cell's own a/b/c edges are labelled instead, at a clearance in
+Å set by the largest ball — a percentage of the edge put every letter inside a
+corner atom), and **bonds as two-tone cylinders in Å**, which settles the legend
+rule *a half belongs to its atom*. `STICK_RADIUS` = 0.08 Å is a lower bound on
+`BALL_FRACTION` = 0.40 (VESTA's fraction, on covalent rather than atomic radii),
+pinned by test so hydrogen cannot become a lump on a rod. **The trackball has no
+up vector to pin**: `cartesian_basis` is upper-triangular, so c ∥ ẑ for every
+orthogonal cell, and a turntable's +z would make "view down c" degenerate — the
+free rotation and the a/b/c buttons are one decision. In ellipsoid mode an
+anisotropic site draws its **three principal ellipses**, one unit-frame
+coordinate near zero since T's columns are the principal axes, and an isotropic
+site draws none, its axes pointing nowhere. **Where principal values are equal
+the server pins the free axes** (`structure3d._pin_axes`), because `eigh`
+chooses them per LAPACK build: a Mac and an x86 runner drew one uniaxial site's
+rings as an X and a + (WP-1462's gate). It pins a site once and turns that T by
+each image's M·R·M⁻¹, so equivalent atoms wear equivalent rings.
+
 ## Handover log
 
 - **2026-07-29** — created from the v1.0 GUI plan. All cited server-side

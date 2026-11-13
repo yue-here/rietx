@@ -288,7 +288,7 @@
       <div class="verbs">
         <input class="mono" placeholder="tag or branch name" bind:value={name}
           disabled={busy} />
-        <button disabled={busy || node.id === head}
+        <button class="ghost" disabled={busy || node.id === head}
           onclick={() => checkout(node.id)}
           title="restore this node's state as the working state">Checkout</button>
         <button class="ghost" disabled={busy || !name.trim()}

@@ -314,12 +314,18 @@ The rest need the patterns:
 | a coordinate degree of freedom whose atom the starting structures place differently | start every pattern with the atom in one place |
 | two declarations with one name, a coefficient path that already exists, or two declarations on one target with overlapping subsets | a name each, and disjoint `patterns` per target |
 | a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per histogram of one model |
+| starting structures that differ in a field that is not a parameter, such as a texture axis, a declared extinction or Stephens block, the restraints or a rigid body's orientation | the same field in every structure wherever it shapes a shared parameter, or that part made per-histogram; parameter values, bounds and vary flags, the phase's `name` and `particle_radius_um` may always differ |
 | starting structures that disagree on a shared path | one value, a per-histogram override, or a declaration on that path |
 | a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 
 The coefficients are unbounded, unless the basis is `"constant"`, whose one coefficient carries the target's own bounds.
-A sum of terms has no box that holds every pattern's target, so a target can leave its own range on some pattern.
-That is read after the fit ([Range and visibility warnings](#range-and-visibility-warnings)).
+A sum of terms has no box that holds every pattern's target.
+The default LM driver holds each pattern's target inside its own `min` and `max` at every step instead, as one linear constraint per pattern.
+A target the answer leaves on a bound is named in the `CONSTRAINT_ACTIVE` finding, as `parametric equation '<name>' (<target> bounds)`.
+Each pattern whose target sits on its bound also gets a `FLOOR_HIT` or `BOUND_HIT` warning, with `where` naming that pattern's `hist.<h>.` path, as a free parameter on its bound does.
+TRF takes no such constraint, and neither does an `"expression"` equation, which is not linear in its variables.
+There a target can leave its range.
+The fit then finishes and carries `PARAMETRIC_OUT_OF_RANGE`, below.
 
 ## Fitting a declaration
 
@@ -336,6 +342,20 @@ What the target drives follows it, such as a cubic cell's `b` and `c`.
 Each of those rows names the declaration in `RefinedParameter.equations`, and so does each coefficient's `vars.` row.
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
 A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names the coefficient.
+
+A cell series is often fitted before a structure is known.
+`mode="pawley"` refines the same declaration with each pattern's reflection intensities its own ([Modes](joint.md#modes)):
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+result = rx.refine_multi(patterns, lab6, instruments, mode="pawley",
+                         coordinates=coordinates, parametric=[expansion])
+```
+
+`"mccusker_default"` becomes `pawley_default` in that mode, as for a single fit.
+An equation on a parameter Pawley cannot refine, such as a `biso` or a scale, is refused before the fit.
+Over twelve seeds of a ten-pattern synthetic LaB6 ramp, the mean of (value − truth)/esd was 0.20 for the intercept and 0.13 for the slope.
+Its spread was 0.65 and 1.01, so neither coefficient's esd understates its scatter.
 
 ### Large libraries
 
@@ -404,6 +424,8 @@ print(series.summary(deliverable="series", parametric=result))
 
 [`PARAMETRIC_OUT_OF_RANGE`](diagnostics-series.md#parametric_out_of_range) is a warning on `RefinementResult.diagnostics`, one per declaration, when the fitted coefficients put the target outside its own `min` or `max` on some pattern.
 `where` names each such pattern's `hist.<h>.` path, and `value` counts them.
+It fires under TRF and for an `"expression"` equation, since the default LM driver holds a linear equation's target inside its range.
+The result's rows keep the equation's value, and that pattern's model holds the bound the value crossed.
 Do not quote the target there as a measurement.
 Narrow the subset to where the equation holds, lower the polynomial's order, or declare a design basis that stays inside the range.
 

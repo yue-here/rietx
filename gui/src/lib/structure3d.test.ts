@@ -19,6 +19,7 @@ import { faceData, instanceData } from "./gl3d";
 import {
   CELL_WIDTH_PX,
   EDGE_WIDTH_PX,
+  FILL_COLOR,
   FLAT_AXIS,
   LOOK,
   POLY_ALPHA,
@@ -34,6 +35,7 @@ import {
   buildScene,
   caption,
   dim,
+  fogSpan,
   invert3,
   legend,
   lookFrom,
@@ -55,6 +57,7 @@ import {
   toggled,
   stickRadius,
   transform,
+  type Fill,
   type Geometry,
   type Mat3,
   type Polyhedron,
@@ -725,6 +728,7 @@ describe("the Python renderer's scene rules", () => {
     views: { look_from: Array<{ eye: number[]; up: number[]; rotation: number[] }>;
              opening: number[];
              axis: Array<{ payload: string; axis: number; rotation: number[] }> };
+    fog: Array<{ scene: number; rotation: number[]; span: number[] | null }>;
   };
 
   // the corpus carries twelve significant figures
@@ -752,11 +756,11 @@ describe("the Python renderer's scene rules", () => {
     const c = corpus.constants;
     expect(LOOK).toEqual(c.LOOK);
     expect({ STICK_RADIUS, STICK_OF_SEMI_AXIS, STICK_FLOOR, FLAT_AXIS, CELL_WIDTH_PX,
-             EDGE_WIDTH_PX, POLY_ALPHA })
+             EDGE_WIDTH_PX, POLY_ALPHA, FILL_COLOR })
       .toEqual({ STICK_RADIUS: c.STICK_RADIUS, STICK_OF_SEMI_AXIS: c.STICK_OF_SEMI_AXIS,
                  STICK_FLOOR: c.STICK_FLOOR, FLAT_AXIS: c.FLAT_AXIS,
                  CELL_WIDTH_PX: c.CELL_WIDTH_PX, EDGE_WIDTH_PX: c.EDGE_WIDTH_PX,
-                 POLY_ALPHA: c.POLY_ALPHA });
+                 POLY_ALPHA: c.POLY_ALPHA, FILL_COLOR: c.FILL_COLOR });
   });
 
   it("builds every scene the Python copy builds", () => {
@@ -764,10 +768,12 @@ describe("the Python renderer's scene rules", () => {
     corpus.scenes.forEach((c, k) => {
       const o = c.options as { mode: "ball" | "ellipsoid"; hidden?: string[];
                                showBoundary?: boolean; exaggeration?: number;
-                               stick?: number; cell?: string; polyhedra?: number[] };
+                               stick?: number; cell?: string; polyhedra?: number[];
+                               fills?: Fill[] };
       const scene = buildScene(corpus.payloads[c.payload], {
         mode: o.mode, hidden: new Set(o.hidden ?? []), showBoundary: o.showBoundary,
         exaggeration: o.exaggeration, stick: o.stick, cell: o.cell, polyhedra: o.polyhedra,
+        fills: o.fills,
       });
       close(scene, c.scene, `scenes[${k}] ${c.payload} ${JSON.stringify(o)}`);
     });
@@ -780,6 +786,21 @@ describe("the Python renderer's scene rules", () => {
                                    new Set(c.hidden ?? []), c.showBoundary ?? true);
       expect(shown, JSON.stringify(c)).toEqual(c.shown);
     }
+  });
+
+  it("starts and ends the fog where the Python copy does", () => {
+    expect(corpus.fog.length).toBeGreaterThan(1);
+    corpus.fog.forEach((f, k) => {
+      const c = corpus.scenes[f.scene];
+      const o = c.options as { mode: "ball" | "ellipsoid"; hidden?: string[];
+                               showBoundary?: boolean; exaggeration?: number;
+                               stick?: number; cell?: string; polyhedra?: number[] };
+      const scene = buildScene(corpus.payloads[c.payload], {
+        mode: o.mode, hidden: new Set(o.hidden ?? []), showBoundary: o.showBoundary,
+        exaggeration: o.exaggeration, stick: o.stick, cell: o.cell, polyhedra: o.polyhedra,
+      });
+      close(fogSpan(scene, f.rotation), f.span, `fog[${k}] ${c.payload}`);
+    });
   });
 
   it("looks from where the Python copy looks", () => {

@@ -367,7 +367,8 @@ Six things in it are moves that any later refinement repeats:
   which `*` matches any run of characters (`phases.*.atoms.*.biso`).
   [How to add a stage](../guides/plan.md#name-the-parameters-a-stage-frees) says
   how such a name matches, and the [parameter map](../reference/parameters.md)
-  lists every name.
+  and the [instrument parameter map](../reference/parameters-instrument.md)
+  list every name.
 - `RefinementResult.parameter` looks one parameter up by path, with its esd:
   `result.parameter("phases.0.cell.a").stderr`.
 - `RefinementResult.diagnostics` is the channel for "your answer is wrong

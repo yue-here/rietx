@@ -97,6 +97,18 @@ export interface Polyhedron {
   drawn_by_default: boolean;
 }
 
+/** A filled ring or named face (WP-1548): atoms the server chose, wound into
+ *  triangles there (`rietx.viz.figure3d.rings`), so a client only draws it. */
+export interface Fill {
+  kind: "ring" | "face";
+  /** indices into `atoms` */
+  vertices: number[];
+  /** triangles as indices into `vertices` */
+  faces: number[][];
+  /** `#rrggbb`, or null for `FILL_COLOR` */
+  color: string | null;
+}
+
 /** A polyhedron the server found and could not draw: its ligands would have
  *  taken the payload past its atom cap. */
 export interface DroppedPolyhedron {
@@ -119,6 +131,9 @@ export interface Geometry {
   atoms: DrawnAtom[];
   bonds: Bond[];
   polyhedra: Polyhedron[];
+  /** the drawing's planar rings (WP-1548), filled while the drawer asks;
+   *  absent reads as none */
+  rings?: Fill[];
   /** the polyhedra the atom cap turned away, by centre site and ligand
    *  elements (WP-1468); absent reads as none */
   polyhedra_dropped?: DroppedPolyhedron[];
@@ -251,6 +266,15 @@ export function formula(centre: string, ligands: readonly string[]): string {
 export function polyhedronFormula(geometry: Geometry, polyhedron: Polyhedron): string {
   return formula(geometry.sites[polyhedron.site].element,
                  polyhedron.vertices.map((v) => geometry.sites[geometry.atoms[v].site].element));
+}
+
+/** One hover line per filled ring or face (WP-1548): its kind, size and
+ *  composition, most common element first.  "Planar" is the whole claim: the
+ *  package cannot tell an aromatic ring from coordinates. */
+export function fillLabel(geometry: Geometry, fill: Fill): string {
+  const what = fill.kind === "ring" ? `planar ${fill.vertices.length}-ring` : "face";
+  return `${what}  ${formula("", fill.vertices.map((v) =>
+    geometry.sites[geometry.atoms[v].site].element))}`;
 }
 
 /** One hover line per polyhedron: what it is, around which site, and its
@@ -472,6 +496,10 @@ export interface SceneLabel {
  *  (WP-1466, P6: VESTA's look). */
 export const POLY_ALPHA = 0.55;
 
+/** A filled ring or face with no colour of its own (WP-1548 D5): a neutral
+ *  grey, a ring having no centre to take a colour from. */
+export const FILL_COLOR = "#8c8c8c";
+
 /**
  * How every solid is lit and inked; `gl3d.ts`'s shaders read it, and the
  * Python renderer's copy (`rietx.viz.figure3d.scene.LOOK`) is held equal to it
@@ -484,7 +512,10 @@ export const POLY_ALPHA = 0.55;
  * ring is where the smallest unit-frame coordinate is under `ring_width`,
  * inked `ring_lighten` of the way to white on an atom whose luminance is under
  * `ring_dark` and at `ring_darken` of its colour on the rest, or a violet atom
- * hides its rings.  The keys are Python's, because Python owns the corpus.
+ * hides its rings.  Depth cueing (WP-1548, off unless asked) fades a surface
+ * toward the background linearly in depth, from nothing at `fog_start` of the
+ * drawn atoms' depth span to `fog_max` at `fog_end` (`fogSpan`).  The keys are
+ * Python's, because Python owns the corpus.
  */
 export const LOOK = {
   light: [-0.40, 0.55, 0.73],
@@ -498,14 +529,38 @@ export const LOOK = {
   ring_lighten: 0.6,
   ring_darken: 0.3,
   luma: [0.2126, 0.7152, 0.0722],
+  fog_start: 0.5,
+  fog_end: 1.0,
+  fog_max: 0.7,
 } as const;
+
+/**
+ * Where depth cueing starts and ends, as view-space depths about the scene's
+ * centre (`rotation·(p − center)`'s z, toward the viewer): `fog_start` and
+ * `fog_end` of the way back through the drawn atoms' centres, front to back,
+ * in this view, so the ramp turns with the picture (WP-1548 D1).  `null` where
+ * the atoms span no depth.  Python's `scene.fog_span` is the twin.
+ */
+export function fogSpan(scene: Scene, rotation: Mat3): [number, number] | null {
+  const [r0, r1, r2] = [rotation[6], rotation[7], rotation[8]];
+  const c = scene.center;
+  const depths = scene.atoms.map((a) =>
+    r0 * (a.pos[0] - c[0]) + r1 * (a.pos[1] - c[1]) + r2 * (a.pos[2] - c[2]));
+  if (depths.length === 0) return null;
+  const front = Math.max(...depths), back = Math.min(...depths);
+  if (!(front > back)) return null;
+  const span = front - back;
+  return [front - LOOK.fog_start * span, front - LOOK.fog_end * span];
+}
 
 /** A polyhedron's edges, in CSS pixels, drawn as the cell frame's quads (D9). */
 export const EDGE_WIDTH_PX = 1.25;
 
 /** One polyhedron as the renderer draws it: flat triangles, wound outward. */
 export interface SceneFaces {
-  /** index into `geometry.polyhedra`, for the hover text */
+  /** which list `index` reads: `geometry.polyhedra`, or the fills drawn */
+  kind: "polyhedron" | "ring" | "face";
+  /** index into that list, for the hover text */
   index: number;
   /** three points a triangle, nine numbers, in Å */
   triangles: number[];
@@ -541,6 +596,8 @@ export interface SceneOptions {
   cell?: string;
   /** the polyhedra drawn, indices into `geometry.polyhedra` (`shownPolyhedra`) */
   polyhedra?: readonly number[];
+  /** filled rings and faces (WP-1548), each drawn only while all its atoms are */
+  fills?: readonly Fill[];
 }
 
 function toRowMajor(m: number[][]): Mat3 {
@@ -673,7 +730,8 @@ export interface Drawn {
  */
 export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
   const { mode, hidden = new Set<string>(), showBoundary = true,
-          exaggeration = 1, stick = 1, cell = "#1f5fa8", polyhedra = [] } = options;
+          exaggeration = 1, stick = 1, cell = "#1f5fa8", polyhedra = [],
+          fills = [] } = options;
   // a drawn polyhedron replaces its centre's sticks to its own vertices (P6)
   const replaced = new Set(polyhedra.flatMap((i) => geometry.polyhedra[i].bonds));
   // and brings the atoms only a polyhedron needs, which come with no other
@@ -711,17 +769,10 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
   const lines: SceneLine[] = geometry.edges.map(([a, b]) => ({
     a: geometry.corners[a], b: geometry.corners[b], color: ink, width: CELL_WIDTH_PX,
   }));
-  const faces: SceneFaces[] = polyhedra.map((index) => {
-    const p = geometry.polyhedra[index];
-    const site = geometry.sites[p.site];
-    // an image's polyhedron is dimmed with its centre, for the same reason
-    const color = geometry.atoms[p.center].boundary ? dim(site.color) : site.color;
-    const at = p.vertices.map((v) => geometry.atoms[v].pos);
-    for (const [i, j] of p.edges) {
-      lines.push({ a: at[i], b: at[j], color: rgb(dim(color, 0.5)), width: EDGE_WIDTH_PX });
-    }
+  const faceEntry = (kind: SceneFaces["kind"], index: number, at: number[][],
+                     triangulation: number[][], color: string): SceneFaces => {
     const triangles: number[] = [], normals: number[] = [];
-    for (const face of p.faces) {
+    for (const face of triangulation) {
       const [a, b, c] = face.map((v) => at[v]);
       const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
       const w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
@@ -731,7 +782,25 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
       normals.push(n[0] / length, n[1] / length, n[2] / length);
     }
     const centroid = [0, 1, 2].map((k) => at.reduce((sum, q) => sum + q[k], 0) / at.length);
-    return { index, triangles, normals, color: rgb(color), centroid };
+    return { kind, index, triangles, normals, color: rgb(color), centroid };
+  };
+  const faces: SceneFaces[] = polyhedra.map((index) => {
+    const p = geometry.polyhedra[index];
+    const site = geometry.sites[p.site];
+    // an image's polyhedron is dimmed with its centre, for the same reason
+    const color = geometry.atoms[p.center].boundary ? dim(site.color) : site.color;
+    const at = p.vertices.map((v) => geometry.atoms[v].pos);
+    for (const [i, j] of p.edges) {
+      lines.push({ a: at[i], b: at[j], color: rgb(dim(color, 0.5)), width: EDGE_WIDTH_PX });
+    }
+    return faceEntry("polyhedron", index, at, p.faces, color);
+  });
+  // a fill comes after the polyhedra, and only while every atom of it is drawn
+  const shown = new Set(atoms.map((a) => a.index));
+  fills.forEach((fill, index) => {
+    if (!fill.vertices.every((v) => shown.has(v))) return;
+    const at = fill.vertices.map((v) => geometry.atoms[v].pos);
+    faces.push(faceEntry(fill.kind, index, at, fill.faces, fill.color || FILL_COLOR));
   });
   // the fit reads positions and ball sizes only, so neither a mode nor a
   // legend click moves the zoom.  The fit takes the atoms the default picture

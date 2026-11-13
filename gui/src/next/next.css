@@ -1,0 +1,199 @@
+/* The rebuilt page's stylesheet (WP-2215).
+
+   It starts from `app.css`, which `main.ts` imports first: the tokens, the
+   type and space scales and the registers the imported panels (the File menu,
+   the start screen, New project) are drawn with. What follows is the frame's
+   own drawing, from the prototype at its default density, and the places the
+   rebuild departs from today's page:
+
+   - headings are sentence case, set apart by weight alone (the maintainer,
+     2026-11-06 and 2026-11-09; `next/style.test.ts` guards it);
+   - a selected tab keeps its weight, since a bolder word is wider and moves
+     what follows it (`gui/STYLE.md` § Type);
+   - words are set in Instrument Sans, with IBM Plex Sans for Greek, and
+     numbers and code in IBM Plex Mono (`gui/STYLE.md` § Type). The app serves
+     all three; `fonts.css` declares them. */
+
+:root {
+  --text: 14px;
+  --text-sm: 13px;
+  --frame-h: 36px;
+  --status-h: 24px;
+  --tab-h: 36px;
+  /* Greek in a number or a path takes Plex Sans, as it does in words */
+  --mono-family: "IBM Plex Mono", "IBM Plex Sans", ui-monospace, "SF Mono", Menlo, monospace;
+  /* the bars' ground: a step off the panel, as the prototype's frame is */
+  --bar: color-mix(in srgb, var(--fg) 4%, var(--bg));
+}
+
+body {
+  height: 100vh;
+  font: 400 var(--text) / 1.35 "Instrument Sans", "IBM Plex Sans", system-ui, sans-serif;
+  letter-spacing: normal;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
+}
+
+h2,
+h3 {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--text);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Buttons at the prototype's size: 30 px, at the words' size and weight, the
+   filled primary at the weight of a label. The registers keep their meaning
+   from app.css (one filled primary, every other action outlined); only the
+   geometry is the rebuild's. */
+button:not(.pick, .tab, .link, .ib, .mbtn) {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--text);
+  font-weight: 500;
+}
+
+button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  button.ghost:hover:not(:disabled) {
+    background: var(--hover);
+  }
+}
+
+/* An icon button: no border at rest, a border on hover (`gui/STYLE.md`
+   § Components). The panel toggles fill their half while it shows. */
+.ib {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.statusbar .ib {
+  height: calc(var(--status-h) - 4px);
+  color: var(--fg);
+}
+
+@media (hover: hover) {
+  .ib:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+}
+
+.ib:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ib svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.ib svg .fill {
+  fill: currentColor;
+  stroke: none;
+  opacity: 0;
+}
+
+.ib svg .fill.on {
+  opacity: 0.55;
+}
+
+/* A menu button: a word and a chevron, the menu's name on the bar. The File
+   menu's name button takes the same drawing. */
+/* A segmented choice at the prototype's size: a control on a title line or
+   the action bar, set at the size of the words beside it (`.segmented` is
+   app.css's register; only its geometry is the rebuild's). */
+.segmented button {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+
+.mbtn,
+.topbar .proj .fm-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--fg);
+  font-size: var(--text);
+  font-weight: 400;
+}
+
+.mbtn.wf {
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+  .mbtn:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+}
+
+.mbtn[aria-expanded="true"] {
+  border-color: var(--line-strong);
+}
+
+.mbtn .chev {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+/* Tabs: a word over a rule, the current word ink over the accent underline
+   and at the same weight (`gui/STYLE.md` § Components and § Type). */
+.tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: var(--tab-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs .tab {
+  height: auto;
+  padding: 0 12px;
+  border-radius: 0;
+  font-weight: 400;
+  font-size: var(--text);
+  border-bottom-width: 2px;
+}
+
+.tabs .tab[aria-selected="true"],
+.tabs .tab[aria-current="step"] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.tabs .tab:disabled {
+  cursor: default;
+}
