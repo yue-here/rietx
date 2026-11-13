@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — option (c)'s allowance measured (2·ln N + d); its `_audit` row awaits the maintainer's ruling, Question 3 (PR #1466)
+Milestone: unscheduled · Status: 🔄 2026-11-13 — option (c)'s allowance measured (2·ln N + d). Ruled by Yue 2026-11-13: option (a); the landing task is open (PR #1466)
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -294,7 +294,10 @@ diagnosed further. WP-1077's fence covers that test.
 
 Questions 1 and 2 were answered by Yue on 2026-11-07 (handover entry of that date); the
 questions and their measurements are in the entry of 2026-11-05. Question 3, the allowance's
-`_audit` row, is open: it is in the handover entry of 2026-11-08 (second session).
+`_audit` row, was answered by Yue on 2026-11-13: **option (a)**. `best_or_none()` names the leading
+class only when its lead over the runner-up strictly exceeds max(`DECISIVE_DELTA_BIC`, 2·ln N + d),
+d the tested positions where the two classes differ. The tier-3 row is approved, dated 2026-11-13.
+The question and its measurements are in the handover entry of 2026-11-08 (second session).
 
 ## Non-goals
 
@@ -354,9 +357,10 @@ questions and their measurements are in the entry of 2026-11-05. Question 3, the
       *Measured 2026-11-08 (handover entry of that day, second session): the
       allowance is d, the count of tested positions where the two leading classes
       differ. The row is Question 3 below; no margin moved.*
-- [ ] On the maintainer's answer to Question 3, land the margin in
+- [ ] Ruled by Yue 2026-11-13: option (a). Land the margin in
       `ExtinctionScreen.best_or_none` with its `_audit` row, flip PbSO₄'s pinned
-      row to `None`, and rewrite the acceptance clause to match.
+      row to `None`, and rewrite the acceptance clause to match. The row carries
+      `approved="2026-11-13"` and the grounds quoted in the handover entry of 2026-11-13.
 
 ## Acceptance
 
@@ -515,7 +519,7 @@ absence test is WP-1077's fence, and a declared λ/2 is the caller's (`harmonics
                 "wrong -> None; Si 640c (11-BM, N 40 001) right -> None; corundum (SRM 676a), "
                 "NAC keep. Measured on one synthetic family (rietx forward model, Cu Bragg-Brentano, "
                 "Ca/Si/O) and thirteen real patterns, untested beyond."),
-      grounds="...", approved=None)
+      grounds="...", approved=None)  # as proposed 2026-11-08; the ruled form is in the entry of 2026-11-13
   ```
 
 *Not done.* No code, so no test suite ran beyond step 10's checks, and `/code-review` did not
@@ -529,6 +533,22 @@ as the replay did, because two classes can name different hkl at one position), 
 and flips `test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit` to `None`. The suite's
 FAP and synthetic Si rows already abstain, and its corundum, NAC and P 2₁/c rows keep their
 answers under both. On (c): close the WP.
+
+- **2026-11-13** — Yue ruled Question 3 on PR #1466: **option (a)**. `best_or_none()` names the leading
+  class only when its lead over the runner-up strictly exceeds max(`DECISIVE_DELTA_BIC`,
+  2·ln N + d), d the tested positions where the two classes differ. The tier-3 row is approved, dated
+  2026-11-13. The row for the landing task, with the ruling in place of the proposal's
+  `approved=None` and `grounds="..."`:
+
+  ```python
+  approved="2026-11-13",
+  grounds="Ruled by Yue 2026-11-13: 2·ln N + d, strictly exceeded, as max(DECISIVE_DELTA_BIC, 2·ln N + d)",
+  ```
+
+  The constant name is still to be settled at landing. Correction to the PR #1466 description: Si 640c
+  at N = 40 001 needs 2·ln N + d = 21.2 + 3 = 24.2 against a lead of 19.7, as this file has it; the
+  description's 21.2 omitted the d. No code moved. *Next:* the open task above lands the margin, adds
+  the row, and flips PbSO₄'s pinned row to `None`.
 
 - **2026-11-08** — CI on PR #1461 failed one row on both Linux legs: FAP at a start ×0.99 read
   `failed` where the gate test expects `unreliable`. The cause predates this branch. Outside the
