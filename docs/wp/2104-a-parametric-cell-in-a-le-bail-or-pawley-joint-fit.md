@@ -1,8 +1,7 @@
 # WP-2104 — a parametric cell in a Le Bail or Pawley joint fit
 
-Milestone: parametric · Status: 🔄 2026-11-12 — Pawley arm in review (PR #1547); whether Le Bail is built or retired waits on Yue
+Milestone: parametric · Status: ✅ 2026-11-13 — the Pawley arm lands (PR #1547); the joint Le Bail arm is retired to WP-2062
 Depends on: 1325 soft (the joint path has landed, and its open tasks are separate); 1964 soft (an equation on the cell)
-Priority: P2 2026-11-04 — a feature the open milestone was opened for: a cell series is often fitted before a structure is known or trusted
 
 ## Goal
 
@@ -94,6 +93,21 @@ mode lands, this file says so, and 2108's second route waits on the Pawley arm.
 - WP-1325 § Scalable solver, WP-1125 (the Pawley block), WP-0308.
 
 ## Handover log
+
+- **2026-11-13** — The WP closes (✅). Ruled by Yue 2026-11-13: "go", approving PR #1547
+  with the equation guide's moved statistics (9.3 now 9.4; 501.5 now 504.2). The joint Le
+  Bail arm is retired to WP-2062, settled by Claude under Yue's 2026-11-05 ruling, and Yue
+  raised no objection. So the Pawley arm answers the acceptance, and this file says only one
+  mode landed. WP-2062's `### Inherited` note now records the retirement, and the narrative
+  is in the v1.12 record.
+  *Merge.* Main was merged in at `4c442c0dd` after #1546 (WP-2116, a hump's closed-form
+  columns) landed. The merge had no textual conflict. Both sides edited
+  `optimize/least_squares.py` and `tests/test_cross_backend.py`, in separate functions:
+  WP-2116 in `_make_jacobian`, this WP in the joint closures, which call the single-fit
+  Jacobian per pattern. No published or acceptance number moved. Fast suite on the merged
+  tree, `[dev]` venv (no jax), darwin arm64, one 27 min run under the machine lock: 14 591
+  passed, 433 skipped, 32 xfailed. `tests.reader_output` exit 0, unchanged against the
+  merge-base. Ruff clean; Vale exit 0 with no warning on a line this branch wrote.
 
 - **2026-11-12** — A cell series can now share a parametric equation before anyone
   has a structure. A joint fit in Pawley mode gives every pattern its own reflection
