@@ -856,6 +856,58 @@ def test_a_joint_fit_of_one_pattern_twice_is_the_single_fit():
     assert joint.for_histogram(1).restraints == joint.histograms[1].restraints
 
 
+def test_a_per_pattern_restraint_carries_the_patterns_weight():
+    """A row held per pattern is a prior on that pattern's own parameter, so it
+    carries ``√w_h`` like the background penalty: each pattern minimises
+    ``w_h·S_y,h + S_G,h``, the single fit with the restraint at weight ``1/w_h``
+    unless the row is scaled.  One pattern fitted twice at weight ½ must land
+    each zero shift on the single fit (restraint weight 1); unscaled it lands on
+    the single fit at restraint weight 2 (Yue's review of #1492, 2026-11-13)."""
+    pattern = synthesize_rutile()
+    zero = ValueRestraint(path="instrument.zero_shift", target=0.03, sigma=0.002)
+    answers = {}
+    for weight in (1.0, 2.0):
+        s, (ins,) = _joint_rutile([zero.model_copy(update={"weight": weight})], n=1)
+        answers[weight] = Refinement(s, ins, history=False).fit(
+            pattern, plan="mccusker_structural", telemetry=False)
+    s, instruments = _joint_rutile([zero])
+    joint = MultiHistogramRefinement(s, instruments).fit(
+        [pattern, pattern], plan="mccusker_structural", weights=[0.5, 0.5],
+        telemetry=False)
+
+    def zshift(result, h=None):
+        path = "instrument.zero_shift" if h is None else f"hist.{h}.instrument.zero_shift"
+        return next(p.value for p in result.parameters if p.path == path)
+
+    single = zshift(answers[1.0])
+    assert abs(zshift(answers[2.0]) - single) > 1e-4, "the arm must be separable"
+    for h in (0, 1):
+        assert zshift(joint, h) == pytest.approx(single, abs=1e-8)
+
+
+def test_a_per_pattern_restraint_row_is_scaled_in_every_layout():
+    """The residual, the dense Jacobian and the blocked one scale a per-pattern
+    restraint row by ``√w_h`` and a shared one not at all."""
+    s, instruments = _joint_rutile([
+        BondRestraint(atom_i=0, atom_j=1, target=1.95, sigma=0.01),
+        ValueRestraint(path="instrument.zero_shift", target=0.03, sigma=0.002)])
+    models = [compile_model(s, ins, _blank(20.0, 80.0, 0.1), mode="rietveld")
+              for ins in instruments]
+    mtable = MultiParameterTable(s, instruments)
+    mtable.set_vary(["phases.*.atoms.*.dof.*", "instrument.zero_shift"], True)
+    x = mtable.x0()
+    weights = [4.0, 9.0]
+    res_w, jac_w, n_data = _multi_closures(models, mtable, weights=weights)
+    res_1, jac_1, _ = _multi_closures(models, mtable)
+    _, blk_w, _ = _multi_closures(models, mtable, weights=weights, layout="blocked")
+    # rows past n_data: [bond (pattern 0, shared) | zero_shift h0 | zero_shift h1]
+    scale = np.array([1.0, 2.0, 3.0])
+    np.testing.assert_allclose(res_w(x)[n_data:], scale * res_1(x)[n_data:], rtol=1e-12)
+    np.testing.assert_allclose(jac_w(x)[n_data:], scale[:, None] * jac_1(x)[n_data:],
+                               rtol=1e-12, atol=1e-300)
+    np.testing.assert_array_equal(blk_w(x).toarray(), jac_w(x))
+
+
 def test_the_stacked_and_blocked_joint_layouts_agree_with_restraints():
     """The blocked Jacobian carries each histogram's restraint rows as a third
     stripe, and its dense twin is the stacked matrix entry for entry (WP-1995)."""

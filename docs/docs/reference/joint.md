@@ -284,11 +284,12 @@ On the two LaB6 patterns a converged fit reads between 5 × 10⁻⁷ and 2.2 × 
 A structure's soft restraints ([Restrain the geometry](../guides/restrain.md)) hold in a joint fit too.
 Each pattern compiles the one structure, so each carries every restraint's row.
 The joint residual holds a restraint on the shared structure once, since counted once per pattern it would weigh N times against the data.
-A restraint row carries no pattern weight, being a prior on the structure and no pattern's measurement.
+A restraint row on the shared structure carries no pattern weight, being a prior on the structure and no pattern's measurement.
 It stays in the covariance and out of χ², Rwp and the Bérar-Lelann factor, as in a single fit.
 `Stage.restraint_weight_scale` scales it stage by stage, as in a single fit.
 
 A restraint that reads a per-pattern parameter restrains a different quantity in each pattern, so each pattern holds its own row.
+That row is a prior on the pattern's own parameter and pulls against data scaled by the pattern's weight, so it carries `√w_h` like the background penalty: each pattern minimises `w_h·S_y + S_G`.
 A `ValueRestraint` on `instrument.zero_shift` restrains every pattern's zero shift.
 A bond under a per-pattern or parametric cell restrains the bond as each pattern's cell gives it.
 A `ValueRestraint` path with a `hist.<h>.` prefix is refused, because a restraint on one pattern alone is not built.

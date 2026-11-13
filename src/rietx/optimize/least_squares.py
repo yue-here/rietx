@@ -3669,14 +3669,30 @@ def _joint_restraint_rows(models: list[CompiledModel],
     from histogram 0 alone, every other restraint's from each histogram
     (:func:`_joint_restraint_shared`).
     """
+    return [rows for rows, _ in _joint_restraint_layout(models, mtable)]
+
+
+def _joint_restraint_layout(models: list[CompiledModel],
+                            mtable: "MultiParameterTable"
+                            ) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Per histogram, ``(rows, held_per_pattern)``: the soft-restraint row
+    indices the joint residual holds (:func:`_joint_restraint_rows`) and, per
+    row, whether it is a per-pattern prior (``True``) or a shared one held once
+    (``False``).  A per-pattern row carries ``√w_h`` in the joint residual."""
     shared = _joint_restraint_shared(models, mtable)
     if not shared:
-        return [np.zeros(0, dtype=np.int64) for _ in models]
-    return [np.asarray([i for (rows, _), once in zip(m.restraints.item_rows(), shared,
-                                                     strict=True)
-                        if h == 0 or not once
-                        for i in range(rows.start, rows.stop)], dtype=np.int64)
-            for h, m in enumerate(models)]
+        return [(np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool))
+                for _ in models]
+    out = []
+    for h, m in enumerate(models):
+        idx: list[int] = []
+        own: list[bool] = []
+        for (rows, _), once in zip(m.restraints.item_rows(), shared, strict=True):
+            if h == 0 or not once:
+                idx.extend(range(rows.start, rows.stop))
+                own.extend([not once] * (rows.stop - rows.start))
+        out.append((np.asarray(idx, dtype=np.int64), np.asarray(own, dtype=bool)))
+    return out
 
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
@@ -3739,10 +3755,13 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
 
     The rows are ``[every histogram's data | every histogram's background
     penalty | the soft-restraint rows]``, each model's blocks read off
-    ``rows.layout`` (WP-1995).  Data and penalty rows carry ``√w_h``; a
-    restraint row carries none, being a prior on the structure and no
-    pattern's measurement, and a restraint on the shared structure is held
-    once rather than once per histogram (:func:`_joint_restraint_rows`).
+    ``rows.layout`` (WP-1995).  Data and penalty rows carry ``√w_h``.  A
+    restraint on the shared structure carries none and is held once rather
+    than once per histogram, being a prior on no pattern's measurement; a
+    restraint row held per pattern (a prior on that pattern's own parameter,
+    :func:`_joint_restraint_layout`) carries ``√w_h`` like the background
+    penalty, so each pattern minimises ``w_h·S_y,h + S_G,h`` and the prior's
+    strength against its data does not move with the weight.
     Everything past ``n_data_total`` is the penalty side, so the restraint
     rows are in JᵀJ and out of χ², Rwp and Bérar-Lelann, as in a single fit.
 
@@ -3774,8 +3793,12 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     # Pawley model's restraint rows (adjacent in ``rows.BLOCK_ORDER``, WP-2104)
     pen = [slice(b["background_penalty"].start, b["pawley_restraint"].stop)
            for b in blocks]
+    rlayout = _joint_restraint_layout(models, mtable)
     restr = [b["soft_restraint"].start + k
-             for b, k in zip(blocks, _joint_restraint_rows(models, mtable), strict=True)]
+             for b, (k, _) in zip(blocks, rlayout, strict=True)]
+    # √w_h on a per-pattern restraint row (a prior on that pattern's own
+    # parameter, pulling against data scaled by w_h); 1 on a shared one
+    restr_scale = [np.where(own, sqrt_w[h], 1.0) for h, (_, own) in enumerate(rlayout)]
     n_data = [s.stop - s.start for s in data]
     n_pen = [s.stop - s.start for s in pen]
     n_restr = [len(r) for r in restr]
@@ -3810,7 +3833,7 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
             if n_pen[h]:
                 pen_parts.append(sqrt_w[h] * r[pen[h]])
             if n_restr[h]:
-                restr_parts.append(r[restr[h]])
+                restr_parts.append(restr_scale[h] * r[restr[h]])
         return (np.concatenate(data_parts + pen_parts + restr_parts) if n_rows
                 else np.zeros(0))
 
@@ -3827,7 +3850,7 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
                 J[po:po + n_pen[h], cm] = sqrt_w[h] * Jh[pen[h]]
             if n_restr[h]:
                 ro = int(restr_off[h])
-                J[ro:ro + n_restr[h], cm] = Jh[restr[h]]
+                J[ro:ro + n_restr[h], cm] = restr_scale[h][:, None] * Jh[restr[h]]
         return J
 
     def block_jacobian(theta: np.ndarray) -> BlockJacobian:
@@ -3841,7 +3864,7 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
                 parts.append(sqrt_w[h] * Jh)
                 continue
             parts.append(np.concatenate([sqrt_w[h] * Jh[:pen[h].stop],
-                                         Jh[restr[h]]]))
+                                         restr_scale[h][:, None] * Jh[restr[h]]]))
         return BlockJacobian(parts, col_maps,
                              n_data, n_pen, n_cols, n_restr=n_restr)
 
