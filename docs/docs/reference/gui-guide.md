@@ -795,24 +795,17 @@ over the step. Near 1 the step is in the data, and near 0 the chain made it.
 
 ### The trace
 
-Above the plot, a strip draws the series on the experiment's own axis: the
-series coordinate against the pattern index, one point per pattern, a failed
-one included. Every mark is read from the series answer:
+Above the plot, a strip draws the series coordinate against the pattern index. Marks, from the series answer:
 
-| mark | label | what it says |
+| mark | label | meaning |
 |---|---|---|
-| `SERIES_PATTERN_FAILED` | failed | every attempt raised: no fit, no point on any trajectory |
-| `SEQUENTIAL_UNRECOVERED` | unrecovered | the fit diverged on every attempt |
-| `SEQUENTIAL_RESEED` | reseeded | a good fit from the initial model, not from its neighbour |
-| `findings` | findings | a bar as tall as the number of codes that pattern's fit raised |
-| `largest_step` | largest step | where the parameter on show moved most, in its esds: a rank, never a verdict |
+| `SERIES_PATTERN_FAILED` | failed | no fit |
+| `SEQUENTIAL_UNRECOVERED` | unrecovered | diverged |
+| `SEQUENTIAL_RESEED` | reseeded | fit cold |
+| `findings` | findings | bar: codes raised |
+| `largest_step` | largest step | a rank, no verdict |
 
-A series diagnostic marks a pattern when it names that pattern. One that names a
-parameter or nothing, such as `SEQUENTIAL_PERSISTENT_FINDING`, stays in the banner
-and the Fences list.
-
-Drag along the strip to scrub. The plot below follows as that pattern's own fit
-and keeps your zoom. The arrow keys step one pattern when the strip has focus.
+Drag the strip to scrub; the plot keeps your zoom.
 
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need
