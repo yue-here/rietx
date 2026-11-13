@@ -160,3 +160,61 @@ def test_a_structure_with_no_rings_gives_none():
     assert rings.bond_edges(geometry)
     assert rings.smallest_rings(rings.bond_edges(geometry), len(geometry["atoms"])) == []
     assert rings.planar_rings(geometry) == []
+
+
+def test_an_atom_past_the_degree_cap_joins_no_ring():
+    """A ring through an atom of more than ``max_degree`` bonds is not walked
+    (``MAX_RING_DEGREE``): a hexagon whose atom 0 also bonds three spokes."""
+    hexagon = [(k, (k + 1) % 6) for k in range(6)]
+    spokes = [(0, 6), (0, 7), (0, 8)]
+    assert len(rings.smallest_rings(hexagon + spokes, 9)) == 1
+    assert rings.smallest_rings(hexagon + spokes, 9, max_degree=4) == []
+    assert len(rings.smallest_rings(hexagon + spokes[:2], 9, max_degree=4)) == 1
+
+
+def test_the_cap_turns_no_planar_ring_away_on_paracetamol(paracetamol):
+    """Every planar ring of paracetamol's block is found under the cap
+    (``docs/wp/1548-measure/rings_degree.txt`` measures every CIF on disk)."""
+    capped = rings.planar_rings(paracetamol)
+    assert capped and capped == rings.planar_rings(paracetamol, max_degree=None)
+
+
+def _points(points) -> dict:
+    return {"atoms": [{"pos": [float(v) for v in p]} for p in points]}
+
+
+def test_a_planar_face_is_the_convex_polygon_round_its_atoms():
+    """D4: a square with an atom at its centre draws the square, a fan of two."""
+    geometry = _points([(0, 0, 0), (2, 0, 0), (2, 2, 0), (0, 2, 0), (1, 1, 0.02)])
+    fill = rings.face_fill(geometry, [4, 3, 2, 1, 0])
+    assert fill["kind"] == "face" and fill["color"] is None
+    assert sorted(fill["vertices"]) == [0, 1, 2, 3]
+    assert fill["faces"] == [[0, 1, 2], [0, 2, 3]]
+    # in order round the polygon: consecutive corners are a side, never a diagonal
+    pos = _positions(geometry)[fill["vertices"]]
+    assert np.allclose(np.linalg.norm(np.roll(pos, -1, axis=0) - pos, axis=1), 2.0)
+
+
+def test_a_face_off_any_plane_is_its_hull_wound_outward():
+    """D4: a tetrahedron's four atoms are drawn as its four outward faces."""
+    geometry = _points([(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)])
+    fill = rings.face_fill(geometry, [0, 1, 2, 3], color="#ff0000")
+    assert fill["color"] == "#ff0000" and len(fill["faces"]) == 4
+    pos = _positions(geometry)[fill["vertices"]]
+    centre = pos.mean(axis=0)
+    for a, b, c in fill["faces"]:
+        assert np.cross(pos[b] - pos[a], pos[c] - pos[a]) @ (pos[a] - centre) > 0
+
+
+@pytest.mark.parametrize("atoms, says", [([0, 1], "three atoms"), ([0, 1, 2], "one line")])
+def test_a_face_that_bounds_no_area_raises(atoms, says):
+    with pytest.raises(ValueError, match=says):
+        rings.face_fill(_points([(0, 0, 0), (1, 0, 0), (2, 0, 0)]), atoms)
+
+
+def test_ring_fills_fan_each_ring(paracetamol):
+    fills = rings.ring_fills(paracetamol, color="#3a7d44")
+    assert len(fills) == len(rings.planar_rings(paracetamol)) > 0
+    for fill in fills:
+        assert fill["kind"] == "ring" and fill["color"] == "#3a7d44"
+        assert fill["faces"] == [[0, k, k + 1] for k in range(1, len(fill["vertices"]) - 1)]

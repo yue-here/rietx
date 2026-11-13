@@ -49,6 +49,20 @@ RING_SIZES = (5, 6)
 #: past it, and none is on disk.
 PLANAR_RING_TOLERANCE = 0.1
 
+#: An atom with more drawn bonds than this joins no ring.  The walk that finds
+#: the rings (:func:`_cycles_up_to`) visits up to d·(d−1)^(k−2) paths from each
+#: atom for a ring of k atoms over neighbours of degree d, so a block of
+#: twelve-coordinate metals would cost 11⁴ paths an atom, while a cap of four
+#: bounds it at 4·3⁴ = 324.  Measured on every CIF on disk as a 2×2×2 block
+#: (WP-1548, ``docs/wp/1548-measure/rings_degree.txt``): no atom of a planar
+#: five- or six-ring carries more than three drawn bonds, the cap turns none
+#: of the 396 away, and the one 24-bond phase (COD 1000055, 315 atoms) costs
+#: 1.90 s without it and nothing with it.  Four leaves room for a metal over a
+#: cyclopentadienyl ring, whose carbons carry two ring bonds, a hydrogen and
+#: the metal.  A ring through a metal centre (a chelate, a paddlewheel's
+#: Cu₂O₄C₂ cage) is turned away by the cap whatever its shape.
+MAX_RING_DEGREE = 4
+
 #: Two positions closer than this, in Å, are one drawn atom: a stick's end is
 #: a copy of its atom's ``pos``, so the match is exact up to rounding.
 _SAME_POSITION = 1e-3
@@ -121,7 +135,8 @@ def _reduce(vector: int, basis: dict[int, int]) -> int:
 
 
 def smallest_rings(edges: Iterable[tuple[int, int]], n_atoms: int,
-                   max_size: int = max(RING_SIZES)) -> list[list[int]]:
+                   max_size: int = max(RING_SIZES),
+                   max_degree: int | None = None) -> list[list[int]]:
     """The smallest rings of a graph up to ``max_size`` atoms, each in order
     round the ring.
 
@@ -140,13 +155,24 @@ def smallest_rings(edges: Iterable[tuple[int, int]], n_atoms: int,
     which is exact for the rings up to that size (a ring's relevance depends
     only on the strictly smaller ones), and each size class is tested over
     GF(2) against the classes below it.
+
+    ``max_degree`` bounds the walk: an atom with more distinct neighbours than
+    that is taken out of the graph first, with its bonds
+    (:data:`MAX_RING_DEGREE`).  Relevance is then judged on what is left, so a
+    ring that is the sum of smaller rings through a removed atom can be kept.
+    ``None`` removes nothing.
     """
+    edges = {(i, j) if i < j else (j, i) for i, j in edges if i != j}
+    if max_degree is not None:
+        degree = [0] * n_atoms
+        for i, j in edges:
+            degree[i] += 1
+            degree[j] += 1
+        edges = {(i, j) for i, j in edges
+                 if degree[i] <= max_degree and degree[j] <= max_degree}
     adjacency: list[list[int]] = [[] for _ in range(n_atoms)]
     edge_bit: dict[tuple[int, int], int] = {}
-    for i, j in edges:
-        i, j = (i, j) if i < j else (j, i)
-        if (i, j) in edge_bit or i == j:
-            continue
+    for i, j in sorted(edges):
         edge_bit[(i, j)] = len(edge_bit)
         adjacency[i].append(j)
         adjacency[j].append(i)
@@ -183,19 +209,89 @@ def ring_deviation(points: np.ndarray) -> float:
 
 
 def planar_rings(geometry: Mapping[str, Any], *, sizes: Sequence[int] = RING_SIZES,
-                 tolerance: float = PLANAR_RING_TOLERANCE) -> list[list[int]]:
+                 tolerance: float = PLANAR_RING_TOLERANCE,
+                 max_degree: int | None = MAX_RING_DEGREE) -> list[list[int]]:
     """The planar rings of a drawing: each a list of indices into
     ``geometry["atoms"]`` in order round the ring.
 
     ``geometry`` is what :func:`rietx.gui.structure3d.build` returns.  A ring
     is one of :func:`smallest_rings` on :func:`bond_edges`, of a size in
     ``sizes``, whose atoms lie within ``tolerance`` Å of their mean plane
-    (:func:`ring_deviation`).  Nothing here says a ring is aromatic.
+    (:func:`ring_deviation`), through no atom of more than ``max_degree``
+    drawn bonds (:data:`MAX_RING_DEGREE`).  Nothing here says a ring is
+    aromatic.
     """
     atoms = geometry.get("atoms") or []
     if not sizes:
         return []
     pos = np.array([a["pos"] for a in atoms], dtype=np.float64).reshape(-1, 3)
     wanted = set(sizes)
-    return [ring for ring in smallest_rings(bond_edges(geometry), len(atoms), max(wanted))
+    return [ring for ring in smallest_rings(bond_edges(geometry), len(atoms), max(wanted),
+                                            max_degree)
             if len(ring) in wanted and ring_deviation(pos[ring]) <= tolerance]
+
+
+# ----------------------------------------------------------------------
+# fills: what the scene draws for a ring or a named face (WP-1548 D4)
+
+def _fan(n: int) -> list[list[int]]:
+    """A convex polygon's triangles as a fan from its first vertex."""
+    return [[0, k, k + 1] for k in range(1, n - 1)]
+
+
+def ring_fills(geometry: Mapping[str, Any], *, color: str | None = None,
+               **found: Any) -> list[dict]:
+    """Each planar ring of a drawing as a fill the scene draws
+    (:func:`rietx.viz.figure3d.scene.build_scene`'s ``fills``): ``kind``
+    ``"ring"``, ``vertices`` the ring's atom indices in order round it, and
+    ``faces`` its triangles as index triples into ``vertices``, a fan from the
+    first.  A five- or six-ring within :data:`PLANAR_RING_TOLERANCE` of its
+    plane is convex, so the fan covers it once.  ``color`` is ``#rrggbb``, or
+    ``None`` for the scene's :data:`~rietx.viz.figure3d.scene.FILL_COLOR`;
+    ``found`` passes to :func:`planar_rings`.
+    """
+    return [{"kind": "ring", "vertices": ring, "faces": _fan(len(ring)), "color": color}
+            for ring in planar_rings(geometry, **found)]
+
+
+def face_fill(geometry: Mapping[str, Any], atoms: Iterable[int], *,
+              color: str | None = None,
+              tolerance: float = PLANAR_RING_TOLERANCE) -> dict:
+    """The fill a named face draws over the atoms ``atoms``, indices into
+    ``geometry["atoms"]`` (WP-1548 D4).
+
+    A set within ``tolerance`` Å of its mean plane (:func:`ring_deviation`) is
+    drawn as the convex polygon round it, a fan from its first corner, and an
+    atom inside the polygon is no corner.  Any other set is drawn as its convex
+    hull, like a polyhedron with no centre, each triangle wound outward
+    (Barber, C. B., Dobkin, D. P. & Huhdanpaa, H. (1996). The Quickhull
+    algorithm for convex hulls. *ACM Trans. Math. Softw.* 22, 469-483).  Fewer
+    than three atoms, or a set on one line, raises.
+    """
+    from scipy.spatial import ConvexHull
+
+    index = sorted({int(k) for k in atoms})
+    if len(index) < 3:
+        raise ValueError(f"a face needs three atoms or more; it names {len(index)}")
+    every = geometry.get("atoms") or []
+    pos = np.array([every[k]["pos"] for k in index], dtype=np.float64)
+    centred = pos - pos.mean(axis=0)
+    _, spread, vt = np.linalg.svd(centred)
+    if spread[1] <= 1e-9 * spread[0]:
+        raise ValueError("the face's atoms lie on one line, which bounds no area")
+    if float(np.abs(centred @ vt[-1]).max()) <= tolerance:
+        corners = [int(k) for k in ConvexHull(centred @ vt[:2].T).vertices]
+        return {"kind": "face", "vertices": [index[k] for k in corners],
+                "faces": _fan(len(corners)), "color": color}
+    hull = ConvexHull(pos)
+    used = sorted({int(v) for simplex in hull.simplices for v in simplex})
+    local = {v: k for k, v in enumerate(used)}
+    centre = pos[used].mean(axis=0)
+    faces = []
+    for simplex in hull.simplices:
+        a, b, c = (int(v) for v in simplex)
+        if np.cross(pos[b] - pos[a], pos[c] - pos[a]) @ (pos[a] - centre) < 0:
+            b, c = c, b
+        faces.append([local[a], local[b], local[c]])
+    return {"kind": "face", "vertices": [index[v] for v in used], "faces": faces,
+            "color": color}

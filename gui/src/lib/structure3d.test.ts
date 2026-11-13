@@ -19,6 +19,7 @@ import { faceData, instanceData } from "./gl3d";
 import {
   CELL_WIDTH_PX,
   EDGE_WIDTH_PX,
+  FILL_COLOR,
   FLAT_AXIS,
   LOOK,
   POLY_ALPHA,
@@ -56,6 +57,7 @@ import {
   toggled,
   stickRadius,
   transform,
+  type Fill,
   type Geometry,
   type Mat3,
   type Polyhedron,
@@ -754,11 +756,11 @@ describe("the Python renderer's scene rules", () => {
     const c = corpus.constants;
     expect(LOOK).toEqual(c.LOOK);
     expect({ STICK_RADIUS, STICK_OF_SEMI_AXIS, STICK_FLOOR, FLAT_AXIS, CELL_WIDTH_PX,
-             EDGE_WIDTH_PX, POLY_ALPHA })
+             EDGE_WIDTH_PX, POLY_ALPHA, FILL_COLOR })
       .toEqual({ STICK_RADIUS: c.STICK_RADIUS, STICK_OF_SEMI_AXIS: c.STICK_OF_SEMI_AXIS,
                  STICK_FLOOR: c.STICK_FLOOR, FLAT_AXIS: c.FLAT_AXIS,
                  CELL_WIDTH_PX: c.CELL_WIDTH_PX, EDGE_WIDTH_PX: c.EDGE_WIDTH_PX,
-                 POLY_ALPHA: c.POLY_ALPHA });
+                 POLY_ALPHA: c.POLY_ALPHA, FILL_COLOR: c.FILL_COLOR });
   });
 
   it("builds every scene the Python copy builds", () => {
@@ -766,10 +768,12 @@ describe("the Python renderer's scene rules", () => {
     corpus.scenes.forEach((c, k) => {
       const o = c.options as { mode: "ball" | "ellipsoid"; hidden?: string[];
                                showBoundary?: boolean; exaggeration?: number;
-                               stick?: number; cell?: string; polyhedra?: number[] };
+                               stick?: number; cell?: string; polyhedra?: number[];
+                               fills?: Fill[] };
       const scene = buildScene(corpus.payloads[c.payload], {
         mode: o.mode, hidden: new Set(o.hidden ?? []), showBoundary: o.showBoundary,
         exaggeration: o.exaggeration, stick: o.stick, cell: o.cell, polyhedra: o.polyhedra,
+        fills: o.fills,
       });
       close(scene, c.scene, `scenes[${k}] ${c.payload} ${JSON.stringify(o)}`);
     });

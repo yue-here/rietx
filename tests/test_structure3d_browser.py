@@ -35,17 +35,16 @@ DATA = Path(__file__).parent / "data"
 pytestmark = pytest.mark.xdist_group("structure3d-browser")
 
 
-@pytest.fixture(scope="module")
-def gui(tmp_path_factory):
-    """NAC with the file's anisotropic tensors, over any pattern: the viewer
-    draws the model and never reads the data."""
+def _serve(tmp_path_factory, cif: str, aniso: bool):
+    """A GUI over one CIF and any pattern: the viewer draws the model and
+    never reads the data."""
     from tests.test_project import _write_xye
     from tests.test_refine_synthetic import perturbed_models, synthesize
 
     data = _write_xye(tmp_path_factory.mktemp("viewer-data") / "synth.xye", synthesize())
     _, instrument = perturbed_models()
-    structure = structure_from_cif(str(DATA / "cod_1000236.cif"), aniso=True)
-    project = rx.Project.create(tmp_path_factory.mktemp("viewer") / "nac.rex",
+    structure = structure_from_cif(str(DATA / cif), aniso=aniso)
+    project = rx.Project.create(tmp_path_factory.mktemp("viewer") / "phase.rex",
                                 pattern=data, instrument=instrument,
                                 structure=structure, plan="mccusker_default")
     session = GuiSession(project, state_dir=tmp_path_factory.mktemp("viewer-state"))
@@ -54,6 +53,19 @@ def gui(tmp_path_factory):
         yield f"http://127.0.0.1:{httpd.server_address[1]}/"
     finally:
         httpd.shutdown()
+
+
+@pytest.fixture(scope="module")
+def gui(tmp_path_factory):
+    """NAC with the file's anisotropic tensors."""
+    yield from _serve(tmp_path_factory, "cod_1000236.cif", aniso=True)
+
+
+@pytest.fixture(scope="module")
+def acridine_gui(tmp_path_factory):
+    """Acridine (COD 2242872), whose one-cell drawing closes eight planar
+    rings (WP-1548): NAC closes none."""
+    yield from _serve(tmp_path_factory, "cod_2242872.cif", aniso=False)
 
 
 @pytest.fixture(scope="module")
@@ -67,14 +79,13 @@ def browser():
         handle.close()
 
 
-@pytest.fixture
-def page(browser, gui):
+def _open(browser, url: str):
     page = browser.new_page(viewport={"width": 1400, "height": 900}, accept_downloads=True)
     errors: list[str] = []
     asked: list[str] = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.on("request", lambda r: asked.append(r.url))
-    page.goto(gui)
+    page.goto(url)
     page.get_by_role("button", name="Model", exact=True).click()
     page.wait_for_selector(".viewer canvas")
     _settle(page)
@@ -82,6 +93,16 @@ def page(browser, gui):
     yield page
     page.close()
     assert not errors, errors
+
+
+@pytest.fixture
+def page(browser, gui):
+    yield from _open(browser, gui)
+
+
+@pytest.fixture
+def acridine_page(browser, acridine_gui):
+    yield from _open(browser, acridine_gui)
 
 
 def _settle(page, frames: int = 4) -> None:
@@ -205,10 +226,11 @@ def test_the_polyhedra_are_painted_and_give_way_to_their_switch(page, tmp_path):
 PARITY_LEVELS = 2.0
 
 
-@pytest.mark.parametrize("depth_cue", [False, True], ids=["plain", "depth-cued"])
-def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
+@pytest.mark.parametrize("case", ["plain", "depth-cued", "planar-rings"])
+def test_the_python_renderer_draws_the_viewers_picture(request, case):
     """WP-1470: one scene and one view drawn by both renderers, and WP-1548's
-    depth cue drawn by both, ticked in the drawer and asked of ``draw``.
+    depth cue and filled planar rings drawn by both, ticked in the drawer and
+    asked of ``draw``.  The rings are acridine's, NAC closing none.
 
     The Python side takes the GUI's framing (``gui_frame``: its zoom-1 fit
     and centre) and the canvas's clear colour, and the DOM letters are hidden
@@ -217,14 +239,17 @@ def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
     alpha-to-coverage there, and a ring's smoothstep against a threshold.
     """
     from rietx.gui import structure3d as s3
-    from rietx.viz.figure3d import raster
+    from rietx.viz.figure3d import raster, rings
     from rietx.viz.figure3d import scene as sc
     from rietx.viz.figure3d.render import _png, gui_frame
 
+    depth_cue, planar = case == "depth-cued", case == "planar-rings"
+    page = request.getfixturevalue("acridine_page" if planar else "page")
+    cif, aniso = ("cod_2242872.cif", False) if planar else ("cod_1000236.cif", True)
     page.add_style_tag(content=".viewer .letters { display: none; }")
-    if depth_cue:
+    if depth_cue or planar:
         page.get_by_role("button", name="drawing").click()
-        page.get_by_label("depth cue").check()
+        page.get_by_label("depth cue" if depth_cue else "fill planar rings").check()
         # the drawer opened above the canvas and moved it; close it again
         page.get_by_role("button", name="drawing").click()
     _settle(page)
@@ -240,9 +265,10 @@ def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
                                 "width": width, "height": height})
     shown = np.asarray(imread(io.BytesIO(png)), dtype=float)[..., :3]
     accent = page.evaluate("getComputedStyle(document.body).getPropertyValue('--accent').trim()")
-    geometry = s3.build(structure_from_cif(str(DATA / "cod_1000236.cif"), aniso=True))
+    geometry = s3.build(structure_from_cif(str(DATA / cif), aniso=aniso))
+    fills = rings.ring_fills(geometry) if planar else ()
     scene = sc.build_scene(geometry, "ball", polyhedra=sc.shown_polyhedra(geometry, True),
-                           cell=accent)
+                           cell=accent, fills=fills)
     rotation = np.asarray(sc.opening_view()).reshape(3, 3)
     frame = gui_frame(scene, rotation, width, height, css_w)
     ground = tuple(float(v) for v in shown[0, 0])
@@ -254,7 +280,7 @@ def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
     ours = raster.draw(scene, rotation, frame, supersample=4, background=ground, fog=fog)
     out = Path(__file__).parent / "output" / "figure3d"
     out.mkdir(parents=True, exist_ok=True)
-    tag = "_cued" if depth_cue else ""
+    tag = {"plain": "", "depth-cued": "_cued", "planar-rings": "_rings"}[case]
     _png(out / f"parity_python{tag}.png", ours, None)
     theirs = np.concatenate([np.round(shown * 255), np.full(shown.shape[:2] + (1,), 255)],
                             axis=-1).astype(np.uint8)
@@ -272,6 +298,18 @@ def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
         ink = np.abs(plain[..., :3] / 255 - plain[0, 0, :3] / 255).sum(axis=2) > 0.06
         near = float(np.abs(ours[..., :3] / 255 - shown)[ink].mean() * 255)
         far = float(np.abs(plain[..., :3] / 255 - shown)[ink].mean() * 255)
+        assert near < 0.5 * far, (near, far)
+    if planar:
+        # likewise the rings: where filling them moved Python's picture, the
+        # viewer is nearer the filled picture than the bare one
+        bare = raster.draw({**scene, "faces": [f for f in scene["faces"]
+                                               if f["kind"] == "polyhedron"]},
+                           rotation, frame, supersample=4, background=ground)
+        moved = np.abs(ours[..., :3] / 255 - bare[..., :3] / 255).sum(axis=2) > 0.06
+        assert moved.sum() > 100
+        near = float(np.abs(ours[..., :3] / 255 - shown)[moved].mean() * 255)
+        far = float(np.abs(bare[..., :3] / 255 - shown)[moved].mean() * 255)
+        print(f"parity{tag}: over the fills {near:.1f} against {far:.1f} levels")
         assert near < 0.5 * far, (near, far)
 
 

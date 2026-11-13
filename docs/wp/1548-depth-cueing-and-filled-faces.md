@@ -238,8 +238,19 @@ with a caller's colour always accepted. `fog_max` stays 0.7.
   of their plane; 10 tests in `tests/test_figure_rings.py`. The no-ring case
   is C₄H₂, since fluorapatite closes non-planar Ca–O–P rings. The `_audit`
   row was dropped by the maintainer's ruling, D2.)*
-- [ ] Named faces from `cut.py` masks (D4), drawn by both renderers, with
-  the parity case.
+- [x] Named faces from `cut.py` masks (D4), drawn by both renderers, with
+  the parity case. *(2026-11-13: a fill is `{kind, vertices, faces, color}`
+  built in Python (`rings.ring_fills`, `rings.face_fill`) and turned into a
+  face entry by both `build_scene` twins, held equal by the corpus; every
+  face entry now carries `kind`. The walk is capped first:
+  `rings.MAX_RING_DEGREE` = 4, measured on every CIF on disk
+  (`1548-measure/rings_degree.txt`: planar-ring atoms carry ≤ 3 bonds, the
+  24-bond phase costs 1.90 s uncapped and nothing capped). The GUI's payload
+  carries `rings` from the session and the drawer's "fill planar rings" box
+  fills them; named faces are Python's alone, the GUI having no selection
+  language. A named face keeps its drawn atoms and the report names the rest.
+  Parity on acridine, NAC closing no ring: 0.61 levels, and 2.3 against 74.6
+  over the fills.)*
 - [ ] Before-and-after pairs on the 21 phases and paracetamol, committed
   under `docs/wp/1548-measure/`. Show them to the maintainer with the three
   questions above.
