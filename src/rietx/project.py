@@ -37,6 +37,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from . import _about
 from .history.store import fingerprint, holds_a_log
 from .history.tree import RefinementTree
@@ -291,7 +293,8 @@ class Project:
         # inheriting the create's answer.
         require_two_theta(data, "Project.open()")
         actual_fp = fingerprint(data.x(), data.intensity)
-        if actual_fp != ref_doc.fingerprint:
+        accepted = {actual_fp, _pre_1952_gsas_fingerprint(ref_doc.reader, data)}
+        if ref_doc.fingerprint not in accepted:
             raise ValueError(
                 f"{pattern_path}: the bytes match but this version parses them "
                 f"differently (fingerprint {actual_fp[:8]}, recorded "
@@ -314,7 +317,7 @@ class Project:
                 "the model state (project.json holds only the settings)")
         history_notes: list[Diagnostic] = []
         tree = RefinementTree.load(history_path, diagnostics=history_notes)
-        if tree.header.data_fingerprint and tree.header.data_fingerprint != actual_fp:
+        if tree.header.data_fingerprint and tree.header.data_fingerprint not in accepted:
             raise ValueError(
                 f"{history_path}: this history was recorded against a different "
                 f"pattern (fingerprint {tree.header.data_fingerprint[:8]}, data "
@@ -505,6 +508,25 @@ def _data_ref(path: Path, data: PatternData, reader: str,
         two_theta_range=(tt[0], tt[-1]),
         has_sigma=data.sigma is not None,
     )
+
+
+def _pre_1952_gsas_fingerprint(reader: str, data: PatternData) -> str | None:
+    """The fingerprint the ``gsas`` reader gave this file before WP-1952.
+
+    It dropped every channel with an esd of zero or below, in silence, where
+    it now keeps them and ``read_pattern`` leaves them out of the fit.  A
+    project made before records the shorter arrays, and must still open: the
+    channels it lacks are the ones the fit now excludes, so the fit is the
+    same.  ``None`` where the two readings cannot differ.
+    """
+    if reader != "gsas" or data.sigma is None:
+        return None
+    bad = data.nonpositive_sigma_mask()
+    if not bad.any():
+        return None
+    keep = ~bad
+    return fingerprint(np.asarray(data.x())[keep],
+                       np.asarray(data.intensity, dtype=np.float64)[keep])
 
 
 def _reader_options(ref: DataRef) -> dict[str, str]:

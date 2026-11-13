@@ -1784,9 +1784,16 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
 
         ``read_pattern`` is therefore the route in, and every format it opens
         is a background format for free.  The blank's own esds are carried when
-        it has them — ``PatternData.sig()`` is not used, because its Poisson
-        fallback would invent statistics for a curve that has none, and that is
-        the difference this field exists to record.
+        it has them, and only then: a blank with no σ column gets
+        ``fixed_sigma = None``, because the Poisson fallback would invent
+        statistics for a curve that has none, and that is the difference this
+        field exists to record.  Where it has a column, ``PatternData.sig()``
+        is read, which is the file's σ wherever it is positive and √max(y, 1)
+        at a σ ≤ 0 the blank was read with ``nonpositive_sigma="poisson"`` to
+        keep (WP-1952).
+
+        A σ ≤ 0 channel under the default ``"exclude"`` leaves the curve as an
+        excluded region's channel does (below).
 
         ``vary_scale`` is the caller's declared act.  It is ``False`` by
         default for the reason the field is: a declared measured background
@@ -1802,9 +1809,11 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
         return cls(
             fixed_two_theta=[float(v) for v in blank.tt()[keep]],
             fixed_intensity=[float(v) for v in blank.y()[keep]],
+            # ``sig()`` only where the blank has esds: it is the file's σ
+            # wherever that is positive, and a σ ≤ 0 is either excluded by
+            # ``keep`` or one the caller asked to weight as Poisson (WP-1952)
             fixed_sigma=(None if blank.sigma is None else
-                         [float(v) for v, k in zip(blank.sigma, keep, strict=True)
-                          if k]),
+                         [float(v) for v in blank.sig()[keep]]),
             fixed_source=source,
             scale=Parameter(value=scale, vary=vary_scale, min=0.0),
             chebyshev=BackgroundChebyshev.with_terms(n_terms, vary=True),
