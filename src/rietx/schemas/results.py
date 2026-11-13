@@ -20,7 +20,7 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import POISSON_FLOOR_COUNTS, _floor_sigma
+from .pattern import POISSON_FLOOR_COUNTS, SigmaRule, _poisson_where_nonpositive
 
 
 class RefinedParameter(Base):
@@ -979,7 +979,10 @@ class MicrostructureTerm(Base):
     rather than zero):
 
     * ``"at_zero"`` — the coefficient is at its off state, where a size is
-      infinite and a strain is a perfect lattice.  True, and not a number;
+      infinite and a strain is a perfect lattice.  True, and not a number.
+      Stored as zero, or on its floor of zero by the bound test
+      (``FLOOR_HIT``), so ``coefficient`` may be a tiny positive number where
+      ``solver="trf"`` stopped just above it (WP-1914);
     * ``"no_wavelength"`` — a size needs a λ and the source declares none
       (never reaches a strain, which has no λ in it);
     * ``"not_measured"`` — the coefficient carries no esd, so ``value`` stands
@@ -1215,8 +1218,9 @@ class StageResult(Base):
     #: runners that build a ``StageResult``.
     termination: str | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
-    #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
-    #: stage: the step for the box alone crossed a row, and the step solved
+    #: Stephens strain cone, the Γ_G² floor of WP-1938 D7, the Γ_L floor of
+    #: WP-2002, or a tied parameter's own bounds of WP-1325) during this
+    #: stage, in a joint fit too: the step for the box alone crossed a row, and the step solved
     #: over the box and the rows replaced it (WP-1938 D8; the name is from
     #: before D8, when such a step was truncated).  Always 0 under
     #: TRF, which has no such vocabulary.  Nonzero in the *final* stage means
@@ -1362,8 +1366,18 @@ class StageResult(Base):
     #: This one is the caller's, and it persists until ``unhold``.
     #:
     #: Empty on every fit where no hold was declared, which is every fit that
-    #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.
+    #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.  A path the
+    #: same stage's ``turn_off`` matches is left out: the stage did not want
+    #: it free (WP-2208).
     blocked_by_hold: list[str] = Field(default_factory=list)
+    #: paths this stage's ``turn_off`` fixed after its frees (WP-2208), in
+    #: table order: the free paths it took, never a row that was already
+    #: fixed or held; a joint fit names them as :attr:`freed` does.  Disjoint
+    #: from :attr:`freed`.  Empty for a stage that declares no ``turn_off``,
+    #: which is every stage before the field, and the empty list is then the
+    #: truth: no stage could fix anything.  Writers: the three runners that
+    #: build a ``StageResult``.
+    fixed: list[str] = Field(default_factory=list)
     #: the **literal** paths, and the retired spellings, in this stage's
     #: ``turn_on`` that name no parameter of the model, in plan order
     #: (WP-1414, issue #265).  A literal is a ``turn_on`` entry with no
@@ -1557,6 +1571,10 @@ class HistogramResult(Base):
     restraints: "RestraintReport | None" = None
     #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
     phase_agreement: list[PhaseAgreement] = Field(default_factory=list)
+    #: which σ rule weighted this histogram's channels, counted (WP-1952);
+    #: :meth:`RefinementResult.for_histogram` swaps it in.  ``None`` on a
+    #: result written before the field existed.
+    sigma_rule: SigmaRule | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
@@ -2325,6 +2343,14 @@ class RefinementResult(Base):
     #: a ``replay`` carries it.  ``None`` means nothing counted, never "none
     #: declared", which is ``0``.
     n_background_components: int | None = None
+    #: Which σ rule weighted the fitted channels, counted (WP-1952; WP-2002
+    #: B14): the file's esd, the Poisson fallback √max(y, 1), and the channels
+    #: inside the range whose σ ≤ 0 left the fit.  Written from
+    #: ``CompiledModel.sigma_rule``, which :meth:`PatternData.sigma_rule` built
+    #: at compile with the fit's own window, so a ``replay`` carries it too.
+    #: ``None`` means nothing here counted: a joint fit (each histogram has its
+    #: own), or a result recorded before the field existed.
+    sigma_rule: SigmaRule | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -2425,21 +2451,21 @@ class RefinementResult(Base):
         * results recorded before v0.2 carry no σ at all, and get the same
           Poisson ``√max(y,1)`` fallback the fit itself would have used
           (CLAUDE.md, Weights);
-        * non-positive entries are floored by :meth:`PatternData.sig`'s own
-          rule, so a zero esd is a small σ rather than an ``inf`` that loses
-          the whole trace.
+        * non-positive entries take :meth:`PatternData.sig`'s own rule,
+          √max(y, 1), so a zero esd is a finite σ rather than an ``inf`` that
+          loses the whole trace.  A fit never stores one (WP-1952 leaves such a
+          channel out, or weights it so), so only a hand-built result has any.
 
         Note this says nothing about *where* σ came from: by the time a result
         exists, a file esd column and a Poisson estimate are the same array of
         floats.  ``DataRef.has_sigma`` is the fact that survives, and it is what
         the GUI and the text document both label the residual from.
         """
+        y = np.asarray(self.y_obs, dtype=np.float64)
         if self.sigma:
-            s = np.asarray(self.sigma, dtype=np.float64)
-        else:
-            s = np.sqrt(np.maximum(np.asarray(self.y_obs, dtype=np.float64),
-                                   POISSON_FLOOR_COUNTS))
-        return _floor_sigma(s)
+            return _poisson_where_nonpositive(
+                np.asarray(self.sigma, dtype=np.float64), y)
+        return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
     def for_histogram(self, h: int) -> "RefinementResult":
         """A single-histogram-shaped view of histogram ``h`` for reporting/plots.
@@ -2489,6 +2515,8 @@ class RefinementResult(Base):
         view.y_calc = list(hr.y_calc)
         view.y_background = list(hr.y_background)
         view.sigma = list(hr.sigma)
+        view.sigma_rule = (hr.sigma_rule.model_copy()
+                           if hr.sigma_rule is not None else None)
         view.ticks = dict(hr.ticks)
         view.radiation = (hr.radiation.model_copy(deep=True)
                           if hr.radiation is not None else None)

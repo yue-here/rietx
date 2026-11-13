@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { GRIP, MODEL_MIN, SERIES_MIN, axisOf, clampSize, dragged,
-         fitColumns, modelStacks, modelThreshold, seriesCompact } from "./resize";
+import { GRIP, MODEL_MIN, SERIES_MIN, SHELL_MIN, axisOf, clampSize, dragged,
+         fitColumns, modelStacks, modelThreshold, seriesCompact, shellStacks,
+         shellThreshold } from "./resize";
 
 // --- ported cases: the table below is copied verbatim into
 // tests/watch_core.test.mjs, because `rietx watch`'s page cannot import this
@@ -179,5 +180,18 @@ describe("when the staged-series table drops its descriptive columns", () => {
     // jsdom, or before the first layout: the same fallback every other
     // measurement here makes, rather than a reflowed table by accident
     expect(seriesCompact(0)).toBe(false);
+  });
+});
+
+describe("the window's one-column threshold (WP-2123)", () => {
+  it("is the sum of the two panels' floors", () => {
+    expect(shellThreshold()).toBe(SHELL_MIN.graphs + SHELL_MIN.side);
+    expect(shellThreshold()).toBe(760);
+    expect(shellStacks(shellThreshold() - 1)).toBe(true);
+    expect(shellStacks(shellThreshold())).toBe(false);
+  });
+
+  it("stays side by side while nothing is measurable", () => {
+    expect(shellStacks(0)).toBe(false);
   });
 });

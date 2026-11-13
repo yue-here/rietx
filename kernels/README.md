@@ -9,7 +9,7 @@ where the CPU has AVX2. `exp` exposes the exponential they call so its bound
 can be measured. From 1.3.0, two test the dichotomy indexer's boxes. From
 1.4.0, three serve the structure-solution engine: the per-site orbit sums of
 the structure factor, their one-site twin, and the interatomic contact term.
-They are built for rietx and have no other public interface.
+From 1.5.0, one more draws the structure figure with depth cueing. They are built for rietx and have no other public interface.
 
 The package is one abi3 wheel per platform, built from Rust with PyO3. Its
 major version is the kernel interface number, `rietx_kernels.KERNEL_ABI`.

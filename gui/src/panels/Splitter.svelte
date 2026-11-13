@@ -25,6 +25,7 @@
     flow = "overlay",
     extent = () => 0,
     onsize,
+    onreset,
     title = "drag to resize",
   }: {
     /** the pane's current size in px, as the owner is rendering it */
@@ -42,6 +43,9 @@
     /** the extent the two panes share, measured when the drag starts */
     extent?: () => number;
     onsize: (size: number, done: boolean) => void;
+    /** a double-click puts the pane back to its default size, as a VS Code
+     *  sash does (WP-2123); absent, a double-click does nothing */
+    onreset?: () => void;
     title?: string;
   } = $props();
 
@@ -75,7 +79,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="grip" data-axis={axis} data-grow={grow} data-flow={flow} class:dragging
-  onpointerdown={grab} {title}></div>
+  onpointerdown={grab} ondblclick={() => onreset?.()} {title}></div>
 
 <style>
   .grip[data-flow="overlay"] {

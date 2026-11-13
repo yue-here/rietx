@@ -123,7 +123,12 @@ VALUE_DIGITS = 12
 #: and a bump would instead refuse every document already stored, since the
 #: parser compares this constant for equality.
 STAGE_KEYS = tuple(k for k in StageSpec.model_fields
-                   if k not in ("name", "turn_on"))
+                   if k not in ("name", "turn_on", "turn_off"))
+#: The clause a stage line writes ``turn_off`` as (WP-2208): globs, like the
+#: frees, so it is a word of its own rather than a ``<key> <number>`` pair.
+#: Rendered only when the stage fixes, so every stored document renders byte
+#: for byte as before.
+STAGE_FIX_WORD = "fix"
 #: The subset that must come back as ``int``.
 STAGE_INT_KEYS = ("max_iter", "lebail_cycles")
 
@@ -428,9 +433,10 @@ def _render_peaks(project) -> list[str]:
     widths = [max(2, *(len(r[0]) for r in rows))] + [
         max(len(name), *(len(r[k]) for r in rows))
         for k, name in ((1, "2theta"), (2, "esd"), (3, "fwhm"), (4, "I"))]
-    shoulders = doc.pick_options.get("shoulders", True)
+    limits = (tuple(project.doc.two_theta_limits)
+              if project.doc.two_theta_limits else None)
     provenance = ("σ assumed, not measured" if doc.peaks.source == "positions"
-                  else f"session.pick_peaks(shoulders={shoulders})")
+                  else store.pick_call(doc.pick_options, default_range=limits))
     names = ("2theta", "esd", "fwhm", "I")
     lines = [
         f"peaks {len(rows)}".ljust(34) + f"# {provenance}",
@@ -486,6 +492,8 @@ def _render_plan(doc: ProjectDoc) -> list[str]:
     for stage in spec.stages:
         parts = [f"stage {stage.name.ljust(width)}  free "
                  + ", ".join(stage.turn_on)]
+        if stage.turn_off:
+            parts.append(f"{STAGE_FIX_WORD} " + ", ".join(stage.turn_off))
         for key in STAGE_KEYS:
             value = getattr(stage, key)
             if value != getattr(default, key):
@@ -856,24 +864,36 @@ def _parse_stage(n: int, rest: list[str], raw: str, fail) -> StageSpec | None:
         return None
     rest = rest[1:]
     keys = STAGE_KEYS
-    cut = next((i for i, token in enumerate(rest) if token in keys), len(rest))
+    stops = (*keys, STAGE_FIX_WORD)
+    cut = next((i for i, token in enumerate(rest) if token in stops), len(rest))
     globs = [g for g in " ".join(rest[:cut]).replace(",", " ").split() if g]
-    if not globs:
-        fail(n, f"stage {name!r} frees nothing", raw, name)
-        return None
-    fields: dict[str, Any] = {}
     tail = rest[cut:]
+    fixes: list[str] = []
+    fields: dict[str, Any] = {}
     while tail:
         key = tail.pop(0)
+        if key == STAGE_FIX_WORD and not fixes:
+            # ``fix <globs>``: the stage's turn_off, after its frees (WP-2208),
+            # read up to the next key wherever the clause sits on the line
+            cut = next((i for i, token in enumerate(tail) if token in keys), len(tail))
+            fixes = [g for g in " ".join(tail[:cut]).replace(",", " ").split() if g]
+            tail = tail[cut:]
+            if not fixes:
+                fail(n, f"stage {name!r}: 'fix' takes '<glob>[, <glob>…]'", raw, name)
+                return None
+            continue
         if key not in keys or not tail or _number(tail[0]) is None:
             fail(n, f"stage {name!r}: expected '<{'|'.join(keys)}> <number>' "
                     f"but found {key!r}", raw, name)
             return None
         fields[key] = float(tail.pop(0))
+    if not globs and not fixes:
+        fail(n, f"stage {name!r} frees nothing", raw, name)
+        return None
     for key in STAGE_INT_KEYS:
         if key in fields:
             fields[key] = int(fields[key])
-    return StageSpec(name=name, turn_on=globs, **fields)
+    return StageSpec(name=name, turn_on=globs, turn_off=fixes, **fields)
 
 
 # ----------------------------------------------------------------------
@@ -1255,11 +1275,15 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
 def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     """Apply ``delta`` through the public verbs; returns the calls it made.
 
-    ``set_values`` runs first *because* it is the one that can still refuse
-    (locked, tied, out of bounds) and it validates everything before writing
-    anything — so a refusal here leaves the project untouched, which is what
-    "all-or-nothing" has to mean for a caller.  The returned lines are the same
-    API echo the console shows for a form edit.
+    Two verbs can still refuse here, and each commits its own node:
+    ``set_values`` (locked, tied, out of bounds) and, since WP-1435,
+    ``set_vary`` (a held literal).  A ``set_vary`` refusal after the values
+    committed would leave half the delta in, so the two run first on a
+    history-free copy (:func:`~rietx.gui.session.rehearse`, WP-2126).  A
+    refusal there leaves the project untouched, which is what
+    "all-or-nothing" has to mean for a caller.  The settings and the plan were
+    validated by :func:`changes`.  The returned lines are the same API echo
+    the console shows for a form edit.
 
     Peak edits run last and go through the panel's own editor
     (:class:`~rietx.gui.peaks.PeakEditor` — the session passes its cached one
@@ -1267,13 +1291,21 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     :func:`changes` (indices, vocabulary, editable columns), so what remains is
     solving, which flags a failure on the peak rather than raising.
     """
-    calls: list[str] = []
-    if delta.values:
-        project.refinement.set_values(dict(delta.values))
-        calls.append(f"ref.set_values({dict(delta.values)!r})")
-    for path, flag in delta.vary.items():
-        hits = project.refinement.set_vary(path, flag)
-        calls.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+    from .session import rehearse
+
+    def verbs(ref) -> list[str]:
+        out: list[str] = []
+        if delta.values:
+            ref.set_values(dict(delta.values))
+            out.append(f"ref.set_values({dict(delta.values)!r})")
+        for path, flag in delta.vary.items():
+            hits = ref.set_vary(path, flag)
+            out.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+        return out
+
+    if delta.values or delta.vary:
+        rehearse(project.refinement, verbs)
+    calls: list[str] = verbs(project.refinement)
     if delta.plan is not None:
         # a preset is stored expanded through the mode the project will run
         # in, as the GUI's preset route stores it, because a project's plan
@@ -1320,7 +1352,7 @@ def _apply_peaks(project, delta: Delta, editor) -> list[str]:
         limits = (tuple(project.doc.two_theta_limits)
                   if project.doc.two_theta_limits else None)
         editor = store.PeakEditor(project.data, project.refinement.instrument,
-                                  two_theta_range=limits)
+                                  **store.settings_of(doc, default_range=limits))
     where = {i: doc.peaks.peaks[i].two_theta
              for i in set(delta.peak_moves) | set(delta.peak_flags)}
 

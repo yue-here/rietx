@@ -1,6 +1,6 @@
 # WP-1814 — refinable internal geometry: Z-matrix lengths, angles and dihedrals
 
-Milestone: rigid-bodies · Status: ⬜
+Milestone: rigid-bodies · Status: 🔄 2026-11-09 — the placement's exact tangent built; the table, block and refusals wait on #1388
 Depends on: 1815 (the derived-geometry table its esds are reported through); 1805
 Priority: P3 2026-10-16 — TOPAS users expect it, and a refined bond with its esd is what a paper reports; nothing is wrong without it
 
@@ -67,6 +67,40 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 - Issue #759.
 
 ## Handover log
+
+### 2026-11-09 — the placement and its exact tangent
+
+A Z-matrix can now be differentiated exactly: `fragments.zmatrix_points`
+places every line, dummies included, and returns ∂(positions)/∂(internals)
+in closed form, per Å and per degree, so a later chunk can hand those
+columns to the rigid-body block without a finite difference anywhere.
+`from_zmatrix` places through it with its signature and results unchanged.
+Nothing refines yet: no schema, table, block or reader change.
+
+- *Done*: `zmatrix_points(refs, values, *, tangents=False, names=None)`, the
+  six placement partials in closed form (`_place_partials`) chained forward
+  line by line into an (m, n, 3) tangent in the twist tangents' layout
+  (columns line by line, r, angle, dihedral); `zmatrix_reach(refs)`, the
+  lines each line's internals can move, read off the references (a covering
+  pattern). Task 2's placement half; its block half (seeding the columns
+  into `body_tangents` after the twists) is the table chunk's.
+- *Measured* (`tests/test_fragments.py`, numpy, arm64 macOS, a dev
+  venv): the six partials against complex step, worst 3.6e-15 on
+  100 draws; the whole-template tangent against complex step, worst
+  7.8e-16, 4.7e-16 and 1.9e-15 of max|J| on a branched 8-atom fragment, a
+  dummy with two 180° lines and acridine (COD 2242872, 23 atoms, 63
+  internals), each at the anchor and 50 random states; the tangent takes
+  about 2 ms on acridine. Old against new `from_zmatrix`: bit-identical
+  positions on 241 random Z-matrices and identical refusal text on 62.
+- *Gotcha*: at an angle of exactly 0° or 180° the position ignores the
+  dihedral, but the angle's column is the one-sided derivative into
+  [0, 180], which needs an open reference triple; over a collinear one no
+  other angle is admissible and the column is zero. A free angle that
+  reaches 180° in a fit therefore keeps a nonzero column when its triple
+  is open, and has none over a collinear one.
+- *Next*: the table chunk (schema, paths, block, write-back, every
+  stage-start refusal), after #1388 merges; the restraint refusal on bodies
+  with no Z-matrix is its own chunk.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #759),
   behind WP-1815 as the maintainer decided. Checked against the tree at

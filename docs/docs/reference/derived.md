@@ -224,7 +224,7 @@ The two are read separately and compared through `PhaseMicrostructure.size_agree
 
 | `unavailable` | What happened |
 |---|---|
-| `"at_zero"` | the coefficient is at its off state, where a size is infinite and a strain is a perfect lattice; true, and not a number to report. A phase whose widths were never refined says this in all four rows |
+| `"at_zero"` | the coefficient is at its off state, where a size is infinite and a strain is a perfect lattice; true, and not a number to report. A coefficient a fit drove to its floor of zero says this too, with `FLOOR_HIT` beside it, whichever solver stopped there. A phase whose widths were never refined says this in all four rows |
 | `"no_wavelength"` | the source declares no emission line, so no size can be read; a strain has no wavelength in it and never says this |
 | `"not_measured"` | the coefficient has no esd, so `MicrostructureTerm.value` stands and `MicrostructureTerm.esd` does not: the parameter was never freed, its column measured nothing, or the result came from `rietx.replay` |
 | `None` | nothing is missing |

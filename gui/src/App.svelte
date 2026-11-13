@@ -16,22 +16,32 @@
    * `ProjectDoc.ui`, whose keys the frontend owns (WP-1005): it is a property of
    * the project a user comes back to, not of this browser tab.
    */
-  import { onMount, setContext } from "svelte";
+  import { onMount, setContext, untrack } from "svelte";
 
   import { ApiError, api } from "./api";
   import Help from "./Help.svelte";
+  import ActionBar from "./panels/ActionBar.svelte";
   import Checklist from "./panels/Checklist.svelte";
   import Console from "./panels/Console.svelte";
   import History from "./panels/History.svelte";
+  import Interactive from "./panels/Interactive.svelte";
   import Model from "./panels/Model.svelte";
+  import NewProject from "./panels/NewProject.svelte";
   import Palette from "./panels/Palette.svelte";
   import Params from "./panels/Params.svelte";
+  import PeakWindows from "./panels/PeakWindows.svelte";
   import Peaks from "./panels/Peaks.svelte";
   import Plan from "./panels/Plan.svelte";
   import Plot from "./panels/Plot.svelte";
+  import Background from "./panels/Background.svelte";
+  import { backgroundTitle } from "./lib/background";
   import Report from "./panels/Report.svelte";
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
+  import Start from "./panels/Start.svelte";
+  import FileMenu from "./panels/FileMenu.svelte";
+  import Recovery from "./panels/Recovery.svelte";
+  import { RecoveryWriter, combine, readDraft, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -43,7 +53,10 @@
   import { isShortcutTarget, type Command } from "./lib/palette";
   import { cellText, type PeaksPayload } from "./lib/peaks";
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
-  import { TABS, type Tab } from "./lib/tabs";
+  import { SHELL_MIN, shellStacks } from "./lib/resize";
+  import { GRAPH_TABS, TABS, type GraphTab, type Tab } from "./lib/tabs";
+  import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "./lib/interactive";
+  import { peakWindows, widestFwhm } from "./lib/peakwin";
   import {
     THEME_CHOICES,
     applyTheme,
@@ -60,6 +73,11 @@
   let recent = $state<any[]>([]);
   let examples = $state<any[]>([]);
   let openError = $state<string>("");
+  /** the start screen over an open project, from the header's Open… (WP-2131);
+   *  with no project it is always shown, so this is only the over-a-project case */
+  let startOpen = $state(false);
+  /** the New project dialog (WP-2131) */
+  let newOpen = $state(false);
 
   let run = $state<RunState | null>(null);
   let result = $state<any>(null);
@@ -81,24 +99,83 @@
     if (tab === "report") reportSeen = true;
   });
 
-  /** Whether the panel column has the whole window (WP-1034).
+  /** Which of the window's two panels are hidden (WP-2123).
    *
-   * The full-window surface WP-1013 and WP-1014 shipped, generalised: instead of
-   * two panes each having their own mode, *the column* expands and its tab strip
-   * comes with it — so the hatch covers every panel and "where am I" is still
-   * read off one strip.  Session-local and unpersisted on purpose: it is a view
-   * choice like the residual selector, not a setting like a width (WP-1033's
-   * line between the two).
-   *
-   * One control for one choice (WP-1029): a segmented pair whose options *are*
-   * the layout, rather than a toggle button that means two different things
-   * depending on where you already are. */
-  let wide = $state(false);
-  const LAYOUTS: { id: boolean; label: string; title: string }[] = [
-    { id: false, label: "Split", title: "the pattern beside the panel column" },
-    { id: true, label: "Full",
-      title: "the panel column across the whole window — the tabs stay with it" },
-  ];
+   * The maintainer's ruling of 2026-11-07: both side panels collapse, each from
+   * a button on its own side that never moves. Hiding the graphs is the
+   * full-window column WP-1034 shipped as `Split | Full`, so the pair replaces
+   * it. One panel always shows, because a window of nothing is no layout.
+   * Session-local and unpersisted, as `Split | Full` was: a layout is a view
+   * choice, not a setting (WP-1033's line between the two). */
+  let hideGraphs = $state(false);
+  let hideModel = $state(false);
+  /** The graph strip's tab (`lib/tabs.ts`), one today. */
+  let graphTab = $state<GraphTab>("pattern");
+  /** The window's width, and whether it has dropped to one column. */
+  let windowWidth = $state(0);
+  const stacked = $derived(shellStacks(windowWidth));
+  /** The model panel's height while stacked, or `null` for half the window.
+   *  Session-local: `side_width` is the stored setting, and a height chosen in
+   *  a narrow window says nothing about the next one. */
+  let sideHeight = $state<number | null>(null);
+  /** The action bar's refine choice and the Parameters panel's pending edits. */
+  let refineMode = $state<"cycle" | "plan">("plan");
+  let pendingTouched = $state(0);
+  let pendingInvalid = $state("");
+  /** The Interactive tab's pending slider values and the preview they drew
+   *  (WP-2128). The action bar counts both panels' edits as one set. */
+  let sliderTouched = $state(0);
+  let previewAnswer = $state.raw<PreviewAnswer | null>(null);
+  let previewError = $state("");
+  const touched = $derived(pendingTouched + sliderTouched);
+  /** The curves the pattern graph last fetched, which the Single peaks graph
+   *  frames and the sliders' ranges are measured from. */
+  let baseCurves = $state.raw<any>(null);
+  const rangeContext = $derived.by((): RangeContext => {
+    const tt = baseCurves?.arrays?.two_theta;
+    const fwhm = baseCurves ? widestFwhm(peakWindows(baseCurves)) : 0;
+    return { fwhm: fwhm > 0 ? fwhm : FALLBACK_FWHM_DEG,
+             thetaMaxDeg: tt?.length ? tt[tt.length - 1] / 2 : 45 };
+  });
+  /** One name per phase, in order. The tick rows are keyed by phase name, but
+   *  a magnetic phase adds a `"<name> (magnetic)"` row after its own and the
+   *  declared peaks a `"(extra)"` row (`refine._tick_rows`), and either would
+   *  shift every later phase's name by one place. */
+  const phaseNames = $derived.by(() => {
+    const out: string[] = [];
+    for (const key of Object.keys(baseCurves?.header?.ticks ?? {})) {
+      if (key === "(extra)" || (out.length && key === `${out[out.length - 1]} (magnetic)`)) continue;
+      out.push(key);
+    }
+    return out;
+  });
+  /** whether the Plan tab holds an edited plan, which the action bar counts as
+   *  one pending edit and its Apply stores (WP-2127) */
+  let planPending = $state(false);
+  const pendingTotal = $derived(touched + (planPending ? 1 : 0));
+
+  /** The recovery copy of the pending edits (WP-2209, the maintainer's
+   *  ruling of 2026-11-09).  The writer is armed for the open project once
+   *  its kept copy has been offered and answered, and the effect below hands
+   *  it every change: the panels' `draft()` read their pending maps, so a
+   *  retyped value is a change even where the count stays the same.  A
+   *  switch of project disarms it first, so the panels' emptied maps never
+   *  overwrite the copy of the project just left. */
+  const recoveryWriter = new RecoveryWriter(
+    (path, at, draft) => api.putRecovery(path, at, draft));
+  let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
+                           moved: boolean } | null>(null);
+  $effect(() => {
+    const path = project?.path ?? null;
+    const draft = combine(pendingTotal, paramsPanel?.draft() ?? null,
+                          interactivePanel?.draft() ?? null, planPanel?.draft() ?? null);
+    const at = head;
+    untrack(() => recoveryWriter.schedule(path, at, draft));
+  });
+  /** Bumped by every project opened, so the Plan tab starts over: its unsaved
+   *  stages and its undo stack belong to the project they were made in, and
+   *  `{#if project}` stays true across an open. */
+  let opens = $state(0);
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
    *  has been dismissed for this project, and whether the Report tab has been
@@ -115,6 +192,7 @@
    * The first drag replaces it with a number, which is the user having said. */
   let sideWidth = $state<number | null>(null);
   let sideMeasured = $state(0);
+  let sideMeasuredHeight = $state(0);
   /** The Model pane's first two column widths; its third takes the rest. */
   let modelColumns = $state<number[] | null>(null);
   let mainEl: HTMLElement | undefined = $state();
@@ -136,6 +214,7 @@
   $effect(() => applyTheme(theme, document.documentElement));
   let paletteOpen = $state(false);
   let paramsPanel = $state<any>(null);
+  let interactivePanel = $state<any>(null);
   let planPanel = $state<any>(null);
   let modelPanel = $state<any>(null);
   let seriesPanel = $state<any>(null);
@@ -321,6 +400,87 @@
     }
   }
 
+  /** Leave the open project's pending edits behind as its recovery copy, and
+   *  clear them from the panels, which stay mounted across an open: without
+   *  this, one project's pending values were the next project's Apply. */
+  async function leaveEdits() {
+    await recoveryWriter.flush();
+    recoveryWriter.disarm();
+    offer = null;
+    paramsPanel?.revert();
+    interactivePanel?.revert();
+  }
+
+  /** Offer the open project's kept edits, or start keeping new ones. */
+  async function offerRecovery() {
+    const path = project?.path;
+    if (!path) return;
+    recoveryWriter.disarm();
+    let kept: any = null;
+    try {
+      kept = await api.recovery();
+    } catch {
+      // an unreadable copy is no copy: the open goes on, and the next edit
+      // writes a good one
+    }
+    if (project?.path !== path) return;   // another project opened meanwhile
+    const draft = readDraft(kept?.draft);
+    if (draft) {
+      offer = { path, draft, savedUtc: kept.saved_utc ?? null,
+                moved: !!kept.head && kept.head !== kept.head_now };
+      return;
+    }
+    recoveryWriter.arm(path, null);
+  }
+
+  function restoreKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
+    if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
+    if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
+    // the server holds exactly this, so it is not written again until it changes
+    recoveryWriter.arm(o.path, o.draft);
+    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+  }
+
+  async function discardKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    try {
+      await api.putRecovery(o.path, null, null);
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+      // the server still holds the copy: arm as if it does, and ask again
+      if (project?.path === o.path) {
+        recoveryWriter.arm(o.path, o.draft);
+        recoveryWriter.schedule(o.path, head, null);
+      }
+      return;
+    }
+    if (project?.path === o.path) recoveryWriter.arm(o.path, null);
+  }
+
+  /** Escape on the offer (the maintainer's ruling of 2026-11-10): neither
+   *  restored nor discarded.  The copy stays on the server and is offered at
+   *  the project's next open, so the writer stays disarmed until then: an
+   *  edit made meanwhile would otherwise overwrite the copy it set aside. */
+  function setAsideKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    say("# unapplied edits kept; offered again when the project next opens");
+  }
+
+  /** The page is going: send the write the timer was holding, with
+   *  `keepalive`, which a timer cannot outlive. */
+  function pageHidden() {
+    const unsent = recoveryWriter.takeUnsent();
+    if (unsent) api.putRecoveryOnHide(unsent.project, unsent.head, unsent.draft);
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
@@ -357,9 +517,13 @@
    * the new project's root node supplies.
    */
   async function opened(doc: any) {
+    await leaveEdits();
     project = doc;
+    opens += 1;
     readUi();
     openError = "";
+    startOpen = false;
+    newOpen = false;
     // a different project, so the checklist's session-local step starts over
     // (WP-1017) — this belongs with `tab = "params"` rather than in `readUi`,
     // which `moved()` also calls on every head move: reset there, reading the
@@ -373,6 +537,7 @@
     run = await api.runState();
     await loadResult();
     await loadPeaks();
+    await offerRecovery();
   }
 
   /** Open another project **in place of** this one (WP-1034).
@@ -386,10 +551,15 @@
    * remedy, so it travels verbatim.
    */
   async function open(path: string): Promise<string> {
+    await recoveryWriter.flush();
     try {
-      project = await api.openProject(path);
+      const doc = await api.openProject(path);
+      await leaveEdits();
+      project = doc;
+      opens += 1;
       readUi();
       openError = "";
+      startOpen = false;
       reportSeen = false;   // a different project — see `opened` (WP-1017)
       tab = "params";
       indexAnswer = null;
@@ -398,6 +568,7 @@
       await loadResult();
       await loadPeaks();
       say(`project.open(${path})`);
+      await offerRecovery();
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -405,7 +576,31 @@
     }
   }
 
-  /** The recent list, kept where both the empty state and the wizard read it. */
+  /** A rename or a move from the File menu (WP-2133): the same project, at a
+   *  new path, its result and panels kept, since the server kept them too. */
+  function relocated(doc: any) {
+    // the server re-keyed the kept copy; the writer follows it there
+    recoveryWriter.follow(doc.path);
+    project = doc;
+    say(`# project: ${doc.path}`);
+  }
+
+  /** Close from the File menu (WP-2133): the start screen is the window. */
+  async function closed() {
+    await leaveEdits();
+    project = null;
+    result = null;
+    startOpen = false;
+    newOpen = false;
+    indexAnswer = null;
+    forgetCandidates();
+    extinction = null;
+    run = await api.runState();
+    await loadRecent();
+    await loadExamples();
+  }
+
+  /** The recent list, which the start screen reads (WP-2131). */
   async function loadRecent() {
     try {
       recent = (await api.recent()).recent ?? [];
@@ -434,6 +629,9 @@
    * exists.  Returns the refusal for the button that was clicked, as `open`
    * does, and refreshes the list because `built` has just changed. */
   async function openExample(name: string, reset = false): Promise<string> {
+    // a write still on the timer lands first: after a reset it would
+    // otherwise re-create the copy the server has just discarded (WP-2209)
+    await recoveryWriter.flush();
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
       await opened(doc);
@@ -446,6 +644,15 @@
     }
   }
 
+  /** Take a project off the recent list; the list comes back whole. */
+  async function removeRecent(path: string) {
+    try {
+      recent = (await api.removeRecent(path)).recent ?? [];
+    } catch (error) {
+      openError = (error as Error).message;
+    }
+  }
+
   async function start() {
     try {
       run = await api.run({ kind: "fit" });
@@ -455,11 +662,93 @@
     }
   }
 
-  async function runStage(stage: any) {
+  async function runStage(stage: any, echo?: string) {
     try {
       run = await api.run({ kind: "stage", stage });
+      if (echo) say(echo);
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
+    }
+  }
+
+  /** Apply the Parameters panel's pending edits from the action bar. A refusal
+   *  is drawn in that panel, so a refused apply brings it forward: from another
+   *  tab it would otherwise be a press that did nothing visible. */
+  async function applyParams(): Promise<boolean> {
+    const ok = !!(await paramsPanel?.apply());
+    if (!ok) tab = "params";
+    if (!ok) return false;
+    // the slider values second, so a slider wins a path both panels touched;
+    // each panel's apply is its own node, as its own Apply always was
+    const slid = !!(await interactivePanel?.apply());
+    if (!slid) tab = "interactive";
+    return slid;
+  }
+
+  /** Apply everything the action bar counts: the Parameters edits and the
+   *  Interactive values (WP-2128), then an edited plan (WP-2127).  A refusal
+   *  brings forward the tab that drew it. */
+  async function applyPending(): Promise<boolean> {
+    if (touched && !(await applyParams())) return false;
+    if (planPending && !(await planPanel?.save())) {
+      tab = "plan";
+      return false;
+    }
+    return true;
+  }
+
+  function revertPending() {
+    paramsPanel?.revert();
+    interactivePanel?.revert();
+    planPanel?.revert();
+  }
+
+  /** A stage run from the Plan tab applies the Parameters and Interactive
+   *  edits first, as the bar's Refine does, so the stage starts from the values
+   *  on screen.  The stage itself is sent as it stands, saved or not. */
+  async function runPlanStage(stage: any) {
+    if (refining || busy || noPhases || pendingInvalid) return;
+    refining = true;
+    try {
+      if (touched && !(await applyParams())) return;
+      await runStage(stage);
+    } finally {
+      refining = false;
+    }
+  }
+
+  /** The action bar's primary: apply the pending edits, then refine (WP-2123).
+   *
+   * `cycle` is one stage with an empty `turn_on`, which `Project.run_stage`
+   * runs on the working free set — exactly what is ticked, because a stage
+   * keeps a hand-freed row where a plan drops it (WP-1208). `plan` is the
+   * project's plan, the header's old Run. A refused apply runs nothing: the
+   * refusal is in the Parameters panel, in the verb's own words.
+   *
+   * `refining` covers the apply's round trip, before `busy` can say a run is
+   * in flight, so a second press in that window starts nothing twice. */
+  let refining = false;
+  async function refine(mode: "cycle" | "plan" = refineMode) {
+    if (refining || busy || noPhases || pendingInvalid) return;
+    refining = true;
+    try {
+      if (pendingTotal && !(await applyPending())) return;
+      if (mode === "plan") await start();
+      else await runStage({ name: "cycle", turn_on: [] },
+                          'ref.run_stage(Stage("cycle", turn_on=[]))');
+    } finally {
+      refining = false;
+    }
+  }
+
+  /** Hide or show one side; the other always stays. */
+  function toggleSide(which: "graphs" | "model") {
+    if (which === "graphs") {
+      if (!hideGraphs && hideModel) return;
+      hideGraphs = !hideGraphs;
+    } else {
+      if (!hideModel && hideGraphs) return;
+      hideModel = !hideModel;
     }
   }
 
@@ -671,29 +960,44 @@
     if (done) setUi({ side_width: next });
   }
 
+  /** The sash's double-click: back to the CSS clamp, as nobody having said. */
+  function resetSide() {
+    sideWidth = null;
+    setUi({ side_width: null });
+  }
+
   function modelSized(next: number[], done: boolean) {
     modelColumns = next;
     if (done) setUi({ model_columns: next });
   }
 
-  /** Show the import wizard, from anywhere — the header button, the palette.
+  /** Show the start screen, from anywhere: the header button, the palette.
    *
-   * The wizard *is* `Model.svelte` (WP-1014), so reaching it is selecting that
-   * tab and telling the pane to show it; the recent list rides inside it, which
-   * is what makes "open another" reachable without restarting the program. */
+   * Over an open project it is a screen of its own with a way back, so the
+   * project's panels stay mounted behind it and lose nothing (WP-2131). The
+   * lists are refetched, because another window may have moved them. */
   function startImport() {
-    tab = "model";
+    startOpen = true;
     loadRecent();
     loadExamples();
-    modelPanel?.startImport();
   }
 
   const commands = $derived<Command[]>([
-    { id: "run", label: "Run the fit", echo: "ref.fit(data, plan=…)", key: "r",
-      disabled: busy || !project || noPhases, run: start },
+    // the action bar's primary on the staged plan, so pending edits are applied
+    // first, as that button applies them (WP-2123)
+    { id: "run", label: pendingTotal ? "Apply the edits and run the fit" : "Run the fit",
+      echo: "ref.fit(data, plan=…)", key: "r",
+      disabled: busy || !project || noPhases || !!pendingInvalid, run: () => refine("plan") },
     { id: "stage", label: `Run one stage${planPanel?.selectedName() ? ` — ${planPanel.selectedName()}` : ""}`,
-      echo: "ref.run_stage(stage)", key: ".", disabled: busy || !project || noPhases,
+      echo: "ref.run_stage(stage)", key: ".",
+      disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => { tab = "plan"; planPanel?.runStage(); } },
+    { id: "plan-undo", label: "Undo the last plan edit", echo: "# the Plan tab's own undo",
+      disabled: !project || !planPanel?.canUndo(),
+      run: () => { tab = "plan"; planPanel?.undo(); } },
+    { id: "plan-redo", label: "Redo the plan edit", echo: "# the Plan tab's own undo",
+      disabled: !project || !planPanel?.canRedo(),
+      run: () => { tab = "plan"; planPanel?.redo(); } },
     { id: "cancel", label: "Cancel the run", echo: "token.cancel()", key: "Esc",
       disabled: !busy, run: cancel },
     { id: "free", label: "Free the filtered parameters", echo: 'ref.set_vary(glob, True)',
@@ -722,11 +1026,18 @@
     { id: "model", label: "Edit the structure and instrument",
       echo: "ref.edit(structure=…, instrument=…)", key: "m", disabled: !project,
       run: () => (tab = "model") },
-    { id: "wide", label: wide ? "Show the pattern beside the panel" : "Give the panel the whole window",
-      echo: "# a layout choice, not a setting", disabled: !project,
-      run: () => (wide = !wide) },
-    { id: "import", label: "Open or import a project", echo: "Project.create(path, …)",
-      run: () => { tab = "model"; startImport(); } },
+    { id: "graphs", label: hideGraphs ? "Show the graphs" : "Hide the graphs",
+      echo: "# a layout choice, not a setting", disabled: !project || hideModel,
+      run: () => toggleSide("graphs") },
+    { id: "side", label: hideModel ? "Show the model panel" : "Hide the model panel",
+      echo: "# a layout choice, not a setting", disabled: !project || hideGraphs,
+      run: () => toggleSide("model") },
+    { id: "cycle", label: "Refine one cycle on the ticked parameters",
+      echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
+      disabled: busy || !project || noPhases || !!pendingInvalid,
+      run: () => refine("cycle") },
+    { id: "import", label: "Open or create a project", echo: "Project.create(path, …)",
+      run: startImport },
     { id: "disclosure", label: simple ? "Show advanced controls" : "Hide advanced controls",
       echo: 'project.doc.ui["simple"]', disabled: !project, run: () => setSimple(!simple) },
     // no `disabled`: the theme is the person's, so it is reachable in the empty
@@ -747,6 +1058,16 @@
     // while the palette is open it owns the keyboard — Esc closes it there, and
     // `r` would otherwise start a fit from inside a search box
     if (paletteOpen) return;
+    // ⌘⏎ is the action bar's primary (WP-2123), except inside the text pane,
+    // whose CodeMirror keymap binds the same chord to its own Apply
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      const inText = (event.target as HTMLElement | null)?.closest?.(".cm-editor");
+      if (!inText && project) {
+        event.preventDefault();
+        refine();
+      }
+      return;
+    }
     // help first: Esc means "close the thing that just opened", and cancelling
     // a run because a popover was open is not recoverable by pressing it again
     if (event.key === "Escape" && helpRequest) {
@@ -932,6 +1253,7 @@
         // loadIndexAnswer clears the screen it assumes stale.
         await loadIndexAnswer();
         await loadExtinction();
+        await offerRecovery();
       }
     })();
 
@@ -987,92 +1309,114 @@
   });
 </script>
 
+<!-- The action bar (WP-2123).  It ends the model panel, and moves to the foot
+     of the graphs while that panel is hidden, so a fit can always be started
+     from a visible button.  Settled by Claude, reversible: a bar across the
+     whole window under both sides is the alternative.  Moving it is part of
+     the collapse click, which asks for a layout change. -->
+{#snippet actions()}
+  <ActionBar bind:mode={refineMode} touched={pendingTotal} invalid={pendingInvalid}
+    {busy} blocked={noPhases ? NO_PHASES_REASON : null}
+    onapply={applyPending} onrevert={revertPending}
+    onrefine={() => refine()} />
+{/snippet}
+
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
-  onscrollcapture={reanchor} />
+  onscrollcapture={reanchor} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
 
+{#if offer}
+  <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
+    onrestore={restoreKept} ondiscard={discardKept} onlater={setAsideKept} />
+{/if}
+
+<!-- The top bar (WP-2123).  Each side's collapse button sits at its own end
+     and never moves: the middle wraps within itself, so a narrow window adds
+     a row there and leaves both buttons where they were (the maintainer's
+     ruling of 2026-11-07, after Xcode and VS Code).  Both are drawn without a
+     project too, disabled, so opening one moves nothing. -->
 <header>
-  <div class="title">
-    <strong>rietx</strong>
-    <span class="muted mono">{version?.package_version ?? "…"}</span>
-  </div>
-
-  {#if project}
-    <div class="project mono" title={project.path}>
-      {project.path.split("/").pop()}
-      <span class="muted">· {project.data.filename} · {project.data.n_points} pts</span>
-      <span class="muted">· {project.doc.mode}</span>
-      <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
-    </div>
-  {/if}
-
-  <!-- A hopeless fit must not be presented in the register of a good one
-       (WP-1029 item c).  The judgement is the *report's* — `maturity` quotes
-       `MATURITY_MAX_RWP`, the Rwp past which Layer 1 refuses to speak about
-       individual parameters — so nothing here decides anything, and the
-       `status` vocabulary (which still says `converged` at Rwp 96 %) is left
-       alone: that is WP-1028's, and two owners would disagree. -->
-  <div class="stats tabular mono" class:immature={immature}>
-    {#if rwp !== null}
-      Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
-      {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
-      {#if immature}
-        <!-- WP-1201 moved this off a `<button>` (a chip states a fact and never
-             acts), which put its message out of reach of the keyboard and of
-             assistive tech.  `<Help text=…>` is that debt paid: the sentence is
-             the *report's*, so no corpus can hold it, and it is now reachable
-             by Tab and Enter like every other explanation. -->
-        <span class="chip bad">
-          <Help text={result.maturity.message} title="Not a fit yet"
-            >⚠ not a fit yet</Help>
-        </span>
+  <button class="ghost toggle" aria-pressed={!hideGraphs}
+    disabled={!project || hideModel} onclick={() => toggleSide("graphs")}
+    aria-label={hideGraphs ? "Show the graphs" : "Hide the graphs"}
+    title={hideModel ? "the graphs cannot hide while the model panel is hidden"
+      : hideGraphs ? "show the graphs" : "hide the graphs"}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      {#if stacked}
+        <rect class="fill" x="2" y="3" width="12" height="4.5" /><path d="M1.5 8h13" />
+      {:else}
+        <rect class="fill" x="2" y="3" width="5" height="10" /><path d="M7.5 2.5v11" />
       {/if}
-    {/if}
-  </div>
+    </svg>
+  </button>
 
-  <div class="controls">
-    {#if project}
-      <button class="ghost" onclick={startImport}
-        title="open a recent project, or import a new one — this session's project
-               is replaced, and nothing is unsaved (settings persist on the verb)"
-        >Open…</button>
-      <div class="segmented" role="group" aria-label="layout">
-        {#each LAYOUTS as entry (entry.label)}
-          <button class:on={wide === entry.id} onclick={() => (wide = entry.id)}
-            title={entry.title}>{entry.label}</button>
+  <div class="bar">
+    <div class="title">
+      <strong>rietx</strong>
+      <span class="muted mono">{version?.package_version ?? "…"}</span>
+    </div>
+
+    <!-- the project's name opens the File menu (WP-2133), with or without a
+         project, so opening one moves nothing in the bar -->
+    <div class="project mono" title={project?.path ?? ""}>
+      <FileMenu {project} {busy} hasResult={!!result} {say}
+        onnew={() => (newOpen = true)} onopen={open} onproject={relocated}
+        onclosed={closed} />
+      {#if project}
+        <span class="muted">· {project.data.filename} · {project.data.n_points} pts</span>
+        <span class="muted">· {project.doc.mode}</span>
+        <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
+      {/if}
+    </div>
+
+    <div class="controls">
+      {#if project}
+        <div class="segmented" role="group" aria-label="disclosure">
+          <button class:on={simple} onclick={() => setSimple(true)}
+            title="hide bounds and stage seeds">Simple</button>
+          <button class:on={!simple} onclick={() => setSimple(false)}
+            title="show every field a stage and a parameter carry">Advanced</button>
+        </div>
+      {/if}
+      <!-- outside the `{#if project}` above, because a theme is not the
+           project's (WP-1044): the empty state is a screen too, and it is the
+           one a first-time user starts on -->
+      <div class="segmented theme" role="group" aria-label="theme">
+        {#each THEME_CHOICES as choice (choice)}
+          <button class:on={themeChoice === choice} onclick={() => setTheme(choice)}
+            aria-label={choice} title={THEME_TITLE[choice]}>{GLYPH[choice]}</button>
         {/each}
       </div>
-      <div class="segmented" role="group" aria-label="disclosure">
-        <button class:on={simple} onclick={() => setSimple(true)}
-          title="hide bounds and stage seeds">Simple</button>
-        <button class:on={!simple} onclick={() => setSimple(false)}
-          title="show every field a stage and a parameter carry">Advanced</button>
-      </div>
-    {/if}
-    <!-- outside the `{#if project}` above, because a theme is not the
-         project's (WP-1044): the empty state is a screen too, and it is the
-         one a first-time user starts on -->
-    <div class="segmented theme" role="group" aria-label="theme">
-      {#each THEME_CHOICES as choice (choice)}
-        <button class:on={themeChoice === choice} onclick={() => setTheme(choice)}
-          aria-label={choice} title={THEME_TITLE[choice]}>{GLYPH[choice]}</button>
-      {/each}
+      <span class="pill" data-state={run?.state ?? "idle"}>
+        {#if busy}
+          {run?.run.stage ?? "starting"}
+          {#if run?.run.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
+          {#if run?.run.lebail?.pass}· pass {run.run.lebail.pass}{#if run.run.lebail.of} of {run.run.lebail.of}{/if}{/if}
+        {:else}
+          {run?.run.status ?? "idle"}
+        {/if}
+      </span>
+      <button class="ghost" onclick={cancel} disabled={!busy}>Cancel</button>
+      <button class="ghost" onclick={() => (paletteOpen = true)} title="every command, with the call it makes">
+        <kbd>⌘K</kbd>
+      </button>
     </div>
-    <span class="pill" data-state={run?.state ?? "idle"}>
-      {#if busy}
-        {run?.run.stage ?? "starting"}
-        {#if run?.run.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
-        {#if run?.run.lebail?.pass}· pass {run.run.lebail.pass}{#if run.run.lebail.of} of {run.run.lebail.of}{/if}{/if}
-      {:else}
-        {run?.run.status ?? "idle"}
-      {/if}
-    </span>
-    <button onclick={start} disabled={busy || !project || noPhases}
-      title={noPhases ? NO_PHASES_REASON : null}>Run</button>
-    <button class="ghost" onclick={cancel} disabled={!busy}>Cancel</button>
-    <button class="ghost" onclick={() => (paletteOpen = true)} title="every command, with the call it makes">
-      <kbd>⌘K</kbd>
-    </button>
   </div>
+
+  <button class="ghost toggle" aria-pressed={!hideModel}
+    disabled={!project || hideGraphs} onclick={() => toggleSide("model")}
+    aria-label={hideModel ? "Show the model panel" : "Hide the model panel"}
+    title={hideGraphs ? "the model panel cannot hide while the graphs are hidden"
+      : hideModel ? "show the model panel" : "hide the model panel"}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      {#if stacked}
+        <rect class="fill" x="2" y="9.5" width="12" height="3.5" /><path d="M1.5 9h13" />
+      {:else}
+        <rect class="fill" x="9" y="3" width="5" height="10" /><path d="M8.5 2.5v11" />
+      {/if}
+    </svg>
+  </button>
 </header>
 
 {#if !busy && run?.run.lebail?.stopped}
@@ -1089,39 +1433,98 @@
 {/if}
 
 <main bind:this={mainEl}>
-  <!-- `Model` is mounted exactly once (WP-1205), whether or not a project is
-       open — it used to sit in two separate branches of an `{#if project}`
-       (the empty-state wizard and a tab panel), each its own component
-       instance with its own `wizardOpen`. That let a project opened from
-       *inside* the tab panel's wizard (`Open…` over an already-open project)
-       leave the wizard painted over the freshly-opened project: `project`
-       stayed truthy the whole time, so the tab-panel instance was never torn
-       down and re-created, and nothing else ever cleared its `wizardOpen`.
-       One instance removes the seam that bug lived in. Without a project the
-       side column simply takes the whole window (`wide` reuses the
-       full-window layout's own CSS) and no other panel exists to share it
-       with. -->
-  <div class="panes">
+  <!-- With no project the start screen is the window (WP-2131), and the
+       header's Open… lays it over an open project, whose panes stay mounted
+       behind it so a look at the recent list throws nothing away. `Model` is
+       still mounted exactly once (WP-1205): switching from one project to
+       another keeps `project` truthy, so no panel is torn down. -->
+  {#if !project || startOpen}
+    <Start version={version?.package_version ?? ""} {recent} {examples} {busy}
+      docsUrl={corpus?.docs_url ?? null} error={openError} hasProject={!!project}
+      onnew={() => (newOpen = true)} onopen={open} onexample={openExample}
+      onremove={removeRecent} onback={() => (startOpen = false)} />
+  {/if}
+  {#if project}
+  <div class="panes" class:stacked class:hidden={startOpen}>
     <!-- hidden rather than unmounted in the full-window layout, for the same
          reason every panel is: a purge and a refetch on a layout click would
          throw the drawn window away -->
     {#if project}
-      <div class="plotcol" class:hidden={wide}>
+      <!-- The graph column (WP-2123): a strip of graph tabs, then a title line
+           saying what the view shows, so a later preview can never read as a
+           changed fit (the maintainer's ruling of 2026-11-07). The fit's
+           statistic rides on that line, moved from the header. -->
+      <div class="plotcol" class:hidden={hideGraphs}>
+        <nav class="tabs" aria-label="graphs">
+          {#each GRAPH_TABS as entry (entry.id)}
+            <button class="tab" class:on={graphTab === entry.id}
+              onclick={() => (graphTab = entry.id)}>{entry.label}</button>
+          {/each}
+        </nav>
+        <!-- A hopeless fit must not be presented in the register of a good one
+             (WP-1029 item c).  The judgement is the *report's* — `maturity`
+             quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
+        <div class="gtitle">
+          <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
+            : previewAnswer ? "Preview, not refined"
+            : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
+          <div class="stats tabular mono" class:immature={immature}>
+            {#if previewAnswer}
+              Rwp <strong>{(previewAnswer.curves.header.rwp * 100).toFixed(3)}%</strong>
+              {#if rwp !== null}<span class="muted">last fit {(rwp * 100).toFixed(3)}%</span>{/if}
+            {:else if previewError}
+              <span class="muted">preview refused: {previewError}</span>
+            {:else if rwp !== null}
+              Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
+              {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
+              {#if immature}
+                <span class="chip bad">
+                  <Help text={result.maturity.message} title="Not a fit yet"
+                    >⚠ not a fit yet</Help>
+                </span>
+              {/if}
+            {/if}
+          </div>
+        </div>
+        <!-- each graph stays mounted while another is up, as the panels do -->
+        <div class="gview" class:hidden={graphTab !== "pattern"}>
         <Plot {result} {plotKey} {zoom} {theme} error={resultError}
           peaks={peaksData} peaksActive={tab === "peaks"} hovered={hoveredPeak}
           candidate={candidateOverlay} {candidatePicked}
           {protocol} {extent} {channels} {wavelengths} {protocolError} {busy}
           onhoverpeak={(i) => (hoveredPeak = i)}
           onaddpeak={addPeak} onmovepeak={movePeak} ontogglepeak={togglePeak}
-          onremovepeak={removePeak} onprotocol={setProtocol} />
+          onremovepeak={removePeak} onprotocol={setProtocol}
+          preview={previewAnswer} oncurves={(c) => (baseCurves = c)} />
+        </div>
+        <div class="gview" class:hidden={graphTab !== "single"}>
+          <PeakWindows curves={baseCurves} preview={previewAnswer} {theme}
+            active={graphTab === "single" && !hideGraphs} />
+        </div>
+        <div class="gview" class:hidden={graphTab !== "background"}>
+          <Background {head} {busy} {theme} {say} onmoved={moved}
+            protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
+                                      protocol.regions])}
+            active={graphTab === "background" && !hideGraphs} />
+        </div>
+        {#if hideModel}{@render actions()}{/if}
       </div>
     {/if}
-    <div class="side" class:wide={wide || !project} bind:clientWidth={sideMeasured}
-      style:flex={wide || !project || sideWidth === null ? null : `0 0 ${sideWidth}px`}>
-      {#if project && !wide}
-        <Splitter size={sideWidth ?? sideMeasured} grow="left" min={300} keep={360}
-          extent={() => mainEl?.clientWidth ?? 0} onsize={sideSized}
-          title="drag to resize the panel column" />
+    <div class="side" class:wide={hideGraphs || !project} class:hidden={!!project && hideModel}
+      bind:clientWidth={sideMeasured} bind:clientHeight={sideMeasuredHeight}
+      style:flex={!project || hideGraphs ? null
+        : stacked ? (sideHeight === null ? null : `0 0 ${sideHeight}px`)
+        : sideWidth === null ? null : `0 0 ${sideWidth}px`}>
+      {#if project && !hideGraphs}
+        <!-- one sash, turned by the layout: along the column's left edge side by
+             side, along its top edge stacked (WP-2123) -->
+        <Splitter size={stacked ? sideHeight ?? sideMeasuredHeight : sideWidth ?? sideMeasured}
+          grow={stacked ? "up" : "left"} min={stacked ? 160 : SHELL_MIN.side}
+          keep={stacked ? 160 : SHELL_MIN.graphs}
+          extent={() => (stacked ? mainEl?.clientHeight : mainEl?.clientWidth) ?? 0}
+          onsize={(next, done) => (stacked ? (sideHeight = next) : sideSized(next, done))}
+          onreset={() => (stacked ? (sideHeight = null) : resetSide())}
+          title="drag to resize the panel column; double-click resets it" />
       {/if}
       {#if project}
         <!-- eight wide, and it **wraps** rather than truncating: measured at
@@ -1143,7 +1546,6 @@
           {/each}
         </nav>
       {/if}
-      {#if !project && openError}<p class="bad">{openError}</p>{/if}
       <!-- the model pane and the text pane are tabs (WP-1034) and stay
            mounted like every other one: a typed species, a half-filled wizard
            and a typed `.rxt` buffer all have to survive a look at the plot.
@@ -1153,20 +1555,28 @@
            active and never hidden. -->
       <div class="panel" class:hidden={!!project && !modelTab}>
         <Model bind:this={modelPanel} {project} {capabilities} {head} {busy} {simple}
-          {theme} {recent} {examples} {say} onexample={openExample}
-          active={!project || modelTab} columns={modelColumns}
-          oncolumns={modelSized} onopen={open} onopened={opened} onmoved={moved} />
+          {theme} {say} active={modelTab} columns={modelColumns}
+          oncolumns={modelSized} onmoved={moved} />
       </div>
       {#if project}
         <!-- every tab stays mounted: switching must not throw away a filter, a
              pending edit, an unsaved stage list or a two-node comparison -->
         <div class="panel" class:hidden={tab !== "params"}>
-          <Params bind:this={paramsPanel} {head} {busy} {simple} {say} />
+          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
+            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+        </div>
+        <div class="panel" class:hidden={tab !== "interactive"}>
+          <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
+            context={rangeContext} {phaseNames}
+            onpending={(n) => (sliderTouched = n)}
+            onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
-          <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
-            noPhasesReason={noPhases ? NO_PHASES_REASON : null}
-            {say} onrun={runStage} onrunall={start} />
+          {#key opens}
+            <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
+              noPhasesReason={noPhases ? NO_PHASES_REASON : null}
+              {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
+          {/key}
         </div>
         <div class="panel" class:hidden={!textTab}>
           <Text {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
@@ -1200,11 +1610,18 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
+        {#if !hideModel}{@render actions()}{/if}
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
   </div>
+  {/if}
 </main>
+
+{#if newOpen}
+  <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)}
+    onopened={opened} />
+{/if}
 
 {#if paletteOpen}
   <Palette {commands} onclose={() => (paletteOpen = false)} />
@@ -1256,15 +1673,50 @@
      `Cancel` and `⌘K` were 118 px past the right edge and unreachable, because
      the row's only shrinkable item is the filename and it had already
      collapsed to nothing (WP-1034's browser pass). */
+  /* The two collapse buttons hold the ends and never wrap (WP-2123); the
+     middle `.bar` is what wraps, so a narrow window costs a row there. */
   header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    flex: 0 0 auto;
+  }
+
+  header > .bar {
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 14px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
+  }
+
+  .toggle {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    color: var(--muted);
+  }
+
+  .toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+  }
+
+  .toggle svg .fill {
+    fill: currentColor;
+    stroke: none;
+    opacity: 0;
+  }
+
+  .toggle[aria-pressed="true"] svg .fill {
+    opacity: 0.55;
   }
 
   .title {
@@ -1287,8 +1739,39 @@
     min-width: 0;
   }
 
+  /* The graph's title line (WP-2123): what the view shows, then the fit's
+     statistic held to the right.  The title gives way first, with an ellipsis,
+     so the statistic never wraps under it. */
+  .gview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gview.hidden {
+    display: none;
+  }
+
+  .gtitle {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 12px;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .gtitle .what {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
   .stats {
-    margin-left: auto;
     flex: 0 0 auto;
     display: flex;
     align-items: baseline;
@@ -1301,6 +1784,7 @@
   }
 
   .controls {
+    margin-left: auto;
     display: flex;
     /* The header wraps and this did not, so it was one unbreakable 604 px
        line: measured at a 420 px window, the document scrolled to 618 px
@@ -1352,6 +1836,19 @@
     display: none;
   }
 
+  /* one graph tab's view (WP-2128): the column's remaining height, so the
+     pattern graph's host sizes exactly as it did before there were two */
+  .gview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gview.hidden {
+    display: none;
+  }
+
   /* The panel column is a *surface*, and says so (WP-1032).
      Reported as "transparent headings clash with other text on scroll"; what is
      actually there is a colour mismatch, measured in both themes.  The Peaks
@@ -1386,6 +1883,38 @@
     border-left: 0;
   }
 
+  .side.hidden {
+    display: none;
+  }
+
+  /* One column below `shellThreshold()` (WP-2123): the graphs above the model,
+     the sash turned to run along the column's top edge.  Half and half until a
+     drag says otherwise. */
+  .panes.stacked {
+    flex-direction: column;
+  }
+
+  .panes.stacked > .plotcol {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  /* `min-height: 0` because a column flex item's automatic minimum is its
+     content height, which let the panel column take the whole window and the
+     graphs none (measured at 700 px: 1094 px against a 860 px pane). */
+  .panes.stacked > .side {
+    flex: 0 0 50%;
+    min-height: 0;
+    max-width: none;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .panes.stacked > .side.wide {
+    flex: 1 1 auto;
+    border-top: 0;
+  }
+
   /* The overflow rule is: never shorten a label, wrap instead (WP-1034) —
      which is also why `.tab` does not grow to fill the row: with nine of them
      the strip wraps at a 340 px column, and a lone `Build` stretched across
@@ -1397,22 +1926,22 @@
     flex: 0 0 auto;
   }
 
+  /* Every panel scrolls inside itself, so a panel taller than its share is
+     clipped here rather than painted over the action bar and the console
+     below it (found stacked at 700 px, WP-2123). */
   .panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
     flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .panel.hidden {
     display: none;
   }
 
-  /* the `openError` shown above Model when there is no project yet — the
-     side column used to be `.empty`'s own full-height flex box before the two
-     `Model` mounts became one (WP-1205); `.side` already carries the same
-     shape (`display: flex; flex-direction: column`). */
-  .side > .bad {
-    margin: 0.6rem 1.2rem 0;
+  .panes.hidden {
+    display: none;
   }
 </style>

@@ -115,7 +115,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import PatternData, SigmaRule, require_two_theta
 
 # PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
 # (``phase_support``); the plan carries the number since WP-2002 B1, so it is
@@ -1034,6 +1034,11 @@ class CompiledModel:
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
     # c_w = 0 silences the restraints the caller declared, never the origin.
     origin: "CompiledOrigin | None" = None
+    # Which σ rule weighted the fitted channels, counted over this compile's own
+    # window (``PatternData.sigma_rule``, WP-1952): what
+    # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
+    # without ``compile_model``.
+    sigma_rule: SigmaRule | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -2385,6 +2390,27 @@ class CompiledModel:
         return (y_bkg + self.extra_peak_curve(values)
                 + self.bragg_component(values)), y_bkg
 
+    def evaluate_parts(self, values: dict[str, float]
+                       ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+        """``(evaluate(values), background(values), [phase_0, phase_1, …])``.
+
+        For an at-rest reader that draws each phase beside the total, such as
+        the GUI's preview route (WP-2125).  One Bragg pass serves both: each
+        phase is computed once and the Bragg sum is :meth:`bragg_component`'s,
+        zeros first and then the phases in order.  The total takes
+        :meth:`evaluate`'s association, background first and the declared
+        peaks before the Bragg sum, so it is bit-identical to it (pinned by
+        ``tests/test_gui_preview.py``).
+        """
+        y_bkg = self.background(values)
+        parts = [self.phase_component(ip, values) for ip in range(len(self.phases))]
+        y = get_backend().zeros_like(self.tt)
+        for comp in parts:
+            y = y + comp
+        if not self.peak_components:
+            return y_bkg + y, y_bkg, parts
+        return y_bkg + self.extra_peak_curve(values) + y, y_bkg, parts
+
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
 
@@ -2926,24 +2952,26 @@ class CompiledModel:
         axial ratios (they move the quadrature nodes — see
         ``derivative_bases``), and anything unknown (falls back to FD).
         """
-        # A background peak is outside **every** analytic branch's reach, and
-        # this line is the declaration rather than the accident.  The default
-        # for an unrecognised path is already False, so this changes no
-        # dispatch; what it changes is that the exclusion is now stated where
-        # the reach is claimed, next to the ``surface_roughness`` clause that
-        # exists for the mirror-image reason (an unstated *inclusion* costs a
-        # slow test, an unstated *exclusion* is the class of bug WP-1070 filed
-        # — a column that comes back **short** rather than raising).
+        # An extra component is outside the per-peak scalar chain, and this
+        # line is the declaration rather than the accident.  Its columns have
+        # their own branch in ``optimize.least_squares._component_columns``
+        # (WP-2116): a hump's closed form, a declared peak's difference of its
+        # own curve, and the whole-model FD for a tie reaching anything else.
+        # The exclusion is stated where the reach is claimed, next to the
+        # ``surface_roughness`` clause that exists for the mirror-image reason
+        # (an unstated *inclusion* costs a slow test, an unstated *exclusion*
+        # is the class of bug WP-1070 filed — a column that comes back
+        # **short** rather than raising).
         #
-        # Short is exactly what does not happen here, and that is checkable
-        # rather than hopeful: the whole-model FD writes ``J[:n_data, c]`` only,
-        # and a peak parameter's derivative on every row below the data block is
-        # *identically* zero — the P-spline penalty rows are w·D₂·c in the
-        # background *coefficients*, the Pawley rows are in the intensity block,
-        # and a restraint row is a function of coordinates and cell.  So the
-        # rows the FD leaves at their zero initialisation are the rows whose
-        # true value is zero, and the FD column is exact because it decodes
-        # through C like the residual does.
+        # Short is what the component routes cannot be, and that is checkable
+        # rather than hopeful: each writes ``J[:n_data, c]`` only, and a
+        # component parameter's derivative on every row below the data block
+        # is *identically* zero — the P-spline penalty rows are w·D₂·c in the
+        # background *coefficients*, the Pawley rows are in the intensity
+        # block, and a restraint row is a function of coordinates and cell.
+        # A tie can carry a column onto a background coefficient as well,
+        # and then the whole-model FD writes that coefficient's penalty rows
+        # from the penalty matrix (``bkg_part`` in ``_make_jacobian``).
         if path.startswith("instrument.extra_components."):
             return False
         # A *declared sharp peak* widens what two instrument names reach, and
@@ -4254,14 +4282,22 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                          or window_area_tol < WINDOW_AREA_TOL)
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
+    window = None
     if two_theta_limits is not None:
         lo, hi = two_theta_limits
         # inverted, it used to fail below as "fewer than 10 points" (WP-1986)
         check_interval("two_theta_limits", lo, hi)
-        mask &= (tt_all >= lo) & (tt_all <= hi)
+        window = (tt_all >= lo) & (tt_all <= hi)
+        mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
+    sigma_rule = pattern.sigma_rule(window)
     if len(tt) < 10:
-        raise ValueError("fewer than 10 points remain in the fit range")
+        why = ""
+        if sigma_rule.n_nonpositive_excluded:
+            why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+                   "because their σ is zero or below (nonpositive_sigma='exclude'), "
+                   "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+        raise ValueError(f"fewer than 10 points remain in the fit range{why}")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
     lams = tuple(line.wavelength.value for line in instrument.source.lines)
@@ -4690,6 +4726,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
+        sigma_rule=sigma_rule,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
@@ -4720,9 +4757,14 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     )
 
 
-def window_sizing(model: CompiledModel, values: dict[str, float]
-                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+def window_sizing(model: CompiledModel, values: dict[str, float],
+                  *, component: int = 0
+                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray] | None]:
     """Each phase's (windows, FCJ node counts, half-widths) sized at ``values``.
+
+    ``component`` picks the frozen family, as in :meth:`CompiledModel.phase_peaks`:
+    ``0`` the nuclear one every phase has, ``1`` the magnetic one (WP-1343),
+    whose entry is ``None`` for a phase that has no such family.
 
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
@@ -4746,10 +4788,16 @@ def window_sizing(model: CompiledModel, values: dict[str, float]
     tt = np.asarray(model.tt, dtype=np.float64)
     out = []
     for ip, cp in enumerate(model.phases):
-        win = np.zeros_like(cp.win)
-        fcj_n = np.zeros_like(cp.fcj_n)
-        halves = np.full(cp.win.shape[:2], np.nan)
-        for il, (pos, w1, w2, _) in enumerate(model.phase_peaks(ip, values)):
+        frozen_win, frozen_fcj = ((cp.win, cp.fcj_n) if component == 0
+                                  else (cp.win_mag, cp.fcj_n_mag))
+        if frozen_win is None:
+            out.append(None)
+            continue
+        win = np.zeros_like(frozen_win)
+        fcj_n = np.zeros_like(frozen_fcj)
+        halves = np.full(frozen_win.shape[:2], np.nan)
+        for il, (pos, w1, w2, _) in enumerate(
+                model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
             half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg

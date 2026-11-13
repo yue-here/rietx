@@ -287,13 +287,15 @@ def _answer(*candidates: CellCandidate) -> IndexingResult:
                               created_utc="2026-07-31T00:00:00Z"))
 
 
-def test_adopt_is_gated_on_best_or_none_server_side(served, client):
-    """The acceptance criterion: no UI path adopts what the gate refuses.
+def test_any_candidate_can_be_adopted_and_an_unpicked_one_records_why(
+        served, client):
+    """Yue's ruling B (2026-11-08, WP-2124): a person may adopt any candidate.
 
     The medium candidate is the *normal* real-data outcome
-    (``shift_allowance_assumed``), so this is the state the panel lives in —
-    the server's ``adopt`` arm must say no, and the route must refuse with the
-    same words, because the button and the route are one answer.
+    (``shift_allowance_assumed``), and on FAP nothing reaches ``high`` at all,
+    so a gate on Adopt left the right cell unreachable.  The gate is still
+    asked: the arm says the row is not its pick and why, and the adoption
+    writes the same sentence, grade and caveats included, into the node.
     """
     session, project, _ = served
     medium = _candidate("medium", ["shift_allowance_assumed"])
@@ -302,25 +304,33 @@ def test_adopt_is_gated_on_best_or_none_server_side(served, client):
 
     status, answer = client.get("/api/index/result")
     assert status == 200
-    assert answer["adopt"] == [{
-        "allowed": False,
-        "why": answer["adopt"][0]["why"],
-    }]
-    assert "medium" in answer["adopt"][0]["why"]
-    assert "best_or_none" in answer["adopt"][0]["why"]
+    why = answer["adopt"][0]["why"]
+    assert answer["adopt"] == [{"picked": False, "why": why}]
+    assert why == ("not best_or_none()'s pick: grade 'medium' "
+                   "(shift_allowance_assumed)")
 
-    status, refused = client.post("/api/index/adopt", {"candidate": 0})
-    assert status == 409
-    assert refused["error"]["code"] == "ADOPT_GATED"
-    assert "medium" in refused["error"]["message"]
+    status, adopted = client.post("/api/index/adopt", {"candidate": 0})
+    assert status == 200, adopted
+    assert adopted["picked"] is False
+    node = project.history.nodes[adopted["node_id"]]
+    assert node.action.kind == "edit_model"
+    assert node.label.startswith("adopted indexed cell 4.1568")
+    assert node.label.endswith(f"; {why}")
 
-    # two high candidates: still no singleton, still no adoption
+    # two high candidates: no singleton, so neither is the pick, and the
+    # sentence says why a `high` row was still not picked
     with session._cond:
         session._index_result = _answer(_candidate("high", []),
                                         _candidate("high", []))
     _, answer = client.get("/api/index/result")
-    assert [a["allowed"] for a in answer["adopt"]] == [False, False]
-    assert client.post("/api/index/adopt", {"candidate": 0})[0] == 409
+    assert [a["picked"] for a in answer["adopt"]] == [False, False]
+    assert answer["adopt"][1]["why"] == (
+        "not best_or_none()'s pick: grade 'high'; more than one candidate "
+        "reached 'high'")
+    status, adopted = client.post("/api/index/adopt", {"candidate": 1})
+    assert status == 200 and adopted["picked"] is False
+    assert project.history.nodes[adopted["node_id"]].label.endswith(
+        answer["adopt"][1]["why"])
 
 
 def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
@@ -329,11 +339,12 @@ def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
         session._index_result = _answer(_candidate("high", []))
 
     _, answer = client.get("/api/index/result")
-    assert answer["adopt"] == [{"allowed": True, "why": ""}]
+    assert answer["adopt"] == [{"picked": True, "why": ""}]
 
     head_before = project.refinement._head_id
     status, adopted = client.post("/api/index/adopt", {"candidate": 0})
     assert status == 200
+    assert adopted["picked"] is True
     assert adopted["api_call"] == "session.adopt_candidate(0)"
     assert adopted["node_id"] and adopted["node_id"] != head_before
     # a bare cell is a Le Bail scaffold: dummy atom, absence-free group, and
@@ -344,7 +355,9 @@ def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
     assert len(phase["atoms"]) == 1
     node = project.history.nodes[adopted["node_id"]]
     assert node.action.kind == "edit_model"
-    assert "adopted indexed cell" in (node.label or "")
+    # the gate's own pick carries no "not picked" sentence
+    assert node.label == ("adopted indexed cell 4.1568 4.1568 4.1568 Å "
+                          "(cubic, P m -3 m)")
 
 
 # ----------------------------------------------------------------------
@@ -681,9 +694,18 @@ def test_a_pattern_only_project_picks_peaks_indexes_adopts_and_only_then_fits(
         assert status == 404
         assert "no phase to draw yet" in no3d["error"]["message"]
 
-        # adopt the cell an indexing run found
+        # the extinction screen needs no phase: it fits its own Le Bail
+        # models from the candidate (WP-2124; WP-1207 had refused it here)
         with session._cond:
             session._index_result = _answer(_candidate("high", []))
+        status, frame = client.post("/api/index/extinction", {"candidate": 0})
+        assert status == 200, frame
+        frame = _wait_idle(client, timeout=180.0)
+        assert frame["run"]["status"] == "completed", frame
+        status, screened = client.get("/api/index/extinction")
+        assert status == 200 and screened["result"]["candidates"]
+
+        # adopt the cell an indexing run found
         status, adopted = client.post("/api/index/adopt", {"candidate": 0})
         assert status == 200, adopted
         assert adopted["mode"] == "lebail"
@@ -696,6 +718,87 @@ def test_a_pattern_only_project_picks_peaks_indexes_adopts_and_only_then_fits(
         frame = _wait_idle(client, timeout=180.0)
         assert frame["run"]["status"] == "converged", frame
         assert frame["run"]["rwp"] < 0.2, frame
+    finally:
+        session.close()
+        httpd.shutdown()
+        httpd.server_close()
+
+
+# ----------------------------------------------------------------------
+# the pick's three options reach the route (WP-2124)
+# ----------------------------------------------------------------------
+def test_the_pick_route_takes_the_range_and_the_contamination_marks(
+        tmp_path_factory, pattern_file):
+    """``pick_peaks``'s three options, through the wire, and kept by the list.
+
+    The route took ``shoulders`` alone: the range came from the project's fit
+    limits and ``flag_contamination`` was library-only (the GUI port's Pick
+    step offers all three).  The list records what it was picked with, and a
+    session opened later builds its editor from that record, not from the
+    project's limits, so a refit sees the detection the list came from.
+    """
+    structure, instrument = perturbed_models()
+    root = tmp_path_factory.mktemp("pick-opts") / "p.rex"
+    project = rx.Project.create(root, pattern=pattern_file,
+                                structure=structure, instrument=instrument)
+    session = GuiSession(project, state_dir=tmp_path_factory.mktemp("pick-st"))
+    httpd = build_server(session, port=0)
+    threading.Thread(target=httpd.serve_forever,
+                     kwargs={"poll_interval": 0.02}, daemon=True).start()
+    client = Client(httpd.server_address[1])
+    try:
+        # a bad range is refused in the project's own words, and named
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": [60, 20]})
+        assert status == 400, refused
+        assert refused["error"]["where"] == ["two_theta_range"]
+        assert "inverted" in refused["error"]["message"]
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": ["a", 20]})
+        assert status == 400 and "two numbers" in refused["error"]["message"]
+        # a range holding too few channels to pick in is the caller's, not a 500
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": [500, 600]})
+        assert status == 400, refused
+        assert refused["error"]["where"] == ["two_theta_range"]
+        # a flag is a boolean, never coerced: bool("false") would be True
+        for key in ("shoulders", "flag_contamination"):
+            status, refused = client.post("/api/peaks", {key: "false"})
+            assert status == 400, refused
+            assert refused["error"]["where"] == [key]
+
+        status, doc = client.post("/api/peaks", {
+            "two_theta_range": [20, 60], "shoulders": False,
+            "flag_contamination": False})
+        assert status == 200, doc
+        assert doc["api_call"] == (
+            "session.pick_peaks(shoulders=False, two_theta_range=(20, 60), "
+            "flag_contamination=False)")
+        assert doc["pick_options"] == {"two_theta_range": [20.0, 60.0],
+                                       "shoulders": False,
+                                       "flag_contamination": False}
+        tts = [p["two_theta"] for p in doc["peaks"]]
+        assert tts and 20.0 <= min(tts) and max(tts) <= 60.0
+        assert doc["two_theta_min"] >= 20.0 and doc["two_theta_max"] <= 60.0
+
+        # the `.rxt` quotes the same call
+        assert doc["api_call"] in client.get("/api/textdoc")[1]["text"]
+
+        # a fresh session (the app reopened) refits under the stored options
+        fresh = GuiSession(rx.Project.open(root),
+                           state_dir=tmp_path_factory.mktemp("pick-st2"))
+        try:
+            editor = fresh._peak_editor()
+            assert editor.two_theta_range == (20.0, 60.0)
+            assert editor.shoulders is False
+            assert editor.flag_contamination is False
+        finally:
+            fresh.close()
+
+        # the defaults still read as they always did
+        status, doc = client.post("/api/peaks", {})
+        assert doc["api_call"] == "session.pick_peaks(shoulders=True)"
+        assert doc["pick_options"]["flag_contamination"] is True
     finally:
         session.close()
         httpd.shutdown()

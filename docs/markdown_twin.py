@@ -29,6 +29,7 @@ from pathlib import Path as _Path
 
 from docutils import nodes as _nodes
 from sphinx import addnodes as _addnodes
+from sphinx.transforms import SphinxTransform as _SphinxTransform
 from sphinx.util.osutil import relative_uri as _relative_uri
 from sphinx_markdown_builder.contexts import IndentContext as _IndentContext
 from sphinx_markdown_builder.contexts import SubContextParams as _SubContextParams
@@ -62,13 +63,45 @@ def _without_raw(node: _nodes.Element) -> list:
     return [child for child in node.deepcopy().children if not isinstance(child, _nodes.raw)]
 
 
+#: The node attribute naming a heading slug that myst-parser added as an id.
+_SLUG_ID = "twin_slug_id"
+
+
+class _MarkSlugIds(_SphinxTransform):
+    """Mark each heading slug that myst-parser is about to add as an id.
+
+    From 5.2, myst-parser's `AddSlugIds` transform (priority 700) appends a
+    heading's anchor slug to its ids wherever no element has that id yet, so
+    `BACKGROUND_ORDER_AT_CAP` gains `background_order_at_cap` beside
+    `background-order-at-cap`.  A slug link resolves to the primary id, so
+    no link in the manual names the slug.  In a twin it was one more
+    `<a id>` line for each heading whose slug is not its id: 315 of them on
+    31 pages, which put `theory/estimation` over the 50 000-character cap.  This runs first,
+    while an id the slug repeats is still distinguishable from one the slug
+    adds, and `_normalise` drops what it marked.
+    """
+
+    default_priority = 699
+
+    def apply(self, **_kwargs) -> None:
+        for node in self.document.findall(_nodes.Element):
+            slug = node.get("slug")
+            if slug and slug not in self.document.ids:
+                node[_SLUG_ID] = slug
+
+
 def _normalise(doctree: _nodes.document) -> None:
     """Rewrite the nodes the markdown translator cannot write into ones it can.
 
     Every rewrite keeps the text a reader of the HTML page sees.  Only what is
     there for the browser goes: a dark figure that repeats its light twin, an
-    HTML comment, an icon, a radio button that switches tabs.
+    HTML comment, an icon, a radio button that switches tabs, and the id a
+    heading's slug added (`_MarkSlugIds`).
     """
+    for node in list(doctree.findall(lambda n: isinstance(n, _nodes.Element)
+                                     and _SLUG_ID in n.attributes)):
+        if node[_SLUG_ID] in node["ids"][1:]:
+            node["ids"].remove(node[_SLUG_ID])
     for node in list(doctree.findall(_nodes.raw)):
         text = node.astext().lstrip()
         if "html" in node.get("format", "").split() and text.startswith(("<!--", "<svg")):
@@ -342,6 +375,7 @@ def setup(app):
     # so its extension is loaded for them; the builder it adds is not used.
     app.setup_extension("sphinx_markdown_builder")
     app.connect("config-inited", _on_config_inited)
+    app.add_transform(_MarkSlugIds)
     # Late, so every other handler has finished with the doctree first.
     app.connect("doctree-resolved", _on_doctree_resolved, priority=900)
     app.connect("build-finished", _on_build_finished)

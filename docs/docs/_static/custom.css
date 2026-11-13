@@ -135,30 +135,47 @@ nav.bd-links p.bd-links__title,
 .bd-header .bd-header__inner {
   padding-top: 0;
   padding-bottom: 0;
+  min-height: var(--pst-header-height);
 }
 
 .bd-header .navbar-brand {
   padding: 0;
 }
 
+/* The lockup's lengths are `tokens.css`'s `--mark-*` (WP-2122), shared with the landing
+ * page's `.brand`.  They are in the wordmark's em, so the font-size sits on the link: on
+ * the `<p>`, the mark's em could not see it.  A box with no baseline of its own gets one
+ * at its bottom edge, so baseline alignment sets the svg on the text's baseline, and
+ * `--mark-drop` lowers it from there.
+ *
+ * pydata makes the brand the bar's height.  Baseline alignment would put the lockup at
+ * the top of that box, so the link takes its content's height and the bar centres it.
+ * The brand was all that gave the bar its height, so `.bd-header__inner` holds it. */
+.bd-header .navbar-brand.rietx-brand {
+  height: auto;
+}
+
 .rietx-brand {
   display: inline-flex;
-  align-items: center;
-  gap: 9px;
+  align-items: baseline;
+  gap: var(--mark-gap);
+  font-size: 1.05rem;
   color: var(--ink);
   text-decoration: none;
 }
 
 .rietx-brand .rietx-mark {
-  width: 22px;
-  height: 22px;
+  width: calc(32 * var(--mark-unit));
+  height: calc(32 * var(--mark-unit));
+  position: relative;
+  top: var(--mark-drop);
   flex: none;
   fill: var(--accent);
 }
 
 .rietx-brand .rietx-wordmark {
   font-family: var(--sans);
-  font-size: 1.05rem;
+  font-size: 1em;
   font-weight: 600;
   color: var(--ink);
   margin: 0;

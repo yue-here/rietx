@@ -227,6 +227,43 @@ bound, because $R^\top\mathbf{H}$ and $R^\top\mathbf{k}$ are images under the
 *same* $R$ and because reducing an arm of the star back into the first cell
 shifts the parent by a lattice vector.
 
+### A child's cell through its parent
+
+A child phase (a superstructure, a distortion, a magnetic supercell) is stated
+in a cell whose axes are $P$ applied to its parent's, $(\mathbf{a}', \mathbf{b}',
+\mathbf{c}') = (\mathbf{a}, \mathbf{b}, \mathbf{c})\,P$. Its metric is the
+parent's carried through $P$, plus the lattice strain the child's lower
+symmetry allows {cite}`campbell2006`:
+
+```{math}
+:label: pos-child-metric
+
+G' \;=\; P^{\top}\!\left(G_{\mathrm{p}} + 2\,L\,E\,L\right)P,
+\qquad E = \sum_j s_j E_j,
+\qquad L = \mathrm{diag}(a, b, c)\ \text{of the parent}.
+```
+
+{source}`rietx.crystallography.metric.child_metric`
+
+$G_{\mathrm{p}}$ is the parent's metric {eq}`pos-metric`, and the $E_j$ span the
+symmetric matrices that the child's point group leaves invariant and the
+parent's average removes, so a parent cell and a list of amplitudes $s_j$ name
+every metric the child's symmetry allows, once. The $E_j$ are orthonormal in the
+parent's Cartesian frame, so each $s_j$ is a dimensionless strain amplitude, and
+$E$ is the Green–Lagrange strain of that frame exactly, at any size. The six
+child parameters $(a', b', c', \alpha', \beta', \gamma')$ are then read off
+$G'$ and are outputs; the parent's cell and the amplitudes are what refines.
+With every $s_j = 0$ the child's metric is $P^{\top} G_{\mathrm{p}} P$.
+
+A real lattice needs $G'$ positive definite. Writing $G_{\mathrm{p}} = L\,C\,L$
+with $C$ the cosine matrix of the parent's angles, that holds exactly when
+$C + 2E$ is positive definite. A sufficient condition for any combination of the
+$n$ amplitudes is $|s_j| < \lambda_{\min}(C) / (2 n \lVert E_j \rVert_2)$, since
+$\lambda_{\min}(C + 2E) \ge \lambda_{\min}(C) - \lVert 2E \rVert_2$ (Weyl's inequality).
+A freed amplitude is bounded a relative {{ PARENT_STRAIN_PD_MARGIN }} inside that box, so the metric
+at the bound is still positive definite to working precision. A tighter bound
+on a strain is the caller's.
+
 ## The wavelength–cell degeneracy
 
 {eq}`pos-bragg` reaches the wavelength only through the ratio $\lambda/2d$, so

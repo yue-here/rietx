@@ -1282,10 +1282,23 @@ def test_the_site_draws_one_mark():
     are held to it: one mark, never redrawn.  Compared on the drawn shapes rather
     than the bytes, since the favicon carries a `<style>` and the headers take
     their fill from the page.  An SVG loaded as an icon reads no CSS variable, so
-    the favicon spells its two fills, and they are `--accent` in `tokens.css`."""
+    the favicon spells its two fills, and they are `--accent` in `tokens.css`.
+
+    The favicon must first parse as XML, because a browser loading an SVG as an
+    image draws nothing for one that does not, and the regexes below read it
+    either way.  A `--accent` in its comment kept every browser from drawing it
+    from WP-2021 to WP-2122 while this test passed."""
+    from xml.etree import ElementTree
+
     from tests.test_landing import site_tokens
 
     favicon = (LANDING_SRC / "favicon.svg").read_text(encoding="utf-8")
+    try:
+        ElementTree.fromstring(favicon)
+    except ElementTree.ParseError as err:
+        raise AssertionError(
+            f"docs/landing/src/favicon.svg is not XML ({err}), so no browser draws it; "
+            "an XML comment may not hold a double hyphen") from None
     shapes = SVG_SHAPES.findall(favicon)
     assert shapes, "no drawn shape in docs/landing/src/favicon.svg — has the mark moved?"
     # The mark is the 32-unit drawing; the theme button beside it draws on 24.
@@ -1686,6 +1699,69 @@ def test_the_twin_writes_every_node_type_the_old_tree_uses(tmp_path):
     anchor = re.search(r"\]\(#([\w-]+)\)", twin.split("cites", 1)[1])[1]
     entry = twin.split(f'<a id="{anchor}"></a>', 1)[1].lstrip()
     assert re.match(r"\*\*\[\w+\]\*\* \S.*1969", entry), entry
+
+
+#: Headings whose GitHub-style slug is not their docutils id: a code name
+#: (`_` kept), an accented letter (kept) and an apostrophe (dropped, where
+#: docutils writes a hyphen).  A second page links them by slug and by label.
+_SLUG_PAGE = """\
+# Slugs
+
+The page holds three headings.
+
+## `BACKGROUND_ORDER_AT_CAP`
+
+Text.
+
+## Bérar-Lelann inflation
+
+Text.
+
+(a-label)=
+## The stage's parameters
+
+Text.
+"""
+
+
+def test_a_twin_carries_no_anchor_a_heading_slug_added(tmp_path):
+    """myst-parser 5.2 adds each heading's slug as an id where no element has
+    it, and the twin writes a section's every id as an anchor, so a twin grew
+    a line for each heading whose slug is not its id.  The twin keeps the ids
+    its links use and drops the slugs; the HTML keeps both."""
+    from importlib.metadata import version
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "index.md").write_text(_SLUG_PAGE, encoding="utf-8")
+    (src / "links.md").write_text(
+        "---\norphan: true\n---\n# Links\n\nThe page links [the code](index.md#background_order_at_cap),"
+        " [the inflation](index.md#bérar-lelann-inflation),"
+        " [the stages](index.md#the-stages-parameters) and {ref}`the label <a-label>`.\n",
+        encoding="utf-8")
+    (src / "conf.py").write_text(
+        "import sys\n"
+        f"sys.path.insert(0, {str(DOCS_TREE.parent)!r})\n"
+        "extensions = ['myst_parser', 'markdown_twin']\n"
+        "myst_heading_anchors = 3\n"
+        "project = 'slugs'\n",
+        encoding="utf-8")
+    out = tmp_path / "html"
+    result = subprocess.run([sys.executable, "-m", "sphinx", "-W", "-q", "-E", "-b", "html",
+                             str(src), str(out)], capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stderr
+    twin = (out / "index.html.md").read_text(encoding="utf-8")
+    html = (out / "index.html").read_text(encoding="utf-8")
+    slugs = ["background_order_at_cap", "bérar-lelann-inflation", "the-stages-parameters"]
+    if tuple(int(p) for p in version("myst-parser").split(".")[:2]) >= (5, 2):
+        # The build added them, so the absence below is the twin's doing.
+        assert [s for s in slugs if f'id="{s}"' not in html] == [], html
+    anchors = re.findall(r'<a id="([^"]*)"></a>', twin)
+    assert [s for s in slugs if s in anchors] == [], twin
+    assert {"background-order-at-cap", "berar-lelann-inflation", "a-label"} <= set(anchors)
+    links = re.findall(r"\]\(index\.html\.md#([^)]+)\)",
+                       (out / "links.html.md").read_text(encoding="utf-8"))
+    assert len(links) == 4 and set(links) <= set(anchors), (links, anchors)
 
 
 # ----------------------------------------------------------------------

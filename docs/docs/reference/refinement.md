@@ -399,7 +399,7 @@ assert spec.correlation_guard == plan.correlation_guard
 
 `PlanSpec.from_plan` and `PlanSpec.to_plan` convert a plan, and `StageSpec.from_stage` and `StageSpec.to_stage` a stage.
 `PlanSpec.stages` is a list of `StageSpec`.
-A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
+A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.turn_off`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
 `PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes` and `PlanSpec.phase_support_sigma` carry the plan's four settings.
 
 Anything that takes one of the pair takes the other.
@@ -557,8 +557,8 @@ At 50σ the phase read 3.7σ at the answer, and the cell stayed where it started
 
 `StageResult.n_constraint_truncations` counts the steps the default `lm` driver held on a linear inequality.
 Each such step crossed an inequality when solved for the bounds alone, and was solved again over the bounds and the inequalities together.
-Three constraints are inequalities: the Stephens strain cone, the positivity of a spherical-harmonics texture, and the floor on the Gaussian width at every reflection.
-The count is 0 under `solver="trf"`, which has no inequalities, and in a joint fit.
+The inequalities are the Stephens strain cone, texture positivity, the Gaussian and Lorentzian width floors, and a tied parameter's own bounds.
+The count is 0 under `solver="trf"`, which has no inequalities.
 Nonzero in the last stage, it also raises [`CONSTRAINT_ACTIVE`](diagnostics-refinement.md#constraint_active), because the answer sits on or near a constraint.
 
 `StageResult.n_degenerate_cell_probes` counts trials, never the answer.
@@ -606,7 +606,7 @@ Each kind has one constructor, so each format string is written once:
 | `GuardFinding.correlation` | `HIGH_CORRELATION` | two free parameters correlate above the plan's `correlation_guard` | ρ |
 | `GuardFinding.flat_direction` | `FLAT_DIRECTION` | a correlated pair reaches \|ρ\| = 1.000 to the three decimals the message prints, so the data do not separate them | ρ |
 | `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so each esd is at least √2 too small | the number of directions |
-| `GuardFinding.at_bound` | `BOUND_HIT`, or `FLOOR_HIT` on a lower bound at 0 | a bound carried load at the answer | the residual's cosine with the column, or `None` where no solve stood behind the test |
+| `GuardFinding.at_bound`, `GuardFinding.tied_at_bound` | `BOUND_HIT`, or `FLOOR_HIT` on a lower bound at 0 | a bound carried load at the answer, on a free or a tied parameter | the residual's cosine with the column, or `None` |
 | `GuardFinding.background_absorption` | `BACKGROUND_ABSORPTION` | the background could largely reproduce a structural parameter's column | the block R² |
 | `GuardFinding.roughness_absorption` | `ROUGHNESS_ABSORPTION` | the surface-roughness correction could | the block R² |
 | `GuardFinding.nonpositive_adp` | `ADP_NOT_POSITIVE_DEFINITE` | an anisotropic displacement tensor is not positive definite | the smallest eigenvalue |

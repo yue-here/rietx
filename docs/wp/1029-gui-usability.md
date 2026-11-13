@@ -409,6 +409,46 @@ the screenshot that prompted it, taken again.
 - `gui/src/panels/Console.svelte` — the drag-resize precedent.
 - `viz/` — the residual and scaling choices the PNG exports already make.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**Usability** (WP-1029, `gui/src/lib/{resize,theme,plot}.ts`,
+`panels/Splitter.svelte`, `gui/structure3d.py`) is the pass that made the eleven
+correct panels one program, and its findings are rules rather than repairs.
+**A stored size is not a settled size**: a drag clamps against the extent it
+happens in, and nothing clamps a width that outlives its window — so
+`fitColumns` re-clamps at *render* (widths chosen at 1500 px reopened at 1000 px
+left the 3D column 24 px wide). The splitter itself carries `Console.svelte`'s
+rule generalised — **report a size, never write one**, `onsize(size, done)`,
+persisted to `ProjectDoc.ui` on the verb — with an `inline` flow because an
+absolute grip inside `overflow: auto` scrolls away from the edge it is meant to
+be. **Distinguishability is a property of the set being drawn**: `_CPK` is an
+element table, `phase_palette` decides what a *picture* uses, anchoring the
+famous CPK assignments and rotating the rest in **OKLab** hue at constant L and
+C — sRGB has no distance, and F `#48d860` against Ca `#40c060` (both in NAC) is
+0.070 apart against a 0.13 floor. Placement is anchors → table → derived, so the
+hue nobody chose is the one that moves. **An exaggeration is not a
+probability** — k(p) = √χ²₃(p) diverges as p → 1, so `caption()` states the
+level and the multiplier separately or the picture claims a surface it is not
+drawing — and **a stick knows which mode it is drawn in**: `stickRadius` returns
+half the smallest semi-axis in ellipsoid mode (0.080 Å ball → 0.065 at p = 0.5 →
+0.032 at p = 0.1, where the fixed stick had been *wider than the atom*), which
+turns the bond cylinder's uncapped ray-cast (`gl3d.ts`, open at the ends) into a proof. The theme is
+three-way and resolved **once**, stamped as `data-theme` on the root, because
+"follow the system" is a choice and not the absence of one; CodeMirror's chrome
+must be an `EditorView.theme` rather than a stylesheet rule, since CM injects
+its own as `.ͼ1 .cm-gutters` and wins on specificity. The curves route sends
+**three** residuals and a `weighted` flag: two are derivable in a client and
+`cumulative_chi2` is not, because it is summed over every fitted channel, and a
+zoom re-bases that one sum (`rxplot.chi2Base`) rather than summing what it
+holds. A chart is sized by the `ResizeObserver` the chart module keeps on its
+host (`rxplot.panes`), because uPlot has no autosize: a panel sizes the host
+and never the chart.
+
 ## Handover log
 
 - **2026-07-30** — created from a user's list after driving the shipped GUI,

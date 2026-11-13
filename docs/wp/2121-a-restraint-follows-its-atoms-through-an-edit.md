@@ -1,9 +1,8 @@
 # WP-2121 — A restraint follows its atoms through an edit
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — every task landed; the PR is open for review, and three decisions wait for the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-09 — every task landed (PR #1463, merged 2026-11-08); the three questions under *Next* are answered, and labels as atom keys, the renumbering record and the construction checks move to WP-2140
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-08 — a silent wrong answer on a path few fits run: an edit that reorders atoms leaves a bond restraint on two other atoms, and the next fit pulls them to the old target with nothing said
 
 ## Goal
 
@@ -102,6 +101,60 @@ never by a bare `IndexError` at the next fit.
 - #1264 and WP-1991: the same defect for holds and ties, and the tie-drop warning this one matches.
 
 ## Handover log
+
+### 2026-11-09 (2nd session) — the three questions answered; the WP closes
+
+The maintainer answered the question that mattered most: atoms are to be named by label
+everywhere, and labels must be unique. That ends the defect class this WP patched, because an
+atom's label does not change when the list is reordered. The two smaller questions were settled
+under written rules and fold into the same new WP, WP-2140. Every task here landed, so the WP
+closes. Next: WP-2140's first task, the assessment of label dot-paths.
+
+*The answers*, one per question under the previous entry's *Next*.
+
+- **Item 3, whether restraints name atoms by label.** Ruled by Yue 2026-11-09: "labels for
+  everything, and make sure they're unique". Asked whether that includes parameter dot-paths
+  (`phases.0.atoms.3.biso` read as `phases.0.atoms.O1.biso` in plans, holds, ties and saved
+  histories), Yue answered: "yes, if this is the clear way to remedy this defect". That makes
+  the remedy itself a question WP-2140 answers first, by measurement. It comes back to Yue only
+  if the answer is not clear.
+- **Item 2, whether the renumbering records that it fired.** Settled by Claude under DESIGN.md
+  Rule 1 and Rule 4 (an automatic action records that it fired), and under the reader rule that a
+  repair is made only where it can say it did. The first settlement filed it as its own WP. It
+  now folds into WP-2140: label keys remove the renumbering for every reference that moves to a
+  label, and whatever keeps an index still owes the record. The maintainer may reverse this.
+- **Item 4, whether construction checks tether, anti-bump and value-path atoms.** Settled by
+  Claude under Yue's ruling that old files must always open (2026-08-21, the compatibility
+  promise): yes when a new structure is built; a saved history holding such a node opens with a
+  warning and is never refused. Folded into WP-2140, since a label's existence is the same check.
+  The maintainer may reverse this.
+- **Item 5, the follow-ups.** Each moves to WP-2140 after the fold check (no open WP owns atom
+  keys; WP-1965's "subset by label" is a parametric glob, not a key). (a) An edit given the very
+  object `ref.structure` renumbers nothing: label keys dissolve it for every reference that moves
+  to a label, and WP-2140 checks what is left. (b) A restraint's `op_index` is not re-read when
+  an edit moves its atom onto or off a special position: a label does not fix it, so it is a
+  WP-2140 task. (c) The GUI refuses a structure upload that removes a restrained atom, where
+  `edit()` drops the restraint with a warning: WP-2140's construction check decides one
+  behaviour for both. (d) Re-running the generality judge on the prefix rule is moot where
+  restraints move to labels, and WP-2140 runs it if any restraint keeps an index.
+
+*Done.* Status line closed (✅), `Priority:` line deleted, narrative moved to the v1.12 record.
+No code or test changed. Bookkeeping PR: #1513.
+
+### 2026-11-09 — bookkeeping: PR #1463 merged, and the WP stays open
+
+The fix is on main. PR #1463 merged on 2026-11-08 at 14:00 UTC as `527048aa4`, so a restraint
+follows its atoms through an edit in every build from that commit on. The status line still said
+the PR was open, and now records the merge. The WP stays open. Three of the decisions under the
+previous entry's *Next* are the maintainer's, and none has been made.
+
+*Done.* Status line synced to the tree: `git branch -r --contains 527048aa4` names `origin/main`,
+and `gh pr view 1463` reads `MERGED`. No code, test or other WP changed. Bookkeeping PR: #1500.
+
+*Next*, in order. Item 1 of the previous *Next* (review and merge) is done. Items 2-4 wait for the
+maintainer: whether the renumbering records that it fired, whether restraints name atoms by label,
+and whether construction checks tether, anti-bump and value-path atoms. Item 5's follow-ups each
+become a WP after the fold check. The WP closes once the three decisions are answered.
 
 ### 2026-11-08 (2nd session) — the review's two refusal messages
 

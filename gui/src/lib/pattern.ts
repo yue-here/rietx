@@ -14,6 +14,7 @@ import "uplot/dist/uPlot.min.css";
 import { pattern, unpack, vlines, type Curves, type Pattern } from "rxplot";
 
 import { api } from "../api";
+import { channelIndex } from "./interactive";
 import { joinCurves, type GroupCurve, type PeakRow } from "./peaks";
 import {
   curveColors,
@@ -100,6 +101,10 @@ export class PatternChart {
   /** What the raw view's residual was last built from, so a repaint rebuilds it only when that moved. */
   private residualKey: unknown[] = [];
   private ringAt: number | null = null;
+  /** The preview drawn over the last fit (WP-2128): its model on the last
+   *  fit's channels, and those channels' 2θ, or null while there is none. */
+  private previewOn: { tt: Float64Array; last: ArrayLike<number>; calc: Float64Array } | null = null;
+  private preview: Curves | null = null;
   private readonly ringEl: HTMLDivElement;
 
   constructor(host: HTMLElement, curves: Curves, overlay: Overlay, opts: ChartOptions) {
@@ -113,7 +118,11 @@ export class PatternChart {
     this.fig = pattern(uPlot, host, curves, {
       // before a fit the lower pane is the peak groups' own residual, which
       // wears the peak layer's ink (WP-1210), as its row in the strip does
+      // while a preview is drawn over a fit the model's own series keeps its
+      // place in the y range and paints nothing: the layer draws the last fit
+      // dashed and the preview solid, so the scale stays the last fit's
       colors: () => ({ ...this.colors, masked: this.colors.edge,
+                       calc: this.previewOn ? "rgba(0, 0, 0, 0)" : this.colors.calc,
                        diff: this.curves.header.fit ? this.colors.diff : this.colors.peakfit }),
       y: Y[opts.scale],
       residual: opts.kind,
@@ -122,7 +131,7 @@ export class PatternChart {
       rawResidual: () => this.groupResidual(),
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
-                over: [(u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
+                over: [(u) => this.previewLines(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
         ticks: { under: [shade] },
         resid: { under: [shade] },
       },
@@ -140,7 +149,55 @@ export class PatternChart {
   /** A new payload. `keep` holds the reader's view, as a run landing should. */
   setCurves(curves: Curves, keep: boolean): void {
     this.curves = curves;
-    this.fig.setCurves(curves, keep);
+    if (this.preview) this.setPreview(this.preview, keep);
+    else this.fig.setCurves(curves, keep);
+  }
+
+  /**
+   * Draw `preview`, the curves at values nobody has applied, over the last fit,
+   * or take it off with null (WP-2128). The view and every y range are kept, so
+   * the comparison is at the last fit's scale (ruled 2026-11-07).
+   *
+   * The preview answers every channel the next fit would fit; it is drawn on
+   * the channels this payload carries, found by their 2θ (`channelIndex`), so
+   * past `CURVES_CEILING` it is decimated onto the curves route's own choice.
+   * The residual pane shows the preview's residuals and the tick band its
+   * ticks, both the route's. Before any fit there is no last fit to compare
+   * with, and the preview is drawn as the model.
+   */
+  setPreview(preview: Curves | null, keep = true): void {
+    this.preview = preview;
+    const base = this.curves;
+    if (!preview) {
+      this.previewOn = null;
+      this.fig.setCurves(base, keep);
+      return;
+    }
+    const tt = base.arrays.two_theta, pv = preview.arrays;
+    const header = { ...base.header, ticks: preview.header.ticks ?? {},
+                     tick_hkl: preview.header.tick_hkl ?? {} };
+    if (!base.header.fit) {
+      const at = channelIndex(tt, pv.two_theta), hit: number[] = [];
+      at.forEach((i, q) => { if (i >= 0) hit.push(q); });
+      const pick = (a: ArrayLike<number>) => Float64Array.from(hit, (q) => a[q]);
+      this.previewOn = null;
+      this.fig.setCurves({ header: { ...header, fit: true }, arrays: {
+        ...base.arrays, fitted: Int32Array.from(hit, (q) => at[q]),
+        y_calc: pick(pv.y_calc), y_background: pick(pv.y_background), delta: pick(pv.delta),
+        delta_raw: pick(pv.delta_raw), cumulative_chi2: pick(pv.cumulative_chi2) } }, keep);
+      return;
+    }
+    const fitTT = Float64Array.from(base.arrays.fitted, (i) => tt[i]);
+    const at = channelIndex(pv.two_theta, fitTT);
+    const pick = (a: ArrayLike<number>) => Float64Array.from(at, (j) => (j < 0 ? NaN : a[j]));
+    // a running sum has a value at a channel the preview does not fit: the sum
+    // so far. A NaN there would make every zoom's re-based Σχ² past it NaN
+    let sum = 0;
+    const cum = Float64Array.from(at, (j) => (sum = j < 0 ? sum : pv.cumulative_chi2[j]));
+    this.previewOn = { tt: fitTT, last: base.arrays.y_calc, calc: pick(pv.y_calc) };
+    this.fig.setCurves({ header, arrays: {
+      ...base.arrays, delta: pick(pv.delta), delta_raw: pick(pv.delta_raw),
+      cumulative_chi2: cum } }, keep);
   }
 
   /** New layer inputs; a repaint, never a refetch. */
@@ -232,6 +289,33 @@ export class PatternChart {
         ctx.stroke();
       }
     }
+    ctx.restore();
+  }
+
+  /** The last fit dashed and the preview solid, in the model's one ink: the
+   *  state rides on the mark, never on a second colour (WP-1210). */
+  private previewLines(u: any): void {
+    const on = this.previewOn;
+    if (!on || this.overlay.hidden.includes("calc")) return;
+    const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
+    const trace = (ys: ArrayLike<number>, width: number, dash: number[]) => {
+      ctx.strokeStyle = this.colors.calc;
+      ctx.lineWidth = width * dpr;
+      ctx.setLineDash(dash.map((d) => d * dpr));
+      ctx.beginPath();
+      let pen = false;
+      for (let q = 0; q < on.tt.length; q++) {
+        const x = on.tt[q], y = ys[q];
+        if (x < min || x > max || !Number.isFinite(y) || (log && !(y > 0))) { pen = false; continue; }
+        const X = u.valToPos(x, "x", true), Y = u.valToPos(y, "y", true);
+        if (pen) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
+        pen = true;
+      }
+      ctx.stroke();
+    };
+    ctx.save();
+    trace(on.last, 1, [4, 3]);
+    trace(on.calc, 1.4, []);
     ctx.restore();
   }
 
