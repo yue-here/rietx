@@ -71,7 +71,7 @@ or automatic action.
   maintainer's #1121 comment, and say the entry was written from that comment.
 - [ ] Stage order: `staged.py`'s `turn_off` comment and practice.md's rietx row ground the order
   on free-then-fix, with GSAS-II's source as agreement and its docs' silence noted.
-- [ ] `_audit.py` carry row: cite the GSAS-II SeqRefine tutorial for `Copy2Next` once its wording
+- [x] `_audit.py` carry row: cite the GSAS-II SeqRefine tutorial for `Copy2Next` once its wording
   is checked.
 - [ ] Tests: `tests/test_docs_consistency.py`, `tests/test_audit_table.py`, ruff.
 - [ ] Skill: none. Nothing here changes how an agent drives rietx.
