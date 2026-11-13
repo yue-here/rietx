@@ -301,6 +301,12 @@ What the table says:
 - [ ] Decision (maintainer): the design, the floor's value and its tier, from
       the brief tasks 1-4 produce. Recorded here as `Decided YYYY-MM-DD:` and
       answered on #1291.
+      *Ruled by Yue 2026-11-13: option (B), an intensity floor tried as a
+      retry only when the full list's search gives no answer. The trigger
+      ("no answer") is measured first, and must not fire on correct runs
+      whose candidates are all `low`, such as SRM 660c. If no trigger
+      separates, the fallback ((C) plus a printed suggestion) is not ruled
+      and comes back to Yue.* The floor's value is still open.
 - [ ] Build what the decision picks, with its `_audit` row and any
       `INDEXING_THRESHOLDS_VERSION` move.
 - [ ] Reader-output diff: `str(IndexingResult)` on the acceptance rows before
