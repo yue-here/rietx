@@ -180,6 +180,8 @@ PR #1541 also fixes issue #1448, as ruled 2026-11-13 under the triage of PR #147
 
 `origin/main` (about 80 commits) merged into the branch without a conflict.
 
+*Measured* on the merged tree (`ff57cfef5`), `[dev]` venv, arm64 Mac, through ghostshift's serial lock: the fast selection (`-m "not slow"`) ran 14 616 passed, 429 skipped, 32 xfailed, 0 failed, in 28:42 wall. `python -m tests.reader_output` exited 0, unchanged against `origin/main`. ruff is clean. Vale reports 0 errors at warning level on `docs/docs` and the tutorial prose.
+
 *Next*: unchanged from the 2026-11-12 entry.
 
 ### 2026-11-12 — the σ ≤ 0 rule and its record field land (PR #1541, ghostshift runner)
