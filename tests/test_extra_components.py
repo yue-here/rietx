@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import sys
 import typing
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -75,6 +76,8 @@ from rietx.strategy.staged import (
     check_hump_width,
 )
 from tests.test_schemas import make_lab6
+
+OUT = Path(__file__).parent / "output"
 
 WAVELENGTH = 1.5405929
 PEAK_PATHS = tuple(f"instrument.extra_components.0.{n}"
@@ -2216,6 +2219,127 @@ def test_a_declared_peak_the_data_cannot_see_says_so():
     assert rows["area"].value == 0.0 and rows["area"].at_bound is True
     assert rows["area"].stderr is not None and rows["area"].stderr > 0.0
     assert rows["center"].stderr is None          # unmeasured, not precise
+
+
+@pytest.mark.parametrize("area, lo, floored, fires", [
+    (1e-6, 0.0, True, True),      # TRF's stopping point, the floor carried load
+    (1e-6, 0.0, False, False),    # the same number, the bound test declined
+    (0.0, 0.0, False, True),      # stored as zero reads as zero
+    (-2.0, -5.0, False, True),    # off below its identity, not "at" a bound
+    (5.0, 5.0, False, False),     # on a positive bound: BOUND_HIT, counts remain
+])
+def test_no_intensity_is_the_bound_tests_floor_and_not_a_distance(
+        area, lo, floored, fires):
+    """WP-2141: ``EXTRA_PEAK_NO_INTENSITY`` reads ``FLOOR_HIT``.
+
+    The default LM driver lands a floored area on 0.0.  ``solver="trf"``
+    stops strictly inside the box, so a distance window of the function's
+    own could disagree with the finding beside it.  The rule is pinned here
+    directly, on numbers no solver chose.
+    """
+    from rietx.refine import _extra_peak_diagnostics
+
+    peak = make_peak(center=40.0, span=0.4, area=Parameter(
+        value=area, min=lo, vary=True, unit="counts*deg"))
+    _s, _i, _d, table, model = _peak_state(peak)
+    values = table.decode(table.x0())
+    area_path = "instrument.extra_components.0.area"
+    floors = {area_path} if floored else set()
+
+    found = _extra_peak_diagnostics(model, values, {}, table, floors=floors)
+    assert [d.code for d in found] == (
+        ["EXTRA_PEAK_NO_INTENSITY"] if fires else [])
+
+
+def _floor_plan() -> PlanSpec:
+    """Scale and background, then the declared area alone, stopped early.
+
+    The area stage stops at ``ftol=1e-5`` with no closing stage after it.
+    Converged at the default 1e-9, TRF lands the area within 1e-19 of zero,
+    inside the ``BOUND_HIT_RTOL`` distance the pre-WP-2141 code used, so a
+    test at the default could not tell the two rules apart.  Stopped here,
+    TRF leaves the area near 2e-5 counts·deg (macOS arm64): far above that
+    distance, and far below the hundredth of an esd (about 0.008) inside
+    which the bound test names a floor.
+    """
+    return PlanSpec(stages=[
+        StageSpec(name="scale_bkg",
+                  turn_on=["phases.*.scale", "instrument.background.*"]),
+        StageSpec(name="area", ftol=1e-5,
+                  turn_on=["instrument.extra_components.0.area"])],
+        closing_window_tol=None)
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_either_driver_reports_a_declared_peak_on_its_floor(solver):
+    """WP-2141 end to end, single fit and its replay.
+
+    Only the area is freed.  The peak sits on a LaB6 line the phase already
+    fits, so the fit drives the area to its floor of zero.  Where TRF stops
+    above that floor moves with platform libm, so the test pins the decision.
+    The code fires exactly where the area is stored at or below zero or
+    ``FLOOR_HIT`` names it, and a replay of the node reads the recorded
+    finding the same way.  ``_floor_plan`` says why its stage stops early.
+    """
+    from rietx.refine import replay
+
+    structure, ins, data, _strong = _clean_lab6()
+    ins_fit = ins.model_copy(deep=True)
+    ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
+    ref = rx.Refinement(structure.model_copy(deep=True), ins_fit,
+                        solver=solver)
+    result = ref.fit(data, plan=_floor_plan())
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / f"wp2141_peak_floor_{solver}_fit.png")
+    again = replay(ref.history, ref.history.order[-1], data)
+
+    area_path = "instrument.extra_components.0.area"
+    for res in (result, again):
+        area = next(p.value for p in res.parameters if p.path == area_path)
+        floors = {p for d in res.diagnostics if d.code == "FLOOR_HIT"
+                  for p in d.where}
+        fired = any(d.code == "EXTRA_PEAK_NO_INTENSITY"
+                    for d in res.diagnostics)
+        assert fired == (area <= 0.0 or area_path in floors), (solver, area)
+    assert any(d.code == "EXTRA_PEAK_NO_INTENSITY" for d in result.diagnostics)
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
+    """WP-2141: the joint fit runs its bound test before the per-histogram
+    diagnostics, so each histogram's declared peak reads that histogram's
+    ``FLOOR_HIT`` (``multi._hist_floors``).
+
+    The peak sits on a LaB6 line the phase already fits.  On seed 1 the phase
+    takes every count there, so the area goes to its floor.  Seed 2's noise
+    leaves a small excess, which the area fits at a free optimum (0.84
+    counts·deg against an esd near 0.8 on macOS arm64).  So one histogram
+    fires and the other does not, and each answers for itself.
+    ``_floor_plan`` says why its stage stops early.
+    """
+    structure, ins, data_a, _ = _clean_lab6(seed=1)
+    _s, _i, data_b, _ = _clean_lab6(seed=2)
+    ins_fit = ins.model_copy(deep=True)
+    ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
+    joint = rx.refine_multi(
+        [data_a, data_b], structure.model_copy(deep=True),
+        [ins_fit, ins_fit.model_copy(deep=True)], solver=solver,
+        plan=_floor_plan())
+    OUT.mkdir(exist_ok=True)
+    for h in range(len(joint.histograms)):
+        joint.for_histogram(h).plot(
+            OUT / f"wp2141_peak_floor_{solver}_joint_h{h}.png")
+
+    floors = {p for d in joint.diagnostics if d.code == "FLOOR_HIT"
+              for p in d.where}
+    fired = []
+    for h, hist in enumerate(joint.histograms):
+        scoped = f"hist.{h}.instrument.extra_components.0.area"
+        area = next(p.value for p in joint.parameters if p.path == scoped)
+        fired.append(any(d.code == "EXTRA_PEAK_NO_INTENSITY"
+                         for d in hist.diagnostics))
+        assert fired[h] == (area <= 0.0 or scoped in floors), (solver, h, area)
+    assert fired == [True, False], solver
 
 
 def test_a_declared_peak_on_a_predicted_line_is_named_as_a_degeneracy():

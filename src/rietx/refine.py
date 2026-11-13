@@ -11,7 +11,7 @@ import subprocess
 import time
 import tomllib
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -9363,7 +9363,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
     tested = set(table.free_paths) | on_bound if guard is not None else set()
     # the FLOOR_HIT half of the same findings, read by the microstructure
-    # block below (WP-1914).  With no guard (``replay``) the recorded
+    # block (WP-1914) and the declared-peak diagnostics (WP-2141) below.
+    # With no guard (``replay``) the recorded
     # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
     # them below, so the table cannot contradict a warning the result carries.
     # A tied width the LM step held on its own floor is named here directly
@@ -9617,9 +9618,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
     # reflection" is asked against the same predicted positions Layer 0 uses,
-    # and the two must not disagree about where the model puts a line.
+    # and the two must not disagree about where the model puts a line.  "On
+    # its floor" is the bound test's ``floors`` above, never a distance of its
+    # own (WP-2141).
     diagnostics = diagnostics + _extra_peak_diagnostics(
-        model, values, ticks, table)
+        model, values, ticks, table, floors=floors)
 
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
@@ -10570,7 +10573,8 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
 
 
 def _extra_peak_diagnostics(model: CompiledModel, values: dict,
-                            ticks: dict, table) -> list[Diagnostic]:
+                            ticks: dict, table, *,
+                            floors: Collection[str]) -> list[Diagnostic]:
     """The two things a declared sharp peak is owed (WP-1103).
 
     Both **report and gate nothing.**  Declaring a peak the phases cannot
@@ -10593,18 +10597,26 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
     item 13, one rank down, and the position it reports is a walk rather than a
     measurement.  Said in the vocabulary the peak list already chose for this
     fact (``no_intensity`` in ``PEAK_UNUSABLE_FLAGS``) rather than in a second
-    one, and tested with ``BOUND_HIT_RTOL``, the distance of the
-    refinement's own bound test where no solve stands behind it
-    (``staged.bound_findings``, which reads the driver's exact active set or
-    a conjunction where it has a solve, WP-1434 and WP-1929) rather than a
-    second constant.
+    one.
+
+    "On its zero bound" is the package's one bound test, read rather than
+    restated (WP-2141).  ``floors`` holds the paths whose ``FLOOR_HIT`` fired
+    in the answer-producing stage, closed over ties by
+    :func:`~rietx.model.microstructure.floored_paths`.  That finding comes
+    from ``staged.bound_findings``, which reads the driver's exact active set
+    or a conjunction of distance and residual angle (WP-1434, WP-1929).  The
+    default LM driver lands a floored area on 0.0.  ``solver="trf"`` keeps its
+    iterates strictly inside the box, so a stopping point a hair above zero
+    still reads as no intensity when the bound test says the floor carried
+    load.  An area at or below zero reads so too, which covers a stated lower
+    bound below zero.  A positive lower bound is ``BOUND_HIT``, never this
+    code: an area held there still puts counts in the pattern.
 
     This is the honest evidence for "the peak was not needed", and it is not an
     Rwp comparison — which the package forbids as a correction's evidence for
     the reason ``docs/milestones/v0.5.md`` records.
     """
     from .report.layer0 import LAYER0_MATCH_TOL_DEG
-    from .strategy.staged import BOUND_HIT_RTOL
 
     out: list[Diagnostic] = []
     if not model.peak_components:
@@ -10634,18 +10646,11 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
             # refinement to report on nor a degeneracy to warn about.
             continue
 
-        entry = (table.entries[table._paths[area_path]]
-                 if area_path in table._paths else None)
-        lo = entry.lo if entry is not None else 0.0
-        # ``BOUND_HIT_RTOL`` is scipy's own test and ``bound_findings``'
-        # fallback, imported rather than restated so the two cannot drift
-        # apart on what counts as *at* a limit.  The ``<= 0`` clause beside
-        # it covers an area whose stated lower bound is below zero, which is
-        # off at its identity without being "at" that bound.
-        at_zero = (area <= 0.0
-                   or (np.isfinite(lo)
-                       and abs(area - lo) <= BOUND_HIT_RTOL * max(1.0, abs(lo))))
-        if at_zero:
+        # ``FLOOR_HIT`` is the bound test's verdict and never a distance of
+        # this function's own (WP-2141).  The ``<= 0`` clause beside it
+        # covers an area whose stated lower bound is below zero, which is off
+        # at its identity without being "at" that bound.
+        if area <= 0.0 or area_path in floors:
             out.append(Diagnostic(
                 level="warning", code="EXTRA_PEAK_NO_INTENSITY",
                 message=(
