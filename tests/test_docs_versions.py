@@ -9,6 +9,8 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import shutil
+import subprocess
 import tarfile
 from pathlib import Path
 
@@ -76,9 +78,10 @@ def _site(tmp_path):
     return tmp_path
 
 
-def _tarball(tmp_path, version, llms=None):
+def _tarball(tmp_path, version, llms=None, pages=()):
     path = tmp_path / versions.asset_name(version)
     files = {"./index.html": version} | ({"./llms.txt": llms} if llms else {})
+    files |= {f"./{page}.html": page for page in pages}
     with tarfile.open(path, "w:gz") as archive:
         for name, text in files.items():
             data = text.encode()
@@ -128,6 +131,57 @@ def test_a_stub_without_a_heading_carries_the_readers_fragment_over(tmp_path, mo
     stub = (site / "profiles.html").read_text(encoding="utf-8")
     assert '<script>location.replace("/docs/dev/theory/profiles.html" + location.hash)' in stub
     assert 'content="0; url=/docs/dev/theory/profiles.html"' in stub
+
+
+def _followed(stub: str, fragment: str) -> str:
+    """Where the stub's script sends a reader arriving with `fragment`, run in node."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = stub.split("<script>", 1)[1].split("</script>", 1)[0]
+    hash_ = f"#{fragment}" if fragment else ""
+    shim = (f"globalThis.location = {{hash: {json.dumps(hash_)}, "
+            "replace(to) { process.stdout.write(to); }};\n")
+    done = subprocess.run([node, "-e", shim + script], capture_output=True, text=True,
+                          check=False)
+    assert done.returncode == 0, done.stderr
+    return done.stdout
+
+
+@pytest.mark.parametrize(("fragment", "target", "url"), [
+    ("stage-settings", "reference/settings#stage-settings",
+     "/docs/dev/reference/settings.html#stage-settings"),
+    ("plan-presets", "reference/plans", "/docs/stable/reference/plans.html"),
+    ("cell", "reference/parameters#cell", "/docs/stable/reference/parameters.html#cell"),
+    ("", "reference/parameters", "/docs/stable/reference/parameters.html"),
+    # An Object property is no row, so it is carried over like any other fragment.
+    ("constructor", "reference/parameters#constructor",
+     "/docs/stable/reference/parameters.html#constructor"),
+])
+def test_a_stub_sends_a_moved_anchor_to_the_page_that_has_it(tmp_path, monkeypatch,
+                                                              fragment, target, url):
+    """An old page's sections can land on several new pages, so the stub looks
+    the reader's fragment up before carrying it over (WP-1986).  The stable
+    tree here lacks the settings page, so that row's address is dev's."""
+    monkeypatch.setattr(versions, "RETIRED", {"using/glossary": "reference/parameters"})
+    monkeypatch.setattr(versions, "MOVED_ANCHORS", {"using/glossary": {
+        "stage-settings": "reference/settings#stage-settings",
+        "plan-presets": "reference/plans"}})
+    site = _site(tmp_path / "site")
+    versions.assemble(site, [("1.11", "1.11.1")], lambda version: _tarball(
+        tmp_path, version, pages=("reference/parameters", "reference/plans")))
+    stub = (site / "using" / "glossary.html").read_text(encoding="utf-8")
+    assert 'content="0; url=/docs/stable/reference/parameters.html"' in stub
+    assert versions.retired_target("using/glossary", fragment) == target
+    assert _followed(stub, fragment) == url
+
+
+def test_every_moved_anchor_belongs_to_a_retired_page_and_targets_a_new_one():
+    for old, moved in versions.MOVED_ANCHORS.items():
+        assert old in versions.RETIRED, f"{old} has no stub to carry its anchors"
+        for anchor, new in moved.items():
+            assert _new_tree_page_exists(new.partition("#")[0]), \
+                f"{old}#{anchor} -> {new}, which docs/docs/ has no page for"
 
 
 def test_a_stub_points_at_stable_only_once_stable_has_the_page(tmp_path, monkeypatch):

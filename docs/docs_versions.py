@@ -121,6 +121,68 @@ RETIRED: dict[str, str] = {
     "using/tutorials/06_your_own_data": "start/tutorials/06_your_own_data",
 }
 
+#: Where an anchor of a retired page went, when the page RETIRED names does not
+#: hold it under the same id: old page -> {old id: new page, and its `#heading`
+#: where the anchor has one}.  A stub looks the reader's fragment up here first,
+#: and any other fragment goes to RETIRED's page as before.  Two sets are
+#: complete (WP-1986, 2026-11-13).  The old glossary's sections went to four
+#: pages, so each has a row.  And each anchor an installed release's help links
+#: carry into a retired page (`rietx.help`'s `anchor`, v1.0 to v1.9) goes where
+#: the current release sends the same entry; the rest of those land on their
+#: own id.  tests/test_manual.py checks both sets against the built manual.
+MOVED_ANCHORS: dict[str, dict[str, str]] = {
+    "using/glossary": {
+        "glossary": "reference/parameters",
+        "looking-one-up-in-code": "reference/settings#looking-one-up-in-code",
+        "entry-fields": "reference/settings#entry-fields",
+        # The two authored fields and where their ranges come from, now told
+        # under the fields themselves.
+        "limitations": "reference/settings#entry-fields",
+        "parameters": "reference/parameters",
+        "stage-settings": "reference/settings#stage-settings",
+        "plan-presets": "reference/plans",
+        "peak-flags": "reference/settings#peak-flags",
+        "diagnostic-codes": "reference/diagnostics",
+        "peak-origins": "reference/settings#peak-origins",
+        "reader-options": "reference/settings#reader-options",
+        "instrument-preset-fields": "reference/settings#instrument-preset-fields",
+        "indexing-search-settings": "reference/settings#indexing-search-settings",
+    },
+    "background": {
+        "additive-models-never-subtraction": "theory/background#additive-background-models",
+        "localised-flexibility-explicit-background-peaks": "theory/background#explicit-humps",
+    },
+    "corrections": {
+        "secondary-extinction": "theory/corrections#primary-extinction",
+    },
+    "microstructure": {
+        "the-positivity-cone-the-seed-and-how-to-read-the-guard":
+            "theory/microstructure#the-positivity-cone-the-seed-and-the-guard",
+    },
+    "using/data": {
+        "a-time-of-flight-bank": "reference/instrument#time-of-flight-peak-shape",
+    },
+    "using/indexing": {
+        "the-systematic-shift-and-the-window-it-opens":
+            "reference/peaks#the-systematic-shift-and-the-window-it-opens",
+    },
+    "using/model": {
+        "declared-extra-peaks": "theory/profiles#declared-extra-peaks",
+    },
+}
+
+
+def retired_target(old: str, fragment: str = "") -> str:
+    """The new-tree page, with its `#heading`, that a retired page's stub opens
+    for a reader arriving with `fragment`."""
+    moved = MOVED_ANCHORS.get(old, {})
+    if fragment in moved:
+        return moved[fragment]
+    new = RETIRED[old]
+    # A row naming a heading of its own drops the reader's, as the stub does.
+    return f"{new}#{fragment}" if fragment and "#" not in new else new
+
+
 _TAG = _re.compile(r"v(\d+)\.(\d+)\.(\d+)")
 #: The start of a markdown link target that is relative to its file.
 _RELATIVE_LINK = _re.compile(r"\]\((?![a-z][a-z0-9+.-]*:|/|#)")
@@ -169,20 +231,33 @@ def switcher_entries(minors: list[str]) -> list[dict]:
     return entries
 
 
-def redirect_page(url: str, canonical: str) -> str:
+def _js(value) -> str:
+    """`value` as a script literal that cannot close the `<script>` element."""
+    return _json.dumps(value).replace("<", "\\u003c")
+
+
+def redirect_page(url: str, canonical: str, moved: dict[str, str] | None = None) -> str:
     """An HTML stub that sends a reader on, for a host with no redirects.
 
     A meta refresh drops the `#fragment` the reader arrived with, so where the
     target names no heading of its own a script carries it over first.  That is
     what keeps an installed release's help links landing on their section:
     their anchors are `<theory chapter>.html#<heading>` at the site root, and
-    each Theory chapter kept its heading ids when it moved under /docs/.  The
-    refresh stays as the fallback for a reader without scripts.
+    each Theory chapter kept its heading ids when it moved under /docs/.
+    `moved` maps a fragment to the address it went to instead (MOVED_ANCHORS),
+    which the script tries first.  The refresh stays as the fallback for a
+    reader without scripts.
     """
     forward = ""
-    if "#" not in url:
-        target = _json.dumps(url).replace("<", "\\u003c")
-        forward = f"<script>location.replace({target} + location.hash)</script>\n"
+    carry = "" if "#" in url else " + location.hash"
+    if moved:
+        # A fragment such as `constructor` reads an Object property, which is
+        # not a string, so it falls through to the default like any other.
+        forward = (f"<script>var to = {_js(moved)}[location.hash.slice(1)];\n"
+                   f'location.replace(typeof to === "string" ? to : {_js(url)}{carry})'
+                   "</script>\n")
+    elif carry:
+        forward = f"<script>location.replace({_js(url)}{carry})</script>\n"
     return ('<!doctype html>\n<meta charset="utf-8">\n'
             + forward +
             f'<meta http-equiv="refresh" content="0; url={_escape(url)}">\n'
@@ -221,15 +296,19 @@ def assemble(site: _Path, kept: list[tuple[str, str]], fetch) -> None:
         text = (docs / tree / "llms.txt").read_text(encoding="utf-8")
         (site / "llms.txt").write_text(
             _RELATIVE_LINK.sub(f"](/docs/{tree}/", text), encoding="utf-8")
-    for old, new in RETIRED.items():
+    def hosted(new: str) -> str:
         page, _, heading = new.partition("#")
         # A page retired on main is in dev at once and in stable only from the next
         # release, so until then the stub sends the reader to dev.
         tree = target if (docs / target / f"{page}.html").is_file() else "dev"
-        path = f"/docs/{tree}/{page}.html" + (f"#{heading}" if heading else "")
+        return f"/docs/{tree}/{page}.html" + (f"#{heading}" if heading else "")
+
+    for old, new in RETIRED.items():
+        path = hosted(new)
+        moved = {fragment: hosted(to) for fragment, to in MOVED_ANCHORS.get(old, {}).items()}
         stub = site / f"{old}.html"
         stub.parent.mkdir(parents=True, exist_ok=True)
-        stub.write_text(redirect_page(path, DOCS_URL + path), encoding="utf-8")
+        stub.write_text(redirect_page(path, DOCS_URL + path, moved), encoding="utf-8")
 
 
 def main(site: _Path) -> None:
