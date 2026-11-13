@@ -4174,6 +4174,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measure the instrument on a standard, and hold that profile in this fit."
         ),
     ),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": HelpEntry(
+        title="A restraint measures geometry a rigid body holds fixed",
+        description=(
+            "A bond, angle, torsion or planarity restraint names atoms that all belong to one "
+            "copy of one rigid body, and no torsion the body declares changes the quantity. "
+            "The body places those atoms from its template, so the distance, angle or plane "
+            "is the template's whatever the fit does: the restraint's row is a constant, and "
+            "it restrains nothing. A quantity is either restrained or refined, never both by "
+            "accident, so the compile warns and keeps the row: a refiner may keep one "
+            "restraint set across a with-body and a without-body comparison, where the row "
+            "is the template's penalty. A declared torsion "
+            "changes the quantity when it turns some of the restrained atoms, other than its "
+            "two axis atoms, and not the others; whether the torsion is free in a stage does "
+            "not matter. A restraint across two bodies, between a body atom and a free "
+            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "a torsion that changes it, take the atoms out of the body and restrain them "
+            "as free atoms, or keep the row."
+        ),
+    ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(
         title="Some contacts have no anti-bump row",
         description=(
