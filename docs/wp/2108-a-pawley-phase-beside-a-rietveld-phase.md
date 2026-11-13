@@ -33,6 +33,17 @@ the Pawley block is appended in `run_least_squares`, and `mode_fixed` force-fixe
 `.atoms.` and `.scale`. Each of these would read the phase's mode. This route has a cell
 already, and it costs a field on the main surface.
 
+### Inherited
+
+- **From WP-2104, 2026-11-12: the joint Pawley arm has landed, under one mode per
+  fit.** `refine_multi(mode="pawley")` compiles every pattern in that mode, and each
+  Pawley model owns one intensity block placed after the table's columns
+  (`least_squares._joint_aux_slices`). Two readers assume one mode for the whole fit
+  and need a per-phase answer here. `multi._joint_mode_fixed` drops a column by what it
+  moves in every pattern. `MultiHistogramRefinement._build_result` computes phase
+  fractions only when `model.mode == "rietveld"`, so a holder phase beside a Rietveld
+  phase would lose the Rietveld phase's fraction too.
+
 ## Non-goals
 
 - Le Bail for one phase beside Rietveld, unless the measurement shows it is the same

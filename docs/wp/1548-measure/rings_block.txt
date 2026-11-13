@@ -1,0 +1,14 @@
+tests/data/cod_2242872.cif 880 atoms 872 bonds 0 airborne
+   size 6 CCCCCC           max|d|=0.012 A  x24
+   size 6 CCCCCC           max|d|=0.025 A  x32
+   size 6 CCCCCN           max|d|=0.005 A  x24
+tests/data/cod_1567181.cif 1144 atoms 1056 bonds 0 airborne
+   size 6 CCCCCN           max|d|=0.001 A  x20
+tests/data/cod_1550439.cif 796 atoms 799 bonds 0 airborne
+   size 6 CCCCCC           max|d|=0.226 A  x20
+   size 6 CCCCCC           max|d|=0.235 A  x32
+tests/data/cod_7252065.cif 608 atoms 564 bonds 0 airborne
+   size 6 CCCCCC           max|d|=0.003 A  x24
+tests/data/cod_1577467.cif 224 atoms 176 bonds 0 airborne
+tests/data/cod_2104364.cif 752 atoms 696 bonds 0 airborne
+   size 6 CCCCCC           max|d|=0.010 A  x16

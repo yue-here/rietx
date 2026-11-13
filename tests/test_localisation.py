@@ -235,7 +235,7 @@ def test_different_sigma_is_refused_like_different_intensities(genuine):
 def test_compare_run_stores_the_package_cumulative(monkeypatch):
     """``rietx compare``'s record is what the package computes for the run's own
     result, and equals the lines ``run`` used to hold wherever σ > 0 (``sig()``
-    floors σ ≤ 0 at a thousandth of the median, the old line at 1.0)."""
+    puts √max(y, 1) at a σ ≤ 0, the old line 1.0)."""
     import rietx.report.localisation as loc
     from rietx.viz import compare as cmp
 
