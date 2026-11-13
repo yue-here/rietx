@@ -158,8 +158,10 @@ The first PR's three questions, answered on 2026-11-11.
   - *A rule reconciled*: `gui/CLAUDE.md` (WP-1032) put a tick in "its own band between
     pattern and residual", which describes today's page. `gui/STYLE.md` § Plots and the
     prototype put the ticks at the foot. The polish follows STYLE.md at `/next`. Since the
-    2026-11-13 rulings the gui/CLAUDE.md clause says the band sits at the foot, with today's
-    page keeping the old place until the swap.
+    2026-11-13 rulings the gui/CLAUDE.md clause says the band sits at the foot. Today's page,
+    `rietx watch` and `rietx compare` still draw it between pattern and residual, through
+    `src/rietx/viz/static/rxplot.mjs`, until the swap. The clause stays one line, because
+    gui/CLAUDE.md sits at its 667-line cap (`tests/test_docs_consistency.py`).
 
 - **The polish's three questions and the tick band, ruled by Yue 2026-11-13** (answering
   § Questions 2 in the session before that day's shift):
