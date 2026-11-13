@@ -1,9 +1,8 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: 🔄 2026-11-12 — tasks 1-4 done (PR #1543); waits on the maintainer decision written in the 2026-11-12 handover entry
+Milestone: unscheduled · Status: ✅ 2026-11-13 — the weak-line retry built under the 2026-11-13 ruling; the reader-text change waits on the maintainer in its PR
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
-Priority: P2 2026-11-02 — a ranking defect with a hand workaround: on the reporter's private benchmark the true cell ranks first on 48 of 172 host and one-impurity lists under all three engines, and on 75 when the search is given only the lines at or above 1 % of the strongest; thinning the list by hand is the workaround
 
 ## Goal
 
@@ -174,6 +173,10 @@ only the host's crystal system declared.
   and cpd-1g (three phases at about a third each; held out). A control "gains"
   when a candidate is graded `medium` or `high`.
 
+"Held out" holds for task 4 only. The trigger was chosen on 2026-11-13 after
+these lists' results were seen, so for the trigger every list here is
+development data.
+
 **Measured (task 4, 2026-11-12).** The harness was session scratch, so each candidate's construction is stated here. `[dev]`, arm64 Mac,
 `preset="quick"` (120 s whole-run ceiling), all three engines (plus single-engine rows on (a) and (d)), 187 runs, none raising. The
 machine was shared with other runners at a load of 25-105 on 10 cores, so every
@@ -307,13 +310,26 @@ for the mixtures, the host. The 5 % floor on (a) puts its truth first,
 **The retry as built, on the T1 lists (2026-11-13).** The code at
 `a6bf12e82`, from a snapshot, `preset="full"`, `[dev]`, arm64 Mac, load 30-80:
 
-IMPL_TABLE
+| list | first pass agrees? | after inlier retry agrees? | weak-line retry | truth | cut | load | wall |
+|---|---|---|---|---|---|---|---|
+| (a) Mo + MoO₃ trace | no | no | ran, **adopted** (5 of 38 lines kept) | 1m |  | 39 | 29 s |
+| LaB₆ + cBN | no | no | ran, not adopted (no agreement either) | — |  | 32 | 34 s |
+| (c) Si + planted | no | yes | not run | — |  | 32 | 36 s |
+| cpd-1a, cubic only | no | yes | not run | 1l |  | 30 | 24 s |
+| cpd-1b, trigonal only | no | yes | not run | 1l | * | 29 | 221 s |
+| cpd-1a | no | yes | not run | 1l |  | 21 | 134 s |
+| cpd-1b | no | yes | not run | 1l | * | 6 | 479 s |
+| cpd-1g (control) | no | yes | not run | none of three | * | 92 | 364 s |
+
+The retry fires on exactly the two runs T2 named, and on none of the four
+correct mixture runs T1 would have caught. On (a) it puts the truth first, at
+`medium`. On LaB₆ + cBN the 5 % list finds no agreement either, so the full
+list's answer (no candidates) stands and the result says the retry ran. The
+review fixes after `a6bf12e82` move only where the dominant-zone probe runs and
+when a budget warning fires; neither changes a row above, since no row ran
+under a whole-run ceiling.
 
 **Licensing.** Concepts only from papers. No program code is consulted.
-
-### Inherited
-
-(none)
 
 ## Non-goals
 
@@ -413,6 +429,127 @@ position-only list returns the same candidates as on `main`.
   driven).
 
 ## Handover log
+
+- **2026-11-13** — tasks 5-9, by a ghostshift runner, closing the WP. When
+  a search ends with no cell two engines agree on, rietx now searches once
+  more on the lines at or above 5 % of the strongest, as the 2004 indexing
+  round robin did for its second attempt. On the trace-oxide fixture the true
+  cell moves from absent to first, graded `medium`. The retry's answer is used
+  only when it finds agreement, and the result says which list its candidates
+  came from. The trigger was the open question. Read on the first search, it
+  fired on four correct mixture runs. Read after the inlier retry, it fires on
+  2 of 23 runs and on none of the 17 whose truth ranked first, SRM 660c
+  included. It misses the picker-split silicon (d), where two engines agree on
+  the wrong cell. A reader's text changes on a run the retry adopts: the line
+  count falls to the kept lines, and the ranking is the kept list's.
+
+  *Done.* Yue's ruling recorded under the Decision task. `engines.weak_line_floor`
+  and `WEAK_LINE_RETRY_FLOOR` (0.05); the retry in `index_pattern` after
+  `search()` (the first pass plus the inlier retry); `INDEX_WEAK_LINE_RETRY`
+  (info) with its help entry, three audit rows, a manual paragraph in
+  `reference/indexing.md`, a skill row in `references/abstention.md`; the
+  provenance note for `n_unindexed` names the third pass. Fixture (a)'s xfail
+  flipped to a rank-1 assertion that also pins the message and the kept line
+  count, drawing `tests/output/weak_lines_a_{peaks,candidates,validation}.png`.
+  `INDEXING_THRESHOLDS_VERSION` stays 1.12 with an "Also 1.12" note, since 1.12
+  is unreleased. `Bergmann` joined the Vale term list.
+
+  *Measured.* The trigger table and the as-built table are in Context ("The
+  trigger", "The retry as built"): `preset="full"`, `[dev]`, arm64 Mac, load
+  12-92 on 10 cores, each run once. GATES
+
+  *Review.* `/code-review high --fix` reported nine findings and fixed five:
+  the floor kept only usable lines and dropped the list's records; the
+  set-aside list re-derived the floor; the provenance note omitted the third
+  pass; "the clock stopped" was wrong for a caller's cancel; a duplicate test
+  missed its xdist group. Finding 1 (the retry could spend the search clock,
+  skipping the dominant-zone probe and firing a budget warning on a finished
+  search) was fixed by ordering: the probe now runs on the full list before
+  the retry, and an unadopted retry raises no budget warning. Declined: no
+  fast-tier test reaches the retry and the not-adopted branch has no test
+  (needs a second fixture); an adopted result's `quality` and line count
+  describe the kept list, recorded only in the message; an unadopted retry
+  still streams its per-system snapshots to a live view. The generality
+  judge's points on the suggestion row (tier 1, kind 2, the supercell reading
+  in help and skill) and the floor row's caveats were applied before this
+  entry.
+
+  *Generality.* The `generality-review` judge's eight sections, condensed by the
+  author from its seven-question tables (about 150 lines). Each verdict is the
+  judge's, word for word; the findings are its own, shortened. Author answers
+  are marked **Answer**.
+
+  - **INDEX_WEAK_LINE_RETRY (code): weak.** Running a second search when the
+    full list gives no answer has the stronger case. The kind-1 claim does not
+    survive a superlattice host that also carries an impurity (the floor would
+    remove its ordering lines and the retry would adopt the subcell; not
+    measured), and only one synthetic fixture shows the action helps. Bergmann
+    et al. call the floor "not for routine use"; McMaille's default run lost
+    its answer under the 5 % list. The tier was set by the runner; the
+    maintainer ruled the design, not the tier. The set-aside lines are only in
+    message text, cut at 12; `info` carries a check-before-quoting advice;
+    no test covers the not-adopted or stopped branch. Would change with fixture
+    (b) plus a planted trace whose full list finds no agreement, or the
+    maintainer's dated approval of the tier.
+    **Answer:** the retry runs only after two searches found no agreement, so
+    on the superlattice-plus-impurity case the full list had no agreed cell to
+    lose; the subcell risk is real and the help text now names it. The tier
+    question goes to the maintainer with the PR.
+  - **INDEX_WEAK_LINE_RETRY.suggestion: weak.** Evidence "arithmetic" under
+    tier 2; kind 2, not 1; "separates a second phase from a supercell" is
+    false, and help and skill dropped the supercell reading.
+    **Answer:** applied: tier 1, ambiguity 2, the evidence lists the three
+    readings unranked, and help and skill name the supercell reading.
+  - **WEAK_LINE_RETRY_FLOOR (constant): holds** as tier 2 on Bergmann et al.'s
+    test of this value; the row omitted the survey's caveats (the 8-10
+    unindexed-line tolerance, McMaille's loss, 5 % being the least-margin floor
+    on (a)). **Answer:** applied to the row's evidence.
+  - **(a) trigger read after the inlier retry: holds.** Rests on development
+    data and on `MIN_AGREEMENT`, itself unaudited; the provenance note omits
+    the inlier retry inside the kept-list search.
+  - **(b) the retry's answer replaces the full list's: weak.** Kind 2 (a pick
+    between two rankings); breaks the inlier retry's "adds and never removes"
+    convention (#951) without naming why; the discarded candidates leave no
+    record; task 4 refutes merging under one score, not appending beside.
+    **Answer:** on every run where it fires, the full list held no cell two
+    engines agree on, so what is discarded is ungraded single-engine cells;
+    appending them is unmeasured and goes to the maintainer as a question.
+  - **(c) a declared `n_unindexed` forbids the retry: holds.** No test covers
+    the branch.
+  - **(d) the retry is skipped on a cut search: holds.** Under the default
+    `quick` call with no system declared, the ceiling cut most as-picked lists
+    under load, so the retry would not run there, and nothing says it was
+    skipped.
+  - **(e) the probe runs before the retry: cannot tell.** Never measured under
+    a whole-run ceiling.
+
+  *Gotchas.* A probe run against the worktree while editing it imports the
+  edits: measure from a `git archive` snapshot. The quick preset's whole-run
+  ceiling cut most as-picked lists under load, so the retry, which needs an
+  uncut search, did not run on them there.
+
+  *Settled by the runner* (each could have gone the other way):
+  1. The trigger is read after the inlier retry, not on the first search.
+     Grounds: the measurement, choosing between the two readings the ruling
+     allowed (the first fired on four correct runs). Alternative: the first
+     search, which needs no inlier retry to run first.
+  2. The floor is 5 %, tier 2, from Bergmann et al. (2004). Grounds: the
+     audit's tier rule (a cited test of this value). Alternative: the
+     reporter's 1 % (tier 3, private data), which also ranks (a)'s truth first.
+  3. The retry's candidates replace the full list's when it finds agreement,
+     rather than being listed beside them. Grounds: task 4 measured the full
+     list's score pushing (a)'s truth to 2nd-9th. Alternative: append the full
+     list's candidates after the retry's; not measured. The judge rates this
+     weak.
+  4. A declared `n_unindexed` forbids the retry. Grounds: the inlier retry's
+     convention. Alternative: retry under `"inliers"` too.
+  5. The retry is scored on the kept lines only. Grounds: as 3.
+
+  Next: none in this WP. The answer on #1291 is owed by the shift lead from
+  the PR. A second fixture for the unadopted branch, and a run of fixture (b)
+  with a planted trace phase whose full list finds no agreement, would settle
+  the judge's open points. Neither is filed: the PR lists them for the
+  maintainer to place.
 
 - **2026-11-12** — tasks 1, 3 and 4, by a ghostshift runner, in PR #1543. A
   floor on line intensity is not what other indexing programs do by default.

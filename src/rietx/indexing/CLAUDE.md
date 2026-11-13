@@ -360,10 +360,7 @@ roughly the shift (+1400 ppm).
   no anchor (one intensity), no fraction. Candidates report
   `n_search_unindexed`/`unindexed_two_theta` under every rule.
 - **Still no agreement → once more on the lines ≥ 5 % of the strongest**
-  (`WEAK_LINE_RETRY_FLOOR`, `INDEX_WEAK_LINE_RETRY`, WP-2078; Bergmann et al.
-  2004's second attempt). The trigger is `_no_agreement` read **after** the
-  inlier retry: read before it, it fired on four correct mixture runs. The kept
-  list is searched *and scored* as a fresh call would, and replaces the full
-  list's answer only when it finds agreement — scored on the full list, a trace
-  phase's lines outranked the host again. **Never a floor before every search**:
-  a trace phase's lines and a superlattice's own overlap in intensity.
+  (`INDEX_WEAK_LINE_RETRY`, WP-2078; Bergmann 2004's second attempt), the
+  trigger read **after** the inlier retry (before it, it fired on correct
+  mixtures); searched *and scored* as a fresh call, adopted only on agreement.
+  **Never a floor first**: trace-phase and superlattice lines overlap in intensity.
