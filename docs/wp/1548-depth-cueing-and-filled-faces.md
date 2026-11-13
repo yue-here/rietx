@@ -1,6 +1,6 @@
 # WP-1548 — depth cueing, and filled rings and faces, in the structure figure
 
-Milestone: rietview · Status: 🔄 2026-11-12 — fog in both renderers and the kernel, rings perceived; faces, pairs and docs open; waits on rietx-kernels 1.5.0
+Milestone: rietview · Status: 🔄 2026-11-13 — every task built, PR #1554 ready; waits on the maintainer confirming the four look choices from the task-6 sheets
 Depends on: 2111 soft (its ruling on `DIM_BOUNDARY`, D6)
 Priority: P3 2026-11-12 — the maintainer asked for it; nothing waits on it, and a ray tracer through WP-1537 would give fog once that lands
 
@@ -191,6 +191,11 @@ names the test rather than a chemistry claim. D3 declines: `depth_cue=True`
 with `background=None` raises, and the GUI's transparent export says it
 drew without fog rather than dropping fog silently. D5 is a neutral grey,
 with a caller's colour always accepted. `fog_max` stays 0.7.
+
+*2026-11-13, drawn:* every choice above is built as stated, and the task-6
+sheets that show each one are in `1548-measure/pairs/`: `q_fog_max_*`,
+`q_d5_*`, `q_d6_*`, and one sheet a phase. The four rulings, confirm or
+change, are what the WP still waits on before it closes.
 
 ## Non-goals
 

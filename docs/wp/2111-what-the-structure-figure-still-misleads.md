@@ -78,6 +78,10 @@ row with its evidence. WP-1957's reviewers and the agent round below are that ev
   *lightens* the far atoms, while `DIM_BOUNDARY` *darkens* the images outside the cell, so the two
   pull apart there. On a dark ground both darken, and that is where they could read as one cue.
   A picture pair on a dark ground is the evidence the shade's ruling should be shown with.
+- **2026-11-13, from WP-1548 (the pair drawn).** That pair is
+  `docs/wp/1548-measure/pairs/q_d6_white_black_plain_cued.png`: NAC in one cell on white and
+  on black, each plain then cued. On black the cued far side and the shaded images both go
+  darker, as predicted. `docs/wp/1548-measure/pairs.py` redraws it.
 
 ## Non-goals
 
