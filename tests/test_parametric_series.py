@@ -1611,3 +1611,162 @@ def test_a_library_surface_over_a_hundred_patterns_through_the_blocked_solver():
     for c in result.parametric:
         assert abs(c.value - truth[c.term]) < 3.0 * c.esd, (c.term, c.value, c.esd,
                                                             truth[c.term])
+
+
+# -- a Pawley joint fit (WP-2104) --------------------------------------------
+
+def pawley_ramp(n: int, *, seed: int = 0, tt_max: float = 24.0):
+    """``n`` LaB6 patterns on a(T) = A0·(1 + RAMP·(T − 300)/100), T from 300
+    to 1200 K: ``(patterns, coordinates, equation, truth)``.  ``truth`` maps
+    each coefficient's term to its value about the reference the result
+    reports, the mean temperature, 750 K."""
+    from tests.test_sequential import A0, RAMP, _simulate
+
+    temps = [300.0 + 900.0 * k / (n - 1) for k in range(n)]
+    patterns = [_simulate(A0 * (1.0 + RAMP * (t - 300.0) / 100.0),
+                          seed=1000 * seed + k, tt_max=tt_max)
+                for k, t in enumerate(temps)]
+    coords = CoordinateTable(columns={"T": temps}, units={"T": "K"})
+    equation = ParametricEquation(name="a", target="phases.0.cell.a",
+                                  basis="polynomial", terms=[[], ["T"]])
+    truth = {"1": A0 * (1.0 + RAMP * 450.0 / 100.0), "T": A0 * RAMP / 100.0}
+    return patterns, coords, equation, truth
+
+
+#: one diffractometer through the ramp, so its zero and profile are shared,
+#: the protocol of the Rietveld ramp above
+_RAMP_SHARING = SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"])
+
+
+def _pawley_joint(n: int, *, seed: int = 0, tt_max: float = 24.0):
+    from tests.test_sequential import _start_models
+
+    patterns, coords, equation, truth = pawley_ramp(n, seed=seed, tt_max=tt_max)
+    s, ins = _start_models()
+    ref = _Probe(s, [ins] * n, sharing=_RAMP_SHARING, coordinates=coords,
+                 parametric=[equation])
+    result = ref.fit(patterns, mode="pawley", telemetry=False)
+    return ref, result, truth
+
+
+def test_a_pawley_joint_fit_shares_a_parametric_cell():
+    """Three patterns, each with its own intensity block, one a(T) line.
+
+    The intensities are each histogram's own columns, so the solve, the
+    statistics and the parameter listing all count them, and nothing an
+    intensity model force-fixes is refined."""
+    n = 3
+    ref, result, truth = _pawley_joint(n, tt_max=14.0)
+    OUT.mkdir(exist_ok=True)
+    for h in (0, n - 1):
+        result.for_histogram(h).plot(OUT / f"pawley_joint_h{h}.png")
+    assert (result.status, result.mode) == ("converged", "pawley")
+    for c in result.parametric:
+        assert abs(c.value - truth[c.term]) < 3.0 * c.esd, (c.term, c.value, c.esd)
+    # every histogram solved its own block, esds and all
+    blocks = [m.pawley for m in ref._models]
+    assert all(b is not None and b.n > 0 and b.stderr is not None for b in blocks)
+    assert ref.outcome_.n_aux == sum(b.n for b in blocks)
+    assert result.statistics.n_free_parameters == (
+        len(ref.mtable.free_paths) + ref.outcome_.n_aux)
+    # nothing an intensity model force-fixes reached θ, the scales included
+    assert not [p.path for p in result.parameters
+                if p.path.endswith(".scale") or ".atoms." in p.path]
+    rows = {r.path: r for r in ref.parameters()}
+    assert rows["hist.0.phases.0.scale"].mode_fixed
+    assert not rows["vars.a_1"].mode_fixed
+    # no fraction off a force-fixed scale, the single Pawley fit's rule
+    assert all(result.for_histogram(h).qpa is None for h in range(n))
+    # the Pawley findings are each histogram's own, never the fit's
+    assert not {d.code for d in result.diagnostics} & {
+        "PAWLEY_OVERLAP_UNRESOLVED", "PAWLEY_OFF_DATA_RIDGED"}
+
+
+def test_a_pawley_joint_stage_drops_what_it_cannot_fit(monkeypatch):
+    """A plan that frees scales and atoms under ``mode="pawley"`` runs without
+    them, the single runner's drop (``_joint_mode_fixed``).  The default
+    Pawley plan frees neither, so this stage names them to make the drop fire."""
+    from rietx import multi
+    from rietx.strategy.staged import RefinementPlan
+
+    dropped: list[str] = []
+    real = multi._joint_mode_fixed
+
+    def spy(mtable, mode):
+        out = real(mtable, mode)
+        dropped.extend(out)
+        return out
+
+    monkeypatch.setattr(multi, "_joint_mode_fixed", spy)
+    from tests.test_sequential import _start_models
+
+    patterns, coords, equation, _ = pawley_ramp(3, tt_max=10.0)
+    s, ins = _start_models()
+    ref = _Probe(s, [ins] * 3, sharing=_RAMP_SHARING, coordinates=coords,
+                 parametric=[equation])
+    plan = RefinementPlan(stages=[Stage(name="all", turn_on=[
+        "vars.*", "*phases.*.scale", "*phases.*.atoms.*.biso"])])
+    result = ref.fit(patterns, mode="pawley", plan=plan, telemetry=False)
+    assert any(p.endswith(".scale") for p in dropped), dropped
+    assert any(".atoms." in p for p in dropped), dropped
+    freed = result.stages[-1].freed
+    assert "vars.a_1" in freed
+    assert not [p for p in freed if p.endswith(".scale") or ".atoms." in p]
+
+
+def test_a_pawley_joint_step_on_blocks_is_the_dense_one():
+    """The intensity blocks are each histogram's own columns of the arrow
+    (``optimize/blocked.py``), so the blocked solve lands where the dense one
+    does."""
+    answers = []
+    for layout in ("dense", "blocked"):
+        was = blocked.set_layout(layout)
+        try:
+            ref, result, _ = _pawley_joint(3, tt_max=10.0)
+        finally:
+            blocked.set_layout(was)
+        assert ref.outcome_.jacobian_layout == layout
+        answers.append(result.parametric)
+    for d, b in zip(*answers, strict=True):
+        assert abs(d.value - b.value) < 0.01 * d.esd, (d.term, d.value, b.value)
+        assert b.esd == pytest.approx(d.esd, rel=1e-6)
+
+
+def test_a_joint_fit_refuses_what_an_intensity_model_cannot_fit():
+    """Three refusals, each before any compile: Le Bail, a Pawley fit
+    sharing nothing (N single fits), and an equation on a parameter Pawley
+    force-fixes."""
+    from tests.test_sequential import _start_models
+
+    dummy = rx.PatternData(two_theta=[1.0, 2.0], intensity=[1.0, 1.0])
+    s, ins = _start_models()
+    ref = MultiHistogramRefinement(s, [ins, ins])
+    with pytest.raises(NotImplementedError, match="mode='pawley'"):
+        ref.fit([dummy, dummy], mode="lebail")
+    alone = MultiHistogramRefinement(s, [ins, ins],
+                                     sharing=SharingMap(per_histogram=["phases.*"]))
+    with pytest.raises(NotImplementedError, match="2 single Pawley fits"):
+        alone.fit([dummy, dummy], mode="pawley")
+    on_b = MultiHistogramRefinement(
+        s, [ins, ins], coordinates=_coords(300.0, 400.0),
+        parametric=[_equation(target="phases.0.atoms.0.biso")])
+    with pytest.raises(ValueError, match="force-fixes phases.0.atoms.0.biso"):
+        on_b.fit([dummy, dummy], mode="pawley")
+
+
+@pytest.mark.slow
+def test_a_pawley_joint_ramp_recovers_its_line_without_bias():
+    """The WP's acceptance: ten patterns, twelve pinned seeds, and the mean
+    z-score of each a(T) coefficient under 0.5 in size.  A z-score is
+    (value − truth)/esd, so a mean near zero says the line is unbiased."""
+    z: dict[str, list[float]] = {"1": [], "T": []}
+    for seed in range(12):
+        _ref, result, truth = _pawley_joint(10, seed=seed)
+        if seed == 0:
+            OUT.mkdir(exist_ok=True)
+            result.for_histogram(9).plot(OUT / "pawley_joint_ramp_h9.png")
+        assert result.status == "converged", seed
+        for c in result.parametric:
+            z[c.term].append((c.value - truth[c.term]) / c.esd)
+    for term, zs in z.items():
+        assert abs(float(np.mean(zs))) < 0.5, (term, zs)
