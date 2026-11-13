@@ -5384,8 +5384,9 @@ ROWS: tuple[Row, ...] = (
     Row("RESTRAINT_BODY_CONTACTS_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: points at the table that lists the body's own distances and names "
-                  "the two remedies (a row for that pair with a minimum the caller states, or a "
-                  "torsion restraint) and picks neither; it states no minimum (#677's rule)")),
+                  "the remedies (a row for that pair with a minimum the caller states, or a "
+                  "torsion restrained or held) and picks none; it cautions against a floor on a "
+                  "torsion's own ends, which the WP-1816 ruling says biases the conformation; it states no minimum (#677's rule)")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),

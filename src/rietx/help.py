@@ -4172,7 +4172,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "own atoms in `result.geometry.distances`, bonds included: a folded pair can be "
             "short enough to be listed as a bond. Where a torsion brought two of its atoms closer than "
             "you allow, add an anti-bump row for that pair, with a minimum you state for it, or "
-            "restrain the torsion."
+            "restrain or hold the torsion. Keep such a row off the two end atoms of a torsion: "
+            "they sit 2.5 to 3.9 Å apart in real molecules, and a floor there pushes the "
+            "torsion towards anti."
         ),
     ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(

@@ -68,8 +68,9 @@ atoms when it turns some of them, other than its own two axis atoms, and not
 the others. For a pair that is the predicate option 2 needs, chained torsions
 included. Import it once it merges; do not write a second one.
 
-**Tier.** The warning is tier 1: it states a fact about the pair list (no
-row inside one copy of the body) where a torsion moved, and gates nothing.
+**Tier.** The warning is tier 1: it states a fact about the checks (the
+end-of-run search never looks inside one copy of a body, and the builder
+skips those pairs by default) where a torsion moved, and gates nothing.
 Option 2's "a rigid pair keeps its distance" is physics; the bond-count
 exclusion is named practice, surveyed in `docs/practice.md` § Which pairs
 inside a molecule a contact term checks. `exclude_same_body`'s default has
@@ -101,15 +102,17 @@ default gets one.
       say which pairs the skip covers, and that a torsion-moved pair is among
       them; the theory chapter's anti-bump paragraph says the same.
 - [x] The warning `RESTRAINT_BODY_CONTACTS_UNCHECKED` at plan end (`fit`
-      and `run_stage`): a phase with an anti-bump row, a body torsion whose
-      `angle` moved during the run, and no row inside one copy of that body
-      (`model.restraints.bodies_with_unchecked_contacts`). Audit rows
+      and `run_stage`): a phase with an anti-bump row at the start, and a
+      body torsion whose wrapped `angle` moved during the run. The message
+      counts the rows the list holds inside the body
+      (`model.restraints.body_own_rows`), which do not silence it. Audit rows
       (code and suggestion, tier 1), help entry, silence pair.
 - [x] Tests: the six-atom chain above (fires, and the folded pair still has
-      no row and no stale report); silent for an unturned torsion, for a list
-      built with `exclude_same_body=False`, for a body without torsions; the
-      biphenyl fit on both entry paths. Positive control: with the emitter's
-      gate disabled, both firing tests fail.
+      no row and no stale report); fires and counts the rows of a list built
+      with `exclude_same_body=False`; silent for an unturned torsion, for one
+      declared at −180 and written back as 180, for a body without torsions;
+      the biphenyl fit on both entry paths. Positive control: with the
+      emitter's gate disabled, both firing tests fail.
 - [x] Skill: a `RESTRAINT_BODY_CONTACTS_UNCHECKED` row in
       `references/diagnostics.md`.
 - [x] File WP-1816 for the bonds direction, coordinated with WP-1814, and

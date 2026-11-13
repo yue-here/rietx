@@ -12282,18 +12282,21 @@ def _body_contacts_unchecked_diagnostics(structure: Structure,
     cannot have folded anything the caller did not start from.
     """
     from .model.restraints import body_own_rows
+    from .params.bodies import wrap_degrees
 
     out: list[Diagnostic] = []
     for phase, start in zip(structure.phases, since, strict=True):
         if start is None:
             continue
-        before = {b.name: {t.name: t.angle for t in b.torsions}
+        # wrapped on both sides: write-back stores every torsion's angle
+        # wrapped, held or not, so a declared −180 comes back 180 unturned
+        before = {b.name: {t.name: wrap_degrees(t.angle) for t in b.torsions}
                   for b in start.rigid_bodies}
         turned_in: dict[str, list] = {}
         for body in phase.rigid_bodies:
             was = before.get(body.name, {})
             moved = [(t.name, was[t.name], t.angle) for t in body.torsions
-                     if t.name in was and t.angle != was[t.name]]
+                     if t.name in was and wrap_degrees(t.angle) != was[t.name]]
             if moved:
                 turned_in[body.name] = moved
         # the row count reads every row's image, so it runs only where a
@@ -12325,8 +12328,8 @@ def _body_contacts_unchecked_diagnostics(structure: Structure,
                             "bond); where a torsion brought "
                             "two of its atoms closer than you allow, add an "
                             "AntiBumpRestraint row for that pair with its own "
-                            "minimum, or restrain the torsion with a "
-                            "TorsionRestraint")))
+                            "minimum, or restrain or hold the torsion; a floor "
+                            "on a torsion's own two ends pushes it towards anti")))
     return out
 
 

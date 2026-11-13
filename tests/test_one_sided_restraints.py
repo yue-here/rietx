@@ -339,6 +339,13 @@ def test_an_unturned_torsion_or_a_rigid_body_stays_silent():
     from rietx.refine import _body_contacts_unchecked_diagnostics
 
     assert _body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0)) == []
+    # declared at −180, written back wrapped to 180 with nothing turned
+    unturned, since = _chain_run(0.0, 0.0)
+    since[0] = _chain_phase(-180.0, 0.0).model_copy(
+        update={"restraints": since[0].restraints})
+    unturned = Structure(phases=[_chain_phase(180.0, 0.0).model_copy(
+        update={"restraints": since[0].restraints})])
+    assert _body_contacts_unchecked_diagnostics(unturned, since) == []
     rigid = _chain_phase(0.0, 0.0, torsions=False)
     rigid.restraints = anti_bump_restraints(rigid, CHAIN_RULE, margin=CHAIN_MARGIN)
     assert body_own_rows(rigid) == {}
