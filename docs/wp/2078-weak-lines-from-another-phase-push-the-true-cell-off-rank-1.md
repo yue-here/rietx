@@ -247,6 +247,68 @@ What the table says:
   no candidate finds either phase, in 8-17 s, with `INDEX_INLIER_RETRY` and
   `INDEX_SEARCH_INCOMPLETE`. A floor is no answer there; it goes to WP-1969.
 
+**The trigger (2026-11-13).** Ruled (B), the floor runs only when the
+full list's search gives no answer, and the ruling asked first whether a
+trigger exists that stays silent on correct runs whose candidates are all
+`low`, SRM 660c among them. The package already has one test of "no answer":
+`workflow._no_agreement`, no lattice that two engines agree on. It is the
+inlier retry's trigger. Two readings of it were measured on all 19 lists plus
+the four host-system reruns, as picked, under `preset="full"`. That preset has
+no whole-run ceiling, but each (engine × system) unit keeps its own budget,
+and on a shared machine (load 12-88 on 10 cores) some units reached it (`*`).
+A cut unit can only remove candidates, and on every cut row the truth still
+ranked first. Each cell ran once.
+
+- *T1*, the test read on the first pass, before the inlier retry. It fires on
+  8 runs: fixtures (a) and (c), LaB₆ + cBN, the cpd-1g control, and four
+  correct runs, cpd-1a and cpd-1b each with all systems and with only the
+  host's system (the truth first, `low`). So it does not separate.
+- *T2*, the same test read after the inlier retry. It fires on 2 runs: (a)
+  and LaB₆ + cBN. It is silent on every run whose truth ranked first (13
+  lists, 17 runs, SRM 660c included) and on both controls. It misses two wrong
+  runs. (c) has its truth absent, but no floor tested finds it either. (d)
+  has its truth 2nd, which the floor would fix; there two engines agree on the
+  trigonal cell, so nothing says "no answer". Read off the earlier `quick`
+  runs (results.jsonl), T2 is also silent on every correct run. It fires
+  there on cpd-1b and cpd-1g too, both cut by the whole-run ceiling, which is
+  why the retry also requires an uncut search.
+
+| list | first pass agrees? | after inlier retry agrees? | truth | cut | load |
+|---|---|---|---|---|---|
+| (a) Mo + MoO₃ trace | no | **no** | — |  | 21-35 |
+| (b) double perovskite | yes | yes | 1m |  | 31-28 |
+| (c) Si + planted | no | yes | — |  | 26-29 |
+| (d) flat Si, picker splits | yes | yes | 2l |  | 27-28 |
+| magnetite | yes | yes | 1m |  | 29-35 |
+| fluorite, cubic only | yes | yes | 1m |  | 36-33 |
+| cpd-1a, cubic only | no | yes | 1l |  | 33-32 |
+| LaB₆ + cBN | no | **no** | — |  | 31-28 |
+| corundum, trigonal only | yes | yes | 1l | * | 27-21 |
+| cpd-1b, trigonal only | no | yes | 1l | * | 22-25 |
+| zircon | yes | yes | 1l | * | 21-26 |
+| zincite | yes | yes | 1l |  | 33-30 |
+| brucite | yes | yes | 1l | * | 30-28 |
+| FAP | yes | yes | 1l |  | 28-31 |
+| SRM 660c LaB₆ | yes | yes | 1l |  | 28-13 |
+| NAC | yes | yes | 1l |  | 12-41 |
+| fluorite | yes | yes | 1m | * | 41-30 |
+| corundum | yes | yes | 1l | * | 28-65 |
+| cpd-1a | no | yes | 1l | * | 65-45 |
+| cpd-1c | yes | yes | 1l | * | 47-88 |
+| cpd-1b | no | yes | 1l | * | 82-26 |
+| cpd-1g (control) | no | yes | none of three | * | 26-25 |
+| HL2-1 (control) | yes | yes | no truth | * | 25-88 |
+
+"Agrees" means a lattice two engines found. Truth: rank, then grade initial;
+for the mixtures, the host. The 5 % floor on (a) puts its truth first,
+`medium`, in 20 s (5 % keeps 5 of the host's 6 lines). The other floors
+(0.5, 1 and 2 %) put it first too.
+
+**The retry as built, on the T1 lists (2026-11-13).** The code at
+`a6bf12e82`, from a snapshot, `preset="full"`, `[dev]`, arm64 Mac, load 30-80:
+
+IMPL_TABLE
+
 **Licensing.** Concepts only from papers. No program code is consulted.
 
 ### Inherited
@@ -298,7 +360,7 @@ What the table says:
       rank, grade, wall time, controls gaining a `medium` candidate, and
       SRM 660c LaB₆ at rank 1. Floors at 0.5, 1 and 2 %.
       *Done 2026-11-12 at 0.5, 1 and 2 % on the fixtures, at 1 % on every family; Context, "Measured".*
-- [ ] Decision (maintainer): the design, the floor's value and its tier, from
+- [x] Decision (maintainer): the design, the floor's value and its tier, from
       the brief tasks 1-4 produce. Recorded here as `Decided YYYY-MM-DD:` and
       answered on #1291.
       *Ruled by Yue 2026-11-13: option (B), an intensity floor tried as a
@@ -306,15 +368,26 @@ What the table says:
       ("no answer") is measured first, and must not fire on correct runs
       whose candidates are all `low`, such as SRM 660c. If no trigger
       separates, the fallback ((C) plus a printed suggestion) is not ruled
-      and comes back to Yue.* The floor's value is still open.
-- [ ] Build what the decision picks, with its `_audit` row and any
+      and comes back to Yue.* Decided 2026-11-13: (B). The trigger
+      separates (Context, "The trigger"): no lattice two engines agree on,
+      read after the inlier retry. The value, 5 % of the strongest, and its
+      tier 2 are Bergmann et al.'s, settled by the runner under the tier rule.
+      The answer on #1291 is owed by the shift lead, from the PR.
+- [x] Build what the decision picks, with its `_audit` row and any
       `INDEXING_THRESHOLDS_VERSION` move.
-- [ ] Reader-output diff: `str(IndexingResult)` on the acceptance rows before
+      *Done 2026-11-13: `engines.WEAK_LINE_RETRY_FLOOR`, `INDEX_WEAK_LINE_RETRY`,
+      three tier-2 rows; the version stays 1.12 (an "Also 1.12" note).*
+- [x] Reader-output diff: `str(IndexingResult)` on the acceptance rows before
       and after, in the PR body, for the maintainer.
-- [ ] Tests: the three fixtures as rows, a test that a `from_positions` list
+      *Done 2026-11-13: no acceptance row triggers the retry, so their text is
+      unchanged; fixture (a)'s before and after are in the PR body.*
+- [x] Tests: the three fixtures as rows, a test that a `from_positions` list
       searches bit-identically, obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: a row in `references/` keyed by the new name if the arm or the
+      *Done 2026-11-13: (a)'s xfail flipped; a position-only list sets no line
+      aside, so the retry's branch is never entered.*
+- [x] Skill: a row in `references/` keyed by the new name if the arm or the
       floor shows in the result, or "none" and why.
+      *Done 2026-11-13: `references/abstention.md`, keyed by the code.*
 
 ## Acceptance
 
