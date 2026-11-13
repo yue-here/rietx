@@ -953,19 +953,16 @@ def _unsupported_silent() -> list:
 def _restraint_compile(*restraints) -> list:
     """``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` from ``resolve_phase_restraints``
     on the bodies of ``tests/test_restraint_body_refusal.py``, one restraint
-    at a time: the refusal raises with its record."""
+    at a time: the warning arrives with the compiled restraints."""
     from rietx.crystallography.structure_factor import compile_phase_sites
-    from rietx.model.restraints import RestraintRefused, resolve_phase_restraints
+    from rietx.model.restraints import resolve_phase_restraints
     from tests.test_restraint_body_refusal import _phase
 
     found: list = []
     for r in restraints:
         phase = _phase([r])
-        try:
-            resolve_phase_restraints(phase, 0, compile_phase_sites(phase),
-                                     phase.cell.lengths_angles())
-        except RestraintRefused as err:
-            found.append(err.diagnostic)
+        resolve_phase_restraints(phase, 0, compile_phase_sites(phase),
+                                 phase.cell.lengths_angles(), found)
     return found
 
 

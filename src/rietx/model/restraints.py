@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import functools
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -181,6 +181,10 @@ class CompiledRestraints:
     """
 
     items: list
+    #: compile-time findings about the restraints (``Diagnostic``), which the
+    #: result build carries to ``diagnostics``:
+    #: ``RESTRAINT_ON_FIXED_BODY_GEOMETRY``
+    findings: list = field(default_factory=list)
 
     @property
     def n_rows(self) -> int:
@@ -190,13 +194,18 @@ class CompiledRestraints:
 # ----------------------------------------------------------------------
 # compile-time resolution (minimum-image freeze)
 # ----------------------------------------------------------------------
-def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
+def resolve_phase_restraints(phase, ip: int, sites, cell,
+                             findings: list | None = None) -> list:
     """Freeze the PBC image of every restraint of ``phase`` at its coordinates.
 
     ``sites`` is the phase's :class:`PhaseSites` (frozen orbit-op subsets);
     ``cell`` its compile-time (a, b, c, α, β, γ).  Returns the ordered list of
-    compiled restraint objects (empty if the phase declares none).
+    compiled restraint objects (empty if the phase declares none).  A
+    restraint on geometry a rigid body holds fixed is kept as a row and its
+    ``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` warning appended to ``findings``.
     """
+    if findings is None:
+        findings = []
     g = _metric_g(cell)
     out: list = []
     eye, zero = np.eye(3), np.zeros(3)
@@ -212,9 +221,9 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
                 target, side = r.min_distance, "min"
             else:
                 target, side = r.target, None
-                _refuse_fixed_body_geometry(
+                findings.extend(_fixed_body_findings(
                     phase, k, "bond", [r.atom_i, r.atom_j],
-                    [(eye, zero), (rot, tr + n)])
+                    [(eye, zero), (rot, tr + n)]))
             out.append(_Bond(ip, r.atom_i, r.atom_j, rot, tr, n,
                              target, r.sigma, r.weight, side))
         elif isinstance(r, AngleRestraint):
@@ -225,9 +234,9 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
                                         r.op_index_i, r.translation_i, g)
             rk, tk, nk = _resolve_image(sites, r.atom_k, x_j, x_k,
                                         r.op_index_k, r.translation_k, g)
-            _refuse_fixed_body_geometry(
+            findings.extend(_fixed_body_findings(
                 phase, k, "angle", [r.atom_i, r.atom_j, r.atom_k],
-                [(ri, ti + ni), (eye, zero), (rk, tk + nk)])
+                [(ri, ti + ni), (eye, zero), (rk, tk + nk)]))
             out.append(_Angle(ip, r.atom_i, r.atom_j, r.atom_k,
                              ri, ti, ni, rk, tk, nk,
                              r.target_deg, r.sigma, r.weight))
@@ -235,37 +244,27 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
             plane = isinstance(r, PlanarityRestraint)
             item = (_resolve_plane if plane else _resolve_torsion)(
                 phase, ip, sites, cell, g, r)
-            _refuse_fixed_body_geometry(
+            findings.extend(_fixed_body_findings(
                 phase, k, "planarity" if plane else "torsion", item.atoms,
                 [(rot, t + n) for rot, t, n in zip(item.R, item.t, item.n,
-                                                   strict=True)])
+                                                   strict=True)]))
             out.append(item)
         else:  # ValueRestraint
             out.append(_Value(r.path, r.target, r.sigma, r.weight, ip))
     return out
 
 
-class RestraintRefused(ValueError):
-    """A restraint the compile refuses (WP-1814).
-
-    ``diagnostic`` is the record the message was built from, so a caller can
-    branch on its ``code`` rather than on the wording.
-    """
-
-    def __init__(self, diagnostic: Diagnostic):
-        self.diagnostic = diagnostic
-        super().__init__(f"{diagnostic.code}: {diagnostic.message} "
-                         f"{diagnostic.suggestion}")
-
-
-def _refuse_fixed_body_geometry(phase, k: int, kind: str, atoms: list,
-                                images: list) -> None:
+def _fixed_body_findings(phase, k: int, kind: str, atoms: list,
+                         images: list) -> list:
     """``RESTRAINT_ON_FIXED_BODY_GEOMETRY``: restrained or refined, never both.
 
     Restraint ``k`` of ``phase`` (a bond, angle, torsion or planarity
     restraint, entry m being atom ``atoms[m]`` at the frozen image
-    ``images[m]`` = (R, t + n)) is refused when its quantity is one its rigid
-    body holds fixed, so its row is a constant that no parameter moves:
+    ``images[m]`` = (R, t + n)) is reported, as a one-element list holding a
+    warning (an empty list when it is not), when its quantity is one its rigid
+    body holds fixed, so its row is a constant that no parameter moves.  The
+    row is kept: a competent refiner may want it as the template's penalty
+    (the maintainer's ruling, 2026-11-13).  The test:
 
     * every entry is an atom of one body, all at one image (one copy of the
       body: an isometry of the template, which keeps every distance, angle,
@@ -279,44 +278,47 @@ def _refuse_fixed_body_geometry(phase, k: int, kind: str, atoms: list,
 
     The rule reads the declaration, never ``vary``: a stage that holds a
     torsion keeps the restraint as a constant row, as rietx keeps any row of
-    a held parameter.  Only the two axis atoms count as on the axis, not an
+    a held parameter, which is also the scope: the structural reading, on
+    bodies with no Z-matrix.  Only the two axis atoms count as on the axis, not an
     atom that happens to sit on the line, so any error lands on accepting a
     restraint.  The body's pose (origin, rotation) and the cell move a copy
     as a whole and change none of these quantities (the template is in Å).
     A Tether or anti-bump row is one-sided and is not checked.
     """
     if not phase.rigid_bodies:
-        return
+        return []
     r0, s0 = images[0]
     for rot, shift in images[1:]:
         if not (np.array_equal(rot, r0)
                 and np.allclose(shift, s0, rtol=0.0, atol=_SAME_IMAGE_TOL)):
-            return
+            return []
     labels = [phase.atoms[j].label for j in atoms]
     named = set(labels)
     body = next((b for b in phase.rigid_bodies if named <= set(b.atoms)), None)
     if body is None:
-        return
+        return []
     for t in body.torsions:
         off_axis = named - set(t.axis)
         turned = off_axis & set(t.moves)
         if turned and turned != off_axis:
-            return
+            return []
     unique = list(dict.fromkeys(labels))
     torsions = (f"none of its {len(body.torsions)} declared torsions turns some "
                 "of them and not the others" if body.torsions
                 else "it declares no torsion")
-    raise RestraintRefused(Diagnostic(
-        level="error", code="RESTRAINT_ON_FIXED_BODY_GEOMETRY",
+    return [Diagnostic(
+        level="warning", code="RESTRAINT_ON_FIXED_BODY_GEOMETRY",
         where=[f"{phase.name} {lab}" for lab in unique],
         message=(f"The {kind} restraint {k} of phase {phase.name!r} on "
                  f"{', '.join(labels)} measures geometry rigid body "
                  f"{body.name!r} holds fixed: every atom is in one copy of the "
-                 f"body and {torsions}, so no parameter moves the row."),
+                 f"body and {torsions}, so no parameter moves the row. The row "
+                 f"is kept."),
         suggestion=("Drop the restraint, declare a torsion of the body that "
-                    "changes it, or take the atoms out of the body and "
-                    "restrain them as free atoms."),
-    ))
+                    "changes it, take the atoms out of the body and restrain "
+                    "them as free atoms, or keep the row as the template's "
+                    "penalty."),
+    )]
 
 
 def _resolve_plane(phase, ip, sites, cell, g, r) -> _Plane:

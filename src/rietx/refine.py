@@ -9437,6 +9437,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if restraints_report is not None:
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
+    if model.restraints is not None:
+        # compile-time findings about the declared rows (WP-1814 C1)
+        diagnostics = diagnostics + model.restraints.findings
 
     # Bonding geometry, with esds through the *whole* covariance (WP-1072,
     # McCusker §10) — built here because that covariance is read off the final

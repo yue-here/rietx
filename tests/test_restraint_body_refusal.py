@@ -4,13 +4,14 @@ A bond, angle, torsion or planarity restraint whose atoms all sit in one copy
 of one rigid body, with no declared torsion of the body able to change the
 quantity, is a constant row: the body places those atoms from its template,
 so no parameter moves it.  ``model.restraints.resolve_phase_restraints``
-refuses it at compile with ``RESTRAINT_ON_FIXED_BODY_GEOMETRY``.
+warns at compile with ``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` and keeps the row
+(the maintainer's ruling, 2026-11-13).
 
 The rule is a set rule per torsion: the quantity changes unless the
 restraint's atoms other than the torsion's two axis atoms all lie in
 ``moves`` or all lie outside it.  The first test is its verification against
 the geometry itself: on a generic body with a chained torsion, for every bond,
-bond angle and torsion of its atoms, the rule refuses exactly the quantities
+bond angle and torsion of its atoms, the rule reports exactly the quantities
 that stay put when every torsion twists and the pose and cell move.  The rest
 check the seat (compile, before any fit) and each accepting arm.
 """
@@ -27,7 +28,7 @@ from rietx import Instrument, PatternData, Refinement
 from rietx.crystallography.bodies import add_body, body_fractional
 from rietx.crystallography.structure_factor import compile_phase_sites
 from rietx.model.forward import compile_model
-from rietx.model.restraints import RestraintRefused, _refuse_fixed_body_geometry
+from rietx.model.restraints import _fixed_body_findings
 from rietx.params.derived import cartesian_frame
 from rietx.schemas.common import Parameter
 from rietx.schemas.structure import (
@@ -118,19 +119,16 @@ def _quantity(x: np.ndarray, idx: tuple[int, ...]) -> float:
 
 def _refused(phase: Phase, idx: tuple[int, ...]) -> bool:
     images = [(np.eye(3), np.zeros(3))] * len(idx)
-    try:
-        _refuse_fixed_body_geometry(phase, 0, "test", [i + 1 for i in idx], images)
-    except RestraintRefused as err:
-        assert err.diagnostic.code == CODE
-        return True
-    return False
+    found = _fixed_body_findings(phase, 0, "test", [i + 1 for i in idx], images)
+    assert all(d.code == CODE for d in found) and len(found) <= 1
+    return bool(found)
 
 
 def test_the_rule_refuses_exactly_what_the_body_holds_fixed():
-    """Every bond, angle and torsion over the chain body's atoms: refused if and
+    """Every bond, angle and torsion over the chain body's atoms: reported if and
     only if it stays put while every torsion twists and the pose and cell move.
 
-    This is the positive control: with the rule removed nothing is refused, and
+    This is the positive control: with the rule removed nothing is reported, and
     each of the 45 fixed quantities fails the assertion (501 change)."""
     phase = _phase()
     rng = np.random.default_rng(1814)
@@ -178,18 +176,20 @@ def test_the_rule_refuses_exactly_what_the_body_holds_fixed():
     (BondRestraint(atom_i=_index("T0"), atom_j=_index("T1"), target=1.2, sigma=0.01),
      "bond"),
 ])
-def test_a_restraint_on_fixed_body_geometry_is_refused_at_compile(restraint, kind):
-    with pytest.raises(RestraintRefused, match=CODE) as err:
-        _compile(_phase([restraint]))
-    d = err.value.diagnostic
-    assert d.code == CODE and d.level == "error"
+def test_a_restraint_on_fixed_body_geometry_warns_at_compile_and_keeps_its_row(
+        restraint, kind):
+    model = _compile(_phase([restraint]))
+    (d,) = model.restraints.findings
+    assert d.code == CODE and d.level == "warning"
     assert f"The {kind} restraint 0 of phase 'p'" in d.message
     assert d.where and all(w.startswith("p ") for w in d.where)
-    assert isinstance(err.value, ValueError)
+    assert "keep the row" in d.suggestion
+    # the row is in the fit, a constant: the maintainer's ruling is warn, keep it
+    assert model.restraints.n_rows >= 1
 
 
 def test_one_shared_non_identity_image_is_still_one_copy():
-    """Every entry at the inversion image: the same copy turned over, refused;
+    """Every entry at the inversion image: the same copy turned over, reported;
     one entry moved to another image is a contact between two copies, accepted."""
     phase = _phase()
     ops_r, _ = compile_phase_sites(phase).ops[_index("K0")]
@@ -197,11 +197,10 @@ def test_one_shared_non_identity_image_is_still_one_copy():
     chain = [_index(k) for k in ("K6", "K0", "K1", "K2")]
     same = TorsionRestraint(atoms=chain, target_deg=0.0, sigma=5.0,
                             op_indices=[inv] * 4, translations=[(1, 0, 0)] * 4)
-    with pytest.raises(RestraintRefused, match=CODE):
-        _compile(_phase([same]))
+    assert [d.code for d in _compile(_phase([same])).restraints.findings] == [CODE]
     split = TorsionRestraint(atoms=chain, target_deg=0.0, sigma=5.0,
                              op_indices=[inv] * 3 + [0], translations=[(1, 0, 0)] * 4)
-    _compile(_phase([split]))
+    assert _compile(_phase([split])).restraints.findings == []
 
 
 @pytest.mark.parametrize("restraint", [
@@ -225,26 +224,29 @@ def test_one_shared_non_identity_image_is_still_one_copy():
 def test_a_restraint_something_can_move_is_accepted(restraint):
     model = _compile(_phase([restraint]))
     assert model.restraints is not None and model.restraints.n_rows >= 1
+    assert model.restraints.findings == []
 
 
 def test_the_declaration_decides_not_vary():
     """A held torsion still lets its restraint through: the rule reads what the
     body declares, so a stage that holds the twist keeps a constant row, as it
-    keeps any row of a held parameter.  Without the torsion the same restraint
-    is refused."""
+    keeps any row of a held parameter (the scope the maintainer settled on that
+    precedent, 2026-11-13).  Without the torsion the same restraint is
+    reported."""
     bond = BondRestraint(atom_i=_index("K0"), atom_j=_index("K3"), target=3.0, sigma=0.01)
     phase = _phase([bond])
     assert not any(t.vary for t in phase.rigid_bodies[0].torsions)
-    _compile(phase)
-    with pytest.raises(RestraintRefused, match=CODE):
-        _compile(_phase([bond], torsions=CHAIN_TORSIONS[1:]))
+    assert _compile(phase).restraints.findings == []
+    fewer = _compile(_phase([bond], torsions=CHAIN_TORSIONS[1:]))
+    assert [d.code for d in fewer.restraints.findings] == [CODE]
 
 
-def test_a_fit_stops_before_the_first_stage_and_says_why():
+def test_a_fit_runs_and_the_warning_reaches_the_result():
     bond = BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=1.5, sigma=0.01)
     tt = np.arange(10.0, 40.0, 0.05)
     pattern = PatternData(two_theta=tt.tolist(), intensity=(100.0 + 0.0 * tt).tolist())
     ref = Refinement(Structure(phases=[_phase([bond])]), INS, history=False)
-    with pytest.raises(RestraintRefused, match=CODE) as err:
-        ref.fit(pattern)
-    assert "Drop the restraint" in str(err.value)
+    result = ref.fit(pattern)
+    found = [d for d in result.diagnostics if d.code == CODE]
+    assert len(found) == 1 and found[0].level == "warning"
+    assert "Drop the restraint" in found[0].suggestion
