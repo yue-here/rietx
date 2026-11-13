@@ -21,6 +21,7 @@
     busy = false,
     blocked = null,
     stats = null,
+    stages = null,
     mode = $bindable("plan"),
     onapply = () => {},
     onrevert = () => {},
@@ -32,16 +33,20 @@
     blocked?: string | null;
     /** the fit's statistics, shown only while the graphs are hidden; null otherwise */
     stats?: { rwp: number | null; gof: number | null; immature: boolean } | null;
+    /** how many stages the project's plan declares; null where it declares none */
+    stages?: number | null;
     mode?: "cycle" | "plan";
     onapply?: () => void;
     onrevert?: () => void;
     onrefine?: () => void;
   } = $props();
 
-  const CHOICES = [
+  // the plan's choice names its length, as the prototype's does
+  const CHOICES = $derived([
     { id: "cycle", label: "One cycle", title: "One least-squares cycle on what is ticked" },
-    { id: "plan", label: "Staged plan", title: "The project's staged plan" },
-  ] as const;
+    { id: "plan", label: stages ? `Staged plan, ${stages} stage${stages === 1 ? "" : "s"}` : "Staged plan",
+      title: "The project's staged plan" },
+  ] as const);
 
   const count = $derived(touched ? `${touched} pending` : "");
   const note = $derived(invalid ? "invalid edit" : count);

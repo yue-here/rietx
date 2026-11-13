@@ -16,7 +16,10 @@
    *   place each is chosen. The choice is kept per project in
    *   `ProjectDoc.ui` (the maintainer's ruling of 2026-11-11, "Yes, build it");
    * - each legend label sits beside the pane its curve is drawn in and is its
-   *   curve's switch (`gui/STYLE.md` § Plots);
+   *   curve's switch (`gui/STYLE.md` § Plots). The excluded points have no
+   *   label: the shading marks where they are (interaction rule 4), and the
+   *   Observed switch shows and hides them with the rest of the data (the
+   *   maintainer's ruling of 2026-11-13);
    * - the fitted range and each excluded region is an object on the plot
    *   (interaction rules 1, 3, 4, 12): a click on its shading selects it, its
    *   selection bar holds the typed bounds and the channel count, Delete or
@@ -28,7 +31,8 @@
    * - the intensity opens on square root, as the prototype's does, until the
    *   project remembers another choice.
    *
-   * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
+   * The chart is today's `lib/pattern.ts` figure, through its `/next` copy
+   * (`next/pattern.ts`, drawn to the prototype by the polish), drawn without the peak layer,
    * which the peaks-and-indexing workflow brings (R6). The three-effect split
    * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
    */
@@ -42,7 +46,7 @@
     residual, shows, toggleCurve,
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
-  import type { Curves, Overlay, PatternChart } from "../lib/pattern";
+  import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import { statusReadout, type StatusReadout } from "./readout";
@@ -107,7 +111,7 @@
 
   let host: HTMLDivElement | undefined = $state();
   let chart: PatternChart | null = null;
-  let chartModule: typeof import("../lib/pattern") | null = null;
+  let chartModule: typeof import("./pattern") | null = null;
   let curves: Curves | null = null;
   let held: Window | null = $state.raw(null);
   let loadError = $state("");
@@ -147,7 +151,14 @@
   let selection = $state<Selection | null>(null);
   let note = $state("");
 
-  const toggles = $derived(held ? curveToggles(held, residual(kind, held).label) : []);
+  // the excluded points are no curve of their own here: their shading marks
+  // them, so the legend lists no "Excluded" (ruled 2026-11-13), and `drawn`
+  // hides them with the observed points
+  const toggles = $derived(held
+    ? curveToggles(held, residual(kind, held).label).filter((t) => t.id !== "masked") : []);
+  /** What the chart and the readout leave out: `hidden`, plus the excluded
+   *  points while the observed ones are hidden. */
+  const drawn = $derived(hidden.includes("obs") ? [...hidden, "masked"] : hidden);
   const dataOnly = $derived(isDataOnly(toggles, hidden));
   const stats = $derived(result?.statistics ?? null);
   const immature = $derived(Boolean(result?.maturity?.immature));
@@ -161,7 +172,7 @@
 
   function overlayNow(): Overlay {
     return { protocol, extent, peaks: null, groups: null, peaksActive: false,
-             candidate: null, hidden, held: untrack(() => held) };
+             candidate: null, hidden: drawn, held: untrack(() => held) };
   }
 
   let fetchSeq = 0;
@@ -170,10 +181,10 @@
   async function drawChart() {
     if (!host) return;
     const seq = ++fetchSeq;
-    let mod: typeof import("../lib/pattern");
+    let mod: typeof import("./pattern");
     let c: Curves;
     try {
-      mod = chartModule ??= await import("../lib/pattern");
+      mod = chartModule ??= await import("./pattern");
       c = await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
@@ -204,10 +215,10 @@
       // the x title is the chart module's own string, and uPlot reads the
       // live pane's axis at each draw: blank it there. Its strip stays, so
       // nothing under the plot moves, and the x hint sits in it
-      const xAxis = chart.fig.panes.resid?.axes?.[0];
+      const xAxis = chart.fig.panes.ticks?.axes?.[0];
       if (xAxis) {
         xAxis.label = () => (exporting ? "2θ (°)" : "");
-        chart.fig.panes.resid.redraw(false, false);
+        chart.fig.panes.ticks.redraw(false, false);
       }
       applied = untrack(() => ({ kind, scale, theme }));
       chart.fig.onCursor = (hit) => (hoverAt = hit ? hit.x : null);
@@ -293,7 +304,7 @@
 
   // a knob applies what moved, and fetches nothing
   $effect(() => {
-    const k = kind, s = scale, h = hidden, t = theme;
+    const k = kind, s = scale, h = drawn, t = theme;
     void protocolKey;
     void extentKey;
     const o = untrack(overlayNow);
@@ -329,7 +340,7 @@
 
   $effect(() => {
     const reading = statusReadout(held, hoverAt, {
-      kind, wavelengths, hidden,
+      kind, wavelengths, hidden: drawn,
       chi2Base: untrack(() => chart?.fig.chi2Base() ?? 0),
     });
     untrack(() => onreadout(reading));
@@ -704,7 +715,7 @@
       const i = phases.findIndex((t) => t.id === id);
       return phases.length > 1 ? c.phase[i % c.phase.length] : c.obs;
     }
-    return ({ obs: c.obs, masked: c.obs, calc: c.calc, bkg: c.bkg, diff: c.diff } as any)[id]
+    return ({ obs: c.obs, calc: c.calc, bkg: c.bkg, diff: c.diff } as any)[id]
       ?? "currentColor";
   }
 </script>
@@ -775,7 +786,7 @@
           </button>
         {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="hint xhint" style:top="{geom.resid.top + geom.resid.height + X_TICKS}px"
+        <span class="hint xhint" style:top="{geom.ticks.top + geom.ticks.height + X_TICKS}px"
           style:height="{X_STRIP}px" style:right="calc(100% - {plotX.left + plotX.width}px)"
           onpointerenter={(e) => showTip("x", e.currentTarget, false)} onpointerleave={hideTip}
           >{hints.x}</span>
@@ -793,8 +804,8 @@
             disabled={!!l.absent} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
             onclick={() => toggle(l.id)}>
             <svg class="sw" viewBox="0 0 16 12" aria-hidden="true" style:color={swatchColor(l.id)}>
-              {#if l.id === "obs" || l.id === "masked"}
-                <path d="M5 3l6 6M11 3l-6 6" class:faint={l.id === "masked"} />
+              {#if l.id === "obs"}
+                <path d="M5 3l6 6M11 3l-6 6" />
               {:else if l.id.startsWith("ticks:")}
                 <path d="M8 1.5v9" />
               {:else if l.id === "bkg"}
@@ -927,10 +938,13 @@
     color: var(--bad);
   }
 
+  /* the plot is a card on the window's ground, as the prototype draws it */
   .plot {
     position: relative;
     flex: 1 1 auto;
     min-height: 300px;
+    border-radius: 6px;
+    background: var(--panel);
   }
 
   .host {
@@ -1084,10 +1098,6 @@
     fill: none;
     stroke: currentColor;
     stroke-width: 1.6;
-  }
-
-  .sw .faint {
-    opacity: 0.45;
   }
 
   /* floating layers: the panel ground, a hairline and one shadow */

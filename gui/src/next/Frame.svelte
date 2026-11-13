@@ -708,7 +708,7 @@
             <div class="pane"><p class="unbuilt">Not built yet.</p></div>
           {/if}
           <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
-            {busy} {blocked} stats={barStats} onapply={() => applyPending()}
+            {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
         {/if}
       </section>
@@ -836,7 +836,8 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
+    /* the page ground, as the prototype's columns: the plot is a panel-ground card on it */
+    background: var(--bg);
   }
 
   .model {
@@ -844,7 +845,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
+    background: var(--bg);
   }
 
   .graphs + .model {

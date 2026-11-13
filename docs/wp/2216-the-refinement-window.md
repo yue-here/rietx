@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — #1535 and the readout follow-up #1536 merged; the menus-and-axes PR open (#1537)
+Milestone: gui-overhaul · Status: 🔄 2026-11-13 — #1535, #1536 and #1537 merged; the polish PR open (#1538), the 2026-11-13 rulings applied
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -134,6 +134,54 @@ The first PR's three questions, answered on 2026-11-11.
   matching" and "Fix N matching" while a filter is typed, and "Free all N" and "Fix all N"
   otherwise.
 
+- **The polish: the prototype is the ruling** (the maintainer, 2026-11-11, "Merge, then
+  polish"). For every visible difference between `/next` and the prototype on R2's screens,
+  `/next` takes the prototype's. Where that would break a written rule, the rule wins
+  (`gui/STYLE.md` principle 9), and the difference is listed below with its rule.
+  - *Fixed in the polish PR*: Parameters' filter box, and a row of links that scrolls to each
+    band; bands 44 px tall in the band face under a strong rule; 32 px rows, indented by
+    depth; each group head counting its free members ("2 free"); drawn checkboxes; value
+    boxes tinted and sized by their own column; units muted and smaller; the atom table's
+    header reads Wyckoff and Biso Å², with each column's box beside its word, the atom's name
+    in the medium weight and its Wyckoff letter muted. On the graph: the reflection ticks are
+    lenses at the foot, under the difference, and carry the 2θ labels; the difference pane is
+    76 px over a ±3 esd band; observed points are crosses; intensity tick labels abbreviate
+    thousands (20k), and a √ or log axis takes 1, 2 and 5 times each power of ten; the plot
+    is a card on the window's ground. The action bar reads "Staged plan, N stages".
+  - *Kept, each by a written rule or ruling*: no horizontal gridlines (`gui/STYLE.md`
+    § Plots); Rwp and every axis label in the mono face (§ Type); the Intensity control in the
+    axis menu, the axis hints and bare 2θ labels with one `° 2θ` hint (§ Rulings, "Yes, build
+    it"); the ⋯ menus (§ Rulings, Free and Fix); Background drawn by default (the readout ruling
+    reads Background); "2 findings" in the status bar (the first PR's consent list). Real data
+    stays: "20 free of 81", no Extinction row, the project name `fap`. No empty User variables
+    band is drawn, since `fap` has none and adding one is a feature.
+  - *A rule reconciled*: `gui/CLAUDE.md` (WP-1032) put a tick in "its own band between
+    pattern and residual", which describes today's page. `gui/STYLE.md` § Plots and the
+    prototype put the ticks at the foot. The polish follows STYLE.md at `/next`. Since the
+    2026-11-13 rulings the gui/CLAUDE.md clause says the band sits at the foot. Today's page,
+    `rietx watch` and `rietx compare` still draw it between pattern and residual, through
+    `src/rietx/viz/static/rxplot.mjs`, until the swap. The clause stays one line, because
+    gui/CLAUDE.md sits at its 667-line cap (`tests/test_docs_consistency.py`).
+
+- **The polish's three questions and the tick band, ruled by Yue 2026-11-13** (answering
+  § Questions 2 in the session before that day's shift):
+  - The atom table's Mult column goes. The Wyckoff symbol already carries the multiplicity,
+    and without the column the table fits its panel: 784 px wide in a 784 px panel at a
+    1440 px window, measured in chromium, where it was 800 px with Mult.
+  - Excluded regions, and the range outside the fitted range, show as shaded regions on the
+    plot. Yue gave the reason: the faint crosses alone are near impossible to tell apart under
+    a model curve. `/next` already drew that shading through `lib/plot.ts:maskShapes`. The
+    `fap` example's only excluded region is 130-130.04° 2θ, so the earlier pictures could not
+    show it. The `ruled-*` pictures set a range and a region to show it.
+  - The legend's "Excluded" entry goes. Yue had no strong feelings, and the lead settled it:
+    the shading marks the excluded points (`gui/STYLE.md` interaction rule 4). Settled by
+    Claude under the same rule: the excluded points stay drawn in their faint crosses, and the
+    Observed switch now shows and hides them with the rest of the data.
+  - GoF stays on the title line, after Rwp.
+  - The tick band sits at the foot (`gui/STYLE.md` § Plots, the prototype), and the
+    gui/CLAUDE.md clause is rewritten to say so. This went to Yue as a consent line, and Yue
+    did not object.
+
 ## Questions
 
 Filled in by the session that builds each PR.
@@ -141,6 +189,16 @@ Filled in by the session that builds each PR.
 1. **Axis titles on the Pattern graph.** The prototype draws none; `/next` drew today's
    (`intensity (√)`, `(obs−calc)/σ`). Keep them, or drop them as the prototype does?
    Answered 2026-11-11: drop them for unit hints with menus (§ Rulings, "Yes, build it").
+2. **Three things `/next` draws and the prototype does not: keep or drop each.** The polish
+   left them alone for the maintainer.
+   - The atom table's Mult column (each site's multiplicity). At a 1440 px window the table
+     is 800 px wide in a 784 px panel, so Mult runs 16 px past the edge and the table scrolls
+     sideways. Without it the table is 760 px and fits.
+   - The legend's "Excluded" entry, for the observed points outside the fitted range.
+   - GoF on the graph's title line, after Rwp.
+
+   Answered 2026-11-13: drop Mult, shade the excluded regions and drop the legend entry, keep
+   GoF (§ Rulings, "The polish's three questions").
 
 ## References
 
@@ -149,6 +207,39 @@ Filled in by the session that builds each PR.
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-13** — a ghostshift runner applied Yue's 2026-11-13 rulings to the polish PR,
+  #1538, after merging `origin/main` into it.
+  - *Done*: `gui/src/next/Params.svelte` drops the Mult column. `gui/src/next/Pattern.svelte`
+    leaves "masked" out of the legend and hides the excluded points while Observed is hidden;
+    `CURVE_WORDS` loses "Excluded". The gui/CLAUDE.md tick clause is rewritten. Pictures:
+    `docs/wp/2216-screenshots/ruled-*.png`, listed in that directory's README.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): the atom
+    table is 784 px in a 784 px panel at a 1440 px window, with no sideways scroll. A real
+    click on Observed hid the excluded points and left the shading. The gate counts are in
+    the PR body.
+  - *Not generalised*: today's page keeps its "masked" toggle and its Mult column until the
+    swap retires it.
+  - *Next*: Yue's glance at the `ruled-*` shading, then the merge.
+
+- **2026-11-12** — a ghostshift runner built the polish PR, #1538, under the ruling "Merge,
+  then polish" (§ Rulings).
+  - *Done*: `gui/src/next/Params.svelte` drawn to the prototype (§ Rulings lists each
+    difference). The chart draws through `/next`'s own copies, `gui/src/next/rxplot.mjs` and
+    `gui/src/next/pattern.ts`, under gui/CLAUDE.md's rule for a shared module the rebuild
+    changes, so today's page, `rietx watch` and `rietx compare` are untouched. The copy's
+    header lists what differs from the original. `ActionBar.svelte` takes the plan's stage
+    count from `project.json`'s plan. Pictures: `docs/wp/2216-screenshots/polish-*.png`, each
+    paired with an `r2b-*` or `readout-hover-*` picture taken before.
+  - *Not generalised*: `src/rietx/viz/static/rxplot.mjs` keeps gridlines, square markers and
+    the tick band between the panes, for today's page, `rietx watch` and `rietx compare`. The
+    swap decides whether those pages follow.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): see the
+    PR body. The atom table with Mult: 800 px in a 784 px panel at a 1440 px window.
+  - *Gotchas*: next.css gives every plain button a 30 px height, which a value box inherited;
+    the box sets its own. A √ axis's splits are measured in pixels, and before the first layout
+    the plot has no height, so the 22 px thinning waits for it.
+  - *Next*: the maintainer's look at the `polish-*` pictures, and § Questions 2.
 
 - **2026-11-11** — a ghostshift runner built the third PR, #1537: the phase and atom menus,
   Free and Fix in a menu, and the axes as ruled.
