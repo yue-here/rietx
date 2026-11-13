@@ -4315,6 +4315,7 @@ def from_structure(structure: Structure, *,
         refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
+        refuse_parent_cell,
     )
 
     job, lambda1, lambda2, ratio = _radiation(instrument)
@@ -4454,6 +4455,7 @@ def from_structure(structure: Structure, *,
     for index, phase in enumerate(structure.phases):
         refuse_operation_list(phase, "a FullProf `.pcr`")
         refuse_distortion_modes(phase, "a FullProf `.pcr`")
+        refuse_parent_cell(phase, "a FullProf `.pcr`")
         refuse_magnetic_phase(phase, "a FullProf `.pcr`")
         phase, restated = restate_in_hexagonal_axes(phase, "a FullProf `.pcr`")
         if restated:

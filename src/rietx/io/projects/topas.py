@@ -169,6 +169,7 @@ from ...crystallography.symmetry import (
     get_spacegroup,
     refuse_distortion_modes,
     refuse_operation_list,
+    refuse_parent_cell,
     setting_diagnostics,
     site_orbit,
 )
@@ -5096,6 +5097,7 @@ def from_structure(structure: Structure, *,
                 f"writer's `write_record` refuses one format over")
         refuse_operation_list(phase, "a TOPAS `.inp`")
         refuse_distortion_modes(phase, "a TOPAS `.inp`")
+        refuse_parent_cell(phase, "a TOPAS `.inp`")
         magnetic_number = _magnetic_group_line(phase)
         lines.append("str")
         lines.append(f'  phase_name "{phase.name}"')

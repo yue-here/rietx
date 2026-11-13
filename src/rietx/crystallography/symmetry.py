@@ -119,6 +119,28 @@ def refuse_distortion_modes(phase, fmt: str) -> None:
             f"record: phase.model_copy(update={{'distortion_modes': None}})")
 
 
+def refuse_parent_cell(phase, fmt: str) -> None:
+    """Refuse, by name, a phase whose cell is stated through its parent (WP-1419).
+
+    :func:`refuse_distortion_modes`' rule for the cell (#1108's review): the
+    formats here state a phase's own six cell parameters under its own group,
+    so written anyway the parent's cell, the transform and the strains would
+    be dropped in silence, and the child's cell would arrive fixed (TOPAS
+    gets ``a ! 5.7``), since the child's group has no cell freedom of its own
+    to write.  The stored child cell is the derived one, so the numbers are
+    right and saying how to write them is the way out.
+    """
+    declared = getattr(phase, "parent_cell", None)
+    if declared is not None:
+        raise ValueError(
+            f"phase {phase.name!r} cannot be written to {fmt}: its cell is "
+            f"derived from its parent's (Phase.parent_cell: "
+            f"{declared.space_group!r} through {declared.transform!r}, with "
+            f"{len(declared.strain)} strain amplitude(s)), which {fmt} cannot "
+            f"state. To write the structure as it stands, with its own cell, "
+            f"drop the record: phase.model_copy(update={{'parent_cell': None}})")
+
+
 def restate_in_hexagonal_axes(phase, fmt: str):
     """``(phase, restated)``: an R lattice on rhombohedral axes in hexagonal ones.
 

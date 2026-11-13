@@ -1383,8 +1383,10 @@ ROWS: tuple[Row, ...] = (
                   "names a phase literal or a concrete site; the package builds one "
                   "only from a caller's own model or flags (report/body_misfit's "
                   "released arm, an internal trial whose findings are not surfaced; "
-                  "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
-                  "glob answered by the same request's biso are excluded")),
+                  "io/recipe's flagged coordinates); a user tie, a hold, an adp.* "
+                  "glob answered by the same request's biso, and a cell glob "
+                  "answered by the same request's freed parent_cell.cell rows are "
+                  "excluded")),
     Row("STAGE_PATH_UNKNOWN", "code"),
     Row("STAGE_SLOW_DESCENT", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the stages whose StageResult.termination is "

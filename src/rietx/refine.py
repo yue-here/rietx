@@ -8574,7 +8574,9 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     ``dof`` rows, which the suggestion names.  One family is asked two ways:
     the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
     request copying that pair for one isotropic atom has its ``adp.*`` answered
-    by the ``biso`` it freed, and stays silent.
+    by the ``biso`` it freed, and stays silent.  A parent-cell phase's cell is
+    the other such family: a stage naming ``phases.<i>.cell.*`` beside a glob
+    that frees ``phases.<i>.parent_cell.cell.*`` has its cell, and stays silent.
 
     A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
     per glob naming its stages.  ``where`` is the glob, as
@@ -8601,6 +8603,14 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                     for e in rows)):
                 # ``biso`` and ``adp.*`` are one displacement asked two ways:
                 # the shipped stages name both, so either answers it
+                continue
+            if site.endswith(".cell") and any(
+                    e.path.startswith(f"{site.removesuffix('.cell')}.parent_cell.cell.")
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in entries):
+                # a parent-cell phase's cell asked both ways: the parent's
+                # edges the stage frees are the cell the child's glob meant
                 continue
             names = asked.setdefault(glob, [])
             if stage.name not in names:

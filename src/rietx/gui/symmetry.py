@@ -376,16 +376,12 @@ def held_causes(structure: Structure, rows: list[dict] | None = None,
     for i, phase in enumerate(structure.phases):
         try:
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            cons = cell_constraints(sg)
+            if phase.parent_cell is None:
+                _cell_causes(causes, f"phases.{i}.cell", sg)
+            else:
+                _parent_cell_causes(causes, f"phases.{i}", phase.parent_cell)
         except (ValueError, RuntimeError):
             continue
-        where = setting_phrase(sg)
-        for name, source in cons.ties.items():
-            causes[f"phases.{i}.cell.{name}"] = f"{where}, so {name} follows {source}"
-        for name, value in cons.fixed_angles.items():
-            glyph = _ANGLE_GLYPH.get(name, name)
-            causes[f"phases.{i}.cell.{name}"] = (
-                f"{where}, so {glyph} is fixed at {value:g}°")
         _strain_causes(causes, f"phases.{i}", sg, phase)
         for j, atom in enumerate(phase.atoms):
             base = f"phases.{i}.atoms.{j}"
@@ -397,6 +393,39 @@ def held_causes(structure: Structure, rows: list[dict] | None = None,
             if atom.aniso is not None:
                 _adp_causes(causes, base, row, site)
     return causes
+
+
+def _cell_causes(causes: dict, base: str, sg) -> None:
+    """The setting's ties and fixed angles, for the six rows under ``base``."""
+    cons = cell_constraints(sg)
+    where = setting_phrase(sg)
+    for name, source in cons.ties.items():
+        causes[f"{base}.{name}"] = f"{where}, so {name} follows {source}"
+    for name, value in cons.fixed_angles.items():
+        glyph = _ANGLE_GLYPH.get(name, name)
+        causes[f"{base}.{name}"] = f"{where}, so {glyph} is fixed at {value:g}°"
+
+
+def _parent_cell_causes(causes: dict, base: str, declared) -> None:
+    """A cell stated through its parent (``Phase.parent_cell``, WP-1419).
+
+    The table never asks the child's own group for cell constraints: its six
+    rows are a ``ParentCellBlock``'s locked outputs, so "b follows a" from the
+    child's ties would name a cause that is not the one holding them (#1108's
+    review).  The child's rows are explained by the derivation, and the
+    parent's rows by the parent's setting, which is what constrains them.
+    """
+    parent_sg = resolve_group(declared.space_group)
+    _cell_causes(causes, f"{base}.parent_cell.cell", parent_sg)
+    sources = f"{base}.parent_cell.cell.*"
+    if declared.strain:
+        sources += f" and {base}.parent_cell.strain.*"
+    for name in ("a", "b", "c", "alpha", "beta", "gamma"):
+        glyph = _ANGLE_GLYPH.get(name, name)
+        causes[f"{base}.cell.{name}"] = (
+            f"this cell is derived from the parent's ({declared.space_group} "
+            f"through {declared.transform}, Phase.parent_cell), so {glyph} "
+            f"follows {sources}")
 
 
 def _site_phrase(row: dict, letter: dict | None) -> str:
