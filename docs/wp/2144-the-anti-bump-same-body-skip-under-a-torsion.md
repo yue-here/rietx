@@ -112,7 +112,7 @@ default gets one.
       gate disabled, both firing tests fail.
 - [x] Skill: a `RESTRAINT_BODY_CONTACTS_UNCHECKED` row in
       `references/diagnostics.md`.
-- [ ] File WP-1816 for the bonds direction, coordinated with WP-1814, and
+- [x] File WP-1816 for the bonds direction, coordinated with WP-1814, and
       record the practice survey in `docs/practice.md`.
 
 ## Acceptance
