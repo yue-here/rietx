@@ -566,6 +566,7 @@ DIAGNOSTIC_GROUPS = (
     ("diagnostics-stages", "Stages and plans", ()),
     # no area: CORRECTION_CODE_PREFIXES files its codes
     ("diagnostics-corrections", "Corrections", ()),
+    ("diagnostics-tof", "Time-of-flight banks", ("rietx/report/tof",)),
     ("diagnostics-refinement", "Refinement", ("",)),
 )
 

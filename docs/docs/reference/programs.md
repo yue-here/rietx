@@ -212,7 +212,7 @@ A program that reads only the anodes would conclude that the build handles X-ray
 
 Each flag is computed from the source class, so it changes by itself when the class gains the feature.
 A listed kind is one the schema accepts, which does not mean every fit runs on it.
-This version reads a time-of-flight bank and refines none ([Time-of-flight bank](instrument.md#time-of-flight-bank)).
+A time-of-flight bank refines on its own, and a joint fit or a series over several refuses it ([Time-of-flight bank](instrument.md#time-of-flight-bank)).
 
 ### Anodes
 

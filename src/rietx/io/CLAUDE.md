@@ -252,6 +252,20 @@ classifying above cannot see a *unit*: a GSAS file whose sniff missed fell to
 and adds no range check of its own. It abstains on a flight-time axis, which
 violates the bound by construction and was declared rather than assumed.
 
+## The intensity basis is never inferred
+
+The ordinate's twin of § The axis is never trusted: GSAS's
+**I_o = I'_o/(W·I_i)** (LAUR 86-748 p. 127) makes a calculated Bragg sum a
+*density*, so raw counts owe a factor of the channel width W — constant on a
+2θ scan (folds into the phase scale) but a **slope in flight time** on a
+TOF bank (the GEM measurement is in `formats/gsas.py`).
+`PatternData.intensity_basis` (`"counts"`/`"density"`/`None`) is set
+**only from a declaration** — a Mantid bin-width header, a GSAS raw-histogram
+form, or a stated y-axis unit — never inferred from the values;
+`PATTERN_INTENSITY_BASIS_UNKNOWN` fires on an undeclared flight-time pattern.
+W itself is measured from the pattern's own abscissa (`numpy.gradient`), never
+read from the file or instrument.
+
 ## Metadata
 
 `METADATA_KEYS` is **data**, and `base.metadata()` refuses an undeclared key,
@@ -441,6 +455,12 @@ same reason. Six rules the pattern readers do not need:
   whose body lives in a library, and a file whose phases belong to different
   patterns — a *selection*, following `read_pattern`'s `scan=`:
   `to_structure(model, dataset=N)`, never concatenated; a TOF one refuses, #193.
+- **A TOPAS time-of-flight bank is read by evaluating its laws, never its
+  spelling** (`projects/topas_tof.py`). Each macro's law is measured against
+  TOPAS output, not read from a body; the file's width, rate and position laws
+  are sampled over d and taken only where rietx's reproduces them exactly, else
+  refused by name. The bank angle is not in a `.inp` (TOPAS's intensity has no
+  sin θ), so the caller gives it; the writer runs only in TOPAS's working form.
 - **Where a file states its symmetry twice, the operators outrank the symbol —
   and where it states it once, the reader says so** (WP-1118, issue #101). A
   Hermann-Mauguin symbol is ambiguous for 40 of gemmi's settings, the `:1`/`:2`
@@ -484,7 +504,8 @@ axis over.
   2/4/5 refused, a non-default set declined; a non-zero anisotropic term or
   ITYP 1/2 fifth `ICOFF` pair refused. A LANSCE-shaped file (8-slot type-1
   `PRCF`) is **refused** here and read only by `legacy/` below. A bank with no
-  `PRCF` reads with an all-zero `ProfileTOF`, which says so. `ICONS`' POLA,
+  `PRCF` reads with an all-zero `ProfileTOF`, which says so and which
+  `compile_tof_model` refuses by name. `ICONS`' POLA,
   IPOLA, KRATIO pass blank **or zero**, FORTRAN's one reading (F77 §13.5.9).
 - **`.instprm` is one public reader on `Type`**: `read_gsas2_instprm` hands
   a file stating `Type: PNT` *by path* to `read_tof_instprm`, before

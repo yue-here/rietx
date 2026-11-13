@@ -12,6 +12,34 @@ The two most important criteria for judging a refinement are the fit of the calc
 Rwp is half of the first.
 Each formula this page names is a numbered equation in Theory.
 
+## Which axis the result holds
+
+A result carries the abscissa the fit ran on, and says which one it is.
+It uses the same pair of fields `PatternData` carries, for the same reason ([Pattern](data.md#pattern)).
+Degrees and microseconds are related by a per-bank calibration that a result does not hold, so nothing may convert between them behind a reader's back.
+
+| Member | Holds |
+|---|---|
+| `RefinementResult.two_theta` | 2θ in degrees, on a constant-wavelength fit; `None` otherwise |
+| `RefinementResult.tof` | neutron flight time in µs, on a time-of-flight bank; `None` otherwise |
+| `RefinementResult.axis` | `"two_theta"`, `"tof"` or `None`, the discriminator |
+| `RefinementResult.axis_unit` | the unit that axis is measured in, for a label or a message |
+| `RefinementResult.x` | whichever abscissa is set, as a float64 numpy view |
+
+At most one of the two is set, and a result that sets both is refused.
+Unlike a pattern, a result may have neither.
+A result built without curves, read back as a summary or assembled by hand from parameters and statistics, carries no abscissa at all, and `RefinementResult.axis` answers `None` there rather than naming an axis nobody measured.
+So the three answers are degrees, microseconds and no curve, and a consumer that works in only one of them tests `axis` and never the values.
+
+`RefinementResult.ticks` is on the result's own axis too: degrees where `two_theta` is set, microseconds where `tof` is.
+A tick list is a set of positions on the curve beside it, never a second quantity to convert.
+
+`RefinementResult.x` is what axis-blind code wants: plotting, windowing, counting channels.
+Code that does arithmetic on the abscissa branches on `axis` first, so that a path which can only do trigonometry refuses a flight time instead of returning a plausible wrong answer.
+
+`HistogramResult` carries the same members per histogram ([Joint result](joint.md#joint-result)): `HistogramResult.tof`, `HistogramResult.axis`, `HistogramResult.axis_unit` and `HistogramResult.x`.
+A joint fit refuses a bank today, so a joint result's histograms are all on 2θ.
+
 ## Fit statistics
 
 `RefinementResult.statistics` is a `Statistics` object.

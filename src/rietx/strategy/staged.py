@@ -22,14 +22,16 @@ from typing import Literal
 from .._nearmiss import did_you_mean
 from ..schemas.common import Mode
 
-# INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
-# CLOSING_WINDOW_TOL are defined beside the mirror because the pydantic fields
-# need them at class-definition time and this module is the *upper* layer;
-# they are re-exported here, where plan policy is read.
+# INTERMEDIATE_FTOL, INTERMEDIATE_LORENTZ_WINDOW_TOL, CORRELATION_GUARD,
+# PHASE_SUPPORT_SIGMA and CLOSING_WINDOW_TOL are defined beside the mirror
+# because the pydantic fields need them at class-definition time and this
+# module is the *upper* layer; they are re-exported here, where plan policy is
+# read.
 from ..schemas.plan import (
     CLOSING_WINDOW_TOL,
     CORRELATION_GUARD,
     INTERMEDIATE_FTOL,
+    INTERMEDIATE_LORENTZ_WINDOW_TOL,
     PHASE_SUPPORT_SIGMA,
     PlanSpec,
     check_closing_window_tol,
@@ -198,9 +200,21 @@ class Stage:
     #: parameter).  The flags carry, so a fix lasts until a later stage's
     #: ``turn_on`` frees the path again, and the closing stage re-solves that
     #: end state (:func:`fixed_at_end`).  Fixing a held, locked or force-fixed
-    #: row changes nothing: a fix only ever sets ``vary`` to False.  Last of
-    #: the fields, so a stage built positionally reads as it always did.
+    #: row changes nothing: a fix only ever sets ``vary`` to False.  After the
+    #: fields it was added beside, so a stage built positionally reads as it
+    #: always did.
     turn_off: list[str] = field(default_factory=list)
+    #: **time-of-flight only**: the per-side area fraction of each peak's
+    #: *Lorentzian component* this stage's frozen windows may leave outside,
+    #: overriding the plan's schedule.  ``None`` = take it from the plan
+    #: (:attr:`RefinementPlan.intermediate_lorentz_window_tol` for every
+    #: declared stage but the last, ``forward_tof.TOF_WINDOW_AREA_TOL`` for the
+    #: last declared stage and for the closing stage when the plan has one).
+    #: The exponential wings and the Gaussian extent are never loosened by it,
+    #: and a constant-wavelength pattern or a Gaussian-branch bank ignores it.
+    #: Frozen at stage compile like every other window input.  Last of the
+    #: fields, so a stage built positionally reads as it always did.
+    lorentz_window_tol: float | None = None
 
     def __getattr__(self, name: str):
         if name in _PYDANTIC_SURFACE:
@@ -427,6 +441,14 @@ class RefinementPlan:
     #: runs the declared stages alone, which reproduces every fit before the
     #: field, bit for bit.
     closing_window_tol: float | None = CLOSING_WINDOW_TOL
+    #: the Lorentzian-component window tolerance every declared stage but the
+    #: last compiles a time-of-flight bank at, unless that stage declares its
+    #: own :attr:`Stage.lorentz_window_tol` (issue #193).  ``None`` = the
+    #: answer tolerance in every stage, bit for bit the windows before the
+    #: schedule existed.  See :meth:`stage_lorentz_window_tols` for the rule
+    #: and :data:`INTERMEDIATE_LORENTZ_WINDOW_TOL` for what the number is and
+    #: buys.
+    intermediate_lorentz_window_tol: float | None = INTERMEDIATE_LORENTZ_WINDOW_TOL
 
     def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
@@ -437,6 +459,10 @@ class RefinementPlan:
         state is what it re-solves.  It seeds nothing: a row back on its floor
         at the answer is where the data put it.  Its window fraction is
         :attr:`closing_window_tol`, which :meth:`stage_window_tols` carries.
+        It does **not** take the last stage's ``lorentz_window_tol``: the
+        closing stage computes the answer, so a bank's Lorentzian windows are
+        sized at the answer tolerance there whatever a declared stage asked
+        for (:meth:`stage_lorentz_window_tols`).
         ``None`` when that is ``None`` or the plan declares no stage.
 
         **A plan that fixes** (``Stage.turn_off``, WP-2208) leaves some freed
@@ -467,9 +493,10 @@ class RefinementPlan:
         """The stages a fit runs, in order: the declared ones, then :meth:`closing_stage`.
 
         Every runner iterates this, never :attr:`stages`, together with
-        :meth:`stage_ftols` and :meth:`stage_window_tols`, which are parallel
-        to it.  A runner passes its table's ``paths``, which the closing stage
-        of a plan that fixes needs (:meth:`closing_stage`).
+        :meth:`stage_ftols`, :meth:`stage_window_tols` and
+        :meth:`stage_lorentz_window_tols`, which are parallel to it.  A runner
+        passes its table's ``paths``, which the closing stage of a plan that
+        fixes needs (:meth:`closing_stage`).
         """
         closing = self.closing_stage(paths)
         return [*self.stages, closing] if closing is not None else list(self.stages)
@@ -484,6 +511,26 @@ class RefinementPlan:
         if self.closing_stage() is not None:
             tols.append(self.closing_window_tol)
         return tols
+
+    def stage_lorentz_window_tols(self) -> list[float | None]:
+        """The Lorentzian window tolerance each of :meth:`run_stages` compiles at.
+
+        :meth:`stage_ftols`' rule, endpoints included, for a time-of-flight
+        bank's own schedule, and here for the same reason: only the plan knows
+        which stage is last.  A stage's own ``lorentz_window_tol`` wins;
+        the last declared stage and the closing stage take ``None`` —
+        ``forward_tof.TOF_WINDOW_AREA_TOL``, one rule for every component —
+        because they produce the answer; every other stage takes
+        :attr:`intermediate_lorentz_window_tol`.  A one-stage plan is all
+        endpoint and nothing is loosened.  The closing stage declares no
+        ``lorentz_window_tol`` of its own (:meth:`closing_stage`), so it is
+        always ``None`` here.
+        """
+        stages = self.run_stages()
+        endpoints = {len(self.stages) - 1, len(stages) - 1}
+        return [s.lorentz_window_tol if s.lorentz_window_tol is not None
+                else (None if i in endpoints else self.intermediate_lorentz_window_tol)
+                for i, s in enumerate(stages)]
 
     def stage_ftols(self) -> list[float | None]:
         """The tolerance each stage runs at, in order — the one authority.
@@ -1494,6 +1541,19 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     Needs the compiled model for the frozen peak paths, so it returns ``[]``
     without one — the ``check_stephens_positive`` convention one function up.
 
+    **Abstains on a time-of-flight bank, and the caller says so.**  Γ_instrument
+    is the Caglioti total FWHM in deg 2θ, which a bank has no term for: its
+    resolution is ``ProfileTOF``'s σ(d) and γ(d) polynomials and a declared
+    background peak's ``position``/``fwhm`` are microseconds, so the comparison
+    has no common unit.  Until this gate the whole function was reached on that
+    arm and died on ``instrument_fwhm_deg``, which
+    :class:`~rietx.model.forward_tof.CompiledTOFModel` does not define — an
+    ``AttributeError`` from inside a guard scan, on any bank that declared a
+    background peak.  ``[]`` here is not the guard passing: the two
+    ``_build_result`` paths pair it with a ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE``
+    line (``report.tof._tof_background_peak_diagnostics``) so an unrun check cannot
+    read as a clean one.
+
     **Abstains where the resolution is not evaluable.**  Γ_instrument is only a
     real width while the Caglioti quadratic Γ_G² = U·tan²θ + V·tanθ + W stays
     positive; a schema-legal but ill-conditioned refinement can drive it
@@ -1524,6 +1584,8 @@ def check_hump_width(table, model) -> list[GuardFinding]:
 
     if model is None or not model.component_paths:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # see the docstring: no common unit, and the caller says so
     values = {e.path: e.value for e in table.entries}
     out: list[GuardFinding] = []
     for pos_path, _height_path, fwhm_path in model.component_paths:
@@ -1767,6 +1829,8 @@ def check_resolution_supported(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     moving = set(table.moving_paths)
     freed = tuple(p for p in GAUSSIAN_RESOLUTION_PATHS if p in moving)
     if not freed:
@@ -2025,6 +2089,8 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     tt = np.asarray(model.tt, dtype=np.float64)
     if tt.size == 0:
         return []

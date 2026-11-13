@@ -26,6 +26,7 @@ import warnings
 import numpy as np
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 
+from ..schemas.pattern import TOF_NOT_EVALUATED
 from ..schemas.results import RefinementResult
 from .background import assess_background
 from .schemas import (
@@ -314,10 +315,46 @@ def background_clause(bg: BackgroundEvidence) -> str | None:
 LAYER0_MATCH_TOL_DEG = 0.08
 
 
+#: What a report says when its result's abscissa is not an angle.
+#:
+#: **Layer 0 abstains on a time-of-flight fit, and the reason is a field name
+#: rather than the arithmetic.**  Everything Layer 0 computes — the cumulative
+#: χ² breakpoints, the peak-cluster segmentation, the residual-peak census — is
+#: arithmetic on channels and would run unchanged on a flight-time grid.  What
+#: cannot run is the *reporting*: :class:`~rietx.report.schemas.Region` names
+#: its ends ``two_theta_lo``/``two_theta_hi`` and
+#: :class:`~rietx.report.schemas.UnmatchedPeak` names its position
+#: ``two_theta``, and writing microseconds into those is the one thing the
+#: whole time-of-flight axis fence exists to prevent — a consumer reading a
+#: field called ``two_theta`` is entitled to degrees.
+#:
+#: The second reason is a constant: ``match_tol_deg`` (0.08) decides whether a
+#: residual peak sits on a tick, and 0.08 µs is three orders too tight on a
+#: bank, so every peak would come back "unmatched observed" and the report
+#: would claim a pattern full of unindexed impurities.  A confident wrong
+#: answer, which is worse than an absent one.
+#:
+#: What still speaks is everything whose fields carry no axis: Rwp, GoF, the
+#: background evidence, the identifiability section, the geometry table and the
+#: microstructure blocks.  Giving these a Layer-0 report shaped like every
+#: other is what lets ``summary()`` and ``FitReport`` render a bank at all.
+TOF_LAYER0_ABSTENTION = (
+    "the fitted abscissa is a flight time in microseconds, and Layer 0 reports "
+    "its regions and unmatched peaks in fields named two_theta; the "
+    "tick-matching tolerance is a constant in degrees besides. The residual "
+    "statistics, the background evidence and the identifiability section below "
+    "are axis-free and did run")
+
+
 def build_layer0(result: RefinementResult, *, top_n: int = 15,
                  match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
                  min_peak_sigma: float = 5.0) -> FitReport:
-    """Layer 0 only.  :func:`rietx.build_report` adds Layers 1-2 on top."""
+    """Layer 0 only.  :func:`rietx.build_report` adds Layers 1-2 on top.
+
+    Abstains on a non-angular abscissa — see :data:`TOF_LAYER0_ABSTENTION`.
+    """
+    if result.axis == "tof":
+        return _layer0_abstained(result)
     tt = np.asarray(result.two_theta)
     y_obs = np.asarray(result.y_obs)
     y_calc = np.asarray(result.y_calc)
@@ -416,4 +453,29 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
         cumulative_chi2_breakpoints=breakpoints,
         regions=kept, n_regions_total=n_total,
         unmatched=unmatched, background=background, summary=summary,
+    )
+
+
+def _layer0_abstained(result: RefinementResult) -> FitReport:
+    """The report a flight-time fit gets: the axis-free half, and why.
+
+    ``assess_background`` still runs, over one region covering the whole fitted
+    window: with no peak-cluster segmentation to cut regions out, the
+    off-region set is empty and the projection half of the section — the R²
+    of a structural Jacobian column on the background span, which is the part
+    that catches a background able to imitate the peaks — is unaffected,
+    because it is read from ``result.identifiability`` rather than from the
+    segmentation.  The residual half of the section reports zero off-region
+    channels, which is true of a report with no regions.
+    """
+    stats = result.statistics
+    x = result.x()
+    bounds = [(float(x[0]), float(x[-1]))] if x.size else []
+    return FitReport(
+        rwp=stats.rwp, gof=stats.gof,
+        background=assess_background(result, bounds),
+        abstained_reason=TOF_LAYER0_ABSTENTION,
+        summary=(f"Rwp={stats.rwp:.4f} GoF={stats.gof:.2f}; "
+                 f"region segmentation and the unmatched-peak census are "
+                 f"{TOF_NOT_EVALUATED}"),
     )

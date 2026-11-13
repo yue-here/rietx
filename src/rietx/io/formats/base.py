@@ -19,7 +19,12 @@ import numpy as np
 from pydantic import ValidationError as PydanticValidationError
 
 from ...schemas.common import Diagnostic
-from ...schemas.pattern import POISSON_FLOOR_COUNTS, AxisKind, PatternData
+from ...schemas.pattern import (
+    POISSON_FLOOR_COUNTS,
+    AxisKind,
+    IntensityBasis,
+    PatternData,
+)
 
 
 @dataclass(frozen=True)
@@ -582,6 +587,7 @@ def check_axis(stated: str, *, path: str | Path, field: str, two_theta: bool,
 
 def pattern_data(path: str | Path, x: Any, intensity: Any,
             sigma: Any = None, *, axis: AxisKind = "two_theta",
+            intensity_basis: IntensityBasis | None = None,
             **meta: object) -> PatternData:
     """The :class:`PatternData` a reader returns — schema refusals included.
 
@@ -590,6 +596,11 @@ def pattern_data(path: str | Path, x: Any, intensity: Any,
     column of flight times is indistinguishable from an ascending column of
     degrees (``io/CLAUDE.md`` § The axis is never trusted).  Defaults to
     ``"two_theta"``, so every existing reader keeps the axis it always had.
+
+    ``intensity_basis`` is the same shape of statement about the *ordinate*
+    (``io/CLAUDE.md`` § The intensity basis is never inferred) and follows the
+    same rule: a reader passes it only where the file declares it, and
+    ``None`` — the default — is "not established", never "density".
 
     Constructing the model is a **parser boundary like any other**, and the last
     one every reader crosses.  ``PatternData``'s own validators are right to
@@ -621,6 +632,7 @@ def pattern_data(path: str | Path, x: Any, intensity: Any,
             two_theta=values if axis == "two_theta" else None,
             tof=values if axis == "tof" else None,
             intensity=ys.tolist(),
+            intensity_basis=intensity_basis,
             sigma=None if ss is None else ss.tolist(),
             metadata=metadata(**meta))
     except PydanticValidationError as exc:

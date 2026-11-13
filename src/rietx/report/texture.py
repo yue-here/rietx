@@ -195,7 +195,13 @@ def analyse_texture(model: CompiledModel, values: dict[str, float], *,
     Rietveld mode only (Le Bail / Pawley intensities are empirical, so there is
     no calculated pattern to compare against): returns ``[]`` otherwise.
     """
-    if model.mode != "rietveld":
+    # Empty on a model whose grid is not an angle, the boundary check
+    # ``report.strain`` carries for the same reason: March-Dollase averages
+    # over a reflection's symmetry orbit at the *measured* angle, and on a
+    # time-of-flight bank every reflection shares one — the correction has a
+    # different form there, not a different value, and ``compile_tof_model``
+    # refuses a declared block outright.
+    if model.mode != "rietveld" or getattr(model, "axis", "two_theta") != "two_theta":
         return []
     corrections = _extracted_corrections(model, values)
     axes = _candidate_axes(max_index)

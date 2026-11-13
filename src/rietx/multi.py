@@ -126,6 +126,7 @@ from .refine import (
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
+    _range_text,
     _refuse_without_phases,
     _reported_support_sigma,
     _resolve_specimen_absorption,
@@ -2685,7 +2686,7 @@ class MultiHistogramRefinement:
         per_lines = np.array([m.phase_line_counts() for m in models])
         diagnostics = diagnostics + _phase_support_diagnostics(
             per_support.max(axis=0), per_lines.sum(axis=0),
-            (min(m.tt_min for m in models), max(m.tt_max for m in models)),
+            _range_text(*models),
             [_unscoped(p) for p in mt.free_paths],
             self.mtable.structures[0], stage_results,
             basis=("against the counting noise, in the histogram that shows it "

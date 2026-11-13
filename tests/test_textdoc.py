@@ -580,6 +580,26 @@ def test_the_tolerance_line_is_always_shown_and_switches_the_schedule(project):
     assert delta.plan["plan"]["intermediate_ftol"] == 1e-4
 
 
+def test_a_plan_setting_no_line_carries_survives_an_apply(project):
+    """``PlanSpec.intermediate_lorentz_window_tol`` has no document line, so an
+    apply keeps the project's own value.  Rebuilt from the default instead, a
+    project that declined the schedule got it back on the next save, and an
+    untouched render read as a plan edit."""
+    from rietx.schemas.plan import PlanSpec
+
+    plan = project.doc.plan
+    assert plan is not None
+    project.doc.plan = plan.model_copy(update={"intermediate_lorentz_window_tol": None})
+    text = td.render(project)
+    delta, errors = _changes(text, project)
+    assert errors == [] and delta.plan is None, "an untouched document edited the plan"
+
+    delta, errors = _changes(_edit(text, "tolerance", "tolerance 1e-4"), project)
+    assert errors == []
+    assert delta.plan["plan"]["intermediate_lorentz_window_tol"] is None
+    assert PlanSpec().intermediate_lorentz_window_tol is not None
+
+
 def test_a_tolerance_that_cannot_be_a_tolerance_is_refused(project):
     """Zero and a negative stop nothing, and a word that is not ``none`` is a
     typo, not a schedule.  Refused with the line number every other refusal in
@@ -664,7 +684,8 @@ def test_a_stage_line_round_trips_every_key_stage_spec_has(project):
     assert set(td.STAGE_KEYS) | {"name", "turn_on", "turn_off"} == set(StageSpec.model_fields)
     non_default = {"max_iter": 40, "ftol": 1e-06, "lebail_cycles": 5, "lebail_tol": 0.0,
                    "seed": 0.0001, "strain_seed": 1e-06,
-                   "restraint_weight_scale": 25.0, "window_slack_deg": 2.5}
+                   "restraint_weight_scale": 25.0, "window_slack_deg": 2.5,
+                   "lorentz_window_tol": 0.003}
     assert set(non_default) == set(td.STAGE_KEYS), "a key has no value to try"
 
     line = "stage every  free phases.*.cell.*   " + "   ".join(

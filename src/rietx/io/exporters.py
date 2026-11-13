@@ -45,7 +45,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import PatternData, require_matched_axis
 from ..schemas.results import (
     PhaseAgreement,
     QuantitativePhaseAnalysis,
@@ -346,22 +346,51 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
     The shape is the one the fit computed (``ProfileTCHZ.shape``), and each
     phase's sample broadening is stated beside the instrument's, since the
     widths add (Gaussian variances, Lorentzian FWHMs).
+
+    **Per source arm.**  A time-of-flight bank shares no width law with the
+    constant-wavelength model: its shape is the back-to-back exponential pair
+    and every coefficient is a polynomial in d, so quoting Caglioti terms for
+    it would describe a model that did not run (and, a bank's table carrying
+    no such rows, would quote five zeros as if they had been refined).  Its
+    size pair is K/L in Å⁻¹ and its square, so those two are stated in that
+    unit rather than in the parameter's degree default.
     """
-    prof, geom = instrument.profile, instrument.geometry
-    shape = ("Voigt (exact convolution)" if prof.shape == "voigt" else
-             "TCHZ pseudo-Voigt (Thompson, Cox & Hastings 1987)")
-    lines = [
-        f"{shape} with Finger, Cox & Jephcoat (1994) axial divergence.",
-        f"Caglioti Gaussian FWHM^2 in deg^2: U={_value(prof.u)}, "
-        f"V={_value(prof.v)}, W={_value(prof.w)}.",
-        f"Lorentzian FWHM in deg: X={_value(prof.x)}, Y={_value(prof.y)}.",
-        f"Axial divergence: S/L={_value(geom.axial_sl)}, H/L={_value(geom.axial_hl)}.",
-    ]
+    units: dict[str, str] = {}
+    if instrument.source.kind == "neutron_tof":
+        p = instrument.source.profile_tof
+        kind = ("Peak shape: back-to-back exponentials convolved with a "
+                "pseudo-Voigt (GSAS TOF type 3)."
+                if any(getattr(p, g).value for g in ("gam0", "gam1", "gam2"))
+                else "Peak shape: back-to-back exponentials convolved with a "
+                     "Gaussian (GSAS TOF type 1).")
+        lines = [
+            kind,
+            f"alpha = {_value(p.alpha0)} + {_value(p.alpha1)}/d in 1/us; "
+            f"beta = {_value(p.beta0)} + {_value(p.beta1)}/d^4 in 1/us.",
+            f"sigma^2 = {_value(p.sig0)} + {_value(p.sig1)} d^2 + "
+            f"{_value(p.sig2)} d^4 in us^2.",
+            f"gamma = {_value(p.gam0)} + {_value(p.gam1)} d + "
+            f"{_value(p.gam2)} d^2 in us.",
+        ]
+        units = {"lor_size": "1/A", "gauss_size": "1/A^2"}
+    else:
+        prof, geom = instrument.profile, instrument.geometry
+        shape = ("Voigt (exact convolution)" if prof.shape == "voigt" else
+                 "TCHZ pseudo-Voigt (Thompson, Cox & Hastings 1987)")
+        lines = [
+            f"{shape} with Finger, Cox & Jephcoat (1994) axial divergence.",
+            f"Caglioti Gaussian FWHM^2 in deg^2: U={_value(prof.u)}, "
+            f"V={_value(prof.v)}, W={_value(prof.w)}.",
+            f"Lorentzian FWHM in deg: X={_value(prof.x)}, Y={_value(prof.y)}.",
+            f"Axial divergence: S/L={_value(geom.axial_sl)}, "
+            f"H/L={_value(geom.axial_hl)}.",
+        ]
     for phase in (structure.phases if structure is not None else []):
         # a Stephens block replaces lor_strain (WP-1467,
         # CompiledModel.lor_strain_term): its stored value is no width the
         # fit drew, so stating it would describe a broadening that is not there
-        terms = [f"{label}={_value(getattr(phase, name))} {getattr(phase, name).unit}"
+        terms = [f"{label}={_value(getattr(phase, name))} "
+                 f"{units.get(name, getattr(phase, name).unit)}"
                  for name, label in _SAMPLE_BROADENING
                  if not (name == "lor_strain" and phase.microstrain is not None)
                  and (getattr(phase, name).vary or getattr(phase, name).value != 0.0)]
@@ -437,8 +466,12 @@ _ABSORPTION = {
 
 
 def _wavelengths(instrument: Instrument) -> list[tuple[str, str]]:
-    """Each line's wavelength and relative weight, through the number rule."""
+    """Each line's wavelength and relative weight, through the number rule.
+
+    None on a time-of-flight bank: a white beam states no wavelength."""
     source = instrument.source
+    if source.kind == "neutron_tof":
+        return []
     if source.kind == "neutron_cw":
         return [(_value(source.wavelength, "_diffrn_radiation_wavelength"),
                  "1.0")]
@@ -571,7 +604,21 @@ def _write_refinement_metadata(block, result: RefinementResult,
     lines = _wavelengths(instrument)
     for tag, value in pairs:
         block.set_pair(tag, value)
-    if len(lines) == 1:
+    if instrument.source.kind == "neutron_tof":
+        # A white beam states no wavelength (λ is a property of the channel),
+        # so the tag is omitted rather than filled with a number nobody
+        # measured.  What plays its part is the bank calibration, written in
+        # the one free-text item cif_pd.dic defines for a calibration a reader
+        # has to be told about in words (``_pd_calibration.special_details``,
+        # held to the dictionary by ``io/cif/registry.py``).
+        src = instrument.source
+        tag = "_pd_calibration_special_details"
+        block.set_pair(tag, text(tag, _wrapped([
+            f"A time-of-flight bank at 2theta = {src.two_theta_bank_deg:.4g} deg; "
+            f"TOF/us = {_value(src.difc, tag)} d + {_value(src.difa, tag)} d^2 + "
+            f"{_value(src.tzero, tag)} + {_value(src.difb, tag)}/d, d in "
+            f"Angstrom."])))
+    elif len(lines) == 1:
         block.set_pair("_diffrn_radiation_wavelength", lines[0][0])
     else:
         loop = block.init_loop("_diffrn_radiation_wavelength", ["", "_id", "_wt"])
@@ -785,7 +832,8 @@ def _dispersion(instrument: Instrument, phase) -> dict[str, tuple[float, float, 
     from ..crystallography.dispersion import normalize_element, resolve
 
     source = instrument.source
-    if source.kind == "neutron_cw" or source.dispersion is None or not phase.atoms:
+    if (source.kind in ("neutron_cw", "neutron_tof") or source.dispersion is None
+            or not phase.atoms):
         return None
     overrides = source.dispersion.overrides or {}
     species = [a.species for a in phase.atoms]
@@ -835,7 +883,8 @@ def refinement_cif_doc(result: RefinementResult, structure: Structure,
                        reflections: list[ReflectionRow] | None = None
                        ) -> gemmi.cif.Document:
     """Build the refinement CIF as a gemmi document (see :func:`write_refinement_cif`)."""
-    require_two_theta(pattern, "refinement_cif_doc()", instrument=instrument)
+    if pattern is not None:
+        require_matched_axis(pattern, "refinement_cif_doc()", instrument=instrument)
     doc = gemmi.cif.Document()
     agreement = {row.name: row for row in result.phase_agreement}
     probe = "neutron" if instrument.source.kind == "neutron_cw" else "xray"
@@ -868,8 +917,11 @@ def refinement_cif_doc(result: RefinementResult, structure: Structure,
             # a single-phase export is one self-contained block that both
             # read_pdcif (pattern) and structure_from_cif (structure) re-read
             _write_refinement_metadata(block, result, instrument, structure)
-            write_pattern_block(block, result,
-                                instrument.source.primary_wavelength, pattern)
+            # a bank's result carries no 2θ curve and its source no
+            # wavelength, so it has no angular pattern loop to write
+            if result.two_theta is not None:
+                write_pattern_block(block, result,
+                                    instrument.source.primary_wavelength, pattern)
             if reflections:
                 write_reflection_loop(block, reflections, structure)
     return doc
@@ -900,6 +952,7 @@ def write_refinement_cif(result: RefinementResult, structure: Structure,
     the reflection table only a fit's compiled model can build
     (:func:`refinement_cif_doc`'s ``reflections``).
     """
-    require_two_theta(pattern, "write_refinement_cif()", instrument=instrument)
+    if pattern is not None:
+        require_matched_axis(pattern, "write_refinement_cif()", instrument=instrument)
     write_document(refinement_cif_doc(result, structure, instrument,
                                       pattern=pattern), path)

@@ -58,6 +58,8 @@ from ..params.vector import (
     is_variable_path,
     size_cap,
     strain_cap,
+    tof_size_cap,
+    tof_strain_cap,
 )
 from ..schemas.results import MomentAngleTest
 from . import blocked, lapack
@@ -1435,7 +1437,7 @@ def _peak_chain_at(model: CompiledModel, bases: DerivativeBases,
                     _require_basis(plane, path, what)
                     terms.append((coef, plane))
             parts.append((lay, terms))
-    return _accumulate(len(model.tt), parts)
+    return _accumulate(model.n_points, parts)
 
 
 def _require_basis(basis: np.ndarray | None, path: str, what: str) -> None:
@@ -1474,7 +1476,7 @@ def _structural_column(model: CompiledModel, table: ParameterTable,
     pp = bases.planes[ip]
     coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
     terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
-    return _accumulate(len(model.tt), [(pp.layout, terms)])
+    return _accumulate(model.n_points, [(pp.layout, terms)])
 
 
 def _moment_column(model: CompiledModel, table: ParameterTable,
@@ -1683,7 +1685,7 @@ def _po_column(model: CompiledModel, bases: DerivativeBases,
     """
     dint = model.po_intensity_grad(ip, values)
     if dint is None:
-        return np.zeros(len(model.tt))
+        return np.zeros(model.n_points)
     # WP-1343: P is a per-(line, reflection) multiplier of the intensity and
     # is applied to **both** components identically (``phase_peaks``), so
     # ∂intensity/∂r is P's derivative times each component's own base.  The
@@ -1695,7 +1697,7 @@ def _po_column(model: CompiledModel, bases: DerivativeBases,
     pp = bases.planes[ip]
     coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
     terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
-    return _accumulate(len(model.tt), [(pp.layout, terms)])
+    return _accumulate(model.n_points, [(pp.layout, terms)])
 
 
 def _texture_column(model: CompiledModel, bases: DerivativeBases,
@@ -1708,11 +1710,11 @@ def _texture_column(model: CompiledModel, bases: DerivativeBases,
     """
     dint = model.texture_intensity_grad(ip, path, values)
     if dint is None:
-        return np.zeros(len(model.tt))
+        return np.zeros(model.n_points)
     pp = bases.planes[ip]
     coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
     terms = [(coef, pp.omega)] if np.any(coef != 0.0) else []
-    return _accumulate(len(model.tt), [(pp.layout, terms)])
+    return _accumulate(model.n_points, [(pp.layout, terms)])
 
 
 def _scale_column(model: CompiledModel, bases: DerivativeBases,
@@ -1749,7 +1751,7 @@ def _scale_column(model: CompiledModel, bases: DerivativeBases,
         coef = np.where(pp.finite, pp.inten / scale, 0.0)
         parts.append((pp.layout,
                       [(coef, pp.omega)] if np.any(coef != 0.0) else []))
-    return _accumulate(len(model.tt), parts)
+    return _accumulate(model.n_points, parts)
 
 
 def _axial_column(model: CompiledModel, bases: DerivativeBases,
@@ -1770,7 +1772,7 @@ def _axial_column(model: CompiledModel, bases: DerivativeBases,
         coef = np.where(pp.finite, pp.inten, 0.0)
         parts.append((pp.layout,
                       [(coef, plane)] if np.any(coef != 0.0) else []))
-    return _accumulate(len(model.tt), parts)
+    return _accumulate(model.n_points, parts)
 
 
 def _pawley_intensity_columns(model: CompiledModel, bases: DerivativeBases,
@@ -2156,6 +2158,19 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     # branch: the missing dependence would silently leave the column short
     # rather than fail (WP-1070).  Empty for every untied column, which is why
     # an unconstrained model dispatches exactly as it did before.
+    # **Does this model have analytic columns at all?**  Every branch of the
+    # ladder below chains through per-emission-line planes, a pseudo-Voigt
+    # profile basis and an FCJ node set, and a time-of-flight bank has none of
+    # the three: its widths are polynomials in d, its shape is a back-to-back
+    # exponential pair and there is no axial aperture.  So it declares
+    # ``analytic_jacobian = False`` and every column but the linear background
+    # ones takes the finite-difference fallback this function already carries,
+    # which is exact for what it computes (it decodes through C exactly as the
+    # residual does).  Read through ``getattr`` with a ``True`` default so the
+    # constant-wavelength model needs no field and its dispatch is byte for
+    # byte what it was — the gate is one ``elif`` and it can only fire on a
+    # model that asked for it.
+    analytic = getattr(model, "analytic_jacobian", True)
     extras = _column_extras(table)
     # What each column *is*, for dispatch.  Identity except for a named
     # variable, which has no branch of its own and is read as what it reaches.
@@ -2234,6 +2249,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 J[:n_data, c] = -sqrt_w * (w @ model.bkg_design[n])
                 if n_bkg_pen:
                     J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
+            elif not analytic:
+                # the whole ladder below is skipped on a model that declares no
+                # analytic columns; the background block above still runs,
+                # because y is linear in those coefficients on either axis and
+                # the exact column is cheaper than a residual evaluation
+                fd_cols.append(c)
             elif path in axial_paths and own:
                 b = get_bases()
                 if b.axial_ok:
@@ -3126,7 +3147,22 @@ def _freeze_strain_cap(model: CompiledModel, table: ParameterTable) -> None:
     :func:`_freeze_cell_windows` makes and for the same measured reason: a
     bound is never free, since TRF takes its per-coordinate trust-region scale
     from the distance to it.
+
+    **A time-of-flight bank states its own cap** (T-1d), which T-3c owed it:
+    :func:`~rietx.params.vector.strain_cap` bounds a width in deg 2θ against a
+    2θ extent, and this model's grid is a flight time — ``model.tt_min``
+    refuses by name on that arm — so the flight-time twin
+    (:func:`~rietx.params.vector.tof_strain_cap`) is derived from the fitted
+    flight-time extent and the bank's own DIFC instead.  Since T-3c the column
+    is a **free** one there, so what was skipped before was a real bound rather
+    than a dead one: a bank made *no claim*, which is the state a table starts
+    in, and the fitted d range's own fractional width is what it can now say.
+    A model carrying no frozen d range or DIFC still declares nothing, and
+    "no bound" and "a bound that happens to be infinite" stay different facts.
     """
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        table.freeze_strain_cap(_tof_model_strain_cap(model))
+        return
     table.freeze_strain_cap(strain_cap(model.tt_min, model.tt_max))
 
 
@@ -3141,10 +3177,26 @@ def _freeze_strain_cap_multi(models: list[CompiledModel],
     cap governs: a line only has to be a line in *some* histogram, and a joint
     fit is entitled to whichever one can express it.  Taking the narrowest
     would let a short scan bound a width the long scan measures perfectly well.
+
+    **A time-of-flight bank contributes a cap and receives one** since T-1d,
+    which is the single-histogram :func:`_freeze_strain_cap`'s rule carried
+    onto this path unchanged.  It enters the same ``max``, and it may, because
+    ``lor_strain`` is the one width the two arms hold in **one unit**: a
+    microstrain is λ-free and axis-free, so ``params.multi.SIZE_LAMBDA_POWER``
+    lists neither strain term and the bank's copy of the column is the same
+    number as the scan's.  A bank's cap comes from its fitted flight-time
+    extent and its own DIFC (:func:`~rietx.params.vector.tof_strain_cap`).
+    Before this, a pure multi-bank fit — which is what a time-of-flight
+    experiment *is* — had no cap at all, and a mixed one bounded the shared
+    column by the scans alone.
     """
-    caps = [strain_cap(m.tt_min, m.tt_max) for m in models]
+    caps = [strain_cap(m.tt_min, m.tt_max)
+            if getattr(m, "axis", "two_theta") == "two_theta"
+            else _tof_model_strain_cap(m)
+            for m in models]
+    caps = [c for c in caps if c is not None]
     cap = max(caps) if caps else None
-    for table in mtable.tables:
+    for _model, table in zip(models, mtable.tables, strict=True):
         table.freeze_strain_cap(cap)
 
 
@@ -3171,6 +3223,37 @@ def _longest_line_wavelength(model: CompiledModel) -> float | None:
     return max(lams) if lams else None
 
 
+def _tof_model_strain_cap(model) -> float | None:
+    """:func:`~rietx.params.vector.tof_strain_cap` for one bank, or ``None``.
+
+    ``None`` is *no claim made* and caps nothing — a model carrying no frozen
+    d range or DIFC has not measured the extent this bound is derived from,
+    and the empty state that reads as an answer is the WP-1076 trap.  Both
+    fields are frozen at stage compile by ``compile_tof_model``, exactly as the
+    windows are, so a model out of that function always has them.
+    """
+    d_range = getattr(model, "d_range", None)
+    difc = getattr(model, "difc_stage", None)
+    if d_range is None or difc is None:
+        return None
+    return tof_strain_cap(model.tof_min, model.tof_max, float(difc),
+                          float(d_range[1]))
+
+
+def _tof_model_size_cap(model) -> float | None:
+    """:func:`~rietx.params.vector.tof_size_cap` for one bank, or ``None``.
+
+    ``None`` for :func:`_tof_model_strain_cap`'s reason: a missing d range
+    removes the only extent the backstop could be read from.
+    """
+    d_range = getattr(model, "d_range", None)
+    difc = getattr(model, "difc_stage", None)
+    if d_range is None or difc is None:
+        return None
+    return tof_size_cap(model.tof_min, model.tof_max, float(difc),
+                        float(d_range[1]))
+
+
 def _freeze_size_cap(model: CompiledModel, table: ParameterTable) -> None:
     """Declare the sample-size cap for this stage — the strain-cap freeze's twin.
 
@@ -3179,7 +3262,15 @@ def _freeze_size_cap(model: CompiledModel, table: ParameterTable) -> None:
     only on a term that has already made a line wider than the fitted range.
     So a fit whose size stays where the data can express it gets no bound at
     all and is bit-identical to an uncapped build.
+
+    **A bank states its own**, in the units it actually holds: ``lor_size``
+    there is K/L in Å⁻¹ rather than a width in degrees, so its backstop is
+    the strain rule with d² for d (:func:`~rietx.params.vector.tof_size_cap`).
+    Reusing the angular cap would have been a bound whose units do not match.
     """
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        table.freeze_size_cap(_tof_model_size_cap(model))
+        return
     table.freeze_size_cap(size_cap(model.tt_min, model.tt_max))
 
 
@@ -3436,12 +3527,12 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         # a moment angle at a direction the symmetry fixes leaves the
         # covariance, and only the covariance (WP-1929)
         moment_angle_tests, stationary = stationary_angle_test(
-            probe, res.x, res.jac, len(model.tt), table.free_paths,
+            probe, res.x, res.jac, model.n_points, table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
             len(res.x), angle_block=_analytic_angle_block(model, table))
         stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
-            n_data=len(model.tt))
+            n_data=model.n_points)
     if stderr_full is not None:
         stderr, corr = stderr_full[:n_table], corr_full[:n_table, :n_table]
         if model.pawley is not None:
@@ -3513,7 +3604,11 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     residuals = [_make_residual(m, t) for m, t in zip(models, mtable.tables, strict=True)]
     jacobians = [_jacobian_for(m, t, backend)
                  for m, t in zip(models, mtable.tables, strict=True)]
-    n_data = [len(m.tt) for m in models]
+    # ``n_points``, not ``len(m.tt)``: the count is the number of channels and
+    # is axis-blind, while ``tt`` is a 2θ-only accessor that *raises* on a
+    # time-of-flight bank.  The same substitution the single-histogram driver
+    # took in T-1c, and the eighth site of it.
+    n_data = [m.n_points for m in models]
     n_pen = [0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models]
     data_off = np.concatenate([[0], np.cumsum(n_data)])
     n_data_total = int(data_off[-1])

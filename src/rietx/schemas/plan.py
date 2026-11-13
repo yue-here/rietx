@@ -186,6 +186,47 @@ def check_closing_window_tol(value: Any) -> float | None:
     return float(value)
 
 
+#: What :attr:`PlanSpec.intermediate_lorentz_window_tol` and
+#: ``strategy.staged.RefinementPlan.intermediate_lorentz_window_tol`` both
+#: default to (issue #193) — the per-side area fraction a time-of-flight
+#: bank's frozen windows may leave outside themselves **in the Lorentzian
+#: component alone**, in every declared stage but the last.  Here for the
+#: reason :data:`INTERMEDIATE_FTOL` is: the pydantic field needs it at
+#: class-definition time.
+#:
+#: The last declared stage and the closing stage always size their windows at
+#: ``model.forward_tof.TOF_WINDOW_AREA_TOL`` (1e-4, one rule for every
+#: component), so the reported numbers are never a coarse stage's
+#: (``RefinementPlan.stage_lorentz_window_tols`` takes ``stage_ftols``'
+#: endpoints verbatim).  The exponential wings and the Gaussian extent stay at
+#: that 1e-4 in every stage too: on a real standard's bank with a flat
+#: direction, a coarse *whole* window at 1e-2 prefers a state measurably off
+#: the true minimum, and the Gaussian branch is cheap anyway.  The Lorentzian
+#: tail is the one that is not: at 1e-4 it is ~η/(π·tol) FWHM long, which on
+#: the committed synthetic Si bank at γ₁ = 10 µs/Å is most of the grid and
+#: 1.4 s an evaluation against 0.7 ms on the Gaussian branch.
+#:
+#: Measured on the committed synthetic Si bank (``tests/test_tof_refine.py``):
+#: three noise seeds at γ₁ = 2 and 10, the five-stage TOF acceptance plan,
+#: every final parameter within **0.006 esd** of the all-1e-4 plan (bar 0.1),
+#: stage count identical; and on a real standard's bank with a flat
+#: direction, a staged plan (1e-2 on the *whole* window, the
+#: harsher test) lands on the same minimum from the state a coarse window
+#: prefers.  The
+#: coarse stages cost 10-50× less; the whole fit 1.2-3.6× less in wall clock
+#: under load (CPU 0.33-0.72× of the all-1e-4 fit on three counted fits),
+#: because the answer stage frees every parameter at 1e-4, is most of what is
+#: left, and after a coarse start takes anywhere from 0.6× to 1.9× the
+#: evaluations it took after a fine one.  Those fits ran before the closing
+#: stage (WP-2002) existed; it adds one more solve at 1e-4 to both arms,
+#: which narrows the whole-fit ratio.  **Not renormalised**: a truncated
+#: Lorentzian's lost area lives in wings far from the core, and putting it back
+#: raises the peak 1.6 % of its height at η = 0.27 (against 0.18 % left
+#: unrenormalised) while buying no measured parameter agreement.
+#: ``None`` = 1e-4 in every stage, bit for bit the pre-schedule windows.
+INTERMEDIATE_LORENTZ_WINDOW_TOL = 1e-2
+
+
 class StageSpec(Base):
     """One stage of a staged plan as data that round-trips through JSON, mirroring ``Stage``."""
 
@@ -231,6 +272,14 @@ class StageSpec(Base):
         "with, replacing the default WINDOW_MIN_DEG — declared by fits whose "
         "start may sit far from the data (the indexing Le Bail validation); "
         "null = the default"))
+    lorentz_window_tol: float | None = Field(None, gt=0.0, lt=0.5, description=(
+        "time-of-flight only: the per-side area fraction of a peak's "
+        "Lorentzian component this stage's frozen windows may leave outside, "
+        "overriding the plan's schedule; null = take it from the plan "
+        "(intermediate_lorentz_window_tol for every declared stage but the "
+        "last, TOF_WINDOW_AREA_TOL = 1e-4 for the last declared stage and for "
+        "the closing stage when the plan has one).  Ignored on a "
+        "constant-wavelength pattern and on a Gaussian-branch bank"))
 
     @model_validator(mode="before")
     @classmethod
@@ -248,7 +297,8 @@ class StageSpec(Base):
                    lebail_cycles=stage.lebail_cycles, lebail_tol=stage.lebail_tol,
                    seed=stage.seed, strain_seed=stage.strain_seed,
                    restraint_weight_scale=stage.restraint_weight_scale,
-                   window_slack_deg=stage.window_slack_deg)
+                   window_slack_deg=stage.window_slack_deg,
+                   lorentz_window_tol=stage.lorentz_window_tol)
 
     def to_stage(self) -> Any:
         from ..strategy.staged import Stage
@@ -259,7 +309,8 @@ class StageSpec(Base):
                      lebail_cycles=self.lebail_cycles, lebail_tol=self.lebail_tol,
                      seed=self.seed, strain_seed=self.strain_seed,
                      restraint_weight_scale=self.restraint_weight_scale,
-                     window_slack_deg=self.window_slack_deg)
+                     window_slack_deg=self.window_slack_deg,
+                     lorentz_window_tol=self.lorentz_window_tol)
 
 
 class PlanSpec(Base):
@@ -312,6 +363,14 @@ class PlanSpec(Base):
             "value under 2 % keeps the closing stage's finer axial-divergence "
             "sampling.  null = no closing stage, today's answers bit for bit "
             "(WP-2002)"))
+    intermediate_lorentz_window_tol: float | None = Field(
+        INTERMEDIATE_LORENTZ_WINDOW_TOL, gt=0.0, lt=0.5, description=(
+            "time-of-flight only: the per-side area fraction of a peak's "
+            "Lorentzian component every declared stage but the last may leave "
+            "outside its frozen window, unless it declares its own "
+            "lorentz_window_tol; the last declared stage and the closing "
+            "stage always run at 1e-4.  null = 1e-4 in every stage, bit for "
+            "bit the unscheduled windows (issue #193)"))
 
     @field_validator("phase_support_sigma")
     @classmethod
@@ -360,7 +419,8 @@ class PlanSpec(Base):
                    intermediate_ftol=plan.intermediate_ftol,
                    lebail_passes=plan.lebail_passes,
                    phase_support_sigma=plan.phase_support_sigma,
-                   closing_window_tol=plan.closing_window_tol)
+                   closing_window_tol=plan.closing_window_tol,
+                   intermediate_lorentz_window_tol=plan.intermediate_lorentz_window_tol)
 
     def to_plan(self) -> Any:
         from ..strategy.staged import RefinementPlan
@@ -370,7 +430,9 @@ class PlanSpec(Base):
                               intermediate_ftol=self.intermediate_ftol,
                               lebail_passes=self.lebail_passes,
                               phase_support_sigma=self.phase_support_sigma,
-                              closing_window_tol=self.closing_window_tol)
+                              closing_window_tol=self.closing_window_tol,
+                              intermediate_lorentz_window_tol=(
+                                  self.intermediate_lorentz_window_tol))
 
     def preset_name(self) -> str | None:
         """The registered preset this plan equals, or ``None`` if it was edited.

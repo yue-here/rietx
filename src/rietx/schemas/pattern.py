@@ -21,8 +21,24 @@ from .common import Base
 #: The two abscissae a pattern may carry, spelled as the field that holds each.
 AxisKind = Literal["two_theta", "tof"]
 
+#: What one stored intensity **is**, in the one respect a time-of-flight
+#: forward model cannot guess: ``"counts"`` is the number of neutrons the
+#: channel counted, ``"density"`` is that number already divided by the
+#: channel's own width in µs.  See :attr:`PatternData.intensity_basis`.
+IntensityBasis = Literal["counts", "density"]
+
 #: What each axis is measured in, for a message that has to name the unit.
 AXIS_UNITS: dict[str, str] = {"two_theta": "degrees", "tof": "microseconds (µs)"}
+
+#: One sentence, quoted by every check a time-of-flight histogram cannot
+#: answer — the diagnostics in ``refine.py`` and the Layer-0 abstention in
+#: ``report/layer0.py``.  **A shared string, because the alternative is
+#: silence**: a check that returns an empty list reads as "we looked and found
+#: nothing" about a question nobody asked, which is the same failure
+#: ``CAPILLARY_OFFSET_UNAVAILABLE`` names one rank over (a held aberration
+#: reads as a measured zero).  Each site appends its own reason, so a reader
+#: gets both halves: what did not run, and why it could not.
+TOF_NOT_EVALUATED = "not evaluated for a time-of-flight histogram"
 
 
 #: The floor :func:`_floor_sigma` raises a zero or negative esd to, as a
@@ -88,6 +104,37 @@ class PatternData(Base):
     #: hold several banks of the same flight times against different constants.
     tof: list[float] | None = None
     intensity: list[float]
+    #: Whether ``intensity`` is a **count per channel** or a count already
+    #: divided by the channel's width in µs — and ``None`` for "the file did
+    #: not say".  GSAS writes the relation as I_o = I'_o/(W·I_i) (Larson & Von
+    #: Dreele, 2004, LAUR 86-748, Technical Manual p. 127), where I'_o is "the
+    #: number of counts observed in a channel of width W": a calculated Bragg
+    #: sum is a *density*, so a file holding counts needs it multiplied by W
+    #: and a file holding a density does not.
+    #:
+    #: **A field rather than a metadata key, and for the same reason
+    #: ``tof`` is a field rather than a label.**  ``io/CLAUDE.md`` § Metadata is
+    #: about keys two *presentation* consumers match on (an import wizard's
+    #: anode pre-selection, a preview's scan count), and its worked example is
+    #: the file's own wavelength — "recorded, never used".  This is the
+    #: opposite kind of fact: it multiplies every calculated intensity in the
+    #: time-of-flight forward model, so it belongs where the axis declaration
+    #: belongs, in a validated field with a closed vocabulary rather than in a
+    #: ``dict[str, str]`` a consumer would have to re-parse.
+    #:
+    #: **A property of the data and not of the instrument.**  Two banks of one
+    #: instrument, exported by two reductions, can disagree; the same bank
+    #: exported twice by Mantid's ``SaveGSS`` disagrees with itself depending
+    #: on ``MultiplyByBinWidth``.  So it travels with the pattern.
+    #:
+    #: W itself is never taken from here or from the instrument — it is
+    #: measured from the pattern's own abscissa, which is where a ``TIME_MAP``
+    #: bank's irregular widths actually live.
+    #:
+    #: **The constant-wavelength arm ignores it.**  A step in 2θ that is
+    #: constant, or nearly so, folds into the phase scale, and every existing
+    #: constant-wavelength number is unchanged whatever this says.
+    intensity_basis: IntensityBasis | None = None
     sigma: list[float] | None = None
     excluded_regions: list[tuple[float, float]] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -238,6 +285,8 @@ class PatternData(Base):
 
         The axis kind is preserved: cropping a TOF pattern returns a TOF
         pattern, which is why the bounds are in µs there and in degrees here.
+        :attr:`intensity_basis` is preserved too — dropping channels does not
+        change what one of the kept channels holds.
         """
         x = self.x()
         keep = (x >= lo) & (x <= hi)
@@ -246,6 +295,7 @@ class PatternData(Base):
             two_theta=kept if self.axis == "two_theta" else None,
             tof=kept if self.axis == "tof" else None,
             intensity=self.y()[keep].tolist(),
+            intensity_basis=self.intensity_basis,
             sigma=None if self.sigma is None else np.asarray(self.sigma)[keep].tolist(),
             excluded_regions=self.excluded_regions,
             metadata=self.metadata,
@@ -272,11 +322,17 @@ def require_two_theta(pattern: PatternData | None, where: str, *,
     not have.  A caller with no pattern in hand passes ``pattern=None`` and
     gets the instrument arm alone.
 
-    **In this build every entry that computes a pattern is 2θ-only**: a
-    time-of-flight bank is read (:mod:`rietx.io.instrument_tof`, the GSAS and
-    Mantid pattern readers) and has a parameter table, and no forward model
-    for it exists yet.  So the refusal says what *is* available — the
-    readers — rather than pointing at a route that is not there.
+    **This is not "the package cannot refine a bank".**  It can:
+    ``Refinement.fit`` routes a (time-of-flight pattern, ``neutron_tof``
+    instrument) pair to :func:`rietx.model.forward_tof.compile_tof_model` and
+    refines it — positions from TOF = DIFC·d + DIFA·d² + TZERO + DIFB/d, the
+    back-to-back-exponential profile whose widths are polynomials in d, and the
+    d⁴·sinθ Lorentz factor.  What this helper says is that **the entry point
+    named in ``where`` is constant-wavelength only**, which is true of peak
+    picking, indexing, extinction-symbol determination, the background
+    diagnostics, the project container and the joint multi-histogram path.  The
+    matched-pair check the routing entry points use instead is
+    :func:`require_matched_axis`.
     """
     kind = getattr(getattr(instrument, "source", None), "kind", None)
     axis = "two_theta" if pattern is None else pattern.axis
@@ -294,8 +350,53 @@ def require_two_theta(pattern: PatternData | None, where: str, *,
         f"{where}: {what}. Every position, width, Lorentz, absorption and "
         f"extinction term reached from here is a function of an angle, so "
         f"running it on a flight time would not fail — it would return a "
-        f"confidently wrong answer. This build reads a time-of-flight bank "
-        f"(the pattern lands on pattern.tof in µs, the calibration on "
-        f"instrument.source with kind='neutron_tof') and refines none: no "
-        f"flight-time forward model exists here yet, and adding one is "
-        f"tracked on yue-here/rietx issue #193.")
+        f"confidently wrong answer. A time-of-flight bank is refined through "
+        f"Refinement.fit (or rietx.refine), which routes the matched pair to "
+        f"the flight-time forward model: positions from "
+        f"TOF = DIFC·d + DIFA·d² + TZERO + DIFB/d, a back-to-back-exponential "
+        f"profile, the d⁴·sinθ Lorentz factor. This entry point is not on that "
+        f"route, and widening it is tracked on yue-here/rietx issue #193. The "
+        f"pattern is on pattern.tof (µs) and the constants on "
+        f"instrument.source (kind='neutron_tof').")
+
+
+def require_matched_axis(pattern: PatternData, where: str, *,
+                         instrument: object) -> None:
+    """Refuse a (pattern, instrument) **pair** whose abscissae disagree.
+
+    The peer of :func:`require_two_theta` at an entry point that serves both
+    arms.  Two matched pairs pass — a 2θ pattern with a constant-wavelength
+    source, a time-of-flight pattern with a ``neutron_tof`` bank — and the two
+    crossed pairs are refused, each naming what the *other* half would have to
+    be.
+
+    Refused at the door rather than left to the compiler, which refuses them
+    too: by the time ``compile_tof_model`` is reached a history tree exists and
+    a ``fit_start`` event has gone out, so a caller that mixed up two
+    instruments sees a run begin and then fail.  The compiler's checks stay as
+    the backstop — every path to a forward model passes one of them — which is
+    the same two-layer arrangement ``compile_model``'s own
+    :func:`require_two_theta` call already is.
+    """
+    kind = getattr(getattr(instrument, "source", None), "kind", None)
+    if (pattern.axis == "tof") == (kind == "neutron_tof"):
+        return
+    if pattern.axis == "tof":
+        what = (f"this pattern's abscissa is a time of flight in microseconds "
+                f"and the instrument's source is {kind!r}, which has no bank "
+                f"calibration to turn a d-spacing into a flight time")
+        fix = ("give the bank its constants: "
+               "Instrument.tof_neutron_bank(difc=…, two_theta_bank_deg=…), or "
+               "rietx.read_gsas_tof_iparm / rietx.read_gsas2_instprm on the "
+               ".iparm/.instprm beside the data")
+    else:
+        what = ("this instrument's source is a neutron_tof bank, whose peak "
+                "positions are flight times in microseconds, while the "
+                "pattern's abscissa is 2θ in degrees")
+        fix = ("read the bank's own histogram (its abscissa lands on "
+               "pattern.tof), or refine this pattern against a "
+               "constant-wavelength instrument")
+    raise ValueError(
+        f"{where}: {what}. The two are related by the bank's "
+        f"DIFC/DIFA/TZERO/DIFB, so running one against the other would put "
+        f"every reflection somewhere it was not measured. {fix}.")

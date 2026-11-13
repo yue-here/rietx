@@ -224,6 +224,28 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
             ),
         ),
     ),
+    "tof": (
+        "The time-of-flight index",
+        "Load it when the pattern is a neutron time-of-flight bank: a flight "
+        "time on `pattern.tof`, a GSAS `.iparm`/`.prm` or a GSAS-II `.instprm` "
+        "`Type: PNT` calibration beside it. Its heuristics and codes are "
+        "`references/tof.md`.",
+        (
+            (
+                "The bank",
+                "`rx.read_pattern` puts a declared flight time on `pattern.tof` "
+                "in µs. The calibration is never in the data file: "
+                "`rx.read_gsas_tof_iparm` returns one frozen `Instrument` per "
+                "bank and `rx.read_gsas2_instprm` one from a `Type: PNT` file "
+                "(both readers are in `api-io.md`), and "
+                "`rx.Instrument.tof_neutron_bank` builds one by hand. "
+                "`Refinement.fit` refines one bank like a scan; the result "
+                "carries `tof`, not `two_theta`, and `result.axis` says which.",
+                ("rx.Instrument.tof_neutron_bank", "rx.TOFSource",
+                 "rx.ProfileTOF", "rx.IncidentSpectrum"),
+            ),
+        ),
+    ),
     "figure": (
         "The figure index",
         "Load it when you want a picture of a structure: a refined model to "
@@ -371,7 +393,8 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "choosing among several; time-of-flight is refused by name: a "
                 "time-of-flight `.iparm` is `rx.read_gsas_tof_iparm`'s, one frozen "
                 "`Instrument` per bank, and a GSAS-II `Type: PNT` file reads the same "
-                "way. This build refines no bank, so every fit refuses one by name). A "
+                "way. One bank refines through `Refinement.fit`; a joint fit over "
+                "several refuses them by name, and `api-tof.md` is the bank's index). A "
                 "Kα1/Kα2 doublet there comes back as two "
                 "emission lines, the second weighted by the file's own `KRATIO`, so "
                 "do not add a Kα2 line yourself after reading one "

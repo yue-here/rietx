@@ -41,6 +41,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
+from typing import ClassVar
 
 import numpy as np
 
@@ -253,6 +254,12 @@ def window_fwhm_mult(eta: np.ndarray, tol: float | None = None) -> np.ndarray:
     vectorised bisection to machine-level precision; the Lorentzian term
     dominates for any η ≳ tol, giving k ≈ η/(π·tol) — the fat tail is the
     price of a Lorentzian mix and is why the criterion must know η.
+
+    ``tol`` defaults to :data:`WINDOW_AREA_TOL`, the constant-wavelength arm's
+    tolerance, so nothing about that arm changes.  It is an argument because
+    the flight-time arm needs a **different** number and needs it for a
+    measured reason — see ``forward_tof.TOF_WINDOW_AREA_TOL``.  D is the
+    *two-sided* discard, so a caller wanting a per-side fraction f passes 2f.
     """
     from scipy.special import erfc
 
@@ -1037,6 +1044,43 @@ class CompiledModel:
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
+    # the axis-blind view, shared with the time-of-flight model
+    # ------------------------------------------------------------------
+    #: Which abscissa this model's grid carries — the discriminator a shared
+    #: consumer branches on, spelled as ``PatternData.axis`` spells it.  A
+    #: ``ClassVar``, because this class *is* the constant-wavelength arm:
+    #: ``model.forward_tof.CompiledTOFModel`` is the other one and says
+    #: ``"tof"``.
+    axis: ClassVar[str] = "two_theta"
+
+    @property
+    def grid(self) -> np.ndarray:
+        """The fit abscissa as measured — degrees here, µs on the TOF model.
+
+        The four members below are the axis-blind view: a consumer that
+        windows, masks, plots or counts channels reads these and works on
+        either arm, while a consumer that does trigonometry reads ``tt`` and is
+        refused by name on the other one.  They cost nothing here — ``grid``
+        *is* ``tt`` — and they are what makes the seven point counts in
+        ``optimize.least_squares`` and the row layout in ``model.rows``
+        radiation-blind rather than seven copies of ``len(model.tt)``.
+        """
+        return self.tt
+
+    @property
+    def x_min(self) -> float:
+        return self.tt_min
+
+    @property
+    def x_max(self) -> float:
+        return self.tt_max
+
+    @property
+    def n_points(self) -> int:
+        """Channels in the fit grid — the algorithm's N, on either axis."""
+        return len(self.tt)
+
+    # ------------------------------------------------------------------
     def background(self, values: dict[str, float]) -> np.ndarray:
         """The whole declared background: the linear block plus any peaks.
 
@@ -1047,23 +1091,9 @@ class CompiledModel:
         them knowing it exists.  Empty ``component_paths`` leaves the body
         bit-identical to the pre-peak one — the loop does not run.
         """
-        # stacked, not np.array-ed: the coefficients come from θ (traced)
-        xp = get_backend()
-        coeffs = xp.stack([values[p] for p in self.bkg_paths])
-        y = xp.matmul(coeffs, self.bkg_design)
-        if self.fixed_background is not None:
-            y = y + xp.asarray(self.fixed_background, dtype=np.float64)
-        if self.component_paths:
-            # lifted once, and lifted *here* rather than at compile: the grid is
-            # a frozen numpy constant that is about to meet a θ-derived
-            # position, and jax's fp64 is scoped to the traced call (CLAUDE.md →
-            # Conventions, and backend/traced.py's module docstring)
-            tt = xp.asarray(self.tt, dtype=np.float64)
-            for pos_path, height_path, fwhm_path in self.component_paths:
-                y = y + hump_curve(
-                    tt, values[pos_path], values[height_path],
-                    values[fwhm_path], xp)
-        return y
+        return background_curve(self.tt, self.bkg_paths, self.bkg_design,
+                                self.fixed_background, self.component_paths,
+                                values)
 
     def peak_component_prefixes(self) -> frozenset[str]:
         """Dot-path prefixes of the components that are **not** background.
@@ -1188,12 +1218,7 @@ class CompiledModel:
     def penalty_residual(self, values: dict[str, float]) -> np.ndarray | None:
         """w·D₂·c rows appended to the residual (P-spline smoothness; the
         frozen weight w is ``bkg_penalty``'s, see that field)."""
-        if self.bkg_penalty is None:
-            return None
-        xp = get_backend()
-        coeffs = xp.stack([values[p] for p in self.bkg_paths])
-        # xp.matmul: the frozen penalty rows are the *left* operand (backend/api.py)
-        return xp.matmul(self.bkg_penalty, coeffs)
+        return background_penalty_rows(self.bkg_penalty, self.bkg_paths, values)
 
     def _position_shift_deg(self, theta: np.ndarray, tt_bragg: np.ndarray,
                             values: dict[str, float]) -> np.ndarray | float:
@@ -4016,6 +4041,160 @@ def magnetic_wanted(phase, source) -> bool:
 
 
 
+# ----------------------------------------------------------------------
+# the axis-blind background block, shared with the time-of-flight model
+# ----------------------------------------------------------------------
+# The three functions below were the bodies of ``compile_model`` and
+# ``CompiledModel.background``/``penalty_residual`` and are hoisted verbatim —
+# same operations, same order, so the constant-wavelength path is bit-identical
+# — because none of them is about an *angle*.  A background model is a
+# polynomial (or spline, or peak) in whatever the abscissa is, and
+# ``model/forward_tof.py`` needs exactly this in microseconds.  Hoisting rather
+# than re-typing is the difference between one background implementation and
+# two that will drift.
+def compile_background(bkg, grid: np.ndarray, x_min: float, x_max: float,
+                       *, gate_off_states: bool = False,
+                       moving_paths: set[str] | None = None,
+                       sigma: np.ndarray | None = None
+                       ) -> tuple[tuple[str, ...], np.ndarray,
+                                  np.ndarray | None, np.ndarray | None,
+                                  np.ndarray | None]:
+    """``(bkg_paths, design, fixed, penalty, sigma)`` for a background on ``grid``.
+
+    ``grid`` is the fit abscissa as measured and ``x_min``/``x_max`` its ends:
+    degrees on a constant-wavelength pattern, microseconds on a time-of-flight
+    one.  The Chebyshev basis is orthogonal on whatever interval it is mapped
+    to, and a B-spline knows only its breakpoints, so nothing here needs to
+    know which quantity it received — with the single exception noted on the
+    air term below.
+
+    ``gate_off_states``/``moving_paths`` are ``compile_model``'s own (see its
+    docstring); they only matter for :class:`BackgroundFixedPlusChebyshev`'s
+    ``scale``, below.  ``sigma`` is the channel weight as already selected for
+    this stage (file esd or Poisson fallback); it is returned unchanged unless
+    ``bkg.fixed_sigma`` is set, in which case it is widened in quadrature and
+    the widened array is what a caller must use from here on.
+    """
+    fixed = None
+    penalty = None
+    moving_paths = moving_paths or set()
+    if isinstance(bkg, BackgroundChebyshev):
+        n_cheb = len(bkg.coefficients)
+        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_cheb))
+        design = chebyshev_design_matrix(grid, n_cheb, x_min, x_max)
+    elif isinstance(bkg, BackgroundFixedPlusChebyshev):
+        n_cheb = len(bkg.chebyshev.coefficients)
+        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_cheb))
+        design = chebyshev_design_matrix(grid, n_cheb, x_min, x_max)
+        curve = interpolate_fixed(grid, np.asarray(bkg.fixed_two_theta),
+                                  np.asarray(bkg.fixed_intensity))
+        # The curve is carried one of two ways, and never both — a double count
+        # is absorbed by the refined scale as s_true − 1, leaves Rwp
+        # bit-for-bit unchanged, and is wrong only in the number the caller
+        # asked for (WP-1309, issue #171 note 1).
+        #
+        # A scale the stage can move is a *row*: the model is linear in it, so
+        # the row is its exact Jacobian column and ``_make_jacobian``'s
+        # background branch picks it up by being in ``bkg_paths`` — which is
+        # also what keeps a background-only stage from rebuilding the profile
+        # derivative bases every iteration.  A scale that cannot move is folded
+        # into the frozen curve instead, where 1.0 is exactly the identity and
+        # every number a project produced before this field existed is
+        # reproduced bit for bit.
+        #
+        # ``moving_paths`` is the authority for "can this move", never
+        # ``free_paths``: a tie can move it without it being a column.  The
+        # no-claim case takes the *row* — read here off ``gate_off_states``,
+        # since ``moving_paths`` has been an empty set since the normalisation
+        # above — because a fold is a freeze, and a freeze taken on an unasked
+        # question would hand a caller who had freed the scale a flat column
+        # and a parameter that cannot move.  Every other gate in this function
+        # falls the other way for the same reason: theirs is a cost, this one
+        # would be a wrong number.
+        if not gate_off_states or SCALE_PATH in moving_paths:
+            bkg_paths = bkg_paths + (SCALE_PATH,)
+            design = np.vstack([design, curve[None, :]])
+        else:
+            fixed = float(bkg.scale.value) * curve
+        if bkg.fixed_sigma is not None:
+            # The curve's own counting statistics, at the scale the stage
+            # compiled at: σ² = σ_y² + s²·σ_f² (schemas.instrument's docstring
+            # has the two caveats).  Frozen per stage like every other discrete
+            # choice, so a stage that moves s re-weights at the next compile.
+            sig_f = interpolate_fixed(grid, np.asarray(bkg.fixed_two_theta),
+                                      np.asarray(bkg.fixed_sigma))
+            s = float(bkg.scale.value)
+            if sigma is not None:
+                sigma = np.sqrt(sigma * sigma + (s * sig_f) ** 2)
+    elif isinstance(bkg, BackgroundPSpline):
+        n_coef = len(bkg.coefficients)
+        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_coef))
+        design = bspline_design_matrix(grid, np.asarray(bkg.breakpoints))
+        # An air term the model does not declare has no row, so no plan's
+        # ``instrument.background.*`` can free it (WP-1454).  It is also the
+        # one row here that *is* a statement about the abscissa: 1/2θ is the
+        # small-angle air-scatter tail, and 1/TOF is not that curve at all.
+        # ``compile_tof_model`` refuses the P-spline background for exactly
+        # this reason rather than letting the row be fitted as an unnamed
+        # hyperbola.
+        n_air = 0 if bkg.air_scatter is None else 1
+        if n_air:
+            bkg_paths = bkg_paths + ("instrument.background.air",)
+            with np.errstate(divide="ignore"):
+                air_row = 1.0 / np.maximum(grid, 1e-3)
+            design = np.vstack([design, air_row[None, :]])
+        if bkg.lambda_smooth > 0.0 and n_coef > 2:
+            d2 = second_difference_matrix(n_coef)
+            weight = np.sqrt(bkg.lambda_smooth)
+            if bkg.lambda_units == "dimensionless":
+                # σ is this compile's, over the fitted channels, so the scale
+                # is frozen per stage like every other discrete choice here
+                weight *= pspline_penalty_scale(sigma, n_coef)
+            penalty = np.hstack([weight * d2,
+                                 np.zeros((d2.shape[0], n_air))])  # air term unpenalised
+    else:  # pragma: no cover - schema exhausts the union
+        raise TypeError(f"unsupported background model {type(bkg).__name__}")
+    return bkg_paths, design, fixed, penalty, sigma
+
+
+def background_curve(grid: np.ndarray, bkg_paths: tuple[str, ...],
+                     bkg_design: np.ndarray,
+                     fixed_background: np.ndarray | None,
+                     component_paths: tuple[tuple[str, str, str], ...],
+                     values: dict[str, float]) -> np.ndarray:
+    """The whole declared background on ``grid``: linear block plus any humps."""
+    # stacked, not np.array-ed: the coefficients come from θ (traced)
+    xp = get_backend()
+    coeffs = xp.stack([values[p] for p in bkg_paths])
+    y = xp.matmul(coeffs, bkg_design)
+    if fixed_background is not None:
+        y = y + xp.asarray(fixed_background, dtype=np.float64)
+    if component_paths:
+        # lifted once, and lifted *here* rather than at compile: the grid is
+        # a frozen numpy constant that is about to meet a θ-derived
+        # position, and jax's fp64 is scoped to the traced call (CLAUDE.md →
+        # Conventions, and backend/traced.py's module docstring)
+        x = xp.asarray(grid, dtype=np.float64)
+        for pos_path, height_path, fwhm_path in component_paths:
+            y = y + hump_curve(
+                x, values[pos_path], values[height_path],
+                values[fwhm_path], xp)
+    return y
+
+
+def background_penalty_rows(bkg_penalty: np.ndarray | None,
+                            bkg_paths: tuple[str, ...],
+                            values: dict[str, float]) -> np.ndarray | None:
+    """w·D₂·c rows appended to the residual (P-spline smoothness; the
+    frozen weight w is already folded into ``bkg_penalty``)."""
+    if bkg_penalty is None:
+        return None
+    xp = get_backend()
+    coeffs = xp.stack([values[p] for p in bkg_paths])
+    # xp.matmul: the frozen penalty rows are the *left* operand (backend/api.py)
+    return xp.matmul(bkg_penalty, coeffs)
+
+
 def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float],
                          window_area_tol: float | None = None
                          ) -> tuple[CompiledExtraPeak, ...]:
@@ -4204,6 +4383,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     ``CompiledPhase.skip_extinction``.  Both are compile-time structural in the
     sense the frozen-per-stage invariant means: the decision is taken once, off
     values that cannot change, and never re-asked from a θ-derived quantity.
+
+    The pattern must be in 2θ and the instrument a constant-wavelength one:
+    this is the backstop for :func:`rietx.schemas.pattern.require_two_theta`,
+    below every public entry that calls it, so a caller who assembled a compile
+    by hand gets the same authored refusal rather than an ``arcsin`` of a
+    microsecond.
 
     ``restraint_weight_scale`` is the coming stage's c_w (McCusker eq 7),
     frozen onto the model like every other discrete choice; 1.0 is the identity
@@ -4598,80 +4783,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             restraint_items.extend(resolve_phase_restraints(phase, ip, sites, cell))
         phases.append(cp)
 
-    # background compilation — always linear: paths + design rows (+ penalty)
-    bkg = instrument.background
-    fixed = None
-    penalty = None
-    if isinstance(bkg, BackgroundChebyshev):
-        n_cheb = len(bkg.coefficients)
-        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_cheb))
-        design = chebyshev_design_matrix(tt, n_cheb, tt_min, tt_max)
-    elif isinstance(bkg, BackgroundFixedPlusChebyshev):
-        n_cheb = len(bkg.chebyshev.coefficients)
-        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_cheb))
-        design = chebyshev_design_matrix(tt, n_cheb, tt_min, tt_max)
-        curve = interpolate_fixed(tt, np.asarray(bkg.fixed_two_theta),
-                                   np.asarray(bkg.fixed_intensity))
-        # The curve is carried one of two ways, and never both — a double count
-        # is absorbed by the refined scale as s_true − 1, leaves Rwp
-        # bit-for-bit unchanged, and is wrong only in the number the caller
-        # asked for (WP-1309, issue #171 note 1).
-        #
-        # A scale the stage can move is a *row*: the model is linear in it, so
-        # the row is its exact Jacobian column and ``_make_jacobian``'s
-        # background branch picks it up by being in ``bkg_paths`` — which is
-        # also what keeps a background-only stage from rebuilding the profile
-        # derivative bases every iteration.  A scale that cannot move is folded
-        # into the frozen curve instead, where 1.0 is exactly the identity and
-        # every number a project produced before this field existed is
-        # reproduced bit for bit.
-        #
-        # ``moving_paths`` is the authority for "can this move", never
-        # ``free_paths``: a tie can move it without it being a column.  The
-        # no-claim case takes the *row* — read here off ``gate_off_states``,
-        # since ``moving_paths`` has been an empty set since the normalisation
-        # above — because a fold is a freeze, and a freeze taken on an unasked
-        # question would hand a caller who had freed the scale a flat column
-        # and a parameter that cannot move.  Every other gate in this function
-        # falls the other way for the same reason: theirs is a cost, this one
-        # would be a wrong number.
-        if not gate_off_states or SCALE_PATH in moving_paths:
-            bkg_paths = bkg_paths + (SCALE_PATH,)
-            design = np.vstack([design, curve[None, :]])
-        else:
-            fixed = float(bkg.scale.value) * curve
-        if bkg.fixed_sigma is not None:
-            # The curve's own counting statistics, at the scale the stage
-            # compiled at: σ² = σ_y² + s²·σ_f² (schemas.instrument's docstring
-            # has the two caveats).  Frozen per stage like every other discrete
-            # choice, so a stage that moves s re-weights at the next compile.
-            sig_f = interpolate_fixed(tt, np.asarray(bkg.fixed_two_theta),
-                                      np.asarray(bkg.fixed_sigma))
-            s = float(bkg.scale.value)
-            sigma = np.sqrt(sigma * sigma + (s * sig_f) ** 2)
-    elif isinstance(bkg, BackgroundPSpline):
-        n_coef = len(bkg.coefficients)
-        bkg_paths = tuple(f"instrument.background.c{n}" for n in range(n_coef))
-        design = bspline_design_matrix(tt, np.asarray(bkg.breakpoints))
-        # An air term the model does not declare has no row, so no plan's
-        # ``instrument.background.*`` can free it (WP-1454).
-        n_air = 0 if bkg.air_scatter is None else 1
-        if n_air:
-            bkg_paths = bkg_paths + ("instrument.background.air",)
-            with np.errstate(divide="ignore"):
-                air_row = 1.0 / np.maximum(tt, 1e-3)
-            design = np.vstack([design, air_row[None, :]])
-        if bkg.lambda_smooth > 0.0 and n_coef > 2:
-            d2 = second_difference_matrix(n_coef)
-            weight = np.sqrt(bkg.lambda_smooth)
-            if bkg.lambda_units == "dimensionless":
-                # σ is this compile's, over the fitted channels, so the scale
-                # is frozen per stage like every other discrete choice here
-                weight *= pspline_penalty_scale(sigma, n_coef)
-            penalty = np.hstack([weight * d2,
-                                 np.zeros((d2.shape[0], n_air))])  # air term unpenalised
-    else:  # pragma: no cover - schema exhausts the union
-        raise TypeError(f"unsupported background model {type(bkg).__name__}")
+    # background compilation — always linear: paths + design rows (+ penalty).
+    # ``sigma`` may widen here (WP-1309's ``fixed_sigma``: σ² + s²·σ_f²), so the
+    # returned array is what every later use of the channel weight must read.
+    bkg_paths, design, fixed, penalty, sigma = compile_background(
+        instrument.background, tt, tt_min, tt_max,
+        gate_off_states=gate_off_states, moving_paths=moving_paths, sigma=sigma)
 
     # the component *count* is frozen here (discrete); every position, width,
     # height and area is read from θ on every call (smooth).  Built from the
@@ -4828,7 +4945,13 @@ def window_loss(model: CompiledModel, values: dict[str, float]) -> float | None:
     on frozen windows dropping more than the compile allows each peak
     (WP-2047: 1.73 % at most on the four acceptance protocols' stages at the
     2 % tolerance, 73-99 % on the hostile series' runaway).
+
+    ``None`` on a time-of-flight bank too: :func:`rewindow` sizes
+    pseudo-Voigt windows in 2θ, and a bank's windows are sized per side by
+    ``forward_tof.TOF_WINDOW_AREA_TOL`` at compile, with no twin of it here.
     """
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return None
     fresh = np.asarray(rewindow(model, values).bragg_component(values),
                        dtype=np.float64).sum()
     if not fresh > 0.0:

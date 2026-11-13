@@ -1277,6 +1277,49 @@ dataset opener. Every one of those is a time-of-flight file, and its banks are
 then refused at build by name (issue #193) while a constant-wavelength dataset
 beside them still builds: 13 more datasets build than before.
 
+#### TOPAS time of flight — each macro's law, measured against TOPAS v6 (2026-10-01)
+
+`io/projects/topas_tof.py` maps a time-of-flight dataset onto `TOFSource` and
+`ProfileTOF`. The reference gives the macros' signatures only (§19.3.11), so
+each law was measured on TOPAS v6 as a **black box**, on synthetic `d_Is` and
+`str` phases (peaks at d = 1.0–2.5 Å, a flat pattern, `iters 0`); no macro body
+was read.
+
+| construct | law | measured |
+|---|---|---|
+| `TOF_x_axis_calibration(t0, ·, t1, ·, t2, ·)` | `Xo = t0 + t1·d + t2·d²` | t0 7.5, t1 10000, t2 −3.25: every `Xo` to 1e-6 µs |
+| `scale_pks = D_spacing^4;` | × d⁴ | `I_after/I_no` = 1, 5.0625, 16, 39.0625 |
+| `TOF_PV(fw, F, lor, η, t1)` | pseudo-Voigt, FWHM = 10⁻⁵·F·t1·d, fraction η | FWHM ∝ F, ∝ d, ∝ t1; h·Γ/area 0.9394 at η 0, 0.635 at η 1 |
+| `TOF_Exponential(a0, ·, a1, ·, w, t1, ±)` | rate ln(1000)·(a0 + a1/d^w)/t1; `+` late, `−` early | r·t1 = 20 ln 1000 at a0 20; ∝ 1/d⁴ at w 4, 1/d at w 1; ∝ 1/t1 |
+| `exp_conv_const c` | rate −ln(0.001)/c, late for c > 0 | c = −Ln(0.001)/0.05 → 0.0500000 µs⁻¹ at every d |
+| `push_peak` / rise / `bring_2nd_peak_to_top` / decay / `add_pop_1st_2nd_peak` | the back-to-back pulse, the same as the two in series (VD82 eq. 10: the members are not unit-area) | 9.8e-4 of max against rietx's pulse, 0.71 off the equal-weight sum; with `scale_top_peak 3` 0.137 off, a weighted pair (`tof/topas_stack/`) |
+| intensity | TOPAS = rietx × 0.01/sin θ_bank at one scale | Si and NiO per d-group, \|ln dev\| ≤ 1.3e-7 (b² in barn vs fm²; rietx's sin θ_bank) |
+| `bkg c0 c1 …` | rietx's shifted Chebyshev, on TOPAS's output grid ends | `bkg 0 1`, `0 0 1`, `1 0 0 1`: 5e-7 (print precision) |
+| `Lam` on a `TOF_LAM` bank | 0 — no wavelength of its own | `phase_out` |
+| equations | juxtaposition is `*` (same rank, left to right); `^` right-associative, above unary minus | `6/2 3` = 9, `2^3 2` = 16, `-2^2` = −4, `2^3^2` = 512 |
+| `extra_X_left`/`_right` | reflections generated only that far outside the range (default 0.5) | a peak 20 µs below `start_X` missing on the TOPAS side: 6e-3 of max until set |
+
+**Forward identity** (rietx bank → `from_tof` → TOPAS v6 `iters 0`, against
+the clean-room forward model): NiO + Si, DIFC 10000, DIFA −3.25, TZERO 7.5,
+2θ 90°, Chebyshev background — profile type 1, type 3, and type 3 with DIFB ≠ 0
+all agree per reflection (positions 5e-9 µs, intensities |ln ratio| 2.6e-7,
+the written widths and rates 5e-13) and in Y_calc to 1.26–1.44e-3 of the
+maximum, which is TOPAS's 1e-3 exponential cut. Four planted writer errors —
+DIFA's sign, α and β swapped, d³ for d⁴, TZERO in ms — each fail (Y_calc
+0.24–0.75, and positions or intensities). TOPAS's own convolution step
+matters on a coarse grid: where a rise exponential spans a channel or two, the
+default step leaves several 1e-3 of the maximum, and `convolution_step 4`–`8`
+removes it (measured on a variant of an archive standard, whose values are not
+quoted here), so `from_tof` takes `convolution_step=` for such a bank.
+
+**In CI:** `tof/topas_synthetic/` vendors one synthetic case of that identity
+at reduced size — the same NiO + Si bank over 8000–12000 µs, profile types 1
+and 3, the `.inp` this package wrote and the `Y_calc` TOPAS computed from it
+(synthetic input, no measured data; its README has the generator, the program
+version, the date and the hashes). `test_tof_topas_synthetic.py` holds rietx
+to 1.5e-3 of the maximum against it (measured 1.26e-3 and 1.05e-3), with DIFA's
+sign and an α/β swap planted on the rietx side as the arms that must fail.
+
 ### FullProf `.pcr` — six real files, none of them vendorable
 
 `io/projects/fullprof.py` reads a FullProf refinement *control* file, the same

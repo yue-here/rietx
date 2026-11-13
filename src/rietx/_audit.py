@@ -504,6 +504,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.texture",
     "rietx.schemas.results.RefinementResult.tick_hkl",
     "rietx.schemas.results.RefinementResult.ticks",
+    "rietx.schemas.results.RefinementResult.tof",
     "rietx.schemas.results.RefinementResult.tree_id",
     "rietx.schemas.results.RefinementResult.two_theta",
     "rietx.schemas.results.RefinementResult.y_background",
@@ -962,6 +963,21 @@ ROWS: tuple[Row, ...] = (
                   "strain off zero with set_values and free it to test for a shear")),
     Row("PATTERN_DEAD_CHANNELS", "code"),
     Row("PATTERN_DUPLICATE_POINTS", "code"),
+    Row("PATTERN_INTENSITY_BASIS_UNKNOWN", "code", tier=1, ambiguity=3,
+        evidence=("a statement about the file: the GSAS reader raises it exactly when a "
+                  "time-of-flight bank declares none of the three things that settle what "
+                  "a channel holds (a SaveGSS header stating the bin-width multiplication, "
+                  "an STD or ESD raw-histogram layout, a TIME_MAP bintype; "
+                  "io/formats/gsas.py _intensity_basis) and leaves intensity_basis None; "
+                  "it tests no value, a count per channel and a count per us being both "
+                  "plausible positive reals, and changes nothing: which one the bank holds "
+                  "is how it was reduced, a fact outside the file (DESIGN.md Rules, 1, "
+                  "third kind)"),
+        response="warning",
+        responds=("set pattern.intensity_basis from how the bank was reduced before quoting "
+                  "a biso, an adp or a scale from a fit of it: the two readings differ by "
+                  "the channel width W(T), a slope across the bank that a displacement "
+                  "parameter absorbs")),
     Row("PATTERN_INTENSITY_NET", "code", tier=1, ambiguity=1,
         evidence=("a record of which column was read: the file states only "
                   "_pd_proc_intensity_net, and the code names it with the IUCr "
@@ -1326,6 +1342,18 @@ ROWS: tuple[Row, ...] = (
         evidence="opt-in: solve_magnetic(tie_to_parent=True), default False"),
     Row("SPACE_GROUP_SETTING_ASSUMED", "code"),
     Row("SPECIES_FALLBACK_NEUTRAL", "code"),
+    Row("SPECIMEN_ABSORPTION_TOF", "code", tier=1, ambiguity=1,
+        evidence=("a record of a correction the caller switched on: fires exactly when a "
+                  "bank's model computed a muR range, i.e. a capillary radius was declared "
+                  "(report/tof.py _tof_absorption_diagnostics), and quotes muR at both ends "
+                  "of the fitted window; the correction is Rouse et al. (1970)'s cylinder "
+                  "at each reflection's own wavelength with mu on Sears (1992)'s 1/v law, "
+                  "physics with no threshold of its own; it gates nothing, the past-domain "
+                  "warning being ABSORPTION_MU_R_OUT_OF_RANGE's"),
+        response="info",
+        responds=("note that absorption was in the model at the quoted muR range before "
+                  "reading a displacement parameter, and check the capillary radius and "
+                  "packing fraction against the specimen")),
     Row("STAGE_FREED_NOTHING", "code", tier=1, ambiguity=3,
         response="info",
         responds=("nothing, where the stage was meant for the other histograms; otherwise add "
@@ -1406,6 +1434,28 @@ ROWS: tuple[Row, ...] = (
     Row("STEPHENS_STRAIN_NOT_POSITIVE", "code"),
     Row("STRAIN_UNUSUALLY_LARGE", "code"),
     Row("TEXTURE_NOT_POSITIVE", "code"),
+    Row("TOF_CHANNEL_WIDTH_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=("a record of a declared state: fires exactly when the histogram's "
+                  "intensity_basis is 'counts' (declared by the caller, or by a reader from "
+                  "a declaration in the file), and quotes the channel width W(T), measured "
+                  "from the pattern's own abscissa, at both ends of the window; the factor "
+                  "is GSAS's I_o = I'_o/(W I_i) (LAUR 86-748, Technical Manual p. 127), "
+                  "arithmetic on the declared basis; it gates nothing"),
+        response="info",
+        responds=("nothing, where the bank's channels hold counts; if the export had already "
+                  "divided by the bin width, declare intensity_basis='density' and refit")),
+    Row("TOF_INTENSITY_BASIS_ASSUMED", "code", tier=1, ambiguity=3,
+        evidence=("arithmetic: fires exactly when a bank's intensity_basis is None at "
+                  "compile (report/tof.py _tof_intensity_basis_diagnostics) and says the "
+                  "fit proceeded as 'density', what every flight-time fit before the option "
+                  "did; which basis the bank holds is how it was reduced, a fact outside "
+                  "the pattern, so it reports and ranks neither (DESIGN.md Rules, 1, third "
+                  "kind).  The fallback itself sits at no DEFAULT_SEATS seat (PatternData "
+                  "is not one), so this row is its only record in the table"),
+        response="warning",
+        responds=("quote no biso or adp from this bank until pattern.intensity_basis is "
+                  "declared and the bank refit: a missing W(T) is a smooth rise across the "
+                  "bank that a displacement parameter absorbs")),
     Row("TOPAS_BLOCK_SKIPPED", "code"),
     Row("TOPAS_CELL_COUPLING_DROPPED", "code"),
     Row("TOPAS_FEATURES_NOT_IMPORTED", "code"),
@@ -1498,6 +1548,19 @@ ROWS: tuple[Row, ...] = (
                  "covered here, ruled by the maintainer 2026-11-03 (2003-batch/batch.md, "
                  "C10 q2 (a))."),
         approved="2026-11-04"),
+    Row("rietx.schemas.results.StageResult.lorentz_window_tol", "action", tier=3, ambiguity=1,
+        evidence=("the record of the schedule PlanSpec:intermediate_lorentz_window_tol runs "
+                  "(that row's evidence), read off the model each stage ran on: 1e-2 for an "
+                  "intermediate declared stage by default, 1e-4 "
+                  "(forward_tof.TOF_WINDOW_AREA_TOL) for the last declared stage and the "
+                  "closing stage, None on a constant-wavelength stage, a Gaussian-branch "
+                  "bank and multi.py, which refuses a bank "
+                  "(tests/test_tof_staged_window.py::test_a_fit_records_which_stages_were_coarse)"),
+        grounds=("Records the action rather than taking one, as StageResult.ftol and "
+                 ".window_area_tol do: a coarse stage's numbers are never the reported "
+                 "ones, and a reader comparing two fits' stage trajectories, or "
+                 "cherry-picking a coarse node, must see which stages were coarse.  Its tier "
+                 "is the schedule's (INTERMEDIATE_LORENTZ_WINDOW_TOL).")),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"
@@ -2799,6 +2862,68 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.forward._MEMO_DEPTH", "constant", tier="invariant", value=2,
         evidence=("answer-invariant: a hit needs bit-equal inputs; tests/test_scalar_memo.py::test_"
                   "a_whole_fit_is_bit_identical_with_the_memo_denied")),
+    Row("rietx.model.forward_tof.TAIL_EFOLDS", "constant", tier=3, value=9.210340371976182,
+        evidence=("derived: -ln(TOF_WINDOW_AREA_TOL), the e-folding count that leaves "
+                  "exp(-k) = tol of an exponential wing outside, with no free factor "
+                  "(tests/test_tof_windows.py::test_the_two_halves_of_one_window_state_one_tolerance); "
+                  "the alpha and beta wings are sized separately and added to the "
+                  "resolution extent, a union bound discarding at most 2 x tol a side "
+                  "(test_the_discarded_area_is_the_stated_bound_on_each_side_separately); "
+                  "inherits TOF_WINDOW_AREA_TOL's tier"),
+        grounds=("Derived from TOF_WINDOW_AREA_TOL with no free factor, so it inherits that "
+                 "row's tier and grounds (the rule's derivation clause); kept so the two "
+                 "halves of one window state one bar.")),
+    Row("rietx.model.forward_tof.TOF_WINDOW_AREA_TOL", "constant", tier=3, value=0.0001,
+        evidence=("per-side area fraction a time-of-flight peak's frozen window may leave "
+                  "outside; measured 2026-09 on one real bank, SNS NOMAD Si (SRM 640c) bank "
+                  "1, as the chi2 difference between two states 5e-3 A apart, each state's "
+                  "penalty being chi2 at the rule less chi2 with 500 us more slack: the 2 % "
+                  "area rule it replaced 40.97, 1e-3 1.88, 1e-4 0.296, 1e-6 0.277, at 45.6, "
+                  "54.9, 63.7 and 78.6 points a window and 0.28, 0.32, 0.34 and 0.42 ms an "
+                  "evaluation on the Gaussian branch; 12-24x slower than the 2 % rule on "
+                  "the pseudo-Voigt branch (synthetic Si bank, gamma1 = 2 and 10); the "
+                  "stated discard bound is pinned (tests/test_tof_windows.py); measured on "
+                  "one bank, untested beyond it.  Against: TOPAS v6, run as a black box "
+                  "(2026-09-25), cuts each exponential where it falls to 1e-3 and "
+                  "renormalises it to unit area; GSAS-II not measured here"),
+        grounds=("A numerical setting whose bar was measured on one real bank: the 2 % rule "
+                 "it replaced moved the frozen window's truncated area between candidate "
+                 "states enough to score an uphill step as downhill, 1e-3 (TOPAS's cut) "
+                 "meets a 2-unit bar on the two-state difference with no margin, and 1e-4 "
+                 "is converged (1e-6 moves it by under a tenth).  Tier 3 under B10 option "
+                 "2, as forward.WINDOW_AREA_TOL, until a domain test spans further banks; "
+                 "the Lorentzian tail's cost is bought back by a stated schedule "
+                 "(INTERMEDIATE_LORENTZ_WINDOW_TOL), never by a cap on this.")),
+    Row("rietx.model.forward_tof.WINDOW_MIN_US", "constant", tier=3, value=3.0,
+        evidence=("absolute window half-width slack, movement headroom beside "
+                  "WINDOW_SLACK_FRAC: windows are frozen per stage while TZERO moves inside "
+                  "them, and a TZERO error is absolute; one synthetic Si bank recovers every "
+                  "generating value within 3 esd from a start 0.5 % off in a and 20 us off "
+                  "in TZERO, recompiling between stages "
+                  "(tests/test_forward_tof.py::test_a_perturbed_start_recovers_the_generating_parameters); "
+                  "untested from a real bank's start"),
+        grounds=("A numerical setting whose domain test covers less than the domain it "
+                 "claims (one synthetic bank, one start); tier 3 under B10 option 2, as "
+                 "forward.WINDOW_MIN_DEG, until that is measured.")),
+    Row("rietx.model.forward_tof.WINDOW_SLACK_FRAC", "constant", tier=3, value=0.002,
+        evidence=("window half-width slack as a fraction of the peak's own flight time, "
+                  "movement headroom beside WINDOW_MIN_US: a cell or DIFC error is "
+                  "relative, 0.2 % of T; one synthetic Si bank recovers every generating "
+                  "value within 3 esd from a start 0.5 % off in a and 20 us off in TZERO, "
+                  "recompiling between stages "
+                  "(tests/test_forward_tof.py::test_a_perturbed_start_recovers_the_generating_parameters); "
+                  "untested from a real bank's start"),
+        grounds=("A numerical setting whose domain test covers less than the domain it "
+                 "claims (one synthetic bank, one start); tier 3 under B10 option 2, as "
+                 "forward.WINDOW_MIN_DEG, until that is measured.")),
+    Row("rietx.model.forward_tof._MIN_RATE", "constant", tier=1, value=1e-12,
+        evidence=("arithmetic: the back-to-back pulse has amplitude alpha beta/(alpha + beta) "
+                  "and unbounded width as alpha or beta goes to 0, so a bank with a "
+                  "non-positive rate makes no peak and compile_tof_model refuses it by name "
+                  "(an all-zero ProfileTOF is what a declined PRCF block leaves); 1e-12 per "
+                  "us only separates zero from positive, real rates sitting many decades "
+                  "above it; elsewhere it is a divide-by-zero floor in the width estimate "
+                  "that sizes windows and reports a width, never inside the residual")),
     Row("rietx.model.geometry.ANGLE_LINEARISATION_LIMIT_DEG", "constant", tier=1, value=0.002562345120281331,
         evidence=("physics: a straight angle is a stationary point of the coordinates; value "
                   "inherits restraints._COS_CLAMP with no free factor")),
@@ -2987,6 +3112,63 @@ ROWS: tuple[Row, ...] = (
         evidence=("Thompson, Cox & Hastings (1987) J. Appl. Cryst. 20, 79, eq 4; GSAS-II 5.8.4 "
                   "GSASIIpwd.py:975 same coefficients (checked)"
                   "; seven programs, 2026-10-21 (docs/practice.md): the same coefficients in GSAS-II, FullProf, RIETAN-FP, EasyDiffraction and TOPAS; MAUD and BGMN use no TCH")),
+    Row("rietx.model.profiles.tof.SQRT_8LN2", "constant", tier=1, value=2.3548200450309493,
+        evidence="arithmetic: Gaussian FWHM = sqrt(8 ln2) sigma"),
+    Row("rietx.model.profiles.tof._EULER_GAMMA", "constant", tier=1, value=0.5772156649015329,
+        evidence=("arithmetic: the Euler-Mascheroni constant of the E1 power series, "
+                  "Abramowitz & Stegun 5.1.11")),
+    Row("rietx.model.profiles.tof._LENTZ_STEPS", "constant", tier=1, value=200,
+        evidence=("numerical setting with a domain test: scaled_exp1's continued-fraction "
+                  "step budget (A&S 5.1.22, modified Lentz, Thompson & Barnett 1986); "
+                  "e^z E1(z) within 1e-11 relative of a contour-integral oracle over 220 "
+                  "radii in [1e-4, 3e3] x 121 arguments filling (-pi, pi) (measured 8.4e-13; "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane), and "
+                  "the continued-fraction branch 1e-13 from e^8 E1(8) "
+                  "(test_the_continued_fraction_carries_the_as_minus_signs)")),
+    Row("rietx.model.profiles.tof._LENTZ_TINY", "constant", tier=1, value=1e-300,
+        evidence=("numerical floor: modified Lentz's stand-in for an exactly zero "
+                  "denominator (Thompson & Barnett 1986), eight decades above the smallest "
+                  "normal double (2.2e-308), "
+                  "so it moves no step whose denominator is not exactly zero; "
+                  "scaled_exp1's accuracy is pinned by "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane")),
+    Row("rietx.model.profiles.tof._LENTZ_TOL", "constant", tier=1, value=1e-15,
+        evidence=("numerical setting with a domain test: the continued fraction stops when "
+                  "a step changes it by under 1e-15, about 4.5 eps; e^z E1(z) within 1e-11 "
+                  "relative of a contour-integral oracle over 220 radii in [1e-4, 3e3] x "
+                  "121 arguments filling (-pi, pi) (measured 8.4e-13; "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane)")),
+    Row("rietx.model.profiles.tof._SERIES_RADIUS", "constant", tier=1, value=60.0,
+        evidence=("numerical setting with a domain test: scaled_exp1 takes the A&S 5.1.11 "
+                  "power series only where |z| <= 60 as well as inside the wedge, the "
+                  "continued fraction elsewhere; within 1e-11 relative of a "
+                  "contour-integral oracle over 220 radii in [1e-4, 3e3] x 121 arguments "
+                  "filling (-pi, pi) (measured 8.4e-13; "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane), and "
+                  "finite along both sides of the cut and far out "
+                  "(test_scaled_exp1_is_finite_along_both_sides_of_the_cut_and_far_out)")),
+    Row("rietx.model.profiles.tof._SERIES_TERMS", "constant", tier=1, value=130,
+        evidence=("numerical setting with a domain test: the A&S 5.1.11 power series' fixed "
+                  "term count inside the switch (|z| + Re z <= 8, |z| <= 60); within 1e-11 "
+                  "relative of a contour-integral oracle over 220 radii in [1e-4, 3e3] x "
+                  "121 arguments filling (-pi, pi) (measured 8.4e-13; "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane)")),
+    Row("rietx.model.profiles.tof._SERIES_WEDGE", "constant", tier=1, value=8.0,
+        evidence=("numerical setting with a domain test: scaled_exp1's switch, the power "
+                  "series (A&S 5.1.11) where |z| + Re z <= 8, the wedge hugging the "
+                  "negative real axis where the continued fraction converges slowly, and "
+                  "the continued fraction (A&S 5.1.22) elsewhere; within 1e-11 relative of "
+                  "a contour-integral oracle over 220 radii in [1e-4, 3e3] x 121 arguments "
+                  "filling (-pi, pi) (measured 8.4e-13; "
+                  "tests/test_profile_tof.py::test_scaled_exp1_over_the_complex_plane), and "
+                  "the continued-fraction branch 1e-13 from e^8 E1(8) "
+                  "(test_the_continued_fraction_carries_the_as_minus_signs)")),
+    Row("rietx.model.profiles.tof._SQRT2", "constant", tier=1, value=1.4142135623730951,
+        evidence=("arithmetic: sqrt(2), the sigma sqrt 2 in the erfc arguments of the "
+                  "back-to-back exponential convolved with a Gaussian (Von Dreele, "
+                  "Jorgensen & Windsor 1982, eq. 13)")),
+    Row("rietx.model.profiles.tof._SQRT_2_OVER_PI", "constant", tier=1, value=0.7978845608028654,
+        evidence="arithmetic: sqrt(2/pi) = 2/sqrt(2 pi), from the Gaussian's normalisation"),
     Row("rietx.model.profiles.voigt.GAUSS_FWHM_TO_SIGMA", "constant", tier=1, value=2.3548200450309493,
         evidence="arithmetic: FWHM = 2 sqrt(2 ln2) sigma"),
     Row("rietx.model.profiles.voigt._SQRT2", "constant", tier=1, value=1.4142135623730951,
@@ -3029,6 +3211,25 @@ ROWS: tuple[Row, ...] = (
                   "images (round(d, 6) in stale_anti_bump_pairs) bins at the same 1e-6 A")),
     Row("rietx.model.tof_spectrum.POINT_BY_POINT_ITYP", "constant", tier=1, value=10,
         evidence="format: GSAS Technical Manual p. 129, 222 define ITYP 10 (docstring)"),
+    Row("rietx.model.tof_spectrum.SABINE_LAUE_ASYMPTOTE_AT_1", "constant", tier=1,
+        value=0.6677608091875543,
+        evidence=("arithmetic: Sabine, Von Dreele & Jorgensen (1988) Acta Cryst. A44, 374, "
+                  "eq. 4 (the x > 1 asymptote of E_L) evaluated at x = 1, kept for the "
+                  "record of the published formulas' ~2.2 % step there, which is not "
+                  "smoothed (tests/test_tof_spectrum.py)")),
+    Row("rietx.model.tof_spectrum.SABINE_LAUE_SERIES_AT_1", "constant", tier=1,
+        value=0.6822916666666667,
+        evidence=("arithmetic: Sabine, Von Dreele & Jorgensen (1988) Acta Cryst. A44, 374, "
+                  "eq. 3 (the x <= 1 series of E_L) evaluated at x = 1, kept for the "
+                  "record of the published formulas' ~2.2 % step there, which is not "
+                  "smoothed (tests/test_tof_spectrum.py pins 0.68229)")),
+    Row("rietx.model.tof_spectrum.THERMAL_WAVELENGTH", "constant", tier=1, value=1.798,
+        evidence=("physics: h/(m_n x 2200 m/s) = 1.798 A, the thermal-neutron reference "
+                  "velocity at which absorption cross sections are tabulated (Sears 1992, "
+                  "Neutron News 3, 26), so sigma_abs scales as lambda/1.798 on the 1/v "
+                  "law")),
+    Row("rietx.model.tof_spectrum._US_PER_MS", "constant", tier=1, value=1000.0,
+        evidence="arithmetic: 1000 us per ms, the unit change at the incident-spectrum door"),
     Row("rietx.optimize.bccg._CAUCHY_ARMIJO", "constant", tier=3, value=0.0001,
         evidence=("Moré & Toraldo (1991) SIAM J. Optim. 1, 93 for the projected search (docstring);"
                   " 1e-4 is the textbook Armijo c1 (recalled, not checked)"),
@@ -3701,6 +3902,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.vector._SIGMA_MAX", "constant", tier=1, value=1.3407807929942596e+154,
         evidence=("numerical floor: sqrt(float64 max) from np.finfo (the floating-point format "
                   "itself)")),
+    Row("rietx.params.vector._STRAIN_COEFFICIENT_TO_DD", "constant", tier=1,
+        value=0.008726646259971648,
+        evidence=("arithmetic: pi/360; the Stokes-Wilson broadening is d2theta = "
+                  "2 (dd/d) tan theta in radians, so a strain coefficient c in degrees "
+                  "means dd/d = (pi/180) c/2; a second spelling of "
+                  "caglioti.microstrain_width's constant, held equal to it by "
+                  "tests/test_strain_cap.py")),
     Row("rietx.refine.AIR_SCATTER_UNDECLARED_FRACTION", "constant", value=0.005),
     Row("rietx.refine.AIR_SCATTER_UNDECLARED_SCORE", "constant", value=25.0),
     Row("rietx.refine.DISPERSION_NEGLECT_FRAC", "constant", value=0.02),
@@ -4115,6 +4323,30 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
+    Row("rietx.schemas.plan.INTERMEDIATE_LORENTZ_WINDOW_TOL", "constant", tier=3, value=0.01,
+        evidence=("the TOF track's staged-tolerance measurement (2026-09-29), 63 fits on the "
+                  "committed synthetic Si bank, three noise seeds x gamma1 = 0, 2 and 10 us/A, the"
+                  " five-stage TOF plan: under this rule (arm L2) every final parameter within "
+                  "0.0058 esd of the all-1e-4 plan (bar 0.1; 0.0087 the worst of the six arms "
+                  "tried), stage count identical, all converged; the whole fit 1.2-3.6x cheaper in"
+                  " wall clock (CPU 0.33-0.72x on three counted fits), the coarse stages 10-50x; "
+                  "the Gaussian branch compiles bit-identical windows, having no Lorentzian tail "
+                  "to size; renormalising bought no parameter agreement and raised a Lorentzian "
+                  "peak 1.56 % of its height against 0.18 %; on SNS NOMAD Si (SRM 640c) bank 1, "
+                  "which has a flat direction, a staged plan with 1e-2 on the whole window lands "
+                  "on the same minimum from the state a coarse window prefers; this branch's "
+                  "gamma1 = 5 fixture: max |d|/esd 3.0e-4 against a bar of 0.1 "
+                  "(tests/test_tof_staged_window.py::test_the_answer_is_the_answer_tolerances). "
+                  "Measured before the closing stage existed, which adds one 1e-4 solve to both "
+                  "arms; not measured on a real gamma != 0 bank (none obtainable), a multi-bank "
+                  "fit or a chained series: one synthetic family, untested beyond it"),
+        grounds=("Cost only, as INTERMEDIATE_FTOL: the reported numbers are never a coarse "
+                 "stage's, since the last declared stage and the closing stage run at "
+                 "TOF_WINDOW_AREA_TOL; every final parameter stayed within 0.006 esd of the "
+                 "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
+                 "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
+                 "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
+                 "family only.")),
     Row("rietx.schemas.plan.PHASE_SUPPORT_SIGMA", "constant", tier=3, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -4568,6 +4800,31 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
+    Row("rietx.schemas.plan.PlanSpec:intermediate_lorentz_window_tol", "default", tier=3,
+        ambiguity=1, value=0.01,
+        evidence=("the TOF track's staged-tolerance measurement (2026-09-29), 63 fits on the "
+                  "committed synthetic Si bank, three noise seeds x gamma1 = 0, 2 and 10 us/A, the"
+                  " five-stage TOF plan: under this rule (arm L2) every final parameter within "
+                  "0.0058 esd of the all-1e-4 plan (bar 0.1; 0.0087 the worst of the six arms "
+                  "tried), stage count identical, all converged; the whole fit 1.2-3.6x cheaper in"
+                  " wall clock (CPU 0.33-0.72x on three counted fits), the coarse stages 10-50x; "
+                  "the Gaussian branch compiles bit-identical windows, having no Lorentzian tail "
+                  "to size; renormalising bought no parameter agreement and raised a Lorentzian "
+                  "peak 1.56 % of its height against 0.18 %; on SNS NOMAD Si (SRM 640c) bank 1, "
+                  "which has a flat direction, a staged plan with 1e-2 on the whole window lands "
+                  "on the same minimum from the state a coarse window prefers; this branch's "
+                  "gamma1 = 5 fixture: max |d|/esd 3.0e-4 against a bar of 0.1 "
+                  "(tests/test_tof_staged_window.py::test_the_answer_is_the_answer_tolerances). "
+                  "Measured before the closing stage existed, which adds one 1e-4 solve to both "
+                  "arms; not measured on a real gamma != 0 bank (none obtainable), a multi-bank "
+                  "fit or a chained series: one synthetic family, untested beyond it"),
+        grounds=("Cost only, as INTERMEDIATE_FTOL: the reported numbers are never a coarse "
+                 "stage's, since the last declared stage and the closing stage run at "
+                 "TOF_WINDOW_AREA_TOL; every final parameter stayed within 0.006 esd of the "
+                 "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
+                 "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
+                 "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
+                 "family only.")),
     Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
         evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
@@ -4684,6 +4941,22 @@ ROWS: tuple[Row, ...] = (
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
         approved="2026-11-05"),
+    Row("rietx.schemas.plan.StageSpec:lorentz_window_tol", "default", tier=3, ambiguity=1,
+        value=None,
+        evidence=("None takes the plan's schedule (intermediate_lorentz_window_tol in every "
+                  "declared stage but the last, TOF_WINDOW_AREA_TOL in the last and the "
+                  "closing stage), so it inherits INTERMEDIATE_LORENTZ_WINDOW_TOL's row; a "
+                  "stage's own value wins and the closing stage never copies a coarse "
+                  "override (tests/test_tof_staged_window.py::"
+                  "test_a_stage_override_wins_and_none_is_the_way_back, "
+                  "::test_the_closing_stage_does_not_copy_a_coarse_override)"),
+        grounds=("Cost only, as INTERMEDIATE_FTOL: the reported numbers are never a coarse "
+                 "stage's, since the last declared stage and the closing stage run at "
+                 "TOF_WINDOW_AREA_TOL; every final parameter stayed within 0.006 esd of the "
+                 "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
+                 "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
+                 "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
+                 "family only.")),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
@@ -5143,7 +5416,7 @@ ROWS: tuple[Row, ...] = (
         evidence="off by default; a caller names the cell whose translations every subgroup keeps"),
     # suggestion: 197
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", value=1),
-    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=1),
+    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=2),
     Row("ABSORPTION_THICKNESS_MATTERS.suggestion", "suggestion", value=1),
     Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", value=1),
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
@@ -5303,6 +5576,12 @@ ROWS: tuple[Row, ...] = (
         grounds="Says how to test for the strain the glob left held (PR #1108, ruled 2026-10-27).",
         approved="2026-10-27"),
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
+    Row("PATTERN_INTENSITY_BASIS_UNKNOWN.suggestion", "suggestion", tier=1, ambiguity=3,
+        value=1,
+        evidence=("arithmetic: names the field that overrides the default and both of its "
+                  "values, with what tells them apart (whether the export multiplied by the "
+                  "bin width); ranks neither, the answer being how the bank was reduced, "
+                  "and moves nothing")),
     Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", value=6),
     Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", value=1),
     Row("PATTERN_NET_HAS_BACKGROUND.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
@@ -5424,6 +5703,10 @@ ROWS: tuple[Row, ...] = (
     Row("SIZE_UNUSUALLY_SMALL.suggestion", "suggestion", value=1),
     Row("SPACE_GROUP_SETTING_ASSUMED.suggestion", "suggestion", value=1),
     Row("SPECIES_FALLBACK_NEUTRAL.suggestion", "suggestion", value=1),
+    Row("SPECIMEN_ABSORPTION_TOF.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: nothing to do, and names the two declared inputs the "
+                  "correction reads (geometry.capillary_radius_mm, packing_fraction); "
+                  "moves nothing")),
     Row("STAGE_FREED_NOTHING.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names how to list the histogram's rows and the two ways to "
                   "change the plan, a glob that reaches them or a stage scoped to one "
@@ -5456,6 +5739,15 @@ ROWS: tuple[Row, ...] = (
     Row("STEPHENS_STRAIN_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("STRAIN_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", value=1),
+    Row("TOF_CHANNEL_WIDTH_APPLIED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the declaration that removes the factor "
+                  "(intensity_basis='density') and what a doubled one does (W applied twice "
+                  "is a slope a displacement parameter absorbs the other way); moves "
+                  "nothing")),
+    Row("TOF_INTENSITY_BASIS_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the field and both of its values, and the file "
+                  "declarations the readers already honour; ranks neither, the answer being "
+                  "how the bank was reduced, and moves nothing")),
     Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", value=1),
     Row("TOPAS_CELL_COUPLING_DROPPED.suggestion", "suggestion", value=1),
     Row("TOPAS_FEATURES_NOT_IMPORTED.suggestion", "suggestion", value=2),
@@ -5471,6 +5763,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
     Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
+    Row("rietx.report.tof._tof_skip.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: the one sentence of every check that abstains on a bank "
+                  "(BACKGROUND_PEAK_WIDTH_UNAVAILABLE, CAPILLARY_OFFSET_UNAVAILABLE through "
+                  "the same builder): it points at the records that did run and says the "
+                  "check did not, so an unrun check never reads as a clean one; moves "
+                  "nothing")),
     Row("rietx.schemas.results._cap_one_code.suggestion", "suggestion", value=1),
 )
 

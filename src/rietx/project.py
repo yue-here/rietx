@@ -456,17 +456,20 @@ def fitted_mask(data: PatternData,
     the *same* authority answers for a pattern the project does not own.  Public
     because it has a second caller (the GUI's series window) and because a third
     open-coding of ``in_range_mask() & limits`` is the drift WP-1033 measured.
+
+    The limits are on the pattern's own abscissa — degrees on a 2θ pattern,
+    µs on a bank — as they are for :meth:`Refinement.fit`, which is the run
+    this answers for.
     """
     import numpy as np
 
-    require_two_theta(data, "project.fitted_mask()")
     mask = data.in_range_mask()
     if two_theta_limits is not None:
         lo, hi = two_theta_limits
         # compile_model refuses these limits, so this answer must too (WP-1986)
         check_interval("two_theta_limits", lo, hi)
-        tt = data.tt()
-        mask &= (tt >= lo) & (tt <= hi)
+        x = data.x()
+        mask &= (x >= lo) & (x <= hi)
     return np.asarray(mask, dtype=bool)
 
 

@@ -23,8 +23,9 @@ stays that way.  This reader accepts them on request, each reported as
    because it holds to the documented layout, so this reader passes it
    through that reader's body with the one switch the body offers
    (``fifth_pair=True``) and nothing else changed.  The pair is carried on
-   :class:`~rietx.schemas.instrument.IncidentSpectrum` as written; nothing in
-   this build evaluates a spectrum.
+   :class:`~rietx.schemas.instrument.IncidentSpectrum` as written, and a fit
+   evaluates it as P₁₀·exp(−P₁₁·T⁵), T in ms, the exponent measured by
+   conformance (:mod:`rietx.model.tof_spectrum`).
 3. **A ``BNKPAR`` value one field too wide** — a TTHETA such as ``46.60``
    written in columns 30-34, across the TTHETA/TILT boundary, which the
    strict column check refuses.  **That one record, and no other**, is
@@ -249,7 +250,8 @@ def read_lansce_iparm(path: str | Path, *,
         _note(diagnostics, "info", "GSAS_IPARM_LEGACY_LAYOUT",
               f"{path.name}: the documented layout stops short of a non-zero "
               f"fifth ICOFF pair ({pairs}). The pair was carried on the "
-              f"bank's incident_spectrum as written, and nothing in this "
-              f"build evaluates a spectrum.",
+              f"bank's incident_spectrum as written, and a fit evaluates it "
+              f"as P10·exp(−P11·T⁵), T in ms, the exponent measured by "
+              f"conformance (rietx.model.tof_spectrum).",
               where=[f"bank {b}" for b in sorted(fifth)] + ["ICOFF3"])
     return out

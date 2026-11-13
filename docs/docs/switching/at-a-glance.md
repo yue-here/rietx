@@ -24,9 +24,10 @@ A joint fit shares the crystallite size and scales each pattern's width in degre
 `refine_sequential` fits a series of patterns one after another, each starting from the last answer.
 [About a fit](../concepts/fit.md) follows one fit through its stages.
 
-Neutron time of flight is not refined.
-`Instrument.tof_neutron_bank` builds a bank and the readers open one, and a time-of-flight fit is refused by name.
-The [roadmap](roadmap.md) lists it among the work fenced for a 2.0 series.
+Neutron time of flight refines one bank at a time.
+`Instrument.tof_neutron_bank` builds a bank, the readers open one, and `Refinement.fit` refines it in Rietveld mode.
+Several banks as one joint fit, and a series of banks, are refused by name.
+The [roadmap](roadmap.md) lists the rest of time of flight among the work fenced for a 2.0 series.
 
 ## Features and what they were checked against
 

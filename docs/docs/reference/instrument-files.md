@@ -257,8 +257,9 @@ bank = rx.read_gsas2_instprm("Bank 2.instprm")              # source.kind "neutr
 d = bank.source.d_from_tof(pattern.tof_us())
 ```
 
-This version reads a bank and refines none.
-`Refinement` and every other entry point that computes a pattern refuse a `neutron_tof` instrument by name.
+Both come back with every parameter `vary=False`, because an instrument-parameter file is a calibration refined against a standard, and freeing DIFC beside a free cell reopens the flat direction a free wavelength does.
+A bank refines through `Refinement` like a scan ([Time-of-flight: the back-to-back exponentials](../theory/profiles.md#time-of-flight-the-back-to-back-exponentials) gives its peak shape).
+A joint fit over several banks is refused by name.
 
 ### GSAS-I .iparm
 
@@ -286,6 +287,7 @@ The reader holds to the layout the GSAS manual documents and refuses anything el
   Each field may be blank or zero, which the record's Fortran format reads identically.
 - A bank with no `PRCF` set keeps its calibration and gets an all-zero `ProfileTOF`, reported as `GSAS_IPARM_PROFILE_DECLINED`.
   A `PRCF` set written without its set number, as some older files are, is treated the same way: it is declined, not read as set 1.
+  A fit refuses that profile by name, so it stops instead of running on a profile nobody read.
 
 Fields with no place in the schema, such as the incident spectrum's `CHKSUM` and `IECOR`, are reported as [`GSAS_IPARM_FIELD_DROPPED`](diagnostics-files.md#gsas_iparm_field_dropped).
 

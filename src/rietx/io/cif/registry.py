@@ -198,6 +198,8 @@ _TAGS: tuple[Tag, ...] = (
         ("_refine_ls_number_parameters", "_refine_ls.number_parameters", "Number", "Integer"),
         ("_pd_proc_number_of_points", "_pd_proc.number_of_points", "Number", "Integer"),
         ("_pd_proc_ls_special_details", "_pd_proc_ls.special_details", "Describe", "Text"),
+        ("_pd_calibration_special_details", "_pd_calibration.special_details",
+         "Describe", "Text"),
         ("_pd_proc_ls_profile_function", "_pd_proc_ls.profile_function", "Describe", "Text"),
         ("_pd_proc_ls_background_function", "_pd_proc_ls.background_function",
          "Describe", "Text"),
