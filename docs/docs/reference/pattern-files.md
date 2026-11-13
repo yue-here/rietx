@@ -56,10 +56,10 @@ The two peak-list refusals and the total-scattering refusal come next, then the 
 | Bruker/Siemens DIFFRAC-AT export | `uxd` | `.uxd` | `scan` | Poisson for a `_COUNTS` block, √(y·t)/t from `_STEPTIME` for a `_CPS` block |
 | PANalytical/Malvern XRDML | `xrdml` | `.xrdml` | `scan` | through the attenuation factor and counting time the file names |
 | PANalytical scan | `udf` | `.udf` | none | Poisson |
-| Powder CIF | `pdcif` | `.cif` | `block` | an `_su` or `_esd` loop, then an uncertainty in parentheses on every intensity, then `_pd_proc_ls_weight` read as 1/σ², else Poisson |
-| GSAS raw powder data | `gsas` | `.fxye`, `.gsas`, `.gda`, `.xra`, `.raw` | `bank` | the third column of an `FXYE` record or the second of an `ESD` record; Poisson for `STD` |
-| FIT2D or pyFAI integrated pattern | `chi` | `.chi` | none | the third column where written, else Poisson |
-| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | `axis` | the third column where present and positive, else Poisson |
+| Powder CIF | `pdcif` | `.cif` | `block`, `nonpositive_sigma` | an `_su` or `_esd` loop, then an uncertainty in parentheses on every intensity, then `_pd_proc_ls_weight` read as 1/σ², else Poisson |
+| GSAS raw powder data | `gsas` | `.fxye`, `.gsas`, `.gda`, `.xra`, `.raw` | `bank`, `nonpositive_sigma` | the third column of an `FXYE` record or the second of an `ESD` record; Poisson for `STD` |
+| FIT2D or pyFAI integrated pattern | `chi` | `.chi` | `nonpositive_sigma` | the third column where written, else Poisson |
+| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | `axis`, `nonpositive_sigma` | the third column where present, else Poisson |
 
 | Refused format | `name` | Suffix | Why |
 |---|---|---|---|
@@ -80,7 +80,8 @@ assert [fmt.name for fmt in caps.reader_formats] == [
     "bruker_raw", "philips_rd", "gsas2_gpx", "rasx", "brml", "ras", "uxd", "xrdml",
     "udf", "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering",
     "xy", "raw_unclaimed"]
-assert [opt.name for opt in caps.reader_options] == ["axis", "bank", "block", "scan"]
+assert [opt.name for opt in caps.reader_options] == [
+    "axis", "bank", "block", "nonpositive_sigma", "scan"]
 ```
 
 ### Format notes
@@ -101,7 +102,7 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 
 ## Reader options
 
-`read_pattern` takes four keyword options, and the Option column under [Formats](#formats) says which format honours which.
+`read_pattern` takes five keyword options, and the Option column under [Formats](#formats) says which format honours which.
 
 `axis`
 : What the x column of a plain two- or three-column file is, `"two_theta"` (2θ in degrees) or `"tof"` (a flight time in µs), the spellings of `PatternData.axis`. A file that states no unit is read as 2θ unless you declare it, because its numbers cannot say which. The declaration is recorded as `PatternData.metadata["declared_axis"]`. A file whose own unit line contradicts it is refused, and the message quotes both.
@@ -114,6 +115,9 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 
 `bank`
 : The GSAS bank to read, by the number its `BANK` record declares. A file holding more than one bank is refused until `bank` names one, because each bank is a different detector. `rietx.io.formats.gsas.gsas_banks` lists each bank's bintype, record layout, channel count and range, or the reason it cannot be read.
+
+`nonpositive_sigma`
+: What a point whose esd in the file is zero or negative becomes. `"exclude"`, the default, leaves the point out of the fit and reports it with [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive). `"poisson"` weights it by σ = √max(y, 1), one count at a zero count, for a file that wrote σ = √0 for a channel that counted nothing. The value is stored as `PatternData.nonpositive_sigma`, and the file's numbers stay in `PatternData.sigma` either way. Taken by the formats whose σ is a column of the file.
 
 An option no format takes is a typo and raises.
 An option this file's format does not take is dropped, and reported as [`READER_OPTION_IGNORED`](diagnostics-files.md#reader_option_ignored).
@@ -135,6 +139,8 @@ A deviation that makes the measurement ambiguous is refused.
 | an axis at or below 0° | reads it, [`PATTERN_X_AXIS_IMPLAUSIBLE`](diagnostics-files.md#pattern_x_axis_implausible) |
 | an axis past 180° | refuses, naming the file, the reader and the range |
 | the same σ on every point | keeps it, [`PATTERN_SIGMA_CONSTANT`](diagnostics-files.md#pattern_sigma_constant) |
+| a σ of zero or below on some points | keeps the values and leaves the points out of the fit, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
+| a σ column with no positive entry | does not read the column, so the Poisson σ applies, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
 | dead detector channels | keeps them, [`PATTERN_DEAD_CHANNELS`](diagnostics-files.md#pattern_dead_channels) |
 
 A constant σ makes the fit unweighted.
@@ -143,6 +149,10 @@ If the column is a placeholder, set `PatternData.sigma` to `None` to use the Poi
 ## Intensities and esds
 
 The fit weights each point by the file's esd where the file has one, and by Poisson σ = √max(y, 1) otherwise.
+An esd of zero or below gives no weight, so by default such a point leaves the fit, as an excluded region's points do (`PatternData.in_range_mask`).
+`PatternData.nonpositive_sigma = "poisson"` weights such points by √max(y, 1) instead, and `PatternData.nonpositive_sigma_mask` says which points they are.
+GSAS-II's `fxye` reader gives such a point zero weight too; FullProf 8.20 and GSAS-II's `xye` reader replace its esd and report nothing (`docs/practice.md`).
+`PatternData.sigma_rule` counts the points each rule weights, and a fit stores that count as `RefinementResult.sigma_rule`, a `SigmaRule`: `n_file_sigma` points weighted by the file's esd, `n_poisson_sigma` by the Poisson σ, and `n_nonpositive_excluded` left out.
 The Poisson fallback is right for raw counts and wrong by a factor √t for a rate already divided by a counting time t.
 So a reader decides which of the two a file holds:
 
