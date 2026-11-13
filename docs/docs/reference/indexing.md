@@ -456,7 +456,7 @@ Before discarding a refuted cell whose chemistry makes it likely, look at the pa
 
 Four of the panel's members read only the first twenty lines, and none of the seven sees intensity.
 A Pawley fit against the whole pattern sees three things the panel cannot: lines beyond the twentieth, reflections predicted where there is no intensity, and impurity content.
-The middle one is the classic doubled-cell false positive, which is why validation is part of the default run.
+The middle one is the classic doubled-cell false positive, so validation is part of the default run.
 `CellCandidate.lebail` is that test, as a `LeBailValidation`.
 
 | Field | Holds |
@@ -475,16 +475,16 @@ The middle one is the classic doubled-cell false positive, which is why validati
 | `LeBailValidation.n_stages` | the stages the fit ran, of the validation plan's four |
 | `LeBailValidation.diagnostics` | findings from the fit; [`INDEX_VALIDATION_FAILED`](diagnostics-indexing.md#index_validation_failed) when it raised |
 | `LeBailValidation.mode` | the decomposition the fit ran: `"pawley"` since 1.11, `"lebail"` on a record written before it |
+| `LeBailValidation.background_terms` | the Chebyshev terms the fit carried, sized from the data since 1.12; `None` for another kind |
 
-The fit holds the cell.
-The candidate is the hypothesis under test, and letting it walk would validate a different cell from the one reported.
+The fit holds the cell: the candidate is the hypothesis under test, and letting it walk would validate a different cell.
 It frees the background, then exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano), then `W`, then `U`, `V`, `X` and `Y` together.
 When the declared instrument's widths disagree with the picked lines', `W` starts from the lines' median FWHM.
+A Chebyshev background gets the terms the data ask for (the order scan of `auto_background(kind="chebyshev")`, never fewer than declared), so a band of misfit is not read as unmatched lines; `validate_by_lebail(size_background=False)` fits it as declared.
 `freeze_profile=True` drops the two width stages and keeps the profile at the peak list's measured width, shared by every candidate, so a wrong cell cannot broaden a neighbour to cover a line it does not explain.
 The fit is single-phase, since a candidate is one lattice.
 The fit is Pawley, and the type keeps its Le Bail name.
-One Le Bail pass re-extracts the intensities only between solves, and on the true cells of nine real patterns it left a width on its lower bound for corundum and zircon and up to four times as many observed lines unmatched.
-A Pawley fit refines the intensities in the same solve.
+One Le Bail pass re-extracts the intensities only between solves, and on nine real patterns' true cells it left up to four times as many observed lines unmatched; Pawley refines them in the same solve.
 
 The test runs on the checked candidates only: the top `check_top`, plus every candidate every engine found, since those are the only ones the gate could promote.
 A candidate outside that set, or one whose fit the clock stopped, keeps `lebail = None`.
@@ -500,7 +500,7 @@ A converged fit of a cell that predicts every reflection of another cell fits at
 On a laboratory magnetite pattern the wrong primitive description reads 0.174 against the true cell's 0.180.
 Read `predicted_but_absent` as "this cell predicts lines the pattern lacks", never as "this cell is too big".
 It counts against the lattice group, so a space-group extinction (a glide plane, a screw axis) shows in the count on a correct cell, and the extinction screen afterwards separates the two ([The extinction symbol](extinction.md)).
-The caveat of the same name reads only the absences no extinction could cancel, inside the first twenty lines, and it caps rather than refutes: a correct cell's weak reflections below detection read absent too, over the whole range, so the count keeps `high` out of reach and the supercell check is what refutes.
+The caveat of the same name reads only the absences no extinction could cancel, inside the first twenty lines, and it caps rather than refutes: a correct cell's weak reflections read absent too, so the supercell check is what refutes.
 A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#index_predicted_but_absent), and unmatched observed lines raise [`INDEX_IMPURITY_LINES`](diagnostics-indexing.md#index_impurity_lines).
 
 ### The confidence gate
@@ -533,28 +533,27 @@ The count of caveats decides nothing.
 | `fom_panel_reduced` | the list is too short for `m20` and `f_n` | caps |
 | `bravais_ambiguous` | `BravaisOpinion.ambiguous` or `BravaisOpinion.methods_disagree`, or no opinion could be formed | caps |
 
-A candidate the ambiguity walk never reached reads `geometric_ambiguity` with an empty `CellCandidate.ambiguity`.
-Not enumerated is not the same as none found, and the gate will not read an unasked question as a clean answer.
+A candidate the ambiguity walk never reached reads `geometric_ambiguity` with an empty `CellCandidate.ambiguity`: not enumerated is not none found.
 On a run whose clock ran out before the walk, every candidate carries this caveat and grades `low`.
 
 `volume_unphysical` uses the same 1.5 times the envelope the search prunes at, so it fires only on a cell a declared `max_volume` let past it.
 It raises [`INDEX_VOLUME_UNPHYSICAL`](diagnostics-indexing.md#index_volume_unphysical).
 
 `not_validated` and `validation_failed` are separate on purpose: the absence of a test and a failed test are different statements, and only the second is evidence about the cell.
-`not_validated` has two causes, and they are not the same news.
+`not_validated` has two causes.
 Either no pattern was supplied, so no candidate could be validated, and `IndexingResult.validated` is false with [`INDEX_NOT_VALIDATED`](diagnostics-indexing.md#index_not_validated) on the run.
 Or a pattern was supplied and this candidate's fit did not run, because it was outside the checked set or the ceiling expired partway down it, which `INDEX_BUDGET_EXHAUSTED` counts.
-So `IndexingResult.validated` true does not mean any one candidate was validated: on the bundled fluorapatite pattern a default run (the same day and build) reports it true while none of its twelve candidates carries a fit.
+So `IndexingResult.validated` true does not mean any one candidate was validated: on the bundled fluorapatite pattern a default run reports it true while none of its twelve candidates carries a fit.
 
 `shift_allowance_assumed` is why `high` is out of reach on real data with no measured shift: a cell found inside a widened window has absorbed the shift.
 Reference positions handed to `assess_peak_list`, a shift the pair screen measured, or a declared `SearchSpecSpec.shift_allowance_deg` clears it.
 
 Never take `candidates[0]` because it is ranked first.
 The ranking orders the hypotheses and the gate judges them, which are different questions.
-The order leads with corroboration and moves a supercell by its checks, which is closer to the gate's reading than a panel ranking alone, and still not it.
+The order leads with corroboration and moves a supercell by its checks, which is closer to the gate's reading, and still not it.
 
 On the default corundum run above, the certified trigonal R lattice comes back first, found by two of the three engines, with a converged Pawley fit.
 It grades `low`, so `best_or_none` returns `None`.
 `LeBailValidation.predicted_but_absent` counts the c-glide's reflections, the shape a space-group extinction takes when read against a lattice group that does not know about it; none of them is a line no space group could extinguish, so the caveat is silent, and the extinction screen ([The extinction symbol](extinction.md)) is what names the glide.
 `geometric_ambiguity` is there on every candidate because the ceiling stopped the run before the ambiguity walk, and `fom_panel_disagrees` because the panel's members split.
-None of the caveats says the cell is wrong; they say what has not been established, which is the difference between this answer and a confident one.
+None of the caveats says the cell is wrong; they say what has not been established.

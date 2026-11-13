@@ -232,7 +232,16 @@ from .structure import Cell
 #: chance rate (``PatternScreen.p0``), so ``n_seen ≤ n_extra·p0``, both
 #: p-values and ``SupercellCheck.p0`` read the windows the count is taken in.
 #: The assumed shift bound floors only the power check (``p0_power``, #951).
-INDEXING_THRESHOLDS_VERSION = "1.12"
+#: 1.13 (WP-2113, #1382): the whole-pattern validation sizes a Chebyshev
+#: background from the data (``auto_background(kind="chebyshev")`` over the
+#: fitted range, never fewer terms than declared), so a candidate's
+#: ``lebail.rwp``, ``gof`` and ``unmatched_observed`` move wherever the
+#: declared four terms could not follow the background: on a steep synthetic
+#: silicon 72 unmatched lines go to 0.  ``LeBailValidation.background_terms``
+#: records the order.  No search, rank or grade reads ``rwp``, ``gof`` or
+#: ``unmatched_observed``; the grade reads ``status``, and without a peak list
+#: the fitted-background ``predicted_but_absent``, both of which can move.
+INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.
@@ -1382,6 +1391,14 @@ class LeBailValidation(Base):
     #: ``"pawley"`` since WP-2011 (schema 0.60).  A record written before then
     #: carries no key and was a Le Bail fit, which is what the default reads.
     mode: Literal["lebail", "pawley"] = "lebail"
+    #: the Chebyshev terms the fit's background carried: since WP-2113 the
+    #: number ``auto_background(kind="chebyshev")`` selects from the data, and
+    #: never fewer than the instrument declared, so a band of background misfit
+    #: is not read as ``unmatched_observed`` lines.  The scan's cap,
+    #: ``background.select.CHEBYSHEV_MAX_ORDER``, is returned whenever BIC still
+    #: falls there.  ``None`` for a background of another kind, and in a
+    #: record written before schema 0.61
+    background_terms: int | None = None
 
 
 class CellCandidate(Base):

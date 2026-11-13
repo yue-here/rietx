@@ -876,7 +876,7 @@ def test_le_bail_validation_separates_the_failure_modes(lab6_pattern, factor,
     the wrong metric is caught instead by ``unmatched_observed``.  That is why
     all three travel together and why none of them is the score.  Under the
     Pawley fit (WP-2011) the wrong metric's background stays near the truth, so
-    the fitted-background count sees its displaced lines too (14 of 28); the Le
+    the fitted-background count sees its displaced lines too (14 of its 30); the Le
     Bail fit's sank, and that count read 0.
 
     The bars are qualitative on purpose (``most``, ``some``, ``many``) — the

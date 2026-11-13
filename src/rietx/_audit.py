@@ -234,6 +234,7 @@ RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.report.schemas.DistortionBlockTests",
     "rietx.schemas.indexing.IndexingResult",
     "rietx.schemas.indexing.PeakList",
+    "rietx.schemas.indexing.LeBailValidation",
 )
 
 
@@ -469,6 +470,25 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.indexing.IndexingResult.thresholds_version",
     "rietx.schemas.indexing.IndexingResult.validated",
     "rietx.schemas.indexing.IndexingResult.wavelength",
+    "rietx.schemas.indexing.LeBailValidation.absent_source",
+    "rietx.schemas.indexing.LeBailValidation.diagnostics",
+    "rietx.schemas.indexing.LeBailValidation.gof",
+    "rietx.schemas.indexing.LeBailValidation.mode",
+    "rietx.schemas.indexing.LeBailValidation.n_lines_screened",
+    "rietx.schemas.indexing.LeBailValidation.n_lines_screened_in_window",
+    "rietx.schemas.indexing.LeBailValidation.n_reflections",
+    "rietx.schemas.indexing.LeBailValidation.n_stages",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent_density_in_window",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent_excess_in_window",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent_two_theta",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent_uncancellable",
+    "rietx.schemas.indexing.LeBailValidation.predicted_but_absent_uncancellable_in_window",
+    "rietx.schemas.indexing.LeBailValidation.rwp",
+    "rietx.schemas.indexing.LeBailValidation.space_group",
+    "rietx.schemas.indexing.LeBailValidation.status",
+    "rietx.schemas.indexing.LeBailValidation.unmatched_observed",
+    "rietx.schemas.indexing.LeBailValidation.unmatched_observed_two_theta",
     "rietx.schemas.indexing.PeakList.diagnostics",
     "rietx.schemas.indexing.PeakList.peaks",
     "rietx.schemas.indexing.PeakList.source",
@@ -1874,6 +1894,26 @@ ROWS: tuple[Row, ...] = (
                   "geometry and profile blocks compared with their defaults (WP-2030, #1123). "
                   "It moves no search, rank or value: INDEX_DATA_INSUFFICIENT names the "
                   "recorded blocks first in its suggestion")),
+    Row("rietx.schemas.indexing.LeBailValidation.background_terms", "action", tier=3, ambiguity=1,
+        evidence=("WP-2113, #1382: the indexing validation fit's Chebyshev background takes the "
+                  "order select_chebyshev_order picks over the fitted range (the scan "
+                  "auto_background(kind='chebyshev') runs; BIC and Durbin-Watson d are tier 2 as "
+                  "statistics, its constants the B12 rows), never fewer terms than declared; "
+                  "another kind of background is kept. Measured on one synthetic family only: "
+                  "forward-modelled Si under a steep background, 72 unmatched_observed (56 below "
+                  "the first line) at Rwp 0.098 under the declared four terms, 0 at 0.029 sized "
+                  "(16, the scan's cap); six planted narrow impurity lines, two on the band, all "
+                  "kept; the flat Si and the synthetic LaB6 validation table unchanged (no more "
+                  "terms than declared). GSAS-II, FullProf and TOPAS take the background order "
+                  "from the user (not checked in a run). Untested: a broad impurity or amorphous "
+                  "hump, a narrow 2-theta window, a wrong cell under the raised order"),
+        grounds=("A band of background misfit is not lines the cell fails to own, and Layer 0 "
+                 "counts each maximum of one as an observed peak, so a background that cannot "
+                 "follow the data reports dozens of impurity lines on a pure phase "
+                 "(INDEX_IMPURITY_LINES). The order is read from the data once per index_pattern "
+                 "call, every candidate is fitted under it, no rank or grade reads rwp, gof or "
+                 "unmatched_observed, and validate_by_lebail(size_background=False) is the way "
+                 "back. Route A ruled by Michael 2026-11-09; the tier-3 approval is Yue's.")),
     Row("rietx.schemas.results.Statistics.esd_inflation", "action", tier=3, ambiguity=1,
         evidence=("Berar & Lelann (1991) J. Appl. Cryst. 24, 1, § IV (docstring; not in the "
                   "corpus); f 1.13 on uncorrelated residuals, 2.15 on FAP, 8.07 on NAC; GSAS-II "

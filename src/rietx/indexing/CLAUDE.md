@@ -33,26 +33,26 @@ class's own fit runs). Its reference fit is gated on the picker's envelope
 
 `index_pattern(peaks | data+instrument)` (`workflow.py`): quality gate → engines →
 `consensus.py` (merge on the reduced cell, `found_by` union, Borda over the panel,
-two-opinion Bravais, ambiguity) → whole-profile validation → the gate. Three
-load-bearing rules. **`high` requires zero caveats**, and
-`IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole gate: any
-caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and *count*
-deliberately separates nothing. **Every reversed question is asked of inputs a candidate
-cannot buy, at the measured resolution** (C3, #916, `screen.py`: peak list + picker's
-envelope + the one overlap rule, after the common shift the forward matches imply) —
-never the candidate's own Le Bail fit (magnetite's wrong P description bought a negative
-background and read 0 of 163 absent, WP-1043) and never the search window (±0.15° on a
-0.023° FWHM read a resolved split as *supported*). The oversized cell is **capped** by
-the line screen (`predicted_but_absent`, the windowed uncancellable count) and
-**refuted** by the generalised supercell check; the whole-profile fit — **Pawley**,
-since one Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
-(`unmatched_observed`, Rwp for a reader; `freeze_profile` is off, measured in
-`validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom gets
-~nothing, so it fires on 68 % of the truth's reflections against 55 % of a doubled
+two-opinion Bravais, ambiguity) → whole-profile validation → the gate. Three load-bearing
+rules. **`high` requires zero caveats**, and `IndexCaveat`/`INDEX_REFUTING_CAVEATS`
+(`schemas/indexing.py`) are the whole gate: any caveat in the refuting set drops a cell to
+`low`, the rest cap at `medium`, and *count* deliberately separates nothing. **Every
+reversed question is asked of inputs a candidate cannot buy, at the measured resolution**
+(C3, #916, `screen.py`: peak list + picker's envelope + the one overlap rule, after the
+common shift the forward matches imply) — never the candidate's own Le Bail fit
+(magnetite's wrong P description bought a negative background and read 0 of 163 absent,
+WP-1043) and never the search window (±0.15° on a 0.023° FWHM read a resolved split as
+*supported*). The oversized cell is **capped** by the line screen (`predicted_but_absent`,
+the windowed uncancellable count) and **refuted** by the generalised supercell check; the
+whole-profile fit — **Pawley**, since one Le Bail pass stalls (WP-2011) — stays **mandatory
+for the forward direction** (`unmatched_observed`, Rwp for a reader; `freeze_profile` is
+off, measured in `validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom
+gets ~nothing, so it fires on 68 % of the truth's reflections against 55 % of a doubled
 cell's), nor `unmatched_observed` as a caveat (its level is the *specimen's* — 10-188
-across 21 correct candidates — comparative only, WP-1041). **The validation fit holds
-the cell**, freeing exactly one peak-position parameter from the candidate's own shift
-template. On real data with no measured shift, `high` is *unreachable* by design
+across 21 correct candidates — comparative only, WP-1041). **The validation fit holds the
+cell**, freeing exactly one peak-position parameter from the candidate's own shift
+template, and its Chebyshev background is **sized from the data**, or a band's maxima read
+as lines (WP-2113). On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant (WP-1026).
 
 ## The scheduler, the presets and the stream (WP-1042)

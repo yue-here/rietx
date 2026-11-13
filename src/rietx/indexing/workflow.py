@@ -48,14 +48,17 @@ detector serves only a call without one.
 
 **The two detectors and ``lebail_rwp`` catch different failures, which is why all
 three are reported.**  Same synthetic pattern under the Pawley validation
-(WP-2011, noise seed 11, no peak list), four cells:
+(WP-2011, noise seed 11, no peak list), four cells.  Re-measured under WP-2113's
+sized background, every cell is unchanged (the order scan asks no more than the three
+declared terms); the wrong metric's absent count had been quoted as 14/28, and the fit
+reports 14/30 with and without the sizing:
 
 | candidate | Rwp | predicted_but_absent | unmatched_observed |
 |---|---|---|---|
 | truth | 0.164 | 0/28 | 0 |
 | doubled cell | 0.164 | **123/153** | 0 |
 | a·√5 supercell | 0.233 | 167/204 | 4 |
-| metric 1 % off | 0.503 | 14/28 | **23** |
+| metric 1 % off | 0.503 | 14/30 | **23** |
 
 Read the table by column.  Rwp is decisive on a *wrong metric* (0.50 against
 0.16) and silent on an *oversized* one: the doubled cell predicts a line at every
@@ -84,7 +87,7 @@ import numpy as np
 
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import CellCandidate, LeBailValidation, PeakList
-from ..schemas.instrument import Instrument
+from ..schemas.instrument import BackgroundChebyshev, Instrument
 from ..schemas.pattern import PatternData, require_two_theta
 from ..schemas.structure import DUMMY_SPECIES, Structure, lebail_scaffold
 from .fom import lattice_group
@@ -407,6 +410,72 @@ def seed_widths(instrument: Instrument, peaks: PeakList) -> tuple[Instrument, bo
     return out, True
 
 
+def _size_validation_background(instrument: Instrument, data: PatternData,
+                               two_theta_limits: tuple[float, float] | None = None
+                               ) -> Instrument:
+    """Give the validation fit a Chebyshev background as flexible as the data ask.
+
+    Returns a copy of ``instrument`` whose Chebyshev background carries the
+    number of terms :func:`~rietx.background.auto_background` (``kind="chebyshev"``,
+    over ``two_theta_limits``) selects, and never fewer than it declared: the
+    declared coefficients are kept as starts and zeros appended.  A background of
+    another kind (a P-spline, a fixed curve plus Chebyshev) is the caller's
+    declaration and comes back unchanged, as does every background when the
+    order scan raises, so the fit then runs as it did before WP-2113.
+
+    **Why** (WP-2113, issue #1382).  Layer 0 reads every local maximum of
+    Δ/σ ≥ 5 with no tick within 0.08° as an observed peak the cell does not
+    own, so a smooth band of *background* misfit becomes dozens of
+    ``unmatched_observed`` lines.  The forward-modelled silicon under a
+    background falling from ~2300 to ~800 counts over 11-22° left 72 such lines
+    on the true cell under the instrument's default four terms (Rwp 0.098, GoF
+    3.42), 56 of them below the first silicon line at 28.4°.  Sized from the
+    data the order is 16, and the count is 0 at Rwp 0.029 and GoF 1.01; with six
+    impurity lines planted (two on the band) all six stay counted.  The flat
+    silicon is unchanged (0 at any order).  The scan reads the data only, so
+    :func:`index_pattern` pays it once per call, never once per candidate.
+
+    The scan is ``auto_background``'s own
+    (:func:`~rietx.background.select.select_chebyshev_order` over the cropped
+    range), called directly: the
+    P-spline diagnostics ``auto_background`` also computes are unused here, and
+    its ``BACKGROUND_ORDER_AT_CAP`` warning (a statement about a pick a caller
+    asked for; here the cap is a flexibility ceiling for a nuisance term) would
+    need a process-wide warnings filter to silence, which is not thread-safe
+    under the GUI's worker.  Any failure of the scan falls back to the declared
+    background rather than aborting the run.
+    """
+    from ..background.select import select_chebyshev_order
+    from ..schemas.common import Parameter
+
+    declared = instrument.background
+    if not isinstance(declared, BackgroundChebyshev):
+        return instrument
+    try:
+        scanned = data if two_theta_limits is None else data.crop(
+            float(two_theta_limits[0]), float(two_theta_limits[1]))
+        n = int(select_chebyshev_order(scanned).selected)
+    except Exception:                               # noqa: BLE001
+        return instrument
+    if n <= len(declared.coefficients):
+        return instrument
+    out = instrument.model_copy(deep=True)
+    # the appended terms carry the declared ones' flag: the plan frees the
+    # background by glob, so the flag is a record, and one background reads alike
+    vary = declared.coefficients[-1].vary if declared.coefficients else True
+    out.background.coefficients += [Parameter(value=0.0, vary=vary)
+                                    for _ in range(n - len(declared.coefficients))]
+    return out
+
+
+def _chebyshev_terms(instrument: Instrument) -> int | None:
+    """The Chebyshev term count of ``instrument``'s background, else ``None``."""
+    background = instrument.background
+    if not isinstance(background, BackgroundChebyshev):
+        return None
+    return len(background.coefficients)
+
+
 def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                        instrument: Instrument, *,
                        peaks: PeakList | None = None,
@@ -416,7 +485,8 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                        with_result: bool = False,
                        cancel=None, screen=None,
                        pattern_screen=None,
-                       freeze_profile: bool = False) -> LeBailValidation:
+                       freeze_profile: bool = False,
+                       size_background: bool = True) -> LeBailValidation:
     """Fit ``candidate`` to the whole pattern by Pawley and report the three
     detectors.  The name predates WP-2011's switch from Le Bail, and
     ``LeBailValidation.mode`` records which fit ran.
@@ -435,6 +505,12 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     enveloped once.  With no peak list the count is the fitted-background
     detector's (``"fitted_background"``), whose measured failure is in
     :func:`absent_reflections`.
+
+    ``size_background`` (WP-2113): a Chebyshev background gets the number of
+    terms the data ask for (:func:`_size_validation_background`, which says
+    why), recorded as ``background_terms``.  ``index_pattern`` sizes it once
+    for the run and passes ``False`` with the sized instrument; ``False`` with
+    the caller's own instrument fits the background exactly as declared.
 
     ``with_result=True`` additionally returns the
     :class:`~rietx.schemas.results.RefinementResult` the fit produced, as
@@ -538,6 +614,8 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                     instrument=instrument, two_theta_limits=two_theta_limits,
                     p0_floor_deg=MATCH_SIGMA * DEFAULT_UNKNOWN_SHIFT_DEG)
             screen = screen_for(pattern_screen, candidate, peaks)
+    if size_background:
+        ins = _size_validation_background(ins, data, two_theta_limits)
     tt_max = float(np.max(data.tt()))
     if two_theta_limits is not None:
         tt_max = min(tt_max, float(two_theta_limits[1]))
@@ -557,6 +635,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         failed = LeBailValidation(
             rwp=float("inf"), gof=float("inf"), space_group=symbol,
             n_reflections=0, status="failed", mode=VALIDATION_MODE,
+            background_terms=_chebyshev_terms(ins),
             diagnostics=[Diagnostic(
                 level="warning", code="INDEX_VALIDATION_FAILED",
                 message=(f"The whole-pattern validation of {candidate.system} "
@@ -600,7 +679,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         predicted_but_absent_two_theta=[round(v, 4) for v in absent_tt],
         unmatched_observed_two_theta=[round(float(v), 4) for v in unmatched],
         status=result.status, n_stages=len(result.stages),
-        mode=VALIDATION_MODE, **extra)
+        mode=VALIDATION_MODE, background_terms=_chebyshev_terms(ins), **extra)
     return (validation, result) if with_result else validation
 
 
@@ -1107,6 +1186,13 @@ def index_pattern(peaks: PeakList | None = None, *,
     validated = False
     if validate and data is not None and instrument is not None:
         progress.add(len(checked))
+        # the validation background is sized from the data, which every
+        # candidate shares, so the order scan runs once per call (WP-2113),
+        # and not at all when no fit will run
+        validation_instrument = instrument
+        if checked and not (run_cancel is not None and bool(run_cancel)):
+            validation_instrument = _size_validation_background(
+                instrument, data, two_theta_limits)
         # under a declared ceiling the fits run cheapest first, by the
         # reflections each will refine, and each runs on whatever the clock
         # holds (WP-2011): for a common deadline that order maximises the fits
@@ -1135,9 +1221,9 @@ def index_pattern(peaks: PeakList | None = None, *,
             progress.start(label, system=cand.system, validation=True)
             try:
                 cand.lebail = validate_by_lebail(
-                    cand, data, instrument, peaks=peaks,
+                    cand, data, validation_instrument, peaks=peaks,
                     two_theta_limits=two_theta_limits, cancel=run_cancel,
-                    pattern_screen=pattern_screen)
+                    pattern_screen=pattern_screen, size_background=False)
             except RefinementCancelled:
                 # a truncated fit is not evidence about the candidate: leave
                 # ``lebail = None``, which reads ``not_validated`` (capping)

@@ -62,7 +62,12 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
 
 ### Inherited
 
-(none)
+- **From WP-2113 (2026-11-09).** Layer 0's `unmatched_obs` reads every local maximum of a smooth Δ/σ ≥ 5
+  band as its own observed peak, so a background a fit cannot follow reports dozens of lines (72 on the
+  steep synthetic silicon under four Chebyshev terms). WP-2113 fixed the indexing validation only, by
+  sizing that fit's background from the data; every other `FitReport` under a stiff declared background
+  still counts the band. A coherent-residual scan that names the band would let Layer 0 count it once,
+  or not at all, for every caller (the code review's altitude finding on PR #1472).
 
 ## Non-goals
 
