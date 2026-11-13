@@ -49,6 +49,7 @@ order in `base.ascending()`, the one place it lives:
 | deviation | verdict | action |
 |---|---|---|
 | NaN or ±inf in 2θ, count or σ | report — the file states no value there; a zero monitor's division writes one | drop the row **first**, `PATTERN_ROWS_DROPPED` naming the 2θ runs; no finite row left → **raise** |
+| σ ≤ 0 | report — no weight; ruled once, on `read_pattern`'s hook, never by a reader (WP-1952) | keep the value, leave the channel out of the fit (`PatternData.in_range_mask`), `PATTERN_SIGMA_NONPOSITIVE`; `nonpositive_sigma="poisson"` weights it √max(y, 1), silently, the caller having asked; no positive σ at all → the column is not read |
 | strictly descending | report — the same measurement stored backwards; reversal is lossless | reverse, `PATTERN_SCAN_REVERSED` |
 | duplicate 2θ, equal y | report — a format artefact | drop the repeat, `PATTERN_DUPLICATE_POINTS` |
 | duplicate 2θ, **different** y | contradiction — averaging invents a datum, dropping picks one | **raise**, naming the 2θ |

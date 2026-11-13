@@ -31,9 +31,9 @@ rows), ``toy_pawley`` (aux intensity block + overlap-restraint rows),
 ``toy_rich`` (aniso ADPs + March-Dollase + *nonzero* extinction + displacement/
 transparency), and the real-data ``srm660c`` / ``nac`` (marked ``slow``).
 Multi-histogram (stacked ``run_multi_least_squares`` layout) and the
-stage-boundary recompiles get their own tests below.  Le Bail and Pawley are
-single-histogram only — WP-0308 shipped multi-histogram as Rietveld-only,
-because per-pattern intensity extractions are not a shared quantity.
+stage-boundary recompiles get their own tests below, the stacked layout in
+Rietveld and in Pawley mode (WP-2104: each histogram's intensity block rides
+after the table's columns).  Le Bail is single-histogram only.
 
 **Every compile declares its windows** (WP-2002), as ``test_backend_shim``'s
 do.  ``compile_model``'s default is the closing stage's ``CLOSING_WINDOW_TOL``,
@@ -1928,11 +1928,19 @@ MULTI_GLOBS = ["phases.*.scale", "instrument.background.*", "phases.*.cell.*",
 
 _MULTI_CACHE: dict[str, tuple] = {}
 
+#: the joint modes, each its own state: Pawley's free set is the Rietveld one
+#: less the scales it force-fixes, and its θ carries each histogram's
+#: intensity block after the table's columns (WP-2104)
+MULTI_MODES = ("rietveld", "pawley")
 
-def _multi_state():
+
+def _multi_state(mode: str = "rietveld"):
     """Two LaB6 patterns of one crystal at two wavelengths (the WP-0308 state),
-    compiled per histogram and wired through a ``MultiParameterTable``."""
-    if "state" not in _MULTI_CACHE:
+    compiled per histogram and wired through a ``MultiParameterTable``:
+    ``(models, mtable, theta, labels)``."""
+    key = f"state:{mode}"
+    if key not in _MULTI_CACHE:
+        from rietx.optimize.least_squares import _joint_aux_paths
         from rietx.params.multi import MultiParameterTable
         from tests.test_multi_histogram import perturbed_inputs, synthesize
 
@@ -1943,36 +1951,46 @@ def _multi_state():
         structure, instruments = perturbed_inputs()
         mtable = MultiParameterTable(structure, instruments)
         mtable.set_vary(["*"], False)
-        assert mtable.set_vary(MULTI_GLOBS, True)
+        globs = (MULTI_GLOBS if mode == "rietveld"
+                 else [g for g in MULTI_GLOBS if not g.endswith(".scale")])
+        assert mtable.set_vary(globs, True)
         mtable.apply_to_models()
-        models = [compile_model(s, ins, d, mode="rietveld",
+        models = [compile_model(s, ins, d, mode=mode,
                                 moving_paths=set(t.moving_paths),
                                 window_area_tol=WINDOW_AREA_TOL)
                   for s, ins, d, t in zip(mtable.structures, mtable.instruments,
                                           data, mtable.tables, strict=True)]
-        _MULTI_CACHE["state"] = (models, mtable)
-    return _MULTI_CACHE["state"]
+        theta = mtable.x0()
+        if mode == "pawley":
+            # the joint runner's seed (``multi._seed_joint_pawley``)
+            for m, t in zip(models, mtable.tables, strict=True):
+                m.lebail_update(t.decode(t.x0()),
+                                n_cycles=_pawley_seed_cycles(Stage("seed", [])))
+                m.build_pawley_restraint()
+            theta = np.concatenate([theta, *[m.pawley_x0() for m in models]])
+        labels = list(mtable.free_paths) + _joint_aux_paths(models)
+        _MULTI_CACHE[key] = (models, mtable, theta, labels)
+    return _MULTI_CACHE[key]
 
 
-def _multi_jacobian(backend: str):
-    key = f"jac:{backend}"
+def _multi_jacobian(backend: str, mode: str = "rietveld"):
+    key = f"jac:{backend}:{mode}"
     if key not in _MULTI_CACHE:
-        models, mtable = _multi_state()
+        models, mtable, _theta, _labels = _multi_state(mode)
         _MULTI_CACHE[key] = _multi_closures(models, mtable, backend=backend)[1]
     return _MULTI_CACHE[key]
 
 
+@pytest.mark.parametrize("mode", MULTI_MODES)
 @pytest.mark.parametrize("method", list(METHODS))
-def test_multi_histogram_stacked_jacobian_matches_analytic(method):
+def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
     """The same matrix over the stacked ``run_multi_least_squares`` layout.
 
-    Rietveld only, and that is not an omission: WP-0308 shipped multi-histogram
-    without Le Bail/Pawley because per-pattern intensity extractions are not a
-    shared quantity, and ``multi.py`` raises ``NotImplementedError`` for them.
+    Rietveld and Pawley (WP-2104).  Le Bail is not a joint mode:
+    ``multi.py`` refuses it, its partition having no seam in the joint solve.
     """
-    models, mtable = _multi_state()
-    theta = mtable.x0()
-    J_ref = _multi_jacobian("numpy")(theta)
+    models, mtable, theta, labels = _multi_state(mode)
+    J_ref = _multi_jacobian("numpy", mode)(theta)
     _build, rel_max, cos_min = METHODS[method]
 
     if method == "fd":
@@ -1989,22 +2007,22 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method):
         backend = method.split("+")[0]
         if backend != "numpy":
             pytest.importorskip(backend)
-        jac = _multi_jacobian(backend)
+        jac = _multi_jacobian(backend, mode)
         if method.endswith("+fp32"):
             with precision_policy(FP32_JACOBIAN):
                 J_test = jac(theta)
         else:
             J_test = jac(theta)
 
-    _assert_columns(J_ref, J_test, list(mtable.free_paths),
+    _assert_columns(J_ref, J_test, labels,
                     rel_max=rel_max, cos_min=cos_min,
-                    what=f"multi/{method} ")
+                    what=f"multi/{mode}/{method} ")
 
 
 def test_multi_histogram_stacked_layout():
     """The layout the agreement above is measured on: one shared column fed by
     *every* histogram's rows, per-histogram columns confined to their own."""
-    models, mtable = _multi_state()
+    models, mtable, _theta, _labels = _multi_state()
     J = _multi_jacobian("numpy")(mtable.x0())
     n_data = [len(m.tt) for m in models]
     blocks = [slice(0, n_data[0]), slice(n_data[0], n_data[0] + n_data[1])]

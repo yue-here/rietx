@@ -9696,6 +9696,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         n_extra_components=(len(model.component_paths)
                             + len(model.peak_components)),
         n_background_components=len(model.component_paths),
+        sigma_rule=model.sigma_rule,
     )
 
 
