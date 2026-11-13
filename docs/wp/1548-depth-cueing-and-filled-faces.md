@@ -299,6 +299,74 @@ looked at.
 
 ## Handover log
 
+### 2026-11-13 (2nd session) — filled rings and faces, the sheets drawn, every task built
+
+A structure figure can now fill flat rings and any set of atoms the caller
+names, as translucent faces, in the Python renderer and in the GUI viewer, and
+the two draw the same picture. Together with last session's depth cue, every
+task of this WP is built, documented and in the agent skill. Before-and-after
+sheets exist for all 21 reference phases, the organics on disk and each of the
+four look choices. The only open item is the maintainer's ruling on those
+choices; the WP closes once they are confirmed or changed.
+
+**Done** (`ef5b6aa9`..this one):
+- Task 5: a fill is built in Python (`rings.ring_fills`, `rings.face_fill`)
+  and turned into a face entry by both `build_scene` twins; every face entry
+  carries `kind`. `rings.MAX_RING_DEGREE` = 4 bounds the ring walk before the
+  scene calls it. `render_structure(planar_rings=, faces=)`; the GUI's payload
+  carries `rings` from `GuiSession.structure3d` and the drawer's "fill planar
+  rings" box fills them. Named faces are Python's alone (no selection language
+  in the GUI). A named face keeps its drawn atoms and `report.warnings` names
+  the rest. The GUI's transparent export now says it drew without the cue (D3).
+- Task 6: `1548-measure/pairs.py`, sheets in `pairs/`, log in `pairs.txt`. The
+  18 COD entries needed `www.crystallography.net`, added to the personal
+  `rietx` environment with the maintainer's go-ahead.
+- Tasks 7-9: `reference/figures.md` (table rows and a paragraph each),
+  `gui-guide.md`'s drawer, the skill's `api-figure.md` clause; `-W` build clean.
+- Merged `main`, which carried another session's repair entry for the kernel
+  half (#1557, #1563); both sets of entries kept.
+- Review (`/code-review high --fix`): fixed a face that hiding leaves on one
+  line (now said and skipped, never raised), a bare mask passed as `faces=`
+  (refused, naming `faces=[mask]`), one docstring wrap, one `isinstance`.
+  **Declined**: `bond_edges` on two atoms at one position (none on disk, and
+  keying by position is the module's rule); ring perception on every geometry
+  fetch (0.00-0.11 s on disk, and on-demand needs a route change); the scene
+  built twice when fills are present (small beside the raster); `fogSpan`'s
+  argument spread (the atom cap keeps it far below the limit).
+
+**Measured** (`[dev]` venv, worktree, Linux x86-64, 4 cores):
+- Degree cap on every CIF on disk as a 2×2×2 block (`rings_degree.txt`): no
+  planar-ring atom has more than three drawn bonds; the cap turns away none of
+  the planar rings; COD 1000055 (24 bonds an atom) costs 1.90 s uncapped and
+  nothing capped.
+- Sheets (`pairs.txt`): no ring filled on any of the 21 inorganic phases;
+  paracetamol 16, acridine 80, HKUST-1 256 as 2×2×2 blocks; C₁₆H₂₆'s chairs 0.
+- Browser parity, chromium-1243 headless, 507×300: 0.61 levels with the rings
+  filled on acridine (NAC closes none), and 2.3 against 74.6 over the fills.
+- Fast suite on the merged tree, run alone: 14 793 passed, 437 skipped, 32
+  xfailed, 0 failed, in 47.7 min. Main moved under the branch, so no exact
+  delta against the last session's count; this session added 16 cases
+  (7 rings, 8 render, 1 browser). Added tests cost 6.39 s over 26 tests
+  (`tests.added_test_times`, local junit), 5.49 s in `test_raster_kernels.py`
+  from last session; none joins the slow tail.
+- vitest 795 passed (40 files); svelte-check clean; ruff clean.
+- No lanes this session. Generality: no `_audit.py` change, and `viz` is
+  outside the audit by the maintainer's ruling (D2), so no judge dispatched.
+
+**Gotchas**:
+- `structure3d.build` one cell closes paracetamol's benzene nowhere; the GUI
+  draws one cell, so its parity case uses acridine.
+- `curl` to an outside host was refused by the permission classifier even
+  with the host allowed; the project's own fetch in `pairs.py` ran.
+
+**Next**:
+1. The maintainer rules on the four choices from `pairs/q_*.png`:
+   `planar_rings=`, the refusal on a transparent ground, the grey default,
+   `fog_max` = 0.7. A change is a one-line edit (`scene.FILL_COLOR` and its
+   TypeScript twin, `LOOK["fog_max"]` in both) plus the corpus rewrite.
+2. Then close the WP (✅), move its narrative to `docs/milestones/v1.12.md`, and
+   merge #1554 once CI is green.
+
 ### 2026-11-13 — the kernel half merged (reconstructed post hoc)
 
 The compiled rasteriser can now draw depth cueing, so the wheel the Python
