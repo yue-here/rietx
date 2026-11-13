@@ -101,6 +101,29 @@ With `refine_cell=False` a cell off by a few parts in 10⁴ leaves a tan θ posi
 On the IUCr round-robin SRM 676a corundum (`tests/data/qarr/corundum.prn`), the certified cell gives `R - c -` and the same cell scaled by 1.0012 gives `R - - -`, whose members exclude `R -3 c`.
 On the X-ray histogram of `tests/data/gsas2_pbso4.gpx` at a cell 0.1-0.2 % long, the held screen abstains, the cell-free fit gives `P c - n`, and the same fit from an unseeded background returns `P - - n`, which is why it seeds one.
 
+### A second screen checks the first
+
+The cell-free fit hands every class its cell and also its widths, zero and seeded background, and those can refute the true class at a cell that is right.
+So when the default screen names a class, it screens again at the same cell, held, from the instrument you declared, and keeps that screen as `ExtinctionScreen.held_screen`.
+The two fail differently, through the prefit's profile or through the declared one.
+When both name a class and the classes differ, `ExtinctionScreen.screens_disagree` is true, [`EXTINCTION_SCREENS_DISAGREE`](diagnostics-indexing.md#extinction_screens_disagree) says so, and `ExtinctionScreen.best_or_none` returns `None`; both rankings are kept, `candidates` and `held_screen.candidates`.
+A held screen that names no class changes nothing.
+Before WP-2076 (measured on `main` `da8fc28f`), on SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
+At the other two (corundum ×0.985, P 2₁/c ×0.9975) the prefit's own cell is off, both screens name the same wrong class, and nothing here can see it.
+WP-2076's nested comparison moved the default off those six wrong classes.
+Re-measured on `main` `1d054085` (2026-11-08, macOS arm64), the check fires on none of 150 rows (these three patterns at 25 scales from ×0.97 to ×1.03, with the true and with the all-zero declared background): the held screen names what the default names, or both name nothing.
+Those patterns therefore show no case the check changes today; the test that it still abstains and says so builds the split.
+When the instrument's background is the preset's all-zero start, which is what the GUI passes, the held screen seeds its background as the cell-free fit does.
+Unseeded, its reference fit is poor and the class that forbids nothing wins by elimination, so the check fires on right answers.
+On a synthetic sweep from the all-zero background (41 space groups, three cell offsets, four arms, 492 rows), `best_or_none()` names the true class, a wrong class or no class on 322, 141 and 29 rows with no second screen, 224, 117 and 151 with an unseeded held screen, and 315, 69 and 108 with the seeded one.
+On 17 committed real patterns (51 rows, from the all-zero preset) the unseeded held screen gave 19, 18 and 14, and the seeded one 28, 16 and 7.
+The seeding cost right answers on one real pattern before WP-2076, the GSAS-II PbSO₄ X-ray histogram: at ×0.999, ×0.9995, ×1.0, ×1.0005, ×1.001, ×1.002, ×1.0025, ×1.005, ×1.0075, ×1.01 and ×1.015, eleven of the twelve offsets where the default named the true `P c - n`, the seeded held screen named `P c - -` and the check abstained.
+At ×1.0125 the default named `P c - -` and the held screen nothing, so the check could not see that row.
+Since WP-2076 the default names `P c - a` at 13 of 14 scales from ×0.99 to ×1.015 (nothing at ×1.0125), the ruled wrong answer of that WP, and the held screen names it too or nothing, so the check withholds no PbSO₄ answer.
+A gate on the held reference fit does not separate these cases: the caught corundum row's held fit is the poorer one.
+Where both screens name the same wrong class at a well-refined cell (P6₃/mmc, P6/mcc, Pn-3n, P4/nmm and Fm-3m in the synthetic sweep, and magnetite, Nd₂Ru₂O₇ and SRM 1976a corundum in the real one), nothing here can see it; that is the first screen's behaviour and WP-2076's.
+The second screen costs about a third to a half again of the screen's time.
+
 ### The reference fit is gated
 
 When the absence-free class's own fit leaves more than half of the net signal's weighted power unexplained, every absence test would read that misfit.
@@ -157,6 +180,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
 | `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |
 | `ExtinctionScreen.z_candidates` | with a density and no `z`, every whole Z within the density's tolerance; several is an ambiguity, none a contradiction |
+| `ExtinctionScreen.held_screen` | the second screen, at `cell` held from the declared instrument, with its own ranking; `None` when the cell was held or the screen named no class |
 | `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened), `"unreliable"` (ranked, but the reference fit failed its gate) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings about the answer |
@@ -176,6 +200,7 @@ The screen's diagnostics say what the answer is and why it may not be one.
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
 - it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).
+- the second screen, when one ran, was not stopped and names no other class (`ExtinctionScreen.screens_disagree`).
 
 Removing one testable line can buy a class ΔBIC ln N at most, about 8 at a few thousand channels, so a class resting on a single testable position never clears the margin.
 When the runner-up is inside it, `EXTINCTION_SYMBOL_AMBIGUOUS` names the tested positions the two classes differ at, which is where counting longer would separate them.

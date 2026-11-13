@@ -698,6 +698,9 @@ from .._nearmiss import did_you_mean
 #: ``.tested_two_theta``, the testable forbidden positions a class was scored
 #: on.  Additive and defaulted to empty, the 0.25 → 0.26 rule; an older build
 #: refuses a screen carrying either key.
+#: Also in 0.61 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
+#: second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
+#: Additive and defaulted to ``None``, the same rule.
 #: Also in 0.61 (WP-2118): ``TieSpec.expression``, a user tie declared as a
 #: formula over named variables (``Refinement.tie(path, expression=...)``).
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so

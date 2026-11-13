@@ -674,6 +674,63 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_FORBIDDEN_INTENSITY", "code"),
     Row("EXTINCTION_GROUPS_NOT_SEPARABLE", "code"),
     Row("EXTINCTION_PRIOR_APPLIED", "code"),
+    Row("EXTINCTION_SCREENS_DISAGREE", "code", tier=3, ambiguity=2,
+        evidence=("warning; statistic: whether the default screen (after the cell-free "
+                  "Le Bail fit) and a second screen at that fit's cell, held, from the "
+                  "declared instrument (an all-zero background seeded first) both name a "
+                  "class and name different ones (arithmetic on two existing answers; the "
+                  "choice of second screen is rietx's own); no threshold of its own: each "
+                  "screen's own margin, DECISIVE_DELTA_BIC, decides whether it names a "
+                  "class; action: best_or_none() abstains and both rankings are kept. "
+                  "Before WP-2076 (main da8fc28f), measured on SRM 676a corundum, GSAS-II "
+                  "FAP, synthetic P 2_1/c and 11-BM NAC at 24 cell scales each "
+                  "(x0.97-1.03): fires on the six offsets where the default names a wrong "
+                  "class and the held screen the true one, on none where the default is "
+                  "right; the six are corundum x0.995, FAP x1.0075 and the synthetic "
+                  "P 2_1/c at x0.998, x0.999, x1.002 and x1.0025 (three families, one "
+                  "synthetic). It fails where the prefit's own cell is off (corundum "
+                  "x0.985, P 2_1/c x0.9975: both screens name the same wrong class). The "
+                  "held screen's background is seeded when the declared one is the "
+                  "preset's all-zero start (the GUI's; #1286 round 2): unseeded, the held "
+                  "reference fit is poor and the class forbidding nothing wins by "
+                  "elimination. Synthetic sweep from the all-zero declared background (the "
+                  "maintainer's, 41 space groups x cell x0.995/1.0/1.0075 x clean, 30 % "
+                  "profile mismatch, 0.02 deg zero shift, plus a preset-profile arm; 492 "
+                  "rows), best_or_none() names the true / a wrong / no class: no second "
+                  "screen 322 / 141 / 29; second screen unseeded 224 / 117 / 151; seeded "
+                  "315 / 69 / 108. Seeded withholds 7 right answers to stop 72 wrong ones; "
+                  "unseeded withheld 98 to stop 24 (130 and 39 on the six-factor grid). "
+                  "Real patterns from the all-zero preset (17 committed X-ray and neutron "
+                  "patterns, x0.995/1.0/1.0075, 51 rows) true / wrong / no class: unseeded "
+                  "19 / 18 / 14; seeded 28 / 16 / 7; no veto from an all-zero background "
+                  "28 / 18 / 5. Known cost, measured then: GSAS-II PbSO4 X-ray, where the "
+                  "seeded held screen names P c - - against the default's true P c - n at "
+                  "x0.999, 0.9995, 1.0, 1.0005, 1.001, 1.002, 1.0025, 1.005, 1.0075, 1.01 "
+                  "and 1.015, eleven of the twelve rows the default gets right (x0.998 "
+                  "agrees, x1.0125 the held screen names nothing; strict xfail at x1.0 "
+                  "until WP-2076). Wrong classes both screens agree on (P6_3/mmc, P6/mcc, "
+                  "Pn-3n, P4/nmm, Fm-3m; magnetite, Nd2Ru2O7, SRM 1976a) are the base "
+                  "screen's, WP-2076. Re-measured 2026-11-08 on main 1d054085 (WP-2076's "
+                  "nested comparison; macOS arm64): the check fires on none of 150 rows "
+                  "(corundum, FAP and the synthetic P 2_1/c at 25 scales x0.97-1.03, "
+                  "true and all-zero declared background), because the default no longer "
+                  "names a wrong class on the six rows above; on PbSO4 X-ray the default "
+                  "names P c - a at 13 of 14 scales (x0.99-1.015; nothing at x1.0125), the "
+                  "accepted wrong answer of WP-2076, and the held screen names it too or "
+                  "nothing, so the eleven rows are not withheld. No case the check changes on main "
+                  "today is shown by these fixtures: its positive arm is a "
+                  "constructed split (tests/test_extinction_margin.py)"),
+        grounds=("Mechanical: three real families plus a synthetic, silent on every right "
+                 "row when the background is declared; from the all-zero background it "
+                 "withholds 7 of 322 synthetic rows and PbSO4's eleven (before WP-2076; "
+                 "none since). The five patterns were also WP-1910's development data on "
+                 "#1178, so this is not out-of-sample. Judgement: two answers naming "
+                 "disjoint classes cannot both be right, so neither can be quoted on this "
+                 "evidence; ruled for this action by the maintainer on #1178, 2026-10-26."),
+        response="warning",
+        responds=("hold back the extinction class: read both rankings (candidates and "
+                  "held_screen.candidates) and the refuting positions each names, and fit the "
+                  "zero and the width law on a standard before screening again")),
     Row("EXTINCTION_SCREEN_FAILED", "code"),
     Row("EXTINCTION_SCREEN_UNRELIABLE", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the absence-free reference fit leaves more than "
@@ -5227,6 +5284,14 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_GROUPS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
     Row("EXTINCTION_PRIOR_APPLIED.suggestion", "suggestion", value=1),
     Row("EXTINCTION_SCREEN_FAILED.suggestion", "suggestion", value=2),
+    Row("EXTINCTION_SCREENS_DISAGREE.suggestion", "suggestion", tier=3, ambiguity=2, value=1,
+        evidence=("one next step and no verdict: read the refuting positions each named class "
+                  "carries (refuted_reason), then fit the zero and the width law on a standard "
+                  "and screen again; the two screens differ in the profile every class is "
+                  "compared at, not in the cell, so a standard is the check that tells which "
+                  "profile is right. Worded by the maintainer on #1286, round 3 (2026-11-06)"),
+        grounds=("Names no class and steers toward neither; the wording is the maintainer's. "
+                 "It rests on the same two-screens evidence as the code row above.")),
     Row("EXTINCTION_SCREEN_UNRELIABLE.suggestion", "suggestion", tier=3, ambiguity=2, value=1,
         evidence=("lists the causes without ranking them: the cell, a phase the reference does "
                   "not model, weak data (S < N), the range, the wavelength, the width law"),

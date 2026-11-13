@@ -1085,6 +1085,28 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
                         "better start), a phase the reference does not model, "
                         "weak data (counting longer helps; re-indexing does "
                         "not), the range, the wavelength, the width law")))
+    held = getattr(screen, "held_screen", None)
+    disagree = held is not None and screen.screens_disagree()
+    if disagree:
+        mine, theirs = screen._own_best(), held.best_or_none()
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_SCREENS_DISAGREE",
+            message=(f"the screen after the cell-free Le Bail fit names "
+                     f"{mine.symbol}, and a second screen at the same cell, "
+                     "held, from the declared instrument (an all-zero "
+                     f"background seeded first) names {theirs.symbol}.  The two "
+                     "classes share no space group, so at most one is right, and "
+                     "best_or_none() abstains.  The screens differ in the "
+                     "profile every class is compared at, not in the cell.  "
+                     "Both rankings are kept: candidates and "
+                     "held_screen.candidates"),
+            where=[f"after the cell-free fit: {mine.symbol} "
+                   f"({', '.join(mine.space_groups)})",
+                   f"held second screen: {theirs.symbol} "
+                   f"({', '.join(theirs.space_groups)})"],
+            suggestion=("Read the refuting positions each class names "
+                        "(refuted_reason).  Then fit the zero and the width "
+                        "law on a standard and screen again.")))
     alive = [c for c in screen.candidates if not c.refuted and c.screened]
     # the classes a declared prior leaves a member in; every class without one
     admissible = [c for c in alive if c.space_groups]
@@ -1111,7 +1133,9 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
            else alive[0] if alive else screen.candidates[0])
     if screen.prior is not None:
         out.append(_prior_diagnostic(screen, alive, top))
-    if len(top.laue_classes) > 1:
+    # both describe the default's class, which a disagreement says to quote
+    # none of; the second even says to pass any of its groups on
+    if len(top.laue_classes) > 1 and not disagree:
         out.append(Diagnostic(
             level="info", code="LAUE_CLASS_NOT_SEPARABLE",
             message=(f"the groups {top.symbol} admits fall in "
@@ -1125,7 +1149,7 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
                         "per group: the members of one Laue class differ only "
                         "in elements a solution can try cheaply, the Laue "
                         "classes in which intensities are equivalent")))
-    if len(top.space_groups) > 1:
+    if len(top.space_groups) > 1 and not disagree:
         out.append(Diagnostic(
             level="info", code="EXTINCTION_GROUPS_NOT_SEPARABLE",
             message=(f"Extinction symbol {top.symbol} is compatible with "

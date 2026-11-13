@@ -1032,6 +1032,25 @@ def _background_unseeded(background) -> bool:
     return all(float(c.value) == 0.0 for c in background.coefficients)
 
 
+def _seeded_instrument(data: PatternData, instrument: Instrument,
+                       two_theta_limits) -> Instrument:
+    """The instrument, with a seeded P-spline background when its own is the
+    preset's all-zero start (:func:`_background_unseeded`); otherwise itself.
+
+    One seam for the prefit and the held second screen (WP-1910, #1286 round 2):
+    a held reference fit from an all-zero background misfits every class with an
+    absence, and the class that forbids nothing then wins by elimination.
+    """
+    if not _background_unseeded(instrument.background):
+        return instrument
+    from ..background.auto import auto_background
+
+    ins = instrument.model_copy(deep=True)
+    ins.background = auto_background(data, two_theta_limits=two_theta_limits,
+                                     source=ins.source, seed=True).background
+    return ins
+
+
 def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
             symbol: str, two_theta_limits, cancel=None):
     """The screen's own cell-free Le Bail of the lattice group (``refine_cell``).
@@ -1053,15 +1072,10 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
     ``cancel`` reaches the fit, which raises
     :class:`~rietx.optimize.cancel.RefinementCancelled` out of it.
     """
-    from ..background.auto import auto_background
     from ..refine import Refinement
     from ..strategy.staged import resolve_plan
 
-    ins = instrument
-    if _background_unseeded(ins.background):
-        ins = ins.model_copy(deep=True)
-        ins.background = auto_background(data, two_theta_limits=two_theta_limits,
-                                         source=ins.source, seed=True).background
+    ins = _seeded_instrument(data, instrument, two_theta_limits)
     ref = Refinement(structure_from_candidate(candidate, space_group=symbol),
                      ins, history=False)
     # the prefit's answer is the cell and widths every class is then compared
@@ -1200,6 +1214,23 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     refuted at an absent-line position (SRM 676a corundum: ``R - c -`` at the
     certified cell, ``R - - -`` once the cell is scaled by 1.0012, #726).
 
+    **A class from the prefit is checked by a second screen** (WP-1910, ruled
+    on #1178): when ``refine_cell=True`` names a class, the screen runs again
+    at the prefit's cell, **held**, from the declared ``instrument``, its all-zero background seeded as the
+    prefit's is (``ExtinctionScreen.held_screen``; without the seed a poor held
+    fit refutes every class with an absence and the lattice class wins by
+    elimination, #1286 round 2).  The two fail differently — the
+    prefit's widths and zero against the declared ones — so
+    when both name a class and the classes differ, ``EXTINCTION_SCREENS_DISAGREE``
+    says so and :meth:`ExtinctionScreen.best_or_none` abstains, both rankings
+    kept.  A held screen naming no class changes nothing.  Before WP-2076 the
+    seeded held screen named ``P c - -`` where the default named the true
+    ``P c - n`` on eleven offsets of the GSAS-II PbSO₄ X-ray pattern (×0.999 to
+    ×1.015 from the all-zero background), and the screens disagreed there; the
+    default names ``P c - a`` since, and the held screen the same or nothing.
+    Where the prefit's own cell is off, both screens can name the same wrong
+    class and this check cannot see it (the synthetic P 2₁/c at ×0.9975).
+
     **The reference fit is gated** (:data:`REFERENCE_NET_RWP_MAX`): when the
     absence-free class's own fit leaves more than half of the net signal's
     weighted power unexplained, every absence test would read that misfit, so
@@ -1233,7 +1264,8 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     Cost is one or two refinements per surviving class (~0.1 s each on a
     3750-point pattern), after **two** profile fits: the cell-free Le Bail
     prefit and the shared Pawley one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
-    Apple-silicon Mac; ``refine_cell=False`` skips the first).  ``max_classes`` caps it; the classes left
+    Apple-silicon Mac; ``refine_cell=False`` skips the first), plus the held
+    second screen whenever the first names a class.  ``max_classes`` caps it; the classes left
     unfitted are reported with ``screened=False`` and, because an unasked question
     must not read as a clean answer, :meth:`ExtinctionScreen.best_or_none` then
     abstains.
@@ -1568,6 +1600,22 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     screen.candidates = sorted(
         entries, key=lambda e: (e.refuted, not e.screened, e.delta_bic,
                                 e.n_absent))
+    if (refine_cell and screen.status == "converged"
+            and screen.best_or_none() is not None):
+        # The second screen (WP-1910, ruled on #1178): the prefit's cell, held,
+        # from the declared instrument, background seeded as the prefit's is.
+        # It fails differently from this one — the prefit's widths and zero
+        # against the declared ones — so two decisive answers that differ cannot both be right, and
+        # ``best_or_none`` then names neither.  ``candidate`` is already at the
+        # prefit's cell; ``instrument`` is the caller's.
+        screen.held_screen = determine_extinction_symbol(
+            data, candidate,
+            _seeded_instrument(data, instrument, two_theta_limits), peaks=peaks,
+            two_theta_limits=two_theta_limits, k_sigma=k_sigma,
+            max_classes=max_classes, refine_cell=False, restrict=prior,
+            cancel=cancel)
+        if screen.held_screen.status == "cancelled":
+            screen.status = "cancelled"
     screen.diagnostics = extinction_diagnostics(screen, fit_errors) + prefit_capped
     return screen
 
