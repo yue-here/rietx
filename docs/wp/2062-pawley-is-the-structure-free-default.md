@@ -168,6 +168,8 @@ above, which come from lab and synchrotron single-phase patterns
   2026-11-05 ruling, and Yue raised no objection. If this WP retires Le Bail from the
   structure-free sites, the joint refusal is already the end state and needs no work.
 
+- **2026-11-08, from the issue triage (#1451): the empty-phase refusal does not name the structure-free route.** `Phase(atoms=[])` raises `phase 'bare' has no atoms` (`schemas/structure.py:1762`). The rule stands (the `lebail_scaffold` docstring: "The dummy atom is mandatory, not a convenience"), but the message names no way out. `rietx.schemas.structure.lebail_scaffold` (`:1974`), which both structure-free modes use, is not a top-level export, and the manual names it once (`docs/docs/start/first-fit.md:230`). An agent needing a bare-cell phase for an approximant Le Bail met only the refusal and wrote a dummy site by hand. Checked against the tree at `63d7c120a`: the issue's snippet raises that `ValidationError` and `hasattr(rietx, "lebail_scaffold")` is `False`. The reporter's suggestion: keep the rule, have the refusal name `lebail_scaffold(space_group, cell)` and say the lebail and pawley modes hold its dummy atom fixed, and export the scaffold beside `Phase`. The message is cheap. A top-level export grows the public surface (`tests/api_surface.py` partition, the skill's API page at its cap), so it is the maintainer's call, best made with decision 3's rename, which keeps `lebail_scaffold`'s name.
+
 - **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
   re-partition. Decide it or retire it with this move.** `_final_compile` carries the
   intensities onto the result's windows without a partition. A one-channel window
