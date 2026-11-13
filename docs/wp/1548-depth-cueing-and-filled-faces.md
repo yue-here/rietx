@@ -251,15 +251,15 @@ with a caller's colour always accepted. `fog_max` stays 0.7.
   language. A named face keeps its drawn atoms and the report names the rest.
   Parity on acridine, NAC closing no ring: 0.61 levels, and 2.3 against 74.6
   over the fills.)*
-- [ ] Before-and-after pairs on the 21 phases and paracetamol, committed
+- [x] Before-and-after pairs on the 21 phases and paracetamol, committed
   under `docs/wp/1548-measure/`. Show them to the maintainer with the three
-  questions above. *(2026-11-13, in part: `1548-measure/pairs.py` draws
-  shipped / cued / rings / both for each phase, plus a sheet each for
-  `fog_max` 0.5-0.7-0.9, D6 on white and black, and D5 grey-green-carbon;
-  `pairs/*.png`, `pairs.txt`. Drawn: the three of the 21 on disk (LaB6, NAC,
-  fluorapatite), five organics and HKUST-1 as 2×2×2 blocks. **Not drawn:** the
-  18 COD entries, `www.crystallography.net` refused by this session's network
-  (`pairs.txt`); rerun with that host allowed.)*
+  questions above. *(2026-11-13: `1548-measure/pairs.py` draws shipped /
+  cued / rings / both for each of the 21 phases, five organics and HKUST-1
+  (the organics as 2×2×2 blocks), plus a sheet each for `fog_max`
+  0.5-0.7-0.9, D6 on white and black, and D5 grey-green-carbon; `pairs/*.png`,
+  `pairs.txt`. No inorganic phase fills a ring; the organics fill 16-256. The
+  18 COD entries needed `www.crystallography.net` added to the session's
+  environment, which the maintainer allowed.)*
 - [x] Docs: the `render_structure` docstring and the GUI guide's structure
   section. *(2026-11-13: the docstring with task 5; `reference/figures.md`'s
   options table and a paragraph each; `gui-guide.md`'s drawer, the transparent
