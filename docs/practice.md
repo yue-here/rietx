@@ -481,6 +481,26 @@ Dropping and zero weight give the same χ². The two differ in what the pattern 
 GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
 excluded region.
 
+## A zero or negative esd
+
+Surveyed 2026-10-19 for WP-2002's batch item B5 (`docs/wp/2002-batch/rulings.md` § B5), and
+carried here for WP-1952, which built the ruling. The question: a file's esd column gives a point
+σ = 0 or σ < 0. An esd of zero claims an exact intensity, and a negative one has no meaning, so
+what weight does the point get?
+
+| Program | What it does with the point |
+|---|---|
+| rietx | Since WP-1952 the point leaves the fit and `PATTERN_SIGMA_NONPOSITIVE` names it; `nonpositive_sigma="poisson"` weights it √max(y, 1) instead, and a column with no positive esd is not read. Before, a floor at 10⁻³ of the column's median esd weighed it about 10⁶ times its neighbours, in silence (#897) |
+| GSAS-II 5.8.4 | Depends on the importer, and none reports anything. The `fxye` reader zero-weights a point with y ≤ 0 or σ ≤ 0 (`imports/G2pwd_fxye.py:86-91`). The `xye` reader zero-weights y ≤ 0, replaces σ = 0 by Poisson 1/y, and skips a line whose σ is negative after storing its 2θ, so every later point pairs with the wrong angle (`imports/G2pwd_xye.py:170-186`). The CIF reader raises every esd below 1 to 1 (`G2pwd_CIF.py:280-292`, agent-read). Checked by reading |
+| FullProf 8.20 | Silent. σ = 0 acted as σ = 1, a hundred times the weight of its σ = 10 neighbours; a negative σ acted as its absolute value (run on its PbSO₄ example, agent-run) |
+| TOPAS | Weights 1/σ² where the file has σ, else 1/Max(Yobs, 1) (Technical Reference § 6.2, § 21.10); silent on σ ≤ 0 |
+| RIETAN-FP, BGMN, MAUD, EasyDiffraction | Not checked |
+
+The maintainer's ruling (2026-10-19): fix what is obviously wrong, warn at ingestion, give an
+option to correct, and spend little effort. So no per-format classifier of what a zero means.
+Zero weight is GSAS-II's `fxye` rule; rietx keeps the point in the pattern, as GSAS-II does, so a
+picture still draws it.
+
 ## Separators, trailing comments and text lines in a column file
 
 Surveyed 2026-11-09 for WP-1952 (issue #897). The question: in a plain two- or three-column
