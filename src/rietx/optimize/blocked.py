@@ -137,60 +137,72 @@ def choose_layout(n_rows: int, n_cols: int, solver: str) -> str:
 class BlockJacobian:
     """The stacked joint Jacobian as one block per histogram.
 
-    ``blocks[h]`` is histogram ``h``'s weighted rows — its data rows, then its
-    background-penalty rows — against its own free columns, in its table's
-    free order; ``col_maps[h]`` sends those columns to θ's
-    (``MultiParameterTable.col_map``).  The row space is the dense stacked
-    layout's: every histogram's data rows first, then every histogram's
-    penalty rows, so :meth:`toarray` is ``_multi_closures``' dense matrix
-    entry for entry and a residual vector indexes both alike.
+    ``blocks[h]`` is histogram ``h``'s rows — its weighted data rows, then its
+    weighted background-penalty rows, then the soft-restraint rows the joint
+    residual holds of it (``n_restr[h]``, unweighted, WP-1995) — against its own
+    free columns, in its table's free order; ``col_maps[h]`` sends those
+    columns to θ's (``MultiParameterTable.col_map``).  The row space is the
+    dense stacked layout's: every histogram's data rows first, then every
+    histogram's penalty rows, then every histogram's restraint rows, so
+    :meth:`toarray` is ``_multi_closures``' dense matrix entry for entry and a
+    residual vector indexes both alike.
     """
 
-    __slots__ = ("blocks", "col_maps", "n_data", "n_pen", "n_cols",
-                 "_data_off", "_pen_off")
+    __slots__ = ("blocks", "col_maps", "n_data", "n_pen", "n_restr", "n_cols",
+                 "_data_off", "_pen_off", "_restr_off")
 
-    def __init__(self, blocks, col_maps, n_data, n_pen, n_cols: int):
+    def __init__(self, blocks, col_maps, n_data, n_pen, n_cols: int, *,
+                 n_restr=None):
         self.blocks = [to_host_fp64(b) for b in blocks]
         self.col_maps = [np.asarray(c, dtype=np.int64) for c in col_maps]
         self.n_data = [int(n) for n in n_data]
         self.n_pen = [int(n) for n in n_pen]
+        self.n_restr = ([0] * len(self.n_data) if n_restr is None
+                        else [int(n) for n in n_restr])
         self.n_cols = int(n_cols)
-        for b, c, nd, npen in zip(self.blocks, self.col_maps, self.n_data, self.n_pen,
-                                  strict=True):
-            if b.shape != (nd + npen, len(c)):
+        for b, c, nd, npen, nr in zip(self.blocks, self.col_maps, self.n_data,
+                                      self.n_pen, self.n_restr, strict=True):
+            if b.shape != (nd + npen + nr, len(c)):
                 raise ValueError(f"a block of shape {b.shape} does not hold "
-                                 f"{nd}+{npen} rows against {len(c)} columns")
+                                 f"{nd}+{npen}+{nr} rows against {len(c)} columns")
         self._data_off = np.concatenate([[0], np.cumsum(self.n_data)]).astype(np.int64)
         self._pen_off = (int(self._data_off[-1])
                          + np.concatenate([[0], np.cumsum(self.n_pen)]).astype(np.int64))
+        self._restr_off = (int(self._pen_off[-1])
+                           + np.concatenate([[0], np.cumsum(self.n_restr)]).astype(np.int64))
 
     # -- shape and the dense twin -------------------------------------------
     @property
     def shape(self) -> tuple[int, int]:
-        return int(self._pen_off[-1]), self.n_cols
+        return int(self._restr_off[-1]), self.n_cols
 
     @property
     def n_blocks(self) -> int:
         return len(self.blocks)
 
+    def _row_slices(self, h: int) -> list[tuple[slice, slice]]:
+        """Block ``h``'s stripes: (its rows in the block, their rows in the stack)."""
+        nd, npen, nr = self.n_data[h], self.n_pen[h], self.n_restr[h]
+        do, po, ro = (int(self._data_off[h]), int(self._pen_off[h]),
+                      int(self._restr_off[h]))
+        return [(slice(a, a + n), slice(o, o + n))
+                for a, o, n in ((0, do, nd), (nd, po, npen), (nd + npen, ro, nr))
+                if n]
+
     def toarray(self) -> np.ndarray:
         """The dense stacked matrix, entry for entry ``_multi_closures``'."""
         out = np.zeros(self.shape, dtype=np.float64)
         for h, (b, cm) in enumerate(zip(self.blocks, self.col_maps, strict=True)):
-            do, nd = int(self._data_off[h]), self.n_data[h]
-            out[do:do + nd, cm] = b[:nd]
-            if self.n_pen[h]:
-                po = int(self._pen_off[h])
-                out[po:po + self.n_pen[h], cm] = b[nd:]
+            for mine, stacked in self._row_slices(h):
+                out[stacked, cm] = b[mine]
         return out
 
     def residual_part(self, r: np.ndarray, h: int) -> np.ndarray:
         """``r``'s rows for histogram ``h``, aligned with ``blocks[h]``."""
-        do, nd = int(self._data_off[h]), self.n_data[h]
-        if not self.n_pen[h]:
-            return r[do:do + nd]
-        po = int(self._pen_off[h])
-        return np.concatenate([r[do:do + nd], r[po:po + self.n_pen[h]]])
+        parts = [r[stacked] for _, stacked in self._row_slices(h)]
+        if len(parts) == 1:
+            return parts[0]
+        return np.concatenate(parts) if parts else r[0:0]
 
     def block(self, h: int, *, data_only: bool = True) -> np.ndarray:
         """Histogram ``h``'s rows against its own columns (``col_maps[h]``
@@ -199,7 +211,8 @@ class BlockJacobian:
         return b[:self.n_data[h]] if data_only else b
 
     def data_rows(self) -> "BlockJacobian":
-        """The data rows alone, the penalty rows dropped (``LSQOutcome.jac``)."""
+        """The data rows alone, the penalty and restraint rows dropped
+        (``LSQOutcome.jac``)."""
         return BlockJacobian([b[:nd] for b, nd in zip(self.blocks, self.n_data, strict=True)],
                              self.col_maps, self.n_data, [0] * self.n_blocks, self.n_cols)
 
@@ -245,7 +258,8 @@ class BlockJacobian:
         f = np.asarray(factors, dtype=np.float64)
         return BlockJacobian([b * f[cm] for b, cm in zip(self.blocks, self.col_maps,
                                                          strict=True)],
-                             self.col_maps, self.n_data, self.n_pen, self.n_cols)
+                             self.col_maps, self.n_data, self.n_pen, self.n_cols,
+                             n_restr=self.n_restr)
 
     def without_columns(self, columns) -> "BlockJacobian":
         """``J`` with ``columns`` zeroed in every block (``_without_columns``)."""
@@ -258,7 +272,8 @@ class BlockJacobian:
                 b = b.copy()
                 b[:, hit] = 0.0
             blocks.append(b)
-        return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols)
+        return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols,
+                             n_restr=self.n_restr)
 
     def matmul_chart(self, t: np.ndarray) -> "BlockJacobian":
         """``J @ T`` for a square chart matrix that keeps each histogram's
@@ -274,7 +289,8 @@ class BlockJacobian:
                 raise ValueError("a chart matrix moving one histogram's columns into "
                                  "another's has no block form")
             blocks.append(b @ t[np.ix_(cm, cm)])
-        return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols)
+        return BlockJacobian(blocks, self.col_maps, self.n_data, self.n_pen, self.n_cols,
+                             n_restr=self.n_restr)
 
     def border(self) -> np.ndarray:
         """Columns more than one block reaches: the arrow's border, the shared
@@ -657,7 +673,7 @@ def _edited(bj: BlockJacobian, remove: np.ndarray,
             n += e.shape[1]
         blocks.append(b)
         maps.append(cm)
-    return BlockJacobian(blocks, maps, bj.n_data, bj.n_pen, n)
+    return BlockJacobian(blocks, maps, bj.n_data, bj.n_pen, n, n_restr=bj.n_restr)
 
 
 def held_projection(bj: BlockJacobian, resid: np.ndarray, hold=()) -> tuple[float, int]:
@@ -675,8 +691,8 @@ def added_columns_gain(bj: BlockJacobian, resid: np.ndarray,
                        ) -> tuple[float, int]:
     """The χ² one linear step gains if block ``h`` also had ``extra[h]``.
 
-    ``extra[h]`` holds columns over block ``h``'s rows, data then penalty as
-    ``blocks[h]``, which no other block reaches; ``None`` adds none.  The
+    ``extra[h]`` holds columns over block ``h``'s rows, data then penalty then
+    restraint as ``blocks[h]``, which no other block reaches; ``None`` adds none.  The
     columns ``drop`` (θ's indices) leave the alternative, so new columns can
     stand in for old ones: each pattern's own target in place of the
     coefficients that tied it.  The columns ``hold`` leave both sides, as a
