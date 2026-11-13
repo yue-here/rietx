@@ -46,16 +46,16 @@ joint fit.
 
 ## Tasks
 
-- [ ] Read `FLOOR_HIT` (or `bound_findings` directly) in `_extra_peak_diagnostics`; keep the
+- [x] Read `FLOOR_HIT` (or `bound_findings` directly) in `_extra_peak_diagnostics`; keep the
       `area <= 0` clause for an area whose stated lower bound is below zero.
-- [ ] In the joint fit, run the bound test before the extra-peak diagnostics, or pass its
+- [x] In the joint fit, run the bound test before the extra-peak diagnostics, or pass its
       findings in.
-- [ ] `replay` reads the recorded `FLOOR_HIT` diagnostics, as WP-1914's fallback does.
-- [ ] Tests: a declared peak with no feature under it, fitted under `lm` and `trf`, single and
+- [x] `replay` reads the recorded `FLOOR_HIT` diagnostics, as WP-1914's fallback does.
+- [x] Tests: a declared peak with no feature under it, fitted under `lm` and `trf`, single and
       joint; the code fires in all four. Pin the rule, never where TRF stops.
 - [ ] Find the remaining siblings: any other reader deciding "on its floor" by its own distance.
       Fix the class or say which were left and why.
-- [ ] Skill: none; the code's row and suggestion are unchanged.
+- [x] Skill: none; the code's row and suggestion are unchanged.
 
 ## Acceptance
 

@@ -321,7 +321,7 @@ def test_a_coefficient_on_its_floor_reads_at_zero_whatever_it_stores():
 
 def test_a_joint_fit_hands_histogram_0_its_own_floor_spelling():
     """Shared rows are bare and per-histogram rows ``hist.h.…`` (WP-1914)."""
-    from rietx.multi import _hist0_floors
+    from rietx.multi import _hist_floors
     from rietx.strategy.staged import GuardFinding
 
     found = [
@@ -332,8 +332,11 @@ def test_a_joint_fit_hands_histogram_0_its_own_floor_spelling():
                               limit=("lower", 0.0)),
         GuardFinding.at_bound("phases.0.lor_strain", limit=("upper", 0.5)),
     ]
-    assert _hist0_floors(found) == {"phases.0.gauss_size",
-                                    "phases.0.gauss_strain"}
+    assert _hist_floors(found, 0) == {"phases.0.gauss_size",
+                                      "phases.0.gauss_strain"}
+    # any histogram reads its own spelling the same way (WP-2141)
+    assert _hist_floors(found, 1) == {"phases.0.gauss_size",
+                                      "phases.0.lor_size"}
 
 
 # --- end to end: the block on a real fit, and the caveat on the report ------

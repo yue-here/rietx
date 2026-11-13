@@ -2434,8 +2434,46 @@ class MultiHistogramRefinement:
         n_data = [len(m.tt) for m in models]
         data_off = np.concatenate([[0], np.cumsum(n_data)]).astype(int)
 
+        # each histogram's physical esds, then the one bound test ------------------
+        # Both run before the per-histogram loop.  The declared-peak
+        # diagnostics inside it read the test's FLOOR_HIT half (WP-2141), and
+        # the test's tied half reads these esds.
+        # (zip rather than a second ``for h in range(n)``: the meta-tests in
+        # tests/test_multi_diagnostics.py find the per-histogram loop by it)
+        per_esds: list[dict[str, float]] = []
+        for h_table, h_theta, cm in zip(mt.tables, thetas,
+                                        map(mt.col_map, range(n))):
+            per_esds.append(
+                h_table.stderr_physical(
+                    h_theta, stderr[cm],
+                    corr[np.ix_(cm, cm)] if corr is not None else None)
+                if stderr is not None else {})
+        # one bound test, three consumers: the rows' at_bound flag, the
+        # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
+        # declared-peak diagnostics (WP-2141)
+        at_bounds = bound_findings(
+            mt.bounds(), mt.free_paths, outcome.theta,
+            cos=outcome.residual_cosine, esd=outcome.stderr_internal,
+            active=_exact_active_bounds(outcome))
+        # a tied value the LM step held on its own limit, per histogram, a
+        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
+        pressed = pressed_tied_paths(outcome.truncated_by)
+        if pressed and per_esds:
+            seen_shared: set[str] = set()
+            for h, table in enumerate(mt.tables):
+                for f in tied_bound_findings(table, pressed, per_esds[h],
+                                             scope=f"hist.{h}."):
+                    base = f.paths[0].removeprefix(f"hist.{h}.")
+                    e = table.entries[table._paths[base]]
+                    if _row_shared(mt, e):
+                        if base in seen_shared:
+                            continue
+                        seen_shared.add(base)
+                        f = dataclasses.replace(f, paths=(base,), message=base)
+                    at_bounds.append(f)
+
         # per-histogram slices ---------------------------------------------------
-        per_values, per_ycalc, per_ybkg, per_esds = [], [], [], []
+        per_values, per_ycalc, per_ybkg = [], [], []
         histograms: list[HistogramResult] = []
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
@@ -2454,9 +2492,7 @@ class MultiHistogramRefinement:
             cm = mt.col_map(h)
             s_h = stderr[cm] if stderr is not None else None
             corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
-            esd_h = (table.stderr_physical(thetas[h], s_h, corr_h)
-                     if s_h is not None else {})
-            per_esds.append(esd_h)
+            esd_h = per_esds[h]
 
             # a Pawley block's intensities are this histogram's free
             # parameters too, as the single fit counts them (``_pawley_n``)
@@ -2588,7 +2624,9 @@ class MultiHistogramRefinement:
             # the single path's own builder (WP-2028 task 7), so a magnetic
             # phase draws its "(magnetic)" row here too (#278)
             ticks, tick_hkl, tick_support = _tick_rows(model, struct, values)
-            diags.extend(_extra_peak_diagnostics(model, values, ticks, table))
+            diags.extend(_extra_peak_diagnostics(
+                model, values, ticks, table,
+                floors=floored_paths(table, _hist_floors(at_bounds, h))))
             diags.extend(_far_from_data_diagnostics(model, y_calc, y_bkg, stats))
             # the measurement's half only: support=None withholds the ratio,
             # which has no joint definition (DIAGNOSTIC_SCOPES says why)
@@ -2625,29 +2663,7 @@ class MultiHistogramRefinement:
         # (WP-1341; ``_final_shift_over_esd_multi`` says why it is defined)
         combined.max_shift_over_esd = outcome.max_shift_over_esd
 
-        # one bound test, two consumers: the rows' at_bound flag and the
-        # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929)
-        at_bounds = bound_findings(
-            mt.bounds(), mt.free_paths, outcome.theta,
-            cos=outcome.residual_cosine, esd=outcome.stderr_internal,
-            active=_exact_active_bounds(outcome))
-        # a tied value the LM step held on its own limit, per histogram, a
-        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
-        pressed = pressed_tied_paths(outcome.truncated_by)
-        if pressed and per_esds:
-            seen_shared: set[str] = set()
-            for h, table in enumerate(mt.tables):
-                for f in tied_bound_findings(table, pressed, per_esds[h],
-                                             scope=f"hist.{h}."):
-                    base = f.paths[0].removeprefix(f"hist.{h}.")
-                    e = table.entries[table._paths[base]]
-                    if _row_shared(mt, e):
-                        if base in seen_shared:
-                            continue
-                        seen_shared.add(base)
-                        f = dataclasses.replace(f, paths=(base,), message=base)
-                    at_bounds.append(f)
-        # Histogram 0's physical esds, built once in the loop above and read by
+        # Histogram 0's physical esds, built once above the loop and read by
         # two consumers (WP-1131): the shared rows of ``_parameters``, and the
         # microstructure block, which reads histogram 0 because its value scale
         # is exactly 1.0.  With a correlation matrix this is a dense n x n, so
@@ -2796,7 +2812,7 @@ class MultiHistogramRefinement:
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
                 esds=esd_hist0,
-                floors=floored_paths(mt.tables[0], _hist0_floors(at_bounds))),
+                floors=floored_paths(mt.tables[0], _hist_floors(at_bounds, 0))),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
@@ -3080,17 +3096,19 @@ def _row_shared(mtable, entry) -> bool:
     return row_shared(mtable.sharing, entry)
 
 
-def _hist0_floors(at_bounds) -> set[str]:
-    """Histogram 0's paths whose ``FLOOR_HIT`` fired, as its values spell them.
+def _hist_floors(at_bounds, h: int) -> set[str]:
+    """Histogram ``h``'s paths whose ``FLOOR_HIT`` fired, as its values spell them.
 
     The joint findings name a shared row bare and a per-histogram row
-    ``hist.h.…`` (``_parameters`` keys on the same spelling), and the
-    microstructure block reads histogram 0's own dict, so a shared floor
-    passes through and a ``hist.0.`` one loses its prefix (WP-1914).
+    ``hist.h.…`` (``_parameters`` keys on the same spelling).  The
+    microstructure block (WP-1914) and the declared-peak diagnostics
+    (WP-2141) read one histogram's own dict, so a shared floor passes through
+    and that histogram's ``hist.h.`` one loses its prefix.
     """
+    own = f"hist.{h}."
     return {_unscoped(p) for f in at_bounds if f.code == "FLOOR_HIT"
             for p in f.paths
-            if p.startswith("hist.0.") or not p.startswith("hist.")}
+            if p.startswith(own) or not p.startswith("hist.")}
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
