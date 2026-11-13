@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by ghostshift runner (MacBook-Air-c4aacd)
 Track: What fires, and what stays silent
-Depends on: 1814 soft (its chunk C1 writes the torsion test this reuses, PR #1510)
-Priority: P3 2026-11-12 — was P2 (a clash nothing flags, on a path few fits run): waits on the maintainer's choice on #1507
+Depends on: —
+Priority: P3 2026-11-13 — decided on #1507: the docs and the warning land here, the restraint itself moves to WP-1816
 
 ## Goal
 
@@ -68,10 +68,13 @@ atoms when it turns some of them, other than its own two axis atoms, and not
 the others. For a pair that is the predicate option 2 needs, chained torsions
 included. Import it once it merges; do not write a second one.
 
-**Tier.** Option 1 adds no rule. Option 2's "a rigid pair keeps its distance"
-is physics; a 1-4 exclusion is named practice (force fields), cited above.
-`exclude_same_body`'s default has no row in `_audit.DEFAULT_SEATS`; if its
-meaning changes, the default gets one.
+**Tier.** The warning is tier 1: it states a fact about the pair list (no
+row inside one copy of the body) where a torsion moved, and gates nothing.
+Option 2's "a rigid pair keeps its distance" is physics; the bond-count
+exclusion is named practice, surveyed in `docs/practice.md` § Which pairs
+inside a molecule a contact term checks. `exclude_same_body`'s default has
+no row in `_audit.DEFAULT_SEATS`; if its meaning changes (WP-1816), the
+default gets one.
 
 ### Inherited
 
@@ -84,19 +87,33 @@ meaning changes, the default gets one.
 
 ## Tasks
 
-- [ ] The maintainer's choice on #1507, recorded here as `Decided YYYY-MM-DD:`.
-- [ ] Option 1: the docstrings of `anti_bump_restraints` and
-      `stale_anti_bump_pairs` say which pairs the skip covers. Option 2: the
-      builder and the stale check keep rows for torsion-moved pairs, with the
-      close-pair treatment the decision names, through PR #1510's predicate.
-- [ ] Tests: the six-atom chain above (a folded pair gets a row and is named
-      stale, or the docstring's claim is pinned); a pair that no torsion
-      moves keeps the skip; a positive control that fails with the change
-      reverted.
-- [ ] Skill: option 2 adds nothing an agent must know beyond the builder's
-      docstring; option 1 adds one line to the anti-bump row of
-      `references/diagnostics.md` (`RESTRAINT_PAIRS_STALE`) saying a body's
-      own pairs are never named.
+- [x] The maintainer's choice on #1507. **Decided 2026-11-13** (ruled by
+      Yue 2026-11-13: "both"). (1) Now, here: correct the docs, and warn when
+      anti-bump meets a body with torsions, saying contacts inside the
+      molecule are not checked. (2) The direction, filed as WP-1816: the
+      stored `RigidBody` keeps its declared bonds (optional field, `None` =
+      undeclared, old files open; WP-1319's never-perceived rule kept). With
+      bonds, anti-bump restrains intra-body pairs four or more bonds apart
+      that a torsion moves; pairs one to three bonds apart are excluded, not
+      scaled, because a floor on a torsion's ends biases the conformation and
+      a preference belongs in a torsion prior. Without bonds, the warning.
+- [x] The docstrings of `anti_bump_restraints` and `stale_anti_bump_pairs`
+      say which pairs the skip covers, and that a torsion-moved pair is among
+      them; the theory chapter's anti-bump paragraph says the same.
+- [x] The warning `RESTRAINT_BODY_CONTACTS_UNCHECKED` at plan end (`fit`
+      and `run_stage`): a phase with an anti-bump row, a body torsion whose
+      `angle` moved during the run, and no row inside one copy of that body
+      (`model.restraints.bodies_with_unchecked_contacts`). Audit rows
+      (code and suggestion, tier 1), help entry, silence pair.
+- [x] Tests: the six-atom chain above (fires, and the folded pair still has
+      no row and no stale report); silent for an unturned torsion, for a list
+      built with `exclude_same_body=False`, for a body without torsions; the
+      biphenyl fit on both entry paths. Positive control: with the emitter's
+      gate disabled, both firing tests fail.
+- [x] Skill: a `RESTRAINT_BODY_CONTACTS_UNCHECKED` row in
+      `references/diagnostics.md`.
+- [ ] File WP-1816 for the bonds direction, coordinated with WP-1814, and
+      record the practice survey in `docs/practice.md`.
 
 ## Acceptance
 

@@ -249,3 +249,91 @@ def _save_fit_png(result, name: str) -> None:
     plot_result(result, path=str(OUT / f"{name}.png"))
     plt.close("all")
     assert (OUT / f"{name}.png").stat().st_size > 0
+
+
+# ------------------------------------- a torsion inside a body (WP-2144, #1507)
+CHAIN_LABELS = ["N1", "C2", "C3", "C4", "C5", "O6"]
+CHAIN_RULE = {("N", "O"): 3.0, ("Li", "O"): 1.0}
+#: wide enough to list N1 against O6 in the next cell along −a, a neighbouring
+#: molecule, so the phase carries anti-bump rows and none inside one copy
+CHAIN_MARGIN = 16.0
+
+
+def _chain_phase(t1: float, t2: float, *, torsions: bool = True) -> Phase:
+    """A planar zigzag N1–C2–C3–C4–C5–O6 (bonds 1.5 Å) as one body in a 20 Å
+    P1 cell, with torsions about C2–C3 (moving C4, C5, O6) and C4–C5 (moving
+    O6) at twists ``t1`` and ``t2``.  At (0, 0) N1···O6 is 4.50 Å; at
+    (−120, −120) it is 1.50 Å, half the stated 3.0 Å minimum (#1507)."""
+    from rietx.schemas.structure import BodyTorsion
+
+    c, s = 1.5 * np.cos(np.radians(54.75)), 1.5 * np.sin(np.radians(54.75))
+    template = np.array([[k * c, (k % 2) * s, 0.0] for k in range(6)])
+    P = Parameter
+    seed = Atom(label="Li", species="Li", x=P(value=0.9), y=P(value=0.9), z=P(value=0.9))
+    phase = Phase(name="p", space_group="P1", cell=Cell.cubic(20.0), atoms=[seed])
+    tors = ([BodyTorsion(name="t1", axis=("C2", "C3"), moves=["C4", "C5", "O6"], angle=t1),
+             BodyTorsion(name="t2", axis=("C4", "C5"), moves=["O6"], angle=t2)]
+            if torsions else [])
+    return add_body(phase, "chain", CHAIN_LABELS, ["N", "C", "C", "C", "C", "O"],
+                    template, (0.5, 0.5, 0.5), torsions=tors)
+
+
+def _chain_run(t1: float, t2: float, **build) -> tuple[Structure, list]:
+    """The chain listed at (0, 0) and answered at (t1, t2): the run's answer,
+    and the phase as the run started, as ``refine`` hands them over."""
+    start = _chain_phase(0.0, 0.0)
+    start.restraints = anti_bump_restraints(start, CHAIN_RULE, margin=CHAIN_MARGIN,
+                                            **build)
+    answer = _chain_phase(t1, t2)
+    answer.restraints = list(start.restraints)
+    return Structure(phases=[answer]), [start]
+
+
+def _n1_o6(phase: Phase) -> float:
+    x = {a.label: np.array([a.x.value, a.y.value, a.z.value]) * 20.0 for a in phase.atoms}
+    return float(np.linalg.norm(x["N1"] - x["O6"]))
+
+
+def test_a_torsion_that_folds_a_body_warns_that_its_contacts_are_unchecked():
+    """The folded pair gets no row and no stale report, as #1507 found; the
+    new warning names the body and the torsions that turned."""
+    from rietx.model.restraints import stale_anti_bump_pairs
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+
+    structure, since = _chain_run(-120.0, -120.0)
+    phase = structure.phases[0]
+    assert _n1_o6(since[0]) == pytest.approx(4.499, abs=1e-3)
+    assert _n1_o6(phase) == pytest.approx(1.498, abs=1e-3)
+    n1, o6 = (CHAIN_LABELS.index(k) + 1 for k in ("N1", "O6"))
+    assert phase.restraints                         # neighbouring molecules are listed
+    assert all(r.translation != (0, 0, 0) for r in phase.restraints
+               if {r.atom_i, r.atom_j} == {n1, o6})
+    assert stale_anti_bump_pairs(phase) == []
+    (d,) = _body_contacts_unchecked_diagnostics(structure, since)
+    assert d.code == "RESTRAINT_BODY_CONTACTS_UNCHECKED" and d.level == "warning"
+    assert d.where == [f"p {k}" for k in CHAIN_LABELS]
+    assert d.value == 2.0
+    assert "contacts inside the molecule are not checked" in d.message
+    assert "t1 0.0° → -120.0°" in d.message and "'chain'" in d.message
+
+
+def test_an_unturned_torsion_or_a_checked_body_stays_silent():
+    """Silent where the torsions did not move, where the caller kept the
+    body's own pairs (``exclude_same_body=False``), and for a body with no
+    torsion; the warning's own predicate names only the torsion body."""
+    from rietx.model.restraints import bodies_with_unchecked_contacts
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+
+    assert _body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0)) == []
+    kept = _chain_run(-120.0, -120.0, exclude_same_body=False)
+    assert bodies_with_unchecked_contacts(kept[0].phases[0]) == []
+    assert _body_contacts_unchecked_diagnostics(*kept) == []
+    rigid = _chain_phase(0.0, 0.0, torsions=False)
+    rigid.restraints = anti_bump_restraints(rigid, CHAIN_RULE, margin=CHAIN_MARGIN)
+    assert bodies_with_unchecked_contacts(rigid) == []
+    folded = _chain_phase(-120.0, -120.0)
+    assert bodies_with_unchecked_contacts(folded) == []        # no anti-bump row
+    folded.restraints = anti_bump_restraints(folded, CHAIN_RULE, margin=CHAIN_MARGIN)
+    assert bodies_with_unchecked_contacts(folded) == ["chain"]
+    assert _body_contacts_unchecked_diagnostics(
+        Structure(phases=[folded]), [None]) == []              # nothing searched

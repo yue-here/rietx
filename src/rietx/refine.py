@@ -6059,6 +6059,8 @@ class Refinement:
                 # after the write-back: the search reads the answer's coordinates
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
                     self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
+                    self.structure, stale_since))
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -6618,6 +6620,8 @@ class Refinement:
             self._record_free_paths(table)
             if mode == "rietveld":
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
+                    self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
                     self.structure, stale_since))
 
             stage_result = StageResult(
@@ -12257,6 +12261,65 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
                        "coordinates (or with a wider margin) and refit; or, if "
                        "the contact is real, lower that species pair's minimum "
                        "distance"))
+    return out
+
+
+def _body_contacts_unchecked_diagnostics(structure: Structure,
+                                          since: list) -> list[Diagnostic]:
+    """``RESTRAINT_BODY_CONTACTS_UNCHECKED`` — a torsion turned inside a body
+    whose own contacts no anti-bump row checks (WP-2144, #1507).
+
+    The anti-bump builder skips two atoms of one rigid body in the body's own
+    copy, and :func:`_restraint_pairs_stale_diagnostics` skips them too, so a
+    torsion that folds the molecule onto itself is neither restrained nor
+    named.  One warning per body, at plan end, where a declared torsion's
+    ``angle`` moved during the run and no anti-bump row joins two of the
+    body's atoms in its own copy
+    (:func:`rietx.model.restraints.bodies_with_unchecked_contacts`).  ``since``
+    is each phase as the run started (:func:`_anti_bump_start_phases`), so a
+    phase without an anti-bump row is never searched, and a torsion that did
+    not move cannot have folded anything the caller did not start from.
+    """
+    from .model.restraints import bodies_with_unchecked_contacts
+
+    out: list[Diagnostic] = []
+    for phase, start in zip(structure.phases, since, strict=True):
+        if start is None:
+            continue
+        before = {b.name: {t.name: t.angle for t in b.torsions}
+                  for b in start.rigid_bodies}
+        turned_in: dict[str, list] = {}
+        for body in phase.rigid_bodies:
+            was = before.get(body.name, {})
+            moved = [(t.name, was[t.name], t.angle) for t in body.torsions
+                     if t.name in was and t.angle != was[t.name]]
+            if moved:
+                turned_in[body.name] = moved
+        # the pair search runs only where a torsion turned
+        if not turned_in:
+            continue
+        for name in bodies_with_unchecked_contacts(phase):
+            if name not in turned_in:
+                continue
+            body = next(b for b in phase.rigid_bodies if b.name == name)
+            moved = turned_in[name]
+            turned = ", ".join(f"{t} {a:.1f}° → {b:.1f}°" for t, a, b in moved)
+            out.append(Diagnostic(
+                level="warning", code="RESTRAINT_BODY_CONTACTS_UNCHECKED",
+                where=[f"{phase.name} {label}" for label in body.atoms],
+                value=float(len(moved)),
+                message=(f"phase {phase.name!r}, rigid body {name!r}: "
+                         f"{len(moved)} torsion(s) turned during the run "
+                         f"({turned}), and the anti-bump list has no row "
+                         "between two atoms of one copy of the body, so "
+                         "contacts inside the molecule are not checked. "
+                         "Contacts with neighbouring molecules are."),
+                suggestion=("read the body's own contacts in "
+                            "result.geometry.contacts; where a torsion brought "
+                            "two of its atoms closer than you allow, add an "
+                            "AntiBumpRestraint row for that pair with its own "
+                            "minimum, or restrain the torsion with a "
+                            "TorsionRestraint")))
     return out
 
 

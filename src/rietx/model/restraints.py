@@ -946,9 +946,16 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
     stated — #677's rule).  ``atoms`` restricts the first atom of each pair
     to those indices; every atom is then a second atom, so a pair of two
     listed atoms comes back once per order.  Two atoms of one rigid body are skipped by default **in
-    the same copy of the body** (identity operation, no lattice shift): their
-    distance is the template's, and a row would only fight the body; every
-    other image is a neighbouring molecule and keeps its row.
+    the same copy of the body** (identity operation, no lattice shift); every
+    other image is a neighbouring molecule and keeps its row.  The skip assumes
+    the pair's distance is the template's, which holds for a pair no declared
+    torsion moves.  A torsion turns its ``moves`` about its axis, so two atoms
+    on opposite sides of it change distance, and such a pair is skipped too:
+    **contacts inside the molecule are not checked** (WP-2144, #1507).  A fit
+    that turns a torsion of such a body warns ``RESTRAINT_BODY_CONTACTS_UNCHECKED``
+    (:func:`bodies_with_unchecked_contacts`).  ``exclude_same_body=False``
+    keeps every pair of the body, the bonded ones included, each held to the
+    same intermolecular minimum.
 
     Images: every operation of the second atom's orbit, times a lattice shell
     centred on the image's nearest lattice vector to the first atom and
@@ -1025,6 +1032,46 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
     return rows
 
 
+def bodies_with_unchecked_contacts(phase) -> list[str]:
+    """The rigid bodies whose own contacts no anti-bump row checks (WP-2144).
+
+    A body qualifies when it declares a torsion and no anti-bump row of the
+    phase joins two of its atoms **in its own copy**: the identity operation,
+    and the lattice shift that keeps the image in the same molecule (the
+    builder's skip, :func:`anti_bump_restraints`).  A torsion turns part of
+    the body about a bond, so two of its atoms can fold together, and with
+    ``exclude_same_body=True`` (the default) nothing restrains or reports
+    that pair.  A body without torsions keeps its template distances, and is
+    never named.  Empty when the phase has no anti-bump row.  Names come back
+    in ``Phase.rigid_bodies`` order.
+    """
+    from ..crystallography.structure_factor import compile_phase_sites
+
+    listed = [r for r in phase.restraints if isinstance(r, AntiBumpRestraint)]
+    bodies = [b for b in getattr(phase, "rigid_bodies", []) if b.torsions]
+    if not listed or not bodies:
+        return []
+    index = {a.label: k for k, a in enumerate(phase.atoms)}
+    sites = compile_phase_sites(phase)
+    g = _metric_g(phase.cell.lengths_angles())
+    covered: set[str] = set()
+    for body in bodies:
+        members = {index[label] for label in body.atoms if label in index}
+        for r in listed:
+            if r.atom_i not in members or r.atom_j not in members:
+                continue
+            x_i = _atom_xyz(phase, r.atom_i)
+            rot, tr, n = _resolve_image(sites, r.atom_j, x_i,
+                                        _atom_xyz(phase, r.atom_j),
+                                        r.op_index, r.translation, g)
+            if (np.array_equal(rot, np.eye(3))
+                    and np.allclose(tr - np.round(tr), 0.0)
+                    and np.array_equal(np.asarray(n), -np.round(tr))):
+                covered.add(body.name)
+                break
+    return [b.name for b in bodies if b.name not in covered]
+
+
 #: two contacts of one atom pair are one contact when their distances agree to
 #: this (Å): a symmetry copy of a listed contact is restrained by its row
 _SAME_CONTACT_A = 1e-6
@@ -1097,7 +1144,9 @@ def stale_anti_bump_pairs(phase, *, since=None) -> list[tuple[int, int, float, f
     of the same two atoms whose image sits at the same distance (to
     ``_SAME_CONTACT_A``), so a symmetry copy of a listed contact is not
     named.  A body's own pairs in its own copy are skipped, as the builder
-    skips them.  Empty when the phase has no anti-bump row.
+    skips them, including a pair a declared torsion has folded together
+    (WP-2144): those are never named here.  Empty when the phase has no
+    anti-bump row.
     """
     from ..crystallography.structure_factor import compile_phase_sites
 

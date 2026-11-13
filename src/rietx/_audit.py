@@ -1146,6 +1146,20 @@ ROWS: tuple[Row, ...] = (
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED", "code", tier=1, ambiguity=1, response="warning",
+        responds=("before quoting a coordinate of a body whose torsion turned, read its own "
+                  "contacts in result.geometry.contacts: no row checked them"),
+        evidence=("arithmetic: a fact about the pair list, not a threshold.  The anti-bump "
+                  "builder skips two atoms of one rigid body in the body's own copy "
+                  "(model.restraints.anti_bump_restraints, exclude_same_body=True), and a "
+                  "declared torsion moves such a pair (WP-1808), so nothing restrains or "
+                  "reports it (#1507: a chain folded to 1.498 A under a 3.0 A minimum).  Fires "
+                  "where the phase has an anti-bump row, a declared torsion's angle moved during "
+                  "the run, and no row joins two of the body's atoms in its own copy "
+                  "(model.restraints.bodies_with_unchecked_contacts); moves no value and gates "
+                  "nothing.  Scope as RESTRAINT_PAIRS_STALE: the purposes whose numbers depend "
+                  "on atom coordinates"),
+        scope=("qpa", "structure", "magnetic")),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -5365,6 +5379,11 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: points at the table that lists the body's own contacts and names "
+                  "the two remedies (a row for that pair with a minimum the caller states, or a "
+                  "torsion restraint) and picks neither; it states no minimum (#677's rule)")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
