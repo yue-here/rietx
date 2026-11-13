@@ -2297,9 +2297,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(
         title="A declared peak refined to zero intensity",
         description=(
-            "The area of a declared peak finished on its floor of zero, as the bound "
-            "test reads it (`FLOOR_HIT`). Under `solver=\"trf\"` the stored area can sit "
-            "a hair above zero. A peak reaches the pattern "
+            "The area of a declared peak finished at or below zero, or on its floor of "
+            "zero as the bound test reads it (`FLOOR_HIT`). Under `solver=\"trf\"` the "
+            "stored area can sit a hair above zero. A peak reaches the pattern "
             "only through its area, so at zero area nothing fixes its centre. The centre "
             "and its esd are then not measurements. Either the feature is not in the "
             "specimen or the bounds on the centre do not cover it. Drop the peak or move "

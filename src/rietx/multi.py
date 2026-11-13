@@ -2440,14 +2440,17 @@ class MultiHistogramRefinement:
         # the test's tied half reads these esds.
         # (zip rather than a second ``for h in range(n)``: the meta-tests in
         # tests/test_multi_diagnostics.py find the per-histogram loop by it)
-        per_esds: list[dict[str, float]] = []
+        # The slices are kept for the loop: with a correlation matrix each is
+        # a dense copy, taken once per histogram.
+        per_stderr, per_corr, per_esds = [], [], []
         for h_table, h_theta, cm in zip(mt.tables, thetas,
                                         map(mt.col_map, range(n))):
-            per_esds.append(
-                h_table.stderr_physical(
-                    h_theta, stderr[cm],
-                    corr[np.ix_(cm, cm)] if corr is not None else None)
-                if stderr is not None else {})
+            s_h = stderr[cm] if stderr is not None else None
+            corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
+            per_stderr.append(s_h)
+            per_corr.append(corr_h)
+            per_esds.append(h_table.stderr_physical(h_theta, s_h, corr_h)
+                            if s_h is not None else {})
         # one bound test, three consumers: the rows' at_bound flag, the
         # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
         # declared-peak diagnostics (WP-2141)
@@ -2474,6 +2477,10 @@ class MultiHistogramRefinement:
 
         # per-histogram slices ---------------------------------------------------
         per_values, per_ycalc, per_ybkg = [], [], []
+        # each histogram's FLOOR_HIT paths in its own spelling, closed over
+        # its ties: read by the declared-peak diagnostics in the loop and
+        # histogram 0's by the microstructure block after it
+        per_floors: list[set[str]] = []
         histograms: list[HistogramResult] = []
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
@@ -2490,9 +2497,7 @@ class MultiHistogramRefinement:
             per_ybkg.append(y_bkg)
 
             cm = mt.col_map(h)
-            s_h = stderr[cm] if stderr is not None else None
-            corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
-            esd_h = per_esds[h]
+            s_h, corr_h, esd_h = per_stderr[h], per_corr[h], per_esds[h]
 
             # a Pawley block's intensities are this histogram's free
             # parameters too, as the single fit counts them (``_pawley_n``)
@@ -2624,9 +2629,9 @@ class MultiHistogramRefinement:
             # the single path's own builder (WP-2028 task 7), so a magnetic
             # phase draws its "(magnetic)" row here too (#278)
             ticks, tick_hkl, tick_support = _tick_rows(model, struct, values)
+            per_floors.append(floored_paths(table, _hist_floors(at_bounds, h)))
             diags.extend(_extra_peak_diagnostics(
-                model, values, ticks, table,
-                floors=floored_paths(table, _hist_floors(at_bounds, h))))
+                model, values, ticks, table, floors=per_floors[h]))
             diags.extend(_far_from_data_diagnostics(model, y_calc, y_bkg, stats))
             # the measurement's half only: support=None withholds the ratio,
             # which has no joint definition (DIAGNOSTIC_SCOPES says why)
@@ -2812,7 +2817,7 @@ class MultiHistogramRefinement:
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
                 esds=esd_hist0,
-                floors=floored_paths(mt.tables[0], _hist_floors(at_bounds, 0))),
+                floors=per_floors[0]),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state

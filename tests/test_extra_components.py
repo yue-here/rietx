@@ -2251,15 +2251,35 @@ def test_no_intensity_is_the_bound_tests_floor_and_not_a_distance(
         ["EXTRA_PEAK_NO_INTENSITY"] if fires else [])
 
 
+def _floor_plan() -> PlanSpec:
+    """Scale and background, then the declared area alone, stopped early.
+
+    The area stage stops at ``ftol=1e-5`` with no closing stage after it.
+    Converged at the default 1e-9, TRF lands the area within 1e-19 of zero,
+    inside the ``BOUND_HIT_RTOL`` distance the pre-WP-2141 code used, so a
+    test at the default could not tell the two rules apart.  Stopped here,
+    TRF leaves the area near 2e-5 counts·deg (macOS arm64): far above that
+    distance, and far below the hundredth of an esd (about 0.008) inside
+    which the bound test names a floor.
+    """
+    return PlanSpec(stages=[
+        StageSpec(name="scale_bkg",
+                  turn_on=["phases.*.scale", "instrument.background.*"]),
+        StageSpec(name="area", ftol=1e-5,
+                  turn_on=["instrument.extra_components.0.area"])],
+        closing_window_tol=None)
+
+
 @pytest.mark.parametrize("solver", ["lm", "trf"])
 def test_either_driver_reports_a_declared_peak_on_its_floor(solver):
     """WP-2141 end to end, single fit and its replay.
 
     Only the area is freed.  The peak sits on a LaB6 line the phase already
-    fits, so the fit drives the area to its floor of zero.  Where TRF stops above that floor
-    moves with platform libm, so the test pins the decision.  The code fires
-    exactly where the area is stored at or below zero or ``FLOOR_HIT`` names
-    it, and a replay of the node reads the recorded finding the same way.
+    fits, so the fit drives the area to its floor of zero.  Where TRF stops
+    above that floor moves with platform libm, so the test pins the decision.
+    The code fires exactly where the area is stored at or below zero or
+    ``FLOOR_HIT`` names it, and a replay of the node reads the recorded
+    finding the same way.  ``_floor_plan`` says why its stage stops early.
     """
     from rietx.refine import replay
 
@@ -2268,11 +2288,7 @@ def test_either_driver_reports_a_declared_peak_on_its_floor(solver):
     ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
     ref = rx.Refinement(structure.model_copy(deep=True), ins_fit,
                         solver=solver)
-    result = ref.fit(data, plan=PlanSpec(stages=[
-        StageSpec(name="scale_bkg",
-                  turn_on=["phases.*.scale", "instrument.background.*"]),
-        StageSpec(name="area",
-                  turn_on=["instrument.extra_components.0.area"])]))
+    result = ref.fit(data, plan=_floor_plan())
     OUT.mkdir(exist_ok=True)
     result.plot(OUT / f"wp2141_peak_floor_{solver}_fit.png")
     again = replay(ref.history, ref.history.order[-1], data)
@@ -2296,8 +2312,10 @@ def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
 
     The peak sits on a LaB6 line the phase already fits.  On seed 1 the phase
     takes every count there, so the area goes to its floor.  Seed 2's noise
-    leaves a small excess, which the area fits at a free optimum (0.85 counts·deg against an esd near 0.8 on macOS arm64).  So
-    one histogram fires and the other does not, and each answers for itself.
+    leaves a small excess, which the area fits at a free optimum (0.84
+    counts·deg against an esd near 0.8 on macOS arm64).  So one histogram
+    fires and the other does not, and each answers for itself.
+    ``_floor_plan`` says why its stage stops early.
     """
     structure, ins, data_a, _ = _clean_lab6(seed=1)
     _s, _i, data_b, _ = _clean_lab6(seed=2)
@@ -2306,11 +2324,11 @@ def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
     joint = rx.refine_multi(
         [data_a, data_b], structure.model_copy(deep=True),
         [ins_fit, ins_fit.model_copy(deep=True)], solver=solver,
-        plan=PlanSpec(stages=[
-            StageSpec(name="scale_bkg",
-                      turn_on=["phases.*.scale", "instrument.background.*"]),
-            StageSpec(name="area",
-                      turn_on=["instrument.extra_components.0.area"])]))
+        plan=_floor_plan())
+    OUT.mkdir(exist_ok=True)
+    for h in range(len(joint.histograms)):
+        joint.for_histogram(h).plot(
+            OUT / f"wp2141_peak_floor_{solver}_joint_h{h}.png")
 
     floors = {p for d in joint.diagnostics if d.code == "FLOOR_HIT"
               for p in d.where}
