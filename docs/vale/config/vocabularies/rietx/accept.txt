@@ -13,6 +13,7 @@ Altomare
 [aA]ntiphase
 [aA]ntisite
 [aA]ragonite
+[aA]romaticity
 [aA]symptote
 [aA]ttenuator
 [aA]utodiff
@@ -52,6 +53,7 @@ Caglioti
 [cC]entrosymmetry
 [cC]hangelog
 Chebyshev
+[cC]helate
 [cC]hiral
 [cC]hirality
 CIF
@@ -81,6 +83,7 @@ Cracknell
 [cC]rystallite
 [cC]rystallites
 [cC]rystallographer
+[cC]yclohexane
 Daams
 Dal
 [dD]e
@@ -272,6 +275,7 @@ Prelog
 PtGeSe
 [pP]x
 [pP]ydantic
+[pP]yridine
 [pP]yroelectric
 [pP]ytest
 [qQ]uadratically
