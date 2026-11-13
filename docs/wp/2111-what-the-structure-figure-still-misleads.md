@@ -67,6 +67,13 @@ ranks by `hidden - stacked`. Both are in the triage batch of 2026-11-05.
 **Tier.** A change to `DIM_BOUNDARY` or to the `auto` ranking moves a default, so it is an `_audit`
 row with its evidence. WP-1957's reviewers and the agent round below are that evidence.
 
+### Inherited
+
+- **2026-11-12, from WP-1548 (filed).** WP-1548 adds optional depth cueing (fog toward the
+  background) to both renderers. Fog and the `DIM_BOUNDARY` shade both change the far side's
+  colour, so a reader could not tell them apart. WP-1548 waits on this WP's ruling on the shade
+  (its D6). Whoever brings that ruling to the maintainer should mention that fog is coming.
+
 ## Non-goals
 
 - Any change to the default polyhedra on the 21 measured phases without re-running

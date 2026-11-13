@@ -665,7 +665,9 @@ class GuiSession:
         p = self._need_project()
         source = Path(p.path).resolve()
         target = source.parent / _project_name(_need(body, "name"))
-        if target == source:
+        # the names as strings: Windows compares paths without case, so a
+        # path test calls ``sample.rex`` → ``Sample.rex`` a no-op (WP-2143)
+        if target.name == source.name:
             return self.project_doc()
         self._relocate(target)
         return self.project_doc()

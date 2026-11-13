@@ -39,6 +39,7 @@ from scipy.optimize import least_squares
 from ..backend import get_backend
 from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64, to_host_fp64
+from ..background.models import hump_partials
 from ..crystallography.adp import U_NAMES
 from ..crystallography.lattice import DegenerateCellError
 from ..crystallography.magnetic.moments import (
@@ -1263,7 +1264,7 @@ def fd_step(theta_c: float, typical: float = 1.0) -> float:
     ``FD_STEP · max(typical, |θ_c|)``: relative to the coordinate's size, and
     absolute at ``typical`` near zero (Dennis & Schnabel 1996, *Numerical
     Methods for Unconstrained Optimization and Nonlinear Equations*, SIAM,
-    § 5.4).  Both FD sites call it, so one rule sizes every column, and
+    § 5.4).  Every FD site calls it, so one rule sizes every column, and
     :func:`_fd_typicals` says what ``typical`` is.
     """
     return FD_STEP * max(typical, abs(theta_c))
@@ -2121,6 +2122,50 @@ def _chained_columns(model: CompiledModel, table: ParameterTable,
         J[:n_data, [cols[i] for i in members]] = -sqrt_w[:, None] * (D @ coeffs)
 
 
+def _component_columns(model: CompiledModel, table: ParameterTable,
+                       identities: list[tuple[str, list[str], bool]]
+                       ) -> tuple[list[list[tuple[int, int, int]] | None], set[int]]:
+    """Which columns an extra component's own evaluator can build (WP-2116).
+
+    Two answers per column, both read off the column's whole reach, the free
+    path and every path its ties move:
+
+    * ``hump_reach[c]``: every reached path is a field of some compiled hump.
+      It lists ``(table row, hump index, field index)`` for each, and the
+      column is then the closed form of :func:`hump_partials`.  ``None``
+      otherwise.
+    * ``c in peak_cols``: every reached path is a field of some declared
+      sharp peak, so the column is a forward difference of
+      :meth:`CompiledModel.extra_peak_curve` alone.
+
+    A column reaching anything else keeps the whole-model FD column.  That
+    includes a hump tied to a cell, to the zero shift or to a peak, since no
+    single component's evaluator sees the rest of what such a column moves
+    (root CLAUDE.md, "An analytic Jacobian branch claims what one parameter
+    name reaches").  A third member of ``Instrument.extra_components`` lands
+    in neither set until its own evaluator is written, so it takes the
+    whole-model column too, which is correct and only slow.
+
+    The membership is read from the compiled model, ``component_paths`` for
+    the humps and ``peak_components`` for the peaks, and never from a path's
+    spelling.
+    """
+    hump_index = {p: (k, j) for k, triple in enumerate(model.component_paths)
+                  for j, p in enumerate(triple)}
+    peak_paths = {p for pc in model.peak_components for p in pc.paths.values()}
+    hump_reach: list[list[tuple[int, int, int]] | None] = []
+    peak_cols: set[int] = set()
+    for c, (path, extra, _own) in enumerate(identities):
+        reached = (path, *extra)
+        if all(q in hump_index for q in reached):
+            hump_reach.append([(table._paths[q], *hump_index[q]) for q in reached])
+            continue
+        hump_reach.append(None)
+        if all(q in peak_paths for q in reached):
+            peak_cols.add(c)
+    return hump_reach, peak_cols
+
+
 def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                    moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
@@ -2177,8 +2222,20 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                          for q in (path, *extra)])
                if all(q in bkg_cols for q in (path, *extra)) else None
                for c, (path, extra, _) in enumerate(identities)]
+    # The background coefficients a column moves when it also moves something
+    # else, so the whole-model FD below can write their penalty rows.  Those
+    # rows are linear in the coefficients, so they are written exactly from
+    # the penalty matrix.  The FD writes the data rows alone, and a column
+    # reaching a P-spline coefficient through a tie came back short on its
+    # penalty rows before WP-2116's review found it.
+    bkg_part = [None if bkg_mix[c] is not None or not any(
+                    q in bkg_cols for q in (path, *extra))
+                else np.array([[bkg_cols[q], coef_c[table._paths[q], c]]
+                               for q in (path, *extra) if q in bkg_cols])
+                for c, (path, extra, _) in enumerate(identities)]
 
     typicals = _fd_typicals(table, identities)
+    hump_reach, peak_cols = _component_columns(model, table, identities)
 
     fixed_intens = _lebail_snapshot(model)
     # the origin rows are linear in the coordinates, so their physical
@@ -2197,6 +2254,8 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
         J = np.zeros((n_rows, len(theta)), dtype=np.float64)
         fd_cols = []
         chain_cols: list[int] = []
+        hump_cols: list[int] = []
+        peak_fd_cols: list[int] = []
         bases: DerivativeBases | None = None
         # the aperture node-FD bases feed only the axial columns, so ask for
         # them only in a stage that will build those columns — two FCJ node
@@ -2234,6 +2293,10 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 J[:n_data, c] = -sqrt_w * (w @ model.bkg_design[n])
                 if n_bkg_pen:
                     J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
+            elif hump_reach[c] is not None:
+                hump_cols.append(c)
+            elif c in peak_cols:
+                peak_fd_cols.append(c)
             elif path in axial_paths and own:
                 b = get_bases()
                 if b.axial_ok:
@@ -2285,17 +2348,59 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                              chain_cols, identities, typicals, intens,
                              sqrt_w, J, n_data)
 
+        if hump_cols:
+            # Closed form, from the hump alone (WP-2116).  The column is
+            # Σ_q (∂p_q/∂θ_c)·∂y/∂p_q over the hump rows it reaches, the
+            # coefficient read off the local Jacobian, so a tie between two
+            # humps' widths or a variable driving one is carried exactly.
+            # A hump moves no penalty, Pawley or restraint row, so the rows
+            # below the data stay at their zero initialisation, which is
+            # their true value.
+            # C itself unless a derived row (an expression) sets a hump field,
+            # whose coefficient then moves with θ
+            lj = (coef_c if not table.derived else table.local_jacobian(
+                np.asarray(theta_t, dtype=np.float64)).tocsc())
+            partials: dict[int, tuple[np.ndarray, ...]] = {}
+            for c in hump_cols:
+                col = np.zeros(n_data, dtype=np.float64)
+                for row, k, j in hump_reach[c]:
+                    coef = lj[row, c]
+                    if coef == 0.0:
+                        continue
+                    if k not in partials:
+                        pos, height, fwhm = model.component_paths[k]
+                        partials[k] = hump_partials(
+                            model.tt, values[pos], values[height], values[fwhm])
+                    col += coef * partials[k][j]
+                J[:n_data, c] = -sqrt_w * col
+
+        if peak_fd_cols:
+            # A declared sharp peak's columns, differenced on the peak curve
+            # alone (WP-2116).  The Bragg sum does not read a peak path, so
+            # this is the whole-model forward difference with the Bragg term
+            # cancelled before it is computed: the same step, the same column
+            # to rounding, and no Bragg evaluation.
+            y0 = model.extra_peak_curve(values)
+            for c in peak_fd_cols:
+                h = fd_step(theta_t[c], typicals[c])
+                tp = theta_t.copy()
+                tp[c] += h
+                yp = model.extra_peak_curve(table.decode(tp))
+                J[:n_data, c] = -sqrt_w * ((yp - y0) / h)
+
         if fd_cols:
-            # The declared fallback.  A background-peak parameter lands here by
-            # design, not by omission: ``scalar_chain_supported`` names the
-            # prefix and returns False, so the reach gate knows the path is
-            # outside every analytic branch instead of discovering it (the
-            # column-comes-back-**short** failure mode of WP-1070).  Writing
-            # only ``[:n_data]`` is exact for it — a peak parameter moves no
-            # penalty, Pawley or restraint row at all, so the rows left at their
-            # zero initialisation are the rows whose true value is zero.  Three
-            # parameters per hump means three residual evaluations per Jacobian,
-            # which is why analytic columns for them are not worth writing.
+            # The declared fallback, for every column no branch above claims:
+            # an unrecognised path, a column whose tie reaches past its
+            # branch, an aperture column off its smooth side.  The difference
+            # covers the data rows.  A background coefficient in the reach
+            # adds its penalty rows, exactly, from ``bkg_part``.  The restraint
+            # and origin rows are written below for every column, and no
+            # table column moves a Pawley row.  Each column costs one whole-model
+            # evaluation, every Bragg window included, plus ``r0``.  That cost
+            # is why the extra components left this loop (WP-2116): on
+            # acridine form IX at the closing windows, a free hump's three
+            # columns and ``r0`` were 49 % of the Jacobian and 24 % of the
+            # fit (issue #1418).
             r0 = sqrt_w * (model.y_obs - model.evaluate(values, intens))
             for c in fd_cols:
                 h = fd_step(theta_t[c], typicals[c])
@@ -2303,6 +2408,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 tp[c] += h
                 rp = sqrt_w * (model.y_obs - model.evaluate(table.decode(tp), intens))
                 J[:n_data, c] = (rp - r0) / h
+                if n_bkg_pen and bkg_part[c] is not None:
+                    n, w = bkg_part[c][:, 0].astype(np.intp), bkg_part[c][:, 1]
+                    J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
 
         if model.pawley is not None:
             _pawley_intensity_columns(model, get_bases(), values, sqrt_w, J,
