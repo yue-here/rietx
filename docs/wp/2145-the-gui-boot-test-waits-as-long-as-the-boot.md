@@ -82,7 +82,7 @@ deadline is read from `GUI_BOOT_TIMEOUT`.
 
 ## Handover log
 
-- **2026-11-13** — filed by the close-only bookkeeping batch of 2026-11-13 (PR #PRNUM). No open
+- **2026-11-13** — filed by the close-only bookkeeping batch of 2026-11-13 (PR #1563). No open
   WP owns it. The open WPs that mention flaky or browser tests are WP-1343 (a magnetic width),
   WP-2019 (which tests each CI leg runs) and WP-2216 (the refinement window), and none covers a
   test's client deadline. The shift reported this as a browser-test start-up timeout; the
