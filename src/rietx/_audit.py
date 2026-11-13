@@ -2480,8 +2480,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783), "
                   "set B: every line at or above 5 % of the strongest, offered to each "
                   "program as a second attempt; Table 5, four programs x two entries x two "
-                  "modes, 5 better, 1 worse, 10 unchanged.  WP-2078: the trace-oxide fixture's "
-                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it."),
+                  "modes, 5 better, 1 worse, 10 unchanged; the manual runs also tolerated "
+                  "8-10 unindexed lines, so the gain is not the floor's alone, and McMaille's "
+                  "default run lost its answer under it.  WP-2078: the trace-oxide fixture's "
+                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it; "
+                  "5 % keeps 5 of its host's 6 lines, the least margin of the four."),
 ),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
@@ -5321,10 +5324,11 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
-    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
+    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
         evidence=("arithmetic: names the set-aside lines and asks whether the leading cell "
-                  "predicts them, which separates a second phase from a supercell's own lines "
-                  "without ranking either, and names the argument that forbids the retry")),
+                  "predicts them, lists the three readings of a line it does not predict "
+                  "(second phase, picker artefact, a supercell's ordering line) without "
+                  "ranking them, and names the argument that forbids the retry")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

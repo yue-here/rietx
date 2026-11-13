@@ -3255,8 +3255,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the candidates are its own, ranked and scored on the kept lines only. "
             "Otherwise they are the full list's. A trace second phase, or a peak the "
             "picker split, adds weak lines the host's cell cannot index. Check the "
-            "set-aside lines against the leading candidate's predicted positions. Lines "
-            "it does not predict are a second phase or the picker's artefacts. Declaring "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
             "`n_unindexed` forbids both retries."
         ),
     ),
