@@ -209,10 +209,12 @@ def test_the_planted_lines_survive_the_floors():
 
 @pytest.mark.xdist_group("weak-lines-a")
 def test_a_floor_removes_nothing_from_a_position_only_list():
-    """``from_positions`` gives every line weight 1, so no floor bites."""
+    """``from_positions`` gives every line weight 1, so no floor bites, the
+    weak-line retry's included: such a list never sets a line aside."""
     fx = _fixture("a")
     flat = PeakList.from_positions(fx.peaks.two_theta(), fx.peaks.wavelength)
     assert len(W.floored(flat, 0.02).usable()) == len(flat.usable())
+    assert len(weak_line_floor(flat).usable()) == len(flat.usable())
 
 
 # ----------------------------------------------------------------------------
@@ -264,14 +266,6 @@ def test_a_trace_second_phase_leaves_the_truth_first():
     n_set_aside = len(fx.peaks.usable()) - len(weak_line_floor(fx.peaks).usable())
     assert f"its {n_set_aside} line(s)" in retry[0].message
     assert res.n_usable_lines == len(weak_line_floor(fx.peaks).usable())
-
-
-def test_the_retry_sets_no_line_aside_on_a_position_only_list():
-    """A list whose lines carry one intensity loses nothing under the floor,
-    so the retry never runs and such a list searches exactly as before."""
-    fx = _fixture("a")
-    flat = PeakList.from_positions(fx.peaks.two_theta(), fx.peaks.wavelength)
-    assert len(weak_line_floor(flat).usable()) == len(flat.usable())
 
 
 @pytest.mark.xdist_group("weak-lines-b")

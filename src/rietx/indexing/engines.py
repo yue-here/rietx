@@ -1361,18 +1361,20 @@ def inlier_retry_diagnostic(n_first: int) -> Diagnostic:
 
 def weak_line_floor(peaks: PeakList,
                     fraction: float = WEAK_LINE_RETRY_FLOOR) -> PeakList:
-    """``peaks`` cut to its usable lines at or above ``fraction`` of the
-    strongest usable line's intensity: the list the weak-line retry searches
-    (:data:`WEAK_LINE_RETRY_FLOOR`).  On a position-only list, where every line
-    carries one intensity, it removes nothing."""
+    """``peaks`` without its usable lines under ``fraction`` of the strongest
+    usable line's intensity: the list the weak-line retry searches
+    (:data:`WEAK_LINE_RETRY_FLOOR`).  Lines already flagged unusable stay, as
+    they do on every list, so the quality report still counts them, and so do
+    the list's own records (``instrument_undeclared``, ``diagnostics``).  On a
+    position-only list, where every line carries one intensity, it removes
+    nothing."""
     usable = peaks.usable()
     if not usable:
         return peaks
     top = max(p.intensity for p in usable)
-    keep = [p for p in usable if p.intensity >= fraction * top]
-    return PeakList(peaks=keep, wavelength=peaks.wavelength,
-                    two_theta_min=peaks.two_theta_min,
-                    two_theta_max=peaks.two_theta_max, source=peaks.source)
+    keep = [p for p in peaks.peaks
+            if not p.usable or p.intensity >= fraction * top]
+    return peaks.model_copy(update={"peaks": keep})
 
 
 def weak_line_retry_diagnostic(set_aside: Sequence[float], n_kept: int,
@@ -1399,7 +1401,7 @@ def weak_line_retry_diagnostic(set_aside: Sequence[float], n_kept: int,
                       "and a supercell would predict some of them; declare "
                       "n_unindexed to forbid the retry")
     else:
-        why = ("which the clock stopped before it found agreement" if stopped
+        why = ("which was stopped before it found agreement" if stopped
                else "which found no agreement either")
         message = (head + f", {why}, so the candidates are the full list's "
                    f"(set-aside 2θ {shown})")

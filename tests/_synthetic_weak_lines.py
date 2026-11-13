@@ -117,8 +117,9 @@ def floored(peaks: PeakList, fraction: float) -> PeakList:
     """``peaks`` cut to its usable lines at or above ``fraction`` of the strongest.
 
     Issue #1291's treatment, as a list: every usable line whose intensity is at
-    least ``fraction`` × the strongest usable line's, and nothing else.  On a
-    position-only list (one intensity everywhere) it removes nothing.
+    least ``fraction`` × the strongest usable line's, and nothing else usable
+    (flagged lines stay, unusable as before).  On a position-only list (one
+    intensity everywhere) it removes nothing.
     """
     return weak_line_floor(peaks, fraction)
 

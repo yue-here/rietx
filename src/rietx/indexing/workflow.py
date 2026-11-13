@@ -836,7 +836,6 @@ def index_pattern(peaks: PeakList | None = None, *,
         INLIERS,
         SEARCH_PRESETS,
         SYSTEM_ORDER,
-        WEAK_LINE_RETRY_FLOOR,
         Deadline,
         Progress,
         SearchSpec,
@@ -1072,7 +1071,27 @@ def index_pattern(peaks: PeakList | None = None, *,
         return results, spec
 
     results, spec = search(spec, peaks, quality, pattern_screen, ordered_systems)
+    trial = next((r for r in results if r.engine == "trial_error"), None)
+    if (trial is not None and not trial.candidates and trial.systems_searched
+            and not (search_cancel is not None and bool(search_cancel))):
+        # the deferred probe: once, over the systems the engine entered, and
+        # on the full list, before the weak-line retry can spend the clock
+        # it runs on (an adopted retry discards this result with its list);
+        # only when the whole harvest is empty — a cancelled run's silence is
+        # explained by the token, not by an index table.  Search phase, so it
+        # runs against the search's own deadline, not the reserve
+        from .trial_error import dominant_zone_probe
+
+        t0 = time.monotonic()
+        hit = dominant_zone_probe(peaks, systems=trial.systems_searched,
+                                  spec=spec, quality=quality,
+                                  cancel=search_cancel, progress=progress)
+        trial.stats["probe.seconds"] = round(time.monotonic() - t0, 3)
+        if hit is not None:
+            trial.diagnostics.append(hit)
+
     retry_diagnostics: list = []
+    retry_unadopted = False
     if (spec_caller.n_unindexed is None and _no_agreement(results)
             and not (search_cancel is not None and bool(search_cancel))):
         # the weak-line retry (WP-2078, ruled 2026-11-13): a run that still
@@ -1084,11 +1103,9 @@ def index_pattern(peaks: PeakList | None = None, *,
         # list's answer stands unless that search finds agreement.  Never
         # before every search: no floor separates a trace phase's lines from
         # a superlattice's own, and the floor regrades SRM 660c
-        usable = peaks.usable()
-        i_max = max((p.intensity for p in usable), default=0.0)
-        set_aside = [p.two_theta for p in usable
-                     if p.intensity < WEAK_LINE_RETRY_FLOOR * i_max]
         kept = weak_line_floor(peaks)
+        kept_ids = {id(p) for p in kept.usable()}
+        set_aside = [p.two_theta for p in peaks.usable() if id(p) not in kept_ids]
         kept_quality = (assess_peak_list(kept, shift_from_pairs=shift_from_pairs,
                                          pair_seed=spec_caller.seed,
                                          instrument=instrument)
@@ -1107,6 +1124,7 @@ def index_pattern(peaks: PeakList | None = None, *,
             kept_results, kept_spec = search(kept_spec, kept, kept_quality,
                                              kept_screen, kept_systems)
             adopted = bool(kept_results) and not _no_agreement(kept_results)
+            retry_unadopted = not adopted
             if adopted:
                 results, spec, peaks, quality = (kept_results, kept_spec, kept,
                                                  kept_quality)
@@ -1114,23 +1132,6 @@ def index_pattern(peaks: PeakList | None = None, *,
             retry_diagnostics.append(weak_line_retry_diagnostic(
                 set_aside, len(kept.usable()), adopted,
                 stopped=search_cancel is not None and bool(search_cancel)))
-    trial = next((r for r in results if r.engine == "trial_error"), None)
-    if (trial is not None and not trial.candidates and trial.systems_searched
-            and not (search_cancel is not None and bool(search_cancel))):
-        # the deferred probe: once, over the systems the engine entered, and
-        # only when the whole harvest is empty — a cancelled run's silence is
-        # explained by the token, not by an index table.  Search phase, so it
-        # runs against the search's own deadline, not the reserve
-        from .trial_error import dominant_zone_probe
-
-        t0 = time.monotonic()
-        hit = dominant_zone_probe(peaks, systems=trial.systems_searched,
-                                  spec=spec, quality=quality,
-                                  cancel=search_cancel, progress=progress)
-        trial.stats["probe.seconds"] = round(time.monotonic() - t0, 3)
-        if hit is not None:
-            trial.diagnostics.append(hit)
-
     prior_cands, prior_reports = [], []
     if spec.prior_cells or spec.prior_spacegroups:
         # the stated cells, checked the engines' own way — what survives
@@ -1210,9 +1211,12 @@ def index_pattern(peaks: PeakList | None = None, *,
 
     # the reserve boundary is part of the ceiling's scheduling: a search it
     # stopped is a budget statement exactly as the ceiling itself is
+    # (a weak-line retry the run did not adopt reached the search's stop on
+    # its own list: the search it reports had finished, and the retry's
+    # diagnostic says the retry was stopped)
     search_expired = (search_cancel is not None
                       and search_cancel is not run_cancel
-                      and bool(search_cancel))
+                      and bool(search_cancel) and not retry_unadopted)
     if deadline is not None and not deadline.cancelled_by_user() \
             and (deadline.expired() or search_expired):
         requested = ordered_systems
@@ -1297,7 +1301,12 @@ def _spec_notes(spec, names: Sequence[str], quality,
     chairs handing identical controls to this run produce identical notes,
     which is what the WP's acceptance asserts.
     """
-    from .engines import ANCHOR_LINES, DEFAULT_N_UNINDEXED, INLIER_FRACTION
+    from .engines import (
+        ANCHOR_LINES,
+        DEFAULT_N_UNINDEXED,
+        INLIER_FRACTION,
+        WEAK_LINE_RETRY_FLOOR,
+    )
 
     optional = {
         "max_volume": None if spec.max_volume is None else (
@@ -1324,7 +1333,8 @@ def _spec_notes(spec, names: Sequence[str], quality,
         "d_axis_range_A": f"{spec.min_d_axis:g}-{spec.max_d_axis:g}",
         "min_volume": f"{spec.min_volume:g}",
         "n_unindexed": (
-            f"{DEFAULT_N_UNINDEXED}, then inliers if no two engines agree"
+            f"{DEFAULT_N_UNINDEXED}, then inliers if no two engines agree, "
+            f"then the lines >= {WEAK_LINE_RETRY_FLOOR:g}·I_max if still none"
             if spec.n_unindexed is None
             else f"inliers >= {INLIER_FRACTION:g}·N and the {ANCHOR_LINES} "
                  f"strongest ({DEFAULT_N_UNINDEXED} on a list of one "
