@@ -162,6 +162,7 @@
   "diagnostics:LAUE_CLASS_NOT_SEPARABLE",
   "diagnostics:LEBAIL_ALTERNATION_STOPPED",
   "diagnostics:LEBAIL_CYCLES_AT_CAP",
+  "diagnostics:LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
   "diagnostics:LOW_ANGLE_UNMODELLED",
   "diagnostics:MAGNETIC_ION_ASSUMED",
   "diagnostics:MAGNETIC_SUBGROUP_PREFERRED",

@@ -3295,6 +3295,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Raise `lebail_cycles` on the stage."
         ),
     ),
+    "LOW_ANGLE_ASYMMETRY_UNCALIBRATED": HelpEntry(
+        title="The lowest lines are magnetic, so nothing checks the asymmetry",
+        description=(
+            "Every line the data sees below some angle is magnetic-only. The axial "
+            "asymmetry of a constant-wavelength pattern is largest at low angle, and a "
+            "magnetic line's shape also carries the moment's form factor and any "
+            "magnetic broadening, so no nuclear line in this sample says how much "
+            "asymmetry the instrument has there. An asymmetry refined against those "
+            "lines, or left at a value that misses them, moves the moment without "
+            "saying so. The finding lists each such line's centroid shift (observed "
+            "minus drawn, with its counting-noise esd), the shift at the first line "
+            "that is not magnetic-only, and what a cot 2theta shape through the "
+            "magnetic lines predicts there. `value` is the lowest line's shift in "
+            "degrees. It decides nothing: one tied asymmetry refined on such a "
+            "pattern has matched the lowest line on one sample and drawn a tail the "
+            "line lacks on another."
+        ),
+    ),
     "LOW_ANGLE_UNMODELLED": HelpEntry(
         title="Unexplained signal below the first reflection",
         description=(

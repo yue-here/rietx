@@ -868,6 +868,22 @@ ROWS: tuple[Row, ...] = (
         responds=("raise lebail_cycles on the stage until StageResult.lebail_settled reads True, "
                   "and read the intensities and widths as unsettled until then"),
         scope=("all",)),
+    Row("LOW_ANGLE_ASYMMETRY_UNCALIBRATED", "code", tier=1, ambiguity=3,
+        evidence=("geometry and arithmetic, reported only (WP-2056): fires exactly when a "
+                  "magnetic-only line the data sees (MAGNETIC_WIDTH_PURITY's cut, seen at "
+                  "MIN_COEF_SIGNIFICANCE) lies below the lowest seen nuclear-only line; "
+                  "quotes each such line's centroid shift by linear least squares on its "
+                  "own position derivative and profile with the counting-noise esd, and a one-term "
+                  "cot 2theta shape through them; no threshold on any number. Ba2FeSbSe5 "
+                  "G4.1 1.5 K: -51.3(2.2) mdeg at 9.38 deg, the nuclear line at 21.67 deg "
+                  "-5.1(2.1); LaMnO3 BT-1 50 K: +19.6(1.8) mdeg at 11.53 deg"),
+        grounds=("Rule 1's third kind: a number with its meaning. The same geometry needs "
+                 "opposite treatment on the two measured samples (issue #1090), so the "
+                 "finding decides nothing."),
+        response="info",
+        responds=("note that the asymmetry at low angle rests on magnetic lines alone, and "
+                  "decide its value from a standard or from the lowest line's shape before "
+                  "quoting the moment")),
     Row("LOW_ANGLE_UNMODELLED", "code"),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
@@ -3846,6 +3862,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
+    Row("rietx.report.magnetic._SHIFT_STEP_FWHM", "constant", tier=1, value=0.0001,
+        evidence=("arithmetic: the central-difference step for a line's position derivative "
+                  "(WP-2056), 1e-4 of its FWHM, so the O(h^2) truncation is ~1e-8 of the "
+                  "derivative and round-off stays far below the counting noise; the shift "
+                  "it feeds is reported and moves no fitted value")),
     Row("rietx.report.satellites._FWHM_FALLBACK_DEG", "constant", value=0.2),
     Row("rietx.report.schemas.BACKGROUND_ABSORPTION_NOTABLE", "constant", value=0.25),
     Row("rietx.report.schemas.COLLECT_DATA_CONFIDENCE", "constant", value=0.5),
@@ -5297,6 +5318,14 @@ ROWS: tuple[Row, ...] = (
     Row("LEBAIL_ALTERNATION_STOPPED.suggestion", "suggestion", value=1),
     Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the stage setting that lifts the cap"),
+    Row("LOW_ANGLE_ASYMMETRY_UNCALIBRATED.suggestion", "suggestion", tier=2, ambiguity=3,
+        value=1,
+        evidence=("an instrument's asymmetry taken from a standard's calibration (same "
+                  "container and fill, since S/L carries the specimen's axial length) is the "
+                  "instrument-parameter workflow GSAS-II (.instprm) and FullProf (the "
+                  "resolution file) run, and rietx's own lab_calibrate -> "
+                  "load_instrument_profile; the second sentence names the check, with no "
+                  "tolerance (WP-2056 ships the agreement test as a skill recipe)")),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence="arithmetic: names the argument that overrides the default"),

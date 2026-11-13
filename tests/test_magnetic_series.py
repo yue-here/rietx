@@ -1614,3 +1614,31 @@ def test_ba2fesbse5_ramp_the_moment_grows_below_the_onset_both_ways(
     # the published value bounds the 1.5 K modulus; it does not validate it
     assert row.supported is True and row.magnitude_esd < 0.15
     assert abs(row.magnitude - BA_PUBLISHED_MU_B) <= 0.5, row.magnitude
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-ba2fesbse5")
+def test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds(
+        ba2fesbse5_ramp):
+    """WP-2056 acceptance: the systematic the protocol comment above names
+    (about -50 mdeg at the 9.35 deg magnetic line, asymmetry held at 0) is
+    stated by the report itself, with its size, as not checkable by any
+    nuclear line of this sample.  Measured 2026-11-09 on the single 1.5 K fit:
+    -51.3(2.2) mdeg at 9.38 deg, three magnetic-only lines below the first
+    nuclear one at 21.67 deg.  Above T_N the moment is held and the magnetic
+    lines carry nothing the data sees, so the lowest seen line is nuclear and
+    the finding is silent: the geometry, not the protocol, fires it.
+    """
+    series = ba2fesbse5_ramp["series"]
+    (d,) = [d for d in series.entries[0].diagnostics
+            if d.code == "LOW_ANGLE_ASYMMETRY_UNCALIBRATED"]
+    assert d.level == "info"
+    assert -0.060 < d.value < -0.035, d.value
+    assert "lies below 21.67 deg, where 3 magnetic-only lines of phase 0 do" in d.message
+    assert "at 9.38 deg (1 0 1)/(1 0 0)" in d.message
+    assert "not determinable from this sample's nuclear lines" in d.message
+    assert "held at 0" in d.message
+    for entry, t in zip(series.entries, BA_TEMPS, strict=True):
+        if t >= 100.0:
+            assert "LOW_ANGLE_ASYMMETRY_UNCALIBRATED" not in {
+                x.code for x in entry.diagnostics}, t
