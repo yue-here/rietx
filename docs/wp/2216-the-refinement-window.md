@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-12 — #1535, #1536 and #1537 merged; the polish PR open (#1538)
+Milestone: gui-overhaul · Status: 🔄 2026-11-13 — #1535, #1536 and #1537 merged; the polish PR open (#1538), the 2026-11-13 rulings applied
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -155,10 +155,30 @@ The first PR's three questions, answered on 2026-11-11.
     reads Background); "2 findings" in the status bar (the first PR's consent list). Real data
     stays: "20 free of 81", no Extinction row, the project name `fap`. No empty User variables
     band is drawn, since `fap` has none and adding one is a feature.
-  - *A rule to reconcile*: `gui/CLAUDE.md` (WP-1032) puts a tick in "its own band between
+  - *A rule reconciled*: `gui/CLAUDE.md` (WP-1032) put a tick in "its own band between
     pattern and residual", which describes today's page. `gui/STYLE.md` § Plots and the
-    prototype put the ticks at the foot. The polish follows STYLE.md at `/next`; the swap
-    rewrites the gui/CLAUDE.md clause.
+    prototype put the ticks at the foot. The polish follows STYLE.md at `/next`. Since the
+    2026-11-13 rulings the gui/CLAUDE.md clause says the band sits at the foot, with today's
+    page keeping the old place until the swap.
+
+- **The polish's three questions and the tick band, ruled by Yue 2026-11-13** (answering
+  § Questions 2 in the session before that day's shift):
+  - The atom table's Mult column goes. The Wyckoff symbol already carries the multiplicity,
+    and without the column the table fits its panel: 784 px wide in a 784 px panel at a
+    1440 px window, measured in chromium, where it was 800 px with Mult.
+  - Excluded regions, and the range outside the fitted range, show as shaded regions on the
+    plot. Yue gave the reason: the faint crosses alone are near impossible to tell apart under
+    a model curve. `/next` already drew that shading through `lib/plot.ts:maskShapes`. The
+    `fap` example's only excluded region is 130-130.04° 2θ, so the earlier pictures could not
+    show it. The `ruled-*` pictures set a range and a region to show it.
+  - The legend's "Excluded" entry goes. Yue had no strong feelings, and the lead settled it:
+    the shading marks the excluded points (`gui/STYLE.md` interaction rule 4). Settled by
+    Claude under the same rule: the excluded points stay drawn in their faint crosses, and the
+    Observed switch now shows and hides them with the rest of the data.
+  - GoF stays on the title line, after Rwp.
+  - The tick band sits at the foot (`gui/STYLE.md` § Plots, the prototype), and the
+    gui/CLAUDE.md clause is rewritten to say so. This went to Yue as a consent line, and Yue
+    did not object.
 
 ## Questions
 
@@ -175,6 +195,9 @@ Filled in by the session that builds each PR.
    - The legend's "Excluded" entry, for the observed points outside the fitted range.
    - GoF on the graph's title line, after Rwp.
 
+   Answered 2026-11-13: drop Mult, shade the excluded regions and drop the legend entry, keep
+   GoF (§ Rulings, "The polish's three questions").
+
 ## References
 
 - [WP-2214](2214-the-gui-rebuild-plan-and-inventory.md), the plan and the inventory;
@@ -182,6 +205,20 @@ Filled in by the session that builds each PR.
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-13** — a ghostshift runner applied Yue's 2026-11-13 rulings to the polish PR,
+  #1538, after merging `origin/main` into it.
+  - *Done*: `gui/src/next/Params.svelte` drops the Mult column. `gui/src/next/Pattern.svelte`
+    leaves "masked" out of the legend and hides the excluded points while Observed is hidden;
+    `CURVE_WORDS` loses "Excluded". The gui/CLAUDE.md tick clause is rewritten. Pictures:
+    `docs/wp/2216-screenshots/ruled-*.png`, listed in that directory's README.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): the atom
+    table is 784 px in a 784 px panel at a 1440 px window, with no sideways scroll. A real
+    click on Observed hid the excluded points and left the shading. The gate counts are in
+    the PR body.
+  - *Not generalised*: today's page keeps its "masked" toggle and its Mult column until the
+    swap retires it.
+  - *Next*: Yue's glance at the `ruled-*` shading, then the merge.
 
 - **2026-11-12** — a ghostshift runner built the polish PR, #1538, under the ruling "Merge,
   then polish" (§ Rulings).

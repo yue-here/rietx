@@ -58,7 +58,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-12 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-13 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -521,7 +521,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 🔄 2026-11-11 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-12 | P2 | [2215](2215-the-frame.md) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-13 | P2 | [2215](2215-the-frame.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 

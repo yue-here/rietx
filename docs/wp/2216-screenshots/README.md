@@ -75,3 +75,16 @@ picture taken before the polish. The `fap` example after one staged fit:
   difference.
 
 Taken 2026-11-12 the same way, by `shots.py` in the runner's scratch directory.
+
+The pictures after Yue's rulings of 2026-11-13 (`ruled-*`). The `fap` example with a fitted range
+of 20-120° 2θ and excluded regions at 50-56° and from 130°, after one staged fit:
+
+- `ruled-rest-*.png` pairs with `polish-rest-*.png`. The excluded region and the two stretches
+  outside the fitted range are shaded across all three panes, each edge a dotted line. The
+  legend reads Observed, Last fit and Background, with no Excluded entry. The atom table has
+  no Mult column and fits its 784 px panel.
+- `ruled-observed-hidden-light.png`: the plot after a click on Observed in the legend. The
+  excluded points go with the rest of the data, and the shading stays.
+
+Taken 2026-11-13 the same way, by `shots.py` and `probe_obs.py` in the runner's scratch
+directory.
