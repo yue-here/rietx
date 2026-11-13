@@ -143,7 +143,7 @@ stage included.
 
 ## Handover log
 
-- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #PRNUM), a
+- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #1563), a
   repair. PR #1520 merged on 2026-11-11 with every task ticked, and four `WP-2208:` commits of
   that day never reached this log. A plan stage can now fix parameters as well as free them, in
   python, in the `.rxt` document and on the Plan tab, and a file that uses it does not open in
