@@ -171,6 +171,7 @@ Uiso
 Abramowitz
 Altomare
 Avrami
+Bergmann
 Borda
 Brentano
 Brindley

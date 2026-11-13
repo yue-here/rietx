@@ -23,6 +23,7 @@ Avrami
 [bB]eamline
 [bB]eamstop
 [bB]eamtime
+Bergmann
 [bB]ijection
 [bB]intype
 [bB]intypes
