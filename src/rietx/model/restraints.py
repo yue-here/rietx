@@ -925,6 +925,19 @@ def summarise_restraints(compiled: CompiledRestraints | None, values: dict,
 # ----------------------------------------------------------------------
 # building an anti-bump pair list (WP-1809)
 # ----------------------------------------------------------------------
+def _is_own_copy(rot, tr, n) -> bool:
+    """Whether the image R·x + t + n of an atom is the atom's own copy.
+
+    The identity operation (a pure lattice translation in ``t`` counts) and
+    the shift ``n`` that undoes it, so two atoms of one rigid body measured
+    this way sit in the same molecule.  The builder's same-body skip and
+    :func:`body_own_rows` both read it.
+    """
+    return bool(np.array_equal(rot, np.eye(3))
+                and np.allclose(tr - np.round(tr), 0.0)
+                and np.array_equal(np.asarray(n), -np.round(tr)))
+
+
 def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
                          weight: float = 1.0, margin: float = 0.5,
                          atoms=None, exclude_same_body: bool = True) -> list:
@@ -946,9 +959,18 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
     stated — #677's rule).  ``atoms`` restricts the first atom of each pair
     to those indices; every atom is then a second atom, so a pair of two
     listed atoms comes back once per order.  Two atoms of one rigid body are skipped by default **in
-    the same copy of the body** (identity operation, no lattice shift): their
-    distance is the template's, and a row would only fight the body; every
-    other image is a neighbouring molecule and keeps its row.
+    the same copy of the body** (identity operation, no lattice shift); every
+    other image is a neighbouring molecule and keeps its row.  The skip assumes
+    the pair's distance is the template's, which holds for a pair no declared
+    torsion moves.  A torsion turns its ``moves`` about its axis, so two atoms
+    on opposite sides of it change distance, and such a pair is skipped too:
+    **contacts inside the molecule are not checked** (WP-2144, #1507).  A fit
+    that turns a torsion of such a body warns ``RESTRAINT_BODY_CONTACTS_UNCHECKED``
+    (:func:`body_own_rows`).  ``exclude_same_body=False``
+    lists the body's own pairs like any other, the bonded ones included, each
+    held to the same intermolecular minimum; as for every pair, only those
+    inside the minimum plus ``margin`` at the present coordinates get a row,
+    and :func:`stale_anti_bump_pairs` still skips the body's own pairs.
 
     Images: every operation of the second atom's orbit, times a lattice shell
     centred on the image's nearest lattice vector to the first atom and
@@ -996,8 +1018,6 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
             for mi in range(len(ops_r)):
                 rot, tr = np.asarray(ops_r[mi]), np.asarray(ops_t[mi])
                 img = rot @ x_j + tr
-                identity = (np.array_equal(rot, np.eye(3))
-                            and np.allclose(tr - np.round(tr), 0.0))
                 # the shell is centred on the image's nearest lattice vector, so
                 # the list does not depend on which cell a coordinate is stored
                 # in (a body placed about any origin, a free atom anywhere)
@@ -1012,8 +1032,7 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
                 d2 = np.einsum("ki,ij,kj->k", dx, g, dx)
                 hit = (d2 >= _COINCIDENT_D2) & (np.sqrt(d2) < r0 + margin)
                 for n in shifts[hit]:
-                    if (same_body and identity
-                            and np.array_equal(n, -np.round(tr))):
+                    if same_body and _is_own_copy(rot, tr, n):
                         # the body's own copy: its geometry is the
                         # template's; every other image is another
                         # molecule and is kept
@@ -1023,6 +1042,44 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
                         sigma=sigma, weight=weight, op_index=mi,
                         translation=tuple(int(v) for v in n)))
     return rows
+
+
+def body_own_rows(phase) -> dict[str, int]:
+    """Per rigid body with a torsion, its anti-bump rows inside one copy (WP-2144).
+
+    A row is inside the body's own copy when both atoms are the body's and the
+    image is the identity operation with the lattice shift that keeps it in
+    the same molecule (:func:`_is_own_copy`, the builder's skip).  Under
+    ``exclude_same_body=True`` (the default) the count is 0.  Whatever the
+    count, :func:`stale_anti_bump_pairs` skips the body's own pairs, so a pair
+    a torsion folds and no row holds is never reported: that is why a body is
+    listed with any count.  A body without torsions keeps its template
+    distances and is left out.  Empty when the phase has no anti-bump row.
+    Keys come in ``Phase.rigid_bodies`` order.
+    """
+    from ..crystallography.structure_factor import compile_phase_sites
+
+    listed = [r for r in phase.restraints if isinstance(r, AntiBumpRestraint)]
+    bodies = [b for b in getattr(phase, "rigid_bodies", []) if b.torsions]
+    if not listed or not bodies:
+        return {}
+    index = {a.label: k for k, a in enumerate(phase.atoms)}
+    sites = compile_phase_sites(phase)
+    g = _metric_g(phase.cell.lengths_angles())
+    out: dict[str, int] = {}
+    for body in bodies:
+        members = {index[label] for label in body.atoms if label in index}
+        count = 0
+        for r in listed:
+            if r.atom_i not in members or r.atom_j not in members:
+                continue
+            x_i = _atom_xyz(phase, r.atom_i)
+            rot, tr, n = _resolve_image(sites, r.atom_j, x_i,
+                                        _atom_xyz(phase, r.atom_j),
+                                        r.op_index, r.translation, g)
+            count += _is_own_copy(rot, tr, n)
+        out[body.name] = count
+    return out
 
 
 #: two contacts of one atom pair are one contact when their distances agree to
@@ -1097,7 +1154,9 @@ def stale_anti_bump_pairs(phase, *, since=None) -> list[tuple[int, int, float, f
     of the same two atoms whose image sits at the same distance (to
     ``_SAME_CONTACT_A``), so a symmetry copy of a listed contact is not
     named.  A body's own pairs in its own copy are skipped, as the builder
-    skips them.  Empty when the phase has no anti-bump row.
+    skips them, including a pair a declared torsion has folded together
+    (WP-2144): those are never named here.  Empty when the phase has no
+    anti-bump row.
     """
     from ..crystallography.structure_factor import compile_phase_sites
 

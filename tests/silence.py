@@ -813,6 +813,26 @@ def _stale_structure(*, drift: bool):
     return Structure(phases=[ph]), [start]
 
 
+def _body_unchecked_fires() -> list:
+    """A chain body whose two torsions folded N1 onto O6 (1.50 A under a
+    3.0 A minimum) while the anti-bump list held no row inside the body."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    return _body_contacts_unchecked_diagnostics(*_chain_run(-120.0, -120.0))
+
+
+def _body_unchecked_silent() -> list:
+    """The same chain with its torsions where they started, and the folded
+    chain in a phase the run did not search (no anti-bump row at its start)."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    folded, _ = _chain_run(-120.0, -120.0)
+    return (_body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0))
+            + _body_contacts_unchecked_diagnostics(folded, [None]))
+
+
 def _stale_fires() -> list:
     """A contact that was outside r0 at the start and came inside it with no
     row restraining it."""
@@ -1038,6 +1058,8 @@ SILENCE: dict[str, Pair] = {
         _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": Pair(
+        _body_unchecked_fires, _body_unchecked_silent, "tests/test_one_sided_restraints.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
     "SITE_MULTIPLICITY_KEPT": Pair(

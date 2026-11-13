@@ -435,6 +435,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1813](1813-fragment-io.md) | Fragment I/O: XYZ, Z-matrix write, SMILES behind an extra | ⬜ | P4 | [1802](1802-the-fragment-type.md) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | 🔄 2026-11-09 | P3 | [1815](1815-derived-geometry-torsions-and-a-request-form.md), [1805](1805-the-rigid-body.md) |
 | [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | ✅ 2026-11-02 | — | [1804](1804-the-derived-block.md) |
+| [1816](1816-a-body-keeps-its-declared-bonds.md) | A rigid body keeps its declared bonds, and anti-bump checks the pairs a torsion folds | ⬜ | P3 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) ([1814](1814-refinable-z-matrix-internals.md) soft) |
 
 ## <a id="structure-solution"></a>structure-solution — a map, a cost and a search
 
@@ -677,7 +678,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
-| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ⬜ | P3 | — ([1814](1814-refinable-z-matrix-internals.md) soft) |
+| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
