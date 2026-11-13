@@ -87,7 +87,8 @@ def read_chi(path: str | Path, *,
 
     n_cols = min(len(r) for r in rows)
     arr = np.array([r[:n_cols] for r in rows], dtype=np.float64)
-    sigma = arr[:, 2] if n_cols >= 3 and np.any(arr[:, 2] > 0) else None
+    # a third column with no positive σ reaches read_pattern's hook (WP-1952)
+    sigma = arr[:, 2] if n_cols >= 3 else None
     tt, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=CHI,
                            diagnostics=diagnostics)
     # the x label verbatim, never normalised: it is the only record of what the
@@ -155,4 +156,5 @@ CHI = PatternFormat(
     sigma="a third column when the writer emitted one, else the Poisson fallback",
     matches=looks_chi,
     read=read_chi,
+    options=("nonpositive_sigma",),
 )

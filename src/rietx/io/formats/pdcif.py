@@ -281,5 +281,5 @@ PDCIF = PatternFormat(
            "dictionary), else the Poisson fallback"),
     matches=lambda p: p.suffix.lower() == ".cif",
     read=read_pdcif,
-    options=("block",),
+    options=("block", "nonpositive_sigma"),
 )

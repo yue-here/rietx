@@ -176,7 +176,10 @@ def hump_curve(two_theta, position, height, fwhm, xp):
     **only** one: :meth:`rietx.model.forward.CompiledModel.background` calls it
     for the numpy path and, through ``get_backend()``, for every traced backend,
     so there is no twin to drift (``backend/traced.py``'s reason for existing,
-    satisfied by having nothing to copy).
+    satisfied by having nothing to copy).  Its derivative has a second spelling,
+    :func:`hump_partials`, which the numpy Jacobian reads.  A change to the form
+    here changes that function too, and a complex-step test in
+    ``tests/test_extra_components.py`` fails until it does.
 
     Empirical basis function, not a peak shape — see
     :class:`~rietx.schemas.instrument.HumpComponent` for the citation of the
@@ -194,3 +197,32 @@ def hump_curve(two_theta, position, height, fwhm, xp):
     """
     u = (two_theta - position) / fwhm
     return height * xp.exp(FOUR_LN2_NEG * (u * u))
+
+
+def hump_partials(two_theta: np.ndarray, position: float, height: float,
+                  fwhm: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The three partial derivatives of :func:`hump_curve`, in field order.
+
+    Returns ``(∂y/∂2θ₀, ∂y/∂h, ∂y/∂Γ)``, the order of
+    :data:`~rietx.schemas.instrument.HUMP_FIELDS`.  With
+    u = (2θ − 2θ₀)/Γ and g = exp(−4 ln2 · u²), so that y = h·g:
+
+        ∂y/∂h   = g
+        ∂y/∂2θ₀ = h·g · 8 ln2 · u/Γ
+        ∂y/∂Γ   = h·g · 8 ln2 · u²/Γ
+
+    The last two follow from ∂u/∂2θ₀ = −1/Γ and ∂u/∂Γ = −u/Γ, each multiplied
+    by ∂g/∂u = −8 ln2 · u · g.  They are differentiated here rather than
+    copied from a source, and ``tests/test_extra_components.py`` checks them
+    against a complex-step derivative of :func:`hump_curve`, which is exact
+    to rounding.
+
+    The analytic Jacobian reads these for a hump column (WP-2116), so a
+    column costs one exponential on the grid and no Bragg evaluation.  numpy
+    only: the traced backends differentiate :func:`hump_curve` themselves.
+    ``u`` and ``g`` are spelled as :func:`hump_curve` spells them.
+    """
+    u = (np.asarray(two_theta, dtype=np.float64) - position) / fwhm
+    g = np.exp(FOUR_LN2_NEG * (u * u))
+    slope = (-2.0 * FOUR_LN2_NEG) * (height * g) / fwhm
+    return slope * u, g, slope * (u * u)
