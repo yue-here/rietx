@@ -446,7 +446,7 @@ position-only list returns the same candidates as on `main`.
   *Done.* Yue's ruling recorded under the Decision task. `engines.weak_line_floor`
   and `WEAK_LINE_RETRY_FLOOR` (0.05); the retry in `index_pattern` after
   `search()` (the first pass plus the inlier retry); `INDEX_WEAK_LINE_RETRY`
-  (info) with its help entry, three audit rows, a manual paragraph in
+  (info) with its help entry, three audit rows, a manual sentence in
   `reference/indexing.md`, a skill row in `references/abstention.md`; the
   provenance note for `n_unindexed` names the third pass. Fixture (a)'s xfail
   flipped to a rank-1 assertion that also pins the message and the kept line
@@ -456,7 +456,14 @@ position-only list returns the same candidates as on `main`.
 
   *Measured.* The trigger table and the as-built table are in Context ("The
   trigger", "The retry as built"): `preset="full"`, `[dev]`, arm64 Mac, load
-  12-92 on 10 cores, each run once. GATES
+  12-92 on 10 cores, each run once. Gates on this tree, `main` merged at `9e9f7c25f`, `[dev]`, arm64 Mac, each
+  through the suite lock: `tests/test_acceptance_indexing.py` 45 passed
+  (18 min); the fast selection 14 622 passed, 433 skipped, 32 xfailed
+  (10-11 min), the same 15 055 total as a first run whose one failure (the
+  manual's indexing page over its 50 000-character twin cap, main's page
+  sitting 6 under it) is fixed by tightening that page, and whose four
+  wheel-build errors were a PyPI timeout. No fast test was added (one was
+  folded into another). `tests.reader_output` exits 0; vale and ruff clean.
 
   *Review.* `/code-review high --fix` reported nine findings and fixed five:
   the floor kept only usable lines and dropped the list's records; the
