@@ -294,6 +294,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
 #                                                          reader-repair row and one rule for every
 #                                                          reader's pre-drop decisions; landed 571
+#   2026-11-03  src/rietx/indexing/CLAUDE.md  361 -> 365  for WP-1915: the refusal of a metric direction
+#                                                          no line constrains, and why a dead cross term
+#                                                          is not one unmeasured angle; landed 365
 #   2026-11-12  src/rietx/io/CLAUDE.md        571 -> 572  for the σ ≤ 0 rule (WP-1952, WP-2002 B5): one
 #                                                          reader-repair row; landed 572
 SIZE_CAPS: dict[str, int | None] = {
@@ -707,7 +710,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # search-window section (a shift is estimated, never a window) and the
     # ``predicted_but_absent`` bullet (caps; the superset check refutes).
     # The measurements stayed in #941's Acceptance table.  Landed at 361, no headroom.
-    "src/rietx/indexing/CLAUDE.md": 361,
+    "src/rietx/indexing/CLAUDE.md": 365,
     # 300 -> 350 (WP-1407): four per-format rows, and three standing rules the
     # Philips √ encoding taught — that a format may encode its counts rather
     # than store them, that the *permissive* description can be the defective

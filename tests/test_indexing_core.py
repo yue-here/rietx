@@ -273,6 +273,37 @@ def test_a_metric_direction_no_line_constrains_raises_whatever_the_rounding(af):
         refine_candidate(q, 1e-4 * q, hkl, system="monoclinic")
 
 
+def test_a_dead_cross_term_leaves_no_direct_length_measured():
+    """Eleven h0l and 0k0 lines leave a triclinic D and F unconstrained (WP-1915).
+
+    The fit raises, and this test pins why that is right rather than a lost
+    candidate.  The delta method at the minimum-norm D = F = 0 gives a, b and c
+    the monoclinic fit's esds, because their first derivatives in D and F vanish
+    there.  The data do not hold the cell at that point: every assigned line's Q
+    is bit-identical along D while a, b and c all move, since G = (G*)⁻¹ puts
+    every cross term into every length.  A finite esd on b would be a confident
+    wrong number.  The same lines fit as monoclinic, with D and F held out of
+    the basis, which is the positive arm.
+    """
+    hkl = np.array([(1, 0, 0), (0, 0, 1), (1, 0, 1), (-1, 0, 1), (2, 0, 0),
+                    (0, 0, 2), (2, 0, 1), (-2, 0, 1), (0, 1, 0), (0, 2, 0),
+                    (0, 3, 0)])
+    m = design_matrix(hkl)
+    q = m @ af_from_cell((5.1, 6.3, 7.2, 90.0, 101.0, 90.0))
+    q = q * (1.0 + 1e-5 * np.sin(np.arange(len(q))))
+    with pytest.raises(ValueError, match="constrains every metric direction"):
+        refine_candidate(q, 1e-4 * q, hkl, system="triclinic")
+
+    held = refine_candidate(q, 1e-4 * q, hkl, system="monoclinic")
+    esd = np.asarray(held.cell_esd)
+    assert np.all(np.isfinite(esd)) and np.all(esd[:3] > 0.0)
+    moved = np.array(held.af, dtype=np.float64)
+    moved[3] = 0.01
+    assert np.array_equal(m @ moved, m @ held.af)
+    shift = np.abs(np.asarray(cell_from_af(moved))[:3] - np.asarray(held.cell)[:3])
+    assert np.all(shift > 10.0 * esd[:3])
+
+
 # ----------------------------------------------------------------------
 # Figures of merit
 # ----------------------------------------------------------------------
