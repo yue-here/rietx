@@ -110,6 +110,33 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1018 (peak picking), WP-1027 (the panel), WP-1110 item 14 (the
   degenerate esds the pseudo-inverse used to truncate).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The peak table's numbers and chips** (WP-1209, `lib/peaks.ts`, `lib/table.ts`,
+`panels/Peaks.svelte`). Four rules. **A column is scanned, so its places are
+fixed**: 2θ at four with the esd in the last place (`formatPosition`), I as
+`I/Imax × 100` over the strongest *measured* line (`formatIntensity`, `—` under
+`no_intensity`/`fit_failed`), and an esd from 1° up is not printed — wider than
+any peak, it is a flat direction, and the row's flag says why. **An esd that has
+swallowed its value is not a precision** (`esdSwallowsValue`: ≥ 1 and larger
+than the value): `formatValue` then shows the value at its own precision and
+`formatEsd` writes `±110` beside it, where `35(111)` was printed for a 2θ with a
+degenerate σ; `12346(56)` keeps the convention, and this holds for every caller.
+**A chip's words are the corpus's**: `HelpEntry.label` is the short form, the
+chip is a `<Help>` term saying `labelFor(corpus, key)`, and the popover restores
+the name a label hid (`Name · position_at_bound`) — so `peak_flags` and
+`peak_origins` carry a label on every entry, held by `test_help.py` to three
+words and unique. And **a `td` that is not `display: table-cell` is not a cell**:
+two adjacent flex/inline-flex `td`s are wrapped into *one* anonymous cell, so a
+class shared with a flex label put the chips under the intensity in a column
+headed by nothing — found in Chrome, invisible to jsdom, and why the intensity
+column is `.rel` rather than the form's `.num`.
+
 ## Handover log
 
 ### 2026-08-27 — closed: the peak table reads like a peak table

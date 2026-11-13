@@ -1,7 +1,7 @@
 """The ILL D1B Co₃O₄ quench series reads, is what was vendored, and is documented.
 
 WP-2003 family D (issue #1150): ten Co₃O₄ samples quenched from 300-1173 K,
-each measured at 1.5 K, some at 100 K and 300 K, with the experiment's garnet
+each measured at 1.5 K, some at 100 K and 300 K, with the experiment's YIG
 standard and empty vanadium can, plus three planted known-bad patterns for a
 series' quarantine and ``on_error``.  Provenance, licence and the reference
 values (Sparks *et al.*, *Phys. Rev. B* **99**, 104104 (2019)) are in
@@ -59,7 +59,7 @@ REAL = {
     "1123q_300K.dat": (1123, 297.707),
     "1173q-1p5K_1.dat": (1173, 1.6663),
     "1173q-300K.dat": (1173, 302.776),
-    "standard_garnet_300K_1.dat": (None, 296.954),
+    "standard_YIG_300K_1.dat": (None, 296.954),
     "vanadium_can_120K.dat": (None, 330.0),
 }
 

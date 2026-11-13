@@ -304,6 +304,121 @@ def test_every_link_from_outside_the_manual_is_on_its_page(built_docs_tree):
                                   "built manual:\n" + "\n".join(missing + broken))
 
 
+#: Every section id of the retired glossary (`using/glossary.html`), read off
+#: its source and generated body before the old tree retired (d881d9029^).  Its
+#: sections went to four pages, so a stub sending them all to one lost most.
+OLD_GLOSSARY_SECTIONS = (
+    "glossary", "looking-one-up-in-code", "entry-fields", "limitations", "parameters",
+    "stage-settings", "plan-presets", "peak-flags", "diagnostic-codes", "peak-origins",
+    "reader-options", "instrument-preset-fields", "indexing-search-settings")
+#: Every `rietx.help` anchor a release carried into a page the old tree
+#: published (v1.0 to v1.9; v1.10 moved them under /docs/), read off each tag.
+#: An installed GUI links them, so they are permanent.
+RELEASED_HELP_ANCHORS = (
+    "background.html#a-measured-background",
+    "background.html#additive-background-models",
+    "background.html#additive-models-never-subtraction",
+    "background.html#choosing-the-flexibility",
+    "background.html#explicit-humps",
+    "background.html#localised-flexibility-explicit-background-peaks",
+    "background.html#model-free-estimation",
+    "corrections.html#attenuation-coefficients",
+    "corrections.html#capillary-cylindrical-absorption",
+    "corrections.html#flat-plate-absorption",
+    "corrections.html#lorentz-polarisation",
+    "corrections.html#preferred-orientation-march-dollase",
+    "corrections.html#primary-extinction",
+    "corrections.html#quantitative-phase-analysis-and-microabsorption",
+    "corrections.html#secondary-extinction",
+    "corrections.html#surface-roughness",
+    "estimation.html#convergence",
+    "estimation.html#staged-strategy-and-series",
+    "forward-model.html#three-intensity-models",
+    "intensities.html#debye-waller-factors-and-adp-representations",
+    "intensities.html#the-magnetic-structure-factor",
+    "intensities.html#the-structure-factor",
+    "microstructure.html#isotropic-size-and-strain",
+    "microstructure.html#stephens-anisotropic-strain",
+    "microstructure.html#the-positivity-cone-the-seed-and-how-to-read-the-guard",
+    "microstructure.html#the-positivity-cone-the-seed-and-the-guard",
+    "parameterisation.html#from-tree-to-vector",
+    "parameterisation.html#moment-degrees-of-freedom",
+    "parameterisation.html#rigid-bodies",
+    "parameterisation.html#site-symmetry-degrees-of-freedom",
+    "parameterisation.html#weighting-the-restraints",
+    "peak-positions.html#aberration-shifts",
+    "peak-positions.html#lattice-metric-and-bragg-s-law",
+    "peak-positions.html#the-wavelengthcell-degeneracy",
+    "peak-positions.html#time-of-flight",
+    "peak-positions.html#wavelength-scales",
+    "profiles.html#finger-cox-jephcoat-axial-divergence",
+    "profiles.html#the-instrument-sample-width-split",
+    "profiles.html#thompson-cox-hastings-pseudo-voigt",
+    "using/data.html#a-time-of-flight-bank",
+    "using/indexing.html#presets-budgets-and-the-three-states-of-a-system",
+    "using/indexing.html#the-confidence-gate",
+    "using/indexing.html#the-result-object",
+    "using/indexing.html#the-search-specification",
+    "using/indexing.html#the-systematic-shift-and-the-window-it-opens",
+    "using/indexing.html#the-whole-profile-test",
+    "using/indexing.html#three-engines-and-why-the-default-is-all-of-them",
+    "using/model.html#declared-extra-peaks",
+)
+#: Every anchor a release's README carried into a page the old tree published
+#: (v1.0 to v1.9), read off each tag.  PyPI keeps each release's README as its
+#: project page, so these are permanent too.
+RELEASED_README_ANCHORS = (
+    "estimation.html#solvers",
+    "using/cli.html#rietx-compare-did-that-correction-help",
+    "using/concepts.html#refinement-plans",
+    "using/data.html#a-neutron-source",
+    "using/exports.html#a-figure-of-the-structure",
+    "using/files.html#refinement-files-another-program-wrote",
+    "using/files.html#writing-one-back",
+    "using/indexing.html#fitting-peaks-you-name",
+    "using/install.html#optional-extras",
+    "using/model.html#declared-extra-peaks",
+    "using/refining.html#a-moment-stated-and-refined",
+    "using/refining.html#watching-a-run",
+    "using/results.html#reading-an-object-in-a-notebook-or-a-terminal",
+    "using/series.html#a-joint-fit-shares-parameters-instead",
+)
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_known_anchor_of_a_retired_page_lands_on_a_page_holding_it(built_docs_tree):
+    """A retired page's stub sends each anchor anyone is known to link to a page
+    that has it (WP-1986, `docs_versions.MOVED_ANCHORS`).
+
+    The stub carries the reader's fragment over, and a fragment whose heading
+    moved to another page, or was renamed, would leave the reader at the top of
+    the wrong page.  Three sets of old anchors are known: the glossary's
+    sections, the help links of installed releases and released READMEs' links.
+    """
+    out, result = built_docs_tree
+    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
+    spec = importlib.util.spec_from_file_location(
+        "_docs_versions", REPO_ROOT / "docs" / "docs_versions.py")
+    versions = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(versions)
+    known = [("using/glossary", section) for section in OLD_GLOSSARY_SECTIONS]
+    known += [(page.removesuffix(".html"), anchor)
+              for page, _, anchor in (link.partition("#") for link in
+                                      RELEASED_HELP_ANCHORS + RELEASED_README_ANCHORS)]
+    assert all(old in versions.RETIRED for old, _ in known), "an anchor of no retired page"
+    texts = {}
+    for old, anchor in known:
+        page, _, heading = versions.retired_target(old, anchor).partition("#")
+        link = f"{DOCS_URL}/docs/stable/{page}.html" + (f"#{heading}" if heading else "")
+        texts[f"{old}.html#{anchor}"] = link
+    missing = [f"{name}: {link}" for name, link in texts.items()
+               if not (out / _STABLE_PAGE.search(link).group(1)).is_file()]
+    broken = _broken_anchors(texts, out)
+    assert not missing + broken, ("a retired page's anchor that its stub sends to no page, or "
+                                  "to no id on that page; add a MOVED_ANCHORS row:\n"
+                                  + "\n".join(missing + broken))
+
+
 #: A link into the published manual with an anchor, its page and anchor apart.
 _ANCHOR_LINK = re.compile(re.escape(DOCS_URL)
                           + r"/docs/stable/([^\s#)>\]\"'`]+)#([^\s)>\]\"'`]+)")
@@ -1699,6 +1814,69 @@ def test_the_twin_writes_every_node_type_the_old_tree_uses(tmp_path):
     anchor = re.search(r"\]\(#([\w-]+)\)", twin.split("cites", 1)[1])[1]
     entry = twin.split(f'<a id="{anchor}"></a>', 1)[1].lstrip()
     assert re.match(r"\*\*\[\w+\]\*\* \S.*1969", entry), entry
+
+
+#: Headings whose GitHub-style slug is not their docutils id: a code name
+#: (`_` kept), an accented letter (kept) and an apostrophe (dropped, where
+#: docutils writes a hyphen).  A second page links them by slug and by label.
+_SLUG_PAGE = """\
+# Slugs
+
+The page holds three headings.
+
+## `BACKGROUND_ORDER_AT_CAP`
+
+Text.
+
+## Bérar-Lelann inflation
+
+Text.
+
+(a-label)=
+## The stage's parameters
+
+Text.
+"""
+
+
+def test_a_twin_carries_no_anchor_a_heading_slug_added(tmp_path):
+    """myst-parser 5.2 adds each heading's slug as an id where no element has
+    it, and the twin writes a section's every id as an anchor, so a twin grew
+    a line for each heading whose slug is not its id.  The twin keeps the ids
+    its links use and drops the slugs; the HTML keeps both."""
+    from importlib.metadata import version
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "index.md").write_text(_SLUG_PAGE, encoding="utf-8")
+    (src / "links.md").write_text(
+        "---\norphan: true\n---\n# Links\n\nThe page links [the code](index.md#background_order_at_cap),"
+        " [the inflation](index.md#bérar-lelann-inflation),"
+        " [the stages](index.md#the-stages-parameters) and {ref}`the label <a-label>`.\n",
+        encoding="utf-8")
+    (src / "conf.py").write_text(
+        "import sys\n"
+        f"sys.path.insert(0, {str(DOCS_TREE.parent)!r})\n"
+        "extensions = ['myst_parser', 'markdown_twin']\n"
+        "myst_heading_anchors = 3\n"
+        "project = 'slugs'\n",
+        encoding="utf-8")
+    out = tmp_path / "html"
+    result = subprocess.run([sys.executable, "-m", "sphinx", "-W", "-q", "-E", "-b", "html",
+                             str(src), str(out)], capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stderr
+    twin = (out / "index.html.md").read_text(encoding="utf-8")
+    html = (out / "index.html").read_text(encoding="utf-8")
+    slugs = ["background_order_at_cap", "bérar-lelann-inflation", "the-stages-parameters"]
+    if tuple(int(p) for p in version("myst-parser").split(".")[:2]) >= (5, 2):
+        # The build added them, so the absence below is the twin's doing.
+        assert [s for s in slugs if f'id="{s}"' not in html] == [], html
+    anchors = re.findall(r'<a id="([^"]*)"></a>', twin)
+    assert [s for s in slugs if s in anchors] == [], twin
+    assert {"background-order-at-cap", "berar-lelann-inflation", "a-label"} <= set(anchors)
+    links = re.findall(r"\]\(index\.html\.md#([^)]+)\)",
+                       (out / "links.html.md").read_text(encoding="utf-8"))
+    assert len(links) == 4 and set(links) <= set(anchors), (links, anchors)
 
 
 # ----------------------------------------------------------------------

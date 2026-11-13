@@ -717,8 +717,8 @@ const MASKED_CURVES = {
 /** The theme's plot inks as `curveColors` falls back to them: jsdom loads no
  *  stylesheet, so these are what the panel paints with here. */
 const INK = {
-  obs: "#8a8a8a", calc: "#c23b22", diff: "#1f5fa8", mask: "#1b1b1b14", edge: "#6b6b66",
-  peak: "#8c257e", peakfit: "#c158b0", candidate: "#1a8f45",
+  obs: "#1c1917", calc: "#c65d0a", diff: "#6b6259", mask: "#1c191714", edge: "#6b6259",
+  peak: "#0072b2", peakfit: "#6f83e6", candidate: "#1a8f45",
   phase: ["#009e73", "#cc79a7"],
 };
 
@@ -793,19 +793,48 @@ const flush = async () => {
 let host: HTMLDivElement;
 let app: any;
 
+/** The start screen over an open project, through the palette (WP-2133). */
+async function toStart() {
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+  await flush();
+  [...document.querySelectorAll<HTMLButtonElement>("button")]
+    .find((b) => b.textContent?.includes("Open or create a project"))!.click();
+  await flush();
+}
+
 function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
-function rowsInDom(): HTMLElement[] {
-  return [...host.querySelectorAll<HTMLElement>(".row")];
+/** The action bar's filled primary (WP-2123), which replaced the header's Run. */
+function refineButton(): HTMLButtonElement | null {
+  return host.querySelector<HTMLButtonElement>(".actions button.refine");
 }
 
-/** The editable cell of the row whose leaf is `leaf` — by name, because the
- *  positions shift: a tied row renders a span rather than an input. */
-function cell(leaf: string): HTMLInputElement {
-  const row = rowsInDom().find((r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-  return row!.querySelector<HTMLInputElement>("input.value")!;
+function rowsInDom(): HTMLElement[] {
+  return [...host.querySelectorAll<HTMLElement>(".params .row")];
+}
+
+/** The Parameters panel's row whose label reads `label` (WP-2126). */
+function rowLabelled(label: string): HTMLElement {
+  return rowsInDom().find((r) => r.querySelector(".label")?.textContent?.trim() === label)!;
+}
+
+/** The number a parameter is drawn as: a button that opens the editor. */
+function numberAt(path: string): HTMLElement {
+  return host.querySelector<HTMLElement>(`.params .ink[data-path="${path}"]`)!;
+}
+
+/** Type a value the way a person does in the Parameters panel: press the
+ *  number, type into the editor that floats over it, press Enter. */
+async function editValue(path: string, text: string) {
+  numberAt(path).click();
+  await flush();
+  const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+  editor.value = text;
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flush();
 }
 
 async function type(selector: string, value: string) {
@@ -831,21 +860,38 @@ afterEach(() => {
 });
 
 describe("the shell", () => {
-  it("renders the no-project state as the import wizard, with its recent list", async () => {
+  it("renders the no-project state as the start screen, with its recent list", async () => {
     vi.stubGlobal("fetch", server({
       ...boot(null),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/a.rex", name: "a.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: [
+        { path: "/tmp/a.rex", name: "a.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+          phases: [["LaB6", "P m -3 m"]], missing: false }] } }),
     }).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // the empty state *is* the wizard (WP-1014) rather than a note about it
-    expect(host.textContent).toContain("New project");
-    expect(host.textContent).toContain("Choose a data file");
-    expect(host.textContent).toContain("a.rex");
-    expect(button("Create project")?.disabled).toBe(true);
-    // Run is disabled without a project — the control follows the state, not hope
-    expect(button("Run")?.disabled).toBe(true);
+    // the start screen is the window (WP-2131): New, Open, Recent, the links
+    expect(host.querySelector(".start")).toBeTruthy();
+    // the name is the File menu's trigger, with or without a project (WP-2133)
+    expect(host.querySelector("header .project .fm-name")?.textContent).toBe("No project▾");
+    expect(button("New project…")?.className).not.toContain("ghost");
+    expect(button("Open…")?.className).toContain("ghost");
+    expect(host.querySelector(".start .row .name")?.textContent).toBe("a");
+    expect(host.querySelector(".start .row .sg")).toBeTruthy();
+    expect(host.querySelector(".start .row")?.textContent).toContain("/tmp");
+    const links = [...host.querySelectorAll<HTMLAnchorElement>(".start a.link")];
+    expect(links.map((a) => a.textContent)).toEqual(["Manual", "Tutorials"]);
+    expect(links[1].href).toBe("https://rietx.org/docs/dev/start/tutorials.html");
+    // no tour, no news, and no dialog until asked
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    // the action bar belongs to a project, so the empty state offers no refine
+    // at all, and both collapse buttons are drawn disabled so opening one
+    // moves nothing (WP-2123)
+    expect(refineButton()).toBeNull();
+    expect(button("Run")).toBeUndefined();
+    const toggles = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((b) => b.disabled)).toBe(true);
   });
 
   it("renders a project with no fit, and offers Run", async () => {
@@ -864,7 +910,8 @@ describe("the shell", () => {
     // panel while nothing is owed.
     expect(host.textContent).toContain("every panel the v1.0 GUI plan named");
     expect(host.textContent).not.toMatch(/WP-\d{4}/);
-    expect(button("Run")?.disabled).toBe(false);
+    expect(refineButton()?.disabled).toBe(false);
+    expect(refineButton()?.textContent).toContain("Refine");
   });
 
   it("shows the statistics and the stage while a run is in flight", async () => {
@@ -884,7 +931,7 @@ describe("the shell", () => {
     expect(host.textContent).toContain("cell");
     expect(host.textContent).toContain("(3/5)");           // 1-based, from stage_start
     expect(host.textContent).toContain("4.150%");          // Rwp as a percentage
-    expect(button("Run")?.disabled).toBe(true);            // 409 made unclickable
+    expect(refineButton()?.disabled).toBe(true);          // 409 made unclickable
     expect(button("Cancel")?.disabled).toBe(false);
   });
 
@@ -965,53 +1012,67 @@ describe("the shell", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const open = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("a.rex"));
-    open!.click();
+    host.querySelector<HTMLButtonElement>(".start button.row")!.click();
     await flush();
     expect(host.textContent).toContain("sha256");
   });
 });
 
 // ----------------------------------------------------------------------
-// the parameter table (WP-1011)
+// the parameter table (WP-1011; the Parameters panel since WP-2126)
 // ----------------------------------------------------------------------
 const ADVANCED = { ...PROJECT, doc: { ...PROJECT.doc, ui: { simple: false } } };
 
 describe("the parameter table", () => {
-  it("groups rows and gives a held row no checkbox at all", async () => {
+  it("groups the rows under the phase and the instrument, and folds what the setting holds", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // one heading per dot-path prefix, in the server's order
-    const groups = [...host.querySelectorAll(".group")].map((g) => g.textContent?.trim());
-    expect(groups?.[0]).toContain("phases.0.cell");
-    expect(groups.some((g) => g?.includes("instrument.profile"))).toBe(true);
+    // grouping B (WP-2126): one band per phase and one for the instrument,
+    // the phase's space group typeset beside its name
+    const bands = [...host.querySelectorAll(".params .band .title")].map((b) => b.textContent);
+    expect(bands).toEqual(["LaB6", "Instrument"]);
+    expect(host.querySelector(".params .band .sg")?.getAttribute("aria-label")).toBe("P m -3 m");
+    const groups = [...host.querySelectorAll(".params .head .ht")]
+      .map((g) => g.textContent?.replace("›", "").trim());
+    expect(groups).toContain("Cell");
+    expect(groups).toContain("Peak shape");
 
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);
-    // three of the six rows cannot be freed, and a checkbox that errors on click
-    // is worse than no checkbox — so there are exactly three
-    const boxes = host.querySelectorAll('.row input[type="checkbox"]');
-    expect(boxes.length).toBe(3);
-    // …and each held row says which of the three reasons holds it
+    // the Cell group shows `a` and folds b and α into the crystallographer's line
+    expect(rowsInDom().map((r) => r.querySelector(".label")?.textContent?.trim()))
+      .toEqual(["Scale", "a", "w"]);
+    const fold = host.querySelector<HTMLElement>(".params .fold")!;
+    expect(fold.textContent).toContain("a = b = c, α = β = γ = 90°");
+    fold.click();
+    await flush();
+    expect(rowsInDom().length).toBe(5);
+
+    // a checkbox only beside a parameter it controls: the two folded rows are
+    // held, so they carry the reason's mark and no box
     const held = rowsInDom().filter((row) => row.classList.contains("held"));
-    expect(held.map((row) => row.dataset.held).sort()).toEqual(["locked", "mode", "tied"]);
-    // …and the reason is reachable rather than hovered: WP-1203 moved it off
-    // `title=` onto the glyph itself, which a keyboard can get to
-    const glyph = host.querySelector<HTMLElement>('[data-held="tied"] .vary .help')!;
+    expect(held.map((r) => r.querySelector(".label")?.textContent?.trim())).toEqual(["b", "α"]);
+    expect(held.every((r) => !r.querySelector("input"))).toBe(true);
+    const glyph = held[0].querySelector<HTMLElement>(".mark .help")!;
     expect(glyph.getAttribute("tabindex")).toBe("0");
     glyph.click();
     await flush();
     expect(host.querySelector(".popover")?.textContent).toContain("tied: =");
   });
 
-  it("hides held rows in Simple mode and says how many", async () => {
-    vi.stubGlobal("fetch", server(boot()).fetcher);   // ui.simple defaults true
+  it("puts each atom on one row of its own table", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    expect(rowsInDom().length).toBe(3);
-    expect(host.textContent).toContain("3 held hidden");   // a count, not a silent cut
+    const row = host.querySelector<HTMLElement>(".params table.atomtab tbody tr")!;
+    expect(row.dataset.atom).toBe("phases.0.atoms.0");
+    expect(row.querySelector(".aname")?.textContent).toBe("La");
+    // the Biso is mode-fixed: its value is drawn, and its box is the mark
+    // saying why it is held, never a checkbox that would error on click
+    expect(numberAt("phases.0.atoms.0.biso").textContent?.trim()).toBe("0.5");
+    expect(row.querySelector("input[type=checkbox]")).toBeNull();
+    expect(row.querySelector(".mark .help")).toBeTruthy();
   });
 
   it("shows a value to the precision its esd justifies", async () => {
@@ -1019,9 +1080,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const value = host.querySelector<HTMLInputElement>(".row input.value");
-    expect(value?.value).toBe("4.1568");                   // 4.1568(2), not 4.15678
-    expect(host.textContent).toContain("(2)");
+    expect(numberAt("phases.0.cell.a").textContent?.replace(/\s+/g, "")).toBe("4.1568(2)");
   });
 
   it("sends the glob for a bulk free — one round trip, one history node", async () => {
@@ -1052,7 +1111,9 @@ describe("the parameter table", () => {
     await flush();
 
     await type("#param-filter", "cell");
-    expect(rowsInDom().length).toBe(3);                    // a, b, alpha
+    // a, b and alpha match: the Cell group alone is left, under its phase
+    expect([...host.querySelectorAll(".params .band")].length).toBe(1);
+    expect([...host.querySelectorAll(".params .head")].length).toBe(1);
     button("Free 0")?.click();                             // disabled: none freeable
     await flush();
     expect(stub.calls.some((call) => call.method === "PATCH")).toBe(false);
@@ -1064,13 +1125,11 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    for (const [leaf, text] of [["a", "4.157"], ["scale", "1.05"]] as const) {
-      const input = cell(leaf);
-      input.value = text;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    await flush();
+    await editValue("phases.0.cell.a", "4.157");
+    await editValue("phases.0.scale", "1.05");
     expect(host.textContent).toContain("2 pending edits");
+    // an edited number is marked where it is drawn
+    expect(numberAt("phases.0.cell.a").classList.contains("edited")).toBe(true);
 
     button("Apply")!.click();
     await flush();
@@ -1081,23 +1140,139 @@ describe("the parameter table", () => {
     });
   });
 
+  it("treats a value typed back as it was drawn as no edit", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // WP-1009's rule: the drawn value is compared, so a click in and out of a
+    // cell cannot truncate a parameter
+    await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).not.toContain("pending edit");
+  });
+
+  it("edits every picked value at once, and ranges a shift-press within a column", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // a modifier press picks rather than opens: scale, then a shift-press on
+    // `a` takes the plain rows between them
+    const down = (path: string, init: MouseEventInit) => {
+      numberAt(path).dispatchEvent(new MouseEvent("mousedown", { bubbles: true, ...init }));
+      numberAt(path).click();
+    };
+    down("phases.0.scale", { metaKey: true });
+    down("phases.0.cell.a", { shiftKey: true });
+    await flush();
+    expect(numberAt("phases.0.scale").classList.contains("picked")).toBe(true);
+    expect(numberAt("phases.0.cell.a").classList.contains("picked")).toBe(true);
+
+    // a press on a picked value edits all of them
+    await editValue("phases.0.cell.a", "2");
+    expect(host.textContent).toContain("2 pending edits");
+  });
+
+  it("holds and releases a value through the padlock in its box's place", async () => {
+    const heldParams = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "phases.0.scale"
+        ? { ...p, vary: false, held: true, refinable: false, held_because: "held by hold()" }
+        : p) };
+    const stub = server({ ...boot(ADVANCED), "/api/params": () => ({ body: heldParams }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const lock = rowLabelled("Scale").querySelector<HTMLButtonElement>("button.lock")!;
+    expect(lock.getAttribute("aria-pressed")).toBe("true");
+    lock.click();
+    await flush();
+    expect(host.textContent).toContain("1 pending edit");
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH");
+    expect(patch?.body).toEqual({ values: {}, vary: {}, hold: { "phases.0.scale": false } });
+  });
+
+  it("sets limits and a restraint from the popover, in one PATCH", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    numberAt("phases.0.scale").click();
+    await flush();
+    const pop = document.getElementById("value-popover")!;
+    const lower = pop.querySelector<HTMLInputElement>('[aria-label="lower limit"]')!;
+    lower.value = "0.5";
+    lower.dispatchEvent(new Event("change", { bubbles: true }));
+    // the word is the box's label, so pressing the word ticks it
+    const restrain = [...pop.querySelectorAll("label")].find((l) => l.textContent?.includes("Restrain"))!;
+    restrain.click();
+    await flush();
+    expect(pop.querySelector<HTMLInputElement>('[aria-label="restraint target"]')?.value).toBe("1.02");
+    document.querySelector<HTMLInputElement>("input.editor")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH")!;
+    expect(patch.body.limits).toEqual({ "phases.0.scale": [0.5, null] });
+    expect(Object.keys(patch.body.restraints)).toEqual(["phases.0.scale"]);
+    expect(patch.body.restraints["phases.0.scale"].target).toBe(1.02);
+  });
+
+  it("applies the pending edits before it refines, in either refine choice", async () => {
+    // WP-2123: the action bar's primary is "Apply and refine" while edits are
+    // pending, and the choice beside it picks what a refine runs
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    expect(refineButton()?.textContent).toContain("Refine");
+    expect(host.querySelector('[aria-label="refine"] button.on')?.textContent?.trim())
+      .toBe("Staged plan");
+    await editValue("phases.0.cell.a", "4.157");
+    expect(refineButton()?.textContent).toContain("Apply and refine");
+
+    refineButton()!.click();
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // one cycle is one stage on the ticked rows: an empty turn_on
+    button("One cycle")!.click();
+    await flush();
+    refineButton()!.click();
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run");
+    expect(runs.at(-1)?.body).toEqual({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+    expect(host.textContent).toContain('ref.run_stage(Stage("cycle", turn_on=[]))');
+  });
+
   it("refuses an out-of-bounds value before the round trip", async () => {
     const stub = server(boot(ADVANCED));
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    const w = [...host.querySelectorAll<HTMLInputElement>(".row input.value")].at(-1)!;
-    w.value = "2";                                          // instrument.profile.w is [0, 1]
-    w.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
-
+    await editValue("instrument.profile.w", "2");          // instrument.profile.w is [0, 1]
+    const w = numberAt("instrument.profile.w");
     expect(w.classList.contains("bad")).toBe(true);
     expect(w.title).toContain("upper bound");
     // Apply is blocked, not silently partial — and Revert is still offered,
     // which is the affordance the bad cell most needs
     expect(button("Apply")?.disabled).toBe(true);
-    expect(host.textContent).toContain("above the upper bound 1");
+    // the action bar says so in words its slot has room for, and the reason
+    // rides in that slot's tooltip as well as the cell's
+    const slot = host.querySelector<HTMLElement>(".actions .pending")!;
+    expect(slot.textContent?.trim()).toBe("invalid edit");
+    expect(slot.title).toBe("w: above the upper bound 1");
     button("Revert")!.click();
     await flush();
     expect(host.textContent).not.toContain("pending edit");
@@ -1119,10 +1294,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const input = host.querySelector<HTMLInputElement>(".row input.value")!;
-    input.value = "4.2";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "4.2");
     button("Apply")!.click();
     await flush();
 
@@ -1144,17 +1316,40 @@ describe("the plan editor", () => {
     return stub;
   }
 
-  it("lists the stages the run will actually execute, and names the preset", async () => {
+  /** The action bar's button labelled `text` — scoped, because the Model and
+   *  Text panels keep an Apply of their own. */
+  function bar(text: string): HTMLButtonElement | undefined {
+    return [...host.querySelectorAll<HTMLButtonElement>(".actions button")]
+      .find((b) => b.textContent?.trim().startsWith(text));
+  }
+
+  const summaries = () => [...host.querySelectorAll("ol.stages > li.stage .rung")]
+    .map((n) => (n.querySelector("summary") ?? n).textContent!.replace(/\s+/g, " ").trim());
+
+  it("reads as a recipe: one row per stage, its globs as facts, no prose", async () => {
     await openPlan();
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
+    const names = [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
     expect(names).toEqual(["scale+bkg", "cell"]);
-    expect(host.querySelector<HTMLSelectElement>("select")?.value).toBe("mccusker_default");
-    // the preset's own words, from PLAN_INFO through /api/plans.  `description`
-    // is the visible one since WP-1208 and `when_to_use` is in the popover, so
-    // this is the line a person reads without clicking anything
-    expect(host.textContent).toContain("Scale and background, zero shift, cell,");
-    // …and the explainer above it, which is the panel's whole subject
-    expect(host.textContent).toContain("A plan is an ordered list of stages.");
+    const steps = [...host.querySelectorAll("li.stage .step")].map((n) => n.textContent);
+    expect(steps).toEqual(["1", "2"]);
+    // each glob is a chip, a fact, and the verb that removes it sits beside it
+    const first = host.querySelector("li.stage .frees")!;
+    expect([...first.querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.scale", "instrument.background.*"]);
+    expect(first.querySelectorAll(".chip button")).toHaveLength(0);
+    expect([...first.querySelectorAll(".glob > button.ghost")]
+      .map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Remove phases.*.scale from stage 1",
+                "Remove instrument.background.* from stage 1"]);
+    expect(host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")?.value)
+      .toBe("mccusker_default");
+    // the preset's words are a tooltip and a help term now, never a paragraph
+    // (the maintainer's ruling of 2026-11-07: no permanent explanatory text)
+    const panel = host.querySelector("section[aria-label=plan]")!;
+    expect(panel.querySelectorAll(":scope > p")).toHaveLength(0);
+    expect(panel.textContent).not.toContain("A plan is an ordered list of stages.");
+    expect(panel.querySelector("select")?.title).toContain("Scale and background, zero shift");
   });
 
   it("resolves each stage against the live table, and says what it holds", async () => {
@@ -1162,72 +1357,59 @@ describe("the plan editor", () => {
     // match — what a stage frees is its matches minus what is tied, locked,
     // mode-fixed or degenerate with a free cell
     await openPlan();
-    const rungs = [...host.querySelectorAll("ol.stages > li .rung summary")]
-      .map((n) => n.textContent!.replace(/\s+/g, " ").trim());
-    expect(rungs).toEqual([
-      "1 · +2 → 2 free · Rwp 95.35%",
-      "2 · +1 → 3 free · 1 held · Rwp 44.57%",
+    expect(summaries()).toEqual([
+      "+2 → 2 free · Rwp 95.35%",
+      "+1 → 3 free · 1 held · Rwp 44.57%",
     ]);
-    expect(host.textContent).toContain("Ends with 5 of 12 parameters free.");
     // the held row carries the server's own sentence, never one written here
     expect(host.textContent).toContain("phases.0.cell.b");
     const held = [...host.querySelectorAll(".rung .body .help")];
     expect(held.map((n) => n.getAttribute("aria-haspopup"))).toEqual(["dialog"]);
   });
 
-  it("refuses both of its run buttons at zero phases, in the shell's words",
-     async () => {
+  it("refuses its run buttons at zero phases, in the shell's words", async () => {
     // WP-1207: zero phases is a legal state and every run verb refuses it, so
     // a client must disable rather than offer a click whose only outcome is a
-    // 409. The panel's two buttons did not (found by `/code-review`), and the
-    // repair must not spell the reason a second time — the shell's sentence
-    // names the route out, and a local copy said something else.
+    // 409, and the repair must not spell the reason a second time
     await openPlan({ ...PROJECT, n_phases: 0 });
-    const runAll = button("Run all")!;
-    const runStage = [...host.querySelectorAll<HTMLButtonElement>(
-      "ol.stages > li .rung button")].filter(
-        (b) => b.textContent?.trim() === "Run this stage");
-    expect(runAll.disabled).toBe(true);
-    expect(runStage.length).toBeGreaterThan(0);
-    expect(runStage.every((b) => b.disabled)).toBe(true);
-
-    const header = button("Run")!;
-    expect(header.disabled).toBe(true);
-    // one sentence, three buttons
-    expect(runAll.title).toBe(header.title);
-    expect(runStage[0].title).toBe(header.title);
-    expect(header.title).toContain("no phase yet");
-
-    // …and with a phase, all three act again
-    unmount(app);
-    app = null;
-    host.innerHTML = "";
-    await openPlan();
-    expect(button("Run all")!.disabled).toBe(false);
-    expect(button("Run")!.disabled).toBe(false);
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
+      .filter((b) => b.textContent?.trim() === "Run this stage");
+    expect(runs).toHaveLength(2);
+    expect(runs.every((b) => b.disabled)).toBe(true);
+    const primary = refineButton()!;
+    expect(primary.disabled).toBe(true);
+    expect(runs[0].title).toBe(primary.title);
+    expect(primary.title).toContain("no phase yet");
   });
 
-  it("hides the resolved facts while the plan on screen is not the server's", async () => {
-    await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
-    });
-    expect(host.querySelector(".rung summary")).not.toBeNull();
-    const first = host.querySelector<HTMLInputElement>("ol.stages > li input.globs")!;
-    first.value = "instrument.*";
-    first.dispatchEvent(new Event("input", { bubbles: true }));
+  it("keeps the facts of the stages before an edit, and counts the edit in the bar",
+     async () => {
+    await openPlan();
+    expect(bar("Refine")).toBeTruthy();
+    // remove the second stage's only glob
+    host.querySelectorAll<HTMLButtonElement>("li.stage:nth-child(2) .glob > button")[0].click();
     await flush();
 
-    expect(host.querySelector(".rung summary")).toBeNull();
-    expect(host.textContent).toContain("Save the plan to see what its stages free");
-    // …and Run all is refused meanwhile, because it would run the saved plan
-    expect(button("Run all")!.disabled).toBe(true);
+    // a plan is cumulative, so stage 1's facts still hold and stage 2 has none
+    expect(summaries()).toEqual(["+2 → 2 free · Rwp 95.35%", "not applied"]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    expect(bar("Apply and refine")).toBeTruthy();
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
+    expect(select.value).toBe("");
+    expect(select.querySelector("option")?.textContent?.trim())
+      .toBe("Standard (profile only), edited");
+
+    // the bar's Revert puts the plan the project holds back
+    bar("Revert")!.click();
+    await flush();
+    expect(summaries()[1]).toContain("+1 → 3 free");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
   });
 
   it("runs one stage through the same machinery a whole fit uses", async () => {
     const stub = await openPlan();
-    const runs = [...host.querySelectorAll<HTMLButtonElement>("ol.stages > li .rung button")]
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
       .filter((b) => b.textContent?.trim() === "Run this stage");
-    expect(runs).toHaveLength(2);
     runs[1].click();
     await flush();
 
@@ -1244,12 +1426,12 @@ describe("the plan editor", () => {
           ? { body: { ...PLAN, preset: "profile_only" } }
           : { body: PLAN },
     });
-    const select = host.querySelector<HTMLSelectElement>("select")!;
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
     select.value = "profile_only";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
 
-    const put = stub.calls.find((call) => call.method === "PUT");
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.path).toBe("/api/plan");
     expect(put?.body).toEqual({ preset: "profile_only" });
   });
@@ -1266,38 +1448,161 @@ describe("the plan editor", () => {
     expect(host.textContent).toContain("correlation guard");
 
     // …and it offers *every* stage field, because the list is derived from
-    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208).  Those
-    // are pinned to `StageSpec` from python, so a schema field cannot reach
-    // the `.rxt` document and miss this form.
-    const boxes = host.querySelectorAll("ol.stages > li .advanced label");
+    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208)
+    const boxes = host.querySelectorAll("ol.stages > li.stage .advanced label");
     expect(boxes.length).toBe((STAGE_WORDS.length - 1) * PLAN.plan.stages.length);
-    const helped = [...host.querySelectorAll("ol.stages > li:first-child .advanced .help")]
-      .map((n) => n.textContent!.trim());
+    const helped = [...host.querySelectorAll(
+      "ol.stages > li.stage:first-child .advanced .help")].map((n) => n.textContent!.trim());
     expect(helped).toHaveLength(STAGE_WORDS.length - 1);
-    // the two fields that were only reachable through the text document
     expect(helped).toContain("ftol");
     expect(helped).toContain("slack");
   });
 
-  it("reorders stages by drag, and offers to save the edited plan", async () => {
+  it("reorders by the handle, and the bar's Apply stores the edited plan", async () => {
     const stub = await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
     });
-    // jsdom has no DragEvent; the handlers read only the indices they were
-    // bound with, so a plain Event of the same type drives them identically
-    const items = [...host.querySelectorAll("ol.stages > li")];
-    items[1].dispatchEvent(new Event("dragstart", { bubbles: true }));
-    items[0].dispatchEvent(new Event("drop", { bubbles: true }));
+    // jsdom has no layout, so every row's centre is 0 and a drag upwards of
+    // any length carries the second stage past the first
+    const handle = host.querySelector<HTMLElement>('[data-handle="1"]')!;
+    handle.dispatchEvent(new MouseEvent("pointerdown", { clientY: 100, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointermove", { clientY: 60, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointerup", { clientY: 60, bubbles: true }));
     await flush();
+    const names = () => [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
-    expect(names).toEqual(["cell", "scale+bkg"]);
-    button("Save plan")!.click();
+    // the arrow keys move it back
+    host.querySelector<HTMLElement>('[data-handle="0"]')!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await flush();
+    expect(names()).toEqual(["scale+bkg", "cell"]);
+    // ⌘Z in the tab, outside a text field, takes that move back
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
-    const put = stub.calls.find((call) => call.method === "PUT");
+    bar("Apply")!.click();
+    await flush();
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.body.plan.stages.map((s: any) => s.name)).toEqual(["cell", "scale+bkg"]);
     expect(put?.body.plan.correlation_guard).toBe(0.98);
+  });
+
+  it("builds a plan: a stage added, globs typed, the last stage kept", async () => {
+    await openPlan();
+    button("+ Stage")!.click();
+    await flush();
+    const rows = () => host.querySelectorAll("li.stage");
+    expect(rows()).toHaveLength(3);
+    expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
+      .toBe("stage 3");
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add:not(.fix)")[2];
+    add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
+    add.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...rows()[2].querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.atoms.*.biso", "instrument.zero_shift"]);
+    expect(add.value).toBe("");
+
+    // a plan needs a stage, so the last one cannot be removed
+    for (const _ of [0, 1]) {
+      host.querySelector<HTMLButtonElement>(
+        'li.stage button[aria-label^="Remove stage"]')!.click();
+      await flush();
+    }
+    expect(rows()).toHaveLength(1);
+    expect(host.querySelector<HTMLButtonElement>(
+      'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
+  });
+
+  it("fixes in a stage: a row of its own, stored as turn_off, undone by ⌘Z", async () => {
+    // WP-2208: a stage fixes its turn_off after it frees its turn_on
+    const stub = await openPlan(PROJECT, {
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+    });
+    const second = () => host.querySelector("ol.stages > li.stage:nth-child(2)")!;
+    // a stage that fixes nothing has no Fixes row, as in the workshop
+    // prototype; `+ Fix` opens one and puts the cursor in its field
+    expect(second().querySelector(".fixing")).toBeNull();
+    const open = [...second().querySelectorAll<HTMLButtonElement>(".frees button.ghost")]
+      .find((b) => b.textContent?.trim() === "+ Fix")!;
+    open.click();
+    await flush();
+    const row = second().querySelector(".fixing")!;
+    expect(row.textContent).toContain("Fixes");
+    expect(row.querySelectorAll(".chip")).toHaveLength(0);
+    // opening a row is no edit
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    const fix = second().querySelector<HTMLInputElement>("input.add.fix")!;
+    expect(document.activeElement).toBe(fix);
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...second().querySelectorAll(".fixing .chip")].map((n) => n.textContent))
+      .toEqual(["instrument.profile.*"]);
+    // the frees row is untouched, and the stage has lost its resolved facts
+    expect([...second().querySelectorAll(".frees:not(.fixing) .chip")]
+      .map((n) => n.textContent)).toEqual(["phases.*.cell.*"]);
+    expect(summaries()[1]).toBe("not applied");
+
+    // the open row has no `+ Fix` beside the frees any more
+    expect([...second().querySelectorAll(".frees button")].map((b) => b.textContent?.trim()))
+      .not.toContain("+ Fix");
+
+    // ⌘Z takes the fix back, and the plan is the stored one again
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(second().querySelectorAll(".fixing .chip")).toHaveLength(0);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // typed again and applied: the PUT carries the fix
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    bar("Apply")!.click();
+    await flush();
+    // by path: the recovery copy (WP-2209) is a PUT too, sent on a 500 ms timer,
+    // so on a slow machine it lands before Apply's
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
+    expect(put?.body.plan.stages[1].turn_off).toEqual(["instrument.profile.*"]);
+    expect(put?.body.plan.stages[1].turn_on).toEqual(["phases.*.cell.*"]);
+  });
+
+  it("counts what a stage fixed in its rung and in the closing stage", async () => {
+    const resolve = structuredClone(PLAN_RESOLVE) as any;
+    resolve.stages[1].turn_off = ["instrument.zero_shift"];
+    resolve.stages[1].fixes = ["instrument.zero_shift"];
+    resolve.closing = { name: "closing", window_area_tol: 0.001,
+                        fixes: ["instrument.zero_shift"], rwp: 0.44 };
+    const plan = structuredClone(PLAN) as any;
+    plan.plan.stages[1].turn_off = ["instrument.zero_shift"];
+    await openPlan(PROJECT, {
+      "/api/plan": () => ({ body: plan }),
+      "/api/plan/resolve": () => ({ body: resolve }),
+    });
+    expect(summaries()[1]).toContain("+1 −1 → 3 free");
+    // a stored fix draws its row with no `+ Fix` press
+    expect([...host.querySelectorAll("ol.stages > li.stage:nth-child(2) .fixing .chip")]
+      .map((n) => n.textContent)).toEqual(["instrument.zero_shift"]);
+    expect(host.querySelector("ol.stages > li.stage:nth-child(1) .fixing")).toBeNull();
+    const body = host.querySelector("ol.stages > li.stage:nth-child(2) .rung .body")!;
+    expect(body.textContent).toContain("fixed here");
+    expect(body.textContent).toContain("instrument.zero_shift");
+    expect(host.querySelector("li.closing")!.textContent!.replace(/\s+/g, " "))
+      .toContain("keeps 1 fixed");
   });
 });
 
@@ -1426,7 +1731,8 @@ describe("the report panel", () => {
     expect(actions[1].textContent).toContain("already refined by the staged plan");
     expect(actions[2].textContent).toContain("no phase is named yet");
     // one Apply button: the other two are refusals with reasons, not controls
-    expect(host.querySelectorAll(".action button:not(.ghost)").length).toBe(1);
+    expect([...host.querySelectorAll(".action button")]
+      .filter((b) => b.textContent?.trim() === "Apply").length).toBe(1);
     // 0.5 is capped by the collinear templates, so it must not read as confident
     expect(actions[0].dataset.tone).toBe("medium");
   });
@@ -1608,7 +1914,6 @@ describe("disclosure and the command palette", () => {
     const post = stub.calls.find((call) => call.method === "POST" && call.path === "/api/project");
     // settings persist on the verb, not on a later save (WP-1005/1008)
     expect(post?.body).toEqual({ ui: { simple: false } });
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);  // held rows are back
   });
 
   it("opens on Cmd-K and shows the API call behind every command", async () => {
@@ -1654,50 +1959,61 @@ describe("disclosure and the command palette", () => {
     expect(writes[0].body).toEqual({ ui: { console_height: 210 } });
   });
 
-  it("selects the layout from one segmented control, and keeps the plot mounted", async () => {
+  it("collapses either side from its own button, and keeps the plot mounted", async () => {
     vi.stubGlobal("fetch", server(boot()).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1034: the top-level choice is no longer *which pane* — Model and Text
-    // are tabs — it is how much window the panel column gets.  Two options, the
-    // current one lit, and neither click means two things (WP-1029's rule).
-    const group = host.querySelector<HTMLElement>('[aria-label="layout"]')!;
-    const labels = [...group.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Split", "Full"]);
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
+    // WP-2123: each side has a collapse button at its own end of the header,
+    // and one side always stays.  This replaced WP-1034's Split | Full control.
+    const [graphs, model] = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(graphs.getAttribute("aria-label")).toBe("Hide the graphs");
+    expect(model.getAttribute("aria-label")).toBe("Hide the model panel");
+    expect(host.querySelector('[aria-label="layout"]')).toBeNull();
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    expect(host.querySelector(".side .actions button.refine")).not.toBeNull();
 
-    button("Full")!.click();
+    graphs.click();
     await flush();
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(true);
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the tab strip travels with the column, which is what makes this a hatch
-    // for every panel rather than for the two that used to have their own mode
-    // — nine since WP-1016, which needed no mode of its own for exactly this
-    expect(host.querySelectorAll("nav.tabs button").length).toBe(9);
+    // the panel tabs travel with the column, ten since WP-2128
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(10);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
+    // the last side showing cannot hide too
+    expect(model.disabled).toBe(true);
 
-    button("Split")!.click();
+    graphs.click();
     await flush();
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
-    // a layout is a view choice, not a setting: nothing reached the document
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(false);
+    expect(model.disabled).toBe(false);
+
+    model.click();
+    await flush();
+    expect(host.querySelector(".side")?.classList.contains("hidden")).toBe(true);
+    expect(graphs.disabled).toBe(true);
+    expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    // the action bar went with the visible side, so Refine is still a button
+    // on screen; there is one bar, never two
+    expect(host.querySelector(".plotcol .actions button.refine")).not.toBeNull();
+    expect(host.querySelectorAll(".actions").length).toBe(1);
+    // the button did not move: it is still the header's last child
+    expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
-  it("carries nine tabs with no label shortened and every panel reachable", async () => {
+  it("carries ten tabs with no label shortened and every panel reachable", async () => {
     const stub = server({ ...boot(), ...FITTED });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    const tabs = [...host.querySelectorAll<HTMLButtonElement>("nav.tabs button")];
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
-      "Parameters", "Plan", "Peaks", "Model", "Text", "Series", "Report",
-      "History", "Build"]);
+      "Parameters", "Interactive", "Plan", "Peaks", "Model", "Text", "Series",
+      "Report", "History", "Build"]);
     // the overflow rule is `flex-wrap` plus `min-width: max-content`: a strip
     // that hides a tab or elides its name is worse than the mode buttons it
     // replaced, so the *count* and the *labels* are the assertion jsdom can make
@@ -1715,7 +2031,7 @@ describe("disclosure and the command palette", () => {
     }
     // every panel is still in the document after the tour — switching must not
     // throw away a filter, a pending edit or a two-node comparison
-    expect(host.querySelectorAll(".side .panel").length).toBe(9);
+    expect(host.querySelectorAll(".side .panel").length).toBe(10);
   });
 
   it("stamps an explicit theme on the root and persists the choice", async () => {
@@ -1793,7 +2109,7 @@ describe("disclosure and the command palette", () => {
       expect(ink("main", 1)).toBe("#112233");
       expect(ink("resid", 1)).toBe(INK.diff);
       // …and the zero line under the residual, in a token of its own
-      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#88888888"))
+      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#cfcfcf"))
         .toBe(true);
 
       const fetched = curvesFetched(stub);
@@ -2027,6 +2343,32 @@ describe("disclosure and the command palette", () => {
     await flush();
     expect(stub.calls.some((call) => call.path === "/api/run")).toBe(true);
   });
+
+  it("applies pending edits on `r` before it runs, as the button it stands for does", async () => {
+    // WP-2123: `r` is the action bar's primary on the staged plan, which reads
+    // "Apply and refine" while edits wait; running without them dropped them
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    await editValue("phases.0.cell.a", "4.157");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.method === "PATCH")?.body)
+      .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // an invalid edit blocks `r` as it disables the button
+    await editValue("phases.0.cell.a", "abc");
+    const runs = stub.calls.filter((c) => c.path === "/api/run").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/run").length).toBe(runs);
+  });
 });
 
 /**
@@ -2118,10 +2460,10 @@ describe("the text pane", () => {
     });
     await typeInto(TEXTDOC_MOVED);
     expect(host.textContent).toContain("edited");
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);  // still debouncing
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);  // still debouncing
 
     await settle();
-    const put = stub.calls.find((call) => call.method === "PUT")!;
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/textdoc")!;
     expect(put.body).toEqual({ text: TEXTDOC_MOVED, base_revision: "r1", validate_only: true });
     expect(host.textContent).toContain("ready to apply");
   });
@@ -2142,7 +2484,8 @@ describe("the text pane", () => {
     button("Apply ⌘⏎")!.click();
     await flush();
 
-    const applied = stub.calls.filter((c) => c.method === "PUT" && !c.body.validate_only);
+    const applied = stub.calls.filter(
+      (c) => c.method === "PUT" && c.path === "/api/textdoc" && !c.body.validate_only);
     expect(applied).toHaveLength(1);
     expect(applied[0].body.base_revision).toBe("r1");
     // the same verbs a form calls, so the console reads the same either way
@@ -2264,7 +2607,7 @@ describe("the text pane", () => {
     // no validate is even attempted: the server would answer RUN_IN_FLIGHT, and
     // the state refusal outranking a parse complaint is only useful if the pane
     // does not ask a question it knows the answer to
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);
     expect((button("Apply ⌘⏎") as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -2326,118 +2669,284 @@ const CIF_PREVIEW = {
   unknown_species: [],
 };
 
-describe("the import wizard", () => {
+describe("the start screen and the New project dialog", () => {
+  const RECENT = [
+    { path: "/tmp/nac.rex", name: "nac.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+      phases: [["NAC", "I 21 3"]], missing: false },
+    { path: "/gone/old.rex", name: "old.rex", opened_utc: "2026-10-01T10:00:00+00:00",
+      phases: [], missing: true },
+  ];
+
+  /** `GET /api/spacegroup` for `R -3 c`, as the server sends it. */
+  const CORUNDUM = {
+    space_group: "R -3 c", xhm: "R -3 c:H", crystal_system: "trigonal",
+    setting: "R -3 c:H is trigonal on hexagonal axes", free_cell: ["a", "c"],
+    constraints: "b = a",
+  };
+
+  function dialog(): HTMLElement | null {
+    return host.querySelector<HTMLElement>('[role="dialog"][aria-labelledby="np-title"]');
+  }
+
+  function inDialog(text: string): HTMLButtonElement | undefined {
+    return [...(dialog()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent?.trim() === text);
+  }
+
+  function rowFor(name: string): HTMLLIElement {
+    return [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === name)!;
+  }
+
+  async function newProject(routes: Record<string, any> = {}) {
+    const stub = server({ ...boot(null), "/api/recent": () => ({ body: { recent: [] } }),
+                          ...routes });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("New project…")!.click();
+    await flush();
+    return stub;
+  }
+
+  async function stagePattern() {
+    chooseFile(dialog()!.querySelector<HTMLInputElement>('.slot input[type="file"]')!,
+               "nac.fxye");
+    await flush();
+  }
+
   it("stages each file, then commits tokens — nothing exists until Create", async () => {
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
+    const stub = await newProject({
       "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
       "/api/upload/cif": () => ({ body: CIF_PREVIEW }),
       "/api/project/new": () => ({ body: PROJECT }),
     });
-    vi.stubGlobal("fetch", stub.fetcher);
-    app = mount(App, { target: host });
-    await flush();
+    expect(dialog()).toBeTruthy();
+    expect(inDialog("Create project")?.disabled).toBe(true);
+    expect(dialog()!.textContent).toContain("Choose a pattern file.");
 
-    const files = [...host.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-    chooseFile(files[0], "nac.fxye");
-    await flush();
+    await stagePattern();
     // the reader that claimed it, in its own words — not the extension
-    expect(host.textContent).toContain("GSAS raw powder data");
-    expect(host.textContent).toContain("σ from the file");
-    // …and how it was recognised is behind the popover, not always-on prose
-    // (WP-1205): the trigger is the format's short name, "gsas".
-    const sniff = [...host.querySelectorAll<HTMLElement>(".help")]
+    expect(dialog()!.textContent).toContain("GSAS raw powder data");
+    expect(dialog()!.textContent).toContain("esd from the file");
+    const sniff = [...dialog()!.querySelectorAll<HTMLElement>(".help")]
       .find((el) => el.textContent?.trim() === "gsas")!;
-    expect(sniff).toBeTruthy();
     sniff.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flush();
-    expect(host.ownerDocument.querySelector(".popover")?.textContent)
-      .toContain("BANK record");
-    // …and the filename went in the query, while the bytes went in the body
+    expect(host.ownerDocument.querySelector(".popover")?.textContent).toContain("BANK record");
     const staged = stub.calls.find((c) => c.path === "/api/upload/pattern")!;
     expect(staged.url).toContain("filename=nac.fxye");
-    expect(staged.body).toBeNull();
     expect(staged.blob).toBeInstanceOf(Blob);
+    // the name and the place follow the file until someone types
+    const [name, where] = [...dialog()!.querySelectorAll<HTMLInputElement>(".pjn input")];
+    expect(name.value).toBe("nac");
+    expect(where.value).toBe("/work");
 
-    chooseFile(files[1], "lab6.cif");
+    inDialog("Add phase")!.click();
     await flush();
-    expect(host.textContent).toContain("P m -3 m");
-    // the aniso checkbox is offered *disabled* when the file has no loop
-    const aniso = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    expect(aniso.disabled).toBe(true);
-    expect(host.textContent).toContain("no aniso loop in this file");
-
-    // the project path was suggested by the pattern step, and the anode by the preset
-    expect(button("Create project")?.disabled).toBe(false);
-    button("Create project")!.click();
+    expect([...dialog()!.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["From a CIF…", "Space group and cell…"]);
+    inDialog("From a CIF…")!.click();
     await flush();
+    expect(dialog()!.querySelector('[role="menu"]')).toBeNull();
+    chooseFile(dialog()!.querySelector<HTMLInputElement>("input.hiddenfile")!, "lab6.cif");
+    await flush();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("LaB6");
+    expect(dialog()!.querySelector(".phl .sg")).toBeTruthy();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("2 sites");
+    // no loop in this file, so nothing to opt into
+    expect(dialog()!.querySelector('input[type="checkbox"]')).toBeNull();
+    // the instrument is assumed, and says so
+    expect(dialog()!.querySelector('[aria-label="Instrument"] .chip')?.textContent)
+      .toBe("assumed");
 
+    inDialog("Create project")!.click();
+    await flush();
     const created = stub.calls.find((c) => c.path === "/api/project/new")!;
-    expect(created.body.pattern).toEqual({ upload: "p1" });
-    expect(created.body.structure).toEqual({ upload: "c1", aniso: false });
-    expect(created.body.instrument).toEqual({ preset: "bragg_brentano", radiation: "CuKa" });
-    expect(created.body.path).toBe("/work/nac.rex");
-    // and the shell adopted it without a second GET /api/project
+    expect(created.body).toEqual({
+      path: "/work/nac.rex", pattern: { upload: "p1" },
+      structure: { upload: "c1", aniso: false },
+      instrument: { preset: "bragg_brentano", radiation: "CuKa" }, mode: "rietveld",
+    });
+    // the shell adopted it without a second GET /api/project, and both went away
+    expect(dialog()).toBeNull();
+    expect(host.querySelector(".start")).toBeNull();
     expect(host.textContent).toContain("synth.xye");
   });
 
   it("shows the reader's refusal and stages nothing", async () => {
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
-      "/api/upload/cif": () => ({ status: 400, body: { error: { code: "UPLOAD_INVALID",
-        message: "could not read a structure from notes.cif: ValueError: "
-                 + "notes.cif:1:0(0): expected block header (data_)" } } }),
+    await newProject({
+      "/api/upload/pattern": () => ({ status: 400, body: { error: { code: "UPLOAD_INVALID",
+        message: "could not read a pattern from notes.txt: no numeric columns" } } }),
     });
-    vi.stubGlobal("fetch", stub.fetcher);
-    app = mount(App, { target: host });
-    await flush();
-
-    const files = [...host.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-    chooseFile(files[1], "notes.cif");
-    await flush();
-
-    expect(host.textContent).toContain("expected block header");
-    expect(button("Create project")?.disabled).toBe(true);
+    await stagePattern();
+    expect(dialog()!.textContent).toContain("no numeric columns");
+    expect(inDialog("Create project")?.disabled).toBe(true);
   });
 
-  it("carries the recent list inside itself, reachable with a project open", async () => {
-    // WP-1034: the only recent list used to be the *empty state's*, so with a
-    // project open there was no route back to another one short of restarting
-    // the program.  The wizard is one component either way (WP-1014), so the
-    // list lives in it and the header's `Open…` is the route.
+  it("makes a typed cell a Le Bail project, without asking for the mode", async () => {
+    const stub = await newProject({
+      "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
+      "/api/spacegroup": () => ({ body: CORUNDUM }),
+      "/api/project/new": () => ({ body: PROJECT }),
+    });
+    await stagePattern();
+    inDialog("Add phase")!.click();
+    await flush();
+    inDialog("Space group and cell…")!.click();
+    await flush();
+    expect(dialog()!.textContent).toContain("Add the typed cell, or cancel it.");
+    const symbol = dialog()!.querySelector<HTMLInputElement>(".tc input")!;
+    symbol.value = "R -3 c";
+    symbol.dispatchEvent(new Event("input", { bubbles: true }));
+    symbol.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    // the boxes are the ones the setting leaves free
+    const boxes = [...dialog()!.querySelectorAll<HTMLInputElement>(".cellgrid input")];
+    expect(boxes).toHaveLength(2);
+    expect(inDialog("Add")?.disabled).toBe(true);
+    for (const [box, value] of [[boxes[0], "4.759"], [boxes[1], "12.99"]] as const) {
+      box.value = value;
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await flush();
+    inDialog("Add")!.click();
+    await flush();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("cell only");
+
+    inDialog("Create project")!.click();
+    await flush();
+    const created = stub.calls.find((c) => c.path === "/api/project/new")!;
+    expect(created.body.structure).toEqual({ space_group: "R -3 c", cell: { a: 4.759, c: 12.99 } });
+    expect(created.body.mode).toBe("lebail");
+    expect("plan" in created.body).toBe(false);
+  });
+
+  it("opens the instrument form on Change…, and a change drops the assumed tag", async () => {
+    await newProject({ "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }) });
+    await stagePattern();
+    expect(dialog()!.querySelector(".iform")).toBeNull();
+    inDialog("Change…")!.click();
+    await flush();
+    const geometry = dialog()!.querySelector<HTMLSelectElement>(".iform select")!;
+    geometry.value = "debye_scherrer";
+    geometry.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(dialog()!.querySelector('[aria-label="Instrument"] .chip')).toBeNull();
+    expect(dialog()!.querySelector(".npf .reason")?.textContent)
+      .toBe("Debye-Scherrer needs a wavelength.");
+    // the wavelength and the radius come first; the rest wait under Advanced
+    const shown = [...dialog()!.querySelector(".iform")!.querySelectorAll(":scope > .fld .help")]
+      .map((el) => el.textContent);
+    expect(shown).toEqual(["wavelength", "radius"]);
+    expect(inDialog("Done")).toBeTruthy();
+  });
+
+  it("closes on Cancel and on Escape, creating nothing", async () => {
+    const stub = await newProject();
+    inDialog("Cancel")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    button("New project…")!.click();
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(stub.calls.some((c) => c.path === "/api/project/new")).toBe(false);
+  });
+
+  it("is reachable over an open project, with a way back", async () => {
+    // WP-1034: with a project open there must be a route to another one short
+    // of restarting the program.  The palette's "Open or create a project"
+    // shows the start screen (the header's Open… became the File menu,
+    // WP-2133), and the project's panes stay mounted behind it.
     const other = { ...PROJECT, path: "/tmp/nac.rex",
                     data: { ...PROJECT.data, filename: "nac.fxye" } };
     const stub = server({
       ...boot(),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
       "/api/project/open": () => ({ body: other }),
     });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    expect(host.textContent).not.toContain("Open a recent project");   // not until asked
+    expect(host.querySelector(".start")).toBeNull();   // not until asked
 
-    button("Open…")!.click();
+    await toStart();
+    expect(host.querySelector(".start")).toBeTruthy();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(true);
+    button("Back to the project")!.click();
     await flush();
-    expect(host.textContent).toContain("Open a recent project");
-    expect(host.textContent).toContain("nothing is unsaved");
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(false);
 
-    button("nac.rex")!.click();
+    await toStart();
+    rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
-    const opened = stub.calls.find((c) => c.path === "/api/project/open")!;
-    expect(opened.body).toEqual({ path: "/tmp/nac.rex" });
-    // the session's project is replaced, and the shell lands on the parameters
+    expect(stub.calls.find((c) => c.path === "/api/project/open")!.body)
+      .toEqual({ path: "/tmp/nac.rex" });
+    expect(host.querySelector(".start")).toBeNull();
     expect(host.textContent).toContain("nac.fxye");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
     expect(host.textContent).toContain("project.open(/tmp/nac.rex)");
   });
 
+  it("keeps a moved project listed, with Locate… and Remove from list", async () => {
+    const after = [RECENT[0]];
+    const stub = server({
+      ...boot(null),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/recent/remove": () => ({ body: { recent: after } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const row = rowFor("old");
+    expect(row.classList.contains("missing")).toBe(true);
+    expect(row.querySelector(".when")?.textContent).toBe("Not found");
+    // its main click cannot open it, so it offers the two verbs that remain
+    row.querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    expect([...row.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["Locate…", "Remove from list"]);
+    expect(stub.calls.some((c) => c.path === "/api/project/open")).toBe(false);
+    // Escape closes the menu and does nothing else
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flush();
+    expect(row.querySelector('[role="menu"]')).toBeNull();
+
+    row.querySelector<HTMLButtonElement>("button.more")!.click();
+    await flush();
+    [...row.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((b) => b.textContent === "Remove from list")!.click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/recent/remove")!.body)
+      .toEqual({ path: "/gone/old.rex" });
+    expect(rowFor("old")).toBeUndefined();
+    expect(rowFor("nac")).toBeTruthy();
+  });
+
+  it("offers Open and Remove from list on a row's ⋯ and on a right-click", async () => {
+    vi.stubGlobal("fetch", server({
+      ...boot(null), "/api/recent": () => ({ body: { recent: RECENT } }),
+    }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    const row = rowFor("nac");
+    row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await flush();
+    expect([...row.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["Open", "Remove from list"]);
+    // a click elsewhere closes it
+    host.querySelector<HTMLElement>(".start h2")!.click();
+    await flush();
+    expect(row.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it("lists the shipped examples and opens one, building it on the way", async () => {
-    // WP-1204: the other half of the empty state.  A new user has no recent
-    // list, so without this the first screen offers only "choose a data file"
-    // to someone who has no data file.
+    // WP-1204: a new user has no recent list, so the first screen shows the
+    // examples alone rather than offering only "choose a file" to someone with none
     const built = { ...PROJECT, path: "/home/me/.rietx/examples/fap.rex",
                     data: { ...PROJECT.data, filename: "FAP.XRA" } };
     const stub = server({
@@ -2450,26 +2959,16 @@ describe("the import wizard", () => {
     app = mount(App, { target: host });
     await flush();
 
-    expect(host.textContent).toContain("Open an example");
-    expect(host.textContent).toContain("APS 11-BM");
-    // the description is what says which one to pick, so it is on the row
+    expect([...host.querySelectorAll(".start h2")].map((h) => h.textContent)).toEqual(["Examples"]);
     expect(host.textContent).toContain("one of them you did not ask for");
-    // Reset appears only where there is a copy to throw away
-    expect(button("Reset")).toBeTruthy();
-    expect(host.querySelectorAll("section.examples button.ghost")).toHaveLength(1);
-
-    [...host.querySelectorAll<HTMLButtonElement>("section.examples button.pick")]
-      .find((b) => b.textContent?.includes("fluorapatite"))!.click();
+    rowFor(EXAMPLES[0].title).querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
-
-    const opened = stub.calls.find((c) => c.path === "/api/examples/open")!;
-    expect(opened.body).toEqual({ name: "fap" });
-    // an example is a project like any other from the moment it exists
+    expect(stub.calls.find((c) => c.path === "/api/examples/open")!.body).toEqual({ name: "fap" });
     expect(host.textContent).toContain("FAP.XRA");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
   });
 
-  it("resets an example through its own verb, not by opening it again", async () => {
+  it("opens a fresh copy of an example through its own verb, only once one is built", async () => {
     const fresh = { ...PROJECT, path: "/home/me/.rietx/examples/nac.rex" };
     const stub = server({
       ...boot(null),
@@ -2481,50 +2980,53 @@ describe("the import wizard", () => {
     app = mount(App, { target: host });
     await flush();
 
-    button("Reset")!.click();
+    const unbuilt = rowFor(EXAMPLES[0].title);
+    unbuilt.querySelector<HTMLButtonElement>("button.more")!.click();
     await flush();
-    expect(stub.calls.find((c) => c.path === "/api/examples/reset")!.body)
-      .toEqual({ name: "nac" });
+    const freshItem = (li: HTMLElement) => [...li.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"]')].find((b) => b.textContent === "Open a fresh copy")!;
+    expect(freshItem(unbuilt).disabled).toBe(true);
+
+    const builtRow = rowFor(EXAMPLES[1].title);
+    builtRow.querySelector<HTMLButtonElement>("button.more")!.click();
+    await flush();
+    freshItem(builtRow).click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/examples/reset")!.body).toEqual({ name: "nac" });
     expect(stub.calls.some((c) => c.path === "/api/examples/open")).toBe(false);
   });
 
-  it("shows a refused example beside the list that asked for it", async () => {
+  it("shows a refused example on the start screen", async () => {
     const message = "could not build the nac example: [Errno 28] No space left";
-    const stub = server({
+    vi.stubGlobal("fetch", server({
       ...boot(null),
       "/api/recent": () => ({ body: { recent: [] } }),
       "/api/examples": () => ({ body: { examples: EXAMPLES } }),
       "/api/examples/open": () => ({ status: 500, body: {
         error: { code: "EXAMPLE_BUILD_FAILED", message } } }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
-
-    host.querySelector<HTMLButtonElement>("section.examples button.pick")!.click();
+    host.querySelector<HTMLButtonElement>(".start button.row")!.click();
     await flush();
-    expect(host.textContent).toContain(message);
+    expect(host.querySelector(".start .bad")?.textContent).toContain(message);
   });
 
-  it("shows a refused open beside the list that asked for it", async () => {
+  it("shows a refused open on the start screen, and the open project stays open", async () => {
     const message = "file has changed since the project was created (sha256 1a2b3c4d)";
-    const stub = server({
+    vi.stubGlobal("fetch", server({
       ...boot(),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
       "/api/project/open": () => ({ status: 400,
         body: { error: { code: "PROJECT_ERROR", message } } }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
-    button("Open…")!.click();
+    await toStart();
+    rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
-    button("nac.rex")!.click();
-    await flush();
-
-    // verbatim, in the wizard, and the project that was open is still open —
-    // every Project.open refusal names a different remedy (WP-1008)
-    expect(host.querySelector(".wizard .bad")?.textContent).toContain("sha256 1a2b3c4d");
+    // verbatim: every Project.open refusal names a different remedy (WP-1008)
+    expect(host.querySelector(".start .bad")?.textContent).toContain("sha256 1a2b3c4d");
     expect(host.textContent).toContain("synth.xye");
   });
 
@@ -2556,13 +3058,9 @@ describe("the import wizard", () => {
     button("Open…")!.click();
     await flush();
     expect(stub.calls.some((c) => c.path === "/api/fs")).toBe(true);
-    // a plain directory and a project are different rows: only the project
-    // gets a `.pick` "open" affordance
     expect(host.querySelector(".backdrop ul")?.textContent).toContain("rietx-projects");
     const openRow = [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
       .find((b) => b.textContent?.includes("nac.rex"))!;
-    expect(openRow).toBeTruthy();
-
     openRow.click();
     await flush();
     expect(stub.calls.find((c) => c.path === "/api/project/open")!.body)
@@ -2589,79 +3087,178 @@ describe("the import wizard", () => {
     await flush();
     const calls = stub.calls.filter((c) => c.path === "/api/fs");
     expect(calls[calls.length - 1].url).toContain("rietx-projects");
-    expect(host.querySelector(".backdrop")).toBeTruthy();   // still open — a navigation, not a project
+    expect(host.querySelector(".backdrop")).toBeTruthy();   // a navigation, not a project
     expect(host.querySelector(".backdrop .none")?.textContent).toBe("nothing here");
   });
 
-  it("settles the wizard after opening a different project from over one already open", async () => {
-    // The bug this closes (WP-1205): `Model` used to be mounted twice — the
-    // empty-state wizard and the Model tab were separate component
-    // instances, each its own `wizardOpen`.  Opening a *different* project
-    // from the tab instance's own wizard left it painted over the freshly
-    // opened one, because `project` stayed truthy the whole time and nothing
-    // ever tore the instance down to reset it.
+  it("settles the start screen after opening a different project over one already open", async () => {
+    // WP-1205's bug one screen along: an opener that forgot to settle what was
+    // drawn over the project left it painted over the freshly opened one.
     const other = { ...PROJECT, path: "/home/me/nac.rex",
                     data: { ...PROJECT.data, filename: "nac.fxye" } };
-    const stub = server({
-      ...boot(),   // a project is already open
+    vi.stubGlobal("fetch", server({
+      ...boot(),
       "/api/recent": () => ({ body: { recent: [] } }),
       "/api/fs": () => ({ body: FS_HOME }),
       "/api/project/open": () => ({ body: other }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
-    expect(host.textContent).toContain("Structure & instrument");   // not the wizard
-
     button("Model")!.click();
     await flush();
-    button("Open…")!.click();      // the App-level header button (startImport)
+    await toStart();
+    host.querySelector<HTMLButtonElement>(".start .left button.ghost")!.click();   // Start's Open…
     await flush();
-    expect(host.textContent).toContain("New project");
-
-    button("Browse for a project…")!.click();
+    [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
+      .find((b) => b.textContent?.includes("nac.rex"))!.click();
     await flush();
-    const openRow = [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
-      .find((b) => b.textContent?.includes("nac.rex"))!;
-    openRow.click();
-    await flush();
-
-    // the wizard is gone — the panel shows the freshly-opened project's model,
-    // never the wizard painted over it (checked on the heading and the wizard
-    // markup itself, not a text search: "New project…" is also the button
-    // that reopens it, and stays in the DOM whenever the wizard is closed)
-    expect(host.querySelector(".model header h1")?.textContent).toBe("Structure & instrument");
-    expect(host.querySelector(".model .wizard")).toBeNull();
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(false);
+    expect(host.textContent).toContain("nac.fxye");
   });
 
-  it("browses to a different directory for a new project, keeping the suggested name", async () => {
-    // A browser cannot suggest a new folder's name, only where it should
-    // live — so picking a directory swaps the *parent* of the path the
-    // staged pattern already suggested, rather than replacing it outright.
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
+  it("browses to a different folder for a new project, keeping the name", async () => {
+    await newProject({
       "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
       "/api/fs": () => ({ body: FS_HOME }),
     });
+    await stagePattern();
+    const fields = () => [...dialog()!.querySelectorAll<HTMLInputElement>(".pjn input")];
+    expect(fields()[1].value).toBe("/work");   // PATTERN_PREVIEW's suggestion
+
+    inDialog("Browse…")!.click();
+    await flush();
+    expect(host.querySelector(".backdrop .panel")).toBeTruthy();
+    // Escape closes the browser and leaves the dialog open
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flush();
+    expect(dialog()).toBeTruthy();
+    inDialog("Browse…")!.click();
+    await flush();
+    button("Use this directory")!.click();
+    await flush();
+    expect(fields()[1].value).toBe("/home/me");
+    expect(fields()[0].value).toBe("nac");
+  });
+});
+
+describe("the File menu on the project name", () => {
+  // WP-2133, after the maintainer's save model A (2026-11-07)
+  function trigger(): HTMLButtonElement {
+    return host.querySelector<HTMLButtonElement>("header .fm-name")!;
+  }
+  function entry(label: string): HTMLButtonElement | undefined {
+    return [...host.querySelectorAll<HTMLButtonElement>(".fm-menu button.item")]
+      .find((b) => b.querySelector(".label")?.textContent === label);
+  }
+
+  it("opens from the name, and Escape closes it without touching the run", async () => {
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }) });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
+    expect(trigger().textContent).toBe("lab6▾");
+    // the header's own Open… is gone: File › Open… is its place now
+    expect([...host.querySelectorAll("header button")].some((b) => b.textContent === "Open…"))
+      .toBe(false);
 
-    const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-    chooseFile(fileInput, "nac.fxye");
+    trigger().click();
     await flush();
-    const pathInput = () => host.querySelector<HTMLInputElement>(".steps input.wide")!;
-    expect(pathInput().value).toBe("/work/nac.rex");   // PATTERN_PREVIEW's suggestion
+    expect(host.querySelector(".fm-menu")).toBeTruthy();
+    expect(entry("Save a copy…")?.disabled).toBe(false);
+    expect(entry("Open recent")?.disabled).toBe(true);    // nothing else to open
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(host.querySelector(".fm-menu")).toBeNull();
+    expect(stub.calls.some((c) => c.path === "/api/run/cancel")).toBe(false);
+  });
 
-    button("Browse…")!.click();
+  it("renames in place and keeps the project open", async () => {
+    const renamed = { ...PROJECT, path: "/tmp/hexaboride.rex" };
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/rename": () => ({ body: renamed }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
     await flush();
-    expect(host.querySelector(".backdrop")).toBeTruthy();
+    trigger().click();
+    await flush();
+    entry("Rename…")!.click();
+    await flush();
+    const box = host.querySelector<HTMLInputElement>("header input.fm-rename")!;
+    expect(box.value).toBe("lab6");
+    box.value = "hexaboride";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/project/rename")!.body)
+      .toEqual({ name: "hexaboride" });
+    expect(trigger().textContent).toBe("hexaboride▾");
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.textContent).toContain('Path("/tmp/lab6.rex").rename("/tmp/hexaboride.rex")');
+  });
 
-    button("Use this directory")!.click();
+  it("asks before replacing an export, with the dialog's own button", async () => {
+    let tries = 0;
+    const stub = server({
+      ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+      "/api/export/instrument_profile": (call) => (tries++ === 0
+        ? { status: 409, body: { error: { code: "DESTINATION_EXISTS",
+                                          message: "/tmp/instrument_profile.json exists" } } }
+        : { body: { path: `${call.body.directory}/${call.body.filename}`,
+                    name: call.body.filename } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
     await flush();
-    expect(host.querySelector(".backdrop")).toBeNull();
-    expect(pathInput().value).toBe("/home/me/nac.rex");   // the parent moved, the name did not
+    trigger().click();
+    await flush();
+    entry("Export")!.click();
+    await flush();
+    // no fit yet: only the instrument profile, which the project answers
+    expect(entry("Refined structure (CIF)…")?.disabled).toBe(true);
+    entry("Instrument profile (JSON)…")!.click();
+    await flush();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"][aria-labelledby="fm-title"]')!;
+    const inputs = [...dialog.querySelectorAll<HTMLInputElement>("input")];
+    expect(inputs.map((i) => i.value)).toEqual(["instrument_profile.json", "/tmp"]);
+    const submit = () => dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit().textContent?.trim()).toBe("Export");
+    submit().click();
+    await flush();
+    expect(dialog.textContent).toContain("exists");
+    expect(submit().textContent?.trim()).toBe("Replace");
+    submit().click();
+    await flush();
+    const sent = stub.calls.filter((c) => c.path === "/api/export/instrument_profile");
+    expect(sent.map((c) => c.body.overwrite)).toEqual([false, true]);
+    expect(host.querySelector('[aria-labelledby="fm-title"]')).toBeNull();
+    expect(host.querySelector(".fm-toast")?.textContent).toBe("Exported instrument_profile.json");
+  });
+
+  it("closes to the start screen", async () => {
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/close": () => ({ body: { closed: "/tmp/lab6.rex" } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    trigger().click();
+    await flush();
+    entry("Close project")!.click();
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/project/close")).toBe(true);
+    expect(host.querySelector(".start")).toBeTruthy();
+    expect(trigger().textContent).toBe("No project▾");
+  });
+
+  it("answers ⌘S with Saved, there being nothing unsaved", async () => {
+    const stub = server({ ...boot(), "/api/project/save": () => ({ body: PROJECT }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", metaKey: true, bubbles: true }));
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/project/save")).toBe(true);
+    expect(host.querySelector(".fm-toast")?.textContent).toBe("Saved");
   });
 });
 
@@ -2928,8 +3525,11 @@ describe("the model editor", () => {
       box.dispatchEvent(new Event("change", { bubbles: true }));
       await flush();
     }
-    // back where it started: nothing pending, so there is nothing to apply
-    expect(button("Apply")).toBeFalsy();
+    // back where it started: nothing pending, so there is nothing to apply —
+    // the Model panel draws no Apply, and the action bar's stays disabled
+    expect([...host.querySelectorAll(".panel button")]
+      .find((b) => b.textContent?.trim() === "Apply")).toBeFalsy();
+    expect(button("Apply")?.disabled).toBe(true);
     expect(stub.calls.some((c) => c.method === "PATCH" && c.path === "/api/params"))
       .toBe(false);
   });
@@ -3571,7 +4171,7 @@ describe("the structure viewer", () => {
     await flush();
     expect(lifecycle.disposed).toBe(given + 1);
     const before = stub.calls.filter((c) => c.path === "/api/structure3d").length;
-    expect(host.querySelector('input[type="range"]')).toBeNull();
+    expect(host.querySelector('.viewer input[type="range"]')).toBeNull();
     field("phases.0.cell.a").value = "4.3";
     field("phases.0.cell.a").dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -4419,6 +5019,46 @@ describe("the peaks tab (WP-1027)", () => {
     expect(host.querySelector<HTMLElement>(".rx-ring")!.style.borderColor).toBe(probe.style.color);
   });
 
+  it("clips every layer it draws to the plot area, at a zoom that cuts one", async () => {
+    // the report (WP-2200): zoomed into a peak, the peak fit's dashes ran left
+    // of the y axis into its gutter. uPlot clips its own series and leaves a
+    // hook's strokes alone, so every layer is held to the pane's plot area.
+    const withGroups = {
+      ...PEAKS_PAYLOAD,
+      groups: [{ two_theta: [8.5, 9.5, 10.5], y_fit: [1, 5, 1], delta: [0, 0, 0] }],
+    };
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/result/curves": fitCurves({
+        two_theta: [3, 6, 9, 9.4, 10, 12, 14, 18, 23.995], y_obs: [1, 2, 1, 2, 5, 3, 4, 1, 1],
+        header: { ticks: { NAC: [9.1, 12], CaF2: [9.3] } } }),
+      "/api/peaks": () => ({ body: withGroups }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await dragOver(9, 14);
+
+    const box = (u: StubPlot) => [u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height];
+    /** Every pane's strokes and fills beyond uPlot's own series, each under its pane's clip. */
+    const unclipped = () => (["main", "ticks", "resid"] as const).flatMap((key) =>
+      pane(key).marks.filter((m) => m.op !== "series" && JSON.stringify(m.clip) !== JSON.stringify(box(pane(key))))
+        .map((m) => `${key} ${m.op} ${m.style}`));
+    // the model's view: the tick rows and the residual's zero line
+    expect(tickInks().length).toBeGreaterThan(0);
+    expect(pane("resid").marks.some((m) => m.op === "stroke")).toBe(true);
+    expect(unclipped()).toEqual([]);
+
+    button("Peaks")!.click();
+    await flush();
+    const main = pane("main");
+    const fit = main.marks.find((m) => m.op === "stroke" && m.style === INK.peakfit)!;
+    // the zoom cut the group: its first point is left of the plot area
+    expect(fit.points!.some(([x]) => x < main.bbox.left)).toBe(true);
+    expect(main.marks.some((m) => m.style === INK.peak)).toBe(true);
+    expect(unclipped()).toEqual([]);
+  });
+
   it("clears the plot to the data and puts back what was there before", async () => {
     // "an easy way to hide everything except the data" — and the way back is
     // the state the plot was in, not everything on: a user who had already
@@ -4455,27 +5095,69 @@ describe("the peaks tab (WP-1027)", () => {
     expect(stub.calls.filter((c) => c.method === "POST" && c.path === "/api/project")).toEqual([]);
   });
 
-  it("disables Adopt for a medium candidate and quotes the server's why", async () => {
-    vi.stubGlobal("fetch", server({}).fetcher);
+  it("offers Adopt on a medium candidate, with the server's why beside it (WP-2130)", async () => {
+    const stub = server({
+      "/api/index/adopt": (call: Call) => ({ body: { node_id: "n0008", mode: "lebail",
+        picked: false, api_call: `session.adopt_candidate(${call.body.candidate})` } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    const why = "not best_or_none()'s pick: grade 'medium' (shift_allowance_assumed)";
     app = mount(Peaks, { target: host, props: {
       peaks: PEAKS_PAYLOAD as any,
       indexAnswer: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium' (shift_allowance_assumed); only the one candidate best_or_none() returns can be adopted" }],
+        adopt: [{ picked: false, why }],
         refuting_caveats: ["predicted_but_absent"], running: false,
       },
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
 
+    // Yue's ruling B (2026-11-08): any candidate can be adopted, and one the
+    // gate did not pick says its grade and caveats beside the button
     const adopt = button("Adopt")!;
-    // the gate does not leak into the UI: the button follows the server's arm
-    expect(adopt.disabled).toBe(true);
-    expect(adopt.title).toContain("medium");
+    expect(adopt.disabled).toBe(false);
+    expect(adopt.closest("tr")!.querySelector(".why")!.textContent).toBe(why);
+    // never a confident singleton: no row wears the gate's badge, and the
+    // list says it is ranked
+    expect(host.querySelector("tr.best")).toBeNull();
     expect(host.textContent).toContain("the list below is ranked, not chosen");
+    adopt.click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/index/adopt")?.body)
+      .toEqual({ candidate: 0 });
   });
 
-  it("enables Adopt only when the server's arm allows, and sends the candidate", async () => {
+  it("says what the search covered even when it found candidates (WP-1042, WP-2130)", async () => {
+    vi.stubGlobal("fetch", server({}).fetcher);
+    app = mount(Peaks, { target: host, props: {
+      peaks: PEAKS_PAYLOAD as any,
+      indexAnswer: {
+        result: {
+          candidates: [MEDIUM_CANDIDATE], quality: null,
+          systems_searched: ["cubic", "hexagonal", "trigonal"],
+          search_complete: { cubic: true, hexagonal: true, trigonal: false },
+          diagnostics: [{ level: "warning", code: "INDEX_BUDGET_EXHAUSTED",
+            message: "The run hit its declared ceiling of 120 s, so the answer covers what was reached.",
+            where: ["truncated: trigonal", "not reached: orthorhombic, monoclinic, triclinic"] }],
+        },
+        adopt: [{ picked: false, why: "not best_or_none()'s pick: grade 'medium'" }],
+        refuting_caveats: [], running: false,
+      },
+      run: IDLE_RUN as any, busy: false,
+    } });
+    await flush();
+
+    const coverage = host.querySelector(".coverage")!.textContent!;
+    expect(coverage).toContain("Searched: cubic, hexagonal, trigonal");
+    expect(coverage).toContain("Search incomplete in trigonal");
+    expect(coverage).toContain("INDEX_BUDGET_EXHAUSTED");
+    expect(coverage).toContain("not reached: orthorhombic, monoclinic, triclinic");
+    // and the candidates are still listed below it
+    expect(button("Adopt")).toBeTruthy();
+  });
+
+  it("badges the gate's pick and sends the candidate", async () => {
     const stub = server({
       "/api/index/adopt": (call: Call) => ({ body: { node_id: "n0007", mode: "lebail",
         api_call: `session.adopt_candidate(${call.body.candidate})` } }),
@@ -4487,7 +5169,7 @@ describe("the peaks tab (WP-1027)", () => {
         result: { candidates: [{ ...MEDIUM_CANDIDATE, confidence: "high",
                                  confidence_caveats: [] }],
                   diagnostics: [], quality: null },
-        adopt: [{ allowed: true, why: "" }],
+        adopt: [{ picked: true, why: "" }],
         refuting_caveats: [], running: false,
       },
       run: IDLE_RUN as any, busy: false,
@@ -4559,7 +5241,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
   const INDEX_ANSWER = {
     "/api/index/result": () => ({ body: {
       result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-      adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+      adopt: [{ picked: false, why: "confidence is 'medium'" }],
       refuting_caveats: [], running: false,
     } }),
     "/api/index/ticks": () => ({ body: {
@@ -4856,7 +5538,7 @@ describe("the hover readout (WP-1213)", () => {
       "/api/peaks": () => ({ body: PEAKS_PAYLOAD }),
       "/api/index/result": () => ({ body: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+        adopt: [{ picked: false, why: "confidence is 'medium'" }],
         refuting_caveats: [], running: false } }),
       "/api/index/ticks": () => ({ body: {
         candidate: 0, space_group: "R -3 m :H", two_theta: [9.398, 12.0],
@@ -4884,13 +5566,13 @@ describe("the hover readout (WP-1213)", () => {
 });
 
 describe("the extinction screen table (WP-1027)", () => {
-  it("ranks classes, lists every space group, and keeps chips inert without the adopt verdict", async () => {
+  it("ranks classes, lists every space group, and offers every unrefuted one", async () => {
     vi.stubGlobal("fetch", server({}).fetcher);
     app = mount(Peaks, { target: host, props: {
       peaks: PEAKS_PAYLOAD as any,
       indexAnswer: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+        adopt: [{ picked: false, why: "confidence is 'medium'" }],
         refuting_caveats: [], running: false,
       },
       extinction: EXTINCTION(null),
@@ -4914,8 +5596,11 @@ describe("the extinction screen table (WP-1027)", () => {
     // both members of the class render — the singleton is unmeasurable…
     expect(host.textContent).toContain("P 63/m");
     expect(host.textContent).toContain("P 63");
-    // …and with the candidate not adoptable, no space-group chip is a button
-    expect(button("P 63")).toBeFalsy();
+    // …and any candidate can be adopted (Yue's ruling B, 2026-11-08), so an
+    // unrefuted class's members are buttons even off the gate's pick, while a
+    // refuted class's stay facts
+    expect(button("P 63")).toBeTruthy();
+    expect(button("P 63 c m")).toBeFalsy();
     // the not-separable info must be shown (it is information, not a footnote)
     expect(host.textContent).toContain("EXTINCTION_GROUPS_NOT_SEPARABLE");
   });
@@ -4932,7 +5617,7 @@ describe("the extinction screen table (WP-1027)", () => {
         result: { candidates: [{ ...MEDIUM_CANDIDATE, confidence: "high",
                                  confidence_caveats: [] }],
                   diagnostics: [], quality: null },
-        adopt: [{ allowed: true, why: "" }],
+        adopt: [{ picked: true, why: "" }],
         refuting_caveats: [], running: false,
       },
       extinction: EXTINCTION(0),
@@ -4997,7 +5682,7 @@ describe("the series panel", () => {
   }
 
   /** `--warn` as the panel falls back to it: jsdom loads no stylesheet. */
-  const WARN = "#b7791f";
+  const WARN = "#7d5f00";
 
   /** The panel's icon buttons, which have no label to search by. */
   function icons(glyph: string): HTMLButtonElement[] {
@@ -5052,7 +5737,7 @@ describe("the series panel", () => {
     expect(icons("↑")[0].disabled).toBe(true);
     icons("↑")[0].click();
     await flush();
-    expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
+    expect(stub.calls.some((c) => c.method === "PUT" && c.path === "/api/series")).toBe(false);
   });
 
   it("puts the forward/backward gap where it cannot be missed", async () => {
@@ -5115,7 +5800,7 @@ describe("the series panel", () => {
     // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.obs).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
     expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);
@@ -5243,7 +5928,7 @@ describe("the series panel", () => {
     carry.value = "phases.* instrument.zero_shift";
     carry.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
-    const put = stub.calls.filter((c) => c.method === "PUT").at(-1);
+    const put = stub.calls.filter((c) => c.method === "PUT" && c.path === "/api/series").at(-1);
     expect(put?.body.carry).toEqual(["phases.*", "instrument.zero_shift"]);
   });
 });
@@ -5400,11 +6085,9 @@ describe("the search controls (WP-1045)", () => {
 });
 
 describe("the help popover", () => {
-  /** The `.help` term inside the row whose leaf is `leaf`. */
-  function term(leaf: string): HTMLElement {
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-    return row!.querySelector<HTMLElement>(".path .help")!;
+  /** The `.help` term naming the row labelled `label`. */
+  function term(label: string): HTMLElement {
+    return rowLabelled(label).querySelector<HTMLElement>(".label .help")!;
   }
 
   const popover = () => host.querySelector<HTMLElement>(".popover");
@@ -5446,7 +6129,7 @@ describe("the help popover", () => {
     await openTable();
     // `phases.*.scale` is a live family the fixture corpus does not carry —
     // exactly the shape of a key the corpus has not caught up with
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(popover()!.textContent).toContain("Not described yet");
   });
@@ -5455,7 +6138,7 @@ describe("the help popover", () => {
     await openTable();
     term("a").click();
     await flush();
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(host.querySelectorAll(".popover").length).toBe(1);
     expect(popover()!.textContent).toContain("Not described yet");
@@ -5498,7 +6181,7 @@ describe("the help popover", () => {
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    const trigger = host.querySelector<HTMLElement>(".path .help")!;
+    const trigger = host.querySelector<HTMLElement>(".params .label .help")!;
     trigger.click();
     await flush();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -5564,9 +6247,10 @@ describe("the help popover", () => {
 
   it("carries a held row's reason, which is the verb's own words", async () => {
     await openTable();
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === "alpha")!;
-    row.querySelector<HTMLElement>(".vary .help")!.click();
+    // α is held by the setting, so it sits behind the Cell group's fold line
+    host.querySelector<HTMLElement>(".params .fold")!.click();
+    await flush();
+    rowLabelled("α").querySelector<HTMLElement>(".mark .help")!.click();
     await flush();
     // no corpus can hold this: it is about one row, not about one name
     expect(popover()!.textContent).toContain("structurally fixed by symmetry");
@@ -5641,7 +6325,7 @@ describe("the first-run checklist (WP-1017)", () => {
     tabs().find((t) => t.textContent?.trim() === "Report")!.click();
     await flush();
     // every step done, so the strip says so rather than counting
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
 
     tabs().find((t) => t.textContent?.trim() === "History")!.click();
     await flush();
@@ -5655,7 +6339,7 @@ describe("the first-run checklist (WP-1017)", () => {
     // fix this read "1 left" — the reset had been put in `readUi()`, which
     // `moved()` calls on every head move, so reading the report and then
     // checking a node out un-ticked the step the person had just finished.
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
   });
 
   it("stays hidden on a project that dismissed it before", async () => {
@@ -5665,5 +6349,254 @@ describe("the first-run checklist (WP-1017)", () => {
     await flush();
 
     expect(host.querySelector(".checklist")).toBeNull();
+  });
+});
+
+describe("the Interactive tab (WP-2128)", () => {
+  /** What `POST /api/preview` answers: the model at the asked values over the
+   *  fitted channels, and the residuals the curves route sends. */
+  const preview = () => ({ body: pack(
+    { evaluated: "frozen", head: "n0002", rwp: 0.183, values: {}, phases: ["NAC"],
+      ticks: {}, tick_hkl: {} },
+    { two_theta: [9, 9.4], y_calc: [1.1, 1.9], y_background: [0, 0],
+      delta: [0.1, -0.1], delta_raw: [0.1, -0.1], cumulative_chi2: [0.01, 0.02] }) });
+
+  async function openInteractive() {
+    const stub = server({ ...boot(), ...FITTED, "/api/preview": preview });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Interactive")!.click();
+    await flush();
+    return stub;
+  }
+
+  /** The action bar's own button, never another panel's of the same name. */
+  function bar(label: string): HTMLButtonElement {
+    return [...host.querySelectorAll<HTMLButtonElement>(".actions button")]
+      .find((b) => b.textContent?.trim() === label)!;
+  }
+
+  function panel(): HTMLElement {
+    return [...host.querySelectorAll<HTMLElement>(".side .panel")]
+      .find((p) => !p.classList.contains("hidden"))!;
+  }
+
+  it("gives a slider to each refinable value of a family, and none to a tied one", async () => {
+    await openInteractive();
+    const tracks = panel().querySelectorAll('input[type="range"]');
+    // w, the scale and a: b follows a and gets none, alpha is locked, Biso is
+    // not a slider family
+    expect(tracks.length).toBe(3);
+    expect(panel().textContent).toContain("Instrument");
+  });
+
+  it("previews a drag, says it is a preview, and commits nothing until Apply", async () => {
+    const stub = await openInteractive();
+    const track = panel().querySelector<HTMLInputElement>('input[type="range"]')!;
+    track.value = "900";
+    track.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    const asked = stub.calls.filter((c) => c.path === "/api/preview");
+    expect(asked.length).toBe(1);
+    expect(asked[0].method).toBe("POST");
+    expect(Object.keys(asked[0].body.values)).toEqual(["instrument.profile.w"]);
+    // the title line says what the graph shows, with both statistics
+    const title = host.querySelector(".gtitle")!.textContent!.replace(/\s+/g, " ");
+    expect(title).toContain("Preview, not refined");
+    expect(title).toContain("18.300%");
+    expect(title).toContain("last fit 21.600%");
+    expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
+
+    bar("Apply").click();
+    await flush();
+    const patch = stub.calls.find((c) => c.method === "PATCH" && c.path === "/api/params")!;
+    expect(Object.keys(patch.body.values)).toEqual(["instrument.profile.w"]);
+    expect(host.querySelector(".gtitle")!.textContent).not.toContain("Preview");
+  });
+
+  it("takes a typed value, and Revert takes the preview down", async () => {
+    const stub = await openInteractive();
+    panel().querySelector<HTMLButtonElement>("button.num")!.click();
+    await flush();
+    const input = panel().querySelector<HTMLInputElement>("input.typed")!;
+    input.value = "0.005";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    const asked = stub.calls.filter((c) => c.path === "/api/preview");
+    expect(asked.at(-1)!.body.values).toEqual({ "instrument.profile.w": 0.005 });
+
+    bar("Revert").click();
+    await flush();
+    expect(host.querySelector(".gtitle")!.textContent).toContain("Last fit");
+    expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
+  });
+
+  it("frames single peaks in a graph tab of their own", async () => {
+    await openInteractive();
+    button("Single peaks")!.click();
+    await flush();
+    // the two-channel fixture has no ticks, so the graph says why it is empty
+    expect(host.textContent).toContain("No fitted peaks to frame yet.");
+  });
+});
+
+describe("unapplied edits kept across a close (WP-2209)", () => {
+  const KEPT_PARAMS = { edits: { "phases.0.cell.a": "4.2" }, vary: {}, hold: {}, limits: {},
+                        restraints: {}, positions: {} };
+  const KEPT = { count: 1, params: KEPT_PARAMS, interactive: null, plan: null };
+  const wait = async (ms = 600) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await flush();
+  };
+  const recoveryPuts = (stub: { calls: Call[] }) =>
+    stub.calls.filter((c) => c.path === "/api/recovery" && c.method === "PUT");
+  const dialog = () => document.querySelector<HTMLElement>(".rc-dialog");
+  function kept(answer: unknown) {
+    return { "/api/recovery": (call: Call) => ({ body: call.method === "GET" ? answer : {} }) };
+  }
+
+  it("offers the kept edits on open, and Restore puts them back as pending", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: "2026-11-10T09:05:00+00:00", head: "n0000", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
+    expect(dialog()?.textContent).not.toContain("since");
+
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    // the server holds exactly these, so nothing is written until they change
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("says when the project has moved since, and Discard deletes the copy", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: null, head: "n0099", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.textContent).toContain(
+      "The project has been refined or edited since. Restored values will replace the current ones.");
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Discard")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(recoveryPuts(stub).map((c) => c.body))
+      .toEqual([{ project: "/tmp/lab6.rex", head: null, draft: null }]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+  });
+
+  it("closes on Escape keeping the copy, and offers it again at the next open", async () => {
+    // the maintainer's ruling of 2026-11-10: Escape restores nothing,
+    // discards nothing, and the offer returns when the project next opens
+    const stub = server({
+      ...boot(), ...kept({ draft: KEPT, saved_utc: null, head: "n0000", head_now: "n0000" }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/lab6.rex", name: "lab6.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: PROJECT }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeTruthy();
+    const cancels = stub.calls.filter((c) => c.path === "/api/cancel").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(dialog()).toBeNull();
+    // nothing restored, and the shell's Escape never heard it
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    expect(stub.calls.filter((c) => c.path === "/api/cancel")).toHaveLength(cancels);
+    // an edit made meanwhile never overwrites the copy set aside
+    await editValue("phases.0.cell.a", "4.3");
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "lab6")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("keeps an edit as it is made, and deletes the copy once it is reverted", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeNull();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(recoveryPuts(stub)).toEqual([]);   // half a second after the last change
+    await wait();
+    const [first] = recoveryPuts(stub);
+    expect(first.body.project).toBe("/tmp/lab6.rex");
+    expect(first.body.head).toBe("n0000");
+    expect(first.body.draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+
+    button("Revert")!.click();
+    await wait();
+    expect(recoveryPuts(stub).map((c) => c.body.draft)).toEqual([first.body.draft, null]);
+  });
+
+  it("leaves the pending edits behind as the project's copy when it closes", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }),
+                          "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/close": () => ({ body: { closed: "/tmp/lab6.rex" } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    host.querySelector<HTMLButtonElement>("header .fm-name")!.click();
+    await flush();
+    [...host.querySelectorAll<HTMLButtonElement>(".fm-menu button.item")]
+      .find((b) => b.querySelector(".label")?.textContent === "Close project")!.click();
+    await flush();
+    // written at once, not half a second later
+    expect(recoveryPuts(stub)).toHaveLength(1);
+    await wait();
+    expect(host.querySelector(".start")).toBeTruthy();
+    // and never followed by a delete as the panels empty
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts).toHaveLength(1);
+    expect(puts[0].project).toBe("/tmp/lab6.rex");
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+  });
+
+  it("opens another project with no pending edit carried over", async () => {
+    const other = { ...PROJECT, path: "/tmp/nac.rex",
+                    data: { ...PROJECT.data, filename: "nac.fxye" } };
+    const stub = server({
+      ...boot(), ...kept({ draft: null }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: other }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(host.textContent).toContain("nac.fxye");
+    // one project's pending value is never the next project's Apply
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
   });
 });

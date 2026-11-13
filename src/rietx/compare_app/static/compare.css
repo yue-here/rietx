@@ -19,10 +19,16 @@ select, button { font:inherit; }
 select { width:100%; padding:6px; background:var(--bg); color:var(--fg);
          border:1px solid var(--line); border-radius:5px; }
 .buttons { margin-top:14px; display:flex; gap:8px; }
-button { padding:7px 14px; border-radius:5px; border:1px solid var(--accent);
-         background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+/* The GUI's two button registers (`app.css`): the primary filled in the
+   accent's text role and inked in `--panel`, since white on the orange accent
+   is 4.22:1 light and 2.06:1 dark; every other action outlined (WP-2200). */
+button { padding:7px 14px; border-radius:5px; border:1px solid var(--accent-ink);
+         background:var(--accent-ink); color:var(--panel); cursor:pointer;
+         font-weight:600; }
 button:disabled { opacity:.5; cursor:default; }
-button.ghost { background:transparent; color:var(--accent); font-weight:400; }
+button.ghost { background:transparent; border-color:var(--line-strong);
+               color:var(--fg); font-weight:400; }
+button.ghost:hover:not(:disabled) { background:var(--hover); }
 table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
 th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--line);
          white-space:nowrap; }

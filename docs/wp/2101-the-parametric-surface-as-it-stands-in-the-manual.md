@@ -31,6 +31,20 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - The refusal for an unknown target points at the private
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
 
+### Inherited
+
+- 2026-11-09, from [1325](1325-parametric-series.md): `reference/parametric.md`
+  § Range and visibility warnings describes `PARAMETRIC_OUT_OF_RANGE` as a warning
+  after the fit. In a real fit it never fires. A target past its own bound makes the
+  write-back after the solve raise `ValueError`, naming the target and the equation,
+  before any result exists. Under the default LM driver a linear equation's target is
+  now held inside its bounds at every step, so the raise is left to TRF and to an
+  `"expression"` equation. 1325's handover entry asks the maintainer whether the
+  warning stays, goes, or replaces the raise. Rewrite that section once they rule.
+  Done in 1325's PR #1497 (2026-11-09): the warning replaces the raise, settled by
+  Claude, and that section and `help.py`'s entry now say a TRF or expression fit
+  finishes with it. Nothing is left here.
+
 ## Non-goals
 
 - Anything WP-1964 adds. Its Manual task extends these pages with the grammar and a

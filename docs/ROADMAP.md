@@ -102,10 +102,10 @@ placement, link resolution, and the size caps on this file and CLAUDE.md.
 **The next release is 1.12** (`pyproject.version` `1.12.0.dev0`), cut from what `main` holds
 ([record](milestones/v1.12.md), [staged notes](releases/1.12.0.md)). 1.11.0 shipped 2026-11-04 ([notes](releases/1.11.0.md)).
 
-**Three milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
+**Four milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
 opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on)
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
-opened 2026-11-04; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
+opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
 numbers, so each row in § Milestones says which it was. **Neutron TOF stays at
 [§ v2+](#v2--fenced)** behind issue #193, but for its T-1 cut ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08).
 
@@ -157,6 +157,7 @@ covers (1119 § Gotchas).
 | structure-solution | Structure solution (was v1.9): a difference-Fourier map, a cost from the Pawley intensities, direct-space search — [WPs](wp/README.md#structure-solution): 1901-1902, the map then the cost; #197 and #198 left the fence 2026-09-30 | ⬜ **queued 2026-09-30** | written at the open |
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
 | parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
+| gui-overhaul | The GUI redesigned around the pattern and the model, ported into `rietx gui` in five pieces (the layout shell, the Parameters panel, the Plan tab, previews, the Background tab), then rebuilt beside it from 2026-11-11 — [§ gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) | 🔄 **opened 2026-11-08** ([record](milestones/gui-overhaul.md)) | ten rows written at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -400,7 +401,7 @@ own view (1503), the surface measured with real agents before more is added
 (1504), and the code leaving as `rietview` when a named trigger fires
 (1505). The name was chosen on 2026-09-27; the survey and the trigger are in
 1505. The maintainer asked on 2026-10-02 for an SVG (1536), POV-Ray and glTF
-(1537), and ambient occlusion (1538). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
+(1537) and ambient occlusion (1538), and on 2026-11-12 for depth cueing and filled rings and faces (1548). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
 
 The WPs are in [the index](wp/README.md#rietview).
 
@@ -438,6 +439,10 @@ One seam each, the same task shape: lanes read and tier, the lead tables, the ma
 ### parametric — a parametric refinement written by hand ports to rietx
 
 Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The reader is an experienced TOPAS or GSAS-II user, so a missing primitive ranks above a missing check, and presets for beginners wait. The machinery stands on its own terms, and an agent ports what does not import. The block 21xx is claimed. The manual for what exists today and a crash on the way in come first (2101, 2102), then the grammar (1964), and the rest stands on those. [The WPs](wp/README.md#parametric).
+
+### gui-overhaul — the GUI redesigned around the pattern and the model
+
+Opened 2026-11-08 by the maintainer ([record](milestones/gui-overhaul.md)), on twelve rounds of prototypes reviewed on screen between 2026-11-06 and 2026-11-08. It redesigns today's `rietx gui` before agent access, the desktop app and the browser build, in that order. Five pieces port it: the layout shell first (2123), then the Parameters panel (2126), the Plan tab (2127), previews (the route 2125, the sliders and graphs 2128) and the Background tab (2129, whose band is rietx's own covariance of the background curve). Each WP restates the designs it builds with the ruling behind each, and every merge leaves every panel reachable. The block 22xx is claimed for the pieces after the first. 2130 repairs two gaps the design rounds found in today's Peaks panel before its own redesign: the search's coverage said whatever the run found, and Adopt on every row. The palette piece (2200) moves the GUI to the site's palette, light and dark, and carries the peak-mark colour (ruled 2026-11-09). The start screen and the New project dialog (2131) port the round-9 design of 2026-11-08, outside the five pieces. Every piece is judged against the style guide, `gui/STYLE.md` (2142), and the record lists the designed pieces not yet filed. The File menu on the project name (2133) ports the file-and-project I/O ruling of 2026-11-07: autosave with no Save command, and the folder copied, renamed, moved or closed on server routes. On 2026-11-11 the maintainer ruled to rebuild the front end from the prototype beside today's, keeping the server, `gui/src/lib`, the chart module and the tokens, and to swap it in at parity; 2214 holds the plan and an inventory giving every old feature a home, and 2215 builds its first piece, the frame, at `/next`. [The WPs](wp/README.md#gui-overhaul).
 
 ### Unscheduled
 

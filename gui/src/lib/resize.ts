@@ -133,6 +133,36 @@ export function modelThreshold(): number {
 }
 
 /**
+ * The window's two panels and the floor each keeps beside the other (WP-2123).
+ *
+ * `side` is the panel column's floor, the lower end of its CSS clamp
+ * `clamp(340px, 38%, 560px)` and the floor its sash drags to. `graphs` is the
+ * floor the design rounds settled for the graph column (2026-11-07): under it
+ * the pattern's knob rows wrap twice and the plot is shorter than it is wide.
+ * The side column's sash is an overlay on its edge, so no grip sits in the row
+ * and the sum is the whole arithmetic.
+ */
+export const SHELL_MIN = { graphs: 420, side: 340 } as const;
+
+/** The window width below which graphs and model cannot sit side by side. */
+export function shellThreshold(): number {
+  return SHELL_MIN.graphs + SHELL_MIN.side;
+}
+
+/**
+ * Does the window drop to one column, graphs above the model?
+ *
+ * The maintainer's ruling of 2026-11-07: below a width the window becomes one
+ * column, as the Claude app drops to one panel. The width is where side by side
+ * stops being possible, computed from the floors above rather than chosen.
+ * Zero means nothing is measurable (jsdom before layout), and then the window
+ * stays side by side, the same fallback `modelStacks` makes.
+ */
+export function shellStacks(width: number): boolean {
+  return width > 0 && width < shellThreshold();
+}
+
+/**
  * The staged-series table's two halves, in px — **measured**, not chosen.
  *
  * On the browser pass (WP-1016, three ramp patterns, 1500 px window): the row is

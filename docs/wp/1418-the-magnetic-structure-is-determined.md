@@ -169,6 +169,32 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   assignment. `SOLVE_MINIMUM_RTOL` is an `_audit` tier-3 row with "no stated source, never
   measured", so that row may move with it.
 
+  *2026-11-12, the Linux nightly went red on the same row* (run 43026125239, `4c48b890d`,
+  `full` job: 1 failed, 15 683 passed, 269 skipped, 51 xfailed). It found m1 = 0.69950, the
+  swap, where the 2026-11-10 run at `5e90f9b41` passed. Two PRs merged in between touch the
+  fit path: #1520 (WP-2208, `Stage.turn_off`) and #1528 (WP-1419 C2, `Phase.parent_cell`).
+  Neither caused it. On an arm64 Mac, `[dev]`, the three class-0 starts give the same χ² to
+  every digit at `5e90f9b41` and at `e0c969887`: 3708.764158295866 (flat),
+  3708.835382150959 (Mn1 only) and 3708.941370498575 (Mn2 only). No numerical package
+  moved between the two nightly environments either: numpy 2.5.4, scipy 1.18.1 and
+  rietx-kernels 1.4.0 both nights, and only five documentation packages changed. The
+  runner image was the same build. So the Linux result moved with something the log does
+  not record. The runner's CPU is the likeliest, as #865 measured for class 2 of this set.
+  A rounding-level nudge reproduces both answers on one Mac. Multiplying the instrument's
+  W by 1 + k·10⁻¹⁴ before the nuclear fit, for k = 0, ±1, ±3, ±7 and 20, the truth won at
+  k = −1 and −7 and the swap at the other six. Across the eight runs the starts stopped
+  between χ² 3708.10 and 3708.99. The lowest stop on each assignment was 3708.101 for the
+  truth and 3708.185 for the swap, so the truth's minimum is deeper by about 0.08. Most
+  starts stop 0.5-0.9 above their own assignment's lowest stop. So the sweep ranks where
+  each start stopped, and the stop scatter is about ten times the gap between the two
+  minima. Probe and log: `~/.cache/ghostshift/rietx/main-nightly-full/perturb.py` and
+  `perturb.log` (maintainer-local).
+  This widens *To decide* by one option. The starts could be made to reach their minima
+  before they are compared, since a converged truth start would win by 0.08 here. Whether
+  that gap is wide enough to pin a site assignment is still the open question. The nightly
+  stays red on this row until the decision is made. Until then a green `full` job on this
+  row is a coin toss, so it says nothing about a PR merged before it.
+
 - **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
 
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
@@ -958,6 +984,31 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
+
+The Linux nightly went red on 2026-11-11 on the two-site row of issue #1424. Two PRs merged
+the day before were suspected, and neither caused it: the arithmetic of this solve did not
+move on a Mac, and no numerical package moved on the runner. The row is decided by
+rounding, because the sweep compares where its starts stopped and the stops scatter about
+ten times wider than the gap between the two site assignments. Nothing was fixed, because
+the fix is a design call on the magnetic path. The nightly stays red on this row until it
+is made.
+
+*Done.* The evidence is under `### Inherited`, in the #1424 entry's 2026-11-12 paragraph.
+No checklist item is ticked, and no code changed. A ghostshift runner wrote this entry.
+
+*Measured.* arm64 Mac, `[dev]` venv: `tests/test_pair_diagnostic_class.py` on `e0c969887`,
+1 failed (the row) and 2 passed. `tests/test_docs_consistency.py`, 26 passed.
+`python -m tests.reader_output`, exit 0.
+
+*Next.* The decision goes to Michael on issue #1424, drafted for the maintainer to post:
+"The two-site Pnma row now fails on the Linux nightly too (2026-11-11). Under a 1e-14 nudge
+the truth won 2 of 8 runs. The truth's deepest stop is 0.08 below the swap's, and the starts
+stop up to 0.9 above their own minimum. Should `solve_magnetic` converge each start before
+comparing, report both assignments when it cannot separate them, or both? And what may the
+test assert once it does?" Once ruled, the fix lands in `strategy/magnetic.py`'s `_starts`
+and `_best_start`, with the test rewritten to what the ruling allows.
 
 ### 2026-11-01 (2nd session) — #1197, a candidate names its own handedness
 

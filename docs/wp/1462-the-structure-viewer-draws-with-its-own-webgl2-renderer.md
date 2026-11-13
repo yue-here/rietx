@@ -427,6 +427,55 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1015 (the viewer) and WP-1461 (every 2D chart on uPlot).
 - `1462-spike/README.md`: the files and how to rerun them.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+## Defaults
+
+**Every choice the GUI offers ships a default that suits most phases, and a
+setting is for the rest** (the maintainer's rule, recorded in WP-1462). A user
+who never opens a drawer sees the conventional picture, such as ellipsoids at
+50 % and bonds at 1.15×(rᵢ+rⱼ). A default
+is measured across phases and the measurement is kept where the choice is
+made. A setting most users would change means the default is wrong.
+
+The **renderer** (WP-1462) draws a `Scene` from a `View`, both built by pure
+functions in `structure3d.ts`, and knows nothing else. Eight rules.
+**Every atom and bond half is a ray-cast quadric** on one instanced quad, exact
+at any zoom and export size (the practice of Mol\* and NGL; WP-1462 § The field).
+**Hover solves the shader's own equations on the CPU** (`pickAtom`, `pickHalf`,
+12-61 µs an event), and says what it hit in a readout line under the canvas,
+WP-1213's rule for the pattern carried over. **An impostor's outline is a
+`discard`, which MSAA does not smooth**, so each shader computes its coverage
+and hands it to alpha-to-coverage — which writes coverage into the samples, so
+**the canvas is opaque**, cleared to the panel's own background, and a
+**transparent export renders twice**, on black and on white, taking alpha from
+the difference. **A line is a quad with a width in CSS pixels** (`gl.LINES` is
+one device pixel: half a CSS pixel at DPR 2, a hairline in an export). **The PNG
+is a render of its own**, offscreen at `EXPORT_LONG_SIDE` = 3000 px and
+multisampled, and the a/b/c letters, which are DOM on screen, are drawn into it.
+**One context for the canvas's life**: the mount effect depends on the canvas
+and nothing else, calling `rebuild` under `untrack` — called bare, it read the
+geometry, every payload re-ran the effect, and its cleanup's `loseContext` left
+the canvas holding a dead context that drew Chrome's sad face (jsdom's stand-in
+loses nothing, so `test-gl3d.ts` now counts a renderer made on a dead canvas).
+**Firefox presents the first frame only after compiling the shaders**, some
+hundreds of ms after the draw call, so a first-show number is read off
+screenshots, never off the call. And **faces blend, never through coverage**,
+whole polyhedra back to front; only a translucent export pixel proves a face
+painted (WP-1466). Under test, `test-setup.ts` mocks
+`lib/gl3d`'s `createRenderer` with `test-gl3d.ts`, which records every scene
+and view; `--line` is invisible in a 3D scene, so the cell frame takes
+`--accent`; and pictures are compared, never a sha256 of one.
+**The scene rules have a Python twin** (WP-1470): `rietx.viz.figure3d.scene` ports
+`buildScene`, `shownPolyhedra`, the views and `LOOK`, held equal by
+`tests/data/gui/scene_cases.json`, which `test_render_structure.py` writes and
+`structure3d.test.ts` replays, so a rule changed here changes there in one commit.
+
 ## Handover log
 
 ### 2026-09-26 (4th session) — renamed, the GPU gate passes as partial, and the WP closes

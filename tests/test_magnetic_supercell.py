@@ -1319,10 +1319,13 @@ def test_the_magnetic_branch_refusal_names_the_magnetic_groups_nuclear_part():
     """P 4/m m m at k = (0,0,½), 63.466: an orientation refusal on the right branch.
 
     Issue #612's positive arm.  Three of the four candidates build under both
-    branches; 63.466 builds under ``"parent"`` and is refused under
-    ``"magnetic"``, whose nuclear part is a C-centred group with diagonal axes
-    in a, b, 2c.  That refusal used to say "carries the parent's space group"
-    and to recommend ``nuclear_group='magnetic'`` — the branch that refused.
+    branches; 63.466 builds under ``"parent"`` and, under ``"magnetic"``, has a
+    nuclear part that is a C-centred group with diagonal axes in a, b, 2c.
+    That used to be refused (and the refusal used to say "carries the parent's
+    space group" and to recommend ``nuclear_group='magnetic'`` — the branch
+    that refused).  Since WP-1419 C2 it builds, its cell stated through the
+    parent's (``Phase.parent_cell``); ``parent_cell=False`` keeps the refusal,
+    which is what is pinned here.
     """
     parent = p4mmm_parent()
     found = candidates("P 4/m m m", (0, 0, 0), HALF_C)
@@ -1331,7 +1334,8 @@ def test_the_magnetic_branch_refusal_names_the_magnetic_groups_nuclear_part():
         for branch in ("parent", "magnetic"):
             try:
                 magnetic_supercell(parent, cand, magnetic_species="Mn", ion="Mn2+",
-                                   magnitude=2.0, nuclear_group=branch)
+                                   magnitude=2.0, nuclear_group=branch,
+                                   parent_cell=False)
                 built.append((cand.bns_number, branch))
             except ValueError as exc:
                 assert (cand.bns_number, branch) == ("63.466", "magnetic"), str(exc)
@@ -1343,6 +1347,11 @@ def test_the_magnetic_branch_refusal_names_the_magnetic_groups_nuclear_part():
                     not in text                                  # not its own remedy
                 assert "child-cell route" in text
     assert len(built) == 7
+    cand = next(c for c in found if c.bns_number == "63.466")
+    statement = magnetic_supercell(parent, cand, magnetic_species="Mn", ion="Mn2+",
+                                   magnitude=2.0, nuclear_group="magnetic")
+    assert statement.phase.parent_cell is not None
+    assert statement.phase.parent_cell.space_group == "P 4/m m m"
 
 
 def test_lattice_cosets_refuses_a_fractional_det_p():

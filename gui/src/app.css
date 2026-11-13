@@ -117,37 +117,41 @@ button {
   letter-spacing: normal;
   padding: var(--s1) var(--s3);
   border-radius: var(--r-control);
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  /* Not white (WP-1438). The accent is a dark blue on the light theme and a
-     *light* blue on the dark one, where white measures 2.22:1 against it —
-     under WCAG AA at any size. `--panel` is white on light and near-black on
-     dark, so one token is the legible ink on both fills: 6.44:1 and 7.51:1.
-     Found by the watcher's own no-colour-literals guard, which this
-     stylesheet has no equivalent of. */
+  /* Filled in the accent's text role, never the accent itself (the
+     maintainer's ruling of 2026-11-06, WP-2200): white on the orange accent
+     is 4.22:1, under WCAG AA, and on `--accent-ink` 5.84:1.  The ink is
+     `--panel`, not white (WP-1438): white on the dark theme's light orange is
+     unreadable, and `--panel` is white on light and near-black on dark, so one
+     token is the legible ink on both fills (5.84:1 and 10.25:1). */
+  border: 1px solid var(--accent-ink);
+  background: var(--accent-ink);
   color: var(--panel);
   cursor: pointer;
 }
 
+/* Every other action is outlined, as on the site: the strong rule for its
+   border and the ink for its words, so only the primary carries the accent
+   (the maintainer's ruling of 2026-11-06). */
 button.ghost {
   background: transparent;
-  color: var(--accent);
+  border-color: var(--line-strong);
+  color: var(--fg);
   font-weight: 400;
 }
 
 /* The one hover in the app, and it belongs to the register rather than to the
    one panel that had written it out (`Peaks`' adopt chips).  A ghost is a
    transparent box, so without this a control that acts is pointer-identical to
-   a chip that does not. */
+   a chip that does not.  The site's hover ground (WP-2200). */
 button.ghost:hover:not(:disabled),
 .file > span:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--hover);
 }
 
 /* a toggle that is engaged — a state, and it reads as the primary does */
 button.on {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
   color: var(--panel);      /* the primary's ink, and for its reason */
   font-weight: 600;
 }
@@ -178,8 +182,8 @@ button:disabled {
   letter-spacing: normal;
   padding: var(--s1) var(--s3);
   border-radius: var(--r-control);
-  border: 1px solid var(--accent);
-  color: var(--accent);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   cursor: pointer;
 }
 
@@ -191,25 +195,49 @@ button:disabled {
 }
 
 /* One choice among N, where the options *are* the control.  The buttons inside
-   take the register's geometry above; only their chrome changes. */
+   take the register's geometry above; only their chrome changes.  A choice is
+   a sunken track with one raised option, so it never looks like an action: the
+   filled `button` above is what an action looks like (the maintainer's ruling
+   of 2026-11-07, WP-2123).  The track's 1 px of padding stands where its 1 px
+   border stood, so the control is as tall as it was and no row moves.
+   Both surfaces are mixes of `--fg` into `--panel`, never tokens of their own
+   (WP-1429's rule).  `light-dark()` picks the dark theme's pair through the
+   `color-scheme` that tokens.css sets with each palette.  A dark interface
+   raises a surface by lightening it, so the option is lighter than the panel
+   in the dark theme and equal to it in the light one, which no single mix
+   can be.  The percentages match the luminance of the prototype's colours,
+   so each contrast is the prototype's to the third decimal: track against
+   option 1.183 light and 1.502 dark, muted text on the track 4.53 and 4.94. */
 .segmented {
   display: flex;
-  border: 1px solid var(--line);
+  gap: 1px;
+  padding: 1px;
   border-radius: var(--r-control);
-  overflow: hidden;
+  background: light-dark(
+    color-mix(in srgb, var(--fg) 8.4%, var(--panel)),
+    color-mix(in srgb, var(--fg) 7%, var(--panel))
+  );
 }
 
 .segmented button {
   border: 0;
-  border-radius: 0;
+  border-radius: calc(var(--r-control) - 1px);
   background: transparent;
   color: var(--muted);
   font-weight: 400;
 }
 
+.segmented button:hover:not(:disabled):not(.on) {
+  color: var(--fg);
+}
+
 .segmented button.on {
-  background: var(--accent);
-  color: var(--panel);
+  background: light-dark(
+    var(--panel),
+    color-mix(in srgb, var(--fg) 20.5%, var(--panel))
+  );
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
 }
 
 /* One choice among N *panels*.  A tab is not a segmented option: it names
@@ -285,7 +313,7 @@ button:disabled {
 }
 
 .chip.accent {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: var(--accent);
 }
 
@@ -330,12 +358,45 @@ button:disabled {
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
 }
 
 .link:hover {
   text-decoration: underline;
+}
+
+/* The start screen's name (WP-2131, the round-9 design of 2026-11-08): the one
+   type size outside the scale, so it is declared here rather than in a panel. */
+.wordmark {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+/* A space-group symbol (SpaceGroup.svelte): a serif face, as the International
+   Tables print one (the maintainer's ruling of 2026-11-08).  A rotoinversion's
+   bar is drawn over its digit. */
+.sg {
+  font-family: "STIX Two Text", "Times New Roman", Times, serif;
+  font-weight: 400;
+  letter-spacing: 0.015em;
+}
+
+.sg .bar {
+  position: relative;
+  display: inline-block;
+  margin: 0 0.04em;
+}
+
+.sg .bar::before {
+  content: "";
+  position: absolute;
+  left: 0.08em;
+  right: 0.08em;
+  top: 0.08em;
+  border-top: 0.07em solid currentColor;
 }
 
 /* The help register (WP-1201; the popover itself is WP-1203).  The cursor is
@@ -483,7 +544,7 @@ kbd {
    are the same custom properties every other surface uses, so the pane follows
    the system theme with everything else. */
 .tok-keyword {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
