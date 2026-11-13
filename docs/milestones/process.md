@@ -871,6 +871,14 @@ bullets of § Model, their two paragraphs to WP-2131's and WP-2133's files,
 and the pointer to `gui/STYLE.md` in the header.  Landed
 662, 44 703 bytes, about 11 200 tokens, +1 headroom.
 
+663 -> 667 for WP-2215 (2026-11-11): the GUI rebuild's second page.  WP-2214's
+plan names the line R1 owes the rulebook, and it is a standing rule a session
+editing `gui/` needs before its first build: the rebuild lives in
+`gui/src/next/`, builds in a second `vite build --mode next` pass because one
+multi-entry pass makes today's page load a shared chunk, moves a shared panel
+before changing it, and keeps its tab names out of the manual's corpus until
+the swap.  Four lines, landed at the cap.
+
 ### `tests/CLAUDE.md`
 
 180 -> 198 for WP-1070 (2026-08-15): the running ladder.  It is a rule
@@ -1294,6 +1302,7 @@ lanes, the ten trial sessions first:
 | 2026-10-30 | 43767e25 | 1 | 0 | 0K | 3 | 12K | 1.92 | 0 / 0 | +1.52 | +13% |
 | 2026-11-02 | 7d134759 | 3 | 1 | 0K | 12 | 25K | 3.56 | 2 / 0 | +17.19 | +29% |
 | 2026-11-05 | 534f4819 | 2 | 0 | 0K | 6 | 22K | 1.05 | 2 / 0 | -0.26 | -2% |
+| 2026-11-13 | 3f3ab8ac | 1 | 4 | 0K | 5 | 6K | 1.00 | 1 / 0 | +0.28 | +5% |
 
 Session 38257a74 (WP-1523) resumed its one lane by `SendMessage` with a
 revised design after the first report. The tool counts that as no redo, and the

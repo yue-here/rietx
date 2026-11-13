@@ -71,7 +71,8 @@
 //! oracle is `rietx/viz/figure3d/raster.py`, and its bar is the bit on every
 //! platform, because it calls no library function.  The dichotomy indexer's
 //! box test joined in 1.3.0 (`dichotomy.rs`), and the structure-solution
-//! engine's orbit sums and contact term in 1.4.0 (`solve.rs`, #562).
+//! engine's orbit sums and contact term in 1.4.0 (`solve.rs`, #562).  The
+//! rasteriser's depth-cued twin, `render_rows_cued`, joined in 1.5.0 (WP-1548).
 
 use numpy::{
     Element, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
@@ -599,6 +600,7 @@ fn rietx_kernels(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(exp, m)?)?;
     m.add_function(wrap_pyfunction!(force_baseline, m)?)?;
     m.add_function(wrap_pyfunction!(raster::render_rows, m)?)?;
+    m.add_function(wrap_pyfunction!(raster::render_rows_cued, m)?)?;
     m.add_function(wrap_pyfunction!(raster::id_plane, m)?)?;
     m.add_function(wrap_pyfunction!(dichotomy::dichotomy_box_test, m)?)?;
     m.add_function(wrap_pyfunction!(dichotomy::dichotomy_child_key, m)?)?;

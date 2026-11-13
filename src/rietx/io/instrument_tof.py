@@ -52,7 +52,9 @@ bank number ``bb`` in columns 5-6.
   No ``ITYP`` record at all is read as no spectrum.
 * ``INS bbPRCFn `` (2I5,F10.5; PTYP, NCOF, CTOF) and ``INS bbPRCFnc``
   (4E15.6) — the NTYP profile sets; **set n = 1 is the default** whatever its
-  PTYP (p. 223) and is the only set read.
+  PTYP (p. 223) and is the only set read.  A set written without its number
+  (``INS bbPRCF  ``, an older writer's form) is declined, not read as set 1:
+  the bank keeps its calibration, as a bank with no set does.
 
 **Named assumption — PRCF coefficient order.**  The manual lists each
 function's coefficients "respectively" against their GSAS names (function 1,
@@ -489,15 +491,25 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
 
 
 def _profile(path: Path, bank: int, headers: dict[int, _Record],
-             conts: dict[int, dict[int, _Record]], diagnostics) -> ProfileTOF:
+             conts: dict[int, dict[int, _Record]], diagnostics,
+             unnumbered: _Record | None = None) -> ProfileTOF:
+    if unnumbered is not None:
+        _note(diagnostics, "warning" if not headers else "info",
+              "GSAS_IPARM_PROFILE_DECLINED",
+              f"Bank {bank}: a PRCF set was not read, because the PRCF set "
+              f"number in column 11 is ' '; the manual numbers the sets "
+              f"n = 1 … NTYP (GSAS Technical Manual p. 223), so which set it "
+              f"is the file does not say.",
+              where=[f"bank {bank}", "PRCF"])
     if not headers:
         if conts:
             raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
                              f"and no PRCF header")
-        _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
-              f"Bank {bank} has no PRCF profile set, so the profile "
-              f"coefficients are left at zero.",
-              where=[f"bank {bank}"])
+        if unnumbered is None:
+            _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
+                  f"Bank {bank} has no PRCF profile set, so the profile "
+                  f"coefficients are left at zero.",
+                  where=[f"bank {bank}"])
         return ProfileTOF()
     if 1 not in headers:
         raise ValueError(
@@ -653,7 +665,12 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
             bank["icoff" if name[:5] == "ICOFF" else "iecof"][int(name[5])] = rec
         elif name.startswith("PRCF"):
             n, c = name[4], name[5]
-            if not n.isdigit() or n == "0":
+            if n == " ":
+                # an older writer's form (an ISIS GEM calibration file): no set
+                # number.  Which set it is, the file does not say, so the set
+                # is declined, not read as set 1; the bank keeps the rest
+                bank["prcf_unnumbered"] = bank.get("prcf_unnumbered") or rec
+            elif not n.isdigit() or n == "0":
                 # refused when this bank is processed, so the file-level
                 # refusals (HTYPE, NBANK) and earlier banks speak first
                 bank["bad_key"] = bank["bad_key"] or rec.fail(
@@ -714,7 +731,8 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
                              dropped, fifth_pair)
         if bank["bad_key"] is not None:
             raise bank["bad_key"]
-        profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics)
+        profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics,
+                           bank.get("prcf_unnumbered"))
         try:
             source = TOFSource(difc=difc, difa=difa, tzero=zero,
                                two_theta_bank_deg=ttheta, l1_m=l1_m,

@@ -1,8 +1,7 @@
 # WP-2214 — the GUI rebuild: its plan, and a home for every feature of today's GUI
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the inventory and the plan written; the maintainer ruled on its five questions; R1 to file
+Milestone: gui-overhaul · Status: ✅ 2026-11-11 — the inventory and the plan written, the five questions ruled, R1 filed as WP-2215
 Depends on: —
-Priority: P2 2026-11-11 — a feature the open milestone was opened for, ruled the same night: every later GUI piece starts from this plan
 
 ## Goal
 
@@ -670,7 +669,9 @@ inventory follows the prototype or a written rule, named in its row.
 - [x] `docs/milestones/gui-overhaul.md` rewritten to the rebuild.
 - [x] `docs/practice.md` § Where a GUI keeps its secondary controls.
 - [x] The maintainer answers § Questions (2026-11-11, on PR #1529).
-- [ ] R1 filed, once the answers are in. Each later piece is filed when its turn comes.
+- [x] R1 filed, once the answers are in, as [WP-2215](2215-the-frame.md). Each later piece is
+  filed when its turn comes.
+- [x] R2 filed as [WP-2216](2216-the-refinement-window.md).
 
 ## Acceptance
 
@@ -691,6 +692,8 @@ The WP closes when the maintainer has answered § Questions and R1 is filed.
 
 ## Handover log
 
+- **2026-11-11** — closed by the ghostshift runner that filed R1 as [WP-2215](2215-the-frame.md),
+  the last task. Its acceptance holds: the questions are answered and R1 is filed.
 - **2026-11-11** — filed by a ghostshift runner on the maintainer's rebuild ruling of the same
   night, in PR #1529. Every feature of today's GUI now has a written home in the new design, and
   the rebuild has an order of seven pieces and a swap. Five placements the prototype never drew

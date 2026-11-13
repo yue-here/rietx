@@ -405,6 +405,19 @@ def test_the_built_app_is_served_and_plotly_is_not(blank):
     assert client.get("/assets/nope.js")[0] == 404
 
 
+def test_the_rebuilt_page_is_served_beside_todays(blank):
+    """`/next` serves the rebuild's page (WP-2215) and `/` stays today's."""
+    _, client = blank
+    for path in ("/next", "/next/"):
+        status, payload = client.get(path)
+        assert status == 200
+        assert 'src="/assets/next.js"' in payload["raw"]
+        assert "/assets/app.js" not in payload["raw"]
+    assert 'src="/assets/app.js"' in client.get("/")[1]["raw"]
+    assert client.get("/assets/next.js")[0] == 200
+    assert client.get("/assets/next.css")[0] == 200
+
+
 def test_the_placeholder_explains_itself_when_the_dist_is_absent(blank, tmp_path,
                                                                 monkeypatch):
     """A checkout without the built assets must still say what is going on."""

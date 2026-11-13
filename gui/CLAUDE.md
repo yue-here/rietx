@@ -48,6 +48,10 @@ read it before changing either.
   Under an older node, rolldown fails at import with a message naming neither node nor
   a version. A `node_modules` installed under the old node fails under the new one, so
   `npm ci` again after switching.
+- **The rebuild is `gui/src/next/`, a second page built in a second pass**
+  (`vite build --mode next`, served at `/next`, WP-2215): one multi-entry pass makes
+  today's page load a shared chunk. A shared panel the new page must change moves
+  into `gui/src/next/` first; its tabs stay out of `panels.json` until the swap.
 - `npm run build` needs `python3`. `vitest` needs `resolve.conditions: ["browser"]`, or
   `mount()` comes from svelte's server build. `@sveltejs/vite-plugin-svelte` must be v7
   for Vite 8 (WP-1010).
