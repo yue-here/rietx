@@ -1,8 +1,7 @@
 # WP-2208 — a plan stage that fixes as well as frees
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built and ruled; PR #1520 approved for merge (a stored-format change)
+Milestone: gui-overhaul · Status: ✅ 2026-11-13 — merged in PR #1520 on 2026-11-11; a plan stage fixes as well as frees, in python, the .rxt document and the Plan tab
 Depends on: 2127 (the Plan tab)
-Priority: P2 2026-11-10 — a feature the open gui-overhaul milestone was opened for, ruled required 2026-11-09
 
 ## Goal
 
@@ -49,7 +48,8 @@ changes nothing. `set_vary(..., False)` skips tied and locked rows as it does to
 
 `docs/practice.md` § A stage that fixes a parameter (surveyed 2026-11-10 for this WP). GSAS-II's
 scripted refinement is the one program whose steps declare both: a step dict has `set` and
-`clear`, applies every `set` before every `clear`, and keeps the flags in the project, so a flag
+`clear`, applies every `set` before every `clear` (read in its source; its docs do not state
+the order), and keeps the flags in the project, so a flag
 cleared in one step stays cleared until a later step sets it again. TOPAS, FullProf and RIETAN-FP
 keep the recipe outside the program as edits between runs, and all three document Pawley or Le
 Bail then Rietveld as two runs of an edited input. RIETAN-FP's `NAUTO = 1` list is the one
@@ -57,9 +57,11 @@ built-in schedule in which a later cycle leaves an earlier group fixed.
 
 ### The design
 
-1. **`turn_off` follows GSAS-II's `clear`.** A stage frees its `turn_on`, then fixes its
+1. **A stage frees, then fixes.** A stage frees its `turn_on`, then fixes its
    `turn_off`, so `free phases.*` with `fix phases.*.atoms.*.biso` frees everything of the
-   phases but the displacements. The flags carry to the next stage, so a fix lasts until a
+   phases but the displacements. Free-then-fix is the only order in which a narrow fix inside
+   a broad free does anything. GSAS-II's scripted `set` and `clear` run in the same order,
+   which its source shows and its docs do not state (WP-2217). The flags carry to the next stage, so a fix lasts until a
    later stage's `turn_on` frees the path again. Each stage line then does at its place in the
    recipe what it says, which is how a person reads the Plan tab (WP-2127, ruled 2026-11-07).
 2. **The closing stage re-solves the end state of the declared stages.** It frees every glob a
@@ -97,14 +99,6 @@ a stored-format change. Old files open unchanged: the field defaults to an empty
 None reads the data or decides for a fit. `turn_off` is the caller's declaration, and the
 closing stage's fixes are its replay. Design 4 changes how a series refits a plan that fixes,
 which is machinery choosing a route to the same answer, not a judgement about the data.
-
-### Inherited
-
-- From WP-2217 (2026-11-13): GSAS-II's scripting docs (`GSASIIscriptable.rst` § Refinement recipe) do
-  not state that `set` runs before `clear`; only its source does. `staged.py`'s `turn_off` comment and
-  practice.md's rietx row now ground the order on free-then-fix (a narrow fix inside a broad free acts
-  only in that order), with GSAS-II's source as agreement. Design item 1's "follows GSAS-II's `clear`"
-  should say the same when this WP is next handed over.
 
 ## Non-goals
 
@@ -148,6 +142,29 @@ stage included.
 - `docs/practice.md` § A stage that fixes a parameter.
 
 ## Handover log
+
+- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #PRNUM), a
+  repair. PR #1520 merged on 2026-11-11 with every task ticked, and four `WP-2208:` commits of
+  that day never reached this log. A plan stage can now fix parameters as well as free them, in
+  python, in the `.rxt` document and on the Plan tab, and a file that uses it does not open in
+  an older rietx. That is shipped on `main` and goes out with v1.12.
+
+  *Changed by this repair.* Status ✅, the `Priority:` line removed. WP-2217's inherited note
+  is applied and its section removed: design item 1 now rests the order on free-then-fix, with
+  GSAS-II's source as agreement, and the practice paragraph says the order is read in GSAS-II's
+  source because its docs do not state it. The narrative moved to `docs/milestones/v1.12.md`.
+
+  Next: none in this WP. The series WPs own the faster collapse of a fixing plan (decision 2).
+
+- **2026-11-11** — (reconstructed post hoc) from the commits. The branch merged `main` twice
+  and PR #1520 merged at 03:15 UTC.
+
+  *Done.* `19243c563` merged main and rebuilt the GUI dist after #1528 and #1530.
+  `40686968b` merged main again, rebuilt the dist, retook the plan-ladder screenshot pair in
+  the new palette, and in the merge moved the palette's (WP-2200) and edit recovery's
+  (WP-2209) rows out of the gui-overhaul milestone's unfiled table. `876440ede` is the vitest fix the 2026-11-10 entry's sub-bullet describes: the
+  "fixes in a stage" test finds Apply's `PUT` by its path, `/api/plan`. The commits do not say
+  whether the suite was rerun on the merged tree; CI on #1520 was the gate.
 
 - **2026-11-10** — stewarded by a ghostshift runner. Yue ruled the same day on PR #1520's five
   decisions: all five stand as built (each marked in the entry below), and approved merging the
