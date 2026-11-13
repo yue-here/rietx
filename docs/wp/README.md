@@ -54,7 +54,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | 2026-11-13 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -680,7 +679,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
-| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | 🔄 2026-11-13 | P3 | — |
+| [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

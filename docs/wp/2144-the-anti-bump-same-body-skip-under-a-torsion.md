@@ -1,9 +1,8 @@
 # WP-2144 — the anti-bump same-body skip, now that a torsion moves the pair
 
-Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by ghostshift runner (MacBook-Air-c4aacd)
+Milestone: unscheduled · Status: ✅ 2026-11-13 — the docs and RESTRAINT_BODY_CONTACTS_UNCHECKED landed; the bonds direction is WP-1816
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-13 — decided on #1507: the docs and the warning land here, the restraint itself moves to WP-1816
 
 ## Goal
 
@@ -77,8 +76,6 @@ inside a molecule a contact term checks. `exclude_same_body`'s default has
 no row in `_audit.DEFAULT_SEATS`; if its meaning changes (WP-1816), the
 default gets one.
 
-### Inherited
-
 ## Non-goals
 
 - Refinable Z-matrix internals (WP-1814). Their pairs join this rule when
@@ -133,6 +130,33 @@ default gets one.
   scaling).
 
 ## Handover log
+
+### 2026-11-13 — the warning and the docs land; the bonds direction filed as WP-1816 (PR #1562)
+
+A fit that turns a torsion inside a rigid body now says that the anti-bump checks do not look inside that molecule. Before, a chain could fold to half its stated minimum with no row, no stale report and no message. The docstrings and the theory chapter now say which pairs the skip covers, and that a torsion-moved pair is among them. Yue's direction for the real fix, a body that keeps its declared bonds and anti-bump rows for pairs four or more bonds apart, is filed as WP-1816 and proposed to Mike before anything is built. The intramolecular-exclusion practice behind that ruling is now in `docs/practice.md`.
+
+*Done.*
+- Ruled by Yue 2026-11-13 on #1507 ("both"); the ruling is recorded under Tasks.
+- `RESTRAINT_BODY_CONTACTS_UNCHECKED` (warning, plan end, `fit` and `run_stage`): a phase with an anti-bump row at the start, a body torsion whose wrapped `angle` moved. The message names the body, each torsion as start° → end°, and counts the rows the list holds inside the body (`model.restraints.body_own_rows`). Rows do not silence it, because `stale_anti_bump_pairs` skips the body's own pairs whatever the list holds. Audit rows (code and suggestion, tier 1, ambiguity 1, scope as `RESTRAINT_PAIRS_STALE`), help entry, silence pair, skill row in all three copies.
+- `model.restraints._is_own_copy`: the one own-copy test, read by the builder's skip and by `body_own_rows`.
+- WP-1816 filed (rigid-bodies, P3), coordinated with WP-1814 (cited, not edited). Practice section "Which pairs inside a molecule a contact term checks" with its sources.
+- The rewritten #1507 comment, which proposes the direction to Mike and asks three questions, is in the runner's scratch (`~/.cache/ghostshift/rietx/wp-2144/comment_1507.md`). Nothing posted.
+
+*Review.* `/code-review high --fix` raised 8. Fixed: the suggestion pointed at `result.geometry.contacts`, where a pair folded to 1.5 Å is listed as a bond (now `distances`); one hand row silenced the warning for the whole body (now counted, not silencing); the `exclude_same_body=False` docstring overclaimed; the own-copy test was copied twice (now one helper); the new code's scope had no test (the scope test now runs for both codes); the message claimed neighbouring contacts are checked (sentence removed). Declined: searching the body's own pairs at plan end, which is WP-1816's rule; a tolerance on "turned", which would be a new number.
+
+*Generality* (judge's sections, condensed by the author; verdicts unedited).
+- `RESTRAINT_BODY_CONTACTS_UNCHECKED` (code): **holds**. Tier 1 and ambiguity 1 agree. Case against: moderate, on level only. It fires on most fits that free a torsion under an anti-bump list, including methyl or hydroxyl rotors whose moved pairs WP-1816 will exclude anyway. The ruling chose the warning channel. Evidence that would change it: a measured run of real molecular refinements where it fires on nearly every freed-torsion fit with no fold found. The narrowing to "a torsion moved" is the author's, not the ruling's; a body that arrives folded with its torsions held gets no warning. Author: kept, since a held torsion cannot have folded anything the run did not start from.
+- `.suggestion`: **holds**; the case against (no caution about a floor on a torsion's ends) was taken: the suggestion and help entry now warn off it and name holding the torsion.
+- The exact-inequality "moved" test: **weak**, a misfire for a torsion declared at −180 (written back as 180 with nothing turned). Fixed: both sides are wrapped, and a test pins it.
+
+*Measured* (`[dev]`, darwin/arm64, this worktree's venv).
+- The chain: N1···O6 4.499 Å at the template, 1.498 Å at twists −120°/−120°, no row, no stale report, the warning fires. Positive control: with the emitter's gate disabled, both firing tests fail.
+- Touched files (8 test files): 165 passed.
+- Fast selection (`-m "not slow"`, on main merged in at `ca949ac65`): 14596 passed, 433 skipped, 32 xfailed, 1 failed. The failure was `test_multi_diagnostics.py`'s helper-scope partition, which wanted a `multi.DIAGNOSTIC_SCOPES` row for the new helper; the row (absent: a joint fit refuses soft restraints) landed after, and that file then ran 129 passed. Added tests: 4 cases plus the parametrised rows (silence pair, scope test, multi scope row); their cost 2.06 s, 1.96 s of it the biphenyl fit, which stays fast-tier as the only end-to-end check of both entry paths. Run queued behind two other suites through serial.py, so alone on the machine.
+- `python -m tests.reader_output`: exit 0, unchanged against the merge-base. Its fixtures carry no body with a torsion, so the new warning is a reader-visible line it does not cover (the text is in the PR body).
+- Full suite not run: the change adds a diagnostic and moves no fitted number.
+
+*Next.* Yue reads the new warning's text (a reader-output change). Then the comment goes to Mike on #1507, and his answer folds into WP-1816 before its first commit. WP-1816 also waits on #1510's merge for the moved-pair predicate.
 
 - **2026-11-12** — created, from the 2026-11-12 issue triage (issue #1507).
   Checked against the tree at `a86dcf9d4`: the skip and its reason are where
