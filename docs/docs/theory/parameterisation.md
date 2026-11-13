@@ -565,13 +565,13 @@ already inside $d_{\min}$ where the run started, such as a bonded pair the
 caller left out of the list, is not named: it did not drift in.
 
 By default the list has no row between two atoms of one copy of a rigid body,
-and the search at plan end skips those pairs too. A rigid body keeps the
+and the search at plan end always skips those pairs. A rigid body keeps the
 distances of its template, so such a row could never change. A declared
 torsion breaks that. It turns part of the body about a bond, and two atoms on
 either side of the bond can come together. Contacts inside the molecule are
-then not checked. A run in which a torsion of such a body turned says so
-(`RESTRAINT_BODY_CONTACTS_UNCHECKED`). Contacts with neighbouring molecules
-are checked as before.
+then not checked, except by a row the caller wrote for that pair. A run in
+which a torsion of such a body turned says so
+(`RESTRAINT_BODY_CONTACTS_UNCHECKED`).
 
 A planarity restraint on $N \ge 4$ atoms contributes one row per atom, its
 signed distance to their least-squares plane {cite}`schomaker1959`. With

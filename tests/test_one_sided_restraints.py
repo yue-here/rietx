@@ -317,23 +317,34 @@ def test_a_torsion_that_folds_a_body_warns_that_its_contacts_are_unchecked():
     assert "t1 0.0° → -120.0°" in d.message and "'chain'" in d.message
 
 
-def test_an_unturned_torsion_or_a_checked_body_stays_silent():
-    """Silent where the torsions did not move, where the caller kept the
-    body's own pairs (``exclude_same_body=False``), and for a body with no
-    torsion; the warning's own predicate names only the torsion body."""
-    from rietx.model.restraints import bodies_with_unchecked_contacts
+def test_rows_inside_the_body_are_counted_and_do_not_silence_it():
+    """A list built with ``exclude_same_body=False`` holds rows inside the
+    body, and a hand row covers one pair; neither makes the end-of-run search
+    look inside the body, so the warning still fires and counts them."""
+    from rietx.model.restraints import body_own_rows
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+
+    kept = _chain_run(-120.0, -120.0, exclude_same_body=False)
+    rows = body_own_rows(kept[0].phases[0])
+    assert list(rows) == ["chain"] and rows["chain"] > 0
+    (d,) = _body_contacts_unchecked_diagnostics(*kept)
+    assert f"holds {rows['chain']} row(s) inside one copy" in d.message
+    assert "contacts inside the molecule are not checked" in d.message
+
+
+def test_an_unturned_torsion_or_a_rigid_body_stays_silent():
+    """Silent where the torsions did not move, for a body with no torsion,
+    and for a phase the run did not search (no anti-bump row at the start)."""
+    from rietx.model.restraints import body_own_rows
     from rietx.refine import _body_contacts_unchecked_diagnostics
 
     assert _body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0)) == []
-    kept = _chain_run(-120.0, -120.0, exclude_same_body=False)
-    assert bodies_with_unchecked_contacts(kept[0].phases[0]) == []
-    assert _body_contacts_unchecked_diagnostics(*kept) == []
     rigid = _chain_phase(0.0, 0.0, torsions=False)
     rigid.restraints = anti_bump_restraints(rigid, CHAIN_RULE, margin=CHAIN_MARGIN)
-    assert bodies_with_unchecked_contacts(rigid) == []
+    assert body_own_rows(rigid) == {}
     folded = _chain_phase(-120.0, -120.0)
-    assert bodies_with_unchecked_contacts(folded) == []        # no anti-bump row
+    assert body_own_rows(folded) == {}                         # no anti-bump row
     folded.restraints = anti_bump_restraints(folded, CHAIN_RULE, margin=CHAIN_MARGIN)
-    assert bodies_with_unchecked_contacts(folded) == ["chain"]
+    assert body_own_rows(folded) == {"chain": 0}
     assert _body_contacts_unchecked_diagnostics(
         Structure(phases=[folded]), [None]) == []              # nothing searched

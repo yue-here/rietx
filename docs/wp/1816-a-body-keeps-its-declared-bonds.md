@@ -43,8 +43,11 @@ of a bond angle ("1-3"), three is the ends of a torsion ("1-4"), four is
   every pair inside one copy of a body (identity operation, the shift that
   keeps the image in the same molecule). `stale_anti_bump_pairs` skips the
   same pairs. WP-2144 documented this and added
-  `RESTRAINT_BODY_CONTACTS_UNCHECKED`, built on
-  `model.restraints.bodies_with_unchecked_contacts`.
+  `RESTRAINT_BODY_CONTACTS_UNCHECKED`, which fires for any torsion body that
+  turned and counts the rows the list holds inside it
+  (`model.restraints.body_own_rows`). A hand-written row for one pair does
+  not silence it, because the end-of-run search still skips the body's other
+  pairs (WP-2144's review).
 - The reproduction from #1507 is `tests/test_one_sided_restraints.py`'s
   `_chain_phase`: N1–C2–C3–C4–C5–O6 with torsions about C2–C3 and C4–C5,
   N1···O6 at 4.50 Å at the template and 1.50 Å at twists of −120° and
@@ -145,8 +148,8 @@ rule), with the field's name.
       own-copy pair four or more bonds apart that a declared torsion moves
       (#1510's predicate); `stale_anti_bump_pairs` names such a pair the
       same way; one to three bonds apart stays skipped.
-      `bodies_with_unchecked_contacts` then names only a body without bonds,
-      so WP-2144's warning narrows to it.
+      `RESTRAINT_BODY_CONTACTS_UNCHECKED` then fires only for a body without
+      bonds, so WP-2144's warning narrows to it.
 - [ ] Tests: the chain fixture (N1–O6 gets a row; C2–C5, three bonds apart,
       does not); a pair no torsion moves keeps the skip; a body with
       `bonds=None` still warns; a positive control that fails with the rule

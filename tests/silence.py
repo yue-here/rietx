@@ -823,14 +823,14 @@ def _body_unchecked_fires() -> list:
 
 
 def _body_unchecked_silent() -> list:
-    """The same chain with its torsions where they started, and folded with
-    the body's own pairs kept in the list (``exclude_same_body=False``)."""
+    """The same chain with its torsions where they started, and the folded
+    chain in a phase the run did not search (no anti-bump row at its start)."""
     from rietx.refine import _body_contacts_unchecked_diagnostics
     from tests.test_one_sided_restraints import _chain_run
 
+    folded, _ = _chain_run(-120.0, -120.0)
     return (_body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0))
-            + _body_contacts_unchecked_diagnostics(
-                *_chain_run(-120.0, -120.0, exclude_same_body=False)))
+            + _body_contacts_unchecked_diagnostics(folded, [None]))
 
 
 def _stale_fires() -> list:

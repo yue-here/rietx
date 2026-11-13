@@ -4161,14 +4161,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "RESTRAINT_BODY_CONTACTS_UNCHECKED": HelpEntry(
         title="A torsion turned, and the body's own contacts are not checked",
         description=(
-            "A rigid body's torsion turned during the run, and the anti-bump list has no row "
-            "between two atoms of one copy of that body. The builder, `anti_bump_restraints`, "
-            "skips those pairs by default, because a rigid body keeps its template distances. "
+            "A rigid body's torsion turned during the run, and the anti-bump checks do not "
+            "search the pairs inside one copy of that body. The builder, "
+            "`anti_bump_restraints`, skips those pairs by default, and the end-of-run contact "
+            "check always skips them, because a rigid body keeps its template distances. "
             "A torsion breaks that: it turns part of the molecule about a bond, and two atoms "
-            "on either side of the bond can come together. Nothing restrains such a pair, and "
-            "the end-of-run contact check does not report it either. Contacts with "
-            "neighbouring molecules are still checked. Read the body's own contacts in "
-            "`result.geometry.contacts`. Where a torsion brought two of its atoms closer than "
+            "on either side of the bond can come together. Only a row you wrote for that pair "
+            "restrains it, and nothing reports it. The message says how many rows the list "
+            "holds inside the body. Read the distances between the body's "
+            "own atoms in `result.geometry.distances`, bonds included: a folded pair can be "
+            "short enough to be listed as a bond. Where a torsion brought two of its atoms closer than "
             "you allow, add an anti-bump row for that pair, with a minimum you state for it, or "
             "restrain the torsion."
         ),
