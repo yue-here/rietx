@@ -260,10 +260,13 @@ with a caller's colour always accepted. `fog_max` stays 0.7.
   fluorapatite), five organics and HKUST-1 as 2×2×2 blocks. **Not drawn:** the
   18 COD entries, `www.crystallography.net` refused by this session's network
   (`pairs.txt`); rerun with that host allowed.)*
-- [ ] Docs: the `render_structure` docstring and the GUI guide's structure
-  section.
-- [ ] Tests + figure pairs to `tests/output/figure3d/`.
-- [ ] Skill: one clause in `api-figure.md` for each option, tagged with this
+- [x] Docs: the `render_structure` docstring and the GUI guide's structure
+  section. *(2026-11-13: the docstring with task 5; `reference/figures.md`'s
+  options table and a paragraph each; `gui-guide.md`'s drawer, the transparent
+  export's note included. `-W` build clean.)*
+- [x] Tests + figure pairs to `tests/output/figure3d/`. *(2026-11-13:
+  `planar_rings_paracetamol`, `named_faces_nac`, `parity_{python,gui}_rings`.)*
+- [x] Skill: one clause in `api-figure.md` for each option, tagged with this
   WP's measurement, then `rietx skill --install . --copy`.
 
 ## Acceptance

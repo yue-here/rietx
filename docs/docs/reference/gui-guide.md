@@ -684,6 +684,16 @@ caption says when the lists are your own.
 letters drawn in. That is a 17 cm figure at 300 dpi with room to crop.
 `transparent PNG`, under `drawing`, leaves the background out.
 
+`depth cue`, under `drawing`, fades each surface toward the background with
+its distance, so the near layer stands out from the far one in a still
+picture. A transparent PNG has no background to fade toward, so it is
+exported without the cue, and the line under the plot says so.
+`fill planar rings` fills each ring of five or six bonded atoms lying within
+0.1 Å of one plane as a translucent grey face. Flat is all the fill says:
+coordinates cannot tell an aromatic ring from any other flat one. The viewer
+draws one cell, so a ring that a cell edge cuts stays open; a block drawn by
+`render_structure` closes it. Both start off.
+
 Two things here will mislead you if nobody says them:
 
 - The bond threshold is a drawing threshold rather than chemistry. Bonds are
