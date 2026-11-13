@@ -364,6 +364,25 @@ RELEASED_HELP_ANCHORS = (
     "using/indexing.html#three-engines-and-why-the-default-is-all-of-them",
     "using/model.html#declared-extra-peaks",
 )
+#: Every anchor a release's README carried into a page the old tree published
+#: (v1.0 to v1.9), read off each tag.  PyPI keeps each release's README as its
+#: project page, so these are permanent too.
+RELEASED_README_ANCHORS = (
+    "estimation.html#solvers",
+    "using/cli.html#rietx-compare-did-that-correction-help",
+    "using/concepts.html#refinement-plans",
+    "using/data.html#a-neutron-source",
+    "using/exports.html#a-figure-of-the-structure",
+    "using/files.html#refinement-files-another-program-wrote",
+    "using/files.html#writing-one-back",
+    "using/indexing.html#fitting-peaks-you-name",
+    "using/install.html#optional-extras",
+    "using/model.html#declared-extra-peaks",
+    "using/refining.html#a-moment-stated-and-refined",
+    "using/refining.html#watching-a-run",
+    "using/results.html#reading-an-object-in-a-notebook-or-a-terminal",
+    "using/series.html#a-joint-fit-shares-parameters-instead",
+)
 
 
 @pytest.mark.xdist_group("manual-build")
@@ -373,8 +392,8 @@ def test_every_known_anchor_of_a_retired_page_lands_on_a_page_holding_it(built_d
 
     The stub carries the reader's fragment over, and a fragment whose heading
     moved to another page, or was renamed, would leave the reader at the top of
-    the wrong page.  Two sets of old anchors are known: the glossary's sections
-    and the help links of installed releases.
+    the wrong page.  Three sets of old anchors are known: the glossary's
+    sections, the help links of installed releases and released READMEs' links.
     """
     out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
@@ -384,7 +403,8 @@ def test_every_known_anchor_of_a_retired_page_lands_on_a_page_holding_it(built_d
     spec.loader.exec_module(versions)
     known = [("using/glossary", section) for section in OLD_GLOSSARY_SECTIONS]
     known += [(page.removesuffix(".html"), anchor)
-              for page, _, anchor in (link.partition("#") for link in RELEASED_HELP_ANCHORS)]
+              for page, _, anchor in (link.partition("#") for link in
+                                      RELEASED_HELP_ANCHORS + RELEASED_README_ANCHORS)]
     assert all(old in versions.RETIRED for old, _ in known), "an anchor of no retired page"
     texts = {}
     for old, anchor in known:

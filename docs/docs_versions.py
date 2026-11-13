@@ -124,12 +124,14 @@ RETIRED: dict[str, str] = {
 #: Where an anchor of a retired page went, when the page RETIRED names does not
 #: hold it under the same id: old page -> {old id: new page, and its `#heading`
 #: where the anchor has one}.  A stub looks the reader's fragment up here first,
-#: and any other fragment goes to RETIRED's page as before.  Two sets are
+#: and any other fragment goes to RETIRED's page as before.  Three sets are
 #: complete (WP-1986, 2026-11-13).  The old glossary's sections went to four
-#: pages, so each has a row.  And each anchor an installed release's help links
+#: pages, so each has a row.  Each anchor an installed release's help links
 #: carry into a retired page (`rietx.help`'s `anchor`, v1.0 to v1.9) goes where
 #: the current release sends the same entry; the rest of those land on their
-#: own id.  tests/test_manual.py checks both sets against the built manual.
+#: own id.  And each anchor a released README links (v1.0 to v1.9, kept for good
+#: on PyPI's release pages) goes where the current README sends the same
+#: feature.  tests/test_manual.py checks all three sets against the built manual.
 MOVED_ANCHORS: dict[str, dict[str, str]] = {
     "using/glossary": {
         "glossary": "reference/parameters",
@@ -159,15 +161,41 @@ MOVED_ANCHORS: dict[str, dict[str, str]] = {
         "the-positivity-cone-the-seed-and-how-to-read-the-guard":
             "theory/microstructure#the-positivity-cone-the-seed-and-the-guard",
     },
+    "using/cli": {
+        "rietx-compare-did-that-correction-help": "reference/cli#rietx-compare",
+    },
+    "using/concepts": {
+        "refinement-plans": "reference/plans",
+    },
     "using/data": {
+        "a-neutron-source": "reference/instrument#neutron-source",
         "a-time-of-flight-bank": "reference/instrument#time-of-flight-peak-shape",
     },
+    "using/exports": {
+        "a-figure-of-the-structure": "reference/figures",
+    },
+    "using/files": {
+        "refinement-files-another-program-wrote": "reference/foreign-models",
+        "writing-one-back": "reference/foreign-writers",
+    },
     "using/indexing": {
+        "fitting-peaks-you-name": "reference/peaks#fitting-peaks-you-name",
         "the-systematic-shift-and-the-window-it-opens":
             "reference/peaks#the-systematic-shift-and-the-window-it-opens",
     },
     "using/model": {
         "declared-extra-peaks": "theory/profiles#declared-extra-peaks",
+    },
+    "using/refining": {
+        "a-moment-stated-and-refined": "reference/magnetic",
+        "watching-a-run": "reference/cli#rietx-watch",
+    },
+    "using/results": {
+        "reading-an-object-in-a-notebook-or-a-terminal":
+            "reference/result#objects-in-a-notebook-or-a-terminal",
+    },
+    "using/series": {
+        "a-joint-fit-shares-parameters-instead": "reference/joint",
     },
 }
 
@@ -299,8 +327,11 @@ def assemble(site: _Path, kept: list[tuple[str, str]], fetch) -> None:
     def hosted(new: str) -> str:
         page, _, heading = new.partition("#")
         # A page retired on main is in dev at once and in stable only from the next
-        # release, so until then the stub sends the reader to dev.
-        tree = target if (docs / target / f"{page}.html").is_file() else "dev"
+        # release, so until then the stub sends the reader to dev.  A heading
+        # added on main is the same case one rank down.
+        built = docs / target / f"{page}.html"
+        tree = target if built.is_file() and (
+            not heading or f'id="{heading}"' in built.read_text(encoding="utf-8")) else "dev"
         return f"/docs/{tree}/{page}.html" + (f"#{heading}" if heading else "")
 
     for old, new in RETIRED.items():

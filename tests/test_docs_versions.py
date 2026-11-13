@@ -176,6 +176,26 @@ def test_a_stub_sends_a_moved_anchor_to_the_page_that_has_it(tmp_path, monkeypat
     assert _followed(stub, fragment) == url
 
 
+def test_a_stub_points_at_stable_only_once_stable_has_the_heading(tmp_path, monkeypatch):
+    """A heading added on main is in dev before the next release puts it in stable."""
+    monkeypatch.setattr(versions, "RETIRED", {"using/glossary": "reference/parameters"})
+    monkeypatch.setattr(versions, "MOVED_ANCHORS", {"using/glossary": {
+        "old": "reference/parameters#new", "kept": "reference/parameters#kept"}})
+    site = _site(tmp_path / "site")
+    tarball = tmp_path / "stable.tar.gz"
+    page = '<section id="kept"></section>'.encode()
+    with tarfile.open(tarball, "w:gz") as archive:
+        for name, data in {"./index.html": b"1.11.1",
+                           "./reference/parameters.html": page}.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    versions.assemble(site, [("1.11", "1.11.1")], lambda version: tarball)
+    stub = (site / "using" / "glossary.html").read_text(encoding="utf-8")
+    assert _followed(stub, "old") == "/docs/dev/reference/parameters.html#new"
+    assert _followed(stub, "kept") == "/docs/stable/reference/parameters.html#kept"
+
+
 def test_every_moved_anchor_belongs_to_a_retired_page_and_targets_a_new_one():
     for old, moved in versions.MOVED_ANCHORS.items():
         assert old in versions.RETIRED, f"{old} has no stub to carry its anchors"
