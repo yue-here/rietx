@@ -1171,7 +1171,6 @@
               aria-label="refine every Biso"
               onclick={(e) => setVary(bisos, (e.currentTarget as HTMLInputElement).checked)} />{/if}</span>Biso Å²
           </span></th>
-          <th class="mult">Mult</th>
         </tr>
       </thead>
       <tbody>
@@ -1205,7 +1204,6 @@
               <span class="slot">{#if atom.biso}{@render box(atom.biso, `${item.key}:biso`)}{/if}</span>
               {#if atom.biso}{@render value(atom.biso, `${item.key}:biso`, false)}{/if}
             </span></td>
-            <td class="mult mono">{atom.multiplicity ?? ""}</td>
           </tr>
         {/each}
       </tbody>
@@ -1872,10 +1870,6 @@
 
   .atomtab .lk {
     padding-right: 10px;
-  }
-
-  .atomtab .mult {
-    text-align: right;
   }
 
   /* the editor floats over its cell, so opening it moves nothing, and is wide

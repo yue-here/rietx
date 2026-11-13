@@ -348,7 +348,10 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   values, not their count (WP-1033).
 - **Shading spans every pane's full height and is clipped to the measured extent**
   (WP-1033). `viz/` does not shade: an exported figure shows exclusion as absence.
-- **A tick belongs to the model** (WP-1032): its own band between pattern and residual.
+- **A tick belongs to the model** (WP-1032): its own band, one row per phase, never on
+  the difference axis. The band sits at the foot, under the difference (`gui/STYLE.md`
+  § Plots; the maintainer's ruling of 2026-11-13, WP-2216). `/next` draws it there;
+  today's page keeps it between pattern and residual until the swap retires that page.
 - **A pattern pane's hooks draw clipped to its plot area, at one seam** (`rxplot.clipped`, WP-2200).
 - **Hiding a curve is by exception** (WP-1032): `curveToggles`/`hidden`, unpersisted.
 - **A layer is drawn where it can be edited** (WP-1210): peak markers and their curve
