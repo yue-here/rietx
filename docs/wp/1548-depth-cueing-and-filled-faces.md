@@ -317,7 +317,15 @@ locally with maturin):
   also asserts the viewer fogged: 5.9 levels from Python's fogged picture
   against 13.8 from its plain one on drawn pixels, and it went red (13.9
   against 6.4) with the box unticked.
-- Fast suite: FAST_COUNTS.
+- Fast suite (`-m "not slow"`, 4-core container, alone): 2 failed, 14 760
+  passed, 428 skipped, 32 xfailed in 42 min. Both failures are browser rows that
+  pass run alone: `test_structure3d_browser.py`'s first row found a blank canvas
+  (its four-frame settle under load), and `test_gui_layout_browser.py`'s
+  parameters-control row found no controls drawn, failing in `stacked` once and
+  in `wide` on a re-run of two files, then passing both run alone; this branch
+  does not touch that panel. The 15 added tests cost 4.99 s locally
+  (`tests.added_test_times`), 4.80 s of it the cued kernel rows; none joins the
+  slow tail. CI cannot measure the delta until 1.5.0 is published.
 - vitest 795 passed (40 files); svelte-check clean.
 - Lanes (`session_usage.py lanes`):
 
