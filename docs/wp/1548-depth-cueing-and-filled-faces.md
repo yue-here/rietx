@@ -183,6 +183,15 @@ visual questions. Bring each with a picture:
 2. D3, fog over a transparent background.
 3. D5, a ring's default colour.
 
+*2026-11-13, provisional:* the maintainer took the session's
+recommendations, to be drawn first and confirmed from the task-6 pictures.
+The release order is the split: the kernels went to `main` alone, as #1557.
+The ring option is `planar_rings=` ("fill planar rings" in the GUI), which
+names the test rather than a chemistry claim. D3 declines: `depth_cue=True`
+with `background=None` raises, and the GUI's transparent export says it
+drew without fog rather than dropping fog silently. D5 is a neutral grey,
+with a caller's colour always accepted. `fog_max` stays 0.7.
+
 ## Non-goals
 
 - Deciding aromaticity, bond orders or hybridisation. D2.
