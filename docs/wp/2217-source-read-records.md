@@ -1,9 +1,8 @@
 # WP-2217 — Records of what was read in another program's source
 
-Milestone: unscheduled · Status: 🔄 2026-11-13 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-13 — PR #1561
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-11-13 — bookkeeping: changes no number and no decision, only which evidence a reader can check
 
 ## Goal
 
@@ -74,8 +73,8 @@ or automatic action.
   on free-then-fix, with GSAS-II's source as agreement and its docs' silence noted.
 - [x] `_audit.py` carry row: cite the GSAS-II SeqRefine tutorial for `Copy2Next` once its wording
   is checked.
-- [ ] Tests: `tests/test_docs_consistency.py`, `tests/test_audit_table.py`, ruff.
-- [ ] Skill: none. Nothing here changes how an agent drives rietx.
+- [x] Tests: `tests/test_docs_consistency.py`, `tests/test_audit_table.py`, ruff.
+- [x] Skill: none. Nothing here changes how an agent drives rietx.
 
 ## Acceptance
 
@@ -90,3 +89,47 @@ or automatic action.
 pass.
 
 ## Handover log
+
+- **2026-11-13** — The records now say which claims about another program rest on reading its
+  source. `ATTRIBUTION.md` states the reading rule by licence, and the three rows that understated
+  their use (CrysPy, MAUD, EasyDiffraction) now say their source was read as specification.
+  `docs/practice.md` marks each check as made in the source, the manual, or both, so a contributor
+  who reads no foreign source (Michael Gaultois's agents) can use the manual-level rows and skip
+  the rest. Nothing a fit computes moved.
+
+  *Done.* No open WP owned this (a `docs/wp/README.md` search for attribution, practice and
+  licence found none). ATTRIBUTION paragraph and three rows. practice.md: legend with three
+  tokens, "checked (source)", "checked (manual)" and "checked (source and manual)"; 192 marks
+  relabelled (87 source, 101 manual, 4 both, 0 undecidable); the pointer to the maintainer's
+  memory replaced by a sentence naming which programs' source was read; the volume-window
+  section says the GSAS-II row is the maintainer's #1121 check, written up by a contributor who
+  read no source; § Limits a control file declares opens "Surveyed" instead of "Checked"; the BGMN
+  extinction mark is "inferred from the binary's keyword table". The carry row in `_audit.py`
+  cites GSAS-II's SeqRefine tutorial (`SequentialTutorial.htm` at GSAS-II-tutorials `924e9eb8`,
+  wording read this session: "Copy results to next histogram?", unchecked after a successful run,
+  otherwise each histogram starts from its own parameters). `staged.py`'s `turn_off` comment and
+  practice.md's rietx row ground the order on free-then-fix. GSAS-II's `GSASIIscriptable.rst`
+  § Refinement recipe was read at 5.8.4 and does not state the order.
+
+  *Not done, on purpose.* The other 21 GSAS-II `file:line` citations in `_audit.py` stay: they are
+  legitimate under the licence rule, and practice.md's marks now say which kind they are.
+  `spherical_harmonics.py`'s C(l, n) names are a convention, so a concept: no change.
+
+  *Gotchas.* MAUD rows with no citation (practice.md, around old lines 27, 80, 315, 328, 341, 368)
+  were marked source because MAUD was read at its tag. Some may have come from its help text.
+  GSAS-II rows with no citation were marked source by the same rule. `/code-review` was skipped:
+  the two `.py` changes are a comment and a string literal.
+
+  *Measured.* Lanes, from `session_usage.py lanes`:
+
+  | lane | est | requests | main at dispatch | lane base | re-read | main requests | left in main | redo | lane $ | saved $ |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | practice-checked | 30 | 28 | 176K | 98K | 0K of 48K | 5 | 6K | 0 | 2.21 | +0.28 |
+
+  Kept items: attribution-rows (est 4, ran 5), volume-window (2, 5), stage-order (5, 5),
+  audit-carry (6, 5), all at 176K. Baseline, selective policy, 0K-300K peak: 72 sessions, -4 %.
+  Tests: `tests/test_audit_table.py` 23 passed; `tests/test_docs_consistency.py` 26 passed after
+  this entry ([dev] venv, macOS arm64). No test added.
+
+  Next: none in this WP. Mike may want the practice.md legend quoted to his agents. WP-2208's
+  Inherited carries its one wording follow-up.
