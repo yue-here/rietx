@@ -115,7 +115,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import PatternData, SigmaRule, require_two_theta
 
 # PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
 # (``phase_support``); the plan carries the number since WP-2002 B1, so it is
@@ -1034,6 +1034,11 @@ class CompiledModel:
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
     # c_w = 0 silences the restraints the caller declared, never the origin.
     origin: "CompiledOrigin | None" = None
+    # Which σ rule weighted the fitted channels, counted over this compile's own
+    # window (``PatternData.sigma_rule``, WP-1952): what
+    # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
+    # without ``compile_model``.
+    sigma_rule: SigmaRule | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -4277,14 +4282,22 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                          or window_area_tol < WINDOW_AREA_TOL)
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
+    window = None
     if two_theta_limits is not None:
         lo, hi = two_theta_limits
         # inverted, it used to fail below as "fewer than 10 points" (WP-1986)
         check_interval("two_theta_limits", lo, hi)
-        mask &= (tt_all >= lo) & (tt_all <= hi)
+        window = (tt_all >= lo) & (tt_all <= hi)
+        mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
+    sigma_rule = pattern.sigma_rule(window)
     if len(tt) < 10:
-        raise ValueError("fewer than 10 points remain in the fit range")
+        why = ""
+        if sigma_rule.n_nonpositive_excluded:
+            why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+                   "because their σ is zero or below (nonpositive_sigma='exclude'), "
+                   "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+        raise ValueError(f"fewer than 10 points remain in the fit range{why}")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
     lams = tuple(line.wavelength.value for line in instrument.source.lines)
@@ -4713,6 +4726,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
+        sigma_rule=sigma_rule,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,
