@@ -1,9 +1,8 @@
 # WP-2145 — the `rietx watch` GUI boot test waits as long as the watcher does
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-13 — the boot test's client outwaits GUI_BOOT_TIMEOUT (PR #1565)
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-11-13 — a false red in every local full suite on this Mac, which runners report as a main failure; CI's Linux runner passes it
 
 ## Goal
 
@@ -51,14 +50,14 @@ the machine's speed rather than the route's contract.
 
 ## Tasks
 
-- [ ] Give the GUI post a client timeout above the watcher's own deadline, derived from
+- [x] Give the GUI post a client timeout above the watcher's own deadline, derived from
   `rietx.watch.GUI_BOOT_TIMEOUT` rather than a second literal (for example
   `GUI_BOOT_TIMEOUT + 10`). `_post` takes the timeout as an argument; the other callers keep 5 s.
-- [ ] Check for siblings: any other test that sends a request to a route which spawns a
+- [x] Check for siblings: any other test that sends a request to a route which spawns a
   process or waits on one, with a client deadline below the server's. On 2026-11-13 a grep of
   `tests/` for `Popen` and `_gui_argv` found only this test and `test_run_control.py`, which
   waits 120 s.
-- [ ] Run the test alone on this Mac, and record the boot time and load beside the result.
+- [x] Run the test alone on this Mac, and record the boot time and load beside the result.
 
 ## Acceptance
 
@@ -81,6 +80,44 @@ deadline is read from `GUI_BOOT_TIMEOUT`.
 - `tests/CLAUDE.md` § Budgets in tests: a wall-clock budget is a runaway guard, never a timer.
 
 ## Handover log
+
+### 2026-11-13 (2nd session) — closed
+
+The real-spawn GUI test of `rietx watch` no longer fails on a Mac whose GUI takes more than
+5 s to start. Its client now waits longer than the watcher itself does, so a slow start
+reaches the route's own answer: a 200, or a 502 that says why. On a quiet Mac the boot takes
+about 2 s, and the old test passed there too. Beside the fast suite it took 4.5 s, just inside
+the old 5 s. At the load of a ghostshift full suite it took 11.7-14.9 s (first entry). The fix
+is in the test alone, and the watcher's 60 s deadline is unchanged. PR #1565.
+
+- *Done*: `_post` in `tests/test_watch_app.py` takes a keyword `timeout`, default 5 s, which
+  every other caller keeps. The real-spawn test passes `watch.GUI_BOOT_TIMEOUT + 10`. The 10 s
+  covers the route's 5 s wait to reap a child that never booted, plus slack. The
+  `GUI_BOOT_TIMEOUT` comment in `src/rietx/watch/__init__.py` now quotes the loaded boot beside
+  the quiet one (a code-review fix).
+- *Siblings*: none. Every other test in `tests/` that posts to a route hits one that answers at
+  once. The compare app and the GUI server hand their work to a thread, and the other `/gui`
+  posts in this file fake the launch or are refused. `test_run_control.py` waits on its child
+  directly, for 120 s.
+- *Measured* (macOS arm64, worktree venv `[dev]`, Python 3.12.10). Alone at load 4: four runs
+  passed, test call 2.15-2.44 s, boot probe 1.86-1.94 s. Beside the fast suite at load 6-14:
+  three runs passed, call 4.29-4.80 s, boot 4.48-4.54 s. The load of 54-91 was not available
+  today, so a slow boot was simulated: a `sitecustomize.py` on `PYTHONPATH` delayed every
+  spawned GUI child by 8 s. The fixed test passed (call 10.16 s). The old 5 s deadline failed
+  with `TimeoutError: timed out` at 5.15 s, the reported message. Fast suite through
+  `serial.py`: 14680 passed, 433 skipped, 32 xfailed, 9:43, alone on the machine. No tests were
+  added. The full suite was not run, because the change is test-only and moves no measured
+  number.
+- *Review*: `/code-review high --fix` found no bug and made the comment fix above. Declined, each
+  with its reason. (1) The `+ 10` leans on the route's unexported 5 s reap wait. Exporting it
+  needs an audit-table row, beyond a test-only WP. (2) 60 s is about 4× the loaded boot, so a
+  heavier machine could turn this test into a 502. Changing `GUI_BOOT_TIMEOUT` is a non-goal,
+  and a boot over 60 s is a product defect for another WP. (3) `_post` lets a client timeout
+  out as a bare `TimeoutError`, now moot for this route. (4) The cleanup's `boot["pid"]` raises
+  `KeyError` if a 200 ever lacks `pid`. That predates this change.
+- *Generality*: not dispatched. The branch adds no heuristic and leaves `_audit.py` alone.
+- *Reader output*: `python -m tests.reader_output` exited 0, unchanged.
+- Next: none. A boot past 60 s on this Mac would be the product defect named above.
 
 - **2026-11-13** — filed by the close-only bookkeeping batch of 2026-11-13 (PR #1563). No open
   WP owns it. The open WPs that mention flaky or browser tests are WP-1343 (a magnetic width),

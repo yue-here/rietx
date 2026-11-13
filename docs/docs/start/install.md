@@ -169,13 +169,13 @@ dichotomy search or `capabilities()` call:
 RuntimeWarning: rietx's compiled kernels did not load, because importing
 rietx_kernels raised ModuleNotFoundError (No module named 'rietx_kernels').
 Fits, structure figures and indexing run the numpy path, which is slower.
-Install the kernels with pip install "rietx-kernels>=1.4,<2", or set
+Install the kernels with pip install "rietx-kernels>=1.5,<2", or set
 RIETX_COMPILED=0 to choose the numpy path and silence this warning.
 ```
 
 The same warning names a wheel of another major version, whose kernel
-interface this rietx does not call. It also names a wheel older than 1.4, the
-oldest rietx accepts, which lacks the structure-solution engine's kernels.
+interface this rietx does not call. It also names a wheel older than 1.5, the
+oldest rietx accepts, which lacks the structure figure's depth-cued kernel.
 
 `capabilities()` answers the three questions in three fields, because they can
 disagree. `features["compiled_kernels"]` is whether the wheel loaded here.
