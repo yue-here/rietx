@@ -967,6 +967,37 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+def _sigma_xye(sigma: list[float], **options) -> list:
+    """Twelve points of an ``.xye`` whose σ column is ``sigma``, read."""
+    from rietx.io.readers import read_pattern
+    from tests.test_readers import write_xy
+
+    tt = [10.0 + 0.02 * i for i in range(12)]
+    y = [500.0 + i % 7 for i in range(12)]
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_xy(pathlib.Path(tmp) / "s.xye", tt, y, sigma)
+        read_pattern(path, diagnostics=found, **options)
+    return found
+
+
+_SIGMA_OK = [22.0 + i % 3 for i in range(12)]
+
+
+def _sigma_nonpositive_fires() -> list:
+    """One σ = 0 and one σ = −1 in an otherwise measured column."""
+    return _sigma_xye([0.0 if i == 5 else (-1.0 if i == 7 else v)
+                       for i, v in enumerate(_SIGMA_OK)])
+
+
+def _sigma_nonpositive_silent() -> list:
+    """Every σ positive; and the same σ ≤ 0 points read with the option that
+    keeps them, which the caller asked for by name."""
+    return (_sigma_xye(_SIGMA_OK)
+            + _sigma_xye([0.0 if i == 5 else v for i, v in enumerate(_SIGMA_OK)],
+                         nonpositive_sigma="poisson"))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -997,6 +1028,9 @@ SILENCE: dict[str, Pair] = {
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
+    "PATTERN_SIGMA_NONPOSITIVE": Pair(
+        _sigma_nonpositive_fires, _sigma_nonpositive_silent,
+        "tests/test_readers_robust.py"),
     "PATTERN_TOTAL_SCATTERING": Pair(
         _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(

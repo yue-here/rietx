@@ -2615,6 +2615,7 @@ class MultiHistogramRefinement:
                 # the partition is of *this* pattern's counts, so a joint fit
                 # has one structure R per histogram, not a pooled one
                 phase_agreement=_phase_agreement(model, values, struct),
+                sigma_rule=model.sigma_rule,
                 diagnostics=diags))
 
         # pooled combined statistics (reported, never quoted alone) --------------

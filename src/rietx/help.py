@@ -3636,6 +3636,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "point has that error. A placeholder in the error field is the usual cause."
         ),
     ),
+    "PATTERN_SIGMA_NONPOSITIVE": HelpEntry(
+        title="Points with an error estimate of zero or below",
+        description=(
+            "The file's error column gives some points an esd of zero or a negative "
+            "one. Zero claims an exact intensity and a negative esd has no meaning, so "
+            "neither gives a weight. These points are left out of the fit, and the "
+            "file's numbers are kept as written. The message counts them, says how "
+            "many record an intensity of zero and gives their 2θ; the code's value is "
+            "the count. A column with no positive esd at "
+            "all is not read, and the Poisson σ = √max(y, 1) is used instead. Where "
+            "the points are channels that counted zero, and the writer computed "
+            "σ = √0, read the file with `nonpositive_sigma='poisson'` to keep them at "
+            "σ = √max(y, 1), one count at a zero count. "
+            "`RefinementResult.sigma_rule` counts what the fit weighted by each rule."
+        ),
+    ),
     "PATTERN_TOTAL_SCATTERING": HelpEntry(
         title="The file holds a total-scattering function, not a pattern",
         description=(
@@ -5020,6 +5036,21 @@ READER_OPTION_HELP: dict[str, HelpEntry] = {
         ),
         typical="`_meas` for measured data in a pdCIF",
     ),
+    "nonpositive_sigma": HelpEntry(
+        title="Zero or negative esds",
+        description=(
+            "What a point whose esd in the file is zero or negative becomes. Such an "
+            "esd gives no weight. `exclude` leaves the point out of the fit and "
+            "reports it as `PATTERN_SIGMA_NONPOSITIVE`. `poisson` weights it by "
+            "σ = √max(y, 1), which is one count at a zero count: use it for a file "
+            "that wrote σ = √0 for a channel that counted nothing. The file's numbers "
+            "are kept either way, and `RefinementResult.sigma_rule` counts the points "
+            "each rule weighted. Taken by the formats whose σ is a column of the file: "
+            "plain columns, GSAS, pdCIF and `.chi`."
+        ),
+        default="exclude",
+        typical="`exclude`; `poisson` for raw counts with zeros written as σ = 0",
+    ),
     "scan": HelpEntry(
         title="Scan index",
         description=(
@@ -5793,6 +5824,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "How many of the declared extra components land in the background. This is "
             "the background flexibility the caller granted, which a reader comparing "
             "two Rwp values needs to see. `0` means none; `None` means nothing counted."
+        ),
+    ),
+    "RefinementResult.sigma_rule": HelpEntry(
+        title="Which σ weighted the fit",
+        description=(
+            "How many fitted points the file's own esd weighted (`n_file_sigma`), how "
+            "many the Poisson σ = √max(y, 1) weighted (`n_poisson_sigma`), and how "
+            "many points inside the fitted range left the fit because their esd was "
+            "zero or negative (`n_nonpositive_excluded`). The first two add up to the "
+            "fit's point count. `None` means nothing counted: a joint fit, which "
+            "counts per histogram, or a result recorded before the field existed."
         ),
     ),
     "RefinementResult.histograms": HelpEntry(
