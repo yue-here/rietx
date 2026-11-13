@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: ✅ 2026-11-09 — nightlies green on all six jobs on 11-04 and again from 11-06 (run 42225042080, after #1429); the Mac full suite green but for one row, the two-site solve, which fails on `main` too and sits in WP-1418 (#1424, PR #1425)
+Milestone: unscheduled · Status: ✅ 2026-11-09 — nightlies green on all six jobs on 11-04 and again from 11-06 (run 42225042080, after #1429); the Mac full suite green but for one row, the two-site solve, which lands on either assignment by rounding on any platform and is fixed by #1559 (#1424 part b, WP-1418; PR #1425)
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 
@@ -291,11 +291,19 @@ gh run list --workflow nightly.yml --branch main --limit 1
   runs passed all six jobs, and so did the first nightly after #1429, run
   42225042080 (2026-11-06, `263227986`, schedule; the 11-07 and 11-08 runs
   passed too). The one red row on 11-03 belonged to another WP and is fixed.
-  The full suite on an arm64 Mac is green except for one row that fails on
-  current `main` as well and passes on Linux: the two-site solve, owned by
-  issue #1424 and WP-1418. Michael ruled (2026-11-05 16:2xZ) that it is a
-  pre-existing Mac-only defect, and that this WP closes with its acceptance
-  recorded as met except for it.
+  The full suite on an arm64 Mac is green except for one row, the two-site
+  solve, owned by issue #1424 and WP-1418. Michael ruled (2026-11-05 16:2xZ)
+  that this WP closes with its acceptance recorded as met except for it.
+  *Corrected 2026-11-13 (Yue's review of #1425):* that row is not Mac-only and
+  does not reliably pass on Linux. The Linux `full` job failed it on
+  2026-11-11, run 43026125239 (`4c48b890d`), with m1 0.6995 (the Mac's
+  value) against 3.5 ± 0.01, and passed it on run 43234222625 (11-12,
+  `a23d06e14`) with no change to the test or to `strategy/magnetic.py` between
+  them. WP-1418's 2026-11-12 entry measured why: on any platform this row lands
+  on the true assignment or the swap by rounding, so a green `full` job on it
+  says nothing. #1559 changes the test to assert what the pattern measures.
+  The close holds until #1559 has merged and a nightly on `main` after it
+  passes all six jobs; that run is then quoted here.
 
   *Done* (ghostshift runner and this close, PR #1425). The moot `Priority:`
   line and the `### Inherited` section went (its notes, on WP-2045's close and on
@@ -340,7 +348,7 @@ gh run list --workflow nightly.yml --branch main --limit 1
   nothing here waits on it. No full suite was re-run on the merged tree: the
   branch adds only `docs/` prose over `main`.
 
-  Next: #1424, the two-site Mac-only row, in WP-1418.
+  Next: #1559 (#1424 part b), the two-site row's test, in WP-1418; then a nightly on `main` after it, quoted here.
 
 - **2026-11-02** — The Linux full suite was red or cancelled every night from
   10-24 to 11-01, and none of what was left is a defect this WP owns. One red
