@@ -59,6 +59,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 2026-11-13 | P4 | [Unscheduled](#unscheduled) |
 
 ## Next, by priority
 
@@ -524,6 +525,10 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-11 | P2 | [2215](2215-the-frame.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
+
+| WP | Title | Status | Priority | Depends on |
+|---|---|---|---|---|
+| [2217](2217-source-read-records.md) | Records of what was read in another program's source | 🔄 2026-11-13 | P4 | — |
 
 ### <a id="unscheduled-coming-from-another-code"></a>Coming from another code
 
