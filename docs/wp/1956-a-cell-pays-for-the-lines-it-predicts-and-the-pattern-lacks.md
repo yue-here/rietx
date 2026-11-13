@@ -1,9 +1,8 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — every task ticked; task 5 ruled by Yue: `fom_panel_disagrees` kept as it is, the lattice-aware form recorded for a revisit; the one item left is WP-2041's tutorial 03 count (write the post-repair grades into WP-2041's `### Inherited`)
+Milestone: unscheduled · Status: ✅ 2026-11-08 — the line screen charges absences at the grade (PRs #941, #1177, #1302); task 5 ruled kept (#916, 2026-11-07); tutorial 03's grades handed to WP-2041, three follow-ups to issue #1468
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
-Priority: P4 2026-11-07 — was P2: the repair shipped and task 5 is ruled kept; what is left is writing tutorial 03's post-repair grades into WP-2041, teaching content that WP-2041 waits on
 
 ## Goal
 
@@ -100,114 +99,6 @@ singleton; a new indexing rule lands in that file; run
 engine or the ranking. Indexing is provisional by declaration
 (`PROVISIONAL_MODULES`).
 
-### Inherited
-
-- **2026-10-28, from WP-2011: the line screen raises on a peak list with no
-  usable peak.** `validate_by_lebail` with such a list fails inside
-  `screen.fwhm_at` with numpy's `ValueError: array of sample points is
-  empty`, where it should decline. The list arises from `pick_peaks` on a
-  pattern divided by its maximum with no σ column: the Poisson fallback
-  √max(y, 1) puts every point under the noise. `index_pattern` stops before
-  validating on such a list, so only a direct call reaches it (WP-2011
-  § Re-measured 2026-10-28, "Found on the way").
-- **2026-10-27, from WP-2011: on the no-peak-list path the fitted-background
-  count moved with the fit's mode.** The Pawley background no longer sinks
-  under a wrong cell, so the count reads more absences there (LaB6 with its
-  cell 1 % long 0 → 14 of 28, a×√5 59 → 167, magnetite's P rival 0 → 3), and
-  NAC's true cell reads 20, its weak real reflections, where Le Bail read 0
-  (WP-2011 § Re-measured 2026-10-27). With a peak list the line screen's count
-  is unchanged in every row. Tutorial 03's candidate now validates at Rwp
-  0.044 with 0 unmatched; the 125-against-200 background in the entry below
-  was the Le Bail fit's and was not re-measured under Pawley.
-
-- **2026-10-24, from WP-2041: the detector also goes blind on the *correct* cell, and
-  that grade is `high`.** Tutorial 03's synthetic aragonite (P m c n, flat 200-count
-  background, `examples/tutorials/03_peaks_indexing_lebail.py`) indexes at `high` over
-  10-80° with `predicted_but_absent` 0 of 105. The validation fit's background sits at
-  125 counts over 10-11° and 46 over 75-78° against the true 200, and 10-19° holds no
-  allowed reflection, so every forbidden position reads as net intensity. Cut the same
-  pattern at 35-60° and the background holds (192 at 10-11° on the 60° cut). The count
-  then returns 4-6 absences, every one a P m c n extinction: (010) 11.09°, (001) 15.43°,
-  (101) 23.68°, (120) 28.71° and (201) 39.54°. The cell grades `low`, found by all three
-  engines. 10-60° alone holds 15 such extinctions. So aragonite is a ready fixture for
-  this WP's glide guard: a correct cell with glides, synthetic, no impurity.
-- **Its outcome decides two things outside `indexing/`.** Tutorial 03's prose reads the
-  "0 of 105" as evidence for the `high` grade ("none of the reflections it predicts is
-  missing"), and WP-2041 is held on this WP to add the notebook's abstention example
-  (a 45° cut, maintainer's choice 2026-10-24). After the repair, say in WP-2041's
-  `### Inherited` what the full range and the 45° cut grade, and with which caveats.
-  Under decision (c) an honest count caps, so the full range may drop to `medium` and
-  print NO CELL unless the extinction screen clears the glide. Rebuild the notebook with
-  `examples/tutorials/build.py`, which lists every cell whose output moved.
-- **2026-10-24, from PR #941's round-5 review: the aragonite case, measured on #941.** On
-  `main` `0070d696` with #941 merged (`b4190354`), the 45° cut still prints NO CELL. Its
-  true cell is now `medium`, capped by `fom_panel_reduced` and `shift_allowance_assumed`,
-  with 6 of 23 lines absent and none uncancellable. The full range stays CELL at `high`,
-  with 24 of 87 lines absent, 5 uncancellable and 0 in de Wolff's window. So the entry
-  above is answered for #941 as it stood. Re-measure at the merge before writing WP-2041's
-  `### Inherited`, since round 5 asked for changes.
-- **2026-10-24, from the same review: a pair with few extras is refuted on half the
-  draws.** `screen.containment_evidence` calls a pair refuted only when k ≤ n·p₀. When
-  n·p₀ < 1 that means no extra seen at all, so one chance pick blocks the refutation. On
-  the tetragonal fixture of `tests/test_indexing_screen.py`, the b × 1.003 orthorhombic
-  split has 7 extras at p₀ 0.055–0.066. It reads `refuted` on Poisson seeds 2, 4, 5 and 6,
-  and `undecided` on 1, 3 and 7 (1 seen) and 8 (2 seen). Its seen fraction is 0.52–0.57
-  against the truth's 1.000 on every seed, so nothing is promoted. What is lost is the
-  refutation. The maintainer ruled the same day that #941's test asserts what holds on all
-  eight seeds and that the rule stays as built. A rule that tolerates a chance hit when
-  n·p₀ < 1 is this follow-up, for example refuting when k is consistent with chance at a
-  stated level and the test has the power to tell. It moves a ruled verdict and acceptance
-  rows, so it goes to the maintainer before code.
-- **2026-10-24, from the same review: #941's release-note bullets are parked.** 1.10.0 was
-  tagged at `ac1ee1e1` without #941, so the sync merge `0f3fce6b` moved #941 to the next
-  cycle (schema 0.60, indexing thresholds 1.12). It also took the bullets out of
-  `docs/releases/1.10.0.md`. Their text is at `83cae9e9:docs/releases/1.10.0.md`. At the
-  merge they go to the 1.11 notes, with "schema 0.59, indexing thresholds 1.11" read as
-  0.60 and 1.12. WP-2043's `### Inherited` holds #1152's line the same way.
-
-- 2026-10-31, from the issue triage (issue #916): task 5 measured (reporter,
-  2026-10-30, addendum 2026-10-31, main at e016f187d, 19 runs from 4 sources).
-  Removing `fom_panel_disagrees` is still unsafe after the repair. Without it,
-  6 runs promote a wrong cell, and on LaB₆ as picked three reach `high`. The
-  reporter measured a lattice-aware form ("TL"). It fires only when the
-  members' co-winners share no lattice, comparing lattices by line set at 1e-3
-  relative in Q. TL promotes no wrong cell. It lifts three truths: #916 arm b
-  and brucite to `medium`, and zincite to `high`. Its tolerance has under a
-  factor of 3 of margin on LaB₆'s 0.12 % tetragonal descent, so the tolerance
-  needs its own measurement before code. The addendum looks at one commit
-  under `preset="quick"`. There the flag on the tP c/a 1.01 negative arm flips
-  with machine load. It fired on 3 of 3 runs with six busy loops and was quiet
-  unloaded, because load changes which cells get validated inside the ~120 s
-  ceiling. A flag that fires by wall clock at fixed inputs is a
-  reproducibility cost of its own. The reporter asks the maintainer to choose:
-  make the flag lattice-aware (a rule change), or close task 5 as "kept".
-  Checked against the tree at d87c8cc91: `fom_panel_disagrees` is unchanged
-  and task 5 is unticked. The figures were not re-run.
-
-- 2026-10-31, from the issue triage (issue #1267): under `preset="quick"`, at
-  one commit (`e016f187d`) with fixed seeds and synthetic inputs,
-  `fom_panel_disagrees` (and the truth's grade it lowers, medium → low) on the
-  tP c/a 1.01 negative arm fired in 3 of 3 runs with six busy loops on the
-  machine and stayed quiet unloaded. Every run took 108-115 s and returned 12
-  candidates, so the 120 s ceiling bound each time; the distinct-class count
-  among the candidates moved 9 (quiet) → 11-12 (loaded). Under a 4× ceiling
-  (`total_budget_seconds=480`) all three runs were quiet. This is the
-  measurement behind the reporter's addendum on #916, which withdrew their
-  earlier "the flag moves with the commit". Checked against the tree at
-  d87c8cc91: `quick` fills `QUICK_TOTAL_BUDGET_SECONDS` = 120 s (`engines.py`)
-  when the caller leaves the ceiling `None`, the search stops
-  `VALIDATION_RESERVE_FRACTION` (0.15) early, validation runs cheapest first
-  and stops at the first cancelled fit (`workflow.py:1083-1114`), and
-  `fom_panel_disagrees` is computed from the panel winners of whatever was
-  ranked (`consensus.py`). So the mechanism the reporter proposes (the clock
-  reaches different units and fits under load) is consistent with the code; it
-  was not instrumented, and not re-run here. Consequence for this WP's open
-  task "Revisit `fom_panel_disagrees` only on the same arms": run that revisit
-  under `preset="full"` or a declared ceiling long enough that no arm binds,
-  or its readings move with machine load. Whether `quick` should become
-  reproducible for a given input (budget by work units, or a deterministic
-  cut) is a change to WP-1042's ruled design and is the maintainer's.
-
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
@@ -260,6 +151,36 @@ absences; Si, corundum and magnetite keep their correct cells.
 - WP-1043 (the magnetite measurement and the recorded design), WP-1449.
 
 ## Handover log
+
+- **2026-11-08** — closed (ghostshift runner, PR #1469; no code changed). The repair this WP
+  asked for is on `main`: a wrong indexing cell can no longer buy a count of zero missing lines
+  by refitting its background, because the count is now read at the peak list's widths against
+  the picker's background, and the correct cell's glide absences are not charged. Yue ruled
+  the last task on 2026-11-07 (the `fom_panel_disagrees` flag stays as it is). What was left
+  was bookkeeping for two other places, and this close does it without new measurements:
+  tutorial 03's grades go to WP-2041 as what is on record, and three unowned follow-ups go to
+  issue #1468.
+
+  *Done.* WP-2041's `### Inherited` gains the entry its 2026-10-24 note asked for. It quotes
+  the full range from the committed notebook, built by 1.11.0's rebuild `3791ef632` on a tree
+  holding PRs #941, #1177 and #1302 (#1353 changed no code): CELL at `high`, 24 of 87 lines
+  absent. It quotes the 45° cut from PR #941's merge (`0070d696`): NO CELL, the true cell
+  `medium`. It says that neither was re-measured after #1177 and #1302, and that WP-2041's
+  own third task re-runs both on `main`. That re-run is a measurement, so it stays WP-2041's
+  rather than being taken here. WP-2041's Priority line now names this close as its blocker
+  gone. The `### Inherited` section is deleted with the Priority line: the tutorial 03 and
+  aragonite entries are consumed by WP-2041's note, the #941 release bullets went into
+  `docs/releases/1.11.0.md`, the 10-27 Pawley count note is already in WP-2041's
+  `### Inherited`, task 5's two triage entries are consumed by the task and by issue #1267
+  (`quick` under load, still open), and the empty peak list (WP-2011's), the
+  n·p₀ < 1 chance hit (PR #941's round 5) and the lattice-aware form's revisit are issue
+  #1468.
+
+  *Not run:* the code review (a prose-only branch), the fast suite (no code or test
+  changed), the generality judge (no heuristic added). Issue #916 is left for the
+  maintainer: this PR carries no closing keyword for it.
+
+  *Next:* none here. WP-2041's third task, then issue #1468 when the maintainer schedules it.
 
 - **2026-11-07** (rulings, PR #1455) — task 5 ruled, and every task is now ticked. Decided
   2026-11-07 (Yue): `fom_panel_disagrees` stays as it is (issue #916). The flag keeps capping the
