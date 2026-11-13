@@ -452,7 +452,7 @@ def test_a_jbt_10_phase_with_no_moment_is_a_nuclear_phase(tmp_path):
 
 
 def test_the_moment_lines_trailing_marker_is_not_a_column(tmp_path):
-    """FullProf's own example file 1 ends a LINE 25b moment line with `<-MagPar`
+    """FullProf's own hobk.pcr ends a LINE 25b moment line with `<-MagPar`
     and no comment marker; the seven numbers before it are the line."""
     _, structure, _ = _build(tmp_path, _combined(
         atoms=_combined_sites(tail=" <-MagPar")))

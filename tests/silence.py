@@ -947,6 +947,31 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+def _pcr_limits(*limits: str) -> list:
+    """The ``.pcr`` flags fixture with the given LINE-47 limits, built."""
+    from rietx.io.projects.fullprof import read_fullprof_pcr, to_structure
+    from tests.test_projects_fullprof import _RANGE
+    from tests.test_projects_fullprof_flags import _file, _limit
+
+    found: list = []
+    for i, limit in enumerate(limits):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _file(pathlib.Path(tmp), f"l{i}.pcr", nre=1, trailing=_limit(*limit) + _RANGE)
+            to_structure(read_fullprof_pcr(path), diagnostics=found)
+    return found
+
+
+def _binding_limit_fires() -> list:
+    """The phase scale is 5.0, on its limit's upper end; a scale never maps."""
+    return _pcr_limits((7, 1.0, 5.0))
+
+
+def _binding_limit_silent() -> list:
+    """The same scale inside its limit (info), and cell a = 5.0 on a limit
+    that maps, so it is applied rather than reported."""
+    return _pcr_limits((7, 1.0, 10.0), (5, 4.9, 5.0))
+
+
 def _sigma_xye(sigma: list[float], **options) -> list:
     """Twelve points of an ``.xye`` whose σ column is ``sigma``, read."""
     from rietx.io.readers import read_pattern
@@ -993,6 +1018,8 @@ SILENCE: dict[str, Pair] = {
     "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
         _rhombohedral_axes_fires, _rhombohedral_axes_silent,
         "tests/test_projects_fullprof.py"),
+    "FULLPROF_BINDING_LIMIT_NOT_APPLIED": Pair(
+        _binding_limit_fires, _binding_limit_silent, "tests/test_projects_fullprof_flags.py"),
     "GSAS2_INSTPRM_GEOMETRY_ASSUMED": Pair(
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
