@@ -3582,10 +3582,54 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
     """``(n_data_total, n_rows)`` of the stacked joint residual: every
-    histogram's data rows, then every histogram's background-penalty rows."""
+    histogram's data rows, then every histogram's rows below its data."""
     n_data = sum(len(m.tt) for m in models)
-    n_pen = sum(0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models)
-    return n_data, n_data + n_pen
+    return n_data, n_data + sum(_rows_below_data(m) for m in models)
+
+
+def _rows_below_data(model: CompiledModel) -> int:
+    """One histogram's rows after its data: the background penalty, then a
+    Pawley model's restraint rows (``model/rows.py``'s order).  A joint fit
+    refuses soft restraints and a floating origin, so nothing else sits there."""
+    return row_layout.n_rows(model) - len(model.tt)
+
+
+def _joint_aux_counts(models: list[CompiledModel]) -> list[int]:
+    """Each histogram's Pawley intensity count, 0 outside Pawley (WP-2104).
+
+    A joint Pawley fit keeps one off-table intensity block per histogram,
+    never shared across them.  The joint vector is ``[the table's columns |
+    histogram 0's block | histogram 1's …]``, so each block is one
+    histogram's own columns, the arrow's diagonal in ``optimize/blocked.py``.
+    """
+    return [0 if m.pawley is None else int(m.pawley.n) for m in models]
+
+
+def _joint_aux_slices(models: list[CompiledModel], n_table: int) -> list[slice]:
+    """Where each histogram's intensity block sits in the joint vector."""
+    off = n_table + np.concatenate([[0], np.cumsum(_joint_aux_counts(models))])
+    return [slice(int(a), int(b)) for a, b in zip(off[:-1], off[1:], strict=True)]
+
+
+def _joint_aux_paths(models: list[CompiledModel]) -> list[str]:
+    """A name per joint intensity column, ``hist.<h>.pawley.<k>``, in vector
+    order.  Not table paths: a reader that counts free columns (the form
+    test's χ²_red) or aligns a matrix with names reads these after
+    ``free_paths``."""
+    return [f"hist.{h}.pawley.{k}" for h, n in enumerate(_joint_aux_counts(models))
+            for k in range(n)]
+
+
+def _table_part(jac, n_table: int, n_maps: list[int]):
+    """The joint Jacobian against the table's columns alone, the Pawley
+    blocks dropped, as :func:`run_least_squares` slices its own."""
+    if jac is None:
+        return None
+    if isinstance(jac, BlockJacobian):
+        return BlockJacobian([b[:, :k] for b, k in zip(jac.blocks, n_maps, strict=True)],
+                             [c[:k] for c, k in zip(jac.col_maps, n_maps, strict=True)],
+                             jac.n_data, jac.n_pen, n_table)
+    return np.asarray(jac)[:, :n_table]
 
 
 def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
@@ -3601,6 +3645,11 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     :class:`~.blocked.BlockJacobian`, each histogram's weighted rows against
     its own columns, whose :meth:`~.blocked.BlockJacobian.toarray` is the
     dense matrix entry for entry (WP-1325).
+
+    In Pawley mode θ is ``[mtable.free_paths | each histogram's intensity
+    block]`` (:func:`_joint_aux_slices`, WP-2104), and each histogram's rows
+    below its data carry its Pawley restraint rows after its background
+    penalty.  Outside Pawley θ is the table's alone.
     """
     if layout not in blocked.LAYOUTS:
         raise ValueError(f"unknown Jacobian layout {layout!r}; "
@@ -3622,15 +3671,28 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     jacobians = [_jacobian_for(m, t, backend)
                  for m, t in zip(models, mtable.tables, strict=True)]
     n_data = [len(m.tt) for m in models]
-    n_pen = [0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models]
+    n_pen = [_rows_below_data(m) for m in models]
     data_off = np.concatenate([[0], np.cumsum(n_data)])
     n_data_total = int(data_off[-1])
     pen_off = n_data_total + np.concatenate([[0], np.cumsum(n_pen)])
     n_rows = int(pen_off[-1])
-    n_cols = len(mtable.free_paths)
+    # a Pawley histogram's intensity block rides after the table's columns,
+    # one block per histogram (WP-2104); outside Pawley every slice is empty
+    n_table = len(mtable.free_paths)
+    aux = _joint_aux_slices(models, n_table)
+    n_cols = aux[-1].stop if aux else n_table
+    col_maps = [np.concatenate([np.asarray(mtable.col_map(h), dtype=np.int64),
+                                np.arange(a.start, a.stop, dtype=np.int64)])
+                if a.stop > a.start else mtable.col_map(h)
+                for h, a in enumerate(aux)]
+
+    def split(theta: np.ndarray) -> list[np.ndarray]:
+        thetas = mtable.split(theta)
+        return [np.concatenate([t, theta[a]]) if a.stop > a.start else t
+                for t, a in zip(thetas, aux, strict=True)]
 
     def residual(theta: np.ndarray) -> np.ndarray:
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         data_parts: list[np.ndarray] = []
         pen_parts: list[np.ndarray] = []
         for h in range(n_hist):
@@ -3641,11 +3703,11 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
         return np.concatenate(data_parts + pen_parts) if n_rows else np.zeros(0)
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         J = np.zeros((n_rows, n_cols), dtype=np.float64)
         for h in range(n_hist):
             Jh = jacobians[h](thetas[h])
-            cm = mtable.col_map(h)
+            cm = col_maps[h]
             do = int(data_off[h])
             J[do:do + n_data[h], cm] = sqrt_w[h] * Jh[:n_data[h]]
             if n_pen[h]:
@@ -3656,10 +3718,10 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     def block_jacobian(theta: np.ndarray) -> BlockJacobian:
         # the dense closure's entries, never scattered: each histogram's rows
         # stay against its own columns (WP-1325)
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         return BlockJacobian(
             [sqrt_w[h] * jacobians[h](thetas[h]) for h in range(n_hist)],
-            [mtable.col_map(h) for h in range(n_hist)], n_data, n_pen, n_cols)
+            col_maps, n_data, n_pen, n_cols)
 
     return (residual, jacobian if layout == "dense" else block_jacobian,
             n_data_total)
@@ -3732,8 +3794,10 @@ def run_multi_least_squares(models: list[CompiledModel],
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
     lapack_start = lapack.retries()
     # dense below a size, blocked above it (WP-1325, ``blocked.choose_layout``)
-    layout = blocked.choose_layout(_stacked_rows(models)[1], len(mtable.free_paths),
-                                   solver)
+    n_table = len(mtable.free_paths)
+    aux = _joint_aux_slices(models, n_table)
+    n_aux = sum(a.stop - a.start for a in aux)
+    layout = blocked.choose_layout(_stacked_rows(models)[1], n_table + n_aux, solver)
     residual, jacobian, n_data_total = _multi_closures(
         models, mtable, weights=weights, backend=backend, layout=layout)
     # The same two guards :func:`run_least_squares` wires up, for the same
@@ -3748,7 +3812,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     residual = cell_guard
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
     jacobian = _FiniteJacobianGuard(jacobian)
-    n_cols = len(mtable.free_paths)
+    n_cols = n_table + n_aux
 
     if cancel is not None:
         # read at an evaluation boundary, below the event wrapper, as in
@@ -3774,6 +3838,14 @@ def run_multi_least_squares(models: list[CompiledModel],
     _freeze_cell_windows_multi(models, mtable, phase_support_sigma)
     x0 = mtable.x0()
     lo, hi = mtable.bounds()
+    pawley = [m for m in models if m.pawley is not None]
+    if pawley:
+        # each histogram's intensity block, bounded ≥ 0, in histogram order
+        # (``_joint_aux_slices``), as :func:`run_least_squares` appends one
+        bounds = [m.pawley_bounds() for m in pawley]
+        x0 = np.concatenate([x0, *[m.pawley_x0() for m in pawley]])
+        lo = np.concatenate([lo, *[b[0] for b in bounds]])
+        hi = np.concatenate([hi, *[b[1] for b in bounds]])
     x0 = _feasible_start(x0, lo, hi, solver)
     r0 = residual(x0)
     require_fp64(r0, "least-squares residual")
@@ -3785,8 +3857,19 @@ def run_multi_least_squares(models: list[CompiledModel],
                           n_degenerate_cell_probes=cell_guard.n_degenerate,
                           jacobian_layout=layout)
 
+    def set_intensities(x: np.ndarray, stderr_full: np.ndarray | None = None) -> None:
+        # each histogram's block into its model's per-phase buffers, as the
+        # single fit pins its own
+        for m, a in zip(models, aux, strict=True):
+            if m.pawley is not None:
+                m.set_pawley_intensities(x[a])
+                if stderr_full is not None:
+                    m.pawley.stderr = stderr_full[a]
+
     def stopped(kind: str, columns=()) -> LSQOutcome:
-        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_cols,
+        # the evaluations wrote trial intensities; the outcome is the start
+        set_intensities(x0)
+        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_table,
                                    cost0, solver, cell_guard, lapack_start,
                                    jacobian_layout=layout)
 
@@ -3799,9 +3882,11 @@ def run_multi_least_squares(models: list[CompiledModel],
         if solver == "lm":
             res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                               ftol=ftol,
-                              inequalities=(
-                                  _joint_width_inequalities(models, mtable, x0)
-                                  + _joint_tied_bound_inequalities(mtable, x0, lo, hi)),
+                              inequalities=_pad_inequalities(
+                                  _joint_width_inequalities(models, mtable, x0[:n_table])
+                                  + _joint_tied_bound_inequalities(
+                                      mtable, x0[:n_table], lo[:n_table],
+                                      hi[:n_table]), n_aux),
                               events=events, stage=stage, track=tracker, table=mtable,
                               cancel=cancel)
         else:
@@ -3816,6 +3901,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
 
     stderr = corr = covariance_error = moment_angle_tests = esd_inflation = None
+    stderr_full = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
         # the single-histogram rule (WP-1929) on the stacked residual: a
         # moment angle's column is every histogram's rows of it, and a shared
@@ -3826,19 +3912,33 @@ def run_multi_least_squares(models: list[CompiledModel],
                            [mtable.col_map(h) for h in range(len(mtable.tables))],
                            len(res.x)),
             len(res.x))
-        stderr, corr, esd_inflation, covariance_error = _guarded_covariance(
+        # off the full vector, the Pawley blocks with it, then sliced: the
+        # single fit's rule, so the table esds carry the intensities'
+        # correlation (``run_least_squares``)
+        stderr_full, corr, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=n_data_total)
-    if isinstance(res.jac, BlockJacobian):
-        jac_data = res.jac.data_rows()
+        if stderr_full is not None:
+            stderr, corr = stderr_full[:n_table], corr[:n_table, :n_table]
+    if pawley:
+        # the last evaluation need not sit at the solution (the single fit's
+        # reason), so the answer's intensities are written back here
+        set_intensities(res.x, stderr_full)
+    jac_table = (res.jac if not n_aux else _table_part(
+        res.jac, n_table, [len(mtable.col_map(h)) for h in range(len(mtable.tables))]))
+    if isinstance(jac_table, BlockJacobian):
+        jac_data = jac_table.data_rows()
     else:
-        jac_data = np.asarray(res.jac)[:n_data_total] if res.jac is not None else None
+        jac_data = np.asarray(jac_table)[:n_data_total] if jac_table is not None else None
+    cosine = _residual_cosine(res.jac, res.fun)
+    if cosine is not None:
+        cosine = cosine[:n_table]
     # ``jac_data`` drops the penalty and restraint *rows*; the angle keeps
     # them, being read off the cost the driver actually minimised
-    return LSQOutcome(res.x, cost0, float(res.cost), int(res.nfev), status,
-                      jac_data, stderr, corr, solver=solver,
-                      residual_cosine=_residual_cosine(res.jac, res.fun),
-                      active_bounds=_active_bounds(res, len(res.x)),
+    return LSQOutcome(res.x[:n_table], cost0, float(res.cost), int(res.nfev), status,
+                      jac_data, stderr, corr, n_aux=n_aux, solver=solver,
+                      residual_cosine=cosine,
+                      active_bounds=_active_bounds(res, n_table),
                       max_shift_over_esd=_final_shift_over_esd_multi(
                           mtable, tracker.step(), stderr, corr),
                       termination=termination,

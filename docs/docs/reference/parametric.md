@@ -343,6 +343,20 @@ Each of those rows names the declaration in `RefinedParameter.equations`, and so
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
 A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names the coefficient.
 
+A cell series is often fitted before a structure is known.
+`mode="pawley"` refines the same declaration with each pattern's reflection intensities its own ([Modes](joint.md#modes)):
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+result = rx.refine_multi(patterns, lab6, instruments, mode="pawley",
+                         coordinates=coordinates, parametric=[expansion])
+```
+
+`"mccusker_default"` becomes `pawley_default` in that mode, as for a single fit.
+An equation on a parameter Pawley cannot refine, such as a `biso` or a scale, is refused before the fit.
+Over twelve seeds of a ten-pattern synthetic LaB6 ramp, the mean of (value − truth)/esd was 0.20 for the intercept and 0.13 for the slope.
+Its spread was 0.65 and 1.01, so neither coefficient's esd understates its scatter.
+
 ### Large libraries
 
 Under the default `solver="lm"`, once the stacked Jacobian would pass 256 MiB (`rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES`), a joint fit keeps one block per pattern, against that pattern's own columns, and never builds the stacked matrix.

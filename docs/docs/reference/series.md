@@ -12,7 +12,7 @@ A joint fit is one refinement whose residual stacks several patterns, and the pa
 | Answer | a trajectory, such as a(T) or w(t) | one set of numbers, informed by every pattern |
 | Used for | an in-situ ramp, a parametric sweep, a tray of specimens | one specimen measured twice, at two wavelengths or on two instruments |
 | Entry point | `SequentialRefinement`, `refine_sequential` | `MultiHistogramRefinement`, `refine_multi` |
-| Modes | any | Rietveld only |
+| Modes | any | Rietveld or Pawley |
 
 The question that separates them is whether the specimen changed.
 Eight mixtures with different compositions are eight specimens, so their cells are eight measurements and a series is the right shape.

@@ -159,6 +159,15 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **From WP-2104, 2026-11-12: a joint fit refuses Le Bail, and the joint Le Bail arm
+  is retired here.** WP-2104 built the Pawley arm of a joint fit
+  (`refine_multi(mode="pawley")`) and left Le Bail refused with a
+  `NotImplementedError`, under the 2026-11-05 ruling. Le Bail's partition runs
+  between solves, so a joint arm would need a partition loop around the stacked solve.
+  The arm was retired to this WP on 2026-11-13, settled by Claude under Yue's
+  2026-11-05 ruling, and Yue raised no objection. If this WP retires Le Bail from the
+  structure-free sites, the joint refusal is already the end state and needs no work.
+
 - **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
   re-partition. Decide it or retire it with this move.** `_final_compile` carries the
   intensities onto the result's windows without a partition. A one-channel window

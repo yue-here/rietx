@@ -2,7 +2,7 @@
 
 Milestone: gui-overhaul · Status: ⬜
 Depends on: 2209 (the recovery copy); #1523 (its pull request)
-Priority: P2 2026-11-10 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; it lands on WP-2209's store, which merges with this file
+Priority: P2 2026-11-13 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; WP-2209's store, which it lands on, is on main since #1523 and WP-2209 is closed
 
 ## Goal
 
@@ -121,6 +121,10 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1009 and WP-1013 (the `.rxt` document and the Text pane's sync rules).
 
 ## Handover log
+
+- **2026-11-13** — re-rated by the close-only bookkeeping batch of 2026-11-13 (PR #1563),
+  which closed WP-2209. Its recovery copy merged in PR #1523 on 2026-11-11, so nothing this WP
+  builds on is waiting any more. The tier stays P2. Next: as below.
 
 - **2026-11-10** — filed by WP-2209's runner, on the maintainer's ruling of 2026-11-10
   (WP-2209's question 5). No open WP owns the work: WP-2209 left both pieces out of scope and
