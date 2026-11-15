@@ -1,6 +1,6 @@
 # WP-2020 — Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name
 
-Milestone: generality · Status: 🔄 2026-11-15 — claimed by @yue-here
+Milestone: generality · Status: 🔄 2026-11-15 — survey, inventory and design brief landed (PR #1574); the build waits on the maintainer's ruling
 Track: The registry and the guard
 Depends on: —
 Priority: P2 2026-10-21 — the maintainer's concept, raised while declining a default backstop in WP-2002; it gives a demoted default somewhere to go other than away
@@ -114,7 +114,7 @@ was not checked.
       Checked from source or manual, as `docs/practice.md` was.
 - [x] Inventory the candidate settings from `_audit.ROWS` and the rulings: each with its
       evidence, the scenario it serves, and the datasets it was measured on.
-- [ ] A design brief for the maintainer: what a set may contain, where it lives (package
+- [x] A design brief for the maintainer: what a set may contain, where it lives (package
       data, a user directory, a project), how it composes with a caller's own settings and
       which wins, how a result and a history node record it, how its evidence is stated,
       and its name in the field's terms.
@@ -135,5 +135,143 @@ datasets it was tested on.
 - `docs/milestones/generality.md` § The rule (tiers and demotion).
 
 ## Handover log
+
+- **2026-11-15** — The survey and the inventory are done, and they point away from building a
+  new kind of file now. Every one of the seven programs has a file for an instrument's values,
+  and no program records in its result which file it loaded. Nothing in rietx today needs a
+  new home. The limits this WP was filed to rehouse were removed or declined with no
+  measurement showing they help, and the strain and size caps turned out to be arithmetic.
+  What rietx lacks is smaller: a profile or preset cannot say which datasets tested it, and
+  a result cannot say which profile it ran under. The design brief below waits on the
+  maintainer, and task 4 builds whatever is ruled.
+
+  *Done.* Survey of the seven programs: `docs/practice.md` § A named set of starting values,
+  limits and refine flags (one agent per two or three programs, Sonnet, with the load-bearing
+  claims re-read by the lead: GSAS-II's flags-False read and its nine coded sets, FullProf's
+  47 IRFs and their readme, MAUD's `instruments.mdb` with no limits, TOPAS's "User defined
+  min/max limits override the defaults"). Inventory: § Findings above. The Context's recalled
+  practice is marked superseded in part.
+
+  *Measured.* `_audit.ROWS` on `0f14ac25d`: 1344 rows, 165 at tier 3, 37 of them resting on
+  one family by a regex over their evidence. None of the 37 is a limit, starting value or plan
+  setting a caller would change for one kind of measurement. No test ran, because the branch
+  touches `docs/` only.
+
+  *Gotchas.* GSAS-II 5.8.4's "Save profile" may call `WriteInstprm` with its arguments
+  shifted (`GSASIIfiles.py:533`). That was read from source and not run. It is GSAS-II's
+  defect and bears on nothing here. FullProf's `.out` and TOPAS's OUT were not checked for
+  the include or IRF file name.
+
+  #### Brief for the maintainer: a scenario-set file, or the two carriers rietx has
+
+  **The decision.** Whether WP-2020 builds a new kind of file (a named set of limits,
+  starting values and plan settings), extends the instrument profile file and the plan
+  presets instead, or waits. Two triggers send it to you. It changes the project's direction
+  (a new concept on the top-level API), and two of the options change a stored format.
+
+  **Why it matters.** A rietx default applies to every fit. The generality rule says a
+  default rietx invented must hold on three unrelated dataset families, or it is demoted. Today
+  demotion means deletion. Your idea (WP-2002's sixth round) was a second home: a named file a
+  caller loads on purpose, tested on fewer datasets, saying which ones. You compared it to
+  sharing a TOPAS `.inp`, made more usable. The survey and the inventory asked what would go
+  in it. Nothing in the tree needs it yet:
+
+  - The TCHZ width ceilings and the 2 nm size floor were removed on your rulings. No dataset
+    showed they helped.
+  - The instrument-width backstop was declined and never measured.
+  - The strain and size caps are tier 1 now.
+  - WP-2017's second pass (every tier-3 threshold on three families) has demoted nothing.
+
+  The scenario-specific settings that remain already have a carrier. An instrument profile
+  file holds calibrated widths, zero and polarisation. Nine plan presets hold the refinement
+  order for lab, magnetic, Le Bail and Pawley work. Two gaps are real. A profile file or a
+  preset cannot say which datasets tested it. A result cannot say which profile file it was
+  fitted under, so its reader cannot tell whose calibration it assumed. Choosing badly costs
+  one of two things. Build too much, and rietx carries a file format that must open forever,
+  with no set worth shipping in it. Build nothing, and the next demoted default is deleted,
+  and results stay silent about their calibration. Importance: moderate.
+
+  **Aim.** I read the aim as serving two readers. One is the expert who calibrates a setup
+  once and hands it on, as a TOPAS user shares an include file. The other is the agent or
+  person reading a result later, who needs to know what it ran under. Correct me if the first
+  reader is instead the scientist choosing a ready-made set for a measurement type.
+
+  **Options.**
+
+  - (A) Do nothing now. Park the WP until WP-2017 demotes a limit or a starting value, or a
+    user asks for a set. Costs nothing and is fully undoable. The next demotion still has
+    nowhere to go.
+  - (B) Extend the two carriers. A profile file gains a name and a "tested on" list (each
+    dataset and what was checked on it). Loading one writes its name, path and file hash into
+    the result's `Provenance` and the history node. Each plan preset's help text gains the
+    same tested-on line. About a day. It bumps the profile format's version, so it is a
+    stored-format change. Old profile files keep opening. No new name reaches the API.
+  - (C) Build the concept as filed. A new file holds instrument values, limits and plan
+    settings together, with its tested-on list. A caller loads it by name, the caller's own
+    settings win, and the result records it. Several days, a new stored format and a new
+    top-level name. The first set would come from the inventory, and every candidate there is
+    untested (series instrument-width limits, a nanocrystalline size floor). Hard to undo once
+    files exist, since an old file must always open. The WP's acceptance also says a set
+    "changes only what it declares". `load_instrument_profile` today returns every parameter
+    fixed, so C needs a new loading verb as well.
+  - Dropped: a set written as a python module or a macro language. rietx's parametric
+    equations own expressions, and a second language breaks the one-integration-surface rule.
+
+  **Practice.** From the survey (`docs/practice.md`, checked from source or manual):
+
+  - GSAS-II, FullProf, MAUD and Profex ship instrument sets. Only FullProf's IRF headers name
+    the standard they came from (D1A from Na₂Ca₃Al₂F₁₄, ID31 from LaB6). No program's file
+    states which datasets tested it.
+  - GSAS-II's instrument file and FullProf's IRF carry values without refine flags. TOPAS,
+    BGMN, MAUD and RIETAN-FP files carry values, limits and flags together, because each is a
+    piece of the program's own input language.
+  - Where a program says which value wins, the user's own setting wins (TOPAS limits, a
+    Profex copy edited in place).
+  - No program records the loaded file in its result. GSAS-II prints the path once to the
+    console. TOPAS writes the expanded input to its log. FullProf keeps the IRF name in the
+    rewritten `.pcr`. Profex's "refinement preset" stores its files with checksums.
+  - The field's words are "instrument parameter file", "resolution file", "include file",
+    "template", "device file" and "refinement preset". rietx already says "preset" for plans
+    and for the GUI's geometries.
+  - Outside diffraction (recall, not checked this session). Hydra composes a run's
+    configuration from named groups, lets later entries and the command line win, and saves
+    the composed configuration beside every run. ESLint's shared configurations are extended
+    by a local file, and the local file wins. My knowledge of these tools ends at mid-2026.
+
+  **Recommendation.** B, as a lean. In your question order:
+
+  - Purpose: a home for scenario choices, and a record of what ran.
+  - rietx convention: both carriers exist and are documented, so extending them follows it.
+  - Agents: an agent gains most from the result naming its profile. The tested-on list helps
+    it pick a preset.
+  - TOPAS: include files carry everything and let the user win, and TOPAS records an include
+    only in its log.
+  - Outside diffraction: Hydra's saved configuration is the precedent for recording.
+  - Design ethos: build the smallest thing, and build no carrier before anything needs one.
+    C fails here today. No question flipped the lean.
+
+  The crux is whether anything in the tree needs a new carrier now. The inventory says
+  nothing does. A loses to B because the result's silence about its calibration is a gap
+  today, whatever WP-2017 finds. Two observations would flip me to C: a ruling that a
+  specific set should exist now (say, instrument-width limits that series users can ask
+  for), or a WP-2017 demotion of a limit or a starting value.
+
+  **Consent line.** I will leave `strain_cap` and `size_cap` as package defaults, because
+  their audit rows are tier 1 (a line wider than the scan carries no information) and the
+  generality rule keeps tier-1 defaults, unless you object.
+
+  **Settled for you.**
+
+  - The inventory counts only what a caller sets per measurement (limits, starting values,
+    plan settings) and leaves solver numerics out. Grounds: the WP's Goal names those three.
+    The alternative was to treat every one-family tier-3 row as a set candidate.
+  - The survey went to `docs/practice.md` as one section with a row per program, under that
+    file's convention and the save-every-survey rule. The alternative was a WP batch file.
+  - A shipped distribution file (FullProf's IRFs, MAUD's `instruments.mdb`) is cited as
+    checked against the distribution's own files. The alternative was to mark it inferred.
+
+  *Next.* The maintainer rules on the brief: A, B or C, and under C the name. Then task 4
+  builds the ruled design with one set or one extended profile and its tests, and the
+  acceptance command runs.
 
 - **2026-10-21** — Filed by the WP-2002 session from the maintainer's answer to the sixth round's Q6. Nothing built; the survey is the first task.
