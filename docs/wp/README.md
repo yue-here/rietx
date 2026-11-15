@@ -51,6 +51,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-15 | P2 | [parametric](#parametric) |
 | [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -72,11 +73,11 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | P2 | — | [generality](#generality-the-registry-and-the-guard) |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | P2 | — ([2003](2003-the-chain-actions.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | P2 | — | [parametric](#parametric) |
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) | [parametric](#parametric) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -484,7 +485,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | ✅ 2026-11-06 | — | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 | [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md) | A parametric equation declared by condition and glob | ⬜ | P3 | [1325](1325-parametric-series.md) ([1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
-| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | ⬜ | P2 | — |
+| [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 🔄 2026-11-15 | P2 | — |
 | [2102](2102-a-joint-fit-takes-a-planspec.md) | A joint fit takes a PlanSpec | ✅ 2026-11-05 | — | — |
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | ⬜ | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) |
 | [2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | A parametric cell in a Le Bail or Pawley joint fit | ✅ 2026-11-13 | — | — ([1325](1325-parametric-series.md), [1964](1964-a-parametric-equation-the-user-writes.md) soft) |
@@ -561,6 +562,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2056](2056-a-low-angle-asymmetry-cw-neutron-cannot-calibrate.md) | A low-angle asymmetry the CW neutron lines cannot calibrate | ⬜ | P3 | — ([2054](2054-the-report-names-asymmetry-with-fcj-off.md) soft) |
 | [2061](2061-a-crystallite-has-a-shape.md) | A crystallite has a shape: hkl-dependent size broadening on the analytical profile | ⬜ | P3 | — ([1343](1343-the-moment-pays-for-the-width.md) soft) |
 | [2070](2070-a-second-cw-neutron-line-that-is-not-a-harmonic.md) | A second CW neutron line that is not a harmonic, with its own weight and offset | ⬜ | P3 | — |
+| [2146](2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) | The ISIS iparm files read, with each repair recorded | ⬜ | P3 | — ([2032](2032-the-tof-readers-t1-follow-ups.md), [1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
 
 ### <a id="unscheduled-what-fires-and-what-stays-silent"></a>What fires, and what stays silent
 
@@ -674,6 +676,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ⬜ | P3 | — ([1814](1814-refinable-z-matrix-internals.md) soft) |
+| [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ⬜ | P3 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
+| [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | ⬜ | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
