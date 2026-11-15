@@ -1,6 +1,6 @@
 # WP-2041 — a tutorial shows the indexer abstain
 
-Milestone: unscheduled · Status: 🔄 2026-10-24 — example found (a 45° cut); held until WP-1956 lands, by the maintainer's choice
+Milestone: unscheduled · Status: 🔄 2026-11-15 — claimed by @yue-here
 Track: The repo's own process
 Depends on: 1956
 Priority: P4 2026-11-08 — teaching content; WP-1956, its one blocker, closed on 2026-11-08 (PR #1469)
