@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-15 — first slice in review: the TOPAS mapping and the target table
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
@@ -20,14 +20,28 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - `docs/docs/switching/topas.md` and `switching/gsas2.md` never mention parametric
   refinement. `guides/equation.md` and `reference/parametric.md` do cover it, but a
   reader starting from the Switching tab has no way to them.
+  *Superseded in part, 2026-11-15:* WP-1964 added a parametric section to both
+  Switching pages (`switching/topas.md` § A parametric equation is a formula,
+  `switching/gsas2.md` § A parametric equation is fitted with the patterns), each
+  linking `reference/parametric.md`.
 - Every kind of target an expert asks for is accepted today: cell, scale, a coordinate
   DOF, Biso, occupancy, `instrument.zero_shift`, a profile `w` and a background
   coefficient. Nothing says so in one place.
+  *Re-measured 2026-11-15:* a declaration also accepts a size or strain term, axial
+  divergence, a wavelength and the specimen displacement (locked on a capillary). A
+  target that no plan stage reaches refines nothing, and nothing says so:
+  `mccusker_default` left the coefficients of a coordinate, B, occupancy, size,
+  strain, axial and wavelength equation at their starts, absent from
+  `result.parameters`, with no diagnostic naming them. That is the held-slope trap's
+  sibling.
 - Freeing only `vars.a_0` holds the slope at its start of 0. Rwp went from 0.49 to 0.86
   on the ramp and nothing was reported. This is undocumented.
 - Equations nonlinear in one scalar already work by scanning that scalar through
   `design` rows. Holding θ at 200, 400 and 800 K gave χ² of 150.1, 150.5 and 155.7, at
   about 0.4 s a fit. The scan gives no esd on θ. That example is not in the manual.
+  *Superseded in part, 2026-11-15:* WP-1964's formula equations refine θ directly,
+  with an esd (`guides/formula.md`: θ = 500.17 ± 0.61 K on a synthetic rutile ramp).
+  So the scan task below may now be moot; the next session decides.
 - The refusal for an unknown target points at the private
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
 
@@ -53,9 +67,12 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 
 ## Tasks
 
-- [ ] `switching/topas.md`: a section mapping TOPAS's parametric vocabulary to rietx's
+- [x] `switching/topas.md`: a section mapping TOPAS's parametric vocabulary to rietx's
   (`prm`, `local`, `#list`, an equation on a `prm`, `!` for fixed). Say what is
-  expressible now and what waits on 1964, by that name.
+  expressible now and what waits on 1964, by that name. *Done 2026-11-15:* WP-1964 had
+  written the core table; this slice added the constructs the two Durham inputs use and
+  a list of the four with no spelling yet. 1964 is closed, so the list names the
+  missing pieces, not WPs.
 - [ ] The inventory, moved from the parked 2105. Every parametric construct in the two
   Durham inputs, each with its rietx spelling, its WP or a named non-goal, and each
   input's free-parameter and channel counts. The milestone's agent row is judged against
@@ -72,7 +89,9 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   a situation row) or a row in the foreign-inputs line, under the skill's placement rule.
 - [ ] `switching/gsas2.md`: the same for GSAS-II's sequential refinement and its
   parametric fit afterwards. Read that program's docs before writing.
-- [ ] `reference/parametric.md`: one table of the target kinds accepted.
+- [x] `reference/parametric.md`: one table of the target kinds accepted. *Done
+  2026-11-15:* § Targets, with an executing block asserting every kind and five
+  refusals.
 - [ ] Document the held-slope trap where a reader meets it, in `guides/equation.md`.
   Decide whether it also earns a diagnostic, under Rule 1 of DESIGN.md.
 - [ ] A worked `design` scan over a held scalar, in `examples/`, included into
