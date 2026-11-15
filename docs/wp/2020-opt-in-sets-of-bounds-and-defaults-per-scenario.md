@@ -56,7 +56,7 @@ of the seven programs rietx-bench runs, from source or manual.
 
 ## Tasks
 
-- [ ] Survey the seven programs (GSAS-II, FullProf, TOPAS, RIETAN-FP, BGMN, MAUD,
+- [x] Survey the seven programs (GSAS-II, FullProf, TOPAS, RIETAN-FP, BGMN, MAUD,
       EasyDiffraction): how a user shares or loads a set of starting values, bounds and
       refinement settings, what such a file may contain, and how a result records it.
       Checked from source or manual, as `docs/practice.md` was.
