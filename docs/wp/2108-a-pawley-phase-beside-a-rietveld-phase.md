@@ -130,6 +130,14 @@ overlap the first phase's.
   heuristic was added, so the generality judge did not run. The skill is unchanged: the
   recipe is a manual page an agent reaches from `holder.md`.
 
+  *Gates run here* (darwin/arm64, `[dev]`): `tests/test_holder_cell.py` and the two holder
+  guide rows of `tests/test_examples.py`, 4 passed; `tests/test_docs_consistency.py` 26
+  passed; ruff clean; Vale clean on the new page; `sphinx -W` green; `python -m
+  tests.reader_output` exit 0 (unchanged). The local fast suite did not run: it waited
+  about 2 h behind other sessions' suites on the machine-wide queue and was withdrawn, so
+  CI's fast suite is the gate. The fast selection gains one test (the new guide row); the
+  slow test is outside it. No full suite: the change is a guide, a script and a slow test.
+
   Next: none in this WP. If a user asks for the joint form, try `variables=` plus an
   expression equation per holder line in a new WP.
 
