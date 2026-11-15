@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
-Priority: P3 2026-09-24 — `SEQUENTIAL_PATH_DEPENDENT` already fires but does not say which answer to quote; whether the package's own passes disagree in cost is unmeasured
+Priority: P3 2026-11-15 — `SEQUENTIAL_PATH_DEPENDENT` already fires but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
 
 ## Goal
 
@@ -66,6 +66,23 @@ Option 1 changes no fitted number and could land first. Its new field needs
 its writer named at review (root CLAUDE.md, a declared name is a claim).
 
 ### Inherited
+
+- **2026-11-15, from the issue triage (issue #1556 § 1): task 1 is measured, and the
+  package's own passes do disagree in cost.** On the 11-BM CuCr₂O₄ + CuO ramp
+  (`tests/data/seqrefine_cucr2o4/`, 17 patterns, 6.8-288.7 K, `direction="both"`), the
+  reporter measured the relative Rwp difference, forward minus backward, on the same
+  points: up to 1.4e-3 (OH_49), 7.5e-4 (OH_41) and −8.3e-4 (OH_53). With CuO's cell
+  held, the two chains agree to 1.4e-8 or better on 16 of 17 patterns, the cold-started
+  high-T end included. So the weak minor phase's cell carries the history, not the cold
+  start. This is one public series with a held-out cause, not the two-basin fixture task 1
+  names, and it was not rerun here. The reporter proposes option 1 as a χ² pair on each
+  `DirectionGap` (Σw·Δ² on the same points), names left to the maintainer
+  (`forward_chi2`, `backward_chi2` offered). χ² is unchanged by any exact equivalence, so
+  the pair needs no ruling on the issue's § 2 (comparing modulo equivalences, held for
+  the maintainer with §§ 3-4). *Checked against the tree at `98d7ba8e3`:*
+  `schemas/sequential.py` and `sequential.py` carry no cost on `DirectionGap` or the
+  entry. A new field on a result type is reader output, so its names go to the
+  maintainer before merge.
 
 - **From WP-1417, 2026-09-27: the ΔBIC this WP's Non-goals defers to
   is settled.** 1417 closed with ΔBIC at N/f² and
