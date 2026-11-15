@@ -33,17 +33,6 @@ the Pawley block is appended in `run_least_squares`, and `mode_fixed` force-fixe
 `.atoms.` and `.scale`. Each of these would read the phase's mode. This route has a cell
 already, and it costs a field on the main surface.
 
-### Inherited
-
-- **From WP-2104, 2026-11-12: the joint Pawley arm has landed, under one mode per
-  fit.** `refine_multi(mode="pawley")` compiles every pattern in that mode, and each
-  Pawley model owns one intensity block placed after the table's columns
-  (`least_squares._joint_aux_slices`). Two readers assume one mode for the whole fit
-  and need a per-phase answer here. `multi._joint_mode_fixed` drops a column by what it
-  moves in every pattern. `MultiHistogramRefinement._build_result` computes phase
-  fractions only when `model.mode == "rietveld"`, so a holder phase beside a Rietveld
-  phase would lose the Rietveld phase's fraction too.
-
 ## Non-goals
 
 - Le Bail for one phase beside Rietveld, unless the measurement shows it is the same
@@ -52,20 +41,22 @@ already, and it costs a field on the main surface.
 
 ## Tasks
 
-- [ ] **Try declared peaks first**, once 1964's grammar lands. Write Stinton & Evans's
+- [x] **Try declared peaks first**, once 1964's grammar lands. Write Stinton & Evans's
   holder with five `PeakComponent`s whose centres come from a shared cell and height. If
   it recovers the truth at acceptable cost, write the recipe, add it to the manual, and
   close this WP with the rest of the list unticked and struck.
-- [ ] If not, say what stopped it, then list every reader of `mode` and how Pawley's block
-  sizes when only some phases own one.
-- [ ] The surface: a field on `Phase` or a per-phase map on `fit`. It is a name on the
-  main surface and may be a stored-format change, so it goes to the maintainer.
-- [ ] The forward model, the Jacobian, the statistics' reflection count and
-  `PAWLEY_OVERLAP_UNRESOLVED` per phase.
-- [ ] QPA refuses a fraction for that phase by name, and the report says why.
-- [ ] A joint fit: the holder's cell shared or per pattern, its intensities per pattern.
-  This needs 2104's Pawley arm.
-- [ ] Manual and skill.
+  Done 2026-11-15: `examples/guides/holder_cell.py` and `docs/docs/guides/holder_cell.md`.
+- [ ] ~~If not, say what stopped it, then list every reader of `mode` and how Pawley's block
+  sizes when only some phases own one.~~ Not needed: declared peaks express the holder.
+- [ ] ~~The surface: a field on `Phase` or a per-phase map on `fit`. It is a name on the
+  main surface and may be a stored-format change, so it goes to the maintainer.~~ Not needed: declared peaks express the holder.
+- [ ] ~~The forward model, the Jacobian, the statistics' reflection count and
+  `PAWLEY_OVERLAP_UNRESOLVED` per phase.~~ Not needed: declared peaks express the holder.
+- [ ] ~~QPA refuses a fraction for that phase by name, and the report says why.~~ Not needed: declared peaks express the holder.
+- [ ] ~~A joint fit: the holder's cell shared or per pattern, its intensities per pattern.
+  This needs 2104's Pawley arm.~~ Not needed for the Phase route. Whether a joint fit
+  can share the offset through declared peaks is untested; see the handover entry.
+- [ ] ~~Manual and skill.~~ Not needed: declared peaks express the holder.
 
 ## Acceptance
 
