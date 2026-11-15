@@ -114,6 +114,70 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 
 ## Handover log
 
+- **2026-11-15** — First slice, by a ghostshift runner, in PR #PRNUM. A TOPAS user reading
+  the Switching tab now finds a rietx spelling for every parametric construct the two
+  Durham inputs use, and the four that have none yet. The reference page now lists, in
+  one table, the twelve kinds of parameter an equation can drive, checked by code the
+  manual test runs. One trap came out of the measuring: an equation whose target no plan
+  stage frees refines nothing, and nothing reports it. It is documented and has no
+  diagnostic.
+
+  *Done.* `switching/topas.md` § A parametric equation is a formula: 14 rows added to
+  WP-1964's table (`for xdds`, `#define`/`macro`, shared and `local` names, `!` on a
+  coordinate as a `turn_off` stage, an overall B per pattern, a monoclinic angle, implied
+  multiplication, `range n` as `scan=n-1`, `Out`/`Get`/`MVW`, `val_on_continue`), an
+  executing block for the overall B and the hold, and a list of the four constructs with
+  no spelling: a joint fit's `hold`/`tie`/`set_values` (WP-2103), restraints and
+  `penalty` in a joint fit (WP-1995), an equation over a reflection or a 2θ point
+  (WP-2107), and `fit_obj` (a milestone non-goal). `reference/parametric.md` § Targets:
+  the table, the refusals pointer, the plan-reach paragraph, and an executing check of
+  14 accepted and 5 refused paths.
+
+  *Measured* (session probes in the runner's scratch, `[dev]` venv, macOS arm64, not in
+  the repo). On the LaB₆ ramp of `examples/guides/_lab6_ramp.py`, a linear-in-T equation
+  on each kind, beside one on the cell, under a three-stage `PlanSpec` whose last stage
+  names the target: every fit converged, and the slope of each target whose truth is
+  constant came back within 1 esd of 0 (scale, coordinate, occupancy, zero shift, w, y,
+  background c1, axial). B's slope sat at −4.5 esd and the wavelength's at −5.7 esd with
+  `FLAT_DIRECTION`. The wavelength is degenerate with the cell; B is the pattern-0 issue
+  below. Under `mccusker_default` the coordinate, B, occupancy, size, strain, axial and
+  wavelength coefficients never left their starts and had no row in
+  `result.parameters`. One B per pattern for every site, written as a formula on each
+  site's `biso` with `vars.b` per pattern: patterns 1-6 returned b = 0.00-0.04 ± 0.10 Å²
+  (truth 0). Pattern 0 stopped at b = 3.7 with its scale halved. A control with each
+  site's B per pattern and no formula did the same (B = 4.0, same scale), so that is the
+  probe's plan (scale before cell, with the start cell 0.1 % off) and not the formula. A
+  `turn_off` stage on the boron coordinate left it at its start through a stage that
+  freed every other atom parameter. A monoclinic β formula previews (90.54-90.86° over the
+  ramp). `a0 (1 + ...)` is refused as an unknown function `a0`.
+
+  *Gates.* `tests/test_manual.py tests/test_manual_api.py`: 84 passed. Sphinx `-W`:
+  clean. Vale on both pages: no warning on an added line. No example changed, so
+  `tests/test_examples.py` was not run. Docs-only branch, so `/code-review` was skipped.
+
+  *Settled by Claude 2026-11-15:* the manual names what is missing and no WP numbers,
+  under the manual's practice (a WP number appears in six places in the manual, two of
+  them comments) and WP-1996 (the Switching tab says only what its tests show). The
+  alternative was naming each WP, as the task text asked when 1964 was open. *Settled by
+  Claude 2026-11-15:* the overall B is documented as spellable today, through formulas,
+  under the 2026-11-04 ruling (docs plus an agent port what does not import) and the
+  measurement above. The alternative was "waits on WP-2103's tie". Forwarded to WP-2103's
+  Inherited. Not reached this slice: the held-slope diagnostic (task 7, DESIGN.md Rule 1)
+  and the skill's placement (tasks 4 and 10). Nothing in this slice changes text the
+  package prints.
+
+  *Gotchas.* Many TOPAS parametric constructs are already handled by a joint fit's
+  sharing defaults: say "nothing" in a row rather than inventing a call. A Durham input's
+  site `!` often marks a coordinate the symmetry already fixes; check the site before
+  porting a hold.
+
+  Next, in order: task 2 (the inventory, with each input's free-parameter and channel
+  counts; this slice's table rows are its vocabulary), task 3 (§ Porting what does not
+  read), then task 7 with the plan-reach sibling, since one Rule 1 decision covers both.
+  Task 8 may be moot (see Context). Task 9's refusal message needs the maintainer, as it
+  changes what a reader receives. Tasks 4, 5 and 10 are untouched; task 10's row is where an agent meets the
+  plan-reach rule, so it carries that rule too.
+
 - **2026-11-04** — Filed on the opening of the milestone. No open WP owned this: 1964's
   Manual task covers the new grammar and 1325's manual tasks are closed. The numbers
   above were measured by session scripts on 2026-11-03 and are not in the repo. Next:

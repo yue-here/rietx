@@ -159,9 +159,9 @@ print([row.path for row in joint.parameters() if row.path.endswith("vars.b")])
 
 `joint.fit(patterns, plan=plan)` then refines one `b` per pattern and keeps the boron coordinate where it started.
 
-Four TOPAS constructs have no rietx spelling yet:
+Four things a TOPAS input does have no rietx spelling yet:
 
-- `hold`, `tie` and `set_values` on a joint fit. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
+- A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
 - A restraint or a `penalty` in a joint fit, which refuses soft restraints.
 - An equation over a reflection or a point: `th2_offset` written in `Xo`, or a width, position or intensity written in `Th` or `D_spacing`. An overall B is the exception, through the formulas above.
 - `fit_obj`, a term added to the calculated pattern.
