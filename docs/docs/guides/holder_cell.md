@@ -4,7 +4,7 @@
 Declare one `PeakComponent` for each of the holder's reflections, and tie each line's centre to a formula of the holder's lattice parameter and its height.
 
 Use this when the holder is a known crystal and its line intensities cannot be trusted, for example an aluminium holder with texture.
-The positions then follow the holder's cell, as for a Pawley phase, while each line's area and width refine freely.
+The positions then follow the holder's cell, as for a Pawley phase, while each line's area and width refine on their own.
 Stinton and Evans fit an aluminium holder this way beside two Rietveld phases {cite}`stinton2007`.
 TOPAS writes such a holder as an `hkl_Is` phase.
 
@@ -43,7 +43,7 @@ The holder's lines then carry their counts before the zero shift and the cell re
 
 The holder's lattice parameter and the offset come back within 1.5 esd of the values the pattern was made with.
 The offset is measured to 0.002 mm, and the height only to 0.022 mm.
-Over 15-90° 2θ the zero shift and the height shift the peaks in nearly the same way, and the fit reports this pair as `FLAT_DIRECTION`.
+Over 15-90° 2θ a zero shift and a change of height move the peaks in similar shapes, and the fit reports this pair as `FLAT_DIRECTION`.
 The offset is a difference between two heights, and the zero shift moves both alike.
 
 ## Compare with the holder fitted as a phase
@@ -98,4 +98,4 @@ The full script is `examples/guides/holder_cell.py`.
 ## See also
 
 - [How to fit a peak from the sample holder](holder.md) declares a single line with a free centre.
-- [How to refine cell edges as Einstein functions of temperature](formula.md) writes formulas across a series.
+- [The Einstein-function guide](formula.md) writes a formula for each lattice parameter across a temperature series.

@@ -1,8 +1,7 @@
 # WP-2108 — a Pawley phase beside a Rietveld phase
 
-Milestone: parametric · Status: 🔄 2026-11-15 — claimed by @yue-here (ghostshift runner)
+Milestone: parametric · Status: ✅ 2026-11-15 — declared peaks with formula centres fit the holder; no new surface (PR #1572)
 Depends on: 1964 (the first task tries equations on declared peaks); 2104 soft (its Pawley arm, if the second route is taken)
-Priority: P3 2026-11-04 — a declared peak with an equation on its centre may already express this, so its first task decides whether any new surface is needed
 
 ## Goal
 
@@ -78,6 +77,51 @@ overlap the first phase's.
 - WP-1103 (declared peaks), WP-2104, WP-1125 (the Pawley block).
 
 ## Handover log
+
+- **2026-11-15 (a ghostshift runner)** — A sample holder of a known crystal can be fitted
+  beside a Rietveld phase today, with nothing new in the package. Each holder reflection is
+  a declared peak whose centre is a formula of one holder lattice parameter and one height
+  offset, and each line's area and width refine freely. On synthetic fluorapatite over a
+  textured aluminium holder this recovers both cells, the sample's coordinates and the
+  offset, while the holder fitted as an aluminium phase misses its own cell by about 30 esd.
+  So the Phase-mode route (a mode field on `Phase`, a per-phase Pawley block) is not
+  needed, and the stored-format question it would have sent to the maintainer never arises.
+
+  *Done.* Guide `docs/docs/guides/holder_cell.md` with its script
+  `examples/guides/holder_cell.py` (one seed, every quoted number asserted), linked from
+  the guides index and `holder.md`. Slow test `tests/test_holder_cell.py`: the milestone's
+  12-seed bar. Task 1 ticked, tasks 2-7 struck as the task said. The `### Inherited` note
+  from WP-2104 is deleted: both readers it named (`multi._joint_mode_fixed`,
+  `_build_result`'s QPA gate) matter only to the Phase route.
+
+  *Measured* (darwin/arm64, `[dev]` venv). The centre formula, Bragg's law for Kα1 plus the
+  zero shift plus −(2s/R)·cosθ at the holder's height, reproduces rietx's own tick
+  positions for an aluminium phase at that height to 3e-14°. Twelve seeds (100-111) of
+  fluorapatite (height 0.040 mm, zero 0.012°) over aluminium 0.120 mm lower with a
+  March-Dollase r = 0.55 along [111], 15-90° 2θ, plan `mccusker_structural` with the zero
+  stage freeing `vars.zero`/`vars.height` and the `extra_components` stage, renamed
+  `holder`, moved second and freeing `vars.a_holder`/`vars.offset`. Mean z of the truth,
+  declared arm: fluorapatite a −0.08, c −0.15, mean coordinate z +0.06, holder a −0.24,
+  offset +0.25, height −0.09, zero −0.09; standard deviation of each 0.78-0.90; GoF
+  1.00-1.03. Holder as a phase: holder a −30.5 mean (sd 1.2), fluorapatite unharmed (a −0.12,
+  c −0.19), GoF 1.17-1.18. One fit 2-5 s. Holding the holder cell at its known value takes
+  the height's esd from 0.022 to 0.012 mm on the guide's seed. A declared line's Kα2 image
+  sits at the Bragg image of its Kα1 centre, while a phase shifts each wavelength; the two
+  differ by 1.6-2.5e-4° here, about a tenth of a line centre's esd, and the simulation drew
+  the holder as a phase, so the 12-seed result includes that mismatch.
+
+  *Gotchas.* No preset frees a `vars.*` column or, in `mccusker_structural`, the specimen
+  displacement, so the recipe edits the plan; without that the variables stay at their
+  starting values and nothing says so. A formula reads only variables, so the zero shift and
+  the displacement are tied to variables first. The holder stage must come before the zero
+  stage, or the zero shift and the height refine against unmodelled holder counts.
+
+  *Not tried.* A joint fit sharing the offset across patterns (Stinton & Evans share it across
+  data sets). `MultiHistogramRefinement` has no `tie`, but takes `variables=` and
+  `ParametricEquation(basis="expression")`, which may express it per pattern; unmeasured.
+
+  Next: none in this WP. If a user asks for the joint form, try `variables=` plus an
+  expression equation per holder line in a new WP.
 
 - **2026-11-04** — Filed from reading Stinton & Evans (2007). No open WP owned it: 2104
   shares a cell across patterns under one mode, and a search of the index for mixed
