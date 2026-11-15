@@ -1,6 +1,6 @@
 # WP-2020 — Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-15 — claimed by @yue-here
 Track: The registry and the guard
 Depends on: —
 Priority: P2 2026-10-21 — the maintainer's concept, raised while declining a default backstop in WP-2002; it gives a demoted default somewhere to go other than away
