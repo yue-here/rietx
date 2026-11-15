@@ -115,7 +115,7 @@ from ..schemas.instrument import (
     BackgroundPSpline,
     Instrument,
 )
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import PatternData, SigmaRule, require_two_theta
 
 # PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
 # (``phase_support``); the plan carries the number since WP-2002 B1, so it is
@@ -1034,6 +1034,11 @@ class CompiledModel:
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:
     # c_w = 0 silences the restraints the caller declared, never the origin.
     origin: "CompiledOrigin | None" = None
+    # Which σ rule weighted the fitted channels, counted over this compile's own
+    # window (``PatternData.sigma_rule``, WP-1952): what
+    # ``RefinementResult.sigma_rule`` carries.  ``None`` only on a model built
+    # without ``compile_model``.
+    sigma_rule: SigmaRule | None = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -2947,24 +2952,26 @@ class CompiledModel:
         axial ratios (they move the quadrature nodes — see
         ``derivative_bases``), and anything unknown (falls back to FD).
         """
-        # A background peak is outside **every** analytic branch's reach, and
-        # this line is the declaration rather than the accident.  The default
-        # for an unrecognised path is already False, so this changes no
-        # dispatch; what it changes is that the exclusion is now stated where
-        # the reach is claimed, next to the ``surface_roughness`` clause that
-        # exists for the mirror-image reason (an unstated *inclusion* costs a
-        # slow test, an unstated *exclusion* is the class of bug WP-1070 filed
-        # — a column that comes back **short** rather than raising).
+        # An extra component is outside the per-peak scalar chain, and this
+        # line is the declaration rather than the accident.  Its columns have
+        # their own branch in ``optimize.least_squares._component_columns``
+        # (WP-2116): a hump's closed form, a declared peak's difference of its
+        # own curve, and the whole-model FD for a tie reaching anything else.
+        # The exclusion is stated where the reach is claimed, next to the
+        # ``surface_roughness`` clause that exists for the mirror-image reason
+        # (an unstated *inclusion* costs a slow test, an unstated *exclusion*
+        # is the class of bug WP-1070 filed — a column that comes back
+        # **short** rather than raising).
         #
-        # Short is exactly what does not happen here, and that is checkable
-        # rather than hopeful: the whole-model FD writes ``J[:n_data, c]`` only,
-        # and a peak parameter's derivative on every row below the data block is
-        # *identically* zero — the P-spline penalty rows are w·D₂·c in the
-        # background *coefficients*, the Pawley rows are in the intensity block,
-        # and a restraint row is a function of coordinates and cell.  So the
-        # rows the FD leaves at their zero initialisation are the rows whose
-        # true value is zero, and the FD column is exact because it decodes
-        # through C like the residual does.
+        # Short is what the component routes cannot be, and that is checkable
+        # rather than hopeful: each writes ``J[:n_data, c]`` only, and a
+        # component parameter's derivative on every row below the data block
+        # is *identically* zero — the P-spline penalty rows are w·D₂·c in the
+        # background *coefficients*, the Pawley rows are in the intensity
+        # block, and a restraint row is a function of coordinates and cell.
+        # A tie can carry a column onto a background coefficient as well,
+        # and then the whole-model FD writes that coefficient's penalty rows
+        # from the penalty matrix (``bkg_part`` in ``_make_jacobian``).
         if path.startswith("instrument.extra_components."):
             return False
         # A *declared sharp peak* widens what two instrument names reach, and
@@ -4275,14 +4282,22 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                          or window_area_tol < WINDOW_AREA_TOL)
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
+    window = None
     if two_theta_limits is not None:
         lo, hi = two_theta_limits
         # inverted, it used to fail below as "fewer than 10 points" (WP-1986)
         check_interval("two_theta_limits", lo, hi)
-        mask &= (tt_all >= lo) & (tt_all <= hi)
+        window = (tt_all >= lo) & (tt_all <= hi)
+        mask &= window
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
+    sigma_rule = pattern.sigma_rule(window)
     if len(tt) < 10:
-        raise ValueError("fewer than 10 points remain in the fit range")
+        why = ""
+        if sigma_rule.n_nonpositive_excluded:
+            why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+                   "because their σ is zero or below (nonpositive_sigma='exclude'), "
+                   "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+        raise ValueError(f"fewer than 10 points remain in the fit range{why}")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
     lams = tuple(line.wavelength.value for line in instrument.source.lines)
@@ -4711,6 +4726,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         sigma_measured=pattern.sigma is not None,
+        sigma_rule=sigma_rule,
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         harmonic_orders=harmonic_orders,

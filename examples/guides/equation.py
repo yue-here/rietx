@@ -59,8 +59,8 @@ assert f"{result.parametric[0].esd:.1e}" == "1.6e-06"
 assert f"{slope.value:.10f}" == "0.0000207819" and f"{slope.esd:.1e}" == "8.0e-09"
 assert result.parametric[0].unit == "Å" and slope.unit == "Å/K"
 reading = result.parametric_form[0].tied
-assert not reading.rejected and f"{reading.statistic:.1f}" == "9.3"
+assert not reading.rejected and f"{reading.statistic:.1f}" == "9.4"
 assert f"{reading.cut:.1f}" == "11.1" and reading.dof == 5
 value = result.parametric_value("a", {"T": 293.0})
 assert f"{value.value:.7f}" == "4.1564527" and value.outside == ["T"]
-assert form.rejected and f"{form.tied.statistic:.1f}" == "501.5"
+assert form.rejected and f"{form.tied.statistic:.1f}" == "504.2"

@@ -401,7 +401,7 @@ own view (1503), the surface measured with real agents before more is added
 (1504), and the code leaving as `rietview` when a named trigger fires
 (1505). The name was chosen on 2026-09-27; the survey and the trigger are in
 1505. The maintainer asked on 2026-10-02 for an SVG (1536), POV-Ray and glTF
-(1537), and ambient occlusion (1538). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
+(1537) and ambient occlusion (1538), and on 2026-11-12 for depth cueing and filled rings and faces (1548). 1504 is costed and closed (2026-10-23, 40 of 42 on the fixed surface), so it opens by the maintainer's word.
 
 The WPs are in [the index](wp/README.md#rietview).
 
