@@ -324,6 +324,23 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1556 § 5): a held setup value's error
+  moves every later cell together, and the series has no row for it.** The reporter ran a
+  synthetic LaB₆ ramp, 7 patterns × 150 noise replicates, and held zero and profile from
+  pattern 1 on at pattern 0's fitted values, the calibrate-then-hold practice this WP
+  starts from. Free on every pattern, the cell's pull std is 0.79-0.93 and neighbouring
+  patterns' errors correlate at −0.09 to 0.04. Held, the pull std is 2.30-2.43 and the
+  correlation 0.85-0.90. So each pattern's cell esd is about 2.4× too small, and a series
+  mean's esd about 5.5× too small (rms error 0.88 ppm against a naive esd of the mean of
+  0.16 ppm). The cause is the held calibration's own error, shared by every pattern.
+  Not rerun here. *Checked against the tree at `98d7ba8e3`:* `SeriesResult` carries no
+  row for a held parameter, and `HOLD_BLOCKED_PLAN` is info only. The reporter's
+  candidate: a per-pattern score statistic for each held parameter, as a row with no
+  threshold, and asks whether that sits inside the maintainer's 2026-11-03 "field, not
+  code" ruling. That question is for this WP's discussion. The rest of the issue (a χ²
+  pair per chain, now in WP-1453; equivalence mapping; the combined-esd step; unmeasured
+  points) is placed elsewhere or held for the maintainer.
+
 - **2026-11-06, from the issue triage (issue #1439): the free set can change
   from frame to frame on its own, through the absent-phase hold.** A design
   proposal from the recurring contributor, from a private multiphase in-situ
