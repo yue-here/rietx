@@ -139,6 +139,17 @@ WP-2113 inherits.
   fixes; after them `build.py --check` is clean and the outputs rebuilt unchanged.
 - *Forward*: WP-2113's `### Inherited` (the tail family, and that a fix there changes this
   notebook's output).
+- *CI on PR #1570* (steward, 2026-11-15) found two failures. `ruff format --check
+  examples/tutorials` refused the new `index_pattern` call at 87 columns. And the section put
+  notebook 03's markdown twin at 55 688 characters, over the page contract's 50 000
+  (`tests/test_manual.py::test_every_page_has_a_twin_that_keeps_the_contract`, whose remedy
+  is "split it"). So the section moved to its own notebook, `03b_when_the_indexer_abstains`,
+  as 02's steering moved to 02b in 1.10. It repeats notebook 03's setup cell and reads notebook
+  03's full-range numbers by name. Notebook 03 is back to `main`'s cells, plus a two-line
+  pointer to 03b where the old one-line pointer to `INDEX_ABSTAINED` stood. Both tutorial
+  tables carry a 03b row. *Settled by Claude under the page contract's cap and the 02b
+  precedent*; the alternative was to trim notebook 03's outputs, which no cut of the new
+  section alone brings under the cap (printing it without explanations saves 2 485).
 
 ### 2026-10-24 (2nd session) — an abstaining example found, and the confident grade it sits beside rests on a sunk background
 
