@@ -1,4 +1,4 @@
-"""The fit behind `docs/docs/guides/holder.md` § Tie the holder's lines to its cell.
+"""The fits behind `docs/docs/guides/holder_cell.md`: a sample holder's lines placed from its cell.
 
 The page shows the lines between each pair of `guide:` markers and quotes what
 they print; every quoted number is asserted at the end, so a change that moves
@@ -111,7 +111,7 @@ as_phase = FLUORAPATITE.model_copy(deep=True)
 as_phase.phases.append(ALUMINIUM.model_copy(deep=True).phases[0])
 as_phase.phases[1].cell.a.value = 4.05
 geometry_plan = rx.RefinementPlan.mccusker_structural()
-geometry_plan.stages[1] = rx.Stage(
+geometry_plan.stages[names.index("zero")] = rx.Stage(
     "zero_height", ["instrument.zero_shift", "instrument.geometry.sample_displacement"])
 phase_instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 phase_instrument.background = rx.BackgroundChebyshev.with_terms(4)

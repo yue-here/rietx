@@ -89,7 +89,7 @@ This is where Stinton and Evans's gain in precision comes from.
 ## Limitations
 
 - Each line's width and Lorentzian fraction refine on their own, not from the instrument's Caglioti terms.
-- A declared line's Kα2 image sits at the Bragg image of its Kα1 centre, as [How to fit a peak from the sample holder](holder.md) describes, while a phase applies the zero and displacement shifts at each wavelength. On this pattern the two placements differ by 0.0002° or less, about a tenth of the esd of a line centre.
+- A declared line's Kα2 image sits at the Bragg image of its Kα1 centre, as [How to fit a peak from the sample holder](holder.md) describes, while a phase applies the zero and displacement shifts at each wavelength. On this pattern the two placements differ by 0.00025° or less, about a tenth of the esd of a line centre.
 - rietx gives the holder no phase fraction, since it is no phase.
 - This page fits one pattern. Sharing the offset across several patterns is not shown here.
 

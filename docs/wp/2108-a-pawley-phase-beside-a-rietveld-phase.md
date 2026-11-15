@@ -120,6 +120,16 @@ overlap the first phase's.
   data sets). `MultiHistogramRefinement` has no `tie`, but takes `variables=` and
   `ParametricEquation(basis="expression")`, which may express it per pattern; unmeasured.
 
+  *Review.* `/code-review high --fix` found eight. Taken: the test module's `xdist_group`,
+  the page's Kα2 bound (now 0.00025°), the script docstring's pointer, and the phase arm's
+  stage found by name. For its finding that a signed mean over atoms cancels a +3σ atom
+  against a −3σ one, the test now also bounds each seed's rms coordinate z at 1.6 (measured
+  0.84 average, 1.11 most). Declined: merging the test with the script (the script fits at
+  import, so the test cannot import it), a guard for an unmeasured esd (no seed has one), and
+  declaring dispersion in the script (no guide script does; the test declares it). No
+  heuristic was added, so the generality judge did not run. The skill is unchanged: the
+  recipe is a manual page an agent reaches from `holder.md`.
+
   Next: none in this WP. If a user asks for the joint form, try `variables=` plus an
   expression equation per holder line in a new WP.
 

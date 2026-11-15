@@ -22,7 +22,7 @@ import pytest
 import rietx as rx
 from rietx.examples import examples_dir
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.xdist_group("holder-cell")]
 
 ZERO, HEIGHT, OFFSET, A_HOLDER = 0.012, 0.040, -0.120, 4.0495  # °, mm, mm, Å
 LIMITS = (15.0, 90.0)
@@ -140,6 +140,7 @@ def _scores(result, holder_cell, offset):
     out = {"a": _z(result, "phases.0.cell.a", true.cell.a.value),
            "c": _z(result, "phases.0.cell.c", true.cell.c.value),
            "coordinates": float(np.mean(coords)),
+           "coordinates_rms": float(np.sqrt(np.mean(np.square(coords)))),
            "a_holder": _z(result, holder_cell, A_HOLDER)}
     if offset:
         out["offset"] = _z(result, offset, OFFSET)
@@ -170,8 +171,12 @@ def runs():
 
 def test_declared_lines_recover_both_cells_the_structure_and_the_offset(runs):
     declared, _ = runs
-    means = {key: float(np.mean([row[key] for row in declared])) for key in declared[0]}
+    means = {key: float(np.mean([row[key] for row in declared]))
+             for key in declared[0] if key != "coordinates_rms"}
     assert all(abs(m) < 0.5 for m in means.values()), means
+    # A signed mean over atoms cancels a +3σ atom against a −3σ one, so the
+    # spread is bounded too: measured 0.84 on average and 1.11 at most.
+    assert max(row["coordinates_rms"] for row in declared) < 1.6
 
 
 def test_the_holder_fitted_as_a_structure_misses_its_cell(runs):
