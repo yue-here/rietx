@@ -75,10 +75,16 @@ spec = SearchSpec(
 # %% [markdown]
 # ## A shorter scan
 #
-# Cut the pattern at 45° 2θ, pick its peaks, and search with the same `spec`.
+# Cut the pattern at 45° 2θ.
 
 # %%
 short = data.crop(10, 45)
+short.plot()
+
+# %% [markdown]
+# Pick the peaks of the cut pattern, and search with the same `spec`.
+
+# %%
 short_peaks = rx.pick_peaks(short, lab)
 short_indexing = rx.index_pattern(
     short_peaks, data=short, instrument=lab, spec=spec
