@@ -179,8 +179,49 @@ print(indexing.best_or_none())
 
 # %% [markdown]
 # The candidate prints every field, its figures of merit included.
-# When no candidate reaches high confidence, `best_or_none()` returns `None` and the result carries [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained).
 # [Indexing](https://rietx.org/docs/stable/theory/indexing.html#figures-of-merit-in-both-directions) explains the figures of merit behind the ranking.
+#
+# ## When the indexer abstains
+#
+# The same search on less data stops short of naming a cell.
+# Cut the pattern at 45° 2θ, pick its peaks again, and search with the same `spec`.
+
+# %%
+short = data.crop(10, 45)
+short_peaks = rx.pick_peaks(short, lab)
+short_indexing = rx.index_pattern(short_peaks, data=short, instrument=lab, spec=spec)
+short_indexing
+
+# %% [markdown]
+# The header counts 15 usable lines, against 54 over the whole range.
+# The top candidate is still the true cell, and all three engines still found it.
+# Its row indexes 14 of the 15 lines, and the Pawley fit reaches Rwp 0.047.
+# Its grade is `medium`.
+# The row's `not higher because` names the two caveats that hold it there:
+#
+# - `fom_panel_reduced`: 15 lines are fewer than the 20 that the `m20` and `f_n` figures of merit are scored on, so the ranking panel leaves those two figures out. [`INDEX_PANEL_REDUCED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-panel-reduced) says so.
+# - `shift_allowance_assumed`: over the whole range the indexer measured a systematic 2θ shift from 8 pairs of harmonic reflections (lines whose sin θ are integer multiples of one another). These 15 lines give no such measurement, so [`INDEX_SHIFT_ALLOWANCE`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-shift-allowance) adds an assumed 0.050° to every line's σ.
+#
+# Neither caveat says the cell is wrong.
+# Each says the evidence is too thin to call it right, and a longer scan closes both.
+# So the verdict line says NO CELL, and [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained) names the best candidate and its two caveats.
+# Its help line says to act first on any caveat that refutes a cell.
+# This candidate has none.
+#
+# The row also raises [`INDEX_IMPURITY_LINES`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-impurity-lines) for one region near 25.54°.
+# That region is the low-angle tail of the strongest line, at 26.22°.
+# The pattern holds one phase.
+# The Pawley fit draws that line's profile only from about 25.6° upward, so the tail below 25.6° stays in the residual.
+#
+# `best_or_none()` returns `None`.
+
+# %%
+print(short_indexing.best_or_none())
+
+# %% [markdown]
+# With a real unknown, read the caveats before you test any candidate.
+# Here both caveats ask for more lines.
+# With all 54 lines, the search above named the cell at `high`.
 #
 # ## Check the candidate with Le Bail
 #

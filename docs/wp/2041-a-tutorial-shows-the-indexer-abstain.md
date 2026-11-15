@@ -88,11 +88,12 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
       validation background. *Decided 2026-10-24: hold this WP until WP-1956 lands* (option
       C of four: correct the confident section now and add the example; add the example
       alone; hold; do nothing).
-- [ ] After WP-1956: re-run the 45° cut and the full range on `main`. Add the cut to notebook
+- [x] After WP-1956: re-run the 45° cut and the full range on `main`. Add the cut to notebook
       03 after the confident search, with prose that reads the output, and rewrite the
       confident section's "none of the reflections it predicts is missing" to what the
-      repaired count says.
-- [ ] Skill: none. The skill's indexing reference already covers `best_or_none()`.
+      repaired count says. *(The rewrite had already landed with WP-2011; the full range's
+      output is unchanged, so the confident section stands.)*
+- [x] Skill: none. The skill's indexing reference already covers `best_or_none()`.
 
 ## Acceptance
 
