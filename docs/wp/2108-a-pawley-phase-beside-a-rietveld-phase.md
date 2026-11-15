@@ -1,6 +1,6 @@
 # WP-2108 — a Pawley phase beside a Rietveld phase
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-15 — claimed by @yue-here (ghostshift runner)
 Depends on: 1964 (the first task tries equations on declared peaks); 2104 soft (its Pawley arm, if the second route is taken)
 Priority: P3 2026-11-04 — a declared peak with an equation on its centre may already express this, so its first task decides whether any new surface is needed
 
