@@ -28,6 +28,7 @@
  */
 
 import {
+  fogSpan,
   LOOK,
   pixelsPerAngstrom,
   POLY_ALPHA,
@@ -46,6 +47,19 @@ const COMMON = `
 uniform mat3 uR; uniform vec3 uCenter; uniform vec2 uPan; uniform vec2 uScale;
 uniform float uDepth;
 vec3 toView(vec3 p) { vec3 v = uR * (p - uCenter); return vec3(v.xy - uPan, v.z); }`;
+
+/** Depth cueing (WP-1548 D1): a colour blended toward the background by its
+ *  view-space depth z, linearly from `uFog.x` (nothing) to `uFog.y` (`uFog.z`
+ *  of the way), as GLSL's `mix`.  The colour is clamped first, as the Python
+ *  raster clamps before it fogs, so a highlight past white fades from white.
+ *  `uFog.z` at 0 is off and returns the colour untouched. */
+const FOG = `
+uniform vec3 uFog; uniform vec3 uFogColor;
+vec3 fog(vec3 col, float z) {
+  if (uFog.z <= 0.0) return col;
+  float f = uFog.z * clamp((uFog.x - z) / (uFog.x - uFog.y), 0.0, 1.0);
+  return mix(clamp(col, 0.0, 1.0), uFogColor, f);
+}`;
 
 /** Shading shared by every solid: one key light up and to the left of the
  *  screen, fixed to the camera, so the lit side follows every rotation. */
@@ -88,6 +102,7 @@ in vec2 vXY;
 flat in vec3 vC; flat in mat3 vMinv; flat in vec4 vColor;
 uniform float uDepth;
 ${SHADE}
+${FOG}
 out vec4 frag;
 void main() {
   // the ray (x, y, z) with z free is u = q + s·e in the unit-sphere frame
@@ -114,7 +129,7 @@ void main() {
                                           : col * ${f(LOOK.ring_darken)};
     col = mix(ink, col, smoothstep(${f(LOOK.ring_width)}, ${f(LOOK.ring_width)} + fwidth(m), m));
   }
-  frag = vec4(col, coverage);
+  frag = vec4(fog(col, z), coverage);
 }`;
 
 const HALF_VS = `#version 300 es
@@ -143,6 +158,7 @@ in vec2 vXY;
 flat in vec3 vA; flat in vec3 vB; flat in vec3 vColor; flat in float vR;
 uniform float uDepth;
 ${SHADE}
+${FOG}
 out vec4 frag;
 void main() {
   // The ray (x, y, z) with z free, against the finite cylinder A-B, open at
@@ -168,7 +184,7 @@ void main() {
   if (along < 0.0 || along > len) discard;
   vec3 n = normalize((q + z * e) / vR);
   gl_FragDepth = clamp(0.5 - z / (2.0 * uDepth), 0.0, 1.0);
-  frag = vec4(shade(vColor, n), coverage);
+  frag = vec4(fog(shade(vColor, n), z), coverage);
 }`;
 
 const LINE_VS = `#version 300 es
@@ -177,7 +193,7 @@ in vec3 aA; in vec3 aB; in vec3 aColor; in float aWidth;
 uniform vec2 uViewport;       // device pixels
 uniform float uPxScale;       // device pixels per CSS pixel
 ${COMMON}
-out float vAcross;
+out float vAcross; out float vZ;
 flat out float vHalf; flat out vec3 vColor;
 void main() {
   vec3 A = toView(aA), B = toView(aB);
@@ -191,6 +207,7 @@ void main() {
           * 2.0 / uViewport;
   float z = mix(A.z, B.z, aCorner.x);
   vAcross = aCorner.y * reach;
+  vZ = z;
   vHalf = half_;
   vColor = aColor;
   gl_Position = vec4(mix(a, b, aCorner.x) + px, -z / uDepth, 1.0);
@@ -198,13 +215,14 @@ void main() {
 
 const LINE_FS = `#version 300 es
 precision highp float;
-in float vAcross;
+in float vAcross; in float vZ;
 flat in float vHalf; flat in vec3 vColor;
+${FOG}
 out vec4 frag;
 void main() {
   float coverage = clamp(vHalf + 0.5 - abs(vAcross), 0.0, 1.0);
   if (coverage <= 0.0) discard;
-  frag = vec4(vColor, coverage);
+  frag = vec4(fog(vColor, vZ), coverage);
 }`;
 
 /** A polyhedron's faces (WP-1466): flat triangles lit from both sides, so a
@@ -212,10 +230,11 @@ void main() {
 const FACE_VS = `#version 300 es
 in vec3 aPos; in vec3 aNormal; in vec3 aColor;
 ${COMMON}
-out vec3 vN;
+out vec3 vN; out float vZ;
 flat out vec3 vColor;
 void main() {
   vec3 p = toView(aPos);
+  vZ = p.z;
   vN = uR * aNormal;
   vColor = aColor;
   gl_Position = vec4(p.xy * uScale, -p.z / uDepth, 1.0);
@@ -223,15 +242,16 @@ void main() {
 
 const FACE_FS = `#version 300 es
 precision highp float;
-in vec3 vN;
+in vec3 vN; in float vZ;
 flat in vec3 vColor;
 uniform float uAlpha;
 ${LIGHT}
+${FOG}
 out vec4 frag;
 void main() {
   vec3 n = normalize(gl_FrontFacing ? vN : -vN);
-  frag = vec4(vColor * (${f(LOOK.ambient)} + ${f(LOOK.face_diffuse)}
-                        * max(dot(n, normalize(LIGHT)), 0.0)), uAlpha);
+  frag = vec4(fog(vColor * (${f(LOOK.ambient)} + ${f(LOOK.face_diffuse)}
+                            * max(dot(n, normalize(LIGHT)), 0.0)), vZ), uAlpha);
 }`;
 
 /** The long side of an exported PNG, in pixels (D5): a 17 cm figure at
@@ -263,6 +283,9 @@ export interface ExportedPng {
 export interface Renderer {
   /** upload a scene; the next `draw` shows it */
   setScene(scene: Scene): void;
+  /** fade each surface toward the background with its depth (WP-1548); off
+   *  by default, and an export on a transparent background draws without it */
+  setDepthCue(on: boolean): void;
   /** draw one frame at the canvas's size, on `background` (0..1 RGB) */
   draw(view: View, background: number[]): void;
   /** render once more, offscreen and larger, to a PNG, with the size it came
@@ -358,6 +381,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   let corner: { atom: WebGLBuffer; strip: WebGLBuffer } | null = null;
   let scene: Scene | null = null;
   let last: { view: View; background: number[] } | null = null;
+  let depthCue = false;
   let lost = false;
 
   function compile(vs: string, fs: string): Program {
@@ -474,8 +498,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
    * pixels for a canvas of `cssWidth` × `cssHeight`.
    */
   function render(view: View, background: number[], width: number, height: number,
-                  cssWidth: number, cssHeight: number) {
+                  cssWidth: number, cssHeight: number, cue = depthCue) {
     if (!scene || !programs || !batches) return;
+    const span = cue ? fogSpan(scene, view.rotation) : null;
+    const fogUniform = span ? [span[0], span[1], LOOK.fog_max] : [0, -1, 0];
     const s = pixelsPerAngstrom(scene, view, cssWidth, cssHeight);
     const pxScale = width / cssWidth;
     context.viewport(0, 0, width, height);
@@ -496,6 +522,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       context.uniform1f(p.uniforms.uDepth, scene!.depth);
       // one and a half device pixels, in Å, for the antialiased fringe
       if (p.uniforms.uPad) context.uniform1f(p.uniforms.uPad, 1.5 / (s * pxScale));
+      context.uniform3fv(p.uniforms.uFog, fogUniform);
+      context.uniform3fv(p.uniforms.uFogColor, background.slice(0, 3));
     };
     common(programs.atom);
     context.bindVertexArray(batches.atoms.vao);
@@ -567,7 +595,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
    * cannot be allocated — an export is 240 MB at 3000 px and 4 samples.
    */
   function offscreen(view: View, background: number[], width: number,
-                     height: number): Uint8Array | null {
+                     height: number, cue = depthCue): Uint8Array | null {
     const cssWidth = canvas.clientWidth || 1, cssHeight = canvas.clientHeight || 1;
     const maxSamples = context.getParameter(context.MAX_SAMPLES) as number;
     for (const samples of [Math.min(4, maxSamples), 0]) {
@@ -593,7 +621,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
         cleanup();
         continue;
       }
-      render(view, background, width, height, cssWidth, cssHeight);
+      render(view, background, width, height, cssWidth, cssHeight, cue);
       context.bindRenderbuffer(context.RENDERBUFFER, target);
       context.renderbufferStorage(context.RENDERBUFFER, context.RGBA8, width, height);
       context.bindFramebuffer(context.FRAMEBUFFER, resolved);
@@ -622,8 +650,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
         pixels = offscreen(view, options.background, width, height);
       } else {
         // difference matting: on black a pixel is a·C, on white a·C + (1 − a)
-        const black = offscreen(view, [0, 0, 0], width, height);
-        const white = black && offscreen(view, [1, 1, 1], width, height);
+        // without fog: fogged toward black and toward white, the two renders
+        // would differ by more than coverage, and there is no ground to fade
+        // toward (WP-1548 D3, Python's background=None refusal)
+        const black = offscreen(view, [0, 0, 0], width, height, false);
+        const white = black && offscreen(view, [1, 1, 1], width, height, false);
         if (black && white) {
           pixels = black;
           alpha = white;
@@ -706,6 +737,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     setScene(next: Scene) {
       scene = next;
       if (!lost) upload();
+    },
+    setDepthCue(on: boolean) {
+      depthCue = on;
     },
     draw,
     exportPng,
