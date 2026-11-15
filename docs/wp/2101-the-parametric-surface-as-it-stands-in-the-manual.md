@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-15 — first slice in review: the TOPAS mapping and the target table
+Milestone: parametric · Status: 🔄 2026-11-15 — first slice in review (#1573): the TOPAS mapping and the target table
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
@@ -114,7 +114,7 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 
 ## Handover log
 
-- **2026-11-15** — First slice, by a ghostshift runner, in PR #PRNUM. A TOPAS user reading
+- **2026-11-15** — First slice, by a ghostshift runner, in PR #1573. A TOPAS user reading
   the Switching tab now finds a rietx spelling for every parametric construct the two
   Durham inputs use, and the four that have none yet. The reference page now lists, in
   one table, the twelve kinds of parameter an equation can drive, checked by code the
