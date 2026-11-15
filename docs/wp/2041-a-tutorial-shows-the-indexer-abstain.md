@@ -11,6 +11,10 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
 
 ## Context
 
+*Superseded in part 2026-11-15: the abstaining example has landed in notebook 03, and the
+full range now reads 24 of 87 lines absent under the Pawley validation. See the newest
+handover entry. The bullets below are the record as written.*
+
 - Notebook 03 (`examples/tutorials/03_peaks_indexing_lebail.py`) used to be the example. Since
   WP-2002 removed the U, V and Y width floors (`879fb1bcc`), its candidate validates with 0 of
   105 reflections absent and grades `high`, so the verdict line names the cell. WP-2039 checked
@@ -116,9 +120,23 @@ WP-2113 inherits.
 - *Done* (PR #1570): the new section in `examples/tutorials/03_peaks_indexing_lebail.py`, the rebuilt
   notebook, the tutorials README row. The old one-line pointer to `INDEX_ABSTAINED` moved into
   the section.
-- *Not run*: the code review (a prose-only change: a tutorial script and its notebook, no
-  library code), the generality judge (no heuristic added), the fast and full suites (no
-  library code or test changed; the acceptance command ran instead).
+- *Code review* (`/code-review high --fix`, eight findings). Fixed: the manual's tutorial
+  table row (`docs/docs/start/tutorials.md`) now matches the README's; the assumed 0.050° is
+  added "in quadrature"; the runtime line names two searches; "15 usable lines" became "15
+  lines", since the cell shows only the indexing header. Declined: a timing report for the
+  fast tier (no test added; the new cell adds one search, 13.6-16.5 s at load 9-11); this
+  Context (now marked superseded in part). Not fixed here, no owner found: `INDEX_PANEL_REDUCED`
+  says "The search runs over cubic, hexagonal, orthorhombic, tetragonal, trigonal", reading
+  `quality.systems_supported` (`indexing/diagnostics.py:626`), while the search ran
+  orthorhombic only (`spec.systems` ∩ supported, `workflow._restrict_to_supported`). The new
+  cell prints it beside `INDEX_SYSTEMS_NOT_COVERED`, which says four of those were not
+  searched. A fix changes reader output, so it goes to the maintainer.
+- *Runtime not re-measured quietly*: the notebook still claims "under a minute". A rebuild at
+  load average 23 on 10 cores took 137 s wall, 99.5 s user CPU.
+- *Not run*: the generality judge (no heuristic added); the fast and full suites (no library
+  code or test changed). The acceptance ran: `build.py --check` clean, and
+  `tests/test_tutorials.py` 35 passed (arm64 macOS, `[dev]`), before the review's markdown-only
+  fixes; after them `build.py --check` is clean and the outputs rebuilt unchanged.
 - *Forward*: WP-2113's `### Inherited` (the tail family, and that a fix there changes this
   notebook's output).
 
