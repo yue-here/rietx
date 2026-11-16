@@ -447,12 +447,15 @@ def test_the_gemmi_floor_is_a_version_the_reader_runs_on():
     ``structure_from_cif`` reads ``SmallStructure.spacegroup``, which gemmi
     0.6.5 lacks, so under the old floor of 0.6.5 every call raised
     ``AttributeError``.  0.6.6 has it, and the CIF test files pass there
-    (measured 2026-11-16, WP-1933).  The attribute is checked on the gemmi
-    installed here too, since a floor no install can meet is no floor."""
+    (measured 2026-11-16, WP-1933).  The gemmi installed here is held to the
+    floor too, so a floor raised past what the suite runs on fails here as
+    well as one lowered below 0.6.6."""
     import tomllib
 
     path = Path(__file__).resolve().parents[1] / "pyproject.toml"
     deps = tomllib.loads(path.read_text(encoding="utf-8"))["project"]["dependencies"]
     [floor] = [d.split(">=")[1] for d in deps if d.startswith("gemmi")]
-    assert tuple(int(p) for p in floor.split(".")) >= (0, 6, 6)
-    assert hasattr(gemmi.SmallStructure, "spacegroup")
+    floor = tuple(int(p) for p in floor.split("."))
+    installed = tuple(int(p) for p in re.findall(r"\d+", gemmi.__version__)[:3])
+    assert floor >= (0, 6, 6)
+    assert installed >= floor

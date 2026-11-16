@@ -21,10 +21,16 @@ from rietx.crystallography.cif import structure_from_cif
 
 _HEX = (5, 5, 12, 90, 90, 120)
 _MONO = (10, 6, 7, 90, 100, 90)
+_TRI = (8, 13, 14, 93, 116, 90)
 
 
 def _ops(name):
     return [op.triplet() for op in gemmi.find_spacegroup_by_name(name).operations()]
+
+
+def _uncentred(name):
+    """The setting's operations with its centring translations dropped."""
+    return [op.triplet() for op in gemmi.find_spacegroup_by_name(name).operations().sym_ops]
 
 
 def _cif(op_list, hm, cell=_HEX, mult="?"):
@@ -65,6 +71,15 @@ REFUSED = {
                                    "P 1 21 1 (No. 4", "P -1 (No. 2"),
     "L the export's B 1 21 1": (_cif(_EXPORT_B21, "B 1 21 1", cell=_MONO),
                                 "B 1 21 1 (No. 4", "P -1 (No. 2"),
+    # a non-standard centred setting of a primitive type that lost its
+    # centring: the loop's group is of the symbol's type, with half the
+    # operations, so only the count of pure translations tells them apart
+    "B 1 21 1 lost centring": (_cif(_uncentred("B 1 21 1"), "B 1 21 1", cell=_MONO),
+                               "B 1 21 1 (No. 4", "P 1 21 1 (No. 4) with 1 pure translation"),
+    "C -1 lost centring": (_cif(_uncentred("C -1"), "C -1", cell=_TRI),
+                           "C -1 (No. 2", "P -1 (No. 2) with 1 pure translation"),
+    "I -1 lost centring": (_cif(_uncentred("I -1"), "I -1", cell=_TRI),
+                           "I -1 (No. 2", "P -1 (No. 2) with 1 pure translation"),
 }
 
 READ = {
@@ -74,6 +89,13 @@ READ = {
     # another origin of the same group: the loop's setting is taken, as before
     "origin choice 2 under a bare symbol": (
         _cif(_ops("F d -3 m:2"), "F d -3 m", cell=(8, 8, 8, 90, 90, 90)), "F d -3 m:2"),
+    # the same centring order in another cell choice of the same type
+    "I 1 2/a 1 loop under C 1 2/c 1": (
+        _cif(_ops("I 1 2/a 1"), "C 1 2/c 1", cell=_MONO), "I 1 2/a 1"),
+    # rhombohedral axes (1 pure translation) under a bare R symbol (hexagonal
+    # axes, 3): exempt from the count, since it is the same group
+    "rhombohedral axes under a bare R symbol": (
+        _cif(_ops("R -3 m:R"), "R -3 m", cell=(5, 5, 5, 80, 80, 80)), "R -3 m:R"),
     # the loop is no group (the 1/6 and 5/6 translations dropped): declined by
     # the ruling, so the symbol is read and nothing is said, as before
     "B not a group": (

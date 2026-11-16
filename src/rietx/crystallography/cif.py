@@ -372,10 +372,17 @@ def _refuse_operators_against_symbol(path: str, block, hm: str, triplets) -> Non
     four operations of P2/m) or a generator (P6₁ under ``P 61 2 2``) built the
     smaller group, half the atoms, with nothing said.  Here the group the loop
     generates is identified by type (spglib, any setting or origin) and
-    compared with the symbol's type: the same number is a choice of setting or
-    origin and passes, as before; a different number is a contradiction the
-    reader cannot settle, so it names both groups and stops.  No keyword
-    overrides it.
+    compared with the symbol's type, and its pure translations (the centring)
+    are counted against those of the symbol's tabulated setting.  The same type
+    with the same number of centring translations is a choice of setting or
+    origin and passes, as before.  A different type is a contradiction the
+    reader cannot settle, and so is the same type with another centring: a
+    non-standard centred setting of a primitive type (``B 1 21 1``, ``C -1``,
+    ``I -1``) whose loop lost its centring is still type 4 or 2, but has half
+    the operations.  Either way the reader names both groups and stops.  The
+    two settings of an R group are exempt from the count, since a loop on
+    rhombohedral axes (1 translation) under a bare ``R`` symbol (hexagonal
+    axes, 3) is the same group.  No keyword overrides it.
 
     A loop that is no group is left alone (the symbol is read, as before), as
     is a symbol gemmi cannot name: the declined part of the ruling.
@@ -393,19 +400,27 @@ def _refuse_operators_against_symbol(path: str, block, hm: str, triplets) -> Non
             np.ascontiguousarray(arrays[0], dtype="intc"), arrays[1])
     except spglib.error.SpglibError:
         found = None
-    if found is None or int(found.number) == symbol.number:
+    if found is None:
+        return
+    centring = len(symbol.operations().cen_ops)
+    translations = int(np.all(arrays[0] == np.eye(3, dtype=np.int64), axis=(1, 2)).sum())
+    if int(found.number) == symbol.number and (
+            translations == centring or symbol.hm.startswith("R")):
         return
     generated = gemmi.find_spacegroup_by_number(int(found.number))
     tag = next((t for t in ("_space_group_symop_operation_xyz",
-                            "_space_group_symop.operation_xyz",
                             "_symmetry_equiv_pos_as_xyz")
-                if block.find_values(t)), "operator loop")
+                if block.find_values(t)), "operator")
+    lattice = ("" if int(found.number) != symbol.number else
+               f" with {translations} pure translation"
+               f"{'s' if translations != 1 else ''} a cell against the symbol's "
+               f"{centring}")
     raise ValueError(
         f"{path}: the H-M symbol {hm.strip()!r} names {symbol.hm} (No. "
         f"{symbol.number}, {len(symbol.operations())} operations a cell), and "
         f"the {tag} loop's {len(triplets)} operations generate a group of type "
-        f"{generated.hm} (No. {generated.number}): a different group, not "
-        f"another setting or origin of the same one. One of the two "
+        f"{generated.hm} (No. {generated.number}){lattice}: a different group, "
+        f"not another setting or origin of the same one. One of the two "
         f"statements is wrong and the file does not say which, so it is not "
         f"read; correct the symbol or the loop")
 
