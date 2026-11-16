@@ -1,6 +1,6 @@
 # WP-2061 — a crystallite has a shape: hkl-dependent size broadening on the analytical profile
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (WP-1343 soft, for the magnetic task only)
 Priority: P3 2026-10-26 — a feature no open milestone was opened for, with one named user asking; no wrong number today, only a misfit the isotropic model cannot absorb
