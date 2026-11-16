@@ -12,6 +12,7 @@ placement written here.
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -687,9 +688,10 @@ def test_an_ideal_benzene_round_trips_through_xyz_with_its_bonds_declared(tmp_pa
 def test_an_xyz_element_reads_as_its_standard_symbol():
     """An atomic number or a symbol in any case is stored as the standard
     spelling; CRLF line ends and a byte-order mark read like plain ones."""
-    f = fr.from_xyz("3\r\n\r\n8 0 0 0\r\n1 0.96 0 0\r\nh -.24 +.93 0e0\r\n")
+    f = fr.from_xyz("\ufeff3\r\n\r\n8 0 0 0\r\n1 0.96 0 0\r\nh -.24 +.93 0e0\r\n")
     assert f.species == ("O", "H", "H")
     assert fr.from_xyz("1\nc\nfe 1.5E-1 0. 0\n").species == ("Fe",)
+    assert fr.from_xyz("1\nc\nCA 0 0 0\n").species == ("Ca",)
     assert fr.from_xyz("0\nempty\n").xyz.shape == (0, 3)
 
 
@@ -708,7 +710,12 @@ def test_an_xyz_element_reads_as_its_standard_symbol():
     ("1\nc\nC 1_0 0 0\n", r"line 3: a coordinate is not a decimal number"),
     ("1\nc\nC 1.0D0 0 0\n", r"line 3: a coordinate is not a decimal number"),
     ("1_0\nc\n", r"non-negative integer; it reads '1_0'"),
+    ("1\nc\nC 1e400 0 0\n", r"line 3: a coordinate overflows a double"),
     ("1\nc\nC1 0 0 0\n", r"line 3: 'C1' is not an element symbol"),
+    # gemmi reads a token's leading letters, so each of these would be an
+    # element (Ca, Ni, Fe, Cl, Ca, He, Na) if the whole token went unchecked
+    *[(f"1\nc\n{tok} 0 0 0\n", rf"line 3: '{re.escape(tok)}' is not an element symbol")
+      for tok in ("Carbon", "Nitrogen", "Fe3", "Cl1", "Ca2", "He2+", "Na+")],
     ("1\nc\nX 0 0 0\n", r"line 3: 'X' is not an element symbol \(it is the Z-matrix dummy\)"),
     ("1\nc\n119 0 0 0\n", r"line 3: atomic number 119 is not 1–118"),
     ("1\nc\n0 0 0 0\n", r"line 3: atomic number 0 is not 1–118"),
@@ -847,9 +854,34 @@ def test_the_writer_refuses_what_from_zmatrix_cannot_read():
         fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 2), (2, 1, 0)])
     with pytest.raises(ValueError, match=r"line 1 \(C\) takes 1 earlier atom indices"):
         fr.to_zmatrix(line_then_off, refs=[(), (None,), (1, 0), (2, 1, 0)])
+    for k in (float("inf"), float("nan")):
+        with pytest.raises(ValueError, match=r"line 3 \(H\) takes 3 earlier atom indices"):
+            fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0), (2, 1, k)])
     with pytest.raises(ValueError, match="3 reference rows for 4 atoms"):
         fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0)])
     assert fr.to_zmatrix(fr.Fragment((), np.zeros((0, 3)))) == []
+
+
+def test_the_writer_never_takes_a_triple_its_own_write_made_collinear():
+    """Atom 2 is 0.8e-6 of a radian off the line 0–1 at atom 0, so it is
+    written at exactly 0°, onto that line.  The triple 0, 2, 1 has a sine of
+    1.2e-6 at atom 2 on the positions as given, but is collinear as written:
+    the chooser must not take it for atom 3, and with no other triple it
+    refuses with advice to_zmatrix can follow (no dummy, which it refuses).
+    The same atoms with the H first write and read back."""
+    x = np.array([[0, 0, 0], [0, 0, 3], [8e-7, 0, 1], [0.9, 0.5, -0.2]])
+    f = fr.Fragment(("C", "C", "C", "H"), x)
+    with pytest.raises(ValueError, match=r"atom 3 \(H\) is off the line that atoms "
+                       r"0–2 lie on.*earlier in the order$"):
+        fr.to_zmatrix(f)
+    # the triple given by hand is refused by the placement, with the writer's advice
+    with pytest.raises(ValueError, match=r"^to_zmatrix: Z-matrix line 3 \(H\): "
+                       r"reference atoms 0 \(C\), 2 \(C\), 1 \(C\) are collinear.*"
+                       r"pass refs .* or put an atom off that line earlier in the order$"):
+        fr.to_zmatrix(f, refs=[(), (0,), (0, 1), (0, 2, 1)])
+    first = fr.Fragment(("H", "C", "C", "C"), x[[3, 0, 1, 2]])
+    back = fr.from_zmatrix(fr.to_zmatrix(first))
+    assert np.max(np.abs(_distances(back.xyz) - _distances(first.xyz))) < 1e-12
 
 
 def test_the_writer_takes_the_best_conditioned_dihedral_reference():

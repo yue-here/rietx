@@ -50,6 +50,15 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
   paper's esd is about: decide whether this WP consumes the caller's `refs=` only, or
   asks 1813's chooser to keep bonded chains (c bonded to b, d to c) above a stated
   conditioning floor (the generality judge's reading, quoted in 1813's handover entry).
+- **From [1813](1813-fragment-io.md) (2026-11-16, the PR #1610 review): an atom
+  written at 0° or 180° takes its d by distance, not by conditioning.** Its dihedral
+  is inert, so `to_zmatrix` takes the earlier atom nearest C as d, and that atom can
+  lie on the same line (the terminal H of propyne, written after its carbons, gets
+  the methyl carbon). `zmatrix_points` then gives the line's angle a zero tangent
+  column, so once the internals refine, that angle can never leave 180°. The
+  geometry is unaffected today. Decide whether the chooser should take d by the
+  best-sine rule there too, or this WP should refuse a refinable angle over a
+  collinear triple.
 
 ## Non-goals
 
