@@ -359,6 +359,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_parametric_form_diagnostics": (
         (FIT,), "joint-only (WP-1325): a declaration's form is tested against "
                 "every pattern of its subset at once"),
+    "_parametric_glob_diagnostics": (
+        (FIT,), "joint-only (WP-1965): what one glob declaration expanded to is "
+                "told once per declaration, naming each skipped path"),
     "_parametric_unseen_diagnostics": (
         (FIT,), "joint-only (WP-1325): one equation sets its target across its "
                 "subset, so the patterns that cannot see it are told once per "
@@ -3461,9 +3464,9 @@ def _parametric_glob_diagnostics(mtable) -> list[Diagnostic]:
         by_reason: dict[str, list[str]] = {}
         for path, why in record.skipped:
             by_reason.setdefault(why, []).append(path)
-        reasons = " ".join(f"{', '.join(paths)} {why}." if not why.endswith(".")
-                           else f"{', '.join(paths)} {why}"
-                           for why, paths in by_reason.items())
+        reasons = "; ".join(
+            f"{', '.join(paths)} {('are ' + why[3:]) if len(paths) > 1 and why.startswith('is ') else why}"
+            for why, paths in by_reason.items())
         n_skip, n_kept = len(record.skipped), len(record.members)
         out.append(Diagnostic(
             level="info", code="PARAMETRIC_GLOB_SKIPPED",
@@ -3471,7 +3474,7 @@ def _parametric_glob_diagnostics(mtable) -> list[Diagnostic]:
             message=(f"Parametric equation {record.name!r} on {record.glob} drives "
                      f"{n_kept} path{'' if n_kept == 1 else 's'} "
                      f"({', '.join(record.members)}) and skipped {n_skip} it matched "
-                     f"that no equation can drive: {reasons}")))
+                     f"that no equation can drive: {reasons}.")))
     return out
 
 

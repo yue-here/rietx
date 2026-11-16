@@ -3528,9 +3528,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "equation per matched path, each with its own coefficients. Some paths "
             "the glob matched cannot carry an equation, because they are tied to "
             "another parameter, locked by symmetry or held, so they were skipped. A "
-            "tied path follows its source, which is driven if the glob matched it. "
-            "Nothing needs doing unless a skipped path was meant to be driven: then "
-            "declare the equation on the path it is tied to."
+            "tied path follows its source, and the message says whether the glob "
+            "drives that source. Nothing needs doing unless a skipped path was meant "
+            "to be driven: then declare the equation on the path it is tied to."
         ),
     ),
     "PARAMETRIC_OUT_OF_RANGE": HelpEntry(

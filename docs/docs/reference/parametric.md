@@ -205,8 +205,10 @@ A member named like another declaration is refused, as two declarations of one n
 
 A glob may match paths that no equation can drive: on a cubic phase, `phases.0.cell.*` matches `b` and `c`, which are tied to `a`, and three locked angles.
 Those paths are skipped, and the result says which, and why, in [`PARAMETRIC_GLOB_SKIPPED`](diagnostics-series.md#parametric_glob_skipped), an info.
+For a tied path it says whether the glob drives the path's source.
 A glob that matches nothing, or matches only such paths, is refused.
-The glob is matched against the model of the first pattern of the subset.
+So is a glob that matches a path refused for another reason, such as a rigid body's increment or a moment component, since that is a path you may have meant to drive.
+The glob is matched against the model of every pattern of the subset, so a path that only some of them have, such as a background term, is a member, and the patterns without it are refused by name.
 
 The declarations as resolved carry the bare targets, so `MultiHistogramRefinement.parametric` lists one per member, and a refit passing them back wires the same equations.
 An expression equation takes no glob: its variables are shared, so every matched path would take one value.
