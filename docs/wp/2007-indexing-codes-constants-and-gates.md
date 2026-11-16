@@ -1,6 +1,6 @@
 # WP-2007 — Indexing: its codes, constants and gates
 
-Milestone: generality · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: generality · Status: 🔄 2026-11-16 — part 1 in PR #1591: the inventory, proposed tiers, the best_or_none call sites and the clash table; the batch to the maintainer next
 Track: The audits
 Depends on: 2001
 Priority: P3 2026-10-19 — 2001 closed, so nothing blocks it; provisional by declaration, so a verdict here already carries a caveat; several sessions
@@ -138,6 +138,67 @@ ranking over one population and is the regression gate, not a family.
   J. Appl. Cryst. 12, 60–65.
 
 ## Handover log
+
+- **2026-11-16** — part 1, up to the batch, in PR #1591 (ghostshift runner, unattended).
+  Indexing's audit now has a measured inventory instead of a count: 50 codes, 188 module-level
+  numbers (25 of them in tables the audit walk cannot see) and 32 defaults, each with what it
+  decides, where it was measured and a proposed tier. Most of indexing's numbers are rietx's own:
+  102 of 188 propose tier 3, against 20 tier 2 and 54 tier 1. The WP's premise that no default path
+  calls `best_or_none()` does not hold: six do, all to present or report a pick, none to apply one,
+  and one approved row's grounds say otherwise. The clash table finds eleven places where one
+  grading or gating rule decides what another reads, the largest being that a single result-level
+  fact (the panel's disagreement) and the never-asked ambiguity check each refute every candidate
+  they touch. No tier, value or code moved: everything here waits on the maintainer's batch.
+  *Done*: `docs/wp/2007-batch/` after `2005-batch/` and `2006-batch/`: `collate_inventory.py` (the
+  tree by AST, refusing an item with no judgement), `judgements.json` (the hand-written part, with
+  89 questions), `inventory.json`, `README.md` (counts, § Task 3 on `best_or_none`) and
+  `clashes.md` (K1-K11). Tasks 1, 3 and 4 ticked; task 2's tiers proposed, entered with the
+  rulings. The proposals came from four read-only lanes, one per slice, run in parallel because
+  none touched the tree; the clash table from a fifth. A read-only review subagent stood in for
+  `/code-review` (a ghostshift runner may not run it): its two must-fix findings (the audit
+  table's `Row("CODE", "code")` read as 50 false raise sites; a derived number the walk sees
+  dropped) and four should-fix findings were taken in `d7b605611`; of its four nits, all taken.
+  *Measured*: Bethanechol benchmark, whole protocol, `python -m tests.bethanechol_benchmark` on `bc77a934e` (the branch changes no `src/`), pearl (Linux x86_64, `~/venvs/rietx-py312`, one pinned core): default −3 (Bb, E, F rank 1; Db rank 2), manual −2, global −5 over 20 runs, ceiling +8, 3735 s. Against the 2026-10-13 default −6 (Linux) it is no worse, and it equals WP-1959's macOS −3. No nightly runs this benchmark, so there is no nightly ranking to compare. It did not run alone: pearl carried load 12-23 from other sessions, WP-2110's own bethanechol run until about 12:35Z and this branch's fast suite; with wall-clock budgets a quiet machine can only find more.
+  Clash measurements (Mac, darwin arm64, `.venv` `[dev]`, `clashes.md` header): a synthetic cubic
+  run, 10.3 s, and a default `quick` run on qarr corundum, 107.3 s, 12 candidates listed, 4
+  validated and checked, all 12 `low` with `fom_panel_disagrees` on every row. Fast selection on
+  pearl (Linux x86_64, `~/venvs/rietx-py312`, `-n 4`): 14850 passed, 280 skipped, 32 xfailed in 948 s, at `d7b605611`; 8.6 GB peak. The branch adds no test.
+  *Forward*: the benchmark WP-1924 owed went to its `### Inherited`; clash K5 to WP-2112's. The
+  lanes measurement (`session_usage.py lanes`) found no lane under this session id, since the lanes
+  ran as background agents; their cost is not in this entry.
+  *Not done, on purpose*: the `### Inherited` was not pruned, because open PR #1471 adds an entry
+  at its head; two of its entries are stale and say so here instead. `Z_INTEGER_TOLERANCE` and
+  `INDEX_Z_NOT_INTEGER` are gone (WP-2030, PR #1237). Of PR #1016's six `solve/chemistry.py`
+  numbers none is in the tree. The `DENSITY_Z_TOLERANCE` comment fix (`schemas/indexing.py:2590`
+  says Z ≳ 50; the arithmetic gives two whole Z from Z ≈ 33.5) waits for its tier, as that entry
+  asks, and because open PR #1579 edits the same file. No generality judge: the branch touches no
+  row of `_audit.py` and adds no heuristic; the proposals go to the judge with the batch.
+  *Questions for the maintainer* (task 5's batch; each has its `file:line` in `judgements.json` or
+  `clashes.md`): (1) the milestone's gate after WP-2004 (`generality.md` § The order) is still
+  shut by its letter, since 2004 is ⬜; this part ran on the WP's own Priority line ("2001 closed,
+  so nothing blocks it"). Does the batch wait for the gate? (2) `best_or_none()` on six default
+  paths (README § Task 3): keep the printed `CELL:` line, the CLI's exit code and the GUI's badges,
+  or show the ranking alone? And `EXTINCTION_SCREEN_UNRELIABLE`'s approved grounds ("no default
+  path calls the pick", `_audit.py:684`) are out of date (K7). (3) A candidate the ambiguity check
+  never reached refutes rather than caps (K1, K8; WP-1986's item). (4) A validation fit that raises
+  refutes the candidate, against WP-2076's rule and the code's own help text (K2). (5)
+  `fom_panel_disagrees` is one fact about the list that refutes every candidate on it (K9). (6)
+  `INDEX_DATA_INSUFFICIENT`'s per-degree-of-freedom and σ(Q)/Q arms still refuse a search on a
+  fitted list, against "gates report, never refuse". (7) The `quick` budgets are tier 3, measured
+  on high-symmetry families only; #1374's share rule under a declared ceiling. (8) `MIN_AGREEMENT`
+  as the grade floor is an action with a named dissenter (a one-program indexer accepting on
+  M₂₀). (9) Do the indexing programs' published defaults (DICVOL, ITO, TREOR, McMaille) count as
+  tier 2 when the rule names seven Rietveld programs? Six tier-2 proposals cite them. (10) The B13
+  hand-over of the eight ghost constants is still unruled. (11) Should `index_pattern` name an
+  assumed σ on a positions list (`PEAK_SIGMA_ASSUMED`)? Two physics questions are written, not
+  decided: `DEFAULT_MIN_D_AXIS` excludes small hexagonal cells, and `svd.MAX_BOX_INDEX` drops a
+  trial cell longer than about 40 d_min without a report.
+  *Gotchas*: the indexing programs' manuals are cited through `docs/practice.md` only. A lane's
+  `read_by` list is by full name since the review: a bare-name match merged unrelated modules.
+  Next: the maintainer answers (1) and then the batch, in that order, since (1) decides whether the
+  batch is sent at all; then enter the ruled tiers into `_audit.py` (deleting each from
+  `UNAUDITED_BASELINE`), demote what is ruled demoted, and run the acceptance file and the
+  benchmark once more on that tree.
 
 - **2026-10-18** — created, from the milestone's opening session, split out of the
   readers' WP on the second review's sizing.
