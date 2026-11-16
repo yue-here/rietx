@@ -51,6 +51,7 @@ The two peak-list refusals and the total-scattering refusal come next, then the 
 | Philips PC-APD binary scan | `philips_rd` | `.rd`, `.sd` | none | Poisson on the decoded counts |
 | Rigaku SmartLab Studio II measurement | `rasx` | `.rasx` | `scan` | measured per file, as for `.ras` |
 | Bruker DIFFRAC.MEASUREMENT experiment | `brml` | `.brml` | `scan` | through the automatic absorber factor a, σ = √(y/a)·a |
+| Zip archive of pattern files | `zip_collection` | `.zip` | `axis`, `bank`, `block`, `nonpositive_sigma`, `scan` | the member's own reader's, unchanged |
 | Rigaku SmartLab or MiniFlex scan | `ras` | `.ras` | `scan` | measured per file: Poisson for whole counts, √(y·t)/t for a rate, withheld otherwise |
 | Bruker/Siemens DIFFRAC-AT export | `uxd` | `.uxd` | `scan` | Poisson for a `_COUNTS` block, √(y·t)/t from `_STEPTIME` for a `_CPS` block |
 | PANalytical/Malvern XRDML | `xrdml` | `.xrdml` | `scan` | through the attenuation factor and counting time the file names |
@@ -76,9 +77,9 @@ from rietx import capabilities
 
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
-    "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
-    "raw_unclaimed"]
+    "bruker_raw", "philips_rd", "rasx", "brml", "zip_collection", "ras", "uxd",
+    "xrdml", "udf", "pdcif", "gsas", "chi", "dif_peaklist", "peak_list",
+    "total_scattering", "xy", "raw_unclaimed"]
 assert [opt.name for opt in caps.reader_options] == [
     "axis", "bank", "block", "nonpositive_sigma", "scan"]
 ```
@@ -91,6 +92,7 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
 - `rasx` and `ras` read an attenuator column and never apply it. [`RAS_ATTENUATOR_PRESENT`](diagnostics-files.md#ras_attenuator_present) names the 2θ range it covers.
 - `brml` locates every column from the file's own data views. A detector frame (a recorded view longer than one point) is refused.
+- `zip_collection` reads a plain `.zip` whose members are patterns, without extracting it. A member is a pattern when another reader claims it, and `scan=k` reads the k-th pattern in sorted member-name order. Directory entries, dotfiles (lock files among them), a zip inside the zip, a member no reader claims and a member only a refusal claims are skipped and not counted. The member is read by the reader that claims it, which decides its σ and axis, and the other reader options are passed to that reader. `list_scans` labels each pattern with its member name, and `PatternData.metadata["source_file"]` is that name. The ASCII reader claims any text, so a text member that is not a pattern, such as a log, counts as one, and reading it is refused, naming the member.
 - `xrdml` applies the beam attenuation factor and reports [`XRDML_ATTENUATOR_APPLIED`](diagnostics-files.md#xrdml_attenuator_applied).
 - `udf` states no scanned axis, so 2θ is assumed without a diagnostic. Its 2θ values are rebuilt from the stated range and step, and a point count that disagrees with them is refused.
 - `gsas` reads `STD`, `ESD` and `FXYE` records and refuses `ALT` and `FXY` by name. A file whose only bank record is behind a `#` is read from that record, with [`GSAS_BANK_COMMENTED`](diagnostics-files.md#gsas_bank_commented).
@@ -106,7 +108,7 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 : What the x column of a plain two- or three-column file is, `"two_theta"` (2θ in degrees) or `"tof"` (a flight time in µs), the spellings of `PatternData.axis`. A file that states no unit is read as 2θ unless you declare it, because its numbers cannot say which. The declaration is recorded as `PatternData.metadata["declared_axis"]`. A file whose own unit line contradicts it is refused, and the message quotes both.
 
 `scan`
-: Which measurement to read, counting from 0, in a vendor file that holds several. The ranges are selected and never concatenated, because two ranges are usually two counting regimes. A file holding several, read without `scan`, returns scan 0 and reports [`PATTERN_MULTISCAN_DEFAULTED`](diagnostics-files.md#pattern_multiscan_defaulted).
+: Which measurement to read, counting from 0, in a vendor file that holds several, or which pattern in a zip of patterns. The ranges are selected and never concatenated, because two ranges are usually two counting regimes. A file holding several, read without `scan`, returns scan 0 and reports [`PATTERN_MULTISCAN_DEFAULTED`](diagnostics-files.md#pattern_multiscan_defaulted).
 
 `block`
 : The pdCIF data block to read, matched against any part of the block's name. Without it, the first block holding a 2θ and an intensity loop is read. A file with a `_meas` and a `_calc` block is a different pattern depending on which one you ask for. `read_pdcif` reads a pdCIF directly with the same option.

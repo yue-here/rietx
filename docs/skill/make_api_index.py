@@ -89,7 +89,10 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "from memory (§1). **A file extension does not name a format here**: "
         "dispatch is on content, and a declined `.raw` names the six vendors "
         "who write one and picks none, so read the refusal rather than the "
-        "suffix (Measured: WP-1407). **Handed another program's file** — a "
+        "suffix (Measured: WP-1407). A plain `.zip` of pattern files is N "
+        "scans: `scan=k` reads the k-th member a reader claims, in name order, "
+        "and `rx.io.readers.list_scans` labels each by its member name. "
+        "**Handed another program's file** — a "
         "TOPAS `.inp`, a FullProf `.pcr`, a GSAS `.EXP` or `.prm`, a GSAS-II "
         "`.gpx` or `.instprm`, a PowderLine recipe — or writing one for it: "
         "the readers and writers are in `api-io.md`.",

@@ -78,7 +78,7 @@ without the files.
       GSAS text is claimed by the zip entry, not by `looks_gsas`.
 - [x] `ScanInfo` labels = member names; `PATTERN_MULTISCAN_DEFAULTED` on
       member 0; `scan_count` in metadata.
-- [ ] `capabilities()` formats arm, `help.py` reader-option coverage if any
+- [x] `capabilities()` formats arm, `help.py` reader-option coverage if any
       option is added, manual line in the data chapter, skill row.
 - [x] Synthetic fixtures + `test_readers_robust.py` arm; the real-archive
       facts as a README row.
