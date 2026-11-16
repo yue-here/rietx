@@ -181,7 +181,12 @@ against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads
   Findings tables; the tolerance row three interleaved rounds, 101 → 76 evaluations
   (1.33×), 0.56-0.62 s → 0.50-0.60 s, 0.000 esd, Rwp equal to 7 digits. Linux x86_64 on
   the workstation reproduced every printed digit of twenty probe arms. Acceptance
-  (`tests/test_staged_start_invariance.py -k lab6`, `-n 3`): 2 passed, 1 xfailed.
+  (`tests/test_staged_start_invariance.py -k lab6`, `-n 3`): 2 passed, 1 xfailed. Fast
+  suite on Linux x86_64 (workstation venv, `-n 6`, at 9e6bce19f): 14849 passed, 280
+  skipped, 32 xfailed, 1 failed, 653 s. The failure was this branch's: the manual note put
+  `reference/refinement` 61 characters over the 50000-character page cap. The note was
+  cut to one line and `test_manual.py`'s twin test then passed on macOS. No test added;
+  one row went from non-strict to strict, so passed + skipped does not move.
 
   *Review.* A read-only Opus reviewer re-ran the probe and found no bug; it confirmed each
   monkeypatch takes effect and reproduced every number. Its wording points were taken:
