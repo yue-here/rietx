@@ -313,6 +313,34 @@ and have no free factor to measure, so this file's old list named them without c
   in each mode, in plain esd over the larger esd (0.1 bar), past `noise`. Rwp, evaluations, status
   and codes beside. These are three laboratories, instruments and materials; whether the modes
   agree well enough is the maintainer's to judge, and no default moves here.
+- **K, read 2026-11-16: it cannot run as the table fixes it.** Its families are "WP-2086's reach
+  table" and "a sparse-count family". The reach table's 119 fits ran from a harness that is not
+  in the tree, against 1.10.0's stored rows, and their raw rows (the cache § Tasks names)
+  are gone from that machine, so the table would have to be rebuilt from WP-2086's prose. No
+  sparse-count family is named in this file, WP-2002's records or `tests/data/README.md`, and the
+  0.77-0.83 reading at 0.5-1 counts a channel names none. Choosing either after reading K's question
+  would not be evidence, and the statistic K would compare against (Rwp over the background-only
+  model's, or Rwp/Rexp) is itself a new threshold, which § Non-goals sends to the maintainer. So K
+  goes to the maintainer as a question, and L runs next.
+- **L, its solves and arms, fixed 2026-11-16 before running** (`2017-batch/group_l.py`). Each solve
+  is `rx.solve_magnetic` from a converged nuclear fit, built as the acceptance suites build it:
+  Cr₂WO₆ at 4 K and at 150 K (`conftest.cr2wo6_nuclear`'s two fits, `sites=["Cr1"]`,
+  `ion="Cr3+"`; 4 K takes the k = 0 route, 150 K is the nothing-to-solve case whose unexplained
+  peaks match a zone-boundary k), LaMnO₃ at 50 K (`conftest.lamno3_nuclear`, `sites=["Mn2"]`,
+  `ion="Mn3+"`), and Ba₂FeSbSe₅ at 1.5 K (`test_magnetic_series`'s nuclear fit of the LLB G4.1
+  pattern, `sites=["Fe1"]`, `ion="Fe3+"`, otherwise the defaults; the row's cited case, where two
+  k index the same 11 peaks). Three laboratories (HFIR, NIST, LLB) and three materials. Arms:
+  `shipped`; `SOLVE_MINIMUM_RTOL` 1e-5 and 1e-3 (patched on the module, read at run time);
+  `top_k` 2 and 4; `k_trials` 1 and 3 (both passed as the keyword whose default the constant is);
+  `repeat`, the shipped solve run a second time, as the floor: a 1e-12 nudge has no single start to
+  act on in a solve that builds its own starts. Control: a `top_k` or `k_trials` arm reaches its
+  constant only on the satellite route with more ranked k than the smaller value; a
+  `SOLVE_MINIMUM_RTOL` arm only where some trial ran two or more starts; otherwise the arm must
+  match `shipped` and reads `unreached`. Read: the verdict, the winning group and k, every trial's
+  ΔBIC, status, `n_starts` and `n_minima`, the k-trial table, and the wall time, each arm against
+  `shipped`. No published reference grades a constant here; Ba₂FeSbSe₅'s published k and class
+  (as `test_magnetic_series` quotes them) and the tutorials' groups are read
+  beside the answer. A changed answer is reported as measured and goes to the maintainer.
 - **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
   starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
   to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
