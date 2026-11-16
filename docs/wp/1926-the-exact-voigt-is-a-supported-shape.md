@@ -170,7 +170,7 @@ states the shape or refuses it by name.
   task is the missing test only (`topas_input.py:373-379` refuses).
   *Measured:* 121 log-spaced Γ_L/Γ_G in 1e-3..1e3 plus both limits against a
   bisected Faddeeva FWHM: Olivero 0.0237 % worst at 0.28, TCH 0.432 % at
-  0.45; Gaussian limit exact, Lorentzian +3.1e-6. Fast suite on pearl (`[dev]` venv, Linux x86_64 under WSL,
+  0.45; Gaussian limit exact, Lorentzian +3.1e-6. Fast suite on a Linux workstation (`[dev]` venv, Linux x86_64 under WSL,
   commit 12f6336cc, `-m "not slow" -n 8`, shared with another job at load 15-27):
   14852 passed / 280 skipped / 32 xfailed / 0 failed, 1002 s. The two added tests
   cost 0.21 s together in that run's junit; they are the only tests added, so the
