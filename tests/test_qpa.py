@@ -945,19 +945,31 @@ def test_the_per_formula_unit_esd_carries_z_where_the_zs_differ():
     assert not math.isclose(qpa.phases[0].mole_fraction_stderr, sigma, rel_tol=1e-3)
 
 
-def test_an_empty_phase_takes_no_mole_fraction_and_withholds_nothing():
-    from rietx.optimize.qpa import compute_qpa
+def test_an_empty_phase_has_no_mole_fraction_and_withholds_nothing():
+    """Every site empty: W = 0 for any scale, but the cell count S·V rides a
+    scale the data cannot move, so it is absent, not zero."""
+    from rietx.optimize.qpa import compute_qpa, formula_unit_diagnostics
 
-    structure, values, _ = _ferrite_pair()
-    for j, _atom in enumerate(structure.phases[1].atoms):
-        values[f"phases.1.atoms.{j}.occ"] = 0.0
-    qpa = compute_qpa(structure, values)
-    pure, empty = qpa.phases
+    structure = Structure(phases=[
+        _perovskite("LaFeO3", [("La", 1.0)]),
+        _perovskite("La0.6Sr0.4FeO3", [("La", 0.6), ("Sr", 0.4)]),
+        _perovskite("empty", [("La", 1.0)])])
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    for j, _atom in enumerate(structure.phases[2].atoms):
+        values[f"phases.2.atoms.{j}.occ"] = 0.0
+    qpa = compute_qpa(structure, values, unmeasured=[1])
+    pure, _, empty = qpa.phases
     assert empty.weight_fraction == 0.0
-    assert (pure.mole_fraction, empty.mole_fraction) == (1.0, 0.0)
-    assert (pure.mole_fraction_formula_unit,
-            empty.mole_fraction_formula_unit) == (1.0, 0.0)
+    assert empty.z_source == "unresolved"
+    assert (empty.mole_fraction, empty.mole_fraction_formula_unit) == (None, None)
+    assert (pure.mole_fraction, pure.mole_fraction_formula_unit) == (1.0, 1.0)
     assert qpa.formula_unit_withheld is None
+    assert formula_unit_diagnostics(qpa) == []
+    # beside a massive unresolved phase it still withholds nothing of its own
+    both = compute_qpa(structure, values)
+    assert both.formula_unit_withheld is not None
+    assert "empty" not in both.formula_unit_withheld
 
 
 def test_a_negative_scale_leaves_a_basis_absent_rather_than_raising():

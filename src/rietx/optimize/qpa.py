@@ -562,12 +562,15 @@ def compute_qpa(structure: Structure, values: dict[str, float],
             z_of[ip] = zmvs[ip].z
             z_source[ip] = ("composition" if zmvs[ip].z_resolved
                             else "unresolved")
-    # a phase with no mass in its cell (every site empty) has W = 0 and
-    # counts no cells either; it neither takes a share nor withholds a column
+    # A phase with no mass in its cell (every site empty) has W = 0 for any
+    # scale, but its cell count S·V does not: its scale is blind there (the
+    # zero column of refine._quantify_phases), so the count is unmeasured.
+    # It leaves both sums, its own mole fractions are None, and its basis
+    # withholds nothing.
     massive = {ip for ip in measured if zmvs[ip].cell_mass > 0.0}
     unresolved = [ip for ip in measured
                   if z_source[ip] == "unresolved" and ip in massive]
-    withheld = unresolved if len(measured) > 1 else []
+    withheld = unresolved if len(massive) > 1 else []
     x_cell: dict[int, float] = {}
     x_cell_sigma: dict[int, float] = {}
     x_fu: dict[int, float] = {}
@@ -584,9 +587,11 @@ def compute_qpa(structure: Structure, values: dict[str, float],
                 # not: the basis is absent, never a raise (WP-1028 §(f))
                 return {}, {}
             x, sx, _ = mole_fractions(per_cell, s_m, scale_cov)
-            return ({ip: float(x[k]) for k, ip in enumerate(measured)},
+            return ({ip: float(x[k]) for k, ip in enumerate(measured)
+                     if ip in massive},
                     {} if sx is None
-                    else {ip: float(sx[k]) for k, ip in enumerate(measured)})
+                    else {ip: float(sx[k]) for k, ip in enumerate(measured)
+                          if ip in massive})
         x_cell, x_cell_sigma = partition(
             [zmvs[ip].cell_volume if ip in massive else 0.0 for ip in measured])
         if not withheld:

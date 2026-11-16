@@ -87,6 +87,7 @@ A mole fraction comes from the same scales as the weight fraction.
 W<sub>p</sub> ∝ S<sub>p</sub>·(Z·M)<sub>p</sub>·V<sub>p</sub>, so dividing by the cell mass leaves S<sub>p</sub>·V<sub>p</sub>, the number of unit cells, with no mass in it.
 `PhaseQuantity.mole_fraction` is that number renormalised, counted in **unit cells**, and it is reported wherever the weight fraction is.
 `PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts **formula units**, which is what reaction stoichiometry and phase diagrams use.
+The Z it uses is the reduced formula, the greatest common divisor of the whole-number counts in the cell, so a molecular crystal of benzene counts CH units (z = 24 for its Z = 4 cell); declare `Phase.formula_units` where the formula unit you mean is a larger one.
 Both esds go through the correlated scale block, as the weight fraction's does.
 
 **A mole-fraction column that sums to 100 % is no evidence that its basis is uniform.**

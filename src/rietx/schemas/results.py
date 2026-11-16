@@ -473,7 +473,13 @@ class PhaseQuantity(Base):
     whole cell).  ``None`` only on a result stored before the field.  Both
     esds go through the correlated scale block as σ(W) does, and are ``None``
     exactly where σ(W) is.  The number divides weight by the cell mass, so it
-    has W's scope: the modelled crystalline content.
+    has W's scope: the modelled crystalline content.  A phase whose cell has
+    no mass (every site empty) has W = 0 but no mole fraction on either
+    basis: its cell count rides a scale the data cannot move.  Its basis
+    withholds nothing, being out of both sums.  ``z`` from the composition is
+    the GCD of the integer counts, the reduced formula (benzene's Z = 4 cell
+    reads z = 24, CH), so the per-formula-unit column counts reduced formula
+    units unless a ``Phase.formula_units`` says otherwise.
     """
 
     name: str                                       # matches Phase.name / ticks key
