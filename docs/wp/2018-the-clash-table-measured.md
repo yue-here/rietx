@@ -213,9 +213,62 @@ Under the default plan both codes fire on the absent phase in the same fit, with
 value: the scale ends exactly on 0 by itself, `FLOOR_HIT` names `phases.1.scale` (ρ +0.0088,
 `at_bound` True, esd 5.8e-9), and `PHASE_UNCONSTRAINED` names `phases.1.cell.a` at 0.0σ. Without
 the hold (window_only, no_support) the scale leaves its floor (1.51(67)e-8), `FLOOR_HIT` does
-not fire and `PHASE_UNCONSTRAINED` reads 2.62σ. So the pair is ordered rather than conflicting:
-the hold (or, without it, the collapse) is what puts the scale on its floor here, and each code names a different path. Whether
-the caller should see one finding or two is § Questions for the maintainer, (3).
+not fire and `PHASE_UNCONSTRAINED` reads 2.62σ. So the hold (or, without it, the collapse) is
+what puts the scale on its floor here, and the two codes name different paths of one phase.
+Whether the caller should see one finding or two is § Questions for the maintainer, (3).
+
+**C14, the Γ_G² ≥ ε rows against the bound test** (`gaussian_rows.py`; macOS arm64, `[dev]`;
+the NAC arms also on a Linux x86_64 workstation, Rwp equal to 12 digits and U to 7e-10 relative). Three arms:
+LM as shipped, LM with `gaussian_width_inequalities` building no row, and `solver="trf"`.
+
+On 11-BM NAC (`tests/test_acceptance_nac.py`'s protocol) the rows never come near binding: the
+smallest Γ_G² over each phase's reflections is 1179 ε (NAC) and 1187 ε (CaF₂), no stage
+truncated a step, and LM without the rows is the shipped fit to every digit. TRF lands within
+7e-10 relative of it. NAC does not exercise C14 since WP-1938 moved W's floor to ε.
+
+So the positive arm is a synthetic LaB₆ pattern (`test_gaussian_width_floor.py`'s
+construction and plan) whose true Γ_G² = 9e-4·(tanθ − 0.1)² touches 0 at 2θ = 11.43° with W
+interior (9e-6):
+
+| Arm | Γ_G² at 11.43° | U, V, W, X: shift from the no-row fit (shipped esds) | distance from the truth (own esds) | what the caller sees |
+|---|---|---|---|---|
+| shipped (rows) | exactly ε (ratio 1 − 2e-13); 6 steps held in `profile`, 3 in `closing` | −0.60, +0.61, −0.40, −0.67 | +0.26, −0.33, +0.52, −0.05 | `CONSTRAINT_ACTIVE` (info, `where` empty, the message names the block "instrument.profile (phases.0): 3" in stage 'closing'); `at_bound` False on U, V, W; no `BOUND_HIT` or `FLOOR_HIT`; esds as for a free fit |
+| no_rows | −1.21 ε, at 1 of 17 reflections | 0 | +0.83, −0.91, +0.90, +0.68 | `RESOLUTION_NOT_POSITIVE` (warning, names U, V, W: 158 of 4200 points, worst −1.21e-8 deg²) |
+| trf | −1.21 ε, the no_rows answer to 2e-8 relative | 0 | same | same |
+
+What the re-derivation row said is half right. A width held on a row is reported, by
+`CONSTRAINT_ACTIVE`, which the 2026-11-09 reading missed. But that record names no path, and
+`at_bound` and `bound_findings` read box sides only, so U, V and W each read "not at a bound"
+with an unconditional esd while the answer is held at ε. The rows move the answer 0.4-0.7 esd,
+here toward the truth (which lies on the face). Both RESOLUTION_UNCONSTRAINED and
+HIGH_CORRELATION (U-V, ρ −0.988) fire in all three arms. Question (4) below.
+
+### Questions for the maintainer (2026-11-16)
+
+Measured above; the verdict on each is a ruling, so none is written into the table yet.
+
+1. **C1.** On the two-basin fixture the support hold changes the width profile's answer by
+   nothing (range, excess and admissible flags identical; the two held points move 0.013 pp in
+   W and 0.06 in χ², both outside the cut). Is C1 recorded *independent* on this evidence, and
+   should `strategy/fraction_profile.py`'s docstring (lines 14-23, the pre-WP-1523 account of
+   χ² running away at 4× and 8×) be rewritten to this measurement, and by which WP?
+2. **C3.** On the absent-phase fixture the window and the reset never act, and the hold and
+   the collapse each give the default answer alone. The measured difference the triple makes
+   is the absent phase's own row: held at 5.2 Å with no esd, or free at 5.0243(21) Å and 2.62σ.
+   Is that the *designed* outcome (the row reads as the hold's purpose), so C3 is recorded
+   independent on this fixture? And is the CuCr₂O₄ ramp still owed for C3, given that it needs
+   a series harness the tree does not have (WP-2003's family B)?
+3. **C3 and C10, two codes for one cause.** When the reset and the collapse reach one path,
+   `CELL_RUNAWAY` fires beside `PHASE_UNCONSTRAINED` on `phases.1.cell.a`; under the default
+   plan, `FLOOR_HIT` on the scale fires beside `PHASE_UNCONSTRAINED` on the cell. Should a
+   caller see both (each names a different act), or should one defer to the other? Neither
+   is a wrong value; the question is what a reader is told.
+4. **C14.** When the answer sits on a Γ_G² row, the only record is `CONSTRAINT_ACTIVE` with an
+   empty `where`; U, V and W read `at_bound` False and carry free-fit esds. Should
+   `bound_findings`' active set (and so `at_bound`) take the rows' active set as it takes the
+   box's (WP-1929's "a row on its bound stays in the matrix" rule, extended to a combination),
+   or should `CONSTRAINT_ACTIVE` carry the paths in `where`, or both? NAC, the dataset chosen
+   for the row, never reaches it; the synthetic touching-truth pattern does.
 
 ## Acceptance
 
