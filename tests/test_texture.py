@@ -461,3 +461,77 @@ def test_the_sampled_sphere_minimum_meets_the_true_one(order):
     assert error <= SPHERE_MIN_BAR, (
         f"order {order}: the sampled minimum sits {error:.2e} above the true one "
         f"({case}; bar {SPHERE_MIN_BAR})")
+
+
+# ------------------------------------------------- the order screen (WP-1974)
+def _bare_fit_screen(texture, *, mg_only=False):
+    """A −3m1 phase built with ``texture``, fitted bare (scale and background
+    only, noise-free), and the order screen run on the answer."""
+    from rietx.model.forward import WINDOW_AREA_TOL, compile_model
+    from rietx.report.texture import _order_screen
+
+    p = Parameter
+
+    def phase(tex):
+        atoms = [Atom(label="Mg", species="Mg", x=p(value=0.0), y=p(value=0.0),
+                      z=p(value=0.0), biso=p(value=0.5))]
+        if not mg_only:
+            atoms.append(Atom(label="O", species="O", x=p(value=1 / 3), y=p(value=2 / 3),
+                              z=p(value=0.22), biso=p(value=0.8)))
+        kw = {"texture": SphericalHarmonicTexture(order=4, coefficients={
+            k: p(value=v) for k, v in tex.items()})} if tex else {}
+        return Phase(name="t", space_group="P -3 m 1",
+                     cell=_cell(3.147, 4.769, 120.0), scale=p(value=1e-3), atoms=atoms, **kw)
+
+    ins = Instrument.bragg_brentano()
+    grid = np.arange(10.0, 120.0, 0.02)
+    y = np.asarray(rx.Refinement(Structure(phases=[phase(texture)]), ins).predict(grid))
+    data = rx.PatternData(two_theta=grid.tolist(), intensity=(y * 2e4 / y.max() + 50.0).tolist())
+    bare = phase(None)
+    bare.scale.value *= 2e4 / y.max()
+    fit = rx.Refinement(Structure(phases=[bare]), ins.model_copy(deep=True))
+    fit.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"])]))
+    fs, fi = fit.fitted_structure, fit.fitted_instrument
+    table = ParameterTable(fs, fi)
+    model = compile_model(fs, fi, data, mode="rietveld", window_area_tol=WINDOW_AREA_TOL)
+    (screen,) = _order_screen(model, table.decode(table.x0()))
+    return {f.order: f for f in screen.fits}, {s.order: s for s in screen.steps}
+
+
+def test_the_order_screen_recovers_an_order_4_specimen_fitted_bare():
+    """The positive arm: the solve on the partitioned columns returns the
+    coefficients the pattern was built with, and order 6 adds nothing.  On the
+    unpartitioned K the same fit reads c4_3 as −0.091 (WP-1974, measured
+    2026-11-16), because hkl and khl share one extracted correction."""
+    truth = {"c2_0": 0.3, "c4_0": 0.4, "c4_3": -0.15}
+    fits, steps = _bare_fit_screen(truth)
+    assert fits[4].r2 > 0.999 and fits[4].rank == 3
+    got = dict(zip(fits[4].names, fits[4].coefficients))
+    for name, value in truth.items():
+        assert got[name] == pytest.approx(value, abs=0.01), name
+    assert steps[6].delta_r2 < 1e-3 < steps[4].delta_r2
+
+
+def test_a_term_the_partition_averages_away_adds_no_rank():
+    """c4_3 on a one-atom −3m1 phase: hkl and khl coincide with equal |F|² and
+    opposite K, so the extraction sees nothing of it — visibility 0, one rank
+    short — and the built texture leaves no misfit for any order to explain:
+    what is left is the report windows' own floor (rms P − 1 of 5.5e-5 to
+    1.2e-4, measured 2026-11-16), three orders below the weakest built arm
+    (0.13, a cubic c4_1 of 0.4)."""
+    fits, _steps = _bare_fit_screen({"c4_3": 0.3}, mg_only=True)
+    vis = dict(zip(fits[4].names, fits[4].visibility))
+    assert vis["c4_3"] < 1e-9 and vis["c4_0"] > 0.9
+    assert (fits[4].n_terms, fits[4].rank) == (3, 2)
+    assert all(f.rms_p < 1e-3 for f in fits.values())
+
+
+def test_a_random_powder_fitted_bare_has_no_texture_amplitude():
+    """The scale-free numbers alone can speak here: a noise-free random powder
+    leaves the misfit of the report's windows against the fit's, which some
+    order explains a fraction of (on m-3m order 6 at F p 0.026, WP-1974's
+    log).  Its amplitude, 7.9e-5 to 2.6e-4 rms P − 1 here, is the strength a
+    suggestion needs beside R²."""
+    fits, _steps = _bare_fit_screen(None)
+    assert all(f.rms_p < 1e-3 for f in fits.values())

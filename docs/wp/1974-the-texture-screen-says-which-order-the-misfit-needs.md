@@ -62,7 +62,14 @@ TEXTURE_SAMPLE_PSI_DEG[geometry.kind])` for w_l.
 
 ## Tasks
 
-- [ ] The per-order solve beside the axis score, on the fit's frozen cell.
+- [x] The per-order solve beside the axis score, on the fit's frozen cell.
+      *2026-11-16:* `report.texture._order_screen`, private and called by
+      nothing, so no report moves. It fits f_k ≈ a + Σ_t b_t·(M·w_l K_t)_k,
+      M the extraction's own partition (`_partitioned`, the extraction
+      applied to the phase's peaks times K), on the axis score's baseline;
+      C_t = b_t/a. The rank is read on columns scaled to their unpartitioned
+      norm, and each term's visibility ‖M·K_t‖/‖K_t‖ rides beside it.
+      Measured in the handover entry; three tests in `tests/test_texture.py`.
 - [ ] The nested comparison per added order, and the record field it writes,
       with its writer named.
 - [ ] The Layer-2 action naming an order, only past the gates. The
