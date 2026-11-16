@@ -1,6 +1,6 @@
 # WP-2140 — Every atom is named by its unique label
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — assessment landed (#1625); label paths or renumbering waits on Yue's ruling, uniqueness and restraints-on-labels can start
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-09 — the remedy for a class of silent wrong answers (a reference that lands on another atom after a reorder), ruled by the maintainer; a stored-format change, so it starts with an assessment
@@ -95,6 +95,122 @@ still opens.
   automatic action, so it records a `Diagnostic` (root CLAUDE.md, a silent correction is a
   reader's to make).
 
+## Findings: the assessment (task 1, 2026-11-16)
+
+Measured on `origin/main` bc77a934e. The probes stayed in the session's scratch directory, so
+each claim below names its `file:line` or the call that shows it.
+
+**The premise holds.** On PbSO₄ (`tests/data/gsas2_pbso4.gpx`: Pb1 S2 O3 O4 O5), with a bond
+restraint on S2–O3, a hold on `phases.0.atoms.4.occ` (O5) and a tie `atoms.3.biso = atoms.2.biso`
+(O4 follows O3), O3 and O5 were swapped in place:
+
+- A deep copy handed to `edit()`, the control: all three follow their atoms (bond S2–O3, hold on
+  `atoms.2.occ`, tie source `atoms.4`).
+- `ref.structure` itself handed to `edit()` (hole 1): the bond restrains S2–O5, the hold sits on
+  O3 and the tie reads O5. No warning names any of the three.
+- No `edit()` at all, then `parameters()`: the hold sits on O3. The one warning is about another
+  path (`atoms.4.dof.2` dropped from a restored set).
+- Hole 3: after the swap, `set_vary("phases.0.atoms.2.biso")` frees O5, which that path did not
+  name when the glob was written.
+- Construction checks bond, angle, planarity and torsion indices; tether, anti-bump and
+  `ValueRestraint` are checked at `edit()` only (`schemas/structure.py:1855-1888`, `:1938-1958`),
+  as Context says.
+- A CIF with two sites labelled `O1` reads with no diagnostic (`Structure.from_cif` and
+  `structure_from_cif(diagnostics=[])`, both `['Na1', 'O1', 'O1']`). Thirteen label-keyed dicts in
+  `src` already assume uniqueness: `cif.py:1077` builds `{a.label: k}`, so a repeated label makes
+  `CIF_SPECIES_NORMALISED` name the last atom of that label.
+
+**What names an atom by index today** (`src`, the committed GUI dist excluded):
+
+| Surface | Count | Where |
+|---|---|---|
+| Builds an index path (`atoms.{j}`) | 106 lines | readers and writers 40 (mostly `Diagnostic.where`: `io/projects/*`, `cif.py`, `magcif.py`, `io/recipe.py`, `io/exporters.py`); model and optimizer value lookups 18 (`model/forward.py:1555-1653`, `model/restraints.py:311-662`, `optimize/qpa.py:471-662`, `optimize/least_squares.py:1472,2013`); `ParameterTable` 10 (`params/vector.py:1409-1417,1982,4961-4971`); GUI server 10 (`gui/symmetry.py`, `gui/structure3d.py:1057`, `gui/imports.py:433`); renumbering 8 (`crystallography/twins.py`); other crystallography 7; `strategy/` 5; `report/` 4; `refine.py` 4 |
+| Reads an index back by regex | 18 | `magnetic/moments.py:104`, `twins.py:313`, `gui/session.py:1829`, `gui/symmetry.py:310`, `io/projects/topas_refined.py:218`, `multi.py:3119`, `optimize/least_squares.py:96,98,168`, `refine.py:831,2210,8356,8523`, `schemas/sequential.py:417`, `schemas/structure.py:1906`, `sequential.py:1054`, `strategy/parameter_interval.py:93`, `strategy/staged.py:43` |
+| Reads an index back by `split`/`int` | 9 | `io/projects/fullprof.py:3887`, `io/projects/topas_ties.py:433`, `io/recipe.py:1678`, `refine.py:4478,7830,8405,10403`, `params/vector.py:1884,1912` |
+| GUI front end | 7 parsers, 6 builders | `gui/src/lib/model.ts:482,543,552,679-689`, `lib/paramtree.ts:240,250,289`, `next/Params.svelte:447,533,609,847`, `panels/Params.svelte:379,617` |
+| Restraint fields typed `int` | 7 kinds | `schemas/structure.py:604-605,627-629,854-855,877-878,912,962`; `ValueRestraint.path` (`:646`) is an index dot-path |
+| GUI routes carrying one | 9 | `PATCH /api/params`, `PUT /api/plan`, `PATCH /api/structure` (restraint indices), `POST /api/structure/aniso` and `/position` (`gui/session.py:1763,1807,1829`), `GET`/`POST /api/structure/symmetry` and `/preview` (`gui/symmetry.py:310`), `GET /api/structure3d` |
+| Literal index paths outside `src` | tests 929 lines in 102 files, 36 restraint constructor lines; docs (WP files excluded) 80 lines in 29 files; examples 62; the skill 7, in each of its three copies; `src` docstrings 40 |
+
+**What needs no change under either remedy.** Every family glob matches a label segment as well
+as an index, since fnmatch's `*` matches any text: `help.py`'s 15 atom families (`:1089-1256`)
+and the anisotropic opt-in (`:1362-1364`), `PLACES`' 15 atom rows (`gui/src/lib/history.ts:426-444`,
+so its vitest and the dist are untouched), and the 67 `atoms.*` lines in `src` (the presets in
+`strategy/staged.py`, `strategy/magnetic.py`, `purposes.py`, `viz/compare.py`). No partial-index
+glob (`atoms.1*`, `atoms.?`) occurs in `src`, tests, docs or examples; 48 lines carry a
+literal-index glob (`atoms.3.*`).
+
+**What is stored.** A history node: `NodeAction.turn_on`, `turn_off`, `values`, `ties`,
+`untied`, `held`, `unheld` (`schemas/history.py:114-149`); `RefinementState.free_paths`, `ties`,
+`holds`, `stderr` (`:300-360`); the restraints inside its structure; `Diagnostic.where` (`:388`);
+`TreeHeader.plan` (`:419`). `project.json`: `ProjectDoc.plan` (`schemas/project.py:155`), in a
+document holding no structure. The `.rxt`: rows such as `atoms.0.biso` under a phase block
+(`gui/textdoc.py:26`). Also `live/events.jsonl` (`free_paths`, `held`), a result's JSON, and the
+GUI's recovery copy of unapplied edits. Version tokens: `SCHEMA_VERSION` 0.61,
+`PROJECT_FORMAT_VERSION` 1.6, the textdoc `FORMAT_VERSION` 1, `EVENT_SCHEMA_VERSION` 3, the
+recovery `FORMAT_VERSION` 1.
+
+**What already names atoms by label.** Rigid bodies; a series, whose `_SeriesNumbering`
+(`sequential.py:715`) matches by label and then writes the key back as an index path; the
+PowderLine recipe, which keys sites by label (`io/recipe.py:1075-1112`); the report's moment rows
+(`report/schemas.py:1699`).
+
+**Labels in the files we hold.** The 19 committed CIFs (17 blocks with atom sites) carry no
+repeated label, no digits-only label and none holding `.`, `*`, `?`, `[` or `]`. No wider corpus
+was measured, so this says nothing about what a reader meets in general.
+
+**The migration at read.** `migrate.py`'s textual rename cannot carry it, for three reasons. It
+has no structure, and `atoms.3` becomes `atoms.O1` only through the structure the path was written
+against. That structure can differ from node to node. And it is unversioned and idempotent
+(`migrate.py:124-145`), so a digits-only label is indistinguishable from an old index. The module's
+second repair can: `restore_declared_ranges` is structural, gated on the version a node was written
+under, and applied per node at `RefinementTree.load` (`DECLARED_RANGE_READ_POINTS`,
+`migrate.py:157-160`). Each node holds its own structure. Four cases need a decision beyond that:
+
+1. A node whose action changed the atom list holds two numberings: its action's paths may name
+   the parent's atoms.
+2. `project.json`'s plan has no structure beside it; read it against the history head.
+3. An `.rxt` is parsed against the live model (`textdoc.parse`), which has the structure.
+4. `events.jsonl` sits outside `READ_POINTS` on purpose (display-only, `migrate.py:58-64`), and a
+   result's JSON records a finished fit. Both can stay as written.
+
+**The two remedies, and a third from practice.**
+
+- **(A) Label dot-paths.** A path names the atom, so holes 1 and 3 and the no-`edit()` route close
+  by construction, with no crossing point to miss. It retires the atom half of the renumbering
+  (`twins.atom_moves`, `carry_restraints`, `_renumber_atoms`) and of `_SeriesNumbering`. Cost: the
+  106 builders, 27 parsers and 7 front-end parsers above, about a thousand test lines, four
+  format bumps (history schema, project, `.rxt`, recovery) with the structural migration, and a
+  label-syntax rule that refuses labels a CIF allows, so every reader that builds atoms needs a
+  rename with a `Diagnostic`. Hole 2 stays open.
+- **(B) Index dot-paths with renumbering, stored references on labels.** The restraints move to
+  labels; their migration is the cheapest of anything here, since a `mode="before"` validator can
+  read the sibling `atoms` list in the same phase. Holds, ties, the free set and plan globs are
+  dot-paths themselves, so keeping the table on indices while they hold labels means two spellings
+  and a translation at every boundary; in practice (B) keeps them on indices, renumbered. Hole 1
+  closes if `edit()` compares against a label snapshot of the last accepted state rather than
+  `self.structure` (`numbering_moves` already accepts a `CoordinateSnapshot`, `twins.py:578`). The
+  no-`edit()` route closes only if that comparison runs at every table build. Hole 3 needs saved
+  plans renumbered at each edit too. The class stays open: each new register of atom paths owes
+  its own renumbering, the shape of WP-1441's absences.
+- **(C) GSAS-II's hidden stable id** (`docs/practice.md` § Naming an atom). Not proposed: it adds
+  an invisible key beside the visible one the user already writes.
+
+**Settled, and the question left.** Neither remedy closes the class at comparable cost: (A)
+closes it by construction at the cost above; (B) closes the three known routes at a fraction of
+it and leaves the class open. The choice is a stored-format change, so it goes to Yue as the
+brief below rather than being settled here. Whichever way it goes, three tasks are needed and
+can start now: labels unique per phase at construction, the decision for duplicate labels at
+read, and the seven restraint kinds on labels.
+
+> **For Yue.** Label dot-paths (A) close the class by construction and cost about 140 code
+> sites, about a thousand test lines and four format bumps with a per-node structural migration.
+> Renumbering with restraints on labels (B) closes the three known routes at a fraction of that,
+> and every new register of atom paths will owe renumbering. Which? Recommendation: (A), landed
+> in two steps: restraints on labels and uniqueness first (needed under either), then the paths.
+> If (A): are labels holding `.`, `*`, `?`, `[`, `]` or only digits renamed at read with a
+> `Diagnostic`, or refused? And may `events.jsonl` and a result's JSON stay in the old spelling?
+
 ## Non-goals
 
 - Phase keys. Phases are matched by name where unique (WP-1991), and `phases.0` stays an index
@@ -105,7 +221,8 @@ still opens.
 
 ## Tasks
 
-- [ ] **Assess the remedy.** Compare (A) label dot-paths against (B) index dot-paths with
+- [x] **Assess the remedy.** (2026-11-16, #1625: § Findings; not clear at comparable cost, so
+      the brief for Yue closes that section.) Compare (A) label dot-paths against (B) index dot-paths with
       renumbering and only stored references on labels. For each, measure what it touches (the
       list in Context, with counts), what the migration at read needs (above all whether
       `migrate.py`'s textual rename can carry it), and which of WP-2121's three holes it closes.
@@ -151,6 +268,28 @@ npm --prefix gui test
 - `docs/DESIGN.md` § Rules, rules 1 and 4.
 
 ## Handover log
+
+- **2026-11-16** — task 1, the assessment, by a ghostshift runner; PR #1625. No format or
+  behaviour changed. The defect is real on today's main. An edit given the working structure
+  itself puts a restraint, a hold and a tie on the wrong atom with nothing said. A swap with no
+  edit at all moves a hold. A saved index glob frees the atom that took the old one's place. A CIF
+  with a repeated label reads silently. Label dot-paths close the class by construction, but at
+  about 140 code sites, a thousand test lines and four format bumps. Renumbering with restraints
+  on labels closes the known routes far more cheaply and leaves the class open. That is not
+  "comparable cost", so the choice went to Yue as a brief rather than being settled.
+  *Done:* § Findings (counts with `file:line`, the stored surfaces, the migration analysis, the
+  two remedies and GSAS-II's third), the brief that closes it, and `docs/practice.md` § Naming an
+  atom (TOPAS v6 Technical Reference and GSAS-II documentation, read by one agent, no source and
+  no macro body). *Measured:* the probes are listed in § Findings and stayed in the session's
+  scratch directory: a PbSO₄ swap through each route, the duplicate-label CIF, and label hazards
+  over the 19 committed CIFs (none). *Gotchas:* `migrate_document_text` is unversioned and
+  idempotent, so it cannot tell a digits-only label from an old index. The structural per-node
+  repair (`restore_declared_ranges`' pattern) is the one that can carry this. `_user_holds` is
+  the user's hold register; `_held` is the stage's (root CLAUDE.md § A hold). *Not done:* no
+  forward note to WP-1965 (its label glob reuses whatever form lands here, which is undecided).
+  Next: Yue's answer to the brief. Meanwhile the three tasks needed under either remedy can start:
+  uniqueness at construction (task 2), the duplicate-label decision at read (task 3), and the seven
+  restraint kinds on labels (part of task 4), whose migration reads the sibling atom list.
 
 - **2026-11-09** — created, from the maintainer's 2026-11-09 answers to WP-2121's questions. No
   open WP owns atom keys: WP-2121 closed today and folds its remaining items here; WP-1991 (✅)
