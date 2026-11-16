@@ -283,7 +283,8 @@ def _fmt(x, spec=".3g") -> str:
 def summary() -> None:
     rows = read_rows()
     latest = {(r["family"], r["constant"], r["arm"]): r for r in rows}
-    meta = next((r["meta"] for r in rows if "meta" in r), {})
+    meta = dict(next((r["meta"] for r in reversed(rows) if "meta" in r), {}))
+    meta["workers"] = "/".join(sorted({str(r["meta"]["workers"]) for r in rows if "meta" in r}))
     lines = ["# WP-2017 group C: the seven `bccg` constants on Pawley fits", "",
              f"Run at `{meta.get('head', '?')[:9]}`, {meta.get('platform', '?')}, "
              f"Python {meta.get('python', '?')}, numpy {meta.get('numpy', '?')}, "

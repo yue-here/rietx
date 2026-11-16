@@ -3290,7 +3290,13 @@ ROWS: tuple[Row, ...] = (
         evidence="format: GSAS Technical Manual p. 129, 222 define ITYP 10 (docstring)"),
     Row("rietx.optimize.bccg._CAUCHY_ARMIJO", "constant", tier=3, value=0.0001,
         evidence=("Moré & Toraldo (1991) SIAM J. Optim. 1, 93 for the projected search (docstring);"
-                  " 1e-4 is the textbook Armijo c1 (recalled, not checked)"),
+                  " 1e-4 is the textbook Armijo c1 (recalled, not checked). "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: "
+                  "1e-5 and 1e-3 bit-identical on FAP and NAC (37 and 35 projected-CG solves) "
+                  "and on cpd-1a, whose 111 Pawley columns never reach projected_cg; no "
+                  "Armijo test on these fits fell between the two, so unreached, no failing "
+                  "case, a third family past the cut owed"),
         grounds=("A constant that decides where a line search stops, the textbook Armijo "
                  "value; no source validated it on rietx's problems, so tier 3 until refits "
                  "of three families on either side give one answer, as B10's solver-path "
@@ -3312,7 +3318,13 @@ ROWS: tuple[Row, ...] = (
                   "block positive definite for any n below 2.7e8")),
     Row("rietx.optimize.bccg._CONVERGED_FRACTION", "constant", tier=3, value=0.0001,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 termination (docstring; paper not on "
-                  "disk)"),
+                  "disk). "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: read only in bccg.solve, which no package code has called since "
+                  "WP-1953 (the LM step past BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits of "
+                  "FAP, NAC and cpd-1a, the spy counting one added call on each, and both arms "
+                  "bit-identical on all three. Unreachable from a fit: it sets only "
+                  "tests/test_bccg.py's reading of the paper"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
@@ -3320,7 +3332,13 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.optimize.bccg._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 termination (docstring; paper not on "
-                  "disk)"),
+                  "disk). "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: read only in bccg.solve, which no package code has called since "
+                  "WP-1953 (the LM step past BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits of "
+                  "FAP, NAC and cpd-1a, the spy counting one added call on each, and both arms "
+                  "bit-identical on all three. Unreachable from a fit: it sets only "
+                  "tests/test_bccg.py's reading of the paper"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
@@ -3328,21 +3346,39 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.optimize.bccg._PCG_BUDGET_PER_VARIABLE", "constant", tier=3, value=2,
         evidence=("WP-1953: 24 NAC Pawley systems, 2n held every solve under 0.64 s, Rwp "
-                  "0.12620721 against 0.12620514 unbudgeted; one family; second pass owed (refits "
-                  "of three families on either side)"),
+                  "0.12620721 against 0.12620514 unbudgeted. "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: "
+                  "at 1 and 4 FAP (329 Pawley columns) moves at most 0.007 plain esd "
+                  "(background 0.036) at 1.05x and 1.10x the evaluations; NAC (140) "
+                  "bit-identical, no solve there spending n; cpd-1a (111) under the cut. "
+                  "Reached on FAP alone; untested beyond it"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
                  "three families on either side give one answer (B10, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.optimize.bccg._PCG_TOL", "constant", tier=3, value=1e-10,
         evidence=("WP-1953: FAP.XRA Pawley (343 columns) and 11-BM NAC Pawley; BCCG's 1e-2 stop "
-                  "took 341 evaluations against 20 on FAP's profile stage; second pass owed "
-                  "(refits of three families on either side)"),
+                  "took 341 evaluations against 20 on FAP's profile stage. "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: "
+                  "reached on FAP (329 Pawley columns) and NAC (140), not cpd-1a (111, "
+                  "under the cut). At 1e-8 FAP lands elsewhere with every stage converged: "
+                  "Rwp 0.0806 against 0.0786, c 1.29 plain esd from the shipped answer and "
+                  "4.9e-5 A from GSAS's against 4.7e-6. At 1e-12 FAP within 0.026 esd at "
+                  "1.46x the evaluations; NAC within 2e-7 esd both sides. Two families, the "
+                  "looser side failing on one; a third past the cut owed"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
                  "three families on either side give one answer (B10, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.optimize.bccg._SMALL_FACTOR", "constant", tier=3, value=200.0,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, eq (2) prints 200 r_i^2 N_k < s_0 (read "
-                  "2026-11-05); no value beside 200 is tried"),
+                  "2026-11-05); no value beside 200 is tried. "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: read only in bccg.solve, which no package code has called since "
+                  "WP-1953 (the LM step past BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits of "
+                  "FAP, NAC and cpd-1a, the spy counting one added call on each, and both arms "
+                  "bit-identical on all three. Unreachable from a fit: it sets only "
+                  "tests/test_bccg.py's reading of the paper"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
@@ -3350,7 +3386,13 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.optimize.bccg._SMALL_RUNS", "constant", tier=3, value=6,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 states 'six consecutive iterations' "
-                  "(read 2026-11-05); no other count is tried"),
+                  "(read 2026-11-05); no other count is tried. "
+                  "WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
+                  "default plan: read only in bccg.solve, which no package code has called since "
+                  "WP-1953 (the LM step past BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits of "
+                  "FAP, NAC and cpd-1a, the spy counting one added call on each, and both arms "
+                  "bit-identical on all three. Unreachable from a fit: it sets only "
+                  "tests/test_bccg.py's reading of the paper"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
