@@ -108,8 +108,9 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
   `:param:` fields; the twin renders it as a list
 - [x] The gate: a test that every documented name is in its signature and every argument on the
   API pages is documented or in the shrink-only `UNDOCUMENTED_PARAMETERS` baseline, seeded now
-- [ ] The split of the everyday page under `PAGE_CHAR_CAP`, if the measurement says it is owed now
-  (else the measurement and the split's plan go to WP-2025's `### Inherited`)
+- [x] The split of the everyday page under `PAGE_CHAR_CAP`, if the measurement says it is owed now
+  (else the measurement and the split's plan go to WP-2025's `### Inherited`) — not owed: twin
+  49 181 of 50 000 after the pilot; measurement and a three-page plan in WP-2025's `### Inherited`
 - [x] The Refinement section's 18 calls written (71 parameters), their entries out of the baseline;
   help.py-owned arguments linked or generated, never restated
 - [ ] Tests (above) green; the manual builds `-W`; looked at in chromium, both themes, 390 px

@@ -46,6 +46,35 @@ argument when this closes.
 - Size: about two sessions; split by section if one runs long. Each section is one commit.
 - Tier: documentation only.
 
+### Inherited
+
+- **From WP-2024 (2026-11-16): the everyday page splits in this WP, before its first section
+  lands.** WP-2024 measured the split as not yet owed and left it here. With the Refinement
+  section written, `api.md`'s generated body is 46 437 characters and its built twin
+  (`reference/api.html.md`, which `test_every_page_has_a_twin_that_keeps_the_contract` holds to
+  `PAGE_CHAR_CAP`) 49 181, **819 under the cap**: one more call on the page fails it. The 78
+  Refinement entries cost about 146 characters each in the body; at that rate the 214 everyday
+  arguments left in `docs/undocumented_parameters.py` add about 31 000, so the written page is
+  about 77 000, two pages at the least. Per section, the body now and with its entries at that
+  rate: Reading data 2 816 → 9 100; Model objects 6 928 (fields, WP-2027's); Refinement 16 840;
+  Results 7 619 → 8 900; Fit report 4 374 → 6 100; Series, history, projects 3 963 → 15 100;
+  Peaks and indexing 1 531 → 6 500; Export and plots 1 963 → 7 800. **Plan: three pages along
+  the sections' order**, since two would leave the second at about 44 000 before WP-2027 adds a
+  description per field: (1) Reading data, Model objects, Refinement (~33 000); (2) Results, Fit
+  report, Series, history, projects (~30 000); (3) Peaks and indexing, Export and plots
+  (~14 000). `api_tiers()` keeps one "Everyday calls" tier and `_api_body` takes a section range
+  per page; `api.md` keeps its URL as page (1), so only names moving to pages (2) and (3) change
+  address, and Python-domain cross-references follow them; a `RETIRED` entry in
+  `docs/docs_versions.py` is owed only for a page URL that goes away, which this plan has none
+  of. The contents and `llms.txt` order follow the toctree.
+- **From WP-2024: the gate and the format.** `tests/test_reference_pages.py`'s
+  `test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line` fails until each
+  entry's baseline line is deleted in the same commit; the CONTRIBUTING.md section has the
+  format. Two shapes found in the pilot: prose after the Parameters section needs a `Notes`
+  heading or it reads as arguments (`build_report`'s did, fixed there), and a description is
+  one paragraph with no literal block. The count above (45 calls, 198 parameters) is from
+  2026-10-23; the baseline is the live one (214 everyday lines on 2026-11-16).
+
 ## Non-goals
 
 - Model and dataclass fields on this page (`RefinementResult`, `PatternData` and the other 34):
