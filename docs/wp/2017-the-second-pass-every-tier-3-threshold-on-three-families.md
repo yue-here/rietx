@@ -376,6 +376,42 @@ and have no free factor to measure, so this file's old list named them without c
   Nd₂Ru₂O₇ neutron pattern, evidence for no audit before the milestone closes (§ Context), so
   whether one synthetic closes the harmonic row goes to the maintainer after it runs.
 - **N.** 2002's § The hand rows that stay lists them.
+- **N, its four claims and arms, fixed 2026-11-16 before running** (`2017-batch/group_n.py`). The
+  four are hand rows, so no `_audit` row carries them; each claim is measured, and a claim that
+  holds gets a `slow` test pinning it on the families below, while one that fails goes to the
+  maintainer with the measurement and no test. Bar and reads as group A: 0.1 plain esd over the
+  larger esd on every row that is not a background coefficient (`_shift`), past a noise arm
+  (every refinable non-zero start ×(1 + 1e-12)), with Rwp, evaluations, status and codes.
+  (1) **The Le Bail/Pawley intensity seed** (`compile_model`: every reflection of a fresh compile
+  starts at max(median y_obs, 1), and a recompile carries matched reflections, so the seed reaches
+  the first stage and every reflection that enters later). Fits: `mode="lebail"` and
+  `mode="pawley"` under `RefinementPlan.mccusker_default()` on `fap`, `nac` (NAC alone, as its
+  protocol's Le Bail pass) and `lab6`, data, structure and instrument from
+  `test_window_domain._protocol`. Arms: the seed ×0.01 and ×100, a shaped seed (the median times
+  a lognormal draw, σ 1, `default_rng(2017)`, per reflection), and noise; applied by wrapping
+  `refine.compile_model`, which counts the seeds it rewrote (control: zero rewrites means the arm
+  measured nothing). (2) **`refine._FLAT_AXIS_TEST_DIRECTIONS`** (magnetic path: measurement only,
+  its design is Michael's). The claim: which two generic directions stack the SVD does not change
+  the axis held or the answer. Fits: `test_magnetic`'s #599 case (R-3m:R, a = 4 Å, α = 70°, the
+  moment started at (3.0, 0.2, 0.2)), the same on its tetragonal cousin (`P 4/m m m`, uniaxial
+  about c), and `test_joint_flat_moments`' joint #599 case; all three synthetic, the only kind on
+  disk with a uniaxial flat rotation. Arms: the shipped pair, the pair turned
+  by a fixed generic rotation (30° about (1, 2, 3)/√14), and a pair drawn by `default_rng(2017)`
+  on the sphere, rejected within 5° of a lattice axis, face or body diagonal. Control: the spy on
+  `_flat_rotation_axis` must see the replaced pair. Read: the angle between held axes, every row
+  in plain esd, and whether a hold was taken. (3) **`background.estimators.arpls`'s `max_iter` 50
+  and `tol` 1e-3** (changed through `arpls.__kwdefaults__`, read at call time). Arms: shipped,
+  tight (500, 1e-6) and loose (10, 1e-2). Patterns: `fap`, `nac`, `cpd1a`, `lab6`, Si SRM 640c
+  (2-50°) and SRM 1976a (20-118.6°), six instruments. Read, per pattern: the baseline's largest
+  change in σ at the λ each caller passes (`PEAK_MASK_BASELINE_LAMBDA`, `auto_lambda`'s pick, 1e7),
+  the background channels `peak_mask` flips, the λ `select_arpls_lambda` and `auto_lambda` choose,
+  and `auto_background`'s pick; where a pick changes, the protocol fit refitted on it against
+  shipped. (4) **`params.vector.FLOOR_SEEDS`**, the width columns' finite-difference size (the judge
+  read it as a numerical setting that moves esds, not an invariant). Arms: every size ×10 and
+  ÷10 (the dict mutated in place, read at run time), on `fap`, `nac`, `cpd1a` and `lab6` under their
+  protocols. Read: every row in plain esd against shipped, past noise, and each width row's esd
+  ratio. No published reference grades any of the four, so each is read against its shipped arm
+  only; a size, seed or count that moves an answer is reported as measured.
 - **O.** Neither set has a stated domain. The interval runs automatically on every moment angle
   the stationary test leaves out, 20-32 refits an angle, and the grid on every `profile_fraction`
   call. The bars are in `tests/test_window_domain.py`. `PARAMETER_INTERVAL_BRACKET_GROWTH` can
