@@ -1,6 +1,6 @@
 # WP-1949 — an accepted evaluation carries what a preview draws
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-11 — a live preview keeps a shadow refinement and re-predicts every frame (about 0.7 s a frame on a large framework); the workaround works and costs a throttle
