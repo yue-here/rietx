@@ -1,6 +1,6 @@
 # WP-1813 — fragment I/O: XYZ, Z-matrix write, SMILES behind an extra
 
-Milestone: rigid-bodies · Status: ⬜
+Milestone: rigid-bodies · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Depends on: 1802
 Priority: P4 2026-10-06 — a fragment can already be built by hand or from a Z-matrix
 
