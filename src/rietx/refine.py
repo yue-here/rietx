@@ -357,15 +357,15 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
     one degenerate with them, and it is locked structurally.  Measured on NIST
     SRM 660c: Kα2/Kα1 0.5126 ± 0.0048 Rietveld, 0.5145 ± 0.0036 Pawley,
     0.5224 ± 0.0033 Le Bail, and with the cell held Le Bail refines λ to
-    1.540605 ± 3e-6 Å.  Re-measured on three laboratory standards (WP-2017
-    group J, 2026-11-16, each acceptance protocol with the weight free):
-    SRM 660c 0.5125, 0.5146 and 0.5133 ± 0.0029 Le Bail, so Le Bail's gap
-    there no longer reproduces (its partition has settled to a tolerance
-    since WP-1542; not checked as the cause); Pawley within 0.34σ of
-    Rietveld on all three; Le Bail 1.9σ and 2.8σ below it on FAP and SRM
-    1976a.  Until then ``.source.lines.`` was force-fixed here,
+    1.540605 ± 3e-6 Å.  Until then ``.source.lines.`` was force-fixed here,
     the wavelength with it, so a Pawley calibration of λ on a standard could
-    not run.
+    not run.  Re-measured on three laboratory patterns, SRM 660c, the FAP
+    tutorial and SRM 1976a (WP-2017 group J, 2026-11-16, each acceptance
+    protocol with the weight free): on SRM 660c 0.5125 and 0.5146 repeat,
+    while Le Bail now reads 0.5133 ± 0.0029 (its partition has settled to a
+    tolerance since WP-1542; not checked as the cause).  Pawley is within
+    0.34σ of Rietveld on all three; Le Bail is 1.9σ and 2.8σ below it on
+    FAP and SRM 1976a (combined σ; 4.3 and 11 plain esds).
     """
     if mode not in ("lebail", "pawley"):
         return False
