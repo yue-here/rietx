@@ -40,6 +40,25 @@ Rietveld mode only, only on a result, `MAX_ASYM_ATOMS` = 200, and nothing
 reads the contacts. No diagnostic code in `src/` names a short contact or a
 clash.
 
+*Superseded in part, 2026-11-16 (checked at `bc77a934e`).* The line numbers
+moved: `geometry_table` is `model/geometry.py:639`, `_neighbours` `:268`,
+the result field `schemas/results.py:2247`. "Only on a result" no longer
+holds: `Refinement.geometry()` (WP-1815) answers with no live fit, at the
+current model's values with every esd `None`, but it needs a `Refinement`
+in Rietveld mode, so a bare `Structure` or a search loop's coordinates
+still had no census. `rietx.solve.chemistry` (WP-1997, #562 S3) landed the
+solve's own contact search, `contacts()`: a minimum-image search over the
+expanded P1 cell, wrapped before shifted, checked pair for pair against
+`_neighbours` on WP-1466's 21 phases, with this WP's boundary defect as its
+test (`test_an_atom_past_its_inversion_image_clashes`), and the occupancy
+rule below as its first cut (`site_clash` skips a pair whose occupancies
+sum to at most 1 and names it in the notes). It is not exported and returns
+bare index pairs, no labels, no symmetry codes and no bond/contact split, so
+task 1 shares `_neighbours` through the geometry table's own assembly rather
+than reusing it; task 2 can take its clash radii and occupancy rule. Still
+true: nothing outside `solve` reads the contacts, and no diagnostic code
+names a short contact or a clash.
+
 **Occupancy is the design problem.** In a split-site model two
 half-occupied sites overlap on purpose, and the run's clash was invisible in
 the average structure. It showed only in an ordered configuration's CIF. So
