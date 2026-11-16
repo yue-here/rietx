@@ -143,6 +143,18 @@ and have no free factor to measure, so this file's old list named them without c
   stage and holds the phase: Rwp 0.86, 9 evaluations, `usable=False` through
   `MODEL_FAR_FROM_DATA`. NAC +3 % keeps NAC, loses CaF₂ to a held scale 0, and reads
   `usable=True`, Rwp 0.139, with `PHASE_UNCONSTRAINED` the only word on it.
+- **G, its starts and arms, fixed 2026-11-16 before running** (`2017-batch/group_g.py`).
+  Arms: `phase_support_sigma` 3 (shipped), 1 and `None`; 3 with the cell window declaring no
+  phase (group H's arm); 3 with every start nudged 1e-12 (the noise floor). Starts: cpd-1a,
+  -1b and -1c under the QPA acceptance protocol, whose trace phases are weighed at 1.15, 1.36
+  and 1.36 wt %; cpd-1a with zircon declared; the CuCr₂O₄ ramp's coldest and hottest frames
+  (11-BM, WP-2081's model and `mccusker_default`), CuO at 1.1 wt % in Suchomel et al. (2012).
+  Each but the zircon start also runs with its trace or minor phase's cell lengths scaled so
+  the phase's strongest line moves one instrument FWHM to low angle, read off the shipped
+  answer from the database cell. The ramp's 17 frames run chained with CuO started one FWHM
+  off, on the four arms that are not noise, and once from the database cell. The cpd-1 suite
+  and cpd-1a with zircon are one family by laboratory, instrument and material, so this set
+  is two families, not three; the WP fixed it so on 2026-11-05, and it is run as fixed.
 - **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
   starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
   to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
