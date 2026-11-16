@@ -23,6 +23,27 @@ keeps one row per pair across stages (WP-1302). `schemas.results._cap_high_corre
 bounds each code at `HIGH_CORRELATION_MAX = 10` **for rendering only**, so
 `summary()` is bounded while `RefinementResult.diagnostics` keeps every row.
 One flat direction across n columns is therefore n(n−1) stored rows.
+*Superseded in part, 2026-11-16 (checked at `bc77a934e`):* the loop is now
+`staged._correlation_findings`, which `check_guards` and the joint fit's
+`MultiRefinement._top_diagnostics` (`multi.py`) both call (WP-2028 task 7).
+The cap bounds two codes, `HIGH_CORRELATION` and `FLAT_DIRECTION`, each on
+its own budget of 10 and each with its own `info` row for what it left out
+(`HIGH_CORRELATION_OMITTED`, `FLAT_DIRECTION_OMITTED`; `results._CAPPED_PAIR_CODES`).
+
+**The unresolved set (from WP-2050, 2026-11-01).** `check_guards` reads
+`statistics.resolved_correlation`, which names the columns an unresolved
+eigen-direction dominates (eigenvalue ≤ n·FD_STEP² on the unit-diagonal
+matrix). A ρ against one of them is `nan` and never reported. That set is the
+candidate this WP's grouping wants for its flat case, and it is recorded
+nowhere yet: a set-level finding naming it would also be the record WP-2050's
+generality review asked for. Two gaps it left for this WP. No message says
+which pairs were withheld (Yue's ruling of 2026-11-01: a correlation whose
+value is rounding is not shown to users; the mask is a developer signal a
+nightly test asserts). Two unresolved directions leave ρ between members of
+different ones set by rounding (by construction; not measured). Checked
+2026-11-16: the joint fit's `_top_diagnostics` passes `outcome.correlation`
+to `_correlation_findings` without the mask, so the single fit and the joint
+fit threshold different matrices.
 
 **The cost.** WP-1454 read an agent session whose first completed fit printed
 about 8 kB, most of it these rows. It then dropped every background-only row
@@ -75,40 +96,12 @@ of member is where a count goes wrong). A grep for the code on 2026-09-24
 found `refine.py` (`_dedup_high_correlations`, the stage loop's
 `correlation_hits`), `schemas/results.py` (`_cap_high_correlation`,
 `summary()`), `sequential.py` and `schemas/sequential.py`
-(`SEQUENTIAL_PERSISTENT_FINDING` across a series), `viz/compare.py`,
+(`SEQUENTIAL_PERSISTENT_FINDING` across a series; *superseded 2026-11-16:*
+WP-2003 replaced it by `SeriesResult.code_counts`), `viz/compare.py`,
 `io/recipe.py`, `optimize/identifiability.py`, `help.py`,
 `gui/src/App.test.ts`, `tests/test_high_correlation_dedup.py` and the skill's
 `references/diagnostics.md`. The grep is a starting list, not the audit: a
 reader that keys on `where` without naming the code is the one it misses.
-
-### Inherited
-
-- **From WP-1906 (2026-10-06), a count on a skill's worked example.** The
-  P-spline default (`rx.auto_background(data)`) on FAP.XRA under
-  `mccusker_structural` reports 770 `HIGH_CORRELATION` findings and two
-  `FLAT_DIRECTION`, against none with `kind="chebyshev"` on the same fit
-  (cells equal to 2e-7 Å). So the skill's worked default uses a Chebyshev
-  background, and the body says nothing about the flood. When this WP lands,
-  the default can go back to the P-spline.
-- **From WP-1545 (2026-10-07), the tutorials took the same workaround.**
-  Notebook 01's Le Bail fit of FAP.XRA under `profile_only` reported 832
-  `HIGH_CORRELATION` rows with `rx.auto_background(data)` (770 with
-  `two_theta_limits=(15, 130)`) against none with a 6-term Chebyshev. Notebooks
-  01 and 02 use the Chebyshev, and 01's prose names the flood as the reason.
-  When this WP lands, rewrite that paragraph in
-  `examples/tutorials/01_quickstart.py` and rebuild the notebook.
-- **From WP-2050 (2026-11-01), the guard now knows the unresolved set.**
-  `check_guards` reads `statistics.resolved_correlation`, which names the
-  columns an unresolved eigen-direction dominates (eigenvalue ≤ n·FD_STEP²
-  on the unit-diagonal matrix). A ρ against one of them is `nan` and never
-  reported. That set is the candidate this WP's grouping wants for its flat
-  case, and it is recorded nowhere yet: a set-level finding naming it would
-  also be the record WP-2050's generality review asked for. Two gaps it left
-  for this WP. No message says which pairs were withheld (Yue's ruling of
-  2026-11-01: a correlation whose value is rounding is not shown to users;
-  the mask is a developer signal a nightly test asserts). Two unresolved directions leave ρ
-  between members of different ones set by rounding (by construction; not
-  measured).
 
 ## Non-goals
 
@@ -131,6 +124,17 @@ reader that keys on `where` without naming the code is the one it misses.
       couples it to the knots, or leaves it to the caller.
 - [ ] Skill: the `HIGH_CORRELATION` and `FLAT_DIRECTION` rows in
       `references/diagnostics.md`, if the shape changes.
+- [ ] Once the grouping lands, undo the two workarounds the flood forced.
+      The skill's worked example uses `auto_background(..., kind="chebyshev")`
+      (`docs/skill/rietx/SKILL.md`), because the P-spline default on FAP.XRA
+      under `mccusker_structural` reported 770 `HIGH_CORRELATION` and two
+      `FLAT_DIRECTION` rows against none with the Chebyshev, cells equal to
+      2e-7 Å (WP-1906, 2026-10-06): it can go back to the P-spline. Tutorial
+      01 uses a 6-term Chebyshev and its prose names the flood as the reason
+      (`examples/tutorials/01_quickstart.py`, "hundreds of correlated
+      coefficient pairs"; WP-1545 measured 832 rows under `profile_only`, 770
+      with `two_theta_limits=(15, 130)`): rewrite that paragraph and rebuild
+      the notebook. Both still true at `bc77a934e`.
 
 ## Acceptance
 
