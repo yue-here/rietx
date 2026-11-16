@@ -4402,7 +4402,18 @@ ROWS: tuple[Row, ...] = (
                   "profile several crossings the growth can choose which one the bracket holds "
                   "(the generality judge, 2026-10-23); fit and run_stage call profile_interval "
                   "for every moment angle the stationary test leaves out (B2 option 2); inline "
-                  "in _walk until the B14 lift"),
+                  "in _walk until the B14 lift"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): 14 rows on five fits, each with a "
+                  "noise twin (the two-site Pnma set at seeds 0, 1 and 14, Mn2's modulus and every "
+                  "angle the fit left out; FAP atoms.0.biso; cpd-1a zincite's scale and its lor_strain "
+                  "on 0), all inside the stated domain (one crossing a side, two reference runs "
+                  "agreeing to 3.3e-8 of the row's plain esd or half-width), the shipped ends within "
+                  "4.6e-4 of a reference at XTOL 1e-5, SETTLE_RUNS 8 and MAX_REFITS 200; 1.5 moved no "
+                  "end more than 4.8e-4; 3 cut both angles' upper ends on Pnma seed 0 by 0.52 and 0.54 "
+                  "half-widths on both twins: its far probe at 3 half-widths (152-158 over the cut) left "
+                  "every refit nearer in above the cut from 1.001 half-widths on, where the shipped "
+                  "walk read 3.9 under it at 1.22, so the profile a walk measures depends on its far "
+                  "probe; 5.0e-4 at most elsewhere"),
         grounds=("A numerical setting of the profile walk, on the default path since B2 "
                  "option 2; tier 3 with a test bounding its error over the claimed domain "
                  "owed (WP-2017), tier 1 once it passes (B10 option 2, ruled 2026-10-19)."),
@@ -4410,7 +4421,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.interval.PARAMETER_INTERVAL_CHI2_TOL", "constant", tier=3, value=0.01,
         evidence=("fit and run_stage call profile_interval for every moment angle the "
                   "stationary test leaves out (B2 option 2, 2026-10-19), 20-32 refits an angle on the "
-                  "two-site Pnma fixtures"),
+                  "two-site Pnma fixtures"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): 14 rows on five fits, each with a "
+                  "noise twin (the two-site Pnma set at seeds 0, 1 and 14, Mn2's modulus and every "
+                  "angle the fit left out; FAP atoms.0.biso; cpd-1a zincite's scale and its lor_strain "
+                  "on 0), all inside the stated domain (one crossing a side, two reference runs "
+                  "agreeing to 3.3e-8 of the row's plain esd or half-width), the shipped ends within "
+                  "4.6e-4 of a reference at XTOL 1e-5, SETTLE_RUNS 8 and MAX_REFITS 200; 0.003 and 0.03"
+                  " moved no end more than 1.4e-4 (reached on four and six of ten fits); at shipped, "
+                  "Pnma seeds 1 and 14 read fit_is_minimum False, a probe 1.4-1.5 and 0.14-0.28 under "
+                  "the fit's chi2 against a cut of 5.0"),
         grounds=("A numerical setting of the profile walk, on the default path since B2 "
                  "option 2; tier 3 with a test bounding its error over the claimed domain "
                  "owed, tier 1 once it passes (B10 option 2, ruled 2026-10-19)."),
@@ -4421,7 +4441,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.interval.PARAMETER_INTERVAL_MAX_REFITS", "constant", tier=3, value=60,
         evidence=("fit and run_stage call profile_interval for every moment angle the "
                   "stationary test leaves out (B2 option 2, 2026-10-19), 20-32 refits an angle on the "
-                  "two-site Pnma fixtures"),
+                  "two-site Pnma fixtures"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): 14 rows on five fits, each with a "
+                  "noise twin (the two-site Pnma set at seeds 0, 1 and 14, Mn2's modulus and every "
+                  "angle the fit left out; FAP atoms.0.biso; cpd-1a zincite's scale and its lor_strain "
+                  "on 0), all inside the stated domain (one crossing a side, two reference runs "
+                  "agreeing to 3.3e-8 of the row's plain esd or half-width), the shipped ends within "
+                  "4.6e-4 of a reference at XTOL 1e-5, SETTLE_RUNS 8 and MAX_REFITS 200; 30 and 120 "
+                  "bit-identical on all ten fits: no side spent more than 25 refits under any arm, so "
+                  "30 was not reached either"),
         grounds=("A numerical setting of the profile walk, on the default path since B2 "
                  "option 2; tier 3 with a test bounding its error over the claimed domain "
                  "owed, tier 1 once it passes (B10 option 2, ruled 2026-10-19)."),
@@ -4429,7 +4457,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.interval.PARAMETER_INTERVAL_SETTLE_RUNS", "constant", tier=3, value=4,
         evidence=("fit and run_stage call profile_interval for every moment angle the "
                   "stationary test leaves out (B2 option 2, 2026-10-19), 20-32 refits an angle on the "
-                  "two-site Pnma fixtures"),
+                  "two-site Pnma fixtures"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): 14 rows on five fits, each with a "
+                  "noise twin (the two-site Pnma set at seeds 0, 1 and 14, Mn2's modulus and every "
+                  "angle the fit left out; FAP atoms.0.biso; cpd-1a zincite's scale and its lor_strain "
+                  "on 0), all inside the stated domain (one crossing a side, two reference runs "
+                  "agreeing to 3.3e-8 of the row's plain esd or half-width), the shipped ends within "
+                  "4.6e-4 of a reference at XTOL 1e-5, SETTLE_RUNS 8 and MAX_REFITS 200; a probe used "
+                  "all four runs on four rows and settled there, so 8 is bit-identical on all ten fits;"
+                  " 2 spent 736 refits against 786 and moved no end more than 1.2e-6"),
         grounds=("A numerical setting of the profile walk, on the default path since B2 "
                  "option 2; tier 3 with a test bounding its error over the claimed domain "
                  "owed, tier 1 once it passes (B10 option 2, ruled 2026-10-19)."),
@@ -4437,7 +4473,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.interval.PARAMETER_INTERVAL_XTOL", "constant", tier=3, value=0.001,
         evidence=("fit and run_stage call profile_interval for every moment angle the "
                   "stationary test leaves out (B2 option 2, 2026-10-19), 20-32 refits an angle on the "
-                  "two-site Pnma fixtures"),
+                  "two-site Pnma fixtures"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): 14 rows on five fits, each with a "
+                  "noise twin (the two-site Pnma set at seeds 0, 1 and 14, Mn2's modulus and every "
+                  "angle the fit left out; FAP atoms.0.biso; cpd-1a zincite's scale and its lor_strain "
+                  "on 0), all inside the stated domain (one crossing a side, two reference runs "
+                  "agreeing to 3.3e-8 of the row's plain esd or half-width), the shipped ends within "
+                  "4.6e-4 of a reference at XTOL 1e-5, SETTLE_RUNS 8 and MAX_REFITS 200; 1e-2 moved no "
+                  "end more than 0.0026 plain esd (seed 14's Mn2 modulus) at 714 refits against 786, "
+                  "1e-4 no more than 4.6e-4 at 838"),
         grounds=("A numerical setting of the profile walk, on the default path since B2 "
                  "option 2; tier 3 with a test bounding its error over the claimed domain "
                  "owed, tier 1 once it passes (B10 option 2, ruled 2026-10-19)."),

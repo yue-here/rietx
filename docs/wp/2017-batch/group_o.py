@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 import os
 import platform
 import subprocess
@@ -413,8 +414,238 @@ def sweep(todo_all: list[dict]) -> None:
             print(*_key(row), row.get("error") or f"{row['s']} s", flush=True)
 
 
+def _f(x, spec=".3g") -> str:
+    return "—" if x is None or (isinstance(x, float) and not math.isfinite(x)) else format(x, spec)
+
+
+def _unit(iv: dict) -> float | None:
+    """The row's plain esd, or an angle's stationary half-width."""
+    for key in ("plain", "half_width"):
+        u = iv.get(key)
+        if u is not None and math.isfinite(u) and u > 0.0:
+            return u
+    return None
+
+
+def _crossings(iv: dict) -> tuple[int, int]:
+    """Changes of sign of Δχ² − cut along each side, nearest probe first."""
+    out = []
+    for sign in (-1, 1):
+        pts = sorted((abs(v - iv["value"]), d) for v, _runs, d, err in iv["points"]
+                     if d is not None and not err and (v - iv["value"]) * sign > 0)
+        prev, n = -1.0, 0
+        for _dist, d in pts:
+            s = 1.0 if d - iv["cut"] > 0 else -1.0
+            n += s != prev
+            prev = s
+        out.append(n)
+    return out[0], out[1]
+
+
+def _end_shift(a: dict, b: dict) -> float | None:
+    """Largest |end_a − end_b| over both ends, in units of the row; ``inf`` where one side
+    has an end and the other has none."""
+    u = _unit(b) or _unit(a)
+    if u is None:
+        return None
+    worst = 0.0
+    for end in ("lower", "upper"):
+        x, y = a.get(end), b.get(end)
+        if (x is None) != (y is None):
+            return math.inf
+        if x is not None:
+            worst = max(worst, abs(x - y) / u)
+    return worst
+
+
+def _o1_summary(rows: list[dict], lines: list[str]) -> None:
+    by = {(r["family"], r["twin"], r["arm"]): r for r in rows
+          if r.get("set") == "O1" and "error" not in r}
+    errors = [r for r in rows if r.get("set") == "O1" and "error" in r]
+    families = sorted({k[0] for k in by}, key=lambda f: (not f.startswith("pnma"), f))
+    lines += ["## O1: the profile interval's five search constants", ""]
+    if SCREEN.exists():
+        screen_rows = json.loads(SCREEN.read_text())
+        passed = [str(r["seed"]) for r in screen_rows if r.get("zeroed")]
+        lines += [f"Screen (seeds 0-19 but 14, no intervals): the test passes on seeds "
+                  f"{', '.join(passed) or 'none'}; the first two join seed 14.", ""]
+    lines += ["| Family | Row | Value | Unit | Shipped interval | Stops | Refits | "
+              "Crossings (lo/hi) | Fit is minimum | Reference plain vs noise | Shipped vs "
+              "reference | Noise twin, shipped | Domain |", "|" + "---|" * 13]
+    domain: dict[tuple[str, str], bool] = {}
+    for fam in families:
+        ship = by.get((fam, "plain", "shipped"))
+        if ship is None:
+            continue
+        for path, iv in ship["intervals"].items():
+            if "error" in iv:
+                lines.append(f"| {fam} | `{path}` | error: {iv['error']} |" + " |" * 11)
+                domain[(fam, path)] = False
+                continue
+            refp = by.get((fam, "plain", "reference"), {}).get("intervals", {}).get(path)
+            refn = by.get((fam, "noise", "reference"), {}).get("intervals", {}).get(path)
+            shipn = by.get((fam, "noise", "shipped"), {}).get("intervals", {}).get(path)
+            cross = [_crossings(x) for x in (iv, refp, refn, shipn) if x and "error" not in x]
+            twin = (_end_shift(refp, refn) if refp and refn and "error" not in refp
+                    and "error" not in refn else None)
+            inside = (twin is not None and twin <= 0.1
+                      and all(max(c) <= 1 for c in cross))
+            domain[(fam, path)] = inside
+            unit = "esd" if iv.get("plain") else "half-width"
+            lines.append(
+                f"| {fam} | `{path}` | {_f(iv['value'], '.6g')} | {unit} {_f(_unit(iv))} | "
+                f"{_f(iv['lower'], '.6g')} to {_f(iv['upper'], '.6g')} | "
+                f"{iv['lower_stop']}/{iv['upper_stop']} | {iv['n_refits']} | "
+                f"{'/'.join(map(str, _crossings(iv)))} | {iv['fit_is_minimum']} | "
+                f"{_f(twin)} | {_f(_end_shift(iv, refp) if refp and 'error' not in refp else None)} | "
+                f"{_f(_end_shift(iv, shipn) if shipn and 'error' not in shipn else None)} | "
+                f"{'inside' if inside else 'outside'} |")
+    lines += ["", "Each arm against the shipped arm on the same twin: the largest end shift "
+              "over the rows inside the domain, in each row's unit; then refits spent "
+              "(shipped → arm, summed over rows) and the stop reasons that changed. "
+              "*Reached*: the arm's probes differ from shipped's on at least one row.", "",
+              "| Family | Twin | Arm | Largest shift (inside) | Its row | Outside rows, largest "
+              "| Refits | Stops changed | Reached |", "|" + "---|" * 9]
+    for fam in families:
+        for twin in TWINS:
+            ship = by.get((fam, twin, "shipped"))
+            if ship is None:
+                continue
+            for arm in O1_ARMS:
+                if arm == "shipped" or (fam, twin, arm) not in by:
+                    continue
+                cur = by[(fam, twin, arm)]
+                worst, at, out_worst = 0.0, "—", None
+                r0 = r1 = 0
+                stops, reached = [], False
+                for path, iv in cur["intervals"].items():
+                    iv0 = ship["intervals"].get(path)
+                    if not iv0 or "error" in iv or "error" in iv0:
+                        continue
+                    shift = _end_shift(iv, iv0)
+                    r0 += iv0["n_refits"]
+                    r1 += iv["n_refits"]
+                    if (iv["lower_stop"], iv["upper_stop"]) != (iv0["lower_stop"],
+                                                               iv0["upper_stop"]):
+                        stops.append(f"{path.rsplit('.', 2)[-2]}.{path.rsplit('.', 1)[-1]}: "
+                                     f"{iv0['lower_stop']}/{iv0['upper_stop']} → "
+                                     f"{iv['lower_stop']}/{iv['upper_stop']}")
+                    reached |= iv["points"] != iv0["points"]
+                    if shift is None:
+                        continue
+                    if domain.get((fam, path)):
+                        if shift > worst:
+                            worst, at = shift, path
+                    else:
+                        out_worst = shift if out_worst is None else max(out_worst, shift)
+                lines.append(f"| {fam} | {twin} | {arm} | {_f(worst)} | `{at}` | "
+                             f"{_f(out_worst)} | {r0} → {r1} | {'; '.join(stops) or '—'} | "
+                             f"{'yes' if reached else 'no'} |")
+    autos = [(f, by[(f, "plain", "shipped")]) for f in families
+             if f.startswith("pnma") and (f, "plain", "shipped") in by]
+    if autos:
+        lines += ["", "Control, the fit's own intervals against the explicit calls (shipped, "
+                  "plain): largest end difference in the row's unit.", ""]
+        for fam, r in autos:
+            diffs = []
+            for path, (lo, hi, _n) in (r.get("auto") or {}).items():
+                iv = r["intervals"].get(path)
+                if iv and "error" not in iv and _unit(iv):
+                    diffs.append(max(abs((lo or 0) - (iv["lower"] or 0)),
+                                     abs((hi or 0) - (iv["upper"] or 0))) / _unit(iv))
+            lines.append(f"- {fam}: {len(r.get('auto') or {})} rows attached by the fit, "
+                         f"largest difference {_f(max(diffs) if diffs else None)}")
+    if errors:
+        lines += ["", "Errors: " + "; ".join(f"{r['family']} {r['twin']} {r['arm']}: "
+                                             f"{r['error']}" for r in errors)]
+
+
+def _basins(prof: dict) -> int:
+    runs = 0
+    for axis in prof["axes"]:
+        flags = [p[4] for p in prof["points"] if p[0] == axis]
+        runs += sum(1 for i, a in enumerate(flags) if a and (i == 0 or not flags[i - 1]))
+    return runs
+
+
+def _top_admissible(prof: dict) -> bool:
+    for axis in prof["axes"]:
+        pts = [p for p in prof["points"] if p[0] == axis]
+        if pts and pts[-1][4]:
+            return True
+    return False
+
+
+def _best(prof: dict):
+    pts = [p for p in prof["points"] if p[3] is not None and p[2] is not None]
+    return min(pts, key=lambda p: p[3]) if pts else None
+
+
+def _o2_domain(prof: dict) -> list[str]:
+    why = []
+    if not any(p[4] for p in prof["points"]):
+        why.append("no admissible grid point")
+    if _top_admissible(prof):
+        why.append("top grid point admissible")
+    if any(prof["stale"]):
+        why.append(f"FROZEN_COMPILE_STALE at {sum(prof['stale'])} points")
+    return why
+
+
+def _o2_summary(rows: list[dict], lines: list[str]) -> None:
+    by = {(r["family"], r["twin"], r["arm"]): r for r in rows
+          if r.get("set") == "O2" and "error" not in r}
+    errors = [r for r in rows if r.get("set") == "O2" and "error" in r]
+    lines += ["", "## O2: the fraction grid's three constants", "",
+              "| Family | Phase | Twin | Arm | Grid (n, min, span) | W ± esd, wt % | Admissible "
+              "range, wt % | Range ends − shipped, in esd | Best point − shipped's, in esd | "
+              "Basins | Domain |", "|" + "---|" * 11]
+    for fam in O2_FAMILIES:
+        for phase in O2_PHASES[fam]:
+            for twin in TWINS:
+                ship = by.get((fam, twin, "shipped"), {}).get("profiles", {}).get(phase)
+                for arm in O2_ARMS:
+                    r = by.get((fam, twin, arm))
+                    prof = None if r is None else r["profiles"].get(phase)
+                    if prof is None:
+                        continue
+                    if "error" in prof:
+                        lines.append(f"| {fam} | {phase} | {twin} | {arm} | error: "
+                                     f"{prof['error']} |" + " |" * 6)
+                        continue
+                    esd = prof["esd"]
+                    ends = best = "—"
+                    if ship and "error" not in ship and esd:
+                        ends = ", ".join(_f((a - b) / esd) for a, b in
+                                         zip(prof["range"], ship["range"], strict=True))
+                        b1, b0 = _best(prof), _best(ship)
+                        if b1 and b0:
+                            best = _f((b1[2] - b0[2]) / esd)
+                    why = _o2_domain(prof)
+                    st = r["settings"]
+                    lines.append(
+                        f"| {fam} | {phase} | {twin} | {arm} | {st['N_FWHM']}, "
+                        f"{st['FWHM_MIN']:g}, {st['FWHM_MAX_SPAN']:g} | "
+                        f"{100 * prof['wf']:.3f} ± {_f(100 * esd if esd else None)} | "
+                        f"{100 * prof['range'][0]:.3f} to {100 * prof['range'][1]:.3f} | {ends} | "
+                        f"{best} | {_basins(prof)} | {'inside' if not why else '; '.join(why)} |")
+    if errors:
+        lines += ["", "Errors: " + "; ".join(f"{r['family']} {r['twin']} {r['arm']}: "
+                                             f"{r['error']}" for r in errors)]
+
+
 def summary() -> None:
-    raise NotImplementedError("written once the rows exist")
+    rows = read_rows()
+    metas = {json.dumps({k: v for k, v in r["meta"].items() if k != "workers"}, sort_keys=True)
+             for r in rows if "meta" in r}
+    lines = ["# WP-2017 group O — measured", "",
+             "Written by `group_o.py summary` from the raw rows; domains, rows and arms as "
+             "fixed in the WP before running.", ""]
+    lines += [f"Run: `{m}`" for m in sorted(metas)] + [""]
+    _o1_summary(rows, lines)
+    _o2_summary(rows, lines)
+    SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {SUMMARY}")
 
 
 def main(argv: list[str]) -> None:
