@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-16 — 10 of 22 live pairs measured (C1, C2, C3, C4, C7, C10, C12, C14, C18, C19); 10 questions for the maintainer
+Milestone: generality · Status: 🔄 2026-11-16 — 11 of 22 live pairs measured (C1, C2, C3, C4, C7, C10, C12, C14, C18, C19, C20); 11 questions for the maintainer
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -435,6 +435,30 @@ from the truth and Rwp 0.010660 against the true structure's 0.010879; without i
 −1.3 ppm and 0.012097. So on the dataset chosen for the row the pair cannot meet, and a
 positive arm on it cannot fail. Question (9).
 
+**C20, the roughness seed against Biso, Pitschke's c** (`roughness_seed.py`; macOS arm64,
+`[dev]`, ≤ 4 s a fit). The remaining half of WP-2002's measurement: the five lab patterns of
+`tests/test_seed_invariance.py`, each under its acceptance protocol with a `RoughnessPitschke`
+block and the shipped roughness stage appended last (no closing stage, as that test runs), c
+seeded to 0.3 against c started on its floor of 0. "Plain esd" is `stderr_uncorrected`, and
+the worst move is over every Biso, scale, c and τ, in the smaller of the two arms' plain esds.
+
+| Family | c, τ from the seed | c, τ from 0 | worst move (plain esd) | χ², relative |
+|---|---|---|---|---|
+| FAP (GSAS protocol) | 1.1325(786), 0.1113 | the same | 6e-6 | 9e-13 |
+| SRM 660c LaB₆ (NIST protocol) | 4e-16, τ 0: off | 0 on its floor, τ 0.05: off | 0.013 (La Biso) | 1.4e-6 |
+| CPD corundum | 0, τ 0: off | **0.022(145), τ 0.3 on its ceiling** (`BOUND_HIT`, `ROUGHNESS_OUTSIDE_REGIME`) | **0.83 (Al Biso)** | −4.3e-4 |
+| CPD fluorite | 1.08 ± 55.9, 0.0116 | 0.89 ± 34.7, 0.0143 | 0.0055 (c) | 1.9e-6 |
+| CPD zincite | 0, τ 0: off | 0, τ 0.05: off | 6e-6 | 4e-12 |
+
+Four families are start-invariant at WP-2002's bar; corundum is not. From 0 its fit walks τ to
+the 0.3 ceiling, past sinθ at the lowest angle (0.221 at 25.5°), with c small but free, and the
+Biso and scale esds grow 2.2-3.3× and 11× (the off state from the seed has no c or τ column, so the
+neighbours' esds there are conditional, as WP-2002 found for Suortti). Al Biso moves 0.83 plain
+esd (0.2273(117) to 0.2177(384) Å²), larger than the 0.26 WP-2002 recorded on corundum, and
+zincite's turned-over landing that WP-2002 recorded from c = 0 does not reproduce (both starts
+off). The seed is the one that keeps corundum out of the outside-the-regime answer; both
+answers converge. Question (11).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -502,6 +526,11 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     *independent* on this evidence? Without the closing stage the absent zircon ends free
     with no `PHASE_UNCONSTRAINED` (scale 1.8 plain esd from zero); is that the support test's
     designed reading, or worth a row of its own?
+11. **C20.** Pitschke's c is start-invariant on four of the five lab patterns; on CPD corundum
+    the start at 0 reaches τ's ceiling outside the model's regime and moves Al Biso 0.83 plain
+    esd, while the shipped seed stays off. Is C20 recorded *ordered* (the seed is load-bearing
+    for Pitschke on corundum, and right), and is a Pitschke row owed in
+    `tests/test_seed_invariance.py`, which today asserts Suortti only?
 
 ## Acceptance
 
