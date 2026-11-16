@@ -422,6 +422,14 @@ def test_a_name_described_twice_is_indexed_once(monkeypatch):
 # the both-ways gate with its shrink-only baseline
 # ----------------------------------------------------------------------
 
+def _undocumented_baseline() -> frozenset[str]:
+    spec = importlib.util.spec_from_file_location(
+        "_undocumented_parameters", DOCS_DIR / "undocumented_parameters.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.UNDOCUMENTED_PARAMETERS
+
+
 def _documented(a, b=2, *rest, **kw):
     """Summary line.
 
@@ -478,3 +486,40 @@ def test_unindented_prose_inside_the_section_reads_as_a_name_the_gate_refuses():
     names = [name for name, _ in reference_pages.parameter_entries(stray)]
     assert set(names) - set(reference_pages.call_arguments(stray)) == {
         "A paragraph of rationale with no heading above it."}
+
+
+def _api_calls() -> dict:
+    """Every name the API pages draw with a signature, once, in reading order."""
+    index = reference_pages._api_index()
+    calls = {}
+    for name, _ in _api_names():
+        obj = index._resolve(name)
+        if name not in calls and reference_pages.documented_call(obj):
+            calls[name] = obj
+    return calls
+
+
+def test_every_parameters_entry_names_an_argument_of_its_call():
+    """An entry for an argument the signature lacks describes nothing."""
+    calls = _api_calls()
+    assert len(calls) > 90
+    stray = [f"{name}: {arg!r}" for name, obj in calls.items()
+             for arg, _ in reference_pages.parameter_entries(obj)
+             if arg not in reference_pages.call_arguments(obj)]
+    assert not stray, "Parameters entries naming no argument:\n" + "\n".join(stray)
+
+
+def test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line():
+    """Both ways, the shape of `test_help.py`: an argument with no entry fails
+    unless the shrink-only `UNDOCUMENTED_PARAMETERS` holds it, and a line there
+    whose argument is now documented or gone fails too, so the set only shrinks."""
+    missing = {f"{name}({arg})" for name, obj in _api_calls().items()
+               for arg in reference_pages.call_arguments(obj)
+               if arg not in {a for a, _ in reference_pages.parameter_entries(obj)}}
+    baseline = _undocumented_baseline()
+    assert not missing - baseline, (
+        "arguments with no Parameters entry (CONTRIBUTING.md § A Parameters section "
+        "under each call):\n" + "\n".join(sorted(missing - baseline)))
+    assert not baseline - missing, (
+        "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
+        + "\n".join(sorted(baseline - missing)))

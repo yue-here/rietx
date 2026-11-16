@@ -106,7 +106,7 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
   `CONTRIBUTING.md`, with one worked entry
 - [x] Generator: parse a docstring's Parameters section and render it as the directive's
   `:param:` fields; the twin renders it as a list
-- [ ] The gate: a test that every documented name is in its signature and every argument on the
+- [x] The gate: a test that every documented name is in its signature and every argument on the
   API pages is documented or in the shrink-only `UNDOCUMENTED_PARAMETERS` baseline, seeded now
 - [ ] The split of the everyday page under `PAGE_CHAR_CAP`, if the measurement says it is owed now
   (else the measurement and the split's plan go to WP-2025's `### Inherited`)
