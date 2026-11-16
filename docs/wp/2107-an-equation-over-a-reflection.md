@@ -151,6 +151,16 @@ every image. A port meets the refusal and takes the exit knowingly.
    orbit refusal. `crystallography/spherical_harmonics.py` holds the machinery, and
    rietx's own normalisation is stated in the manual. A port converts its coefficients.
 
+### Inherited
+
+- **2026-11-16, from WP-2061** (PR #1582). 2061's AS-1 now reuses WP-1960's `texture_basis`
+  in `crystallography/spherical_harmonics.py`, the machinery step 3 names, so 2061 no longer
+  derives its own subspace and the Non-goals line on 2061 below is stale on that point. The two WPs
+  share one basis: 2061 owns the named, declared size block (guard, report rows, exporters),
+  and an invariant harmonic inside a user's equation is this WP's. 2061's AS-2 (a size term on
+  a declared family of hkl) overlaps this WP's family widths; which WP owns that is open, as
+  2061's handover question 4.
+
 ## Non-goals
 
 - A convolution by equation: `hat`, `one_on_x_conv`, `exp_conv_const`, `circles_conv`,
