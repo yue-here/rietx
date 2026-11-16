@@ -155,16 +155,15 @@ remembers, and the alternatives are the first thing lost.
       pointer lands on a record of that day; nor that an untagged value was
       not chosen, which is why the tag is a convention and not a gate on
       every number. The check runs on a fixture tree too (ten failing tags,
-      three passing), and was made to fail twice on purpose: with no tags in
+      four passing), and was made to fail twice on purpose: with no tags in
       the tree, and with one live date moved a day.
 - [x] A pass over the values that are case 3 today. Start from the fourteen
       "this package's own" / "no source" sites and from any constant whose
       docstring argues rather than measures.
-      **Done 2026-11-16: six tags, each checked against its record.** Tagged
+      **Done 2026-11-16: five tags, each checked against its record.** Tagged
       where a WP entry of the day records the choice and its alternatives:
       `background.diagnostics.GHOST_MIN_PARENTS` (WP-1447, 2026-09-22),
-      `GHOST_RATIO_TOL` and `_ghost_consensus`'s parent count (WP-1442,
-      2026-09-22), `SAMPLING_HEIGHT_FRACTION` (WP-1415, 2026-09-21), and
+      `_ghost_consensus`'s parent count (WP-1442, 2026-09-22), `SAMPLING_HEIGHT_FRACTION` (WP-1415, 2026-09-21), and
       the report-only `split_share` in `report/schemas.py` and
       `report/localisation.py` (WP-1339, 2026-09-03). Each replaced a
       "decided YYYY-MM-DD" phrase or sat beside "Chosen with that margin";
@@ -181,6 +180,9 @@ remembers, and the alternatives are the first thing lost.
       lost their history (`indexing.fom`'s ⟨ΔQ⟩ floor,
       `crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG` and
       `crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG`).
+      `GHOST_RATIO_TOL`, the worked example above, is not tagged either:
+      its 1.3/1.5/2.0/3.0 sweep is written only in its docstring, and
+      WP-1442's 2026-09-22 entry names the constant without it.
       Inventing a record for them would be the failure this WP describes.
       The 161 "ruled YYYY-MM-DD" phrases are the generality rulings, whose
       record is `docs/milestones/generality.md`; converting them is a

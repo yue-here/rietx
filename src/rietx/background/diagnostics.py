@@ -216,8 +216,7 @@ GHOST_MIN_PARENTS = 5
 #: leak at r = 0.10 scores 5 at 1.3 and 1.5 against 6 at 2.0 and 3.0.  The
 #: tolerance buys detection for nothing.  2.0 is the widest at which "a common
 #: ratio" still means something, which is where it stops being a measurement
-#: and becomes a judgement.  *(Chosen: WP-1442, 2026-09-22 — 2.0 over 1.3, 1.5
-#: and 3.0, the four measured above)*
+#: and becomes a judgement (decided 2026-09-22; WP-1442).
 GHOST_RATIO_TOL = 2.0
 
 #: The sampling band of McCusker, Von Dreele, Cox, Louër & Scardi (1999) §2:

@@ -43,7 +43,7 @@ _TAG_START = re.compile(r"\*\(Chosen\b")
 #: The whole tag, matched at a :data:`_TAG_START` on flattened text.
 _TAG = re.compile(
     r"\*\(Chosen: "
-    r"(?P<where>WP-\d{4}|docs/[\w./-]+\.md § [^,]+?), "
+    r"(?P<where>WP-\d{4}|docs/[\w./-]+\.md § .+?), "
     r"(?P<date>\d{4}-\d{2}-\d{2}) — "
     r"(?P<what>\S.*?)\)\*"
 )
@@ -69,15 +69,16 @@ def _tags(text: str) -> list[str]:
 
 
 def _section(text: str, heading: str) -> str | None:
-    """The body under the markdown heading *heading*, to the next heading of
-    the same or a higher level; ``None`` when the file has no such heading."""
+    """The markdown heading *heading* and its body, to the next heading of
+    the same or a higher level (a heading may carry the date itself);
+    ``None`` when the file has no such heading."""
     heads = list(_HEADING.finditer(text))
     for i, h in enumerate(heads):
         if h.group(2) != heading:
             continue
         level = len(h.group(1))
         end = next((n.start() for n in heads[i + 1:] if len(n.group(1)) <= level), len(text))
-        return text[h.end():end]
+        return text[h.start():end]
     return None
 
 
@@ -139,6 +140,7 @@ def tree(tmp_path: Path) -> Path:
         encoding="utf-8")
     (tmp_path / "docs" / "DESIGN.md").write_text(
         "# Design\n\n## Locked decisions\n\n- *Amendment (2026-07-24).* X.\n\n"
+        "## Decisions, 2026-10-18\n\nRuled.\n\n"
         "## History\n\n2026-08-01 something else.\n", encoding="utf-8")
     return tmp_path
 
@@ -150,6 +152,7 @@ TODAY = datetime.date(2026, 11, 16)
     "*(Chosen: WP-0001, 2026-09-22 — A over B)*",
     "*(Chosen: docs/DESIGN.md § Locked decisions, 2026-07-24 — X over Y)*",
     "*(Chosen: WP-0001, 2026-09-22 — 2.0 over 1.3 (r = 0.10) and 3.0)*",
+    "*(Chosen: docs/DESIGN.md § Decisions, 2026-10-18, 2026-10-18 — a heading with a comma)*",
 ])
 def test_a_tag_naming_a_record_of_its_day_passes(tree, tag):
     assert _tag_problems(tag, tree, TODAY) == []
