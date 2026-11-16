@@ -111,7 +111,8 @@ ranking over one population and is the regression gate, not a family.
       margin that makes the top candidate unanimous. *2026-11-16:* not confirmed: five
       default paths call the two gates, all presenting, none applying
       (`2007-batch/README.md` § Task 3); the gate's rule proposed tier 1 over the grade.
-- [ ] The clash table: grading × gating × the `best_or_none` gate.
+- [x] The clash table: grading × gating × the `best_or_none` gate. *2026-11-16:* eleven
+      clashes, K1-K11, in [`2007-batch/clashes.md`](2007-batch/clashes.md), each with its question.
 - [ ] The batch to the maintainer; rulings dated into the table.
 - [ ] Approved demotions; a gate that refused now reports.
 - [ ] `tests/test_acceptance_indexing.py` green and the benchmark run once alone on the
