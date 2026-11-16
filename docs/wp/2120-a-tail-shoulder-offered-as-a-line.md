@@ -1,6 +1,6 @@
 # WP-2120 — a tail shoulder on its position bound is offered as a line
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-06 — false lines reach the engines at full weight, but no case yet moves a cell or costs an indexing row
