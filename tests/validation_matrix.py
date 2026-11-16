@@ -3094,9 +3094,9 @@ GAPS: tuple[tuple[str, str], ...] = (
      "ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below "
      "~15 deg with real low-angle reflections."),
     ("The SRM 660c certificate band is not reached and is not claimed.",
-     "Measured +24 ppm against a certificate uncertainty of +-8e-5 A "
-     "(k = 2, 19 ppm).  The "
-     "residual is a characterised cotTheta/sin2Theta aberration — equatorial "
+     "Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute "
+     "4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, "
+     "19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial "
      "divergence, tube tails, monochromator passband — which is the "
      "fundamental-parameters territory fenced to v2, not a tuning gap."),
     ("GoF does not reach 1 on lab data and should not be expected to.",
