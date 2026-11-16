@@ -665,15 +665,27 @@ def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
     ``compile_phase_sites`` of the phase where there is not
     (:meth:`~rietx.Refinement.geometry` with no live fit).
     """
+    def covariance(ip: int, n_atoms: int):
+        return _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
+
+    return _assemble(sites_of, table.decode(theta), structure.phases, table,
+                     covariance)
+
+
+def _assemble(sites_of, values: dict, phases, table, covariance):
+    """The table over ``values`` (a decoded dict: cell and x/y/z per atom).
+
+    ``covariance(ip, n_atoms)`` is :func:`_covariance`'s answer for phase
+    ``ip``, or ``None``; ``table`` is read only where it is not ``None``.
+    """
     from ..schemas.results import GeometryAngle, GeometryDistance, GeometryTable
 
-    values = table.decode(theta)
     notes: list[str] = []
     distances: list[GeometryDistance] = []
     angles: list[GeometryAngle] = []
     torsions: list = []
     for ip, sites in enumerate(sites_of):
-        phase = structure.phases[ip]
+        phase = phases[ip]
         if sites.n_asym > MAX_ASYM_ATOMS:
             notes.append(f"{phase.name}: {sites.n_asym} asymmetric-unit atoms "
                          f"exceeds the {MAX_ASYM_ATOMS}-atom search limit; no "
@@ -682,7 +694,7 @@ def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
         labels, bonds, contacts, angle_rows, torsion_rows = _phase_items(
             phase, sites, values, ip, notes)
         n_atoms = len(phase.atoms)
-        cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
+        cov = covariance(ip, n_atoms)
         pairs = ([(i, e, True) for i, e in bonds]
                  + [(i, e, False) for i, e in contacts])
         pair_items = [_bond_item(ip, i, e) for i, e, _ in pairs]
@@ -715,6 +727,98 @@ def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
     return GeometryTable(distances=distances, angles=angles, torsions=torsions,
                          bond_slack=BOND_SLACK_ANG, contact_max=CONTACT_MAX_ANG,
                          notes=notes)
+
+
+# ----------------------------------------------------------------------
+# the census without a fit (WP-1513)
+# ----------------------------------------------------------------------
+def geometry_census(structure, coordinates=None):
+    """The bonds, contacts, angles and torsions of a structure, with no fit.
+
+    The table a Rietveld fit closes with (:func:`geometry_table`), built by the
+    same search and the same assembly, for any coordinates: a ``Structure`` or
+    a single ``Phase`` as stored, or with its fractional coordinates replaced
+    by ``coordinates`` — an (n_atoms, 3) array for a one-phase structure, or
+    one entry per phase, each such an array or ``None`` to keep that phase's
+    own.  Row *i* is ``Phase.atoms[i]``.  What an agent writing its own search
+    loop calls instead of its own contact code (WP-1513: the run whose code
+    shifted images before wrapping them was blind to every contact of an atom
+    above ½ for the whole run).
+
+    Every esd is ``None``, since no fit means no covariance, and ``None`` with
+    no phase, as for a result.  Each phase's orbit split is decided at the
+    coordinates given, so an atom moved off a special position gets its whole
+    orbit.  Only each species' element is read, for its covalent radius; no
+    scattering factor is looked up.
+
+    The limits are the table's, and each writes a note where it bounds the
+    answer: contacts are listed out to :data:`CONTACT_MAX_ANG` and capped at
+    :data:`MAX_CONTACTS_PER_ATOM` nearest per atom, torsions at
+    :data:`MAX_TORSIONS_PER_ATOM`, and a phase of more than
+    :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is not searched at all.  The
+    cell is read as stored, with no crystal-system tie applied.  Occupancy is
+    not read: every site is present, so two halves of a split site are listed
+    as a contact at whatever distance they sit.
+    """
+    from ..crystallography.structure_factor import PhaseSites, phase_orbit_split
+
+    phases = list(structure.phases) if hasattr(structure, "phases") else [structure]
+    if not phases:
+        return None
+    phases = [p if xyz is None else _placed(p, xyz)
+              for p, xyz in zip(phases, _coordinates_per_phase(coordinates, phases),
+                                strict=True)]
+    values: dict[str, float] = {}
+    for ip, phase in enumerate(phases):
+        for k in _CELL_NAMES:
+            values[f"phases.{ip}.cell.{k}"] = float(getattr(phase.cell, k).value)
+        for j, atom in enumerate(phase.atoms):
+            for c in _XYZ:
+                values[f"phases.{ip}.atoms.{j}.{c}"] = float(getattr(atom, c).value)
+    sites_of = [PhaseSites(ops=phase_orbit_split(p),
+                           species=[a.species for a in p.atoms]) for p in phases]
+    return _assemble(sites_of, values, phases, None, lambda ip, n_atoms: None)
+
+
+def _coordinates_per_phase(coordinates, phases) -> list:
+    """``coordinates`` as one (n_atoms, 3) array or ``None`` per phase."""
+    if coordinates is None:
+        return [None] * len(phases)
+    if getattr(np.asarray(coordinates, dtype=object), "ndim", 0) == 2:
+        if len(phases) != 1:
+            raise ValueError(f"one coordinate array was given for {len(phases)} "
+                             "phases; give one entry per phase, None to keep "
+                             "a phase's own")
+        per = [coordinates]
+    else:
+        per = list(coordinates)
+        if len(per) != len(phases):
+            raise ValueError(f"{len(per)} coordinate entries for {len(phases)} "
+                             "phases; give one per phase, None to keep a "
+                             "phase's own")
+    out = []
+    for phase, xyz in zip(phases, per, strict=True):
+        if xyz is None:
+            out.append(None)
+            continue
+        xyz = np.asarray(xyz, dtype=np.float64)
+        if xyz.shape != (len(phase.atoms), 3):
+            raise ValueError(f"phase {phase.name!r}: coordinates have shape "
+                             f"{xyz.shape}, its {len(phase.atoms)} atoms need "
+                             f"({len(phase.atoms)}, 3)")
+        if not np.all(np.isfinite(xyz)):
+            raise ValueError(f"phase {phase.name!r}: a coordinate is not finite")
+        out.append(xyz)
+    return out
+
+
+def _placed(phase, xyz: np.ndarray):
+    """A copy of ``phase`` with its atoms at the fractional ``xyz``."""
+    atoms = [atom.model_copy(update={
+        c: getattr(atom, c).model_copy(update={"value": float(v)})
+        for c, v in zip(_XYZ, row, strict=True)})
+        for atom, row in zip(phase.atoms, xyz, strict=True)]
+    return phase.model_copy(update={"atoms": atoms})
 
 
 # ----------------------------------------------------------------------

@@ -29,6 +29,7 @@ import gemmi
 import numpy as np
 import pytest
 
+import rietx as rx
 from rietx import Instrument, PatternData, Refinement
 from rietx.model import geometry as geom
 from rietx.model.forward import compile_model
@@ -669,3 +670,114 @@ def test_the_volume_gradient_is_the_volume_s_derivative(cell):
         down[k] -= h
         fd = (geom._volume_and_gradient(*up)[0] - geom._volume_and_gradient(*down)[0]) / (2 * h)
         assert grad[k] == pytest.approx(fd, rel=1e-7, abs=1e-9)
+
+
+# ----------------------------------------------------------------------
+# the census without a fit (WP-1513)
+# ----------------------------------------------------------------------
+def _phase_in(group: str, cell, atoms):
+    """``_p1_phase`` in any space group."""
+    return _p1_phase(cell, atoms).model_copy(update={"space_group": group})
+
+
+def _shifted_before_wrapped(phase, i: int) -> float:
+    """The nearest image of any atom from atom ``i`` by the source run's code
+    (WP-1513 § Context): each symmetry image R·x + t shifted by ±1 cell
+    without first being brought into the cell."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+
+    g = _metric_g(tuple(getattr(phase.cell, k).value for k in
+                        ("a", "b", "c", "alpha", "beta", "gamma")))
+    xyz = [np.array([a.x.value, a.y.value, a.z.value]) for a in phase.atoms]
+    out = []
+    for j, (rot, tran) in enumerate(phase_orbit_split(phase)):
+        for r, t in zip(rot, tran, strict=True):
+            for n in np.ndindex(3, 3, 3):
+                d = r @ xyz[j] + t + np.array(n) - 1 - xyz[i]
+                dist = float(np.sqrt(d @ g @ d))
+                if dist > 1e-3:
+                    out.append(dist)
+    return min(out)
+
+
+@pytest.mark.parametrize("x, defect_finds_it", [(0.95, False), (0.05, True)])
+def test_the_census_finds_an_image_across_the_cell_boundary(x, defect_finds_it):
+    """O at (x, ½, ½) in P -1 sits 0.5 Å from its inversion image either way.
+
+    Above ½ the image is a whole cell away until it is wrapped, so the source
+    run's shifted-before-wrapped search misses it there and finds it below ½
+    (the positive arm: the stand-in reproduces the defect, and the census
+    finds what it missed).
+    """
+    phase = _phase_in("P -1", (5.0, 5.2, 5.4, 88.0, 92.0, 91.0),
+                      [("O1", "O", x, 0.5, 0.5)])
+    near = [d for d in rx.geometry_census(phase).distances if d.distance < 1.0]
+    assert len(near) == 1 and (near[0].atom_1, near[0].atom_2) == ("O1", "O1")
+    assert 0.49 < near[0].distance < 0.53
+    assert (_shifted_before_wrapped(phase, 0) < 1.0) is defect_finds_it
+
+
+def test_the_census_reads_bare_coordinates_across_the_boundary():
+    """Coordinates handed in replace the stored ones: a pair 0.05 of a 10 Å
+    edge apart across x = 1 is found, and the stored structure has no such pair."""
+    phase = _p1_phase((10.0, 6.0, 7.0, 90.0, 90.0, 90.0),
+                      [("A", "Si", 0.2, 0.3, 0.4), ("B", "O", 0.6, 0.3, 0.4)])
+    structure = Structure(phases=[phase])
+    moved = rx.geometry_census(structure, coordinates=[[0.97, 0.3, 0.4],
+                                                       [0.02, 0.3, 0.4]])
+    pair = [d.distance for d in moved.distances if (d.atom_1, d.atom_2) == ("A", "B")]
+    assert min(pair) == pytest.approx(0.5, abs=1e-9)
+    stored = rx.geometry_census(structure)
+    assert not [d for d in stored.distances if d.distance < 3.0]
+    # one entry per phase is the same answer, and the structure is untouched
+    again = rx.geometry_census(structure, coordinates=[np.array([[0.97, 0.3, 0.4],
+                                                                 [0.02, 0.3, 0.4]])])
+    assert again == moved
+    assert structure.phases[0].atoms[0].x.value == 0.2
+
+
+@pytest.mark.parametrize("builder", [corundum_phase, zincite_phase, fluorite_phase])
+def test_the_census_is_the_unfitted_refinement_geometry(builder):
+    """``geometry_census`` and ``Refinement.geometry()`` with no live fit are
+    one table, row for row: the census shares the search and the assembly."""
+    structure = Structure(phases=[builder()])
+    census = rx.geometry_census(structure)
+    assert census == Refinement(structure, LAB, history=False).geometry()
+    assert census.distances and census.angles
+
+
+def test_a_census_off_a_special_position_has_the_whole_orbit():
+    """Rutile's Ti moved off 2a (m = 2) takes its general orbit (m = 16), and
+    orbit counting |A_ij|·m_i = |A_ji|·m_j holds over the bonds at the new
+    coordinates.  Bonds only: sixteen Ti a few hundredths of a cell apart fill
+    the contact cap, which truncates one direction of a pair (the cap's own
+    docstring), and the note says so."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+    from rietx.model.geometry import _placed
+
+    structure = make_rutile()
+    xyz = np.array([[a.x.value, a.y.value, a.z.value]
+                    for a in structure.phases[0].atoms])
+    xyz[0] += (0.01, 0.02, 0.03)
+    g = rx.geometry_census(structure, coordinates=xyz)
+    mult = [len(r) for r, _t in phase_orbit_split(_placed(structure.phases[0], xyz))]
+    assert mult[0] == 16
+    counts: dict[tuple[int, int, float], int] = {}
+    for d in g.bonds:
+        key = (d.atom_index_1, d.atom_index_2, round(d.distance, 6))
+        counts[key] = counts.get(key, 0) + 1
+    assert counts
+    for (i, j, dist), n_ij in counts.items():
+        assert n_ij * mult[i] == counts.get((j, i, dist), 0) * mult[j], (i, j, dist)
+    assert any("per atom are not listed" in n for n in g.notes)
+
+
+def test_the_census_refuses_coordinates_it_cannot_place():
+    structure = Structure(phases=[corundum_phase()])
+    with pytest.raises(ValueError, match="need"):
+        rx.geometry_census(structure, coordinates=np.zeros((1, 3)))
+    with pytest.raises(ValueError, match="one per phase"):
+        rx.geometry_census(structure, coordinates=[None, None])
+    with pytest.raises(ValueError, match="not finite"):
+        rx.geometry_census(structure, coordinates=np.full((2, 3), np.nan))
+    assert rx.geometry_census(Structure(phases=[])) is None

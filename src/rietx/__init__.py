@@ -56,6 +56,7 @@ from .io.projects import (
 )
 from .io.readers import read_pattern, read_pdcif
 from .io.recipe import Recipe, RecipeError, read_recipe, write_recipe_tables
+from .model.geometry import geometry_census
 from .multi import MultiHistogramRefinement, refine_multi
 from .optimize.cancel import CancelToken, RefinementCancelled
 from .params.multi import SharingMap
@@ -217,6 +218,7 @@ __all__ = [
     "diagnose",
     "diagnostics_summary",
     "format_su",
+    "geometry_census",
     "help_for",
     "help_key_for",
     "help_registry",

@@ -84,7 +84,7 @@ neither pattern.
 
 ## Tasks
 
-- [ ] A public census over a `Structure` or bare fractional coordinates
+- [x] A public census over a `Structure` or bare fractional coordinates
       without a fit, sharing `_neighbours`, with its limits stated. A test
       puts an image pair across the cell boundary at a coordinate above 0.5
       (the run's defect class) and asserts the pair is found.

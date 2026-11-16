@@ -100,6 +100,31 @@ The esds come from the covariance the fit's parameter esds were read off, with t
 With no live fit, before one, after an edit or a checkout, the values are the current model's and every esd is `None`.
 The verb returns `None` in Le Bail and Pawley mode, as the result does.
 
+### Without a fit
+
+`rietx.geometry_census` returns the same table for a `Structure` or a single `Phase`, with no refinement, pattern or instrument.
+Its search and its assembly are the fit's, so it equals `Refinement.geometry()` before a fit, row for row, and every esd is `None`.
+`coordinates=` replaces the stored fractional coordinates: an array of shape (atoms, 3) for a one-phase structure, or one entry per phase, `None` keeping that phase's own.
+The coordinates follow the order of `Phase.atoms`, and the structure itself is not changed.
+A search loop that moves atoms calls it in place of contact code of its own.
+Every image is first brought next to the atom it is measured from, so a contact across a cell face is found from an atom on either side of it.
+
+```python
+import rietx as rx
+from rietx.examples import examples_dir
+
+structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+table = rx.geometry_census(structure)
+xyz = [[a.x.value, a.y.value, a.z.value] for a in structure.phases[0].atoms]
+xyz[0][2] += 0.01
+moved = rx.geometry_census(structure, coordinates=xyz)
+```
+
+The limits are the table's, and each writes a note where it applies.
+The orbit of each atom is decided at the coordinates given, so an atom moved off a special position has its whole orbit.
+The cell is read as stored.
+Occupancy is not read, so the two halves of a split site are listed as a contact at whatever distance they sit.
+
 A distance prints on one line, such as `Ca1–O5  2.3898(50) Å  5_565` from the fluorapatite tutorial fit.
 
 Geometry is computed for a Rietveld fit only.
