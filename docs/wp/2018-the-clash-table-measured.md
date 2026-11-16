@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-16 — 4 of 22 live pairs measured (C1, C3, C10, C14); 4 questions for the maintainer
+Milestone: generality · Status: 🔄 2026-11-16 — 5 of 22 live pairs measured (C1, C3, C4, C10, C14); 5 questions for the maintainer
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -243,6 +243,49 @@ with an unconditional esd while the answer is held at ε. The rows move the answ
 here toward the truth (which lies on the face). Both RESOLUTION_UNCONSTRAINED and
 HIGH_CORRELATION (U-V, ρ −0.988) fire in all three arms. Question (4) below.
 
+**C4, the scale-B ridge hold against capillary absorption** (`ridge_absorption.py`; macOS arm64,
+`[dev]`; the LaB₆ `plain` arm also on a Linux x86_64 machine, output not committed: Rwp equal to
+6e-14, B to 1.4e-11 Å²). Capillary absorption is A = K·exp(c·sin²θ), an exact
+reparameterisation of each phase's {scale, B} whose content is ΔB = c(µR)λ²/2; the ridge hold
+reads a phase component that carries A and holds the B column A's shift lands on. The probe of
+every arm is recorded each time the runner asked it. The dataset row named the fluorite as the
+phase that fires the hold; on that fixture it is the iron (one reflection in range, (110)), and
+the fluorite is the separable neighbour.
+
+*The ridge fixture* (`tests/test_scale_b_ridge.py`'s four phases, noise seed and `cell_then_B`
+staging, moved to the `debye_scherrer` preset at Cu Kα1 with the Bragg-Brentano profile, the
+pattern drawn with µR = 1.0, predicted ΔB = 0.48869 Å²):
+
+| Arm | Fe B (Å²) | Fe separation, stage `b` (floor 6.3e-8) | Fe scale ÷ corundum scale, relative to mu_hold | Fe wt% | Rwp |
+|---|---|---|---|---|---|
+| mu_hold (shipped) | 0.35, held in `b`, `w`, `closing` | 5.9e-13 | 1 | 1.5084 | 0.0827765366 |
+| mu_nohold (positive arm) | 0.052(2.9), free | 5.9e-13 | 0.9644 | 1.4556 | 0.0827765366 |
+| nomu_hold (µR undeclared) | 0.35, held in the same stages | 7.4e-13 | 1.0613 | 1.5994 | 0.0827765366 |
+| nomu_nohold | 0.049(0.57), free | 7.4e-13 | 1.0231 | 1.5427 | 0.0827765366 |
+
+Rwp agrees across all four arms to 4e-11 (the reparameterisation and the ridge are both flat).
+A changes no hold decision: the probe reads corundum 0.223 against 0.228, zincite 0.193 against
+0.190 and iron 5.9e-13 against 7.4e-13 with µR declared and not, so the same phase is held in the
+same stages, and `SCALE_B_INSEPARABLE` names `phases.3.atoms.0.biso` alone in both hold arms. Every
+site of the three separable phases moves by ΔB between the declared and undeclared arms to within
+1.3e-5 Å² of the prediction (corundum 7e-8 and 8e-8, zincite 8e-6, fluorite Ca +1.2e-5 and F
+−2e-6, against esds of 1.2, 4.3 and 3e3-1e4 Å²). The iron cannot carry its share: held, its B
+takes none of ΔB, and its scale takes A at (110) instead, 1.0613 measured against
+exp(2ΔB·s²(110)) = 1.0613 predicted, so its weight fraction moves 6.0 % relative (0.44 of the
+scale's own esd) between declaring µR and not. Free, its B walks from the 0.35 it was handed to
+0.05 in both arms and takes 0.0033 Å² of ΔB (0.7 %), and the fraction moves the same 6.0 %. So
+the 6 % is the ridge's, not the hold's: no setting of an iron B the data cannot see absorbs a
+correction the data cannot see either. The fluorite's separation falls to 1.6e-6 (µR declared)
+and 4.0e-6 (not) by the closing stage, 25-64 times the floor, in both arms.
+
+*11-BM SRM 660a* (`tests/test_acceptance_capillary.py`'s protocol, dispersion off, µR estimated at
+0.6788): the hold never fires, plain or corrected (separation 0.771-0.780, seven orders above the
+floor); B(La) and B(B) move by 0.01687472 Å² between the arms, 2.3e-9 and 2.9e-9 Å² from the
+predicted ΔB, and Rwp by 3e-14. The positive arm `corrected_forced` raises the floor to 2 so the
+hold takes both B in the `biso` and `closing` stages: they stay at the 0.3 Å² handed in, ΔB is
+lost entirely, `SCALE_B_INSEPARABLE` fires, and Rwp goes from 0.08809 to 0.11246. Had the hold
+fired on SRM 660a, the ΔB measurement would have shown it.
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -269,6 +312,12 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
    box's (WP-1929's "a row on its bound stays in the matrix" rule, extended to a combination),
    or should `CONSTRAINT_ACTIVE` carry the paths in `where`, or both? NAC, the dataset chosen
    for the row, never reaches it; the synthetic touching-truth pattern does.
+5. **C4.** Absorption changes no ridge-hold decision, and the hold never fires on SRM 660a
+   (ΔB lands to 3e-9 Å²). On the ridge phase, an undeclared µR moves the weight fraction
+   6.0 % relative (0.44 of the scale's esd) with or without the hold, because B there cannot
+   carry ΔB either way. Is C4 recorded *independent*? And should `SCALE_B_INSEPARABLE`, which
+   already states the fraction's sensitivity per Å² of B, also say that an undeclared
+   absorption correction lands on that phase's fraction rather than its B?
 
 ## Acceptance
 
