@@ -528,6 +528,20 @@ def test_the_out_of_band_refusal_names_the_way_out():
     assert "DISPERSION_NEGLECTED" in OUT_OF_BAND_ESCAPE
 
 
+def test_the_fullprof_pair_check_drops_the_way_out():
+    """A ``.pcr``'s stated pair is checked, not computed, so the advice goes.
+
+    ``_dispersion_disagreement`` feeds the reader's refusal and the writer's;
+    the writer refuses ``dispersion = None`` itself, so the escape there would
+    send the caller into the next refusal (WP-1532 review).
+    """
+    from rietx.io.projects.fullprof import _dispersion_disagreement
+
+    why = _dispersion_disagreement("Si", 0.0, 0.0, 0.1665)
+    assert "outside the tabulated" in why
+    assert "dispersion = None" not in why
+
+
 def test_unknown_element_is_refused():
     with pytest.raises(KeyError, match="Z = 3-98"):
         dispersion("Cf", CU_KA1_LAMBDA)  # Z = 98 is the last; Es is not there

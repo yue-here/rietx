@@ -76,7 +76,7 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
 | 9 | flattened background paths | declined: placed | `STAGE_PATH_UNKNOWN` already answers `instrument.background.chebyshev.c0` with "Did you mean 'instrument.background.c0'?" (measured) |
 | 10 | TOPAS-to-rietx mapping table | reference | `diagnostics-projects.md`, a block before the `RECIPE_*` family; `LP_Factor` maps to `model.lp_factor` and `to_structure(scale="rietx")`, which landed after the issue |
 | 11 | `coverage.partial == False` is no proof | declined: placed | the `TOPAS_FEATURES_NOT_IMPORTED` row already says it (`unread_calls`, the silent bare keyword, after #651); the issue's "compare χ² with the file's `gof`" contradicts that row's "not comparable" and is not written |
-| 12 | `TOPAS_BLOCK_SKIPPED` suggestion | reference | one clause on the row: the refusal ends on the line to add (`_skipped_remedy`) |
+| 12 | `TOPAS_BLOCK_SKIPPED` suggestion | reference | one clause on the row: the refusal names the line to add (`_skipped_remedy`) |
 | 13 | origin-choice suffix | declined: placed | the `SPACE_GROUP_SETTING_ASSUMED` row says to write the suffix (`"F d -3 m:2"`), and the message quotes each setting's contents |
 | 14 | isotope spellings | package output | the neutron parser's refusal of an element-then-number label names the mass-first spelling (`Li7` → `7Li`); it fires at evaluation, not at `Atom(...)` |
 | 15 | issue #728: screen a chosen `candidates[i]` | reference | `diagnostics-indexing.md`, load-bearing point 2 |

@@ -85,14 +85,15 @@ def test_an_element_first_isotope_is_refused_naming_the_mass_first_spelling():
 
     Issue #661: an agent wrote lithium-7 element-first and the message said
     only that it could not read the species.  A label that is no such slip
-    gets no hint, since there is no spelling to name.
+    gets no hint: ``O1`` is a site label and ``Fe3`` an unsigned charge, and
+    naming ``1O`` or ``3Fe`` would invent a nuclide.
     """
-    with pytest.raises(KeyError, match="mass-first, 7Li") as caught:
+    with pytest.raises(KeyError, match="mass-first, 7Li"):
         normalize_species("Li7")
-    assert "Fe3+" in str(caught.value)              # the charge reading too
-    with pytest.raises(KeyError) as plain:
-        normalize_species("123")
-    assert "mass-first" not in str(plain.value)
+    for label in ("123", "O1", "Fe3"):    # no nuclide to name: a site label, a charge
+        with pytest.raises(KeyError) as plain:
+            normalize_species(label)
+        assert "mass-first" not in str(plain.value), label
 
 
 def test_vanadium_is_the_standard_can():

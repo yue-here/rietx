@@ -49,7 +49,7 @@ What to look for, in order:
    `RESOLUTION_NOT_POSITIVE`, `BISO_UNUSUALLY_LARGE` and the rest of
    `refine._REVISABLE_CODES`): the final result re-takes it on the converged
    values, so one absent from `result.diagnostics` was repaired by a later
-   stage. Read the final one.
+   stage, or is no longer free in it. Read the final one.
 2. **A confidence that climbs across rungs.** On real 11-BM data with an
    unmodelled CaF₂ impurity, `add_impurity_phase` reads 0.3 → 0.6 → 0.9 as the
    host phase fits: a hypothesis getting *stronger* as the model improves is

@@ -1098,7 +1098,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "symmetry leaves free, so the site symmetry holds exactly. The coordinates "
             "x, y and z are tied to these directions. Each value is a step from where "
             "the fit began, so it reads 0 again after a fit: quote the tied `x`, `y` "
-            "or `z` row, which carries the coordinate and the same esd. "
+            "or `z` row, which carries the coordinate and its own esd. "
             "A site with no free direction produces no `dof` entry, and "
             "its coordinates are locked. Free these parameters with "
             "`phases.*.atoms.*.dof.*`. In a polar space group, `Phase.floating_origin = "
