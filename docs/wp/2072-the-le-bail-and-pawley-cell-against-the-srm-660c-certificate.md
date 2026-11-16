@@ -60,6 +60,12 @@ ten times smaller than the certificate's ±0.00008 Å. Sites at `d87c8cc91`:
 `tests/data/README.md` lines 132 and 785; `tests/test_acceptance_srm660c.py` lines 16
 and 27; `tests/test_acceptance_indexing.py` line 191. The correct spelling is
 4.15683(8) Å, or 4.156826 ± 0.00008 Å (k = 2).
+*Superseded in part, 2026-11-16:* at `bc77a934e` the five sites sat at
+`tests/data/README.md` lines 134 and 787, and the census missed three more of the same
+error: `tests/validation_matrix.py` lines 509 and 3096 ("+-8e-6", rendered into
+`docs/VALIDATION.md`) and `docs/docs/switching/validation.md` line 197
+("±8×10<sup>−6</sup> Å"). All eight are corrected. Dated records (WP-1001's log,
+`docs/milestones/v0.2.md` line 30) keep the old wording as history.
 
 **Tier.** A comparison with an independent measurement; no heuristic, no `_audit` row.
 
@@ -71,7 +77,7 @@ and 27; `tests/test_acceptance_indexing.py` line 191. The correct spelling is
 
 ## Tasks
 
-- [ ] Correct the five quotations of the certificate's uncertainty.
+- [x] Correct the five quotations of the certificate's uncertainty (eight, see Context).
 - [ ] Check the temperature correction against Sirota et al. (1998); record the value.
 - [ ] The test: both modes under the NIST protocol within 50 ppm of 4.156780 Å; Pawley
       and Le Bail agree within the esd; the λ × (1 ± 1e-4) positive arm fails the bar
