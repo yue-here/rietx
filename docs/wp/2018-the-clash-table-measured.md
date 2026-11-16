@@ -547,6 +547,39 @@ moves 62.446's ΔBIC by 9.99 at an Rwp equal to 1e-9 relative, because ΔBIC's p
 the count of *free* moment rows in the result (`n_moment`, magnetic.py:1610-1611, read): a held
 azimuth is not charged. Question (14).
 
+**C25, the size cap against `SIZE_LAMBDA_POWER` in a joint fit** (`joint_size_cap.py`; macOS
+arm64, `[dev]`, about 3.5 s an arm). The published Nd₂Ru₂O₇ pair of
+`tests/test_acceptance_wavelength.py` (11-BM X-ray as histogram 0, the CW neutron pattern as
+histogram 1, λ ratio 3.727) under its own `mccusker_structural` protocol, both λ held, with a
+`size` stage appended that frees `lor_size` and `gauss_size`. Each stage's cap freeze is logged
+per histogram table. Arms: shipped; no_cap; no_lambda (`SIZE_LAMBDA_POWER` emptied); tight
+(`SIZE_CAP_RANGE_FRACTION` 1e-8, a cap of 4.05e-7°) and tight_no_lambda; tight6 (1e-6, a
+cap of 4.05e-5°, just under the fitted size); and three arms starting both sizes at 2e-5
+(column units) rather than 0: seeded, tight6_seeded, tight6_seeded_no_lambda.
+
+| Arm | lor_size (°, column) | gauss_size | Rwp X-ray, neutron | what the cap did |
+|---|---|---|---|---|
+| shipped | 4.81(25)e-5 | 3.2(55)e-5 | 0.0919566, 0.0623754 | never armed |
+| no_cap, tight, tight6 | identical to shipped, every digit | | | never armed |
+| no_lambda, tight_no_lambda | 4.80(25)e-5 | 3.6(59)e-5 | 0.0919565, 0.0623747 | never armed |
+| seeded | 6.81(25)e-5 | 5.2(55)e-5 | 0.0919567, 0.0623754 | never armed |
+| tight6_seeded | 5.13(25)e-5 | 0, on its floor (`FLOOR_HIT`) | 0.0919534, 0.0623760 | armed in `size` only |
+| tight6_seeded_no_lambda | 5.26(25)e-5 | 0, on its floor | 0.0919534, 0.0623762 | armed in `size` only (`gauss_size`) |
+
+The sizes are not resolved on this pair (each within its esd of 0). Started at 0 they sit at 0
+at every stage's compile until the closing stage moves them, so the cap, which arms only on a copy that
+has already reached it at compile (`size_cap_hi`, vector.py:1033), never arms: switching it
+off or narrowing it to 1/119 of the fitted size changes no digit. `SIZE_LAMBDA_POWER` off moves
+the sizes 0.0006 and 0.0064 esd and the cell 5e-5 esd. The seeded positive arm shows the two
+meeting as WP-1131's docstring says (least_squares.py:3294-3313): at the `size` stage's compile
+the neutron copy of `lor_size` (7.45e-5°) arms and the X-ray copy (2e-5°) does not, so the
+intersected bound is the neutron table's, 1.0866e-5 in column units (4.05e-5° / 3.727); both
+copies of `gauss_size` arm and the neutron's binds, 1.18e-10 (1.64e-9 / 13.89). The stage
+starts above both bounds and ends with both sizes at 0. The closing stage then compiles at 0,
+nothing arms, and it takes `lor_size` to 5.13e-5°, 1.27× the cap, unchecked. In every arm the
+closing stage sets the size the caller reads, and it compiles before any copy reaches a cap.
+Question (15).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -641,6 +674,14 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     charged in ΔBIC (`n_moment` counts free moment rows), so the hold raised the rejected class
     62.446's ΔBIC by 9.99 at an unchanged χ². Should ΔBIC charge the class's moment DOFs whatever
     a stage held, or is a held direction rightly free of charge?
+15. **C25.** On the Nd₂Ru₂O₇ pair the size cap never arms (the sizes are unresolved and only
+    the closing stage moves them), and a positive arm shows the cap and the λ scaling meeting
+    as WP-1131 documents: the neutron copy arms first and its bound, in column units, is the one
+    the intersection keeps. Is C25 recorded *independent* (reconciled by design) on this
+    evidence? And beside the pair: the cap arms only at a compile where a copy has already
+    reached it, so a size the closing stage moves past it (1.27× in the positive arm) is never
+    capped. Is that the intended reach of a stage-granularity backstop, or does the closing
+    stage owe the cap a second look?
 
 ## Acceptance
 
