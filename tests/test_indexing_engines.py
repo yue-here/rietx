@@ -965,6 +965,93 @@ def test_a_dichotomy_unit_stops_at_its_harvest_cap(monkeypatch):
     assert "outgrew a size cap on tetragonal" in diag.message
 
 
+def _trial_error_unit(peaks, spec, system):
+    """One trial_error unit through ``_search_system``, set up as
+    ``search_trial_error`` sets it up, with the unit's scored solutions counted
+    independently of its own ``seen`` set (every key enters ``seen`` just
+    before ``_score``)."""
+    from rietx.indexing import trial_error
+    from rietx.indexing.engines import effective_shift_allowance, search_volume_ceiling
+    from rietx.indexing.qspace import sigma_effective
+
+    q_all, tt_all = peaks.q(), peaks.two_theta()
+    allowance, _assumed = effective_shift_allowance(spec, None, peaks)
+    sigma = sigma_effective(peaks.q_esd(), tt_all, peaks.wavelength, allowance)
+    scored: list[bool] = []
+    real_score = trial_error._score
+
+    def score(*args, **kwargs):
+        cand = real_score(*args, **kwargs)
+        scored.append(cand is not None)
+        return cand
+
+    trial_error._score = score
+    try:
+        found, stats, complete = trial_error._search_system(
+            peaks, system, metric_basis(system), spec,
+            Budget(spec.budget_seconds), q_all, sigma, tt_all,
+            float(peaks.two_theta_max), search_volume_ceiling(spec, None, system))
+    finally:
+        trial_error._score = real_score
+    return found, stats, complete, scored
+
+
+def test_a_trial_error_unit_stops_at_its_seen_cap(monkeypatch):
+    """A unit's ``seen`` set is bounded inside the unit (WP-2110, #1376: the
+    footprint of an unfinished monoclinic unit tracks ``len(seen)``, 2.24 M
+    entries and 1.14 GB at 1 800 CPU seconds).  Reaching the cap ends the unit
+    as a size cap does, and keeps every candidate already built: the capped
+    unit's harvest is a prefix of the uncapped one's, in enumeration order."""
+    from rietx.indexing import trial_error
+    from rietx.indexing.reduce import same_lattice
+
+    peaks, _cell = synthetic_peaks("orthorhombic")
+    spec = spec_for("orthorhombic")
+    full, full_stats, full_complete, full_scored = _trial_error_unit(
+        peaks, spec, "orthorhombic")
+    assert full_complete
+    # the case must harvest at least two candidates, and never reach the
+    # in-loop dedup, or "prefix" stops meaning enumeration order
+    assert 2 <= len(full) <= 2000, "the case no longer harvests"
+    assert full_stats["seen"] == len(full_scored) < trial_error.MAX_SEEN
+    # the cap at the solution that built the first candidate: the unit holds
+    # exactly that many and stops before adding one more
+    cap = full_scored.index(True) + 1
+    monkeypatch.setattr(trial_error, "MAX_SEEN", cap)
+    capped, stats, complete, scored = _trial_error_unit(peaks, spec, "orthorhombic")
+    assert not complete
+    assert stats["seen"] == len(scored) == cap
+    assert 1 <= len(capped) < len(full)
+    for got, want in zip(capped, full):
+        assert np.array_equal(got.fit.af, want.fit.af), "not a prefix"
+
+    result = trial_error.search_trial_error(peaks, spec=spec, probe=False)
+    assert not result.search_complete["orthorhombic"]
+    assert result.stats["orthorhombic.seen"] == cap
+    (diag,) = [d for d in result.diagnostics if d.code == "INDEX_SEARCH_INCOMPLETE"]
+    assert "outgrew a size cap on orthorhombic" in diag.message
+    assert result.candidates
+    for cand in result.candidates:
+        assert any(same_lattice(cand.fit.af, other.fit.af)[0] for other in full), (
+            "a capped unit ranked a lattice the uncapped unit never built")
+
+
+@pytest.mark.parametrize("cap", [1, 7, 300])
+def test_a_trial_error_unit_never_holds_more_than_max_seen(monkeypatch, cap):
+    """The bound itself, counted rather than timed (WP-2110): whatever the cap,
+    the unit scores exactly ``cap`` distinct solutions and no more.  The count
+    is of solutions scored, taken outside the engine, so it is deterministic
+    and its margin is exact, where an RSS figure would be a load sensor."""
+    from rietx.indexing import trial_error
+
+    peaks, _cell = synthetic_peaks("orthorhombic")
+    monkeypatch.setattr(trial_error, "MAX_SEEN", cap)
+    _found, stats, complete, scored = _trial_error_unit(
+        peaks, spec_for("orthorhombic"), "orthorhombic")
+    assert not complete
+    assert len(scored) == stats["seen"] == cap
+
+
 def test_dichotomy_holds_its_frontier_as_indices_until_a_cell_is_popped(
         monkeypatch):
     """Phase 2 holds the grid's survivor lists as narrow indices and gathers
