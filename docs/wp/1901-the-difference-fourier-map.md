@@ -56,7 +56,7 @@ Amendments from the review:
 ## Tasks
 
 - [ ] `solve/fourier.py`: F_obs and F_calc maps from a fit, peak picking, a significance in σ of the map
-- [ ] The alias in `structure_factor.py`
+- [x] The alias in `structure_factor.py`
 - [ ] Tests: NAC minus one atom puts the top ΔF peak within 0.10 Å of the removed site and above 3σ; the intact model has no peak above the threshold; the observed map has NAC's six maxima at the six sites
 - [ ] Skill: a routing row only if it ships a public entry point, otherwise none
 
