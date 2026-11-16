@@ -143,9 +143,20 @@ remembers, and the alternatives are the first thing lost.
       § Decisions with the maintainer, 2026-10-18) stays there. The tag
       names whichever holds it. A choice later revisited gets a new dated
       entry and a new tag date; the old entry stays.
-- [ ] The meta-test, modelled on `test_skill.py`'s: a tag that names nothing is
+- [x] The meta-test, modelled on `test_skill.py`'s: a tag that names nothing is
       a failure. Decide what it can actually check — a date, a resolvable WP or
       DESIGN.md anchor — and do not claim more.
+      **`tests/test_chosen_values.py`.** It checks that every `*(Chosen`
+      under `src/rietx` parses whole (so a misspelt tag fails, not passes
+      unread), that its date is real and not in the future, that its WP file
+      exists or its `docs/` file has the named heading, and that the record
+      mentions the date (in the WP file, or inside the named section). It
+      **cannot** check that the record holds the alternatives, only that the
+      pointer lands on a record of that day; nor that an untagged value was
+      not chosen, which is why the tag is a convention and not a gate on
+      every number. The check runs on a fixture tree too (ten failing tags,
+      three passing), and was made to fail twice on purpose: with no tags in
+      the tree, and with one live date moved a day.
 - [x] A pass over the values that are case 3 today. Start from the fourteen
       "this package's own" / "no source" sites and from any constant whose
       docstring argues rather than measures.
@@ -180,7 +191,7 @@ remembers, and the alternatives are the first thing lost.
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_docs_consistency.py tests/test_skill.py
+.venv/bin/python -m pytest tests/test_docs_consistency.py tests/test_skill.py tests/test_chosen_values.py
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 ```
 
