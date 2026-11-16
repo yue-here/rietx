@@ -580,6 +580,35 @@ nothing arms, and it takes `lor_size` to 5.13e-5°, 1.27× the cap, unchecked. I
 closing stage sets the size the caller reads, and it compiles before any copy reaches a cap.
 Question (15).
 
+**C26, σ widened at the compile-time blank scale while the scale is free**
+(`blank_sigma_scale.py`; macOS arm64, `[dev]`, about 4 s a fit). Si SRM 640c in Kapton with its
+measured blank, the `blank_free` protocol of `tests/test_acceptance_si640c.py` (3 Chebyshev
+terms, the blank's esd column as `fixed_sigma`, its scale free from 1.0). Each compile's blank
+scale is logged. The fit compiles eight times: the six declared stages, the closing stage, and
+the report's fresh compile at the answer, which keeps the solve's σ (`fresh.sigma =
+model.sigma`, refine.py:6433). Arms: start_1 (shipped); start_conv and start_3 (the scale started
+at 0.85 and at 3.0); again (one more declared stage freeing every glob, so the closing stage
+compiles one solve later); pinned (every compile widens σ at the start_1 answer's scale,
+0.841316, by setting the scale for the compile alone; a free scale is a design row, so the
+compile reads it only for σ); no_sigma (the blank's esd column dropped: no widening).
+
+| Arm | scale the closing stage compiled at | answer's scale | worst move against start_1 (esd) | σ against σ at the answer's scale |
+|---|---|---|---|---|
+| start_1 | 0.837415 | 0.84132(1074) | — | up to 0.24 % |
+| start_conv, start_3 | 0.837415 | the same | 2.5e-6, 1.4e-6 | up to 0.24 % |
+| again | 0.837429 | the same to 1.3e-7 | 9.3e-5 | up to 0.24 % |
+| pinned (σ at 0.841316 in every stage) | (σ at 0.841316) | 0.84128(1075) | **0.0061** (c0; scale 0.0036, `lor_size` 0.0047) | 0.0024 % |
+| no_sigma (positive arm) | — | 0.84528(999) | **0.80** (c0; `lor_size` 0.67, scale 0.40, Biso 0.22) | the widening itself is up to 45 % of σ_y |
+
+The per-stage lag does not survive the plan: only the first compiles see the start (1.0, 0.85
+or 3.0), and from the fourth compile on every arm compiles at the same scale to 1e-6. What reaches
+the caller is the closing stage's own move: it compiles at 0.837415 and lands at 0.841316, 0.36
+of the scale's esd, so the σ the result divides by is the one at 0.837415, within 0.24 % of
+the σ at the answer on every channel (the widening it carries is up to 45 %). The pinned arm,
+where every stage weights at the answer's scale, moves no value by more than 0.0061 esd
+against the shipped fit, while dropping the widening moves values up to 0.80 esd, so the arms
+can see a weighting effect of this kind; the lag is about 1/130 of it. Question (16).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -682,6 +711,12 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     reached it, so a size the closing stage moves past it (1.27× in the positive arm) is never
     capped. Is that the intended reach of a stage-granularity backstop, or does the closing
     stage owe the cap a second look?
+16. **C26.** On Si 640c in Kapton the stage-start scale's lag washes out of every intermediate
+    stage, and what reaches the caller is the closing stage's own move (0.36 esd of the
+    scale), which leaves `result.sigma` within 0.24 % of σ at the answer and the values within
+    0.0061 esd of a fit weighted at the answer throughout. Is C26 recorded *independent* (the
+    lag accepted, as forward.py's comment says) on this evidence, and is the bar for "the
+    lag is accepted" the maintainer's to state?
 
 ## Acceptance
 
