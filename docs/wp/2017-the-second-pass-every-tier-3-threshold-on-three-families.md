@@ -217,6 +217,24 @@ and have no free factor to measure, so this file's old list named them without c
   `at_bound` fired; then the margins on this family beside WP-1434's 13× and 236× (distance) and
   145× and 2e5× (angle). A margin under 1× either way is reported as measured and goes to the
   maintainer; no constant moves here.
+- **F, its patterns and arms, fixed 2026-11-16 before running** (`2017-batch/group_f.py`). Each
+  pattern's instrument background is replaced by `auto_background(data)`'s pick (the default
+  P-spline; both scores recorded). Arms: `pick` (the shipped triggers); `knot_flip`
+  (`HUMP_TRIGGER` moved just across the pattern's own `amorphous_hump_score`, so the other knot
+  step, 3° or 8°, is taken); `air_flip` (`AIR_SCATTER_TRIGGER` moved just across its
+  `air_scatter_gain`); `both_flip`; and the noise arm on the pick. Control: each arm's
+  `BackgroundChoice` must show the flipped knot step or air term, or the arm measured nothing.
+  Families. The Kapton capillary for a real hump: 11-BM Si SRM 640c under
+  `test_acceptance_si640c`'s XND-range protocol (its structure, instrument at 2-50°,
+  `_plan(asymmetric=True)`, S/L tied to H/L), whose low-angle halo is the empty capillary's (run
+  4736); references XND's λ and that suite's measured-blank arm (`_fit_chebyshev(3,
+  blank_scale=1.0, free_scale=True)`: the hump as measured, not fitted), read on λ, zero and Biso.
+  qarr's weighed mixtures for air: cpd-1a to -1h under the QPA acceptance protocol (its three
+  phases, `seed_scales`, `qpa_plan`), reference the weighed fractions. Read as group A: 0.1 plain
+  esd against `pick`, past noise, with Rwp, evaluations, status and whether
+  `AIR_SCATTER_UNDECLARED` fires; each pattern's two scores beside their triggers. These are two
+  families (11-BM; the qarr laboratory), against the table's two; a third is not owed by the row
+  text, which names these two.
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
