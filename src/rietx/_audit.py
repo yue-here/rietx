@@ -4072,7 +4072,7 @@ ROWS: tuple[Row, ...] = (
                   "x86_64): 1e-3, 1e-4 and 1e-5 under mccusker_default() at five passes are "
                   "bit-identical on LaB6+cBN, FAP and cpd-1a, because no pass's gain fell between "
                   "them: LaB6+cBN and cpd-1a stop at a second pass that raised Rwp (13.609 to "
-                  "13.649 %; 22.561 to 33.879 %), and FAP still gained 1.3 % a pass at the cap "
+                  "13.649 %; 22.561 to 33.879 %), and FAP still gained 1.3 % at its last pass "
                   "(10.108 to 8.710 % over five), so the constant was reached on none of three "
                   "families"),
         grounds=("Stops an opt-in alternation once a pass no longer lowers Rwp; kept at the "
@@ -4182,7 +4182,10 @@ ROWS: tuple[Row, ...] = (
                   "x86_64): the gap read at 2, 5 and 20 cycles from one converged Rietveld state "
                   "(n_cycles echoed back) is 0.977, 0.978, 0.978 on LaB6+cBN, 0.536, 0.549, 0.626 "
                   "on cpd-1a and 0.764, 0.980, 1.052 on FAP, so the partition sits at its fixed "
-                  "point by 5 cycles on one family of three; no arm crosses LEBAIL_GAP_NOTABLE")),
+                  "point by 5 cycles on one family of three; on FAP and cpd-1a more cycles raise "
+                  "the ratio (5 cycles under-reads FAP's by 0.07); every arm is a correct model "
+                  "and none comes near LEBAIL_GAP_NOTABLE (1.5), so no arm here could change that "
+                  "verdict")),
     Row("rietx.report.schemas.LEBAIL_GAP_NOTABLE", "constant", value=1.5),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MIN_REFLECTIONS", "constant", value=2),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA", "constant", value=1.0),
@@ -5104,7 +5107,9 @@ ROWS: tuple[Row, ...] = (
                   "against 1e-7 move LaB6+cBN 0.0002 plain esd and FAP 0.0095 and 0.0005, while "
                   "FAP's 506 share of that pair reads 0.0010, 0.048 and 0.0000; they move cpd-1a "
                   "0.76 and 0.82 plain esd (corundum a), past bar 2 on both sides, at 516 and 517 "
-                  "evaluations against 474 (noise twin 3.5e-7)"),
+                  "evaluations against 474 (noise twin 3.5e-7); cpd-1a's Le Bail fit ends at "
+                  "22.56 %, above the 16.31 % of its Rietveld protocol, so its move may read a fit "
+                  "off its minimum"),
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
