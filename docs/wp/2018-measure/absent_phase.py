@@ -9,7 +9,9 @@ fitted with ``mccusker_default``, in four arms:
               default cell window off; PHASE_UNCONSTRAINED still read at the default)
   neither     both off
   no_hold     ``refine._hold_unsupported_phases`` patched to hold nothing, so the
-              support window, the collapse and the reset act alone
+              support window, the collapse and the reset act alone; its empty
+              "unseen" set also reaches ``_hold_width_twins`` (refine.py:5227),
+              which holds nothing in either arm on this fixture
   window_only no_hold, and the collapse at the answer patched to collapse nothing
               (``_unsupported_phase_paths(..., at_answer=True)`` returns []): the
               support window and the reset act alone
