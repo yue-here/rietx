@@ -1,9 +1,8 @@
 # WP-1987 — The kernel gate on the macOS Intel runner
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-16 — the gate holds the twins on macOS x86_64 again, numpy and SciPy on OpenBLAS there (PR #1599)
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-10-16 — a red check on the PRs that touch the kernel paths; not a required check, and no fitted number is shown wrong
 
 ## Goal
 
@@ -112,6 +111,50 @@ runs in a row, or fails with a message that names the platform's non-determinism
 - `.github/workflows/kernels.yml` (`test` job).
 
 ## Handover log
+
+- **2026-11-16** — closed. The macOS Intel runner's numpy path does not reproduce itself
+  because of Accelerate, the BLAS that numpy's and SciPy's macOS 14 wheels use. The number
+  of Accelerate threads makes no difference. With the same versions built on OpenBLAS,
+  every fit is bit-identical. So the Kernels test job swaps numpy and SciPy for those
+  wheels on that runner, and the gate holds the kernels' twins to the numpy path there,
+  as it does on the other four platforms. Since WP-1999 the gate had only reported the
+  twins' gap there. A red job on that runner can again mean a kernel defect. An
+  Accelerate install, such as a developer's Intel Mac, still gets the report. PR #1599.
+
+  - *Measured*: Context § Measured 2026-11-16 (fork run 43874967910, eight jobs). The
+    positive arm held: Accelerate as installed gave 3 and 4 distinct results in 5 fits.
+    Acceptance check on the fork (run 43881637331, `wp1987-gate`, this branch's
+    `kernels.yml` test job on `macos-15-intel`): PENDING (four jobs still running at the pause, 2026-11-16T14:13Z: three with the swap, one Accelerate control). That run installed the
+    published rietx-kernels 1.5.0 wheel, not one built in the run, because GitHub's macOS
+    arm64 runners refused the cross-build for capacity (run 43879055791, "not acquired by
+    Runner of type hosted"). `kernels/` is unchanged since the `kernels-v1.5.0` tag. Local,
+    `.venv` `[dev]`, macOS arm64, python 3.12, numpy 2.5.5:
+    `tests/test_compiled_kernels.py` 28 passed, 1 skipped (one test function added,
+    `test_the_exemption_names_the_blas_not_only_the_platform`). `ruff check src tests
+    examples` clean. `python -m tests.reader_output` exit 0: unchanged against the
+    merge-base `bc77a934e`. The fast and full suites were not run: the branch touches the
+    bench, one test file and the workflow, and none of them moves a measured number.
+  - *Done*: `kernels.yml` gains a `macos-x86_64`-only step after the install. It
+    reinstalls numpy and SciPy at their resolved versions with `--python-platform
+    x86_64-apple-darwin` and `MACOSX_DEPLOYMENT_TARGET=13.0`, which selects the macOS 10.13
+    OpenBLAS wheels, and asserts that both report an OpenBLAS BLAS. In the bench,
+    `NONDETERMINISTIC` holds (platform, machine, BLAS) triples, and `nondeterministic()`
+    and `BLAS` read both libraries' `show_config(mode="dicts")`. A build that names no BLAS
+    stays exempt on macOS x86_64. The header line prints the BLAS. No thread pin is set:
+    OpenBLAS gave the same digest at one thread and at four.
+  - *Review*: a read-only review subagent found no bugs. It made three findings, and all
+    were applied: the unknown-BLAS case stays exempt, the test asserts that the BLAS is
+    read on the platform it runs on, and the spacing around the new test.
+  - *Not done*: why Accelerate on that CPU (i7-8700B, AVX2) varies from fit to fit. Every
+    BLAS call probed on a fixed 7000 × 30 matrix was bit-identical 40 times at all eight
+    alignments, so the variation needs inputs the probe did not build. It does not reach
+    the gate any more. No issue was filed: nothing in rietx is wrong, and Rosetta 2 does
+    not show it (WP-1999).
+  - *Generality*: not dispatched. `_audit.py` is unchanged, and the one new rule
+    (`NONDETERMINISTIC`) is in the CI bench under `examples/`, not in the package.
+  - Next: nothing for this WP. If GitHub retires `macos-15-intel`, or numpy stops
+    publishing macOS 10.13 x86_64 wheels, the swap step's assert fails by name. The choice
+    then is between dropping the platform from the gate and restoring WP-1999's report.
 
 - **2026-10-16** — filed at the maintainer's request from WP-1985's PR (#1017), where the
   job failed on a message reword. No open WP owns the kernel gate: 1939, 1940, 1959 and
