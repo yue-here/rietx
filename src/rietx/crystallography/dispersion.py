@@ -81,6 +81,16 @@ _ZERO_DISPERSION = frozenset({"H", "D", "He"})
 #: caller is expected to warn, and to prefer a measured override.
 NEAR_EDGE_EV = 50.0
 
+#: The way out a refusal outside the tabulated band names (issue #661,
+#: WP-1532).  An agent at a 74 keV beamline met the refusal and found the
+#: escape only in the :class:`~rietx.schemas.instrument.Dispersion`
+#: docstring.  A caller that has already taken it (the recipe reader, which
+#: declines and says so) strips it with ``str.removesuffix``.
+OUT_OF_BAND_ESCAPE = (
+    "; set `instrument.source.dispersion = None` to use f = f0 there (the "
+    "fit then reports DISPERSION_NEGLECTED), or supply a measured pair "
+    "through the source's dispersion overrides")
+
 
 @lru_cache(maxsize=1)
 def _load_table() -> dict[str, np.ndarray]:
@@ -190,7 +200,8 @@ def dispersion(element: str, wavelength: float) -> tuple[float, float]:
     if not (e[0] <= energy <= e[-1]):
         raise ValueError(
             f"wavelength {wavelength} A (E = {energy / 1e3:.3f} keV) is outside "
-            f"the tabulated {e[0] / 1e3:.0f}-{e[-1] / 1e3:.0f} keV band for {sym}")
+            f"the tabulated {e[0] / 1e3:.0f}-{e[-1] / 1e3:.0f} keV band for {sym}"
+            + OUT_OF_BAND_ESCAPE)
     i = int(np.searchsorted(e, energy)) - 1
     i = max(0, min(i, len(e) - 2))
     if grid[i + 1, 2] > grid[i, 2]:

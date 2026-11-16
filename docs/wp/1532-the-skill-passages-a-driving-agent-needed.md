@@ -144,7 +144,7 @@ The row needs that check before it is written.
 - [ ] Place each of the fourteen rows: the package's own text, a reference
       row, the body (paid for by a cut), or declined with a reason, recorded
       row by row in the handover
-- [ ] The f′/f″ raise names `dispersion = None` in its own message (the
+- [x] The f′/f″ raise names `dispersion = None` in its own message (the
       issue's note, left out of PR #660)
 - [ ] `rietx skill --install . --copy` re-syncs the two committed copies
 - [ ] Skill: this WP is the skill change

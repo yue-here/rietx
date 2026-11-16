@@ -22,7 +22,7 @@ import math
 import numpy as np
 import pytest
 
-from rietx.crystallography.dispersion import dispersion
+from rietx.crystallography.dispersion import OUT_OF_BAND_ESCAPE, dispersion
 from rietx.crystallography.lattice import d_spacings
 from rietx.crystallography.scattering import f0
 from rietx.crystallography.structure_factor import (
@@ -513,6 +513,19 @@ def test_out_of_band_wavelength_is_refused():
         dispersion("Fe", 6.0)      # 2.07 keV, below the 3 keV floor
     with pytest.raises(ValueError, match="outside the tabulated"):
         dispersion("Fe", 0.1)      # 124 keV, above the 70 keV ceiling
+
+
+def test_the_out_of_band_refusal_names_the_way_out():
+    """The refusal says ``dispersion = None`` and what it costs (WP-1532).
+
+    Issue #661: an agent at 74 keV found the escape only in the
+    ``Dispersion`` docstring.
+    """
+    with pytest.raises(ValueError) as caught:
+        dispersion("Si", 0.1665)   # 74.5 keV, a PDF beamline
+    assert str(caught.value).endswith(OUT_OF_BAND_ESCAPE)
+    assert "`instrument.source.dispersion = None`" in OUT_OF_BAND_ESCAPE
+    assert "DISPERSION_NEGLECTED" in OUT_OF_BAND_ESCAPE
 
 
 def test_unknown_element_is_refused():

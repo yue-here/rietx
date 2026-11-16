@@ -105,7 +105,7 @@ from typing import Any
 
 import numpy as np
 
-from ..crystallography.dispersion import dispersion
+from ..crystallography.dispersion import OUT_OF_BAND_ESCAPE, dispersion
 from ..crystallography.lattice import cell_volume
 from ..model.forward import seed_phase_scales
 from ..model.profiles.caglioti import (
@@ -702,7 +702,7 @@ def _decline_dispersion_off_table(instrument: Instrument, structure: Structure,
             level="info", code="RECIPE_DISPERSION_DECLINED",
             message=(
                 f"Anomalous scattering was declined and f = f0 is used: "
-                f"{exc}."),
+                f"{str(exc).removesuffix(OUT_OF_BAND_ESCAPE)}."),
             where=["instrument.source.dispersion"]))
 
 
