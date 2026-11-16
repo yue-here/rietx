@@ -188,7 +188,7 @@ class JanaPhase:
     lattice: str = "P"
     lattvec: list[tuple[float, float, float]] = field(default_factory=list)
     centro: bool = False
-    symmetry: list[str] = field(default_factory=list)
+    symmetry: list[str] = field(default_factory=list)  # x1/x2/x3 read as x/y/z
     sgshift: tuple[float, ...] | None = None
     atom_types: list[JanaAtomType] = field(default_factory=list)
     other: dict[str, str] = field(default_factory=dict)
@@ -232,6 +232,7 @@ class JanaModel:
     title: str | None = None
     wavelength: float | None = None
     radtype: int | None = None
+    experiment: dict[str, str] = field(default_factory=dict)
     phases: list[JanaPhase] = field(default_factory=list)
     autkeys: int | None = None
     constraints: list[str] = field(default_factory=list)
@@ -240,6 +241,7 @@ class JanaModel:
     overall_temperature: float | None = None
     extinction: Keyed | None = None
     atoms: list[list[JanaAtom]] = field(default_factory=list)
+    m40_trailing: int = 0
     m41_header: dict[str, str] = field(default_factory=dict)
     m41_common: dict[str, Keyed] = field(default_factory=dict)
     m41_phases: list[JanaM41Phase] = field(default_factory=list)
@@ -289,6 +291,27 @@ def _float(text: str) -> float:
     return value
 
 
+def _values(text: str, *, where: str) -> list[float]:
+    """Every number on ``text``, refusing a run-together positive value.
+
+    A negative value that fills its field fuses with its neighbour and the
+    sign separates them (``0.500000-0.063340``, M2000 p. 52).  A *positive*
+    one would fuse with nothing to separate it (``4.31000090.000000``), and
+    a decimal-point split would cut it in a plausible wrong place, so a
+    number that starts straight after a digit is refused rather than read.
+    """
+    matches = list(_NUMBER.finditer(text))
+    for m in matches:
+        if (m.start() > 0 and text[m.start() - 1].isdigit()
+                and m.group()[0] not in "+-"):
+            raise JanaError(f"{where}: two values run together on "
+                            f"{text.strip()!r}; their boundary cannot be read")
+    try:
+        return [_float(m.group()) for m in matches]
+    except (ValueError, OverflowError) as exc:
+        raise JanaError(f"{where}: a non-finite value on {text.strip()!r}") from exc
+
+
 def _keyed_line(line: str, *, where: str, n_keys: int | None = None) -> Keyed:
     """Values then a digit-only key string, one digit per value (M98 p. 97).
 
@@ -305,7 +328,7 @@ def _keyed_line(line: str, *, where: str, n_keys: int | None = None) -> Keyed:
         raise JanaError(f"{where}: unreadable field on {line.strip()!r} "
                         f"(numbers must carry a decimal point; the line ends "
                         f"in a digit-only key string)")
-    values = [_float(m.group()) for m in matches]
+    values = _values(line[:matches[-1].end()], where=where)
     want = len(values) if n_keys is None else n_keys
     if len(tail) != want:
         raise JanaError(
@@ -316,10 +339,9 @@ def _keyed_line(line: str, *, where: str, n_keys: int | None = None) -> Keyed:
 
 
 def _numbers(text: str, *, where: str) -> list[float]:
-    matches = list(_NUMBER.finditer(text))
     if _NUMBER.sub(" ", text).strip():
         raise JanaError(f"{where}: unreadable field on {text.strip()!r}")
-    return [_float(m.group()) for m in matches]
+    return _values(text, where=where)
 
 
 # ------------------------------------------------------------- .m50
@@ -339,19 +361,22 @@ def _keyword(token: str, *, where: str) -> str:
         f"document, so they are refused rather than guessed")
 
 
-def _part_one_end(lines: list[str]) -> int:
+def _part_one_end(lines: list[str], where: str) -> int:
+    """The ``end`` closing part I (M98 Fig. 55); a file without one is cut short."""
     for i, raw in enumerate(lines):
         text = raw.split("!")[0].strip()
         if text.lower() == "end":
             return i
-    return len(lines)
+    raise JanaError(f"{where}: no 'end' line closes the keyword part, so the "
+                    f"file is cut short or is not a Jana file")
 
 
 def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
-    end = _part_one_end(lines)
+    end = _part_one_end(lines, where)
     phase = JanaPhase()
     phases: list[JanaPhase] = []
     explicit = False
+    in_table = False  # inside a formtab's numbers, which may wrap lines
     for n, raw in enumerate(lines[:end], start=1):
         here = f"{where} line {n}"
         text = raw.split("!")[0]
@@ -362,6 +387,11 @@ def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
         tokens = text.split()
         i = 0
         while i < len(tokens):
+            if in_table:
+                if _NUMBER.fullmatch(tokens[i]) or tokens[i].lstrip("+-").isdigit():
+                    i += 1
+                    continue
+                in_table = False
             key = _keyword(tokens[i], where=here)
             stance = M50_STANCES[key]
             if stance.stance == "refused":
@@ -379,6 +409,11 @@ def _read_m50(lines: list[str], model: JanaModel, where: str) -> None:
                                     f"has {len(args)}")
                 arg = " ".join(args)
                 i += 1 + count
+            if key == "formtab":
+                # the table's numbers follow, eight a line (M2000 p. 53); what
+                # a negative count means is not documented, so the numbers are
+                # taken up to the next keyword rather than counted
+                in_table = True
             try:
                 phase, explicit = _apply(key, arg, phase, phases, explicit, model)
             except JanaError as exc:
@@ -401,8 +436,12 @@ def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
     elif key == "radtype":
         model.radtype = int(arg)
     elif key == "phase":
-        if explicit or phase.cell or phase.atom_types or phase.symmetry:
+        if explicit:
             phases.append(phase)
+        elif phase != JanaPhase():
+            raise JanaError("a phase-level keyword comes before the first "
+                            "'phase' line, so which phase it belongs to is not "
+                            "stated")
         phase, explicit = JanaPhase(name=arg or None), True
     elif key in ("cell", "esdcell", "sgshift"):
         setattr(phase, key, tuple(_float(v) for v in nums))
@@ -426,7 +465,9 @@ def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
         if len(nums) != 3:
             raise JanaError(f"symmetry {arg!r} has {len(nums)} components; only "
                             f"three-dimensional operators are read")
-        phase.symmetry.append(",".join(nums))
+        phase.symmetry.append(",".join(
+            t.lower().replace("x1", "x").replace("x2", "y").replace("x3", "z")
+            for t in nums))
     elif key == "ndim" and int(arg) != 3:
         raise JanaError(f"ndim {arg} is a modulated structure, refused by name")
     elif key == "ncomp" and int(arg) != 1:
@@ -437,7 +478,9 @@ def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
         if not phase.atom_types:
             raise JanaError(f"{key!r} before any 'atom' line")
         phase.atom_types[-1].values[key] = _float(arg)
-    elif key in ("unitsnumb", "chemform", "lpfactor", "monangle", "datcolltemp"):
+    elif key in ("lpfactor", "monangle", "datcolltemp"):
+        model.experiment[key] = arg  # global in M2000 p. 53's multiphase set
+    elif key in ("unitsnumb", "chemform"):
         phase.other[key] = arg
     return phase, explicit
 
@@ -465,17 +508,22 @@ def _read_control_sections(lines: list[str], model: JanaModel, where: str) -> No
         if head == "end":
             current = None
             continue
-        if current != "refine":
+        if not _names(current, "refine"):
             continue
         for j, token in enumerate(tokens):
-            if token.lower() == "autkeys" and j + 1 < len(tokens):
+            if _names(token.lower(), "autkeys") and j + 1 < len(tokens):
                 try:
                     model.autkeys = int(tokens[j + 1])
                 except ValueError as exc:
                     raise JanaError(f"{where}: autkeys {tokens[j + 1]!r} is not "
                                     f"an integer") from exc
-        if head.startswith(CONSTRAINT_COMMANDS):
+        if any(_names(head, c) for c in CONSTRAINT_COMMANDS):
             model.constraints.append(text)
+
+
+def _names(token: str, word: str) -> bool:
+    """``token`` spells ``word`` or abbreviates it (M98 p. 77), in three letters or more."""
+    return len(token) >= 3 and word.startswith(token)
 
 
 # ------------------------------------------------------------- .m40
@@ -515,6 +563,8 @@ def _read_m40(lines: list[str], model: JanaModel, where: str) -> None:
                 f"integers; the single-part layout is Nat Nmol Itemp Irot "
                 f"(M98 p. 107)")
         nat, nmol, itemp, _irot = header
+        if nat < 0:
+            raise JanaError(f"{where} line {n}: a negative atom count {nat}")
         if nmol:
             raise JanaError(f"{where} line {n}: {nmol} rigid-body molecule(s), "
                             f"refused by name")
@@ -539,6 +589,9 @@ def _read_m40(lines: list[str], model: JanaModel, where: str) -> None:
             n, first = take()
             atoms.append(_atom(first, take()[1], where=f"{where} line {n}"))
         model.atoms.append(atoms)
+    # what follows the declared atoms is the s.u. block (M98 pp. 93-94),
+    # whose separator no document shows: counted, and named at build
+    model.m40_trailing = len(rows) - pos
 
 
 _ATOM_HEAD = re.compile(r"\s*(\S+)\s+(-?\d+)\s+(-?\d+)(.*)$")
@@ -569,7 +622,7 @@ def _atom(first: str, second: str, *, where: str) -> JanaAtom:
             raise JanaError(f"{where}: atom {label!r} carries modulation "
                             f"waves or special functions ({' '.join(tail)}), "
                             f"refused by name")
-    ai, x, y, z = (_float(m.group()) for m in values[:4])
+    ai, x, y, z = _values(rest[:values[3].end()], where=where)
     adp = _keyed_line(second, where=f"{where} (+1)", n_keys=10)
     if len(adp.values) != 6:
         raise JanaError(f"{where}: atom {label!r}: the displacement line holds "
@@ -581,7 +634,7 @@ def _atom(first: str, second: str, *, where: str) -> JanaAtom:
 # ------------------------------------------------------------- .m41
 
 def _read_m41(lines: list[str], model: JanaModel, where: str) -> None:
-    end = _part_one_end(lines)
+    end = _part_one_end(lines, where)
     for raw in lines[:end]:
         tokens = raw.split("!")[0].split()
         for k in range(0, len(tokens) - 1, 2):
@@ -657,11 +710,17 @@ def _report(model: JanaModel, diagnostics: list[Diagnostic]) -> None:
     if model.autkeys != 0:
         diagnostics.append(Diagnostic(
             level="warning", code="JANA_KEYS_MAY_BE_IGNORED",
-            message=(f"{named} does not state 'autkeys 0' in a REFINE section "
-                     f"(stated: {model.autkeys!r}; M98 gives 1 as the default). "
-                     f"In Jana's automatic mode REFINE ignores the .m40 keys of "
-                     f"all but scales and occupancies, so the vary flags read "
-                     f"from them may not be the set the Jana run refined."),
+            message=(
+                (f"{named} states autkeys {model.autkeys} in its REFINE section: "
+                 f"Jana's automatic mode, in which REFINE ignores the .m40 keys "
+                 f"of all but scales and occupancies, so the vary flags read "
+                 f"from them are not the set the Jana run refined."
+                 if model.autkeys is not None else
+                 f"{named} does not state autkeys in a REFINE section, and the "
+                 f"Jana98 manual gives automatic mode (autkeys 1) as the "
+                 f"default, in which REFINE ignores the .m40 keys of all but "
+                 f"scales and occupancies; so the vary flags read from them may "
+                 f"not be the set the Jana run refined.")),
             suggestion=("Check which parameters the Jana run refined before "
                         "reusing its protocol.")))
     if model.constraints:
@@ -693,7 +752,9 @@ def _operators(phase: JanaPhase) -> list[str]:
         centring = _CENTRING[phase.lattice] + list(phase.lattvec)
     else:
         raise JanaError(f"lattice {phase.lattice!r} is not a centring letter")
-    listed = [gemmi.Op(t) for t in phase.symmetry] or [gemmi.Op("x,y,z")]
+    if not phase.symmetry:
+        raise JanaError("states no symmetry operator, not even x y z")
+    listed = [gemmi.Op(t) for t in phase.symmetry]
     full = []
     for op in listed:
         variants = [op, gemmi.Op("-x,-y,-z") * op] if phase.centro else [op]
@@ -703,7 +764,9 @@ def _operators(phase: JanaPhase) -> list[str]:
                 shifted.tran = [(v.tran[i] + round(t[i] * gemmi.Op.DEN))
                                 % gemmi.Op.DEN for i in range(3)]
                 full.append(shifted.triplet())
-    return full
+    # an operator listed and also generated (an explicit -x -y -z beside
+    # centro) is one operation; gemmi finds no group for a list with repeats
+    return list(dict.fromkeys(full))
 
 
 def to_structure(model: JanaModel, *, phase: int | str | None = None,
@@ -729,9 +792,12 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
 
     import rietx as rx
 
+    from ...crystallography.adp import u_equivalent
     from ...crystallography.symmetry import site_orbit
     from ...crystallography.twins import merge_site_twins
     from ...crystallography.wyckoff import coordinate_basis
+    from ...params.vector import ParameterTable
+    from ...schemas.instrument import Instrument
 
     named = model.path
     names = [p.name for p in model.phases]
@@ -753,6 +819,8 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
     try:
         ops = gemmi.GroupOps([gemmi.Op(t) for t in _operators(chosen)])
         sg = gemmi.find_spacegroup_by_ops(ops)
+    except JanaError as exc:
+        raise JanaError(f"{named}: phase {label!r} {exc}") from exc
     except (RuntimeError, ValueError) as exc:
         raise JanaError(f"{named}: phase {label!r}: its symmetry operators "
                         f"do not form a group this build reads ({exc})") from exc
@@ -778,6 +846,10 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                             f"section holds {len(cell_section.values)} values, "
                             f"not six")
         cell, cell_vary = cell_section.values, cell_section.keys
+        if chosen.cell is not None and any(
+                abs(x - y) > 1e-9 for x, y in zip(chosen.cell, cell)):
+            not_carried.append(f"the .m50 cell {list(chosen.cell)}, the .m41's "
+                               f"refined {list(cell)} being taken")
     elif chosen.cell is not None and len(chosen.cell) == 6:
         cell, cell_vary = list(chosen.cell), [False] * 6
         not_carried.append("the .m41 states no cell for this phase, so the "
@@ -786,14 +858,28 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         raise JanaError(f"{named}: phase {label!r} states no cell")
 
     general = len(list(sg.operations()))
-    sites, frozen, merged = [], [], []
+    sites, frozen, merged, snapped = [], [], [], []
     for atom in model.atoms[index]:
         xyz = np.array(atom.xyz, dtype=float)
         orbit = site_orbit(sg, xyz)
-        # M98 p. 116: ai is the occupancy over the site's symmetry order
-        occupancy = atom.ai * general / orbit.multiplicity
+        # M98 p. 116: ai is the occupancy over the site's symmetry order,
+        # printed to six decimals, so the occupancy is known to 5e-7 times
+        # that order: a full site within it reads as full, and one past it
+        # is more than full, which is another program's convention
+        order = general / orbit.multiplicity
+        occupancy = atom.ai * order
+        printed = 5e-7 * order + 1e-12
+        if occupancy > 1.0 + printed:
+            raise JanaError(
+                f"{named}: phase {label!r}: atom {atom.label!r} has ai "
+                f"{atom.ai} on a site of symmetry order {order:g}, an "
+                f"occupancy of {occupancy:g}; Jana's ai of a special position "
+                f"is the occupancy over that order (M98 p. 116)")
+        if occupancy != 1.0 and abs(occupancy - 1.0) <= printed:
+            snapped.append(atom.label)
+            occupancy = 1.0
         # one flag for the three coordinates, freeing what symmetry permits,
-        # as GSAS's X flag does: a site's directions are rietx's DOFs, not x/y/z
+        # as GSAS's X flag does: ParameterTable frees a site's DOFs together
         keys_xyz = atom.keys[1:4]
         vary_xyz = any(keys_xyz)
         if vary_xyz and not all(keys_xyz):
@@ -806,11 +892,15 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
             atom=atom, species=chosen.atom_types[atom.type_index - 1].symbol,
             occupancy=occupancy, vary_xyz=vary_xyz,
             # an anisotropic site's biso is an inert record (Atom's docstring)
-            biso=(u[0] if atom.adp_type == 1 else (u[0] + u[1] + u[2]) / 3)
+            biso=(u[0] if atom.adp_type == 1 else u_equivalent(u, cell))
             * EIGHT_PI_SQUARED,
             aniso=u if atom.adp_type == 2 else None,
             vary_aniso=any(atom.keys[4:10])))
 
+    # Every schema object is built here, inside one guard, and so is the
+    # ParameterTable, whose symmetry refusals (a cell angle against its
+    # setting, a tensor outside its site's subspace) would otherwise reach
+    # the caller at fit time naming a parameter path rather than the file.
     try:
         structure = rx.Structure(phases=[rx.Phase(
             name=label,
@@ -832,22 +922,41 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                        rx.AnisoU.from_values(s["aniso"], vary=s["vary_aniso"])))
                 for s in sites],
             scale=rx.Parameter(value=1e-3, min=0.0))])
+        ParameterTable(structure, Instrument.constant_wavelength_neutron(1.0))
     except ValueError as exc:
-        raise JanaError(f"{named}: phase {label!r} states values this build's "
-                        f"schema refuses ({exc}). The file's own numbers are "
-                        f"on the model") from exc
+        raise JanaError(f"{named}: phase {label!r} states values this build "
+                        f"refuses ({exc}). The file's own numbers are on the "
+                        f"model") from exc
 
     structure = merge_site_twins(structure, diagnostics=diagnostics, source=named)
     if diagnostics is not None:
+        where = ["phases.0.scale"]
+        labels = [s["atom"].label for s in sites]
         if frozen:
             not_carried.append(f"coordinate keys on fully fixed special positions "
-                               f"({', '.join(frozen)}) are held")
+                               f"({', '.join(frozen)}), which are held")
         if merged:
-            not_carried.append(f"partly set coordinate keys ({', '.join(merged)}) "
-                               f"free every direction the site allows")
+            not_carried.append(
+                f"the per-axis coordinate keys of {', '.join(merged)}: a key on "
+                f"any axis frees every direction the site allows, so an axis "
+                f"the Jana run held (a polar group's origin, say) moves unless "
+                f"held again, e.g. by Phase.floating_origin")
+        if snapped:
+            not_carried.append(f"the last printed digit of ai for "
+                               f"{', '.join(snapped)}, read as fully occupied")
+        where += [f"phases.0.atoms.{labels.index(n)}.x"
+                  for n in dict.fromkeys(frozen + merged + snapped)]
+        stated = sorted({k for t in chosen.atom_types for k in t.values
+                         if k in ("f'", 'f"', "fneutron")})
+        if stated:
+            not_carried.append(f"the .m50's stated {', '.join(stated)}, rietx "
+                               f"computing its own scattering factors")
         if len(model.phases) > 1:
             not_carried.append("the .m40 scale line's phase volume fractions, "
                                "whose positions no published document states")
+        if model.m40_trailing:
+            not_carried.append(f"{model.m40_trailing} .m40 line(s) after the "
+                               f"declared atoms, taken as the s.u. block")
         others = sorted({_title_key(t) for t in model.m41_common}
                         | {_title_key(t) for p in model.m41_phases
                            for t in p.sections} - set(M41_READ))
@@ -861,5 +970,5 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
             message=(f"{named}: phase {label!r} was built without: "
                      + "; ".join(not_carried) + "."),
             suggestion="Refine the scale before you trust it.",
-            where=["phases.0.scale"]))
+            where=where))
     return structure

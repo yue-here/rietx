@@ -25,8 +25,15 @@ PBAM_OPS = ["x y z", "x y -z", "1/2-x 1/2+y z", "1/2-x 1/2+y -z"]
 
 
 def _num(v: float) -> str:
-    """Jana's value field: nine characters, six decimals, so negatives fuse."""
-    return f"{v:9.6f}"
+    """Jana's value field as the manuals' listings show it: nine characters,
+    as many decimals as fit, a positive keeping one blank in front (``90.00000``)
+    and a negative filling the field, so it fuses (``0.500000-0.063340``)."""
+    room = 9 if v < 0 else 8
+    for d in range(6, -1, -1):
+        text = f"{v:.{d}f}"
+        if len(text) <= room:
+            return text.rjust(9)
+    raise ValueError(v)
 
 
 def _keyed(values, keys: str) -> str:
@@ -154,6 +161,9 @@ def test_a_two_phase_set_reads_what_the_files_state(tmp_path):
     assert model.scale.values[-1] == 0.16 and model.scale.keys[0]
     assert model.m41_common["Background parameters"].values == [100.0, -20.0, 3.0]
     assert model.m41_phases[1].name == "NaCl"
+    assert model.m41_phases[0].sections["Gaussian parameters - U,V,W,P"].values \
+        == [30.0, -10.0, 20.0, 0.0]
+    assert model.experiment == {"lpfactor": "1", "monangle": "0"}
 
 
 @pytest.mark.parametrize("path", ["syn.m40", "syn.m41", "syn"])
@@ -198,10 +208,15 @@ def test_the_structure_carries_occupancy_symmetry_and_flags(tmp_path):
     assert atoms["Ti1"].aniso is not None and atoms["Ti1"].aniso.u12.value == 0.001
     assert atoms["Ti1"].aniso.u11.vary and not atoms["Ti1"].biso.vary
     cell = phase.cell
-    assert (cell.a.value, cell.a.vary, cell.c.vary, cell.alpha.vary) == (8.11, True, True, False)
+    assert [getattr(cell, n).value for n in ("a", "b", "c", "alpha", "beta", "gamma")] \
+        == [8.11, 9.21, 4.31, 90.0, 90.0, 90.0]
+    assert (cell.a.vary, cell.c.vary, cell.alpha.vary) == (True, True, False)
     (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
     assert "Ba1" in info.message and "Gaussian parameters" in info.message
     assert "phase volume fractions" in info.message
+    assert "f'" in info.message and 'f"' in info.message
+    assert "the .m50 cell [8.1" in info.message
+    assert "phases.0.atoms.0.x" in info.where
 
 
 def test_the_cubic_phase_reads_its_setting_from_the_operators(tmp_path):
@@ -330,3 +345,96 @@ def test_every_truncation_raises_naming_the_file_or_reads(tmp_path):
                     jana.to_structure(model, phase=index)
             except jana.JanaError as exc:
                 assert str(tmp_path) in str(exc) or "phase" in str(exc), exc
+
+
+# --------------------------------------------------------------- review findings
+
+def test_a_positive_value_run_into_its_neighbour_is_refused(tmp_path):
+    text = m41().replace(" 8.110000 9.210000", " 8.1100009.210000")
+    with pytest.raises(jana.JanaError, match="run together"):
+        jana.read_jana(write_set(tmp_path, m41=text))
+
+
+def test_a_non_finite_value_is_refused_naming_the_file(tmp_path):
+    text = m40().replace(" 0.840000", "1.0E999  ", 1)
+    with pytest.raises(jana.JanaError, match="non-finite") as info:
+        jana.read_jana(write_set(tmp_path, m40=text))
+    assert "syn.m40" in str(info.value)
+
+
+def test_a_form_factor_table_is_read_past_across_lines(tmp_path):
+    text = m50().replace("atom O\n", "atom O\nformtab -4\n 8.0 7.5\n 7.0 6.5 atweight 15.999\n")
+    assert len(jana.read_jana(write_set(tmp_path, m50=text)).phases[0].atom_types) == 3
+
+
+def test_an_operator_listed_and_generated_is_one_operation(tmp_path):
+    text = m50().replace("symmetry x y z\n", "symmetry x y z\nsymmetry -x -y -z\n", 1)
+    s = jana.to_structure(jana.read_jana(write_set(tmp_path, m50=text)), phase=0)
+    assert gemmi.SpaceGroup(s.phases[0].space_group).number == 55
+
+
+def test_rows_after_the_declared_atoms_are_counted_and_named(tmp_path):
+    text = m40() + " 0.001000 0.000000 0.000000 0.000000 0.000000 0.000000\n"
+    model = jana.read_jana(write_set(tmp_path, m40=text))
+    assert model.m40_trailing == 1
+    diags: list[Diagnostic] = []
+    jana.to_structure(model, phase=0, diagnostics=diags)
+    assert "after the declared atoms" in diags[-1].message
+
+
+@pytest.mark.parametrize("which", [".m50", ".m41"])
+def test_a_keyword_part_without_its_end_is_refused(tmp_path, which):
+    texts = {".m50": m50(), ".m41": m41()}
+    texts[which] = texts[which].replace("\nend\n", "\n")  # every one
+    with pytest.raises(jana.JanaError, match="no 'end' line"):
+        jana.read_jana(write_set(tmp_path, m50=texts[".m50"], m41=texts[".m41"]))
+
+
+def test_a_phase_keyword_before_the_first_phase_is_refused(tmp_path):
+    text = m50().replace("phase Alpha\n", "centro\nphase Alpha\n")
+    with pytest.raises(jana.JanaError, match="before the first 'phase'"):
+        jana.read_jana(write_set(tmp_path, m50=text))
+
+
+def test_an_occupancy_past_one_is_refused_and_a_full_site_is_full(tmp_path):
+    line = "Ba1       1  1     " + "".join(_num(v) for v in (1.0, 0, 0, 0))
+    model = jana.read_jana(write_set(tmp_path, m40=m40(ba_line=line)))
+    with pytest.raises(jana.JanaError, match="symmetry order 4"):
+        jana.to_structure(model, phase=0)
+    s = jana.to_structure(jana.read_jana(write_set(tmp_path, stem="b")), phase=1)
+    assert [a.occ.value for a in s.phases[0].atoms] == [1.0, 1.0]
+
+
+def test_a_phase_with_no_operator_is_refused(tmp_path):
+    text = m50(two_phase=False)
+    text = "\n".join(x for x in text.splitlines() if not x.startswith("symmetry"))
+    model = jana.read_jana(write_set(tmp_path, m50=text + "\n", two_phase=False))
+    with pytest.raises(jana.JanaError, match="no symmetry operator"):
+        jana.to_structure(model)
+
+
+def test_a_tensor_outside_its_site_symmetry_is_refused_naming_the_file(tmp_path):
+    adp = _keyed([0.011, 0.012, 0.013, 0.001, 0.003, 0], "0110111111")
+    model = jana.read_jana(write_set(tmp_path, m40=m40(ti_adp=adp)))
+    with pytest.raises(jana.JanaError, match="syn.m50"):
+        jana.to_structure(model, phase=0)
+
+
+def test_an_ambiguous_abbreviation_is_refused(tmp_path):
+    text = m50().replace("atweight 47.867", "f 47.867")
+    with pytest.raises(jana.JanaError, match="'f' is not in"):
+        jana.read_jana(write_set(tmp_path, m50=text))
+
+
+def test_abbreviated_refine_commands_are_still_read(tmp_path):
+    diags: list[Diagnostic] = []
+    text = m50(refine="autk 0\nrestr O1 1").replace("\nrefine\n", "\nref\n")
+    model = jana.read_jana(write_set(tmp_path, m50=text), diagnostics=diags)
+    assert model.autkeys == 0 and model.constraints == ["restr O1 1"]
+    assert [d.code for d in diags] == ["JANA_CONSTRAINTS_NOT_CARRIED"]
+
+
+def test_a_stated_automatic_mode_is_said_plainly(tmp_path):
+    diags: list[Diagnostic] = []
+    jana.read_jana(write_set(tmp_path, m50=m50(refine="autkeys 1")), diagnostics=diags)
+    assert "are not the set" in diags[0].message
