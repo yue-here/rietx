@@ -698,6 +698,37 @@ correlation's other basin (ρ = 0.985). So on NAC the pair does not change an an
 positive arm cannot make it act, because the scale's floor or the basin decides first. Question
 (19).
 
+**C36, the background's start against the Le Bail partition at stage compile**
+(`lebail_bkg_seed.py`; macOS arm64, `[dev]`, under 1 s a fit). Three patterns of one synthetic
+Pnma phase (CW neutron 2.4 Å, drawn with W = 0.25, X = 0.001, U = V = Y = 0, true cell known):
+#740's (`test_lebail_cycles.py`, strong peaks on a 300 + 2·2θ pedestal) and the two of
+`test_lebail_background_hump.py` (the phase at 1/50 of that scale on the same pedestal, and
+with a 600-count hump at 50°), each fitted as that module fits (`profile_only` Le Bail from the
+true cell and widths). Arms: zero (`auto_background`, the default: every coefficient 0), seed
+(`seed=True`), truth (the positive arm: the true curve held, four Chebyshev terms free from 0).
+
+| Pattern | arm | Rwp | background / truth at 50° | W (truth 0.25) | Y (truth 0) | cell axis furthest from the truth, in its esds (ppm) |
+|---|---|---|---|---|---|---|
+| #740 | zero / seed / truth | 0.0108 / 0.0107 / 0.0108 | 1.004 / 1.004 / 0.994 | 0.2500 / 0.2499 / 0.2498 (6e-4) | within 1.2 esd of 0 in all three | b, −4.7(13) in all three |
+| flat | zero | 0.0547 | 0.978 | 0.219(20) | **0.079(25)**, U −0.016(8), X on its floor | c, −36(36) |
+| flat | seed | 0.0468 | 0.983 | 0.249(12) | 0.034(14) | b, −38(20) |
+| flat | truth | 0.0425 | 0.987 | 0.254(10) | 0.012(11) | b, −40(16) |
+| hump | zero | 0.1001 | 0.817 | 0.190(55), `RESOLUTION_NOT_POSITIVE` | 0.030(67) | a, −60(130) |
+| hump | seed | 0.0934 | 0.830 | 0.255(47) | −0.017(59) | a, −72(106) |
+| hump | truth | 0.0405 | 0.996 | 0.253(10) | 0.010(12) | b, −41(16) |
+
+On #740's pattern, where the peaks dwarf the pedestal, the start changes nothing (cell within
+0.6 esd, widths within 0.4 esd, across all three). Where the phase is weak against the
+pedestal the partition against an unfitted background does reach the answer: from zero, Y
+ends 3.1 esd from its true 0 and U 1.9 esd negative on the flat pattern, and W 1.1 esd low with
+`RESOLUTION_NOT_POSITIVE` on the hump; the seed takes W to within 0.1 esd of the truth on
+both, but Y stays 2.4 esd off on the flat pattern and the hump's background still ends at 0.83
+of the truth (WP-1542's 0.83, reproduced). Only the true curve held brings every width within
+1.1 esd and the background to within 1.3 %. The cells move less: between the zero and truth arms by at most 1.2 of the truth arm's esds
+on the flat pattern and 2.5 on the hump (0.4 of the zero arm's own, which are 6× wider), and
+the axis furthest from the truth is as far in the truth arm (2.6 esd) as in any other, so what
+the start moves first is the profile and the esds. Question (20).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -826,6 +857,13 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     Rietveld scale floors in the first stage; Pawley lands in the zero-cell basin at ρ 0.985),
     so is a dataset that moves a position by more than the 0.3° headroom inside one stage and
     still converges owed, or is the row closed?
+20. **C36.** On #740's pattern the background's start changes nothing; on the weak-phase
+    patterns of `test_lebail_background_hump.py` the first partition against an unfitted
+    background leaves the profile 1.1-3.1 esd off from a zero start, the seed recovers W but
+    not Y (2.4 esd) or the hump, and only the true curve recovers both. Is C36 recorded
+    *ordered* (the partition reads the background the stage starts from, by design), and is
+    #725's question, whether `seed=True` should be the default, answered or reopened by these
+    numbers? (The verdict on a default is the maintainer's.)
 
 ## Acceptance
 
