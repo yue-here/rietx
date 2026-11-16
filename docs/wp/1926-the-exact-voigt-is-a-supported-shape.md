@@ -56,6 +56,9 @@ a PV peak type is a pseudo-Voigt approximation too (Technical Reference
   inverts (σ, γ) to the component FWHMs exactly and then applies the TCH
   quintic (`model/forward.py:1462`). It is evaluate-only and never in the
   residual. Olivero & Longbothum (1977) is 0.02 % by the issue's account.
+  *Superseded in part 2026-11-16:* `peak_fwhm` under `voigt` now applies
+  Olivero & Longbothum (`profiles.voigt.voigt_fwhm`, measured 0.024 % worst);
+  `peak_gamma_eta` keeps the quintic for window sizing and FCJ node counts.
 - *The compare row: present, unread.* `viz/compare.py` registers a `voigt`
   variant ("+ true Voigt peak shape"), and `tests/test_compare_ui.py`
   asserts every variant is reachable. No reading of it on the standards is
@@ -115,9 +118,11 @@ guard comparing the two paths.
       beside the three it has
 - [ ] Read the `voigt` compare variant on srm660c, srm676a, lab6_cbn and nac,
       and record the cumulative Δχ² panel in the handover
-- [ ] `peak_fwhm` under `voigt` by Olivero & Longbothum (1977); window sizing
+- [x] `peak_fwhm` under `voigt` by Olivero & Longbothum (1977); window sizing
       and `fcj_node_count` keep the quintic. A test against a bisected
-      Faddeeva FWHM
+      Faddeeva FWHM — `profiles.voigt.voigt_fwhm`, 0.024 % worst
+      (`MANUAL_OLIVERO_FWHM_ERROR_PCT`), equation `prof-voigt-fwhm` in the
+      manual, audit row `_OLIVERO_FWHM` at tier 2 (2026-11-16)
 - [ ] Deferred until the compare readings show the shape in use: the kernel pair (symmetric and FCJ, forward and bases) in
       a `kernels/src/` module of its own, dispatched in `compiled.py`, held
       to rule 3's bar by `tests/test_compiled_kernels.py`'s pattern

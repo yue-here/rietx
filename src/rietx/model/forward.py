@@ -175,6 +175,7 @@ from .profiles.voigt import (
     voigt,
     voigt_basis,
     voigt_derivs,
+    voigt_fwhm,
 )
 from .restraints import (
     CompiledRestraints,
@@ -1839,23 +1840,30 @@ class CompiledModel:
         function need".  Under TCHZ ``w1`` already *is* Γ; under the true Voigt
         the pair is (σ, γ_HWHM), which inverts to the component FWHMs exactly
         (:func:`~rietx.model.profiles.voigt.fwhm_to_voigt_params` is two
-        divisions) and then goes through the same TCH quintic.  That last step
-        is the ~1 % approximation ``compile_model`` already relies on for
-        window sizing and FCJ node counts, and for the same reason: the quintic
-        is *fit* to the true Voigt FWHM.
+        divisions) and then goes through Olivero & Longbothum (1977)
+        (:func:`~rietx.model.profiles.voigt.voigt_fwhm`, 0.024 % worst), the width of
+        the shape actually evaluated (WP-1926, decided 2026-10-08).  The TCH
+        quintic (0.43 % worst against the Voigt) stays what
+        :meth:`peak_gamma_eta` returns, because window sizing and FCJ node
+        counts read it under either shape and are frozen per stage.
 
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        if self.shape == "voigt":
+            return voigt_fwhm(np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA,
+                              2.0 * np.asarray(w2, dtype=np.float64))
         return self.peak_gamma_eta(w1, w2)[0]
 
     def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
                        ) -> tuple[np.ndarray, np.ndarray]:
         """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
 
-        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        The TCH quintic's reading with the mixing parameter beside it, for a
         consumer that sizes a window by ``compile_model``'s rule
-        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        (:func:`rewindow`).  Under ``"voigt"`` its Γ is the quintic, not
+        :meth:`peak_fwhm`'s Olivero-Longbothum width: window sizing keeps the
+        rule ``compile_model`` froze.  Evaluate-only, like :meth:`peak_fwhm`.
         """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
