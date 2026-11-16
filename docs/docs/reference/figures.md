@@ -212,7 +212,7 @@ A site's `color` is `#rrggbb`, `"white"` or `"black"`.
 
 On an Apple M4 in October 2026, a render of the NAC cell took 35-41 ms at 1000 px and 89-117 ms at 3000 px.
 
-### As an SVG
+### Vector output
 
 A `path` ending `.svg` writes the same picture as vector shapes.
 Each atom is an ellipse, each stick a run of short pieces, each polyhedron face a polygon at the viewer's translucency, and the letters are text.
