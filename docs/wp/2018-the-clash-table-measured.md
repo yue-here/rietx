@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-16 — 6 of 22 live pairs measured (C1, C3, C4, C7, C10, C14); 6 questions for the maintainer
+Milestone: generality · Status: 🔄 2026-11-16 — 10 of 22 live pairs measured (C1, C2, C3, C4, C7, C10, C12, C14, C18, C19); 10 questions for the maintainer
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -339,6 +339,102 @@ wrong, the values are not. `_refitted_increase` refits every other free angle an
 for a flat combination, so the test's verdict is right only after the hold has run. No arm
 reorders the two; each removes one.
 
+**C12, the Stephens seed's skip against the cone rows' drop** (`stephens_start.py`; macOS arm64,
+`[dev]`, 4 s a fit). Brucite under `tests/test_acceptance_stephens.py`'s LM protocol (strain seed
+800 ppm in `sample_broadening`, `intermediate_ftol` 1e-6, no closing stage), from five starting
+blocks. The record says, per solve that frees the block, whether the σ²(M) ≥ 0 rows were built
+and how many of the stage's 43 reflections start outside the cone.
+
+| Arm (start; driver) | seed | rows in the 3 strain stages | reflections out at the end | Rwp | what the caller sees |
+|---|---|---|---|---|---|
+| zero (the test's: all-zero block; LM) | writes the 800 ppm ray | built, all three | 0 (one at −1.9e-18 of the largest σ², on the face) | 0.181470 | `CONSTRAINT_ACTIVE` (27 steps held in `biso`) |
+| ray (the caller hands in `isotropic(800)`; LM) | skips it | built, all three | 0 (roundoff) | 0.180448 | `CONSTRAINT_ACTIVE` |
+| out (the ray with s004 negated, 12 of 43 out; LM) | skips it | **dropped, all three** (12, 24, 19 out at their starts) | **19**, worst σ² −0.51 of the largest | 0.180540 | `STEPHENS_STRAIN_NOT_POSITIVE` (44.8 % of m·\|F\|²); nothing says the rows were dropped |
+| out_seeded (out, the skip removed; LM) | overwrites it with the ray | built, all three | 0 (roundoff) | 0.181936 | `CONSTRAINT_ACTIVE` |
+| out_trf (out; TRF) | skips it | none (TRF) | 19 | 0.180554 | `STEPHENS_STRAIN_NOT_POSITIVE` |
+| zero_trf (the test's TRF fit) | writes the ray | none (TRF) | 19 | 0.180419 | `STEPHENS_STRAIN_NOT_POSITIVE` (the positive arm: it fires) |
+| trf_then_lm (zero_trf's fitted models, refitted under LM) | skips it | **dropped, all three** (19 out at each start) | **19** | 0.179462 | `STEPHENS_STRAIN_NOT_POSITIVE` (44.7 %), suggesting "Under solver='trf', refit with the default LM driver" |
+| trf_then_lm_seeded (the same, the skip removed) | overwrites it | built, all three | 0 (roundoff) | 0.180299 | `CONSTRAINT_ACTIVE` |
+
+The zero and zero_trf rows reproduce the test module's 1.10.0 figures (LM 18.15 % with none
+out, TRF 18.04 % with 19 of 43). A caller's block that starts outside the cone turns the LM
+fit into an unconstrained one for the whole plan: the seed leaves it (it is not all zero), the
+rows are dropped at each stage's start because the start violates them, and since the solve
+then never returns inside, every later stage drops them too. The answer is TRF's (out against
+out_trf: 19 of 43 out both, Rwp to 1.4e-5, the four DOFs within 0.13 of TRF's esds), and the
+record looks like TRF's: the guard fires, `CONSTRAINT_ACTIVE` does not, and no field or code
+says the driver held nothing. The realistic route there is the guard's own advice: refitting
+the TRF answer under LM (`trf_then_lm`) carries the out-of-cone block in, and the LM fit ends
+19 of 43 out again with the same suggestion to switch to LM. Without the skip (`*_seeded`) the
+same starts end inside the cone. The ray arm shows the skip costs nothing when the caller's
+block is inside: the rows hold; it lands in another of brucite's minima (dof 3 at 15630(5261)
+against 7840(4819)), because a nonzero block broadens the peaks from the first stage (stage-1
+Rwp 0.770 against 0.802), the multi-start spread the test module documents. Also seen, not
+pursued: both `trf_then_lm` arms fire `RESOLUTION_NOT_POSITIVE`, which zero_trf does not, and
+`trf_then_lm`'s dof 0 reads −9050(110) against zero_trf's −8623(165887). Question (7).
+
+**C2, the profile interval's refits against the support hold** (`scale_interval.py`). Two
+datasets, each with the interval as shipped and with the hold and the collapse at the answer
+switched off during the interval only (`no_hold`); the fit is the same in both arms, and every
+refit's held, released and collapsed paths are recorded.
+
+*The trace, the positive arm* (`test_qpa_multimodal.py`'s two-basin fit, macOS arm64, `[dev]`):
+CaF₂'s scale 2.688e-6, esd 9.61e-7, the fit holding nothing. The cut is Δχ² 5.196.
+
+| Arm | lower end (esd below) | upper end (esd above) | refits | what the refits held |
+|---|---|---|---|---|
+| shipped | 1.3935469e-6 (1.347) | **4.6094e-6 (2.000)** | 30 | CaF₂'s `cell.a` and `lor_strain` at 7.66e-7 and every lower-side probe after it, and at every upper-side probe from 5.144e-6 down to 4.6099e-6, though not at 6.531e-6 |
+| no_hold | 1.3935465e-6 (1.347) | 5.1460e-6 (2.558) | 24 | nothing |
+
+On the lower side the hold changes nothing: a held refit's χ² equals the free one's to 2e-5,
+and the ends agree to 3e-7 relative. On the upper side it moves the answer. Held, the refit at
+5.144e-6 reads Δχ² 10.67, free 5.19, so the hold alone puts that value outside the cut. Every
+Brent probe between 4.6094e-6 and 5.144e-6 was held and read Δχ² ≈ 11.2, so the end Brent
+returned is the bracket's inner point, the unheld probe at exactly +2 esd (Δχ² 3.33): the
+shipped interval is 14 % narrower (3.22e-6 against 3.75e-6) and its upper end is a step in the
+profile the hold made (Δχ² 3.33 to 11.20 across 4.8e-10 in the scale), not a crossing of the
+cut. Which probe is held is not monotone in the pinned value (6.531e-6 free, 5.144e-6 held, in
+one walk): the stage-start hold reads the screen at the pinned scale beside the previous refit's
+answer reading (`_hold_unsupported_phases`' `prior`), and with the scale pinned, the answer
+reading is the screen alone (`_answer_significance`). The mechanism of each switch was not
+traced further. Every held refit fires `PHASE_UNCONSTRAINED` inside the walk; the interval's
+own record (`ParameterInterval.points`) carries none of it. Question (8).
+
+*cpd-1a, the dataset chosen for the row* (`qpa_plan()`, three phases; Linux x86_64, py3.12, 43
+and 45 s, 380 MB): corundum's scale 1.608(612)e-5, W = 1.72(64) wt % against 1.15 weighed. Both
+arms make the same 28 refits to every digit, no refit holds anything, and the interval is
+[8.787e-6, 3.705e-5], 1.19 esd below and 3.43 esd above (cut Δχ² 77.4): a lopsided profile, but
+not the hold's. The weighed trace phase sits far enough above the support threshold that no
+pinned value inside its interval reaches it, so the pair does not meet on cpd-1a.
+
+**C18, `intermediate_ftol` against the holds that read each stage's end** (`ftol_holds.py`;
+Linux x86_64, py3.12, 11-45 s, ≤ 366 MB). cpd-1a with zircon declared (a phase the sample
+lacks), `qpa_plan()`, LM, at 1e-6 and None, with and without the closing stage:
+
+| Arm | zircon held before the last stage | the last stage | zircon W (wt %) | largest move between tolerances | iterations, 1e-6 / None |
+|---|---|---|---|---|---|
+| close (shipped) | never, either tolerance | `closing`: 9 structural paths collapsed and held, either tolerance; `PHASE_UNCONSTRAINED` | 0.03(7) | 0.0053 plain esd (fluorite `lor_strain`) | 380 / 677 |
+| open (B7's arms, no closing stage) | never, either tolerance | `biso`: nothing held; zircon free, a = 6.6145(78) Å, scale 6.5(3.5)e-7 (plain esd); no `PHASE_UNCONSTRAINED` | 0.08(16) | 0.065 plain esd (fluorite `a`, then zero and displacement) | 266 / 561 |
+
+B7's flip (2026-10-21: at 1e-6 the last stage held nine zircon paths, at 1e-9 nothing) does not
+reproduce on this tree: in no stage of any arm does the tolerance change what is held. Every
+hold, release and collapse decision is the same at 1e-6 and 1e-9, both with the closing stage
+(which holds zircon either way, as `test_staged_start_invariance.py` asserts) and without it
+(which never holds it). The tolerance moves only values, within 0.0053 plain esd behind the
+closing stage and 0.065 without it, and halves the iterations. The ramp half of the row
+(`seqrefine_cucr2o4/`) needs the series harness C3 lacks, and was not run. Question (10).
+
+**C19, the Le Bail partition at an intermediate stage's end** (`lebail_ftol.py`; macOS arm64,
+`[dev]`). `test_lebail_cycles.py`'s #740 pattern under its `profile_only` Le Bail plan, with
+and without the closing stage, at `intermediate_ftol` 1e-6 and None (every stage at 1e-9): each
+pair is the same fit to every digit, parameters and extracted intensities alike. The tolerance
+never governs a stage here: each ends in 2-3 LM iterations on another stop, and the LM driver's
+`ftol` test needs three consecutive iterations under it, so the positive arms at 1e-2, 1e-1 and
+5e-1 are bit-identical too. With the closing stage the cell lands at −1.5, −4.6 and −1.4 ppm
+from the truth and Rwp 0.010660 against the true structure's 0.010879; without it, −1.7, −6.3,
+−1.3 ppm and 0.012097. So on the dataset chosen for the row the pair cannot meet, and a
+positive arm on it cannot fail. Question (9).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -381,6 +477,31 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
    candidate whose Δχ² vanishes because another free angle absorbs the move), or is the hold's
    precedence the design? And should the row's
    datasets be replaced by the #599 fixture, since the two chosen ones cannot exercise it?
+7. **C12.** A caller's Stephens block that starts outside the cone makes the default LM fit
+   unconstrained for the whole plan (the seed skips a nonzero block, the rows drop at every
+   infeasible start), with nothing in the record saying so; following
+   `STEPHENS_STRAIN_NOT_POSITIVE`'s own advice from a TRF answer lands there (19 of 43 out,
+   the same suggestion again). Is C12 recorded a *clash*? And which of these, if any, is the
+   owner's to do: (a) a record or code when a phase's cone rows are dropped; (b) the
+   suggestion to stop telling an LM fit to switch to LM; (c) put an infeasible start back on
+   the isotropic ray (as `seed_stephens` does for a zero block, and as the `*_seeded` arms show
+   holds the cone), which changes a caller's starting values and so is a default flip?
+8. **C2.** On the trace the hold acts inside the interval's refits and narrows the upper end
+   by 0.56 esd (14 % of the width), and that end sits on a step the hold made rather than a
+   crossing of the cut. On cpd-1a's corundum (1.15 wt % weighed) no refit holds anything
+   (§ below). Is C2 recorded a *clash* on the trace's evidence? Should the interval's refits
+   hold only what the fit held (no stage-start hold and no collapse inside `_walk`), or should
+   a held refit end the side as `"error"` the way an unmeasurable point does, so a hold never
+   becomes an end?
+9. **C19.** On #740's pattern `intermediate_ftol` never binds (2-3 iterations a stage), so the
+   partition never runs at a 1e-6 end point that differs from 1e-9. Is C19 recorded *does not
+   meet on this dataset*, and is a dataset whose Le Bail stages run long owed, or is the row
+   closed by the closing stage (which repartitions at the answer in every arm)?
+10. **C18.** On cpd-1a with zircon declared no hold decision changes with the tolerance, with
+    or without the closing stage; B7's flip no longer reproduces. Is C18 recorded
+    *independent* on this evidence? Without the closing stage the absent zircon ends free
+    with no `PHASE_UNCONSTRAINED` (scale 1.8 plain esd from zero); is that the support test's
+    designed reading, or worth a row of its own?
 
 ## Acceptance
 
