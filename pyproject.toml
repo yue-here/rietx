@@ -50,7 +50,10 @@ dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
     "pydantic>=2.6",
-    "gemmi>=0.6.5",
+    # 0.6.6 is the first gemmi whose SmallStructure has `spacegroup`, which
+    # structure_from_cif reads; under 0.6.5 every call raised AttributeError.
+    # Measured 2026-11-16 (WP-1933, #913): the CIF test files pass on 0.6.6.
+    "gemmi>=0.6.6",
     # 2.8 corrects the time-reversal flags of UNI 282-284, the three magnetic
     # groups 2.7.0 could not identify from their own operators (WP-1452).
     "spglib>=2.8",

@@ -237,7 +237,7 @@ land before C-e:
 - [x] #913 (1): a coordinate written `.` or `?` is refused, naming the file,
       the site and the tag. An occupancy written `.` or `?` reads by the
       `cif_core` default, checked against the dictionary before it is written.
-- [ ] #913 (2): `pyproject.toml`'s `gemmi` floor raised to a version under which
+- [x] #913 (2): `pyproject.toml`'s `gemmi` floor raised to a version under which
       `structure_from_cif` works (0.6.5 raises on `SmallStructure.spacegroup`).
 - [x] #913 (3): an operator loop that generates a different group from the
       H-M symbol, beyond a setting or origin choice, is refused, naming both
