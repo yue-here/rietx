@@ -1,6 +1,6 @@
 # WP-1901 — the difference-Fourier map: a missing atom shows as a peak
 
-Milestone: structure-solution · Status: ⬜
+Milestone: structure-solution · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Depends on: —
 Priority: P3 2026-09-30 — a view over what a converged fit already knows, and the first user-visible rung of the structure-solution milestone
 
