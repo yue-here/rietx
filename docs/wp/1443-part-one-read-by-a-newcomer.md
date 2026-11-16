@@ -1,6 +1,6 @@
 # WP-1443 — Part 1 read by a newcomer: eleven passages, one word, and the version the manual describes
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — every task landed in #1589; closing issues #395–#407 is the maintainer's
 Track: The repo's own process
 Depends on: — (1409 is the shape)
 Priority: P3 2026-09-23 — twelve passages a newcomer stopped on; the text is wrong in words, never in a number
@@ -212,9 +212,9 @@ folded into this map and deleted. Each passage, read against the new tree:
 - [x] #407: `install.md` says what the manual describes and how to install
       `main`; the "since" note derived from the dist version and the release
       records.
-- [ ] `tests/test_manual_api.py` and `tests/test_manual.py` green; the
+- [x] `tests/test_manual_api.py` and `tests/test_manual.py` green; the
       `yue-prose` grep pass over every touched chapter, before and after.
-- [ ] Skill: none. Every change is Part 1 prose for a human reader; the
+- [x] Skill: none. Every change is Part 1 prose for a human reader; the
       skill's body and `api.md` are untouched.
 
 ## Acceptance
@@ -236,6 +236,51 @@ Issues #395, #396, #397, #398, #399, #400, #401, #402, #403, #404, #406,
 WP-1435 (`hold`), `docs/RELEASING.md`, `docs/releases/1.5.1.md`.
 
 ## Handover log
+
+- **2026-11-16** — every passage the newcomer stopped on now reads plainly in
+  the manual a reader actually gets, the new tree in `docs/docs/`, not the
+  retired `docs/manual/` this WP was written against. Four of the eleven had
+  already been fixed by the rebuild (#396, #401, #402, #404) and #400's figure
+  is on no page any more; the rest were changed in words only, and no number on
+  any page moved. #407 shrank to one paragraph, because WP-1979's per-release
+  manual already answers the version question the reporter hit. The eleven
+  issues themselves are still open: closing them, each against its commit, is
+  the maintainer's act, not this branch's. Draft PR #1589.
+  - *Done*: the passage-by-passage map is § Where the passages live now. Four
+    commits: passages 1–5 (an `assert` line explained once in
+    `start/this-manual.md` and commented in `reference/data.md`; 17 "shipped"
+    in Start, Guides, Concepts, Reference and Switching reworded; the
+    special-position refusal named as `ValueError`; "histogram" defined in
+    `guides/joint.md`), 6–10 (`concepts/correlations.md` says what each of the
+    four angular curves shapes; `guides/hold.md` names a `*` path a glob),
+    11 (a symptom table in `concepts/report.md` § Where to read about a
+    symptom, eleven rows, each a link) and #407 (`start/install.md`).
+  - *Measured* (macOS arm64, `.venv` with `[dev,docs]`): `test_manual_api.py`
+    19 passed, `test_help.py` 37, `test_docs_consistency.py` 26,
+    `test_gui_manual.py` 10, `test_manual.py` 65 (it builds the manual).
+    Vale over the touched pages: 0 errors, one warning on a line this branch
+    did not write (`guides/joint.md:119`). `tests.reader_output`: exit 0,
+    unchanged. Page cap (`PAGE_CHAR_CAP`, 50 000 rendered characters):
+    `reference/refinement.md` 49 661 (+3, headroom 339),
+    `reference/result.md` 44 908 (−2), `reference/parameter-table.md` 42 469
+    (+1), `concepts/report.md` 9 780 (+2 120); every other touched page has
+    over 18 000 left. Fast and full suites not run: the branch is prose and
+    cannot move a measured number; CI runs the fast matrix.
+  - *Gotchas*: "shipped" is left in four Theory pages (Part 2, a non-goal) and
+    in one HTML comment no reader sees (`switching/gsas2.md:188`). The WP's
+    gloss for #400, "the shift of a peak's position per unit of the
+    parameter", is wrong for crystallite size, which widens a peak; the
+    rewritten sentence says so. `make_figures.py`'s `angular-signatures`
+    still labels its axis "effect, normalised at mid-range", but the figure
+    is on no page, so it was not regenerated.
+  - *Open question for the maintainer*: the WP asks for "histogram" and
+    "glob" in "the glossary". The new tree has no word glossary (the old
+    one's sections went to `reference/parameters` and `reference/settings`),
+    and `help.py` has no arm for a word. Both are defined at first use only.
+    Whether the manual wants a glossary of words is a design call.
+  - *Next*: the maintainer reviews #1589, and on merge closes #395–#404,
+    #406 and #407, each against the commit the map names, then marks this WP
+    ✅.
 
 - **2026-09-21** — created, from the 2026-09-21 issue triage (issues #395,
   #396, #397, #398, #399, #400, #401, #402, #403, #404, #406, #407). Checked
