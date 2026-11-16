@@ -156,12 +156,40 @@ def projected_ellipse(shape_view: np.ndarray, ppa: float):
     return rx, ry, angle
 
 
-def trim_length(inverse: np.ndarray, axis: np.ndarray) -> float:
-    """How far along the unit ``axis`` from an ellipsoid's centre its surface
-    lies: the ``t`` with ``|M⁻¹·t·axis| = 1``."""
-    q = np.asarray(inverse, dtype=np.float64).reshape(3, 3) @ np.asarray(axis, dtype=np.float64)
-    n = math.sqrt(float(q @ q))
-    return 1.0 / n if n > _EPS else 0.0
+#: Directions round a stick's rim tried when trimming it at its atom.
+RIM_SAMPLES = 16
+
+
+def trim_length(inverse: np.ndarray, axis: np.ndarray, radius: float = 0.0) -> float:
+    """How far along the unit ``axis`` from an ellipsoid's centre a tube of
+    ``radius`` round it first leaves the surface: the least ``t`` over the rim
+    with ``|M⁻¹·(t·axis + radius·d)| = 1``, ``d`` perpendicular to the axis.
+
+    At ``radius=0`` it is where the axis itself leaves.  Past the returned
+    ``t`` some of the rim is outside, so a stick cut there leaves no gap
+    against its ball; a rim wider than the ellipsoid is never inside, and 0
+    is returned.  Exact for a sphere, √(R² − r²).
+    """
+    minv = np.asarray(inverse, dtype=np.float64).reshape(3, 3)
+    w = np.asarray(axis, dtype=np.float64)
+    a = minv @ w
+    aa = float(a @ a)
+    if aa < _EPS:
+        return 0.0
+    if radius <= 0.0:
+        return 1.0 / math.sqrt(aa)
+    e1 = _unit(np.cross(w, [1.0, 0.0, 0.0] if abs(w[0]) < 0.9 else [0.0, 1.0, 0.0]))
+    e2 = np.cross(w, e1)
+    best = math.inf
+    for k in range(RIM_SAMPLES):
+        phi = 2.0 * math.pi * k / RIM_SAMPLES
+        b = minv @ (radius * (math.cos(phi) * e1 + math.sin(phi) * e2))
+        ab, bb = float(a @ b), float(b @ b)
+        disc = ab * ab - aa * (bb - 1.0)
+        if disc < 0.0:
+            return 0.0                      # this side of the rim is never inside
+        best = min(best, (-ab + math.sqrt(disc)) / aa)
+    return max(best, 0.0)
 
 
 def _at(pos) -> tuple:
@@ -258,9 +286,24 @@ def display_list(scene: Mapping, geometry: Mapping, rotation, frame: Frame, *,
         items += _stick_pieces(h, geometry, by_pos, R, px, ppa, step, fog)
 
     for line in scene["lines"]:
-        A = R @ np.asarray(line["a"], dtype=np.float64)
-        B = R @ np.asarray(line["b"], dtype=np.float64)
-        n = max(1, math.ceil(math.sqrt(float((B - A) @ (B - A))) / step))
+        # a line ending at an atom (a polyhedron's vertex, a cell corner) is
+        # trimmed at its surface, as a stick is, or its pieces near the
+        # centre would sort in front of the ball they pass inside
+        a = np.asarray(line["a"], dtype=np.float64)
+        b = np.asarray(line["b"], dtype=np.float64)
+        length = math.sqrt(float((b - a) @ (b - a)))
+        if length < 1e-9:
+            continue
+        w = (b - a) / length
+        half_width = 0.5 * line["width"] * frame.px_scale / ppa
+        lo = (trim_length(by_pos[_at(a)]["inverse"], w, half_width)
+              if _at(a) in by_pos else 0.0)
+        hi = (trim_length(by_pos[_at(b)]["inverse"], -w, half_width)
+              if _at(b) in by_pos else 0.0)
+        if lo + hi >= length:
+            continue
+        A, B = R @ (a + w * lo), R @ (b - w * hi)
+        n = max(1, math.ceil((length - lo - hi) / step))
         cls = "cell" if line["width"] == CELL_WIDTH_PX else "edge"
         for k in range(n):
             p, q = A + (B - A) * (k / n), A + (B - A) * ((k + 1) / n)
@@ -348,7 +391,7 @@ def _stick_pieces(h, geometry, by_pos, R, px, ppa, step, fog) -> list[dict]:
         return []
     w = (B - A) / length
     atom = by_pos.get(_at(A))
-    start = trim_length(atom["inverse"], w) if atom is not None else 0.0
+    start = trim_length(atom["inverse"], w, h["radius"]) if atom is not None else 0.0
     if start >= length:
         return []                           # wholly inside its own atom
     Av, Bv = R @ (A + w * start), R @ B
@@ -422,6 +465,11 @@ def _faces(face, R, px, light, cls, fog) -> list[dict]:
 # the SVG
 # ----------------------------------------------------------------------
 
+def _attr(text: str) -> str:
+    """Text for a double-quoted attribute: a CIF label may hold a quote."""
+    return escape(text, {'"': "&quot;"})
+
+
 def _num(v: float) -> str:
     """A coordinate to a hundredth of a pixel, without trailing zeros."""
     text = f"{v:.2f}".rstrip("0").rstrip(".")
@@ -460,7 +508,7 @@ def svg(items: Sequence[dict], frame: Frame, *, background=None, dpi: float | No
     if outline is not None:
         rim = f' stroke="{_hex(outline[2])}" stroke-width="{_num(outline[0])}"'
     gradients: dict[tuple, str] = {}
-    half_gradient: dict[int, str] = {}
+    half_gradient: dict[tuple, str] = {}
 
     def gradient(key, build) -> str:
         if key not in gradients:
@@ -482,17 +530,18 @@ def svg(items: Sequence[dict], frame: Frame, *, background=None, dpi: float | No
                 + "</radialGradient>"))
             rot = (f' transform="rotate({_num(it["angle"])} {_num(it["cx"])} {_num(it["cy"])})"'
                    if it["angle"] else "")
-            body.append(f'<ellipse class="{escape(it["cls"])}" cx="{_num(it["cx"])}" '
+            body.append(f'<ellipse class="{_attr(it["cls"])}" cx="{_num(it["cx"])}" '
                         f'cy="{_num(it["cy"])}" rx="{_num(it["rx"])}" ry="{_num(it["ry"])}"'
                         f'{rot} fill="url(#{gid})"{rim}/>')
         elif kind == "ring":
             pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in it["points"])
-            body.append(f'<polyline class="{escape(it["cls"])}" points="{pts}" fill="none" '
+            body.append(f'<polyline class="{_attr(it["cls"])}" points="{pts}" fill="none" '
                         f'stroke="{_hex(it["color"])}" stroke-width="{_num(it["width"])}" '
                         'stroke-linecap="round" stroke-linejoin="round"/>')
         elif kind == "stick":
             g0, g1, stops = it["gradient"]
-            hid = it["half"]
+            # one gradient a half, unless depth cueing fades its pieces apart
+            hid = (it["half"], round(it["fog"], 3))
             if hid not in half_gradient:
                 fogged = stops
                 if it["fog"]:
@@ -512,15 +561,15 @@ def svg(items: Sequence[dict], frame: Frame, *, background=None, dpi: float | No
             body.append(_stick_path(it, half_gradient[hid], outline))
         elif kind == "line":
             (ax, ay), (bx, by) = it["a"], it["b"]
-            body.append(f'<line class="{escape(it["cls"])}" x1="{_num(ax)}" y1="{_num(ay)}" '
+            body.append(f'<line class="{_attr(it["cls"])}" x1="{_num(ax)}" y1="{_num(ay)}" '
                         f'x2="{_num(bx)}" y2="{_num(by)}" stroke="{_hex(it["color"])}" '
-                        f'stroke-width="{_num(it["width"])}" stroke-linecap="round"/>')
+                        f'stroke-width="{_num(it["width"])}" stroke-linecap="square"/>')
         elif kind == "face":
             pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in it["points"])
-            body.append(f'<polygon class="{escape(it["cls"])}" points="{pts}" '
+            body.append(f'<polygon class="{_attr(it["cls"])}" points="{pts}" '
                         f'fill="{_hex(it["color"])}" fill-opacity="{POLY_ALPHA}"/>')
         elif kind == "text":
-            body.append(f'<text class="{escape(it["cls"])}" x="{_num(it["x"])}" '
+            body.append(f'<text class="{_attr(it["cls"])}" x="{_num(it["x"])}" '
                         f'y="{_num(it["y"])}" font-family="Helvetica, Arial, sans-serif" '
                         f'font-size="{_num(it["em"])}" text-anchor="middle" '
                         f'dominant-baseline="central" fill="{_hex(it["color"])}">'
@@ -550,10 +599,10 @@ def _stick_path(it: dict, gid: str, outline) -> str:
          f"A{_num(r)},{_num(minor)} {angle} 0 {sweep} {_num(p2[0])},{_num(p2[1])} "
          f"L{_num(p3[0])},{_num(p3[1])} "
          f"A{_num(r)},{_num(minor)} {angle} 0 {sweep} {_num(p0[0])},{_num(p0[1])} Z")
-    out = f'<path class="{escape(it["cls"])}" d="{d}" fill="url(#{gid})"/>'
+    out = f'<path class="{_attr(it["cls"])}" d="{d}" fill="url(#{gid})"/>'
     if outline is not None:
         sides = (f"M{_num(p0[0])},{_num(p0[1])} L{_num(p1[0])},{_num(p1[1])} "
                  f"M{_num(p2[0])},{_num(p2[1])} L{_num(p3[0])},{_num(p3[1])}")
-        out += (f'<path class="{escape(it["cls"])} outline" d="{sides}" fill="none" '
+        out += (f'<path class="{_attr(it["cls"])} outline" d="{sides}" fill="none" '
                 f'stroke="{_hex(outline[2])}" stroke-width="{_num(outline[0])}"/>')
     return out

@@ -216,7 +216,7 @@ On an Apple M4 in October 2026, a render of the NAC cell took 35-41 ms at 1000 p
 
 A `path` ending `.svg` writes the same picture as vector shapes.
 Each atom is an ellipse, each stick a run of short pieces, each polyhedron face a polygon at the viewer's translucency, and the letters are text.
-Every element carries a class naming its kind and its site (`atom Ca1`, `stick Ca1`, `cell`, and `face` with the polyhedron's formula), so an editor's select-same picks every Ca1 at once.
+Every element carries a class naming its kind and its site (`atom Ca1`, `stick Ca1`, `cell`, and `face` with the polyhedron's formula), so a stylesheet rule such as `.Ca1` or a search by class finds every element of one site.
 User units are the PNG's pixels, so `.atoms` and `.letters` hold for both files, and `dpi=` sets the printed size.
 The returned figure's `.image` and `.report` are the PNG's either way.
 

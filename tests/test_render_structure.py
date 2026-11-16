@@ -1597,76 +1597,141 @@ def test_the_svg_ellipse_lies_on_the_rasters_silhouette():
     assert checked >= 24
 
 
-def test_a_trimmed_stick_starts_on_its_atoms_surface():
+def test_a_trimmed_stick_starts_where_its_rim_leaves_its_atom():
+    """A stick is cut where the first point of its rim leaves the ellipsoid,
+    so no wedge of background opens between stick and ball (D2): exactly
+    √(R² − r²) on a sphere, and on an ellipsoid one rim point on the surface
+    with the rest inside."""
+    sphere = sc.invert3([0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5])
+    w = np.array([0.6, 0.0, 0.8])
+    assert vector.trim_length(sphere, w, 0.08) == pytest.approx(np.sqrt(0.25 - 0.0064), abs=1e-3)
+    assert vector.trim_length(sphere, w) == pytest.approx(0.5, abs=1e-12)
+    assert vector.trim_length(sphere, w, 0.6) == 0.0          # wider than the ball
     geo = s3.build(_rutile())                # an anisotropic Ti, and bonds
     scene = sc.build_scene(geo, "ellipsoid")
     # a half starts at its atom's centre, or at an image of it drawn there
     atoms = {tuple(np.round(a["pos"], 8)): a for a in scene["atoms"]}
-    assert scene["halves"]
+    checked = 0
     for h in scene["halves"]:
         own = atoms.get(tuple(np.round(h["from"], 8)))
         if own is None:
             continue
         A, B = np.asarray(h["from"]), np.asarray(h["to"])
         w = (B - A) / np.linalg.norm(B - A)
-        t = vector.trim_length(own["inverse"], w)
-        p = A + w * t
+        r = h["radius"]
+        t = vector.trim_length(own["inverse"], w, r)
+        assert 0.0 < t < vector.trim_length(own["inverse"], w)
         minv = np.asarray(own["inverse"]).reshape(3, 3)
-        assert np.linalg.norm(minv @ (p - np.asarray(own["pos"]))) == pytest.approx(1.0, abs=1e-12)
+        e1 = np.cross(w, [1.0, 0.0, 0.0] if abs(w[0]) < 0.9 else [0.0, 1.0, 0.0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(w, e1)
+        rim = [np.linalg.norm(minv @ (w * t + r * (np.cos(f) * e1 + np.sin(f) * e2)))
+               for f in np.linspace(0.0, 2 * np.pi, vector.RIM_SAMPLES, endpoint=False)]
+        assert max(rim) == pytest.approx(1.0, abs=1e-9)
+        checked += 1
+    assert checked
     # and the display list's first piece starts at that point's projection
-    R = np.eye(3)
     frame = raster.Frame(width=400, height=400, x0=-6.0, y0=6.0, ppa=400 / 12.0, px_scale=1.0)
-    items = vector.display_list(scene, geo, R, frame)
+    items = vector.display_list(scene, geo, np.eye(3), frame)
     h = scene["halves"][0]
     own = atoms[tuple(np.round(h["from"], 8))]
     A, B = np.asarray(h["from"]), np.asarray(h["to"])
     w = (B - A) / np.linalg.norm(B - A)
-    p = A + w * vector.trim_length(own["inverse"], w)
+    p = A + w * vector.trim_length(own["inverse"], w, h["radius"])
     want = ((p[0] - frame.x0) * frame.ppa, (frame.y0 - p[1]) * frame.ppa)
     starts = [it["a"] for it in items if it["kind"] == "stick"]
     assert min(np.hypot(s[0] - want[0], s[1] - want[1]) for s in starts) < 1e-6
 
 
-def _crossing(z_bond: float) -> tuple[dict, dict]:
-    """1470's crossing fault in its smallest form: a bond from x = −2 to 2,
-    seen down z, at depth ``z_bond`` past a third ball at the origin."""
+def test_a_line_ending_at_an_atom_is_trimmed_at_its_surface():
+    """A polyhedron edge or cell edge from an atom's centre starts where its
+    width leaves the atom's surface, as a stick does, so no piece of it sorts
+    in front of the ball it is inside; an end at no atom is left alone."""
+    r = 0.5
+    m = [r, 0.0, 0.0, 0.0, r, 0.0, 0.0, 0.0, r]
+    geo = {"sites": [{"label": "A1"}], "atoms": [{"site": 0}], "bonds": [], "polyhedra": []}
+    scene = {"atoms": [{"index": 0, "pos": [0.0, 0.0, 0.0], "shape": m,
+                        "inverse": sc.invert3(m), "color": [0.5, 0.5, 0.5], "rings": False}],
+             "halves": [], "faces": [], "labels": [],
+             "lines": [{"a": [0.0, 0.0, 0.0], "b": [2.0, 0.0, 1.0], "color": [0, 0, 0],
+                        "width": sc.EDGE_WIDTH_PX}]}
+    frame = raster.Frame(width=300, height=300, x0=-3.0, y0=3.0, ppa=50.0, px_scale=1.0)
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    pieces = [it for it in items if it["kind"] == "line"]
+    w = np.array([2.0, 0.0, 1.0]) / np.sqrt(5.0)
+    half = 0.5 * sc.EDGE_WIDTH_PX / frame.ppa
+    t = vector.trim_length(scene["atoms"][0]["inverse"], w, half)
+    assert t == pytest.approx(np.sqrt(r * r - half * half), abs=1e-3)
+    first = min(pieces, key=lambda it: it["a"][0])
+    assert first["a"] == pytest.approx((150.0 + w[0] * t * frame.ppa, 150.0), abs=1e-9)
+    last = max(pieces, key=lambda it: it["b"][0])
+    assert last["b"] == pytest.approx((250.0, 150.0), abs=1e-9)
+    ball = next(k for k, it in enumerate(items) if it["kind"] == "atom")
+    assert all(items.index(it) > ball for it in pieces)    # all of it in front
+
+
+def _crossing(sign: float) -> tuple[dict, dict]:
+    """1470's crossing fault in its smallest form: a bond seen down z, tilted
+    so the half on the right has its mean depth in front of a third ball at
+    the origin while its middle passes behind it; ``sign=-1`` turns it round,
+    its mean depth behind the ball and its middle in front."""
     def ball(pos, r):
         m = [r, 0.0, 0.0, 0.0, r, 0.0, 0.0, 0.0, r]
         return {"pos": list(pos), "shape": m, "inverse": sc.invert3(m),
                 "color": [0.5, 0.5, 0.5], "rings": False}
-    ends = [(-2.0, 0.0, z_bond), (2.0, 0.0, z_bond)]
+    mid = (0.0, 0.0, -0.8 if sign > 0 else 1.5)
+    ends = [(-2.0, 0.0, mid[2]), (2.0, 0.0, 3.0 * sign)]
     geo = {"sites": [{"label": "A1"}, {"label": "B1"}],
            "atoms": [{"site": 0}, {"site": 0}, {"site": 1}],
            "bonds": [{"i": 0, "j": 1, "a": list(ends[0]), "b": list(ends[1])}],
            "polyhedra": []}
     scene = {"atoms": [{"index": 0, **ball(ends[0], 0.3)}, {"index": 1, **ball(ends[1], 0.3)},
                        {"index": 2, **ball((0.0, 0.0, 0.0), 0.6)}],
-             "halves": [{"bond": 0, "from": list(ends[0]), "to": [0.0, 0.0, z_bond],
+             "halves": [{"bond": 0, "from": list(ends[0]), "to": list(mid),
                          "radius": 0.1, "color": [0.9, 0.1, 0.1]},
-                        {"bond": 0, "from": list(ends[1]), "to": [0.0, 0.0, z_bond],
+                        {"bond": 0, "from": list(ends[1]), "to": list(mid),
                          "radius": 0.1, "color": [0.9, 0.1, 0.1]}],
              "lines": [], "faces": [], "labels": []}
     return scene, geo
 
 
-@pytest.mark.parametrize("z_bond", [-1.0, 1.0], ids=["behind", "in_front"])
-def test_a_bond_passing_a_third_ball_sorts_piece_by_piece(z_bond):
-    """The crossing fault (WP-1470's ``mpl_baseline.py``) repaired: every
-    stick piece over the ball's disc is drawn before it when the bond passes
-    behind, after it when in front, and the pieces clear of it either way."""
-    scene, geo = _crossing(z_bond)
+@pytest.mark.parametrize("sign", [1.0, -1.0], ids=["rising", "falling"])
+def test_a_bond_passing_a_third_ball_sorts_piece_by_piece(sign):
+    """The crossing fault (WP-1470's ``mpl_baseline.py``) repaired.  The half
+    on the right averages in front of the ball while its middle passes behind
+    it, so drawn whole it would sort wrong one way or the other; cut, every
+    piece over the ball's disc lying wholly behind the ball's centre is drawn
+    before it, and every piece wholly in front of its surface after it."""
+    scene, geo = _crossing(sign)
     frame = raster.Frame(width=300, height=300, x0=-3.0, y0=3.0, ppa=50.0, px_scale=1.0)
     items = vector.display_list(scene, geo, np.eye(3), frame)
     ball = next(k for k, it in enumerate(items) if it["cls"] == "atom B1")
-    disc = 0.6 * frame.ppa
-    over = [k for k, it in enumerate(items) if it["kind"] == "stick"
-            and max(abs(it["a"][0] - 150.0), abs(it["b"][0] - 150.0)) < disc]
-    assert len(over) >= 2
-    assert all((k < ball) == (z_bond < 0) for k in over)
-    # no piece is longer than the ball is wide, so none reaches across it
-    for it in items:
-        if it["kind"] == "stick":
-            assert abs(it["b"][0] - it["a"][0]) <= 2 * disc
+    right = scene["halves"][1]
+    A, B = np.asarray(right["from"]), np.asarray(right["to"])
+
+    def z_at(px_x):                          # the bond's depth at an image x
+        x = px_x / frame.ppa + frame.x0
+        return A[2] + (B[2] - A[2]) * (x - A[0]) / (B[0] - A[0])
+
+    behind = in_front = 0
+    for k, it in enumerate(items):
+        if it["kind"] != "stick" or min(it["a"][0], it["b"][0]) < 150.0:
+            continue
+        xs = [(x - 150.0) / frame.ppa for x in (it["a"][0], it["b"][0])]
+        if max(abs(x) for x in xs) >= 0.6:
+            continue                         # not wholly over the disc
+        zs = [z_at(it["a"][0]), z_at(it["b"][0])]
+        surface = [np.sqrt(0.36 - x * x) for x in xs]
+        if max(zs) < 0.0:
+            assert k < ball
+            behind += 1
+        elif all(z > s for z, s in zip(zs, surface)):
+            assert k > ball
+            in_front += 1
+    # rising, the middle runs behind the ball; falling, in front of it
+    assert (behind if sign > 0 else in_front) >= 2
+    # drawn whole, the half's one depth would put all of it on one side
+    assert (np.mean([A[2], B[2]]) > 0) == (sign > 0)
 
 
 def test_the_svg_is_the_pngs_picture_in_shapes(tmp_path, nac):
@@ -1720,3 +1785,11 @@ def test_the_svg_carries_every_switch(tmp_path, kw):
         assert len(root.findall(f"{SVG}text")) == 3 + sum(not a["boundary"] for a in fig.atoms)
     _save(fig, f"rutile_svg_{kw['mode']}")
     (OUTPUT / f"rutile_svg_{kw['mode']}.svg").write_bytes((tmp_path / "r.svg").read_bytes())
+
+
+def test_a_quote_in_a_site_label_keeps_the_svg_well_formed(tmp_path):
+    geo = s3.build(_rutile())
+    geo = {**geo, "sites": [dict(s, label=s["label"] + '"x') for s in geo["sites"]]}
+    render_structure(geo, size=200, path=tmp_path / "q.svg")
+    root = _svg_tree(tmp_path / "q.svg")
+    assert any((e.get("class") or "").endswith('"x') for e in root.iter())
