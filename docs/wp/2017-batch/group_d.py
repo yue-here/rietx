@@ -168,7 +168,7 @@ def _rows(result) -> dict:
 
 def _fractions(result) -> list | None:
     try:
-        return [[[f.phase, f.weight_fraction] for f in result.for_histogram(h).qpa.fractions]
+        return [[[f.name, f.weight_fraction] for f in result.for_histogram(h).qpa.phases]
                 for h in range(3)]
     except Exception:  # noqa: BLE001  not every fit carries QPA
         return None
@@ -318,6 +318,26 @@ def summary() -> None:
                 f"| {fit} | {arm} | {len(r['layout_calls'])} ({_layouts(r)}) | "
                 f"{r['max_dense_bytes'] / 2**20:.1f} | {r['rwp']:.9f} | {r['n_eval']} | "
                 f"{r['status']} | {shift} | {bshift} | {codes} | {r['wall_s']:.0f} |")
+    lines += ["", "## Esds against `dense`", "",
+              "The rows carrying an esd, and the largest relative difference in an esd "
+              "between the arm and `dense` (the near-cut case `blocked.py`'s docstring names "
+              "would show here as a different set).", "",
+              "| Fit | Arm | rows with an esd (dense) | same set | largest relative esd difference (row) |",
+              "|---|---|---|---|---|"]
+    for fit in FITS:
+        d = latest.get((fit, "dense"))
+        if d is None or "error" in d:
+            continue
+        for arm in ARMS[1:]:
+            r = latest.get((fit, arm))
+            if r is None or "error" in r:
+                continue
+            sd = {k for k, v in d["rows"].items() if v[1]}
+            sr = {k for k, v in r["rows"].items() if v[1]}
+            worst = max(((abs(r["rows"][k][1] / d["rows"][k][1] - 1.0), k) for k in sd & sr),
+                        default=(0.0, None))
+            lines.append(f"| {fit} | {arm} | {len(sr)} ({len(sd)}) | {'yes' if sd == sr else 'no'} "
+                         f"| {_fmt(worst[0])} (`{worst[1]}`) |")
     lines += ["", "## References, read beside the bar", ""]
     for arm in ("dense", "blocked"):
         r = latest.get(("cpd1_joint", arm))

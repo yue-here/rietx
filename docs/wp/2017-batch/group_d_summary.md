@@ -23,6 +23,22 @@ Shift: plain esd over the larger of the two arms' esds against `dense` (`_shift`
 | cucr_cold | rule | 6 (dense) | 110.0 | 0.222537206 | 250 | converged | 0 (`None`) | 0 | yes | 171 |
 | cucr_cold | noise | 6 (dense) | 110.0 | 0.222537206 | 248 | converged | 0.00503 (`hist.4.phases.1.cell.b`) | 0 | yes | 167 |
 
+## Esds against `dense`
+
+The rows carrying an esd, and the largest relative difference in an esd between the arm and `dense` (the near-cut case `blocked.py`'s docstring names would show here as a different set).
+
+| Fit | Arm | rows with an esd (dense) | same set | largest relative esd difference (row) |
+|---|---|---|---|---|
+| library20 | blocked | 264 (264) | yes | 2.88e-05 (`hist.18.instrument.profile.u`) |
+| library20 | rule | 264 (264) | yes | 0 (`vars.a_3`) |
+| library20 | noise | 264 (264) | yes | 4.39e-06 (`hist.18.instrument.profile.w`) |
+| cpd1_joint | blocked | 72 (72) | yes | 0.07 (`hist.0.instrument.profile.w`) |
+| cpd1_joint | rule | 72 (72) | yes | 0 (`phases.2.lor_strain`) |
+| cpd1_joint | noise | 72 (72) | yes | 0.0849 (`hist.2.instrument.profile.w`) |
+| cucr_cold | blocked | 161 (161) | yes | 0.000678 (`hist.6.phases.0.cell.c`) |
+| cucr_cold | rule | 161 (161) | yes | 0 (`hist.6.phases.1.scale`) |
+| cucr_cold | noise | 161 (161) | yes | 0.000574 (`hist.6.phases.0.cell.c`) |
+
 ## References, read beside the bar
 
 - cucr_cold dense, coldest frame against Suchomel et al. (2012) Table I at 10 K: a -19 ppm, b +110 ppm, c -114 ppm

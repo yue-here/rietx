@@ -3407,8 +3407,11 @@ ROWS: tuple[Row, ...] = (
                   "joint families, cpd-1a/-1b/-1c together (qarr) and the CuCr2O4 ramp's seven frames "
                   "below 130 K (11-BM), and on that synthetic library at 20 patterns: every free row "
                   "within 0.0050 plain esd of the dense answer, the noise arm's own 0.0050 on the "
-                  "ramp, Rwp equal to 9 digits and the same codes "
-                  "(docs/wp/2017-batch/group_d_summary.md); their largest dense Jacobian is 110 MiB, "
+                  "ramp, Rwp equal to 9 digits and the same codes, the same rows carrying an esd, "
+                  "esds within 7.0 % on cpd-1's instrument W (noise arm 8.5 %) and 0.068 % on the "
+                  "ramp (noise 0.057 %) (docs/wp/2017-batch/group_d_summary.md); both real families "
+                  "are development data; the near-cut case blocked.py names, where the layouts can "
+                  "discard different directions, was not produced; their largest dense Jacobian is 110 MiB, "
                   "so the size rule took dense on all three and only the forced arm reached the "
                   "blocked path; a third real joint family owed, and none on disk but Nd2Ru2O7, "
                   "evidence for no audit before the milestone closes"),
