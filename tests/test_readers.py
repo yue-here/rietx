@@ -2324,10 +2324,13 @@ def test_a_zip_that_is_not_a_rasx_is_not_claimed(tmp_path):
     with zipfile.ZipFile(p, "w") as archive:
         archive.writestr("notes.txt", "not a diffraction file at all")
 
+    assert identify_format(p).name != "rasx"
     with pytest.raises(ValueError) as refusal:
         rx.read_pattern(p)
     assert "other.rasx" in str(refusal.value)
-    assert "Supported" in str(refusal.value)
+    # since WP-1315 a plain zip whose text member the ASCII reader claims is a
+    # zip of patterns, so the refusal is that reader's, naming the member
+    assert "member 'notes.txt'" in str(refusal.value)
 
 
 def test_the_attenuator_column_is_reported_here_exactly_as_in_ras(tmp_path):

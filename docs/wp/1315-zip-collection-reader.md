@@ -72,11 +72,11 @@ without the files.
 
 ## Tasks
 
-- [ ] The `zip_collection` entry: dispatch position, membership-by-claim,
+- [x] The `zip_collection` entry: dispatch position, membership-by-claim,
       sorted-name `scan=`, capped member reads, refusals naming the zip.
-- [ ] The STORED-zip fix asserted directly: a zip whose first member is
+- [x] The STORED-zip fix asserted directly: a zip whose first member is
       GSAS text is claimed by the zip entry, not by `looks_gsas`.
-- [ ] `ScanInfo` labels = member names; `PATTERN_MULTISCAN_DEFAULTED` on
+- [x] `ScanInfo` labels = member names; `PATTERN_MULTISCAN_DEFAULTED` on
       member 0; `scan_count` in metadata.
 - [ ] `capabilities()` formats arm, `help.py` reader-option coverage if any
       option is added, manual line in the data chapter, skill row.
