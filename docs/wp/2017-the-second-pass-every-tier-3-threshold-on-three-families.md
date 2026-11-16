@@ -291,6 +291,28 @@ and have no free factor to measure, so this file's old list named them without c
   displacement values and esds; Rwp, evaluations, status, and whether `FLAT_DIRECTION`,
   `HIGH_CORRELATION` and `BOUND_HIT` fire. Whether the removal stands on what this shows is the
   maintainer's; no default moves here.
+- **J, its fits and arms, fixed 2026-11-16 before running** (`2017-batch/group_j.py`). What is
+  measured: Le Bail and Pawley refining `instrument.source.lines.*.weight` since 84b9e87a2, read
+  against Rietveld on the same pattern and protocol. Families: `lab6` (SRM 660c, the NIST
+  calibrated protocol, which already frees the Kα2 weight in its `lines_axial` stage; graphite
+  diffracted-beam monochromator), `fap` (FAP under its GSAS protocol, whose file leaves the ratio
+  blank, so 0.5 is the start) and `srm1976a` (the SRM 1976a plate under its textured TOPAS-mirrored
+  protocol, cell held as there; a five-line CuKα in TOPAS against rietx's doublet). The last two
+  get one stage, `lines`, after their last structural stage, freeing the Kα2 weight alone. Arms per
+  family: `rietveld`, `lebail` and `pawley`, each with the weight free under that one plan (in
+  Le Bail and Pawley the atom, scale and texture rows are the mode's own force-fixed ones); each
+  mode again with the weight held at the 0.5 start (`held`); and each free arm with every free
+  start value that is not zero ×(1 + 1e-12) (`noise`). Control: the free arm's weight row must be
+  among the refined rows, or the arm measured nothing. Positive arm for the harness: SRM 660c must
+  repeat WP-2002's 0.5126 ± 0.0048 (Rietveld), 0.5145 ± 0.0036 (Pawley) and 0.5224 ± 0.0033 (Le
+  Bail), or the protocol differs from the one that found the 1.7σ. Read: the Kα2/Kα1 weight with
+  its reported and plain esds per mode; Le Bail and Pawley against Rietveld in combined σ
+  (√(e₁² + e₂²), the measure WP-2002's 1.7σ is in) and over the larger esd; each against 0.5, the
+  2j+1 degeneracy ratio (`KA2_RATIO`'s comment: measured integrated ratios run a few percent
+  above it, and a diffracted-beam monochromator clips it); and every cell row, free against held
+  in each mode, in plain esd over the larger esd (0.1 bar), past `noise`. Rwp, evaluations, status
+  and codes beside. These are three laboratories, instruments and materials; whether the modes
+  agree well enough is the maintainer's to judge, and no default moves here.
 - **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
   starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
   to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
