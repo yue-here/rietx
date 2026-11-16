@@ -235,7 +235,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
 | `POST /api/recent/clear` | empty that list |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
-| `GET /api/examples` | the example projects shipped in the wheel |
+| `GET /api/examples` | the example projects included in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |
 
 ### The project

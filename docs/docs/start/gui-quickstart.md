@@ -40,7 +40,7 @@ temporary directory.
 `rietx gui` with no project named reopens the project you had open last, unless
 you closed it from the File menu. Otherwise it shows the start screen. On the left are `New project…`, `Open…`, and
 links to this manual and its tutorials. On the right are the projects you opened
-recently and the example projects shipped inside the package. A first run has no
+recently and the example projects included in the package. A first run has no
 recent list, so it shows the examples alone. Start from an example if you have
 no data of your own.
 
@@ -61,12 +61,12 @@ refinement starts to need a plan rather than a button.
 
 ```{image} ../screenshots/empty-state-light.png
 :class: only-light
-:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the included example projects with their descriptions on the right
 ```
 
 ```{image} ../screenshots/empty-state-dark.png
 :class: only-dark
-:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the included example projects with their descriptions on the right
 ```
 
 ## What is on the screen

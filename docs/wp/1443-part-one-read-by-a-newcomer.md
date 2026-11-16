@@ -198,7 +198,7 @@ folded into this map and deleted. Each passage, read against the new tree:
 
 ## Tasks
 
-- [ ] Passages 1–5 (`data.md`, and `concepts.md:41`): the `Parameter` example
+- [x] Passages 1–5 (`data.md`, and `concepts.md:41`): the `Parameter` example
       shows its output, σ's three consumers get verbs, "shipped" leaves Part 1,
       the coordinate refusal is named, "histogram" is defined at first use and
       in the glossary.

@@ -78,7 +78,7 @@ A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leav
 
 The statistics measure agreement, and agreement is not correctness.
 A background flexible enough to imitate the peaks biases displacement parameters up and phase fractions down while Rwp improves.
-Of the eight corrections shipped in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
+Of the eight corrections added in v0.5, two provably cannot move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are invisible in it.
 That is what [the report](../concepts/report.md) is for.
 It is also why a correction in rietx ships with a record field or a diagnostic saying what it changed, such as the [absorption record](#absorption-correction), rather than with an Rwp comparison as its evidence.
 

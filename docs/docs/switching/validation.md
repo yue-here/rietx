@@ -68,7 +68,7 @@ The page [Names in other programs](../reference/foreign-names.md) maps the param
 ## LaB6 and cBN against TOPAS
 
 The specimen is NIST SRM 660b LaB<sub>6</sub> mixed with cubic BN, measured at APS 11-BM.
-The reference is TOPAS's two shipped models of the same histogram.
+The reference is the two models of the same pattern that come with TOPAS.
 LaB<sub>6</sub>'s certified cell is held, so that the cBN cell is measured against it.
 
 The protocol check comes first.
