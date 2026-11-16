@@ -1013,6 +1013,7 @@ def test_a_trial_error_unit_stops_at_its_seen_cap(monkeypatch):
     # the case must harvest at least two candidates, and never reach the
     # in-loop dedup, or "prefix" stops meaning enumeration order
     assert 2 <= len(full) <= 2000, "the case no longer harvests"
+    assert sum(full_scored) == len(full), "the in-loop dedup ran"
     assert full_stats["seen"] == len(full_scored) < trial_error.MAX_SEEN
     # the cap at the solution that built the first candidate: the unit holds
     # exactly that many and stops before adding one more
