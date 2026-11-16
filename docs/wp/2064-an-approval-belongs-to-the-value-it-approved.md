@@ -1,9 +1,8 @@
 # WP-2064 — An approval belongs to the value it approved
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-16 — CI's audit delta fails a retune under its old approval (PR #1601)
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-10-30 — process: no number moves, and the judge already sees a retuned value at review; it closes a path where one passes without a fresh ruling
 
 ## Goal
 
@@ -73,5 +72,55 @@ closes the one gap the survey found that is cheap to close.
 NASA-STD-7009A (2016), Standard for Models and Simulations, via `docs/practice.md`.
 
 ## Handover log
+
+- **2026-11-16** — closed, all four tasks landed (PR #1601; a ghostshift runner, one session).
+
+  A pull request can no longer carry a tier-3 number into `main` under an approval the
+  maintainer gave to a different number: CI's audit delta now fails it until the row carries a
+  later date, and the failure says the maintainer's ruling is owed. The WP's two cases are
+  settled as written: a value moved together with a tier that needs no approval passes, and a
+  tier-2 action meets the tier-3 rule. A change with no such retune prints and exits exactly as
+  before, so nothing open moves; it costs one more paired-row comparison per run.
+
+  *Done.* `tests/audit_delta.py`: `RETUNED`, its `(FAILS)` group, `needs_approval` (tier 3 or a
+  tier-2 action, the predicate of `test_audit_table.py`'s `needs grounds and approved`),
+  `retuned_under_old_approval`, a message naming the row, both values and the base date, and a
+  `::error` annotation. The summary line gains `, N retuned under an earlier approval` only when
+  N > 0; retunes still count under `changed`. Exit codes unchanged (1 on any failure). Seven new
+  tests in `tests/test_audit_delta.py`; one sentence in `CONTRIBUTING.md`.
+
+  *Decided while writing (the WP's two cases, and two it did not name).* "Needs no approval"
+  is read off the head row's tier with the table test's predicate, so tier 1, `invariant`,
+  `unaudited` and a tier-2 non-action all pass. The tier-2 action arm is vacuous today, since
+  `test_audit_table.py` holds every action's value at None; the test gives an action a value to
+  show the rule reaches it. "Later" is strict, as the Goal says: a retune ruled on the day of
+  the old approval needs the next day's date. From the diff review: renames pair only at an
+  equal value, so a row renamed and retuned in one change read as an addition plus a deletion
+  and passed; a new name now pairs with a deleted one of the same kind and leaf for this check
+  alone, and only when the pair fails (otherwise the report is unchanged).
+
+  *Measured.* Five of the seven new tests fail against main's `audit_delta.py` (the two
+  decided cases among them, the demotion test through its positive arm); the plain-rename and
+  evidence-only tests pass there too, as they should. Locally (`[dev]`, darwin/arm64) the file
+  is 23 passed, 16 on main plus 7. On purpose: `AIR_SCATTER_TRIGGER` 0.3 → 0.25 in the
+  working tree, `python -m tests.audit_delta` exited 1 printing the message, then restored. On
+  #1577's head 539ef7fc7 against its merge-base: 24 changed (evidence only), 0 failures, output
+  identical to main's. Workstation canary (38132e546): 109 passed, 35 s, 4 pinned cores,
+  149 % CPU, 432 MB. Fast suite: 14857 passed, 280 skipped, 32 xfailed, 0 failed, 514 s (co-tenant, after ~4.5 min queued for memory), 5.9 GB, 745 % on 8 cores; the 7 added tests cost 0.00 s in its junit (`tests.added_test_times`) (Linux workstation, py3.12 `[dev]`). `tests.reader_output` exit 0.
+
+  *Review.* A read-only subagent reviewed the diff (`/code-review` not run: a ghostshift runner
+  may not). Five findings: the rename-plus-retune gap (fixed, above); the vacuous action arm
+  (documented); same-day strictness (kept, documented in the docstring); a test name that
+  promised an equal-date case (added); the docstring overstating who writes the date (now says
+  the check sees only that the date moved).
+
+  *Generality.* Not dispatched: the branch does not touch `_audit.py` and adds no heuristic
+  rietx makes (the WP's tier line: none, a CI check).
+
+  *Forward.* WP-2017's `### Inherited` names the new failure, since its groups measure tier-3
+  values and #1577 runs this gate.
+
+  Next: none here. If the maintainer wants a same-day ruling to count, `now <= was` in
+  `retuned_under_old_approval` becomes `now < was` and the equal-date test flips.
 
 - **2026-10-30** — created, from the 2026-10-30 issue triage (issue #1224). Checked against the tree at 44de0f62a: `Row.approved` is a date with no tie to `Row.value`, and `tests/audit_delta.py` fails only on a new `unaudited` name. No open WP owns it: 2017 measures the tier-3 thresholds and does not touch the guard, and 2014, which built the guard's outside-PR path, is closed.
