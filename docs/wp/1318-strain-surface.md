@@ -67,9 +67,11 @@ second one.
 
 ## Tasks
 
-- [ ] The projection: directional FWHM surface evaluated through
+- [x] The projection: directional FWHM surface evaluated through
       `crystallography/stephens.py`'s own sum; negative regions rendered as
-      unphysical, not clipped.
+      unphysical, not clipped. (`stephens.directional_sigma2`, the hkl along a
+      unit direction at M = 1 Å⁻² fed to `sigma2_m`; `stephens.reciprocal_frame`
+      the Cartesian frame.)
 - [ ] The `viz/` figure in house figure style; the GUI home decided and, if
       taken, wired to the existing 3-D path with vitest coverage.
 - [ ] Manual: a short section beside the Stephens material, figure pair via
