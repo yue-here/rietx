@@ -244,13 +244,14 @@ here toward the truth (which lies on the face). Both RESOLUTION_UNCONSTRAINED an
 HIGH_CORRELATION (U-V, ρ −0.988) fire in all three arms. Question (4) below.
 
 **C4, the scale-B ridge hold against capillary absorption** (`ridge_absorption.py`; macOS arm64,
-`[dev]`; the LaB₆ `plain` arm also on a Linux x86_64 machine, output not committed: Rwp equal to
-6e-14, B to 1.4e-11 Å²). Capillary absorption is A = K·exp(c·sin²θ), an exact
+`[dev]`; the LaB₆ `plain` arm also on a Linux x86_64 machine, its record the file's last two
+lines: Rwp equal to 6e-14, B to 1.4e-11 Å²). Capillary absorption is A = K·exp(c·sin²θ), an exact
 reparameterisation of each phase's {scale, B} whose content is ΔB = c(µR)λ²/2; the ridge hold
 reads a phase component that carries A and holds the B column A's shift lands on. The probe of
 every arm is recorded each time the runner asked it. The dataset row named the fluorite as the
 phase that fires the hold; on that fixture it is the iron (one reflection in range, (110)), and
-the fluorite is the separable neighbour.
+the fluorite is the neighbour above the probe's floor (though `FLAT_DIRECTION` still reads its
+scale and B as one direction, ρ +1.000, in every arm).
 
 *The ridge fixture* (`tests/test_scale_b_ridge.py`'s four phases, noise seed and `cell_then_B`
 staging, moved to the `debye_scherrer` preset at Cu Kα1 with the Bragg-Brentano profile, the
@@ -263,20 +264,23 @@ pattern drawn with µR = 1.0, predicted ΔB = 0.48869 Å²):
 | nomu_hold (µR undeclared) | 0.35, held in the same stages | 7.4e-13 | 1.0613 | 1.5994 | 0.0827765366 |
 | nomu_nohold | 0.049(0.57), free | 7.4e-13 | 1.0231 | 1.5427 | 0.0827765366 |
 
-Rwp agrees across all four arms to 4e-11 (the reparameterisation and the ridge are both flat).
+Rwp agrees across all four arms to 3e-11 (the reparameterisation and the ridge are both flat).
 A changes no hold decision: the probe reads corundum 0.223 against 0.228, zincite 0.193 against
 0.190 and iron 5.9e-13 against 7.4e-13 with µR declared and not, so the same phase is held in the
 same stages, and `SCALE_B_INSEPARABLE` names `phases.3.atoms.0.biso` alone in both hold arms. Every
-site of the three separable phases moves by ΔB between the declared and undeclared arms to within
+site of the three phases above the floor moves by ΔB between `mu_hold` and `nomu_hold` to within
 1.3e-5 Å² of the prediction (corundum 7e-8 and 8e-8, zincite 8e-6, fluorite Ca +1.2e-5 and F
-−2e-6, against esds of 1.2, 4.3 and 3e3-1e4 Å²). The iron cannot carry its share: held, its B
+−2e-6, against esds of 1.2, 4.3 and 3e3-1e4 Å²); between the two free arms, where the iron's B
+moves too, to within 4.7e-3 Å² (zincite −4.6e-3). The iron cannot carry its share: held, its B
 takes none of ΔB, and its scale takes A at (110) instead, 1.0613 measured against
 exp(2ΔB·s²(110)) = 1.0613 predicted, so its weight fraction moves 6.0 % relative (0.44 of the
-scale's own esd) between declaring µR and not. Free, its B walks from the 0.35 it was handed to
-0.05 in both arms and takes 0.0033 Å² of ΔB (0.7 %), and the fraction moves the same 6.0 %. So
+held fit's scale esd) between declaring µR and not. Free, its B walks from the 0.35 it was handed to
+0.05 in both arms and takes 0.0033 Å² of ΔB (0.7 %), and the fraction moves the same 6.0 % (0.17
+and 0.87 of the free fits' scale esds, µR declared and not). So
 the 6 % is the ridge's, not the hold's: no setting of an iron B the data cannot see absorbs a
 correction the data cannot see either. The fluorite's separation falls to 1.6e-6 (µR declared)
-and 4.0e-6 (not) by the closing stage, 25-64 times the floor, in both arms.
+and 4.0e-6 (not) by the closing stage in the hold arms (25 and 64 times the floor), and to 8.8e-6
+and 1.7e-6 in the free arms.
 
 *11-BM SRM 660a* (`tests/test_acceptance_capillary.py`'s protocol, dispersion off, µR estimated at
 0.6788): the hold never fires, plain or corrected (separation 0.771-0.780, seven orders above the
@@ -296,7 +300,7 @@ stays a column of the covariance).
 *The two datasets chosen for the row never meet the pair.* On HB-2A Cr₂WO₆ at 4 K and BT-1 LaMnO₃
 at 50 K (Pn′ma′), each with its acceptance protocol, the hold finds no flat direction in any stage,
 so `no_hold` and `no_turn` are the shipped fit to every digit. The test acts alone: it zeroes the
-polar angle in every stage (Cr₂WO₆ stationary at π, the moment along a, statistic ≤ 0.002 against
+polar angle in every stage (Cr₂WO₆ stationary at 0, then π, the moment along ±a, statistic ≤ 0.002 against
 the cut 2.706; LaMnO₃ at π/2, 0.49-0.57), and `MOMENT_ANGLE_STATIONARY` names it. With the test
 off no value moves; the modulus esd goes from 0.0450 to 0.0507 μ_B (Cr₂WO₆) and 0.0433 to 0.0482
 (LaMnO₃), and the polar angle carries an esd (0.40 and 0.062 rad) where shipped it carries a profile
@@ -317,19 +321,23 @@ noise (`rhn`, `rh111n`). The noisy rows:
 
 The noise-free rows say the same at every arm (ψ 10.199° and 0.0025° shipped, against 10.20° and 0
 true; 27.84° without the turn), with the test's statistic read at roundoff in the closing stage
-(χ²_red near 1e-18).
+of every converging arm (χ² 4e-22 to 2e-13); the trapped `no_turn` arms end at χ² 2.6-2.9, so
+their statistic is a reading.
 
-So the shipped order is what keeps the test's verdict true: the hold and the turn act at stage
-start and the test reads the turned polar angle after the solve, and it gets both truths right
-while changing no value (`no_test` is bit-identical in all six datasets; only esds move). Take
-either half of the hold away and the test still answers, wrongly and confidently. Without the turn
-the polar angle sweeps a meridian that never comes within 27.8° of [111], the test finds the
-meridian's closest approach a stationary point (it is one, along that meridian), and
-`MOMENT_ANGLE_STATIONARY` presents a trapped answer at Rwp 0.145 as a symmetry-fixed direction with a
-0.036 rad interval. Without the hold the test refits the azimuth while it moves the polar angle,
-which the flat cone lets it do at no cost, so a flat combination reads as a stationary polar angle,
-the azimuth gets an esd, and the report says no direction is unmeasured. The test has no guard of
-its own against either; it relies on the hold having run.
+So the test's verdict is right when the hold and the turn have acted: they act at stage start,
+the test reads the turned polar angle after the solve, and it gets both truths right while
+changing no value (`no_test` is bit-identical in all six datasets; only esds and intervals move).
+Take either half of the hold away and the test still answers, wrongly. Without the turn the polar
+angle ends 27.84° from [111], at the point the test finds stationary along its meridian (it is
+one, along that meridian), and `MOMENT_ANGLE_STATIONARY` presents a trapped answer at Rwp 0.145 as
+a symmetry-fixed direction with a 0.036 rad interval: wrong and confident. Without the hold the
+answer itself is the shipped one (ψ and Rwp equal), but the test refits the azimuth while it moves
+the polar angle, which the flat cone allows at no cost, so a flat combination reads as a
+stationary polar angle with a 0.39 rad interval (45 times the shipped esd), the azimuth gets an
+esd of its own, and the report says no direction is unmeasured: the verdict and the report are
+wrong, the values are not. `_refitted_increase` refits every other free angle and has no check
+for a flat combination, so the test's verdict is right only after the hold has run. No arm
+reorders the two; each removes one.
 
 ### Questions for the maintainer (2026-11-16)
 
@@ -359,17 +367,19 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
    for the row, never reaches it; the synthetic touching-truth pattern does.
 5. **C4.** Absorption changes no ridge-hold decision, and the hold never fires on SRM 660a
    (ΔB lands to 3e-9 Å²). On the ridge phase, an undeclared µR moves the weight fraction
-   6.0 % relative (0.44 of the scale's esd) with or without the hold, because B there cannot
+   6.0 % relative (0.44 of the held fit's scale esd) with or without the hold, because B there cannot
    carry ΔB either way. Is C4 recorded *independent*? And should `SCALE_B_INSEPARABLE`, which
    already states the fraction's sensitivity per Å² of B, also say that an undeclared
    absorption correction lands on that phase's fraction rather than its B?
 6. **C7.** On Cr₂WO₆ and LaMnO₃ the hold never acts, so the pair never meets; on the #599
    combination fixture the shipped order gives the test's verdict right both ways (not
-   stationary at 10.3°, stationary on [111]) and the test moves no value. Is C7 recorded
-   *ordered*, the order being load-bearing? The `no_hold` and `no_turn` arms show the test
-   itself cannot tell a flat combination or a trapped meridian from a symmetry-fixed direction:
-   should it carry a guard of its own (refusing a candidate whose Δχ² vanishes because another
-   free angle absorbs the move), or is the hold's precedence the design? And should the row's
+   stationary at 10.3°, stationary on [111]) and the test moves no value. The arms remove the
+   hold or the turn rather than reorder them, so what is measured is a dependency: the test's
+   verdict is right only once both have acted. Is C7 recorded *ordered* on that evidence? The
+   `no_hold` and `no_turn` arms show the test itself cannot tell a flat combination or a trapped
+   meridian from a symmetry-fixed direction: should it carry a guard of its own (refusing a
+   candidate whose Δχ² vanishes because another free angle absorbs the move), or is the hold's
+   precedence the design? And should the row's
    datasets be replaced by the #599 fixture, since the two chosen ones cannot exercise it?
 
 ## Acceptance
