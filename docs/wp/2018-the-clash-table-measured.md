@@ -729,6 +729,33 @@ on the flat pattern and 2.5 on the hump (0.4 of the zero arm's own, which are 6�
 the axis furthest from the truth is as far in the truth arm (2.6 esd) as in any other, so what
 the start moves first is the profile and the esds. Question (20).
 
+**C37, a free measured-background scale beside the Chebyshev rows** (`blank_chebyshev.py`;
+macOS arm64, `[dev]`, about 4.5 s a fit). C26's Si 640c in Kapton with its blank under the
+`_fit_chebyshev` protocol, the blank's scale free from 1.0 under 2, 3 (the `blank_free`
+fixture), 6 (`blank_free_cheb6`) and 10 Chebyshev terms (the positive arm, room for the
+polynomial to imitate the blank), and held at 1.0 under 3 (`blank_held`) and 10. The scale's
+correlation with each coefficient is read from the closing solve's correlation matrix.
+
+| Arm | blank scale | largest ρ(scale, c_k) | Si scale (×1e-4) | Biso (Å²) | `lor_size` (°) | Rwp (own σ) |
+|---|---|---|---|---|---|---|
+| free, 2 terms | 0.501(16) | −0.81 (c0) | 2.94234(12) | 0.4170(96) | 0.002169(83) | 0.0921 |
+| free, 3 terms | 0.841(11) | −0.88 (c0) | 2.94487(53) | 0.4217(43) | 0.002287(37) | 0.0734 |
+| free, 6 terms | 0.693(19) | −0.95 (c0) | 2.94526(57) | 0.4220(46) | 0.002295(39) | 0.0735 |
+| free, 10 terms | 0.695(24) | −0.95 (c0) | 2.94512(57) | 0.4219(46) | 0.002293(39) | 0.0733 |
+| held at 1, 3 terms | 1 | — | 2.94628(54) | 0.4228(44) | 0.002304(38) | 0.0736 |
+| held at 1, 10 terms | 1 | — | 2.94555(50) | 0.4222(40) | 0.002303(35) | 0.0724 |
+
+The blank's scale is not a measurement independent of the polynomial beside it: from three
+terms to six it moves from 0.841 to 0.693, 7.7 of the six-term esd and 14 of the three-term
+one. Its correlation with c0 grows with the
+order to −0.95, under the 0.98 guard, so nothing fires (no `HIGH_CORRELATION`, no
+`BACKGROUND_ABSORPTION`, whose targets are the `phases.` columns, the scale being part of
+the span they are projected onto).
+The specimen does not follow it: from three to ten terms, free or held, the Si scale, Biso and
+`lor_size` move at most 0.44 esd (`lor_size`, held against free at 3 terms). Two terms are too
+few (Rwp 0.092): there the scale falls to 0.50 and `lor_size` sits 3.2 esd low, which is the
+polynomial's shortfall rather than the pair's. Question (21).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -864,6 +891,13 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     *ordered* (the partition reads the background the stage starts from, by design), and is
     #725's question, whether `seed=True` should be the default, answered or reopened by these
     numbers? (The verdict on a default is the maintainer's.)
+21. **C37.** On Si 640c in Kapton the blank's refined scale depends on the Chebyshev order
+    beside it (0.841 at 3 terms, 0.693 at 6, 7.7 esd), with ρ(scale, c0) reaching −0.95 and
+    no code firing, while the specimen moves at most 0.44 esd from 3 to 10 terms, free or
+    held. Is C37 recorded a *clash* (the scale a caller reads as "how much blank" is not
+    separable from the polynomial), *independent* (the specimen does not care), or something
+    the scale's own reading owes, for instance a note that a free blank scale is conditional on
+    the polynomial order?
 
 ## Acceptance
 
