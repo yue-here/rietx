@@ -39,7 +39,7 @@ components sit within 0.25 FWHM of a window edge or outside it. All 120 are re-s
 `PEAK_UNUSABLE_FLAGS` (WP-1043: 11 unverified usable components on six other lab patterns),
 so class 1 asks about the **conjunction** with `position_at_bound`, never about
 `axial_tail` alone. WP-2055's harness (direction test, lattice distances, window edges) was
-kept outside the tree at `~/.cache/ghostshift/rietx/wp-2055/`. *Superseded in part
+kept outside the tree, in ghostshift scratch. *Superseded in part
 2026-11-16:* that directory is gone, and task 1's findings below come from a new harness.
 
 **Tier.** Making a flag combination unusable is a new judgement. It is measured on one
@@ -221,6 +221,18 @@ WP records why such a component stays usable.
 
 ## Handover log
 
+- **2026-11-16 (review fix-ups, PR #1579)** — A second review found that the editor's
+  *fresh* refit (`PeakEditor.refit(doc, g)` with no `n_components`, which runs `fit_group`
+  and so judges) returns 9 of the 10 development shoulders to `usable()` with `axial_tail`
+  alone. Seeded at its fitted position, the component converges 0.0001-0.057° away and off
+  its bound (SRM 1976a 52.5267° → 52.5208°, 76.8362° → 76.8361°, re-checked here; only zircon
+  67.67° comes back on its bound). The earlier answer "named positions are never judged" holds
+  for add, move, remove and the `n_components` refit only. So the flag depends on detection's
+  seed path, and "no position of its own" was a census reading, not a measurement: the docs
+  now say "on the development data" and "on a list detection picked". No code changed and no
+  test pins the fresh-refit path. **Open for Yue (with decision 1):** should a fresh refit keep
+  the flag (a path-independent rule, such as `axial_tail` within the 0.6-1.0 FWHM band and
+  4-14× ratio), or is the instability accepted and pinned by a test?
 - **2026-11-16 (second session, PR #1579)** — Class 1 now has the synthetic positive arm the
   judge asked for, and a negative arm, so the rule's evidence can fail in either direction. A real weak lattice line
   planted below a strong one survives the rule wherever it does not sit on the tail's own
@@ -234,10 +246,10 @@ WP records why such a component stays usable.
   lines 0.62 and 0.95 FWHM below kept with `axial_tail`, the 0.75 FWHM one taken), with
   `tests/output/peaks_tail_shoulder_planted.png`. Each fails if the rule is widened to
   `axial_tail` alone or dropped.
-  *Measured:* sweep on macOS arm64 `[dev]` (harness in ghostshift scratch `wp-2120/arm/`,
-  about 7 min). Both new rows pass on Linux x86_64 too: pearl canary on `470e6cf0b`,
+  *Measured:* sweep on macOS arm64 `[dev]` (harness in local scratch, not committed,
+  about 7 min). Both new rows pass on Linux x86_64 too: the workstation's canary on `470e6cf0b`,
   `test_peak_tail_shoulder` + `test_audit_table` + `test_help` (`-m ""`, `-n 4`), 66 passed.
-  Acceptance on pearl, same tree: `test_peak_bounds` + `test_peak_tail_shoulder` +
+  Acceptance on the workstation, same tree: `test_peak_bounds` + `test_peak_tail_shoulder` +
   `test_acceptance_indexing` (`-m ""`, `-n 4`): 60 passed, 0 failed (this morning's 58 plus the two new
   rows). Ruff clean. `tests.reader_output` exit 0, unchanged. `test_docs_consistency` + the test file on macOS: 32 passed.
   *Questions for the maintainer* (not decided here):
@@ -296,7 +308,7 @@ WP records why such a component stays usable.
   entries, the `PEAK_AXIAL_TAIL` message (it counts the excluded ones), the manual's flag table,
   the skill row, the GUI vocabulary and dist, a release note, and `tests/test_peak_tail_shoulder.py`
   (4 rows, one `slow`).
-  *Measured:* see Findings above. Pearl Linux (shared, co-tenant), `[dev]`, `aaa61b53e`:
+  *Measured:* see Findings above. The Linux x86_64 workstation (shared, co-tenant), `[dev]`, `aaa61b53e`:
   `test_peak_bounds` + `test_peak_tail_shoulder` + `test_acceptance_indexing` (`-m ""`, `-n 4`) 58 passed, 0 failed (the 54 main rows plus 4 new). Main bc77a934e on the same machine: `test_peak_bounds` + `test_acceptance_indexing`
   54 passed. Fast suite (`-m "not slow"`, `-n 6`) on `aaa61b53e`: 14850 passed / 3 failed / 280 skipped / 32 xfailed. Three rows were fixed after it: the skill API index (`c10c1ac97`), and two flat-Si rows that count the usable or driven lines (`test_indexing_screen` 16 → 15; `test_indexing_driven_set`'s control now also offers the `tail_shoulder` back, so it keeps its 18 lines). Their three files were re-run locally on macOS arm64 `[dev]`: 212 passed. `tests.reader_output` exit 0 (unchanged).
   *Rows moved:* `test_peak_bounds`' flat-Si census goes from 16 to 15 usable. The removed

@@ -802,11 +802,13 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: list that can carry the flag comes from a call that did not exist at 1.3.
 #: ``tail_shoulder`` — the component carries both ``axial_tail`` and
 #: ``position_at_bound`` (WP-2120).  It is a weak shoulder on the axial-tail side
-#: of a much stronger group-mate, and the fit pushed it to its position bound, so
-#: no position of its own was measured.  Either flag alone is reported, not
+#: of a much stronger group-mate, and the fit pushed it from detection's seed to
+#: its position bound.  Either flag alone is reported, not
 #: refused (``axial_tail`` for WP-1043's reason, ``position_at_bound`` because
-#: real lines carry it alone at I/σ_I up to 29).  Together they mark the
-#: strong line's own tail, so the conjunction **is** unusable.  Measured on three
+#: real lines carry it alone at I/σ_I up to 29).  On the development data every
+#: component carrying both was the strong line's own tail (a census finding, not
+#: a property of the conjunction: a real weak line 0.6-1.0 FWHM below a strong
+#: one can carry both), so the conjunction **is** unusable.  Measured on three
 #: unrelated lab families (the IUCr round robin, SRM 660c and SRM 1976a; the
 #: fluorapatite pattern has none), 11 of 11 sit 0.62-0.95 FWHM below a mate that
 #: is on the lattice line nearest to them.  Ten have no other lattice line there,
@@ -869,8 +871,8 @@ PEAK_AXIAL_TAIL_MAX_FWHM = 3.5
 #: already says so" holds while σ is finite and a consumer can act on it, and
 #: stops holding at ±1 961° (WP-1442).
 #: ``tail_shoulder`` is here and neither of the two flags that define it is
-#: (WP-2120): the conjunction is a strong line's tail with no measured position,
-#: while each flag alone also marks real lines.
+#: (WP-2120): on the development data the conjunction was always a strong line's
+#: tail, while each flag alone also marks real lines.
 PEAK_UNUSABLE_FLAGS: frozenset[str] = frozenset(
     {"ghost_kbeta", "ghost_tungsten", "excluded", "fit_failed", "not_separable",
      "no_intensity", "position_unmeasured", "duplicate_line",

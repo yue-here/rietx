@@ -389,7 +389,7 @@ def _flags_for(fit: GroupFit, j: int,
         flags.append("not_separable")
     if _axial_tail(fit, j):
         flags.append("axial_tail")
-        # the strong line's own tail, at no position of its own (WP-2120).
+        # on detection's seed path, the strong line's own tail (WP-2120).
         # Detection's judgement about a component it proposed, so only on a
         # fit ``fit_group`` judged: never on positions a caller named
         if bool(fit.at_bound[j]) and fit.width_at_bound is not None:
@@ -424,11 +424,17 @@ def _axial_tail(fit: GroupFit, j: int) -> bool:
     ``PEAK_UNUSABLE_FLAGS``: the side test is evidence, not proof, and a real
     weak line can sit there too (measured, the screen reaches 11 unverified
     usable components across the six other real lab patterns).  **Refused only
-    together with** ``position_at_bound``, as ``tail_shoulder`` (WP-2120): a
-    component the fit pushed to its bound has no position of its own, and on
-    three lab families every such one is its mate's tail.  That is detection's
-    judgement, made only on a fit :func:`fit_group` judged, never on named
-    positions (:func:`fit_peaks`, the peak editor's refits).  Measured on
+    together with** ``position_at_bound``, as ``tail_shoulder`` (WP-2120): on
+    three lab families every component the fit pushed from detection's seed to
+    its bound sat below its mate's reflection (a census finding, not a property
+    of the conjunction: a real weak line 0.6-1.0 FWHM below a strong one can
+    carry both).  That is detection's judgement, made only on a fit
+    :func:`fit_group` judged, never on named positions (:func:`fit_peaks`, the
+    peak editor's add, move, remove and ``n_components`` refits).  The editor's
+    fresh refit (``PeakEditor.refit`` without ``n_components``) runs
+    :func:`fit_group` again and judges anew: seeded at the fitted positions, 9
+    of the 10 development shoulders converge off their bound and come back
+    usable with ``axial_tail`` alone.  Measured on
     SRM 660c it catches exactly the five tails, worth 125 ppm of
     certified-cell bias, and excluding the flagged components is what took the
     gate to ``high`` at −2 ppm.

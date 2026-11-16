@@ -1519,9 +1519,9 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "not find a minimum there. The component may not be a line of its own. A "
             "shoulder on the axial-divergence tail of a much stronger line ends here "
             "too, because the peak shape does not carry all of that tail. That tail is "
-            "on the low-2θ side below 90° and the high-2θ side above it. One also "
-            "flagged `axial_tail` is treated as such a shoulder: it is flagged "
-            "`tail_shoulder` and is unusable."
+            "on the low-2θ side below 90° and the high-2θ side above it. On a list "
+            "detection picked, one also flagged `axial_tail` is treated as such a "
+            "shoulder: it is flagged `tail_shoulder` and is unusable."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(
@@ -1563,7 +1563,8 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "points to. That side is low 2θ below 90° and high 2θ above it. The screen "
             "looks on one side only, because nothing else in a powder pattern flips "
             "sign at 90°. The line stays usable, since a real line can coincide with a "
-            "tail, unless it also sits on its position bound (`tail_shoulder`)."
+            "tail, unless, on a list detection picked, it also sits on its position "
+            "bound (`tail_shoulder`)."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),
@@ -1653,18 +1654,20 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "tail_shoulder": HelpEntry(
-        title="A stronger line's tail, at no position of its own",
+        title="A shoulder on a stronger line's tail, at its position bound",
         label="tail shoulder",
         description=(
             "The component carries both `axial_tail` and `position_at_bound`. It is a weak "
             "shoulder on the axial-divergence tail side of a much stronger component in its "
-            "group, and the fit pushed it to its position bound, so the data did not fix "
-            "a position for it. Measured on three laboratory instruments (the IUCr CPD "
-            "round robin, SRM 660c, SRM 1976a), every such component sat below the "
-            "stronger line's own reflection; untested on synchrotron or dense "
-            "low-symmetry patterns. It stays in the list as part of that line's shape "
-            "and is unusable. Detection judges it; a position you named is never "
-            "flagged."
+            "group, and the fit pushed it from detection's seed to its position bound. On "
+            "three laboratory instruments (the IUCr CPD round robin, SRM 660c, SRM "
+            "1976a) every such component sat below the stronger line's own reflection; "
+            "untested on synchrotron or dense low-symmetry patterns. That is a finding "
+            "on those patterns, not a property of the two flags: in a synthetic sweep "
+            "the rule also took 16 of 112 real weak lines 0.6-1.0 FWHM below a strong "
+            "one (S/L = 0.03). It stays in the list as part of that line's shape and "
+            "is unusable. Detection judges it on a list it picked; a position you named "
+            "is never flagged."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),
@@ -3799,8 +3802,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "Weak components lie within 3.5 FWHM of a stronger group-mate on the side "
             "axial divergence points. They may be real lines and are reported rather "
-            "than removed, except those the fit also pushed to their position bound, "
-            "which are flagged `tail_shoulder` and are unusable."
+            "than removed, except, on a list detection picked, those the fit also "
+            "pushed to their position bound, which are flagged `tail_shoulder` and "
+            "are unusable."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),

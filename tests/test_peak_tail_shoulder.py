@@ -2,7 +2,7 @@
 
 A component carrying both ``axial_tail`` (a weak group-mate on a much stronger
 line's axial-divergence tail side) and ``position_at_bound`` (the fit pushed it
-to its position bound, so the data fixed no position for it) is flagged
+from detection's seed to its position bound) is flagged
 ``tail_shoulder`` and leaves ``usable()``.  Neither flag alone does.
 
 Interpretation table, written before the tests were (each arm can fail):
@@ -216,7 +216,7 @@ def _taken_by_the_rule(p) -> bool:
 
 def test_a_pure_axial_tail_leaves_a_shoulder_the_rule_takes_in_part():
     """The negative arm, and its control.  Without axial divergence nothing
-    sits below a strong line.  With S/L = H/L = 0.03 the unmodelled tail leaves
+    sits below a strong line (3 seeds).  With S/L = H/L = 0.03 the unmodelled tail leaves
     shoulders where the real ones sit (0.6-1.0 FWHM below, 4-14x weaker), and
     the rule takes some of them, not all: on 20 seeds, 5 of the 19 that would
     be usable (macOS arm64 and Linux x86_64 alike; WP-2120's handover)."""
