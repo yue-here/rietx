@@ -151,16 +151,17 @@ def test_a_retune_under_its_old_approval_fails_naming_the_row_both_values_and_th
     assert "    value 3.0 → 2.5" in text
 
 
-def test_a_retune_with_a_later_approval_passes_and_an_equal_one_fails():
+def test_a_retune_with_a_later_approval_passes_and_an_equal_earlier_or_dropped_one_fails():
     before = _table(_APPROVED.format(value=3.0))
     later = _table(_APPROVED.format(value=2.5).replace("2026-10-19", "2026-11-16"))
     found, bad, text = _run(before, later)
     assert _whys(found) == [(ad.CHANGED, "rietx.refine.HOLD_SIGMA")] and bad == []
     assert "approved 2026-10-19 → 2026-11-16; value 3.0 → 2.5" in text
     assert "retuned" not in text
+    equal = _table(_APPROVED.format(value=2.5))
     earlier = _table(_APPROVED.format(value=2.5).replace("2026-10-19", "2026-10-01"))
     dropped = _table(_APPROVED.format(value=2.5).replace(', approved="2026-10-19"', ""))
-    for head in (earlier, dropped):
+    for head in (equal, earlier, dropped):
         assert _whys(_run(before, head)[0]) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")]
 
 
@@ -180,6 +181,24 @@ def test_a_rename_of_an_approved_row_with_its_value_passes():
     assert bad == []
 
 
+def test_a_rename_that_also_retunes_fails_and_with_a_later_date_passes():
+    """A new name pairs with a deleted one of its kind and leaf for this check,
+    so moving a row does not launder its retune; with a later date the pair is
+    an addition and a deletion as before."""
+    before = _table(_APPROVED.format(value=3.0))
+    moved = _APPROVED.format(value=2.5).replace("rietx.refine.", "rietx.schemas.plan.")
+    found, bad, text = _run(before, _table(moved))
+    assert [(d.why, d.old.name, d.row.name) for d in found] == [
+        (ad.RETUNED, "rietx.refine.HOLD_SIGMA", "rietx.schemas.plan.HOLD_SIGMA")]
+    (message,) = bad
+    assert message.startswith("rietx.schemas.plan.HOLD_SIGMA (constant, tier 3), renamed from "
+                              "rietx.refine.HOLD_SIGMA, changed value from 3.0 to 2.5 (")
+    assert "    from rietx.refine.HOLD_SIGMA; value 3.0 → 2.5" in text
+    found, bad, _ = _run(before, _table(moved.replace("2026-10-19", "2026-11-16")))
+    assert _whys(found) == [(ad.ADDED, "rietx.schemas.plan.HOLD_SIGMA"),
+                            (ad.DELETED, "rietx.refine.HOLD_SIGMA")] and bad == []
+
+
 def test_a_retune_to_a_tier_that_needs_no_approval_passes():
     """Decided in the WP: a value moved together with a tier needing no
     approval at all (tier 1, ``invariant``) owes no ruling."""
@@ -194,7 +213,9 @@ def test_a_retune_to_a_tier_that_needs_no_approval_passes():
 
 
 def test_a_tier_2_action_meets_the_tier_3_rule():
-    """Decided in the WP: a tier-2 action row is retuned under the same rule."""
+    """Decided in the WP: a tier-2 action row is retuned under the same rule.
+    Vacuous on today's table, whose test holds an action's value at None; the
+    row here carries one to show the rule reaches it."""
     row = ('Row("rietx.refine.hold_absent_phase", "action", tier=2, ambiguity=1, '
            'evidence="GSAS-II", grounds="B8", approved="2026-10-19", value={value}),')
     found, bad, _ = _run(_table(row.format(value=3)), _table(row.format(value=4)))

@@ -38,13 +38,17 @@ and its numbers still need their tiers.
 date is the maintainer's ruling on one value, and the table test holds a row's
 value to the tree's, so a retune edits the value and leaves the date.  A row
 whose value differs from its base row's, where the base row carries
-``approved``, fails unless the head's date is later.  Two cases pass: a rename,
-whose value is the same by definition, and a row whose head tier needs no
-approval at all (`needs_approval`), such as one moved from tier 3 to tier 1 or
-``invariant``.  A tier-2 action meets the same rule as a tier-3 row.  The
-maintainer writes the date (CONTRIBUTING.md § A heuristic needs its tier), so
-the failure says a ruling is owed and never tells the author to write one.
-Every other delta is a report.
+``approved``, fails unless the head's date is later, a date on the same day
+included.  A new name pairs with a deleted one of the same kind and leaf for
+this check alone, so a row renamed and retuned in one change is caught too; a
+plain rename keeps its value and is no retune.  A row whose head tier needs no
+approval at all (`needs_approval`) passes, such as one moved from tier 3 to
+tier 1 or ``invariant``.  A tier-2 action meets the same rule as a tier-3 row,
+which is vacuous today: the table test holds every action's value at None.
+The maintainer writes the date (CONTRIBUTING.md § A heuristic needs its tier),
+so the failure says a ruling is owed and never tells the author to write one;
+the check sees only that the date moved, never who moved it.  Every other
+delta is a report.
 
 Stdlib only, like `skill_caps`, whose base revision and git helpers it reuses
 (`RIETX_CAPS_BASE` overrides the base for both).
@@ -255,9 +259,15 @@ def deltas(before: Table, after: Table,
         row = after.rows[name]
         pair = next((d for d in deleted
                      if _rename_key(before.rows[d]) == _rename_key(row)), None)
+        retuned = next((d for d in deleted
+                        if _rename_key(before.rows[d])[:2] == _rename_key(row)[:2]
+                        and retuned_under_old_approval(before.rows[d], row)), None)
         if pair is not None:
             deleted.remove(pair)
             out.append(Delta(RENAMED, row, before.rows[pair]))
+        elif retuned is not None:
+            deleted.remove(retuned)
+            out.append(Delta(RETUNED, row, before.rows[retuned]))
         elif via := opened_by(row, before, after, existed):
             out.append(Delta(OPENED, row, via=via))
         else:
@@ -309,7 +319,7 @@ def _describe(row: Row, code: Callable[[str], str]) -> str:
 
 def _how_it_moved(d: Delta, code: Callable[[str], str]) -> list[str]:
     out = []
-    if d.why == RENAMED:
+    if d.old is not None and d.old.name != d.row.name:
         out.append(f"from {code(d.old.name)}")
     if d.via:
         where = "the walk's new entry" if d.row.kind == "constant" else "the new seat"
@@ -362,7 +372,8 @@ def report(found: list[Delta], declared: list[tuple[str, str, list[str]]], how: 
 
 def _failure(d: Delta) -> str:
     if d.why == RETUNED:
-        return (f"{d.row.name} ({d.row.kind}, tier {d.row.tier}) changed value from "
+        moved = f", renamed from {d.old.name}," if d.old.name != d.row.name else ""
+        return (f"{d.row.name} ({d.row.kind}, tier {d.row.tier}){moved} changed value from "
                 f"{d.old.value!r} to {d.row.value!r} ({TABLE}:{d.row.line}), and its "
                 f"approval, dated {d.old.approved} at the base, was given to "
                 f"{d.old.value!r}.  The maintainer's ruling on the new value is owed: the "
