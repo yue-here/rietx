@@ -530,8 +530,8 @@ flag reprints the saved numbers without fitting.
 - **2026-11-16** — the discussion began, and the series milestone opened (one chat
   session with Yue; no package code changed).
 
-  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five are
-  accepted and one, rule 2, is proposed and unanswered. They are recorded with Yue's words
+  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five were
+  accepted at once and rule 2 after a second explanation, in a changed form. They are recorded with Yue's words
   in [`docs/milestones/series.md`](../milestones/series.md) § The rules, which is now
   their authority. Yue ruled that series is its own milestone, separate from parametric,
   and this WP moved to it. Yue ruled WP-2080 to option A, the ratio as a field with no
@@ -542,6 +542,13 @@ flag reprints the saved numbers without fitting.
   2. Question 1, the default on later patterns, is still open and is the first open
   decision in the milestone record. No question in § Open questions is edited: this entry
   and the milestone record say where each stands.
+
+  *Two more rulings, later the same day.* Question 1 is ruled: the default stays as it is
+  (option a), in Yue's words "keep today's default". `SEQUENTIAL_WIDTH_GROWTH` is to be
+  removed ("Remove"). Both are in the milestone record § Ruled after the open, with the
+  options put. Neither is built. Rule 2 is ruled too: the series call and the joint call stay two
+  calls ("Yes, two calls"), the series call taking per-pattern and fixed parameters only.
+  All six rules are now accepted.
 
   *Stale lines above, not yet corrected.* Context says PR #1310 is open and mergeable; it
   has merged. Context says `SequentialRefinement.fit:plan` is unaudited; it has a tier-3

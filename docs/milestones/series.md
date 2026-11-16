@@ -6,7 +6,7 @@ milestones, one for parametric, one for series"). The block 23xx is claimed for 
 the rows.
 
 **This file is a draft of the open.** A Claude session wrote it the same day from that
-chat. The six rules carry the maintainer's answer to each. The title, § Scope and
+chat. The six rules carry the maintainer's answer to each, and all six are accepted. The title, § Scope and
 § Acceptance are the session's wording and wait for the maintainer's read.
 
 Narrative about the WPs below goes to the record of the release in flight,
@@ -41,7 +41,8 @@ Four more points the maintainer agreed in the same discussion:
 **Relation to [parametric](parametric.md).** That milestone builds the joint fit and its
 equations for an expert who writes their own model. This one decides how a series is
 declared and what it does by default. The two share one way of declaring a parameter
-(rule 1 below), and rule 2 needs WP-2103 from the parametric milestone. They stay separate
+(rule 1 below), and rule 2's start from a series result needs WP-2103 from the parametric
+milestone. They stay separate
 because their readers and their acceptance differ (ruled 2026-11-16).
 
 ## The rules
@@ -56,15 +57,18 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
    on each pattern. The globs work as `SharingMap` and `hold` already do.
    *Accepted* ("I think it's a good idea"). DESIGN Rule 5, convention.
 
-2. **The declarations decide how the series is fitted.** If every parameter is per-pattern
-   or fixed, the patterns are fitted one after another, each started from its neighbour's
-   result. If any parameter is common or set by an equation, all patterns are fitted
-   together in one least-squares problem, started from the one-after-another results. The
-   caller does not pick between the two. The result records which ran.
-   *Proposed.* The maintainer asked for the reasoning and has not answered it. The reasons
-   given: a common parameter cannot be honoured one pattern at a time; with nothing common,
-   the joint fit gives the same numbers at higher cost; and the caller keeps control
-   through the declarations. It cannot be built before WP-2103.
+2. **Two calls, and each accepts only the kinds it can honour.** The series call fits the
+   patterns one after another, each started from its neighbour's result, and accepts
+   per-pattern and fixed parameters. The joint call fits all patterns together in one
+   least-squares problem and accepts all four kinds. A joint fit can start from a series
+   result. A parameter cannot be declared common or by equation in the series call, so a
+   series never approximates one by freezing a single pattern's value.
+   *Accepted* ("Yes, two calls"). The session first proposed one call whose declarations
+   chose the method, then leaned to two calls on rietx's own convention (each kind of
+   answer has its own call and result type), on practice (TOPAS, GSAS-II and FullProf users
+   build a different input for each) and on DESIGN Rule 5. The start from a series result
+   waits on WP-2103. What would reopen it: evidence that users stop at the series call and
+   hold a first-pattern value where they meant a common one.
 
 3. **Fitting one after another gives the same answer as fitting each pattern alone.**
    Starting from the neighbour saves iterations. The one-after-another fit applies no
@@ -100,22 +104,33 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
    ratio is a field under rule 5 (WP-2080, option A, "Yes, field only"). DESIGN Rule 1,
    protecting work already done.
 
+## Ruled after the open
+
+- **The default stays as it is** (maintainer, 2026-11-16: "keep today's default"). A series
+  call with no plan refines on every pattern what the default single-fit plan refines: the
+  zero shift, five profile terms, the background, the scale and the cell. It assumes nothing
+  about the experiment. The typical temperature series, with a calibrated instrument held,
+  is a named preset and a skill recipe that a caller opts into. The options put: keep the
+  default; hold the instrument at the first pattern's fitted values (measured to fail with
+  confident esds, WP-2081); refine the instrument as one common value through the joint fit
+  (unmeasured, and not buildable before WP-2103). This answers WP-2081 question 1 with its
+  option a. What would reopen it: a measurement showing the common-value route correct and
+  affordable on real ramps.
+- **`SEQUENTIAL_WIDTH_GROWTH` is removed** (maintainer, 2026-11-16: "Remove"). The warning
+  fired when a phase width reached 3× its first measured value, GoF had doubled and the
+  growth exceeded 3 esds, on three unaudited constants. The width trajectory and each
+  pattern's GoF are already in the result, so rule 5 is met without it. The removal is
+  not built yet.
+
 ## Open decisions
 
 Each is the maintainer's. None is ruled.
 
-- **What "default" means here.** Either the call with no arguments assumes nothing and a
-  named preset describes the typical experiment, or the call with no arguments itself
-  assumes a fixed instrument. Today's default refines the zero shift and five profile terms
-  on every pattern. WP-2081 question 1 holds the options and the measurements.
-- **Rule 2.** Whether the caller may pick the method, and how the joint route returns the
-  per-pattern result a series returns today (DESIGN Rule 4 asks for one typed result from a
-  call).
-- **Two codes that still fire on tuned thresholds**, against rule 5:
-  `SEQUENTIAL_WIDTH_GROWTH` (three unaudited constants) and `SEQUENTIAL_MOMENT_ONSET`
-  (magnetic, so the magnetic path's owner rules on it).
+- **`SEQUENTIAL_MOMENT_ONSET`** still fires on a tuned threshold, against rule 5. It is
+  magnetic, so the magnetic path's owner rules on it.
 - **The audit label on today's default plan.** `SequentialRefinement.fit:plan` is recorded
-  as unanimous, and the traditional calibrate-then-hold route is a named dissent.
+  as unanimous, and the traditional calibrate-then-hold route is a named dissent. With the
+  default kept, the row's kind is corrected and brought to the maintainer for approval.
 - **A skill trap with no outside source.** "Holding every width invents a transition" rests
   on one run on development data (WP-2081, the CuCr2O4 ramp). DESIGN Rule 3 cuts a skill
   line whose only evidence is rietx's own run, so it needs a source from the literature.
@@ -131,24 +146,24 @@ Each is the maintainer's. None is ruled.
 | [1453](../wp/1453-both-directions-name-the-lower-cost.md) | the two directions of a series compared by cost | proposed for this milestone |
 | [1524](../wp/1524-the-step-scans-last-two-blind-spots.md) | the step list's two blind spots | proposed for this milestone |
 | [1317](../wp/1317-series-scrubber.md) | the GUI's view of a finished series | proposed for this milestone |
-| [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2 depends on it |
+| [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie and restart on a joint fit | stays in parametric; rule 2's start from a series result depends on it |
 | [2003](../wp/2003-the-chain-actions.md) | the tiers of the series' automatic actions | stays in generality |
 
 The four proposed rows keep `Milestone: unscheduled` in their files until the maintainer
 approves the move. Each has an open pull request that edits the same header line.
 
 WP-2081's twelve questions under the rules: 2 and 3 fall to rules 1 and 2; 4 to rule 6; 5 to
-rule 4; 7 and 9 to rule 5; 11 to rules 1 and 2. Question 1 is the first open decision
-above. Questions 6 (a view of the raw series) and 8 (a structure-free phase beside a
+rule 4; 7 and 9 to rule 5; 11 to rule 2, which keeps the two calls separate. Question 1 is
+ruled above: the default stays. Questions 6 (a view of the raw series) and 8 (a structure-free phase beside a
 structural one, WP-2108) are work of their own.
 
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
 WP-2080, a fixed value surviving a restart (WP-2081 question 4), and the two thresholded
-codes once ruled. Rule 1 comes next, as a declaration on the series call. Rule 2 waits on
-WP-2103 and on the joint route's measurement on a real ramp. The default is ruled before
-any preset is written. The documentation for a user arriving from another program's
+codes once ruled. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+from a series result waits on WP-2103. The default is ruled, so a preset for the typical
+temperature series can be written. The documentation for a user arriving from another program's
 sequential mode is written with rule 1. Each WP's `Priority:` line outranks this paragraph.
 
 ## Acceptance

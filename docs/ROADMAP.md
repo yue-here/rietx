@@ -158,7 +158,7 @@ covers (1119 § Gotchas).
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
 | parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
 | gui-overhaul | The GUI redesigned around the pattern and the model, ported into `rietx gui` in five pieces (the layout shell, the Parameters panel, the Plan tab, previews, the Background tab), then rebuilt beside it from 2026-11-11 — [§ gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) | 🔄 **opened 2026-11-08** ([record](milestones/gui-overhaul.md)) | ten rows written at the open, the record's § Acceptance |
-| series | A series a scientist can predict and drive: each parameter declared per pattern, common, fixed or by equation, the declarations choosing the fit, strategy left to the caller, problems reported as numbers — [§ series](#series--a-series-a-scientist-can-predict-and-drive) | 🔄 **opened 2026-11-16** ([record](milestones/series.md)) | six rows drafted at the open, the record's § Acceptance |
+| series | A series a scientist can predict and drive: each parameter declared per pattern, common, fixed or by equation, a series call and a joint call each taking the kinds it can honour, strategy left to the caller, problems reported as numbers — [§ series](#series--a-series-a-scientist-can-predict-and-drive) | 🔄 **opened 2026-11-16** ([record](milestones/series.md)) | six rows drafted at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -447,7 +447,7 @@ Opened 2026-11-08 by the maintainer ([record](milestones/gui-overhaul.md)), on t
 
 ### series — a series a scientist can predict and drive
 
-Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each with the maintainer's answer, and the decisions still open, the default first. Rule 2 waits on 2103. The block 23xx is claimed. [The WPs](wp/README.md#series).
+Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each accepted by the maintainer, and the decisions still open. The default stays as it is, and a joint fit starting from a series result waits on 2103. The block 23xx is claimed. [The WPs](wp/README.md#series).
 
 ### Unscheduled
 
