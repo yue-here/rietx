@@ -157,12 +157,12 @@ and goes through the harness.
   0.369-0.379. On SRM 1976a and FAP every Biso rises under the held curve too.
   The issue's mechanism: at 3 FWHM the SNIP curve rises under each line's
   tails, and Biso grows to remove the tail intensity the model lost.
-  `BACKGROUND_ABSORPTION` cannot see it, since the screen projects onto freed
-  background terms and a held curve has none. Checked against the tree at
-  bc77a934e with the issue's own harness, synthetic arm only: La Biso
-  0.4749(163) held against 0.3789(158) co-refined, `worst_absorption` 0.0111;
-  the real patterns were not re-run, and a larger `w` was not tried against
-  Biso. The issue leaves three changes to the maintainer: the rule's evidence
+  `BACKGROUND_ABSORPTION` cannot see it, since the screen sees only the freed
+  background correction, never what the held SNIP curve absorbed. Checked
+  against the tree at bc77a934e with the issue's own harness, synthetic arm
+  only: La Biso 0.4749(163) held against 0.3789(158) co-refined,
+  `worst_absorption` 0.0111; the real patterns were not re-run, and a larger
+  `w` was not tried against Biso. The issue leaves three changes to the maintainer: the rule's evidence
   names a structural check (Biso against truth) beside background/truth, and
   says meanwhile that the held SNIP biases Biso up at 3 FWHM; the abstention
   row stops naming the held SNIP as the fallback until then; optionally, one

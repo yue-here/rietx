@@ -65,14 +65,15 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
 - 2026-11-16, from the issue triage (issue #1568): the off-region residual per
   region, head (first 10 % of the fitted range), middle and tail (last 10 %),
   each with three numbers: the RMS of the binned mean z over off-peak channels
-  (40 bins; off-peak = more than 3 FWHM from every reflection, with a valley
-  fallback where a bin holds fewer than 3), the worst bin (signed mean and 2θ),
-  and a wave count; printed beside `worst_absorption`. It is #1215's edge window
-  in a simpler form, report only. The issue's measurement (seven public patterns
-  in the tree, five backgrounds each, at 740931532; not re-run in triage): the
-  ranking of backgrounds within a pattern matches a refiner's read on five of
-  seven; no threshold holds across patterns (SRM 660c's tail at 0.6-1.0 σ went
-  unflagged, SRM 1976a's at 1.0-1.2 σ was flagged); the one miss, Cr₂WO₆ with a
+  (the range cut into 40 equal bins; off-peak = more than 3 FWHM from every
+  reflection, with a valley fallback where a bin holds fewer than 3), the worst
+  bin (signed mean and 2θ), and a wave count; printed beside
+  `worst_absorption`. It is #1215's edge window in a simpler form, report only.
+  The issue's measurement (seven public patterns in the tree, five backgrounds
+  each, at 740931532; not re-run in triage): the ranking of backgrounds within a
+  pattern matches a refiner's read on five of seven; no threshold holds across
+  patterns (SRM 660c's tail at 0.6-1.0 σ went unflagged, SRM 1976a's at
+  1.0-1.2 σ in arms B and D (0.57 in C) was flagged); the one miss, Cr₂WO₆ with a
   P-spline at λ = 0.01, is ranked best by every residual measure and caught by
   `BACKGROUND_ABSORPTION` alone (`worst_absorption` 0.157 against 0.074-0.083).
   So a residual row read alone rewards an over-flexible background, which bears
