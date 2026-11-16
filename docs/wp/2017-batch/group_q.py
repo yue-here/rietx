@@ -70,7 +70,7 @@ os.environ.setdefault(COMPILED_THREADS_ENV, "1")
 
 import rietx as rx  # noqa: E402
 from rietx.model import compiled  # noqa: E402
-from rietx.schemas.instrument import BackgroundChebyshev, BackgroundPSpline  # noqa: E402
+from rietx.schemas.instrument import BackgroundChebyshev  # noqa: E402
 
 RAW = Path(os.environ.get("WP2017Q_RAW", Path.home() / ".cache" / "rietx" / "wp-2017-q"))
 JSONL = RAW / "group_q.jsonl"
@@ -80,13 +80,14 @@ NUDGE = 1e-12
 
 SYN_LO, SYN_HI, SYN_STEP = 15.0, 120.0, 0.02
 SYN_SEED = 20261112
-SYN_SCALE = float(os.environ.get("WP2017Q_SYN_SCALE", "5e-3"))   # calibrated: cheb La esd ~0.016
-SYN_LADDER = (1e-3, 3e-2)          # count levels either side, cheb/snip7/snip10/truth
-SYN_SEEDS = (20261113, 20261114)   # two more Poisson draws at SYN_SCALE, same four arms
+SYN_PEAK = 2.0e4                   # strongest peak, counts (#1569)
+SYN_LADDER = (2.0e3, 2.0e5)        # count levels either side, cheb/snip3/truth
+SYN_SEEDS = (20261113, 20261114)   # two more Poisson draws at SYN_PEAK, same three arms
+SL, HL = "instrument.geometry.axial_sl", "instrument.geometry.axial_hl"
 HUMP = (28.0, 10.0, 150.0)          # centre, FWHM, height
 TRUTH = {"phases.0.atoms.0.biso": 0.355, "phases.0.atoms.1.biso": 0.276}
-SYN_ARMS = ("cheb", "ps1", "ps001", "snip7", "snip10", "snip14", "truth")
-SYN_SUB = ("cheb", "snip7", "snip10", "truth")
+SYN_ARMS = ("cheb", "ps1", "ps001", "snip3", "snip6", "truth")
+SYN_SUB = ("cheb", "snip3", "truth")
 REAL = ("srm1976a", "fap")
 LEBAIL = ("pbso4", "corundum726")
 Q2_FAMILIES = ("lab6cbn", "fap", "cpd1a")
@@ -169,47 +170,106 @@ def syn_background(tt) -> np.ndarray:
     return 200.0 + 60.0 * x + h * np.exp(-4.0 * math.log(2.0) * ((tt - c) / fwhm) ** 2)
 
 
-def syn_inputs(scale: float = SYN_SCALE, seed: int = SYN_SEED):
-    """(data, structure, instrument, peak counts) of #1569's construction."""
-    from tests.test_acceptance_srm660c import build_srm_inputs
+def _lab6() -> rx.Structure:
+    P = rx.Parameter
+    return rx.Structure(phases=[rx.Phase(
+        name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.1568),
+        atoms=[rx.Atom(label="La", species="La", x=P(value=0.0), y=P(value=0.0), z=P(value=0.0),
+                       biso=P(value=0.355, min=0.0, max=25.0)),
+               rx.Atom(label="B", species="B", x=P(value=0.198), y=P(value=0.5), z=P(value=0.5),
+                       biso=P(value=0.276, min=0.0, max=25.0))],
+        scale=P(value=1e-4, min=0.0, transform="softplus"))])
 
-    _d, st, ins = build_srm_inputs()
-    st.phases[0].scale.value = scale
-    ins.background = BackgroundChebyshev.with_terms(6)
-    grid = np.round(np.arange(SYN_LO, SYN_HI + SYN_STEP / 2, SYN_STEP), 6)
-    y = np.asarray(rx.Refinement(st, ins, history=False).predict(grid)) + syn_background(grid)
-    obs = np.random.default_rng(seed).poisson(np.maximum(y, 0.0)).astype(float)
-    data = rx.PatternData(two_theta=grid.tolist(), intensity=obs.tolist(),
-                          sigma=np.sqrt(np.maximum(obs, 1.0)).tolist())
-    return data, st, ins, float(y.max() - syn_background(grid)[int(np.argmax(y))])
+
+def _syn_instrument() -> rx.Instrument:
+    return rx.Instrument.bragg_brentano(monochromator_two_theta=26.6)
+
+
+def syn_inputs(peak_max: float = SYN_PEAK, seed: int = SYN_SEED):
+    """(data, peak counts) of #1569's construction, as its harness builds it: LaB₆ on the
+    graphite-monochromated Bragg-Brentano preset, W 2e-3, X 5e-3, no axial term; the calculated
+    peaks less their minimum, scaled so the strongest is ``peak_max`` counts; Poisson noise."""
+    tt = np.arange(SYN_LO, SYN_HI + 1e-9, SYN_STEP)
+    ins = _syn_instrument()
+    ins.profile.w.value = 2e-3
+    ins.profile.x.value = 5e-3
+    ins.background = BackgroundChebyshev(coefficients=[rx.Parameter(value=0.0),
+                                                       rx.Parameter(value=0.0)])
+    peaks = np.asarray(rx.Refinement(_lab6(), ins, history=False).predict(tt), float)
+    peaks = peaks - peaks.min()
+    peaks *= peak_max / peaks.max()
+    y = np.random.default_rng(seed).poisson(peaks + syn_background(tt)).astype(float)
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(np.maximum(y, 1.0)).tolist())
+    return data, peak_max
+
+
+def _seed_h(data, ins, limits) -> float:
+    """#1569's width rule: the median FWHM of the twelve strongest picked peaks, picked over
+    ``auto_background``'s Chebyshev."""
+    cheb = rx.auto_background(data, kind="chebyshev", two_theta_limits=limits)
+    ins0 = ins.model_copy(deep=True)
+    ins0.background = cheb.background.model_copy(deep=True)
+    strong = sorted(rx.pick_peaks(data, ins0).peaks, key=lambda p: -p.intensity)[:12]
+    return float(np.median([p.fwhm for p in strong]))
+
+
+def _window(data, h: float) -> int:
+    step = float(np.median(np.diff(np.asarray(data.two_theta, dtype=float))))
+    return max(3, int(round(3 * h / step)))
+
+
+def _syn_plan() -> rx.RefinementPlan:
+    """#1569's plan (FCJ arms): scale+background, displacement, cell, W, U V X Y, coordinates,
+    Biso, then the tied axial pair."""
+    return rx.RefinementPlan(stages=[
+        rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        rx.Stage("offsets", ["instrument.geometry.sample_displacement"]),
+        rx.Stage("cell", ["phases.*.cell.*"]),
+        rx.Stage("profile_w", ["instrument.profile.w"]),
+        rx.Stage("profile", ["instrument.profile.u", "instrument.profile.v",
+                             "instrument.profile.x", "instrument.profile.y"]),
+        rx.Stage("coordinates", ["phases.*.atoms.*.dof.*"]),
+        rx.Stage("biso", ["phases.*.atoms.*.biso"]),
+        rx.Stage("axial", [SL, HL])])
 
 
 def _syn_fit(task: dict) -> dict:
     arm, noise = task["arm"], task["noise"]
-    data, st, ins, peak = syn_inputs(task.get("scale", SYN_SCALE), task.get("seed", SYN_SEED))
+    data, peak = syn_inputs(task.get("peak", SYN_PEAK), task.get("seed", SYN_SEED))
     tt, y = np.asarray(data.two_theta), np.asarray(data.intensity)
+    lim = (float(tt.min()), float(tt.max()))
+    h = _seed_h(data, _syn_instrument(), lim)
     if arm == "cheb":
-        ins.background = BackgroundChebyshev.with_terms(6)
+        bg = rx.auto_background(data, kind="chebyshev", two_theta_limits=lim).background
     elif arm in ("ps1", "ps001"):
-        ins.background = BackgroundPSpline.for_range(
-            SYN_LO, SYN_HI, lambda_smooth={"ps1": 1.0, "ps001": 0.01}[arm])
-    elif arm.startswith("snip"):
-        ins.background = _snip_held(tt, y, int(arm[4:]))
-    elif arm == "truth":
-        ins.background = rx.BackgroundFixedPlusChebyshev.from_pattern(
+        bg = rx.auto_background(data, two_theta_limits=lim).background.model_copy(deep=True)
+        if arm == "ps001":
+            bg.lambda_smooth = 0.01
+    elif arm == "snip3":
+        bg = _snip_held(tt, y, _window(data, h))
+    elif arm == "snip6":
+        bg = _snip_held(tt, y, 2 * _window(data, h))
+    else:   # truth
+        bg = rx.BackgroundFixedPlusChebyshev.from_pattern(
             rx.PatternData(two_theta=tt.tolist(), intensity=syn_background(tt).tolist()),
             n_terms=4)
-    plan = rx.RefinementPlan.mccusker_default()
-    plan.stages.append(rx.Stage("biso", ["phases.*.atoms.*.biso"]))
-    ref = rx.Refinement(st, ins, history=False)
+    ins = _syn_instrument()
+    ins.background = bg.model_copy(deep=True)
+    ins.profile.w.value, ins.profile.x.value = (0.6 * h) ** 2, 0.6 * h
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = 0.02
+    ref = rx.Refinement(_lab6(), ins, history=False)
+    ref.tie_equal([SL, HL])
     row = {"n_nudged": _nudged(ref)} if noise else {}
-    result = ref.fit(data, plan=plan)
+    result = ref.fit(data, plan=_syn_plan(), two_theta_limits=lim)
     rtt = np.asarray(result.two_theta)
     m = (rtt >= 26.0) & (rtt <= 30.0)
     ratio = float(np.mean(np.asarray(result.y_background)[m] / syn_background(rtt[m])))
     row.update({"rows": _rows(result), **_stats(result), **_absorption(ref),
                 "bkg_over_truth_26_30": ratio, "fwhm_points": _fwhm_points(result),
-                "peak_counts": peak})
+                "peak_counts": peak, "h_seed": h, "half_window": _window(data, h),
+                "background": type(bg).__name__ + (f" n={len(bg.coefficients)}"
+                                                   if hasattr(bg, "coefficients") else "")})
     return row
 
 
@@ -261,15 +321,18 @@ def _one_fit(data, st, ins, plan, kw, prepare, noise, mode="rietveld"):
 
 
 def _pair_task(task: dict, build, mode: str) -> dict:
-    """``cheb`` then ``snip3`` (window from the ``cheb`` fit), each plain and nudged."""
+    """``cheb`` (the protocol's background) then ``snip3`` (#1569's window rule), each plain
+    and nudged."""
     out = {}
     data, st, ins, plan, kw, prepare = build(task["pattern"])
     tt, y = _limited_arrays(data, kw)
+    lim = kw.get("two_theta_limits") or (float(tt.min()), float(tt.max()))
+    h = _seed_h(data, ins, lim)
+    window = _window(data, h)
     ref, res, _ = _one_fit(data, st.model_copy(deep=True), ins.model_copy(deep=True),
                            plan, kw, prepare, False, mode)
-    fwhm = _fwhm_points(res)
-    window = max(1, int(round(3.0 * fwhm))) if fwhm else None
-    out["cheb"] = {"rows": _rows(res), **_stats(res), **_absorption(ref), "fwhm_points": fwhm}
+    out["cheb"] = {"rows": _rows(res), **_stats(res), **_absorption(ref),
+                   "fwhm_points": _fwhm_points(res), "h_seed": h}
     data, st, ins, plan, kw, prepare = build(task["pattern"])
     ref, res, n = _one_fit(data, st.model_copy(deep=True), ins.model_copy(deep=True),
                            plan, kw, prepare, True, mode)
@@ -408,7 +471,7 @@ def _q2_fit(task: dict) -> dict:
 
 # ---------------------------------------------------------------- runner
 def _key(t: dict) -> tuple:
-    return tuple(t[k] for k in ("part", "family", "pattern", "arm", "noise", "scale", "seed") if k in t)
+    return tuple(t[k] for k in ("part", "family", "pattern", "arm", "noise", "peak", "seed") if k in t)
 
 
 def run_one(task: dict) -> dict:
@@ -451,8 +514,8 @@ def _tasks(parts=("syn", "real", "lebail", "conv", "tol", "gap")) -> list[dict]:
                   for f in Q2_FAMILIES for nz in (False, True)]
     if "syn" in parts:
         tasks += [{"part": "syn", "arm": a, "noise": nz} for a in SYN_ARMS for nz in (False, True)]
-        tasks += [{"part": "syn", "arm": a, "noise": False, "scale": sc}
-                  for a in SYN_SUB for sc in SYN_LADDER]
+        tasks += [{"part": "syn", "arm": a, "noise": False, "peak": pk}
+                  for a in SYN_SUB for pk in SYN_LADDER]
         tasks += [{"part": "syn", "arm": a, "noise": False, "seed": sd}
                   for a in SYN_SUB for sd in SYN_SEEDS]
     if "lebail" in parts:
@@ -520,7 +583,7 @@ def summary() -> None:
     ok = [r for r in rows if "error" not in r]
 
     syn = {(r["arm"], r["noise"]): r for r in ok if r["part"] == "syn"
-           and "scale" not in r and "seed" not in r}
+           and "peak" not in r and "seed" not in r}
     if syn:
         out += ["## Q1, the synthetic (truth La 0.355, B 0.276 Å²)", "",
                 "| arm | La Biso | (La − truth)/esd | B Biso | (B − truth)/esd | a (Å) | bkg/truth 26-30° "
@@ -545,22 +608,22 @@ def summary() -> None:
                 f"| {_fmt(r['rwp'], '.5f')} | {r['n_eval']} | {_fmt(s[0], '.2g')} {s[1] or ''} |")
         r0 = syn.get(("cheb", False))
         if r0:
-            out += ["", f"Strongest peak {r0['peak_counts']:.0f} counts over background at scale "
-                    f"{SYN_SCALE:g}; FWHM read off the cheb fit {_fmt(r0['fwhm_points'], '.2f')} "
-                    "points (3 FWHM = the rule's window)."]
+            out += ["", f"Strongest peak {r0['peak_counts']:.0f} counts; seed FWHM {r0['h_seed']:.4f}°, "
+                    f"half-window {r0['half_window']} points (#1569: 7); FWHM off the cheb fit "
+                    f"{_fmt(r0['fwhm_points'], '.2f')} points; cheb background {r0['background']}."]
         out += ["", "Other count levels and Poisson draws (plain arms only):", "",
-                "| scale | seed | arm | peak counts | La Biso | (La − truth)/esd | B Biso "
+                "| peak | seed | arm | peak counts | La Biso | (La − truth)/esd | B Biso "
                 "| (B − truth)/esd | bkg/truth 26-30° | worst absorption |",
                 "|---|---|---|---|---|---|---|---|---|---|"]
-        extra = [r for r in ok if r["part"] == "syn" and ("scale" in r or "seed" in r)]
-        extra.sort(key=lambda r: (r.get("scale", SYN_SCALE), r.get("seed", SYN_SEED),
+        extra = [r for r in ok if r["part"] == "syn" and ("peak" in r or "seed" in r)]
+        extra.sort(key=lambda r: (r.get("peak", SYN_PEAK), r.get("seed", SYN_SEED),
                                   SYN_ARMS.index(r["arm"])))
         for r in extra:
             la = r["rows"].get("phases.0.atoms.0.biso", [None, None])
             b = r["rows"].get("phases.0.atoms.1.biso", [None, None])
             dz = [(x[0] - TRUTH[p]) / x[1] if x[0] is not None and x[1] else None
                   for x, p in ((la, "phases.0.atoms.0.biso"), (b, "phases.0.atoms.1.biso"))]
-            out.append(f"| {r.get('scale', SYN_SCALE):g} | {r.get('seed', SYN_SEED)} | {r['arm']} "
+            out.append(f"| {r.get('peak', SYN_PEAK):g} | {r.get('seed', SYN_SEED)} | {r['arm']} "
                        f"| {r['peak_counts']:.0f} | {_fmt(la[0], '.4f')}({_fmt(la[1], '.4f')}) "
                        f"| {_fmt(dz[0], '.2f')} | {_fmt(b[0], '.4f')}({_fmt(b[1], '.4f')}) "
                        f"| {_fmt(dz[1], '.2f')} | {_fmt(r['bkg_over_truth_26_30'], '.3f')} "
