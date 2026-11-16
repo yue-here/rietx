@@ -1,6 +1,6 @@
 # WP-1453 — both directions name the lower cost
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — task 1 measured (the passes disagree in cost); option 1's field and the option 2/3 choice wait on the maintainer
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
 Priority: P3 2026-11-15 — `SeriesResult.direction_gaps` already lists the gap but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
@@ -164,6 +164,50 @@ the lower cost, and quotes both costs.
   rule), WP-1301 (the holds), WP-1417 (ΔBIC).
 
 ## Handover log
+
+- **2026-11-16** — **The package's own two passes do disagree in cost,
+  and where they do, the cheaper one was right every time.** On the
+  two-basin series from issue #267, 9 of 42 runs had the forward and
+  backward chains settle in opposite basins over the last four patterns,
+  and there the weighted residual picked the true basin in all 36 patterns, by
+  3.6 to 39 %. So this WP does not close on task 1. Two limits came with it:
+  in most runs both chains settled in the same wrong basin, which no cost
+  comparison can see; and before the onset the two chains often fit
+  different numbers of parameters, so a lower cost there is not a better
+  fit. Nothing in the package changed. PR #1594.
+  *Done:* the Inherited prune (the #1556 entry folded into Context as "A
+  public series"; the WP-1417 note into Non-goals; the 2026-09-24 warning
+  discharged, since WP-1420's probe rung was never built and its tasks went
+  to issue #1402). Context's first paragraph is marked superseded in part:
+  WP-2003 removed `SEQUENTIAL_PATH_DEPENDENT`, the gaps are
+  `SeriesResult.direction_gaps` rows, and the backward costs are already
+  reachable through `series.backward`. The Priority line's code name was
+  updated to match; its tier was left alone. Task 1 ticked, with the
+  numbers in § Context, "The package's own passes, measured".
+  *Measured:* `[dev]`, darwin arm64, `bc77a934e`, run locally (two processes,
+  1.9-3.2 s a series; 84 short series in all). The probe is
+  `tests/repro_1420.py chains` from PR #1401's branch extended to read
+  `statistics.chi2·(N − P)` per pattern from `series.entries` and
+  `series.backward.entries`. It was not committed, because it imports PR
+  #1401's unmerged `tests/test_identity_point_seed.py`.
+  *Not done, and why:* option 1. It adds a field to `DirectionGap` (a
+  `SCHEMA_VERSION` bump), and issue #1556's question 1, whether and under
+  what names, is open with the maintainer. Tasks 3-5 follow from the ruling.
+  *Questions for the maintainer:* (1) Option 1: should the per-pattern cost
+  pair land, and where? On every `DirectionGap` row (#1556's
+  `forward_chi2`/`backward_chi2`), where it repeats once per path at each
+  pattern, or once per pattern beside the rows. (2) Option 2 or 3. Option 2
+  would have returned the true basin at all 36 disagreeing patterns here,
+  but it needs an equal-P condition (the 117 pre-onset pairs) and a floor
+  under which two costs count as tied (pre-onset differences reach 1.15e-3
+  in Σw·Δ², the size of #1556's whole range). Option 3's cold rung from the
+  declared start would not have helped: it lands in the wrong basin 42 of 42
+  times here. Recommendation: option 1 first; then option 2 limited to equal
+  P with a floor measured from noise draws; option 3 only as #1402's
+  two-sided start, if that issue's option B is taken.
+  *Next:* the maintainer's ruling on the two questions above. Then option 1
+  in `_direction_gaps` (its one writer), the test on this construction at
+  0.15 (the smallest gap, 3.6 %), and the skill paragraph.
 
 - **2026-09-24** — created from the review of an agent session on a private
   series. The forward-only return and the value-only comparison were checked
