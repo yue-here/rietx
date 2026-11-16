@@ -1,6 +1,6 @@
 # WP-1933 — the CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling (#913 items 1-3)
+Milestone: unscheduled · Status: 🔄 2026-11-16 — #913 items 1-3 in PR #1587; C-e waits on 1918's I-c, #752 on a decision
 Track: Coming from another code
 Depends on: 1319 (#756, #752)
 Priority: P2 2026-10-09 — was P3 until 1319 landed the registry, number rule and structure block it builds on; #756's later chunks, a named user waiting
@@ -22,6 +22,15 @@ acceptance. Each chunk builds on 1319's `rietx/io/cif/` registry, number rule an
 structure block, so read 1319's Context for the decisions already taken
 (dictionaries vendored whole, the deprecated H-M tag dropped, § 7's defaults).
 C-f (magCIF parent record) is [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md)'s.
+
+The tier of each rule this WP adds ([generality § The rule](../milestones/generality.md#the-rule)):
+the #913 items (2026-11-16) add two refusals and no default. Refusing a `.` or `?`
+coordinate is physics (CIF's meaning of the two nulls, the core dictionary's).
+Refusing an operator loop of another space-group type than the H-M symbol is named
+practice: two statements of one fact contradict each other, the rule this package
+already follows for a cell angle past `CIF_ANGLE_CORRECT_MAX_DEG`; the type is read
+by spglib, so no threshold is chosen. The occupancy null's 1.0 is the dictionary's
+default (core 2.4.5, DDL1), not a new judgement.
 
 - **C-d, the pdCIF pattern block** (C-W2). The raw `_pd_meas_*` loop of every
   measured point, su in parentheses, weights with 0 on excluded points, d-spacing,
