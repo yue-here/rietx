@@ -129,48 +129,63 @@ one authority for figures. The `yue-docs-style` and `yue-prose` skills carry
 the register and the banned words; "simply", "just" and "easy" are not the
 problem here, undefined words are.
 
-### Inherited
+### Where the passages live now (2026-11-16, superseded in part)
 
-- **2026-10-16, from the issue triage (#407): the reporter's symptom is gone
-  from the release; the manual still does not say which version it
-  describes.** `Refinement.hold` is in the `v1.6.0` tag (tagged 2026-10-04;
-  `git grep "def hold" v1.6.0 -- src/rietx/refine.py` hits) and in every tag
-  after it. No 1.5.1 was cut, so this file's "`docs/releases/1.5.1.md`" and "a
-  1.5.1 release carrying `hold`" point at a release that does not exist; the
-  `RELEASING.md` walk it mentions is moot for this issue. What is still open
-  and still this WP's: `install.md` says nothing of the manual describing
-  `main` or how to install it (its only version line is `{{ release }}` at
-  line 79), no verb or field carries a "since" note (`git grep 'since [0-9]'`
-  finds one unrelated row), and WP-1979 plans the versioned `/docs/<version>/`
-  tree that would make the note unnecessary. Decide whether 1443's #407 task
-  is paid by 1979 or by a short `install.md` paragraph in the meantime.
-  Checked at origin/main 138d55dc.
+*Superseded in part, 2026-11-16, at origin/main `bc77a934e`.* The passage
+list above was located in `docs/manual/using/`, which WP-1986 retired
+(`d881d9029`); the manual is now the new tree in `docs/docs/` (WP-1978), whose
+Start, Guides, Concepts and Reference tabs hold what Part 1 held. Theory is the
+old Part 2 and stays a non-goal. The four inherited notes (#407's version
+skew, #395's removed `transform`, the `shipped` count, WP-1975's rebuild) were
+folded into this map and deleted. Each passage, read against the new tree:
 
-- **2026-10-16, from the issue triage (#395): passage 1's quoted sentence is
-  no longer in the tree, and the maintainer's public answer on #395 is
-  stale.** WP-1938 D6 (`c7cadcc1`, schema 0.45 to 0.46) removed
-  `Parameter.transform`. The block at `data.md:37-43` now ends `assert
-  width.min == 0.0` with no output, and the prose says only that
-  `Parameter.positive` "sets `min=0.0`". The reporter's confusion stands (an
-  unexplained `assert` in an API example), but the task's wording (`assert
-  width.transform == "softplus" and width.min == 0.0`, "show what
-  `Parameter.positive` set") needs re-reading against the new block, and the
-  comment on #395 said `Parameter.positive` "sets the softplus transform",
-  which is now false. Same drift, smaller: `grep -w shipped docs/manual/using`
-  finds 15 hits in 8 files, against this file's 9 in 7 (quickstart,
-  `refining.md` x5 and `results.md` are new or moved). Checked at origin/main
-  138d55dc; the other nine passages are still in `data.md`/`concepts.md`.
-
-- **From WP-1975 (2026-10-15): the manual is to be rebuilt as a new tree beside the old one,
-  with each old chapter retired once its content has been mined** (WP-1975 § F8, § H1). The
-  layout is Start | Guides | Concepts | Reference | Theory | Switching. A fix made in an old
-  `data.md` or `concepts.md` passage is lost when that chapter is retired, unless the new page
-  that holds the content also gets it. Before starting, check how far the rebuild has got.
-  Where a passage's content already has a home in the new tree, fix it there. These eleven
-  passages are also a ready-made acceptance check for the new Start and Concepts pages.
-- **From WP-1975 (2026-10-16): the rebuild is filed.** WP-1978 builds the new tree (Sphinx
-  with pydata-sphinx-theme), WP-1983 writes Concepts, and WP-1986 mines the old chapters into
-  Guides and retires them. Check those three for how far each has got.
+- **#395** — the block is in `reference/data.md` (the `Parameter` section) and
+  ends `assert width.min == 0.0`; no hidden-block form exists, and twenty
+  pages use `assert` the same way. Fixed in two places: the line carries what
+  `positive()` set as a comment, and `start/this-manual.md` § How to read it
+  says once what an `assert` line in an example is.
+- **#396** — answered by the rebuild: `reference/data.md` now reads "The
+  objective {eq}`est-obj`, every difference curve and both GUI windows divide
+  by it", a sentence with a verb.
+- **#397** — `reference/data.md` § Broadening still said "no shipped plan";
+  `grep -w shipped` over the new tree found 22 hits, 4 in Theory (left, as a
+  non-goal) and one in an HTML comment no reader sees. The other 17 now read
+  "built-in" (a plan or stage), "included" (an example), or "released"/"added"
+  (a version).
+- **#398** — `reference/data.md` § Atoms; the Concepts page now says
+  "locked", not "raises". Measured on fluorapatite's F4: `ValueError` from
+  `Refinement.parameters` and from `fit`, its message beginning with the
+  atom's path and "sits on a fully fixed special position".
+- **#399** — `reference/data.md` no longer says "histogram". Its first use in
+  reading order is `guides/qpa.md` (now "for each of its patterns"), then
+  `guides/joint.md`, which now defines it. There is no word glossary in the
+  new tree (the old one's sections went to `reference/parameters` and
+  `reference/settings`), and `help.py` has no arm for a word, so "the glossary
+  carries it" has no target.
+- **#400** — the `angular-signatures` figure is on no page of the new tree
+  (only in `docs/wp/1975-spike/`), so its axis is not regenerated. The prose
+  that replaced it (`concepts/correlations.md` § Why parameters correlate)
+  named four curves without saying of what; it now says. The WP's "the shift
+  of a peak's position per unit of the parameter" is wrong for one of the four:
+  crystallite size widens a peak (1/cos θ), it does not move it.
+- **#401**, **#402** — answered by the rebuild: `guides/tie.md` says "A
+  restraint adds an observation and keeps every parameter", and its worked
+  example checks the free values first, then reads the smaller esd and an
+  unchanged Rwp in that order.
+- **#403** — the API sense of "glob" first appears in `guides/hold.md`
+  (a printed message); the page now names a `*` path a glob. The rewritten
+  sentence of `concepts.md:287-290` has no counterpart; `guides/hold.md` says
+  it in plain words already. No glossary, as for #399.
+- **#404** — answered by the rebuild: `reference/plans.md` draws one ladder
+  per preset from the plan objects, and says "Staging is cumulative, so each
+  stage refines with every earlier stage's parameters still free";
+  `concepts/plans.md` says the same.
+- **#406** — no symptom index existed. Added as a section of
+  `concepts/report.md`, one row per symptom, each a link.
+- **#407** — WP-1979 landed the versioned manual (`/docs/<minor>/`, `stable`,
+  `dev`, a version menu on every page), which makes task (b), the "since" note,
+  unnecessary: a release's own copy documents only that release. Task (a) is a
+  short paragraph in `start/install.md`.
 
 ## Non-goals
 
