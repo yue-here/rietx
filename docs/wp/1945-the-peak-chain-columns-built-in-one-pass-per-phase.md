@@ -211,7 +211,7 @@ first.
 
 ## Tasks
 
-- [ ] The memo looks up every entry it holds, and the expansion point stops
+- [x] The memo looks up every entry it holds, and the expansion point stops
       being evictable by a run of columns: a pinned entry, or a depth with the
       measurement that sizes it. Correct `_memo`'s docstring (the depth-8
       claim, and the "earlier Jacobian" reading of the gap to an unbounded

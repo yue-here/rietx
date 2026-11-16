@@ -315,31 +315,133 @@ def test_an_alternation_between_two_states_stops_rebuilding(rich):
                     f"the perturbed arm was rebuilt (line {il}, slot {k})"
 
 
-def test_a_third_state_evicts_the_least_recently_used_arm(rich):
+def test_the_recent_trail_is_bounded_and_evicts_its_oldest_key(rich):
     """The bound is real, and that is the point of it.
 
     The keys are decoded θ, so an unbounded map grows an entry per parameter
-    vector a fit visits — thousands — which is a leak, not a cache.  Depth is
-    therefore 2, and this pins that a third state costs the older arm rather
-    than joining it.  Measured justification for the number: depth 8 built
-    exactly the same blocks as depth 2 on the trigger fit, to the call, so the
-    lookups a deeper cache would catch are ones from an earlier Jacobian
-    entirely (``CompiledModel._memo``).
+    vector a fit visits — thousands — which is a leak, not a cache.  Off the
+    expansion point (nothing pinned here: no ``derivative_bases`` ran) one
+    state more than ``_MEMO_DEPTH`` costs the oldest key rather than joining
+    it.
     """
     from rietx.model.forward import _MEMO_DEPTH
 
-    assert _MEMO_DEPTH == 2, "this test pins the shape that constant sets"
     cached, _plain, table = rich
     base = table.decode(table.x0())
-    second = dict(base)
-    second["phases.0.cell.a"] = base["phases.0.cell.a"] * 1.001
-    third = dict(base)
-    third["phases.0.cell.a"] = base["phases.0.cell.a"] * 1.002
-
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
     first_base = cached.phase_peaks(0, base)
-    cached.phase_peaks(0, second)
-    cached.phase_peaks(0, third)          # base is now the older of three
-    assert len(cached.phases[0].scalar_cache["cell"]) == _MEMO_DEPTH
+    for step in range(1, _MEMO_DEPTH + 1):
+        other = dict(base)
+        other["phases.0.cell.a"] = base["phases.0.cell.a"] * (1 + 1e-3 * step)
+        cached.phase_peaks(0, other)          # base is now the oldest key
+    held = cached.phases[0].scalar_cache["cell"]
+    assert held.pin is None
+    assert len(held.recent) == _MEMO_DEPTH
     back = cached.phase_peaks(0, base)
     assert back[0][0] is not first_base[0][0], \
-        "a third state did not evict, so the cache is unbounded"
+        "a state past the bound did not evict, so the cache is unbounded"
+
+
+def test_the_lookup_scans_every_key_it_holds(rich, monkeypatch):
+    """WP-1945: the lookup compared ``held[0]`` and ``held[1]`` and nothing
+    else, whatever ``_MEMO_DEPTH`` said, so a deeper memo held keys it could
+    never return — and WP-1121's depth-8 measurement, which built exactly the
+    blocks depth 2 did, could not have come out any other way.
+
+    Here the depth is raised to four and the key asked for is the oldest of
+    them, the one position the two-compare lookup could not reach.
+    """
+    import rietx.model.forward as fwd
+
+    monkeypatch.setattr(fwd, "_MEMO_DEPTH", 4)
+    cached, _plain, table = rich
+    base = table.decode(table.x0())
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
+    first_base = cached.phase_peaks(0, base)
+    for step in (1, 2, 3):
+        other = dict(base)
+        other["phases.0.cell.a"] = base["phases.0.cell.a"] * (1 + 1e-3 * step)
+        cached.phase_peaks(0, other)
+    assert [k for k, _v in cached.phases[0].scalar_cache["cell"].recent][-1] \
+        == _cell_key(cached, base)
+    again = cached.phase_peaks(0, base)
+    assert again[0][0] is first_base[0][0], \
+        "a key fourth in the list was rebuilt rather than found"
+
+
+def _cell_key(model, values):
+    cell = tuple(float(values[f"phases.0.cell.{k}"])
+                 for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    return cell + tuple(float(x) for x in model.line_lambdas(values))
+
+
+def test_two_cell_columns_cannot_evict_the_expansion_point(rich, monkeypatch):
+    """WP-1945's case: a phase with two cell columns.
+
+    ``derivative_bases`` builds the expansion point's peaks; the Jacobian then
+    perturbs ``cell.a``, then ``cell.c``, and the next column of the same
+    phase — a width, which moves no cell — wants the expansion point's cell
+    block again.  Two keys deep and unpinned it was gone by then, so that
+    column rebuilt d, 2θ and |F|² at a state the memo had already built
+    (129 of 172 ``lor_size`` columns on the trigger fit).  Pinned, it hits.
+
+    Reuse is asserted on the builders themselves, counted, and by object
+    identity on the positions; a rebuilt block carries the same numbers, so
+    an equality check would pass for the memo that is not working.
+    """
+    import rietx.model.forward as fwd
+
+    cached, _plain, table = rich
+    base = table.decode(table.x0())
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
+    cached.derivative_bases(base)                # pins the expansion point
+    first = cached.phase_peaks(0, base)
+    for path in ("phases.0.cell.a", "phases.0.cell.c"):
+        moved = dict(base)
+        moved[path] = base[path] * 1.001
+        cached.phase_peaks(0, moved)
+
+    built = {"cell": 0, "f2": 0}
+    cell_block, total_f2 = fwd.CompiledModel._cell_block, fwd.CompiledModel._total_f2
+
+    def counted_cell(self, *a, **k):
+        built["cell"] += 1
+        return cell_block(self, *a, **k)
+
+    def counted_f2(self, *a, **k):
+        built["f2"] += 1
+        return total_f2(self, *a, **k)
+
+    monkeypatch.setattr(fwd.CompiledModel, "_cell_block", counted_cell)
+    monkeypatch.setattr(fwd.CompiledModel, "_total_f2", counted_f2)
+    width = dict(base)
+    width["phases.0.lor_size"] = base["phases.0.lor_size"] * 1.001
+    peaks = cached.phase_peaks(0, width)
+    assert built == {"cell": 0, "f2": 0}, \
+        f"the expansion point was evicted by two cell columns: {built}"
+    for il in range(len(first)):
+        assert peaks[il][0] is first[il][0], f"positions rebuilt (line {il})"
+
+
+def test_the_next_expansion_point_takes_the_pin(rich):
+    """An accepted step: the solver evaluates the residual at a trial point,
+    then the next Jacobian expands there.  ``derivative_bases`` finds the
+    trial's blocks on the recent trail and pins them without a rebuild, and
+    the old expansion point leaves the pin."""
+    cached, _plain, table = rich
+    base = table.decode(table.x0())
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
+    cached.derivative_bases(base)
+    trial = dict(base)
+    trial["phases.0.cell.a"] = base["phases.0.cell.a"] * 1.001
+    at_trial = cached.phase_peaks(0, trial)          # the residual's call
+    held = cached.phases[0].scalar_cache["cell"]
+    assert held.pin[0] == _cell_key(cached, base)
+    cached.derivative_bases(trial)
+    assert held.pin[0] == _cell_key(cached, trial)
+    assert all(k != _cell_key(cached, trial) for k, _v in held.recent)
+    assert cached.phase_peaks(0, trial)[0][0] is at_trial[0][0]
