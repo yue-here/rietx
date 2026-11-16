@@ -4068,7 +4068,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.LEBAIL_CONVERGED_REL", "constant", tier=3, value=0.0001,
         evidence=("WP-1323: one family, 11-BM LaB6+cBN (cell exact 16.908 to 16.908; +0.3 % 16.969 "
                   "to 16.967); stops the opt-in multi-pass alternation (lebail_passes > 1) and "
-                  "labels a non-lowering pass converged; second pass owed"),
+                  "labels a non-lowering pass converged; WP-2017 group Q (2026-11-16, Linux "
+                  "x86_64): 1e-3, 1e-4 and 1e-5 under mccusker_default() at five passes are "
+                  "bit-identical on LaB6+cBN, FAP and cpd-1a, because no pass's gain fell between "
+                  "them: LaB6+cBN and cpd-1a stop at a second pass that raised Rwp (13.609 to "
+                  "13.649 %; 22.561 to 33.879 %), and FAP still gained 1.3 % a pass at the cap "
+                  "(10.108 to 8.710 % over five), so the constant was reached on none of three "
+                  "families"),
         grounds=("Stops an opt-in alternation once a pass no longer lowers Rwp; kept at the "
                  "measured value, one family (B11, ruled 2026-10-19)."),
         approved="2026-10-19"),
@@ -4171,7 +4177,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.schemas.EXCHANGEABLE_MIN_R2", "constant", value=0.9),
     Row("rietx.report.schemas.EXCHANGE_PARTNER_MIN_SIGNIFICANCE", "constant", value=5.0),
     Row("rietx.report.schemas.IMPURITY_SHIFT_CAP", "constant", value=0.3),
-    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", value=5),
+    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", value=5,
+        evidence=("unaudited, for the maintainer's tier. WP-2017 group Q (2026-11-16, Linux "
+                  "x86_64): the gap read at 2, 5 and 20 cycles from one converged Rietveld state "
+                  "(n_cycles echoed back) is 0.977, 0.978, 0.978 on LaB6+cBN, 0.536, 0.549, 0.626 "
+                  "on cpd-1a and 0.764, 0.980, 1.052 on FAP, so the partition sits at its fixed "
+                  "point by 5 cycles on one family of three; no arm crosses LEBAIL_GAP_NOTABLE")),
     Row("rietx.report.schemas.LEBAIL_GAP_NOTABLE", "constant", value=1.5),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MIN_REFLECTIONS", "constant", value=2),
     Row("rietx.report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA", "constant", value=1.0),
@@ -5088,7 +5099,12 @@ ROWS: tuple[Row, ...] = (
                   "1.61 % at 3 cycles, a cell 4.6 ppm off truth against 34.9; a stop on estimated "
                   "distance (s2^2/(s1-s2), Aitken) left FAP at 1.23 too; a Le Bail plan costs "
                   "1.0-2.1x on six patterns and 150x on LaMnO3 (0.45 s to about a minute); "
-                  "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64"),
+                  "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64; WP-2017 group Q "
+                  "(2026-11-16, Linux x86_64, Le Bail under mccusker_default()): 1e-6 and 1e-9 "
+                  "against 1e-7 move LaB6+cBN 0.0002 plain esd and FAP 0.0095 and 0.0005, while "
+                  "FAP's 506 share of that pair reads 0.0010, 0.048 and 0.0000; they move cpd-1a "
+                  "0.76 and 0.82 plain esd (corundum a), past bar 2 on both sides, at 516 and 517 "
+                  "evaluations against 474 (noise twin 3.5e-7)"),
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "judged against the true structure.  The number, FAP as its failing case and "
                  "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
