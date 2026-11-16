@@ -1,6 +1,6 @@
 # WP-2064 — An approval belongs to the value it approved
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: —
 Priority: P4 2026-10-30 — process: no number moves, and the judge already sees a retuned value at review; it closes a path where one passes without a fresh ruling
