@@ -30,6 +30,8 @@ Reference: Dollase (1986) J. Appl. Cryst. 19, 267.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from ..crystallography.lattice import reciprocal_metric_tensor
@@ -282,3 +284,216 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
     pa = _p_pattern(a, gstar, members, seg, counts, _EQUIV_REF_R)
     pb = _p_pattern(b, gstar, members, seg, counts, _EQUIV_REF_R)
     return bool(np.max(np.abs(pa - pb)) < tol)
+
+
+# ------------------------------------------------------------ the order screen
+# WP-1974 tasks 1-2: the spherical-harmonics order the misfit needs, scored on
+# the same f_k and w_k as the axis.  A measurement hook: nothing in the report
+# calls it yet, so no default output moves.  Which numbers would make it
+# suggest an order is the gated Layer-2 action of the WP's task 3.
+
+#: A design column counts towards the rank when its singular value, on columns
+#: scaled to the unit norm of their *unpartitioned* values, is above this.  It
+#: separates exact invisibility (c4_3 on a one-atom −3m1 phase, 1e-15) from
+#: any column the partition leaves anything of; the visibility of each term is
+#: reported beside it, so this number sets no physics.
+_ORDER_RANK_RTOL = 1e-8
+
+
+@dataclass(frozen=True)
+class _OrderFit:
+    """One order's weighted linear solve on a phase's extracted corrections."""
+
+    order: int
+    n_terms: int
+    rank: int                       # terms the partition leaves resolvable
+    r2: float                       # same baseline as the axis score's
+    names: tuple[str, ...]
+    visibility: tuple[float, ...]   # ‖M·K_t‖_w / ‖K_t‖_w, centred
+    coefficients: tuple[float, ...]  # C_t, in the block's own units
+    rms_p: float                    # weighted rms of P − 1 at the reflections
+
+
+@dataclass(frozen=True)
+class _OrderStep:
+    """The nested comparison of one order against the order below it."""
+
+    order: int
+    added_rank: int
+    delta_r2: float
+    f_stat: float
+    p_value: float
+    delta_bic: float                # n·ln(SS_hi/SS_lo) + Δp·ln n; < 0 favours hi
+    delta_bic_vs_axis: float        # the same, against the best March-Dollase axis
+
+
+@dataclass(frozen=True)
+class _OrderScreen:
+    phase_index: int
+    n_reflections_used: int
+    n_effective: float              # Kish: (Σw)²/Σw²
+    axis: tuple[int, int, int] | None
+    axis_r2: float
+    fits: tuple[_OrderFit, ...]
+    steps: tuple[_OrderStep, ...]
+
+
+def _partitioned(model: CompiledModel, values: dict[str, float], ip: int,
+                 multipliers: np.ndarray) -> np.ndarray:
+    """Phase ip's extraction applied to a pattern of its own peaks times g.
+
+    ``multipliers`` is (n_reflections, m).  Column j of the answer is what
+    :func:`_extracted_corrections` would read off a net intensity built from
+    phase ip's calculated peaks, reflection k scaled by g_kj, partitioned over
+    every phase's calculated pattern as the extraction does.  The extraction is
+    linear in the net, so this is M·g, M the partition operator: a texture term
+    whose values the partition averages away (hkl and khl at one position with
+    opposite signs) comes back near zero here.
+    """
+    bases = model.derivative_bases(values)
+    y_bragg = np.zeros_like(model.tt)
+    for jp in range(len(bases.planes)):
+        for rows, peaks in bases.component_entries(jp):
+            for (il, k, i0, i1, omega, *_rest) in rows:
+                y_bragg[i0:i1] += peaks[il][3][k] * omega
+    g = np.asarray(multipliers, dtype=np.float64)
+    net = np.zeros((len(model.tt), g.shape[1]))
+    for rows, peaks in bases.component_entries(ip):
+        for (il, k, i0, i1, omega, *_rest) in rows:
+            net[i0:i1] += (peaks[il][3][k] * omega)[:, None] * g[k][None, :]
+    num = np.zeros_like(g)
+    den = np.zeros(g.shape[0])
+    for rows, peaks in bases.component_entries(ip):
+        for (il, k, i0, i1, omega, *_rest) in rows:
+            intensity = peaks[il][3][k]
+            if intensity == 0.0:
+                continue
+            denom = y_bragg[i0:i1]
+            good = denom > 1e-12
+            if not np.any(good):
+                continue
+            share = intensity * omega[good] / denom[good]
+            num[k] += share @ net[i0:i1][good]
+            den[k] += intensity * float(omega.sum())
+    return np.where(den[:, None] > 0.0, num / np.where(den > 0.0, den, 1.0)[:, None], 0.0)
+
+
+def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
+                  scale: np.ndarray) -> tuple[float, int, np.ndarray, float]:
+    """(SS, rank, b, a) of f ≈ a + design·b under weights w.
+
+    The columns are weight-centred, so a is the free scale, and divided by
+    ``scale`` before the rank is read, so a column's singular value is its
+    surviving fraction.
+    """
+    sw = np.sqrt(w)
+    W = float(w.sum())
+    fbar = float((w * f).sum() / W)
+    y = sw * (f - fbar)
+    if design.shape[1] == 0:
+        return float(y @ y), 0, np.zeros(0), fbar
+    centre = (w @ design) / W
+    x = sw[:, None] * (design - centre[None, :]) / scale[None, :]
+    u, sv, vt = np.linalg.svd(x, full_matrices=False)
+    keep = sv > _ORDER_RANK_RTOL
+    coef = vt[keep].T @ ((u[:, keep].T @ y) / sv[keep])
+    resid = y - x @ coef
+    b = coef / scale
+    return float(resid @ resid), int(keep.sum()), b, fbar - float(centre @ b)
+
+
+def _order_screen(model: CompiledModel, values: dict[str, float], *,
+                  orders: tuple[int, ...] = (2, 4, 6, 8), max_index: int = 2,
+                  min_weight_frac: float = 1e-3) -> list[_OrderScreen]:
+    """The per-order solve and the nested comparison, per phase (WP-1974).
+
+    For each even order L the extracted corrections are fitted as
+    f_k ≈ a + Σ_t b_t·(M·w_l K_t)_k, every term of the Laue class from l = 2
+    to L, M the extraction's own partition (:func:`_partitioned`) and w_l the
+    geometry's term weight; C_t = b_t/a.  Linear, so one solve per order, and
+    its R² has the axis score's baseline (the weighted mean), so the two
+    compare directly.  Each order is compared with the one below by the F
+    statistic and ΔBIC on the rank it adds, and with the best March-Dollase
+    axis by ΔBIC at one shape parameter.  Measures, decides nothing.
+    """
+    from scipy.stats import f as f_dist
+
+    from ..crystallography.spherical_harmonics import texture_basis
+    from ..model.preferred_orientation import (
+        TEXTURE_SAMPLE_PSI_DEG,
+        texture_term_weights,
+    )
+
+    if model.mode != "rietveld":
+        return []
+    axes = {r.phase_index: r for r in analyse_texture(
+        model, values, max_index=max_index, min_weight_frac=min_weight_frac)}
+    corrections = _extracted_corrections(model, values)
+    psi = TEXTURE_SAMPLE_PSI_DEG[model.geometry_kind]
+    out: list[_OrderScreen] = []
+    for ip, (f, w) in enumerate(corrections):
+        live = w > min_weight_frac * (w.max() if w.size and w.max() > 0 else 1.0)
+        n = int(live.sum())
+        refl = model.phases[ip].reflections
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        group = resolve_group(refl.spacegroup, refl.operations)
+        wl = w[live]
+        fl = f[live]
+        W = float(wl.sum())
+        base = float((wl * (fl - (wl * fl).sum() / W) ** 2).sum()) if W > 0 else 0.0
+        fits: list[_OrderFit] = []
+        ss: dict[int, tuple[float, int]] = {}
+        for order in orders:
+            basis = texture_basis(group, order, cell)
+            weights = texture_term_weights([t.degree for t in basis.terms], psi)
+            raw = (basis.at_reflections(refl.hkl, cell) * weights[None, :]
+                   if basis.names else np.zeros((len(f), 0)))
+            part = _partitioned(model, values, ip, raw)[live]
+            rawl = raw[live]
+            centred = rawl - ((wl @ rawl) / W)[None, :]
+            norm = np.sqrt(wl @ centred ** 2)
+            norm = np.where(norm > 0.0, norm, 1.0)
+            pc = part - ((wl @ part) / W)[None, :]
+            vis = np.sqrt(wl @ pc ** 2) / norm
+            s, rank, b, a = _weighted_fit(fl, wl, part, norm)
+            c = b / a if a else b
+            dp_k = rawl @ c if c.size else np.zeros(len(fl))
+            ss[order] = (s, rank)
+            fits.append(_OrderFit(
+                order=order, n_terms=len(basis.names), rank=rank,
+                r2=(1.0 - s / base) if base > 0 else 0.0, names=basis.names,
+                visibility=tuple(float(v) for v in vis),
+                coefficients=tuple(float(v) for v in c),
+                rms_p=float(np.sqrt((wl * dp_k ** 2).sum() / W)) if W > 0 else 0.0))
+        tex = axes.get(ip)
+        axis_r2 = tex.r2 if tex is not None else 0.0
+        ss_axis = (1.0 - axis_r2) * base
+        steps: list[_OrderStep] = []
+        lo_ss, lo_rank = base, 0
+        for order in orders:
+            hi_ss, hi_rank = ss[order]
+            dp = hi_rank - lo_rank
+            dof = n - 1 - hi_rank
+            if dp > 0 and dof > 0 and hi_ss > 0:
+                fs = ((lo_ss - hi_ss) / dp) / (hi_ss / dof)
+                pv = float(f_dist.sf(fs, dp, dof))
+            else:
+                fs, pv = float("nan"), float("nan")
+            log_n = float(np.log(max(n, 1)))
+            dbic = (n * float(np.log(hi_ss / lo_ss)) + dp * log_n
+                    if hi_ss > 0 and lo_ss > 0 else float("nan"))
+            dbic_axis = (n * float(np.log(hi_ss / ss_axis)) + (hi_rank - 1) * log_n
+                         if hi_ss > 0 and ss_axis > 0 else float("nan"))
+            steps.append(_OrderStep(
+                order=order, added_rank=dp,
+                delta_r2=(lo_ss - hi_ss) / base if base > 0 else 0.0,
+                f_stat=float(fs), p_value=pv, delta_bic=dbic,
+                delta_bic_vs_axis=dbic_axis))
+            lo_ss, lo_rank = hi_ss, hi_rank
+        out.append(_OrderScreen(
+            phase_index=ip, n_reflections_used=n,
+            n_effective=(W * W / float((wl * wl).sum())) if W > 0 else 0.0,
+            axis=(tex.best_axis if tex is not None else None), axis_r2=axis_r2,
+            fits=tuple(fits), steps=tuple(steps)))
+    return out
