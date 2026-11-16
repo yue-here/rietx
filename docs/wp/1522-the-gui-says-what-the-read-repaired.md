@@ -108,7 +108,11 @@ npm --prefix gui test && npm --prefix gui run check
   - *Measured* (Mac arm64, worktree `.venv` `[dev]`): `test_gui_server.py`
     188 passed, `test_gui_manual.py` 10 passed, `test_audit_table.py` 23
     passed, serial; ruff clean. Workstation canary (5 files, `-n 4`): 284 passed.
-    Fast suite: the workstation lost it twice to memory pressure; rerun on the Mac (in flight at pause, 18:07Z).
+    Fast suite (`-m "not slow" -n 4`, Mac arm64, `[dev]`, on c8af8de5f;
+    the workstation run lost it twice to memory pressure from other
+    sessions' suites, so it ran on the Mac): 14687 passed, 432 skipped,
+    32 xfailed, 0 failed, 15:54 beside other sessions. The added test costs
+    0.10 s (`tests.added_test_times`), +1 over the fast selection.
   - *Review:* a read-only review agent found nothing (callers of
     `project_doc`, non-finite `value` through the server's JSON writer, no
     key-set assertion on the document in tests or `gui/src`).
