@@ -2547,9 +2547,6 @@ class MultiHistogramRefinement:
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
         joint_unmeasured = _joint_unmeasured_phases(models, mt, stage_results)
-        # what pins each histogram's d scale, for WAVELENGTH_CALIBRATION's
-        # clause: the fence's own answer (WP-2148)
-        pins = mt.wavelength_pins()
         for h in range(n):
             table = mt.tables[h]
             model = models[h]
@@ -2654,7 +2651,9 @@ class MultiHistogramRefinement:
                 unsupported_resolution=check_resolution_supported(table, model))))
             diags.extend(_wavelength_calibration_diagnostics(
                 self._declared_wavelengths[h], table, values, esd_h,
-                pinned_by=_wavelength_pinned_by(pins[h]), h=h))
+                # the clause names what pins this histogram's d scale: the
+                # fence's own answer (WP-2148)
+                pinned_by=_wavelength_pinned_by(mt.wavelength_pins()[h]), h=h))
             # The two tier-2 flags, per histogram — without which a joint fit
             # gets the tier-1 bound (``_freeze_strain_cap_multi`` /
             # ``_freeze_size_cap_multi``) and none of the interpretation the
