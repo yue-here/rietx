@@ -80,7 +80,7 @@ without the files.
       member 0; `scan_count` in metadata.
 - [ ] `capabilities()` formats arm, `help.py` reader-option coverage if any
       option is added, manual line in the data chapter, skill row.
-- [ ] Synthetic fixtures + `test_readers_robust.py` arm; the real-archive
+- [x] Synthetic fixtures + `test_readers_robust.py` arm; the real-archive
       facts as a README row.
 
 ## Acceptance
