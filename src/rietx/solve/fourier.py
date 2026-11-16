@@ -32,9 +32,11 @@ cell's electrons the fit does not refine.
 average ⟨|F|²⟩ = |A|² + |B|² (``structure_factor``'s module docstring), and a
 Fourier coefficient needs one phase.  This module takes arg A, the phase of the
 dispersion-free part including f′, and the magnitude √⟨|F|²⟩.  It is exact
-when the source declares no dispersion (B is ``None``) and differs from arg
-(A + iB) by at most atan(|B|/|A|) otherwise; :attr:`FourierMaps.phase_convention`
-states which held.
+when the source declares no dispersion (B is ``None``).  Otherwise A and B are
+both complex, so arg A differs from arg (A + iB) by up to asin(|B|/|A|) while
+|B| < |A|, and without bound past it; arg A is then the phase of
+½(F(h) + F(−h)*), the Friedel-averaged coefficient a real map is built from.
+:attr:`FourierMaps.phase_convention` states which held.
 
 **Model bias.**  I_obs is I_calc times the reflection's own observed/calculated
 count ratio, and the phases are the model's, so both maps lean towards the
@@ -97,7 +99,9 @@ class FourierMap:
     (i/n_a, j/n_b, k/n_c).  ``sigma`` is its root-mean-square over the cell,
     the unit of every ``significance``.  ``peaks`` are the maxima above zero,
     highest first; ``holes`` the minima below zero, deepest first.  Neither is
-    thresholded: a significance cut is the reader's (WP-1901).
+    thresholded: a significance cut is the reader's (WP-1901).  ``n_merged``
+    counts the extrema left out of the two lists as lying within one grid
+    spacing of an image of a stronger one kept.
     """
 
     kind: Literal["observed", "difference"]
@@ -105,6 +109,7 @@ class FourierMap:
     sigma: float
     peaks: tuple[MapPeak, ...]
     holes: tuple[MapPeak, ...]
+    n_merged: int
 
 
 @dataclass(frozen=True)
@@ -112,7 +117,9 @@ class FourierMaps:
     """The observed and difference maps of one phase, and what they rest on.
 
     ``d_min`` (Å) is the shortest d among the reflections used, which sets
-    the maps' resolution; ``n_reflections`` counts the unique reflections with
+    the maps' resolution; ``grid_step`` (Å) the largest spacing of the grid
+    the maps were drawn on, which the no-aliasing rule may make finer than
+    the step asked for; ``n_reflections`` counts the unique reflections with
     an observed share, ``n_unobserved`` those the partition could give none
     (no profile in the fitted range), left out of both maps.  ``units`` is
     e/Å³ for X-rays and fm/Å³ for neutrons.
@@ -219,9 +226,12 @@ def fourier_maps_from_model(model: CompiledModel, values: dict[str, float],
 
     def _map(kind, grid):
         sigma = float(np.sqrt(np.mean(grid * grid)))
-        peaks = _extrema(grid, sigma, group, metric, images, merge, sign=1.0)
-        holes = _extrema(grid, sigma, group, metric, images, merge, sign=-1.0)
-        return FourierMap(kind=kind, grid=grid, sigma=sigma, peaks=peaks, holes=holes)
+        peaks, n_peaks_merged = _extrema(grid, sigma, group, metric, images, merge,
+                                         sign=1.0)
+        holes, n_holes_merged = _extrema(grid, sigma, group, metric, images, merge,
+                                         sign=-1.0)
+        return FourierMap(kind=kind, grid=grid, sigma=sigma, peaks=peaks, holes=holes,
+                          n_merged=n_peaks_merged + n_holes_merged)
 
     neutron = cp.sites.b_coh is not None
     dispersive = b_part is not None
@@ -243,7 +253,7 @@ def fourier_maps_from_model(model: CompiledModel, values: dict[str, float],
         observed=_map("observed", rho_obs),
         difference=_map("difference", rho_diff),
         d_min=d_min,
-        grid_step=step,
+        grid_step=merge,
         n_reflections=int(live.sum()),
         n_unobserved=int((~live).sum()),
         units="fm/Å³" if neutron else "e/Å³",
@@ -298,10 +308,15 @@ def _min_distance(p: np.ndarray, others: np.ndarray, metric: np.ndarray) -> floa
 
 
 def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
-             images, merge: float, *, sign: float) -> tuple[MapPeak, ...]:
-    """Local maxima of ``sign·grid`` above zero, one per space-group orbit.
+             images, merge: float, *, sign: float) -> tuple[tuple[MapPeak, ...], int]:
+    """Local maxima of ``sign·grid`` above zero, one per orbit, and how many merged.
 
-    A grid point is an extremum when it exceeds all 26 periodic neighbours.
+    A grid point is an extremum when it is at least its 13 neighbours on the
+    lexicographically positive side and exceeds the other 13.  The tie-break
+    is not cosmetic: an atom on a mirror or an axis that falls midway between
+    two grid points gives those two points the same value to the bit, and a
+    strict test on all 26 keeps neither, dropping the atom from the list
+    (LaMnO₃'s La1 at y = ¼ on a 54-point b axis, WP-1901's review).
     Each is refined by an axis-wise parabola, then dropped if it lies within
     ``merge`` (Å, one grid spacing) of an image of a stronger one already
     kept: a map with the space group's symmetry repeats each peak over the
@@ -314,12 +329,14 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
             for dk in (-1, 0, 1):
                 if di == dj == dk == 0:
                     continue
-                is_max &= g > np.roll(g, (di, dj, dk), axis=(0, 1, 2))
+                other = np.roll(g, (di, dj, dk), axis=(0, 1, 2))
+                is_max &= (g >= other) if (di, dj, dk) > (0, 0, 0) else (g > other)
     idx = np.argwhere(is_max)
     order = np.argsort(-g[tuple(idx.T)])
     shape = np.array(grid.shape)
     kept: list[MapPeak] = []
     kept_images: list[np.ndarray] = []
+    n_merged = 0
     for row in idx[order]:
         # f(t) = f0 + ½(f₊ − f₋)t + ½(f₋ − 2f0 + f₊)t² per axis: the vertex
         # sits at t* = ½(f₋ − f₊)/(f₋ − 2f0 + f₊) and rises ¼(f₊ − f₋)t*
@@ -337,6 +354,7 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
             height_fit += 0.25 * (fp - fm) * off
         frac = np.mod(frac, 1.0)
         if any(_min_distance(frac, im, metric) < merge for im in kept_images):
+            n_merged += 1
             continue
         kept_images.append(np.array(expand_positions(group, frac)))
         label, dist = None, None
@@ -349,4 +367,4 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
                             height=value,
                             significance=value / sigma if sigma > 0.0 else float("nan"),
                             nearest_atom=label, nearest_distance=dist))
-    return tuple(kept)
+    return tuple(kept), n_merged

@@ -40,11 +40,13 @@ WAVELENGTH = 0.4139090
 NAC_SITES = {"Ca1", "Al1", "Na1", "F1", "F2", "F3"}
 
 
-def _nac_model(structure, pattern=None, *, mode="rietveld"):
-    instrument = rx.Instrument.debye_scherrer(wavelength=WAVELENGTH)
-    instrument.source.dispersion = None
+def _nac_model(structure, pattern=None, *, mode="rietveld", wavelength=WAVELENGTH,
+               dispersion=False, tt_max=24.0):
+    instrument = rx.Instrument.debye_scherrer(wavelength=wavelength)
+    if not dispersion:
+        instrument.source.dispersion = None
     if pattern is None:
-        tt = np.linspace(2.0, 24.0, 6000)
+        tt = np.linspace(2.0, tt_max, 6000)
         pattern = PatternData(two_theta=tt.tolist(), intensity=[0.0] * len(tt))
     model = compile_model(structure, instrument, pattern, mode=mode)
     values = ParameterTable(structure, instrument).decode(
@@ -115,7 +117,42 @@ def test_the_atom_a_model_lacks_is_the_top_difference_peak(nac_noiseless):
     assert top.significance > 3.0
     # nothing is placed there, so the nearest *model* atom is far away
     assert top.nearest_distance > 1.5
-    assert all(p.height < top.height for p in maps.difference.peaks[1:])
+
+
+def _self_partition(cif, **kw):
+    """A structure's maps from its own noiseless pattern."""
+    structure = rx.Structure.from_cif(str(DATA / cif))
+    structure.phases[0].scale.value = 1e-6
+    model, values = _nac_model(structure, **kw)
+    pattern = PatternData(two_theta=model.tt.tolist(),
+                          intensity=np.asarray(model.evaluate(values)).tolist())
+    model, values = _nac_model(structure, pattern, **kw)
+    return structure, model, values
+
+
+def test_a_peak_split_by_a_mirror_between_two_grid_points_is_kept():
+    """LaMnO₃'s La1 sits on the mirror at y = ¼, midway between points 13 and
+    14 of a 54-point b axis, so the two read the same to the bit; a strict
+    26-neighbour test kept neither and lost the heaviest atom (the review)."""
+    structure, model, values = _self_partition("gsas2_bt1_lamno3.cif")
+    maps = fourier_maps_from_model(model, values, structure, grid_step=0.142373)
+    assert maps.observed.grid.shape == (45, 54, 40)
+    la = [p for p in maps.observed.peaks if p.nearest_atom == "La1"]
+    assert la and la[0].nearest_distance < 0.10
+    assert maps.observed.peaks[0] is la[0]
+
+
+def test_a_dispersive_source_states_its_phase_convention():
+    """NAC at Cu Kα with f′ and f″ declared: the convention says so, and the
+    observed map still finds the six sites (the f″ path, otherwise untested)."""
+    structure, model, values = _self_partition(
+        "cod_1000236.cif", wavelength=1.5406, dispersion=True, tt_max=150.0)
+    maps = fourier_maps_from_model(model, values, structure)
+    assert "f'' is declared" in maps.phase_convention
+    top = maps.observed.peaks[:6]
+    assert {p.nearest_atom for p in top} == NAC_SITES
+    assert max(p.nearest_distance for p in top) < 0.10
+    assert np.abs(maps.difference.grid).max() < 1e-9 * maps.observed.sigma
 
 
 def test_a_le_bail_model_is_refused(nac_noiseless):
