@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-05 — the list and group A landed (PR #1428); seven rows closed by ruling; 54 hard-start fits and 18 groups open
+Milestone: generality · Status: 🔄 2026-11-16 — the list and group A landed (PR #1428); group A's hard starts and H in #1494; group G measured in #1577, unreached on real trace phases, three questions to the maintainer; 16 groups open
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
@@ -99,7 +99,7 @@ different laboratory, instrument and material:
 | D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
 | E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
 | F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
-| G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | open |
+| G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | measured 2026-11-16: unreached on real trace phases, acts on zircon alone; B1.1's case not produced |
 | H. Cell window | `vector.CELL_WINDOW_FRACTION`, `_ANGLE_DEG`, `_PAD_A` | count the stages where it binds | every fit of groups A and G | open |
 | I. Position bounds | their removal, 2026-10-20 | free over a narrow range | lab flat plate: `fap`, `lab6`, SRM 1976a | open |
 | J. Refined lines | Le Bail and Pawley Kα2/Kα1 | second standard, tabulated ratio | SRM 660c, SRM 1976a, FAP | open |
@@ -273,6 +273,93 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-16** — The absent-phase hold's 3σ threshold was run on the cases its approval left owed, and on real trace phases it never acts. Three weighed phases near 1 wt % and the CuO impurity in an 11-BM ramp read 9 to 34 esds at every stage. From their database cells, and with their cells moved about one peak width off, holding at 1σ, at 3σ or not at all gave bit-identical fits, and every cell found its way back. The one start where the threshold mattered is a phase weighed at zero (zircon declared in cpd-1a): 3σ holds it at the end, 1σ and off do not, and nothing else in the fit moves by more than the noise. The case the threshold was most suspected of, a real phase pushed under 3σ by its own offset and then held there, was not produced: one peak width is not far enough. So no value moved and no tier changed; the three rows now say what was measured and what is still owed.
+
+  *Done.* PR #1577, a second PR beside #1494 (expect a trivial conflict in this file's Status line, group table and log head, and in `docs/wp/README.md`). `2017-batch/group_g.py` and `group_g_summary.md`; starts and arms fixed in § The list's "G, its starts and arms" bullet before anything ran (commit 51e56e95f). Evidence rewritten on `schemas.plan.PHASE_SUPPORT_SIGMA`, `PlanSpec:phase_support_sigma` and `Refinement.run_stage:phase_support_sigma`; tier, value and approval unchanged.
+
+  *Measured* (the workstation, Linux x86_64, `rietx-py312` venv with the tree on `PYTHONPATH`, rietx-kernels 1.5.0, numpy 2.5.3, compiled tier on, 12 workers of one kernel thread, at `51e56e95f`; 55 single fits and 5 chains in 338 s, 398 MB peak a process):
+
+  | Start | Minor phase | Scale / reported esd | Held at 3σ | 1σ, None, window off against 3σ |
+  |---|---|---|---|---|
+  | cpd-1a, -1b, -1c | corundum 1.15, zincite 1.36, fluorite 1.36 wt % weighed | 8.7, 33.8, 22.4 | never | bit-identical |
+  | the same, cell one fitted FWHM off (1.05-1.09 FWHM from the answer) | as above | as above | never | bit-identical; cell recovered to the database start's answer |
+  | CuCr₂O₄ 6.8 K and 288.7 K frames | CuO, 1.1 wt % by Rietveld (Suchomel 2012); reads 0.50 and 0.38(25) | 17.2, 14.8 | never | bit-identical |
+  | the same, one FWHM off | as above | as above | never | bit-identical, recovered |
+  | the ramp, 17 frames chained, CuO one FWHM off | CuO 0.38-0.64 wt % | 14.9-21.9 | never | bit-identical; within 0.011 plain esd of the chain from the database cell |
+  | cpd-1a with zircon declared | zircon, weighed 0 | 1.3 (3σ), 0.7 (1σ, None) | closing stage only | other rows 0.0135 plain esd (noise arm 0.0245), background 0.040 (noise 0.0005), every weight fraction within 0.007 wt % |
+
+  Zircon's reported c walked from 5.980 to 5.870 Å (−1.8 %) in the stages before the closing one under every arm, since it passed the screen at each stage start; the hold at 3σ restored it only to that walked value. Each start's distance from its answer, per axis, is in the summary: the cold frame's off start sat 0.73-0.95 FWHM from its answer, and the hot frame's database cell already sat 2.2-4.9 FWHM below its answer, so its "off" start was the nearer of the two (the displacement was applied to the database cell, as fixed). The FWHM is the fitted U, V, W, X, Y of the answer, which `mccusker_default` refines on the specimen, so on the ramp it is the total width. CuCr₂O₄'s cold-frame cell against Suchomel's 10 K Table I: a −19, b +110, c −114 ppm. Group H on these fits: 628 solves, a phase windowed in 2 (zircon's closing stage), a free cell column bounded in none; the window-off arm is bit-identical on every start and chain. With #1494's 298 fits, the window has now bounded nothing in 3060 solves.
+
+  *Canary*: cpd-1c and the cold frame at 3σ, 15.5 s, 281 MB, 128 % of 2 cores, Rwp equal to the Mac's run to four digits.
+
+  *Tests.* Fast selection at d7ac4cf93 on the workstation (Linux x86_64, `rietx-py312` venv, tree on `PYTHONPATH`, `-n 8 --dist loadgroup`): 14850 passed, 280 skipped, 32 xfailed in 9 min 27 s, as a co-tenant beside two other jobs. No test added. `tests/test_audit_table.py` 23 passed and `tests.audit_delta` exit 0 after the last row edit, `tests/test_docs_consistency.py` 26 passed (macOS arm64, worktree `[dev]` venv). Reader output unchanged. Full suite not run: no measured number in the package can move.
+
+  *Gotchas.* `phase_support_sigma=None` still reports `PHASE_UNCONSTRAINED` against 3, while 1 reports against 1, so on bit-identical fits `off` says yes and `s1` no. The summary's scale/esd column is the reported plain esd, not `refine._answer_significance`, which the hold reads; zircon reads 0.7 at 1σ and was not held. A `StageResult.width_twins_held` key is the held twin and its values the free specimen columns: the rows written at `51e56e95f` took the values out of `support_held` too, so zircon's closing-stage widths are missing from that one list; `held_phases`, which the summary reads, is unaffected (fixed in d7ac4cf93). `wsrun` kills a 12-worker pool under the default process guard: pass `--max-procs-per-task`.
+
+  *Review.* A read-only agent in the worktree (never `/code-review`, which edits the main checkout). Seven findings, all taken in d7ac4cf93: the twin filter above, and the scale-B filter widened to anisotropic paths; the off start's real distance from the answer now printed, and the rows say "0.7-1.1 fitted FWHM" rather than "one instrument FWHM"; the rows no longer quote 1.3σ as the hold's statistic and now name zircon's walk; "a weighed phase under 1 wt %" is kept as owed; the ramp's recovery read on its first frame, frames 2-17 being warm starts; "frames rejected" counted with `schemas.sequential._rejected`; the promised 10 K cell comparison added. Nothing it found changed a number in either table.
+
+  *Generality.* The judge (Opus, reading `.claude/agents/generality-review.md`) on the rows before the review's rewording; the 1.3σ wording, the zircon walk, the development-data and check-only labels, the owed sub-1 wt % phase and the `run_stage` seat it raised are now in the rows. Its sections, unedited:
+
+  ##### `rietx.schemas.plan.PHASE_SUPPORT_SIGMA` (constant, tier 3, 3.0, approved 2026-10-19)
+
+  **Verdict: weak.** The case for the hold itself is still the stronger side, but this row's new evidence does not test its 3σ threshold. The threshold was reached on one start of one family, and the row says "no failing case" even though the WP and the extra raw numbers contain candidates.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | grounds: "The hold it gates passes the judgement ground" (`_audit.py:4165`) | It sets the significance below which a phase counts as unseen. Under it, every free structural path of the phase is held for the stage, and a phase that collapsed at the answer is restored and held (`refine._answer_significance`, `StageResult.held`). | answered |
+  | 2. Ambiguity kind | No `ambiguity` field. No constant row in the table carries one (0 of 289). | The hold is kind 1 (the data settle it), as DESIGN.md § Rules, 1 names it. The number 3 is the part on trial. | agrees |
+  | 3. Case against acting | grounds: "the 3 sigma is rietx's own, which Currie (1968) does not carry" | **(a) A different number in practice.** TOPAS's opt-in `Remove_Phase(0.3, 0.5)` removes a phase when its esd is more than half its value, which is under 2σ, and its weight is below 0.3 %, with both numbers the caller's (`2002-batch/rulings.md:1179`, checked there). **(b) B1.1's case** (the maintainer's PR #1050 item: a minor phase one peak width off its cell, read under 3σ and held there) was never produced. CuO read 14.9-21.9σ per frame, and every off start recovered. **(c) Candidates on disk the row leaves out.** The WP's inherited G bullets (lines 142-145) record LaB₆ with its cell +1 % (scale to 0, phase held, `usable=False`) and NAC +3 % (CaF₂ lost to a held scale 0, `usable=True`, `PHASE_UNCONSTRAINED` the only word on it). Neither was run at 1σ or None, so whether the hold kept them there is not known. **(d) A missed absent phase.** Zircon (weighed 0) passed the 3σ screen in intermediate stages, and its c walked from 5.9796 to 5.870 Å under every arm. 3σ held it only at the closing stage, after the walk. That is the walk the hold exists to stop. | real, unmeasured |
+  | 4. Case for acting | evidence: "3 holds zircon at the answer (1.3 sigma), 1 and None leave it free, the other phases' rows within 0.014 plain esd (noise 0.025) and every weight fraction within 0.01 wt %" | Confirmed by the extra numbers: 0.01345 esd against a noise arm of 0.0245, and 0.0068 wt %. Background rows moved 0.0397 against the noise arm's 0.000539, 74× the noise floor (under the 0.1 bar, and excluded by the protocol). The row does not quote this. On the new data, leaving the phase free cost nothing measurable on the other numbers. The case for still rests on the earlier evidence: the 14.9 Å walk (v1.3) and WP-1523's 20 blank fits. | holds the action, not the number |
+  | 5. Tier and source | tier 3, "rietx's own" | Correct. GSAS-II (scale floored at 1e-12, no significance test), TOPAS (scale floored at 1e-11, removal opt-in) and FullProf (a negative scale reset to 1e-10) hold nothing by default. All three are checked in `rulings.md` B1. RIETAN-FP, BGMN, MAUD and EasyDiffraction: not checked in this repository. The "1.3 sigma" the row quotes is the reported scale/esd. The tested statistic is `_answer_significance` (no χ²_red or Bérar-Lelann factor; `tests/test_phase_significance.py` docstring). The s1 arm shows the two differ: zircon reads 0.7 there and was not held at 1σ. | statistic misquoted |
+  | 6. Families | "two families by lab, instrument and material" | **Two families, as the row says; the rule asks for three.** The arms reached the threshold on **one start of one family**: cpd-1a with zircon. 50 of 55 fits and all 5 chains were bit-identical across 1, 3 and None, and the row says so ("unreached there"). The row does not say that both families are development data: cpd-1a is graded so in this WP's own handover (line 374), and the CuCr₂O₄ ramp was used in WP-2081. CuO's 1.1 wt % is "Rietveld; temperature not stated" (`tests/data/README.md:1973`), a published refinement under another protocol. It measures drift only and does not validate, yet the row lists it beside the weighed fractions without saying so. CuO reads 0.38-0.64 wt %, unrelated to the arms. | fails the count |
+  | 7. Record | not in the row | `StageResult.held`, `.released` and `.collapsed`, and `PHASE_UNCONSTRAINED`. Under None the code still reports against 3σ (`_reported_support_sigma`), which is why zircon's off arm reads "yes" and s1 reads "no". The per-stage `significance` was not recorded by `group_g.py`. | exists |
+
+  **What would change the verdict:** B1.1's case actually reached and run at 1σ, 3σ and None, with each answer's distance from its reference. Candidates: NAC +3 % (CaF₂), LaB₆ +1 %, or CuO started 2-3 FWHM off. Also a third family, the per-stage significance recorded, and a stricter arm (5σ) on the zircon start, where 3σ let the walk through.
+
+  *Author:* agreed; the row now quotes no σ for zircon, names the walk and the owed cases, and labels the families and CuO's reference. The B1.1 case and a third family go to the maintainer as questions (1) and (2).
+
+  ##### `rietx.schemas.plan.PlanSpec:phase_support_sigma` (default, tier 3, ambiguity 1, 3.0)
+
+  **Verdict: weak.** The evidence text is identical to the constant's, so the same gaps apply. The grounds for having the hold on by default are sound, but the default value is untested where it matters.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | grounds: "On by default: the hold touches only parameters the data cannot determine" (`_audit.py:4650`) | Every plan runs the hold at 3σ unless the caller sets another value or None. | answered |
+  | 2. Ambiguity kind | `ambiguity=1` | Agrees for the action. The value is rietx's own. | agrees |
+  | 3. Case against acting | grounds: "no other code holds by default (TOPAS's Remove_Phase is opt-in)" | Same as the constant's row 3. The nearest practice is opt-in, at under 2σ and 0.3 wt %. The default is applied to every caller's fits, so the zircon walk under 3σ and the untested B1.1 case bear on it directly. | real, unmeasured |
+  | 4. Case for acting | "an unseen phase's free cell walked 14.9 A from the truth while Rwp did not move" | Still the strongest evidence, but it predates this change and is one case. This WP measured no cost of None on the other numbers (≤ 0.0135 esd, ≤ 0.0068 wt %). | holds the action |
+  | 5. Tier and source | tier 3, "the 3 sigma is rietx's own" | Correct. No program sets this by default (`rulings.md` B1, three programs checked; four not checked here). | correct |
+  | 6. Families | same text as the constant | Same as the constant's row 6: two families, reached on one start, development data not stated, CuO's reference only verifies. | fails the count |
+  | 7. Record | not in the row | `StageResult.held`, `PHASE_UNCONSTRAINED`. The default `None` is recorded in the plan (`tests/test_textdoc.py:619-643`). | exists |
+
+  **What would change the verdict:** the same as for the constant. In addition, a run of the B1.1 case at the default against None that shows which reaches the reference cell and composition.
+
+  *Author:* agreed, as for the constant.
+
+  ##### `rietx.refine.Refinement.run_stage:phase_support_sigma` (default, tier 3, ambiguity 1, 3.0)
+
+  **Verdict: weak.** This is the same number at a second seat, used when a stage runs outside a plan. Its evidence and grounds are the plan default's word for word, so its findings are the same. No fit in group G went through `run_stage` on its own, so nothing here measured this seat.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | grounds as the plan default's (`_audit.py:4849`) | It sets the hold's threshold for a stage run by hand. Replay passes the node's recorded value (`refine.py:4912`). | answered |
+  | 2. Ambiguity kind | `ambiguity=1` | Agrees. | agrees |
+  | 3. Case against acting | as the plan default's | Same as the plan default's row 3. A caller running one stage by hand is the most likely person to want the phase's cell free (stepping a trace phase in deliberately). This seat gives them the hold unasked. | real, unmeasured |
+  | 4. Case for acting | as the plan default's | Same as the plan default's row 4. One value at both seats keeps a hand-run stage consistent with a plan's. | holds the action |
+  | 5. Tier and source | tier 3 | Correct. | correct |
+  | 6. Families | same text | **none given** for this seat: every group G fit went through `fit(plan=…)`. | fails the count |
+  | 7. Record | not in the row | `StageResult.held`, `PHASE_UNCONSTRAINED`. | exists |
+
+  **What would change the verdict:** the plan default's evidence, plus one hand-run `run_stage` fit on a start that reaches the threshold.
+
+  *Author:* agreed; the row now says no group G fit ran through this seat.
+
+  *Not done, and why.* The rest of group G's debt: B1.1's case was never reached. Candidates the judge named, none run: NAC +3 % (CaF₂ lost to a held scale 0, in § What each group inherits), LaB₆ +1 %, CuO started two or three FWHM off, a phase weighed under 1 wt %, a third family, and a 5σ arm on the zircon start, where 3σ let the walk through. Group H's removal waits on #1494 merging, since that PR rewrites the three `CELL_WINDOW_*` rows.
+
+  *Questions for the maintainer.* (1) Does group G stand closed on this evidence under the 2026-11-05 ruling (a constant its families barely reach stays at tier 3 on a named synthetic case, WP-1523's 20 blank fits here), or should B1.1's case be built first, and at which offset or fraction? (2) The family set fixed on 2026-11-05 was two families, not three; is a third owed for this row? (3) Zircon's c walked 1.8 % under the 3σ hold before the closing stage: is that the hold's job (a stage-start screen that passed it), or a separate question?
+
+  *Next.* (1) Group H's removal once #1494 merges: no fit in groups A or G was bounded by the window. Answer first the case read off the code in #1494's entry (a caller's tie). (2) Group B, the next in this file's order: `_POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS`, whose "one more" Stephens family is not yet named and must be fixed before running.
 
 - **2026-11-05** — On fits that reach their answer, the ten solver stop constants do not matter. Moving each one either side of its value shifted no refined number by more than 0.0084 esd, a twelfth of the bar, on four families from nine harder starts. The same sweep could not clear them, though. Most constants are never read on these fits, and only three acted on three or more families at an answer. On starts that miss the answer, four of the constants choose which wrong minimum the fit lands in, and the shipped values are no better than their neighbours. So nothing was demoted and no value moved. Seven rows go to the maintainer, because no written exit fits a constant that ordinary fits barely reach.
 
