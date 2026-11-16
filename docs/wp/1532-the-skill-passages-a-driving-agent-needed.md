@@ -1,9 +1,8 @@
 # WP-1532 — the skill passages a driving agent needed: fourteen rows, placed where each is cheapest
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-16 — PR #1596
 Track: The repo's own process
 Depends on: — (PR #660 soft: the docstring and diagnostic-text half of the same findings)
-Priority: P3 2026-10-02 — each row is a wrong turn an agent took, and a reader of the docstrings could recover from it
 
 ## Goal
 
@@ -109,6 +108,46 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
 - `CONTRIBUTING.md` § The agent skill; `tests/skill_caps.py`.
 
 ## Handover log
+
+- **2026-11-16** — closed (ghostshift runner, PR #1596). Every row issue #661
+  proposed, and #728's fifteenth, now has a place or a reason it has none,
+  and the skill body grew by nothing. An agent that hits the 70 keV refusal or
+  writes `Li7` on a neutron model is now told the fix by the refusal itself;
+  the help for a coordinate DOF says why it reads 0. A TOPAS user has a table
+  of where the file's instrument goes. Six rows needed nothing, because later
+  work had already placed them or removed what they described.
+  *Done*: the placement table above (Context), row by row. Package output:
+  `dispersion.OUT_OF_BAND_ESCAPE` on the band refusal (stripped by
+  `io/recipe.py` and `io/projects/fullprof.py`, which have taken or refuse
+  the escape), the neutron hint for a tabulated element-first nuclide,
+  `help.py`'s `dof.*` entry. References: `diagnostics-projects.md`,
+  `history.md`, `numbers.md`, `diagnostics-indexing.md`; copies re-synced.
+  *Measured* (macOS arm64, worktree venv `[dev]`; pearl Linux, its
+  `rietx-py312` venv): the 74.5 keV refusal and its escape, `Li7` refused
+  at `predict` with the hint and `7Li` evaluating, `dof.0` = 0.0 after a fit
+  with `x` carrying the value, `STAGE_PATH_UNKNOWN` answering
+  `instrument.background.chebyshev.c0` with the flat path, the default
+  `BackgroundChebyshev` at 4 terms. Acceptance (`test_skill`, `test_skill_cli`,
+  `test_docs_consistency`, `test_skill_claims`, `test_help` with the touched
+  files): 412 passed, Mac. Canary on pearl `wp1532c`: 383 passed. Fast suite
+  on pearl `wp1532f`: FAST_RESULT. `tests.reader_output`: exit 0, unchanged.
+  Ruff clean. Skill caps: four references grew (+239, +1323 then +1.5 kB,
+  +352, +220 B), each far under budget.
+  *Review*: a read-only review subagent (the runner may not run
+  `/code-review`) found the FullProf leak of the escape, an isotope hint
+  inventing `1O`/`3Fe`, "the same esd" wrong for a (x, 2x, ¼) site, and
+  "repaired" overclaiming for a code whose parameter a later stage stopped
+  freeing; all four fixed in `0103adba7`. Not checkable from the repo: the
+  TOPAS-mapping signs (`Zero_Error`, `Specimen_Displacement`) are issue #661's
+  measurements against the program's output, cited as such.
+  *Generality*: no heuristic, threshold or default added; two refusal texts
+  and reference prose only, no `_audit.py` change.
+  *Forward*: WP-1925's Inherited (the refusal now names the workaround).
+  Overlaps with open PRs: #1579 edits `help.py` and
+  `diagnostics-indexing.md` (other entries and lines), #1592 `api.md` (not
+  touched here).
+  Next: none for this WP. A maintainer may want the TOPAS mapping signs
+  re-measured on the TOPAS VM before trusting the table beyond the issue.
 
 - **2026-10-02** — created, from the 2026-10-02 issue triage (issue #661).
   Checked against the tree at `ca9bda29`: the byte counts match the issue,
