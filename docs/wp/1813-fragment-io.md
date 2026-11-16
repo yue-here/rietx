@@ -79,9 +79,9 @@ optional extra is installed. This is chunk R12 of issue #561, sized M.
     "Skill row" (nothing in `fragments` or `bodies` is exported, and the skill's API
     pages are generated from `rx.`). All three in #1617.
   - *Measured.* `tests/test_fragments.py` 56 passed, 31 more than main's 25 (worktree
-    `.venv` `[dev]`, macOS arm64). Pearl canary gs1813c (5 files, `-n 4`): admitted
+    `.venv` `[dev]`, macOS arm64). Workstation canary (5 files, `-n 4`): admitted
     `running=1`, commit and tree `rietx.__file__` printed, 151 passed, 69 s, 435 MB,
-    154 % on 4 cores. Pearl fast gs1813f4 on 374da3acc (`-n 4 --dist loadgroup -m "not slow"`, pearl's
+    154 % on 4 cores. Workstation fast run on 374da3acc (`-n 4 --dist loadgroup -m "not slow"`, the workstation's
     `rietx-py312` venv with the tree on `PYTHONPATH`, Linux x86_64, beside other jobs):
     14881 passed, 280 skipped, 32 xfailed, 0 failed in 1604 s, 6.1 GB, 391 % on 4
     cores; the `-n 8` try was never admitted (co-tenant CPU cap) and was stopped. The
