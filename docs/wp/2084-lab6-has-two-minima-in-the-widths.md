@@ -130,7 +130,9 @@ against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads
 - [ ] Decide between a plan change that reaches the deeper minimum from the shipped start
       and a finding that says which minimum the fit is in. The deeper χ² is not by itself
       the evidence (root CLAUDE.md: never an Rwp comparison).
-- [ ] Make the lab6 axial-floor row strict, or drop its mark.
+- [x] Make the lab6 axial-floor row strict, or drop its mark. *Done 2026-11-16: strict,
+      since both platforms land the same way at every 1e-14 nudge (Findings). If the
+      ruling on the task above makes the floors agree, the mark drops then.*
 - [ ] Re-word three `_audit.py` evidence strings that still quote LaB6 from before WP-2012:
       `AXIAL_SIZING_FLOOR` (the floors' answers agreeing behind the closing stage, now
       0.582 plain esd on u), and `INTERMEDIATE_FTOL` with `StageResult.ftol` ("fails on
