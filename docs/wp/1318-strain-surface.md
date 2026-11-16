@@ -140,7 +140,20 @@ The shipping PR comments on issue #197 saying its strain half landed —
     touching such a direction is drawn red, so the region is never smaller
     than it is. No flag, threshold or automatic action is added, so there is
     no tier to state and `_audit.py` is untouched.
-  - *Measured:* MEASURED_PLACEHOLDER
+  - *Measured:* fast suite (`-m "not slow" -n 4 --dist loadgroup`) on the
+    final tree b763c2051, darwin/arm64, `[dev]`: 14707 passed, 432 skipped,
+    32 xfailed, 0 failed, in 18 min under load from other sessions (the
+    Linux workstation was memory-saturated, so it ran on the Mac). The same
+    suite on that workstation at 8e7d144d5 (Linux x86_64, Python 3.12,
+    `[dev,jax]`) gave 1 failed, 14865 passed, 280 skipped, 32 xfailed in
+    697 s: the new slow test had no row in `tests/validation_matrix.py`,
+    added in b763c2051 (tier identity, `starts=4` from the fixture's own
+    sweep) with `docs/VALIDATION.md` regenerated; `test_validation_matrix.py`
+    780 passed. Slow selection (`test_strain_surface` +
+    `test_acceptance_stephens`, `-m ""`) on the workstation: 22 passed in
+    10 s. The 8 added fast tests cost 2.1 s together
+    (`tests.added_test_times`, Mac junit). `python -m tests.reader_output`
+    exit 0, unchanged; ruff clean; Vale 0 errors.
   - *Review:* a read-only review agent found the silent-guard note claimed
     the region lay between reflections (false for an all-negative block),
     the refined pin could not catch a wrong frame (m cancelled), the note's
