@@ -84,8 +84,10 @@ class Counters:
 
     One row per base set, taken as the base's ``_combos`` returns: CPU seconds,
     current memory, solutions scored so far, candidates held, the base's
-    assignments.  Scored solutions equal ``len(seen)`` because ``_search_system``
-    adds every key to ``seen`` immediately before scoring it.
+    assignments.  Within the one unit this case runs, scored solutions equal
+    ``len(seen)`` because ``_search_system`` adds every key to ``seen``
+    immediately before scoring it; the counters are not reset, so a deferred
+    dominant-zone probe after an empty harvest would add to them.
     """
 
     def __init__(self):
@@ -135,6 +137,8 @@ def memory_ceiling(max_gb: float, counters: Counters | None) -> None:
     import threading
 
     limit, cpu0 = max_gb * 1024.0 ** 3, time.process_time()
+    if memory_bytes()[0] is None:
+        sys.exit("--max-gb needs a current-memory reading (psutil off macOS)")
 
     def watch() -> None:
         while True:
