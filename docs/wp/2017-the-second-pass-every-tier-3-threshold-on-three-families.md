@@ -464,6 +464,31 @@ and have no free factor to measure, so this file's old list named them without c
   the ratio against `LEBAIL_GAP_NOTABLE` (1.5). Families: LaB₆ + cBN
   (`test_acceptance_lab6_cbn`), `fap` and `cpd1a`, in Le Bail under their protocols' first
   stages as `mccusker_default()` runs them.
+- **Q, what its bullet left open, fixed 2026-11-16 before the full run** (`2017-batch/group_q.py`).
+  #1569 does not state its count level, and its harness is not attached. On the construction as
+  written, SRM 660c's instrument gives a FWHM of 3.5 points, not the 2.3 that #1569's window of
+  7 implies. So, from six calibration fits on this Mac (`[dev]`, macOS arm64), the co-refined
+  arm's La Biso esd was 0.34 at scale 1e-4, 0.047 at 1e-3, 0.0098 at 1e-2 and 0.0052 at 3e-2.
+  The scale is set at 5e-3, where that esd should read about #1569's 0.016. This calibrates the
+  precision, never the value. Those fits also showed the held arm's direction (La Biso higher
+  than co-refined at every level), so that direction is not a blind result; what the run
+  adds is its size against the truth, its twins and the arms below. Added before running: an
+  arm `snip10` (3 FWHM in this construction's own points); the arms `cheb`, `snip7`, `snip10`
+  and `truth` again at scales 1e-3 and 3e-2 and at Poisson seeds 20261113 and 20261114, since
+  one draw and one count level are a weak floor. *Real, Rietveld*: the FWHM in points is read
+  off the co-refined fit's strongest calculated peak, half-maximum above its background, and
+  the held window is three of it rounded. *Real, Le Bail*: the PbSO₄ on disk is the X-ray
+  pattern (`Pbso4.raw`, 10-160°), not the neutron histogram WP-1542 named, which is not on this
+  machine. It is fitted in `P n m a` at Hill's (1992) cell, Cu Kα₁/Kα₂ at 1.5405/1.5443 Å as
+  `test_extinction_gate`'s PbSO₄ instrument, a 6-term Chebyshev, the widths seeded by
+  `seed_widths`. #726's pattern is WP-1910's fixture: `qarr/corundum.prn`, 20-90°, the CPD
+  instrument, `seed_widths`, the certified cell. *Q2*: `layer0.lebail_gap` returns `None`
+  outside Rietveld, so `LEBAIL_GAP_CYCLES` is read on each family's Rietveld protocol
+  (LaB₆ + cBN's shared plan, FAP's GSAS-II plan, cpd-1a's QPA plan), fitted once and plain and
+  nudged, the gap evaluated at 5, 2 and 20 cycles from the one converged state, with
+  `n_cycles` echoed back as the control. The `LEBAIL_CONVERGED_REL` arms all run five passes,
+  the shipped 1e-4 included, so the control is the pass each stopped at. The `lebail_tol` 1e-9
+  arm runs at a cap of 100 000 cycles, as `test_lebail_cycles` does below the default.
 - **R.** `width_twins_held` has one real two-phase family, 11-BM LaB₆ + cBN. Y's floor went on a
   physical argument with one synthetic cost (Y −0.0059 against 0, `lor_size` 55 % low). The test:
   SRM 660c with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain.
