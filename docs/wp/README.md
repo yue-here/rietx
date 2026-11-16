@@ -57,6 +57,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-17 | P2 | [parametric](#parametric) |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 2026-11-16 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | 2026-11-17 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | 2026-11-18 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -862,7 +863,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
-| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | 🔄 2026-11-16 | P3 | — |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | ✅ 2026-11-10 | — | — |
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |

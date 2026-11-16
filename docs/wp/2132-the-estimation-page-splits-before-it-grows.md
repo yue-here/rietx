@@ -1,6 +1,6 @@
 # WP-2132 — the Estimation page splits before it grows
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-09 — no reader sees a defect yet, but the next sentence added to the Theory tab's Estimation chapter fails the page contract, and two open PRs already edit that page; the workaround is trimming text that is right
