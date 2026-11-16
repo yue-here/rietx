@@ -13,6 +13,7 @@ names hard dependencies, and *soft* marks a preferred order.
 
 | WP | Title | Since | Priority | Section |
 |---|---|---|---|---|
+| [1316](1316-hdf5-multiscan-reader.md) | A NeXus/HDF5 multi-scan reader, behind an extra | 2026-11-16 | P3 | [Unscheduled](#unscheduled-one-file-many-patterns) |
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
@@ -716,7 +717,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1315](1315-zip-collection-reader.md) | A zip of patterns is N scans | ⬜ | P3 | — |
-| [1316](1316-hdf5-multiscan-reader.md) | A NeXus/HDF5 multi-scan reader, behind an extra | ⬜ | P3 | — |
+| [1316](1316-hdf5-multiscan-reader.md) | A NeXus/HDF5 multi-scan reader, behind an extra | 🔄 2026-11-16 | P3 | — |
 
 ### <a id="unscheduled-the-formats-a-lab-still-has"></a>The formats a lab still has
 
