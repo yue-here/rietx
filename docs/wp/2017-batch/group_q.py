@@ -33,7 +33,7 @@ SNIP").
   (``layer0.lebail_gap``'s keyword default set in place), ratio against ``LEBAIL_GAP_NOTABLE``.
 
     .venv/bin/python docs/wp/2017-batch/group_q.py          # every task
-    .venv/bin/python docs/wp/2017-batch/group_q.py canary   # syn cheb + truth, fap tol 1e-6
+    .venv/bin/python docs/wp/2017-batch/group_q.py canary   # syn cheb + truth, fap tol 1e-6, pbso4 pair, fap gap
     .venv/bin/python docs/wp/2017-batch/group_q.py summary  # write group_q_summary.md
 
 ``WP2017Q_RAW`` names the raw directory (default ``~/.cache/rietx/wp-2017-q``);
@@ -713,7 +713,9 @@ def main(argv: list[str]) -> None:
     if mode == "canary":
         sweep([{"part": "syn", "arm": "cheb", "noise": False},
                {"part": "syn", "arm": "truth", "noise": False},
-               {"part": "tol", "family": "fap", "arm": "1e-6", "noise": False}])
+               {"part": "tol", "family": "fap", "arm": "1e-6", "noise": False},
+               {"part": "lebail", "pattern": "pbso4"},
+               {"part": "gap", "family": "fap", "arm": "all", "noise": False}])
         return
     if mode in ("syn", "real", "lebail", "conv", "tol", "gap"):
         sweep(_tasks((mode,)))
