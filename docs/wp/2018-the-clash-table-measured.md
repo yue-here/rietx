@@ -788,7 +788,8 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     the positive arm's finding, for B9's owner: at the 1e-6 floor (and at 2e-6) `march_term`
     returns NaN for reflections on the texture axis whose cos²α rounds above 1, so a fit started
     there is NaN in every stage. Should `cos2_alpha` clamp to [0, 1], should the floor rise
-    to where the rounding no longer sets the factor (about 1e-5 here), or both, and does the
+    to where the rounding no longer sets the factor (2.2e-16/r equals r² at r = 6e-6, and
+    at 1e-5 five of eleven factors are still off), or both, and does the
     floor's docstring need correcting either way?
 
 ## Acceptance
