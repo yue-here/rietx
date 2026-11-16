@@ -4312,12 +4312,16 @@ ROWS: tuple[Row, ...] = (
                   "by stating max")),
     Row("rietx.schemas.instrument.EXTRA_PEAK_FWHM_MIN", "constant", value=0.005),
     Row("rietx.schemas.instrument.HARMONIC_WEIGHT_SEED", "constant", tier=3, value=0.01,
-        evidence=("answer-invariant behind the closing stage only (closing_window_tol=None "
-                  "keeps the 0.15 esd it moved before): seeds 0.001 and 0.3 against 0.01 within "
-                  "0.1 plain esd (at most 0.003) at true lambda/2 weights 0, 0.003 and 0.05, a "
-                  "synthetic CW neutron corundum drawn by the package's own forward model, the "
-                  "one family a harmonic has here (tests/test_staged_start_invariance.py, the "
-                  "sixth round's Q2 bar)"),
+        evidence=("answer-invariant behind the closing stage only: seeds 0.001 and 0.3 against "
+                  "0.01 within 0.1 plain esd (at most 0.015 on 2026-11-16, macOS arm64 and Linux "
+                  "x86_64, against 0.003 quoted on 2026-10-23) at true lambda/2 weights 0, 0.003 "
+                  "and 0.05, a synthetic CW neutron corundum drawn by the package's own forward "
+                  "model (tests/test_staged_start_invariance.py, the sixth round's Q2 bar); "
+                  "without the closing stage (closing_window_tol=None) 0.26-1.44 plain esd on "
+                  "the O Biso and the scale, past a 1e-12 noise floor of 5e-7 (WP-2017 group M); "
+                  "the one family a harmonic has here: no protocol family declares one, and the "
+                  "only real lambda/2 pattern on disk, Nd2Ru2O7's neutron half, is evidence for "
+                  "no audit before the milestone closes"),
         grounds=("The maintainer delegated this tier to the lead on 2026-10-23 ('use your best "
                  "judgement'), on the generality judge's reading that an answer-invariant claim "
                  "has no conditional form (MAGNETIC_SIZING_FLOOR's precedent): tier 3, with "
@@ -4489,15 +4493,16 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.results.HIGH_CORRELATION_MAX", "constant", value=10),
     Row("rietx.schemas.structure.BISO_SEED", "constant", tier=3, value=0.5,
-        evidence=("starts 0.5 and 1.5 within 0.1 plain esd behind the closing stage on FAP and "
-                  "11-BM NAC (0.000, 0.000; tests/test_staged_start_invariance.py); cpd-1a 0.070 "
-                  "until the width twin hold kept a start-dependent X/Y split, 15.68 on zincite's "
-                  "lor_strain since (WP-2002, a strict xfail); LaB6's two starts land in its "
-                  "mirrored axial minima (1.16 esd, 9.36 before WP-2002; WP-2012), a strict "
-                  "xfail; the Atom.biso "
-                  "default and the literal of three readers for a site with no ADP "
-                  "(crystallography/cif.py, io/recipe.py, io/projects/topas.py) until the B14 "
-                  "lift"),
+        evidence=("starts 0.5 and 1.5 on every atom within 0.1 plain esd behind the closing "
+                  "stage on FAP, 11-BM NAC and LaB6 (0.000, 0.000, 0.009; "
+                  "tests/test_staged_start_invariance.py, LaB6 passing since WP-2012); cpd-1a "
+                  "15.6 on fluorite's lor_strain, the width twin hold's cost (WP-2002, a strict "
+                  "xfail); without the closing stage (closing_window_tol=None) 0.119 on FAP's Ca2 "
+                  "Biso, 0.008 on NAC, 0.199 on LaB6's La Biso and 14.8 on cpd-1a, past a 1e-12 "
+                  "noise floor of 2e-6, so invariant behind the closing stage only (WP-2017 group "
+                  "M, 2026-11-16, Linux x86_64); the Atom.biso default, also read by "
+                  "crystallography/cif.py, io/recipe.py and io/projects/topas.py for a site with "
+                  "no ADP"),
         grounds=("The maintainer delegated this tier to the lead on 2026-10-23 ('use your best "
                  "judgement'), on the generality judge's reading that an answer-invariant claim "
                  "has no conditional form (MAGNETIC_SIZING_FLOOR's precedent): tier 3, with "

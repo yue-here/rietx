@@ -275,6 +275,13 @@ def _refs(family: str, r: dict) -> str:
     return "; ".join(out) or "—"
 
 
+def _weight_col(family: str, r: dict) -> str:
+    """The λ/2 weight refined (synthetic only; on X-ray line 1 is Kα2, not a harmonic)."""
+    if not family.startswith("harm"):
+        return "—"
+    return "yes" if r["weight_refined"] else "no"
+
+
 def summary() -> None:
     rows = {(r["family"], r["closing"], r["arm"]): r for r in read_rows()}
     meta = next((r["meta"] for r in rows.values() if "meta" in r), {})
@@ -293,7 +300,7 @@ def summary() -> None:
         "the answer). Reference: cell distance in ppm (plain esd), cpd-1a's fractions minus the "
         "weighed (wt %), the synthetic's weight against its truth.",
         "",
-        "| Family | Closing | Arm | last stage | Rwp | evals | status | Biso rows | weight "
+        "| Family | Closing | Arm | last stage | Rwp | evals | status | Biso rows | λ/2 weight "
         "refined | harmonics declared | reference |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
@@ -309,7 +316,7 @@ def summary() -> None:
                     continue
                 lines.append(
                     f"| `{f}` | {c} | {a} | {r['last_stage']} | {r['rwp']:.6f} | {r['n_eval']} | "
-                    f"{r['status']} | {r['n_biso']} | {'yes' if r['weight_refined'] else 'no'} | "
+                    f"{r['status']} | {r['n_biso']} | {_weight_col(f, r)} | "
                     f"{r['harmonics_declared']} | {_refs(f, r)} |")
     lines += [
         "",
