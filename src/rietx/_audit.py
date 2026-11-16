@@ -4239,7 +4239,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.fraction.FRACTION_PROFILE_FWHM_MAX_SPAN", "constant", tier=3, value=0.5,
         evidence=("WP-1320: on the full span a pinned width outran the frozen windows "
                   "(FROZEN_COMPILE_STALE at 85 deg on an 85 deg fixture, not at 60 deg); inline "
-                  "in default_fwhm_grid until the B14 lift"),
+                  "in default_fwhm_grid until the B14 lift"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): profiled on test_qpa_multimodal's "
+                  "two-basin fixture and its control (CaF2) and on cpd-1a's three phases, each "
+                  "with a noise twin; inside the stated domain at shipped (an admissible fraction on "
+                  "the grid, neither grid end admissible, no FROZEN_COMPILE_STALE) are the control "
+                  "and cpd-1a zincite only: the fixture's second basin is its top grid point alone "
+                  "(42.5 deg FWHM, CaF2 77 wt %), cpd-1a corundum and fluorite read "
+                  "FROZEN_COMPILE_STALE, and every cpd-1a profile reads fit_admissible False (a "
+                  "pinned refit 90 chi2 under the fit against a cut of 77; corundum's 1891 under, "
+                  "at widths 2.1-30 deg FWHM and 51-64 wt %, against 1.72(64) fitted and 1.15 "
+                  "weighed); 0.3 and 0.7 moved the control's range ends 0.20 and 0.13 esd and "
+                  "zincite's 3.1e-4 esd; both lost the fixture's second basin (upper end 230 esd lower), no grid point at "
+                  "either span landing in it; at 0.5 the grid reaches 72.5 deg FWHM on cpd-1a"),
         grounds=("A numerical setting of the width grid, on the default path since the "
                  "skill sends every agent to profile_fraction (B12's ruling); tier 3 with a "
                  "test bounding its error over the claimed domain owed, tier 1 once it "
@@ -4247,7 +4259,19 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.fraction.FRACTION_PROFILE_FWHM_MIN", "constant", tier=3, value=0.01,
         evidence=("grid start below a lab instrument's own width; the skill tells agents to call "
-                  "profile_fraction (SKILL.md), so no longer opt-in"),
+                  "profile_fraction (SKILL.md), so no longer opt-in"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): profiled on test_qpa_multimodal's "
+                  "two-basin fixture and its control (CaF2) and on cpd-1a's three phases, each "
+                  "with a noise twin; inside the stated domain at shipped (an admissible fraction on "
+                  "the grid, neither grid end admissible, no FROZEN_COMPILE_STALE) are the control "
+                  "and cpd-1a zincite only: the fixture's second basin is its top grid point alone "
+                  "(42.5 deg FWHM, CaF2 77 wt %), cpd-1a corundum and fluorite read "
+                  "FROZEN_COMPILE_STALE, and every cpd-1a profile reads fit_admissible False (a "
+                  "pinned refit 90 chi2 under the fit against a cut of 77; corundum's 1891 under, "
+                  "at widths 2.1-30 deg FWHM and 51-64 wt %, against 1.72(64) fitted and 1.15 "
+                  "weighed); 0.003 and 0.03 moved the control's range ends 0.20 and 0.46 esd (its "
+                  "best grid point 1.11 esd at 0.03) and zincite's 4.5e-4 esd; the fixture kept both "
+                  "basins"),
         grounds=("A numerical setting of the width grid, on the default path since the "
                  "skill sends every agent to profile_fraction (B12's ruling); tier 3 with a "
                  "test bounding its error over the claimed domain owed, tier 1 once it "
@@ -4255,7 +4279,19 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.fraction.FRACTION_PROFILE_N_FWHM", "constant", tier=3, value=11,
         evidence=("the number of widths the grid samples; the skill tells agents to call "
-                  "profile_fraction (SKILL.md), so no longer opt-in"),
+                  "profile_fraction (SKILL.md), so no longer opt-in"
+                  "; WP-2017 group O (2026-11-16, Linux x86_64): profiled on test_qpa_multimodal's "
+                  "two-basin fixture and its control (CaF2) and on cpd-1a's three phases, each "
+                  "with a noise twin; inside the stated domain at shipped (an admissible fraction on "
+                  "the grid, neither grid end admissible, no FROZEN_COMPILE_STALE) are the control "
+                  "and cpd-1a zincite only: the fixture's second basin is its top grid point alone "
+                  "(42.5 deg FWHM, CaF2 77 wt %), cpd-1a corundum and fluorite read "
+                  "FROZEN_COMPILE_STALE, and every cpd-1a profile reads fit_admissible False (a "
+                  "pinned refit 90 chi2 under the fit against a cut of 77; corundum's 1891 under, "
+                  "at widths 2.1-30 deg FWHM and 51-64 wt %, against 1.72(64) fitted and 1.15 "
+                  "weighed); 5 left the control no admissible grid point (its range the fit's "
+                  "alone, ends 0.93 and 0.64 esd in); 21 moved its ends 5e-6 esd and its best grid "
+                  "point 0.82 esd, zincite's ends 0.003 esd; the fixture kept both basins at 5 and 21"),
         grounds=("A numerical setting of the width grid, on the default path since the "
                  "skill sends every agent to profile_fraction (B12's ruling); tier 3 with a "
                  "test bounding its error over the claimed domain owed, tier 1 once it "

@@ -599,7 +599,7 @@ def _o2_summary(rows: list[dict], lines: list[str]) -> None:
     lines += ["", "## O2: the fraction grid's three constants", "",
               "| Family | Phase | Twin | Arm | Grid (n, min, span) | W ± esd, wt % | Admissible "
               "range, wt % | Range ends − shipped, in esd | Best point − shipped's, in esd | "
-              "Basins | Domain |", "|" + "---|" * 11]
+              "Basins | χ² fit − best (cut) | Domain |", "|" + "---|" * 12]
     for fam in O2_FAMILIES:
         for phase in O2_PHASES[fam]:
             for twin in TWINS:
@@ -611,7 +611,7 @@ def _o2_summary(rows: list[dict], lines: list[str]) -> None:
                         continue
                     if "error" in prof:
                         lines.append(f"| {fam} | {phase} | {twin} | {arm} | error: "
-                                     f"{prof['error']} |" + " |" * 6)
+                                     f"{prof['error']} |" + " |" * 7)
                         continue
                     esd = prof["esd"]
                     ends = best = "—"
@@ -628,7 +628,10 @@ def _o2_summary(rows: list[dict], lines: list[str]) -> None:
                         f"{st['FWHM_MIN']:g}, {st['FWHM_MAX_SPAN']:g} | "
                         f"{100 * prof['wf']:.3f} ± {_f(100 * esd if esd else None)} | "
                         f"{100 * prof['range'][0]:.3f} to {100 * prof['range'][1]:.3f} | {ends} | "
-                        f"{best} | {_basins(prof)} | {'inside' if not why else '; '.join(why)} |")
+                        f"{best} | {_basins(prof)} | "
+                        f"{prof['chi2_fit'] - prof['chi2_best']:.1f} ({prof['cut']:.1f})"
+                        f"{'' if prof['fit_admissible'] else ', fit not admissible'} | "
+                        f"{'inside' if not why else '; '.join(why)} |")
     if errors:
         lines += ["", "Errors: " + "; ".join(f"{r['family']} {r['twin']} {r['arm']}: "
                                              f"{r['error']}" for r in errors)]
