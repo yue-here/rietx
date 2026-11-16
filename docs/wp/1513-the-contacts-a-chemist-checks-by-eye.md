@@ -174,7 +174,7 @@ with a planted clash and on none of the bundled acceptance structures.
   - *Tier.* The census adds no flag, threshold, default or action, and no
     `_audit` row: it reads `CONTACT_MAX_ANG`, `MAX_CONTACTS_PER_ATOM`,
     `MAX_TORSIONS_PER_ATOM`, `MAX_ASYM_ATOMS` and `TWIN_COORD_TOL` as they are.
-  - *Measured* (pearl, Linux x86_64, py3.12 venv, `bf3fc4eb7` on
+  - *Measured* (the workstation, Linux x86_64, py3.12 venv, `bf3fc4eb7` on
     `bc77a934e`, under load 14-37 from other jobs). Fast selection at `-n 4`:
     14860 passed, 280 skipped, 32 xfailed, 0 failed, in 1411 s (+10 passed
     against 14850 on main the same day; no new skip), 6.1 GB peak. The added
