@@ -1,6 +1,6 @@
 # WP-1315 — a zip of patterns is N scans
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: One file, many patterns
 Depends on: —
 Priority: P3 2026-09-23 — a reader nobody is waiting for; members open one at a time
