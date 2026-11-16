@@ -378,9 +378,6 @@ class _MemoSlot:
         self.pin: tuple | None = None
         self.recent: list[tuple] = []
 
-    def __len__(self) -> int:
-        return len(self.recent) + (self.pin is not None)
-
 
 def _freeze(value) -> None:
     """Mark every ndarray inside a memoised block read-only, in place.
