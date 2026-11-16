@@ -136,12 +136,17 @@ def normalize_species(species: str) -> str:
         # An element-then-mass label is the one misspelling with a fix to
         # name: an agent wrote 'Li7' for lithium-7 and met only the refusal
         # (issue #661, WP-1532).  Named only where that nuclide is tabulated,
-        # so a site label ('O1') or an unsigned charge ('Fe3') gets no
-        # invented isotope.
+        # so 'O1' or an unsigned charge ('Fe3') gets no invented isotope.
+        # Where it is tabulated the same spelling is also a common site
+        # label ('H1', 'C13', 'N15', 'O18' in organic structures), so the
+        # hint names both readings and never only the isotope (WP-1532
+        # review): following an isotope-only hint for a label passed as the
+        # species would swap natural N (9.36 fm) for 15N (6.44 fm) silently.
         flipped = re.fullmatch(r"([A-Za-z]{1,2})(\d+)", s)
-        nuclide = (f"{flipped[2]}{flipped[1].capitalize()}" if flipped
-                   else None)
-        hint = (f"; an isotope is written mass-first, {nuclide}"
+        element = flipped[1].capitalize() if flipped else None
+        nuclide = f"{flipped[2]}{element}" if flipped else None
+        hint = (f"; for the isotope write it mass-first, {nuclide}; for the "
+                f"natural element (if {s!r} is a site label) write {element}"
                 if nuclide in _load_table() else "")
         raise KeyError(f"cannot read a species from {species!r}{hint}")
     mass, element = m.groups()

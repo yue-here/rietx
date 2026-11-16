@@ -85,11 +85,15 @@ NEAR_EDGE_EV = 50.0
 #: WP-1532).  An agent at a 74 keV beamline met the refusal and found the
 #: escape only in the :class:`~rietx.schemas.instrument.Dispersion`
 #: docstring.  A caller that has already taken it (the recipe reader, which
-#: declines and says so) strips it with ``str.removesuffix``.
+#: declines and says so) strips it with ``str.removesuffix``.  The cost of
+#: the escape is stated as it is: ``refine._dispersion_diagnostics`` sizes
+#: the neglect with this same table, so out of band it skips every element
+#: and no DISPERSION_NEGLECTED is emitted (WP-1925 owns that silence).
 OUT_OF_BAND_ESCAPE = (
-    "; set `instrument.source.dispersion = None` to use f = f0 there (the "
-    "fit then reports DISPERSION_NEGLECTED), or supply a measured pair "
-    "through the source's dispersion overrides")
+    "; set `instrument.source.dispersion = None` to use f = f0 there (no "
+    "DISPERSION_NEGLECTED then sizes the neglect: it reads this same table, "
+    "WP-1925), or supply a measured pair through the source's dispersion "
+    "overrides")
 
 
 @lru_cache(maxsize=1)

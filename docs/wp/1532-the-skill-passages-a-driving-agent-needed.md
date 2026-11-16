@@ -66,7 +66,7 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
 |---|---|---|---|
 | 1 | σ floor at 10⁻³ × median | declined: stale | `_floor_sigma` is gone; WP-1952 honours a stated σ and leaves σ ≤ 0 out of the fit, which the body row and root CLAUDE.md already say |
 | 2 | match another program's background order | reference | `diagnostics-projects.md`'s TOPAS mapping block, the `bkg` row (`model.background_terms`); the default `BackgroundChebyshev` still carries 4 terms (measured) |
-| 3 | f′/f″ above 70 keV, `dispersion = None` | package output | the band refusal ends on `dispersion.OUT_OF_BAND_ESCAPE`; the "TOPAS zeroes above 30 keV" clause is declined (a claim from the program's own prose, and WP-1925's measurement) |
+| 3 | f′/f″ above 70 keV, `dispersion = None` | package output | the band refusal ends on `dispersion.OUT_OF_BAND_ESCAPE`, which also says no `DISPERSION_NEGLECTED` sizes the neglect out of band (WP-1925's silence); the "TOPAS zeroes above 30 keV" clause is declined (a claim from the program's own prose, and WP-1925's measurement) |
 | 4 | TCHZ bound box per preset | declined: placed | the `ProfileTCHZ` docstring states both boxes (PR #660, rewritten by WP-2002, which changed the boxes the issue quotes) |
 | 5 | two starts, two basins | reference | `numbers.md`, after "an esd is a number about one basin" |
 | 6 | `RESOLUTION_NOT_POSITIVE` is revisable | reference | `history.md`, rule 1 of reading the rungs, for every `_REVISABLE_CODES` member |
@@ -77,7 +77,7 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
 | 11 | `coverage.partial == False` is no proof | declined: placed | the `TOPAS_FEATURES_NOT_IMPORTED` row already says it (`unread_calls`, the silent bare keyword, after #651); the issue's "compare χ² with the file's `gof`" contradicts that row's "not comparable" and is not written |
 | 12 | `TOPAS_BLOCK_SKIPPED` suggestion | reference | one clause on the row: the refusal names the line to add (`_skipped_remedy`) |
 | 13 | origin-choice suffix | declined: placed | the `SPACE_GROUP_SETTING_ASSUMED` row says to write the suffix (`"F d -3 m:2"`), and the message quotes each setting's contents |
-| 14 | isotope spellings | package output | the neutron parser's refusal of an element-then-number label names the mass-first spelling (`Li7` → `7Li`); it fires at evaluation, not at `Atom(...)` |
+| 14 | isotope spellings | package output | the neutron parser's refusal of an element-then-number label names the mass-first spelling (`Li7` → `7Li`) and, for a site label such as `N15`, the bare element; it fires at evaluation, not at `Atom(...)` |
 | 15 | issue #728: screen a chosen `candidates[i]` | reference | `diagnostics-indexing.md`, load-bearing point 2 |
 
 ## Non-goals
@@ -122,15 +122,15 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
   the escape), the neutron hint for a tabulated element-first nuclide,
   `help.py`'s `dof.*` entry. References: `diagnostics-projects.md`,
   `history.md`, `numbers.md`, `diagnostics-indexing.md`; copies re-synced.
-  *Measured* (macOS arm64, worktree venv `[dev]`; pearl Linux, its
+  *Measured* (macOS arm64, worktree venv `[dev]`; the workstation, Linux,
   `rietx-py312` venv): the 74.5 keV refusal and its escape, `Li7` refused
   at `predict` with the hint and `7Li` evaluating, `dof.0` = 0.0 after a fit
   with `x` carrying the value, `STAGE_PATH_UNKNOWN` answering
   `instrument.background.chebyshev.c0` with the flat path, the default
   `BackgroundChebyshev` at 4 terms. Acceptance (`test_skill`, `test_skill_cli`,
   `test_docs_consistency`, `test_skill_claims`, `test_help` with the touched
-  files): 412 passed, Mac. Canary on pearl `wp1532c`: 383 passed. Fast suite
-  on pearl `wp1532f`: 14 853 passed, 280 skipped, 32 xfailed, 0 failed in 524 s on 8 cores (6.1 GB, 752 % CPU) at `0103adba7`, the code of this branch's head; the three added tests cost 0.00 s each. `tests.reader_output`: exit 0, unchanged.
+  files): 412 passed, Mac. Canary on the workstation: 383 passed. Fast suite
+  on the workstation: 14 853 passed, 280 skipped, 32 xfailed, 0 failed in 524 s on 8 cores (6.1 GB, 752 % CPU) at `0103adba7`, the code of this branch's head; the three added tests cost 0.00 s each. `tests.reader_output`: exit 0, unchanged.
   Ruff clean. Skill caps: four references grew (+239, +1323 then +1.5 kB,
   +352, +220 B), each far under budget.
   *Review*: a read-only review subagent (the runner may not run
@@ -140,6 +140,14 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
   freeing; all four fixed in `0103adba7`. Not checkable from the repo: the
   TOPAS-mapping signs (`Zero_Error`, `Specimen_Displacement`) are issue #661's
   measurements against the program's output, cited as such.
+  *Second review* (2026-11-16): the escape said "the fit then reports
+  DISPERSION_NEGLECTED", but out of band `_dispersion_diagnostics` skips
+  every element and reports nothing; the escape now says no
+  `DISPERSION_NEGLECTED` sizes the neglect, and its test pins the silence
+  (W at 74.5 keV) against a reporting arm (W at 62 keV). The isotope hint
+  fired on site labels (`H1`, `C13`, `N15`, `O18`); it now names both
+  readings, the mass-first isotope and the bare element. Making the
+  diagnostic speak out of band stays WP-1925's.
   *Generality*: no heuristic, threshold or default added; two refusal texts
   and reference prose only, no `_audit.py` change.
   *Forward*: WP-1925's Inherited (the refusal now names the workaround).
