@@ -130,8 +130,13 @@ moved = rx.geometry_census(structure, coordinates=xyz)
 The limits are the table's, and each writes a note where it applies.
 The orbit of each atom is decided at the coordinates given, so an atom moved off a special position has its whole orbit.
 Before measuring, it does to the model what a fit does first.
+A space group that fixes an angle the cell disagrees with is refused, as a fit refuses it.
 The cell takes the ties its space-group setting imposes, such as b = a, and a site within a few 10⁻⁴ of a special position is moved onto it, with a note saying so.
-Occupancy is not read, so the two halves of a split site are listed as a contact at whatever distance they sit.
+Occupancy is read once, at that step.
+A site whose occupancy marks it as one half of a split pair is left where it is, and the note gives both readings.
+Its two halves are then listed at whatever distance they sit, and as a bond when that is within the radii.
+A half-occupied O atom 3·10⁻⁴ off a mirror lists its own image 0.004 Å away as bonded.
+Coordinates handed in are merged in the same way.
 
 ### Esds of distances and angles
 

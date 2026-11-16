@@ -139,8 +139,14 @@ with a planted clash and on none of the bundled acceptance structures.
     does what a `Refinement` does to its model first: the setting's cell ties
     (`cell_constraints(...).ties`) and `merge_site_twins`, the merge's message
     joining `GeometryTable.notes`; without the merge a site 3·10⁻⁴ off a special
-    position listed its own images 0.003 Å apart as bonds. Occupancy is not
-    read. Documented in `reference/derived.md` § Without a fit (executed
+    position listed its own images 0.003 Å apart as bonds. Occupancy is read
+    once, by the merge's gate (corrected 2026-11-16 after review; this entry
+    first said it was not read): a site whose occupancy marks it as a split
+    pair is kept (`SITE_TWINS_KEPT`), and its halves are listed at whatever
+    distance they sit, as bonded within the radii. A half-occupied O 3·10⁻⁴
+    off a mirror lists a 0.0036 Å O1–O1 bond; a test pins that for task 3 to
+    settle. The census also refuses a symmetry-fixed angle the cell disagrees
+    with (`check_cell_angles`), as a `Refinement` does. Documented in `reference/derived.md` § Without a fit (executed
     example) and in the skill's `api.md` Results section (the verb gate
     required a door; task 6's search-loop row is still to write).
   - *Reuse answer.* `solve.chemistry.contacts` is a minimum-image search over

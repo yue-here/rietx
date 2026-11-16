@@ -774,6 +774,50 @@ def test_the_census_does_to_the_model_what_a_fit_does_first():
     assert sum("moved onto the special position" in n for n in census.notes) == 2
 
 
+def _near_mirror(occ: float, y: float = 0.0003):
+    """O1 3·10⁻⁴ off the mirror of P 1 m 1 (y = 0), at occupancy ``occ``."""
+    phase = _phase_in("P 1 m 1", (5.0, 6.0, 7.0, 90.0, 95.0, 90.0),
+                      [("O1", "O", 0.2, y, 0.3)])
+    atom = phase.atoms[0]
+    atom = atom.model_copy(update={"occ": atom.occ.model_copy(update={"value": occ})})
+    return phase.model_copy(update={"atoms": [atom]})
+
+
+def test_the_census_keeps_a_split_site_and_lists_its_halves_as_bonded():
+    """Pins the current behaviour, which WP-1513 task 3 may change.
+
+    Occupancy is read once, by the twin merge.  At occ = 1 the site 3·10⁻⁴ off
+    the mirror is moved onto it and no short row is left (the positive arm).
+    At occ = ½ the merge's gate reads it as one half of a split pair: nothing
+    is moved, and the two halves, 0.0036 Å apart, are listed as a bond, as
+    ``Refinement.geometry()`` lists them.
+    """
+    merged = rx.geometry_census(_near_mirror(1.0))
+    assert not [d for d in merged.distances if d.distance < 1.0]
+    assert any("moved onto the special position" in n for n in merged.notes)
+
+    phase = _near_mirror(0.5)
+    kept = rx.geometry_census(phase)
+    assert any("nothing was moved" in n for n in kept.notes)
+    near = [d for d in kept.distances if d.distance < 1.0]
+    assert [(d.atom_1, d.atom_2, d.bonded) for d in near] == [("O1", "O1", True)]
+    assert near[0].distance == pytest.approx(0.0036, abs=1e-4)
+    unfitted = Refinement(Structure(phases=[phase]), LAB, history=False).geometry()
+    assert kept.distances == unfitted.distances
+
+
+@pytest.mark.parametrize("y", [0.0003, 3.0003, -2.9997])
+def test_the_census_moves_a_trial_atom_onto_its_special_position(y):
+    """Coordinates handed in are merged as stored ones are: a fully occupied
+    trial atom 3·10⁻⁴ off the mirror, in any cell, is measured on it, with one
+    note, and does not list its own image as a bond."""
+    phase = _near_mirror(1.0, y=0.25)
+    g = rx.geometry_census(phase, coordinates=[[0.2, y, 0.3]])
+    assert sum("moved onto the special position" in n for n in g.notes) == 1
+    assert not [d for d in g.distances if d.distance < 1.0]
+    assert phase.atoms[0].y.value == 0.25
+
+
 def test_a_census_off_a_special_position_has_the_whole_orbit():
     """Rutile's Ti moved off 2a (m = 2) takes its general orbit (m = 16), and
     orbit counting |A_ij|·m_i = |A_ji|·m_j holds over the bonds at the new
@@ -812,3 +856,13 @@ def test_the_census_refuses_coordinates_it_cannot_place():
     with pytest.raises(ValueError, match="not finite"):
         rx.geometry_census(structure, coordinates=np.full((2, 3), np.nan))
     assert rx.geometry_census(Structure(phases=[])) is None
+    # a symmetry-fixed angle the cell disagrees with, refused as a fit refuses it
+    skewed = _phase_in("P m m m", (5.0, 6.0, 7.0, 90.0, 93.2, 90.0),
+                       [("O1", "O", 0.1, 0.2, 0.3)])
+    with pytest.raises(ValueError, match="fixes beta at 90.0° by symmetry"):
+        rx.geometry_census(skewed)
+    with pytest.raises(ValueError, match="fixes beta at 90.0° by symmetry"):
+        Refinement(Structure(phases=[skewed]), LAB, history=False).geometry()
+    # a Refinement handed in by mistake is named, not passed on to pydantic
+    with pytest.raises(TypeError, match=r"not Refinement .*\.structure"):
+        rx.geometry_census(Refinement(structure, LAB, history=False))

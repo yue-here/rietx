@@ -756,26 +756,44 @@ def geometry_census(structure, coordinates=None):
     :data:`MAX_CONTACTS_PER_ATOM` nearest per atom, torsions at
     :data:`MAX_TORSIONS_PER_ATOM`, and a phase of more than
     :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is not searched at all.
-    Occupancy is not read: every site is present, so two halves of a split
-    site are listed as a contact at whatever distance they sit.
+    Occupancy is read once, by the twin merge below; after it every site is
+    present, and each pair, at any distance, is a bond or a contact by the
+    covalent radii alone.
 
-    Two things a fit does to the model before it measures anything are done
-    here too, so the census equals :meth:`~rietx.Refinement.geometry` before a
-    fit: the cell takes its setting's ties (b ← a and the rest, from
+    What a fit does to the model before it measures anything is done here too,
+    so the census equals :meth:`~rietx.Refinement.geometry` before a fit.  A
+    space group that fixes an angle the cell disagrees with is refused, with
+    the parameter table's message
+    (:func:`~rietx.crystallography.symmetry.check_cell_angles`).  The cell
+    takes its setting's ties (b ← a and the rest, from
     :func:`~rietx.crystallography.symmetry.cell_constraints`, the parameter
-    table's one authority), and a site within
+    table's one authority).  A site within
     :data:`~rietx.crystallography.symmetry.TWIN_COORD_TOL` of a special
     position is moved onto it (:func:`~rietx.crystallography.twins.
-    merge_site_twins`), its message joining the notes.  Without the second, an
-    atom a few 10⁻⁴ off a special position would list its own images, a few
-    thousandths of an ångström away, as bonds.
+    merge_site_twins`), its message joining the notes, unless its occupancy
+    marks it as a split site: summed occupancy × (images before / images
+    after) at most 1.  Such a site stays as stored, the note gives both
+    readings, and its two halves are listed at whatever distance they sit,
+    as a bond when that is within the radii.  A half-occupied O 3·10⁻⁴ off a
+    mirror lists its own image 0.004 Å away as bonded; what to do there is
+    WP-1513 task 3's.  Without the merge, a fully occupied atom a few 10⁻⁴
+    off a special position would list its own images, a few thousandths of an
+    ångström away, as bonds.
+
+    Coordinates handed in are merged the same way, so a trial atom that close
+    to a special position is measured on it.
     """
     from ..crystallography.structure_factor import PhaseSites, phase_orbit_split
-    from ..crystallography.symmetry import cell_constraints
+    from ..crystallography.symmetry import cell_constraints, check_cell_angles
     from ..crystallography.twins import merge_site_twins
-    from ..schemas.structure import Structure
+    from ..schemas.structure import Phase, Structure
 
-    phases = list(structure.phases) if hasattr(structure, "phases") else [structure]
+    if not isinstance(structure, Structure | Phase):
+        hint = (" (a Refinement: pass its .structure)"
+                if hasattr(structure, "structure") else "")
+        raise TypeError(f"geometry_census takes a Structure or a Phase, not "
+                        f"{type(structure).__name__}{hint}")
+    phases = list(structure.phases) if isinstance(structure, Structure) else [structure]
     if not phases:
         return None
     phases = [p if xyz is None else _placed(p, xyz)
@@ -787,8 +805,9 @@ def geometry_census(structure, coordinates=None):
     values: dict[str, float] = {}
     for ip, phase in enumerate(phases):
         cell = {k: float(getattr(phase.cell, k).value) for k in _CELL_NAMES}
-        ties = cell_constraints(resolve_group(phase.space_group,
-                                              phase.symmetry_operations)).ties
+        sg = resolve_group(phase.space_group, phase.symmetry_operations)
+        check_cell_angles(sg, {k: cell[k] for k in ("alpha", "beta", "gamma")})
+        ties = cell_constraints(sg).ties
         for dependent, source in ties.items():
             cell[dependent] = cell[source]
         for k in _CELL_NAMES:
