@@ -560,6 +560,9 @@ def _phase_mu_neutron(zmv: ZMV, wavelength: float) -> float:
 #: no table, and every caller declines for it with a reason rather than borrow
 #: another radiation's: X-ray and neutron µ are different quantities, not
 #: coarse and fine versions of one.
+#: ``capabilities.RadiationCapability.absorption_estimate`` is derived from
+#: membership here (``kind in`` this dict), so the arm a client reads cannot
+#: disagree with what the estimators do.
 LINEAR_ATTENUATION_BY_SOURCE = {
     "xray_cw": _phase_mu_xray,
     "neutron_cw": _phase_mu_neutron,

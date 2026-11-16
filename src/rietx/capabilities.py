@@ -189,10 +189,16 @@ class RadiationCapability(Base):
     magnetic_scattering: bool
     #: ``True`` where a fit turns a declared capillary radius or flat-plate
     #: thickness into an estimated µR or µt from the composition, when
-    #: ``Geometry.mu_r``/``mu_t`` is left unset (WP-1132).  Read off
+    #: ``Geometry.mu_r``/``mu_t`` is left unset (X-ray µR since WP-0501 and µt
+    #: since WP-0508, constant-wavelength neutron since WP-1132).  Read off
     #: ``optimize.qpa.LINEAR_ATTENUATION_BY_SOURCE``, the table the estimator
     #: dispatches on, so a source kind joining that table flips its own flag.
-    #: ``False`` means the fit declines and says so: declare the value.
+    #: The same table gives the µ of the Brindley microabsorption correction in
+    #: phase quantification, so ``False`` also means a QPA with
+    #: ``Phase.particle_radius_um`` skips that correction on this source.
+    #: ``False`` means the fit does not estimate µR or µt and says so; an explicit
+    #: ``mu_r``/``mu_t`` is still honoured wherever the source can be fitted
+    #: (a time-of-flight source cannot be fitted yet).
     #: ``True`` is not a promise for every specimen, since the estimate still
     #: declines for an absorption edge, an untabulated species or a resonant
     #: neutron absorber
