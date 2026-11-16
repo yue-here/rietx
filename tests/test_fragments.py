@@ -684,9 +684,12 @@ def test_an_ideal_benzene_round_trips_through_xyz_with_its_bonds_declared(tmp_pa
     assert fr.from_xyz(_xyz_text(ring)).body_frame().rotation_dofs == 3
 
 
-def test_an_xyz_atomic_number_reads_as_its_symbol():
-    f = fr.from_xyz("3\n\n8 0 0 0\n1 0.96 0 0\nH -0.24 0.93 0\n")
+def test_an_xyz_element_reads_as_its_standard_symbol():
+    """An atomic number or a symbol in any case is stored as the standard
+    spelling; CRLF line ends and a byte-order mark read like plain ones."""
+    f = fr.from_xyz("3\r\n\r\n8 0 0 0\r\n1 0.96 0 0\r\nh -.24 +.93 0e0\r\n")
     assert f.species == ("O", "H", "H")
+    assert fr.from_xyz("1\nc\nfe 1.5E-1 0. 0\n").species == ("Fe",)
     assert fr.from_xyz("0\nempty\n").xyz.shape == (0, 3)
 
 
@@ -699,8 +702,15 @@ def test_an_xyz_atomic_number_reads_as_its_symbol():
     ("1\nc\nC 0 0\n", r"line 3: an atom line holds an element and three coordinates "
                       r"\(4 fields\); it has 3"),
     ("1\nc\nC 0 0 0 0.5\n", r"line 3: .* it has 5"),
-    ("1\nc\nC 0 zero 0\n", r"line 3: a coordinate is not a number"),
-    ("1\nc\nC 0 inf 0\n", r"line 3: a coordinate is not finite"),
+    ("1\nc\nC 0 zero 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 0 inf 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 0 nan 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 1_0 0 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 1.0D0 0 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1_0\nc\n", r"non-negative integer; it reads '1_0'"),
+    ("1\nc\nC1 0 0 0\n", r"line 3: 'C1' is not an element symbol"),
+    ("1\nc\nX 0 0 0\n", r"line 3: 'X' is not an element symbol \(it is the Z-matrix dummy\)"),
+    ("1\nc\n119 0 0 0\n", r"line 3: atomic number 119 is not 1–118"),
     ("1\nc\n0 0 0 0\n", r"line 3: atomic number 0 is not 1–118"),
     ("1\nc\nC 0 0 0\n1\nc\nC 1 0 0\n", r"line 4: text after the 1 atoms of line 1's "
                                        r"count .* this reader takes one frame"),
@@ -711,6 +721,9 @@ def test_an_xyz_file_that_is_not_one_bare_frame_is_refused_by_line(text, match):
 
 
 def test_an_xyz_refusal_names_the_file(tmp_path):
+    bom = tmp_path / "bom.xyz"
+    bom.write_text("1\nc\nC 0 0 0\n", encoding="utf-8-sig")
+    assert fr.read_xyz(bom).species == ("C",)
     path = tmp_path / "short.xyz"
     path.write_text("2\nc\nC 0 0 0\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"short\.xyz: line 1 counts 2 atoms"):
@@ -832,6 +845,29 @@ def test_the_writer_refuses_what_from_zmatrix_cannot_read():
         fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0), (2, 1, 0)])
     with pytest.raises(ValueError, match=r"line 2 \(C\) takes 2 earlier atom indices"):
         fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 2), (2, 1, 0)])
+    with pytest.raises(ValueError, match=r"line 1 \(C\) takes 1 earlier atom indices"):
+        fr.to_zmatrix(line_then_off, refs=[(), (None,), (1, 0), (2, 1, 0)])
     with pytest.raises(ValueError, match="3 reference rows for 4 atoms"):
         fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0)])
     assert fr.to_zmatrix(fr.Fragment((), np.zeros((0, 3)))) == []
+
+
+def test_the_writer_takes_the_best_conditioned_dihedral_reference():
+    """Atom 4 sits 1e-6 of a radian off the line 1–0 and is written at exactly
+    180°, which moves it ~1e-6 Å; the triple 2, 3, 4 is then barely off its
+    line (sine ~1e-6), so a dihedral measured from it would turn by O(1) on the
+    way back (0.22 Å in the distances).  The chooser takes the triple furthest
+    from a line, and the round trip keeps only the write's own ~r·1e-6 Å."""
+    h, a = 0.99e-6, 3.05e-6
+    x = np.array([[-2, 0, -h], [-1, 0, -h], [0, -1.5, 0], [0, -3, 0], [a, 0, 0],
+                  [0.3, -1.2, 1.1]])
+    f = fr.Fragment(("C",) * 6, x)
+    lines = fr.to_zmatrix(f)
+    assert lines[4][4] == 180.0
+    back = fr.from_zmatrix(lines)
+    assert np.max(np.abs(_distances(back.xyz) - _distances(x))) < 5 * fr.COLLINEAR_TOL
+    # the same line written from the ill-conditioned triple, as a caller may
+    refs = [tuple(line[1::2]) for line in lines]
+    refs[5] = (2, 3, 4)
+    bad = fr.from_zmatrix(fr.to_zmatrix(f, refs=refs))
+    assert np.max(np.abs(_distances(bad.xyz) - _distances(x))) > 0.1

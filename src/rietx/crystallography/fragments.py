@@ -73,12 +73,15 @@ so :func:`from_zmatrix` rebuilds the fragment up to a rigid motion (never its
 mirror image, the dihedral signs being kept).  The reference atoms are a
 construction choice, the caller's when given; otherwise each line's b is the
 nearest earlier atom among those *declared* bonded to it, else the nearest
-earlier atom, and c and d are taken the same way about b and about c, skipping
-a d that would make B, C, D collinear.  Distance only orders the candidates;
-it declares no bond.  An atom on its reference line B–C (sine under
-:data:`COLLINEAR_TOL`) is written at exactly 0° or 180° with an inert
+earlier atom.  c and d are the pair of earlier atoms that puts B, C, D
+furthest from a line (the largest sine at C), because a nearly collinear
+reference triple makes the dihedral's half-plane ill-conditioned; exact ties
+go to atoms declared bonded, then to nearer ones.  Distance only orders the
+candidates; it declares no bond.  An atom on its reference line B–C (sine
+under :data:`COLLINEAR_TOL`) is written at exactly 0° or 180° with an inert
 dihedral, which is how :func:`from_zmatrix` accepts it, so a linear molecule
-writes and reads back without a dummy.  The writer adds no dummy: an atom off
+writes and reads back without a dummy; the write moves that atom by at most
+r·:data:`COLLINEAR_TOL` (r its distance to B).  The writer adds no dummy: an atom off
 a line on which every earlier atom lies has no dihedral reference and is
 refused, and putting an off-line atom earlier in the order resolves it.
 
@@ -98,6 +101,7 @@ caller types, in degrees.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -125,6 +129,11 @@ INERTIA_RANK_TOL: float = 1e-6
 
 #: The largest eigenvalue (Å²) below which the atoms coincide: no rotation DOF.
 _COINCIDENT_A2 = 1e-20
+
+# XYZ tokens: an ASCII count or atomic number, and a plain decimal coordinate
+# (no nan/inf, no underscores, no Fortran D exponent)
+_DIGITS = re.compile(r"[0-9]+")
+_DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 
 
 @dataclass(frozen=True, eq=False)
@@ -557,8 +566,11 @@ def from_xyz(text: str, bonds=None, *, source: str = "XYZ text") -> Fragment:
     The format (module docstring, "XYZ"): line 1 is the atom count, line 2 a
     comment, which is ignored, and each of the next ``count`` lines holds an
     element and three Cartesian coordinates in Å, separated by whitespace.  An
-    element may be a symbol, kept as written, or an atomic number 1–118, read
-    as its symbol.  Blank lines after the frame are allowed.
+    element is a symbol in any case or an atomic number 1–118, and is stored
+    as its symbol's standard spelling (``fe`` and ``26`` are ``Fe``).  A
+    coordinate is a decimal number, an exponent allowed.  Lines end at
+    ``\n``, a ``\r`` before it is dropped, and blank lines after the frame
+    are allowed.
 
     ``bonds`` are declared by the caller as pairs of 0-based atom indices in
     file order (:class:`Fragment`); a file states none, and none is inferred.
@@ -567,20 +579,22 @@ def from_xyz(text: str, bonds=None, *, source: str = "XYZ text") -> Fragment:
 
     Refusals (``ValueError``, naming ``source`` and the line): a first line
     that is not a non-negative integer count, fewer atom lines than the count,
-    an atom line with other than four fields or a coordinate that is not a
-    finite number, an atomic number outside 1–118, and anything but blank
+    an atom line with other than four fields, a coordinate that is not a
+    decimal number (``nan``, ``inf``, ``1_0`` and Fortran's ``1.0D0`` among
+    them), an element that is neither a known symbol nor an atomic number
+    1–118 (a site label such as ``C1`` is not an element, and :data:`DUMMY`
+    is the Z-matrix dummy, not an atom), and anything but blank
     lines after the frame, which is a second frame or a miscount: this reader
     takes one frame.
     """
-    lines = text.splitlines()
+    lines = [line.removesuffix("\r") for line in text.split("\n")]
+    if lines[-1] == "":
+        lines.pop()  # the final line end closes a line; it opens none
     if not lines or not lines[0].strip():
         raise ValueError(f"{source}: line 1 must hold the atom count; it is empty")
     head = lines[0].split()
-    try:
-        count = int(head[0])
-    except ValueError:
-        count = -1
-    if len(head) != 1 or count < 0:
+    count = int(head[0]) if len(head) == 1 and _DIGITS.fullmatch(head[0]) else -1
+    if count < 0:
         raise ValueError(f"{source}: line 1 must hold the atom count, a "
                          f"non-negative integer; it reads {lines[0].strip()!r}")
     body = lines[2:2 + count]
@@ -597,18 +611,21 @@ def from_xyz(text: str, bonds=None, *, source: str = "XYZ text") -> Fragment:
                              f"coordinates (4 fields); it has {len(fields)}: "
                              f"{line.strip()!r}")
         element = fields[0]
-        if element.isdigit():
+        if _DIGITS.fullmatch(element):
             z = int(element)
             if not 1 <= z <= 118:
                 raise ValueError(f"{where}: atomic number {z} is not 1–118")
             element = gemmi.Element(z).name
-        try:
-            point = tuple(float(v) for v in fields[1:])
-        except ValueError:
-            raise ValueError(f"{where}: a coordinate is not a number: "
-                             f"{line.strip()!r}") from None
-        if not all(math.isfinite(v) for v in point):
-            raise ValueError(f"{where}: a coordinate is not finite: {line.strip()!r}")
+        elif element == DUMMY or gemmi.Element(element).name == DUMMY:
+            raise ValueError(f"{where}: {element!r} is not an element symbol"
+                             + (" (it is the Z-matrix dummy)" if element == DUMMY
+                                else ""))
+        else:
+            element = gemmi.Element(element).name
+        if not all(_DECIMAL.fullmatch(v) for v in fields[1:]):
+            raise ValueError(f"{where}: a coordinate is not a decimal number: "
+                             f"{line.strip()!r}")
+        point = tuple(float(v) for v in fields[1:])
         species.append(element)
         xyz.append(point)
     for k, line in enumerate(lines[2 + count:], start=3 + count):
@@ -624,7 +641,7 @@ def read_xyz(path, bonds=None) -> Fragment:
     """A fragment from a bare XYZ file (:func:`from_xyz`, which has the format
     and the refusals; ``bonds`` are the caller's, in file order)."""
     p = Path(path)
-    return from_xyz(p.read_text(encoding="utf-8"), bonds, source=str(p))
+    return from_xyz(p.read_text(encoding="utf-8-sig"), bonds, source=str(p))
 
 
 def _measure(x, i, ref):
@@ -682,16 +699,18 @@ def _choose_refs(fragment: Fragment) -> list[tuple[int, ...]]:
             refs.append((b, cs[0], ranked([k for k in range(i) if k not in (b, cs[0])],
                                           cs[0])[0]))
             continue
-        found = None
+        # the best-conditioned dihedral: a triple B, C, D barely off its line
+        # turns D's half-plane by O(1) under the ~r·COLLINEAR_TOL an earlier
+        # 0°/180° write moves an atom, so the largest sine wins and the
+        # preference order only breaks ties
+        found, best = None, COLLINEAR_TOL
         for c in cs:
             if _collinear_sine(x[i], x[b], x[c]) < COLLINEAR_TOL:
                 continue
             for d in ranked([k for k in range(i) if k not in (b, c)], c):
-                if _collinear_sine(x[b], x[c], x[d]) >= COLLINEAR_TOL:
-                    found = (b, c, d)
-                    break
-            if found:
-                break
+                sine = _collinear_sine(x[b], x[c], x[d])
+                if sine > best or (found is None and sine >= best):
+                    found, best = (b, c, d), sine
         if found is None:
             raise ValueError(
                 f"to_zmatrix: atom {i} ({fragment.species[i]}) is off the line "
@@ -714,11 +733,11 @@ def to_zmatrix(fragment: Fragment, refs=None) -> list[tuple]:
     ``refs`` gives each line's reference atoms as earlier indices, ``()``,
     ``(b,)``, ``(b, c)``, then ``(b, c, d)``.  Without it they are chosen
     (module docstring, "Writing a Z-matrix"): b is the nearest earlier atom
-    bonded to the line's atom, else the nearest earlier atom; c and d are
-    taken the same way about b and c, skipping any that would make the
-    reference triple collinear.  An atom on its reference line within
-    :data:`COLLINEAR_TOL` is written at exactly 0° or 180° with an inert 0°
-    dihedral, the form :func:`from_zmatrix` accepts there.
+    bonded to the line's atom, else the nearest earlier atom; c and d are the
+    earlier pair that makes B, C, D furthest from collinear.  An atom on its
+    reference line within :data:`COLLINEAR_TOL` is written at exactly 0° or
+    180° with an inert 0° dihedral, the form :func:`from_zmatrix` accepts
+    there, which moves it by at most r·:data:`COLLINEAR_TOL`.
 
     Refusals (``ValueError``): an atom of species :data:`DUMMY`, which
     :func:`from_zmatrix` would drop; with ``refs`` chosen here, an atom off
@@ -740,7 +759,8 @@ def to_zmatrix(fragment: Fragment, refs=None) -> list[tuple]:
                              f"{len(fragment)} atoms")
         for i, ref in enumerate(refs):
             if len(ref) != min(i, 3) or any(
-                    isinstance(k, bool) or int(k) != k or not 0 <= k < i for k in ref):
+                    isinstance(k, bool) or not isinstance(k, (int, float, np.number))
+                    or int(k) != k or not 0 <= k < i for k in ref):
                 raise ValueError(f"to_zmatrix: line {i} ({fragment.species[i]}) "
                                  f"takes {min(i, 3)} earlier atom indices; got {ref}")
         refs = [tuple(int(k) for k in ref) for ref in refs]
