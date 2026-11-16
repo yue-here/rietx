@@ -1,6 +1,6 @@
 # WP-2132 — the Estimation page splits before it grows
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — measured and reported; the split waits on three maintainer questions (handover log)
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-09 — no reader sees a defect yet, but the next sentence added to the Theory tab's Estimation chapter fails the page contract, and two open PRs already edit that page; the workaround is trimming text that is right
@@ -115,5 +115,64 @@ a question for this WP to measure and report, never to build unasked.
 - Issue #1495; PR #1383 and its review; PR #1473; WP-1978 (the page contract); WP-1975 § F8 (the cap).
 
 ## Handover log
+
+- **2026-11-16** — measured and reported, nothing split (ghostshift runner; draft PR #1578). The page is
+  not about to break from the two PRs the WP was waiting on: on current main it has 60 characters to
+  spare, and #1383 and #1473 merged in, alone or together, move it by one character. What does
+  threaten it is growth nobody makes on this page: a citation added to another Theory page renumbered
+  Sphinx's citation ids and took this twin 48 over the cap on 2026-11-10 with its source unedited,
+  so it was trimmed a second time (WP-1419's `da3a2d301`). The split still waits on the maintainer:
+  which of the two boundaries, the new title, and whether to go before #1383 lands. A growth budget
+  on the skill's pattern is not worth building as it stands; the evidence and three options are
+  below, for the maintainer to choose.
+
+  *Measured* (`[dev]` venv, Python 3.12, Linux under WSL2, sphinx 9.1.0; the build the test runs,
+  `python -m sphinx -W -q -E -b html docs/docs <out>`, then `len()` of each twin; 27-34 s a build, 430 MB):
+  - Main `bc77a934e`: 132 twins, none over. Headroom: `reference/indexing` 49 994 (6),
+    `reference/refinement` 49 987 (13), `theory/estimation` 49 940 (60), `reference/series` 49 924 (76),
+    `reference/parametric` 49 031 (969), `reference/instrument` 48 801, `reference/gui-guide` 48 407,
+    `theory/parameterisation` 47 550, `start/tutorials/03_peaks_indexing_lebail` 47 053; median 13 884.
+    Twins over 49 000: 5; over 48 000: 7; over 45 000: 9; over 38 000: 17.
+  - Each open PR touching the four near-cap pages or `src/rietx/help.py` (25: #1043 #1262 #1285 #1286
+    #1332 #1372 #1383 #1388 #1405 #1410 #1422 #1472 #1473 #1475 #1477 #1480 #1482 #1493 #1510 #1532
+    #1548 #1549 #1562 #1566 #1567), merged into main one at a time with `git merge-tree` and built.
+    18 merge clean and build green; none takes any twin over the cap; none adds to a near-cap twin
+    (#1472 `indexing` −24, #1332 `estimation` −7, #1473 splits `series` to 45 502 with a new
+    `series-ladder` page). The largest growth any of them puts on an existing page is 3 935
+    (`reference/extinction`, #1286). Seven conflict with main: #1262 and #1383 in
+    `schemas/common.py` and `tests/test_magnetic.py`, #1480 and #1548 in the skill's `api.md`
+    copies, #1562, #1566 and #1567 in `docs/milestones/v1.12.md`.
+  - Worst 24 hours of source growth on main's first-parent merges, 2026-10-16 to 2026-11-16, bytes:
+    `theory/estimation` 5 930 (2026-10-20), `reference/refinement` 6 138 (10-22), `reference/indexing`
+    2 906 (10-25), `reference/series` 910 (10-26).
+  - Source characters per H2 now: preamble 158; first row 5 840; Bérar-Lelann 7 712; derived-esd rows
+    16 812; solve-and-steer rows 15 125. Twin/source ratio 1.094, so the esd split gives twins near
+    23 100 and 26 800, the solve split near 33 400 and 16 500.
+
+  *Growth budget, the evidence.* `tests/skill_caps.py` sets its gap at twice the worst day close to
+  a cap, and fails a change that grows a file past the budget against the change's base. Three
+  things differ here. (1) The size is a build product: the base's twin needs a second build, or the
+  budget reads source deltas, which cannot see the citation renumbering above, one of the two cap
+  failures on record (the other, #1383 dropping an equation, a source budget would see). (2) Twice
+  this month's worst day is about 12 000 characters, a budget near 38 000 that would close 17 pages
+  today. (3) The concurrent load it guards against measured zero: no open PR grows a near-cap twin.
+  Options, none built: **A** no budget, plus a headroom report (`python -m tests.<name>`, the skill's
+  report without its gate) and the five nearest pages named in the cap test's failure message;
+  **B** a source-delta budget on the skill's pattern, stdlib and cheap, blind to non-local growth;
+  **C** a twin budget against a committed size snapshot, a stored file someone must regenerate.
+  The runner would choose A, since it is the only one whose cost fits what was measured.
+
+  *Questions for the maintainer.* (1) Which boundary: the esd rows (Bérar-Lelann through "A scale
+  and a B …", contiguous, halves near 23 000) or the solve-and-steer rows; and the new page's title.
+  (2) Split now and let #1383 and #1473 rebase (their hunks are 4/5 and 2/2 lines and follow their
+  section to whichever page), or wait for both as the first task says. #1383 is mustachefeeling's,
+  conflicted on unrelated files, and unpushed since 2026-11-09. (3) A, B, C or nothing for
+  the budget.
+
+  *Gotchas.* `git merge --no-commit` still wants a committer identity; `git merge-tree --write-tree`
+  then `git read-tree --reset -u` builds a merged tree without one.
+
+  Next: answer the three questions; then task 3 on the chosen boundary, task 4's 28 links and 9
+  citations, task 5's after-split headroom, task 6's tests.
 
 - **2026-11-09** — created, from the 2026-11-09 issue triage (issue #1495; PR #1501). Checked against the tree at `9979cee7c`: built the manual and read every twin's length, and the issue's 49 998 for this page reproduced exactly, with a fifth page near the cap (`reference/series`, 49 919) that the issue did not name; no open WP owns it: every WP citing `theory/estimation` is closed (WP-2060 last trimmed the page, ✅ 2026-11-07), WP-1986 (🔄) is open only for guide 18, and the open WPs that plan around the cap own Reference pages. Next: read the two open PRs' state, then split.
