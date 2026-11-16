@@ -128,6 +128,83 @@ def test_a_deletion_and_a_retune_are_listed_and_pass():
                            "0 renamed, 1 changed, 1 deleted, 0 new at 'unaudited'.")
 
 
+_APPROVED = ('Row("rietx.refine.HOLD_SIGMA", "constant", tier=3, evidence="WP-1523", '
+             'grounds="B8", approved="2026-10-19", value={value}),')
+
+
+def test_a_retune_under_its_old_approval_fails_naming_the_row_both_values_and_the_date():
+    """WP-2064: an approval belongs to the value it approved."""
+    before = _table(_APPROVED.format(value=3.0))
+    after = _table(_APPROVED.format(value=2.5))
+    found, bad, text = _run(before, after)
+    assert _whys(found) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")]
+    (message,) = bad
+    assert message.startswith("rietx.refine.HOLD_SIGMA (constant, tier 3) changed value "
+                              "from 3.0 to 2.5 (src/rietx/_audit.py:5), and its approval, "
+                              "dated 2026-10-19 at the base, was given to 3.0.")
+    assert "The maintainer's ruling on the new value is owed" in message
+    assert "later than 2026-10-19, which the maintainer writes" in message
+    assert text.startswith("Audit table delta, measured against a base: 0 added, 0 renamed, "
+                           "1 changed, 0 deleted, 0 new at 'unaudited', "
+                           "1 retuned under an earlier approval.")
+    assert "Retuned under an approval given to another value (FAILS):" in text
+    assert "    value 3.0 → 2.5" in text
+
+
+def test_a_retune_with_a_later_approval_passes_and_an_equal_one_fails():
+    before = _table(_APPROVED.format(value=3.0))
+    later = _table(_APPROVED.format(value=2.5).replace("2026-10-19", "2026-11-16"))
+    found, bad, text = _run(before, later)
+    assert _whys(found) == [(ad.CHANGED, "rietx.refine.HOLD_SIGMA")] and bad == []
+    assert "approved 2026-10-19 → 2026-11-16; value 3.0 → 2.5" in text
+    assert "retuned" not in text
+    earlier = _table(_APPROVED.format(value=2.5).replace("2026-10-19", "2026-10-01"))
+    dropped = _table(_APPROVED.format(value=2.5).replace(', approved="2026-10-19"', ""))
+    for head in (earlier, dropped):
+        assert _whys(_run(before, head)[0]) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")]
+
+
+def test_an_approved_row_changed_in_anything_but_its_value_passes():
+    before = _table(_APPROVED.format(value=3.0))
+    after = _table(_APPROVED.format(value=3.0).replace('"WP-1523"', '"WP-1523, WP-2064"'))
+    found, bad, _ = _run(before, after)
+    assert _whys(found) == [(ad.CHANGED, "rietx.refine.HOLD_SIGMA")] and bad == []
+
+
+def test_a_rename_of_an_approved_row_with_its_value_passes():
+    before = _table(_APPROVED.format(value=3.0))
+    after = _table(_APPROVED.format(value=3.0).replace("rietx.refine.", "rietx.schemas.plan."))
+    found, bad, _ = _run(before, after)
+    assert [(d.why, d.old.name, d.row.name) for d in found] == [
+        (ad.RENAMED, "rietx.refine.HOLD_SIGMA", "rietx.schemas.plan.HOLD_SIGMA")]
+    assert bad == []
+
+
+def test_a_retune_to_a_tier_that_needs_no_approval_passes():
+    """Decided in the WP: a value moved together with a tier needing no
+    approval at all (tier 1, ``invariant``) owes no ruling."""
+    before = _table(_APPROVED.format(value=3.0))
+    for tier in ("1", '"invariant"'):
+        after = _table(_APPROVED.format(value=2.5).replace("tier=3", f"tier={tier}"))
+        found, bad, _ = _run(before, after)
+        assert _whys(found) == [(ad.CHANGED, "rietx.refine.HOLD_SIGMA")] and bad == [], tier
+    # the positive arm: the same retune kept at tier 3 fails
+    kept = _run(before, _table(_APPROVED.format(value=2.5)))
+    assert _whys(kept[0]) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")] and len(kept[1]) == 1
+
+
+def test_a_tier_2_action_meets_the_tier_3_rule():
+    """Decided in the WP: a tier-2 action row is retuned under the same rule."""
+    row = ('Row("rietx.refine.hold_absent_phase", "action", tier=2, ambiguity=1, '
+           'evidence="GSAS-II", grounds="B8", approved="2026-10-19", value={value}),')
+    found, bad, _ = _run(_table(row.format(value=3)), _table(row.format(value=4)))
+    assert _whys(found) == [(ad.RETUNED, "rietx.refine.hold_absent_phase")]
+    assert bad[0].startswith("rietx.refine.hold_absent_phase (action, tier 2) changed value "
+                             "from 3 to 4")
+    assert ad.needs_approval(ad.Row("x", "action", tier=2))
+    assert not ad.needs_approval(ad.Row("x", "constant", tier=2))
+
+
 def test_a_constant_in_a_file_the_base_did_not_walk_passes():
     before = _table(walked={"refine.py": 2002, "io/readers.py": 2006})
     after = _table('Row("rietx.solve.cost.NAMED_REFLECTIONS", "constant", value=5),',
