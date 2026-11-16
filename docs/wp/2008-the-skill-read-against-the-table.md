@@ -145,6 +145,30 @@ and goes through the harness.
   than a row measured on rietx's own data. The issue's open question 1 (make
   the card a recorded `Instrument` provenance field that `summary()` checks)
   is a stored-format change and the maintainer's call.
+- 2026-11-16, from the issue triage (issue #1569): the judging rule "Under a
+  broad hump, hold SNIP" (`references/judging.md:75`, routed from `SKILL.md:87`
+  and from the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row,
+  `references/abstention.md:32`) rests on one synthetic fixture judged on
+  background/truth at the hump (WP-1542), a row measured on rietx's own data.
+  The issue ran the recipe (`w` = 3 FWHM in points, 4-term Chebyshev
+  correction, FCJ) on a synthetic LaB₆ with a broad hump: it passes the rule's
+  own check (0.983 at the hump) and puts La Biso at 0.475(16) against a truth
+  of 0.355, 7.3σ high, where co-refined Chebyshev and P-spline arms read
+  0.369-0.379. On SRM 1976a and FAP every Biso rises under the held curve too.
+  The issue's mechanism: at 3 FWHM the SNIP curve rises under each line's
+  tails, and Biso grows to remove the tail intensity the model lost.
+  `BACKGROUND_ABSORPTION` cannot see it, since the screen projects onto freed
+  background terms and a held curve has none. Checked against the tree at
+  bc77a934e with the issue's own harness, synthetic arm only: La Biso
+  0.4749(163) held against 0.3789(158) co-refined, `worst_absorption` 0.0111;
+  the real patterns were not re-run, and a larger `w` was not tried against
+  Biso. The issue leaves three changes to the maintainer: the rule's evidence
+  names a structural check (Biso against truth) beside background/truth, and
+  says meanwhile that the held SNIP biases Biso up at 3 FWHM; the abstention
+  row stops naming the held SNIP as the fallback until then; optionally, one
+  docstring sentence that `worst_absorption` does not see a held curve.
+  WP-2017's row Q (the held SNIP not re-measured on PbSO₄ and #726) is the
+  measurement twin. Until a ruling or this sweep moves it, the rule stays.
 
 ## Non-goals
 
