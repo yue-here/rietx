@@ -106,3 +106,20 @@ Floor reads: `least_squares` reads of the table during the fit (control: 0 means
 | `lab6` | x10 | 0.087431 | 76 | converged | 120 | 1.98e-07 `instrument.geometry.axial_sl` | 1.0000, 1.0000 | — |
 | `lab6` | d10 | 0.087431 | 76 | converged | 120 | 2.78e-07 `instrument.geometry.axial_sl` | 1.0000, 1.0000 | — |
 | `lab6` | noise | 0.087431 | 76 | converged | 120 | 5.79e-07 `phases.0.cell.a` | 1.0000, 1.0000 | — |
+
+Width rows whose esd moved by more than a factor of two (plain esd, shipped → arm):
+
+- `cpd1a` x10: `phases.0.gauss_size` at 0, esd 51 → 511
+- `cpd1a` x10: `phases.0.gauss_strain` at 0, esd 51 → 511
+- `cpd1a` x10: `phases.1.gauss_size` at 0, esd 51 → 511
+- `cpd1a` x10: `phases.1.gauss_strain` at 0, esd 51 → 511
+- `cpd1a` x10: `phases.2.gauss_size` at 0, esd 51 → 511
+- `cpd1a` x10: `phases.2.gauss_strain` at 0, esd 51 → 511
+- `cpd1a` x10: `instrument.profile.w` at 0.01056, esd 51 → 511
+- `cpd1a` d10: `phases.0.gauss_size` at 0, esd 51 → 4.26
+- `cpd1a` d10: `phases.0.gauss_strain` at 0, esd 51 → 4.26
+- `cpd1a` d10: `phases.1.gauss_size` at 0, esd 51 → 4.26
+- `cpd1a` d10: `phases.1.gauss_strain` at 0, esd 51 → 4.26
+- `cpd1a` d10: `phases.2.gauss_size` at 0, esd 51 → 4.26
+- `cpd1a` d10: `phases.2.gauss_strain` at 0, esd 51 → 4.26
+- `cpd1a` d10: `instrument.profile.w` at 0.01056, esd 51 → 4.26

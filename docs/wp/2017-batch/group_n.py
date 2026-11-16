@@ -616,6 +616,20 @@ def summary() -> None:
                 codes = set(r["codes"]) ^ set(base["codes"])
             L.append(f"| `{f}` | {a} | {_fmt(r['rwp'], '.6f')} | {r['n_eval']} | {r['status']} | "
                      f"{r['floor_reads']} | {cmp} | {ratio} | {', '.join(sorted(codes)) or '—'} |")
+    L += ["", "Width rows whose esd moved by more than a factor of two (plain esd, shipped → arm):",
+          ""]
+    for f in FLOOR_FAMILIES:
+        base = latest.get(("floor", f, "shipped"))
+        if not base or "error" in base:
+            continue
+        for a in FLOOR_ARMS[1:]:
+            r = latest.get(("floor", f, a))
+            if not r or "error" in r:
+                continue
+            for k, (v, e) in r["rows"].items():
+                v0, e0 = base["rows"].get(k, (None, None))
+                if WIDTH.search(k) and e and e0 and not 0.5 <= e / e0 <= 2.0:
+                    L.append(f"- `{f}` {a}: `{k}` at {v0:.4g}, esd {e0:.3g} → {e:.3g}")
     L.append("")
     SUMMARY.write_text("\n".join(L), encoding="utf-8")
     print(SUMMARY)

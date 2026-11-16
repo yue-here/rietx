@@ -9,8 +9,10 @@ of a fresh compile at max(median y_obs, 1), and a recompile carries matched
 reflections, so the seed reaches the first stage and every reflection that
 enters later.  Seeds ×0.01, ×100 and a lognormal shape (σ 1) moved no row that
 is not a background coefficient by more than 1.4e-4 plain esd on FAP, NAC and
-LaB6 under ``mccusker_default()``, against a 0.1 bar; LaB6's Le Bail rows were
-bit-identical at ×0.01 and ×100.  The arm wraps ``refine.compile_model`` and
+SRM 660c under ``mccusker_default()``, against a 0.1 bar; SRM 660c's Le Bail
+rows were bit-identical at ×0.01 and ×100.  A uniform factor cancels in a Le
+Bail partition's ratio, so those two arms reach only the reflections that enter
+at a recompile; the shape is the arm that reaches every seed.  The arm wraps ``refine.compile_model`` and
 counts what it rewrote, so a seed that never reached the fit fails here.
 
 **``refine._FLAT_AXIS_TEST_DIRECTIONS``.** Which two generic directions stack
@@ -51,17 +53,21 @@ def _shift(cur, ref) -> float:
     return worst
 
 
-def _seed_fit(family: str, mode: str, factor: float):
+def _seed_fit(family: str, mode: str, arm: str):
     counts = {"rewritten": 0}
     original = refine.compile_model
+    rng = np.random.default_rng(2017)
 
     def wrapped(*args, **kwargs):
         model = original(*args, **kwargs)
-        if factor != 1.0 and model.mode in ("lebail", "pawley"):
+        if arm != "x1" and model.mode in ("lebail", "pawley"):
             for cp in model.phases:
                 if cp.hkl_intensity is not None:
+                    n = len(cp.hkl_intensity)
+                    factor = (rng.lognormal(0.0, 1.0, n) if arm == "shaped"
+                              else float(arm[1:]))
                     cp.hkl_intensity = cp.hkl_intensity * factor
-                    counts["rewritten"] += len(cp.hkl_intensity)
+                    counts["rewritten"] += n
         return model
 
     plan = rx.RefinementPlan.mccusker_default()
@@ -87,13 +93,15 @@ def _seed_fit(family: str, mode: str, factor: float):
 @pytest.mark.parametrize("family", ["fap", "nac", "lab6"])
 @pytest.mark.parametrize("mode", ["lebail", "pawley"])
 def test_the_lebail_and_pawley_intensity_seed_leaves_the_answer(family, mode):
-    shipped, none = _seed_fit(family, mode, 1.0)
+    shipped, none = _seed_fit(family, mode, "x1")
     assert none == 0
-    for factor in (0.01, 100.0):
-        rows, rewritten = _seed_fit(family, mode, factor)
+    # a uniform factor cancels in a Le Bail partition's ratio, so ×0.01 and ×100
+    # reach only reflections entering at a recompile; the shape reaches every one
+    for arm in ("x0.01", "x100", "shaped"):
+        rows, rewritten = _seed_fit(family, mode, arm)
         assert rewritten > 0, "the seed arm never reached a compile"
         assert set(rows) == set(shipped)
-        assert _shift(rows, shipped) <= 0.1, (family, mode, factor)
+        assert _shift(rows, shipped) <= 0.1, (family, mode, arm)
 
 
 def _flat_fit(case: str, pair: np.ndarray):
