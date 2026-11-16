@@ -1,6 +1,6 @@
 # WP-2140 — Every atom is named by its unique label
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-09 — the remedy for a class of silent wrong answers (a reference that lands on another atom after a reorder), ruled by the maintainer; a stored-format change, so it starts with an assessment
