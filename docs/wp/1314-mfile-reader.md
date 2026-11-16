@@ -1,6 +1,6 @@
 # WP-1314 — a Jana2020 project reader: .m50/.m40/.m41
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: Coming from another code
 Depends on: — (1118 closed ✅ 2026-09-16 and delivered what this waited on: the
 model-format registry, `io/projects/registry.py`, and the answer's shape)
