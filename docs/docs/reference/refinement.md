@@ -249,8 +249,7 @@ Measured on five single fits from the acceptance suites against the same plans w
 | cpd-1a, absent zircon | 1221 → 311 (3.93×) | 21.5-22.4 → 9.6-11.0 | 0.0092 esd |
 
 Rwp agreed to 1e-6 in every case.
-LaB6's row was re-measured on 2026-11-16, after its protocol came to hold H/L at its declared value.
-Before that it read 8.82 esd on `Geometry.axial_sl` against `Geometry.axial_hl`: with both free, the two ratios could trade places for an equally good fit, and each schedule landed in a different one.
+LaB6's row is from 2026-11-16, its protocol holding `Geometry.axial_hl` since WP-2012.
 The absent zircon phase has nothing to fit, and at 1e-9 two of its stages run to their limit of 400 evaluations.
 
 A series is the case to measure rather than assume.
