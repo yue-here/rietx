@@ -107,7 +107,7 @@ def _peaks_tab(browser, url: str, width: int = 1300):
     page.goto(url)
     page.wait_for_selector(".actions button.refine")
     page.evaluate("document.fonts.ready")
-    page.locator("nav.tabs button", has_text="Peaks").first.click()
+    page.locator(".side > nav.tabs").get_by_role("button", name="Peaks", exact=True).click()
     page.wait_for_selector(".coverage")
     _frames(page)
     return page

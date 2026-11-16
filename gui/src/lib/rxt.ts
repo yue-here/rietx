@@ -49,6 +49,11 @@ export const PAIRS = ["min", "max", "esd"];
 export const STAGE_WORDS = ["free", "max_iter", "ftol", "lebail_cycles", "lebail_tol",
   "seed", "strain_seed", "restraint_weight_scale", "window_slack_deg"];
 
+/** The clause a stage line writes its fixes as (`fix <globs>`, `StageSpec.turn_off`):
+ * `textdoc.STAGE_FIX_WORD`, pinned from python like the arrays (WP-2208). It is not a
+ * stage word, since it takes globs rather than a number. */
+export const STAGE_FIX_WORD = "fix";
+
 /** Of those, the ones `StageSpec` types as `int`. `textdoc.STAGE_INT_KEYS`. */
 export const STAGE_INT_WORDS = ["max_iter", "lebail_cycles"];
 
@@ -147,7 +152,9 @@ function classify(word: string, opening: boolean): Token {
   // `excluded` is both a top-level keyword and a peak flag; `opening` has
   // already separated them by the parser's own dispatch (indentation)
   if (FLAGS.includes(word) || PEAK_FLAGS.includes(word)) return "flag";
-  if (PAIRS.includes(word) || STAGE_WORDS.includes(word)) return "annotation";
+  if (PAIRS.includes(word) || STAGE_WORDS.includes(word) || word === STAGE_FIX_WORD) {
+    return "annotation";
+  }
   return "path";
 }
 

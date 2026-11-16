@@ -1,8 +1,7 @@
 # WP-1806 — first public case: acridine form IX
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-06 — Part 1 merged (PR #1416); open: Part 2, the free-atom control
+Milestone: rigid-bodies · Status: ✅ 2026-11-12 — the body agrees with a free-atom control in rietx (PR #1545)
 Depends on: 1805
-Priority: P3 2026-10-23 — the first real-data proof of the body; 1810 closed without it (PR #955), and 1989 waits on it soft for its public case and pdCIF reader
 
 ## Goal
 
@@ -14,9 +13,15 @@ of issue #561, sized M.
 
 - Data: COD 2242872 (CC0; NSLS X16C, 0.6998 Å; Stephens et al. 2019). Origin and
   orientation free, no torsions.
-- The deposited intensities are background-subtracted, so the test holds the background
-  at zero and says so.
-- The bar was the published esds until 2026-11-05 (`### Inherited`). An outside spike,
+- The deposited `_pd_proc_intensity_net` column still carries the background (never
+  within 14σ of zero), so the test refines a 10-term Chebyshev plus one broad hump
+  (corrected 2026-11-12; `tests/data/README.md` has the measurement).
+- **The bar (Yue, 2026-11-05, #561): a free-atom control in rietx.** The same model
+  refines with the heavy atoms free, under the same data, profile and background as
+  the body, and the body must agree with it. The deposited coordinates and cell are
+  another model's answer under another protocol (Rule 2), so they go to a record
+  table that asserts nothing.
+- The bar was the published esds until 2026-11-05. An outside spike,
   reported on #561 on 2026-10-06, found two obstacles. This WP clears both first:
   1. The pdCIF reader refuses this file's `_pd_proc_intensity_net` with
      `_pd_proc_ls_weight` columns. The fix lands in `io/` under that subtree's rules
@@ -30,92 +35,6 @@ of issue #561, sized M.
   it. If that floor exceeds the published esds, bring the number back to the
   maintainer before loosening anything.
 
-### Inherited
-
-- **Decided 2026-11-05 (Yue, #561): the bar is a free-atom control in rietx.**
-  This is the brief's option C, and it replaces the 2026-10-16 bar below. The same
-  model refines with the heavy atoms free, under the same data, profile and
-  background as the body. Restraints may hold the free atoms stable, and the test
-  says which. The deposited coordinates cannot judge the body, because they are
-  another model's answer under another protocol (Rule 2). The per-atom table
-  against them stays as a record and asserts nothing. If the free atoms show the
-  body's shift along c, the body is cleared. If they land on the deposited z values
-  and the body does not, the body owns the shift and the WP stops to investigate.
-  The ruling names no number for "the same shift". Part 2 reads it off the
-  control's own esds and brings it to Yue if the reading is not clear.
-
-- **Superseded 2026-11-05. Decided 2026-10-16 (maintainer, from the issue triage, #561): the bar is
-  option (c), and the body may be built from the deposited coordinates.** Each
-  body atom passes within the larger of its published esd and rietx's own esd
-  for that atom. The published esds come from a free-atom refinement with a
-  different profile and background, so they are one reference among two.
-  Option (b), removing the mean translation, was declined because it hides the
-  body's position. `body_from_atoms` on the deposited heavy atoms is allowed,
-  since an idealised template already sits 0.019 Å off. The Context line
-  holding the background at zero is wrong per the entry below and is corrected
-  when this WP starts.
-
-- **2026-10-16, from the issue triage (#561): the reporter's R4 groundwork
-  contradicts two lines of this WP and asks the maintainer to choose the
-  bar.** Three comments, 2026-10-15 23:20Z to 2026-10-16 07:06Z, none recorded
-  here; figures are the reporter's, not re-run (the groundwork is on private
-  runs of COD 2242872). (1) The deposited `_pd_proc_intensity_net` is not
-  background-subtracted (minimum 249 counts, never within 14σ of zero;
-  deposited calc ≥ 301), so Context's "hold the background at zero" is wrong:
-  the authors' calc includes a 10-term Chebyshev plus a broad hump, and the
-  2026-10-06 spike's 0.09 Å came mostly from the zero background (Rwp 0.46).
-  The pdCIF reader half is only the missing `_pd_proc_intensity_net` tag plus
-  a diagnostic for a far-from-zero "net" column, open as PR #1006. (2)
-  Template floor against the published esds: the deposited heavy atoms as the
-  body give 0; a planar copy gives 0.019 Å RMS (C5 at 6 esd); regular hexagons
-  0.064 Å (30 esd). So the bar is reachable only with `body_from_atoms` on the
-  deposited coordinates. (3) Acceptance fit (Chebyshev 10 + hump, TCHZ,
-  Stephens 2/m, FCJ, March-Dollase (100)): Rwp 0.0584 against the published
-  0.0503; misses on C5 (3.45 esd), C11 (1.29), C12 (1.32), all along c, from
-  one rigid translation of the body (mean Δz −0.0043 Å against a fit esd of
-  0.0024 Å on the origin). No background or profile variant brings C5 inside 2
-  esd; FCJ off is unusable (Rwp 0.142). The test is held until the maintainer
-  chooses: (1) keep "every atom within the published esds" and drop the test,
-  (2) compare after removing the body's mean translation, (3) a bound in
-  rietx's own esds. Also asked, unanswered: OK to build the body from the
-  deposited coordinates with the bar unchanged. Profile needs FCJ asymmetry
-  and a 1000 ppm Stephens seed. Tree checked at 2c94d848: `body_from_atoms`
-  exists (`crystallography/bodies.py:56`); #1005, #1006, #995 open.
-
-- 2026-10-31, from the issue triage (issue #561): the acceptance fit misses
-  the maintainer's option-(3) bar on three atoms (reporter, 2026-10-27, main
-  at feae4c75). The model is the 16 October one: 14 heavy atoms, 9 riding H,
-  Chebyshev 10 plus one hump, TCHZ, FCJ, Stephens 2/m at 1000 ppm,
-  March-Dollase (100). Rwp is 0.05839. Read per component, C5, C11 and C12
-  miss along c at 2.22, 1.32 and 1.32 of the bar. Every x and y component is
-  at most 0.30 of its bar, and the cell passes. The miss is one translation of
-  the body along c. The origin's z is 1.9 of rietx's own esd from the
-  deposited value. The background moves it. Chebyshev 12 takes C5 to 1.35 but
-  ends at a higher Rwp (0.0598). So it found another minimum along a
-  Chebyshev-hump degeneracy (ρ up to −1.000), not a better background. On
-  2026-10-30 the reporter proposed splitting the acceptance. Part 1 would
-  assert now what the body owns: a 10° / 0.3 Å perturbed start returns to the
-  same minimum (0.0001 Å); an intra-body distance reports `None`; a simulated
-  known answer is recovered while a regular-hexagon template fails. Part 2
-  would add the option-(3) assertion once the maintainer rules on the 27
-  October numbers. This WP does not say whether the bar is read per component
-  or as a 3-D distance. C5 fails both readings. Checked against the tree at
-  d87c8cc91: the acceptance task is unticked and no acridine acceptance test
-  exists. The reporter's figures were not re-run.
-
-- **2026-11-05, settled by Claude under Yue's instruction to action clear
-  calls: the acceptance may land in two parts.** Options B and C of the
-  decision brief on this WP's bar both take the split, so it holds whichever
-  Yue picks. Part 1 lands now. It holds the perturbed-start check, the
-  intra-body and inter-body distance esds, and the simulated known-answer test
-  where a regular-hexagon template must fail. The per-atom table goes to
-  `tests/output/` as a record and asserts nothing. Part 2 stays Yue's and
-  undecided: what the miss along c means for the 16 October bar, and whether
-  the assertion stays. The brief's option C, not ruled, replaces the assertion
-  with a free-atom control fit under the same profile. Acceptance is unchanged
-  because the bar is not ruled. Part 1's items are unticked Tasks below. Filed
-  in PR #1414.
-
 ## Non-goals
 
 - Hydrogens (WP-1810), torsions (WP-1808).
@@ -125,14 +44,14 @@ of issue #561, sized M.
 - [x] pdCIF reader: accept the net-intensity and weight columns, with a diagnostic where it repairs
 - [x] The data file and a provenance row in `tests/data/README.md`
 - [x] The authors' profile; the template-superposition floor, measured and recorded
-- [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
+- [x] The acceptance test + obs/calc/diff PNGs to `tests/output/`
 - [x] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
 - [x] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
 - [x] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
 - [x] Part 1: the per-atom table goes to `tests/output/` as a record
-- [ ] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
-- [ ] Part 2: the cell joins the per-atom record table (|Δ|, published esd, rietx esd, ratio), asserting nothing
-- [ ] Skill: none expected; say why at handover
+- [x] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
+- [x] Part 2: the cell joins the per-atom record table (|Δ|, published esd, rietx esd, ratio), asserting nothing
+- [x] Skill: none expected; say why at handover (none: the work is a test; the handover entry says why)
 
 ## Acceptance
 
@@ -148,6 +67,96 @@ of issue #561, sized M.
 - Issue #561; PR #596.
 
 ## Handover log
+
+- **2026-11-12** — Part 2 is done and the WP closes. The rigid body on the real
+  acridine pattern now has the bar Yue chose: the same model refined with its 14
+  heavy atoms free lands where the body does. The free fit needed no restraints. Its
+  worst disagreement with the body is 2.3 esds, and a wrong template (regular
+  hexagons) breaks the same bar at 8.7. The shift along c that the 27 October
+  comparison blamed on the body is not the body's. The free atoms sit 0.0027 Å below
+  the deposit along c, the body 0.0019 Å below the free atoms, and each gap is about
+  one esd. The published cell now sits in the deposit record table and asserts
+  nothing. Filed as PR #1545 by a ghostshift runner.
+
+  *Done.* `tests/test_acceptance_acridine_ix.py` gains
+  `test_the_body_agrees_with_the_free_atom_control` (slow, group `acridine-ix`) and
+  the `free_control` fixture. The control is the body's starting atoms with the body
+  removed. Its 14 heavy atoms free their `dof.*`, and each H ties its `dof.k` to its
+  carrier's (`RIDES_ON`, Hi on Ci), so it takes the carrier's shift. Biso ties,
+  profile, background and the four-stage plan are the body's own (`_fit` branches on
+  whether the phase has a body). No restraint is used, and the test asserts so. The
+  bar (`CONTROL_BOUND` = 4) covers each of the 42 heavy-atom coordinates and the
+  molecule's mean position along x, y and z. Each is divided by the esd of the
+  body-minus-control difference, √(σ²_control − σ²_body), with the body's σ put on
+  the control's GoF × Bérar-Lelann scale (Hausman 1978, nested fits of one pattern).
+  Four of those over 45 statistics fail a correct body with probability ≤ 0.3 %, the
+  known-answer row's reasoning. The control's table goes to
+  `tests/output/acridine_ix_control_table.md`. The cell rows (a, b, c, β: |Δ|,
+  published esd, rietx esd, ratio) join `acridine_ix_deposit_table.md`. Body and
+  control also draw a 6.5-12.5° zoom PNG. `tests/validation_matrix.py` and
+  `docs/VALIDATION.md` carry the row (`own_result`, `ceiling`).
+
+  *Measured* (this runner, macOS arm64, Python 3.12.10, worktree `[dev]` venv).
+  Rwp 0.058424 body, 0.057799 control; GoF 2.065 and 2.048; Bérar-Lelann 1.869 and
+  1.848. Body against control: worst 2.29 (C8 along b), median 0.62 over 42
+  components, none over 4. Mean position: x 0.54, y 1.27, z 0.97 esds. Along c the
+  body sits 0.0019 Å below the control (esd of the gap 0.0020), and the control
+  0.0027(31) Å below the deposit. The control from a second start (the body's
+  answer) lands 0.00023 Å from the first, about 0.02 of the smallest difference esd,
+  so the bar does not sense where the solver stopped. Positive arm, run once by
+  probe and not kept in the suite: the regular-hexagon body on the real pattern
+  scores 8.68 (C6 along b), 7 of 42 components over 4, Rwp 0.0648. The control's
+  unrestrained bonds scatter ±0.033 Å about the body's. The body's own H leave
+  their carrier's shift by at most 0.0015 Å, which bounds how far the two models
+  fail to nest. The two control fixtures cost about 105 s for the test pair alone on
+  a machine shared with other runners. Mike's owed note from part 1 stands: over
+  eight noise seeds of the simulated arm, the heavy atoms' mean z error ran −1.02 to
+  +0.19 esd, rms 0.44, so esds on this pattern may run conservative.
+
+  *Gates*, on this branch with origin/main merged in (`a6e3ead25`), same venv. Fast
+  suite: 14 564 passed, 424 skipped, 32 xfailed in 12:28, through the shared
+  machine's suite queue. The added test is `slow`, so it moves no fast count, and
+  `tests.added_test_times` has nothing to rank. The acridine file with its slow rows:
+  6 passed in 9:00, the four part-1 slow rows included. Lint as CI runs it is clean: ruff, the tutorials' format,
+  `audit_delta`, and Vale at 0 errors. `test_docs_consistency.py` with
+  `test_validation_matrix.py`: 801 passed. `tests.reader_output` exits 0. The full
+  suite did not run: the change is a test and its records, which tests/CLAUDE.md
+  exempts.
+
+  *The c-shift reading, settled by Claude under the 2026-11-05 ruling.* The ruling
+  said: the body is cleared if the free atoms show its shift along c, and the WP
+  stops to investigate if they land on the deposited z and the body does not. It
+  named no number and asked for one read off the control's own esds. Read so, the
+  stop branch does not fire, because the body agrees with the control along c to
+  1.0 esd. The control's 0.0027 Å shift has the body's sign and 58 % of its size,
+  and is 0.86 esd from the deposit. So the control cannot tell the deposit from the
+  body along c. What it does say is that a free-atom fit of these data lands where
+  the body lands. The alternative reading is that "show the body's shift" needs the
+  control significantly off the deposit, which these data cannot give at all. Under
+  that reading the WP would stay open with no measurement able to close it. Yue may
+  reverse this.
+
+  *Review* (`/code-review high`, ten findings). Fixed five: the mean position goes
+  through `physical_covariance` with its guards, an unguarded `sqrt` now asserts with
+  the axis, `tie_equal` names its source, the deposit table parses the CIF once, and
+  the table's Å column says it is a fractional difference times the cell edge. The
+  esd-scale finding was right and is fixed by the common scale above. The first
+  probe of the positive arm crashed on it, a hexagon body's esd exceeding the
+  control's on its own scale. Declined with measurements: the nesting finding (the
+  H non-nesting is ≤ 0.0015 Å); the margin finding (bar 4 against 2.29 is a
+  statistical margin, and the measured start spread is 0.02 esd; a cross-platform
+  spread is not measured); two small duplications (`_published_cell_esds` beside
+  `_published`, `_draw_zoom` beside `_draw` in another module).
+
+  *Skill:* none. The work is a test and its record. An agent checking its own rigid
+  body has `check_rigid_bodies`, whose released arm is WP-1989's subject.
+
+  *Forward:* WP-1989 `### Inherited` gains the measured result that a shift tie
+  keeps riding H riding on this pattern, and its soft dependency on this WP is
+  discharged.
+
+  *Next:* none here. The rigid-bodies milestone's next real-data work is WP-1989's
+  released arm, which can reuse this control's construction.
 
 - **2026-11-07** — Yue ruled on Acceptance's "the cell matches the published cell": it
   goes, and the cell joins the per-atom record table, asserting nothing. Grounds, from the

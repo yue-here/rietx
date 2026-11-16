@@ -182,6 +182,42 @@ is not installed, so `playwright-core` is installed in the job scratchpad,
 - `src/rietx/schemas/instrument.py:374-386` — the `packing_fraction` docstring
   the tooltip quotes.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**Repairs found by use** (WP-1032, `lib/resize.ts`, `lib/plot.ts`,
+`panels/{Plot,Peaks,Structure3D}.svelte`) is the pass that measured what the
+eleven panels *feel* like, and its rules are about how to find such things.
+**A trailing canvas is not a dropped frame**: chunked work behind an
+un-coalesced `ResizeObserver` costs *latency*, not jank. Under plotly a drag
+issued one ~111 ms resize per pointer move and the last landed 1.10 s late at a
+steady 60 fps, so measure when the final size lands, not the frame rate. The
+chart module's `setSize` runs in the observer's own frame and the viewer asks
+for one `requestAnimationFrame`, so neither queues, and `resize.ts:coalesce`
+went with plotly (WP-1461). **Instrument before the library loads**: a
+`$state` rune proxies a namespace and caches each property on first read, so a
+probe patched in after boot counts nothing while the chart redraws (it was
+`window.Plotly`) — use an init script. **A fix that does not remove the symptom is evidence about the cause**:
+the sticky peak header's backdrop is opaque and the panel column's missing
+surface was a real, separate mismatch; what paints a row over the header is
+`opacity: 0.55`, which promotes it to z-index 0 while the sticky `th` sat at
+`auto`. Three rules about what a plot may say: **a tick belongs to the model,
+not the residual** (a band of its own between the two — on the residual's axis
+its visibility was a property of which residual was chosen), **hiding a
+curve is by exception** (`curveToggles`/`hidden`, unpersisted, so a curve a
+later build adds arrives drawn), and **a hover link never repaints the
+pattern** — the ring is a DOM mark over the canvas (WP-1461; under plotly it
+was one `restyle` of a two-point trace). Right-click **removes** a
+peak (refit stays on the table's `↻`; the `window.prompt` is gone), and the
+gestures are stated whenever the Peaks tab is up, each naming its non-pointer
+route. **No mute fields**: every `PresetField` and every `instrumentFields()`
+entry is described, pinned by a meta-test over every geometry — ten were mute
+the day it was written. WP-1203 retargeted it from `title=` to a corpus key.
+
 ## Handover log
 
 - **2026-08-05** — **closed.** All nine repairs landed on branch

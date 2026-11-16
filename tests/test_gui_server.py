@@ -405,6 +405,19 @@ def test_the_built_app_is_served_and_plotly_is_not(blank):
     assert client.get("/assets/nope.js")[0] == 404
 
 
+def test_the_rebuilt_page_is_served_beside_todays(blank):
+    """`/next` serves the rebuild's page (WP-2215) and `/` stays today's."""
+    _, client = blank
+    for path in ("/next", "/next/"):
+        status, payload = client.get(path)
+        assert status == 200
+        assert 'src="/assets/next.js"' in payload["raw"]
+        assert "/assets/app.js" not in payload["raw"]
+    assert 'src="/assets/app.js"' in client.get("/")[1]["raw"]
+    assert client.get("/assets/next.js")[0] == 200
+    assert client.get("/assets/next.css")[0] == 200
+
+
 def test_the_placeholder_explains_itself_when_the_dist_is_absent(blank, tmp_path,
                                                                 monkeypatch):
     """A checkout without the built assets must still say what is going on."""
@@ -447,6 +460,142 @@ def test_new_open_and_recent_round_trip(blank, tmp_path, pattern_file):
 
     status, payload = client.post("/api/project/open", {"path": str(tmp_path)})
     assert status == 400 and payload["error"]["code"] == "PROJECT_ERROR"
+
+
+def test_a_moved_project_stays_on_the_recent_list_until_removed(tmp_path, pattern_file):
+    """The start screen lists a moved project as "Not found" beside Locate…
+    and Remove from list (WP-2131), so the list keeps it and says so, and
+    carries each phase with its space group as written at the last open."""
+    session = GuiSession(state_dir=tmp_path / "state")
+    kept, moved = tmp_path / "kept.rex", tmp_path / "moved.rex"
+    for root in (kept, moved):
+        _project(root, pattern_file)
+        session.project_open({"path": str(root)})
+    session.close()
+    moved.rename(tmp_path / "elsewhere.rex")
+
+    other = GuiSession(state_dir=tmp_path / "state")
+    rows = {Path(r["path"]).name: r for r in other.recent()}
+    assert rows["moved.rex"]["missing"] is True
+    assert rows["kept.rex"]["missing"] is False
+    phase = rx.Project.open(kept).refinement.structure.phases[0]
+    assert rows["kept.rex"]["phases"] == [[phase.name, phase.space_group]]
+
+    httpd = _start(other)
+    try:
+        status, payload = Client(httpd.server_address[1]).post(
+            "/api/recent/remove", {"path": str(moved)})
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert status == 200
+    assert [Path(r["path"]).name for r in payload["recent"]] == ["kept.rex"]
+    # removing what the list does not hold changes nothing and is no error
+    assert other.recent_remove({"path": str(moved)})["recent"] == payload["recent"]
+    assert (tmp_path / "elsewhere.rex" / "project.json").is_file()  # untouched
+    other.close()
+
+
+def test_a_launch_reopens_the_last_project_or_stays_on_the_start_screen(
+        tmp_path, pattern_file):
+    """VS Code's and JetBrains' rule, adopted in round 9 (WP-2131): a launch
+    with no project named returns to the last one, and a head that has moved
+    leaves the session empty rather than failing the launch."""
+    state = tmp_path / "state"
+    root = tmp_path / "last.rex"
+    _project(root, pattern_file)
+    first = GuiSession(state_dir=state)
+    first.project_open({"path": str(root)})
+    first.close()
+
+    again = GuiSession(state_dir=state)
+    assert again.reopen_last() == str(root)
+    assert again.project is not None and again.project.path == root
+    again.close()
+
+    root.rename(tmp_path / "gone.rex")
+    empty = GuiSession(state_dir=state)
+    assert empty.reopen_last() is None and empty.project is None
+    assert GuiSession(state_dir=tmp_path / "fresh").reopen_last() is None
+
+
+def test_rietx_gui_with_no_project_reopens_the_last_one(cli, tmp_path, pattern_file):
+    main, seen = cli
+    state = tmp_path / "state"
+    root = tmp_path / "last.rex"
+    _project(root, pattern_file)
+    first = GuiSession(state_dir=state)
+    first.project_open({"path": str(root)})
+    first.close()
+    assert main(["--no-open", "--state-dir", str(state)]) == 0
+    assert seen["session"].project.path == root
+
+
+def test_a_list_of_structure_forms_is_one_structure(blank, tmp_path, pattern_file):
+    """The New project dialog lists several phases (WP-2131): the structure
+    argument takes a list of the other forms, concatenated in order, and a
+    typed cell anywhere in it refuses rietveld as a lone one does."""
+    session, client = blank
+    cells = [{"space_group": "P m -3 m", "cell": {"a": 4.160}, "name": "LaB6"},
+             {"space_group": "F m -3 m", "cell": {"a": 5.463}, "name": "CaF2"}]
+    body = {"pattern": str(pattern_file), "structure": cells,
+            "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}}
+    status, payload = client.post("/api/project/new", {
+        **body, "path": str(tmp_path / "rv.rex"), "mode": "rietveld"})
+    assert status == 400 and payload["error"]["where"] == ["mode"]
+    status, payload = client.post("/api/project/new", {
+        **body, "path": str(tmp_path / "two.rex"), "mode": "lebail"})
+    assert status == 200, payload
+    assert payload["n_phases"] == 2
+    assert [p.name for p in session.project.refinement.structure.phases] \
+        == ["LaB6", "CaF2"]
+
+
+def test_unnamed_typed_cells_in_one_create_get_distinct_names(blank, tmp_path,
+                                                              pattern_file):
+    """The dialog sends no name for a typed cell, and two of them were both
+    "phase" (WP-2131 review finding 8). In a list each unnamed one takes its
+    place in the joined list, phase_N as the CIF reader names an unnamed
+    block; a name given is kept, and a lone cell stays "phase"."""
+    session, client = blank
+    cells = [{"space_group": "P m -3 m", "cell": {"a": 4.160}},
+             {"space_group": "F m -3 m", "cell": {"a": 5.463}, "name": "CaF2"},
+             {"space_group": "F m -3 m", "cell": {"a": 5.431}}]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells, "mode": "lebail",
+        "path": str(tmp_path / "three.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] \
+        == ["phase_1", "CaF2", "phase_3"]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells[0], "mode": "lebail",
+        "path": str(tmp_path / "one.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] == ["phase"]
+
+
+def test_a_species_refused_in_a_list_names_its_place_in_the_project(
+        blank, tmp_path, pattern_file):
+    """The list form joins its members before the species check, so a refused
+    atom's path carries its phase index in the joined list, never in its own
+    form: the second member's atom is phases.1, not phases.0."""
+    from rietx.schemas.structure import lebail_scaffold
+
+    _session, client = blank
+    bad = lebail_scaffold("F m -3 m", [5.463, 5.463, 5.463, 90, 90, 90],
+                          name="bad").model_dump(mode="json")
+    bad["phases"][0]["atoms"][0]["species"] = "Xx"
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "mode": "lebail",
+        "structure": [{"space_group": "P m -3 m", "cell": {"a": 4.160}}, bad],
+        "path": str(tmp_path / "species.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 400, payload
+    assert payload["error"]["code"] == "UNKNOWN_SPECIES"
+    assert payload["error"]["where"] == ["phases.1.atoms.0.species"]
+    assert not (tmp_path / "species.rex").exists()   # refused before anything is made
 
 
 def test_new_refuses_an_instrument_it_would_have_to_guess(blank, tmp_path,
@@ -2046,6 +2195,32 @@ def test_plan_resolve_is_the_ladder_a_cumulative_plan_climbs(blank, tmp_path,
     assert all(h["held_because"] for h in cell["held"])
     tied = next(h for h in cell["held"] if h["path"] == "phases.0.cell.b")
     assert tied["held_because"].startswith("tied: =")
+
+
+def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
+    """A stage's ``turn_off`` (WP-2208): ``fixes`` names the free paths it took,
+    the free count falls by them, and the buckets still partition the frees."""
+    session, client = blank
+    _open(session, tmp_path / "fixes.rex", pattern_file)
+    plan = {"stages": [
+        {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
+                                    "instrument.zero_shift"]},
+        {"name": "two", "turn_on": ["phases.*.cell.*"],
+         "turn_off": ["instrument.zero_shift"]}]}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
+    ladder = _ladder(client)
+    one, two = ladder["stages"]
+    # the closing stage keeps the fix, as a literal path
+    assert ladder["closing"]["fixes"] == ["instrument.zero_shift"]
+    assert one["fixes"] == [] and "instrument.zero_shift" in one["frees"]
+    assert two["fixes"] == ["instrument.zero_shift"]
+    assert two["turn_off"] == ["instrument.zero_shift"]
+    assert two["n_free"] == one["n_free"] + len(two["frees"]) - 1
+    for stage in (one, two):
+        assert (len(stage["frees"]) + len(stage["already"]) + len(stage["held"])
+                == stage["n_matched"]), stage["name"]
 
 
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,

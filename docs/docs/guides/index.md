@@ -18,6 +18,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to use a measured blank as the background](blank.md) holds an empty-container scan under the pattern with `BackgroundFixedPlusChebyshev`.
 - [How to add a hump to the background](hump.md) declares a broad Gaussian for amorphous or container scattering.
 - [How to fit a peak from the sample holder](holder.md) declares a sharp line no phase explains with a `PeakComponent`.
+- [How to fit a sample holder's lines from its cell](holder_cell.md) ties each declared line's centre to the holder's lattice parameter and height with a formula.
 
 ## Constraints and plans
 
@@ -69,6 +70,7 @@ Calibrate an instrument on a standard and reuse it <calibrate>
 Use a measured blank as the background <blank>
 Add a hump to the background <hump>
 Fit a peak from the sample holder <holder>
+Fit a sample holder's lines from its cell <holder_cell>
 Keep a parameter fixed whatever the plan frees <hold>
 Tie parameters together <tie>
 Restrain a bond length or an angle <restrain>

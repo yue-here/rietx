@@ -42,11 +42,11 @@ export function curveColors(read: (name: string) => string): {
 } {
   const pick = (name: string, fallback: string) => read(name).trim() || fallback;
   return {
-    obs: pick("--plot-obs", "#8a8a8a"),
-    calc: pick("--plot-calc", "#c23b22"),
-    bkg: pick("--plot-bkg", "#6b7280"),
-    diff: pick("--plot-diff", "#1f5fa8"),
-    zero: pick("--plot-zero", "#88888888"),
+    obs: pick("--plot-obs", "#1c1917"),
+    calc: pick("--plot-calc", "#c65d0a"),
+    bkg: pick("--plot-bkg", "#b5793a"),
+    diff: pick("--plot-diff", "#6b6259"),
+    zero: pick("--plot-zero", "#cfcfcf"),
     // The peak layer's two (WP-1210).  It had none: the markers took `--accent`
     // and the fitted curve `--bad`, which on the light theme *are* `--plot-diff`
     // and `--plot-calc` to the last digit — so the picked-peak fit and the model
@@ -55,8 +55,8 @@ export function curveColors(read: (name: string) => string): {
     // mark.  Each value's separation from every other plot colour is asserted
     // in `tests/test_gui_palette.py`, against the same OKLab floor the phase
     // palette uses.
-    peak: pick("--plot-peak", "#8c257e"),
-    peakfit: pick("--plot-peakfit", "#c158b0"),
+    peak: pick("--plot-peak", "#0072b2"),
+    peakfit: pick("--plot-peakfit", "#6f83e6"),
     // The candidate overlay's one (WP-1211).  It could not share the peak
     // layer's: both are up on the same tab at the same time, and telling them
     // apart *is* the question — which of the picked lines does this cell
@@ -66,8 +66,8 @@ export function curveColors(read: (name: string) => string): {
     // curve colour because what it marks is *absence from the residual*, and
     // `edge` is the boundary, which has to stay readable when the wash is
     // off-screen — a fit range shows only its edges once you zoom inside it.
-    mask: pick("--plot-mask", "#1b1b1b14"),
-    edge: pick("--muted", "#6b6b66"),
+    mask: pick("--plot-mask", "#1c191714"),
+    edge: pick("--muted", "#6b6259"),
     // One colour per phase, keyed by the phase and not by the trace (WP-1438).
     // Before this the tick traces carried no colour at all, so plotly assigned
     // from its own cycle by position in the trace array — and every trace ahead

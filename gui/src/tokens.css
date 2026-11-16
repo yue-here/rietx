@@ -15,39 +15,45 @@
    system in *both* directions, and one media query cannot say that. */
 :root {
   color-scheme: light dark;
-  --fg: #1b1b1b;
-  --bg: #fbfbfa;
+  --fg: #1c1917;
+  --bg: #fbfaf8;
   --panel: #ffffff;
-  --line: #dcdcd6;
-  --muted: #6b6b66;
-  --accent: #1f5fa8;
-  --ok: #2e8b57;
-  --warn: #b3541e;
-  --bad: #c23b22;
-  /* The pattern plot's curves (WP-1029) — the Rietveld convention:
-     recessive grey observations and background, red calculated, blue
-     difference. The greys are *meant* to sit below the chroma floor a
-     categorical palette would demand; identity there is carried by the
-     mark (points / dotted line). Each theme's set is validated against its
-     own surface, not flipped. */
-  --plot-obs: #8a8a8a;
-  --plot-calc: #c23b22;
-  --plot-bkg: #6b7280;
-  --plot-diff: #1f5fa8;
-  --plot-zero: #88888888;
-  /* The picked-peak layer (WP-1210). It had no colours of its own: the
-     markers took `--accent` and the fitted curve `--bad`, and on the light
-     theme those *are* `--plot-diff` and `--plot-calc` to the last digit —
-     two curves the reader has to tell apart, drawn in one red. One hue
-     (334° in OKLab) and two tones, because the layer is one thing; the
-     markers take the stronger contrast against the page in either theme
-     and the fitted curve sits a step in, dashed. Every value here clears
-     the phase palette's 0.13 OKLab floor against every other plot colour,
-     asserted in `tests/test_gui_palette.py` — measured, the free hue space
-     is this magenta and green alone: violet lands 0.10-0.12 from
-     `--plot-diff` and the alert tone `--warn` 0.053 from `--plot-calc`. */
-  --plot-peak: #8c257e;
-  --plot-peakfit: #c158b0;
+  --hover: #ece7e0;
+  --line: #e6e0d8;
+  --line-strong: #d1c9bf;
+  --muted: #6b6259;
+  --accent: #c65d0a;
+  --accent-ink: #a34c06;
+  --ok: #2a7d2a;
+  --warn: #7d5f00;
+  --bad: #b4271f;
+  /* The pattern plot's curves (WP-1029, redrawn in the site's palette by
+     WP-2200): observed points in the ink, the calculated curve in the
+     accent, the background dashed in the figures' brown, the difference in
+     the muted grey, as the design rounds drew them and as rietx's own
+     figures do (`viz/plots.PALETTES`). The brown sits under the 0.13 OKLab
+     floor from the orange curve (0.065 light, 0.092 dark) and from the
+     dark difference grey (0.110): the dash carries its identity, as the
+     point marks carry the observations', and `tests/test_gui_palette.py`
+     names the three pairs and holds each to its measured distance. */
+  --plot-obs: #1c1917;
+  --plot-calc: #c65d0a;
+  --plot-bkg: #b5793a;
+  --plot-diff: #6b6259;
+  --plot-zero: #cfcfcf;
+  /* The picked-peak layer (WP-1210, recoloured by WP-2200). The marks take
+     Okabe-Ito blue, the complement of the orange fits, which the
+     maintainer chose in the design rounds of 2026-11-08 (`#0072b2`). Its
+     dark twin there was `#56b4e9`, which is `--phase-2` exactly, so the
+     dark marks take the same hue lifted for the dark ground, the nearest
+     blue that clears 0.13 from every curve and every phase. One hue and
+     two tones, because the layer is one thing: the markers take the
+     stronger contrast against the page in either theme and the fitted
+     curve sits a step in, dashed. The fit cannot take the accent as the
+     prototype drew it, because it shares the pane with the calculated
+     curve. */
+  --plot-peak: #0072b2;
+  --plot-peakfit: #6f83e6;
   /* An indexing candidate's predicted lines (WP-1211) — the last of the
      free hue space the note above measured, spent rather than borrowed. It
      could not take the peak layer's: these two layers are up at the same
@@ -63,7 +69,7 @@
      quantity, so it carries no hue anything else could be confused with,
      and it is weak enough that the recessive grey observations stay
      readable through it. */
-  --plot-mask: #1b1b1b14;
+  --plot-mask: #1c191714;
   /* The history graph's lanes (WP-1217). Not a palette but half of one:
      the hues are `gui/src/lib/history.ts`'s `LANE_HUES`, rotated there,
      and what lives here is the lightness and chroma each theme reads a
@@ -74,11 +80,11 @@
      `--panel` and has to read there. */
   --lane-l: 0.58;
   --lane-c: 0.15;
-  /* One colour per phase, both themes: four of Okabe-Ito's eight. Orange,
-     vermillion and blue are out because the calculated and difference
-     curves have spent them, and black is the single-phase row's neutral
-     rather than a member. `viz/theme.py` carries the measurement and the
-     order. */
+  /* One colour per phase, both themes: four of Okabe-Ito's eight. Orange
+     and vermillion are out because the calculated curves have spent them,
+     blue because the picked-peak marks have, and black is the single-phase
+     row's neutral rather than a member. `viz/theme.py` carries the
+     measurement and the order. */
   --phase-0: #009e73;
   --phase-1: #cc79a7;
   --phase-2: #56b4e9;
@@ -87,24 +93,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fg: #e6e6e2;
-    --bg: #151515;
-    --panel: #1e1e1e;
-    --line: #333333;
-    --muted: #9a9a94;
-    --accent: #7fb2ea;
-    --ok: #6cc08b;
-    --warn: #e0955c;
-    --bad: #e8776a;
-    --plot-obs: #909090;
-    --plot-calc: #e56a52;
-    --plot-bkg: #6e6e66;
-    --plot-diff: #5897dd;
-    --plot-zero: #88888888;
-    --plot-peak: #e687d5;
-    --plot-peakfit: #b156a2;
+    --fg: #f1ece5;
+    --bg: #15110d;
+    --panel: #1d1813;
+    --hover: #2e2820;
+    --line: #312a22;
+    --line-strong: #463d32;
+    --muted: #a0968a;
+    --accent: #ff9d4d;
+    --accent-ink: #ffb679;
+    --ok: #5fd45f;
+    --warn: #e3c25b;
+    --bad: #ff8f86;
+    --plot-obs: #d2c9bd;
+    --plot-calc: #ff9d4d;
+    --plot-bkg: #c99a6a;
+    --plot-diff: #8f8f8f;
+    --plot-zero: #4a4a4a;
+    --plot-peak: #008ad5;
+    --plot-peakfit: #516494;
     --plot-candidate: #4ccf8a;
-    --plot-mask: #e6e6e214;
+    --plot-mask: #f1ece514;
     --lane-l: 0.72;
     --lane-c: 0.15;
   }
@@ -116,24 +125,27 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --fg: #e6e6e2;
-  --bg: #151515;
-  --panel: #1e1e1e;
-  --line: #333333;
-  --muted: #9a9a94;
-  --accent: #7fb2ea;
-  --ok: #6cc08b;
-  --warn: #e0955c;
-  --bad: #e8776a;
-  --plot-obs: #909090;
-  --plot-calc: #e56a52;
-  --plot-bkg: #6e6e66;
-  --plot-diff: #5897dd;
-  --plot-zero: #88888888;
-  --plot-peak: #e687d5;
-  --plot-peakfit: #b156a2;
+  --fg: #f1ece5;
+  --bg: #15110d;
+  --panel: #1d1813;
+  --hover: #2e2820;
+  --line: #312a22;
+  --line-strong: #463d32;
+  --muted: #a0968a;
+  --accent: #ff9d4d;
+  --accent-ink: #ffb679;
+  --ok: #5fd45f;
+  --warn: #e3c25b;
+  --bad: #ff8f86;
+  --plot-obs: #d2c9bd;
+  --plot-calc: #ff9d4d;
+  --plot-bkg: #c99a6a;
+  --plot-diff: #8f8f8f;
+  --plot-zero: #4a4a4a;
+  --plot-peak: #008ad5;
+  --plot-peakfit: #516494;
   --plot-candidate: #4ccf8a;
-  --plot-mask: #e6e6e214;
+  --plot-mask: #f1ece514;
   --lane-l: 0.72;
   --lane-c: 0.15;
 }

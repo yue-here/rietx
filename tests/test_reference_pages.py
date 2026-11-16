@@ -241,6 +241,39 @@ def test_the_index_reaches_the_shapes_a_keyword_walk_misses(tmp_path):
     assert index["TYPED_CODE"]["files"] == {"rietx/c.py"}
 
 
+def _misfiled_links(text: str, index: dict, where: str) -> list[str]:
+    """Each link into a diagnostic page whose page is not the one that files its code."""
+    link = re.compile(r"(diagnostics(?:-[a-z]+)*)(?:\.md|\.html)?#([A-Za-z0-9_-]+)")
+    breaches = []
+    for stem, anchor in link.findall(text):
+        code = anchor.upper().replace("-", "_")
+        if code in index and reference_pages.diagnostic_group(index[code]["files"], code) != stem:
+            breaches.append(f"{where}: {stem}#{anchor}")
+    return breaches
+
+
+def test_every_link_into_a_diagnostic_page_names_the_page_that_files_the_code():
+    """A code that changes page leaves its links in the manual and the tutorials
+    on the old one, and a link to a page that no longer holds the anchor opens
+    at the page's top.  Sphinx sees the manual's links; only this sees the
+    tutorials' absolute ones."""
+    index = reference_pages.diagnostic_index()
+    root = DOCS_DIR.parent
+    paths = [*sorted((DOCS_DIR / "docs").rglob("*.md")),
+             *sorted((root / "examples" / "tutorials").glob("*.py"))]
+    paths = [p for p in paths if "_generated" not in p.parts and "_build" not in p.parts]
+    breaches = [b for p in paths
+                for b in _misfiled_links(p.read_text(encoding="utf-8"), index,
+                                         p.relative_to(root).as_posix())]
+    assert not breaches, "\n".join(breaches)
+    # the check can fail: a link on the page a code left, in both spellings
+    stale = ("[a](diagnostics-refinement.md#stage_max_iter) "
+             "[b](https://x/docs/stable/reference/diagnostics-series.html#stage-max-iter)")
+    assert _misfiled_links(stale, index, "t.md") == [
+        "t.md: diagnostics-refinement#stage_max_iter",
+        "t.md: diagnostics-series#stage-max-iter"]
+
+
 # ----------------------------------------------------------------------
 # The project tree
 # ----------------------------------------------------------------------

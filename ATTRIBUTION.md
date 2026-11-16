@@ -235,18 +235,27 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 
 ## Open-source software studied or used
 
+Whether rietx reads a program's source depends on its licence. Source under a permissive
+licence, or under GSAS-II's royalty-free one, is read as a specification of what the program
+does. No code is copied from it unless the row says so. GPL and LGPL programs are studied
+through their papers, manuals and runs, and their source is not read. The one exception is
+the facts of a file format, which § Format specifications covers. Closed programs are read
+through their papers and manuals, and run. `docs/practice.md` marks each claim about another
+program as checked in its source, checked in its manual, ran or inferred, so a reader who
+reads no foreign source can tell which claims they can check.
+
 | Project | License | Relationship |
 |---|---|---|
 | lmfit | BSD-3 | **API inspiration**: the Parameter model (value/vary/min/max/expr). No code ported. |
 | GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506; the Suortti surface-roughness parameterization `SurfaceRough`, whose SRA/SRB are our `a`/`b`, WP-0502 — independently confirmed against Pitschke *et al.* (1993) p. 78, which quotes Suortti's form directly, so the physics does not rest on the GSAS-II reading alone; and its `Absorb` cylinder routine, consulted for WP-0501 and then *not* followed — see the Lobanov note above). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
-| CrysPy | MIT | Reference for pure-Python Rietveld mathematics. No code ported. |
-| MAUD | BSD-3 | Reference for texture / residual-stress methods (studied for the spherical-harmonics texture path, WP-1960). No code ported. |
+| CrysPy | MIT | **Behavioral reference**: source read at 0.13.0 as a specification of its defaults (peak cut-off, width floors, what is recomputed per evaluation), cited by file and line in `docs/practice.md`. Reference for pure-Python Rietveld mathematics. No code ported. |
+| MAUD | BSD-3 | **Behavioral reference**: source read at tag v3.07 as a specification, for texture and residual-stress methods (the spherical-harmonics texture path, WP-1960) and for its defaults and batch refinement (`docs/practice.md`, WP-2003). One file carries a proprietary header despite the repository's BSD-3, so the licence is checked per file (§ Format specifications). No code ported. |
 | CrysFML / CrysFML2008 | LGPL-3.0-or-later + ILL no-military-use clause | Studied (concepts only — the LGPL and the ILL clause both bar a port into an MIT core). **No code ported.** |
 | powerxrd | MIT | Reference for a minimal quick-look powder-XRD API surface. No code ported. |
 | Dans_Diffraction | Apache-2.0 | Reference for scattering computations. No code ported. |
 | pymatgen | MIT | Cross-check for structure factors/multiplicities in tests. |
 | cctbx | BSD-style | Cross-check for symmetry constraints in tests. |
-| EasyDiffraction | BSD-3 | Architecture reference (schema-driven design). No code ported. |
+| EasyDiffraction | BSD-3 | **Behavioral reference**: source read at 0.21.1 as a specification of its defaults and its sequential refinement (`docs/practice.md`, WP-2003). Architecture reference (schema-driven design). No code ported. |
 | pybaselines (derb12) | BSD-3 | **Algorithm reference** for arPLS/SNIP implementations (reimplemented from the papers with the pybaselines documentation as a guide). Not a dependency: the implementations are ours, and the `baselines` extra that used to install it was removed in v1.0 because no module imported it. |
 | gemmi | MPL-2.0 | **Dependency** — CIF parsing, space-group operations, hkl utilities. |
 | spglib | BSD-3 | **Dependency, and the source of two tabulations.** Wyckoff letters and oriented site-symmetry symbols (`crystallography/wyckoff.py`), and the **magnetic space-group database** the 1651 Shubnikov groups are read from (`crystallography/magnetic/operators.py`). Nothing is vendored: the tables are queried at run time through the installed library. spglib's own `msg.py` credits **Litvin, D. B. (2013), *Magnetic Group Tables*, IUCr** (`https://www.iucr.org/publ/978-0-9553602-2-0`) for the Litvin serial number it returns beside each group; the sequential 1–1651 numbering the package speaks in is the UNI numbering of **Campbell, Stokes, Perez-Mato & Rodríguez-Carvajal (2022), *Acta Cryst.* A78, 99**, and the identification algorithms are **Shinohara, Togo & Tanaka (2023), *Acta Cryst.* A79, 390**. Three of its 1651 entries (UNI 282-284) did not round-trip through its own identification on 2.7.0; 2.8.0 corrected them, and `pyproject.toml` requires it. |
@@ -349,19 +358,26 @@ they were built from. Their licence texts ship in the wheel and sdist as
 | uPlot | MIT | **Vendored** (WP-1461) — `src/rietx/viz/static/uPlot.iife.min.js` and `uPlot.min.css`, unmodified, with the licence beside them as `uPlot.LICENSE`. `npm run build` copies them from the exact pin in `gui/package.json` (`gui/scripts/vendor.py`), and `tests/test_gui_dist.py` holds the file's banner version equal to that pin. The page `viz.html.write_html` writes inlines the code with the licence as a comment beside it, because a written file leaves the package. |
 | svgcanvas (Zeno Zeng; canvas2svg, Gliffy Inc.) | MIT | **Vendored** (WP-1461) — `src/rietx/viz/static/svgcanvas.esm.js`, unmodified, with the licence beside it as `svgcanvas.LICENSE`, whose notice names both copyright holders. The charts' SVG export redraws each pane through it, loading it on the first export. `npm run build` copies it from the exact pin in `gui/package.json` (`gui/scripts/vendor.py`), records the version in `VENDORED.json` beside it, and `tests/test_gui_dist.py` holds that equal to the pin. The page `viz.html.write_html` writes inlines it with the licence as a comment. |
 
-## Fonts the manual serves
+## Fonts the manual and the GUI serve
 
 The manual carries its two faces rather than loading them from a font service
 (WP-2021), so they are redistributed: in the repository, on rietx.org and in the
-sdist, which carries `docs/`. They are not in the wheel. Both are unmodified
-Fontsource 5.3.0 builds, from npm, under `docs/docs/_static/fonts/`, each with
-its licence text beside it as the OFL requires. The landing page loads the same
-two faces from Google Fonts and redistributes nothing.
+sdist, which carries `docs/`. Both are unmodified Fontsource 5.3.0 builds, from
+npm, under `docs/docs/_static/fonts/`, each with its licence text beside it as
+the OFL requires. The landing page loads the same two faces from Google Fonts
+and redistributes nothing.
+
+The rebuilt GUI (`/next`, WP-2215) serves the same files, byte for byte, and a
+Greek-only subset of IBM Plex Sans for the Greek letters Instrument Sans lacks.
+They sit under `gui/src/next/static/fonts/` and are copied into the committed
+dist's `src/rietx/gui/static/fonts/`, so these three faces **are in the wheel**,
+each with its licence text beside it.
 
 | Face | License | Relationship |
 |---|---|---|
-| Instrument Sans (The Instrument Sans Project Authors) | SIL OFL 1.1 | **Redistributed** — the variable woff2 files, latin and latin-ext, upright and italic; licence `OFL-InstrumentSans.txt` |
-| IBM Plex Mono (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — regular, italic and semibold woff2 files, latin and latin-ext; licence `OFL-IBMPlexMono.txt` |
+| Instrument Sans (The Instrument Sans Project Authors) | SIL OFL 1.1 | **Redistributed** — the variable woff2 files, latin and latin-ext, upright and italic; licence `OFL-InstrumentSans.txt`. In the manual and the GUI |
+| IBM Plex Mono (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — regular, italic and semibold woff2 files, latin and latin-ext; licence `OFL-IBMPlexMono.txt`. In the manual and the GUI |
+| IBM Plex Sans (IBM Corp.) | SIL OFL 1.1 | **Redistributed** — the Greek subset only, regular, medium and semibold woff2 files, unmodified from Fontsource's `@fontsource/ibm-plex-sans` 5.3.0 on npm (tarball sha256 `232592af20ae413026cc705fc9c104135fb760432fd710f06a02c39e062d3213`); licence `OFL-IBMPlexSans.txt`, the package's own `LICENSE`. In the GUI only |
 
 ## Data tables
 

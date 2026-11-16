@@ -84,6 +84,30 @@ The ones most often set are:
 
 `help(rx.Stage)` lists the rest.
 
+## Fix parameters in a stage
+
+`Stage.turn_off` lists parameter names the stage fixes after it frees its `turn_on`, and `StageSpec.turn_off` is the same list in a stored plan.
+A fixed parameter stays fixed in the stages after it, until a later stage frees it again.
+The closing stage that follows the declared ones keeps it fixed too.
+This plan refines the structure while the profile stays where an earlier Pawley or Le Bail fit left it, although its stage frees every instrument parameter:
+
+```python
+import rietx as rx
+
+plan = rx.RefinementPlan(stages=[
+    rx.Stage("background", ["instrument.background.*", "phases.*.scale"]),
+    rx.Stage("structure", ["instrument.*", "phases.*.cell.*", "phases.*.atoms.*.biso"],
+             turn_off=["instrument.profile.*"]),
+])
+assert plan.stages[1].turn_off == ["instrument.profile.*"]
+```
+
+`StageResult.fixed` lists the parameters each stage fixed.
+Which parameters the closing stage fixes depends on the names the model has, so `RefinementPlan.run_stages` and `RefinementPlan.closing_stage` take them as `paths`, and the closing stage's `turn_off` then lists names, not patterns.
+`rietx.strategy.staged.fixed_at_end` computes that list.
+In the `.rxt` text document the list is a `fix` clause after the stage's frees.
+To keep a parameter fixed in every plan you run, hold it with `Refinement.hold` instead ([How to keep a parameter fixed whatever the plan frees](hold.md)).
+
 ## Where to put the new stage
 
 The presets follow the order of the IUCr guidelines {cite}`mccusker1999`, and a new stage fits into it:

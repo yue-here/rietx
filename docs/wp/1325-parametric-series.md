@@ -1,8 +1,7 @@
 # WP-1325 — parametric series: a parameter as a function of each pattern's coordinates
 
-Milestone: parametric · Status: 🔄 2026-11-09 — both remaining tasks landed and the maintainer's three questions answered (PR #1497, ready for merge); (a) and (b) settled by Claude, (c) ruled by Yue
+Milestone: parametric · Status: ✅ 2026-11-12 — the two tasks the milestone left here merged in PR #1497 (2026-11-10); the next-term test and the replicate reading stay parked here, as the milestone's scope says
 Depends on: — (1119 soft: a named coefficient is a named variable)
-Priority: P2 2026-10-14 — was P3: the maintainer took the combinatorial-library case (the first named outside user) and the scalable solver it needs; 1962 waits on that solver
 
 ## Goal
 
@@ -104,7 +103,7 @@ The maintainer opened the [parametric](../milestones/parametric.md) milestone on
 - "Compute a target's peak-chain column once per pattern" moved to 1964, because a
   nonlinear equation needs that column taken at the target.
 - The next-term test is parked, and so is the replicate reading (#1218, row S2,
-  § Inherited). Neither is rejected. Each comes back on a user's request.
+  § Tasks). Neither is rejected. Each comes back on a user's request.
 
 ### The general shape, and which part this WP builds
 
@@ -1136,54 +1135,6 @@ Their numbers are as reported and were not re-measured here.
   closed). A parametric equation exists only in the joint fit, which has no
   carry step.
 
-### Inherited
-
-- **2026-11-01, from [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md): a held
-  coefficient's target rows leave `parameters`.** A result now lists only the rows the fit
-  could move (`ParameterTable.moving_paths`). When the support hold takes `vars.b_0`, the
-  `hist.h.phases.1.cell.*` rows it drives are absent, so their `RefinedParameter.equations`
-  is no longer readable there. `PARAMETRIC_TARGET_UNSEEN` and `result.parametric` still name
-  both. `test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees` was re-pinned to
-  that.
-- **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): joint-report items now go
-  to [2028](2028-a-joint-fits-guards-see-every-histogram.md).** The four joint items and the
-  three `PARAMETRIC_*` rendering notes this WP sent 1341 on 2026-10-14 are 2028's Context items
-  1-4 and 6, under today's names (`parametric_equations`, `RefinedParameter.equations`).
-- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): `rietx events`
-  could print one line per parametric equation of a joint fit.** This is
-  @mustachefeeling's point from the PR #977 comments, which this WP sent to
-  1322 on 2026-10-15. 1322 closed without it. A joint fit keeps no history
-  (`multi.py`), but it has emitted events since #926, and `rietx events`
-  (`history.aggregate.summarize_events`) shipped in PR #902. The line would
-  carry the subset size, the form verdict, and whether a detector fired inside
-  the subset (the subset boundary and the detectors are
-  [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md)'s). Two rules
-  for whoever builds it:
-  - Pair events in file order, never by `(series_index, series_pass)`, since
-    indices recur on reseeds and restarted segments. The aggregator already
-    clears its open stages at each `fit_start` (`aggregate.py:185`).
-  - A segmented chain's summed fit time is not its wall time: 700 s against
-    148 s on one chain, as reported and not re-measured.
-
-- 2026-10-31, from the issue triage (issue #1218, row S2): a pure-error
-  lack-of-fit beside the declared-form test. For every group of patterns that
-  share every declared coordinate, the χ² of the free-fit targets about their
-  inverse-variance mean on n_g − 1 dof, per group and pooled, with esds
-  uncorrected (the choice the form test already makes), and "no replicate
-  groups: not measured" when no coordinate repeats. It would sit on
-  `ParametricFormTest` as `replicates`, or on the series summary. Measured by
-  the reporter on one synthetic series (16 patterns, cubic perovskite
-  capillary, a = a₀(1 + αΔT) + 0.02·x, a ramp to 700 K then a hold): when x
-  drifts during the hold the 9 held patterns differ in `phases.0.cell.a` by χ²
-  = 24 054 on 8 dof; when x stays put, χ² = 12.0 on 8 dof (p ≈ 0.15). The
-  score test cannot see a misfit that varies at a repeated coordinate, which
-  is what replicates measure (Draper & Smith 1998, pure error). Checked
-  against the tree at d87c8cc91: `ParametricFormTest`
-  (`schemas/parametric.py:320`) carries `n_patterns`, `n_subset`, `tied`,
-  `others_freed`, `rejected` and no replicate reading; this WP's ticked
-  lack-of-fit task built the score test only. Not re-run here. The reporter
-  proposes landing S2 before S1.
-
 ## Non-goals
 
 - A library of physical models: here the caller supplies the basis, or names
@@ -1535,6 +1486,25 @@ Their numbers are as reported and were not re-measured here.
     The table above divides by χ²_red·f². The shipped form test now divides
     by χ²_red alone (decision 4), so re-run the synthetic half on that
     divisor before landing.
+- [ ] **Parked 2026-11-04, see § Direction.** **A pure-error lack-of-fit beside
+  the declared-form test** (moved here from § Inherited at the close,
+  2026-11-12; filed 2026-10-31 by the issue triage, issue #1218, row S2). For
+  every group of patterns that share every declared coordinate, the χ² of the
+  free-fit targets about their inverse-variance mean on n_g − 1 dof, per group
+  and pooled, with esds uncorrected (the choice the form test already makes),
+  and "no replicate groups: not measured" when no coordinate repeats. It would
+  sit on `ParametricFormTest` as `replicates`, or on the series summary.
+  Measured by the reporter on one synthetic series (16 patterns, cubic
+  perovskite capillary, a = a₀(1 + αΔT) + 0.02·x, a ramp to 700 K then a
+  hold): when x drifts during the hold the 9 held patterns differ in
+  `phases.0.cell.a` by χ² = 24 054 on 8 dof; when x stays put, χ² = 12.0 on
+  8 dof (p ≈ 0.15). The score test cannot see a misfit that varies at a
+  repeated coordinate, which is what replicates measure (Draper & Smith 1998,
+  pure error). Checked against the tree at d87c8cc91: `ParametricFormTest`
+  (`schemas/parametric.py:320`) carries `n_patterns`, `n_subset`, `tied`,
+  `others_freed`, `rejected` and no replicate reading. Not re-run here. The
+  reporter proposes landing S2 before S1 (S1 is
+  [2074](2074-the-report-says-where-the-residual-is-structured.md)'s).
 - [x] **Profile the joint Jacobian**, the maintainer's question of 2026-10-14:
   would another Rust kernel help? It would not, first. § Measured: where the
   joint Jacobian's time goes.
@@ -1715,6 +1685,44 @@ Their numbers are as reported and were not re-measured here.
   Schur identity), issue #212.
 
 ## Handover log
+
+### 2026-11-12 (twelfth session) — closed: PR #1497 merged (this close is PR #1540)
+
+The maintainer merged PR #1497 on 2026-11-10 (`cf6594baa`). It carried the
+two tasks the parametric milestone left here. A parametric equation can no
+longer walk its target past the target's own limits under the default solver,
+and per-pattern starting structures must agree beyond their parameters. The
+maintainer approved the new warning texts before the merge, so this WP closes.
+Its two new checks stay parked here, unticked, because the milestone's scope
+lists new built-in checks as out of scope and names this WP as where they wait.
+Nothing was run or measured in this session.
+
+*Done.* Status set to ✅ and the Priority line removed. § Inherited is gone.
+Three of its four entries were consumed or moved:
+
+- 1999's re-pinned test and 1341's handover to 2028 were records of work
+  already done.
+- The `rietx events` line per parametric equation went to
+  [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md)'s
+  § Inherited, since the line reports 1965's subset and detectors.
+- The replicate reading (#1218, row S2) is now a parked task beside the
+  next-term test, so a reader of § Direction finds both under § Tasks.
+
+*Rulings recorded.* (c), `TIED_BOUND_MARGIN` at tier 3, was ruled by the
+maintainer on 2026-11-09 and is in the entry below. (a) and (b) were settled
+by Claude and stand. The maintainer approved merging #1497 on 2026-11-09 with
+the new `FLOOR_HIT` and `PARAMETRIC_OUT_OF_RANGE` texts. The result row keeps
+the equation's value (−0.14 on the Biso ramp), and the model holds the bound.
+
+*Settled by Claude at the close.* The WP closes with two parked tasks rather
+than staying open to hold them. Grounds: the milestone's scope
+(`docs/milestones/parametric.md` § Scope, "Not in scope", written in the session where
+the maintainer opened it), which parks them here; and closed WPs that keep
+unticked items under a status that says so (1310, 1311). The alternative was
+to keep this WP 🔄 until a user asks for either check.
+
+*Next:* none here. A user's request for the next-term test or the replicate
+reading reopens its task, starting from its own notes under § Tasks.
 
 ### 2026-11-09 (eleventh session) — the maintainer's three questions answered
 

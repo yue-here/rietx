@@ -137,6 +137,8 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   cells and a constant height offset between the two have a mean z-score under 0.5 in size.
   The same fit with the second phase treated as a structure misses the truth, and the
   fixture is built so that it does. A height offset is what the holder is there to give.
+  Met on single patterns on 2026-11-15 by declared peaks with formula centres, with no new
+  surface (`tests/test_holder_cell.py`); a joint fit sharing the offset was not tried.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
   ramp the result agrees with the joint fit's coefficients within their combined esds. On a

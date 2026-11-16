@@ -1,0 +1,535 @@
+{
+ "codes": {
+  "ABSORPTION_ESTIMATE_UNAVAILABLE": {
+   "condition": "A capillary radius or plate thickness was declared and the absorption estimate recorded why it was skipped (`record.skipped`).",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "ABSORPTION_MU_R_OUT_OF_RANGE": {
+   "condition": "The estimated µR lies past `CYLINDER_MU_R_MAX`, the end of the published fit the capillary correction uses.",
+   "kind": 1,
+   "kind_reason": "The published fit's range is a fact about the correction, not a judgement about the data."
+  },
+  "ABSORPTION_PLATE_THICKNESS": {
+   "condition": "Under `flat_plate_transmission`, the declared thickness gives under 0.7 of the counts the optimal thickness would (the inline literal 0.7).",
+   "kind": 1,
+   "kind_reason": "The fraction of the optimal counts is arithmetic on the declared µt; the threshold decides only when it is said, and the code suggests nothing.",
+   "note": "Gated by an inline literal (0.7), one of the two the WP names."
+  },
+  "ABSORPTION_THICKNESS_MATTERS": {
+   "condition": "Under a flat-plate geometry, the declared thickness moves the equivalent Biso by more than `FLAT_PLATE_BIAS_MIN`.",
+   "kind": 1,
+   "kind_reason": "The equivalent ΔBiso is arithmetic on the declared µt; the threshold decides only when it is said."
+  },
+  "ADP_NOT_POSITIVE_DEFINITE": {
+   "condition": "A refined anisotropic displacement tensor has a negative eigenvalue (`staged.check_adp_positive_definite`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Raised from a guard finding; its test is in `strategy/staged.py` (WP-2002's walk)."
+  },
+  "AIR_SCATTER_UNDECLARED": {
+   "condition": "A spline background with no air-scatter term, where a 1/(2θ) column would remove at least `AIR_SCATTER_UNDECLARED_FRACTION` of χ² at a score of at least `AIR_SCATTER_UNDECLARED_SCORE`.",
+   "kind": 2,
+   "kind_reason": "Issue #1215 names a second explanation, a background too stiff at the low edge; the alternatives are enumerable and a refit scores each, while the code names one.",
+   "note": "Issue #1215 (in the WP's Inherited): fires on 20/20 clean synthetic patterns under the P-spline, by the issue's count."
+  },
+  "BACKGROUND_ABSORPTION": {
+   "condition": "The projection R² of a structural column onto the background span exceeds `staged.BACKGROUND_ABSORPTION_GUARD` (0.25).",
+   "kind": 3,
+   "kind_reason": "Whether a given overlap biases the quantity the caller wants depends on the purpose, which the pattern does not carry.",
+   "note": "Threshold in `strategy/staged.py` (WP-2002's walk), unaudited there."
+  },
+  "BACKGROUND_ORDER_AT_CAP": {
+   "condition": "The Chebyshev order scan ended at `CHEBYSHEV_MAX_ORDER` without its Durbin-Watson stop firing.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "BISO_NEGATIVE": {
+   "condition": "A refined isotropic displacement parameter is below zero (`staged.check_biso_negative`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Raised from a guard finding in `strategy/staged.py`."
+  },
+  "BISO_UNUSUALLY_LARGE": {
+   "condition": "A refined Biso exceeds the Lindemann melting amplitude for the cell (`staged.LINDEMANN_RHO`).",
+   "kind": 3,
+   "kind_reason": "Static disorder or a wrong site can exceed the thermal bound in a sound model; which one holds is a fact about the sample.",
+   "note": "Raised from a guard finding; `LINDEMANN_RHO` is tier 2 there."
+  },
+  "BOUND_HIT": {
+   "condition": "A refined value finished on a declared limit that carried load (`staged.bound_findings`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "Its tests are `staged.BOUND_HIT_*`, tiered in WP-2002's walk."
+  },
+  "BRINDLEY_OUTSIDE_REGIME": {
+   "condition": "A phase's µR exceeds `qpa.BRINDLEY_MU_R_FENCE`, the regime the Brindley correction was published for.",
+   "kind": 1,
+   "kind_reason": "The regime is the correction's published range, a fact about the method."
+  },
+  "CAPILLARY_OFFSET_UNAVAILABLE": {
+   "condition": "A capillary geometry carries no goniometer radius, so the specimen-offset terms are held at zero.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "CELL_DEGENERATE_PROBE": {
+   "condition": "The solver tried at least one trial cell with zero or negative volume during the stage.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "CELL_RUNAWAY": {
+   "condition": "A free cell parameter left the window `CELL_SAFETY_FRACTION` / `CELL_SAFETY_ANGLE_DEG` around its starting value.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 3, approved); copied here, not re-judged."
+  },
+  "CONSTRAINT_ACTIVE": {
+   "condition": "In the final stage the LM driver held at least one step against a built-in inequality (the Stephens cone or Γ_G² ≥ 1e-8).",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "COVARIANCE_DIRECTION_DISCARDED": {
+   "condition": "The covariance build discarded a direction several parameters share (`staged.check_discarded_directions`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "COVARIANCE_UNAVAILABLE": {
+   "condition": "The solver returned and the esd calculation raised afterwards.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "DATA_SUPPORT_LOW": {
+   "condition": "Independent reflections per structural parameter fall below `OBS_PER_PARAMETER_PREFERRED` (info) or `OBS_PER_PARAMETER_MIN` (warning).",
+   "kind": 1,
+   "kind_reason": "The count is arithmetic and the bands are quoted from the literature (CLAUDE.md, WP-1071); they set the level alone."
+  },
+  "DECLARED_RANGE_NOT_RESTORED": {
+   "condition": "An older file stored a hand-set parameter with no limits, and migration found no declared range to restore.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "DECLARED_RANGE_RESTORED": {
+   "condition": "An older file stored a hand-set parameter with no limits, and migration restored its declared range (a warning where the value sits on it).",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "DISPERSION_NEGLECTED": {
+   "condition": "Anomalous scattering is off, and |f|² at this wavelength differs from Z² by at least `DISPERSION_NEGLECT_FRAC` for some element (a warning from `DISPERSION_NEGLECT_SEVERE`).",
+   "kind": 1,
+   "kind_reason": "The relative change is arithmetic on tabulated f′ and f″; the thresholds set when and how loudly."
+  },
+  "EXTRA_PEAK_NO_INTENSITY": {
+   "condition": "A declared extra peak's area finished on its zero floor (`BOUND_HIT_RTOL`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "EXTRA_PEAK_ON_REFLECTION": {
+   "condition": "A declared extra peak lies within `LAYER0_MATCH_TOL_DEG` (0.08°) of a predicted reflection.",
+   "kind": 2,
+   "kind_reason": "A duplicate of the reflection and an impurity line at nearly the same angle are both possible, and a refit with and without the peak scores them.",
+   "note": "The tolerance is a fixed angle, not a fraction of the local FWHM."
+  },
+  "FLAT_DIRECTION": {
+   "condition": "Two free parameters are correlated at or above `staged.FLAT_DIRECTION_RHO` (1 − 5e-4).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "`FLAT_DIRECTION_RHO` is tier 1 in WP-2002's walk."
+  },
+  "FLOOR_HIT": {
+   "condition": "A scale, width or similar quantity finished on its zero floor and the data push it lower (`staged.bound_findings`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "FROZEN_COMPILE_STALE": {
+   "condition": "A fresh compile at the returned parameters changes χ² by more than `FROZEN_COMPILE_CHI2_REL` of itself.",
+   "kind": 1,
+   "kind_reason": "The relative change is measured directly; the threshold decides only when it is said."
+  },
+  "HARMONIC_ABSENT": {
+   "condition": "A declared harmonic's refined fraction is below `HARMONIC_ABSENT_FRAC`.",
+   "kind": 1,
+   "kind_reason": "Whether a fraction is distinguishable from zero is a statistical question the data settle; the code answers it with a fixed fraction rather than the esd, which is the threshold's question for part 2.",
+   "note": "An absolute fraction, not a significance test."
+  },
+  "HARMONIC_FRACTION": {
+   "condition": "A declared harmonic refined to a measurable fraction; a warning above `HARMONIC_IMPLAUSIBLE_FRAC`.",
+   "kind": 3,
+   "kind_reason": "Whether a fraction is plausible depends on the monochromator and the detector's energy window, facts outside the pattern."
+  },
+  "HARMONIC_HELD": {
+   "condition": "A declared harmonic's weight was not free, so it did not enter the fit.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "HIGH_CORRELATION": {
+   "condition": "Two free parameters are correlated above the stage's `correlation_guard` (`schemas.plan.CORRELATION_GUARD`, 0.98).",
+   "kind": 3,
+   "kind_reason": "Whether a correlation of this size harms the quantity the caller wants depends on the purpose; WP-2037's response column is the package's answer to that.",
+   "note": "The threshold is in `schemas/plan.py` (WP-2002's walk), unaudited there; B13 handed it here."
+  },
+  "HOLD_BLOCKED_PLAN": {
+   "condition": "A stage's `turn_on` glob matched a parameter the caller had held, so it stayed fixed.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "HUMP_TOO_NARROW": {
+   "condition": "A declared background hump narrowed below `staged.HUMP_MIN_WIDTH_MULT` times the instrumental width.",
+   "kind": 2,
+   "kind_reason": "An unindexed Bragg line and a real narrow diffuse feature are both possible, and the data can score a peak against a hump.",
+   "note": "`HUMP_MIN_WIDTH_MULT` is in `strategy/staged.py`, unaudited; B13 handed it here."
+  },
+  "LEBAIL_ALTERNATION_STOPPED": {
+   "condition": "The Le Bail alternation stopped; info when it converged, a warning for any other reason.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "LEBAIL_CYCLES_AT_CAP": {
+   "condition": "The intensity partition reached the cap `lebail_cycles` before the intensities stopped moving.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "LOW_ANGLE_UNMODELLED": {
+   "condition": "Below the first reflection less two FWHM, the mean (Δ/σ)² over at least `LOW_ANGLE_MIN_CHANNELS` channels exceeds `LOW_ANGLE_UNMODELLED_RATIO` times χ²_red.",
+   "kind": 3,
+   "kind_reason": "Issue #1219 names three competent responses (air scatter, a beam-stop cut, a real diffuse component), and which applies depends on the measurement, outside the pattern.",
+   "note": "Two inline literals: the 2 FWHM region edge and the 2σ channel test that places the suggested lower limit. Issue #1219 proposes dropping the suggestion."
+  },
+  "MAGNETIC_WIDTH_MOVED_MOMENT": {
+   "condition": "Freeing the magnetic broadening moved a released moment by more than `MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA` esds.",
+   "kind": 1,
+   "kind_reason": "The shift is measured in its own esd; the threshold decides only when it is said."
+  },
+  "MICROABSORPTION_SKIPPED": {
+   "condition": "A particle radius was given for at least one phase and the Brindley correction could not run (`qpa.microabsorption_skipped`).",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "MODEL_FAR_FROM_DATA": {
+   "condition": "Rwp exceeds `MODEL_FAR_FROM_DATA_RWP` (0.8), at an error level.",
+   "kind": 1,
+   "kind_reason": "No competent refiner reads an Rwp near that of a model predicting no intensity as a fit; the threshold row is tier 3 on its own.",
+   "note": "Error level: a series escalates and quarantines on it (WP-2003, the WP's Inherited)."
+  },
+  "NEUTRON_RESONANT_ABSORBER": {
+   "condition": "Under a neutron source, the structure holds an element with a complex scattering length near a resonance; a warning from `RESONANT_ABSORBER_SEVERE_BARN`.",
+   "kind": 1,
+   "kind_reason": "The tabulated absorption is a nuclear fact; the threshold sets the level alone."
+  },
+  "OCCUPANCY_ABOVE_ONE": {
+   "condition": "A refined site occupancy is above 1.",
+   "kind": 3,
+   "kind_reason": "The audit row already carries ambiguity 3 (tier 1); copied here, not re-judged.",
+   "note": "No significance gate; whether to add one is the maintainer's (WP-2002's handover, in the WP's Inherited)."
+  },
+  "ORIGIN_FIXED_ON_POLAR_AXIS": {
+   "condition": "The space group is polar and the package held the origin along the polar axis (`_origin_diagnostics`, `_centroid_finding`).",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "ORIGIN_NOT_FIXED": {
+   "condition": "The space group is polar and nothing holds the origin along its polar axis.",
+   "kind": 1,
+   "kind_reason": "Symmetry fixes it."
+  },
+  "PATTERN_DEAD_CHANNELS": {
+   "condition": "With a measured σ, a short run of fitted channels reads far below the local background and its σ shrank with it (`background.diagnostics.dead_channels`).",
+   "kind": 1,
+   "kind_reason": "Counts below a smooth background with σ shrinking alongside are a detector fault; no diffraction physics produces the pair.",
+   "note": "Thresholds in `background/diagnostics.py` (WP-2002's walk)."
+  },
+  "PATTERN_UNDERSAMPLED": {
+   "condition": "The typical peak spans fewer than `STEPS_PER_FWHM_MIN` points per FWHM.",
+   "kind": 1,
+   "kind_reason": "The band is quoted from the literature (tier 2); it sets the level alone."
+  },
+  "PAWLEY_OFF_DATA_RIDGED": {
+   "condition": "Some Pawley reflections have no emission line centred inside the fitted data, and their intensities are ridged.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "PAWLEY_OVERLAP_UNRESOLVED": {
+   "condition": "In an overlap group the largest esd/|I| reaches `PAWLEY_UNRESOLVED_REL`.",
+   "kind": 1,
+   "kind_reason": "The relative esd is measured; the threshold decides only when it is said."
+  },
+  "PHASE_UNCONSTRAINED": {
+   "condition": "A phase with free non-scale paths, held paths or no measured scale has a scale under `PHASE_SUPPORT_SIGMA` of its counting-noise esd, or no line in range (a single-phase model only where something was held); the message says what was held, the instrument included.",
+   "kind": 1,
+   "kind_reason": "The hold passes the judgement ground (milestone § The rule); only its 3σ is on trial, and that is WP-2002's.",
+   "note": "The action is WP-2002's; this WP owns the code."
+  },
+  "PLAN_FREES_NO_MOMENT": {
+   "condition": "The structure carries a magnetic moment and no stage of the plan frees it.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "QPA_ESD_UNAVAILABLE": {
+   "condition": "A phase scale refined to a value where its esd could not be measured.",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "QPA_UNAVAILABLE": {
+   "condition": "The weighted scales sum to zero or less, so no weight fractions exist.",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "RESOLUTION_NOT_POSITIVE": {
+   "condition": "An instrument width is negative somewhere in the fitted range (`staged.check_resolution_positive`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "RESOLUTION_UNCONSTRAINED": {
+   "condition": "Gaussian resolution terms were free while more than half the fitted channels are Lorentzian-dominated (`staged.check_resolution_supported`).",
+   "kind": 1,
+   "kind_reason": "The Lorentzian share is arithmetic on the refined widths.",
+   "note": "The 'more than half' is an inline literal in `strategy/staged.py` (`lorentzian.sum() * 2 <= tt.size`), outside this WP's file."
+  },
+  "RESTRAINT_PAIRS_STALE": {
+   "condition": "At the end of the run a phase's anti-bump restraints missed contacts closer than their minimum distance.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "RESTRAINT_TENSION": {
+   "condition": "A soft restraint finished more than `RESTRAINT_TENSION_SIGMA` of its own σ from its target.",
+   "kind": 3,
+   "kind_reason": "Whether the restraint or the data is wrong depends on chemistry outside the pattern."
+  },
+  "RIGID_BODY_UNSUPPORTED": {
+   "condition": "A free rotation or shift of a rigid body has a zero column.",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "ROUGHNESS_ABSORPTION": {
+   "condition": "The roughness column's projection R² onto displacement, scale and background exceeds `staged.ROUGHNESS_ABSORPTION_GUARD` (0.9).",
+   "kind": 3,
+   "kind_reason": "As for `BACKGROUND_ABSORPTION`: whether the overlap harms the quantity wanted depends on the purpose.",
+   "note": "Threshold in `strategy/staged.py`, unaudited there."
+  },
+  "ROUGHNESS_OUTSIDE_REGIME": {
+   "condition": "Under the Pitschke model, τ exceeds sin θ_min (a warning) or half of it (info).",
+   "kind": 1,
+   "kind_reason": "The model's regime is from its paper; the half that sets the info band is an inline literal.",
+   "note": "Inline literal 0.5 for the info band."
+  },
+  "ROUGHNESS_UNCONSTRAINED": {
+   "condition": "The refined roughness changes every modelled reflection's intensity by less than `ROUGHNESS_MIN_DEPRESSION`.",
+   "kind": 1,
+   "kind_reason": "The depression is arithmetic on the refined model; the threshold decides only when it is said."
+  },
+  "SCALE_B_INSEPARABLE": {
+   "condition": "Over the fitted range a phase's scale and Biso columns separate by less than `SCALE_B_SEPARATION_FLOOR`.",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way.",
+   "note": "`SCALE_B_SEPARATION_FLOOR` is tier 1 (2√rcond)."
+  },
+  "SITE_DOFS_RENUMBERED": {
+   "condition": "A site moved onto or off a special position and a hold, tie or free path sat on one of its renumbered DOFs.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "SIZE_UNUSUALLY_SMALL": {
+   "condition": "A phase's size broadening implies a crystallite size below `SIZE_FLAG_SIZE_A` (Scherrer, `SCHERRER_K`).",
+   "kind": 3,
+   "kind_reason": "A small crystallite is a real outcome of synthesis or milling; whether it is a defect depends on the sample.",
+   "note": "Calibrated on one 1 213-record archive (the WP's Families): one family."
+  },
+  "SPECIES_FALLBACK_NEUTRAL": {
+   "condition": "An ion named for a site has no form-factor entry, so the neutral atom's was used.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT": {
+   "condition": "A stage frees the magnetic broadening in the stage that first frees the moment.",
+   "kind": 2,
+   "kind_reason": "The two orders are enumerable and a refit of each scores them; the code asserts one."
+  },
+  "STAGE_MAX_ITER": {
+   "condition": "A stage ran out of iterations before it converged.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "STAGE_NOT_FINITE": {
+   "condition": "The model held a NaN or an infinity at a point the solver reached.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "STAGE_PATH_NOT_FREE": {
+   "condition": "A stage asked to refine a path that symmetry or the model fixes, or that follows another.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "STAGE_PATH_UNKNOWN": {
+   "condition": "A stage named a path no parameter of the model has.",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "STAGE_SLOW_DESCENT": {
+   "condition": "The stage stopped with its cost still falling, too slowly to move a parameter by one esd in 300 more evaluations.",
+   "kind": 1,
+   "kind_reason": "The audit row already carries ambiguity 1 (tier 1); copied here, not re-judged."
+  },
+  "STAGE_WINDOWS_STALE": {
+   "condition": "The last declared stage (and the closing stage) ended with a peak-area share outside its frozen windows above the window tolerance it ran at.",
+   "kind": 3,
+   "kind_reason": "The audit row already carries ambiguity 3 (tier 3, approved); copied here, not re-judged."
+  },
+  "STEPHENS_STRAIN_NOT_POSITIVE": {
+   "condition": "The refined Stephens coefficients give a negative variance at some reflections (`staged.check_stephens_positive`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "STRAIN_UNUSUALLY_LARGE": {
+   "condition": "A phase's strain width exceeds `STRAIN_FLAG_WIDTH`.",
+   "kind": 3,
+   "kind_reason": "Large strain is a real outcome of deformation or composition gradients; whether it is a defect depends on the sample.",
+   "note": "Calibrated on one 1 213-record archive (the WP's Families): one family."
+  },
+  "TEXTURE_NOT_POSITIVE": {
+   "condition": "The truncated spherical-harmonics series goes below zero on the sphere (`staged.check_texture_positive`).",
+   "kind": 1,
+   "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
+  },
+  "WAVELENGTH_CALIBRATION": {
+   "condition": "A wavelength was free in the fit; the message gives its shift from the declared value in ppm, with no test on its size.",
+   "kind": 1,
+   "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  }
+ },
+ "literals": {
+  "_bic|1e-300|max(rss, 1e-300)": {
+   "role": "numerical floor",
+   "reason": "Keeps log(RSS) finite for an exact fit."
+  },
+  "select_chebyshev_order|4|m < max_order * 4": {
+   "role": "threshold",
+   "reason": "Refuses an order scan with fewer than four background channels per order; it raises a ValueError, not a code, so no verdict of this WP rests on it."
+  },
+  "select_chebyshev_order|2|range(2, max_order + 1)": {
+   "role": "count",
+   "reason": "The scan's lowest order."
+  },
+  "_absorption_diagnostics|100|100 * residue": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_absorption_diagnostics|0.7|record.intensity_fraction_of_optimal < 0.7": {
+   "role": "threshold",
+   "reason": "Gates `ABSORPTION_PLATE_THICKNESS`: the plate gives under 70 % of the optimal thickness's counts. To lift into a named constant at part 2."
+  },
+  "_absorption_diagnostics|100|100 * record.intensity_fraction_of_optimal": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_air_scatter_undeclared_diagnostics|0.001|np.maximum(model.tt, 0.001)": {
+   "role": "numerical floor",
+   "reason": "Keeps 1/(2θ) finite at 2θ = 0; a fitted range never reaches 0.001°."
+  },
+  "_dispersion_diagnostics|2|abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)": {
+   "role": "arithmetic",
+   "reason": "The squares in |f|² / Z²."
+  },
+  "_first_reflection_fwhm|2.0|first_tick / 2.0": {
+   "role": "arithmetic",
+   "reason": "θ from 2θ."
+  },
+  "_frozen_compile_diagnostics|100|100 * rel": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_harmonic_diagnostics|100.0|100.0 * frac": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_harmonic_diagnostics|100.0|100.0 * esd": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_hold_diagnostics|5|n > 5": {
+   "role": "listing cap",
+   "reason": "The message lists the first five held paths (`where[:5]`) and marks the rest with an ellipsis; `where` carries them all."
+  },
+  "_intensity_weighted_s2|0.25|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)": {
+   "role": "arithmetic",
+   "reason": "s² = 1/(4d²)."
+  },
+  "_intensity_weighted_s2|2|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)": {
+   "role": "arithmetic",
+   "reason": "The square in s² = 1/(4d²)."
+  },
+  "_lebail_stop_diagnostic|100|100 * r": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_low_angle_diagnostics|2.0|first_tick - 2.0 * fwhm": {
+   "role": "threshold",
+   "reason": "Sets the low-angle region's upper edge at two FWHM below the first reflection, so it decides which channels `LOW_ANGLE_UNMODELLED` reads. To lift at part 2."
+  },
+  "_low_angle_diagnostics|2|np.mean(weighted ** 2)": {
+   "role": "arithmetic",
+   "reason": "The square in the mean of (Δ/σ)²."
+  },
+  "_low_angle_diagnostics|2.0|np.abs(weighted) >= 2.0": {
+   "role": "threshold",
+   "reason": "The 2σ channel test placing the suggested lower limit in `LOW_ANGLE_UNMODELLED`'s suggestion, the second literal the WP names; issue #1219 proposes dropping that suggestion. To lift at part 2, or to go with it."
+  },
+  "_pawley_unresolved_diagnostics|1e-10|np.maximum(np.abs(inten), 1e-10)": {
+   "role": "numerical floor",
+   "reason": "Keeps esd/|I| finite at a zero intensity."
+  },
+  "_phase_support_diagnostics|2|n_phases < 2": {
+   "role": "count",
+   "reason": "A single-phase model."
+  },
+  "_renumber_atoms|4|stacklevel=4": {
+   "role": "count",
+   "reason": "The `warnings.warn` stack level, so the warning names the caller's line."
+  },
+  "_roughness_regime_diagnostics|0.5|np.radians(0.5 * tt_min)": {
+   "role": "arithmetic",
+   "reason": "θ from 2θ."
+  },
+  "_roughness_regime_diagnostics|2|drawn(2 * np.degrees(np.arcsin(min(tau, 1.0))))": {
+   "role": "arithmetic",
+   "reason": "2θ from θ in the message."
+  },
+  "_roughness_regime_diagnostics|0.5|tau > 0.5 * sin_min": {
+   "role": "threshold",
+   "reason": "The info band of `ROUGHNESS_OUTSIDE_REGIME`: τ above half of sin θ_min. To lift at part 2."
+  },
+  "_scale_b_ridge_diagnostics|3|n > 3": {
+   "role": "listing cap",
+   "reason": "Marks with an ellipsis the held displacement paths the message lists, cut at three (`held[:3]`); `where` carries them all."
+  },
+  "_scale_b_ridge_diagnostics|100.0|100.0 * math.expm1(2.0 * s2)": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_scale_b_ridge_diagnostics|2.0|math.expm1(2.0 * s2)": {
+   "role": "arithmetic",
+   "reason": "The 2 of the Debye-Waller factor exp(−2B s²) for intensity."
+  },
+  "_size_flag_diagnostics|10.0|SIZE_FLAG_SIZE_A / 10.0": {
+   "role": "unit",
+   "reason": "Å to nm in the message."
+  },
+  "_size_flag_diagnostics|10.0|size_a / 10.0": {
+   "role": "unit",
+   "reason": "Å to nm in the message."
+  },
+  "_wavelength_calibration_diagnostics|1000000.0|1000000.0 * (lam - lam0) / lam0": {
+   "role": "unit",
+   "reason": "Relative shift to ppm in the message."
+  },
+  "_window_loss_diagnostics|100|100 * sr.window_loss": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_window_loss_diagnostics|100|100 * tol": {
+   "role": "unit",
+   "reason": "Fraction to per cent in the message."
+  },
+  "_in|3|len(ids) <= 3": {
+   "role": "listing cap",
+   "reason": "Names up to three documents in full, beyond that the first and the last with the count."
+  }
+ }
+}

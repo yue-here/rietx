@@ -399,7 +399,7 @@ assert spec.correlation_guard == plan.correlation_guard
 
 `PlanSpec.from_plan` and `PlanSpec.to_plan` convert a plan, and `StageSpec.from_stage` and `StageSpec.to_stage` a stage.
 `PlanSpec.stages` is a list of `StageSpec`.
-A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
+A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.turn_off`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
 `PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes` and `PlanSpec.phase_support_sigma` carry the plan's four settings.
 
 Anything that takes one of the pair takes the other.

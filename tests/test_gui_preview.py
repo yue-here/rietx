@@ -223,6 +223,25 @@ def test_the_phases_and_background_sum_to_the_total(nac):
         assert len(answer.header["tick_hkl"][name]) == len(answer.header["ticks"][name])
 
 
+def test_the_residuals_are_the_curves_route_s_at_the_last_fit(fap):
+    """At the last fit's values the three residuals are the ones the curves
+    route sends, so the residual pane does not change when a preview starts
+    from there (WP-2128)."""
+    answer = preview.evaluate(fap, {"values": {}})
+    res = fap.refinement.result_
+    raw = np.asarray(res.y_obs) - np.asarray(res.y_calc)
+    delta = raw / np.asarray(res.sig())
+    np.testing.assert_allclose(answer.arrays["delta_raw"], raw, rtol=0, atol=1e-6)
+    np.testing.assert_allclose(answer.arrays["delta"], delta, rtol=0, atol=1e-6)
+    np.testing.assert_allclose(answer.arrays["cumulative_chi2"], np.cumsum(delta**2),
+                               rtol=1e-6)
+    # and the Rwp in the header is taken over the same σ
+    sig = answer.arrays["delta_raw"] / answer.arrays["delta"]
+    y = answer.arrays["y_calc"] + answer.arrays["delta_raw"]
+    rwp = np.sqrt(np.sum((answer.arrays["delta_raw"] / sig) ** 2) / np.sum((y / sig) ** 2))
+    assert rwp == pytest.approx(answer.header["rwp"], rel=1e-9)
+
+
 def test_the_values_header_names_the_tied_dependents(fap):
     a = preview._base(fap).values["phases.0.cell.a"]
     answer = preview.evaluate(fap, {"values": {"phases.0.cell.a": a + 1e-4}})
@@ -337,7 +356,8 @@ def test_one_round_trip_through_the_real_server(fap, tmp_path):
         assert status == 200 and kind.startswith(MEDIA_TYPE)
         answer = unpack(raw)
         assert answer.header["evaluated"] == "frozen"
-        assert set(answer.arrays) == {"two_theta", "y_calc", "y_background", "phase_0"}
+        assert set(answer.arrays) == {"two_theta", "y_calc", "y_background", "phase_0",
+                                      "delta", "delta_raw", "cumulative_chi2"}
         assert len(answer.arrays["y_calc"]) == len(answer.arrays["two_theta"])
 
         status, _, raw = post({"values": {"phases.0.cell.b": 9.4}})

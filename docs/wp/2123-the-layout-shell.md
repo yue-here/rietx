@@ -1,8 +1,7 @@
 # WP-2123 — the layout shell
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built, second round of fixes in; PR #1476 waits for the maintainer's review
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the layout shell merged in #1476; the fit statistics' home with the graphs hidden is the milestone's action-bar row
 Depends on: —
-Priority: P2 2026-11-08 — the first piece of the open gui-overhaul milestone; pieces 2-5 build inside it
 
 ## Goal
 
@@ -240,6 +239,21 @@ today's GUI opens from the new shell, and the page does not scroll sideways at 4
 
 ## Handover log
 
+- **2026-11-10** — closed. The maintainer merged PR #1476 on 2026-11-09, so the layout shell
+  is on `main` and every later piece of the port builds inside it. Nothing of the shell is left
+  undone. Its one open question was where Rwp, GoF and the not-a-fit chip go while the graphs
+  are hidden (item 6 of the second round). The maintainer ruled on 2026-11-09 to try the action
+  bar beside Refine. That build is the row "Fit statistics in the action bar" in
+  `docs/milestones/gui-overhaul.md` § Designed, not yet filed, which now names this WP.
+
+  *Leftovers, and where each went.* Item 6 went to that row. Two owed items were already in
+  the milestone's § Owed to the port: the Model and Text panels' own Apply beside the bar's,
+  and the runs from the Report or Series panel or the `.` key that skip the bar's pending
+  edits. The fourteen settled calls were reviewed with the PR at its merge. The narrative went
+  to `docs/milestones/v1.12.md` § How v1.12 is getting here.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here. The milestone's next piece is the palette, in the milestone's order.
 - **2026-11-09, second round** — a fix round on PR #1476, on the open items the first round
   reported. Five of six are fixed; one is left for the maintainer.
 
