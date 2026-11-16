@@ -40,6 +40,17 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 
 ### Inherited
 
+- **From [1813](1813-fragment-io.md) (2026-11-16): `fragments.to_zmatrix` writes a
+  fragment as Z-matrix lines, and its default reference choice is not a torsion
+  chain.** Without `refs=`, b is the nearest earlier atom among those declared bonded
+  (else the nearest), and c, d are the earlier pair that makes B, C, D furthest from
+  collinear, so a dihedral need not be a torsion about a bond and, with no bonds
+  declared, r need not be a bond length. Geometry round-trips either way. Once these
+  internals are refined parameters the choice decides *which* r, angle and torsion a
+  paper's esd is about: decide whether this WP consumes the caller's `refs=` only, or
+  asks 1813's chooser to keep bonded chains (c bonded to b, d to c) above a stated
+  conditioning floor (the generality judge's reading, quoted in 1813's handover entry).
+
 ## Non-goals
 
 - Named-bond torsions (WP-1808, shipped).

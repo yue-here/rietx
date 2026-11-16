@@ -46,6 +46,12 @@ promise stages every break).
 
 ### Inherited
 
+- **From [1813](1813-fragment-io.md) (2026-11-16): `fragments.COLLINEAR_TOL` has a
+  second consumer.** Besides `from_zmatrix`'s refusal of a collinear reference triple
+  B, C, D, `to_zmatrix` now writes an atom A lying within it of its reference line B–C
+  at exactly 0° or 180°, moving A by at most r·1e-6 Å. The row is still `unaudited`
+  (on `UNAUDITED_BASELINE`); tier it naming both uses.
+
 - **From WP-2013 (2026-11-03, PR #1369): a reader default the hump ruling left standing.** `HumpComponent.position` is now required of a caller (maintainer, 2026-11-02), because the old 0.0 placed a hump below any measured range. `io/recipe.py`'s background-peak builder still writes `0.0 if pos is None`, silently, so a PowderLine recipe whose `single_peaks` entry has no position gets the placeholder the ruling removed, and a flagged position starts its refinement there. Refusing it or reporting it changes what `read_recipe` returns, so it goes to the maintainer before merge (memory rule on reader output). No recipe with a null position has been seen; whether PowderLine writes one is unchecked.
 
 - **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed):
