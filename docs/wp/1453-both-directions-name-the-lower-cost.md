@@ -1,6 +1,6 @@
 # WP-1453 — both directions name the lower cost
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
 Priority: P3 2026-11-15 — `SEQUENTIAL_PATH_DEPENDENT` already fires but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
