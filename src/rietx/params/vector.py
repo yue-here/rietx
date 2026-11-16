@@ -144,7 +144,7 @@ def _is_wavelength(path: str) -> bool:
 
 
 #: The cell lengths, the rows a d scale lives in.  An angle scales nothing,
-#: so a held angle pins nothing (WP-2148): only a held length does.
+#: so a held angle pins nothing (WP-2148): only held lengths do.
 _CELL_LENGTHS = ("a", "b", "c")
 
 
@@ -164,8 +164,8 @@ def wavelength_pins(wavelength_held: list[bool],
     A powder pattern measures d = λ/(2 sin θ), so scaling a histogram's λ and
     every cell length that histogram sees by one factor leaves every computed
     position unchanged.  That direction is broken by anything in it that
-    cannot move: a **held wavelength**, or a **held cell length of a phase in
-    the histogram** — a certified standard in the mixture, which is how a
+    cannot move: a **held wavelength**, or the **held cell of a phase in the
+    histogram** — a certified standard in the mixture, which is how a
     wavelength is calibrated (WP-2148, issue #1550).  A free cell carries the
     scale from one histogram to every other that shares it, so the rule is
     connectivity: a histogram's scale is pinned when the set it is linked to,
@@ -173,8 +173,8 @@ def wavelength_pins(wavelength_held: list[bool],
 
     ``wavelength_held[h]`` says histogram *h* has a held wavelength.
     ``cells[h]`` maps a key per phase in histogram *h* (the same key wherever
-    the cell is shared, so a shared cell is one node) to the path of a held
-    length of that phase's cell, or ``None`` when every length moves.  The
+    the cell is shared, so a shared cell is one node) to a length path of
+    that phase's cell when the cell is held, or ``None`` when it moves.  The
     answer per histogram is the path of one pin its set reaches — a held cell
     length, else ``"hist.{k}"`` for a held wavelength of histogram *k* — or
     ``None`` where nothing pins it, which is the flat direction.
@@ -3238,22 +3238,27 @@ class ParameterTable:
             "wavelengths are measurable: rietx.refine_multi")
 
     def cell_pins(self) -> dict[str, str | None]:
-        """Per phase index, the path of a held length of its cell, or ``None``.
+        """Per phase index, its held cell's first length path, or ``None``.
 
         :func:`wavelength_pins`' input for this table: a phase pins the d
-        scale when any of its cell lengths cannot move.  Read from the
-        **entries**, not ``_free_idx``, for :meth:`set_vary`'s reason (see
-        :meth:`wavelength_pin`).  A length tied to a free one moves with it, so
-        a cubic ``b`` follows ``a``; one tied to held rows only is held.
+        scale when **none** of its cell lengths can move — a held cell, what a
+        certified standard is.  One held length of an otherwise free cell
+        would break the flat direction too (Bragg's law needs every length to
+        scale), but the fence asks for the held cell its messages name, the
+        WP's rule and the stricter one; a partly held cell pins nothing here.
+        Read from the **entries**, not ``_free_idx``, for :meth:`set_vary`'s
+        reason (see :meth:`wavelength_pin`).  A length tied to a free one
+        moves with it, so a cubic ``b`` follows ``a``.
         """
-        out: dict[str, str | None] = {}
+        first: dict[str, str] = {}
+        moves: dict[str, bool] = {}
         for e in self.entries:
             ip = _cell_length_phase(e.path)
             if ip is None:
                 continue
-            if out.get(ip) is None:
-                out[ip] = None if self._row_moves(e) else e.path
-        return out
+            first.setdefault(ip, e.path)
+            moves[ip] = moves.get(ip, False) or self._row_moves(e)
+        return {ip: None if moves[ip] else path for ip, path in first.items()}
 
     def _row_moves(self, e: Entry) -> bool:
         """Whether a row can move under the entries' current ``vary`` flags:
@@ -3266,7 +3271,7 @@ class ParameterTable:
         return any(c != 0.0 and self.entries[j].vary for j, c in terms)
 
     def wavelength_pin(self) -> str | None:
-        """What pins this histogram's d scale: a held cell length, or ``None``.
+        """What pins this histogram's d scale: a held cell's length path, or ``None``.
 
         The one predicate the single-histogram fence reads, at three seats:
         :meth:`check_wavelength_against_cell` (the refusal at the solve), the

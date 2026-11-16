@@ -103,8 +103,10 @@ Each line diffracts at its own Bragg angle, so a doublet's splitting grows with 
 Bragg's law {eq}`pos-bragg` fixes only the product of λ with the reciprocal cell, so on one pattern a free λ beside a free cell is an exactly flat direction.
 With the cell held, λ refines on one pattern.
 That is how a beamline's wavelength is calibrated: a standard of certified cell, such as NIST SRM 640c silicon, holds the scale the cell would otherwise trade against λ.
-A glob that would free λ beside a free cell skips λ, as a plan's stage does.
-A solve that finds both free refuses, naming the degeneracy:
+One held phase is enough in a mixture.
+Hold the standard's cell beside a sample whose cell is free, and λ and the sample's cell refine together against the standard ({func}`~rietx.params.vector.wavelength_pins`).
+A glob that would free λ while no phase's cell is held skips λ, and a plan's stage reports the skip as `WAVELENGTH_NOT_FREED`.
+A solve that finds λ free with no cell held refuses, naming the degeneracy:
 
 ```python
 from rietx import Instrument, Structure
@@ -133,7 +135,7 @@ else:
 
 Patterns of one specimen fitted together share one cell, and that breaks the degeneracy too.
 Hold one wavelength and free at most N − 1 of N, holding the wavelength of the pattern that determines the cell best.
-A free wavelength also needs its pattern's cell shared with a pattern whose wavelength is held.
+A free wavelength also needs its pattern's cell shared with a pattern whose wavelength is held, unless a standard's held cell is in the patterns, which pins every wavelength.
 [How to fit several patterns of one specimen together](../guides/joint.md) shows the procedure.
 
 The rule has the same shape as the line weights.

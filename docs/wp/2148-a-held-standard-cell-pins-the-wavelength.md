@@ -103,9 +103,9 @@ merge.
 - [x] Tests: the reporter's arms A, B and the one-stage variant on a seeded
       synthetic pattern; the flat arms A0 and B0 still refused; a held but
       unsupported standard. Obs/calc/diff PNGs to `tests/output/`.
-- [ ] `_audit` rows, `help.py` if a field is added, and the manual's
+- [x] `_audit` rows, `help.py` if a field is added, and the manual's
       wavelength-calibration text.
-- [ ] Skill: the row keyed by `WAVELENGTH_CALIBRATION` or the fence's
+- [x] Skill: the row keyed by `WAVELENGTH_CALIBRATION` or the fence's
       refusal, if one exists, says a held standard in the mixture is enough.
 
 ## Acceptance

@@ -11125,7 +11125,7 @@ def _wavelength_pinned_by(pin: str | None) -> str:
 
     ``pin`` is what :meth:`~rietx.params.vector.ParameterTable.wavelength_pin`
     or :meth:`~rietx.params.multi.MultiParameterTable.wavelength_pins` found:
-    a held cell length's path (scoped ``hist.h.`` when that cell is
+    a held cell's length path (scoped ``hist.h.`` when that cell is
     per-histogram), ``"hist.{k}"`` for histogram *k*'s held wavelength, or
     ``None`` — unreachable through the fence, and said plainly rather than
     named as a cell no one held.
