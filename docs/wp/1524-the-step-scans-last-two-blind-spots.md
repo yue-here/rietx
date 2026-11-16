@@ -130,7 +130,7 @@ existing series fire nothing new.
 
   *Measured.* Positive arm: with `adjacent = np.diff(idx) >= 1`, both shape-1 cases fail on
   an extra `(2, 6)` row (Mac, darwin arm64, worktree venv `[dev]`); the source was restored
-  by sed before the commit. Pearl (Linux x86-64 WSL2, venv `[dev]` 1.12.0.dev0, tree a1188e716,
+  by sed before the commit. The workstation (Linux x86-64 WSL2, venv `[dev]` 1.12.0.dev0, tree a1188e716,
   co-tenant). The canary, the two touched files plus audit_table, help and docs_consistency
   at `-n 4`: 260 passed. The fast suite at `-n 4`: 14853 passed, 280 skipped, 32 xfailed,
   0 failed in 934 s. Added-test cost from that run's junit: the shape-1 test 1.11 s (2 cases),
