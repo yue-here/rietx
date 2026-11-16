@@ -403,6 +403,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                    "carry is the floating origin's, which HOLD_BLOCKED_PLAN "
                    "leaves to _origin_diagnostics, so it would report "
                    "nothing"),
+    "_wavelength_not_freed_diagnostics": (
+        (ABSENT,), "a joint fit never declines a wavelength by glob: the joint "
+                   "fence refuses an unpinned one when the columns are rebuilt "
+                   "(WP-2148), so there is no declined λ to report"),
     "_pawley_unresolved_diagnostics": (
         (HISTOGRAM,), "each histogram keeps its own Pawley intensity block "
                       "and overlap groups (WP-2104)"),

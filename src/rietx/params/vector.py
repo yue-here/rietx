@@ -285,8 +285,9 @@ def check_wavelength_freedom(unpinned: list[str], n_wavelengths: int,
             "joint fit, where it looks solved.  Share the cell (SharingMap's "
             "default does), hold a standard's cell, or hold every wavelength")
     raise ValueError(
-        f"{len(unpinned)} of {n_wavelengths} wavelengths are free; hold one, or "
-        f"hold the cell of a standard in the mixture.  Across {n_histograms} "
+        f"{len(unpinned)} of {n_wavelengths} wavelengths are free; hold one.  "
+        "Or hold the cell of a standard in the mixture.  Across "
+        f"{n_histograms} "
         "histograms of one specimen the shared cell makes N − 1 wavelengths "
         "measurable, but only because something held pins the cell's scale — "
         "free every wavelength beside every cell and the flat direction of a "
