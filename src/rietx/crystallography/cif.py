@@ -339,6 +339,77 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
                     f"standard uncertainty in parentheses, as in '5.4307(2)')")
 
 
+def _closed_operations(triplets) -> tuple[np.ndarray, np.ndarray] | None:
+    """The listed operations as integer arrays, or ``None`` where they are no group.
+
+    Rotations and translations are taken in gemmi's units of 1/``Op.DEN``,
+    translations modulo one cell, so the closure test is exact: every product
+    of two listed operations must be listed.  A list gemmi cannot parse is
+    ``None`` too, since there is then nothing to compare.
+    """
+    try:
+        ops = [gemmi.Op(str(t)).wrap() for t in triplets]
+    except (RuntimeError, ValueError):
+        return None
+    den = gemmi.Op.DEN
+    rot = np.array([op.rot for op in ops], dtype=np.int64)
+    tran = np.array([op.tran for op in ops], dtype=np.int64) % den
+    listed = {r.tobytes() + t.tobytes() for r, t in zip(rot, tran)}
+    rr = np.einsum("aij,bjk->abik", rot, rot) // den
+    tt = (np.einsum("aij,bj->abi", rot, tran) // den + tran[:, None, :]) % den
+    for r, t in zip(rr.reshape(-1, 3, 3), tt.reshape(-1, 3)):
+        if r.tobytes() + t.tobytes() not in listed:
+            return None
+    return rot // den, tran / den
+
+
+def _refuse_operators_against_symbol(path: str, block, hm: str, triplets) -> None:
+    """Refuse a file whose operator loop is a different group from its H-M symbol.
+
+    Issue #913, item (3), ruled "minimum" by the maintainer on 2026-11-02.
+    gemmi takes the loop's group where the loop is a tabulated setting and the
+    symbol otherwise, so a loop that lost a centring (C2/m written over the
+    four operations of P2/m) or a generator (P6₁ under ``P 61 2 2``) built the
+    smaller group, half the atoms, with nothing said.  Here the group the loop
+    generates is identified by type (spglib, any setting or origin) and
+    compared with the symbol's type: the same number is a choice of setting or
+    origin and passes, as before; a different number is a contradiction the
+    reader cannot settle, so it names both groups and stops.  No keyword
+    overrides it.
+
+    A loop that is no group is left alone (the symbol is read, as before), as
+    is a symbol gemmi cannot name: the declined part of the ruling.
+    """
+    symbol = gemmi.find_spacegroup_by_name(hm.strip().strip("'\""))
+    arrays = _closed_operations(triplets)
+    if symbol is None or arrays is None:
+        return
+    import spglib
+
+    # spglib says "no match" as None or as SpglibError depending on a
+    # process-wide flag (magnetic.operators.identification says why)
+    try:
+        found = spglib.get_spacegroup_type_from_symmetry(
+            np.ascontiguousarray(arrays[0], dtype="intc"), arrays[1])
+    except spglib.error.SpglibError:
+        found = None
+    if found is None or int(found.number) == symbol.number:
+        return
+    generated = gemmi.find_spacegroup_by_number(int(found.number))
+    tag = next((t for t in ("_space_group_symop_operation_xyz",
+                            "_space_group_symop.operation_xyz",
+                            "_symmetry_equiv_pos_as_xyz")
+                if block.find_values(t)), "operator loop")
+    raise ValueError(
+        f"{path}: the H-M symbol {hm.strip()!r} names {symbol.hm} (No. "
+        f"{symbol.number}, {len(symbol.operations())} operations a cell), and "
+        f"the {tag} loop's {len(triplets)} operations generate a group of type "
+        f"{generated.hm} (No. {generated.number}): a different group, not "
+        f"another setting or origin of the same one. One of the two "
+        f"statements is wrong and the file does not say which, so it is not "
+        f"read; correct the symbol or the loop")
+
+
 #: Two occupancies agree, and two sites fill a position without overfilling it,
 #: to within this (absolute).  Occupancies are quoted to two or three decimals
 #: with su up to a few 1e-3, so two refined values summing to 1.004
@@ -707,7 +778,12 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
 
     Uses gemmi's small-molecule reader, which resolves the space group from
     the recorded H-M (or Hall) symbol and carries fractional coordinates,
-    occupancies, and isotropic/equivalent displacement parameters.
+    occupancies, and isotropic/equivalent displacement parameters.  Where the
+    file states both an H-M symbol and an operator loop, and the loop is a
+    group of another type than the symbol's (a lost centring, a lost
+    generator), the file is refused naming both groups (issue #913); another
+    setting or origin of the symbol's group reads in the loop's setting, as
+    before.  A coordinate written ``.`` or ``?`` is refused by site and tag.
 
     ``aniso=True`` keeps ``_atom_site_aniso_U_ij`` as an
     :class:`~rietx.schemas.structure.AnisoU` block on each site that has
@@ -832,6 +908,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     listed = None
     if split_group_label(small.spacegroup_hm or "") is not None and small.symops:
         listed = [str(op) for op in small.symops]
+    elif block is None and small.symops and (small.spacegroup_hm or "").strip():
+        # a magCIF's nuclear group is magcif.resolve_nuclear_symmetry's to check
+        _refuse_operators_against_symbol(path, source, small.spacegroup_hm,
+                                         [str(op) for op in small.symops])
     sg = (OperatorGroup(label=small.spacegroup_hm.strip(), xyz=tuple(listed))
           if listed else small.spacegroup)
     if sg is None:

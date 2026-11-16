@@ -239,7 +239,7 @@ land before C-e:
       `cif_core` default, checked against the dictionary before it is written.
 - [ ] #913 (2): `pyproject.toml`'s `gemmi` floor raised to a version under which
       `structure_from_cif` works (0.6.5 raises on `SmallStructure.spacegroup`).
-- [ ] #913 (3): an operator loop that generates a different group from the
+- [x] #913 (3): an operator loop that generates a different group from the
       H-M symbol, beyond a setting or origin choice, is refused, naming both
       groups. No keyword overrides it.
 
