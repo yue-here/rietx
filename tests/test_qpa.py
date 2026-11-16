@@ -917,3 +917,64 @@ def test_mole_fraction_esds_go_through_the_correlated_scale_block():
     assert all(r.mole_fraction_stderr is None
                and r.mole_fraction_formula_unit_stderr is None
                for r in bare.phases)
+
+
+def test_the_per_formula_unit_esd_carries_z_where_the_zs_differ():
+    from rietx.optimize.qpa import compute_qpa
+
+    structure = make_lab6()                      # Z = 1
+    structure.phases.append(_caf2_phase())       # Z = 4
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    s = np.array([values["phases.0.scale"], values["phases.1.scale"]])
+    cov = np.array([[1.0, 0.3], [0.3, 1.0]]) * np.outer(0.02 * s, 0.02 * s)
+    qpa = compute_qpa(structure, values, scale_cov=cov)
+    zv = np.array([r.z * r.cell_volume for r in qpa.phases])
+    assert list(zv / [r.cell_volume for r in qpa.phases]) == [1, 4]
+
+    def x0(scales):
+        n = scales * zv
+        return n[0] / n.sum()
+
+    h = 1e-6 * s
+    grad = np.array([(x0(s + h[k] * np.eye(2)[k]) - x0(s - h[k] * np.eye(2)[k]))
+                     / (2 * h[k]) for k in range(2)])
+    sigma = math.sqrt(grad @ cov @ grad)
+    assert math.isclose(qpa.phases[0].mole_fraction_formula_unit_stderr, sigma,
+                        rel_tol=1e-6)
+    assert not math.isclose(qpa.phases[0].mole_fraction_stderr, sigma, rel_tol=1e-3)
+
+
+def test_an_empty_phase_takes_no_mole_fraction_and_withholds_nothing():
+    from rietx.optimize.qpa import compute_qpa
+
+    structure, values, _ = _ferrite_pair()
+    for j, _atom in enumerate(structure.phases[1].atoms):
+        values[f"phases.1.atoms.{j}.occ"] = 0.0
+    qpa = compute_qpa(structure, values)
+    pure, empty = qpa.phases
+    assert empty.weight_fraction == 0.0
+    assert (pure.mole_fraction, empty.mole_fraction) == (1.0, 0.0)
+    assert (pure.mole_fraction_formula_unit,
+            empty.mole_fraction_formula_unit) == (1.0, 0.0)
+    assert qpa.formula_unit_withheld is None
+
+
+def test_a_negative_scale_leaves_a_basis_absent_rather_than_raising():
+    from rietx.optimize.qpa import compute_qpa
+
+    structure = make_lab6()
+    structure.phases.append(_caf2_phase())
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    zmv = [phase_zmv(ph.space_group, ph.cell.lengths_angles(), _atoms(ph))
+           for ph in structure.phases]
+    # Σ S·ZMV > 0 while Σ S·V < 0: weight fractions form, the per-cell sum does not
+    values["phases.1.scale"] = 1.0
+    values["phases.0.scale"] = -0.5 * (zmv[1].cell_volume / zmv[0].cell_volume
+                                      + zmv[1].zmv / zmv[0].zmv)
+    assert sum(values[f"phases.{i}.scale"] * zmv[i].zmv for i in range(2)) > 0
+    assert sum(values[f"phases.{i}.scale"] * zmv[i].cell_volume for i in range(2)) < 0
+    qpa = compute_qpa(structure, values)
+    assert all(r.weight_fraction is not None for r in qpa.phases)
+    assert all(r.mole_fraction is None for r in qpa.phases)

@@ -562,7 +562,11 @@ def compute_qpa(structure: Structure, values: dict[str, float],
             z_of[ip] = zmvs[ip].z
             z_source[ip] = ("composition" if zmvs[ip].z_resolved
                             else "unresolved")
-    unresolved = [ip for ip in measured if z_source[ip] == "unresolved"]
+    # a phase with no mass in its cell (every site empty) has W = 0 and
+    # counts no cells either; it neither takes a share nor withholds a column
+    massive = {ip for ip in measured if zmvs[ip].cell_mass > 0.0}
+    unresolved = [ip for ip in measured
+                  if z_source[ip] == "unresolved" and ip in massive]
     withheld = unresolved if len(measured) > 1 else []
     x_cell: dict[int, float] = {}
     x_cell_sigma: dict[int, float] = {}
@@ -574,15 +578,21 @@ def compute_qpa(structure: Structure, values: dict[str, float],
         x_fu = dict.fromkeys(w_of, 1.0)
     elif w_of:
         def partition(per_cell):
-            x, sx, _ = mole_fractions(per_cell, [scales[ip] for ip in measured],
-                                      scale_cov)
+            s_m = [scales[ip] for ip in measured]
+            if sum(s * c for s, c in zip(s_m, per_cell, strict=True)) <= 0.0:
+                # a negative scale can leave Σ S·ZMV positive and this sum
+                # not: the basis is absent, never a raise (WP-1028 §(f))
+                return {}, {}
+            x, sx, _ = mole_fractions(per_cell, s_m, scale_cov)
             return ({ip: float(x[k]) for k, ip in enumerate(measured)},
                     {} if sx is None
                     else {ip: float(sx[k]) for k, ip in enumerate(measured)})
-        x_cell, x_cell_sigma = partition([zmvs[ip].cell_volume for ip in measured])
+        x_cell, x_cell_sigma = partition(
+            [zmvs[ip].cell_volume if ip in massive else 0.0 for ip in measured])
         if not withheld:
-            x_fu, x_fu_sigma = partition([z_of[ip] * zmvs[ip].cell_volume
-                                          for ip in measured])
+            x_fu, x_fu_sigma = partition(
+                [z_of[ip] * zmvs[ip].cell_volume if ip in massive else 0.0
+                 for ip in measured])
     rows = [
         PhaseQuantity(
             name=phase.name,
@@ -640,12 +650,14 @@ def _formula_unit_withheld_reason(phases: list[tuple[str, ZMV]]) -> str:
         counts = " and ".join(f"{el} {count:.4g}" for el, count in odd.items())
         named.append(
             f"{name}, whose occupancy-weighted counts per cell ({counts}) are "
-            "not whole numbers (a mixed or partially occupied site)"
-            if counts else f"{name}, which has no atoms to count")
+            "not whole numbers (a mixed or partially occupied site)")
+    one = len(phases) == 1
     return ("Mole fractions are given per unit cell only: the formula unit is "
-            "not established for " + "; ".join(named) + ", so its z = 1 and "
-            "molar_mass are the whole cell's, and a per-formula-unit column "
-            "would mix two bases.")
+            "not established for " + "; ".join(named)
+            + (", so its z = 1 and molar_mass are" if one
+               else ", so their z = 1 and molar_mass are each")
+            + " the whole cell's, and a per-formula-unit column would mix two "
+            "bases.")
 
 
 def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
@@ -661,7 +673,7 @@ def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]
     if qpa.formula_unit_withheld is None:
         return []
     names = [r.name for r in qpa.phases if r.z_source == "unresolved"
-             and r.weight_fraction is not None]
+             and r.weight_fraction is not None and r.cell_mass > 0.0]
     return [Diagnostic(
         level="info", code="QPA_FORMULA_UNIT_WITHHELD",
         where=names,
