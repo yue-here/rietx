@@ -2651,9 +2651,10 @@ def _corrupt_streams(path: Path, *, at: int) -> Path:
     raw = bytearray(path.read_bytes())
     with zipfile.ZipFile(path) as archive:
         for member in archive.infolist():
-            at = member.header_offset
-            start = (at + 30 + int.from_bytes(raw[at + 26:at + 28], "little")
-                     + int.from_bytes(raw[at + 28:at + 30], "little"))
+            offset = member.header_offset
+            start = (offset + 30
+                     + int.from_bytes(raw[offset + 26:offset + 28], "little")
+                     + int.from_bytes(raw[offset + 28:offset + 30], "little"))
             raw[start + at] ^= 0xFF
     path.write_bytes(bytes(raw))
     return path
@@ -2674,6 +2675,24 @@ def test_a_zip_version_past_6_3_is_not_claimed_by_a_vendor_sniff(tmp_path, kind)
     assert looks_brml(p) is False
     with pytest.raises(ValueError) as refusal:
         rx.read_pattern(p)
+    assert p.name in str(refusal.value)
+
+
+@pytest.mark.parametrize("kind", ["rasx", "brml"])
+def test_a_zip_version_past_6_3_is_refused_by_the_reader_called_directly(
+        tmp_path, kind):
+    """``read_rasx`` and ``read_brml`` are exported, so a caller can reach
+    ``_archive`` without the sniff: the ``NotImplementedError`` is converted
+    there too."""
+    from rietx.io.formats.brml import read_brml
+    from rietx.io.formats.rasx import read_rasx
+
+    p = _rewritten(_zip_container(kind, tmp_path / f"good.{kind}"),
+                   tmp_path / f"v64.{kind}", extract_version=64)
+
+    reader = read_rasx if kind == "rasx" else read_brml
+    with pytest.raises(ValueError, match="not a readable one") as refusal:
+        reader(p)
     assert p.name in str(refusal.value)
 
 

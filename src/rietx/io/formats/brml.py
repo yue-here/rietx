@@ -137,7 +137,7 @@ class _Columns:
 def _archive(path: Path) -> zipfile.ZipFile:
     try:
         return zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError) as exc:
         raise ValueError(f"{path.name} begins like a zip archive but is not a "
                          f"readable one ({exc}); a .brml that stops early is "
                          "usually a copy that was interrupted") from None

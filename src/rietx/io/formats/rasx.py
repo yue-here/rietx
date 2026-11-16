@@ -101,7 +101,7 @@ def _archive(path: Path) -> zipfile.ZipFile:
     """The open archive, with ``zipfile``'s exception converted at this boundary."""
     try:
         return zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError) as exc:
         raise ValueError(f"{path.name} begins like a zip archive but is not a "
                          f"readable one ({exc}); a .rasx that stops early is "
                          "usually a copy that was interrupted") from None
