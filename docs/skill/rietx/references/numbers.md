@@ -84,6 +84,9 @@ wt% was reported on a pattern that admitted 0 %, 1.5 % and 98.7 % within
 `ref.profile_fraction(data, phase)` and read its range
 (`judging.md` § "a trace phase's esd describes one basin"). It is a scan,
 because nothing read at the converged point can see this.
+Two different starts that converge to different Rwp are two basins, not one
+answer: report both, since no diagnostic separates them and `HIGH_CORRELATION`
+reads the curvature at the one minimum it is given (issue #661).
 
 Images are secondary evidence. `plot_for_vlm()` exists and renders what VLMs
 *can* read (annotated multi-panel montage, worst regions auto-zoomed, Δ/σ panel,

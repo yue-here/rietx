@@ -80,6 +80,21 @@ def test_ionic_charge_is_discarded_but_mass_number_is_kept():
     assert normalize_species("157Gd") == "157Gd"
 
 
+def test_an_element_first_isotope_is_refused_naming_the_mass_first_spelling():
+    """``Li7`` is refused at evaluation, and the refusal names ``7Li`` (WP-1532).
+
+    Issue #661: an agent wrote lithium-7 element-first and the message said
+    only that it could not read the species.  A label that is no such slip
+    gets no hint, since there is no spelling to name.
+    """
+    with pytest.raises(KeyError, match="mass-first, 7Li") as caught:
+        normalize_species("Li7")
+    assert "Fe3+" in str(caught.value)              # the charge reading too
+    with pytest.raises(KeyError) as plain:
+        normalize_species("123")
+    assert "mass-first" not in str(plain.value)
+
+
 def test_vanadium_is_the_standard_can():
     """Near-null coherent, overwhelmingly incoherent.
 

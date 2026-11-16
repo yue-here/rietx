@@ -133,7 +133,14 @@ def normalize_species(species: str) -> str:
         return _ISOTOPE_ALIAS[s]
     m = re.fullmatch(r"(\d*)([A-Za-z]{1,2})", s)
     if not m:
-        raise KeyError(f"cannot read a species from {species!r}")
+        # An element-then-number label is the one misspelling with a fix to
+        # name: an agent wrote 'Li7' for lithium-7 and met only the refusal
+        # (issue #661, WP-1532).  'Fe3' reads the same way, so both readings go.
+        flipped = re.fullmatch(r"([A-Za-z]{1,2})(\d+)", s)
+        hint = (f"; an isotope is written mass-first, "
+                f"{flipped[2]}{flipped[1].capitalize()}, and a charge carries "
+                "its sign, Fe3+") if flipped else ""
+        raise KeyError(f"cannot read a species from {species!r}{hint}")
     mass, element = m.groups()
     return f"{mass}{element.capitalize()}" if mass else element.capitalize()
 
