@@ -190,6 +190,30 @@ def test_a_preview_rides_accepted_evals_to_the_callback_alone(
         _draw_preview(last, synthetic_pattern, OUT / "wp1949_preview_obs_calc_diff.png")
 
 
+@pytest.mark.parametrize("mode", ["pawley", "lebail"])
+def test_a_preview_in_the_extraction_modes(synthetic_pattern, mode):
+    """Pawley carries its intensities in θ, so its preview is the fitted
+    curve to the 8e-6 bar.  Le Bail's residual reads intensities frozen for
+    the solve, re-extracted only after it, so its preview is the curve the
+    solve minimised and is not held to ``predict()`` (``_preview_builder``'s
+    docstring has the measured gap)."""
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    ref = rx.Refinement(structure, ins, history=False)
+    ref.fit(synthetic_pattern, mode=mode,
+            events=EventStream(callback=seen.append, preview=True))
+    evals = [e for e in seen if e["kind"] == "eval"]
+    assert evals and all(("preview" in e) == e["data"]["accepted"]
+                         for e in evals)
+    _, stage_evals = _last_stage_previews(seen)
+    last = [e for e in stage_evals if e["data"]["accepted"]][-1]["preview"]
+    assert np.all(np.isfinite(last["y_calc"]))
+    if mode == "pawley":
+        y = ref.predict()
+        gap = np.max(np.abs(last["y_calc"] - y)) / np.max(np.abs(y))
+        assert gap <= 8e-6, gap
+
+
 def _draw_preview(preview: dict, pattern, path: Path) -> None:
     """The obs/calc/diff picture a viewer draws from one preview (WP-1949)."""
     import matplotlib
