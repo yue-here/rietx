@@ -1659,9 +1659,12 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "The component carries both `axial_tail` and `position_at_bound`. It is a weak "
             "shoulder on the axial-divergence tail side of a much stronger component in its "
             "group, and the fit pushed it to its position bound, so the data did not fix "
-            "a position for it. On three laboratory instruments every such component sat "
-            "below the stronger line's own reflection. It stays in the list as part of "
-            "that line's shape and is unusable."
+            "a position for it. Measured on three laboratory instruments (the IUCr CPD "
+            "round robin, SRM 660c, SRM 1976a), every such component sat below the "
+            "stronger line's own reflection; untested on synchrotron or dense "
+            "low-symmetry patterns. It stays in the list as part of that line's shape "
+            "and is unusable. Detection judges it; a position you named is never "
+            "flagged."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),

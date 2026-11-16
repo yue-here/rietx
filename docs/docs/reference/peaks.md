@@ -138,7 +138,7 @@ A contamination line is flagged and left out, never subtracted, because strippin
 
 The evidence flags leave a line in because one pattern cannot say what the line is.
 A real reflection can stand on an extrapolated background, on a stronger line's axial tail or at a predicted Kα2 position, and on the certified laboratory patterns a component under the false-discovery bar is often a real weak line the certified cell indexes.
-Two of them together are another matter: a component on a stronger line's axial tail that the fit also pushed to its position bound is flagged `tail_shoulder` and left out, because on three laboratory instruments every such component sat below the stronger line's own reflection.
+`axial_tail` and `position_at_bound` together are another matter: a component on a stronger line's axial tail that the fit also pushed to its position bound is flagged `tail_shoulder` and left out, because on three laboratory instruments every such component sat below the stronger line's own reflection.
 
 `weak_line` sits between the two groups.
 A search is driven by the strongest usable lines and scores a candidate against every usable line, and every line a search is driven by is one an accepted cell must index.
@@ -222,7 +222,7 @@ It takes `data`, `instrument`, `positions` (a list or an array of 2θ in degrees
 | a weak shoulder | proposed, then kept or refused on ΔBIC | fitted only if you name it |
 | `ObservedPeak.origin` | `"fitted"` | `"manual"` |
 | a position with no peak | does not arise | returned, flagged `no_intensity` |
-| `unresolved_split`, `width_capped` | judged | not judged: a named pair closer than Sparrow's limit comes back as two lines |
+| `unresolved_split`, `width_capped`, `tail_shoulder` | judged | not judged: a named pair closer than Sparrow's limit comes back as two lines, and a named shoulder on a tail stays usable |
 | `duplicate_line`, `weak_line` | judged | not judged |
 | ghost search | `flag_contamination=True` by default | always, subject to the declared beam |
 | `PEAK_LIST_TOO_SHORT`, `PEAK_EXPECTED_FALSE_LINES` | reported | never: the count and the positions are yours |

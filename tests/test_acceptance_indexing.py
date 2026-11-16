@@ -2240,10 +2240,15 @@ def test_the_tail_components_escape_not_separable_and_are_flagged_by_cause(
     assert by_flag <= by_probe, (
         f"the flag trim kept lines the probe drops: "
         f"{sorted(by_flag - by_probe)}")
+    # WP-2120: the 43.5° tail also sits on its position bound, so it is
+    # ``tail_shoulder`` and already out of ``usable()``; both trims keep it
+    # as shape, and they now agree.  Before WP-2120 they differed by exactly it.
     swap = sorted(by_probe - by_flag)
-    assert len(swap) == 1 and abs(swap[0] - 43.5) < 0.1, (
-        f"the two trims should differ by exactly the 43.5° slot-swap tail "
-        f"(the one aliased onto a certified position), got {swap}")
+    assert swap == [], (
+        f"the two trims should agree now the 43.5° slot-swap tail is "
+        f"tail_shoulder, got {swap}")
+    (slot,) = [p for p in peaks.peaks if abs(p.two_theta - 43.505) < 0.01]
+    assert "tail_shoulder" in slot.flags and not slot.usable, slot.flags
 
 
 @pytest.mark.xdist_group("indexing-acceptance-lab6")
@@ -2907,9 +2912,17 @@ def test_what_the_unflagged_tail_components_cost_the_certified_cell(
     # what the zero-error column was measured to rescue — running the control
     # there would silently re-measure WP-1040's claim instead of pinning it.
     probe = _without_the_off_lattice_lines(lab6_peaks)
+    # WP-2120 took the 43.5° tail out of ``usable()`` (``tail_shoulder``), so
+    # the probe trim now leaves the flag trim's 0.0025°.  The window is still
+    # the one WP-1040 measured the rescue under: the probe screen with that
+    # one component offered again, as it was before WP-2120.
+    offered = lab6_peaks.model_copy(update={"peaks": [
+        p.model_copy(update={"flags": [f for f in p.flags if f != "tail_shoulder"]})
+        for p in lab6_peaks.peaks]})
+    then = _without_the_off_lattice_lines(offered)
     probe_screen = fit_shift_model(
-        probe.two_theta(), _certified_deviation(probe, probe.two_theta()),
-        probe.two_theta_esd())
+        then.two_theta(), _certified_deviation(then, then.two_theta()),
+        then.two_theta_esd())
     spec = SearchSpec(systems=("cubic",), max_volume=300.0, budget_seconds=REAL_DATA_BUDGET_SECONDS,
                       n_unindexed=REAL_DATA_N_UNINDEXED,
                       shift_template="cos_theta",

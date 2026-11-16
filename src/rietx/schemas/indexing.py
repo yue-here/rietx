@@ -238,7 +238,11 @@ from .structure import Cell
 #: group-mate's axial-tail side, which the fit pushed to its position bound.  On
 #: the 16 IUCr round-robin lab patterns the eight such components leave
 #: ``usable()``.  Seven of them are 0.070-0.142 degrees from every lattice line.
-#: Neither flag alone moves, and no threshold here moved.
+#: Two leave on SRM 1976a and one on #916's flat synthetic silicon (0.095 degrees
+#: off its line); SRM 660c's one was ``weak_line`` and is now out of the
+#: false-discovery screen, which reads usable components only.  A component that
+#: was a ``duplicate_line`` copy can now be ``tail_shoulder`` instead, unusable
+#: either way.  Neither flag alone moves, and no threshold here moved.
 INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is

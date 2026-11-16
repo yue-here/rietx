@@ -143,9 +143,11 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     position, so what comes back is wherever the solve left it (measured: 40 m°
     from the seed, with an esd of 1e+16 degrees saying exactly that) — the flag
     is the answer, the number is not.
-    (3) The two resolvability judgements of detection (``unresolved_split``,
-    ``width_capped``) are **not** made: the components are the caller's, so a
-    named pair closer than Sparrow's limit comes back as two lines.
+    (3) The three judgements detection makes about the components it proposed
+    (``unresolved_split``, ``width_capped``, ``tail_shoulder``) are **not**
+    made: the components are the caller's, so a named pair closer than
+    Sparrow's limit comes back as two lines, and a named shoulder on a tail
+    keeps its ``axial_tail`` and ``position_at_bound`` and stays usable.
     (4) Where the window holds a component the list did not name, its named
     lines are flagged ``unnamed_neighbour``: the unnamed intensity had nowhere
     to go but into them.  The question is asked of the caller's own fit, and
@@ -387,8 +389,10 @@ def _flags_for(fit: GroupFit, j: int,
         flags.append("not_separable")
     if _axial_tail(fit, j):
         flags.append("axial_tail")
-        if bool(fit.at_bound[j]):
-            # the strong line's own tail, at no position of its own (WP-2120)
+        # the strong line's own tail, at no position of its own (WP-2120).
+        # Detection's judgement about a component it proposed, so only on a
+        # fit ``fit_group`` judged: never on positions a caller named
+        if bool(fit.at_bound[j]) and fit.width_at_bound is not None:
             flags.append("tail_shoulder")
     if (float(fit.intensity[j]) <= BOUND_HIT_RTOL
             or float(fit.intensity[j])
@@ -422,7 +426,9 @@ def _axial_tail(fit: GroupFit, j: int) -> bool:
     usable components across the six other real lab patterns).  **Refused only
     together with** ``position_at_bound``, as ``tail_shoulder`` (WP-2120): a
     component the fit pushed to its bound has no position of its own, and on
-    three lab families every such one is its mate's tail.  Measured on
+    three lab families every such one is its mate's tail.  That is detection's
+    judgement, made only on a fit :func:`fit_group` judged, never on named
+    positions (:func:`fit_peaks`, the peak editor's refits).  Measured on
     SRM 660c it catches exactly the five tails, worth 125 ppm of
     certified-cell bias, and excluding the flagged components is what took the
     gate to ``high`` at −2 ppm.

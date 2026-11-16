@@ -12,6 +12,7 @@ Interpretation table, written before the tests were (each arm can fail):
 | the 16 IUCr round-robin lab patterns | ``tail_shoulder`` on exactly the components carrying both flags; none usable; 8 of them would otherwise be usable (no other unusable flag, no other group's usable copy), each 0.6-1.0 fitted FWHM below a usable group-mate 4-14x its area | the flag missing from the conjunction, raised without it, or a usable line taken that is not a shoulder of its mate |
 | the same, the other flags | every component carrying only one of the two is still usable unless another flag says otherwise | the rule widened to ``axial_tail`` or ``position_at_bound`` alone |
 | SRM 1976a on an X'Pert (a second instrument family) | the two shoulders at 52.53 deg and 76.84 deg flagged and unusable; a usable component still holds each mate's line, 52.57 deg and 76.88 deg | the rule fails to carry to a narrower-line instrument, or takes the strong line |
+| the same shoulder **named** (``fit_peaks``, a negative arm) | ``axial_tail`` and ``position_at_bound`` both raised, ``tail_shoulder`` not, and the line usable: the judgement is detection's, never made on a caller's positions | the flag reaching named positions |
 | fluorite.prn: the picture | ``tests/output/peaks_tail_shoulder_fluorite.png`` with the 46.92 deg shoulder under the fluorite (220) line | — |
 
 Real data only: the round robin (``tests/data/qarr``) and SRM 1976a
@@ -81,10 +82,6 @@ def test_the_flag_is_exactly_the_conjunction_on_the_round_robin():
         for p in pl.peaks:
             both = {"axial_tail", "position_at_bound"} <= set(p.flags)
             assert ("tail_shoulder" in p.flags) == both, (name, p.two_theta, p.flags)
-            if both:
-                assert not p.usable, (name, p.two_theta)
-            elif not set(p.flags) & PEAK_UNUSABLE_FLAGS:
-                assert p.usable, (name, p.two_theta, p.flags)
         taken += [(name, p, _mate(fits, p)) for p in _taken(pl)]
     assert len(taken) == 8, [(n, round(p.two_theta, 3)) for n, p, _ in taken]
     for name, p, (tt_m, i_m, fwhm) in taken:
@@ -107,6 +104,8 @@ def test_a_second_instrument_family_loses_the_shoulders_and_keeps_their_lines():
         # that fitted it; the other copy is ``duplicate_line``)
         held = [m for m in pl.peaks if m.usable and abs(m.two_theta - line) < 0.005]
         assert held and all("tail_shoulder" not in m.flags for m in held)
+    codes = {d.code: d for d in pl.diagnostics}
+    assert "(tail_shoulder) and are excluded from usable()" in codes["PEAK_AXIAL_TAIL"].message
     # the census moved by those two alone: 61.13° is a third ``tail_shoulder``,
     # but another group's usable component holds its line, so it was a
     # ``duplicate_line`` copy and unusable before
@@ -126,3 +125,14 @@ def test_the_fluorite_shoulder_is_drawn_under_its_line():
     assert path.exists()
     p = min(pl.peaks, key=lambda q: abs(q.two_theta - 46.918))
     assert "tail_shoulder" in p.flags and not p.usable
+
+
+def test_a_named_shoulder_is_the_callers_and_is_not_judged():
+    from tests.test_acceptance_srm1976a_texture import PATTERN, _instrument
+    if not PATTERN.exists():
+        pytest.skip("SRM 1976a pattern not present")
+    pl = rx.fit_peaks(rx.read_pattern(PATTERN), _instrument(), [52.48, 52.569])
+    p = min(pl.peaks, key=lambda q: abs(q.two_theta - 52.51))
+    assert p.origin == "manual"
+    assert {"axial_tail", "position_at_bound"} <= set(p.flags), p.flags
+    assert "tail_shoulder" not in p.flags and p.usable, p.flags

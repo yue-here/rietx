@@ -15,7 +15,7 @@ Interpretation table, written before the tests were (each arm can fail):
 
 | arm | must read if it works | reading if it is broken |
 |---|---|---|
-| #916's flat Si (seed 1, 12.1–60°): census | 20 picked, 16 usable, ``[1,1,1,2,1,3,1,1,1,1,1]``, and the flag counts main's own picker gives (``position_at_bound`` 7, ``no_intensity`` 3, ``weak_line`` 5, ``width_capped`` 1) | a diagnostic change moved a flag or ``usable()`` |
+| #916's flat Si (seed 1, 12.1–60°): census | 20 picked, 15 usable, ``[1,1,1,2,1,3,1,1,1,1,1]``, and the flag counts main's own picker gives (``position_at_bound`` 7, ``no_intensity`` 3, ``weak_line`` 4, ``width_capped`` 1, ``tail_shoulder`` 3; WP-2120 moved the usable count and ``weak_line``) | a diagnostic change moved a flag or ``usable()`` |
 | the same: ``PEAK_POSITION_AT_BOUND`` | lists exactly the 7 flagged components, each with ±0.5 × its window's seed FWHM; ``info``, value 0 (every one is unusable or under the bar) | absent, a component missed, or a bound that is not its window's |
 | a position named one FWHM off a strong line (``fit_peaks``) | flagged, the bound from **its own** window (not detection's group of the same index), ``info`` (Yue's ruling: never a warning), value 1, the count still offered | the bound read from the wrong window, or the offered count lost |
 | the same position named on the line (control) | no flag, no diagnostic | a clean line reported at its bound |
