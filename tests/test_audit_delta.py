@@ -212,6 +212,20 @@ def test_a_retune_to_a_tier_that_needs_no_approval_passes():
     assert _whys(kept[0]) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")] and len(kept[1]) == 1
 
 
+def test_a_retune_that_demotes_to_tier_2_or_unaudited_fails_until_a_later_date():
+    """Decided in the WP: only tier 1 or ``invariant`` passes.  A demotion to
+    tier 2 or ``unaudited`` is itself a ruling nobody gave, so the retune
+    still owes one; a later date passes it."""
+    before = _table(_APPROVED.format(value=3.0))
+    for tier in ("2", '"unaudited"'):
+        demoted = _APPROVED.format(value=2.5).replace("tier=3", f"tier={tier}")
+        found, bad, _ = _run(before, _table(demoted))
+        assert _whys(found) == [(ad.RETUNED, "rietx.refine.HOLD_SIGMA")], tier
+        assert len(bad) == 1 and "The maintainer's ruling on the new value is owed" in bad[0]
+        found, bad, _ = _run(before, _table(demoted.replace("2026-10-19", "2026-11-16")))
+        assert _whys(found) == [(ad.CHANGED, "rietx.refine.HOLD_SIGMA")] and bad == [], tier
+
+
 def test_a_tier_2_action_meets_the_tier_3_rule():
     """Decided in the WP: a tier-2 action row is retuned under the same rule.
     Vacuous on today's table, whose test holds an action's value at None; the
@@ -222,8 +236,19 @@ def test_a_tier_2_action_meets_the_tier_3_rule():
     assert _whys(found) == [(ad.RETUNED, "rietx.refine.hold_absent_phase")]
     assert bad[0].startswith("rietx.refine.hold_absent_phase (action, tier 2) changed value "
                              "from 3 to 4")
-    assert ad.needs_approval(ad.Row("x", "action", tier=2))
-    assert not ad.needs_approval(ad.Row("x", "constant", tier=2))
+
+
+def test_a_split_of_an_approved_row_pairs_the_same_way_whichever_name_sorts_first():
+    """The exact rename is placed before the retune pairing, so the copy that
+    keeps the value is the rename and the retuned copy is an addition."""
+    before = _table(_APPROVED.format(value=3.0))
+    for kept, retuned in (("rietx.b.", "rietx.a."), ("rietx.a.", "rietx.b.")):
+        after = _table(_APPROVED.format(value=3.0).replace("rietx.refine.", kept),
+                       _APPROVED.format(value=2.5).replace("rietx.refine.", retuned))
+        found, bad, _ = _run(before, after)
+        assert sorted((d.why, d.row.name) for d in found) == sorted(
+            [(ad.RENAMED, kept + "HOLD_SIGMA"), (ad.ADDED, retuned + "HOLD_SIGMA")]), kept
+        assert bad == [], kept
 
 
 def test_a_constant_in_a_file_the_base_did_not_walk_passes():

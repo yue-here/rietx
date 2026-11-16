@@ -199,11 +199,12 @@ and have no free factor to measure, so this file's old list named them without c
   is one of the two observations that would flip that pick to a new scenario-set file. Name
   any such demotion in WP-2020's handover log when it lands.
 - **From WP-2064 (2026-11-16, PR #1601).** Once #1601 merges, CI's audit delta fails a pull
-  request that changes the value of a row carrying `approved` and keeps it at tier 3 (or a
-  tier-2 action), until the maintainer writes a later date. A group whose measurement moves a
+  request that changes the value of a row carrying `approved` and leaves it at any tier but 1
+  or `invariant`, until the maintainer writes a later date. A group whose measurement moves a
   tier-3 value therefore waits on that ruling before CI passes. A value demoted to tier 1 or
-  `invariant` passes, and an evidence-only change, which every group so far has been, reads
-  exactly as before (measured on #1577's head 539ef7fc7: 24 changed, no failure).
+  `invariant` passes; one demoted to tier 2 or `unaudited` still waits, since the demotion is
+  itself a ruling. An evidence-only change, which every group so far has been, reads exactly
+  as before (measured on #1577's head 539ef7fc7: 24 changed, no failure).
 
 ## Non-goals
 

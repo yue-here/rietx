@@ -38,13 +38,20 @@ and its numbers still need their tiers.
 date is the maintainer's ruling on one value, and the table test holds a row's
 value to the tree's, so a retune edits the value and leaves the date.  A row
 whose value differs from its base row's, where the base row carries
-``approved``, fails unless the head's date is later, a date on the same day
-included.  A new name pairs with a deleted one of the same kind and leaf for
+``approved``, fails unless the head's date is later; a date on the same day
+fails too.  A new name pairs with a deleted one of the same kind and leaf for
 this check alone, so a row renamed and retuned in one change is caught too; a
-plain rename keeps its value and is no retune.  A row whose head tier needs no
-approval at all (`needs_approval`) passes, such as one moved from tier 3 to
-tier 1 or ``invariant``.  A tier-2 action meets the same rule as a tier-3 row,
-which is vacuous today: the table test holds every action's value at None.
+plain rename keeps its value and is no retune.  The exact renames are placed
+first, over every new name, so the retune pairing sees only what they leave
+and its result does not hang on which name sorts first.  The pairing is by
+leaf, so it can join two unrelated rows that share one; a later date on the
+new row, which a new tier-3 row needs anyway, passes it.  Only a head tier
+that needs no approval at all passes without a later date: tier 1 or
+``invariant`` (`NEEDS_NO_APPROVAL`).  Any other head tier meets the rule, so a
+retune that demotes the row to tier 2 or ``unaudited`` still owes the ruling,
+since the demotion is itself one.  A tier-2 action meets it as a tier-3 row
+does, which is vacuous today: the table test holds every action's value at
+None.
 The maintainer writes the date (CONTRIBUTING.md § A heuristic needs its tier),
 so the failure says a ruling is owed and never tells the author to write one;
 the check sees only that the date moved, never who moved it.  Every other
@@ -223,10 +230,9 @@ def changed_fields(old: Row, new: Row) -> list[str]:
     return [f for f in FIELDS[1:] if repr(getattr(old, f)) != repr(getattr(new, f))]
 
 
-def needs_approval(row: Row) -> bool:
-    """Whether a row needs the maintainer's dated ruling: tier 3, and a
-    tier-2 action (`tests/test_audit_table.py`, `needs grounds and approved`)."""
-    return row.tier == 3 or (row.tier == 2 and row.kind == "action")
+#: The head tiers a retune passes at without a later date (WP-2064): the
+#: tiers that need no approval at all.
+NEEDS_NO_APPROVAL = (1, "invariant")
 
 
 def _date(text: object) -> datetime.date | None:
@@ -237,9 +243,11 @@ def _date(text: object) -> datetime.date | None:
 
 
 def retuned_under_old_approval(old: Row, new: Row) -> bool:
-    """Whether ``new`` changed ``old``'s value and still needs an approval
-    that is no later than the one ``old`` carried (module docstring)."""
-    if not old.approved or repr(old.value) == repr(new.value) or not needs_approval(new):
+    """Whether ``new`` changed ``old``'s value, sits at a tier other than
+    `NEEDS_NO_APPROVAL`, and carries no approval later than the one ``old``
+    carried (module docstring)."""
+    if (not old.approved or repr(old.value) == repr(new.value)
+            or new.tier in NEEDS_NO_APPROVAL):
         return False
     was, now = _date(old.approved), _date(new.approved)
     return was is None or now is None or now <= was
@@ -254,20 +262,30 @@ def deltas(before: Table, after: Table,
     """Every row the change added, renamed, changed or deleted.  ``existed``
     says whether the base defined the code a row names (`defined_at`)."""
     deleted = sorted(before.rows.keys() - after.rows.keys())
+    added = sorted(after.rows.keys() - before.rows.keys())
     out = []
-    for name in sorted(after.rows.keys() - before.rows.keys()):
+    # Exact renames first, over every new name, then the retune pairing over
+    # what they leave, so neither depends on which name sorts first.
+    paired: dict[str, Delta] = {}
+    for name in added:
         row = after.rows[name]
         pair = next((d for d in deleted
                      if _rename_key(before.rows[d]) == _rename_key(row)), None)
-        retuned = next((d for d in deleted
-                        if _rename_key(before.rows[d])[:2] == _rename_key(row)[:2]
-                        and retuned_under_old_approval(before.rows[d], row)), None)
         if pair is not None:
             deleted.remove(pair)
-            out.append(Delta(RENAMED, row, before.rows[pair]))
-        elif retuned is not None:
+            paired[name] = Delta(RENAMED, row, before.rows[pair])
+    for name in added:
+        row = after.rows[name]
+        retuned = None if name in paired else next(
+            (d for d in deleted if _rename_key(before.rows[d])[:2] == _rename_key(row)[:2]
+             and retuned_under_old_approval(before.rows[d], row)), None)
+        if retuned is not None:
             deleted.remove(retuned)
-            out.append(Delta(RETUNED, row, before.rows[retuned]))
+            paired[name] = Delta(RETUNED, row, before.rows[retuned])
+    for name in added:
+        row = after.rows[name]
+        if name in paired:
+            out.append(paired[name])
         elif via := opened_by(row, before, after, existed):
             out.append(Delta(OPENED, row, via=via))
         else:

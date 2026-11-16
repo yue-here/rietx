@@ -73,6 +73,15 @@ NASA-STD-7009A (2016), Standard for Models and Simulations, via `docs/practice.m
 
 ## Handover log
 
+- **2026-11-16** — review fix-ups on PR #1601 (a ghostshift runner, from a read-only review).
+  The head tiers that pass a retune without a later date are now the WP's own two, tier 1 and
+  `invariant` (`NEEDS_NO_APPROVAL`, replacing `needs_approval`); a retune that demotes the row
+  to tier 2 or `unaudited` fails until a later date, with a test. The new-name pairing places
+  every exact rename before the retune pairing, so a split of one approved row reads the same
+  whichever name sorts first, with a test. The docstring now says a same-day date fails, and
+  that the pairing is by leaf. The tier list is the same in the docstring, the v1.12 record and
+  WP-2017's forward note. `tests/test_audit_delta.py` is 25 passed (two tests added).
+
 - **2026-11-16** — closed, all four tasks landed (PR #1601; a ghostshift runner, one session).
 
   A pull request can no longer carry a tier-3 number into `main` under an approval the
@@ -90,8 +99,9 @@ NASA-STD-7009A (2016), Standard for Models and Simulations, via `docs/practice.m
   tests in `tests/test_audit_delta.py`; one sentence in `CONTRIBUTING.md`.
 
   *Decided while writing (the WP's two cases, and two it did not name).* "Needs no approval"
-  is read off the head row's tier with the table test's predicate, so tier 1, `invariant`,
-  `unaudited` and a tier-2 non-action all pass. The tier-2 action arm is vacuous today, since
+  is the WP's own list, tier 1 or `invariant` (`NEEDS_NO_APPROVAL`); a retune that demotes the
+  row to tier 2 or `unaudited` still fails until a later date, since the demotion is itself a
+  ruling (narrowed at review: the review fix-up entry). The tier-2 action arm is vacuous today, since
   `test_audit_table.py` holds every action's value at None; the test gives an action a value to
   show the rule reaches it. "Later" is strict, as the Goal says: a retune ruled on the day of
   the old approval needs the next day's date. From the diff review: renames pair only at an
