@@ -245,11 +245,18 @@ def bound_one(task: dict) -> dict:
         sign = 1.0 if side == "min" else -1.0          # min: bound above the optimum
         bound = opt + sign * BOUND_ESDS * esd if mode == "bind" else opt - sign * BOUND_ESDS * esd
         start = opt + sign * (BOUND_ESDS + START_ESDS) * esd
+        # widen only as far as the start needs, place it, then set the moved bound: a
+        # Parameter validates value against its bounds on every assignment
         if side == "min":                 # a lower bound: above the optimum, or (control) below
-            param.min, param.max = bound, max(param.max, start + esd)
+            param.max = max(param.max, start + esd)
+            param.min = min(param.min, start)
+            param.value = start
+            param.min = bound
         else:                             # an upper bound: below the optimum, or (control) above
-            param.max, param.min = bound, min(param.min, start - esd)
-        param.value = start
+            param.min = min(param.min, start - esd)
+            param.max = max(param.max, start)
+            param.value = start
+            param.max = bound
         row.update({"optimum": opt, "esd": esd, "bound": bound, "start": start,
                     "lo": param.min, "hi": param.max})
         captured: list = []
