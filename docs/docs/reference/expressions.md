@@ -84,7 +84,7 @@ Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
 ## Conditions
 
 A condition is a comparison, or comparisons joined by `and`, `or` and `not`.
-A condition appears only as the first argument of `if`.
+A condition appears as the first argument of `if`, and alone as a parametric equation's `where`, the subset it applies to ([Parametric refinement](parametric.md)).
 An expression whose value is a condition is refused, because an equation's value is a number.
 
 A condition carries no derivative.

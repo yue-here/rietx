@@ -507,6 +507,31 @@ def parse(text: str):
     The tree is a number: a condition is refused at the top level, since an
     equation's value is a number.
     """
+    node = _parse_any(text)
+    if _is_condition(node):
+        raise ExpressionError("type", "the expression is a condition; an equation's "
+                              "value is a number (a condition goes in if(…))", text, 0)
+    return node
+
+
+def parse_condition(text: str):
+    """The tree of a condition ``text``; raises :class:`ExpressionError`.
+
+    The grammar's own conditions (a comparison, or comparisons joined by
+    ``and``, ``or`` and ``not``), written alone: a parametric equation's
+    ``where`` (WP-1965).  A number is refused at the top level, the mirror of
+    :func:`parse`.
+    """
+    node = _parse_any(text)
+    if not _is_condition(node):
+        raise ExpressionError("type", "the text is a number; a condition is a "
+                              "comparison such as 'T < 800', or comparisons joined "
+                              "by and, or and not", text, 0)
+    return node
+
+
+def _parse_any(text: str):
+    """The tree of ``text``, a number or a condition, with every shared refusal."""
     if not isinstance(text, str):
         raise TypeError(f"an expression is text, got {type(text).__name__}")
     if len(text) > MAX_LENGTH:
@@ -526,9 +551,6 @@ def parse(text: str):
                               f"{MAX_DEPTH} levels; group a long sum or product in "
                               "parentheses, or split it into intermediate "
                               "equations", text, 0)
-    if _is_condition(node):
-        raise ExpressionError("type", "the expression is a condition; an equation's "
-                              "value is a number (a condition goes in if(…))", text, 0)
     return node
 
 
@@ -1000,3 +1022,34 @@ class Expression:
         out = [np.array(np.broadcast_to(np.asarray(d.get(k, 0.0)), v.shape),
                         dtype=v.dtype) for k in wrt]
         return v, out
+
+
+class Condition:
+    """One parsed condition: its text, its tree, its names, and where it holds.
+
+    ``Condition("T < 800 and x >= 0.1")`` parses (raising
+    :class:`ExpressionError`, a number at the top level included) and keeps
+    the user's text.  A parametric equation's ``where`` (WP-1965) is one,
+    evaluated over the coordinate columns at every resolution.
+    """
+
+    def __init__(self, text: str):
+        self.text = text
+        self.tree = parse_condition(text)
+        #: the free names, first use first, ``pi`` left out
+        self.names: tuple[str, ...] = tuple(names_in(self.tree))
+
+    def __repr__(self) -> str:
+        return f"Condition({self.text!r})"
+
+    def holds(self, bindings: Mapping[str, Any]) -> np.ndarray:
+        """Where the condition holds, element-wise over numpy ``bindings``.
+
+        A bool array of the bindings' broadcast shape (a 0-d one when every
+        binding is a scalar).  A name with no binding raises with code
+        ``unbound``.
+        """
+        xp = _numpy_xp()
+        with np.errstate(all="ignore"):
+            v = _Eval(xp, bindings, ()).cond(rewrite(self.tree))
+        return np.asarray(v, dtype=bool)

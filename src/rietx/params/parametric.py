@@ -130,6 +130,69 @@ def _term_unit(target_unit: str | None, term: list[str],
             else f"{target_unit}/({'*'.join(below)})")
 
 
+def subset_of(equation: ParametricEquation, coordinates: CoordinateTable | None,
+              n_patterns: int) -> list[int]:
+    """The patterns ``equation`` applies to, in the order passed (WP-1965).
+
+    ``patterns`` as given, every pattern when it is ``None``, or the patterns
+    at which ``where`` holds, evaluated over the coordinate columns **now**:
+    the condition is what is stored, so membership follows the campaign while
+    the reference and scale stay where the first resolution froze them.
+
+    Refusals, each a ``ValueError`` naming its fix: an index out of range; a
+    condition with no coordinate table, or a table of the wrong length; a
+    condition naming a column the table lacks; a pattern with no value for a
+    column the condition reads (its membership would be undecided); and a
+    condition that holds at no pattern.
+    """
+    name = equation.name
+    if equation.where is None:
+        patterns = (list(range(n_patterns)) if equation.patterns is None
+                    else list(equation.patterns))
+        bad = [k for k in patterns if k >= n_patterns]
+        if bad:
+            raise ValueError(
+                f"parametric equation {name!r}: pattern index {bad[0]} is out of range for "
+                f"{n_patterns} patterns (indices 0…{n_patterns - 1})")
+        return patterns
+    from .expression import Condition
+
+    condition = Condition(equation.where)
+    if coordinates is None:
+        raise ValueError(
+            f"parametric equation {name!r}: its subset is where={equation.where!r}, "
+            "which needs a CoordinateTable (coordinates=…) giving each pattern's values")
+    if coordinates.n_patterns != n_patterns:
+        raise ValueError(
+            f"the coordinate table has {coordinates.n_patterns} rows for "
+            f"{n_patterns} patterns: one row per pattern, in the order passed")
+    columns = coordinates.columns
+    missing = [c for c in condition.names if c not in columns]
+    if missing:
+        from .._nearmiss import did_you_mean
+
+        hint = did_you_mean(missing[0], columns)
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} names "
+            f"{missing[0]!r}, which is not a coordinate column (the table has "
+            f"{sorted(columns)})" + (f"; {hint}" if hint else ""))
+    for c in condition.names:
+        holes = [k for k, v in enumerate(columns[c]) if v is None]
+        if holes:
+            raise ValueError(
+                f"parametric equation {name!r}: pattern {holes[0]} has no value for "
+                f"coordinate {c!r}, which where={equation.where!r} reads, so whether "
+                "it is in the subset is undecided; give it a value")
+    env = {c: np.asarray(columns[c], dtype=np.float64) for c in condition.names}
+    held = np.broadcast_to(condition.holds(env), (n_patterns,))
+    patterns = [int(k) for k in np.flatnonzero(held)]
+    if not patterns:
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} holds at no "
+            f"pattern of the {n_patterns}, so the equation has nothing to drive")
+    return patterns
+
+
 def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTable | None,
                        n_patterns: int, *, target_unit: str | None = None
                        ) -> ResolvedParametric:
@@ -140,8 +203,8 @@ def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTabl
     declaration: a refit passing it back reproduces Φ exactly, and a pattern
     that joins later never redefines a coefficient.
 
-    Refusals, each a ``ValueError`` naming its fix: a subset index out of
-    range; a polynomial with no coordinate table, a table of the wrong length,
+    Refusals, each a ``ValueError`` naming its fix: every refusal of
+    :func:`subset_of`; a polynomial with no coordinate table, a table of the wrong length,
     a term naming a column the table lacks, a subset pattern with no value
     for a coordinate it needs, a coordinate taking one value across the
     subset with no scale given; design rows not matching the subset; fewer
@@ -155,12 +218,7 @@ def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTabl
         raise ValueError(
             f"the coordinate table has {coordinates.n_patterns} rows for "
             f"{n_patterns} patterns: one row per pattern, in the order passed")
-    patterns = list(range(n_patterns)) if equation.patterns is None else list(equation.patterns)
-    bad = [k for k in patterns if k >= n_patterns]
-    if bad:
-        raise ValueError(
-            f"parametric equation {name!r}: pattern index {bad[0]} is out of range for "
-            f"{n_patterns} patterns (indices 0…{n_patterns - 1})")
+    patterns = subset_of(equation, coordinates, n_patterns)
     n_sub = len(patterns)
     resolved = equation
     divisors: list[float]

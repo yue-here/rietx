@@ -92,6 +92,7 @@ The coordinates need not be compositions or temperatures: a position on the subs
 | `ParametricEquation.terms` | a polynomial's terms, each a list of coordinate names: `[]` is the intercept, and a repeated name is a power |
 | `ParametricEquation.design` | a design basis's rows, one per pattern of the subset, in subset order |
 | `ParametricEquation.patterns` | the subset the equation holds over, by index into the patterns as passed; `None` is every pattern |
+| `ParametricEquation.where` | the subset as a condition on the coordinate columns, such as `"T < 800"`, re-evaluated whenever the declaration is resolved ([A subset by condition](#a-subset-by-condition)); not with `patterns`, and not on a design basis |
 | `ParametricEquation.reference`, `ParametricEquation.scale` | per coordinate, the point a polynomial is centred on and the length it is scaled by |
 
 `ParametricEquation.coefficient_paths` lists the coefficients' dot-paths, `ParametricEquation.n_coefficients` counts them, and `ParametricEquation.coordinates_used` names the coordinates the terms use.
@@ -109,6 +110,7 @@ A property varies smoothly within a field and not across its boundary, so name t
 Outside the subset the target is each pattern's own parameter, refined wherever a stage frees it.
 Two fields with an equation each are two declarations on one target with disjoint subsets, each with its own name and its own reference.
 A pattern both subsets hold is refused.
+The subset is given by index (`patterns`) or by a condition on the coordinates (`where`).
 
 A thermal-expansion line down a ramp, declared and resolved without a fit:
 
@@ -149,6 +151,46 @@ surface = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="polyn
 assert library.n_patterns == 8
 assert surface.n_coefficients == 5
 assert surface.coordinates_used() == ["x", "y"]
+```
+
+### A subset by condition
+
+`where` states the subset as a condition on the coordinate columns, in the condition syntax of [Expressions](expressions.md): a comparison such as `"T < 800"`, or comparisons joined by `and`, `or` and `not`, such as `"x >= 0.1 and x <= 0.3"`.
+A comparison chain such as `0.1 <= x <= 0.3` is refused, as it is in an expression.
+
+The condition is what is stored, and it is evaluated again each time the declaration is resolved.
+An index list names positions in the patterns as passed, so dropping one bad pattern from a library moves every later index, and the list then names other specimens.
+A condition names the specimens by where they sit, so the equation covers the same ones afterwards, and a pattern that joins inside the field joins the equation.
+The reference and scale are still fixed at the first resolution ([Reference and scale](#reference-and-scale)), so a coefficient keeps its meaning while the subset follows the campaign.
+
+A pattern with no value for a column the condition reads is refused, since its membership is undecided.
+So is a condition that holds at no pattern.
+A design basis takes no condition, because its rows follow the subset's order, one per pattern.
+
+Two phase fields of a ramp, each with its own line:
+
+```python
+import rietx as rx
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0),
+                   y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0))],
+)])
+temperatures = [300.0, 450.0, 600.0, 900.0, 1050.0, 1200.0]
+instruments = [rx.Instrument.debye_scherrer(wavelength=0.4139) for _ in temperatures]
+coordinates = rx.CoordinateTable(columns={"T": temperatures}, units={"T": "K"})
+
+low = rx.ParametricEquation(name="a_low", target="phases.0.cell.a", basis="polynomial",
+                            terms=[[], ["T"]], where="T < 800")
+high = rx.ParametricEquation(name="a_high", target="phases.0.cell.a", basis="polynomial",
+                             terms=[[], ["T"]], where="T >= 800")
+joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
+                                    parametric=[low, high])
+
+resolved_low, resolved_high = joint.parametric
+assert resolved_low.where == "T < 800" and resolved_low.patterns is None
+assert resolved_low.reference == {"T": 450.0}
 ```
 
 ## Targets

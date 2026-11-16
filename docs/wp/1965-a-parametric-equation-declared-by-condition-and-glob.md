@@ -89,8 +89,16 @@ one declaration per matched path, each with its own coefficients.
 
 ## Tasks
 
-- [ ] A subset by condition, or by label. Decide what is stored, and pin a
+- [x] A subset by condition, or by label. Decide what is stored, and pin a
   dropped pattern by test: the equation covers the same specimens afterwards.
+  *(2026-11-16: `ParametricEquation.where`, a condition in the expression
+  grammar's condition syntax over the coordinate columns. The condition is the
+  key, not a label: a phase field is a region of the coordinates, and a label
+  column would be a second key a pattern must be given by hand. The condition is
+  stored and re-evaluated at each resolution (`params.parametric.subset_of`), the
+  reference and scale still frozen at the first; refused beside `patterns` and on
+  a `design` basis, whose rows stay positional.
+  `test_a_condition_keeps_its_specimens_when_a_pattern_is_dropped` pins the drop.)*
 - [ ] A glob target, expanded at resolution, with skipped paths reported.
 - [ ] Manual: `reference/parametric.md` § Declaration shows the new forms beside
   the data form.

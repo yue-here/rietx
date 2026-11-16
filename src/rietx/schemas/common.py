@@ -717,6 +717,12 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-1965): ``ParametricEquation.where``, a subset stated as a
+#: condition on the coordinate columns, stored as written and re-evaluated at
+#: every resolution.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule;
+#: an older build refuses a declaration carrying the key.  A glob ``target`` is
+#: expanded at resolution into one declaration per matched path, so a result
+#: stores bare targets and nothing new.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
