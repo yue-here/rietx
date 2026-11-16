@@ -146,9 +146,11 @@ The two inherited entries were checked against `main` and folded here; the
 - [x] Tests: the LaFeO₃ / La₀.₆Sr₀.₄FeO₃ pair asserts 47.8 / 52.2 and that the
       naive route is not what ships; a mixed table withholds the formula-unit
       column and names the phase.
-- [ ] Skill: the QPA row in `references/diagnostics.md` and the reading rule
+- [x] Skill: the QPA row in `references/diagnostics.md` and the reading rule
       in the body or `references/judging.md` — that a mol % column summing to
-      100 % is no evidence its basis is uniform.
+      100 % is no evidence its basis is uniform (the rule went in the row and
+      in the manual's `reference/qpa.md` § Mole fractions: `judging.md` is
+      99 B under its budget).
 
 ## Acceptance
 

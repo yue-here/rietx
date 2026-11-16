@@ -28,6 +28,7 @@ for row in result.qpa.phases:
 | `QuantitativePhaseAnalysis.unmeasured_held` | the part of that list a stage held while a reflection is in range at the answer |
 | `QuantitativePhaseAnalysis.microabsorption` | the `MicroabsorptionCorrection` record, when the correction ran |
 | `QuantitativePhaseAnalysis.microabsorption_skipped` | why it did not run, when a phase asked for it |
+| `QuantitativePhaseAnalysis.formula_unit_withheld` | why the mole fractions per formula unit are absent, naming the phase |
 
 `PhaseQuantity` is one phase's row.
 
@@ -36,11 +37,16 @@ for row in result.qpa.phases:
 | `PhaseQuantity.name` | the phase name |
 | `PhaseQuantity.weight_fraction` | its mass fraction, from 0 to 1, or `None` for an unmeasured phase |
 | `PhaseQuantity.weight_fraction_stderr` | that fraction's esd, or `None` |
+| `PhaseQuantity.mole_fraction` | its mole fraction counted in unit cells, from 0 to 1, or `None` where the weight fraction is |
+| `PhaseQuantity.mole_fraction_stderr` | that fraction's esd, or `None` |
+| `PhaseQuantity.mole_fraction_formula_unit` | its mole fraction counted in formula units, or `None` unless every measured phase's formula unit is known |
+| `PhaseQuantity.mole_fraction_formula_unit_stderr` | that fraction's esd, or `None` |
 | `PhaseQuantity.scale` | the refined scale it came from |
 | `PhaseQuantity.cell_mass` | Z·M, the mass in one unit cell, in g/mol |
 | `PhaseQuantity.cell_volume` | V, in Å³ |
 | `PhaseQuantity.zmv` | their product, the quantity the fractions are proportional to |
 | `PhaseQuantity.z` | formula units per cell |
+| `PhaseQuantity.z_source` | where `z` came from: `"composition"`, `"declared"` or `"unresolved"` |
 | `PhaseQuantity.molar_mass` | one formula unit's mass, in g/mol |
 | `PhaseQuantity.particle_radius_um` | the particle radius you supplied, in µm, when the correction ran |
 | `PhaseQuantity.mu_cm` | the phase's linear attenuation coefficient µ, in cm⁻¹ |
@@ -74,6 +80,24 @@ Under the protocol of `tests/test_acceptance_qpa_roundrobin.py`, with anomalous 
 The errors are inside the published participant spread for this sample.
 Corundum's error is 5 times its esd and zincite's 10 times, which is the usual case.
 An esd measures how well this model fixes the scales against this pattern, and it says nothing about how close the answer is to the weighed composition.
+
+## Mole fractions
+
+A mole fraction comes from the same scales as the weight fraction.
+W<sub>p</sub> ∝ S<sub>p</sub>·(Z·M)<sub>p</sub>·V<sub>p</sub>, so dividing by the cell mass leaves S<sub>p</sub>·V<sub>p</sub>, the number of unit cells, with no mass in it.
+`PhaseQuantity.mole_fraction` is that number renormalised, counted in **unit cells**, and it is reported wherever the weight fraction is.
+`PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts **formula units**, which is what reaction stoichiometry and phase diagrams use.
+Both esds go through the correlated scale block, as the weight fraction's does.
+
+**A mole-fraction column that sums to 100 % is no evidence that its basis is uniform.**
+Z is recovered from the cell contents, and a solid solution or a partly occupied site does not reduce to whole formula units, so its `z` is 1 and its `molar_mass` is the whole cell's.
+Dividing `weight_fraction` by that `molar_mass` puts one phase per cell and the others per formula unit, and the column still sums to 1.
+On a 50/50 wt % mixture of LaFeO<sub>3</sub> and La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub>, both perovskites with Z = 4, the true composition is 47.8/52.2 mol %, and that route gives 78.5/21.5.
+So the per-formula-unit column is reported only when every measured phase's formula unit is known, and is otherwise `None` on every row: one phase on the other basis spoils the comparison for all of them.
+`QuantitativePhaseAnalysis.formula_unit_withheld` and the info diagnostic [`QPA_FORMULA_UNIT_WITHHELD`](diagnostics-refinement.md#qpa_formula_unit_withheld) name the phase and its counts.
+`PhaseQuantity.mole_fraction` still stands, and for that pair, both cells holding four formula units, it is the 47.8/52.2 itself.
+
+A solid solution's formula unit is a choice its occupancies cannot express, so declare it: `Phase.formula_units = 4` on La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub> gives the per-formula-unit column, `z_source` reads `"declared"`, and `molar_mass` follows the declared Z.
 
 ## One basin
 
