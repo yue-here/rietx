@@ -2785,12 +2785,16 @@ ROWS: tuple[Row, ...] = (
                  "INDEX_SEARCH_INCOMPLETE 'outgrew a size cap'; finished units replay to "
                  "their digests (tests.unit_replay); "
                  "tests/test_indexing_engines.py::test_a_trial_error_unit_stops_at_its_seen_cap",
-        grounds="The cap is rietx's own choice, a memory bound on a laptop: about 1.7 GB "
-                "of solution keys at the 0.43 KB an entry measured on #1376's list. The "
+        grounds="The cap is rietx's own choice, a memory bound on a laptop: on #1376's list "
+                "the process peaked at about 1.7 GB at the cap, of which the solution keys "
+                "are about 1.4 GB (the same run without them sat at 0.25-0.30 GB). The "
                 "largest finished trial_error units measured hold 38 076 (the acceptance "
                 "suite) and 254 344 (bethanechol set Ab, manual mode), so it sits about 16 "
                 "times above them. #1376's unit would hold about 12 M at its finish and is "
-                "reported incomplete instead; nothing is ranked by it.",
+                "reported incomplete instead; nothing is ranked by it. The cap is shared "
+                "across the centring loop, so a unit capped in its first centring never "
+                "searches the later ones (C for monoclinic; C, I and F for orthorhombic), "
+                "and a centred truth cannot be among its candidates.",
         value=4000000),
     Row("rietx.indexing.trial_error.SOLVE_CHUNK", "constant", value=200000),
     Row("rietx.indexing.workflow.ABSENT_SIGMA", "constant", value=3.0),

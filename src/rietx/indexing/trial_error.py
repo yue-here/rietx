@@ -140,7 +140,12 @@ SOLVE_CHUNK = 200_000
 #: entries and 1.14 GB at 1 800 CPU seconds, the unit still unfinished.  The
 #: count is of held entries, which are distinct by construction.  Reaching it
 #: ends the unit as a size cap does, ``complete = False``, and ``found`` is
-#: returned as it stands.  About 1.7 GB of keys, some 16 times the largest
+#: returned as it stands.  The cap is shared across the centring loop, as
+#: ``seen`` is: a unit that reaches it in its first centring never searches
+#: the later ones (a monoclinic unit capped in ``P`` never reaches ``C``; an
+#: orthorhombic one capped in ``P`` never reaches ``C``, ``I`` or ``F``), so a
+#: centred truth cannot be among a capped unit's candidates.  About 1.7 GB peak
+#: at the cap (the keys about 1.4 GB of it), some 16 times the largest
 #: finished unit measured (254 344, bethanechol set Ab in manual mode); its
 #: grounds are its ``rietx._audit`` row.
 MAX_SEEN = 4_000_000

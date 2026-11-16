@@ -965,7 +965,7 @@ def test_a_dichotomy_unit_stops_at_its_harvest_cap(monkeypatch):
     assert "outgrew a size cap on tetragonal" in diag.message
 
 
-def _trial_error_unit(peaks, spec, system):
+def _trial_error_unit(monkeypatch, peaks, spec, system):
     """One trial_error unit through ``_search_system``, set up as
     ``search_trial_error`` sets it up, with the unit's scored solutions counted
     independently of its own ``seen`` set (every key enters ``seen`` just
@@ -985,14 +985,12 @@ def _trial_error_unit(peaks, spec, system):
         scored.append(cand is not None)
         return cand
 
-    trial_error._score = score
-    try:
+    with monkeypatch.context() as m:
+        m.setattr(trial_error, "_score", score)
         found, stats, complete = trial_error._search_system(
             peaks, system, metric_basis(system), spec,
             Budget(spec.budget_seconds), q_all, sigma, tt_all,
             float(peaks.two_theta_max), search_volume_ceiling(spec, None, system))
-    finally:
-        trial_error._score = real_score
     return found, stats, complete, scored
 
 
@@ -1008,7 +1006,7 @@ def test_a_trial_error_unit_stops_at_its_seen_cap(monkeypatch):
     peaks, _cell = synthetic_peaks("orthorhombic")
     spec = spec_for("orthorhombic")
     full, full_stats, full_complete, full_scored = _trial_error_unit(
-        peaks, spec, "orthorhombic")
+        monkeypatch, peaks, spec, "orthorhombic")
     assert full_complete
     # the case must harvest at least two candidates, and never reach the
     # in-loop dedup, or "prefix" stops meaning enumeration order
@@ -1019,7 +1017,8 @@ def test_a_trial_error_unit_stops_at_its_seen_cap(monkeypatch):
     # exactly that many and stops before adding one more
     cap = full_scored.index(True) + 1
     monkeypatch.setattr(trial_error, "MAX_SEEN", cap)
-    capped, stats, complete, scored = _trial_error_unit(peaks, spec, "orthorhombic")
+    capped, stats, complete, scored = _trial_error_unit(
+        monkeypatch, peaks, spec, "orthorhombic")
     assert not complete
     assert stats["seen"] == len(scored) == cap
     assert 1 <= len(capped) < len(full)
@@ -1048,7 +1047,7 @@ def test_a_trial_error_unit_never_holds_more_than_max_seen(monkeypatch, cap):
     peaks, _cell = synthetic_peaks("orthorhombic")
     monkeypatch.setattr(trial_error, "MAX_SEEN", cap)
     _found, stats, complete, scored = _trial_error_unit(
-        peaks, spec_for("orthorhombic"), "orthorhombic")
+        monkeypatch, peaks, spec_for("orthorhombic"), "orthorhombic")
     assert not complete
     assert len(scored) == stats["seen"] == cap
 
