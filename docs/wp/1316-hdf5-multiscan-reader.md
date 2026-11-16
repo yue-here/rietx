@@ -114,7 +114,7 @@ through axis discovery and `nexus` would describe less than it reads. The
       file.
 - [x] σ tiers.
 - [ ] The Poisson self-check as a diagnostic.
-- [ ] Synthetic fixtures + `test_readers_robust.py` arm + the README facts
+- [x] Synthetic fixtures + `test_readers_robust.py` arm + the README facts
       row; skill row and manual line.
 
 ## Acceptance

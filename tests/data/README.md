@@ -1775,6 +1775,26 @@ it is also the evidence that the comma before the terminator is optional. The
 key table above is what the real files prove, and the two together are why the
 reader requires only `DataAngleRange`, `ScanStepSize` and the marker.
 
+## NeXus/HDF5 reels (WP-1316) — real-file facts, no files
+
+About 1290 `.nxs`/`.h5` files exist in the maintainer's archive and **none may
+ship**, so every HDF5 fixture is synthesized by `tests/writers_hdf5.py` with the
+NeXus structure written literally (`NX_class`, `@signal`, `@axes`,
+`<signal>_errors`) and nothing imported from the reader. What the real files
+established, from the maintainer-local prototype recorded on issue #135:
+
+| fact | value | what it set |
+|---|---|---|
+| block shapes seen | `(3134, 2051)` and `(27, 3590)` | a reel is one 2-D block of N patterns against one shared 1-D axis, and the axis length is what picks the orientation |
+| the 2θ span a found axis must have | 0 ≤ x₀ < 180°, x₁ ≤ 180°, span > 5° | `hdf5.MIN_TWO_THETA_SPAN_DEG`; the search tier only, never a declared axis |
+| the Q span | 0 ≤ x₀ < 30 Å⁻¹, x₁ ≤ 30, span > 1 Å⁻¹ | `hdf5.MAX_Q_PER_ANGSTROM`, `MIN_Q_SPAN_PER_ANGSTROM`; a found axis in this span and too narrow for 2θ is refused as Q |
+| the machine-learning trap | 1290 square 256×256 weight matrices among the archive's HDF5 | a "2-D and big enough" test would take each for a reel; the monotonic-axis requirement refuses them (`test_a_file_of_weight_matrices_is_refused`) |
+| the Poisson self-check | on a simulated file the adjacent-channel difference std was 0.39, against the ~13 that √(2·mean) predicts for counts | not implemented in this slice; at most a diagnostic, never a refusal (the WP's follow-up) |
+
+The synthesized arm of `test_readers_robust.py` truncates both tiers (`hdf5`,
+`hdf5_bare`) at the twenty offsets, and `hdf5` is classified for non-finite
+values like every other reader.
+
 ## WP-2003 family D — the ILL D1B Co₃O₄ quench series, with planted known-bad patterns
 
 `d1b_co3o4_quench/` holds a second real magnetic series whose truth comes from
