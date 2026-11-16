@@ -3403,7 +3403,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES", "constant", tier=3, value=268435456,
         evidence=("switches the dense solve to the blocked one; "
                   "tests/test_parametric_series.py::test_a_blocked_fit_lands_on_the_dense_answer holds "
-                  "the two within 0.01 esd on one case; refits of three families on either side owed"),
+                  "the two within 0.01 esd on one case; WP-2017 group D forced each layout on two real "
+                  "joint families, cpd-1a/-1b/-1c together (qarr) and the CuCr2O4 ramp's seven frames "
+                  "below 130 K (11-BM), and on that synthetic library at 20 patterns: every free row "
+                  "within 0.0050 plain esd of the dense answer, the noise arm's own 0.0050 on the "
+                  "ramp, Rwp equal to 9 digits and the same codes "
+                  "(docs/wp/2017-batch/group_d_summary.md); their largest dense Jacobian is 110 MiB, "
+                  "so the size rule took dense on all three and only the forced arm reached the "
+                  "blocked path; a third real joint family owed, and none on disk but Nd2Ru2O7, "
+                  "evidence for no audit before the milestone closes"),
         grounds=("A solver-path switch no refiner has a view on, the seventh beside B10's six; "
                  "tier 3 until refits of three families on either side give one answer "
                  "(ruled 2026-10-20)."),
