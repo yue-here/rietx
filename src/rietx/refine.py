@@ -3310,8 +3310,9 @@ class Refinement:
         Parameters
         ----------
         mode
-            The mode each row's ``mode_fixed`` is answered for. ``None`` is the mode the
-            last stage ran in, ``"rietveld"`` before any.
+            The mode each row's ``mode_fixed`` is answered for. ``None`` is the working
+            state's: the last run's, the checked-out node's, or ``"rietveld"`` before
+            any.
 
         Notes
         -----
@@ -4450,8 +4451,9 @@ class Refinement:
         path_globs
             One dot-path or a list of them, each of which may be a glob with ``*`` (the
             [parameter map](parameters.md) gives the names). They match the holds this
-            refinement declared; a literal path that is not held is refused. A released
-            parameter stays fixed at its current value.
+            refinement declared, and the holds that fix a floating origin; a literal
+            path that is not held is refused. A released parameter stays fixed at its
+            current value.
 
         Notes
         -----
@@ -4702,10 +4704,11 @@ class Refinement:
         exclude
             Dot-path globs that drop candidates ``include`` matched.
         mode
-            The mode the next stage would run in. ``None`` is the mode the last stage
-            ran in.
+            The mode the next stage would run in. ``None`` is the working state's: the
+            last run's, or the checked-out node's.
         two_theta_limits
-            ``(low, high)`` in degrees 2θ. ``None`` uses the last run's limits.
+            ``(low, high)`` in degrees 2θ. ``None`` uses the working state's: the last
+            run's, or the checked-out node's.
         report
             A ``FitReport``, or its ``suggested_actions``: a candidate an action names
             is marked with the action's kind. ``None`` marks none.
@@ -5844,7 +5847,8 @@ class Refinement:
         cancel
             A ``CancelToken`` another thread can set. The stage in flight is abandoned,
             the models go back to their values before it, and ``RefinementCancelled`` is
-            raised carrying the stages that completed. ``None`` cannot be cancelled.
+            raised carrying the stages that completed. ``None`` passes no token; a
+            recorded run can still be stopped from ``rietx watch``.
         telemetry
             The directory the run's own directory is created in, which ``rietx watch``
             reads. ``False`` records nothing; ``None`` uses the project's ``live/``
@@ -5864,6 +5868,11 @@ class Refinement:
 
         Notes
         -----
+        ``events`` — optional per-iteration telemetry: a path (JSONL appended),
+        a callable (called per event dict), or an
+        :class:`~rietx.history.events.EventStream`.  See that module for the
+        record format; ``rietx watch`` tails it live.
+
         ``progress`` — a text stream or path; one line per stage boundary
         (``[series 7/13] 250C stage cell converged Rwp 0.0812 12s`` under
         :func:`refine_sequential`, ``stage cell converged Rwp 0.0812 12s``
@@ -5892,6 +5901,12 @@ class Refinement:
         sample, the candidate cell.  It is written to the run's ``meta.json``
         and lives nowhere a result reproduces — telemetry, not a refined
         quantity — so naming a run changes no number the fit produces.
+
+        ``cancel`` — an :class:`~rietx.optimize.cancel.CancelToken` another
+        thread can set.  The stage in flight is abandoned (no node, no commit,
+        the models restored to their pre-stage values) and
+        :class:`~rietx.optimize.cancel.RefinementCancelled` is raised carrying
+        the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
         the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
@@ -6708,10 +6723,11 @@ class Refinement:
             The one ``Stage`` to run from the current state ([stage
             settings](settings.md#stage-settings) describes its fields).
         mode
-            ``"rietveld"``, ``"lebail"`` or ``"pawley"``. ``None`` is the mode the last
-            stage ran in.
+            ``"rietveld"``, ``"lebail"`` or ``"pawley"``. ``None`` is the working
+            state's: the last run's, or the checked-out node's.
         two_theta_limits
-            ``(low, high)`` in degrees 2θ. ``None`` uses the last run's limits.
+            ``(low, high)`` in degrees 2θ. ``None`` uses the working state's: the last
+            run's, or the checked-out node's.
         correlation_guard
             The |ρ| above which a pair of free parameters is reported as
             ``HIGH_CORRELATION``.
@@ -6728,7 +6744,8 @@ class Refinement:
         cancel
             A ``CancelToken`` another thread can set. The stage in flight is abandoned,
             the models go back to their values before it, and ``RefinementCancelled`` is
-            raised carrying the stages that completed. ``None`` cannot be cancelled.
+            raised carrying the stages that completed. ``None`` passes no token; a
+            recorded run can still be stopped from ``rietx watch``.
         telemetry
             The directory the run's own directory is created in, which ``rietx watch``
             reads. ``False`` records nothing; ``None`` uses the project's ``live/``
@@ -12771,7 +12788,8 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
         scipy's Trust Region Reflective.
     history
         ``False`` keeps no history; a path writes it to that file, which must not hold
-        one already.
+        one already; a ``RefinementTree`` continues that tree; ``True`` keeps it in
+        memory, where it is lost with the call.
     events
         Per-iteration events for the caller: a path they are appended to as JSON lines,
         a callable given each event as a dict, or an ``EventStream``. ``None`` sends
@@ -12779,12 +12797,13 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
     cancel
         A ``CancelToken`` another thread can set. The stage in flight is abandoned, the
         models go back to their values before it, and ``RefinementCancelled`` is raised
-        carrying the stages that completed. ``None`` cannot be cancelled.
+        carrying the stages that completed. ``None`` passes no token; a recorded run can
+        still be stopped from ``rietx watch``.
     telemetry
         The directory the run's own directory is created in, which ``rietx watch``
-        reads. ``False`` records nothing; ``None`` uses the project's ``live/``
-        directory when this refinement came from a project, else ``.rietx/runs`` under
-        the working directory.
+        reads. ``False`` records nothing; ``None`` uses a project's ``live/`` directory
+        when ``history`` is a project's file, else ``.rietx/runs`` under the working
+        directory.
     label
         What the run is called in ``rietx watch``: the phase, the sample or the
         candidate it fits. ``None`` names it after its directory or its project. It

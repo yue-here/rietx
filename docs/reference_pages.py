@@ -870,6 +870,10 @@ def _directive(kind: str, argument: str, body: str, *, options: dict[str, str] |
     fence = "````" if children else "```"
     lines = [f"{fence}{{py:{kind}}} {argument}".rstrip()]
     lines += [f":{key}: {value}".rstrip() for key, value in options.items()]
+    if body.startswith(":"):
+        # a body opening on a doc field (a call with no summary line) would
+        # otherwise be read as more options
+        lines.append("")
     if body:
         lines += [body]
     for child in children:
@@ -898,13 +902,13 @@ def parameter_entries(obj) -> list[tuple[str, str]]:
     A name line sits at the docstring's own indentation and may carry
     numpydoc's ` : type`, which is dropped (the signature has the type); a
     line `a, b` documents both.  The description is every indented line under
-    it, joined into one paragraph.  The section ends at the next underlined
+    it, joined into one paragraph (a blank line inside one is dropped).  The section ends at the next underlined
     heading, so an unindented line before one reads as another argument,
     which the gate then reports as a name the signature lacks.
     """
     lines = _own_doc(obj).splitlines()
     starts = [i for i in range(len(lines) - 1)
-              if lines[i].strip() == "Parameters" and _SECTION_RULE.match(lines[i + 1].strip())]
+              if lines[i] == "Parameters" and _SECTION_RULE.match(lines[i + 1])]
     if not starts:
         return []
     entries: list[tuple[list[str], list[str]]] = []
@@ -913,7 +917,7 @@ def parameter_entries(obj) -> list[tuple[str, str]]:
         if not line.strip():
             continue
         if (not line[0].isspace() and i + 1 < len(lines)
-                and _SECTION_RULE.match(lines[i + 1].strip())):
+                and _SECTION_RULE.match(lines[i + 1])):
             break
         if not line[0].isspace():
             names = line.split(" : ", 1)[0].rstrip(":").strip()
@@ -951,7 +955,7 @@ def documented_call(obj) -> bool:
     if inspect.isclass(obj):
         return not (issubclass(obj, BaseException) or issubclass(obj, BaseModel)
                     or _dataclasses.is_dataclass(obj))
-    return callable(obj) and not isinstance(obj, dict)
+    return callable(obj)
 
 
 def call_arguments(obj) -> list[str]:

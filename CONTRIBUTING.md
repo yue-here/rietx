@@ -98,8 +98,9 @@ rest of the docstring stays where `help()` and an IDE show it.
   entry says which of those it takes and links to the manual page generated
   from help.py (`parameters.md`, `plans.md`, `settings.md`); it never restates
   it.
-- Inside an entry, double backticks and Sphinx roles (`:meth:`, `:class:`)
-  render as code. Keep literal blocks (`::`) and lists out of an entry.
+- An entry is one paragraph: a blank line inside it is dropped when it
+  renders. Double backticks and Sphinx roles (`:meth:`, `:class:`) render as
+  code. Keep literal blocks (`::`) and lists out of an entry.
 - **The gate**, `tests/test_reference_pages.py`: every name an entry gives is
   an argument of its call, and every argument of a call on the API pages has
   an entry or a line in the shrink-only baseline `UNDOCUMENTED_PARAMETERS`

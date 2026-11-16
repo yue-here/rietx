@@ -50,9 +50,9 @@ argument when this closes.
 
 - **From WP-2024 (2026-11-16): the everyday page splits in this WP, before its first section
   lands.** WP-2024 measured the split as not yet owed and left it here. With the Refinement
-  section written, `api.md`'s generated body is 46 437 characters and its built twin
+  section written, `api.md`'s generated body is 46 904 characters and its built twin
   (`reference/api.html.md`, which `test_every_page_has_a_twin_that_keeps_the_contract` holds to
-  `PAGE_CHAR_CAP`) 49 181, **819 under the cap**: one more call on the page fails it. The 78
+  `PAGE_CHAR_CAP`) 49 676, **324 under the cap**: one more call on the page fails it. The 78
   Refinement entries cost about 146 characters each in the body; at that rate the 214 everyday
   arguments left in `docs/undocumented_parameters.py` add about 31 000, so the written page is
   about 77 000, two pages at the least. Per section, the body now and with its entries at that

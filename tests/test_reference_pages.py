@@ -457,6 +457,14 @@ def test_a_parameters_section_is_one_entry_per_name_and_stops_at_a_heading():
     assert reference_pages.parameter_entries(reference_pages.parameter_entries) == []
 
 
+def test_a_call_with_no_summary_line_keeps_its_fields_out_of_the_options():
+    """MyST reads `:name: value` lines straight under the directive as options,
+    so a body that opens on a doc field is set off by a blank line."""
+    text = reference_pages._directive("function", "f(a)", ":param a: A.",
+                                      options={"module": "rx"})
+    assert text.splitlines()[1:4] == [":module: rx", "", ":param a: A."]
+
+
 def test_an_entry_renders_as_a_doc_field_with_its_markup_as_code():
     """The Python domain draws `:param:` fields as the Parameters list; a
     variadic name's stars are escaped, or they would open emphasis."""
@@ -504,9 +512,10 @@ def test_every_parameters_entry_names_an_argument_of_its_call():
     calls = _api_calls()
     assert len(calls) > 90
     stray = [f"{name}: {arg!r}" for name, obj in calls.items()
-             for arg, _ in reference_pages.parameter_entries(obj)
-             if arg not in reference_pages.call_arguments(obj)]
-    assert not stray, "Parameters entries naming no argument:\n" + "\n".join(stray)
+             for arg, text in reference_pages.parameter_entries(obj)
+             if arg not in reference_pages.call_arguments(obj) or not text]
+    assert not stray, ("Parameters entries naming no argument, or saying nothing:\n"
+                       + "\n".join(stray))
 
 
 def test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line():
@@ -533,6 +542,10 @@ def test_the_refinement_section_is_documented_in_full():
     left = sorted(line for line in _undocumented_baseline()
                   if line.split("(")[0] in names)
     assert not left, left
+    calls = _api_calls()
+    drawn = [name for name in names if name in calls]
+    assert len(drawn) == 19, drawn
+    assert all(reference_pages.parameter_entries(calls[name]) for name in drawn)
 
 
 # ----------------------------------------------------------------------
