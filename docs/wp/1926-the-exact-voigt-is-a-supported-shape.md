@@ -155,6 +155,23 @@ states the shape or refuses it by name.
 
 ## Handover log
 
+- **2026-11-16** — review fix-ups, PR #1605. The manual now says the Olivero
+  width is what a Voigt *model* peak reports (`CompiledModel.peak_fwhm`), and
+  that the indexing peak list (`indexing/peakfit.py`, `_fit_at`) still reports
+  the TCH Γ under `shape="voigt"` on purpose, for comparability. The three
+  "~1 %" comments on the quintic (`forward.py` `compile_model` and
+  `window_sizing`, `peakfit.py` `_fit_at`) now give the measured 0.43 %.
+  *Provenance:* `olivero1977` is not held (FETCH row 381, no open copy), so
+  nobody here has read the paper's statement of the coefficients or its stated
+  accuracy. They are checked by our own measurement only: the test's
+  121-point sweep, and the reviewer's independent SciPy `voigt_profile`
+  sweep (4001 ratios, 1e-4..1e4, worst 0.02367 % at Γ_L/Γ_G = 0.290).
+  *Open for Yue:* the tier of `_OLIVERO_FWHM`. The row says tier 2; the
+  reviewer recommends keeping tier 2, the same kind as
+  `pseudovoigt._TCH_GAMMA`/`_TCH_ETA` and Rouse et al.'s `absorption._A1.._B2`
+  (an empirical closed form fitted to a quantity rietx computes exactly, with
+  an in-repo test of its error). Neither tier changes any behaviour.
+
 - **2026-11-16** — ghostshift runner, one task, PR #1605. A peak drawn with
   the exact Voigt now reports its own width: the number the diagnostics, the
   observation count and the magnetic reports read is within 0.024 % of the

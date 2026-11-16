@@ -4517,7 +4517,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                         0.0 if aniso_est is None else aniso_est)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
-                # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
+                # Voigt FWHM to 0.43 % at worst (measured, tests/test_voigt.py;
+                # that is what the TCH quintic is fit to),
                 # far inside the area criterion's own resolution.
                 gamma_est, eta_est = tch_gamma_eta(g_est, l_est)
                 if primary:
@@ -4780,7 +4781,7 @@ def window_sizing(model: CompiledModel, values: dict[str, float],
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
     model draws at ``values`` (``phase_peaks``) where the compile reads its
-    own width estimate, so the two agree to that estimate's ~1 % and not to
+    own width estimate, so the two agree to that estimate's 0.43 % and not to
     the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
     arrays have the compile's shapes, so a caller can compare them with
     ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The
