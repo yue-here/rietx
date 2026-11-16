@@ -1,6 +1,6 @@
 # WP-2148 — A held standard's cell pins the wavelength, and a skipped λ is said
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — in review, PR #1575; data support filed as #1581
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-15 — a silent wrong answer on a path few fits run (a standard-plus-sample wavelength calibration freed in one stage: λ is dropped, the sample cell takes its error at −496 ppm, z −109, and the fit reports converged), plus a false refusal of the same calibration staged apart
@@ -92,9 +92,10 @@ merge.
 
 ## Tasks
 
-- [ ] One predicate: is this histogram's d scale pinned (a held λ, or a held
+- [x] One predicate: is this histogram's d scale pinned (a held λ, or a held
       cell of a phase the data support)? Read by `check_wavelength_against_cell`,
-      the glob skip and the joint check.
+      the glob skip and the joint check. (Support not read: measured and filed
+      as #1581.)
 - [x] The joint fit: replace the N − 1 count by the pin rule over shared
       cells, keeping every case `test_wavelength_freedom.py` refuses today.
 - [x] A λ the fence declines in a stage is recorded on `StageResult` and
@@ -126,6 +127,14 @@ planted value in both plan shapes. The flat arms are refused. No stage drops
 - NIST SRM 640 series certificates (the Si cell); WP-1134 (refinable λ).
 
 ## Handover log
+
+- **2026-11-16** — A wavelength now refines against a standard held in a mixture. Si held at its certificate value beside CeO₂ with a free cell calibrates λ in one pattern or across several, in either plan shape. In the stage that froze the old silent variant (CeO₂ a 496 ppm low, z −109, `converged`), λ now lands 0.53 esd from the planted value. A stage that asks for λ with no phase's cell held still declines it, and now says so in a record and a diagnostic. Not done: the rule does not read whether the data can see the standard. Measured, an absent standard leaves λ on the flat direction with `FLAT_DIRECTION` firing. That is filed as #1581, with questions for the maintainer. PR #1575.
+  - *Done.* `params.vector.wavelength_pins` is the one rule, connectivity over free cells: a histogram's d scale is pinned when its linked set contains a held wavelength or a phase whose **whole** cell is held. It is read by the single-histogram refusal (`ParameterTable.wavelength_pin`, `check_wavelength_against_cell`), the `set_vary` glob skip, the joint rebuild check (`MultiParameterTable.wavelength_pins`, which replaces the N − 1 count) and `ParameterRow.needs_held_cell` on both tables. `_cell_is_free` is gone. A declined λ rides on `StageResult.blocked_by_hold`, beside the caller's holds, as the floating-origin hold already does, so the schema is unchanged. The new info code `WAVELENGTH_NOT_FREED` reports it, and `HOLD_BLOCKED_PLAN` skips it (`refine._fence_declined`). `WAVELENGTH_CALIBRATION`'s clause is worded from the fence's pin (`_wavelength_pinned_by`), so it names the held phase or histogram. Also updated: the `_audit` rows (tier 1), help.py, the manual (instrument and joint references, the theory page, the parameter-table rows) and the skill's diagnostics rows.
+  - *Decisions taken here, for the maintainer to overrule.* (1) A partly held cell does not pin, though physics would allow it: the manual's own example refuses λ beside a hexagonal phase with only `a` freed, and no case asks for it. (2) Support is not read (#1581). (3) The record reuses `blocked_by_hold` rather than adding a field. The generality review notes that this field's `_audit` row (`tier="caller"`, "opt-in") no longer describes all three of its writers.
+  - *Measured* (seeded synthetic Si+CeO₂, λ +500 ppm, `[dev]` arm64 macOS): arm A, own stage and one stage, λ z +0.53, CeO₂ a z +0.49, GoF 1.010. Arm B, Cu + Mo patterns with both λ free: z +1.36 and +1.26, GoF 1.012. A plan freeing `phases.*.cell.*` with λ: λ declined and recorded, CeO₂ a −499.8 ppm, which is expected with λ held at its declared value. Si absent (scale 0): λ esd 4.9e-4 Å, about 900× arm A's, with `FLAT_DIRECTION`. Every one of the 8 new tests in the first test commit fails on `origin/main` for the reported reason.
+  - *Review.* A read-only reviewer (in place of `/code-review`, which edits the main checkout here) found four issues, all fixed in b6cd1fe09 with tests. A derived cell (parent cell, formula) read as held. A `vars.X` freed in the same `set_vary` call as λ was not yet free when λ was tested. The previous stage's hold and this stage's `turn_off` were not seen by the skip, so the stage now settles the fence after both. A per-histogram held cell lost to a held wavelength in the clause. Declined nits: a shared λ is not modelled as a link between histograms, and TOF has no λ rows. Both over-refuse, as the old code did.
+  - *Generality* (general-purpose stand-in following `.claude/agents/generality-review.md`): `WAVELENGTH_NOT_FREED` and its suggestion hold at tier 1. The connectivity rule holds; the whole-cell sub-choice is weak. Answer: decision (1) above. Not reading support is weak, because the calibration clause still names an unseen standard. Answer: filed as #1581; the skill row now says "a standard the data see". Reusing `blocked_by_hold` fails on that field's `caller` row. Answer: left for the maintainer's ruling, see the PR body.
+  - *Next:* the maintainer rules on decisions (1)-(3) and on #1581. The status becomes ✅ when #1575 merges.
 
 - **2026-11-15** — created, from the 2026-11-15 issue triage (issue #1550).
   Checked against the tree at `98d7ba8e3`: the refusal and the silent glob
