@@ -126,6 +126,130 @@ def test_event_stream_hot_loop_is_plain_json(tmp_path):
 
 
 # ----------------------------------------------------------------------
+# the opt-in preview on accepted evals (WP-1949)
+# ----------------------------------------------------------------------
+def _last_stage_previews(seen: list[dict]) -> tuple[dict, list[dict]]:
+    """The last stage's ``stage_start`` data and its previewed ``eval``s."""
+    start = [e for e in seen if e["kind"] == "stage_start"][-1]
+    stage = start["data"]["stage"]
+    evals = [e for e in seen if e["kind"] == "eval"
+             and e["data"]["stage"] == stage]
+    return start["data"], evals
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_preview_rides_accepted_evals_to_the_callback_alone(
+        tmp_path, synthetic_pattern, solver):
+    """WP-1949's acceptance: a callback draws the curve and the atoms from
+    accepted ``eval`` events alone, within the documented 8e-6 of
+    ``predict()``, and the stream's own file never carries the preview.
+
+    ``y_calc`` is read off the residual the driver measured (``y_obs − r·σ``),
+    so on the last accepted evaluation — the answer — it is the fitted curve.
+    ``predict()`` evaluates a compile *at* the answer, whose windows differ
+    from the stage's (its docstring), which is the 8e-6.
+    """
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    log = tmp_path / "e.jsonl"
+    stream = EventStream(path=log, callback=seen.append, preview=True)
+    ref = rx.Refinement(structure, ins, history=False, solver=solver)
+    ref.fit(synthetic_pattern, events=stream)
+    stream.close()
+
+    evals = [e for e in seen if e["kind"] == "eval"]
+    assert evals and any(e["data"]["accepted"] for e in evals)
+    for e in evals:
+        assert ("preview" in e) == e["data"]["accepted"], e["data"]
+    assert all("preview" not in e for e in seen if e["kind"] != "eval")
+    # the file got the plain lines: no preview, and nothing it could not write
+    assert "preview" not in log.read_text(encoding="utf-8")
+
+    start, stage_evals = _last_stage_previews(seen)
+    accepted = [e for e in stage_evals if e["data"]["accepted"]]
+    for e in accepted:
+        pv = e["preview"]
+        assert set(pv) == {"two_theta", "y_calc", "values"}
+        assert pv["y_calc"].shape == pv["two_theta"].shape
+        assert not pv["two_theta"].flags.writeable
+        # every free value the event carries is among the moving ones, equal
+        for path, value in zip(start["free_paths"], e["data"]["values"]):
+            assert pv["values"][path] == value
+    # the moving set reaches past the free set: the tied cell and coordinates
+    moving = set(accepted[-1]["preview"]["values"])
+    assert set(start["free_paths"]) < moving
+    assert "phases.0.cell.b" in moving
+
+    last = accepted[-1]["preview"]
+    y = ref.predict()
+    assert len(y) == len(last["y_calc"])
+    gap = np.max(np.abs(last["y_calc"] - y)) / np.max(np.abs(y))
+    assert gap <= 8e-6, gap
+
+    if solver == "lm":
+        _draw_preview(last, synthetic_pattern, OUT / "wp1949_preview_obs_calc_diff.png")
+
+
+def _draw_preview(preview: dict, pattern, path: Path) -> None:
+    """The obs/calc/diff picture a viewer draws from one preview (WP-1949)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    tt = preview["two_theta"]
+    obs = np.interp(tt, np.asarray(pattern.two_theta), np.asarray(pattern.intensity))
+    fig, (top, bottom) = plt.subplots(
+        2, 1, sharex=True, figsize=(7, 4), gridspec_kw={"height_ratios": [3, 1]})
+    top.plot(tt, obs, ".", ms=2, label="obs")
+    top.plot(tt, preview["y_calc"], "-", lw=0.8, label="calc (preview)")
+    top.legend()
+    bottom.plot(tt, obs - preview["y_calc"], "-", lw=0.6)
+    bottom.set_xlabel("2θ (°)")
+    OUT.mkdir(exist_ok=True)
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+
+
+def test_without_the_option_no_event_carries_a_preview(synthetic_pattern):
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    stream = EventStream(callback=seen.append)
+    assert stream.preview is False
+    rx.Refinement(structure, ins, history=False).fit(
+        synthetic_pattern, events=stream)
+    assert seen and all("preview" not in e for e in seen)
+
+
+def test_a_preview_without_a_callback_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="needs a callback"):
+        EventStream(path=tmp_path / "e.jsonl", preview=True)
+
+
+def test_a_series_hands_each_pattern_its_preview(synthetic_pattern):
+    """The series wraps the caller's stream per pattern (``_SeriesStream``);
+    the preview passes through it, stamped like every other event."""
+    structure, ins = perturbed_models()
+    seen: list[dict] = []
+    series = rx.SequentialRefinement(structure, ins, history=False)
+    series.fit([synthetic_pattern, synthetic_pattern], x=[1.0, 2.0],
+               events=EventStream(callback=seen.append, preview=True))
+    previewed = [e for e in seen if "preview" in e]
+    assert {e["data"]["series_index"] for e in previewed} == {0, 1}
+    assert all(e["data"]["accepted"] for e in previewed)
+
+
+def test_a_joint_fit_refuses_a_preview(synthetic_pattern):
+    """Its data rows are several histograms', so no one grid draws them."""
+    structure, ins = perturbed_models()
+    with pytest.raises(ValueError,
+                       match=r"preview=True\) is not supported on a joint fit"):
+        rx.refine_multi([synthetic_pattern, synthetic_pattern], structure,
+                        [ins, ins.model_copy(deep=True)],
+                        events=EventStream(callback=lambda e: None,
+                                           preview=True))
+
+
+# ----------------------------------------------------------------------
 # the self-contained page (WP-1461)
 # ----------------------------------------------------------------------
 @pytest.fixture(scope="module")

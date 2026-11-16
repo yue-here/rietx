@@ -384,6 +384,46 @@ def test_a_callers_event_stream_keeps_its_identity(tmp_path, monkeypatch,
     assert ours == [e["kind"] for e in seen]
 
 
+def _lines_without_clock(path: Path) -> list[str]:
+    """Each event line of a log with its clock taken out, the run header
+    (a fresh id and open time per run) dropped: what one fit wrote."""
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        if record.get("record") == "run":
+            continue
+        record.pop("t")
+        out.append(json.dumps(record))
+    return out
+
+
+def test_a_preview_leaves_every_log_byte_identical(tmp_path, monkeypatch,
+                                                   pattern, recording):
+    """WP-1949: with ``preview=True`` the callback gets the curve and the
+    moving values on accepted evals, while the caller's own file and the run
+    recorder chained onto the stream write exactly the lines they write
+    without it, the clock aside."""
+    logs = {}
+    for preview in (False, True):
+        root = tmp_path / f"preview_{preview}"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        seen = []
+        stream = EventStream(path=root / "mine.jsonl", callback=seen.append,
+                             preview=preview)
+        _fit(pattern, events=stream)
+        stream.close()
+        (run,) = runs.discover(root)
+        logs[preview] = (_lines_without_clock(root / "mine.jsonl"),
+                         _lines_without_clock(run.path / runs.EVENTS_FILE))
+        assert any("preview" in e for e in seen) == preview
+
+    off, on = logs[False], logs[True]
+    assert on[0] == off[0], "the caller's file changed with the preview on"
+    assert on[1] == off[1], "the recorder's log changed with the preview on"
+    assert any('"kind": "eval"' in line for line in on[1])
+
+
 def test_a_callers_callback_exception_still_propagates(tmp_path, monkeypatch,
                                                        pattern, recording):
     """``events.py``'s rule is untouched: a monitoring hook that crashes the

@@ -392,6 +392,8 @@ class _SeriesStream(EventStream):
         super().__init__()          # no path, no callback: the inner one has both
         self._inner = inner
         self._stamp = stamp
+        # the solvers ask the stream they are handed, which is this one
+        self.preview = getattr(inner, "preview", False)
         # Forwarded by *assignment* rather than by a method, so that
         # ``refine._snapshot_sinks``'s ``hasattr`` test keeps telling the truth:
         # a plain ``EventStream`` inner takes no snapshot, and a wrapper that
@@ -409,10 +411,14 @@ class _SeriesStream(EventStream):
         if target is not None:
             self.write_snapshot = target.write_snapshot
 
-    def emit(self, kind: str, **data: Any) -> None:
+    def emit(self, kind: str, *, preview: dict | None = None,
+             **data: Any) -> None:
         # the stamp first, so a future event field named ``series_*`` would
         # override it rather than be silently dropped
-        self._inner.emit(kind, **{**self._stamp, **data})
+        if preview is None:
+            self._inner.emit(kind, **{**self._stamp, **data})
+        else:
+            self._inner.emit(kind, preview=preview, **{**self._stamp, **data})
         self.n_written += 1
 
 

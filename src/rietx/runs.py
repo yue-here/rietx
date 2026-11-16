@@ -83,7 +83,7 @@ from ._about import (
     STATE_DIR_NAME,
     TELEMETRY_ENV,
 )
-from .history.events import EVENT_SCHEMA_VERSION, EventStream
+from .history.events import EVENT_SCHEMA_VERSION, EventStream, _with_preview, _without_preview
 from .schemas.common import Base
 
 #: The log every run has, and the only file this module needs to find one.
@@ -1577,8 +1577,12 @@ class RunRecorder(EventStream):
 
     # -- the EventStream surface ------------------------------------------
 
-    def emit(self, kind: str, **data) -> None:
-        """Record one event, then run the caller's callback outside the guard."""
+    def emit(self, kind: str, *, preview: dict | None = None, **data) -> None:
+        """Record one event, then run the caller's callback outside the guard.
+
+        A ``preview`` (WP-1949) goes to the callback alone, as
+        :meth:`EventStream.emit` hands it on; the log never carries it.
+        """
         event = {"record": "event", "v": EVENT_SCHEMA_VERSION,
                  "t": time.time(), "kind": kind, "data": data}
         if self.error is None:
@@ -1589,7 +1593,7 @@ class RunRecorder(EventStream):
         # Outside, and deliberately: a callback reached through ``events=`` is
         # the caller's code and its exception is theirs to see.
         if self.callback is not None:
-            self.callback(event)
+            self.callback(_with_preview(event, preview))
         self.n_written += 1
 
     def record(self, event: dict) -> None:
@@ -1599,11 +1603,15 @@ class RunRecorder(EventStream):
         ``events=`` of their own: their stream writes their file, and this
         writes ours. The dict arrives built, so there is no second ``t`` and
         the two logs agree about when everything happened.
+
+        A caller's ``EventStream(preview=True)`` hands this the dict its own
+        callback gets, so a ``preview`` key is dropped here: the log a fit
+        writes is byte-identical with the option on and off (WP-1949).
         """
         if self.error is not None or self._closed:
             return
         try:
-            self._write(event)
+            self._write(_without_preview(event))
         except BaseException as exc:
             self._latch(exc, "writing an event")
 

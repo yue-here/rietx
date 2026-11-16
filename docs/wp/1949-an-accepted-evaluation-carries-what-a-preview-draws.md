@@ -124,14 +124,45 @@ threshold, no automatic action). No number is added.
       callback the caller passes. Decide too whether `y_calc` reaches only
       an in-process callback (ndarray, never the file sink) or also the file
       at `MAX_POINTS`.
-- [ ] Carry the moving-path values (coordinates and cell, absolute) on
+
+      **Proposed 2026-11-16, built as proposed; the ruling is Yue's**
+      (it adds a key to the event dict a callback receives). A property of
+      the stream: `EventStream(callback=cb, preview=True)`, refused without a
+      callback. No `fit` argument, because the stream already reaches the
+      solver through every entry point (`fit`, `run_stage`, `refine`, a
+      series) and is the one object that knows a callback is there. Each
+      accepted `eval` then reaches the callback with a top-level `preview`
+      key beside `data`: `two_theta` (the stage's fitted grid, a read-only
+      view), `y_calc` (an ndarray, `y_obs − r·σ`) and `values` (every
+      moving path, absolute). **`y_calc` reaches the in-process callback
+      only**, never a file at `MAX_POINTS`: the JSON form costs 8 % of a
+      FAP solve and 6.9 MB a fit on every sink (Task 1), and the per-stage
+      `snapshot.json` already writes the curve to disk. The moving values
+      ride the same way, so the opt-in changes no file at all. A joint fit
+      refuses the option with a `ValueError` (its data rows are several
+      histograms'); that is left for a follow-up issue.
+- [x] Carry the moving-path values (coordinates and cell, absolute) on
       accepted `eval` events under the opt-in, on both drivers. The LM path
       needs the residual plumbed to `trial_cb`.
-- [ ] Carry `y_calc` under the decided form. Test: on accepted events it
+      *Done 2026-11-16:* `lm.minimize`'s `on_trial` takes the trial
+      residual as a sixth argument; `_preview_builder`
+      (`optimize/least_squares.py`) decodes θ and picks `moving_paths`,
+      fixed once a stage.
+- [x] Carry `y_calc` under the decided form. Test: on accepted events it
       equals `y_obs − r/sqrt_w` and lands within the documented 8e-6 of
       `predict()` at the event's values. The recorder's `events.jsonl` is
       byte-identical with the option on and off.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
+      *Done 2026-11-16:* the last accepted preview sits 4.38e-6 of the
+      curve's maximum from `predict()` on both drivers (synthetic fixture);
+      `RunRecorder.record` drops the key, and
+      `test_a_preview_leaves_every_log_byte_identical` fails with the drop
+      removed (checked once: the recorder latched on the ndarray).
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`.
+      *Done 2026-11-16:* six in `tests/test_events_viz_history.py` (both
+      drivers, off, refused without a callback, a series, a joint fit) and
+      one in `tests/test_telemetry.py`;
+      `tests/output/wp1949_preview_obs_calc_diff.png` is drawn from one
+      preview alone.
 - [ ] Manual (`using/refining.md` § events) and the event table in the
       skill's API index.
 - [ ] Skill: one row in the reference that documents `events=`. Nothing in
