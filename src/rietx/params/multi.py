@@ -40,7 +40,10 @@ from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
 from .parametric import (
+    GlobExpansion,
     ResolvedParametric,
+    expand_glob,
+    is_glob,
     least_squares_start,
     resolve_parametric,
     subset_of,
@@ -502,6 +505,11 @@ class MultiParameterTable:
         declared = list(parametric or [])
         variables = dict(variables or {})
         self.sharing = sharing or SharingMap()
+        #: what each glob target expanded to, in declaration order (WP-1965);
+        #: empty when no target is a glob
+        self.glob_expansions: list[GlobExpansion] = []
+        if any(is_glob(e.target) for e in declared):
+            declared = self._expand_globs(declared, starts, instruments, coordinates)
         if declared:
             _refuse_clashing_declarations(declared, len(instruments), coordinates)
             # a private copy: the targets (and, below, what follows them)
@@ -577,6 +585,39 @@ class MultiParameterTable:
         self._rebuild_columns()
 
     # -- per-pattern starting values and parametric equations (WP-1325) -----
+    def _expand_globs(self, declared: list[ParametricEquation], starts: list[Structure],
+                      instruments: list[Instrument],
+                      coordinates: CoordinateTable | None) -> list[ParametricEquation]:
+        """Each glob target expanded into one declaration per path (WP-1965).
+
+        Matched against the model of the first pattern of the declaration's
+        subset, on a scratch table built before any of this fit's own, since
+        what a target is decides the sharing map those are built under.  A
+        matched path no equation can drive is skipped and recorded in
+        :attr:`glob_expansions` (``_target_refusal``'s reason, the one a bare
+        target on it would be refused with); every other refusal of a member is
+        made where a bare target's is, on every pattern of the subset.
+        """
+        n = len(instruments)
+        scratch: dict[int, ParameterTable] = {}
+        out: list[ParametricEquation] = []
+        for equation in declared:
+            if not is_glob(equation.target):
+                out.append(equation)
+                continue
+            h = subset_of(equation, coordinates, n)[0]
+            if h not in scratch:
+                scratch[h] = ParameterTable(starts[h].model_copy(deep=True),
+                                            instruments[h].model_copy(deep=True),
+                                            joint=True)
+            table = scratch[h]
+            members, record = expand_glob(
+                equation, [e.path for e in table.entries],
+                lambda p, t=table: _target_refusal(t, t.entries[t._paths[p]]))
+            out.extend(members)
+            self.glob_expansions.append(record)
+        return out
+
     def _check_starts_agree(self, starts: list[Structure]) -> None:
         """Refuse per-pattern starts that are not one model, or that disagree
         on a shared path.

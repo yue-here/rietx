@@ -19,8 +19,10 @@ fence (WP-1119).
 
 from __future__ import annotations
 
+import fnmatch
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -128,6 +130,105 @@ def _term_unit(target_unit: str | None, term: list[str],
         return target_unit
     return (f"{target_unit}/{below[0]}" if len(below) == 1
             else f"{target_unit}/({'*'.join(below)})")
+
+
+#: fnmatch's metacharacters, which make a target a glob
+_GLOB_CHARS = frozenset("*?[")
+
+
+def is_glob(target: str | None) -> bool:
+    """Whether ``target`` is a glob, expanded at resolution (WP-1965)."""
+    return target is not None and bool(_GLOB_CHARS & set(target))
+
+
+def glob_member_name(name: str, glob: str, path: str) -> str:
+    """The name of the declaration a glob ``name`` expands to on ``path``.
+
+    ``{name}_{tail}``, ``tail`` being ``path`` past the glob's leading literal
+    segments, its dots written ``_``: a declaration ``cell`` on
+    ``phases.0.cell.*`` has the member ``cell_c`` on ``phases.0.cell.c``, and
+    one ``s`` on ``phases.*.scale`` the member ``s_1_scale`` on
+    ``phases.1.scale``.  Those segments match
+    every path literally, so two matched paths differ in their tails.  A
+    member's coefficients are then ``vars.{name}_{tail}_{j}``, which no other
+    member's can be, since the trailing ``_{j}`` is all digits.
+    """
+    lead = 0
+    for seg in glob.split("."):
+        if _GLOB_CHARS & set(seg):
+            break
+        lead += 1
+    return f"{name}_{'_'.join(path.split('.')[lead:])}"
+
+
+@dataclass
+class GlobExpansion:
+    """What one glob target expanded to (WP-1965).
+
+    ``members`` are the declarations' names, one per matched path an equation
+    can drive, in table order; ``skipped`` each matched path no equation can
+    drive with the reason, ``_target_refusal``'s wording.
+    """
+
+    name: str
+    glob: str
+    members: list[str]
+    skipped: list[tuple[str, str]] = field(default_factory=list)
+
+
+def expand_glob(equation: ParametricEquation, paths: list[str],
+                refusal: Callable[[str], str | None]
+                ) -> tuple[list[ParametricEquation], GlobExpansion]:
+    """One declaration per path of ``paths`` that ``equation``'s glob target matches.
+
+    ``paths`` are a model's parameter paths in table order and
+    ``refusal(path)`` the reason a path cannot be a target, or ``None``.  A
+    matched path that is refused is **skipped and recorded**, never silent
+    (root CLAUDE.md § A hold): ``phases.0.cell.*`` on a cubic phase drives
+    ``a`` and skips ``b`` and ``c`` (tied to ``a``) and the three locked
+    angles.  Each member is the declaration with its own name
+    (:func:`glob_member_name`) and one bare target, so the declaration as
+    resolved, and a result read back, holds bare targets only.
+
+    Refused: a glob matching no path, or only paths no equation can drive
+    (each named with why); and a member name that is not an identifier, or
+    that two matched paths share.
+    """
+    glob = equation.target
+    matched = [p for p in paths if fnmatch.fnmatchcase(p, glob)]
+    if not matched:
+        raise ValueError(
+            f"parametric equation {equation.name!r}: target glob {glob!r} matches no "
+            "parameter of the model")
+    members: list[ParametricEquation] = []
+    skipped: list[tuple[str, str]] = []
+    seen: dict[str, str] = {}
+    for path in matched:
+        why = refusal(path)
+        if why:
+            skipped.append((path, why))
+            continue
+        member = glob_member_name(equation.name, glob, path)
+        if not member.isidentifier():
+            raise ValueError(
+                f"parametric equation {equation.name!r}: target glob {glob!r} matches "
+                f"{path}, whose member name {member!r} is not an identifier; narrow "
+                "the glob, or declare that path on its own")
+        if member in seen:
+            raise ValueError(
+                f"parametric equation {equation.name!r}: target glob {glob!r} matches "
+                f"{seen[member]} and {path}, which would both be named {member!r}; "
+                "declare them separately")
+        seen[member] = path
+        members.append(equation.model_copy(update={"name": member, "target": path}))
+    if not members:
+        reasons = "; ".join(f"{p} {why}" for p, why in skipped[:3])
+        more = f"; and {len(skipped) - 3} more" if len(skipped) > 3 else ""
+        raise ValueError(
+            f"parametric equation {equation.name!r}: target glob {glob!r} matches only "
+            f"parameters no equation can drive: {reasons}{more}")
+    return members, GlobExpansion(name=equation.name, glob=glob,
+                                  members=[m.name for m in members], skipped=skipped)
 
 
 def subset_of(equation: ParametricEquation, coordinates: CoordinateTable | None,
