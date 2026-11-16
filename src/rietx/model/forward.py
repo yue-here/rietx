@@ -1560,9 +1560,10 @@ class CompiledModel:
         the keys are decoded θ: an unbounded map grows one entry per distinct
         parameter vector and a fit visits thousands, so it is a leak wearing a
         cache's clothes.  With the pin in place the trail's depth barely
-        matters, measured over nac, cpd-1a, cpd-2 and trigger: 9732, 9724 and
-        9631 block builds on trigger at depth 1, 2 and 8, against 11 428 for
-        the shipped two-key memo.  It stays at 2.  Every count, Rwp and
+        matters, measured over nac, cpd-1a, cpd-2 and trigger by WP-1945's
+        replay probe (its handover names the script and holds the tables):
+        9732, 9724 and 9631 block builds on trigger at depth 1, 2 and 8,
+        against 11 428 for the shipped two-key memo.  It stays at 2.  Every count, Rwp and
         refined value was bit-identical at all three depths, as a memo hit
         must be.
         """

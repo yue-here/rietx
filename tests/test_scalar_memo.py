@@ -106,6 +106,21 @@ def rich():
     return cached, plain, table
 
 
+@pytest.fixture
+def fresh_memo(rich):
+    """``rich`` with every memo slot emptied on entry **and on exit**.
+
+    ``rich`` is module-scoped, so a test that pins an expansion point would
+    otherwise hand its pins to every test after it in file order.
+    """
+    cached = rich[0]
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
+    yield rich
+    for cp in cached.phases:
+        cp.scalar_cache.clear()
+
+
 def _same(a, b) -> bool:
     return all(np.array_equal(x, y)
                for pa, pb in zip(a, b, strict=True)
@@ -315,7 +330,7 @@ def test_an_alternation_between_two_states_stops_rebuilding(rich):
                     f"the perturbed arm was rebuilt (line {il}, slot {k})"
 
 
-def test_the_recent_trail_is_bounded_and_evicts_its_oldest_key(rich):
+def test_the_recent_trail_is_bounded_and_evicts_its_oldest_key(fresh_memo):
     """The bound is real, and that is the point of it.
 
     The keys are decoded θ, so an unbounded map grows an entry per parameter
@@ -326,10 +341,8 @@ def test_the_recent_trail_is_bounded_and_evicts_its_oldest_key(rich):
     """
     from rietx.model.forward import _MEMO_DEPTH
 
-    cached, _plain, table = rich
+    cached, _plain, table = fresh_memo
     base = table.decode(table.x0())
-    for cp in cached.phases:
-        cp.scalar_cache.clear()
     first_base = cached.phase_peaks(0, base)
     for step in range(1, _MEMO_DEPTH + 1):
         other = dict(base)
@@ -343,22 +356,20 @@ def test_the_recent_trail_is_bounded_and_evicts_its_oldest_key(rich):
         "a state past the bound did not evict, so the cache is unbounded"
 
 
-def test_the_lookup_scans_every_key_it_holds(rich, monkeypatch):
+def test_the_lookup_scans_every_key_it_holds(fresh_memo, monkeypatch):
     """WP-1945: the lookup compared ``held[0]`` and ``held[1]`` and nothing
     else, whatever ``_MEMO_DEPTH`` said, so a deeper memo held keys it could
     never return — and WP-1121's depth-8 measurement, which built exactly the
     blocks depth 2 did, could not have come out any other way.
 
     Here the depth is raised to four and the key asked for is the oldest of
-    them, the one position the two-compare lookup could not reach.
+    them, a position the two-compare lookup could not reach.
     """
     import rietx.model.forward as fwd
 
     monkeypatch.setattr(fwd, "_MEMO_DEPTH", 4)
-    cached, _plain, table = rich
+    cached, _plain, table = fresh_memo
     base = table.decode(table.x0())
-    for cp in cached.phases:
-        cp.scalar_cache.clear()
     first_base = cached.phase_peaks(0, base)
     for step in (1, 2, 3):
         other = dict(base)
@@ -377,7 +388,7 @@ def _cell_key(model, values):
     return cell + tuple(float(x) for x in model.line_lambdas(values))
 
 
-def test_two_cell_columns_cannot_evict_the_expansion_point(rich, monkeypatch):
+def test_two_cell_columns_cannot_evict_the_expansion_point(fresh_memo, monkeypatch):
     """WP-1945's case: a phase with two cell columns.
 
     ``derivative_bases`` builds the expansion point's peaks; the Jacobian then
@@ -393,10 +404,8 @@ def test_two_cell_columns_cannot_evict_the_expansion_point(rich, monkeypatch):
     """
     import rietx.model.forward as fwd
 
-    cached, _plain, table = rich
+    cached, _plain, table = fresh_memo
     base = table.decode(table.x0())
-    for cp in cached.phases:
-        cp.scalar_cache.clear()
     cached.derivative_bases(base)                # pins the expansion point
     first = cached.phase_peaks(0, base)
     for path in ("phases.0.cell.a", "phases.0.cell.c"):
@@ -426,15 +435,13 @@ def test_two_cell_columns_cannot_evict_the_expansion_point(rich, monkeypatch):
         assert peaks[il][0] is first[il][0], f"positions rebuilt (line {il})"
 
 
-def test_the_next_expansion_point_takes_the_pin(rich):
+def test_the_next_expansion_point_takes_the_pin(fresh_memo):
     """An accepted step: the solver evaluates the residual at a trial point,
     then the next Jacobian expands there.  ``derivative_bases`` finds the
     trial's blocks on the recent trail and pins them without a rebuild, and
     the old expansion point leaves the pin."""
-    cached, _plain, table = rich
+    cached, _plain, table = fresh_memo
     base = table.decode(table.x0())
-    for cp in cached.phases:
-        cp.scalar_cache.clear()
     cached.derivative_bases(base)
     trial = dict(base)
     trial["phases.0.cell.a"] = base["phases.0.cell.a"] * 1.001
@@ -445,3 +452,70 @@ def test_the_next_expansion_point_takes_the_pin(rich):
     assert held.pin[0] == _cell_key(cached, trial)
     assert all(k != _cell_key(cached, trial) for k, _v in held.recent)
     assert cached.phase_peaks(0, trial)[0][0] is at_trial[0][0]
+
+
+def test_the_slots_only_a_magnetic_phase_uses_keep_their_pin(monkeypatch):
+    """WP-1945, from the review of #1603: a magnetic phase whose second
+    family is built runs ``phase_peaks`` twice inside ``derivative_bases``,
+    once per component, and the pin governs ``f2mag`` and ``widths_mag`` as
+    well as the slots the two calls share.
+
+    The shared slots hold because both components send them the same key,
+    so the second call hits the pin the first one set.  A component-dependent
+    term in a shared key would make the two calls replace each other's pin on
+    every Jacobian and silently undo the gain, so this asserts the outcome:
+    after two cell columns of both components, a column that moves none of
+    these blocks rebuilds nothing on either component, and every slot still
+    holds the pin ``derivative_bases`` set.
+    """
+    import rietx.model.forward as fwd
+    from tests.test_magnetic_width import SIZE, _mnf2, _state
+
+    model, _table, base = _state(_mnf2(size=SIZE), moving=None)
+    assert model.mag_split(0)
+    cp = model.phases[0]
+    model.derivative_bases(base)                 # pins the expansion point
+    assert {"f2mag", "widths_mag"} <= set(cp.scalar_cache)
+    pinned = {slot: held.pin for slot, held in cp.scalar_cache.items()}
+    for path in ("phases.0.cell.a", "phases.0.cell.c"):
+        moved = dict(base)
+        moved[path] = base[path] * 1.001
+        for component in (0, 1):
+            model.phase_peaks(0, moved, component=component)
+
+    built = {"cell": 0, "f2": 0, "f2mag": 0, "widths": 0, "widths_mag": 0}
+    cell_block = fwd.CompiledModel._cell_block
+    nuclear_f2 = fwd.CompiledModel._nuclear_f2
+    magnetic_f2 = fwd.CompiledModel._magnetic_f2
+    width_block = fwd.CompiledModel._width_block
+
+    def counted_cell(self, *a, **k):
+        built["cell"] += 1
+        return cell_block(self, *a, **k)
+
+    def counted_nuclear(self, *a, **k):
+        built["f2"] += 1
+        return nuclear_f2(self, *a, **k)
+
+    def counted_magnetic(self, *a, **k):
+        built["f2mag"] += 1
+        return magnetic_f2(self, *a, **k)
+
+    def counted_widths(self, *a, **k):
+        built["widths_mag" if k.get("magnetic") else "widths"] += 1
+        return width_block(self, *a, **k)
+
+    monkeypatch.setattr(fwd.CompiledModel, "_cell_block", counted_cell)
+    monkeypatch.setattr(fwd.CompiledModel, "_nuclear_f2", counted_nuclear)
+    monkeypatch.setattr(fwd.CompiledModel, "_magnetic_f2", counted_magnetic)
+    monkeypatch.setattr(fwd.CompiledModel, "_width_block", counted_widths)
+    scale = dict(base)
+    scale["phases.0.scale"] = base["phases.0.scale"] * 1.001
+    for component in (0, 1):
+        model.phase_peaks(0, scale, component=component)
+    assert built == dict.fromkeys(built, 0), \
+        f"two cell columns evicted the magnetic expansion point: {built}"
+    assert all(pin is not None for pin in pinned.values()), \
+        sorted(slot for slot, pin in pinned.items() if pin is None)
+    for slot, held in cp.scalar_cache.items():
+        assert held.pin is pinned[slot], f"slot {slot!r} lost its pin"

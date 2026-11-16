@@ -311,8 +311,11 @@ nit, an unused `_MemoSlot.__len__`, is removed (baa7d8e9f). It noted that
 its module. That predates this change, it is safe under loadgroup today, and
 I left it.
 
-*Measured.* The replay script and logs are in the runner's scratch, not the
-repo. The replay used `examples/bench_refinement.py`'s setups for nac,
+*Measured.* The replay script is
+[replay.py](1945-prototype/replay.py), committed with the review fix-ups on
+2026-11-16. Rerun then on nac, it reproduced this branch's record field for
+field (1752 builds). The logs are in the runner's scratch, not the repo. The
+replay used `examples/bench_refinement.py`'s setups for nac,
 cpd-1a, cpd-2 and trigger, with counters wrapped around `_make_residual` and
 `_make_jacobian`. Main bc77a934e and this branch were run on the worktree's
 `[dev]` venv, darwin/arm64, python 3.12, in place.
