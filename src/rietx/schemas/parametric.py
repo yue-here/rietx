@@ -60,7 +60,8 @@ from .common import Base
 #: one basis that may be nonlinear in what it refines.
 ParametricBasis = Literal["constant", "polynomial", "design", "expression"]
 
-#: fnmatch's metacharacters: a target names one path, never a family
+#: fnmatch's metacharacters: a target holding one is a glob, expanded at
+#: resolution into one declaration per matched path (WP-1965)
 _GLOB_CHARS = frozenset("*?[")
 
 
@@ -137,10 +138,16 @@ class ParametricEquation(Base):
     **intermediate** alone.  It drives nothing itself and is evaluated wherever
     a later equation names it, so it takes no ``patterns``.
 
-    * ``target`` — one model parameter's bare dot-path, no glob and no
-      ``hist.`` scope (the subset says which patterns): ``phases.0.cell.a``,
+    * ``target`` — one model parameter's dot-path, with no ``hist.`` scope (the
+      subset says which patterns): ``phases.0.cell.a``,
       ``instrument.background.c2``.  ``None`` only on an expression equation,
-      which is then an intermediate.
+      which is then an intermediate.  On a linear basis it may be a glob
+      (WP-1965), ``phases.0.cell.*``: it is expanded when the declaration is
+      resolved into one declaration per matched path that an equation can
+      drive, each with its own coefficients and named ``{name}_{tail}``
+      (:func:`~rietx.params.parametric.glob_member_name`); a path it matches
+      that no equation can drive (tied, locked, held) is skipped and reported
+      (``PARAMETRIC_GLOB_SKIPPED``).
     * ``basis`` — ``constant``; ``polynomial``, with ``terms``: each a list of
       coordinate names, a repeat being a power and ``[]`` the intercept
       (``[[], ["T"]]`` is a + b·T, ``[[], ["x"], ["y"], ["x", "y"]]`` a bilinear
@@ -194,10 +201,13 @@ class ParametricEquation(Base):
                     f"parametric equation {self.name!r} is an intermediate "
                     "(target=None), so it takes no patterns and no where: it is "
                     "evaluated at the patterns of each later equation that names it")
-        elif not t or _GLOB_CHARS & set(t):
+        elif not t:
+            raise ValueError("target must be a dot-path, or None for an intermediate")
+        elif _GLOB_CHARS & set(t) and self.basis == "expression":
             raise ValueError(
-                f"target {t!r} must be one bare dot-path, not a glob: one "
-                "declaration ties one parameter")
+                f"target {t!r} is a glob, which an expression equation cannot take: "
+                "its variables are shared, so every matched path would take one "
+                "value. Declare one expression per path")
         elif not t.startswith(("phases.", "instrument.")):
             raise ValueError(
                 f"target {t!r} must be a model parameter, a dot-path under "

@@ -46,6 +46,7 @@ from rietx.multi import (
     MultiHistogramRefinement,
     _equation_rows,
     _joint_fixed_literals,
+    _parametric_glob_diagnostics,
     _parametric_range_diagnostics,
     _unsupported_paths_multi,
     refine_multi,
@@ -66,6 +67,7 @@ from rietx.params.parametric import (
     ResolvedParametric,
     coefficient_rows,
     form_tests,
+    glob_member_name,
     parametric_equation,
     resolve_parametric,
     target_columns,
@@ -141,7 +143,8 @@ def test_a_1_9_coefficient_row_opens_with_its_tie_key_read_as_equation():
 
 @pytest.mark.parametrize("kw, fragment", [
     (dict(name="a.b"), "single identifier"),
-    (dict(target="phases.*.cell.a"), "not a glob"),
+    (dict(basis="expression", terms=None, expression="a0", target="phases.0.cell.*"),
+     "glob, which an expression equation cannot take"),
     (dict(target="hist.0.phases.0.cell.a"), "model parameter"),
     (dict(target="vars.x"), "model parameter"),
     (dict(basis="constant"), "takes no terms"),
@@ -405,6 +408,80 @@ def test_a_sharing_map_that_splits_a_coefficient_is_refused():
         MultiParameterTable(s, _lab6_instruments(2),
                             sharing=SharingMap(per_histogram=["vars.*"]),
                             parametric=[_equation(basis="constant", terms=None)])
+
+
+# -- a glob target, expanded at resolution (WP-1965) -------------------------
+
+def test_a_glob_member_is_named_by_the_path_past_the_globs_literal_segments():
+    assert glob_member_name("cell", "phases.0.cell.*", "phases.0.cell.c") == "cell_c"
+    assert glob_member_name("s", "phases.*.scale", "phases.1.scale") == "s_1_scale"
+    assert glob_member_name("bg", "instrument.background.c*",
+                            "instrument.background.c2") == "bg_c2"
+    # accepted on a linear basis, as written
+    assert _equation(target="phases.0.cell.*").target == "phases.0.cell.*"
+
+
+def test_a_glob_target_expands_per_path_and_reports_what_it_skips():
+    """A cubic cell's glob drives ``a`` and skips the two edges tied to it and
+    the three locked angles, saying so; an atom glob gives each atom its own
+    coefficients.  The declarations as resolved carry bare targets, so a refit
+    passing them back wires the same ties."""
+    s, _ = perturbed_inputs()
+    coords = _coords(300.0, 400.0, 500.0)
+    cell = _equation(name="cell", target="phases.0.cell.*")
+    biso = _equation(name="B", target="phases.0.atoms.*.biso")
+    mt = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
+                             parametric=[cell, biso])
+    assert [(r.name, r.target) for r in mt.parametric] == [
+        ("cell_a", "phases.0.cell.a"), ("B_0_biso", "phases.0.atoms.0.biso"),
+        ("B_1_biso", "phases.0.atoms.1.biso")]
+    assert [r.paths for r in mt.parametric][1:] == [["vars.B_0_biso_0", "vars.B_0_biso_1"],
+                                                    ["vars.B_1_biso_0", "vars.B_1_biso_1"]]
+    for h in range(3):
+        t = mt.tables[h]
+        for target, name in [("phases.0.atoms.0.biso", "B_0_biso"),
+                             ("phases.0.atoms.1.biso", "B_1_biso")]:
+            assert [src for src, _ in t.entries[t._paths[target]].tie.terms] == [
+                f"vars.{name}_0", f"vars.{name}_1"]
+    (record, plain) = mt.glob_expansions
+    assert record.members == ["cell_a"] and plain.skipped == []
+    assert [p for p, _ in record.skipped] == [f"phases.0.cell.{k}" for k in
+                                              ("b", "c", "alpha", "beta", "gamma")]
+    assert "is tied" in record.skipped[0][1] and "locked" in record.skipped[2][1]
+    (finding,) = _parametric_glob_diagnostics(mt)
+    assert finding.code == "PARAMETRIC_GLOB_SKIPPED" and finding.level == "info"
+    assert finding.value == 5.0 and finding.where == [p for p, _ in record.skipped]
+    assert "'cell' on phases.0.cell.* drives 1 path (cell_a)" in finding.message
+    assert "phases.0.cell.b, phases.0.cell.c is tied" in finding.message
+    # the resolved declarations are bare, and refit to the same wiring
+    assert [e.target for e in mt.declared] == [r.target for r in mt.parametric]
+    again = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
+                                parametric=mt.declared)
+    assert again.glob_expansions == []
+    assert [(r.name, r.target, r.equation.reference) for r in again.parametric] == [
+        (r.name, r.target, r.equation.reference) for r in mt.parametric]
+
+
+@pytest.mark.parametrize("equation, fragment", [
+    (_equation(name="g", target="phases.0.cell.q*"), "matches no parameter"),
+    (_equation(name="g", target="phases.0.cell.[bc]"),
+     r"matches only parameters no equation can drive: phases.0.cell.b is tied"),
+])
+def test_a_glob_that_drives_nothing_is_refused(equation, fragment):
+    s, _ = perturbed_inputs()
+    with pytest.raises(ValueError, match=fragment):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[equation])
+
+
+def test_a_glob_member_named_like_another_declaration_is_refused():
+    s, _ = perturbed_inputs()
+    glob = _equation(name="cell", target="phases.0.cell.*")
+    clash = _equation(name="cell_a", target="phases.0.atoms.0.biso", basis="constant",
+                      terms=None)
+    with pytest.raises(ValueError, match="two parametric equations are named 'cell_a'"):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[glob, clash])
 
 
 # -- the joint table's wiring ------------------------------------------------

@@ -1068,6 +1068,18 @@ ROWS: tuple[Row, ...] = (
                   "caller's own declaration against each target entry's min/max, the schema's "
                   "default where the caller set none (multi.py:2316-2322), and applies no "
                   "threshold of its own (WP-1325)")),
+    Row("PARAMETRIC_GLOB_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic of the tie map: a path the table ties to another, locks or holds "
+                  "has no column of its own, so a second tie onto it cannot be wired and a bare "
+                  "target on it is refused (params.multi._target_refusal); fires exactly when a "
+                  "glob target matched such a path and names each with that refusal's reason "
+                  "(test_a_glob_target_expands_per_path_and_reports_what_it_skips)"),
+        grounds=("Unanimity: a glob over a cubic cell asks for the free edge, and no refiner "
+                 "would give b, tied to a, or a locked angle a second function; the dissenting "
+                 "case, a glob matching nothing drivable, is refused, never expanded to nothing."),
+        response="info",
+        responds=("note which matched paths were skipped and why; declare the equation on a "
+                  "tied path's source if that path was meant to be driven")),
     Row("PARAMETRIC_TARGET_UNSEEN", "code"),
     Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
         evidence=("info; fires when a stage frees a Phase.parent_cell phase's cell edges while a "

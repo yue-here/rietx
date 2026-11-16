@@ -99,7 +99,16 @@ one declaration per matched path, each with its own coefficients.
   reference and scale still frozen at the first; refused beside `patterns` and on
   a `design` basis, whose rows stay positional.
   `test_a_condition_keeps_its_specimens_when_a_pattern_is_dropped` pins the drop.)*
-- [ ] A glob target, expanded at resolution, with skipped paths reported.
+- [x] A glob target, expanded at resolution, with skipped paths reported.
+  *(2026-11-16: a linear basis's `target` may be a glob. `MultiParameterTable`
+  expands it before any of its tables exist (`_expand_globs`, matched on a scratch
+  table of the subset's first pattern, since a target decides the sharing map)
+  through `params.parametric.expand_glob`: one declaration per drivable path, named
+  `{name}_{tail}` (`glob_member_name`, the path past the glob's literal segments),
+  so the stored declaration keeps its data form with bare targets. Skipped paths
+  are `_target_refusal`'s, recorded in `glob_expansions` and reported as
+  `PARAMETRIC_GLOB_SKIPPED` (info, tier 1). An expression basis refuses a glob: its
+  variables are shared, so every matched path would take one value.)*
 - [ ] Manual: `reference/parametric.md` § Declaration shows the new forms beside
   the data form.
 - [ ] Skill: the series reference's parametric row, or "none" and why.

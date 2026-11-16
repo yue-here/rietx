@@ -3521,6 +3521,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the form holds."
         ),
     ),
+    "PARAMETRIC_GLOB_SKIPPED": HelpEntry(
+        title="Equation glob skipped paths",
+        description=(
+            "A parametric equation whose target is a glob was expanded into one "
+            "equation per matched path, each with its own coefficients. Some paths "
+            "the glob matched cannot carry an equation, because they are tied to "
+            "another parameter, locked by symmetry or held, so they were skipped. A "
+            "tied path follows its source, which is driven if the glob matched it. "
+            "Nothing needs doing unless a skipped path was meant to be driven: then "
+            "declare the equation on the path it is tied to."
+        ),
+    ),
     "PARAMETRIC_OUT_OF_RANGE": HelpEntry(
         title="An equation put a parameter outside its bounds",
         description=(

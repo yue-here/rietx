@@ -2689,6 +2689,8 @@ class MultiHistogramRefinement:
         # what a parametric declaration did to each pattern's dependent that
         # no bound the solve saw could stop (WP-1325, FIT)
         diagnostics = diagnostics + _parametric_range_diagnostics(mt)
+        # the paths a glob target matched and no equation can drive (WP-1965)
+        diagnostics = diagnostics + _parametric_glob_diagnostics(mt)
         # the subset patterns that cannot see each equation's target: there the
         # value is the equation's alone, and the form test leaves them out (WP-1325)
         unseen = _parametric_unseen(models, mt, support_sigma)
@@ -3439,6 +3441,38 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
                               if _unseen(mtable, f"hist.{k}.{r.target}", absent,
                                          models=models))
             for r in (*mtable.parametric, *mtable.expressions)}
+
+
+def _parametric_glob_diagnostics(mtable) -> list[Diagnostic]:
+    """``PARAMETRIC_GLOB_SKIPPED`` — a glob target's matched paths that no
+    equation can drive (WP-1965).
+
+    A glob target expands at resolution into one declaration per matched path
+    (``params.parametric.expand_glob``), skipping each path a bare target on it
+    would be refused for: tied, locked or held.  The skip is the package's own
+    act on the caller's glob, so it is said out loud, never silent (root
+    CLAUDE.md § A hold).  One info per declaration with any skipped path;
+    ``where`` names each, ``value`` counts them.
+    """
+    out: list[Diagnostic] = []
+    for record in mtable.glob_expansions:
+        if not record.skipped:
+            continue
+        by_reason: dict[str, list[str]] = {}
+        for path, why in record.skipped:
+            by_reason.setdefault(why, []).append(path)
+        reasons = " ".join(f"{', '.join(paths)} {why}." if not why.endswith(".")
+                           else f"{', '.join(paths)} {why}"
+                           for why, paths in by_reason.items())
+        n_skip, n_kept = len(record.skipped), len(record.members)
+        out.append(Diagnostic(
+            level="info", code="PARAMETRIC_GLOB_SKIPPED",
+            where=[path for path, _ in record.skipped], value=float(n_skip),
+            message=(f"Parametric equation {record.name!r} on {record.glob} drives "
+                     f"{n_kept} path{'' if n_kept == 1 else 's'} "
+                     f"({', '.join(record.members)}) and skipped {n_skip} it matched "
+                     f"that no equation can drive: {reasons}")))
+    return out
 
 
 def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
