@@ -1,8 +1,7 @@
 # WP-1965 — a parametric equation declared by condition and glob
 
-Milestone: parametric · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: parametric · Status: ✅ 2026-11-16 — a subset by condition (`where=`) and a glob target land in PR #1619; leftovers in #1621
 Depends on: 1325 (the declaration this lowers onto); 1964 soft (an expression as what a glob expands)
-Priority: P3 2026-11-04 — writing the lists by hand is the workaround, and no user has asked yet; last in the milestone's order
 
 ## Goal
 
@@ -133,6 +132,52 @@ one declaration per matched path, each with its own coefficients.
 - WP-1325 § Prior art and § The shape.
 
 ## Handover log
+
+- **2026-11-16** — A parametric equation can now say which patterns it covers by a
+  condition on the coordinates, `where="T < 800"`, and drive a whole family of
+  parameters with one glob target, `phases.0.cell.*`. The condition is stored and
+  evaluated again whenever the declaration is resolved, so dropping a bad pattern from
+  a library no longer silently re-points an index list at other specimens, and a
+  pattern that joins inside a phase field joins its equation. A glob becomes one
+  ordinary declaration per path it can drive, so what a result stores is unchanged
+  in shape. Paths it cannot drive (tied, locked, held) are skipped and reported.
+  The schema gains one optional field, which is the maintainer's to accept.
+  - *Done:* all four tasks (commits per task, ticked above), plus a review pass.
+    `params.parametric.subset_of` is now the one authority for a declaration's
+    subset (resolution, the expression path and the clash check all read it).
+    `ParametricEquation.where` is new (schema 0.61 note, additive). `expression.py`
+    gains `parse_condition` and `Condition` (`holds`, `undecided`), a condition
+    being the grammar's own, so `GRAMMAR_VERSION` does not move. A glob is expanded
+    in `MultiParameterTable._expand_globs` before the sharing map is built, on
+    scratch tables of every pattern of the subset (1.4 ms a table on the Mac), into
+    members named `{name}_{tail}`. New info code `PARAMETRIC_GLOB_SKIPPED` (audit
+    row tier 1, help entry, skill row, `DIAGNOSTIC_SCOPES` row).
+  - *Review (read-only agent, Opus):* five findings, all taken. A missing
+    `DIAGNOSTIC_SCOPES` row (failed `test_multi_diagnostics.py`); a NaN inside a
+    condition read as "not in the subset" (now refused as undecided); a glob and a
+    bare declaration could share a name (names are now checked before expansion); the
+    skip message advised declaring on a source the glob already drove (it now says
+    which); a size-across-λ refusal of one member did not name its glob (it now
+    does; skipping it instead is in #1621).
+  - *Generality (agent, Opus, unedited verdicts):* `PARAMETRIC_GLOB_SKIPPED` **weak**:
+    "the grounds cover only skipped paths that still follow a driven source" — the
+    reasons `_target_refusal` gives for a rigid body's increment and a moment DOF
+    were skipped at info though nothing follows them. *Author:* those two now refuse
+    the glob, and the evidence says so. Matching on the first pattern **weak**: "a
+    concrete silent gap" for a background with more terms on a later pattern.
+    *Author:* now matched on the union, refused by name, tested
+    (`test_a_glob_is_matched_on_every_pattern_of_its_subset`). Member naming
+    **holds**; skip-then-refuse **holds**; `where` **holds** with "a record field
+    naming each equation's selected patterns" as what would change it (in #1621);
+    expression glob refusal **holds**, message could name the tie route (in #1621).
+  - *Measured:* reader_output exit 0 ("unchanged against the merge-base"). Sphinx
+    `-W` build of `docs/docs` exit 0. Pearl canary gs1965c (f2b581c48, `[dev]` venv
+    rietx-py312, Linux): 557 passed, 80 skipped, 68 s, 479 MB, 4 cores at 211 %.
+  - *Gotchas:* `tests/test_gui_help.py` rewrites `tests/data/gui/help_keys.json` when
+    a code is added; commit the rewrite. `series.md` in the skill sits 3 B under its
+    budget after this branch.
+  - *Next:* nothing in this WP. #1621 holds the events line per equation, the
+    detectors-inside-a-subset report, and four review points for the maintainer.
 
 - **2026-11-04** — The maintainer's track ruling moved this WP into the `parametric`
   milestone and dropped the formula, so the file and title were renamed. Next: the
