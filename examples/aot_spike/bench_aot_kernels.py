@@ -167,7 +167,9 @@ ON_MEASURED = (sys.platform, platform.machine()) == MEASURED_PLATFORM
 #: scipy-openblas 0.3.31 and 0.3.30), every fit of both cases was
 #: bit-identical to the first.  So an entry names the BLAS too, as numpy's and
 #: SciPy's build configurations name it, and one library on it is enough.
-NONDETERMINISTIC = {("darwin", "x86_64", "accelerate")}
+#: A build that does not name its BLAS stays exempt there, as before WP-1987.
+NONDETERMINISTIC = {("darwin", "x86_64", "accelerate"),
+                    ("darwin", "x86_64", "unknown")}
 
 
 def _blas() -> tuple[str, str]:
