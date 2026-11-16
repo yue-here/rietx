@@ -130,7 +130,7 @@ pruned. The body sits at 16 981 of its 17 000 B budget, so no row went there;
   `BackgroundChebyshev` at 4 terms. Acceptance (`test_skill`, `test_skill_cli`,
   `test_docs_consistency`, `test_skill_claims`, `test_help` with the touched
   files): 412 passed, Mac. Canary on pearl `wp1532c`: 383 passed. Fast suite
-  on pearl `wp1532f`: FAST_RESULT. `tests.reader_output`: exit 0, unchanged.
+  on pearl `wp1532f`: 14 853 passed, 280 skipped, 32 xfailed, 0 failed in 524 s on 8 cores (6.1 GB, 752 % CPU) at `0103adba7`, the code of this branch's head; the three added tests cost 0.00 s each. `tests.reader_output`: exit 0, unchanged.
   Ruff clean. Skill caps: four references grew (+239, +1323 then +1.5 kB,
   +352, +220 B), each far under budget.
   *Review*: a read-only review subagent (the runner may not run
