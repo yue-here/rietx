@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: The repo's own process
 Depends on: 2024 (the format, the renderer and the gate); 2025 soft (the everyday page first)
-Priority: P4 2026-10-23 — down a rung from P3 until WP-2024 lands its format and gate; P3 then
+Priority: P3 2026-11-16 — WP-2024's format and gate are in its PR #1622
 
 ## Goal
 
@@ -45,6 +45,18 @@ gate's "every argument documented" half holds with no exceptions.
   arguments may move; the gate's "documented name is in the signature" half says when one does.
 - Size: about one session.
 - Tier: documentation only.
+
+### Inherited
+
+- **From WP-2024 (2026-11-16).** The format is `CONTRIBUTING.md` § A Parameters section under
+  each call; the gate is `tests/test_reference_pages.py`'s
+  `test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line`, and an entry's line
+  in `docs/undocumented_parameters.py` goes in the same commit. On 2026-11-16 the baseline held
+  180 technique-page lines (batch 3, figure 65, other programs' files 50, magnetic 62) and 3
+  on the everything-else page. `api-techniques.md`'s twin was 16 913 characters; at the
+  pilot's ~146 characters an entry the written page is about 43 000, under `PAGE_CHAR_CAP` but
+  worth measuring before the last section rather than after. Prose after a Parameters section
+  needs a `Notes` heading, or it reads as arguments.
 
 ## Non-goals
 

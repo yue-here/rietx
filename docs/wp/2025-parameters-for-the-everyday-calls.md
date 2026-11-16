@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: The repo's own process
 Depends on: 2024 (the format, the renderer, the gate and the page split)
-Priority: P4 2026-10-23 — down a rung from P3 until WP-2024 lands its format and gate; P3 then
+Priority: P3 2026-11-16 — WP-2024's format and gate are in its PR #1622; the page split comes first
 
 ## Goal
 

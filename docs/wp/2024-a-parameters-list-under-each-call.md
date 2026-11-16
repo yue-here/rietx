@@ -1,6 +1,6 @@
 # WP-2024 — A Parameters list under each call: the format, the gate, and the Refinement calls
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — PR #1622 open; left: the look in chromium at 390 px, both themes
 Track: The repo's own process
 Depends on: — (2023 soft: either order works; both edit the same pages' rendering)
 Priority: P3 2026-10-23 — a reference that names every argument and explains a fifth of them; reading the source is the workaround
@@ -114,7 +114,9 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
 - [x] The Refinement section's 18 calls written (71 parameters), their entries out of the baseline;
   help.py-owned arguments linked or generated, never restated
 - [ ] Tests (above) green; the manual builds `-W`; looked at in chromium, both themes, 390 px
-- [ ] Skill: none expected, and why (the index stays signature-only); re-check at close
+- [x] Skill: none expected, and why (the index stays signature-only); re-check at close —
+  none: `make_api_index.py --check` passes, the skill's `api.md` reads signatures and first lines
+  only, and its budget (`tests/skill_caps.py`) is untouched
 
 ## Acceptance
 
@@ -132,6 +134,56 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
 - Sphinx, *The Python domain*, § Info field lists (`:param:`), sphinx-doc.org.
 
 ## Handover log
+
+- **2026-11-16** — (ghostshift runner, PR #1622.) A reader of the manual's API pages now sees,
+  under every call of the Refinement section, a list naming each argument and saying what it
+  does and what its special values mean, where before there was one sentence per call. The
+  format is decided and written down, the generator renders it, and a test now fails when a
+  description names an argument that does not exist or an argument has none and is not on a
+  shrink-only list, so the remaining 397 arguments are counted rather than forgotten. The
+  everyday page is now 324 characters under its size cap, so WP-2025 splits it before writing
+  anything else.
+  - *Done.* `CONTRIBUTING.md` § A Parameters section under each call (bare name line, register,
+    `Notes` for the reasons, the gate). `docs/reference_pages.py`: `parameter_entries` (our own
+    parser; numpydoc is not a dependency and would flag every bare name as PR04),
+    `_parameter_fields` writing `:param:` fields, `documented_call`, `call_arguments`; MyST's
+    `fieldlist` extension on (`docs/sphinx_shared.py`). `docs/undocumented_parameters.py`, seeded
+    with 475 lines over 106 calls, now 397. All 19 Refinement-section calls (78 arguments: the
+    WP's 18/71 had grown) written in `src/rietx/refine.py`, each old paragraph kept under
+    `Notes`; path arguments link `parameters.md`, plans `plans.md`, a stage
+    `settings.md#stage-settings`, a formula `expressions.md`. `build_report`'s existing section
+    reshaped to numpy's name lines plus a `Notes` heading, since its closing prose was parsed as
+    arguments. The twin's residue check (`tests/test_manual.py`) now fails on a raw `:param`
+    line.
+  - *Measured.* With `fieldlist` on, every built page but `reference/api.html` (and its twin and
+    `llms-full.txt`) is byte-identical to the build with it off. Twin of `api.md`: 37 753 before,
+    49 676 after (cap 50 000); body 46 904. Without `fieldlist` the twin carried 18 raw `:param`
+    lines, with it 0 (the residue check's positive arm). Gate made to fail on purpose by deleting
+    one baseline line. Mac arm64, worktree venv `[dev]`, each file alone: test_reference_pages 41
+    passed, test_manual 67, test_manual_api 19, test_help 37, test_skill 174; `sphinx -W` exit 0;
+    `make_api_index.py --check` 0; ruff clean; `rietx_vale.sh` 0 errors. Fast suite on pearl (Linux x86-64, `rietx-py312`
+    venv, `-n 4`, co-tenant, tip 6079db766): 14859 passed, 280 skipped, 32 xfailed, 0 failed
+    in 1006 s, 6.6 GB peak; the 7 added tests cost 0.03 s together (`tests.added_test_times`),
+    plus two cases on an existing residue test; no main baseline was run, so the delta is the
+    added tests, not a measured difference.
+    `python -m tests.reader_output`: exit 0, unchanged.
+  - *Review.* No `/code-review` (it edits the main checkout); a read-only review agent instead.
+    Applied: `cancel=None` can still be stopped from `rietx watch` on a recorded run; `None` for
+    mode and limits in `run_stage`/`suggest`/`parameters` is the working state's, which a
+    checkout sets; `refine`'s `history` and `telemetry` entries; `unhold`'s floating-origin
+    holds; `fit`'s `events`/`cancel` paragraphs restored under Notes; a body opening on a doc
+    field is set off from the directive's options (latent: no call has an empty summary today);
+    the gate refuses an empty entry. Declined: cross-reference links inside entries (roles
+    render as code, as `_doc_line` already does); entry order against the signature.
+  - *Not done.* The look in chromium at 390 px in both themes: headless Chrome on this Mac
+    returned blank screenshots. The HTML is Sphinx's own field list in the theme's styling.
+  - *Gotchas.* Vale does not read inside the directive fences, so entries are not spell-checked
+    by CI; the tests and the build are their only gate. An unindented line inside the section
+    reads as an argument and fails the gate, which is the intended alarm.
+  - *Generality.* None: documentation only, no rule, threshold, default or automatic action.
+  - Next: the chromium look (anyone, on the built page); then WP-2025, whose first commit is the
+    page split (its `### Inherited` has the measurement and a three-page plan); WP-2026 and
+    WP-2027 are re-rated P3.
 
 - **2026-10-23** — created. No open WP owns argument descriptions: WP-2022 fenced them out as
   "docstring work and a new WP"; WP-2013 corrects stale sentences but adds no sections; WP-2008
