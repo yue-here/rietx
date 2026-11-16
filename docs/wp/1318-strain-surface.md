@@ -1,9 +1,8 @@
 # WP-1318 — the Stephens strain surface, rendered
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-16 — `rx.viz.plot_strain_surface` over `stephens.directional_sigma2`; GUI view and esd band left to #1624 (PR #1620)
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-09-23 — a view over coefficients already refined
 
 ## Goal
 
@@ -114,6 +113,51 @@ The shipping PR comments on issue #197 saying its strain half landed —
   restated above.
 
 ## Handover log
+
+- **2026-11-16** — closed (ghostshift runner, PR #1620). A fitted Stephens
+  block can now be looked at: one call draws its strain broadening over every
+  direction of reciprocal space, from the same sum the width law uses, with
+  any direction outside the physical cone drawn in red at its true size and
+  the guard's finding printed under it. On the brucite acceptance fit under
+  TRF the picture shows what that file's assertions say in words: the c*
+  lobes broaden to about 2000 ppm while half the sphere, around the basal
+  plane, is outside the cone. Nothing about the fit changes; the GUI view and
+  a propagated confidence band are not built and wait in #1624.
+  - *Done:* `crystallography.stephens.directional_sigma2` (σ²(M)/M² at the
+    unit-M hkl B⁻¹u, i.e. `sigma2_m` itself) and `reciprocal_frame` (B, the
+    transposed Cholesky factor of G*, a* along x); `viz/strain.py`
+    `plot_strain_surface(structure, diagnostics=None, *, phase=0, …)`,
+    lazily exported from `rx.viz`, sampling with WP-1960's `sphere_points`;
+    `tests/test_strain_surface.py` (16 fast); one slow test on the brucite
+    TRF fixture in `test_acceptance_stephens.py` (its xdist group, no new
+    fit); theory section `microstructure.md` § The strain surface, equation
+    `ms-surface`; `make_figures.strain_surface` and the committed pair.
+  - *Decided:* the GUI home is not taken (the GUI frontend is being rebuilt
+    under Yue's claims) and the band is absent, because a result carries no
+    S_HKL covariance block to propagate and a diagonal one is wrong both ways;
+    both are #1624. "Below zero" on the sphere is the guard's
+    `STEPHENS_CONE_TOL` applied to σ²/M², so no new threshold; a facet
+    touching such a direction is drawn red, so the region is never smaller
+    than it is. No flag, threshold or automatic action is added, so there is
+    no tier to state and `_audit.py` is untouched.
+  - *Measured:* MEASURED_PLACEHOLDER
+  - *Review:* a read-only review agent found the silent-guard note claimed
+    the region lay between reflections (false for an all-negative block),
+    the refined pin could not catch a wrong frame (m cancelled), the note's
+    colour broke the notebook dark copy, two wordings, and the colourbar
+    shown with no physical facet; all fixed in 3fc87cffd. Its remaining
+    point, that the notebook's dark copy keeps the light red for the
+    shaded facets, is declined: the dark copy is drawn from the light
+    figure by colour mapping, and a shaded facet's colour is no role colour.
+  - *Gotchas:* the hull's simplices come in either winding, and matplotlib's
+    shading reads the normal, so they are turned outward or the surface draws
+    as a checkerboard. Poly3DCollection with `shade=True` needs explicit
+    edge colours. A per-value 1e-12 bar fails on Linux at a near-zero
+    direction; the bar is relative to the largest value.
+  - *Next:* the shipping PR was to comment on #197 that its strain half
+    landed (it stays open for the fenced Fourier half); a ghostshift runner
+    may not comment, so that is the maintainer's. Then #1624 when the GUI
+    rebuild settles.
 
 - **2026-09-01** — created, from issue #197's strain half (2026-09-01
   triage). Settled: values come from the module's own evaluation; first
