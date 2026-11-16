@@ -102,7 +102,7 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
 
 ## Tasks
 
-- [ ] Decide and write down the format (numpy style; the type line; register) in
+- [x] Decide and write down the format (numpy style; the type line; register) in
   `CONTRIBUTING.md`, with one worked entry
 - [ ] Generator: parse a docstring's Parameters section and render it as the directive's
   `:param:` fields; the twin renders it as a list

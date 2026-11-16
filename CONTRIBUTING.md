@@ -71,6 +71,63 @@ fails before review reads it.
 - A new correction ships with a record field or a diagnostic stating what
   it changed — never an Rwp comparison as its evidence.
 
+## A Parameters section under each call
+
+A call on the manual's API pages (`docs/docs/reference/api*.md`) describes its
+arguments in a numpy-style **Parameters** section, the convention numpy and
+scipy use (numpydoc). `docs/reference_pages.py` renders that section, and only
+that section, under the signature as a list with one entry per argument. The
+rest of the docstring stays where `help()` and an IDE show it.
+
+- The section follows the summary: `Parameters` underlined with dashes, then
+  per argument its name alone on a line, and under it, indented four spaces,
+  one to three plain sentences saying what the argument does and what each
+  special value (`None`, `False`, a preset name) means.
+- **The name line carries no type.** The type and the default are in the
+  signature drawn above the list, so a second copy could only drift.
+  numpydoc's validator reports a bare name as PR04 ("has no type"); rietx
+  does not run that validator, and its own gate is the test below. Name a
+  variadic argument with its stars, `**kw`.
+- **The register is the user's; the reason goes below.** Why a default is
+  what it is, the measurement behind it and the WP that made it go under a
+  `Notes` heading after the section, which the manual does not render. Prose
+  after the Parameters section needs a heading of its own, because an
+  unindented line inside the section reads as another argument.
+- An argument that is a parameter dot-path, a stage field, a reader option or
+  an instrument preset field is described once, in `src/rietx/help.py`. The
+  entry says which of those it takes and links to the manual page generated
+  from help.py (`parameters.md`, `plans.md`, `settings.md`); it never restates
+  it.
+- Inside an entry, double backticks and Sphinx roles (`:meth:`, `:class:`)
+  render as code. Keep literal blocks (`::`) and lists out of an entry.
+- **The gate**, `tests/test_reference_pages.py`: every name an entry gives is
+  an argument of its call, and every argument of a call on the API pages has
+  an entry or a line in the shrink-only baseline `UNDOCUMENTED_PARAMETERS`
+  (`docs/undocumented_parameters.py`). Write the entry and delete the line in
+  the same commit; a baseline line whose argument is documented or gone fails.
+
+One worked entry, from `Refinement.fit`:
+
+```python
+def fit(self, data, *, ..., telemetry=None, ...):
+    """Run a staged refinement.
+
+    Parameters
+    ----------
+    telemetry
+        Where the run directory is created. ``False`` records nothing;
+        ``None`` uses the project's ``live/`` directory when this
+        refinement came from a project, else ``.rietx/runs`` under the
+        working directory.
+
+    Notes
+    -----
+    A fit records itself whether or not ``events=`` was passed, because
+    the knob nobody had to switch on is the one an agent cannot switch
+    off by accident (WP-1322 measured three of three doing exactly that).
+    """
+```
+
 ## A heuristic needs its tier
 
 Every decision rietx makes on its own has a row in `src/rietx/_audit.py`,
