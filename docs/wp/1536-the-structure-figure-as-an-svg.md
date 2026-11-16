@@ -231,11 +231,11 @@ row, the pixel test of the crossing case and the PDF check are all still open.
   436 kB. Lines dominate; if an editor slows, cut only pieces whose screen box
   meets an atom (D2's fallback). Writing an SVG adds well under 0.1 s.
   reader_output: exit 0, unchanged.
-- **Tests** (`[dev]` venv, macOS 26 arm64 for the targeted runs; pearl,
-  Linux, for the suites): the canary selection (this file's tests,
+- **Tests** (`[dev]` venv, macOS 26 arm64 for the targeted runs; a Linux
+  workstation for the suites): the canary selection (this file's tests,
   `test_structure3d_browser.py`, audit_table, help, docs_consistency, skill;
-  pearl, `-n 4`) gave 401 passed, 1 skipped on 07f6ff48d. The fast selection
-  (`-m "not slow" -n 8 --dist loadgroup`, pearl, 2176fd57b, beside other
+  `-n 4`) gave 401 passed, 1 skipped on 07f6ff48d. The fast selection
+  (`-m "not slow" -n 8 --dist loadgroup`, 2176fd57b, beside other
   jobs at load 25-32) gave 14859 passed, 280 skipped, 32 xfailed, 0 failed
   in 1005 s. Nine cases were added (seven tests), costing 1.11 s together
   in that run's junit, the slowest the end-to-end SVG test at 0.54 s; the
