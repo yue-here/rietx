@@ -1,6 +1,6 @@
 # WP-1460 — one degeneracy, one finding
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: — (1454 soft: it removed the commonest source; 1302 soft: the render cap)
 Priority: P3 2026-09-24 — a correct report said once per pair, up to hundreds of times, burying the rows beside it; `summary()` already caps the view and dropping the rows is the workaround
