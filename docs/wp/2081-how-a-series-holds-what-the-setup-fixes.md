@@ -1,7 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: unscheduled · Status: ⬜
-Track: A long run is not one fit
+Milestone: series · Status: ⬜
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
@@ -527,6 +526,34 @@ flag reprints the saved numbers without fitting.
   `tests/data/README.md`.
 
 ## Handover log
+
+- **2026-11-16** — the discussion began, and the series milestone opened (one chat
+  session with Yue; no package code changed).
+
+  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five are
+  accepted and one, rule 2, is proposed and unanswered. They are recorded with Yue's words
+  in [`docs/milestones/series.md`](../milestones/series.md) § The rules, which is now
+  their authority. Yue ruled that series is its own milestone, separate from parametric,
+  and this WP moved to it. Yue ruled WP-2080 to option A, the ratio as a field with no
+  automatic retry (that file's handover log), and approved the comment posted on PR #1473.
+
+  *What the rules settle here.* Questions 2 and 3 fall to rules 1 and 2, question 4 to
+  rule 6, question 5 to rule 4, questions 7 and 9 to rule 5 and question 11 to rules 1 and
+  2. Question 1, the default on later patterns, is still open and is the first open
+  decision in the milestone record. No question in § Open questions is edited: this entry
+  and the milestone record say where each stands.
+
+  *Stale lines above, not yet corrected.* Context says PR #1310 is open and mergeable; it
+  has merged. Context says `SequentialRefinement.fit:plan` is unaudited; it has a tier-3
+  row approved 2026-11-03, recorded as unanimous, and `fit:refit` is still unaudited.
+  WP-2080's trigger no longer waits on anything, and is ruled to a field.
+
+  *In progress.* A joint fit on the CuCr2O4 ramp is being measured by a subagent
+  (`2081-batch/measure_joint_ramp.py`, `joint_ramp.json`). Its numbers are not in this
+  entry.
+
+  *Next:* Yue's read of the milestone record's title, scope and draft acceptance rows;
+  the open decisions listed there, the default first; the joint-fit measurement's result.
 
 - **2026-11-04** — rewritten around Yue's account (a ghostshift runner, one session). No
   package code changed, and no question is ruled. Yue said in chat on 2026-11-03 how an
