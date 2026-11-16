@@ -234,7 +234,7 @@ and alert lists are in 1319's Context.
 #913, ruled by the maintainer 2026-11-02: "minimum". Three items, each able to
 land before C-e:
 
-- [ ] #913 (1): a coordinate written `.` or `?` is refused, naming the file,
+- [x] #913 (1): a coordinate written `.` or `?` is refused, naming the file,
       the site and the tag. An occupancy written `.` or `?` reads by the
       `cif_core` default, checked against the dictionary before it is written.
 - [ ] #913 (2): `pyproject.toml`'s `gemmi` floor raised to a version under which

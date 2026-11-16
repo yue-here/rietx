@@ -305,6 +305,12 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
     parenthesis unclosed, ``8.6l(2)`` with a letter for a digit), and the NaN
     then reached the schema as "value nan lies outside bounds" with no file,
     tag or value in the message.  Called only once a NaN has been found.
+
+    A CIF null is refused the same way, by tag and site (issue #913, item 1).
+    ``?`` means the value is unknown and ``.`` that it is inapplicable; neither
+    is zero, and gemmi reads both as NaN for a coordinate.  The occupancy is the
+    one exception: its null reads by the core dictionary's default, which is
+    the caller's business (:func:`structure_from_cif`), so it is skipped here.
     """
     for tag in tags:
         values = ([block.find_value(tag)] if label is None else
@@ -312,8 +318,19 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
                                                                 tag[11:]])
                    if row.str(0) == label])
         for value in values:
-            if value is None or value in ("?", "."):
+            if value is None:
                 continue
+            if value in ("?", "."):
+                if tag == "_atom_site_occupancy":
+                    continue
+                where = "" if label is None else f" for site {label!r}"
+                meaning = "unknown" if value == "?" else "inapplicable"
+                raise ValueError(
+                    f"{path}: {tag}{where} is {value!r}, which CIF reads as "
+                    f"{meaning}, not as a number, and this reader has no value "
+                    f"to put in its place. State the number; a file from a "
+                    f"source that writes 0 as '.' needs that repair before it "
+                    f"is read")
             if math.isnan(gemmi.cif.as_number(value)):
                 where = "" if label is None else f" for site {label!r}"
                 raise ValueError(
@@ -903,6 +920,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             x=Parameter(value=site.fract.x),
             y=Parameter(value=site.fract.y),
             z=Parameter(value=site.fract.z),
+            # an occupancy the file leaves out, or writes as a null ('?' or
+            # '.'), reads as 1.0: the default `_enumeration_default 1.0` of
+            # `_atom_site_occupancy` in the IUCr core dictionary 2.4.5 (DDL1).
+            # The DDLm core 3.3.0 vendored in tests/data states none (#913)
             occ=Parameter(value=(site.occ if site.occ or said.get("occ")
                                  else 1.0), min=0.0),
             biso=Parameter(value=b_iso, unit="A^2"),
