@@ -201,8 +201,9 @@ GHOST_N_PARENTS = 8
 #: because that is what the bundled corpus has an anode for.  A control run per
 #: pattern would remove that dependence and costs ~1.4 % of the peak fit it
 #: rides on; it is written up in WP-1447 rather than built, the fixed bar
-#: having measured at zero false findings here (decided 2026-09-22 with the
-#: maintainer).
+#: having measured at zero false findings here, on the maintainer's call.
+#: *(Chosen: WP-1447, 2026-09-22 — a fixed bar over a control run per
+#: pattern)*
 GHOST_MIN_PARENTS = 5
 
 #: How far two parents' ratios may differ and still be called one leak, as a
@@ -215,7 +216,8 @@ GHOST_MIN_PARENTS = 5
 #: leak at r = 0.10 scores 5 at 1.3 and 1.5 against 6 at 2.0 and 3.0.  The
 #: tolerance buys detection for nothing.  2.0 is the widest at which "a common
 #: ratio" still means something, which is where it stops being a measurement
-#: and becomes a judgement (decided 2026-09-22; WP-1442).
+#: and becomes a judgement.  *(Chosen: WP-1442, 2026-09-22 — 2.0 over 1.3, 1.5
+#: and 3.0, the four measured above)*
 GHOST_RATIO_TOL = 2.0
 
 #: The sampling band of McCusker, Von Dreele, Cox, Louër & Scardi (1999) §2:
@@ -268,7 +270,8 @@ SAMPLING_PROMINENCE_SIGMA = 5.0
 #: Chosen with that margin and for leaving the shipped answer alone where σ is
 #: honest (median 0.998 of today's over the fixtures, worst 0.678, and **no**
 #: fixture crosses :data:`STEPS_PER_FWHM_MIN` in either direction).  The sweep
-#: is in WP-1415's handover.
+#: is in WP-1415's handover.  *(Chosen: WP-1415, 2026-09-21 — 0.03 over the
+#: swept 0.015-0.05)*
 SAMPLING_HEIGHT_FRACTION = 0.03
 
 #: Median-filter width, in ° 2θ, applied to the variance-inflation ratio before
@@ -1838,8 +1841,9 @@ def _ghost_consensus(
     injection minimum of 6 at r = 0.10; ghost-counted, 3 against 5).  An
     earlier note here claimed the ghost-counted statistic overlapped its own
     control; that was measured against a control contaminated near λ(Kα1) and
-    is withdrawn.  Parents are kept on the independence argument alone
-    (decided 2026-09-22; WP-1442).
+    is withdrawn.  Parents are kept on the independence argument alone.
+    *(Chosen: WP-1442, 2026-09-22 — counting parents over counting ghost
+    lines)*
 
     The returned list holds one candidate per supporting parent, the one whose
     ratio is nearest the consensus, so a caller emitting one flag per entry

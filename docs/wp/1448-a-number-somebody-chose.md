@@ -146,9 +146,34 @@ remembers, and the alternatives are the first thing lost.
 - [ ] The meta-test, modelled on `test_skill.py`'s: a tag that names nothing is
       a failure. Decide what it can actually check — a date, a resolvable WP or
       DESIGN.md anchor — and do not claim more.
-- [ ] A pass over the values that are case 3 today. Start from the fourteen
+- [x] A pass over the values that are case 3 today. Start from the fourteen
       "this package's own" / "no source" sites and from any constant whose
       docstring argues rather than measures.
+      **Done 2026-11-16: six tags, each checked against its record.** Tagged
+      where a WP entry of the day records the choice and its alternatives:
+      `background.diagnostics.GHOST_MIN_PARENTS` (WP-1447, 2026-09-22),
+      `GHOST_RATIO_TOL` and `_ghost_consensus`'s parent count (WP-1442,
+      2026-09-22), `SAMPLING_HEIGHT_FRACTION` (WP-1415, 2026-09-21), and
+      the report-only `split_share` in `report/schemas.py` and
+      `report/localisation.py` (WP-1339, 2026-09-03). Each replaced a
+      "decided YYYY-MM-DD" phrase or sat beside "Chosen with that margin";
+      no number moved.
+      *Not tagged, and why.* Of the "this package's own" / "no source" /
+      "never tuned" sites, most describe a parser or a wording, not a value.
+      `B_iso` unbounded (WP-1534) follows the default of all three programs
+      it names, so it is established practice, not a free choice. Five
+      sites argue a choice and have **no record of the alternatives** to
+      point at: `background.select`'s "conventional 3σ, no source cited"
+      (named in WP-2002, never decided there), `schemas.interval
+      .PARAMETER_INTERVAL_CHI2_TOL` ("Chosen, not measured", WP-1929 records
+      no alternative), and three that predate the WP-1066 rename and so
+      lost their history (`indexing.fom`'s ⟨ΔQ⟩ floor,
+      `crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG` and
+      `crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG`).
+      Inventing a record for them would be the failure this WP describes.
+      The 161 "ruled YYYY-MM-DD" phrases are the generality rulings, whose
+      record is `docs/milestones/generality.md`; converting them is a
+      maintainer's call (handover, 2026-11-16).
 - [ ] Root CLAUDE.md § Conventions takes the rule, in the form it takes rules:
       a few lines, evidence compressed, pointing here.
 
