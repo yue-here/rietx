@@ -46,6 +46,27 @@ test reads it.
 "this package's own", "had no source", "quoted, never tuned"
 (`optimize/statistics.py`'s McCusker bands, `io/formats/*.py`'s hand-written
 parsers, `help.py`'s 25 Å² default). Useful, unenforced, and not a vocabulary.
+*Superseded in part (2026-11-16, checked on `bc77a934e`):* the 25 Å² default is
+gone (WP-1534), and a grep of `src/rietx` for those phrasings now finds 19
+"this package's own", 12 "no source" and 8 "never tuned", most of them about
+parsers and wording rather than a value. Two more phrasings carry case 3
+already: "decided YYYY-MM-DD" (9 sites, most naming a WP) and "ruled
+YYYY-MM-DD" (161, nearly all the generality rulings).
+
+**What landed since this was filed (premise check, 2026-11-16).** The
+generality audit (WP-2001, opened 2026-10-19) now records case 3 for part of
+the tree. `rietx._audit.ROWS` gives every module-level number under
+`_audit.WALKED` and every default at `_audit.DEFAULT_SEATS` a tier, and tier 3
+("rietx's own") must carry `grounds` and a dated `approved`
+(`tests/test_audit_table.py`). On `bc77a934e` 165 rows are tier 3. So for a
+walked number the *approval* of a choice is recorded and enforced. Three parts
+of this WP's gap remain: (1) nothing at the value tells a reader of the code
+that it was chosen, since the table is a 484 KB file nobody reads beside
+`diagnostics.py`; (2) nothing points at where the alternatives are, and 55 of
+the 165 tier-3 rows name no WP in `grounds` or `evidence`; (3) what the audit
+cannot see by declaration (an inline literal, a number in a dict, a design
+choice with no number, such as "report-only, no threshold") has no record at
+all. `GHOST_MIN_PARENTS` and `GHOST_RATIO_TOL` are still at `unaudited`.
 
 **The gap, stated exactly.** For a constant in the code, nothing distinguishes:
 
@@ -72,17 +93,6 @@ judgement wearing a measurement's clothes.
 cites the WP number, so a determined reader can reconstruct most of it. The
 failure is that nothing *prompts* the record, so it happens when someone
 remembers, and the alternatives are the first thing lost.
-
-### Inherited
-
-- **2026-10-02, from WP-1311 (PR #663).** The 25 Å² Biso ceiling now has one
-  name, `schemas.structure.BISO_BOUNDS`. `Atom.biso`'s default reads it, and
-  `biso_bounds(value)` widens it to hold a value read from a file. It is a
-  case-3 value: WP-1311's 2026-09-18 entry measured that it bounds nothing
-  physical, and it was kept on the maintainer's ruling. That makes it one site
-  for this WP's pass, and its argument is in that WP.
-  **Moot since 2026-10-04 (WP-1534):** `Atom.biso` is unbounded by default,
-  and `BISO_BOUNDS`, `biso_bounds` and `BISO_BOUND_WIDENED` are deleted.
 
 ## Non-goals
 
