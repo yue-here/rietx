@@ -100,6 +100,13 @@ The esds come from the covariance the fit's parameter esds were read off, with t
 With no live fit, before one, after an edit or a checkout, the values are the current model's and every esd is `None`.
 The verb returns `None` in Le Bail and Pawley mode, as the result does.
 
+A distance prints on one line, such as `Ca1–O5  2.3898(50) Å  5_565` from the fluorapatite tutorial fit.
+
+Geometry is computed for a Rietveld fit only.
+In Le Bail and Pawley mode `RefinementResult.geometry` is `None`, because the dummy atom those modes require is not a structure to measure.
+The table is computed when the fit closes.
+The covariance it needs comes from the final Jacobian, and the Jacobian is not stored.
+
 ### Without a fit
 
 `rietx.geometry_census` returns the same table for a `Structure` or a single `Phase`, with no refinement, pattern or instrument.
@@ -122,15 +129,9 @@ moved = rx.geometry_census(structure, coordinates=xyz)
 
 The limits are the table's, and each writes a note where it applies.
 The orbit of each atom is decided at the coordinates given, so an atom moved off a special position has its whole orbit.
-The cell is read as stored.
+Before measuring, it does to the model what a fit does first.
+The cell takes the ties its space-group setting imposes, such as b = a, and a site within a few 10⁻⁴ of a special position is moved onto it, with a note saying so.
 Occupancy is not read, so the two halves of a split site are listed as a contact at whatever distance they sit.
-
-A distance prints on one line, such as `Ca1–O5  2.3898(50) Å  5_565` from the fluorapatite tutorial fit.
-
-Geometry is computed for a Rietveld fit only.
-In Le Bail and Pawley mode `RefinementResult.geometry` is `None`, because the dummy atom those modes require is not a structure to measure.
-The table is computed when the fit closes.
-The covariance it needs comes from the final Jacobian, and the Jacobian is not stored.
 
 ### Esds of distances and angles
 

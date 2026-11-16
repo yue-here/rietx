@@ -755,12 +755,25 @@ def geometry_census(structure, coordinates=None):
     answer: contacts are listed out to :data:`CONTACT_MAX_ANG` and capped at
     :data:`MAX_CONTACTS_PER_ATOM` nearest per atom, torsions at
     :data:`MAX_TORSIONS_PER_ATOM`, and a phase of more than
-    :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is not searched at all.  The
-    cell is read as stored, with no crystal-system tie applied.  Occupancy is
-    not read: every site is present, so two halves of a split site are listed
-    as a contact at whatever distance they sit.
+    :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is not searched at all.
+    Occupancy is not read: every site is present, so two halves of a split
+    site are listed as a contact at whatever distance they sit.
+
+    Two things a fit does to the model before it measures anything are done
+    here too, so the census equals :meth:`~rietx.Refinement.geometry` before a
+    fit: the cell takes its setting's ties (b ← a and the rest, from
+    :func:`~rietx.crystallography.symmetry.cell_constraints`, the parameter
+    table's one authority), and a site within
+    :data:`~rietx.crystallography.symmetry.TWIN_COORD_TOL` of a special
+    position is moved onto it (:func:`~rietx.crystallography.twins.
+    merge_site_twins`), its message joining the notes.  Without the second, an
+    atom a few 10⁻⁴ off a special position would list its own images, a few
+    thousandths of an ångström away, as bonds.
     """
     from ..crystallography.structure_factor import PhaseSites, phase_orbit_split
+    from ..crystallography.symmetry import cell_constraints
+    from ..crystallography.twins import merge_site_twins
+    from ..schemas.structure import Structure
 
     phases = list(structure.phases) if hasattr(structure, "phases") else [structure]
     if not phases:
@@ -768,23 +781,41 @@ def geometry_census(structure, coordinates=None):
     phases = [p if xyz is None else _placed(p, xyz)
               for p, xyz in zip(phases, _coordinates_per_phase(coordinates, phases),
                                 strict=True)]
+    merged: list = []
+    phases = list(merge_site_twins(Structure(phases=phases),
+                                   diagnostics=merged).phases)
     values: dict[str, float] = {}
     for ip, phase in enumerate(phases):
+        cell = {k: float(getattr(phase.cell, k).value) for k in _CELL_NAMES}
+        ties = cell_constraints(resolve_group(phase.space_group,
+                                              phase.symmetry_operations)).ties
+        for dependent, source in ties.items():
+            cell[dependent] = cell[source]
         for k in _CELL_NAMES:
-            values[f"phases.{ip}.cell.{k}"] = float(getattr(phase.cell, k).value)
+            values[f"phases.{ip}.cell.{k}"] = cell[k]
         for j, atom in enumerate(phase.atoms):
             for c in _XYZ:
                 values[f"phases.{ip}.atoms.{j}.{c}"] = float(getattr(atom, c).value)
     sites_of = [PhaseSites(ops=phase_orbit_split(p),
                            species=[a.species for a in p.atoms]) for p in phases]
-    return _assemble(sites_of, values, phases, None, lambda ip, n_atoms: None)
+    table = _assemble(sites_of, values, phases, None, lambda ip, n_atoms: None)
+    if table is not None and merged:
+        table = table.model_copy(update={"notes": [d.message for d in merged]
+                                         + list(table.notes)})
+    return table
 
 
 def _coordinates_per_phase(coordinates, phases) -> list:
     """``coordinates`` as one (n_atoms, 3) array or ``None`` per phase."""
     if coordinates is None:
         return [None] * len(phases)
-    if getattr(np.asarray(coordinates, dtype=object), "ndim", 0) == 2:
+    if isinstance(coordinates, str | bytes):
+        raise TypeError("coordinates are fractional numbers, not text")
+    try:
+        ndim = np.asarray(coordinates, dtype=object).ndim
+    except ValueError:            # a ragged nesting numpy will not hold
+        ndim = None
+    if ndim == 2:
         if len(phases) != 1:
             raise ValueError(f"one coordinate array was given for {len(phases)} "
                              "phases; give one entry per phase, None to keep "
@@ -792,6 +823,10 @@ def _coordinates_per_phase(coordinates, phases) -> list:
         per = [coordinates]
     else:
         per = list(coordinates)
+        if len(phases) == 1 and len(per) != 1:
+            raise ValueError(f"phase {phases[0].name!r}: give its coordinates as "
+                             f"({len(phases[0].atoms)}, 3) fractional numbers, "
+                             "one row per atom")
         if len(per) != len(phases):
             raise ValueError(f"{len(per)} coordinate entries for {len(phases)} "
                              "phases; give one per phase, None to keep a "
@@ -801,7 +836,10 @@ def _coordinates_per_phase(coordinates, phases) -> list:
         if xyz is None:
             out.append(None)
             continue
-        xyz = np.asarray(xyz, dtype=np.float64)
+        try:
+            xyz = np.asarray(xyz, dtype=np.float64)
+        except ValueError:        # ragged rows
+            xyz = np.asarray(xyz, dtype=object)
         if xyz.shape != (len(phase.atoms), 3):
             raise ValueError(f"phase {phase.name!r}: coordinates have shape "
                              f"{xyz.shape}, its {len(phase.atoms)} atoms need "

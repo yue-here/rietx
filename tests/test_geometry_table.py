@@ -736,6 +736,18 @@ def test_the_census_reads_bare_coordinates_across_the_boundary():
     assert structure.phases[0].atoms[0].x.value == 0.2
 
 
+def test_the_census_reads_coordinates_a_loop_never_wrapped():
+    """A search loop that never wraps hands in x = 3.95: the inversion image
+    sits at −3.95, seven cells away before it is centred, past any fixed shell
+    of shifts.  The contact is still the 0.5 Å one."""
+    phase = _phase_in("P -1", (5.0, 5.2, 5.4, 88.0, 92.0, 91.0),
+                      [("O1", "O", 0.3, 0.5, 0.5)])
+    for x in (3.95, -6.05):
+        g = rx.geometry_census(phase, coordinates=[[x, 0.5, 0.5]])
+        near = [d.distance for d in g.distances if d.distance < 1.0]
+        assert len(near) == 1 and 0.49 < near[0] < 0.53, x
+
+
 @pytest.mark.parametrize("builder", [corundum_phase, zincite_phase, fluorite_phase])
 def test_the_census_is_the_unfitted_refinement_geometry(builder):
     """``geometry_census`` and ``Refinement.geometry()`` with no live fit are
@@ -744,6 +756,22 @@ def test_the_census_is_the_unfitted_refinement_geometry(builder):
     census = rx.geometry_census(structure)
     assert census == Refinement(structure, LAB, history=False).geometry()
     assert census.distances and census.angles
+
+
+def test_the_census_does_to_the_model_what_a_fit_does_first():
+    """A hexagonal cell stored with b ≠ a takes b ← a, and a site 3·10⁻⁴ off
+    its special position is merged onto it and said in the notes, as `Refinement` does before any
+    fit; without the merge the site's own images, 0.003 Å apart, are listed."""
+    phase = _phase_in("P 63 m c", (3.2499, 3.26, 5.2066, 90.0, 90.0, 120.0),
+                      [("Zn", "Zn", 0.333, 0.667, 0.0),
+                       ("O", "O", 0.333, 0.667, 0.3819)])
+    structure = Structure(phases=[phase])
+    census = rx.geometry_census(structure)
+    unfitted = Refinement(structure, LAB, history=False).geometry()
+    assert census.distances == unfitted.distances
+    assert census.angles == unfitted.angles
+    assert min(d.distance for d in census.distances) > 1.9
+    assert sum("moved onto the special position" in n for n in census.notes) == 2
 
 
 def test_a_census_off_a_special_position_has_the_whole_orbit():
@@ -769,15 +797,18 @@ def test_a_census_off_a_special_position_has_the_whole_orbit():
     assert counts
     for (i, j, dist), n_ij in counts.items():
         assert n_ij * mult[i] == counts.get((j, i, dist), 0) * mult[j], (i, j, dist)
-    assert any("per atom are not listed" in n for n in g.notes)
+    assert any("contact(s) beyond" in n for n in g.notes)
 
 
 def test_the_census_refuses_coordinates_it_cannot_place():
     structure = Structure(phases=[corundum_phase()])
     with pytest.raises(ValueError, match="need"):
         rx.geometry_census(structure, coordinates=np.zeros((1, 3)))
-    with pytest.raises(ValueError, match="one per phase"):
+    with pytest.raises(ValueError, match="one row per atom"):
         rx.geometry_census(structure, coordinates=[None, None])
+    with pytest.raises(ValueError, match="one per phase"):
+        rx.geometry_census(Structure(phases=[corundum_phase(), fluorite_phase()]),
+                           coordinates=[None])
     with pytest.raises(ValueError, match="not finite"):
         rx.geometry_census(structure, coordinates=np.full((2, 3), np.nan))
     assert rx.geometry_census(Structure(phases=[])) is None
