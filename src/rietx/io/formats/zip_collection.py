@@ -14,7 +14,7 @@ dispatch :func:`~rietx.io.readers.identify_format` runs on a file, and
 ``scan=k`` reads the k-th pattern in **sorted name order**.  Skipped, and never
 counted, so that ``k`` addresses a pattern and not a byte-blob:
 
-- directory entries;
+- directory entries (a ``\\``-terminated one from Windows too) and empty members;
 - dotfiles, which include an office suite's lock file (``.~lock.<name>#``, as
   the real archive carries) and macOS's ``__MACOSX/._<name>`` resource forks;
 - a member no reader claims, and a member claimed only by a *refusal*
@@ -24,6 +24,12 @@ counted, so that ``k`` addresses a pattern and not a byte-blob:
   non-goal; a ``.rasx`` or ``.brml`` member is a pattern, since a reader here
   claims it by its manifest;
 - a member past :data:`MAX_MEMBER_BYTES`, which no reader here would open.
+
+A member that cannot be decompressed (corrupt, encrypted, a method ``zipfile``
+cannot undo) is not skipped: whether it is a pattern cannot be known, so the
+archive is claimed and its read refused, naming the member.  A member that
+holds several scans of its own (a ``.rasx``, an ``.xrdml``) is refused too:
+``scan=`` already selects the member, so its second scan could not be reached.
 
 The ASCII reader claims any text that is not binary, so a text member that is
 not a pattern (a log, a parameter file) counts as one, and reading it refuses,
@@ -50,10 +56,18 @@ here takes a path, and gemmi reads one too.
 **The pattern keeps its reader's metadata**, with ``source_file`` the member's
 full name inside the archive and ``scan``/``scan_count`` the archive's own.
 ``scan_count`` comes from the one pass over the archive that the read makes.
+
+**What a read costs.** That pass decompresses and stages every candidate member
+to count the patterns, so one read of a large archive costs a pass over all of
+it (measured on synthetic members: ~0.4 ms a small member), and reading every
+pattern of an archive in turn is quadratic in its size.  ``list_scans`` reads
+every member whole.  Nothing is cached between calls, for the reason
+``base.head`` gives.
 """
 
 from __future__ import annotations
 
+import lzma
 import re
 import struct
 import tempfile
@@ -93,23 +107,30 @@ _SAFE_NAME = re.compile(r"[^A-Za-z0-9._+-]")
 class _Member:
     """A member that a reader here claims, by its name inside the archive."""
 
-    name: str
+    info: zipfile.ZipInfo
     reader: PatternFormat
+
+    @property
+    def name(self) -> str:
+        return self.info.filename
 
 
 def _archive(path: Path) -> zipfile.ZipFile:
     """The open archive, with ``zipfile``'s exception converted at this boundary."""
     try:
         return zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError) as exc:
         raise ValueError(f"{path.name} begins like a zip archive but is not a "
                          f"readable one ({exc}); a zip that stops early is "
                          "usually a copy that was interrupted") from None
 
 
 def _skipped(info: zipfile.ZipInfo) -> bool:
-    """A directory entry or a dotfile, which is never a pattern."""
-    if info.is_dir():
+    """A directory entry, an empty member or a dotfile, which is never a pattern.
+
+    The empty test reads the archive's declared size, trusted only to skip.
+    """
+    if info.is_dir() or info.filename.endswith("\\") or info.file_size == 0:
         return True
     return PurePosixPath(info.filename.replace("\\", "/")).name.startswith(".")
 
@@ -136,7 +157,7 @@ def _member_bytes(zip_archive: zipfile.ZipFile, info: zipfile.ZipInfo, *,
     try:
         with zip_archive.open(info) as fh:
             raw = fh.read(MAX_MEMBER_BYTES + 1)
-    except (zipfile.BadZipFile, EOFError, OSError, zlib.error,
+    except (zipfile.BadZipFile, EOFError, OSError, zlib.error, lzma.LZMAError,
             struct.error) as exc:
         raise ValueError(f"{path.name}: member {info.filename!r} could not be "
                          f"decompressed ({exc})") from None
@@ -209,7 +230,7 @@ def _patterns(zip_archive: zipfile.ZipFile, directory: Path, *,
         finally:
             staged[0].unlink()
         if reader is not None:
-            out.append(_Member(info.filename, reader))
+            out.append(_Member(info, reader))
     return out
 
 
@@ -217,23 +238,46 @@ def _read_member(zip_archive: zipfile.ZipFile, directory: Path, member: _Member,
                  *, path: Path, index: int, count: int,
                  options: dict[str, Any],
                  diagnostics: list[Diagnostic] | None) -> PatternData:
-    """Read one claimed member by its own reader, naming the archive on refusal."""
-    info = zip_archive.getinfo(member.name)
-    staged = _stage(directory, zip_archive, info, path=path)
+    """Read one claimed member by its own reader, naming the archive on refusal.
+
+    What the reader says names the staged file, a name found neither in the
+    archive nor on disk afterwards, so each message is rewritten to name the
+    member and the archive instead.
+    """
+    staged = _stage(directory, zip_archive, member.info, path=path)
     if staged is None:                      # it was under the cap a moment ago
         raise ValueError(f"{path.name}: member {member.name!r} is larger than "
                          f"the {MAX_MEMBER_BYTES // (1024 * 1024)} MB a pattern "
                          "member may be, so it was not read")
+    file = staged[0]
+    here = f"{member.name} in {path.name}"
+
+    def named(text: str) -> str:
+        return text.replace(str(file), here).replace(file.name, here)
+
+    inner: list[Diagnostic] = []
     try:
-        kwargs = reader_options_for(member.reader, options, diagnostics=diagnostics)
-        return member.reader.read(staged[0], diagnostics=diagnostics, **kwargs)
+        kwargs = reader_options_for(member.reader, options, diagnostics=inner)
+        data = member.reader.read(file, diagnostics=inner, **kwargs)
     except (ValueError, OSError) as exc:
         raise ValueError(f"{path.name}: member {member.name!r}, pattern "
                          f"{index} of the {count} the archive holds, was claimed "
                          f"by the {member.reader.title} reader and could not be "
-                         f"read: {exc}") from None
+                         f"read: {named(str(exc))}") from None
     finally:
-        staged[0].unlink()
+        file.unlink()
+    held = int(data.metadata.get("scan_count", "1"))
+    if held > 1:
+        # a member's own scans are a container inside the container, and scan=
+        # already selects the member, so none past its first could be reached
+        raise ValueError(f"{path.name}: member {member.name!r} is itself a "
+                         f"{member.reader.title} holding {held} scans. A zip of "
+                         "multi-scan files is not read; extract that member and "
+                         "read it with scan=")
+    if diagnostics is not None:
+        diagnostics.extend(d.model_copy(update={"message": named(d.message)})
+                           for d in inner)
+    return data
 
 
 def _out_of_range(path: Path, count: int, index: int) -> ValueError:
@@ -290,17 +334,18 @@ def list_zip_collection_scans(path: str | Path) -> list[ScanInfo]:
 def looks_zip_collection(p: Path) -> bool:
     """Zip magic; then no vendor manifest, and a member some reader claims.
 
-    Two answers for an archive that cannot be opened.  An archive that begins
-    with the magic and is not readable is claimed, so its refusal names it as a
-    zip: left unclaimed, a stored one reaches ``gsas`` through its first
-    member's text and fails on the archive's bytes.  An archive that opens is
-    claimed only once a member is, and the search stops at the first.
+    An archive that begins with the magic and is not readable is claimed, so
+    its refusal names it as a zip: left unclaimed, a stored one reaches
+    ``gsas`` through its first member's text and fails on the archive's bytes.
+    A member that cannot be decompressed claims it for the same reason.  An
+    archive that opens is otherwise claimed only once a member is, and the
+    search stops at the first.
     """
     if not head(p, n=len(ZIP_MAGIC)).raw.startswith(ZIP_MAGIC):
         return False
     try:
         zip_archive = zipfile.ZipFile(p)
-    except zipfile.BadZipFile:
+    except (zipfile.BadZipFile, NotImplementedError):
         return True
     except OSError:
         return False
@@ -311,7 +356,7 @@ def looks_zip_collection(p: Path) -> bool:
             try:
                 staged = _stage(directory, zip_archive, info, path=p)
             except ValueError:
-                continue                    # read() names it; a sniff only asks
+                return True                 # claimed, so the read refuses by name
             if staged is None:
                 continue
             try:

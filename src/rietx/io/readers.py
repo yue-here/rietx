@@ -128,15 +128,24 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
         raise ValueError(f"reader option nonpositive_sigma= takes one of "
                          f"{list(NONPOSITIVE_SIGMA_RULES)}, got {rule!r}")
     data = fmt.read(p, diagnostics=diagnostics, **kwargs)
+    # the checks below quote the reader that read the points: a container
+    # (zip_collection, WP-1315) hands a member to its own reader, which writes
+    # its name, or its name and a record layout (``gsas-fxye``), as "format"
+    reader = _READERS_BY_NAME.get(
+        data.metadata.get("format", "").split("-")[0], fmt)
     sigma_notes = _apply_nonpositive_sigma(data, rule, p.name)
-    axis = _axis_diagnostics(data, fmt, p.name)
+    axis = _axis_diagnostics(data, reader, p.name)
     if diagnostics is not None:
         diagnostics.extend(sigma_notes)
         diagnostics.extend(axis)
-        diagnostics.extend(_constant_sigma_diagnostics(data, fmt, p.name))
+        diagnostics.extend(_constant_sigma_diagnostics(data, reader, p.name))
         diagnostics.extend(_dead_channel_diagnostics(data, p.name))
     return data
 
+
+#: Each registered format by name, for the checks :func:`read_pattern` runs on
+#: what a reader handed back.
+_READERS_BY_NAME: dict[str, PatternFormat] = {f.name: f for f in PATTERN_FORMATS}
 
 #: The spellings ``nonpositive_sigma=`` takes, ``PatternData``'s own.
 NONPOSITIVE_SIGMA_RULES: tuple[str, ...] = get_args(NonPositiveSigma)

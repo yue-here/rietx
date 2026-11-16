@@ -281,3 +281,76 @@ def test_the_capabilities_arm_names_the_format_and_its_options():
     assert zipped.extensions == [".zip"]
     assert zipped.options == ["axis", "bank", "block", "nonpositive_sigma", "scan"]
     assert zipped.refuses is None
+
+
+# ------------------------------------------- from the branch's review pass
+def test_two_members_of_one_name_are_two_patterns(tmp_path):
+    """``getinfo(name)`` answers with the last of them, so each member is
+    carried as its own entry from the listing to the read."""
+    path = write_zip_collection(tmp_path / "dup.zip", [("a.xye", xye_text(10.0)),
+                                                       ("a.xye", xye_text(30.0))])
+    starts = [rx.read_pattern(path, scan=k).tt()[0] for k in (0, 1)]
+    assert starts == pytest.approx([10.0, 30.0])
+
+
+@pytest.mark.parametrize("method", [zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2,
+                                    zipfile.ZIP_LZMA])
+def test_a_member_that_cannot_be_decompressed_is_refused_by_name(method, tmp_path):
+    """Its bytes cannot say whether it is a pattern, so the archive is claimed
+    and the read refuses naming it, never with ``lzma``'s own exception."""
+    path = write_zip_collection(tmp_path / "bad.zip",
+                                [("a.xye", xye_text(10.0, n=400))],
+                                compression=method)
+    raw = bytearray(path.read_bytes())
+    start = 30 + len("a.xye")                  # the local header, then the data
+    for i in range(start + 20, start + 60):
+        raw[i] ^= 0xFF
+    path.write_bytes(bytes(raw))
+    assert identify_format(path).name == "zip_collection"
+    with pytest.raises(ValueError) as exc:
+        rx.read_pattern(path)
+    assert "bad.zip" in str(exc.value)
+
+
+def test_a_member_holding_several_scans_is_refused_naming_it(tmp_path):
+    from tests.test_readers import write_rasx
+
+    rasx = write_rasx(tmp_path / "two.rasx",
+                      [dict(rows=[(10.0 + 0.02 * i, 500 + i % 7) for i in range(50)]),
+                       dict(rows=[(40.0 + 0.02 * i, 300 + i % 5) for i in range(50)])])
+    path = write_zip_collection(tmp_path / "m.zip", [("two.rasx", rasx.read_bytes())])
+    found: list = []
+    with pytest.raises(ValueError, match="member 'two.rasx' is itself a .* holding 2"):
+        rx.read_pattern(path, diagnostics=found)
+    # the member's own "pass scan=" advice would select an archive member
+    assert "PATTERN_MULTISCAN_DEFAULTED" not in {d.code for d in found}
+
+
+def test_what_the_member_reader_says_names_the_member_and_the_archive(tmp_path):
+    rows = "".join(f"{30.0 - 0.02 * i:.2f} {500 + i % 7}\n" for i in range(20))
+    path = write_zip_collection(tmp_path / "w.zip",
+                                [("données/scan 1 (A).xy", rows),
+                                 ("notes.txt", "a log, not a pattern\n")])
+    found: list = []
+    rx.read_pattern(path, scan=0, diagnostics=found)
+    (d,) = [d for d in found if d.code == "PATTERN_SCAN_REVERSED"]
+    assert "données/scan 1 (A).xy in w.zip" in d.message
+    with pytest.raises(ValueError) as exc:
+        rx.read_pattern(path, scan=1)
+    assert "rietx-zip-" not in str(exc.value)      # no staging path escapes
+
+
+def test_the_post_read_checks_quote_the_member_reader(tmp_path):
+    """A GSAS member whose ``BANK`` record is gone reads as columns in
+    centidegrees; the hint read from the ASCII reader still reaches it."""
+    rows = "".join(f"{1000.0 + 2.0 * i} {500 + i % 7}\n" for i in range(20))
+    path = write_zip_collection(tmp_path / "c.zip", [("a.dat", rows)])
+    with pytest.raises(ValueError, match="Divided by 100"):
+        rx.read_pattern(path)
+
+
+def test_empty_members_and_windows_directory_entries_are_not_patterns(tmp_path):
+    path = write_zip_collection(tmp_path / "e.zip", [("empty.xy", ""),
+                                                     ("folder\\", ""),
+                                                     ("b.xye", xye_text(10.0))])
+    assert [s.label for s in list_scans(path)] == ["b.xye"]
