@@ -2691,7 +2691,8 @@ ROWS: tuple[Row, ...] = (
                   "cpd-1a's corundum c a strict xfail; WP-2002, 2026-10-21); since WP-2012 held "
                   "H/L, SRM 660c reads 0.582 plain esd on u behind it, a strict xfail: the 0.05 "
                   "floor's closing stage starts past the (333)/(511) Ka2 row of the Gamma_G^2 cone "
-                  "and drops it, so the two arms stop on two rows of the cone, not two sizings "
+                  "and drops it, so the two arms stop on two rows of the cone; the floor only moves "
+                  "where that stage starts "
                   "(WP-2084, 2026-11-16)"),
         grounds=("A numerical setting whose domain test fails over part of the domain it claims; "
                  "tier 3 under B10 option 2 (ruled 2026-10-19).  The seventh round's Q2 (ruled "
