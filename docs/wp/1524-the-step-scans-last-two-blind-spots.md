@@ -1,9 +1,8 @@
 # WP-1524 — The step scan's last two blind spots
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-16
 Track: A long run is not one fit
 Depends on: — (1469 landed the rule this extends)
-Priority: P3 2026-09-29 — a false flag on a run of failed patterns, and a second real step on one path goes unreported; both on paths few series run
 
 ## Goal
 
@@ -77,9 +76,9 @@ pair once. `plot_trajectory` shades each recorded pair.
       If they are flagged, `SeriesStep` needs a key other than `path`, and
       the verification and the plot follow.
       *2026-11-16, superseded by WP-2003:* nothing is flagged and every step
-      is a row, so a path with two steps already has both. `SeriesStep`
-      is keyed by `(path, indices)`, and `verify_steps=k` and the plot read
-      rows. No measurement was run: the two legs it would count against
+      is a row, so a path with two steps already has both. There is one
+      `SeriesStep` per (path, index pair), and `verify_steps=k` and the plot
+      read rows. No measurement was run: the two legs it would count against
       are gone, and its answer would move no code. The behaviour is pinned
       by `tests/test_sequential.py::test_a_path_with_two_planted_steps_lists_both`.
 - [x] Tests: both shapes, and the suite's clean series firing nothing new
@@ -110,6 +109,41 @@ existing series fire nothing new.
 
 ## Handover log
 
-- **2026-09-29** — created, from WP-1469's session: shape 1 was the review's
+- **2026-11-16** — closed. Ghostshift runner, PR #1588. The diagnostic this WP was
+  filed against no longer exists. WP-2003 replaced it with a plain list of every step,
+  and that change had already fixed both shapes. A run of failed patterns is a gap and
+  never one step. A path with two transitions shows both. What was missing was a test
+  for the first, which this session adds; it fails when the gap check is loosened. The
+  one open question was inherited from WP-1986. Should a cubic cell's three tied axes
+  give one row per step or three? And should the count of steps to re-check count them
+  once? That question is the maintainer's, and it is #1590.
+
+  *Done.* `cebd7ed06`: `test_a_run_of_failed_patterns_is_never_bridged_by_a_step`
+  (`tests/test_series_error_policy.py`; patterns 3-5 of the eight-pattern ramp raise on
+  every rung, under `skip` and under `carry`; `steps` keeps (0, 1), (1, 2), (6, 7)).
+  `a1188e716`: `test_a_path_with_two_planted_steps_lists_both` (`tests/test_sequential.py`).
+  Context marked superseded in part. Tasks ticked with what was done in place of each.
+  No source changed. *Inherited* pruned: WP-1986's tied-axis finding is #1590, and
+  WP-2003's next actions (item 2, "`verify_steps` counting tied rows") already own its
+  `verify_steps` half.
+
+  *Measured.* Positive arm: with `adjacent = np.diff(idx) >= 1`, both shape-1 cases fail on
+  an extra `(2, 6)` row (Mac, darwin arm64, worktree venv `[dev]`); the source was restored
+  by sed before the commit. Pearl (Linux x86-64 WSL2, venv `[dev]` 1.12.0.dev0, tree a1188e716,
+  co-tenant). The canary, the two touched files plus audit_table, help and docs_consistency
+  at `-n 4`: 260 passed. The fast suite at `-n 4`: 14853 passed, 280 skipped, 32 xfailed,
+  0 failed in 934 s. Added-test cost from that run's junit: the shape-1 test 1.11 s (2 cases),
+  the shape-2 test 0.00 s. Neither joins the slow tail. The full suite was not run: the branch
+  is test-only. `tests.reader_output` exit 0 (unchanged). On the Mac: docs_consistency 26
+  passed, ruff clean.
+
+  *Review.* A read-only review subagent found nothing. It made one nit: say "one row per
+  (path, index pair)" rather than "keyed by". It was taken. `/code-review` was not run,
+  because the runner rules forbid it (it edits the main checkout).
+
+  *Generality.* No `_audit.py` change, and no heuristic, default or threshold added. The judge
+  was not dispatched.
+
+  Next: none here. #1590 waits for the maintainer's ruling, and WP-2003's C4 touch takes it.- **2026-09-29** — created, from WP-1469's session: shape 1 was the review's
   declined finding, shape 2 the limit its decision 2 recorded. Next: task 1,
   which is small; task 2 is a measurement first.
