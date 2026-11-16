@@ -1,6 +1,6 @@
 # WP-1522 — the GUI says what reading the project repaired
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: — (1321 landed the history channel this shows)
 Priority: P3 2026-09-29 — a view over what the readers already report; the python API is the workaround
