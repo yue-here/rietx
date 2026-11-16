@@ -109,8 +109,11 @@ one declaration per matched path, each with its own coefficients.
   are `_target_refusal`'s, recorded in `glob_expansions` and reported as
   `PARAMETRIC_GLOB_SKIPPED` (info, tier 1). An expression basis refuses a glob: its
   variables are shared, so every matched path would take one value.)*
-- [ ] Manual: `reference/parametric.md` § Declaration shows the new forms beside
-  the data form.
+- [x] Manual: `reference/parametric.md` § Declaration shows the new forms beside
+  the data form. *(2026-11-16: the field table's `target` and `where` rows, and
+  § A subset by condition and § A target glob, each with an executed example;
+  `reference/expressions.md` § Conditions names `where` as a second place a
+  condition appears.)*
 - [ ] Skill: the series reference's parametric row, or "none" and why.
 
 ## Acceptance

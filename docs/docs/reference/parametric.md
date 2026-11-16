@@ -86,7 +86,7 @@ The coordinates need not be compositions or temperatures: a position on the subs
 | Field | Holds |
 |---|---|
 | `ParametricEquation.name` | the declaration's name, a single identifier; its coefficients are named variables, `vars.<name>_0`, `vars.<name>_1`, one per term |
-| `ParametricEquation.target` | one bare dot-path under `phases.` or `instrument.`, with no glob and no `hist.` scope; `None` only on an expression equation, which is then an intermediate that a later expression names |
+| `ParametricEquation.target` | one dot-path under `phases.` or `instrument.`, with no `hist.` scope; on a linear basis it may be a glob, expanded into one declaration per path ([A target glob](#a-target-glob)); `None` only on an expression equation, which is then an intermediate that a later expression names |
 | `ParametricEquation.basis` | `"constant"`, `"polynomial"`, `"design"` or `"expression"` |
 | `ParametricEquation.expression` | an expression basis's text, in the grammar of [Expressions](expressions.md), over the variables `refine_multi(variables=…)` declares, the coordinate columns and the names of earlier expression equations |
 | `ParametricEquation.terms` | a polynomial's terms, each a list of coordinate names: `[]` is the intercept, and a repeated name is a power |
@@ -191,6 +191,52 @@ joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
 resolved_low, resolved_high = joint.parametric
 assert resolved_low.where == "T < 800" and resolved_low.patterns is None
 assert resolved_low.reference == {"T": 450.0}
+```
+
+### A target glob
+
+On a constant, polynomial or design basis the target may be a glob, such as `phases.0.cell.*` or `phases.0.atoms.*.biso`.
+It is expanded when the declaration is resolved, into one declaration per matched path, each with its own coefficients.
+An orthorhombic cell linear in T is then one declaration rather than three.
+
+Each member is named `<name>_<tail>`, where the tail is the matched path after the glob's leading literal segments, with its dots written `_`.
+A declaration `cell` on `phases.0.cell.*` has the member `cell_a` on `phases.0.cell.a`, whose coefficients are `vars.cell_a_0`, `vars.cell_a_1`, and so on.
+A member named like another declaration is refused, as two declarations of one name are.
+
+A glob may match paths that no equation can drive: on a cubic phase, `phases.0.cell.*` matches `b` and `c`, which are tied to `a`, and three locked angles.
+Those paths are skipped, and the result says which, and why, in [`PARAMETRIC_GLOB_SKIPPED`](diagnostics-series.md#parametric_glob_skipped), an info.
+A glob that matches nothing, or matches only such paths, is refused.
+The glob is matched against the model of the first pattern of the subset.
+
+The declarations as resolved carry the bare targets, so `MultiHistogramRefinement.parametric` lists one per member, and a refit passing them back wires the same equations.
+An expression equation takes no glob: its variables are shared, so every matched path would take one value.
+
+```python
+import rietx as rx
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0),
+                   y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0)),
+           rx.Atom(label="B", species="B", x=rx.Parameter(value=0.1975),
+                   y=rx.Parameter(value=0.5), z=rx.Parameter(value=0.5))],
+)])
+temperatures = [300.0, 450.0, 600.0, 750.0, 900.0]
+instruments = [rx.Instrument.debye_scherrer(wavelength=0.4139) for _ in temperatures]
+coordinates = rx.CoordinateTable(columns={"T": temperatures}, units={"T": "K"})
+
+cell = rx.ParametricEquation(name="cell", target="phases.0.cell.*", basis="polynomial",
+                             terms=[[], ["T"]])
+biso = rx.ParametricEquation(name="B", target="phases.0.atoms.*.biso", basis="polynomial",
+                             terms=[[], ["T"]])
+joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
+                                    parametric=[cell, biso])
+
+assert [(e.name, e.target) for e in joint.parametric] == [
+    ("cell_a", "phases.0.cell.a"),
+    ("B_0_biso", "phases.0.atoms.0.biso"),
+    ("B_1_biso", "phases.0.atoms.1.biso"),
+]
 ```
 
 ## Targets
