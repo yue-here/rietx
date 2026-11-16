@@ -215,8 +215,8 @@ today's.
   `predict()` by 4.38e-6 of the curve maximum in Rietveld mode (both
   drivers), 4.8e-20 in Pawley mode and 2.6e-4 in Le Bail mode. Le Bail's
   residual uses intensities frozen per solve. Gates:
-  - fast suite on pearl: 14859 passed, 280 skipped, 32 xfailed, 0 failed,
-    in 1130 s (shared venv `rietx-py312`, Linux x86_64, `-n 4`, at
+  - fast suite on a Linux workstation: 14859 passed, 280 skipped, 32 xfailed, 0 failed,
+    in 1130 s (`[dev]`-equivalent venv, Linux x86_64, `-n 4`, at
     `91cf502c1`, beside another job). The 7 added tests (9 cases) cost
     2.4 s together on that run;
   - canary (`gs1949c`, touched files + audit_table + help +
