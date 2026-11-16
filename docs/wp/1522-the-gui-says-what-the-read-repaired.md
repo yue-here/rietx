@@ -47,12 +47,16 @@ holds the server contract and the panel rules; read it first.
 
 ## Tasks
 
-- [ ] The route that opens a project carries both lists, as `Diagnostic`
+- [x] The route that opens a project carries both lists, as `Diagnostic`
       dumps, and `test_gui_manual.py`'s route partition is kept whole.
+      (2026-11-16: on `project_doc`, so `GET /api/project` after a reload
+      says it too; no route added, so the partition is unchanged.)
 - [ ] A panel or the existing diagnostics surface shows them on open,
       warning level first, with the code, the message and the `where`.
-- [ ] Tests: a project whose log predates schema 0.35 (the aging helper in
+- [x] Tests: a project whose log predates schema 0.35 (the aging helper in
       `tests/test_project.py`) opens in the server with both codes reported.
+      (`test_open_says_what_the_readers_repaired`: a reversed scan plus a log
+      aged to 0.16, `DECLARED_RANGE_RESTORED` and `_NOT_RESTORED`.)
 - [ ] Manual: `using/gui-guide.md` (or the chapter the panel belongs to).
 - [ ] Skill: none expected (an agent reads the lists off `Project`), say so.
 
