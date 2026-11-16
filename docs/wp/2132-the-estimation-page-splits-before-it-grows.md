@@ -93,8 +93,10 @@ a question for this WP to measure and report, never to build unasked.
 
 ## Tasks
 
-- [ ] Read the state of PR #1383 and PR #1473. Split after both land or close, or agree the order with their author on the PR.
-- [ ] Re-measure every twin on a fresh build (`python -m sphinx -W -q -E -b html docs/docs <out>`, then `len()` of each `.html.md`), since the numbers above move with every merge.
+- [x] Read the state of PR #1383 and PR #1473. Split after both land or close, or agree the order with their author on the PR.
+  2026-11-16: both open, neither approved. #1383 (head `fa35f671d`, last push 2026-11-09, one maintainer review "commented") conflicts with main in `src/rietx/schemas/common.py` and `tests/test_magnetic.py`; its estimation hunk merges clean. #1473 (`eca5fafbc`) is mergeable and green. Merged into main alone or together they move this twin by +1 and 0. The order is the maintainer's call (handover entry).
+- [x] Re-measure every twin on a fresh build (`python -m sphinx -W -q -E -b html docs/docs <out>`, then `len()` of each `.html.md`), since the numbers above move with every merge.
+  2026-11-16 at `bc77a934e`: 132 twins, none over; the Context's dated notes carry the numbers, the handover entry the table.
 - [ ] Split the page along one H2 boundary: the new chapter's file, its H1 and answer sentence, both lines in `theory/index.md`, and the old page's answer sentence narrowed to what it keeps.
 - [ ] Move every inbound link: the 27 fragment links in the manual (the `-W` build finds a miss) and the 9 `theory/estimation` citations under `src/` (grep finds them).
 - [ ] Report the headroom of every twin after the split, and whether a growth budget below the cap, on `tests/skill_caps.py`'s pattern, is worth proposing. Propose; build nothing.
