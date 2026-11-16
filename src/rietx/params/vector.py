@@ -28,7 +28,7 @@ matrix — no pydantic objects are touched per iteration.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
@@ -3232,7 +3232,7 @@ class ParameterTable:
             "specimen sharing a cell the degeneracy breaks and N − 1 "
             "wavelengths are measurable: rietx.refine_multi")
 
-    def cell_pins(self) -> dict[str, str | None]:
+    def cell_pins(self, *, moving: Collection[str] = ()) -> dict[str, str | None]:
         """Per phase index, its held cell's first length path, or ``None``.
 
         :func:`wavelength_pins`' input for this table: a phase pins the d
@@ -3244,6 +3244,12 @@ class ParameterTable:
         Read from the **entries**, not ``_free_idx``, for :meth:`set_vary`'s
         reason (see :meth:`wavelength_pin`).  A length tied to a free one
         moves with it, so a cubic ``b`` follows ``a``.
+
+        ``moving`` names columns to read as free although the table holds
+        them: the run's own holds (the support hold, a collapse), which froze
+        a cell the caller never held.  The fence settles before those holds,
+        so a report worded after them passes them here to name the pin the
+        fence admitted λ against (review of PR #1575, finding 1).
         """
         first: dict[str, str] = {}
         moves: dict[str, bool] = {}
@@ -3252,31 +3258,34 @@ class ParameterTable:
             if ip is None:
                 continue
             first.setdefault(ip, e.path)
-            moves[ip] = moves.get(ip, False) or self._row_moves(e)
+            moves[ip] = moves.get(ip, False) or self._row_moves(e, moving=moving)
         return {ip: None if moves[ip] else path for ip, path in first.items()}
 
-    def _row_moves(self, e: Entry, _seen: frozenset[str] = frozenset()) -> bool:
+    def _row_moves(self, e: Entry, _seen: frozenset[str] = frozenset(), *,
+                   moving: Collection[str] = ()) -> bool:
         """Whether a row can move under the entries' current ``vary`` flags:
         it is free, tied with a nonzero coefficient on a free row, or the
         output of a derived block (a parent cell's child cell, a formula) one
         of whose inputs moves.  A derived output is a locked row with no tie,
-        so without the last clause it would read as held (review of WP-2148)."""
-        if e.vary:
+        so without the last clause it would read as held (review of WP-2148).
+        A row in ``moving`` counts as free (:meth:`cell_pins`)."""
+        if e.vary or e.path in moving:
             return True
         if e.tie is not None:
             terms, _ = self._flatten(e.tie, (e.path,))
-            return any(c != 0.0 and self._row_moves(self.entries[j], _seen | {e.path})
+            return any(c != 0.0 and self._row_moves(self.entries[j], _seen | {e.path},
+                                                    moving=moving)
                        for j, c in terms)
         if e.path in _seen:
             return False
         for block in self.derived:
             if e.path in block.outputs:
                 return any(self._row_moves(self.entries[self._paths[q]],
-                                           _seen | {e.path})
+                                           _seen | {e.path}, moving=moving)
                            for q in block.inputs if q in self._paths)
         return False
 
-    def wavelength_pin(self) -> str | None:
+    def wavelength_pin(self, *, moving: Collection[str] = ()) -> str | None:
         """What pins this histogram's d scale: a held cell's length path, or ``None``.
 
         The one predicate the single-histogram fence reads, at three seats:
@@ -3299,8 +3308,10 @@ class ParameterTable:
         (a ``vars.X`` driving a cell sits after it).
         ``test_a_glob_skips_it_while_the_cell_is_free_but_not_when_held``'s
         ``WL not in hits`` assertion on the held-cell table pins it.
+
+        ``moving`` is :meth:`cell_pins`' (the run's own holds, read as free).
         """
-        return wavelength_pins([False], [self.cell_pins()])[0]
+        return wavelength_pins([False], [self.cell_pins(moving=moving)])[0]
 
     def constraint_block(self) -> tuple[sparse.csr_matrix, np.ndarray]:
         """The current (C, d) with rows in entry order, columns in θ order."""
@@ -4255,10 +4266,13 @@ class ParameterTable:
         """The paths ``set_vary(path_globs, True)`` would match — a dry run.
 
         Entry order, and the table is not touched.  The one thing it does not
-        replay is ``set_vary``'s *dynamic* wavelength skip, which depends on
-        the order the cell and λ are freed in the same call; a caller asking
-        about any other family gets exactly ``set_vary``'s answer (WP-1343,
-        for a plan check that runs before the stage does).
+        replay is ``set_vary``'s wavelength skip, which asks
+        :meth:`wavelength_pin` once, after every other row of the call is
+        applied, so it depends on the free set the call leaves rather than on
+        any order (WP-2148); ``_run_stage``'s fence replays it on the set the
+        stage leaves free, after its ``turn_off``.  A caller asking about any
+        other family gets exactly ``set_vary``'s answer (WP-1343, for a plan
+        check that runs before the stage does).
         """
         return [e.path for e in self.entries
                 if self._glob_reaches(e, path_globs, True)]
