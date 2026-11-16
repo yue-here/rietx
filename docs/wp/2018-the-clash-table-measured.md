@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-16 — 5 of 22 live pairs measured (C1, C3, C4, C10, C14); 5 questions for the maintainer
+Milestone: generality · Status: 🔄 2026-11-16 — 6 of 22 live pairs measured (C1, C3, C4, C7, C10, C14); 6 questions for the maintainer
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -286,6 +286,51 @@ hold takes both B in the `biso` and `closing` stages: they stay at the 0.3 Å² 
 lost entirely, `SCALE_B_INSEPARABLE` fires, and Rwp goes from 0.08809 to 0.11246. Had the hold
 fired on SRM 660a, the ΔB measurement would have shown it.
 
+**C7, the moment hold and turn against the stationary-angle test** (`moment_hold.py`; the
+rhombohedral arms on macOS arm64, `[dev]`; Cr₂WO₆ and LaMnO₃ on a Linux x86_64 machine, py3.12).
+Four arms: shipped; `no_hold` (`_flat_moment_scan` answers nothing, so no moment direction is held,
+released, collapsed or turned); `no_turn` (`_turn_onto_meridians` turns nothing, so the azimuth is
+held where the stage found it); `no_test` (`stationary_angle_test` answers nothing, so every angle
+stays a column of the covariance).
+
+*The two datasets chosen for the row never meet the pair.* On HB-2A Cr₂WO₆ at 4 K and BT-1 LaMnO₃
+at 50 K (Pn′ma′), each with its acceptance protocol, the hold finds no flat direction in any stage,
+so `no_hold` and `no_turn` are the shipped fit to every digit. The test acts alone: it zeroes the
+polar angle in every stage (Cr₂WO₆ stationary at π, the moment along a, statistic ≤ 0.002 against
+the cut 2.706; LaMnO₃ at π/2, 0.49-0.57), and `MOMENT_ANGLE_STATIONARY` names it. With the test
+off no value moves; the modulus esd goes from 0.0450 to 0.0507 μ_B (Cr₂WO₆) and 0.0433 to 0.0482
+(LaMnO₃), and the polar angle carries an esd (0.40 and 0.062 rad) where shipped it carries a profile
+interval ([2.910, 3.373] and [1.400, 1.742] rad). Cr₂WO₆'s site has two moment DOFs and LaMnO₃'s
+plan frees two of its three, and a combination needs the polar angle and the azimuth both free.
+
+*The pair meets on a combination site*: `tests/test_magnetic.py`'s #599 fixture (one Mn on
+rhombohedral axes, uniaxial about [111], start (3, 0.2, 0.2)), with the truth off the axis, (1.5, 2,
+3) at ψ = 10.20° from [111], and on it, (2, 2, 2), each noise-free (`rh`, `rh111`) and with Poisson
+noise (`rhn`, `rh111n`). The noisy rows:
+
+| Arm | truth at 10.20°: ψ, Rwp | what the test said of the polar angle | truth on [111]: ψ, Rwp | what the test said |
+|---|---|---|---|---|
+| shipped | 10.34°, 0.07872 | not stationary (statistic 107-111): esd 0.0087 rad | 1.13°, 0.08332 | stationary (0.012-0.029): interval [1.070, 1.240] rad, `MOMENT_ANGLE_STATIONARY` |
+| no_test | the shipped fit to every digit | — | the shipped fit to every digit; polar esd 0.089 rad, modulus esd 0.0311 against 0.0247 μ_B | — |
+| no_turn | 27.84° (#599's trap), 0.1446 | **stationary** (−4e-6): interval [1.078, 1.114] at the trap's closest approach | 27.84°, 0.1591 | **stationary** (−9e-6), the same point |
+| no_hold | 10.34°, 0.07872 | the pair fails jointly (107); the polar angle alone **stationary** (6e-10): interval [0.958, 1.351], azimuth esd 0.0097 rad, `unmeasured_directions` empty | 1.13°, 0.08332 | both stationary jointly (0.012-0.029), `unmeasured_directions` empty |
+
+The noise-free rows say the same at every arm (ψ 10.199° and 0.0025° shipped, against 10.20° and 0
+true; 27.84° without the turn), with the test's statistic read at roundoff in the closing stage
+(χ²_red near 1e-18).
+
+So the shipped order is what keeps the test's verdict true: the hold and the turn act at stage
+start and the test reads the turned polar angle after the solve, and it gets both truths right
+while changing no value (`no_test` is bit-identical in all six datasets; only esds move). Take
+either half of the hold away and the test still answers, wrongly and confidently. Without the turn
+the polar angle sweeps a meridian that never comes within 27.8° of [111], the test finds the
+meridian's closest approach a stationary point (it is one, along that meridian), and
+`MOMENT_ANGLE_STATIONARY` presents a trapped answer at Rwp 0.145 as a symmetry-fixed direction with a
+0.036 rad interval. Without the hold the test refits the azimuth while it moves the polar angle,
+which the flat cone lets it do at no cost, so a flat combination reads as a stationary polar angle,
+the azimuth gets an esd, and the report says no direction is unmeasured. The test has no guard of
+its own against either; it relies on the hold having run.
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -318,6 +363,14 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
    carry ΔB either way. Is C4 recorded *independent*? And should `SCALE_B_INSEPARABLE`, which
    already states the fraction's sensitivity per Å² of B, also say that an undeclared
    absorption correction lands on that phase's fraction rather than its B?
+6. **C7.** On Cr₂WO₆ and LaMnO₃ the hold never acts, so the pair never meets; on the #599
+   combination fixture the shipped order gives the test's verdict right both ways (not
+   stationary at 10.3°, stationary on [111]) and the test moves no value. Is C7 recorded
+   *ordered*, the order being load-bearing? The `no_hold` and `no_turn` arms show the test
+   itself cannot tell a flat combination or a trapped meridian from a symmetry-fixed direction:
+   should it carry a guard of its own (refusing a candidate whose Δχ² vanishes because another
+   free angle absorbs the move), or is the hold's precedence the design? And should the row's
+   datasets be replaced by the #599 fixture, since the two chosen ones cannot exercise it?
 
 ## Acceptance
 
