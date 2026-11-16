@@ -1,6 +1,6 @@
 # WP-2084 — The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-02 — a start-dependent answer on the absolute anchor's widths; the cell moves 0.18 esd between the two and nothing fires; a reader quotes u, v and w, which `RESOLUTION_UNCONSTRAINED` already says not to quote
