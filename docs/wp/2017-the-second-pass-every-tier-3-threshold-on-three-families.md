@@ -539,7 +539,7 @@ No row this WP lists still names the second pass as owed.
 
   *Generality.* The judge (Opus, following `.claude/agents/generality-review.md`, read-only), condensed: `BISO_SEED` **holds** (four unrelated real families; the start dependence without the closing stage shown on two), `HARMONIC_WEIGHT_SEED` **weak** (one self-drawn synthetic against grounds naming three families; the positive arm missed its 0.003; the uncovered fits flag themselves). It found four wordings to fix: a platform claim the summary did not show, a 5e-7 floor that is 5.9e-7, "invariant behind the closing stage only" quoted after NAC's 0.008, and the test docstring's stale 0.003. *Author:* all four fixed (eab2c76bf). The Mac readings are in this entry, the floor reads 6e-7, the row says start-dependent on FAP and LaB₆, and the docstring carries both readings.
 
-  *Tests.* TESTS_PLACEHOLDER
+  *Tests.* Fast selection at ea522617e on the workstation (Linux x86_64, `rietx-py312` venv, tree on `PYTHONPATH`, `-n 8 --dist loadgroup -m "not slow"`): 14849 passed, 281 skipped, 32 xfailed in 6 min 45 s, as a co-tenant, 5.0 GB peak. The same counts as at c486ea466; no test added (the start test's docstring changed, not its assertions). `tests/test_audit_table.py` and `tests/test_docs_consistency.py` 49 passed, `tests.audit_delta` exit 0 (24 rows changed on the branch), at d4ec227ed (macOS arm64, worktree `[dev]` venv). Reader output unchanged (exit 0); ruff clean; Vale 0 errors. Full suite not run: no measured number in the package can move (evidence strings and a docstring).
 
   *Not done, and why.* A second harmonic family. The only real one on disk is Nd₂Ru₂O₇'s neutron pattern, held out until the milestone closes, and drawing a second synthetic is the maintainer's to ask for.
 
