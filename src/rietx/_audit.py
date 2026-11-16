@@ -1610,8 +1610,9 @@ ROWS: tuple[Row, ...] = (
                   "start); read on every stage at 1x it reports the "
                   "three and the chain, and also FAP +3 %, which reaches its answer after a "
                   "19.8 % sample_lor stage; LaB6 +1 % loses its scale in its first stage and "
-                  "records no loss at all; at 0.5x on every stage it also reports three fits that "
-                  "reach their answer (cpd-1a's profile stage, 0.66x); the four protocols' 32 fits reach at most 0.80x their "
+                  "records no loss at all; at 0.5x on every stage it also reports every cpd-1a and "
+                  "LaB6 protocol fit, which reach their answers (profile stages at 0.66x and "
+                  "0.80x); the four protocols' 32 fits reach at most 0.80x their "
                   "tolerance on any stage and 0.025x on the stages reported"),
         grounds=("No surveyed program reports this: GSAS-II, MAUD, RIETAN-FP and "
                  "EasyDiffraction resize every evaluation, TOPAS rebuilds its buffer past "
