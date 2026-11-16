@@ -452,8 +452,8 @@ real and $\operatorname{Re}[w] = e^{-z^2}$ (the unit Gaussian); $\sigma \to
 Lorentzian).
 
 The width a Voigt peak *reports* (`rietx.model.forward.CompiledModel.peak_fwhm`, read by the low-angle
-and width diagnostics, the observation count and the satellite and magnetic
-reports) is Olivero and Longbothum's {cite}`olivero1977`:
+and width diagnostics, the observation count, the satellite and magnetic
+reports and the magnetic-only region candidates are scored on) is Olivero and Longbothum's {cite}`olivero1977`:
 
 ```{math}
 :label: prof-voigt-fwhm

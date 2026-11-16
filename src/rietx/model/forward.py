@@ -1176,7 +1176,10 @@ class CompiledModel:
         because it answers a question about the *goniometer*: "how narrow can a
         real reflection be here?".  That is the scale a background peak's width
         is judged against (``strategy.staged.check_hump_width``), and
-        it must not depend on which phase one happens to ask about.
+        it must not depend on which phase one happens to ask about.  It reads
+        the TCH quintic under either shape, so under ``"voigt"`` it sits up to
+        0.43 % from :meth:`peak_fwhm`'s Olivero-Longbothum width (WP-1926): a
+        scale, not a reported width.
 
         Evaluate-only and off the hot path: plain floats in, the shared
         ``profiles`` functions through the active backend.
