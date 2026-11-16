@@ -1,6 +1,6 @@
 # WP-1987 — The kernel gate on the macOS Intel runner
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-16 — a red check on the PRs that touch the kernel paths; not a required check, and no fitted number is shown wrong
