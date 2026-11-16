@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: A long run is not one fit
 Depends on: — (1420 soft: its fixture may serve this one)
-Priority: P3 2026-11-15 — `SEQUENTIAL_PATH_DEPENDENT` already fires but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
+Priority: P3 2026-11-15 — `SeriesResult.direction_gaps` already lists the gap but does not say which answer to quote; the package's own passes now measured to disagree in cost on one public ramp (issue #1556, relative Rwp up to 1.4e-3), which keeps the row at P3: a diagnostic that says less than it could
 
 ## Goal
 
@@ -13,15 +13,22 @@ one.
 
 ## Context
 
-**What the package does now.** `direction="both"` runs the chain each way
-and reports `SEQUENTIAL_PATH_DEPENDENT` where a parameter disagrees beyond
-its esds. The docstring says so plainly: "The reported entries are the
-forward ones" (`src/rietx/sequential.py:743-745`).
-`_path_dependence_diagnostics` (`sequential.py:1937`) compares parameter
-values and never costs.
+**What the package does now** *(superseded in part, 2026-11-16, checked
+against the tree at `bc77a934e`: WP-2003 removed `SEQUENTIAL_PATH_DEPENDENT`
+and its 3σ bar).* `direction="both"` runs the chain each way and lists every
+path's gap at every pattern, unthresholded, as `SeriesResult.direction_gaps`:
+one `DirectionGap` row per path and pattern, carrying both values, the signed
+gap, the gap over the combined esd and both kept rungs
+(`schemas/sequential.py:496`). The docstring still says "The reported entries
+are the forward ones" (`src/rietx/sequential.py:1317-1318`). Its writer,
+`_direction_gaps` (`sequential.py:3444`), compares parameter values and never
+costs. The backward chain itself rides on the result as `series.backward`
+(WP-1076), so each pattern's backward `Statistics` is already readable at
+`series.backward.entries[j].statistics`; what nothing does is put the two
+costs side by side or say which is lower.
 
 Within one pattern the ladder already ranks attempts. `_prefer` and
-`_better` (`sequential.py:1550`) rank a diverged fit below a finished one,
+`_better` (`sequential.py:2393-2418`) rank a diverged fit below a finished one,
 rank a truncated attempt below a completed one, and then go on Rwp. A
 backward pass is two more attempts at the same pattern, and nothing ranks
 them against the forward one.
@@ -51,12 +58,27 @@ chain pruned phases, so the two passes sometimes fitted different phase
 sets, and the agent ranked on BIC. With one phase list, χ² compares
 directly.
 
+**A public series** (issue #1556 § 1, 2026-11-15, folded from Inherited). On
+the 11-BM CuCr₂O₄ + CuO ramp (`tests/data/seqrefine_cucr2o4/`, 17 patterns,
+6.8-288.7 K, `direction="both"`) the reporter measured the relative Rwp
+difference, forward minus backward, on the same points: up to 1.4e-3 (OH_49),
+7.5e-4 (OH_41) and −8.3e-4 (OH_53). With CuO's cell held the two chains agree
+to 1.4e-8 or better on 16 of 17 patterns, so the weak minor phase's cell
+carries the history, not the cold start. The reporter proposes option 1 as a
+χ² pair on each `DirectionGap` (Σw·Δ² on the same points), offering
+`forward_chi2` and `backward_chi2` and leaving the names to the maintainer
+(the issue's question 1, open). χ² is unchanged by any exact equivalence, so
+the pair needs no ruling on the issue's § 2.
+
 **The design question.** A per-pattern best mixes the two passes, so the
 returned trajectory is no longer one chain. Each entry is still a converged
 optimum of its own pattern. The options:
 
 1. Report only. Each `SEQUENTIAL_PATH_DEPENDENT` finding carries the two
    costs, and the entries carry the backward cost beside the forward one.
+   *(2026-11-16: the finding is now a `DirectionGap` row, one per path, so a
+   per-pattern pair there repeats on every path's row at that pattern; and
+   the entries' backward cost is already reachable through `series.backward`.)*
 2. `keep="lower_cost"` returns the better pass per pattern and marks which
    one it took.
 3. A cold rung at every pattern the two passes disagree on, ranked by
@@ -67,44 +89,14 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
 
 ### Inherited
 
-- **2026-11-15, from the issue triage (issue #1556 § 1): task 1 is measured, and the
-  package's own passes do disagree in cost.** On the 11-BM CuCr₂O₄ + CuO ramp
-  (`tests/data/seqrefine_cucr2o4/`, 17 patterns, 6.8-288.7 K, `direction="both"`), the
-  reporter measured the relative Rwp difference, forward minus backward, on the same
-  points: up to 1.4e-3 (OH_49), 7.5e-4 (OH_41) and −8.3e-4 (OH_53). With CuO's cell
-  held, the two chains agree to 1.4e-8 or better on 16 of 17 patterns, the cold-started
-  high-T end included. So the weak minor phase's cell carries the history, not the cold
-  start. This is one public series with a held-out cause, not the two-basin fixture task 1
-  names, and it was not rerun here. The reporter proposes option 1 as a χ² pair on each
-  `DirectionGap` (Σw·Δ² on the same points), names left to the maintainer
-  (`forward_chi2`, `backward_chi2` offered). χ² is unchanged by any exact equivalence, so
-  the pair needs no ruling on the issue's § 2 (comparing modulo equivalences, held for
-  the maintainer with §§ 3-4). *Checked against the tree at `98d7ba8e3`:*
-  `schemas/sequential.py` and `sequential.py` carry no cost on `DirectionGap` or the
-  entry. A new field on a result type is reader output, so its names go to the
-  maintainer before merge.
-
-- **From WP-1417, 2026-09-27: the ΔBIC this WP's Non-goals defers to
-  is settled.** 1417 closed with ΔBIC at N/f² and
-  `report.compare_freed` for nested pairs. Two models with different
-  phase sets are not nested, so `compare_freed` refuses them. A hand
-  comparison takes each `Statistics.chi2` (reduced) back to Σw·Δ² at
-  its own N − P before `report.delta_bic`.
-
-- **2026-09-24, from a review of the open WPs: task 1's fixture can be fixed
-  out from under it.** Task 1 closes this WP if the two passes never
-  disagree in cost, and it names WP-1420's #267 fixture as a candidate.
-  1420's probe rung is written to bring the forward chain into the right
-  basin on that fixture at all three fractions. Once it lands, the passes
-  may agree there because 1420 fixed the forward chain, and a close on that
-  measurement would be wrong. So measure before 1420's rung lands, or on a
-  two-basin series with no held phase, and record which in the handover.
-
 ## Non-goals
 
 - Choosing between different models. With different phase sets the
   comparison needs an information criterion, and WP-1417 owns ΔBIC at powder
-  channel counts.
+  channel counts. 1417 closed with ΔBIC at N/f² and `report.compare_freed`
+  for nested pairs, which refuses two models with different phase sets; a
+  hand comparison takes each `Statistics.chi2` (reduced) back to Σw·Δ² at its
+  own N − P before `report.delta_bic`.
 - Changing how a single chain seeds its successor.
 
 ## Tasks
