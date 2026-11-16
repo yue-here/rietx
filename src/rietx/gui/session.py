@@ -46,6 +46,7 @@ import json
 import math
 import os
 import re
+import shutil
 import threading
 import time
 from collections import deque
@@ -63,7 +64,7 @@ from ..history.events import EventStream
 from ..io.readers import read_pattern
 from ..optimize.cancel import CancelToken, RefinementCancelled
 from ..optimize.least_squares import DEFAULT_SOLVER
-from ..project import Project
+from ..project import PROJECT_JSON, Project
 from ..refine import (
     _VERSION,
     NoPhasesError,
@@ -79,6 +80,7 @@ from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
 from ..viz.packed import Packed
+from . import recovery as recovery_mod
 from . import series as series_mod
 from . import symmetry
 from .imports import (
@@ -237,7 +239,7 @@ class GuiSession:
         #: cannot be two answers.
         self._series_run: dict | None = None
         if project is not None:
-            self._remember(project.path)
+            self._remember(project)
 
     # ------------------------------------------------------------------
     # introspection
@@ -471,7 +473,9 @@ class GuiSession:
         path = _need(body, "path")
         try:
             project = Project.open(path, backend=self.backend, solver=self.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
+            # OSError, not only FileNotFoundError: a folder this user cannot
+            # read is a refusal to report, never a 500 or a failed launch
             raise GuiError(str(exc), code="PROJECT_ERROR") from None
         self._adopt(project)
         return self.project_doc()
@@ -481,7 +485,10 @@ class GuiSession:
         p = self._need_project()
         ref = p.data_ref
         return {
-            "path": str(p.path),
+            # resolved, as the recent list stores it: `rietx gui sample.rex`
+            # opens a relative path, and the File menu derives the folder a
+            # copy or an export starts in from this string (WP-2133)
+            "path": str(Path(p.path).resolve()),
             "doc": p.doc.model_dump(mode="json"),
             "data": {
                 "filename": ref.filename, "reader": ref.reader,
@@ -531,6 +538,12 @@ class GuiSession:
         :func:`schemas.project.check_interval`'s words — the same sentence the
         ``.rxt`` document refuses with, because the document's field validators
         are what both routes run into (WP-1033).
+
+        All or nothing (WP-2126): every setting is first written to a copy of
+        the document, whose validators refuse, and only then to the project.
+        Written straight in, a refused ``excluded_regions`` left the ``mode``
+        sent with it in the live document, unsaved, for the next save to
+        persist and the next run to use.
         """
         self._require_idle()
         p = self._need_project()
@@ -540,29 +553,44 @@ class GuiSession:
             raise GuiError(f"unknown setting(s): {sorted(unknown)}; the plan has "
                            "its own route and the model lives in the history",
                            where=sorted(unknown))
+        draft = p.doc.model_copy(deep=True)
         if "mode" in body:
-            p.doc.mode = body["mode"]
+            with self._settings_refusal("mode"):
+                draft.mode = body["mode"]
         if "indexing" in body:
             # whole-object replace, like the plan: the form pushes the block
             # it edited, and a partial merge would let two half-specs disagree
             from ..schemas.indexing import IndexingControls
 
             with self._settings_refusal("indexing"):
-                p.doc.indexing = IndexingControls.model_validate(
+                draft.indexing = IndexingControls.model_validate(
                     body["indexing"] or {})
         if "two_theta_limits" in body:
             limits = body["two_theta_limits"]
             with self._settings_refusal("two_theta_limits"):
-                p.doc.two_theta_limits = None if limits is None else tuple(limits)
+                draft.two_theta_limits = (None if limits is None
+                                          else _pair(limits, "two_theta_limits"))
         if "excluded_regions" in body:
-            regions = [tuple(r) for r in (body["excluded_regions"] or [])]
+            regions = [_pair(r, "excluded_regions")
+                       for r in (body["excluded_regions"] or [])]
             with self._settings_refusal("excluded_regions"):
-                p.set_excluded_regions(regions)
-        for key, value in (body.get("ui") or {}).items():
+                draft.excluded_regions = regions
+        ui = body.get("ui") or {}
+        if not isinstance(ui, dict):
+            raise GuiError("'ui' maps a key to a value, or to null to drop it",
+                           where=["ui"])
+        for key, value in ui.items():
             if value is None:
-                p.doc.ui.pop(key, None)
+                draft.ui.pop(key, None)
             else:
-                p.doc.ui[key] = value
+                draft.ui[key] = value
+        # every setting validated: write the draft's values into the project
+        p.doc.mode = draft.mode
+        p.doc.indexing = draft.indexing
+        p.doc.two_theta_limits = draft.two_theta_limits
+        if "excluded_regions" in body:
+            p.set_excluded_regions(list(draft.excluded_regions))
+        p.doc.ui = draft.ui
         p.save()
         return self.project_doc()
 
@@ -598,6 +626,145 @@ class GuiSession:
         p = self._need_project()
         p.save()
         return {"saved": str(p.path), "updated_utc": p.doc.updated_utc}
+
+    # -- the File menu (WP-2133) -------------------------------------------
+    #
+    # The maintainer's save model A (2026-11-07): work saves itself, so the
+    # menu has no Save, and what it does to a project is done to the *folder*.
+    # Four rules, shared by the verbs below.  Each is idle-only, the 409
+    # outranking every other refusal, because a stage appends to the history
+    # log while it runs and a copy or a move taken then could split a line.  A
+    # name is one path component, refused rather than cleaned.  A destination
+    # folder passes the folder browser's containment gate (WP-1205).  And no
+    # folder is ever replaced: an existing destination is a 409.
+
+    def project_copy(self, body: dict) -> dict:
+        """Copy the whole project folder, history included, and stay on this one.
+
+        "Save a copy" in the document apps' sense: the window keeps the
+        project it had, and the copy is a project of its own from the moment
+        it exists, opened later through Open or Open recent like any other.
+        """
+        self._require_idle()
+        p = self._need_project()
+        target = self._destination(_need(body, "directory"), _need(body, "name"))
+        if target.is_relative_to(Path(p.path).resolve()):
+            raise GuiError("a project cannot be copied into itself",
+                           where=["directory"])
+        _refuse_existing(target)
+        try:
+            shutil.copytree(p.path, target, symlinks=True)
+        except OSError as exc:
+            raise GuiError(f"could not copy the project to {target}: {exc}",
+                           code="PROJECT_ERROR") from None
+        return {"path": str(target), "name": target.name}
+
+    def project_rename(self, body: dict) -> dict:
+        """Rename the project's folder where it stands."""
+        self._require_idle()
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        target = source.parent / _project_name(_need(body, "name"))
+        # the names as strings: Windows compares paths without case, so a
+        # path test calls ``sample.rex`` → ``Sample.rex`` a no-op (WP-2143)
+        if target.name == source.name:
+            return self.project_doc()
+        self._relocate(target)
+        return self.project_doc()
+
+    def project_move(self, body: dict) -> dict:
+        """Move the project's folder into another folder, keeping its name."""
+        self._require_idle()
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        # the folder's own name, unvetted: a project the Python API made may
+        # lack the suffix, and a move must not rename it on the way
+        target = self._browsable_folder(_need(body, "directory")) / source.name
+        if target == source:
+            return self.project_doc()
+        if target.is_relative_to(source):
+            raise GuiError("a project cannot be moved into itself",
+                           where=["directory"])
+        self._relocate(target)
+        return self.project_doc()
+
+    def project_close(self) -> dict:
+        """Close the project: the session holds none, and the start screen shows.
+
+        Nothing is saved here because nothing is unsaved (save model A).  The
+        recent list's entry is marked ``closed``, so the next launch shows the
+        start screen rather than reopening a project its user closed.
+        """
+        self._require_idle()
+        p = self._need_project()
+        path = str(Path(p.path).resolve())
+        with self._cond:
+            self.project = None
+            self._run = _idle_run()
+            self._index_result = None
+            self._extinction = None
+            self._peak_ed = None
+            self._series = series_mod.SeriesSetup()
+            self._series_run = None
+            self._cond.notify_all()
+        self._write_recent([
+            {**_recent_entry(e), "closed": True} if str(e.get("path", "")) == path
+            else _recent_entry(e) for e in self._recent_raw()])
+        return {"closed": path}
+
+    def _destination(self, directory: Any, name: Any) -> Path:
+        """``directory/name`` for a copy or a move, refused where it may not go."""
+        return self._browsable_folder(directory) / _project_name(str(name))
+
+    def _browsable_folder(self, directory: Any) -> Path:
+        """A destination folder the person chose in the folder browser.
+
+        The browser's own gate (WP-1205, :meth:`fs`): resolved first, then
+        contained in one of the two roots, so a client cannot name a folder the
+        browser would not have listed.
+        """
+        folder = Path(str(directory)).expanduser().resolve()
+        roots = self._fs_roots()
+        if not any(folder.is_relative_to(r) for r in roots):
+            raise GuiError(
+                f"{folder} is outside the browsable roots "
+                f"({', '.join(str(r) for r in roots)})", where=["directory"])
+        if not folder.is_dir():
+            raise GuiError(f"{folder} is not a folder", where=["directory"])
+        return folder
+
+    def _relocate(self, target: Path) -> None:
+        """Move the open project's folder to ``target`` and follow it.
+
+        The session keeps its project object, result and run frame: only two
+        things hold the old place, ``Project.path`` and the history log's own
+        path, which every later node is appended to.  The recent list swaps the
+        old entry for the new one.
+        """
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        # a case-only rename on a case-insensitive volume (the macOS default)
+        # finds its own folder at the target; shutil.move renames it in place
+        if not (target.exists() and os.path.samefile(target, source)):
+            _refuse_existing(target)
+        try:
+            shutil.move(str(source), str(target))
+        except OSError as exc:
+            raise GuiError(f"could not move the project to {target}: {exc}",
+                           code="PROJECT_ERROR") from None
+        with self._cond:
+            p.path = target
+            p.history.path = target / p.doc.history_file
+            self._peak_ed = None
+            # the third place that holds the old path: the recovery copy's key
+            # (WP-2209); a move made in the app takes the pending edits along
+            try:
+                recovery_mod.move(self.state_dir, source, target)
+            except OSError:
+                pass  # the edits are still on screen; the next write re-keys them
+        self._write_recent([_recent_entry(e) for e in self._recent_raw()
+                            if str(e.get("path", "")) != str(source)])
+        self._remember(p)
 
     def settings(self) -> dict:
         """The **app's** own `ui` keys — the ones that belong to the person.
@@ -657,6 +824,68 @@ class GuiSession:
             # an unwritable recent list
             pass
         return {"ui": ui}
+
+    # ------------------------------------------------------------------
+    # recovery of unapplied edits (WP-2209)
+    # ------------------------------------------------------------------
+    def recovery(self) -> dict:
+        """The open project's recovery copy of unapplied edits, or ``draft: None``.
+
+        ``head`` is the node the edits were made against and ``head_now`` the
+        project's, so the client can say the project moved since.  Not behind
+        the run's 409: reading a copy changes nothing.
+        """
+        p = self._need_project()
+        record = recovery_mod.read(self.state_dir, p.path)
+        if record is None:
+            return {"draft": None}
+        return {"draft": record["draft"], "saved_utc": record.get("saved_utc"),
+                "head": record.get("head"), "head_now": p.refinement._head_id}
+
+    def recovery_put(self, body: dict) -> dict:
+        """Keep a project's pending edits, or drop them with ``draft: null``.
+
+        The write names its project rather than meaning the open one.  The
+        client writes once more after a switch has landed, for the project it
+        is leaving: New project and Close are answered before the shell hears
+        of them, and a write keyed to "whatever is open" would then put one
+        project's edits under the next one's name.  So ``project`` must be a
+        project folder, and ``head`` is the node the client drew the edits
+        against.  ``draft: null`` deletes the copy: the client sends it when
+        the edits are applied, reverted or discarded.  Not behind the run's
+        409, for ``settings_patch``'s reason: nothing here can disagree with a
+        run, and an edit made during one must still be kept.
+        """
+        unknown = set(body) - {"project", "head", "draft"}
+        if unknown:
+            raise GuiError(f"unknown key(s): {sorted(unknown)}; a recovery write "
+                           "is {project, head, draft}", where=sorted(unknown))
+        project = Path(str(_need(body, "project"))).expanduser()
+        if "draft" not in body:
+            raise GuiError("missing 'draft' (an object, or null to delete the copy)",
+                           where=["draft"])
+        draft = body["draft"]
+        if draft is not None and not isinstance(draft, dict):
+            raise GuiError("'draft' is an object, or null to delete the copy",
+                           where=["draft"])
+        head = body.get("head")
+        if head is not None and not isinstance(head, str):
+            raise GuiError("'head' is a node id, or null", where=["head"])
+        if not (project / PROJECT_JSON).is_file():
+            raise GuiError(f"{project} is not a project folder; pending edits are "
+                           "kept only for a project", where=["project"])
+        if draft is None:
+            recovery_mod.discard(self.state_dir, project)
+            return {"draft": None}
+        try:
+            record = recovery_mod.write(self.state_dir, project, draft, head)
+        except ValueError as exc:
+            raise GuiError(str(exc), where=["draft"]) from None
+        except OSError as exc:
+            raise GuiError(f"could not keep the pending edits in "
+                           f"{recovery_mod.root(self.state_dir)}: {exc}",
+                           code="RECOVERY_ERROR") from None
+        return {"saved_utc": record["saved_utc"], "head": record["head"]}
 
     # ------------------------------------------------------------------
     # examples (WP-1204)
@@ -738,6 +967,8 @@ class GuiSession:
                     self._run = _idle_run()
                     self._cond.notify_all()
             shutil.rmtree(root)
+        # starting the example over is the request, its pending edits included
+        recovery_mod.discard(self.state_dir, root)
         self._build_example(name, root)
         return self.project_open({"path": str(root)})
 
@@ -754,18 +985,74 @@ class GuiSession:
                            code="EXAMPLE_BUILD_FAILED") from None
 
     def recent(self) -> list[dict]:
-        """Recently opened projects, newest first (missing ones filtered out)."""
+        """Recently opened projects, newest first.
+
+        A project whose folder has moved stays listed with ``missing`` set
+        (WP-2131): the start screen shows it as "Not found" beside Locate… and
+        Remove from list, as JetBrains does, rather than letting it vanish
+        between two launches with nothing said.  ``phases`` is what
+        :meth:`_remember` wrote at the last open, ``[]`` for an entry written
+        before it did.
+        """
+        out = []
+        for entry in self._recent_raw():
+            row = _recent_entry(entry)
+            path = Path(row["path"])
+            out.append({**row, "name": path.name,
+                        "missing": not (path / "project.json").is_file()})
+        return out
+
+    def _recent_raw(self) -> list[dict]:
         try:
             raw = json.loads((self.state_dir / "recent.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return []
-        out = []
-        for entry in raw if isinstance(raw, list) else []:
-            path = Path(str(entry.get("path", "")))
-            if (path / "project.json").is_file():
-                out.append({"path": str(path), "name": path.name,
-                            "opened_utc": entry.get("opened_utc", "")})
-        return out
+        return [e for e in raw if isinstance(e, dict) and e.get("path")] \
+            if isinstance(raw, list) else []
+
+    def recent_remove(self, body: dict) -> dict:
+        """Drop one entry from the recent list; the project itself is untouched.
+
+        Matched on the stored path exactly, so a path the list does not hold
+        changes nothing and is not an error: removing is idempotent.  Not
+        behind the 409, like the list itself, since nothing here touches a
+        project a run is writing.
+        """
+        path = str(_need(body, "path"))
+        kept = [_recent_entry(e) for e in self._recent_raw()
+                if str(e.get("path", "")) != path]
+        self._write_recent(kept)
+        return {"recent": self.recent()}
+
+    def recent_clear(self) -> dict:
+        """Empty the recent list (the File menu's Clear the list, WP-2133).
+
+        Only the list: no project is touched.  Not behind the 409, for
+        :meth:`recent_remove`'s reason.
+        """
+        self._write_recent([])
+        return {"recent": []}
+
+    def reopen_last(self) -> str | None:
+        """Open the recent list's head at launch, or leave the session empty.
+
+        The start screen's rule (WP-2131, the maintainer's round-9 design):
+        a launch with no project named returns to the last project, and the
+        start screen shows when there is none.  The head is the last project
+        opened, and :meth:`project_close` marks it ``closed`` (WP-2133), so a
+        project closed before quitting is not the one open at the next launch.
+        A head that has moved, or that refuses to open, leaves the session
+        empty rather than failing the launch: the start screen then lists it.
+        Returns the path opened, or ``None``.
+        """
+        head = next(iter(self.recent()), None)
+        if head is None or head["missing"] or head.get("closed"):
+            return None
+        try:
+            self.project_open({"path": head["path"]})
+        except GuiError:
+            return None
+        return head["path"]
 
     def fs(self, path: str | None) -> dict:
         """Directories and projects under one root, for the "Open…" browser.
@@ -866,41 +1153,44 @@ class GuiSession:
         the log — where a following run continues from.  ``vary`` is applied in
         the order the JSON object gave, since overlapping globs are ordinary
         (``phases.*`` then a single path back off).
+
+        Three more arms (WP-2126), so the Parameters panel's Apply stays one
+        round trip.  ``limits`` and ``restraints`` go first, as one
+        ``edit_model`` node (:func:`_limit_and_restraint_edit`): no verb sets a
+        limit or adds a value restraint, and a limit can admit a value the old
+        one refused.  ``hold`` maps a glob to ``True`` (``Refinement.hold``) or
+        ``False`` (``unhold``); unholds run before the vary flags and holds
+        after them, so "release and free" and "untick and hold" both land.
+
+        **One PATCH is all or nothing.**  Each arm commits its own node, and
+        a later arm can refuse after an earlier one committed (a held literal
+        in ``vary``, a value outside the limits it arrived without), so the
+        arms are first run on a history-free copy (:func:`rehearse`).  A
+        refusal there names its arm's path and leaves the model, the head and
+        the history as they were.
         """
         self._require_idle()
         p = self._need_project()
+        arms = self._param_arms(body)
+        rehearse(p.refinement, lambda ref: _apply_param_arms(ref, *arms))
+        changed = _apply_param_arms(p.refinement, *arms)
+        return {"changed": changed, **self.params()}
+
+    @staticmethod
+    def _param_arms(body: dict) -> tuple[dict, dict, dict, dict, dict]:
+        """``PATCH /api/params``'s five arms, each checked to be a map."""
         values = body.get("values") or {}
         vary = body.get("vary") or {}
-        if not isinstance(values, dict) or not isinstance(vary, dict):
-            raise GuiError("'values' maps dot-path → number and 'vary' maps "
-                           "dot-path glob → bool")
-        changed: dict[str, Any] = {"values": [], "vary": {}}
-        # a literal vary key the model lacks is a typo, refused before the
-        # values or any earlier key commit a node (WP-1951)
-        try:
-            p.refinement._refuse_unknown_literals(list(vary))
-        except ValueError as exc:
-            raise GuiError(str(exc), where=sorted(vary)) from None
-        if values:
-            try:
-                p.refinement.set_values({k: float(v) for k, v in values.items()})
-            except (ValueError, TypeError) as exc:
-                # a tied path names its sources, a locked one says it is
-                # structural, a bound violation prints the interval — each has a
-                # different fix, so the message travels intact
-                raise GuiError(str(exc), where=sorted(values)) from None
-            changed["values"] = sorted(values)
-        for glob, flag in vary.items():
-            try:
-                changed["vary"][glob] = p.refinement.set_vary(glob, bool(flag))
-            except ValueError as exc:
-                # ``set_vary`` could not refuse anything until WP-1435 gave a
-                # caller's hold precedence over a named path, so this branch
-                # ran bare and the first refusal would have been a 500.  Same
-                # treatment as ``set_values`` above: the sentence names the
-                # verb that resolves it, so it travels intact.
-                raise GuiError(str(exc), where=[glob]) from None
-        return {"changed": changed, **self.params()}
+        hold = body.get("hold") or {}
+        limits = body.get("limits") or {}
+        restraints = body.get("restraints") or {}
+        if not all(isinstance(arm, dict)
+                   for arm in (values, vary, hold, limits, restraints)):
+            raise GuiError("'values' maps dot-path → number, 'vary' and 'hold' "
+                           "map dot-path glob → bool, 'limits' maps dot-path → "
+                           "[lower, upper] and 'restraints' maps dot-path → "
+                           "{target, sigma} or null")
+        return values, vary, hold, limits, restraints
 
     # ------------------------------------------------------------------
     # plan
@@ -1009,7 +1299,7 @@ class GuiSession:
         stages, 4200 channels; WP-1208's handover has the matrix).  A node is
         matched to a ladder rung by **position and identity**: the last run of
         ``stage`` nodes on the head's lineage, aligned from its start, each
-        required to carry this stage's name *and* its ``turn_on``.  Anything
+        required to carry this stage's name *and* its ``turn_on`` and ``turn_off``.  Anything
         else — a plan edited since the run, a single stage run from a state no
         plan describes, a checkout — leaves ``rwp`` null rather than printing
         the wrong stage's number.  Between the head and that run,
@@ -1049,8 +1339,18 @@ class GuiSession:
                        if mode_fixed_column(reach.get(path, [path]), mode)]
             if dropped:
                 table.set_vary(dropped, False)
+            # the stage's fixes, after its frees, as ``_run_stage`` applies
+            # them (WP-2208); ``fixes`` names the free paths they took
+            pre_fix = set(table.free_paths)
+            fixed_here = (set(table.set_vary(list(stage.turn_off), False))
+                          if stage.turn_off else set())
             after = set(table.free_paths)
+            fixes = [path for path in rows
+                     if path in fixed_here and path in pre_fix]
 
+            # a path the stage frees and fixes is the stage's own fix, under
+            # ``fixes``, so the three buckets below still partition ``matched``
+            matched = [path for path in matched if path not in fixed_here]
             held, already, frees = [], [], []
             for path in matched:
                 if path not in after:
@@ -1064,19 +1364,26 @@ class GuiSession:
                     frees.append(path)
             stages.append({
                 "name": stage.name, "turn_on": globs,
+                "turn_off": list(stage.turn_off),
                 "frees": frees, "already": already, "held": held,
+                "fixes": fixes,
                 "n_matched": len(matched), "n_free": len(after),
             })
 
-        rwps = self._stage_rwp(p, plan)
+        rwps = self._stage_rwp(p, plan, paths=list(rows))
         for entry, rwp in zip(stages, rwps, strict=False):
             entry["rwp"] = rwp
         # the stage the plan appends (WP-2002, the sixth round's Q1 and Q2):
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
-        closing = plan.closing_stage()
+        closing = plan.closing_stage(list(rows))
+        # the rows the closing stage's fix takes back from its frees: a tied,
+        # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
             "name": closing.name, "window_area_tol": plan.closing_window_tol,
+            "fixes": [path for path in closing.turn_off
+                      if rows[path].refinable
+                      and any(fnmatchcase(path, g) for g in closing.turn_on)],
             "rwp": rwps[-1]}
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
@@ -1100,7 +1407,8 @@ class GuiSession:
                                   "set_variable"})
 
     @classmethod
-    def _stage_rwp(cls, p: Project, plan) -> list[float | None]:
+    def _stage_rwp(cls, p: Project, plan,
+                   paths: list[str] | None = None) -> list[float | None]:
         """One Rwp per stage the plan runs, off the history nodes the run recorded.
 
         Parallel to ``plan.run_stages()``: the declared stages, then the
@@ -1110,7 +1418,14 @@ class GuiSession:
         the first run, and the honest one whenever the plan on screen is not
         the plan that ran.
         """
-        stages = plan.run_stages()
+        # the closing stage of a plan that fixes records its fixes as the
+        # model's paths (WP-2208), so the plan is read over them too; a
+        # caller already holding them passes them in
+        if not any(s.turn_off for s in plan.stages):
+            paths = None
+        elif paths is None:
+            paths = [row.path for row in p.parameters()]
+        stages = plan.run_stages(paths=paths)
         blank: list[float | None] = [None] * len(stages)
         tree = p.refinement.history
         head = p.refinement._head_id
@@ -1145,7 +1460,8 @@ class GuiSession:
                 break
             node = run[k]
             if (node.action.name != stage.name
-                    or list(node.action.turn_on) != list(stage.turn_on)):
+                    or list(node.action.turn_on) != list(stage.turn_on)
+                    or list(node.action.turn_off) != list(stage.turn_off)):
                 break
             stats = node.metrics.statistics
             out[k] = None if stats is None else float(stats.rwp)
@@ -1380,7 +1696,7 @@ class GuiSession:
                 raise GuiError(str(exc), where=[what]) from None
         structure = self._need_project().refinement.structure
         try:
-            return geometry.build(
+            built = geometry.build(
                 structure, int(phase), probability=float(probability),
                 bond_tolerance=(geometry.BOND_TOLERANCE if bond_tolerance is None
                                 else float(bond_tolerance)), disorder=disorder,
@@ -1390,6 +1706,13 @@ class GuiSession:
                            where=["phase"]) from None
         except ValueError as exc:
             raise GuiError(str(exc), where=["probability"]) from None
+        # the planar rings ride with the drawing they were found on, for the
+        # drawer's "fill planar rings" (WP-1548); a ring is the server's to find
+        # as a polyhedron is, and the walk is bounded (rings.MAX_RING_DEGREE)
+        from ..viz.figure3d import rings
+
+        built["rings"] = rings.ring_fills(built)
+        return built
 
     def instrument(self) -> dict:
         return {"instrument": self._need_project().refinement.instrument.model_dump(
@@ -1547,14 +1870,8 @@ class GuiSession:
         form needs it to highlight the field.
         """
         self._require_idle()
-        p = self._need_project()
-        try:
-            return p.refinement.edit(structure=structure, instrument=instrument,
-                                     label=label)
-        except ValueError as exc:
-            match = _LEADING_PATH.search(str(exc))
-            raise GuiError(str(exc), code="MODEL_REFUSED",
-                           where=[match.group(1)] if match else []) from None
+        return _edit_on(self._need_project().refinement, structure=structure,
+                        instrument=instrument, label=label)
 
     # ------------------------------------------------------------------
     # run control
@@ -2280,10 +2597,7 @@ class GuiSession:
             # Every row can be adopted (Yue's ruling B, 2026-11-08, WP-2124).
             # ``picked`` is the gate's own pick and ``why`` the sentence an
             # adoption of any other row records in its history node.
-            # ``allowed`` carries ``picked`` under its pre-ruling name, because
-            # the old Peaks panel reads it for both its Adopt button and its
-            # ``best_or_none()`` badge; it goes when the port redraws the panel.
-            adopt.append({"allowed": picked, "picked": picked,
+            adopt.append({"picked": picked,
                           "why": "" if picked else _unpicked_note(cand)})
         return {"result": result.model_dump(mode="json"),
                 "adopt": adopt,
@@ -2800,6 +3114,27 @@ class GuiSession:
         return curve_arrays(p.data.tt(), p.data.y(), p.fitted_mask(), res,
                             weighted=p.data_ref.has_sigma)
 
+    def preview(self, body: dict) -> Packed:
+        """The curves at values nobody has applied, writing nothing (WP-2125).
+
+        Refuses what ``set_values`` refuses, and 409s while a run is in flight
+        like every verb that compiles. :mod:`rietx.gui.preview` has the three
+        evaluation paths and the answer's contract.
+        """
+        from . import preview
+
+        self._require_idle()
+        return preview.evaluate(self._need_project(), body)
+
+    def background(self) -> Packed:
+        """The background curve and the band it may move in, writing nothing
+        (WP-2129). Idle-only, like every verb that compiles;
+        :mod:`rietx.gui.background` has the band's derivation."""
+        from . import background
+
+        self._require_idle()
+        return background.answer(self._need_project())
+
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
 
@@ -2940,9 +3275,14 @@ class GuiSession:
         p = self._need_project()
         node_id = _need(body, "node_id")
         name = str(body.get("name") or "").strip()
-        out = self.history_checkout({"node_id": node_id})
+        # the tag first: it refuses (an unknown node, the reserved 'head')
+        # before it writes, and a checkout of a node that resolved does not
+        # refuse, so a refused branch has moved nothing (WP-2126).  Checked
+        # out first, a refused name left the head moved.
+        self._require_idle()
         if name:
             self.history_tag({"node_id": node_id, "name": name})
+        out = self.history_checkout({"node_id": node_id})
         return {"branched_from": p.history.resolve(node_id), "name": name, **out}
 
     def history_tag(self, body: dict) -> dict:
@@ -2967,7 +3307,7 @@ class GuiSession:
     # exports
     # ------------------------------------------------------------------
     def export(self, kind: str, body: dict) -> dict:
-        """Write an export into ``<project>/exports/``.
+        """Write an export into ``<project>/exports/``, or into a chosen folder.
 
         Idle-only, and not because it writes: ``write_cif`` and the reflection
         table read the *compiled model*, which a running stage owns.
@@ -2975,6 +3315,14 @@ class GuiSession:
         Two gates, not one.  Everything here describes a fit and needs a result;
         ``_EXPORT_MODEL_ONLY`` names the kinds that describe the model instead
         and are answered from the project alone.
+
+        ``directory`` is the File menu's Export dialog (WP-2133), which starts
+        in the folder holding the project, after File › Export in the document
+        apps.  It passes the folder browser's containment gate, and a file
+        already there is refused (``DESTINATION_EXISTS``) unless the request
+        says ``overwrite``: the dialog shows the refusal and asks first, because
+        a replaced file has no undo.  Without ``directory`` the export goes to
+        ``exports/`` and replaces its namesake, as it always has.
         """
         self._require_idle()
         p = self._need_project()
@@ -2983,7 +3331,13 @@ class GuiSession:
                            f"available: {sorted(EXPORT_DEFAULTS)}",
                            code="NOT_FOUND", status=404)
         res = None if kind in _EXPORT_MODEL_ONLY else self._need_result()
-        target = self._export_target(body.get("filename") or EXPORT_DEFAULTS[kind])
+        filename = body.get("filename") or EXPORT_DEFAULTS[kind]
+        if body.get("directory"):
+            target = self._export_elsewhere(body["directory"], filename)
+            if not body.get("overwrite"):
+                _refuse_existing(target, "filename")
+        else:
+            target = self._export_target(filename)
         ref = p.refinement
         try:
             if kind == "instrument_profile":
@@ -3008,8 +3362,21 @@ class GuiSession:
             # one: a Le Bail fit has no weight fractions, and saying so beats
             # writing an empty table
             raise GuiError(str(exc), code="EXPORT_UNAVAILABLE", status=409) from None
+        except OSError as exc:
+            # a folder the person chose may be read-only, or hold a folder of
+            # the file's name: a refusal the dialog shows, never a 500
+            raise GuiError(f"could not write {target}: {exc}",
+                           where=["directory"]) from None
         return {"kind": kind, "path": str(target), "name": target.name,
                 "bytes": target.stat().st_size}
+
+    def _export_elsewhere(self, directory: Any, filename: str) -> Path:
+        """``directory/filename`` for the Export dialog, refused where it may not go."""
+        folder = self._browsable_folder(directory)
+        name = str(filename).strip()
+        if not name or name.startswith(".") or any(c in name for c in "/\\\0"):
+            raise GuiError(f"{filename!r} is not a file name", where=["filename"])
+        return folder / name
 
     def _export_target(self, filename: str) -> Path:
         p = self._need_project()
@@ -3039,15 +3406,29 @@ class GuiSession:
             self._series = series_mod.SeriesSetup()
             self._series_run = None
             self._cond.notify_all()
-        self._remember(project.path)
+        self._remember(project)
 
-    def _remember(self, path: Path) -> None:
-        entry = {"path": str(Path(path).resolve()), "opened_utc": _utcnow()}
-        kept = [e for e in self.recent() if e["path"] != entry["path"]]
+    def _remember(self, project: Project) -> None:
+        """Put ``project`` at the head of the recent list, with its phases.
+
+        The phases are written here, while the project is open, because the
+        start screen names each one with its space group (WP-2131) and reading
+        every listed project's history to find them would cost a log parse per
+        row.  They are a label as of the last open, never a second authority:
+        the history is the model.
+        """
+        entry = {"path": str(Path(project.path).resolve()), "opened_utc": _utcnow(),
+                 "phases": [[ph.name, ph.space_group]
+                            for ph in project.refinement.structure.phases]}
+        kept = [_recent_entry(e) for e in self._recent_raw()
+                if str(e.get("path", "")) != entry["path"]]
+        self._write_recent([entry, *kept])
+
+    def _write_recent(self, entries: list[dict]) -> None:
         try:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             (self.state_dir / "recent.json").write_text(
-                json.dumps([entry, *kept][:_MAX_RECENT], indent=2), encoding="utf-8")
+                json.dumps(entries[:_MAX_RECENT], indent=2), encoding="utf-8")
         except OSError:
             pass  # a read-only home is not a reason to fail opening a project
 
@@ -3329,6 +3710,41 @@ def _pick_action(report, kind: str, paths: Any = None):
     return hits[0]
 
 
+def _project_name(name: str) -> str:
+    """A project folder's name from what a person typed, or a refusal.
+
+    One path component, refused rather than cleaned (WP-1205's rule: the gate
+    is a test, never a sanitiser).  The project suffix is added when it is not
+    typed, so "sample" and "sample.rex" name the same folder.
+    """
+    text = str(name or "").strip()
+    if text.endswith(_about.PROJECT_SUFFIX):
+        text = text[: -len(_about.PROJECT_SUFFIX)].strip()
+    if not text or text.startswith(".") or any(c in text for c in "/\\\0"):
+        raise GuiError(f"{name!r} is not a project name: give one folder name, "
+                       "with no separator and no leading dot", where=["name"])
+    return f"{text}{_about.PROJECT_SUFFIX}"
+
+
+def _refuse_existing(target: Path, where: str = "name") -> None:
+    """No File menu verb replaces a folder or a file that is already there."""
+    if target.exists():
+        raise GuiError(f"{target} already exists; choose another name or folder",
+                       code="DESTINATION_EXISTS", status=409, where=[where])
+
+
+def _pair(value, where: str) -> tuple:
+    """A ``[lo, hi]`` from a body as a tuple, for the document's validator.
+
+    Only the shape is checked here; the interval's own rule is
+    :func:`schemas.project.check_interval`'s, reached through the validator.
+    """
+    if not isinstance(value, (list, tuple)):
+        raise GuiError(f"'{where}' takes [lo, hi] pairs, got {value!r}",
+                       where=[where])
+    return tuple(value)
+
+
 def _need(body: dict, key: str):
     value = body.get(key)
     if value in (None, ""):
@@ -3362,13 +3778,277 @@ def _validate(model, payload, where: str):
 _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
 
 
+def rehearse(refinement, apply: Callable[[Any], Any]) -> None:
+    """Run ``apply`` on a history-free copy of ``refinement``, to see it refuse.
+
+    A route that applies several engine verbs for one request commits a node
+    per verb, so a refusal from a later verb would leave the earlier nodes in
+    the history and their changes in the model: a half-applied request.  No
+    verb can be asked in advance whether it will refuse, and their refusals
+    interact (a limit admits a value; an unhold lets a path be freed).  So the
+    whole sequence runs first on ``Refinement._trial(record=False)``, the copy
+    the package already builds for a fit whose result it discards: same models,
+    ties, variables, holds and free set, no history.  The verbs are
+    deterministic in that state, so a sequence the copy accepts is one the
+    working refinement accepts; a refusal raises here, before anything real
+    was touched.
+
+    The copy's warnings are dropped: the real run warns them once.
+    """
+    import warnings
+
+    trial = refinement._trial(record=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        apply(trial)
+
+
+def _edit_on(refinement, *, structure: Structure | None = None,
+             instrument: Instrument | None = None, label: str = "") -> str | None:
+    """``Refinement.edit`` with its refusal addressed (see ``GuiSession._edit``)."""
+    try:
+        return refinement.edit(structure=structure, instrument=instrument,
+                               label=label)
+    except ValueError as exc:
+        match = _LEADING_PATH.search(str(exc))
+        raise GuiError(str(exc), code="MODEL_REFUSED",
+                       where=[match.group(1)] if match else []) from None
+
+
+@contextmanager
+def _arm(name: str):
+    """Name the ``PATCH /api/params`` arm a refusal came from, in ``details``.
+
+    The message stays the verb's own sentence; the arm rides beside it, so a
+    client can tell a refused limit from a refused value on the same path.
+    """
+    try:
+        yield
+    except GuiError as exc:
+        exc.details = [{"arm": name, "where": list(exc.where)}, *exc.details]
+        raise
+
+
+def _apply_param_arms(ref, values: dict, vary: dict, hold: dict, limits: dict,
+                      restraints: dict) -> dict:
+    """``PATCH /api/params``'s arms applied to ``ref``, in the route's order.
+
+    Returns the ``changed`` map.  Called twice per request: on a rehearsal copy
+    (:func:`rehearse`) and then on the project's refinement.
+    """
+    values = dict(values)   # a limit's value is taken out of it below
+    changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {},
+                               "limits": [], "restraints": []}
+    # a literal vary key the model lacks is a typo, refused before the
+    # values or any earlier key commit a node (WP-1951)
+    for name, arm in (("vary", vary), ("hold", hold)):
+        with _arm(name):
+            try:
+                ref._refuse_unknown_literals(list(arm))
+            except ValueError as exc:
+                raise GuiError(str(exc), where=sorted(arm)) from None
+    if limits or restraints:
+        # one ``edit_model`` node for both, first: a limit can admit a
+        # value the old one refused, so a value typed with its limit
+        # travels inside the same validated model (pydantic checks a
+        # value against min/max as one object, WP-2126)
+        with _arm("limits" if limits else "restraints"):
+            structure, instrument = _limit_and_restraint_edit(
+                ref, limits, restraints, values)
+            _edit_on(ref, structure=structure, instrument=instrument,
+                     label="limits and restraints edited")
+        changed["limits"] = sorted(limits)
+        changed["restraints"] = sorted(restraints)
+        for path in limits:
+            if path in values:
+                changed["values"].append(path)
+                del values[path]
+    with _arm("hold"):
+        for glob, flag in hold.items():
+            # unholds before the vary flags and holds after them, so "release
+            # this and free it" and "untick this and hold it" both land
+            if not flag:
+                changed["hold"][glob] = _holding(ref.unhold, glob)
+    if values:
+        with _arm("values"):
+            try:
+                ref.set_values({k: float(v) for k, v in values.items()})
+            except (ValueError, TypeError) as exc:
+                # a tied path names its sources, a locked one says it is
+                # structural, a bound violation prints the interval — each has
+                # a different fix, so the message travels intact
+                raise GuiError(str(exc), where=sorted(values)) from None
+        changed["values"] = sorted({*changed["values"], *values})
+    with _arm("vary"):
+        for glob, flag in vary.items():
+            try:
+                changed["vary"][glob] = ref.set_vary(glob, bool(flag))
+            except ValueError as exc:
+                # ``set_vary`` could not refuse anything until WP-1435 gave a
+                # caller's hold precedence over a named path, so this branch
+                # ran bare and the first refusal would have been a 500.  Same
+                # treatment as ``set_values`` above: the sentence names the
+                # verb that resolves it, so it travels intact.
+                raise GuiError(str(exc), where=[glob]) from None
+    with _arm("hold"):
+        for glob, flag in hold.items():
+            if flag:
+                changed["hold"][glob] = _holding(ref.hold, glob)
+    return changed
+
+
+def _holding(verb, glob: str) -> list[str]:
+    """``Refinement.hold``/``unhold`` on one glob, a refusal in its own words."""
+    try:
+        return verb(glob)
+    except ValueError as exc:
+        raise GuiError(str(exc), where=[glob]) from None
+
+
+#: Table paths whose parameter the model stores somewhere else
+#: (``ParameterTable._collect_instrument``; ``Field.param`` in the GUI's
+#: ``lib/model.ts`` carries the same pair, WP-1214).
+_MODEL_PATH_OF = {"instrument.polarization": "instrument.source.polarization"}
+
+
+def _stored_param(tree: dict, path: str) -> dict:
+    """The stored ``{value, min, max, …}`` a parameter path names in a dumped model.
+
+    ``tree`` is ``{"phases": [...], "instrument": {...}}``.  A path the table
+    has and the model does not store (a coordinate DOF, which is rederived at
+    every table build) is refused by name, because its limits have nowhere to
+    live.
+    """
+    node: Any = tree
+    for part in _MODEL_PATH_OF.get(path, path).split("."):
+        if isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        elif isinstance(node, dict) and part in node:
+            node = node[part]
+        else:
+            node = None
+            break
+    if not (isinstance(node, dict) and {"value", "min", "max"} <= node.keys()):
+        raise GuiError(f"{path} stores no limits of its own in the model, so "
+                       "they cannot be set here", where=[path])
+    return node
+
+
+def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
+                              values: dict) -> tuple[Structure | None,
+                                                     Instrument | None]:
+    """The model ``limits`` and ``restraints`` describe, validated whole (WP-2126).
+
+    No verb sets a parameter's limits or adds a value restraint: both live on
+    the model (``Param.min``/``max``, ``Phase.restraints``), and
+    ``Refinement.edit`` records a model.  So the stored model is dumped,
+    changed at the paths named, and validated as a whole — a value typed with
+    its limit is written in the same object, since pydantic checks a value
+    against its limits together.  ``None`` for either half means it did not
+    change.
+
+    ``limits`` maps a path to ``[lower, upper]``, ``None`` meaning unbounded on
+    that side.  ``restraints`` maps a path to ``{"target", "sigma"}``, or to
+    ``None`` to remove the path's value restraint.  A value restraint names a
+    whole-model path; it is stored on the phase its path names, or on the
+    first phase for an instrument path.
+    """
+    structure = refinement.structure.model_dump(mode="python")
+    instrument = refinement.instrument.model_dump(mode="python")
+    tree = {"phases": structure["phases"], "instrument": instrument}
+    touched = {"structure": False, "instrument": False}
+    for path, pair in limits.items():
+        if not (isinstance(pair, (list, tuple)) and len(pair) == 2):
+            raise GuiError(f"{path}: limits are [lower, upper]", where=[path])
+        stored = _stored_param(tree, path)
+        try:
+            lo, hi = (-math.inf if pair[0] is None else float(pair[0]),
+                      math.inf if pair[1] is None else float(pair[1]))
+            value = float(values[path]) if path in values else None
+        except (TypeError, ValueError):
+            raise GuiError(f"{path}: a limit and a value are numbers",
+                           where=[path]) from None
+        if math.isnan(lo) or math.isnan(hi):
+            raise GuiError(f"{path}: a limit is a number, or null for none",
+                           where=[path])
+        if lo > hi:
+            raise GuiError(f"{path}: the lower limit {lo:g} is above the upper "
+                           f"one {hi:g}", where=[path])
+        stored["min"], stored["max"] = lo, hi
+        if value is not None:
+            stored["value"] = value
+        touched["instrument" if path.startswith("instrument.") else "structure"] = True
+    if restraints:
+        from ..schemas.structure import ValueRestraint
+        phases = refinement.structure.phases
+        if not phases:
+            raise GuiError("a value restraint lives on a phase, and this "
+                           "project has none", where=sorted(restraints))
+        kept = [[r for r in phase.restraints
+                 if not (isinstance(r, ValueRestraint) and r.path in restraints)]
+                for phase in phases]
+        # the panel edits a target and a σ; a weight set elsewhere survives it
+        weight_of = {r.path: r.weight for phase in phases for r in phase.restraints
+                     if isinstance(r, ValueRestraint)}
+        for path, spec in restraints.items():
+            if spec is None:
+                continue
+            if not isinstance(spec, dict) or not {"target", "sigma"} <= spec.keys():
+                raise GuiError(f"{path}: a restraint is {{target, sigma}}",
+                               where=[path])
+            match = re.match(r"phases\.(\d+)\.", path)
+            home = int(match.group(1)) if match else 0
+            if home >= len(phases):
+                raise GuiError(f"{path} names a phase this project lacks",
+                               where=[path])
+            try:
+                kept[home].append(ValueRestraint(path=path,
+                                                 target=float(spec["target"]),
+                                                 sigma=float(spec["sigma"]),
+                                                 weight=weight_of.get(path, 1.0)))
+            except (ValueError, TypeError) as exc:
+                raise GuiError(f"{path}: {exc}", where=[path]) from None
+        touched["structure"] = True
+    try:
+        new_structure = (Structure.model_validate(structure)
+                         if touched["structure"] else None)
+        if restraints and new_structure is not None:
+            for phase, rows in zip(new_structure.phases, kept, strict=True):
+                phase.restraints = rows
+        new_instrument = (Instrument.model_validate(instrument)
+                          if touched["instrument"] else None)
+    except ValueError as exc:
+        match = _LEADING_PATH.search(str(exc))
+        raise GuiError(str(exc), code="MODEL_REFUSED",
+                       where=[match.group(1)] if match else sorted(limits)) from None
+    return new_structure, new_instrument
+
+
 def _is_typed_cell(payload) -> bool:
-    """Is this ``structure`` argument the typed-cell form? (WP-1206)
+    """Is this ``structure`` argument the typed-cell form, or a list holding one?
 
     The four forms are told apart by their keys, and these are disjoint: a whole
-    :class:`Structure` has ``phases``, the file forms have ``cif``/``upload``.
+    :class:`Structure` has ``phases``, the file forms have ``cif``/``upload``
+    (WP-1206).  A list (WP-2131) holds a typed cell when any member is one,
+    which is what makes ``rietveld`` refused for it too.
     """
+    if isinstance(payload, list):
+        return any(_is_typed_cell(item) for item in payload)
     return isinstance(payload, dict) and "space_group" in payload
+
+
+def _recent_entry(entry: dict) -> dict:
+    """One stored recent-list row, reduced to the keys it is written with."""
+    phases = entry.get("phases")
+    row = {"path": str(entry.get("path", "")),
+           "opened_utc": str(entry.get("opened_utc", "")),
+           "phases": [[str(n), str(sg)] for n, sg in phases]
+           if isinstance(phases, list) and all(
+               isinstance(x, list) and len(x) == 2 for x in phases) else []}
+    if entry.get("closed") is True:
+        # written by Close (WP-2133); absent on every entry an open wrote
+        row["closed"] = True
+    return row
 
 
 def _typed_cell_structure(payload: dict) -> Structure:
@@ -3450,8 +4130,12 @@ def _typed_cell_structure(payload: dict) -> Structure:
 
 
 def _as_structure(payload, uploads=None) -> Structure:
-    """A :class:`Structure` from ``None``, an inline dict, a typed cell, a CIF
-    or an upload.
+    """A :class:`Structure` from ``None``, an inline dict, a typed cell, a CIF,
+    an upload, or a list of those.
+
+    The list is the sixth form (WP-2131): the New project dialog lists several
+    phases, each a CIF or a typed cell, and their phases are concatenated in
+    the order given.  An empty list is the pattern-only project, as ``None``.
 
     Every route into the model passes through here, which is where the species
     check belongs: a structure carrying a scattering species no form-factor table
@@ -3469,6 +4153,42 @@ def _as_structure(payload, uploads=None) -> Structure:
     themselves — ``project_new`` does — because the absence of a key and a
     ``null`` value are the same thing to ``dict.get`` and only one of them is a
     deliberate answer.
+    """
+    if payload is None:
+        return Structure(phases=[])
+    if isinstance(payload, list):
+        # each member read in its own form, and the species check run once over
+        # the joined list, so a refused atom's path carries its phase index in
+        # the project rather than in its own file
+        phases: list = []
+        for item in payload:
+            if _is_typed_cell(item) and not str(item.get("name") or "").strip():
+                # two unnamed cells would both be "phase"; a number from the
+                # joined list keeps them apart, in the CIF reader's phase_N form
+                item = {**item, "name": f"phase_{len(phases) + 1}"}
+            phases.extend(_structure_form(item, uploads).phases)
+        structure = Structure(phases=phases)
+    else:
+        structure = _structure_form(payload, uploads)
+    unknown = unknown_species(structure)
+    if unknown:
+        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
+        raise GuiError(
+            f"{len(unknown)} atom(s) carry a scattering species this build has "
+            f"no form factor for: {named}. A fit would fail at stage compile "
+            "with the same lookup; edit the species (ions fall back to the "
+            "neutral atom, so 'O2-' is fine and 'D' is not).",
+            code="UNKNOWN_SPECIES",
+            where=[f"{u['path']}.species" for u in unknown])
+    return structure
+
+
+def _structure_form(payload, uploads=None) -> Structure:
+    """One non-list ``structure`` form read as a :class:`Structure`, unchecked.
+
+    :func:`_as_structure` is the boundary and runs the species check; this is
+    the per-form dispatch under it.  A list inside a list is not a form, and is
+    refused as a malformed model by the inline branch.
     """
     if payload is None:
         return Structure(phases=[])
@@ -3503,16 +4223,6 @@ def _as_structure(payload, uploads=None) -> Structure:
                            where=["structure.cif"]) from None
     else:
         structure = _validate(Structure, payload, "structure")
-    unknown = unknown_species(structure)
-    if unknown:
-        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
-        raise GuiError(
-            f"{len(unknown)} atom(s) carry a scattering species this build has "
-            f"no form factor for: {named}. A fit would fail at stage compile "
-            "with the same lookup; edit the species (ions fall back to the "
-            "neutral atom, so 'O2-' is fine and 'D' is not).",
-            code="UNKNOWN_SPECIES",
-            where=[f"{u['path']}.species" for u in unknown])
     return structure
 
 
@@ -3577,4 +4287,3 @@ def _as_plan_argument(plan: Any):
                            f"available: {sorted(PLAN_PRESETS)}", where=["plan"])
         return plan
     return _validate(PlanSpec, plan, "plan").to_plan()
-

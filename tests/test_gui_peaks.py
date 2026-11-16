@@ -305,8 +305,7 @@ def test_any_candidate_can_be_adopted_and_an_unpicked_one_records_why(
     status, answer = client.get("/api/index/result")
     assert status == 200
     why = answer["adopt"][0]["why"]
-    # `allowed` keeps the gate's pick under its old name for the old panel
-    assert answer["adopt"] == [{"allowed": False, "picked": False, "why": why}]
+    assert answer["adopt"] == [{"picked": False, "why": why}]
     assert why == ("not best_or_none()'s pick: grade 'medium' "
                    "(shift_allowance_assumed)")
 
@@ -340,7 +339,7 @@ def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
         session._index_result = _answer(_candidate("high", []))
 
     _, answer = client.get("/api/index/result")
-    assert answer["adopt"] == [{"allowed": True, "picked": True, "why": ""}]
+    assert answer["adopt"] == [{"picked": True, "why": ""}]
 
     head_before = project.refinement._head_id
     status, adopted = client.post("/api/index/adopt", {"candidate": 0})

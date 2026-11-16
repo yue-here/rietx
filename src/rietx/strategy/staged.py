@@ -12,8 +12,10 @@ invariant — they stay frozen *within* a stage).
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
 import functools
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -188,6 +190,19 @@ class Stage:
     #: (``indexing.workflow.VALIDATION_WINDOW_SLACK_DEG``).  ``None`` = the
     #: default; frozen at stage compile like every other discrete choice.
     window_slack_deg: float | None = None
+    #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
+    #: ruled 2026-11-09), so ``turn_on=["phases.*"]`` with
+    #: ``turn_off=["phases.*.atoms.*.biso"]`` frees a phase but its
+    #: displacements.  Fixing after freeing is the only order in which a
+    #: narrow fix inside a broad free does anything.  GSAS-II's scripted
+    #: ``set`` and ``clear`` run in the same order (read in its source; its
+    #: docs do not state the order; ``docs/practice.md`` § A stage that
+    #: fixes a parameter).  The flags carry, so a fix lasts until a later stage's
+    #: ``turn_on`` frees the path again, and the closing stage re-solves that
+    #: end state (:func:`fixed_at_end`).  Fixing a held, locked or force-fixed
+    #: row changes nothing: a fix only ever sets ``vary`` to False.  Last of
+    #: the fields, so a stage built positionally reads as it always did.
+    turn_off: list[str] = field(default_factory=list)
 
     def __getattr__(self, name: str):
         if name in _PYDANTIC_SURFACE:
@@ -340,6 +355,36 @@ MAGNETIC_WIDTH_STAGE_PATHS: tuple[tuple[str, ...], ...] = (
 )
 
 
+def fixed_at_end(stages: Iterable[Stage],
+                 paths: Iterable[str | tuple[str, ...]]) -> list[str]:
+    """The paths a run of ``stages`` leaves fixed by a ``turn_off``, in ``paths`` order.
+
+    Read stage by stage as the runner applies them: ``turn_on`` frees, then
+    ``turn_off`` fixes, and the flags carry (WP-2208).  A path is in the answer
+    when the last glob to match it, in that order, is a ``turn_off``; a path a
+    later ``turn_on`` freed again is not.  Matching is ``set_vary``'s fnmatch
+    on the path, and nothing else: whether a row is tied, locked or held is
+    the table's to decide when the closing stage fixes these.
+
+    A tuple is one row under several names, the joint table's scoped and bare
+    spellings (``MultiParameterTable.set_vary`` matches either); a glob
+    matching any of them matches the row, and the first is the one returned.
+    """
+    stages = list(stages)
+    out = []
+    for path in paths:
+        names = (path,) if isinstance(path, str) else tuple(path)
+        last = None
+        for stage in stages:
+            if any(fnmatch.fnmatchcase(n, g) for n in names for g in stage.turn_on):
+                last = True
+            if any(fnmatch.fnmatchcase(n, g) for n in names for g in stage.turn_off):
+                last = False
+        if last is False:
+            out.append(names[0])
+    return out
+
+
 @dataclass
 class RefinementPlan:
     stages: list[Stage]
@@ -385,7 +430,7 @@ class RefinementPlan:
     #: field, bit for bit.
     closing_window_tol: float | None = CLOSING_WINDOW_TOL
 
-    def closing_stage(self) -> Stage | None:
+    def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
 
         It frees every glob any declared stage freed, in first-seen order,
@@ -395,24 +440,40 @@ class RefinementPlan:
         at the answer is where the data put it.  Its window fraction is
         :attr:`closing_window_tol`, which :meth:`stage_window_tols` carries.
         ``None`` when that is ``None`` or the plan declares no stage.
+
+        **A plan that fixes** (``Stage.turn_off``, WP-2208) leaves some freed
+        paths fixed at its end, and the closing stage fixes them again after
+        its frees: :func:`fixed_at_end` over ``paths``, the model's parameter
+        paths, as literals.  Two globs that overlap cannot be compared without
+        the paths, so a runner passes its table's.  Without ``paths`` the
+        closing stage's ``turn_off`` is every glob a declared stage fixed,
+        which is the end state while no later stage frees again what an
+        earlier one fixed; that reading serves callers that use the stage's
+        name or frees alone.  A plan with no ``turn_off`` builds the closing
+        stage it built before the field, whatever ``paths`` is.
         """
         if check_closing_window_tol(self.closing_window_tol) is None or not self.stages:
             return None
         last = self.stages[-1]
         globs = list(dict.fromkeys(g for s in self.stages for g in s.turn_on))
+        fixes: list[str] = []
+        if any(s.turn_off for s in self.stages):
+            fixes = (fixed_at_end(self.stages, paths) if paths is not None
+                     else list(dict.fromkeys(g for s in self.stages for g in s.turn_off)))
         return Stage(CLOSING_STAGE_NAME, globs, max_iter=last.max_iter, ftol=last.ftol,
                      lebail_cycles=last.lebail_cycles, lebail_tol=last.lebail_tol,
                      restraint_weight_scale=last.restraint_weight_scale,
-                     window_slack_deg=last.window_slack_deg)
+                     window_slack_deg=last.window_slack_deg, turn_off=fixes)
 
-    def run_stages(self) -> list[Stage]:
+    def run_stages(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> list[Stage]:
         """The stages a fit runs, in order: the declared ones, then :meth:`closing_stage`.
 
         Every runner iterates this, never :attr:`stages`, together with
         :meth:`stage_ftols` and :meth:`stage_window_tols`, which are parallel
-        to it.
+        to it.  A runner passes its table's ``paths``, which the closing stage
+        of a plan that fixes needs (:meth:`closing_stage`).
         """
-        closing = self.closing_stage()
+        closing = self.closing_stage(paths)
         return [*self.stages, closing] if closing is not None else list(self.stages)
 
     def stage_window_tols(self) -> list[float | None]:
@@ -1062,10 +1123,11 @@ class GuardFinding:
     #: rendered form, identical to the pre-v1.0 list entry
     message: str
     #: a clause a *diagnostic* appends to its own sentence, already rendered.
-    #: Two writers, each read only where its own code builds the
+    #: Three writers, each read only where its own code builds the
     #: ``Diagnostic`` (WP-1076 wants both ends of a field named):
-    #: :meth:`at_bound`, read by ``BOUND_HIT`` and ``FLOOR_HIT`` (WP-1434 gives
-    #: that finding evidence to carry), and :meth:`nonpositive_strain`, read by
+    #: :meth:`at_bound` and :meth:`tied_at_bound`, read by ``BOUND_HIT`` and
+    #: ``FLOOR_HIT`` (WP-1434 gives that finding evidence to carry, WP-1325 a
+    #: tied value's), and :meth:`nonpositive_strain`, read by
     #: ``STEPHENS_STRAIN_NOT_POSITIVE`` (the intensity share, WP-1467).  It
     #: is deliberately not part of :meth:`__str__`, which is the pre-v1.0 text
     #: byte for byte and is what the other diagnostics are built from.
@@ -1109,6 +1171,19 @@ class GuardFinding:
                else f", {gap_over_esd:.1e} esd from the limit")
         return cls(code, (path,), float(cos), path,
                    detail=f" (ρ={cos:+.3f}{gap})", limit=limit)
+
+    @classmethod
+    def tied_at_bound(cls, path: str, gap_over_esd: float, *,
+                      limit: tuple[str, float]) -> "GuardFinding":
+        """A tied value held on its own limit by the row the LM step keeps
+        (:func:`tied_bound_findings`, WP-1325).  The code follows the limit as
+        :meth:`at_bound`'s does, and ``detail`` says the value is tied, since
+        "refined to its bound" alone reads as a free column."""
+        code = "FLOOR_HIT" if _at_zero_floor(limit) else "BOUND_HIT"
+        return cls(code, (path,), None, path,
+                   detail=(f" (a tied value, held there inside the step, "
+                           f"{gap_over_esd:.1e} esd from the limit)"),
+                   limit=limit)
 
     @classmethod
     def background_absorption(cls, path: str, r2: float) -> "GuardFinding":
@@ -2200,6 +2275,75 @@ def bound_findings(bounds, free: list[str], theta, *,
     return out
 
 
+def pressed_tied_paths(truncated_by) -> set[str]:
+    """The tied entries whose bound rows shaped a step, read off the labels
+    :func:`~rietx.optimize.least_squares.tied_bound_inequalities` writes
+    (``"<path> bounds"``, a joint fit's ``"hist.<h> <path> bounds"`` and
+    ``"parametric equation '<name>' (<target> bounds)"``).  A label of any
+    other block (the Stephens cone, the width floors) names no tied entry."""
+    out: set[str] = set()
+    for label, n in (truncated_by or {}).items():
+        if not n:
+            continue
+        m = (re.search(r"\((\S+) bounds\)$", label)
+             or re.fullmatch(r"(?:hist\.\d+ )?(\S+) bounds", label))
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def tied_bound_findings(table, pressed: set[str], esd: dict[str, float], *,
+                        scope: str = "") -> list[GuardFinding]:
+    """Tied values held on their own limit at the answer (WP-1325).
+
+    :func:`bound_findings` tests free columns only.  A tied entry with a finite
+    bound gets an LM row instead
+    (:func:`~rietx.optimize.least_squares.tied_bound_inequalities`), and the
+    step holds the value on it.  This is that entry's half of the one bound
+    test, so ``BOUND_HIT``/``FLOOR_HIT`` and ``RefinedParameter.at_bound``
+    report a held tied value as they report a free column on its bound
+    (settled by Claude 2026-11-09 under that rule and the guard rule that
+    every diagnostic carries its paths in ``where``).
+
+    It is :func:`bound_findings`' conjunction, read for a row.  *Pushed into
+    the limit*: the row shaped at least one step of the stage (``pressed``,
+    from :func:`pressed_tied_paths`), the driver's own record that the limit
+    carried load.  *And still on it at the answer*: the value sits within
+    :data:`BOUND_HIT_ESD_FRAC` of its own esd of the nearer limit.  The face
+    is :data:`~rietx.optimize.least_squares.TIED_BOUND_MARGIN` of the row's
+    scale inside the bound, far under that window.  A row that pressed and let
+    go leaves the value an ordinary distance away, and no finding.  No esd
+    (no covariance, or a row on a column that measured nothing) declines the
+    entry: a distance alone is the test WP-1434 retired.
+
+    ``esd`` is :meth:`~rietx.params.vector.ParameterTable.stderr_physical`'s
+    map for this table.  ``scope`` prefixes each finding's path, as a joint
+    fit spells a per-histogram row (``"hist.1."``); a joint caller passes
+    ``""`` for a shared entry.
+    """
+    import math
+
+    out: list[GuardFinding] = []
+    if not pressed:
+        return out
+    free = set(table.free_paths)
+    for e in table.entries:
+        if e.path not in pressed or e.path in free:
+            continue
+        below, above = e.value - e.lo, e.hi - e.value
+        side, limit, gap = (("lower", e.lo, below) if below <= above
+                            else ("upper", e.hi, above))
+        if not math.isfinite(limit):
+            continue
+        sd = esd.get(e.path)
+        if sd is None or not math.isfinite(sd) or sd <= 0.0:
+            continue
+        if abs(gap) <= BOUND_HIT_ESD_FRAC * sd:
+            out.append(GuardFinding.tied_at_bound(
+                scope + e.path, abs(gap) / sd, limit=(side, float(limit))))
+    return out
+
+
 def check_discarded_directions(jac, free: list[str],
                                flat: list[GuardFinding]) -> list[GuardFinding]:
     """``COVARIANCE_DIRECTION_DISCARDED``: the parameters a direction the solve
@@ -2357,4 +2501,12 @@ def check_guards(table, outcome, threshold: float,
         cos=getattr(outcome, "residual_cosine", None),
         esd=getattr(outcome, "stderr_internal", None),
         active=_exact_active_bounds(outcome))
+    # a tied value the LM step held on its own limit (WP-1325): the esds are
+    # built only when a tied bound row pressed, which a default table never has
+    pressed = pressed_tied_paths(getattr(outcome, "truncated_by", None))
+    sd_internal = getattr(outcome, "stderr_internal", None)
+    if pressed and sd_internal is not None:
+        report.at_bounds += tied_bound_findings(
+            table, pressed,
+            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
     return report

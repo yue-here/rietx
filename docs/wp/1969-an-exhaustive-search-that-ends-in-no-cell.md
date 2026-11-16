@@ -58,6 +58,15 @@ second pass on the residue. Both are tasks below.
 
 ### Inherited
 
+- **2026-11-12, from WP-2078 (task 4): a two-phase pattern where the default ends
+  in no cell.** `tests/data/11BM_LaB6_cBN_mg2044.xye` (SRM 660b LaB₆ + cBN, both
+  major), picked by `pick_peaks` with `test_acceptance_lab6_cbn._inputs()`'s
+  instrument: 92 usable lines. `index_pattern(peaks, spec=SearchSpec(systems=("cubic",),
+  max_volume=300.0), preset="quick")` returns neither cell in 8-17 s, with
+  `INDEX_INLIER_RETRY` and `INDEX_SEARCH_INCOMPLETE` (`[dev]`, arm64 Mac, at
+  `a86dcf9d4`), and `n_unindexed="inliers"` returns neither too. No indexing test
+  searches this file, so it is held-out data for this WP. Not diagnosed.
+
 - **2026-10-14, from the issue triage: issue #933 is in PR #951 (theirs,
   head `a215e460`).** `SearchSpec.n_unindexed` takes `None` (the new
   default), `"inliers"` or an int. `None` keeps the count of 2 and, when no

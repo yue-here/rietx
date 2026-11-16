@@ -23,6 +23,7 @@ antiparallel
 antiphase
 antisite
 aragonite
+aromaticity
 attenuator
 bcc
 beamline
@@ -36,6 +37,7 @@ centring
 centrings
 centrosymmetric
 centrosymmetry
+chelate
 chiral
 chirality
 CIF
@@ -49,6 +51,7 @@ cryostat
 crystallite
 crystallites
 crystallographer
+cyclohexane
 deuterated
 deuteration
 diffractometer
@@ -121,6 +124,7 @@ polyhedra
 polyimide
 pseudosymmetry
 PtGeSe
+pyridine
 pyroelectric
 rhombohedral
 rutile
