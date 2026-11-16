@@ -1,6 +1,8 @@
 # WP-1447 — a threshold each pattern sets for itself
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — the control and its p-value landed (#1609); whether
+the screen reads them by default, and with which numbers, waits on the
+maintainer (#1615)
 Track: What fires, and what stays silent
 Depends on: — (1442 soft)
 Priority: P3 2026-09-23 — a threshold that works on copper and is not the pattern's own
@@ -118,6 +120,90 @@ when p ≤ α. At K = 199 the smallest achievable p is 0.005.
   unfiltered tube leaks, which is what the floor has to catch.
 
 ## Handover log
+
+### 2026-11-16 — the control and its p-value, built and not switched on
+
+Each pattern can now be screened against its own coincidences. A caller hands
+the screen's peak list to a new function and gets back, for each ghost search,
+how many strong reflections agree at the real Kβ or W Lα position, the same
+count at about two hundred made-up wavelengths that no line can sit at, and
+how rare the real count is among them. On the sixteen round-robin patterns the
+real wavelength is never rare (smallest p 0.125), and an injected Kβ image at
+10 % is always the rarest (p = 0.005, the floor of the test). The screen itself
+is unchanged and no picked peak moves, because the level, the number of
+wavelengths and the floor beside it are the maintainer's to set. One case shows
+why the floor matters: on zircon with a Kβ image, the W Lα search gathers three
+parents at p = 0.005 on a line that is not there.
+
+*Premise* (checked first, on `bc77a934e`): `GHOST_MIN_PARENTS = 5` is still a
+fixed constant in the screen, and `ghost_searches` (WP-1445) now skips a
+declared monochromator, which the round-robin fixtures do not declare. Still
+open: the maintainer chose on 2026-09-22 not to build this, with "a pattern
+from a different instrument class" as the trigger to revisit. The ghostshift
+lead dispatched tasks 1-2. This entry builds the machinery and leaves the
+default to the maintainer, which keeps that decision where it was.
+
+*Done*:
+- Task 1: `_ghost_control_ratios`. The exclusions are exact intervals in
+  ratio, one per parent and per line, around five positions read off the
+  anode table: the parent, its Kα partner either side, Kβ and W Lα1. Each is
+  one matching window wide, using the list's own largest esd. No margin, band
+  edge or grid step is a new number.
+- Task 2, the machinery only: `ghost_p_value` (North, Curtis & Sham 2002),
+  `ghost_control` → `GhostControl` (`p_value`, `decide(alpha=, floor=)`). A
+  control ratio is compared only where it searched at least as many parents as
+  the real ratio did, so ratios whose companions fall off the range cannot
+  make the observation look rare. `_ghost_parent_rank` is factored out of
+  `_ghost_candidates` with no change in behaviour. Task 2 stays unticked:
+  K, α, span and floor are arguments, not named constants.
+- 13 tests in `test_background_auto.py`. Each control has a positive arm:
+  removing the self exclusions fails 7 of them. The near-unity row checks that
+  a naive sweep reaches ≥ 5 on the fitted list before asserting the control
+  stays at ≤ 2.
+
+*Measured* (`[dev]` venv, macOS arm64; scripts in the runner's scratch, ~60
+lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
+
+| arm (16 patterns, k=199, span 0.80-1.0) | census pool | fitted list |
+|---|---|---|
+| clean, Kβ: smallest p | 0.145 | 0.125 |
+| clean, W Lα: smallest p | 0.210 | 0.270 |
+| Kβ image r=0.05: p ≤ 0.01 | 16/16 (brucite, magnetite at 3 parents) | 15/16 (magnetite 2, p 0.035) |
+| Kβ image r=0.10 / 0.15: p | 0.005 on all | 0.005 on all |
+
+- **The near-unity wall, measured again:** a naive sweep of the fitted list
+  has a chance mean of 0.55 in the bulk, 2.03 in 0.990-0.995 and 4.35 above,
+  with a maximum of 8. It starts at about 0.99, not 0.98. The census pool
+  shows no wall at all. Admitted control ratios ≥ 0.95 reach at most 2 on
+  both paths.
+- **Cost:** `ghost_control` at k=199 takes 6.8-7.6 ms on fluorite's 18-line
+  list and 8.1-8.5 ms on cpd-4's 113 lines (macOS arm64, five runs each).
+- **Zircon, Kβ image 0.10, fitted:** the W Lα search reaches 3 at p = 0.005
+  against a control maximum of 2. The fixed bar is silent on it.
+
+*Review*: a read-only subagent in the worktree (the runner rules forbid
+`/code-review`).
+- Applied: `span` must be finite (an unbounded span filled the control with
+  free zeros); control ratios are matched by parents searched; the exclusion
+  window takes the list's own largest esd instead of the cap; `k` validation;
+  and docstring corrections (what the control cannot exclude, the p-value as a
+  rank over a correlated grid, cost, a truncated comment).
+- Recorded, not fixed: W Lα2, the Kβ image of a Kα2 component, and a leak's
+  images of non-parent lines are not excluded. Two test rows sit with zero
+  margin: corundum at its bar of 2, and zircon's W Lα with 3 against 2. Both
+  passed on Linux x86_64.
+- *Generality*: no `_audit.py` change, and no number added to a default
+  path. Every new knob is a required argument, so the judge was not
+  dispatched.
+
+*Gotchas*: the census pool does not show the near-unity wall that the fitted
+list does, so a test of the control has to use the fitted list to fail.
+
+Next: the maintainer's answer on #1615 (option (a): floor 5, α 0.01, K 199,
+span 0.80-1.0, which moves no answer measured here; or a lower floor). Then
+wire it into `_ghost_screen` with named constants and audit rows, and work
+tasks 3-5 in order. Task 3's table decides whether task 5's version bump is
+owed.
 
 ### 2026-09-22 — filed, deliberately not built
 
