@@ -16,9 +16,15 @@ test is bought here by cutting things up (D2):
   projects to, a rectangle closed by two half-ellipses.
 - **Lines are cut the same way**, so a cell edge behind an atom is hidden
   where it passes behind it and not along its whole length.
+- **Of atoms sharing a position** (a mixed site) the one reaching nearer the
+  viewer is drawn last, each atom's rings straight after it, and a stick or
+  line ending there is trimmed at the largest of them.
 - **A polyhedron face is one polygon**: coplanar triangles are merged, and
-  each face keys on its own centroid, so a centre atom sorts between its
-  polyhedron's back and front faces.
+  each face keys on the centroid of its own corners, so a centre atom sorts
+  between its polyhedron's back and front faces.  A filled ring, or a named
+  face on one plane, is one polygon too, though its corners lie on that plane
+  only to within :data:`.rings.PLANAR_RING_TOLERANCE`; a named face off any
+  plane is a hull, drawn face by face as a polyhedron is.
 
 Shading is gradients from ``LOOK`` (D3).  A ball takes a radial gradient whose
 focus is the specular highlight, with stops sampled from the raster's formula
@@ -197,6 +203,14 @@ def _at(pos) -> tuple:
     return tuple(round(float(v), 8) for v in pos)
 
 
+def _trim_at(by_pos: Mapping, point, axis: np.ndarray, radius: float) -> float:
+    """Where a stick or line from ``point`` along ``axis`` leaves the atoms
+    drawn there: the largest :func:`trim_length` of them, since every one of
+    a mixed site's atoms sits at the one position; 0 where none is drawn."""
+    return max((trim_length(a["inverse"], axis, radius) for a in by_pos.get(_at(point), ())),
+               default=0.0)
+
+
 def _site_of(geometry: Mapping, index: int) -> str:
     return _token(geometry["sites"][geometry["atoms"][index]["site"]]["label"])
 
@@ -256,11 +270,11 @@ def display_list(scene: Mapping, geometry: Mapping, rotation, frame: Frame, *,
 
     items: list[dict] = []
     fog_colour = None if fog is None else tuple(fog[3])
-    by_pos = {}
-    for a in scene["atoms"]:
+    by_pos: dict[tuple, list] = {}
+    for order, a in enumerate(scene["atoms"]):
         if a["inverse"] is None:
             continue
-        by_pos[_at(a["pos"])] = a
+        by_pos.setdefault(_at(a["pos"]), []).append(a)
         c = R @ np.asarray(a["pos"], dtype=np.float64)
         shape = np.asarray(a["shape"], dtype=np.float64).reshape(3, 3)
         sv = R @ shape
@@ -270,16 +284,19 @@ def display_list(scene: Mapping, geometry: Mapping, rotation, frame: Frame, *,
         site = _site_of(geometry, a["index"])
         cx, cy = px(c)
         # a tie in depth goes to the atom reaching nearer the viewer, so of two
-        # sites sharing a position (a mixed site) the one the raster shows is
-        # drawn last, as its depth test shows the larger
+        # sites sharing a position (a mixed site) the larger along the line of
+        # sight is drawn last, near enough what the raster's depth test shows
+        # (which sees 1/|M⁻¹ẑ| on the centre ray, not this support); each
+        # atom's rings follow it, so a larger atom drawn later covers them
         reach = math.sqrt(float(sv[2] @ sv[2]))
-        items.append({"kind": "atom", "depth": float(c[2]), "tie": reach,
+        tie = (reach, order)
+        items.append({"kind": "atom", "depth": float(c[2]), "tie": (*tie, 0),
                       "cls": f"atom {site}",
                       "cx": cx, "cy": cy, "rx": rx, "ry": ry, "angle": angle,
                       "axes": axes, "color": tuple(a["color"]),
                       "fog": _fog_factor(float(c[2]), fog), "fog_colour": fog_colour})
         if a["rings"]:
-            items += _rings(a, R, shape, c, px, ppa, site, fog)
+            items += _rings(a, R, shape, c, px, ppa, site, fog, (*tie, 1))
 
     step = piece_length(scene)
     for h in scene["halves"]:
@@ -296,10 +313,8 @@ def display_list(scene: Mapping, geometry: Mapping, rotation, frame: Frame, *,
             continue
         w = (b - a) / length
         half_width = 0.5 * line["width"] * frame.px_scale / ppa
-        lo = (trim_length(by_pos[_at(a)]["inverse"], w, half_width)
-              if _at(a) in by_pos else 0.0)
-        hi = (trim_length(by_pos[_at(b)]["inverse"], -w, half_width)
-              if _at(b) in by_pos else 0.0)
+        lo = _trim_at(by_pos, a, w, half_width)
+        hi = _trim_at(by_pos, b, -w, half_width)
         if lo + hi >= length:
             continue
         A, B = R @ (a + w * lo), R @ (b - w * hi)
@@ -322,16 +337,20 @@ def display_list(scene: Mapping, geometry: Mapping, rotation, frame: Frame, *,
         items += _faces(face, R, px, light, cls, fog)
 
     for text, x, y, is_axis, *_ in labels:
+        # a site label's text is its site's label, so it carries the site's
+        # class as every other element of the site does (D5)
         items.append({"kind": "text", "depth": math.inf, "cls": "label axis" if is_axis
-                      else "label", "x": float(x), "y": float(y), "text": str(text),
+                      else f"label {_token(text)}", "x": float(x), "y": float(y),
+                      "text": str(text),
                       "em": float(em), "color": tuple(accent if is_axis else ink)})
     # stable: equal keys keep the scene's order, as the GUI's LEQUAL test does
-    items.sort(key=lambda it: (it["depth"], it.get("tie", 0.0)))
+    items.sort(key=lambda it: (it["depth"], it.get("tie", (0.0, 0, 0))))
     return items
 
 
-def _rings(atom, R, shape, c, px, ppa, site, fog) -> list[dict]:
-    """The visible runs of an ellipsoid's three principal rings, as polylines."""
+def _rings(atom, R, shape, c, px, ppa, site, fog, tie) -> list[dict]:
+    """The visible runs of an ellipsoid's three principal rings, as polylines,
+    sorting at the atom's own depth straight after it (``tie``)."""
     inverse = np.asarray(atom["inverse"], dtype=np.float64).reshape(3, 3)
     base = np.asarray(atom["color"], dtype=np.float64)
     lum = float(np.asarray(LOOK["luma"]) @ base)
@@ -353,7 +372,7 @@ def _rings(atom, R, shape, c, px, ppa, site, fog) -> list[dict]:
         width = max(2.0 * LOOK["ring_width"] * ppa
                     * math.hypot(*(R @ shape[:, k])[:2]), 0.5)
         for run in _runs(seen):
-            out.append({"kind": "ring", "depth": float(c[2]) + 1e-9, "cls": f"ring {site}",
+            out.append({"kind": "ring", "depth": float(c[2]), "tie": tie, "cls": f"ring {site}",
                         "points": [px(pts[m]) for m in run], "width": width,
                         "color": tuple(ink)})
     return out
@@ -390,8 +409,7 @@ def _stick_pieces(h, geometry, by_pos, R, px, ppa, step, fog) -> list[dict]:
     if length < 1e-9:
         return []
     w = (B - A) / length
-    atom = by_pos.get(_at(A))
-    start = trim_length(atom["inverse"], w, h["radius"]) if atom is not None else 0.0
+    start = _trim_at(by_pos, A, w, h["radius"])
     if start >= length:
         return []                           # wholly inside its own atom
     Av, Bv = R @ (A + w * start), R @ B
@@ -433,18 +451,28 @@ def _stick_pieces(h, geometry, by_pos, R, px, ppa, step, fog) -> list[dict]:
 
 
 def _faces(face, R, px, light, cls, fog) -> list[dict]:
-    """A face entry's triangles, merged into one polygon per plane."""
+    """A face entry's triangles, merged into one polygon per plane.
+
+    A fill (a ring, or a named face) whose triangles all face one way is an
+    open fan over a convex polygon (:func:`.rings.ring_fills`,
+    :func:`.rings.face_fill`) and is one polygon whatever its deviation from
+    a plane; a closed hull always holds triangles facing apart, and is split
+    by plane as a polyhedron is."""
     tri = np.asarray(face["triangles"], dtype=np.float64).reshape(-1, 3, 3)
     nrm = np.asarray(face["normals"], dtype=np.float64).reshape(-1, 3)
     base = np.asarray(face["color"], dtype=np.float64)
     planes: dict[tuple, list[int]] = {}
-    for t, n in enumerate(nrm):
-        key = (*np.round(n, 6), round(float(n @ tri[t, 0]), 6))
-        planes.setdefault(key, []).append(t)
+    if face["kind"] != "polyhedron" and len(nrm) and bool((nrm @ nrm[0] > 0.0).all()):
+        planes[()] = list(range(len(nrm)))
+    else:
+        for t, n in enumerate(nrm):
+            key = (*np.round(n, 6), round(float(n @ tri[t, 0]), 6))
+            planes.setdefault(key, []).append(t)
     out = []
     for members in planes.values():
-        verts = tri[members].reshape(-1, 3) @ R.T
-        nv = R @ nrm[members[0]]
+        # each corner once: a fan repeats its first vertex in every triangle
+        verts = np.unique(np.round(tri[members].reshape(-1, 3), 9), axis=0) @ R.T
+        nv = R @ _unit(nrm[members].sum(axis=0))
         if abs(nv[2]) < 1e-12:
             continue                        # seen edge on
         if nv[2] < 0.0:

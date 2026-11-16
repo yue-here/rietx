@@ -1782,9 +1782,140 @@ def test_the_svg_carries_every_switch(tmp_path, kw):
         assert any(c.startswith("stick ") for c in classes)
     else:
         assert any(c.startswith("face TiO") for c in classes)
-        assert len(root.findall(f"{SVG}text")) == 3 + sum(not a["boundary"] for a in fig.atoms)
+        texts = root.findall(f"{SVG}text")
+        assert len(texts) == 3 + sum(not a["boundary"] for a in fig.atoms)
+        # a site label carries its site's class, as every element of the site does
+        sites = {a["label"] for a in fig.atoms}
+        named = [t.get("class").split() for t in texts if t.get("class") != "label axis"]
+        assert named and all(c[0] == "label" and c[1] in sites for c in named)
+        # depth cueing fades the rearmost atom's gradient toward the ground,
+        # and the uncued drawing of the same view leaves it alone
+        plain = dict(kw, depth_cue=False)
+        render_structure(_rutile(), size=300, path=tmp_path / "plain.svg", **plain)
+        ground = _hex_rgb(root.find(f"{SVG}rect").get("fill"))
+        cued, bare = (_rear_stops(_svg_tree(tmp_path / name)) for name in ("r.svg", "plain.svg"))
+        assert np.abs(cued - ground).mean() < np.abs(bare - ground).mean() - 0.05
     _save(fig, f"rutile_svg_{kw['mode']}")
     (OUTPUT / f"rutile_svg_{kw['mode']}.svg").write_bytes((tmp_path / "r.svg").read_bytes())
+
+
+def _hex_rgb(text: str) -> np.ndarray:
+    return np.array([int(text[k:k + 2], 16) / 255 for k in (1, 3, 5)])
+
+
+def _rear_stops(root) -> np.ndarray:
+    """The stop colours of the rearmost atom's gradient: the first ellipse
+    drawn, the document being far to near."""
+    gid = re.match(r"url\(#(\w+)\)", root.find(f"{SVG}ellipse").get("fill")).group(1)
+    grad = next(g for g in root.iter() if g.get("id") == gid)
+    return np.array([_hex_rgb(st.get("stop-color")) for st in grad.findall(f"{SVG}stop")])
+
+
+def _classes(path: Path) -> list[list[str]]:
+    return [(e.get("class") or "").split() for e in _svg_tree(path).iter()]
+
+
+def test_the_svg_draws_each_planar_ring_as_one_polygon(tmp_path, paracetamol_block):
+    """``planar_rings=`` reaches the SVG, and a ring is one polygon however
+    far its fan's triangles tilt from one another, so it sorts as one shape
+    rather than as four pieces each in front of or behind a neighbour."""
+    from rietx.viz.figure3d import rings
+
+    render_structure(paracetamol_block, size=240, path=tmp_path / "plain.svg")
+    render_structure(paracetamol_block, size=240, path=tmp_path / "rings.svg",
+                     planar_rings=True)
+    assert not [c for c in _classes(tmp_path / "plain.svg") if c[:2] == ["fill", "ring"]]
+    filled = [e for e in _svg_tree(tmp_path / "rings.svg").iter(f"{SVG}polygon")
+              if (e.get("class") or "").split()[:2] == ["fill", "ring"]]
+    found = rings.planar_rings(paracetamol_block)
+    assert len(filled) == len(found) > 0
+    # a six-ring's outline has its six corners, a five-ring's five
+    assert {len(e.get("points").split()) for e in filled} <= {len(r) for r in found}
+
+
+def test_the_svg_draws_named_faces_and_leaves_hidden_atoms_out(tmp_path, nac):
+    """``faces=`` and ``hidden=`` reach the SVG as they reach the PNG: a named
+    face is filled polygons classed ``fill face``, and a hidden element's
+    sites have no element at all."""
+    geometry = s3.build(nac)
+    fluorine = {s["label"] for s in geometry["sites"] if s["species"].rstrip("1-") == "F"}
+    render_structure(geometry, size=240, path=tmp_path / "plain.svg", polyhedra=False)
+    render_structure(geometry, size=240, path=tmp_path / "faced.svg", polyhedra=False,
+                     faces=[cut.plane(geometry, (0, 0, 1), 0.0)])
+    render_structure(geometry, size=240, path=tmp_path / "hidden.svg", hidden=["F"])
+    plain = _classes(tmp_path / "plain.svg")
+    assert not [c for c in plain if c[:2] == ["fill", "face"]]
+    assert [c for c in _classes(tmp_path / "faced.svg") if c[:2] == ["fill", "face"]]
+    assert fluorine and any(fluorine & set(c) for c in plain)
+    assert not any(fluorine & set(c) for c in _classes(tmp_path / "hidden.svg"))
+
+
+def _mixed(order: str) -> Structure:
+    """Pm-3m with Ca1 and Sr1 sharing ½,½,½ at half occupancy each, Sr1's
+    tensor three times Ca1's, listed in ``order``, and O1 at ½,½,0."""
+    cell = Cell(a=_p(4.0), b=_p(4.0), c=_p(4.0),
+                alpha=_p(90.0), beta=_p(90.0), gamma=_p(90.0))
+    site = {"Ca1": ("Ca", 0.01), "Sr1": ("Sr", 0.03)}
+    atoms = [Atom(label=label, species=site[label][0], x=_p(0.5), y=_p(0.5), z=_p(0.5),
+                  occ=_p(0.5), aniso=AnisoU.from_values([site[label][1]] * 3 + [0.0] * 3))
+             for label in (order[:3], order[3:])]
+    atoms.append(Atom(label="O1", species="O", x=_p(0.5), y=_p(0.5), z=_p(0.0)))
+    return Structure(phases=[Phase(name="mixed", space_group="P m -3 m", cell=cell,
+                                   atoms=atoms)])
+
+
+@pytest.mark.parametrize("order", ["Ca1Sr1", "Sr1Ca1"])
+def test_a_mixed_sites_atoms_sort_with_their_rings_and_trim_at_the_largest(order):
+    """Two sites sharing a position: each atom's rings come straight after its
+    own ellipse, so the larger atom, drawn last, covers the smaller's; and a
+    stick from there starts where it leaves the larger atom, whichever site
+    the scene lists last, so no stub of it is drawn over the larger ball."""
+    geo = s3.build(_mixed(order))
+    centre = np.array([2.0, 2.0, 2.0])
+    frame = raster.Frame(width=400, height=400, x0=-2.0, y0=6.0, ppa=50.0, px_scale=1.0)
+    cpx = ((centre[0] - frame.x0) * frame.ppa, (frame.y0 - centre[1]) * frame.ppa)
+    scene = sc.build_scene(geo, "ellipsoid")
+    items = vector.display_list(scene, geo, np.eye(3), frame)
+    here = []                                # what is drawn at the shared centre
+    for it in items:
+        if it["kind"] not in ("atom", "ring") or it["depth"] != pytest.approx(centre[2]):
+            continue
+        xy = [(it["cx"], it["cy"])] if it["kind"] == "atom" else it["points"]
+        if max(np.hypot(x - cpx[0], y - cpx[1]) for x, y in xy) < frame.ppa:
+            here.append(it["cls"].split())
+    assert here[0] == ["atom", "Ca1"] and ["atom", "Sr1"] in here
+    big = here.index(["atom", "Sr1"])
+    assert all(c[1] == "Ca1" for c in here[:big]) and all(c[1] == "Sr1" for c in here[big:])
+    assert ["ring", "Ca1"] in here[:big] and ["ring", "Sr1"] in here[big:]
+
+    # a tilted view of the balls, so no stick is seen end on
+    tx, ty = np.radians(30.0), np.radians(20.0)
+    R = (np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+         @ np.array([[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0, np.cos(ty)]]))
+    scene = sc.build_scene(geo, "ball")
+    items = vector.display_list(scene, geo, R, frame)
+    shared = [a for a in scene["atoms"] if np.allclose(a["pos"], centre)]
+    assert len(shared) == 2
+
+    def px(p):
+        c = R @ p
+        return np.array([(c[0] - frame.x0) * frame.ppa, (frame.y0 - c[1]) * frame.ppa])
+
+    checked = 0
+    for h in scene["halves"]:
+        if not np.allclose(h["from"], centre):
+            continue
+        w = np.asarray(h["to"]) - centre
+        w /= np.linalg.norm(w)
+        trims = [vector.trim_length(a["inverse"], w, h["radius"]) for a in shared]
+        d = px(centre + w) - px(centre)
+        first = min((it for it in items if it.get("half") == id(h)),
+                    key=lambda it: np.hypot(*(np.asarray(it["a"]) - px(centre))))
+        s = float((np.asarray(first["a"]) - px(centre)) @ d / (d @ d))
+        assert s == pytest.approx(max(trims), abs=1e-6)
+        assert max(trims) > min(trims) + 0.05
+        checked += 1
+    assert checked >= 2
 
 
 def test_a_quote_in_a_site_label_keeps_the_svg_well_formed(tmp_path):
