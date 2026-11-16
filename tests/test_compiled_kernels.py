@@ -279,7 +279,8 @@ def test_one_agreeing_numpy_pair_does_not_make_a_noisy_platform_checkable(
     gap = "max 3.0e-06 esd, 7 with the same value and another esd"
     noise = "max 1.7e-07 esd, 7 with the same value and another esd"
     verdict = aot_bench.twins_verdict
-    assert ("darwin", "x86_64") in aot_bench.NONDETERMINISTIC
+    assert aot_bench.nondeterministic("darwin", "x86_64",
+                                      ("accelerate", "accelerate"))
     assert verdict(gap, "bit-identical", nondeterministic=True) == "unchecked"
     assert verdict(gap, "bit-identical", nondeterministic=False) == "drifted"
     assert verdict(gap, noise, nondeterministic=False) == "unchecked"
@@ -287,6 +288,22 @@ def test_one_agreeing_numpy_pair_does_not_make_a_noisy_platform_checkable(
         assert verdict("bit-identical", noise, noisy) == "same"
         assert verdict("bit-identical", "bit-identical", noisy) == "same"
 
+
+
+def test_the_exemption_names_the_blas_not_only_the_platform(aot_bench):
+    """WP-1987: on the macOS x86_64 runner the numpy path reproduced itself on
+    OpenBLAS (five fits of each case bit-identical) and not on Accelerate,
+    with one Accelerate thread or several.  So the gate is held there when
+    both numpy and SciPy are on OpenBLAS, as kernels.yml installs them, and
+    reported when either is on Accelerate.  Other platforms are unaffected.
+    """
+    nd = aot_bench.nondeterministic
+    assert nd("darwin", "x86_64", ("accelerate", "accelerate"))
+    assert nd("darwin", "x86_64", ("scipy-openblas", "accelerate"))
+    assert not nd("darwin", "x86_64", ("scipy-openblas", "scipy-openblas"))
+    assert not nd("darwin", "arm64", ("accelerate", "accelerate"))
+    assert not nd("linux", "x86_64", ("scipy-openblas", "scipy-openblas"))
+    assert len(aot_bench.BLAS) == 2
 
 @pytest.mark.parametrize("hl", [0.030, 0.0])
 def test_fcj_rows_agree_to_rounding_on_every_plane(aot_bench, monkeypatch, hl):

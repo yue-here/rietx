@@ -29,10 +29,12 @@ Three measurements:
    a second fit run with the tier switched off.  That proves the twins are the
    fallback on every call these fits make.  A third fit, the numpy path again,
    says whether the comparison can be made in this run.  On macOS x86_64 under
-   numpy 2.4.6 two identical numpy-path fits in one process differ by up to
-   7.1e-1 esd (WP-1940), and in some runs they agree.  So on a platform in
-   :data:`NONDETERMINISTIC` the twins' gap is reported, never gated, even when
-   the third fit agreed (:func:`twins_verdict`).  Serial: the pool's worker count is
+   numpy 2.4.6 built on Accelerate, two identical numpy-path fits in one
+   process differ by up to 7.1e-1 esd (WP-1940), and in some runs they agree.
+   So where the platform and the BLAS are in :data:`NONDETERMINISTIC` the
+   twins' gap is reported, never gated, even when the third fit agreed
+   (:func:`twins_verdict`).  The same platform on OpenBLAS reproduces itself,
+   and ``kernels.yml`` runs its gate there (WP-1987).  Serial: the pool's worker count is
    forced to 1, so each call covers all its rows.  The comparison is over the
    rows the call wrote, in window.  Per kernel the table gives the calls, the
    calls that were bit-identical, the largest relative difference (the largest
@@ -104,6 +106,7 @@ sys.path.insert(0, str(REPO / "examples"))
 sys.path.insert(0, str(REPO / "tests"))
 
 import numpy as np  # noqa: E402
+import scipy  # noqa: E402
 
 import rietx as rx  # noqa: E402
 from rietx.model import compiled  # noqa: E402
@@ -154,8 +157,40 @@ ON_MEASURED = (sys.platform, platform.machine()) == MEASURED_PLATFORM
 #: numpy path's own differences take on that case, with the same count of rows
 #: that keep their value and change their esd.  Rosetta does not reproduce it: four
 #: trigger fits and three cpd-1a fits came out bit-identical under Rosetta 2.
-NONDETERMINISTIC = {("darwin", "x86_64")}
-ON_NONDETERMINISTIC = (sys.platform, platform.machine()) in NONDETERMINISTIC
+#:
+#: The noise is Accelerate's, not the platform's (WP-1987, fork run 43874967910
+#: on the same i7-8700B runner image, numpy 2.4.6 and SciPy 1.17.1, five
+#: numpy-path fits per arm).  On Accelerate, as installed, trigger gave 3
+#: distinct results in 5 and cpd-1a 4 in 5; with ``VECLIB_MAXIMUM_THREADS=1``
+#: trigger still gave 3 in 5, so it is not Accelerate's threading.  With the
+#: same numpy and SciPy versions built on OpenBLAS (the macOS 10.13 wheels,
+#: scipy-openblas 0.3.31 and 0.3.30), every fit of both cases was
+#: bit-identical to the first.  So an entry names the BLAS too, as numpy's and
+#: SciPy's build configurations name it, and one library on it is enough.
+NONDETERMINISTIC = {("darwin", "x86_64", "accelerate")}
+
+
+def _blas() -> tuple[str, str]:
+    """The BLAS numpy and SciPy were built against, lower-cased, as each
+    one's ``show_config`` names it; ``"unknown"`` where it does not say."""
+    names = []
+    for lib in (np, scipy):
+        try:
+            cfg = lib.show_config(mode="dicts")
+            names.append(str(cfg["Build Dependencies"]["blas"]["name"]).lower())
+        except Exception:  # noqa: BLE001 - an older build config
+            names.append("unknown")
+    return names[0], names[1]
+
+
+def nondeterministic(system: str, machine: str, blas: tuple[str, ...]) -> bool:
+    """Whether the numpy path on ``system``/``machine`` under any of ``blas``
+    is one :data:`NONDETERMINISTIC` names."""
+    return any((system, machine, b) in NONDETERMINISTIC for b in blas)
+
+
+BLAS = _blas()
+ON_NONDETERMINISTIC = nondeterministic(sys.platform, platform.machine(), BLAS)
 
 #: each kernel's bar against the numpy path, as tests/test_compiled_kernels.py
 #: asserts it (the module docstring names the test behind each): ``"bit"``, or
@@ -474,8 +509,9 @@ def agreement(case: str, wheel: dict) -> tuple[int, set[str], bool]:
               "their gap is reported, not gated.")
     elif twins == "unchecked":
         print("The numpy path against itself: bit-identical in this run, but "
-              "on this platform it does not reproduce itself between fits "
-              "(NONDETERMINISTIC), so the twins' gap is reported, not gated.")
+              "on this platform and BLAS it does not reproduce itself between "
+              "fits (NONDETERMINISTIC), so the twins' gap is reported, not "
+              "gated.")
     print()
     print("| kernel | calls | arms ran (calls) | bit-identical | max rel | "
           "max ulp | bar | past the bar |")
@@ -669,7 +705,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"# WP-1940 kernel agreement — {platform.platform()}, python "
           f"{platform.python_version()}, numpy {np.__version__}, rietx_kernels "
           f"{rietx_kernels.__version__} (interface {rietx_kernels.KERNEL_ABI}), "
-          f"rietx {rx.__version__}")
+          f"rietx {rx.__version__}, BLAS numpy {BLAS[0]} and SciPy {BLAS[1]}"
+          + (" (the twins' gap is reported, not gated: NONDETERMINISTIC)"
+             if ON_NONDETERMINISTIC else ""))
     past, called, drifted, unchecked = 0, set(), [], []
     for case in args.cases.split(","):
         if "1" not in skip:

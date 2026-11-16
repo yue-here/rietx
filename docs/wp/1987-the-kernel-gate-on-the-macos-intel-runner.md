@@ -87,12 +87,19 @@ kernel that is wrong. WP-1940 built the gate; its record is in its WP file (clos
       and does under OpenBLAS; Context § Measured 2026-11-16. Run on the fork from a
       probe-only branch, `wp1987-probe`, since a fork's dispatch needs the file on its
       default branch.)*
-- [ ] If the numpy path is not deterministic there, find the source (BLAS, threads), and
+- [x] If the numpy path is not deterministic there, find the source (BLAS, threads), and
       either pin it for the gate's fits (`threadpoolctl`, an environment variable in the
       job) or make the gate's self-check take enough repeats to see the noise.
-- [ ] If the numpy path is deterministic and the twins still drift, treat it as a kernel
-      defect on x86_64 macOS and bisect the kernels the trigger fit calls.
-- [ ] Skill: none, the gate is CI-only.
+      *(2026-11-16: the source is Accelerate, and one Accelerate thread does not pin it,
+      so neither listed fix applies. `kernels.yml` swaps numpy and SciPy on that runner
+      for the same versions built on OpenBLAS, asserting the swap took, and
+      `NONDETERMINISTIC` names the BLAS beside the platform, so the gate holds the
+      twins there again and still reports them on an Accelerate install.)*
+- [x] If the numpy path is deterministic and the twins still drift, treat it as a kernel
+      defect on x86_64 macOS and bisect the kernels the trigger fit calls. *(2026-11-16:
+      not reached. The numpy path is not deterministic under Accelerate; whether the twins
+      hold under OpenBLAS is what the restored gate now measures.)*
+- [x] Skill: none, the gate is CI-only.
 
 ## Acceptance
 
