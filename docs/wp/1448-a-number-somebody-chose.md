@@ -243,7 +243,7 @@ that PR merges is in #1629. The WP is otherwise complete.
 *Generality.* No judge dispatched: the branch does not touch `_audit.py`, and
 adds no heuristic, only comments on existing values and a test.
 
-*Measured* (pearl, `~/venvs/rietx-py312`, Linux x86-64, [dev]-equivalent,
+*Measured* (a Linux x86-64 workstation, Python 3.12 venv, [dev]-equivalent,
 co-tenant beside one other job): canary `pc1448c` 102 passed in 25 s on 4
 pinned cores; fast suite `pc1448f` 14 866 passed, 280 skipped, 32 xfailed in 522 s (8 pinned cores, 746 % CPU, peak 6.2 GB) on `9c06c4414`, the tree before this entry. Local (darwin arm64, worktree
 `.venv` [dev]): the acceptance files `test_docs_consistency`, `test_skill`,
