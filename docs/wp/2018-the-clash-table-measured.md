@@ -150,6 +150,73 @@ Chosen from `tests/data/README.md` and the acceptance suites; no fit was run. He
 | C36 | #740's pattern (`tests/test_lebail_cycles.py`) and `tests/test_lebail_background_hump.py` | A partition against an unfitted background, with and without `auto_background(seed=True)` |
 | C37 | `11BM_Kapton.xy` with `BackgroundFixedPlusChebyshev` and a free scale | The measured curve and the Chebyshev rows describing it are both present |
 
+### Measured (2026-11-16, task 3)
+
+Scripts and their raw output are in `docs/wp/2018-measure/` (one JSON line per arm; PNGs to
+`tests/output/wp2018/`). The package under test is `origin/main` at bc77a934e, unchanged on
+this branch. An arm switches one action off by patching the function that takes it, or by
+`phase_support_sigma = None` where the package offers that switch; each script's docstring
+names its arms. "esd" is the arm-with-the-action's own esd of that parameter. The verdict
+column is left to the maintainer: the rows say what moved and by how much, and § Questions
+for the maintainer asks what the table should call it.
+
+**C1, `profile_fraction` against the support hold and collapse** (`fraction_profile.py`; macOS
+arm64, `[dev]`). The two-basin trace fit (Rwp 0.06887, W(CaF₂) = 0.93(33) %), then the shipped
+12-point FWHM grid on `phases.1.lor_strain`, each refit warm from the last, in two arms: the
+probe as shipped (`phase_support_sigma` 3) and the same refits with it `None`.
+
+| FWHM (°) | 0-1.50 (8 points) | 3.47 | 7.99 | 18.4, 42.5 |
+|---|---|---|---|---|
+| shipped: what the refit did | nothing held; at 0.28-1.50 the cell is held at stage start and released at the answer | cell held (collapse at stage start) | cell held | nothing held |
+| W shipped − W no_support | 0 (to 1e-10) | −0.013 pp (5.692 % vs 5.705 %) | −0.003 pp | 0 |
+| Δχ² shipped − no_support | 0 | +0.062 | +0.001 | 0 |
+| CaF₂ scale, shipped − no_support | 0 | +0.007 esd | −0.004 esd | 0 |
+| admissible (cut 5.19) | first four yes | no (Δχ² 14.1) | no (15.6) | 18.4 no, 42.5 yes |
+
+The probe's own answer is identical in both arms: range 0.930-77.07 %, excess 117.77, the same
+admissible flags, `QPA_FRACTION_RANGE` alone. The hold acts on two points of twelve and both
+lie in the barrier, outside the cut by 9-10 in Δχ² either way. WP-1320's account (the width held
+at 4× and 8× the fitted scale and χ² ran away, `fraction_profile.py:14-23`) is not reproduced
+under the WP-1523 test: χ² at the held points is 0.06 and 0.001 above the free refit. The
+module docstring still states the old measurement as current.
+
+**C3, the support window, the support hold or collapse, and the cell reset**
+(`absent_phase.py`; macOS arm64, `[dev]`). `tests/test_absent_phase.py`'s fixture (LaB₆, plus a
+LaB₆ copy at a = 5.2 Å and scale 1e-9 that is not in the pattern), `mccusker_default`, eight arms:
+
+| Arm | absent a (Å) | absent scale | Rwp | what acted, by stage | codes naming phase 1 |
+|---|---|---|---|---|---|
+| default | 5.2, held | 0 (at its floor), esd 5.8e-9 | 0.041557 | hold from `cell` to `closing` | `PHASE_UNCONSTRAINED` (0.0σ), `FLOOR_HIT` (ρ +0.0088) |
+| no_reset | identical to default, every digit | | | | |
+| no_hold | identical to default to 1e-14 relative | | | the collapse at the answer takes the cell in every stage instead | same |
+| window_only (no hold, no collapse) | 5.0243(21) | 1.51(67)e-8 | 0.041525 | nothing | `PHASE_UNCONSTRAINED` (2.62σ) |
+| no_support (`phase_support_sigma=None`) | identical to window_only, every digit | | | | same |
+| neither (no_support, no reset) | identical to window_only, every digit | | | | same |
+| escape_no_hold (positive arm) | 5.2, held | 0 | 0.041557 | the `cell` solve is made to answer 1.3 × a: reset and collapse both reach the path; the collapse records it, `cell_reset` stays empty | `CELL_RUNAWAY` (1.56 Å), `PHASE_UNCONSTRAINED`, `FLOOR_HIT` |
+| escape_no_support (positive arm) | 5.0243(21) | 1.51(67)e-8 | 0.041525 | the reset puts a back at 5.2 and holds it for the `cell` stage; later stages refit it to the free answer (to 2e-10 Å) | `CELL_RUNAWAY`, `PHASE_UNCONSTRAINED` (2.62σ) |
+
+On this fixture the three actions never meet. The default cell window changed no digit (the
+free answer, 5.024 Å, is inside it, and window_only equals neither exactly). The reset fires only
+when an escape is injected (it does not walk since WP-1938, as `test_cell_runaway_safety.py`
+says). The hold and the collapse are interchangeable: either one alone gives the default answer.
+The two answers the caller can get differ in the absent phase alone. Held: a = 5.2 with no esd and
+the scale on its floor. Free: a phase at 2.62σ with a cell at 5.0243(21) Å, which is noise fitted
+by a phase that is not there. The visible phase moves 7e-9 Å in a (0.002 esd) and 0.004 esd in
+scale between the two. When the reset and the collapse reach one path, the records stay disjoint
+as refine.py:5391-5394 says, but `CELL_RUNAWAY` still fires beside `PHASE_UNCONSTRAINED` on the
+same path. The second C3 dataset, the CuCr₂O₄ ramp, has no fit harness in the tree
+(`tests/data/README.md` § WP-2003 series family B: "Nothing in the tree fits these files yet"),
+and was not run.
+
+**C10, the phase hold leaves the scale free, against `FLOOR_HIT`** (same fixture and arms).
+Under the default plan both codes fire on the absent phase in the same fit, with no forced
+value: the scale ends exactly on 0 by itself, `FLOOR_HIT` names `phases.1.scale` (ρ +0.0088,
+`at_bound` True, esd 5.8e-9), and `PHASE_UNCONSTRAINED` names `phases.1.cell.a` at 0.0σ. Without
+the hold (window_only, no_support) the scale leaves its floor (1.51(67)e-8), `FLOOR_HIT` does
+not fire and `PHASE_UNCONSTRAINED` reads 2.62σ. So the pair is ordered rather than conflicting:
+the hold (or, without it, the collapse) is what puts the scale on its floor here, and each code names a different path. Whether
+the caller should see one finding or two is § Questions for the maintainer, (3).
+
 ## Acceptance
 
 ```sh
