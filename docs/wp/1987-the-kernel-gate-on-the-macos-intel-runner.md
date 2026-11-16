@@ -124,7 +124,7 @@ runs in a row, or fails with a message that names the platform's non-determinism
   - *Measured*: Context § Measured 2026-11-16 (fork run 43874967910, eight jobs). The
     positive arm held: Accelerate as installed gave 3 and 4 distinct results in 5 fits.
     Acceptance check on the fork (run 43881637331, `wp1987-gate`, this branch's
-    `kernels.yml` test job on `macos-15-intel`): PENDING (four jobs still running at the pause, 2026-11-16T14:13Z: three with the swap, one Accelerate control). That run installed the
+    `kernels.yml` test job on `macos-15-intel`): three runs with the swap, each reporting `scipy-openblas` for both libraries, each with the twins bit-identical to the numpy path on cpd-1a and on trigger, gated, the job green (`tests/test_compiled_kernels.py` 29 passed in each). The control without the swap (Accelerate) printed NONDETERMINISTIC, measured the numpy path against itself at 3.4e-07 esd (cpd-1a) and 3.0e-06 (trigger), and reported rather than gated, green. That run installed the
     published rietx-kernels 1.5.0 wheel, not one built in the run, because GitHub's macOS
     arm64 runners refused the cross-build for capacity (run 43879055791, "not acquired by
     Runner of type hosted"). `kernels/` is unchanged since the `kernels-v1.5.0` tag. Local,
