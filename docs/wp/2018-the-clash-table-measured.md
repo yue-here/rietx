@@ -670,6 +670,34 @@ are NaN. At 1e-5 all eleven are finite, but five still read 7.4e14-1.46e15 again
 1e15. The floor's docstring (structure.py:51) says every factor is finite in fp64 at every
 angle on the bound itself. Question (18).
 
+**C33, positions that move inside a stage whose list and windows are frozen**
+(`frozen_positions.py`; macOS arm64, `[dev]`, about 1 s a fit). 11-BM NAC (`build_nac_inputs`)
+cold-fitted from a cell 0.1 % short, Rietveld under `mccusker_default` and Pawley under
+`pawley_default`, with the zero started at 0 (shipped), +0.1° and +0.6° (the positive arm,
+past the 0.5° reflection margin). Every solve logs the zero at its start and its answer (no
+geometric shift is free in either plan). The arm with less of the freeze runs each declared
+stage three times in a row (16 solves against 6), so the list and the windows are recompiled
+at two more points along every stage's path; it is run from 0 and from +0.1°.
+
+| Arm | Rietveld: a (Å), zero (°), Rwp | largest in-stage zero move | Pawley: a, zero, Rwp | largest in-stage zero move |
+|---|---|---|---|---|
+| 0 | 10.251212(56), −0.00024(7), 0.1401 | 0.0056° (`zero`) | 10.251213(54), −0.00025(7), 0.1345 | 0.0052° |
+| 0, repeated | the same to 8e-12 Å and 1e-11° | 0.0056° | the same to 2e-11 Å and 4e-11° | 0.0052° |
+| +0.1 | scale on its floor, cell held from `cell` on; zero 0.1, no esd; Rwp 0.838, `MODEL_FAR_FROM_DATA` | 0 | 10.2653(78), 0.153(12), Rwp 0.836, `MODEL_FAR_FROM_DATA` | 0.040° (`cell`) |
+| +0.1, repeated | identical | 0 | the same to 2.3e-7 Å | 0.039° |
+| +0.6 | as +0.1 | 0 | 10.2450(65), 0.594(11), Rwp 0.831 | 0.0033° |
+
+Recompiling three times as often changes no answer: from 0 the repeated arms agree to 1e-11,
+and from +0.1° the Pawley fit lands in the same wrong basin to 2.3e-7 Å. In the converged fits
+no stage moves the zero more than 0.0056°, under 2 % of the 0.3° of movement headroom every
+window carries (`WINDOW_MIN_DEG`), and the Pawley off-data ridge marks the same eight reflections either
+way. A 0.1° start error fails for reasons that are not the freeze: in Rietveld the scale falls to its floor in the first stage (`FLOOR_HIT`), after which
+nothing of the phase moves the pattern, so the zero's column is flat: it never moves and ends
+with no esd, and the support hold takes the cell from `cell` on; in Pawley the fit reaches the zero-cell
+correlation's other basin (ρ = 0.985). So on NAC the pair does not change an answer, and the
+positive arm cannot make it act, because the scale's floor or the basin decides first. Question
+(19).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -791,6 +819,13 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     to where the rounding no longer sets the factor (2.2e-16/r equals r² at r = 6e-6, and
     at 1e-5 five of eleven factors are still off), or both, and does the
     floor's docstring need correcting either way?
+19. **C33.** On NAC cold-fitted from a cell 0.1 % short, recompiling the list and the windows
+    three times as often changes no answer (1e-11 from a zero of 0; the same wrong basin from
+    +0.1°), and no converged stage moves the zero more than 0.0056°. Is C33 recorded
+    *independent* on this evidence? A larger start error fails before the freeze can act (the
+    Rietveld scale floors in the first stage; Pawley lands in the zero-cell basin at ρ 0.985),
+    so is a dataset that moves a position by more than the 0.3° headroom inside one stage and
+    still converges owed, or is the row closed?
 
 ## Acceptance
 
