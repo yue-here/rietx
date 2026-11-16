@@ -12,6 +12,18 @@ with two real steps reports both.
 
 ## Context
 
+> **Superseded in part, 2026-11-16** (checked against `bc77a934e`). WP-2003
+> removed `SEQUENTIAL_DISCONTINUITY` and its three thresholds (released in
+> 1.11.0). Its successor, `SeriesResult.steps` (`sequential._series_steps`),
+> lists every refined path's step between consecutive patterns, with no
+> threshold and no flag. Shape 1's rule landed there in c9c59b3fc (WP-2003's
+> review fixes): a step is a row only between entries whose **series index**
+> differs by 1, so a run of `SeriesFailure`s is a gap. That commit carried no
+> test. Shape 2 is moot: no argmax is left, so a path with two steps has two
+> rows. Since no threshold acts, task 2's measurement would count against
+> legs that no longer exist, and it informs no code. The text below is the
+> WP as filed. The tasks record what was done instead.
+
 `sequential._discontinuity_steps` flags a step that is over
 `DISCONTINUITY_FACTOR` (5) × the path's median step **and** over
 `DISCONTINUITY_SIGMA` (3) × the two points' combined esd, one flag per path.
@@ -66,8 +78,14 @@ pair once. `plot_trajectory` shades each recorded pair.
 
 ## Tasks
 
-- [ ] Shape 1: drop the steps that span a missing index, as 1469 did for
+- [x] Shape 1: drop the steps that span a missing index, as 1469 did for
       rejected patterns, with a test built from `SeriesFailure`s on a ramp.
+      *2026-11-16:* the rule was already on `main` (c9c59b3fc, WP-2003), so
+      this item is the test only:
+      `tests/test_series_error_policy.py::test_a_run_of_failed_patterns_is_never_bridged_by_a_step`,
+      with three consecutive patterns raising on every rung under `skip`
+      and under `carry`. Its positive arm: with `adjacent` widened to
+      `>= 1`, both cases fail on an extra `(2, 6)` row.
 - [ ] Shape 2: measure how many paths on the suite's real series (round
       robin, the thermal and held-phase ramps) have a second step passing
       both legs; decide, and record here, whether to flag every such step.
