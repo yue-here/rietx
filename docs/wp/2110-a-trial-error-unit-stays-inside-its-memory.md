@@ -122,7 +122,7 @@ on …"), and returns every candidate it had already built.
 
 ## Tasks
 
-- [ ] A repro for the case, on `tests/repro_780.py`'s pattern (a
+- [x] A repro for the case, on `tests/repro_780.py`'s pattern (a
   `--case`/`--engines trial_error` arm there, or `tests/repro_1376.py`
   importing its `memory_bytes` and `cpu_clock`). It builds the list from
   `cod_1567181.cif`'s cell at Cu Kα1 over 5–34° 2θ, searches monoclinic only,
