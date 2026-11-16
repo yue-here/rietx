@@ -855,3 +855,30 @@ def test_the_excess_reads_the_density_against_the_cleanest_candidate():
     alone = screened("cubic", "I", a_i, 2, 20)
     absence_excess([alone])
     assert alone.lebail.predicted_but_absent_excess_in_window == 0.0
+
+
+def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
+    """#1468 item 1: ``fwhm_at`` interpolated over an empty ``obs_tt`` and numpy
+    raised; it answers zeros as ``half_width_at`` beside it does.  The list is
+    the issue's own: ``pick_peaks`` on a pattern divided by its maximum, with
+    no σ column, so the Poisson fallback puts every point under the noise.  A
+    direct ``validate_by_lebail`` reached the screen with it and raised."""
+    from rietx.indexing.screen import PatternScreen, screen_candidate
+    from rietx.indexing.workflow import validate_by_lebail
+
+    data, ins, _peaks = si
+    y = np.asarray(data.y(), dtype=np.float64)
+    norm = rx.PatternData(two_theta=list(data.tt()), intensity=list(y / y.max()))
+    peaks = pick_peaks(norm, ins, two_theta_range=LIM)
+    assert not peaks.usable()
+    pattern = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks),
+                                       data=norm, instrument=ins)
+    tt = np.array([20.0, 30.0, 40.0])
+    assert np.array_equal(pattern.fwhm_at(tt), np.zeros(3))
+    assert np.array_equal(pattern.half_width_at(tt), np.zeros(3))
+    assert pattern.fwhm_at(np.zeros(0)).shape == (0,)
+    system, centring, cell = SI_CELLS["truth cF"]
+    screen = screen_candidate(pattern, cell, system, centring)
+    assert len(screen.two_theta) and not screen.seen.any()
+    v = validate_by_lebail(_candidate(system, centring, cell), norm, ins, peaks=peaks)
+    assert v.absent_source == "line_screen"
