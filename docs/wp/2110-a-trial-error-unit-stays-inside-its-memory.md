@@ -1,6 +1,6 @@
 # WP-2110 — A trial_error unit stays inside its memory under a raised budget
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: A long run is not one fit
 Depends on: —
 Priority: P2 2026-11-05 — a run killed for memory returns nothing, and the skill's own advice for a unit cut by time (raise `budget_seconds`) is the route to it; the default 30 s slice cuts it short since #1244, which is why it is not P1
