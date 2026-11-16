@@ -451,7 +451,7 @@ On 11-BM NAC over 2-24° 2θ with the zero shift and both capillary offsets free
 The unbounded fit lets the offsets slide to +4.86 and +2.12 mm, puts the cell 5111 ppm away, and reports an esd of 2544 ppm.
 Both fits reported the same two `FLAT_DIRECTION` findings.
 The bound acted as a prior that the mount is aligned, which held on 11-BM, and it left the esd as wide as before.
-On three laboratory flat plates (FAP, SRM 660c and SRM 1976a) with the zero shift freed beside the displacement, the old bounds never bound, and each fit agreed with or without them to 5e-6 of an esd.
+On three laboratory flat plates (FAP, SRM 660c and SRM 1976a) with the zero shift freed beside the displacement, the old bounds never bound, and each fit agreed with or without them to 5e-6 of a plain esd.
 There the cell moved 48-1000 ppm from the fit that held the zero: within three of its esds on SRM 1976a and on FAP over 15-71° 2θ, and past that on FAP's full range (4.5 esds) and on SRM 660c (3.6 esds, and 6.6 esds or 1000 ppm over 20-85° 2θ).
 That prior is a fact about your instrument, so state a bound yourself where you know the mount.
 
