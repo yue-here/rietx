@@ -1,6 +1,6 @@
 # WP-2072 — The Le Bail and Pawley cell, validated against the SRM 660c certificate
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The fit has no reference
 Depends on: 2010 (the feature registry and the `reference_kind` join, PR #1266); 2015 soft (the shipped presets pass the bar only once the declared geometry picks the offset)
 Priority: P3 2026-10-31 — a validation row over a measurement already made; changes no number a user gets, but lifts one feature to "validated on development data"
