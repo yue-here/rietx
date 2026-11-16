@@ -361,7 +361,7 @@ out, TRF 18.04 % with 19 of 43). A caller's block that starts outside the cone t
 fit into an unconstrained one for the whole plan: the seed leaves it (it is not all zero), the
 rows are dropped at each stage's start because the start violates them, and since the solve
 then never returns inside, every later stage drops them too. The answer is TRF's (out against
-out_trf: 19 of 43 out both, Rwp to 1.4e-5, the four DOFs within 0.13 of TRF's esds), and the
+out_trf: 19 of 43 out both, Rwp to 1.4e-5, the four DOFs within 0.14 of TRF's esds), and the
 record looks like TRF's: the guard fires, `CONSTRAINT_ACTIVE` does not, and no field or code
 says the driver held nothing. The realistic route there is the guard's own advice: refitting
 the TRF answer under LM (`trf_then_lm`) carries the out-of-cone block in, and the LM fit ends
@@ -371,7 +371,7 @@ block is inside: the rows hold; it lands in another of brucite's minima (dof 3 a
 against 7840(4819)), because a nonzero block broadens the peaks from the first stage (stage-1
 Rwp 0.770 against 0.802), the multi-start spread the test module documents. Also seen, not
 pursued: both `trf_then_lm` arms fire `RESOLUTION_NOT_POSITIVE`, which zero_trf does not, and
-`trf_then_lm`'s dof 0 reads −9050(110) against zero_trf's −8623(165887). Question (7).
+`trf_then_lm`'s dof 0 reads −9050(110) against zero_trf's −8623(165886). Question (7).
 
 **C2, the profile interval's refits against the support hold** (`scale_interval.py`). Two
 datasets, each with the interval as shipped and with the hold and the collapse at the answer
@@ -389,15 +389,17 @@ CaF₂'s scale 2.688e-6, esd 9.61e-7, the fit holding nothing. The cut is Δχ²
 On the lower side the hold changes nothing: a held refit's χ² equals the free one's to 2e-5,
 and the ends agree to 3e-7 relative. On the upper side it moves the answer. Held, the refit at
 5.144e-6 reads Δχ² 10.67, free 5.19, so the hold alone puts that value outside the cut. Every
-Brent probe between 4.6094e-6 and 5.144e-6 was held and read Δχ² ≈ 11.2, so the end Brent
+Brent probe between 4.6094e-6 and 5.144e-6 was held and read Δχ² 11.05-11.20, so the end Brent
 returned is the bracket's inner point, the unheld probe at exactly +2 esd (Δχ² 3.33): the
 shipped interval is 14 % narrower (3.22e-6 against 3.75e-6) and its upper end is a step in the
 profile the hold made (Δχ² 3.33 to 11.20 across 4.8e-10 in the scale), not a crossing of the
 cut. Which probe is held is not monotone in the pinned value (6.531e-6 free, 5.144e-6 held, in
-one walk): the stage-start hold reads the screen at the pinned scale beside the previous refit's
-answer reading (`_hold_unsupported_phases`' `prior`), and with the scale pinned, the answer
-reading is the screen alone (`_answer_significance`). The mechanism of each switch was not
-traced further. Every held refit fires `PHASE_UNCONSTRAINED` inside the walk; the interval's
+one walk), but it is monotone in walk order: on each side, once a probe was held every later
+probe was (lower side: 1.727e-6 free, then 7.66e-7 and all after it held; upper side: 3.649e-6,
+4.609e-6 and 6.531e-6 free, then 5.144e-6 and all after it held). A refit through `run_stage`
+passes no prior significance, so its stage-start hold reads the screen at the state the probe
+starts from, which is the previous probe's answer; why each side switched where it did was not
+traced. Every held refit fires `PHASE_UNCONSTRAINED` inside the walk; the interval's
 own record (`ParameterInterval.points`) carries none of it. Question (8).
 
 *cpd-1a, the dataset chosen for the row* (`qpa_plan()`, three phases; Linux x86_64, py3.12, 43
@@ -414,7 +416,7 @@ lacks), `qpa_plan()`, LM, at 1e-6 and None, with and without the closing stage:
 | Arm | zircon held before the last stage | the last stage | zircon W (wt %) | largest move between tolerances | iterations, 1e-6 / None |
 |---|---|---|---|---|---|
 | close (shipped) | never, either tolerance | `closing`: 9 structural paths collapsed and held, either tolerance; `PHASE_UNCONSTRAINED` | 0.03(7) | 0.0053 plain esd (fluorite `lor_strain`) | 380 / 677 |
-| open (B7's arms, no closing stage) | never, either tolerance | `biso`: nothing held; zircon free, a = 6.6145(78) Å, scale 6.5(3.5)e-7 (plain esd); no `PHASE_UNCONSTRAINED` | 0.08(16) | 0.065 plain esd (fluorite `a`, then zero and displacement) | 266 / 561 |
+| open (B7's arms, no closing stage) | never, either tolerance | `biso`: nothing of zircon held; zircon free, a = 6.6145(78) Å, scale 6.5(3.5)e-7 (plain esd); no `PHASE_UNCONSTRAINED` | 0.08(16) | 0.065 plain esd (fluorite `a`, then zero and displacement) | 266 / 561 |
 
 B7's flip (2026-10-21: at 1e-6 the last stage held nine zircon paths, at 1e-9 nothing) does not
 reproduce on this tree: in no stage of any arm does the tolerance change what is held. Every
@@ -442,13 +444,13 @@ block and the shipped roughness stage appended last (no closing stage, as that t
 seeded to 0.3 against c started on its floor of 0. "Plain esd" is `stderr_uncorrected`, and
 the worst move is over every Biso, scale, c and τ, in the smaller of the two arms' plain esds.
 
-| Family | c, τ from the seed | c, τ from 0 | worst move (plain esd) | χ², relative |
+| Family | c, τ from the seed | c, τ from 0 | worst move (plain esd) | χ², zero − seeded, relative |
 |---|---|---|---|---|
-| FAP (GSAS protocol) | 1.1325(786), 0.1113 | the same | 6e-6 | 9e-13 |
-| SRM 660c LaB₆ (NIST protocol) | 4e-16, τ 0: off | 0 on its floor, τ 0.05: off | 0.013 (La Biso) | 1.4e-6 |
+| FAP (GSAS protocol) | 1.1325(786), 0.1113, `ROUGHNESS_OUTSIDE_REGIME` | the same | 6e-6 | −9e-13 |
+| SRM 660c LaB₆ (NIST protocol) | 4e-16, τ 0: off | 0 on its floor, τ 0.05: off | 0.013 (La Biso) | −1.4e-6 |
 | CPD corundum | 0, τ 0: off | **0.022(145), τ 0.3 on its ceiling** (`BOUND_HIT`, `ROUGHNESS_OUTSIDE_REGIME`) | **0.83 (Al Biso)** | −4.3e-4 |
-| CPD fluorite | 1.08 ± 55.9, 0.0116 | 0.89 ± 34.7, 0.0143 | 0.0055 (c) | 1.9e-6 |
-| CPD zincite | 0, τ 0: off | 0, τ 0.05: off | 6e-6 | 4e-12 |
+| CPD fluorite | 1.08 ± 55.9, 0.0116 | 0.89 ± 34.7, 0.0143 | 0.0055 (c) | +1.9e-6 |
+| CPD zincite | 0, τ 0: off | 0, τ 0.05: off | 6e-6 | +4e-12 |
 
 Four families are start-invariant at WP-2002's bar; corundum is not. From 0 its fit walks τ to
 the 0.3 ceiling, past sinθ at the lowest angle (0.221 at 25.5°), with c small but free, and the
@@ -456,8 +458,8 @@ Biso and scale esds grow 2.2-3.3× and 11× (the off state from the seed has no 
 neighbours' esds there are conditional, as WP-2002 found for Suortti). Al Biso moves 0.83 plain
 esd (0.2273(117) to 0.2177(384) Å²), larger than the 0.26 WP-2002 recorded on corundum, and
 zincite's turned-over landing that WP-2002 recorded from c = 0 does not reproduce (both starts
-off). The seed is the one that keeps corundum out of the outside-the-regime answer; both
-answers converge. Question (11).
+off). The seed is the one that keeps corundum out of the outside-the-regime answer (FAP's τ is
+outside the regime from both starts, and both agree); both corundum answers converge. Question (11).
 
 **C21, extinction and roughness free together** (`extinction_roughness.py`; macOS arm64,
 `[dev]`). The same five protocols (no closing stage) with neither correction, primary
@@ -470,12 +472,13 @@ every Biso, scale and extinction coefficient, in the smaller plain esd:
 | FAP | roughness (b 0.81, a 0.54; scale 123 esd from neither); extinction stays on its floor | 0.0001 | 0.0008 | ×1.00 |
 | SRM 660c LaB₆ | neither (extinction on its floor, roughness off) | 0.0082 (against extinction alone) | 0.0003 | ×1.06-1.16 |
 | CPD corundum | extinction (2.87(62) µm²; scale 4.8 esd from neither); roughness off | 0.0066 | 0.0072 | ×1.16-2.22 |
-| CPD fluorite | roughness (b 0.028, a 0.54 ± 38.7: a hinge); extinction on its floor | < 1e-4 | 0.0011 | ×1.33-1.39 |
+| CPD fluorite | roughness (b 0.028 ± 1.50, a 0.54 ± 22.7: a hinge); extinction on its floor | < 1e-4 | 0.0011 | ×1.33-1.39 |
 | CPD zincite | extinction (0.54(10) µm²; scale 8.7 esd from neither); roughness off (a on 1) | < 1e-4 | < 1e-4 | ×1.01-2.29 |
 
 On every pattern at most one of the two leaves its identity, and which one is the pattern's,
 not the plan's: declaring both, in either order, gives the answer of the one the data used to
-0.0082 plain esd, and χ² to 2.8e-4 relative (each idle correction adds its own term to N − P).
+0.0082 plain esd, and reduced χ² to 3.8e-4 relative (each idle correction is one more free
+parameter in N − P).
 Each correction alone moves the scale by 4.8-123 esd, so a shared trade would show at this size;
 none appears. What the idle partner does change is the esds: a declared but idle correction
 keeps its floored row in the covariance (WP-1929's marginal reading), so its neighbours' esds
@@ -554,7 +557,7 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
 11. **C20.** Pitschke's c is start-invariant on four of the five lab patterns; on CPD corundum
     the start at 0 reaches τ's ceiling outside the model's regime and moves Al Biso 0.83 plain
     esd, while the shipped seed stays off. Is C20 recorded *ordered* (the seed is load-bearing
-    for Pitschke on corundum, and right), and is a Pitschke row owed in
+    for Pitschke on corundum), and is a Pitschke row owed in
     `tests/test_seed_invariance.py`, which today asserts Suortti only?
 12. **C21.** On five lab patterns from three laboratories at most one of extinction and
     roughness turns on, and the order changes no value (≤ 0.0072 plain esd). Is C21 recorded
