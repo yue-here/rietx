@@ -18,7 +18,8 @@ for **every member** of each reflection's Laue orbit, Friedel mates included
 derived from the representative's phase through the operations' translations.
 The maps are the syntheses ρ(r) = (1/V) Σ_h F(h) exp(−2πi h·r) (Coppens, Su &
 Becker 2006, *International Tables for Crystallography* Vol. C, ch. 8.7,
-eq. 8.7.3.1; the difference map is their Table 8.7.3.1's residual map)
+eq. 8.7.3.1 in its lattice-sum form; the difference map is their
+Table 8.7.3.1's residual map)
 
     ρ_obs(x) = (1/V) Σ_h |F_obs(h)| e^{iφ(h)} e^{−2πi h·x},
     Δρ(x)    = (1/V) Σ_h (|F_obs(h)| − |F_calc(h)|) e^{iφ(h)} e^{−2πi h·x},
