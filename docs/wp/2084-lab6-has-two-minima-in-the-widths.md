@@ -62,8 +62,8 @@ and its Kα2 image at 149.71°. The shipped answer has Γ_G² on its face at the
 (148.6797°), with Γ_G² clamped at ε past it.
 
 **Why a start reaches one or the other.** `gaussian_width_inequalities` drops a row the
-stage's start violates by more than `lm._ON_FACE` (1e-9 of max(|slack|, 1)). The closing
-stage starts with the Kα2 row's Γ_G² at 2.59e-8 under the shipped floor, so the row is kept
+stage's start violates by more than `lm._ON_FACE` (1e-9 of the block's largest |slack| or
+1). The closing stage starts with the Kα2 row's Γ_G² at 2.59e-8 under the shipped floor, so the row is kept
 (slack +1.6e-8, 48 rows) and the stage stops on it. Under the 0.05 floor it starts at
 4.35e-9 (slack −5.7e-9), so the row is dropped (47 rows) and the stage walks on to the
 Kα1 row. Floors 0.02, 0.025 and 0.03 land on the Kα2 face; 0.04 and 0.05 on the Kα1 face.
@@ -211,9 +211,12 @@ against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads
      buys 0.24 % χ² by putting Γ_G² under zero at 140 points instead of 75, with the
      displacement 0.22 esd further from NIST's; the evidence here does not favour it.
      (b) Keep a cone row the stage's start violates by a small margin (measured with
-     `lm._ON_FACE` at 1e-7): every floor then lands on the Kα2 face, 0.004 esd apart, so
-     the floor row would pass, but the start rows would not, because along that face the
-     answer still moves 0.44-0.58 esd on w with the path. It changes a tier-1 constant
+     `lm._ON_FACE` at 1e-7): floors 0.02, 0.04 and 0.05 then land on the Kα2 face, 0.004
+     esd apart, so the floor row's 0.02/0.05 pair would pass. Not every floor: floor 0.03
+     keeps the Kα2 row yet lands 0.442 esd on w from the shipped answer with a higher χ²,
+     so the floor moves the answer past the 0.1 bar without dropping a row, under (b) as
+     under (c). The start rows would not pass either, because along that face the answer
+     still moves 0.44-0.58 esd on w with the path. It changes a tier-1 constant
      the guards share. (c) A finding: the result says which reflection's Γ_G² row the
      answer stops on and that a stage dropped one, and the floor row stays a strict xfail.
      (d) The test's bar includes u, v and w, which every arm's `RESOLUTION_UNCONSTRAINED`
