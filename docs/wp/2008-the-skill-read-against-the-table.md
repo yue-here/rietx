@@ -213,3 +213,9 @@ star, puts it back, because the skill's role is now narrower than interpreting v
   that on the maintainer's statement of the skill's role (DESIGN.md § Rules, 3): the
   interpretation is the caller's, the skill carries vocabulary and sourced traps, and the
   total falls. The title changed from "read against the audit table" to match.
+- **2026-11-16** — Ruled by Yue 2026-11-16: withdraw the held-SNIP hump recipe now (option
+  (b) of the decisions walk); the Le Bail hump guidance falls back to a co-refined
+  background. Done on branch `wp2008-withdraw-held-snip`: `judging.md` § rules 4-5, SKILL.md
+  §2 item 5 and the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row now say to co-refine, with
+  #1569's measurement; `optimize.statistics.background_absorption`'s docstring says the
+  screen cannot see a held curve. This WP's tasks are otherwise unchanged.
