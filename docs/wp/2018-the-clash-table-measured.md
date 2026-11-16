@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-16 — 11 of 22 live pairs measured (C1, C2, C3, C4, C7, C10, C12, C14, C18, C19, C20); 11 questions for the maintainer
+Milestone: generality · Status: 🔄 2026-11-16 — 12 of 22 live pairs measured (C1, C2, C3, C4, C7, C10, C12, C14, C18, C19, C20, C21); 12 questions for the maintainer
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -459,6 +459,31 @@ zincite's turned-over landing that WP-2002 recorded from c = 0 does not reproduc
 off). The seed is the one that keeps corundum out of the outside-the-regime answer; both
 answers converge. Question (11).
 
+**C21, extinction and roughness free together** (`extinction_roughness.py`; macOS arm64,
+`[dev]`). The same five protocols (no closing stage) with neither correction, primary
+extinction alone (`Phase.extinction = 0.0`, the plan's `extinction` stage), Suortti roughness
+alone (the shipped roughness stage), both in the plan's order, and both swapped. Worst move over
+every Biso, scale and extinction coefficient, in the smaller plain esd:
+
+| Family | which turns on alone | both, against the one that turned on | both, against swapped | esds with both, against that one alone |
+|---|---|---|---|---|
+| FAP | roughness (b 0.81, a 0.54; scale 123 esd from neither); extinction stays on its floor | 0.0001 | 0.0008 | ×1.00 |
+| SRM 660c LaB₆ | neither (extinction on its floor, roughness off) | 0.0082 (against extinction alone) | 0.0003 | ×1.06-1.16 |
+| CPD corundum | extinction (2.87(62) µm²; scale 4.8 esd from neither); roughness off | 0.0066 | 0.0072 | ×1.16-2.22 |
+| CPD fluorite | roughness (b 0.028, a 0.54 ± 38.7: a hinge); extinction on its floor | < 1e-4 | 0.0011 | ×1.33-1.39 |
+| CPD zincite | extinction (0.54(10) µm²; scale 8.7 esd from neither); roughness off (a on 1) | < 1e-4 | < 1e-4 | ×1.01-2.29 |
+
+On every pattern at most one of the two leaves its identity, and which one is the pattern's,
+not the plan's: declaring both, in either order, gives the answer of the one the data used to
+0.0082 plain esd, and χ² to 2.8e-4 relative (each idle correction adds its own term to N − P).
+Each correction alone moves the scale by 4.8-123 esd, so a shared trade would show at this size;
+none appears. What the idle partner does change is the esds: a declared but idle correction
+keeps its floored row in the covariance (WP-1929's marginal reading), so its neighbours' esds
+grow, up to 2.29× on zincite (extinction on, roughness off) and 2.22× on corundum; between the
+two orders the corundum esds differ by the same factor because roughness lands in two different
+off states (a = 0.885, b = 0 in the plan's order; a = 1, b = 0 swapped, where b's column is
+identically zero and leaves the covariance). Question (12).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -531,6 +556,12 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     esd, while the shipped seed stays off. Is C20 recorded *ordered* (the seed is load-bearing
     for Pitschke on corundum, and right), and is a Pitschke row owed in
     `tests/test_seed_invariance.py`, which today asserts Suortti only?
+12. **C21.** On five lab patterns from three laboratories at most one of extinction and
+    roughness turns on, and the order changes no value (≤ 0.0072 plain esd). Is C21 recorded
+    *independent* on this evidence? The idle partner inflates the neighbours' esds up to 2.3×,
+    and on corundum the order picks which of two off states roughness reports, and so which
+    esds: is that WP-1929's designed marginal reading, or a report an idle correction owes
+    (for instance, that it ended at its identity)?
 
 ## Acceptance
 
