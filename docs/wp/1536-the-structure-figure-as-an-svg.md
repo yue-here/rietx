@@ -1,6 +1,6 @@
 # WP-1536 — the structure figure as an SVG
 
-Milestone: rietview · Status: ⬜
+Milestone: rietview · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Depends on: —
 Priority: P3 2026-10-02 — a workaround covers it: a 3000 px PNG, or a CIF exported to VESTA's own vector output
 
