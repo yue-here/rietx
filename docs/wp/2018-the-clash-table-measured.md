@@ -487,6 +487,37 @@ two orders the corundum esds differ by the same factor because roughness lands i
 off states (a = 0.885, b = 0 in the plan's order; a = 1, b = 0 swapped, where b's column is
 identically zero and leaves the covariance). Question (12).
 
+**C3a, the support window on an unseen phase's cell that drives a visible one**
+(`tied_window.py`; macOS arm64, `[dev]`, ≤ 1 s a fit). C3's fixture with the visible LaB₆'s
+a tied to the absent copy's (`ref.tie("phases.0.cell.a", "phases.1.cell.a", scale=4.1606/5.2)`),
+`mccusker_default`. The window keys on the free column's path (`_cell_parameter_name`,
+vector.py:600, applied in `bounds()` :4409), so it bounds the absent phase's a and through the
+tie the visible one; the support hold reads what the column moves (`column_reach`), so it
+never holds it.
+
+| Arm | visible a − truth (Å) | absent a (Å) | Rwp | held | codes naming phase 1 |
+|---|---|---|---|---|---|
+| notie (C3's default) | +1.64e-7 (esd 4.34e-6) | 5.2, held | 0.041557 | `phases.1.cell.a`, `cell` to `closing` | `PHASE_UNCONSTRAINED` (cell.a, 0σ), `FLOOR_HIT` (scale) |
+| tie | +1.64e-7 (esd 4.34e-6) | 5.195001(5) | 0.041557 | nothing | the same two |
+| tie_no_window, tie_no_support | identical to tie, every digit and iteration count | | | | |
+| tie_narrow (positive arm: window ±0.01 %, no pad) | **+2.34e-3** | 5.197920 | 0.3736 | nothing | the same two; no `BOUND_HIT` |
+| notie_narrow (control) | identical to notie, every digit | | | | |
+
+On the fixture the window does not bind: the source travels 0.005 Å against a ±0.31 Å
+window, and the visible cell lands where it lands untied (to 1e-14 Å, its esd to 2e-7
+relative). The hold correctly leaves the tied column free. Two things a caller is told are not
+what happened. First, `PHASE_UNCONSTRAINED` still names `phases.1.cell.a` and says "1 of its
+parameters was refined without signal", while that column is the visible cell's and carries
+its esd (5.42e-6 = 4.34e-6 / 0.8001). Second, the positive arm shows that when the window does
+bind, nothing reports it: the source ends where four stages in a row (`cell` to `closing`), each stopped on
+its lower edge, put it (5.2 × (1 − 1e-4)⁴ = 5.1979203, to every digit), the visible cell stops 2.34e-3 Å
+(about 540 of the tie arm's esds) short and Rwp is 9× the free fit's, yet `at_bound` reads False and
+no `BOUND_HIT` fires. Read, not traced: the stage commits the answer (refine.py:5273) before
+`check_guards` (:5594) calls `table.bounds()` again, and `cell_window` anchors on the entry's
+current value, so the guard sees a window centred on the answer rather than the one the solver
+stopped on. That reaches any binding support window, tied or not; this fixture is the only one
+here where one binds. Question (13).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -565,6 +596,15 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     and on corundum the order picks which of two off states roughness reports, and so which
     esds: is that WP-1929's designed marginal reading, or a report an idle correction owes
     (for instance, that it ended at its identity)?
+13. **C3a.** With a user tie from an unseen phase's cell to a visible one, the shipped window
+    does not bind on the fixture and the visible cell is the untied answer, so is C3a recorded
+    *independent* there? Two reports are owed a ruling. (a) `PHASE_UNCONSTRAINED` names the tied
+    source as "refined without signal" while it carries the visible cell's esd: should the
+    finding leave out a column whose reach includes a seen phase, as the hold already does?
+    (b) When a support window binds (the ±0.01 % positive arm), `at_bound` and `BOUND_HIT` stay
+    silent, because the guard recomputes the window around the committed answer: should
+    `check_guards` read the bounds the solver used (frozen with the window set), and is that
+    the owner's fix (WP-1110's window) or a new row?
 
 ## Acceptance
 
