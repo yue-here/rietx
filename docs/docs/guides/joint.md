@@ -46,7 +46,7 @@ The shared cell then carries the X-ray scale, and the neutron wavelength refines
 
 <!-- output of examples/guides/joint.py -->
 ```text
-info[WAVELENGTH_CALIBRATION]: Histogram 1 line 0: wavelength refined from the declared 2.078000 A to 2.078618 A, +297.3 ppm, 58.8× its own esd (1.05e-05 A). The shift is taken against the cell pinned by the histogram whose wavelength is held.
+info[WAVELENGTH_CALIBRATION]: Histogram 1 line 0: wavelength refined from the declared 2.078000 A to 2.078618 A, +297.3 ppm, 58.8× its own esd (1.05e-05 A). The shift is taken against the cell pinned by the histogram whose wavelength is held (histogram 0).
   at: hist.1.instrument.source.lines.0.wavelength
   help: Compare it with the instrument's own calibration history before you quote the cell.
 ```
