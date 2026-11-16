@@ -38,14 +38,70 @@ components sit within 0.25 FWHM of a window edge or outside it. All 120 are re-s
 `reseed_at` in `indexing/peakfit.py`. `axial_tail` is deliberately out of
 `PEAK_UNUSABLE_FLAGS` (WP-1043: 11 unverified usable components on six other lab patterns),
 so class 1 asks about the **conjunction** with `position_at_bound`, never about
-`axial_tail` alone. WP-2055's harness (direction test, lattice distances, window edges) is
-kept outside the tree at `~/.cache/ghostshift/rietx/wp-2055/`.
+`axial_tail` alone. WP-2055's harness (direction test, lattice distances, window edges) was
+kept outside the tree at `~/.cache/ghostshift/rietx/wp-2055/`. *Superseded in part
+2026-11-16:* that directory is gone, and task 1's findings below come from a new harness.
 
 **Tier.** Making a flag combination unusable is a new judgement. It is measured on one
 diffractometer only (the round robin), so the first task is a second family: the other
 real lab patterns in `tests/data/` (SRM 660c, the FAP pattern, the certified corundum).
 A change to `usable()` moves what every engine is driven by, so it runs
 `tests/test_acceptance_indexing.py` and goes to the maintainer as a reader-output change.
+
+### Findings, task 1 (2026-11-16, `bc77a934e`, `[dev]`, macOS arm64)
+
+WP-2055's harness was no longer on disk, so a new one measured both classes. It runs
+`pick_peaks` on each pattern with its acceptance suite's own instrument. The lattice is the
+Kα1 lines of the pattern's phases (the round-robin start cells, the SRM 660c and SRM 1976a
+certified cells, the GSAS fluorapatite cell). Each pattern's offset
+z + s·cosθ + t·tanθ is fitted on its strong, unflagged, matched lines (I/σ_I ≥ 20). The
+residual rms of those lines is 0.002–0.022° on the round robin, 0.0012° on SRM 660c, 0.006°
+on fluorapatite and 0.0022° on SRM 1976a. Distances below are after that offset. The second
+family is three unrelated lab instruments: SRM 660c (NIST, graphite monochromator,
+R = 217.5 mm), the GSAS-II fluorapatite tutorial pattern, and SRM 1976a on an X'Pert with an
+X'Celerator (R = 240 mm). The "certified corundum" this WP named is read as SRM 1976a. SRM
+676a is `qarr/corundum.prn`, which is the round robin itself.
+
+**The census has moved since WP-2055.** The round robin now has 31 usable components on their
+position bound, where WP-2055 counted 24. Class 1 is still eight components, but brucite 71.800°
+now carries `axial_tail` in place of cpd-1f 68.763°. Class 2's counts are unchanged:
+120 of 1056 components, 56 of them `duplicate_line` and 53 usable.
+
+**Class 1** (usable ∧ `axial_tail` ∧ `position_at_bound`):
+
+| family | n | above the FDR bar | sits below its strong mate by | ratio | distance to the lattice |
+|---|---|---|---|---|---|
+| round robin | 8 | 8 | 0.75–0.95 FWHM | 4.1–13.7× | 0.070–0.142° (seven); 0.011° (brucite 71.800°) |
+| SRM 660c | 1 | 0 (`weak_line`) | 0.82 FWHM | 6.1× | 0.038° |
+| SRM 1976a | 2 | 2 | 0.62–0.75 FWHM | 4.0–6.7× | 0.038, 0.039° |
+| fluorapatite | 0 | — | — | — | — |
+
+In 10 of the 11 the nearest lattice line is the strong mate's own line. The mate sits on that
+line (|Δ| ≤ 0.050°) and the component sits below it on the tail side. Nothing in the phase list
+puts a line at the component, so in all ten it is a tail by attribution. The eleventh is brucite
+71.800°, which is 0.011° from brucite (112). A Rietveld fit of `brucite.prn` (the round-robin QPA
+protocol with texture, Rwp 18 %) gives (112) 0.25 % of (201)'s intensity, but the component is
+24 % of its mate. So the component's area is about 100 times what the line under it can supply.
+By position it is on the lattice, and by intensity it is the (201) tail. In degrees the distances
+scale with the line width: the shoulders sit 0.62–0.95 fitted FWHM below their mate in every
+family. That gives 0.07–0.14° on the round robin (FWHM 0.11–0.23°) and 0.04° on the
+narrow-line instruments (FWHM 0.05–0.07°). The acceptance's 0.07° is therefore a round-robin
+number. On SRM 1976a the same tails sit inside it.
+
+**Class 2** (usable re-seeds within 0.25 seed FWHM of their window's edge, or outside it):
+
+| family | usable | above FDR | outside the window | ≥ 0.07° off the lattice | a neighbouring group holds the same lattice line | on the lattice, held by no neighbour |
+|---|---|---|---|---|---|---|
+| round robin | 53 | 46 | 29 | 43 | 35 | 7 |
+| SRM 660c | 0 | — | — | — | — | — |
+| SRM 1976a | 1 | 1 | 0 | 1 | 1 | 0 |
+| fluorapatite | 4 | 2 | 4 | 2 | 3 | 0 |
+
+The window edge does separate the false lines from the true ones on the round robin. Of the
+usable components above the bar there, 38 of 46 edge re-seeds are ≥ 0.07° off the lattice,
+against 28 of 97 inner re-seeds and 62 of 628 detected components. But six of the 46 are on a
+lattice line that no other group holds. Taking class 2 out would lose those six lines. The
+second family has three such components in all, too few to measure the rule on.
 
 ## Non-goals
 
@@ -54,7 +110,7 @@ A change to `usable()` moves what every engine is driven by, so it runs
 
 ## Tasks
 
-- [ ] Measure both classes on a second instrument family: count `axial_tail` ∧
+- [x] Measure both classes on a second instrument family: count `axial_tail` ∧
       `position_at_bound` usable components and their distance to the lattice, and the
       usable window-edge re-seeds and whether a neighbouring group already holds their line.
 - [ ] Decide, per class, whether it leaves `usable()`, is undriven only
