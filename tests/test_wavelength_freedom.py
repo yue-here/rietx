@@ -845,6 +845,48 @@ def test_the_joint_fence_admits_every_wavelength_beside_a_held_standard():
         flat.set_vary([CEO2_A, WL], True)
 
 
+def test_a_per_histogram_held_standard_pins_its_own_histogram():
+    """An unshared held standard pins its own histogram only, scoped by name.
+
+    With every cell per-histogram, no held λ elsewhere can reach a histogram,
+    so each needs a standard of its own: Si held in both admits both λ, and
+    the pin is the scoped ``hist.h.`` path the calibration clause quotes.
+    With Si free the per-histogram refusal stands (review of PR #1575).
+    """
+    per_hist = SharingMap(per_histogram=["phases.*.cell.*"])
+    mt = MultiParameterTable(_mixture(), [_ds(1.5406), _ds(0.7107)],
+                             sharing=per_hist)
+    mt.set_vary([f"hist.0.{CEO2_A}", f"hist.1.{CEO2_A}", WL], True)
+    assert sum(1 for p in mt.free_paths if p.endswith(".wavelength")) == 2
+    assert mt.wavelength_pins() == [f"hist.{h}.phases.0.cell.a" for h in (0, 1)]
+
+    flat = MultiParameterTable(_mixture(si_free=True), [_ds(1.5406), _ds(0.7107)],
+                               sharing=per_hist)
+    with pytest.raises(ValueError, match="per-histogram"):
+        flat.set_vary([f"hist.1.{WL}"], True)
+
+
+@pytest.mark.parametrize("per_histogram", [False, True])
+def test_the_joint_parameter_rows_read_the_pin_rule(per_histogram):
+    """``ParameterRow.needs_held_cell`` on a joint fit asks the joint fence.
+
+    A held Si cell pins every histogram, shared or per histogram, so neither
+    λ row needs a held cell; with Si free a shared cell is still pinned by the
+    other histogram's held λ (the N − 1 count), while per-histogram cells
+    leave each λ needing one (review of PR #1575, finding 5).
+    """
+    sharing = SharingMap(per_histogram=["phases.*.cell.*"]) if per_histogram else None
+
+    def needs(structure):
+        joint = MultiHistogramRefinement(structure, [_ds(1.5406), _ds(0.7107)],
+                                         sharing=sharing)
+        rows = {r.path: r for r in joint.parameters()}
+        return [rows[f"hist.{h}.{WL}"].needs_held_cell for h in (0, 1)]
+
+    assert needs(_mixture()) == [False, False]
+    assert needs(_mixture(si_free=True)) == [per_histogram] * 2
+
+
 @pytest.mark.parametrize("shape", ["own_stage", "one_stage"])
 def test_arm_a_refines_lambda_against_a_held_standard(cu_mixture, shape):
     """Arm A in both plan shapes: λ lands within 3 esd of the planted value.
@@ -897,6 +939,12 @@ def test_a_stage_that_frees_every_cell_says_it_declined_lambda(cu_mixture):
     found = [d for d in result.diagnostics if d.code == "WAVELENGTH_NOT_FREED"]
     assert len(found) == 1 and found[0].where == [WL]
     assert "'cells_lam'" in found[0].message
+    # the plan's own closing stage is not quoted as if the caller wrote it,
+    # and the reason names the fence's rule, a whole cell held (review of
+    # PR #1575, finding 3)
+    assert "'closing'" not in found[0].message
+    assert "and the closing stage" in found[0].message
+    assert "whole cell held" in found[0].message
     assert "HOLD_BLOCKED_PLAN" not in {d.code for d in result.diagnostics}
 
 
@@ -922,6 +970,36 @@ def test_a_held_but_unseen_standard_is_flagged_not_trusted():
     rows = {p.path: p for p in result.parameters}
     assert rows[WL].stderr > 1e-4                      # visible Si: ~5e-7 Å
     assert "FLAT_DIRECTION" in {d.code for d in result.diagnostics}
+
+
+def test_the_clause_names_the_standard_the_caller_held_not_a_support_hold():
+    """``WAVELENGTH_CALIBRATION`` is worded from the caller's pin, not the
+    support hold's (review of PR #1575, finding 1).
+
+    Si sits first with its cell free and the data cannot see it; CeO₂ is the
+    held standard.  The fence admits λ against ``phases.1.cell.a``, then the
+    closing stage's support hold freezes the invisible Si cell.  Read off the
+    table at the end, that frozen Si cell came first and the clause named
+    phase 0, a cell the caller never held and the data cannot see.
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    data = _synth(LAM_CU, 15.0, 140.0, seed=14, si_scale=0.0)
+    start = _mixture(si_free=True)
+    start.phases[0].scale.value = 1e-6
+    start.phases[1].cell.a.vary = False                # CeO₂, the standard
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("lam", [WL, "phases.0.cell.*"])])
+    result = Refinement(start, _ds(1.5406), history=False).fit(data, plan=plan)
+    rows = {p.path: p for p in result.parameters}
+    assert WL in result.stages[-1].freed
+    assert abs(_z(rows[WL], LAM_CU)) < 3.0
+    assert any("phases.0.cell" in p for s in result.stages for p in s.held)
+    cal = [d for d in result.diagnostics if d.code == "WAVELENGTH_CALIBRATION"]
+    assert len(cal) == 1
+    assert "held cell of phase 1 (phases.1.cell.a)" in cal[0].message
+    assert "phase 0" not in cal[0].message
 
 
 def test_arm_b_refines_both_wavelengths_against_a_held_standard(cu_mixture,

@@ -8778,8 +8778,9 @@ def _wavelength_not_freed_diagnostics(stage_results: list[StageResult],
     """``WAVELENGTH_NOT_FREED`` — a stage asked for λ and the fence declined it.
 
     A stage's ``turn_on`` reached the wavelength while no phase in the
-    pattern had a held cell, so λ and every cell length were one exactly flat
-    direction (:meth:`~rietx.params.vector.ParameterTable.wavelength_pin`).
+    pattern had its whole cell held (one held length of a free cell pins
+    nothing, by the fence's rule), so λ and every cell length were one exactly
+    flat direction (:meth:`~rietx.params.vector.ParameterTable.wavelength_pin`).
     ``set_vary`` skips a row it cannot free rather than turning a broad plan
     into an error, and this says so: before WP-2148 the skip was silent, the
     stage read ``converged`` and the calibration error went into the cells.
@@ -8788,25 +8789,40 @@ def _wavelength_not_freed_diagnostics(stage_results: list[StageResult],
     the cells are measured against it exactly as in a fit that never asked
     for λ.  What the reader learns is that the plan did less than it says, and
     which hold would let it do the rest.  One diagnostic for the fit, keyed on
-    the paths, with the stages named.
+    the paths, with the stages named: the caller's by name, and the closing
+    stage a plan appends (the re-run of the union, which the caller did not
+    write) as "the closing stage", by
+    :func:`_window_loss_diagnostics`' test for it.
     """
+    closing = (len(stage_results) > 1
+               and stage_results[-1].name == CLOSING_STAGE_NAME
+               and stage_results[-1].window_area_tol is not None)
     by_path: dict[str, list[str]] = {}
-    for sr in stage_results:
+    closing_hit = False
+    for i, sr in enumerate(stage_results):
+        appended = closing and i == len(stage_results) - 1
         for path in sr.blocked_by_hold:
             if path in declined:
-                by_path.setdefault(path, []).append(sr.name)
+                by_path.setdefault(path, [])
+                if appended:
+                    closing_hit = True
+                else:
+                    by_path[path].append(sr.name)
     if not by_path:
         return []
     where = sorted(by_path)
     stages = sorted({n for names in by_path.values() for n in names})
+    who = (f"stage{'' if len(stages) == 1 else 's'} "
+           f"{', '.join(repr(s) for s in stages)}" if stages else "")
+    if closing_hit:
+        who = f"{who} and the closing stage" if who else "the closing stage"
     return [Diagnostic(
         level="info", code="WAVELENGTH_NOT_FREED",
         message=(f"{', '.join(where)} was matched by the turn_on glob of "
-                 f"stage{'' if len(stages) == 1 else 's'} "
-                 f"{', '.join(repr(s) for s in stages)} and stayed fixed: no "
-                 "phase in the pattern had a held cell, so the wavelength and "
-                 "the free cells were one flat direction (d = lambda/(2 sin "
-                 "theta) fixes only the product)."),
+                 f"{who} and stayed fixed: no phase in the pattern had its "
+                 "whole cell held, so the wavelength and the free cells were "
+                 "one flat direction (d = lambda/(2 sin theta) fixes only the "
+                 "product)."),
         where=where, value=float(len(where)),
         suggestion=("Hold the cell of a standard in the pattern if you meant "
                     "to calibrate the wavelength; the other phases' cells then "
@@ -10226,10 +10242,16 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # pre-fit declared values: a wavelength refines against the *held cell*
     # here, which is the clause that differs from the joint framing.  ``replay``
     # passes nothing and reuses the node's recorded diagnostics instead.
+    # The clause names the pin the fence admitted λ against, which settled
+    # before the last stage's own holds: a support hold or a collapse still
+    # freezes cells here, and read as held, an unseen phase the caller left
+    # free came first and was named as the standard (review of PR #1575).
     if declared_wavelengths is not None:
+        run_held = ({*stage_results[-1].held, *(stage_results[-1].cell_reset or [])}
+                    if stage_results else set())
         diagnostics = diagnostics + _wavelength_calibration_diagnostics(
             declared_wavelengths, table, values, stderr_phys,
-            pinned_by=_wavelength_pinned_by(table.wavelength_pin()))
+            pinned_by=_wavelength_pinned_by(table.wavelength_pin(moving=run_held)))
 
     # A phase the data cannot see (WP-1110), and what the run did about it
     # (WP-1301).  Named here rather than left to HIGH_CORRELATION, which reports
