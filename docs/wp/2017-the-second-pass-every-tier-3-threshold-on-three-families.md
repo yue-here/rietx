@@ -188,6 +188,34 @@ and have no free factor to measure, so this file's old list named them without c
   synthetic, against the row's three: no third joint family is on disk but Nd₂Ru₂O₇, which is
   evidence for no audit before the milestone closes, so whether two close D goes to the maintainer
   after it runs, not decided here.
+- **E, its starts and arms, fixed 2026-11-16 before running** (`2017-batch/group_e.py`). Every
+  fit under `solver="trf"`, the only driver that reads the four constants (LM is the default
+  since WP-1938). Part 1, `GTOL` and `XTOL`: three fits, each through its closing stage.
+  `cpd1a`, cpd-1a under the QPA acceptance protocol (group G's start; reference the weighed
+  fractions). `corundum`, the Stephens acceptance fit with the block freed
+  (`_with_block(corundum_phase())`, `_plan(texture=False, stephens=True)`, last stage
+  `max_iter` 1000 as its test sets; reference the shipped arm, since no anisotropy is the
+  answer the test holds). `si640c`, 11-BM Si SRM 640c under `test_acceptance_si640c`'s XND-range
+  protocol (2-50°, FCJ, λ free, cell held at the certificate; reference XND's λ as that test
+  reads it). Arms: shipped (both 1e-12), `GTOL` 1e-8, `XTOL` 1e-8, both 1e-8 (WP-1109's trial),
+  and the noise arm (every free start value that is not zero ×(1 + 1e-12)). Control: a spy on
+  `scipy.optimize.least_squares` records the `gtol` and `xtol` each TRF solve received and its
+  termination status, so an arm whose solves stopped on another test measured nothing
+  (`unreached` when rows, Rwp and evaluations match bit for bit). Read as group A: 0.1 plain
+  esd against shipped, past noise; Rwp, evaluations (× shipped), status, codes. Part 2,
+  `BOUND_HIT_ESD_FRAC` and `BOUND_HIT_COS_MIN`: issue #273's construction on cpd-1a, the third
+  family under TRF (FAP and Si SRM 640c were the first two). From cpd-1a's shipped TRF answer,
+  five cases, each one path freed alone for one stage with its declared bound moved 3 of its esds
+  past the optimum: fluorite's first atom's Biso with `min` above it, zincite's last atom's Biso
+  with `max` below it, fluorite's `lor_size` with `max` below it, zincite's `scale` with `max`
+  below it, and `instrument.zero_shift` with `max` below it; each at `ftol` 1e-9, 1e-6, 1e-4 and
+  1e-3 (`test_bound_hit_at_convergence.FTOLS`): 20 binding cases. Their control, the same 20 with
+  the bound moved 3 esds to the other side (a free optimum, which must stay silent). Read off
+  `staged.bound_findings`' own inputs per case: gap over esd against `BOUND_HIT_ESD_FRAC`,
+  |residual cosine| against `BOUND_HIT_COS_MIN`, and whether `BOUND_HIT`/`FLOOR_HIT` and
+  `at_bound` fired; then the margins on this family beside WP-1434's 13× and 236× (distance) and
+  145× and 2e5× (angle). A margin under 1× either way is reported as measured and goes to the
+  maintainer; no constant moves here.
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
