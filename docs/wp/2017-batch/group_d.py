@@ -335,8 +335,8 @@ def summary() -> None:
             axes = {"a": "a", "b": "c", "c": "b"}
             parts = []
             for paper, cif in axes.items():
-                hit = [v for k, v in r["rows"].items()
-                       if k.endswith(f"phases.0.cell.{cif}") and ("h0" in k or "[" not in k)]
+                hit = [r["rows"][k] for k in (f"hist.0.phases.0.cell.{cif}",
+                                              f"phases.0.cell.{cif}") if k in r["rows"]]
                 if hit:
                     parts.append(f"{paper} {1e6 * (hit[0][0] / fddd[paper] - 1):+.0f} ppm")
             lines.append(f"- cucr_cold {arm}, coldest frame against Suchomel et al. (2012) "

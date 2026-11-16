@@ -205,12 +205,13 @@ and have no free factor to measure, so this file's old list named them without c
   esd against shipped, past noise; Rwp, evaluations (× shipped), status, codes. Part 2,
   `BOUND_HIT_ESD_FRAC` and `BOUND_HIT_COS_MIN`: issue #273's construction on cpd-1a, the third
   family under TRF (FAP and Si SRM 640c were the first two). From cpd-1a's shipped TRF answer,
-  five cases, each one path freed alone for one stage with its declared bound moved 3 of its esds
-  past the optimum: fluorite's first atom's Biso with `min` above it, zincite's last atom's Biso
+  five cases, each one path freed alone for one stage (no closing stage) with its declared bound
+  moved 3 of the answer's esds past the optimum and the path started 1 esd inside that bound: fluorite's first atom's Biso with `min` above it, zincite's last atom's Biso
   with `max` below it, fluorite's `lor_size` with `max` below it, zincite's `scale` with `max`
   below it, and `instrument.zero_shift` with `max` below it; each at `ftol` 1e-9, 1e-6, 1e-4 and
-  1e-3 (`test_bound_hit_at_convergence.FTOLS`): 20 binding cases. Their control, the same 20 with
-  the bound moved 3 esds to the other side (a free optimum, which must stay silent). Read off
+  1e-3 (`test_bound_hit_at_convergence.FTOLS`): 20 binding cases. Their control, the same 20 from
+  the same start with the bound 3 esds on the optimum's other side (a free optimum, which must stay
+  silent). Read off
   `staged.bound_findings`' own inputs per case: gap over esd against `BOUND_HIT_ESD_FRAC`,
   |residual cosine| against `BOUND_HIT_COS_MIN`, and whether `BOUND_HIT`/`FLOOR_HIT` and
   `at_bound` fired; then the margins on this family beside WP-1434's 13× and 236× (distance) and
