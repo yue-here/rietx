@@ -1,6 +1,6 @@
 # WP-2084 — The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — three of four tasks landed; the plan choice waits on the maintainer (PR #1583)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-02 — a start-dependent answer on the absolute anchor's widths; the cell moves 0.18 esd between the two and nothing fires; a reader quotes u, v and w, which `RESOLUTION_UNCONSTRAINED` already says not to quote
@@ -157,6 +157,81 @@ against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads
 ```
 
 ## Handover log
+
+- **2026-11-16** — a ghostshift runner's session (PR #1583). The two SRM 660c minima are
+  not two basins of one fit. They are two stopping places on the guard that keeps the
+  Gaussian width real: the fit stops where that guard holds at the last reflection's
+  Kα2 image, or, when a stage starts a hair past it and the guard drops it, one reflection
+  image further down. Which happens turns on a 2e-8 difference at the closing stage's
+  start, the same on macOS and Linux and under every small nudge of the start, so the
+  floor test fails deterministically and is now a strict xfail. The deeper answer is not
+  the better one: each step down in χ² comes from letting the Gaussian width go negative
+  over more of the range, and the displacement moves away from NIST's as it does. Picking
+  what the protocol should do about it is the maintainer's call, written below.
+
+  *Done.* Task 1 (Findings, 2026-11-16) with its probe at `docs/wp/2084-measure/`. Task 3:
+  the lab6 axial-floor row is strict, its reason the cone row. Task 4: the SRM 660c
+  sentence re-worded in five `_audit.py` rows (`AXIAL_SIZING_FLOOR`; `INTERMEDIATE_FTOL`,
+  `StageResult.ftol`, `PlanSpec:intermediate_ftol` and `StageSpec:ftol`, which carried one
+  sentence four times), the manual's tolerance row and its two sentences (the Inherited
+  item, folded and removed), and the same stale clause in `schemas/plan.py`'s comment.
+  Evidence strings only: no tier, value, grounds or approval moved.
+
+  *Measured* (macOS arm64 worktree venv `[dev]`, compiled tier on, unless named). The
+  Findings tables; the tolerance row three interleaved rounds, 101 → 76 evaluations
+  (1.33×), 0.56-0.62 s → 0.50-0.60 s, 0.000 esd, Rwp equal to 7 digits. Linux x86_64 on
+  the workstation reproduced every printed digit of twenty probe arms. Acceptance
+  (`tests/test_staged_start_invariance.py -k lab6`, `-n 3`): 2 passed, 1 xfailed.
+
+  *Review.* A read-only Opus reviewer re-ran the probe and found no bug; it confirmed each
+  monkeypatch takes effect and reproduced every number. Its wording points were taken:
+  the floor acts by moving where the closing stage starts, not "not the sizing"; the node
+  comparison names its pair; "ten times a rounding" became the measured robustness (both
+  arms hold for w nudges up to ±1e-6 relative); the dropped-row value is quoted at the
+  stage that drops it; the probe records the compiled tier and whether the cone was
+  applied.
+
+  *Generality* (the judge's verdicts, its tables in PR #1583's body): `AXIAL_SIZING_FLOOR`
+  **weak**: the added sentence is supported, but the row now contradicts its approved
+  grounds, which say the floor "passes on LaB6 … and misses on cpd-1a"; today LaB6 misses
+  (0.582) and cpd-1a passes (0.010 since the width twin hold). Author: left the grounds
+  alone because they are the maintainer's ruling text; the question is below.
+  `INTERMEDIATE_FTOL`, `StageResult.ftol`, `PlanSpec:intermediate_ftol`, `StageSpec:ftol`
+  **hold**, with one unmeasured margin noted: a start difference of 2e-8 in Γ_G² can move
+  u by 0.58 esd on LaB6, and the tolerance arm missed that only by where it landed. The
+  second trigger (a heuristic outside the table) is confirmed absent.
+
+  *Questions for the maintainer* (task 2 stays open on them):
+  1. The plan choice. (a) A change that reaches the deeper minimum from the shipped start
+     buys 0.24 % χ² by putting Γ_G² under zero at 140 points instead of 75, with the
+     displacement 0.22 esd further from NIST's; the evidence here does not favour it.
+     (b) Keep a cone row the stage's start violates by a small margin (measured with
+     `lm._ON_FACE` at 1e-7): every floor then lands on the Kα2 face, 0.004 esd apart, so
+     the floor row would pass, but the start rows would not, because along that face the
+     answer still moves 0.44-0.58 esd on w with the path. It changes a tier-1 constant
+     the guards share. (c) A finding: the result says which reflection's Γ_G² row the
+     answer stops on and that a stage dropped one, and the floor row stays a strict xfail.
+     (d) The test's bar includes u, v and w, which every arm's `RESOLUTION_UNCONSTRAINED`
+     already marks unquotable; whether a start test should hold rows the result tells the
+     reader not to quote is a test-design question. Which, if any?
+  2. `AXIAL_SIZING_FLOOR`'s grounds: does ruling (a) of 2026-10-22 stand with LaB6's 0.582
+     as the strict xfail in place of cpd-1a's 0.138, and will you re-word the grounds
+     and re-date the approval?
+  3. `lm._ON_FACE` is tier 1 on "the last-bit disagreement of two association orders";
+     here it decides a row at ±1e-8 slack and moves u by 0.58 esd. Should its row's
+     evidence say so, and in which WP?
+
+  *Not done.* The three LaB6 strict xfails in `tests/test_window_domain.py` still quote
+  both-free numbers and were not re-measured. The `AXIAL_SIZING_FLOOR` evidence still
+  calls cpd-1a's corundum c a strict xfail, which it no longer is; that clause is the
+  cpd-1a family's, outside this WP's SRM 660c scope.
+
+  *Overlap.* PR #1422 (WP-2012) also edits `docs/wp/README.md`, the generated index; this
+  branch rewrites only WP-2084's row there.
+
+  *Next:* the maintainer answers question 1. On (a) or (b), write the change and drop the
+  floor row's mark; on (c), build the finding and keep the strict xfail; on (d), change
+  the bar. Then question 2 settles the audit row's grounds.
 
 - **2026-11-02, filed by WP-2012's session.** No open WP owns the SRM 660c width minima:
   the index's open rows name WP-2080 (a warm series rung in a wrong basin, a different
