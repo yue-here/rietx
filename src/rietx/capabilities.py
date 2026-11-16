@@ -419,8 +419,9 @@ def capabilities() -> Capabilities:
 
 def _importable(module: str | None) -> bool:
     """Whether ``module`` would import here, without importing it.  ``None``
-    needs nothing; a module set to ``None`` in ``sys.modules`` (how an import
-    is blocked) makes ``find_spec`` raise, and counts as absent."""
+    needs nothing.  A module set to ``None`` in ``sys.modules`` (how an import
+    is blocked) gets ``None`` back from ``find_spec`` and counts as absent; a
+    spec lookup that raises counts as absent too."""
     if module is None:
         return True
     try:

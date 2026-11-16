@@ -126,9 +126,13 @@ _OTHER_UNITS: dict[str, str] = {
     **{u: "a neutron flight time, which this reader does not read"
        for u in ("us", "µs", "microsecond", "microseconds")},
     **{u: "a photon energy — an energy-dispersive scan" for u in ("ev", "kev")},
+    **{u: "an angle in radians, which this reader does not convert to degrees"
+       for u in ("rad", "radian", "radians", "mrad")},
 }
 #: Series-axis names that are the specimen temperature, normalised.
 _TEMPERATURE_NAMES = frozenset({"temperature", "temp", "sampletemperature"})
+#: Units of a temperature, normalised (``°C`` normalises to ``c``).
+_TEMPERATURE_UNITS = frozenset({"k", "kelvin", "c", "degc", "celsius"})
 
 
 @dataclass(frozen=True)
@@ -195,13 +199,31 @@ def _names(value: Any) -> list[str] | None:
 
 
 def _classify(name: str, units: str | None) -> tuple[bool, str | None]:
-    """``(is 2θ, what else it is)`` from the axis's own name and units."""
-    key = _norm(name.rsplit("/", 1)[-1])
+    """``(is 2θ, what else it is)`` from the axis's own name and units.
+
+    A unit that says what the axis is outranks the name, so ``two_theta`` in
+    radians is refused rather than read as degrees.  A name carrying its unit
+    as a suffix (pyFAI writes ``2th_deg``, ``q_nm^-1``) is split once at its
+    first ``_``, when the whole name is not already a vocabulary word."""
+    raw = name.rsplit("/", 1)[-1]
+    key = _norm(raw)
+    known = _TWO_THETA_NAMES | set(_OTHER_NAMES)
+    if key not in known and "_" in raw:
+        head, _, tail = raw.partition("_")
+        if _norm(head) in known:
+            key, units = _norm(head), units or tail
+    said = _OTHER_UNITS.get(_norm(units or ""))
+    if said is not None:
+        return False, said
     if key in _TWO_THETA_NAMES:
         return True, None
-    if key in _OTHER_NAMES:
-        return False, _OTHER_NAMES[key]
-    return False, _OTHER_UNITS.get(_norm(units or ""))
+    return False, _OTHER_NAMES.get(key)
+
+
+def _is_temperature(f: Any, axis: str) -> bool:
+    """A series coordinate by its name or its unit, so never an abscissa."""
+    return (_norm(axis.rsplit("/", 1)[-1]) in _TEMPERATURE_NAMES
+            or _norm(_attr(f[axis], "units") or "") in _TEMPERATURE_UNITS)
 
 
 def _stated(f: Any, axis: str) -> str:
@@ -248,10 +270,18 @@ def _signal(group: Any, h5py: Any) -> str | None:
         return name if name in group else None
     for key, child in group.items():
         flag = child.attrs.get("signal") if _numeric(child, h5py) else None
-        if flag is not None and (_text(flag)
-                                 or str(np.asarray(flag).reshape(-1)[0])) == "1":
+        if flag is not None and _is_one(flag):
             return key
     return None
+
+
+def _is_one(flag: Any) -> bool:
+    text = _text(flag)
+    try:
+        return float(text if text is not None
+                     else np.asarray(flag).reshape(-1)[0]) == 1.0
+    except (TypeError, ValueError):
+        return False
 
 
 def _declared_reel(f: Any, gname: str, *, path: Path, h5py: Any) -> _Reel | None:
@@ -273,6 +303,10 @@ def _declared_reel(f: Any, gname: str, *, path: Path, h5py: Any) -> _Reel | None
         indices = group.attrs.get(f"{name}_indices")
         dim = int(np.asarray(indices).reshape(-1)[0]) if indices is not None \
             else position
+        if not 0 <= dim < signal.ndim:
+            raise ValueError(
+                f"{path.name}: {gname} declares {name!r} as the axis of dimension "
+                f"{dim} of its signal {sname!r}, which has {signal.ndim}")
         if name not in group or not _numeric(group[name], h5py) \
                 or group[name].ndim != 1 or not 0 <= dim < signal.ndim:
             raise ValueError(
@@ -311,9 +345,17 @@ def _x_dim(f: Any, by_dim: dict[int, str], ndim: int, *, path: Path,
     series coordinate.  A 2θ name decides; failing one, a name the axis rule
     refuses (so the refusal is reached); failing both, the one axis declared,
     or the last dimension, NeXus's fastest-varying."""
-    if ndim == 1 or len(by_dim) == 1:
-        return next(iter(by_dim))
-    kinds = {d: _classify(a, _attr(f[a], "units")) for d, a in by_dim.items()}
+    # a temperature is the series coordinate, never what the points are against
+    candidates = {d: a for d, a in by_dim.items() if not _is_temperature(f, a)}
+    if not candidates:
+        raise ValueError(
+            f"{path.name}: {gname} declares only "
+            f"{', '.join(repr(a.rsplit('/', 1)[-1]) for a in by_dim.values())} "
+            "as an axis, a temperature — the series coordinate of a reel, not the "
+            "abscissa its points were measured against")
+    if ndim == 1 or len(candidates) == 1:
+        return next(iter(candidates))
+    kinds = {d: _classify(a, _attr(f[a], "units")) for d, a in candidates.items()}
     two_theta = [d for d, (tt, _) in kinds.items() if tt]
     if len(two_theta) == 2:
         raise ValueError(
@@ -537,7 +579,12 @@ def list_hdf5_scans(path: str | Path) -> list[ScanInfo]:
         with h5py.File(p, "r") as f:
             reel = _reel(f, path=p, h5py=h5py)
             x = np.asarray(f[reel.axis][()], dtype=np.float64)
-            lo, hi = float(np.nanmin(x)), float(np.nanmax(x))
+            finite = x[np.isfinite(x)]
+            if not finite.size:
+                raise ValueError(f"{p.name}: its axis {reel.axis} holds no finite "
+                                 "value")
+            lo, hi = float(finite.min()), float(finite.max())
+            name = reel.axis.rsplit("/", 1)[-1]
             out = []
             for i in range(_n_scans(f, reel)):
                 label, temperature = _series_value(f, reel, i)
@@ -545,7 +592,8 @@ def list_hdf5_scans(path: str | Path) -> list[ScanInfo]:
                          f"{reel.block}[{i}]" if reel.x_dim == 1 else
                          f"{reel.block}[:, {i}]")
                 out.append(ScanInfo(index=i,
-                                    label=f"{label or where} {lo:.4g}–{hi:.4g}",
+                                    label=f"{label or where}, {name} "
+                                          f"{lo:.4g}–{hi:.4g}",
                                     n_points=int(x.size),
                                     two_theta_range=(lo, hi),
                                     temperature_k=temperature))

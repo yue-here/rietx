@@ -213,6 +213,45 @@ def test_two_nxdata_groups_are_chosen_by_default_or_refused(tmp_path):
                 rx.read_pattern(path)
 
 
+def test_a_temperature_is_never_taken_for_the_abscissa(tmp_path):
+    """Declared on the other dimension with an unrecognised x name, it is still
+    the series; declared alone, the group states no abscissa (review, WP-1316)."""
+    tt, block = reel(n_scans=3)
+    path = write_nexus(tmp_path / "vt.nxs", tt, block, axis_name="x",
+                       axis_units=None,
+                       series=("temperature", [10.0, 50.0, 100.0], "K"))
+    pat, found = _read(path, scan=1)
+    assert pat.intensity == list(block[1])
+    assert [d.code for d in found] == ["PATTERN_X_AXIS_ASSUMED"]
+    with h5py.File(path, "a") as f:
+        f["entry/data"].attrs["axes"] = ["temperature", "."]
+    with pytest.raises(ValueError, match="a temperature"):
+        rx.read_pattern(path)
+
+
+def test_a_2theta_axis_in_radians_is_refused_not_read_as_degrees(tmp_path):
+    tt, block = reel(n_scans=1)
+    path = write_nexus(tmp_path / "rad.nxs", np.radians(tt), block[0],
+                       axis_units="rad")
+    with pytest.raises(ValueError, match="radians"):
+        rx.read_pattern(path)
+
+
+@pytest.mark.parametrize("name,refused", [("2th_deg", False), ("q_nm^-1", True),
+                                          ("q_A^-1", True)])
+def test_a_unit_suffixed_axis_name_is_classified(name, refused, tmp_path):
+    """pyFAI writes the unit into the axis name."""
+    tt, block = reel(n_scans=1)
+    path = write_nexus(tmp_path / "s.nxs", tt, block[0], axis_name=name,
+                       axis_units=None)
+    if refused:
+        with pytest.raises(ValueError, match="momentum transfer Q"):
+            rx.read_pattern(path)
+    else:
+        pat, found = _read(path)
+        assert found == [] and pat.intensity == list(block[0])
+
+
 # ---------------------------------------------------------- the search tier
 def test_a_bare_reel_reads_with_the_axis_assumed(tmp_path):
     tt, block = reel(n_scans=3)

@@ -37,8 +37,7 @@ is what pushes a real file's first `BANK` past the window (`vnb5053.dat`, byte
 holds — and a bounded escalation behind a shape gate is the cheaper class, to be
 reached for before a second O(N) one.
 
-`xy` is not total (`matches = not looks_binary(head)`), so `identify_format`'s
-terminal refusal is reachable and its message is **built from the registry**.
+`xy` is not total (`matches = not looks_binary(head)`), so `identify_format`'s terminal refusal is reachable and its message is **built from the registry**.
 
 ## What a reader may repair
 
