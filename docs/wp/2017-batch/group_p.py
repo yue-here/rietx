@@ -593,10 +593,11 @@ def summary() -> None:
                              f"{'yes' if _same(r, ship) else 'no'} | {axs} | "
                              f"{', '.join(r['codes'])} |")
     lines.append("")
-    lines += ["The floors' gap with the closing stage against without, per family (0.05 and "
-              "0.01 each against 0.02):", "",
-              "| family | 0.05 none | 0.05 closing | 0.01 none | 0.01 closing | noise none | "
-              "noise closing |", "|---|---|---|---|---|---|---|"]
+    lines += ["The floors' gap with the closing stage and without it, per family (0.05 and "
+              "0.01 each against 0.02).  Every row's metadata is the first row's (the canary "
+              "ran with 3 workers, the full run with 8).", "",
+              "| family | 0.05 closing | 0.05 none | 0.01 closing | 0.01 none | noise closing | "
+              "noise none |", "|---|---|---|---|---|---|---|"]
     for f in FAMILIES:
         cells = []
         for a in ("f0.05", "f0.01", "noise"):
