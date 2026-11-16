@@ -104,7 +104,7 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
 
 - [x] Decide and write down the format (numpy style; the type line; register) in
   `CONTRIBUTING.md`, with one worked entry
-- [ ] Generator: parse a docstring's Parameters section and render it as the directive's
+- [x] Generator: parse a docstring's Parameters section and render it as the directive's
   `:param:` fields; the twin renders it as a list
 - [ ] The gate: a test that every documented name is in its signature and every argument on the
   API pages is documented or in the shrink-only `UNDOCUMENTED_PARAMETERS` baseline, seeded now

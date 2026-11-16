@@ -361,34 +361,36 @@ def build_report(result: RefinementResult, *, model=None, values=None,
 
     Parameters
     ----------
-    result:
+    result
         The refinement result (Layer 0 needs nothing else).
-    model, values:
+    model, values
         A :class:`~rietx.model.forward.CompiledModel` and its parameter
         value dict.  Supplying both enables Layers 1-2; without them the
         report is Layer 0 and ``layer1_available`` stays False.
         ``Refinement.report()`` fills these in for you.
-    plan, free_paths:
+    plan, free_paths
         Used by the Layer-2 strategy veto: actions the plan already performs,
         or parameters already free, are marked inactive.  ``plan`` is a plan,
         its ``PlanSpec`` or a preset name, read for ``result.mode`` as the fit
         read it (``strategy.staged.resolve_plan``, WP-2102).
-    structure:
+    structure
         The :class:`~rietx.schemas.structure.Structure` the model was compiled
         from.  Optional, and it buys two things the compiled model does not
         carry: the moment arm (WP-1327) labels each row with the atom's own
         label rather than its index, and the satellite arm (WP-1326) reports
         which propagation vector each phase already *declares*.
-    instrument:
+    instrument
         The :class:`~rietx.schemas.instrument.Instrument` the model was
         compiled from.  With ``structure`` it lets Layer 1 and the texture
         screen read the misfit at the closing stage's precision and fit it
         with shapes at the declared stages' (:func:`_reading_models`).
-    held:
+    held
         The last stage's hold list (``StageResult.held``), so the moment arm's
         "unmeasured" directions are the refinement's answer rather than a
         second opinion about it.
 
+    Notes
+    -----
     ``model`` without ``structure`` and ``instrument`` is refused, except for a
     Pawley model, whose intensity block is the solve's and is read as it is.
     Read from one model, Layer 1 takes both its misfit and its shapes at one

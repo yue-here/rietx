@@ -878,6 +878,99 @@ def _directive(kind: str, argument: str, body: str, *, options: dict[str, str] |
     return "\n".join(lines) + "\n"
 
 
+#: A numpy-style section's underline (`CONTRIBUTING.md` § A Parameters section
+#: under each call).
+_SECTION_RULE = _re.compile(r"^-{3,}$")
+
+
+def _own_doc(obj) -> str:
+    """The object's own docstring, dedented; a class's is never inherited."""
+    import inspect
+
+    doc = obj.__doc__ if inspect.isclass(obj) else inspect.getdoc(obj)
+    return inspect.cleandoc(doc) if doc else ""
+
+
+def parameter_entries(obj) -> list[tuple[str, str]]:
+    """(argument, description) per entry of the docstring's numpy-style
+    **Parameters** section, in the order written; [] when there is none.
+
+    A name line sits at the docstring's own indentation and may carry
+    numpydoc's ` : type`, which is dropped (the signature has the type); a
+    line `a, b` documents both.  The description is every indented line under
+    it, joined into one paragraph.  The section ends at the next underlined
+    heading, so an unindented line before one reads as another argument,
+    which the gate then reports as a name the signature lacks.
+    """
+    lines = _own_doc(obj).splitlines()
+    starts = [i for i in range(len(lines) - 1)
+              if lines[i].strip() == "Parameters" and _SECTION_RULE.match(lines[i + 1].strip())]
+    if not starts:
+        return []
+    entries: list[tuple[list[str], list[str]]] = []
+    for i in range(starts[0] + 2, len(lines)):
+        line = lines[i]
+        if not line.strip():
+            continue
+        if (not line[0].isspace() and i + 1 < len(lines)
+                and _SECTION_RULE.match(lines[i + 1].strip())):
+            break
+        if not line[0].isspace():
+            names = line.split(" : ", 1)[0].rstrip(":").strip()
+            entries.append(([n.strip() for n in names.split(",")], []))
+        elif entries:
+            entries[-1][1].append(line.strip())
+        else:
+            raise ValueError(f"{obj!r}: a Parameters description before any name")
+    return [(name, " ".join(text)) for names, text in entries for name in names]
+
+
+def _entry_text(index, text: str) -> str:
+    """A description as the page renders it: roles and ``code`` as code."""
+    text = index._RST_ROLE.sub(lambda m: f"`{m.group(1)}`", text).replace("``", "`")
+    return _notation(text)
+
+
+def _parameter_fields(index, obj) -> str:
+    """The Parameters section as Sphinx doc fields, which the Python domain
+    draws under the signature as a "Parameters" list; "" when there is none.
+    A variadic name keeps its stars, escaped so they are not emphasis."""
+    return "\n".join(f":param {name.replace('*', chr(92) + '*')}: {_entry_text(index, text)}"
+                     for name, text in parameter_entries(obj))
+
+
+def documented_call(obj) -> bool:
+    """Whether the API pages draw `obj` with a signature, so its arguments
+    are owed a Parameters entry: a function, a method, or a class that is
+    neither an exception nor a model or dataclass (whose fields are drawn
+    instead, WP-2027)."""
+    import inspect
+
+    from pydantic import BaseModel
+
+    if inspect.isclass(obj):
+        return not (issubclass(obj, BaseException) or issubclass(obj, BaseModel)
+                    or _dataclasses.is_dataclass(obj))
+    return callable(obj) and not isinstance(obj, dict)
+
+
+def call_arguments(obj) -> list[str]:
+    """The arguments a call's signature names, `self`/`cls` left out and a
+    variadic one with its stars, as a Parameters entry names it."""
+    import inspect
+
+    out = []
+    for i, p in enumerate(inspect.signature(obj).parameters.values()):
+        if i == 0 and p.name in ("self", "cls"):
+            continue
+        out.append({p.VAR_POSITIONAL: "*", p.VAR_KEYWORD: "**"}.get(p.kind, "") + p.name)
+    return out
+
+
+def _with_fields(doc: str, fields: str) -> str:
+    return "\n\n".join(part for part in (doc, fields) if part)
+
+
 def _api_entry(index, dotted: str, technique: str | None = None, *,
                no_index: bool = False) -> str:
     """One name as a Python-domain object: its signature, its summary line
@@ -915,6 +1008,7 @@ def _api_entry(index, dotted: str, technique: str | None = None, *,
         fields = [_directive("fields", "", "\n".join(lines), no_index=no_index)] if parts else []
         return _directive("class", name, doc, options=options, children=fields,
                           no_index=no_index)
+    doc = _with_fields(doc, _parameter_fields(index, obj))
     if inspect.isclass(obj):
         return _directive("class", name + index._signature(obj, drop_self=False), doc,
                           options=options, no_index=no_index)
