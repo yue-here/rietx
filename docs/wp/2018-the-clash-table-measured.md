@@ -720,11 +720,11 @@ true cell and widths). Arms: zero (`auto_background`, the default: every coeffic
 On #740's pattern, where the peaks dwarf the pedestal, the start changes nothing (cell within
 0.6 esd, widths within 0.4 esd, across all three). Where the phase is weak against the
 pedestal the partition against an unfitted background does reach the answer: from zero, Y
-ends 3.1 esd from its true 0 and U 1.9 esd negative on the flat pattern, and W 1.1 esd low with
+ends 3.1 esd from its true 0 and U 2.0 esd negative on the flat pattern, and W 1.1 esd low with
 `RESOLUTION_NOT_POSITIVE` on the hump; the seed takes W to within 0.1 esd of the truth on
 both, but Y stays 2.4 esd off on the flat pattern and the hump's background still ends at 0.83
 of the truth (WP-1542's 0.83, reproduced). Only the true curve held brings every width within
-1.1 esd and the background to within 1.3 %. The cells move less: between the zero and truth arms by at most 1.2 of the truth arm's esds
+1.2 esd and the background to within 1.3 %. The cells move less: between the zero and truth arms by at most 1.2 of the truth arm's esds
 on the flat pattern and 2.5 on the hump (0.4 of the zero arm's own, which are 6× wider), and
 the axis furthest from the truth is as far in the truth arm (2.6 esd) as in any other, so what
 the start moves first is the profile and the esds. Question (20).
