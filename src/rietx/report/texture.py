@@ -292,13 +292,6 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
 # calls it yet, so no default output moves.  Which numbers would make it
 # suggest an order is the gated Layer-2 action of the WP's task 3.
 
-#: A design column counts towards the rank when its singular value, on columns
-#: scaled to the unit norm of their *unpartitioned* values, is above this.  It
-#: separates exact invisibility (c4_3 on a one-atom −3m1 phase, 1e-15) from
-#: any column the partition leaves anything of; the visibility of each term is
-#: reported beside it, so this number sets no physics.
-_ORDER_RANK_RTOL = 1e-8
-
 
 @dataclass(frozen=True)
 class _OrderFit:
@@ -379,7 +372,8 @@ def _partitioned(model: CompiledModel, values: dict[str, float], ip: int,
 
 
 def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
-                  scale: np.ndarray) -> tuple[float, int, np.ndarray, float]:
+                  scale: np.ndarray, rank_rtol: float
+                  ) -> tuple[float, int, np.ndarray, float]:
     """(SS, rank, b, a) of f ≈ a + design·b under weights w.
 
     The columns are weight-centred, so a is the free scale, and divided by
@@ -395,7 +389,7 @@ def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
     centre = (w @ design) / W
     x = sw[:, None] * (design - centre[None, :]) / scale[None, :]
     u, sv, vt = np.linalg.svd(x, full_matrices=False)
-    keep = sv > _ORDER_RANK_RTOL
+    keep = sv > rank_rtol
     coef = vt[keep].T @ ((u[:, keep].T @ y) / sv[keep])
     resid = y - x @ coef
     b = coef / scale
@@ -404,7 +398,8 @@ def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
 
 def _order_screen(model: CompiledModel, values: dict[str, float], *,
                   orders: tuple[int, ...] = (2, 4, 6, 8), max_index: int = 2,
-                  min_weight_frac: float = 1e-3) -> list[_OrderScreen]:
+                  min_weight_frac: float = 1e-3, rank_rtol: float = 1e-8
+                  ) -> list[_OrderScreen]:
     """The per-order solve and the nested comparison, per phase (WP-1974).
 
     For each even order L the extracted corrections are fitted as
@@ -415,6 +410,14 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     compare directly.  Each order is compared with the one below by the F
     statistic and ΔBIC on the rank it adds, and with the best March-Dollase
     axis by ΔBIC at one shape parameter.  Measures, decides nothing.
+
+    ``rank_rtol``: a column counts towards the rank when its singular value,
+    on columns scaled to the unit norm of their *unpartitioned* values, is
+    above it.  1e-8 separates exact invisibility (c4_3 on a one-atom −3m1
+    phase, 1e-15) from every column the partition leaves anything of (0.36 the
+    least, c6_3 on CPD-2 brucite).  A tolerance of an unwired hook: the action
+    that consumes this (the WP's task 3) brings it and its thresholds to
+    ``rietx._audit``.
     """
     from scipy.stats import f as f_dist
 
@@ -456,7 +459,7 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
             norm = np.where(norm > 0.0, norm, 1.0)
             pc = part - ((wl @ part) / W)[None, :]
             vis = np.sqrt(wl @ pc ** 2) / norm
-            s, rank, b, a = _weighted_fit(fl, wl, part, norm)
+            s, rank, b, a = _weighted_fit(fl, wl, part, norm, rank_rtol)
             c = b / a if a else b
             dp_k = rawl @ c if c.size else np.zeros(len(fl))
             ss[order] = (s, rank)

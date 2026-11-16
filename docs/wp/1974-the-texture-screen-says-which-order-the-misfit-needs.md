@@ -71,7 +71,13 @@ TEXTURE_SAMPLE_PSI_DEG[geometry.kind])` for w_l.
       norm, and each term's visibility ‖M·K_t‖/‖K_t‖ rides beside it.
       Measured in the handover entry; three tests in `tests/test_texture.py`.
 - [ ] The nested comparison per added order, and the record field it writes,
-      with its writer named.
+      with its writer named. *2026-11-16, half done:* the comparison is in
+      `_order_screen` and measured (handover entry): per order, the F
+      statistic and p on the rank the order adds, ΔBIC = n·ln(SS_hi/SS_lo) +
+      Δp·ln n, ΔBIC against the best March-Dollase axis at one shape
+      parameter, and rms(P − 1) as the strength. The field is **proposed, not
+      added**, since a report-schema change is the maintainer's: see the
+      handover entry's questions.
 - [ ] The Layer-2 action naming an order, only past the gates. The
       March-Dollase action stays where an axis explains as much.
 - [ ] Tests: an order-4 specimen fitted bare suggests 4, a March-Dollase one
