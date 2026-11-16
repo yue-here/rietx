@@ -1,6 +1,6 @@
 # WP-1974 — the texture screen says which order the misfit needs
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: 1960 (the basis)
 Priority: P3 2026-10-15 — a workaround covers it: declare orders 4, 6 and 8 by hand and compare the fits
