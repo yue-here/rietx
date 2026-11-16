@@ -108,9 +108,9 @@ ranking over one population and is the regression gate, not a family.
       rulings (task 5), since no tier moves before the batch.
 - [x] `best_or_none()`: a first-kind pick on a second-kind ranking (the record § A pick
       on top of a ranking). Confirm no default path calls it, and tier its gate as the
-      margin that makes the top candidate unanimous. *2026-11-16:* not confirmed: six
-      default paths call the two gates, all presenting or reporting, none applying
-      (`2007-batch/README.md` § Task 3); the gate's rule proposed tier 1 over the grade.
+      margin that makes the top candidate unanimous. *2026-11-16:* not confirmed: five
+      default paths call the cell gate and one user-requested GUI route the extinction
+      gate, all presenting or reporting, none applying (`2007-batch/README.md` § Task 3); the gate's rule proposed tier 1 over the grade.
 - [x] The clash table: grading × gating × the `best_or_none` gate. *2026-11-16:* eleven
       clashes, K1-K11, in [`2007-batch/clashes.md`](2007-batch/clashes.md), each with its question.
 - [ ] The batch to the maintainer; rulings dated into the table.
@@ -143,9 +143,11 @@ ranking over one population and is the regression gate, not a family.
   Indexing's audit now has a measured inventory instead of a count: 50 codes, 188 module-level
   numbers (25 of them in tables the audit walk cannot see) and 32 defaults, each with what it
   decides, where it was measured and a proposed tier. Most of indexing's numbers are rietx's own:
-  102 of 188 propose tier 3, against 20 tier 2 and 54 tier 1. The WP's premise that no default path
-  calls `best_or_none()` does not hold: six do, all to present or report a pick, none to apply one,
-  and one approved row's grounds say otherwise. The clash table finds eleven places where one
+  102 of 188 propose tier 3, against 20 tier 2 and 53 tier 1. The WP's premise that no default path
+  calls `best_or_none()` does not hold: five default paths call `IndexingResult.best_or_none`, all to
+  present or report a pick, none to apply one; a sixth call, the GUI's user-requested extinction
+  route, calls `ExtinctionScreen.best_or_none`, and has since before the ruling whose grounds say no
+  default path calls that pick. The clash table finds eleven places where one
   grading or gating rule decides what another reads, the largest being that a single result-level
   fact (the panel's disagreement) and the never-asked ambiguity check each refute every candidate
   they touch. No tier, value or code moved: everything here waits on the maintainer's batch.
@@ -176,10 +178,13 @@ ranking over one population and is the regression gate, not a family.
   *Questions for the maintainer* (task 5's batch; each has its `file:line` in `judgements.json` or
   `clashes.md`): (1) the milestone's gate after WP-2004 (`generality.md` § The order) is still
   shut by its letter, since 2004 is ⬜; this part ran on the WP's own Priority line ("2001 closed,
-  so nothing blocks it"). Does the batch wait for the gate? (2) `best_or_none()` on six default
-  paths (README § Task 3): keep the printed `CELL:` line, the CLI's exit code and the GUI's badges,
-  or show the ranking alone? And `EXTINCTION_SCREEN_UNRELIABLE`'s approved grounds ("no default
-  path calls the pick", `_audit.py:684`) are out of date (K7). (3) A candidate the ambiguity check
+  so nothing blocks it"). Does the batch wait for the gate? (2) `IndexingResult.best_or_none()` on five
+  default paths (README § Task 3): keep the printed `CELL:` line, the CLI's exit code and the GUI's
+  badges, or show the ranking alone? And `EXTINCTION_SCREEN_UNRELIABLE`'s approved grounds ("no
+  default path calls the pick", `_audit.py:684`): one user-requested GUI route calls
+  `ExtinctionScreen.best_or_none` (`gui/session.py:2803`), and has since WP-1027 (2026-08-01), before
+  the 2026-10-21 ruling, so nothing has moved since. Did the ruling's "no default path" mean to
+  exclude a screen the user asks for (K7)? (3) A candidate the ambiguity check
   never reached refutes rather than caps (K1, K8; WP-1986's item). (4) A validation fit that raises
   refutes the candidate, against WP-2076's rule and the code's own help text (K2). (5)
   `fom_panel_disagrees` is one fact about the list that refutes every candidate on it (K9). (6)

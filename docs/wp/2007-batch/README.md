@@ -21,8 +21,10 @@ Run it with `.venv/bin/python docs/wp/2007-batch/collate_inventory.py`.
   50 suggestion rows (47 `unaudited`), tiered with their code.
 - **188 module-level numbers**, not 76: 163 the audit walk sees (148 `unaudited`, 7 tier 1, 2 tier 2,
   6 tier 3) and 25 it cannot (dicts, lists, enumerations; mostly crystallographic tables, plus
-  `engines.SEARCH_PRESET_INFO`, `svd.CONTROL` and `schemas.indexing.METRIC_DOF`). Proposed: 54 tier 1,
-  20 tier 2, 102 tier 3, 12 invariant. Two names the walk drops are recorded by hand in the default rows:
+  `engines.SEARCH_PRESET_INFO`, `svd.CONTROL` and `schemas.indexing.METRIC_DOF`). Proposed: 53 tier 1,
+  20 tier 2, 102 tier 3, 12 invariant, and none for `DEFAULT_MAX_CANDIDATES`: the cap sets the population
+  the refuting `fom_panel_disagrees` is read over (clash K9), so it is not a pure listing cap, and its
+  tier is the maintainer's call (its row states the effect). Two names the walk drops are recorded by hand in the default rows:
   `engines.DEFAULT_SEARCH_PRESET = "quick"` (under `index_pattern:preset`) and `workflow.VALIDATION_MODE
   = "pawley"` (under `index_pattern:validate`). `engines.SEARCH_PRESETS` holds names, not numbers, so the
   120 s is `QUICK_TOTAL_BUDGET_SECONDS`'s row. `fom.FOM_N` (an alias of `PEAK_MIN_USABLE_LINES`) and
@@ -38,18 +40,26 @@ Run it with `.venv/bin/python docs/wp/2007-batch/collate_inventory.py`.
   PR #1237, `schemas/indexing.py:218`). Of PR #1016's six `solve/chemistry.py` constants none is in the
   tree; `OCCUPANCY_MAX_DENOMINATOR` and `_CELLS27` are.
 
-## Task 3: `best_or_none()` is called on six default paths
+## Task 3: `best_or_none()` is called on five default paths and one requested route
 
 The WP asks to confirm that no default path calls it. **It does not hold.** `IndexingResult.best_or_none`
 (`schemas/indexing.py:2245`) is called by the result's own text display (`_verdict_lines`, `:2231`,
 printing `CELL:` or `NO CELL`), by `index_diagnostics`, which raises `INDEX_ABSTAINED` on every run it
 returns `None` (`indexing/diagnostics.py:893`, a report), by `workflow._emit_end`'s `index_end` event (`workflow.py:1211`, its
 `cell` and `abstained` fields), by the CLI's exit code (`cli.py:374`) and by the GUI's `picked` row and
-adopt label (`gui/session.py:2593`, `:2836`). `ExtinctionScreen.best_or_none` (`:2614`) is called by
-the GUI's extinction route (`gui/session.py:2803`), which badges the class. None of them applies a cell
-or a class unasked: since WP-2124 (ruling B, 2026-11-08) every row can be adopted. They present a
-first-kind pick on top of a second-kind ranking. The approved grounds of `EXTINCTION_SCREEN_UNRELIABLE`
-(`_audit.py:684`, "no default path calls the pick") are therefore out of date (clash K7).
+adopt label (`gui/session.py:2593`, `:2836`). These five are default paths. A different pick,
+`ExtinctionScreen.best_or_none` (`schemas/indexing.py:2614`), is called once, by the GUI's extinction
+route (`gui/session.py:2803`), which badges the class. That route runs only when the user clicks
+"Screen extinctions" (`gui/src/panels/Peaks.svelte:865`, `POST /api/index/extinction`); no library or
+CLI default path runs the screen. None of the six applies a cell or a class unasked: since WP-2124
+(ruling B, 2026-11-08) every row can be adopted. They present a first-kind pick on top of a
+second-kind ranking.
+
+`EXTINCTION_SCREEN_UNRELIABLE`'s approved grounds (`_audit.py:684`, "no default path calls the pick")
+are about the extinction pick, not the cell pick, and nothing has moved since they were ruled: the GUI
+call came in with WP-1027 (`04f028dad`, 2026-08-01), before the 2026-10-21 ruling (PR #939). So the
+question is not whether the grounds are out of date but what the ruling's "no default path" meant:
+did it exclude a screen the user asks for, or was its wording loose from the start (clash K7)?
 
 The gate's margin. For cells there is no number: the pick needs exactly one candidate at `high` and no
 ambiguity partner, and `high` needs zero caveats, so the margin is "every engine that ran found it,

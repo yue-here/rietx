@@ -165,8 +165,10 @@ def constants(mods: list[Module]) -> list[dict]:
 def readers(mods: list[Module], full: set[str]) -> dict[str, list[str]]:
     """Every function or module/class body reading one of the constants in `full`, keyed
     by the constant's full name: in its defining module by bare name, elsewhere only through
-    an import of that name or an attribute of an imported module (`engines.NAME`), so two
-    modules' same bare name never merge (WP-2007 review)."""
+    an import of that name or an attribute of an imported module (`engines.NAME`, or
+    `rietx.indexing.engines.NAME` after a plain `import`), so two modules' same bare name
+    never merge (WP-2007 review). A function that binds the bare name itself (argument,
+    assignment, loop target) reads its local, not the constant (PR #1591 review)."""
     out: dict[str, set[str]] = defaultdict(set)
 
     def resolve_from(m: Module, node: ast.ImportFrom) -> str:
@@ -189,6 +191,7 @@ def readers(mods: list[Module], full: set[str]) -> dict[str, list[str]]:
     for m in mods:
         names = {f.rsplit(".", 1)[1]: f for f in full if f.rsplit(".", 1)[0] == m.name}
         aliases: dict[str, str] = {}
+        roots: set[str] = set()
         for node in ast.walk(m.tree):
             if isinstance(node, ast.ImportFrom):
                 src = resolve_from(m, node)
@@ -201,14 +204,46 @@ def readers(mods: list[Module], full: set[str]) -> dict[str, list[str]]:
                 for a in node.names:
                     if a.name in modnames and a.asname:
                         aliases[a.asname] = a.name
+                    elif a.asname is None:
+                        # `import rietx.indexing.engines` binds `rietx`; the constant is
+                        # read as the dotted chain `rietx.indexing.engines.NAME`
+                        roots.add(a.name.split(".")[0])
+
+        def dotted(n: ast.AST) -> str | None:
+            parts = []
+            while isinstance(n, ast.Attribute):
+                parts.append(n.attr)
+                n = n.value
+            if not isinstance(n, ast.Name):
+                return None
+            return ".".join([n.id, *reversed(parts)])
 
         def hit(n: ast.AST) -> str | None:
             if isinstance(n, ast.Name):
                 return names.get(n.id)
             if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
                 tm = aliases.get(n.value.id)
-                return f"{tm}.{n.attr}" if tm and f"{tm}.{n.attr}" in full else None
+                if tm and f"{tm}.{n.attr}" in full:
+                    return f"{tm}.{n.attr}"
+            if isinstance(n, ast.Attribute):
+                chain = dotted(n.value)
+                if (chain and chain.split(".")[0] in roots and chain in modnames
+                        and f"{chain}.{n.attr}" in full):
+                    return f"{chain}.{n.attr}"
             return None
+
+        def local_names(fn: ast.AST) -> set[str]:
+            """Names a function binds itself (arguments, assignments, loop and `with`
+            targets), less those it declares global: a read of one is a local, not the
+            module's constant."""
+            bound = {a.arg for a in ast.walk(fn.args) if isinstance(a, ast.arg)}
+            declared: set[str] = set()
+            for n in ast.walk(fn):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                    bound.add(n.id)
+                elif isinstance(n, (ast.Global, ast.Nonlocal)):
+                    declared.update(n.names)
+            return bound - declared
 
         here = m.name.removeprefix("rietx.")
         for n in outside_functions(m.tree):
@@ -218,7 +253,14 @@ def readers(mods: list[Module], full: set[str]) -> dict[str, list[str]]:
                 out[k].add(f"{here}.<module or class body>")
         for fn in ast.walk(m.tree):
             if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                local = local_names(fn)
+                # defaults and decorators are evaluated in the enclosing scope
+                outer = {id(x) for e in (*fn.args.defaults, *fn.args.kw_defaults,
+                                         *fn.decorator_list) if e is not None
+                         for x in ast.walk(e)}
                 for n in ast.walk(fn):
+                    if isinstance(n, ast.Name) and n.id in local and id(n) not in outer:
+                        continue
                     k = hit(n)
                     if k:
                         out[k].add(f"{here}.{fn.name}")

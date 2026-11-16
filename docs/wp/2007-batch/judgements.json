@@ -611,10 +611,10 @@
   "rietx.indexing.engines.DEFAULT_MAX_CANDIDATES": {
    "role": "cap",
    "decides": "How many candidates the reported list holds after consensus ranks the whole merge; it also bounds what estimate_ceiling prices and checked_indices may reach (engines.py:316).",
-   "measured_on": "bethanechol set F (WP-1046); a synthetic cubic list in tests/test_indexing_consensus.py:499-515",
-   "proposed": 1,
-   "evidence": "A listing cap applied once, at the layer whose ordering is authoritative (WP-1046 moved it off the units). tests/test_indexing_consensus.py:505-515 asserts the list holds exactly the cap and INDEX_CANDIDATES_TRUNCATED states the truncation, whose message counts the merged lattices left out.",
-   "question": "Two doubts on tier 1: the test asserts the truncation note fires but not its count, and WP-2112 (#1375) reports an engine's own first cell dropped from the twelve because every corroborated cell sorts above it, so the cut decides what a reader sees when the gate abstains. Is that a ranking-key question for WP-2112 or a reason to tier the cap 3 (engines.py:316)?"
+   "measured_on": "bethanechol set F (WP-1046); a synthetic cubic list in tests/test_indexing_consensus.py:499-515; the synthetic cubic list of clash M1 at max_candidates 12 and 1 (PR #1591 review)",
+   "proposed": "unaudited",
+   "evidence": "No tier proposed: the tier-1 proposal (a listing cap) is withdrawn, because the cap is not answer-invariant. It is applied once, at the layer whose ordering is authoritative (WP-1046 moved it off the units), and INDEX_CANDIDATES_TRUNCATED states the truncation (tests/test_indexing_consensus.py:505-515). But it also sets the panel population: fom_panel_disagrees is computed over the truncated list (consensus.py:497-510, cut at engines.py:2095) and is refuting (schemas/indexing.py:703-706), so the cap decides whether every candidate grades low. Measured on M1's synthetic cubic list (preset full): at 12 the top candidate carries geometric_ambiguity, fom_panel_disagrees and not_validated; at 1 the refuting fom_panel_disagrees is gone. The pick did not change there, since geometric_ambiguity still refutes; where nothing else refutes (K9's LaB6 row), the cap decides best_or_none and the CLI exit code.",
+   "question": "Which tier, now that the cap sets the panel population (clash K9)? Tier 1 holds only if the panel is read over the whole merge or per candidate (K9's own question). Also: the test asserts the truncation note fires but not its count, and WP-2112 (#1375) reports an engine's own first cell dropped from the twelve because every corroborated cell sorts above it (engines.py:316)."
   },
   "rietx.indexing.engines.ENGINE_POOL_MULTIPLE": {
    "role": "cap",

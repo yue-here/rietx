@@ -28,9 +28,9 @@ systems cubic, tetragonal, hexagonal, `preset="full"`, peaks only: 10.3 s, 12 ca
 | K2 | `validation_failed` (refuting, action 3) × WP-2076 "a raised fit is no evidence" × help text | A fit that raises refutes the candidate. The help text says the candidate is "neither supported nor refuted". The extinction screen leaves a raised class unscored. | Verified. Not measured. | Should a raised fit cap like `not_validated`, with `diverged` kept refuting? |
 | K3 | `shift_allowance_assumed` (capping; INDEX_SHIFT_ALLOWANCE action 3) × `best_or_none` default paths | Where the pair screen declines, `high` is out of reach, so the CLI exits 1 and prints "NO CELL". | Partly refuted. Every fitted corpus list measures its shift from pairs, so the caveat does not fire there. It fires on position lists and where the screen declines. | Should the dossier sentence be narrowed to "where the pair screen declines"? |
 | K4 | `INDEX_DATA_INSUFFICIENT` (action 3) × `usable()` flags and ghost flags (B13 pending) | Flags remove lines before the line count is taken. The refusal needs fewer than 5 usable lines. The live effect is the 20-line bar: below it the search is narrowed to the systems the count supports. | Partly. Mechanism verified. Refusal by flags only on lists of a few lines. Not measured. | Should the narrowing and the refusal name how many lines the flags removed? |
-| K5 | `DEFAULT_MAX_CANDIDATES` (1) × `CONSENSUS_CHECK_TOP` (1) × `VALIDATION_RESERVE_FRACTION` (3) × #1375 | 12 listed, about 4 checked. Ranks 5-12 are never validated or enumerated. Corroborated cells sort first, so a single-finder rank 1 can drop off. | Verified. M2: 4 of 12 checked, 8 neither validated nor enumerated. The reserve half is superseded (WP-2011). | Is the reported cap tier 1 when 8 of its 12 rows can only grade `low`? |
+| K5 | `DEFAULT_MAX_CANDIDATES` (none proposed) × `CONSENSUS_CHECK_TOP` (1) × `VALIDATION_RESERVE_FRACTION` (3) × #1375 | 12 listed, about 4 checked. Ranks 5-12 are never validated or enumerated. Corroborated cells sort first, so a single-finder rank 1 can drop off. | Verified. M2: 4 of 12 checked, 8 neither validated nor enumerated. The reserve half is superseded (WP-2011). | Which tier for the reported cap, when 8 of its 12 rows can only grade `low` and it sets K9's panel population? |
 | K6 | `MIN_AGREEMENT` (3) as ranking key and grade floor × system-major truncation × `DEFAULT_BUDGET_SECONDS` (3) | In the system the clock catches, later engines never enter. Its cells lose finders, grade `low` and sort below every corroborated cell. The inlier retry is skipped when the clock has fired. | Partly. Verified for the caught system. Completed systems keep every finder, as the dossier says. Not measured. | Should a cell from a truncated system be ranked on a finder count the clock set? |
-| K7 | `REFERENCE_NET_RWP_MAX` (3, approved) × `DECISIVE_DELTA_BIC` (2) × the GUI's `best` | The approved grounds say no default path calls the pick. The GUI serves and badges it. A 1 %-off PbSO₄ cell passes the reference gate. | Verified for the GUI path. Whether a wrong class is badged today is not re-measured. | Do the 2026-10-21 grounds stand now that the GUI route calls the pick? |
+| K7 | `REFERENCE_NET_RWP_MAX` (3, approved) × `DECISIVE_DELTA_BIC` (2) × the GUI's `best` | The approved grounds say no default path calls the pick. A user-requested GUI route serves and badges it, and has since before the ruling. A 1 %-off PbSO₄ cell passes the reference gate. | Verified for the GUI route (WP-1027, 2026-08-01). Whether a wrong class is badged today is not re-measured. | Did the ruling's "no default path" mean to exclude a screen the user asks for? |
 | K8 | the ambiguity sweep after validation × `run_cancel` × refuting unchecked | If the clock fires during validation, the sweep skips every candidate. Then every candidate is `low`, validated ones included. | Verified in the code. Not reached in M2 (the search stopped at the reserve boundary; validation and the sweep finished). | Same as K1. Should a fully unswept result say so in INDEX_BUDGET_EXHAUSTED? |
 | K9 | `fom_panel_disagrees` (refuting, result-level, no row) × the list's composition (systems reached, the ceiling, `max_candidates`) | One boolean over the reported list refutes every candidate. A longer search adds cells that win some member, and the certified cell drops from `high` to `low`. | Verified and measured: LaB6 acceptance row; M1 12 of 12; M2 12 of 12. | Should panel disagreement cap rather than refute, or be read per candidate? |
 | K10 | `best_or_none` "exactly one high" × `grade` per candidate | Two cells at `high` abstain even when the data separate them (Rwp 0.098 against 0.250). | Verified and measured (LaB6 calibrated row). | Should a second `high` the data separate block the pick? |
@@ -159,7 +159,7 @@ INDEX_DATA_INSUFFICIENT)?
 
 ## K5. The reported cap × the checked set × the reserve × #1375
 
-**Rules.** `DEFAULT_MAX_CANDIDATES` = 12 (`engines.py:316`, proposed 1); `ENGINE_POOL_MULTIPLE`
+**Rules.** `DEFAULT_MAX_CANDIDATES` = 12 (`engines.py:316`, no tier proposed: see K9); `ENGINE_POOL_MULTIPLE`
 = 5 (`:331`, proposed 3); `CONSENSUS_CHECK_TOP` (proposed 1); `VALIDATION_RESERVE_FRACTION` = 0.15
 (`engines.py:2385`, tier 3, approved 2026-10-28).
 
@@ -177,8 +177,9 @@ none of 12 was at 8 %, Le Bail and rank-order slices. WP-2011 moved to Pawley, c
 15 %, and then FAP validated every checked cell (`engines.py:2366-2373`; inventory row). #1375 has
 not been re-run on this tree (WP-2112 § Tasks, first box).
 
-**Question.** Is the reported cap a listing cap (tier 1) when two thirds of its rows can only be
-`low` by construction? Or should rows outside the checked set be marked "unchecked" rather than
+**Question.** The reported cap is not a pure listing cap: it also sets the population
+`fom_panel_disagrees` is read over (K9). Which tier, when two thirds of its rows can only be `low` by
+construction? Or should rows outside the checked set be marked "unchecked" rather than
 graded?
 
 ## K6. `MIN_AGREEMENT` × the clock's cut inside a system
@@ -216,12 +217,17 @@ proposed 2, Kass & Raftery). `ExtinctionScreen.best_or_none` (`schemas/indexing.
 
 **Mechanism.** Status `unreliable` makes `best_or_none` abstain (`schemas/indexing.py:2641-2642`)
 whatever the margin. Otherwise the top class needs a 10-unit margin (`:2658-2660`). The GUI route
-calls it (`gui/session.py:2803`) and serves `best` (`:2804-2807`). The panel marks that class with a
+calls it (`gui/session.py:2803`) and serves `best` (`:2804-2807`). The route runs only when the user
+clicks "Screen extinctions" (`gui/src/panels/Peaks.svelte:865`, `POST /api/index/extinction`); no
+library or CLI default path runs the screen. The panel marks that class with a
 `best_or_none()` chip (`gui/src/panels/Peaks.svelte:918-920`). The screen runs on any candidate,
 not only a picked one (`gui/session.py:1973-1980`).
 
 **Verified clash.** The approved grounds of EXTINCTION_SCREEN_UNRELIABLE say "no default path
-calls the pick" (`_audit.py:684-685`). The GUI route calls it. The constant's own record shows
+calls the pick" (`_audit.py:684-685`). The user-requested GUI route calls it, and has since WP-1027
+(`04f028dad`, 2026-08-01), before the 2026-10-21 ruling (PR #939), so nothing has moved since the
+ruling: either it counted a requested screen as no default path, or its wording was loose from the
+start. The constant's own record shows
 the reference gate missing a cell 1 % off: PbSO₄ at ×0.99 reads 0.45 on the Le Bail reference
 "(a wrong class returned)" (`_audit.py:682`), and 0.30 on the Pawley reference re-measured on
 2026-11-07 (`_audit.py:2473-2476`). Whether today's screen returns a wrong class there is not
@@ -229,8 +235,8 @@ recorded.
 
 **Measured.** Partly: the reference readings above. Not the class returned on today's tree.
 
-**Question.** Do the 2026-10-21 grounds still hold with a default GUI path calling the pick? If
-not, is DECISIVE_DELTA_BIC the unanimity margin for that pick (the inventory's question on
+**Question.** Did the 2026-10-21 ruling's "no default path" mean to exclude a screen the user
+asks for? If not, is DECISIVE_DELTA_BIC the unanimity margin for that pick (the inventory's question on
 EXTINCTION_SYMBOL_AMBIGUOUS), and does PbSO₄ ×0.99 need a re-run first?
 
 ## K8. The clock fires during validation, and the sweep is skipped for all
@@ -261,7 +267,9 @@ reported list (`consensus.py:508-510`; `fom.py:981-995`), and written onto every
 `max_candidates`.
 
 **Mechanism.** The flag is True when the panel's members put different candidates first
-(`fom.py:991-995`). `indexed_fraction` favours large cells by design (`fom.py:1005-1007`), so a list
+(`fom.py:991-995`). The panel reads `ranked`, which `rank_candidates(…, max_candidates=reported)`
+has already cut to the cap (`consensus.py:497-510`, `engines.py:2095`), so `max_candidates` sets the
+panel population, and with it whether every candidate grades `low`. `indexed_fraction` favours large cells by design (`fom.py:1005-1007`), so a list
 holding a supercell and its parent will often disagree. Adding a system adds cells, and one new cell
 that wins one member makes every candidate `low`. Under `quick` the systems reached depend on wall
 clock (`tests/test_indexing_ceiling.py:303-306`).
@@ -270,7 +278,11 @@ clock (`tests/test_indexing_ceiling.py:303-306`).
 three engines, is `low` on `fom_panel_disagrees` alone, and "on a cubic-only search the run
 promotes to `high`" (`tests/test_acceptance_indexing.py:2132-2137`). The only real-data `high`
 in the suite is a cubic-only search (`tests/test_acceptance_indexing.py:687`, `:2827`). M1: 12 of
-12 candidates carry it. M2: 12 of 12, the certified R cell included.
+12 candidates carry it. M2: 12 of 12, the certified R cell included. M1 again at
+`max_candidates=1` (PR #1591 review, reproduced by its fix-up; Mac arm64): the top candidate's caveats drop from
+`geometric_ambiguity`, `fom_panel_disagrees`, `not_validated` at 12 to `geometric_ambiguity`,
+`not_validated` at 1. The pick does not change there, because `geometric_ambiguity` still refutes;
+where nothing else refutes, as on LaB6, the cap decides `best_or_none` and the CLI exit code.
 
 **What the result says.** "The data refute this cell" for every cell, when the fact is "the list
 holds cells the members rank differently". A shorter search can grade the truth higher than a
