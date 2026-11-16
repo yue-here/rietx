@@ -237,8 +237,8 @@ Review (a read-only subagent, not `/code-review`): two findings, both taken. A
 removed.
 
 *Not done, deliberately.* The `Status:` line stays ⬜ and `docs/wp/README.md`
-is untouched, because open PR #1601 edits the index; flipping it to ✅ after
-#1601 merges is in #1629. The WP is otherwise complete.
+is untouched, because open PR #1601 edits the index; flipping it to ✅ once
+that PR merges is in #1629. The WP is otherwise complete.
 
 *Generality.* No judge dispatched: the branch does not touch `_audit.py`, and
 adds no heuristic, only comments on existing values and a test.
