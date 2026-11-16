@@ -387,6 +387,9 @@ def _flags_for(fit: GroupFit, j: int,
         flags.append("not_separable")
     if _axial_tail(fit, j):
         flags.append("axial_tail")
+        if bool(fit.at_bound[j]):
+            # the strong line's own tail, at no position of its own (WP-2120)
+            flags.append("tail_shoulder")
     if (float(fit.intensity[j]) <= BOUND_HIT_RTOL
             or float(fit.intensity[j])
             < PEAK_NO_INTENSITY_SIGMA * float(fit.intensity_esd[j])):
@@ -416,7 +419,10 @@ def _axial_tail(fit: GroupFit, j: int) -> bool:
     **Reported, not refused** — the flag is absent from
     ``PEAK_UNUSABLE_FLAGS``: the side test is evidence, not proof, and a real
     weak line can sit there too (measured, the screen reaches 11 unverified
-    usable components across the six other real lab patterns).  Measured on
+    usable components across the six other real lab patterns).  **Refused only
+    together with** ``position_at_bound``, as ``tail_shoulder`` (WP-2120): a
+    component the fit pushed to its bound has no position of its own, and on
+    three lab families every such one is its mate's tail.  Measured on
     SRM 660c it catches exactly the five tails, worth 125 ppm of
     certified-cell bias, and excluding the flagged components is what took the
     gate to ``high`` at −2 ppm.
