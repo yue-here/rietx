@@ -2099,7 +2099,13 @@ ROWS: tuple[Row, ...] = (
                   "refitted with 3° or 8° knots and the air term on or off: no near-trigger choice "
                   "moved a cell, scale or Biso past 0.8 esd; only FAP with its air term left "
                   "out (score 0.75) moved scale 2 esd and Lorentzian size and strain 3 esd, "
-                  "and AIR_SCATTER_UNDECLARED fired there"),
+                  "and AIR_SCATTER_UNDECLARED fired there; "
+                  "WP-2017 group F (2026-11-16): gains 0.067 (Si SRM 640c) and 0.245-0.817 "
+                  "(cpd-1a to -1h); flipping the air term moves cpd-1a to -1h 0.049-0.17 plain "
+                  "esd and a weight fraction at most 0.022 wt %, and Si SRM 640c 4e-6 esd; "
+                  "AIR_SCATTER_UNDECLARED fired on all nine with the term off, Si SRM 640c "
+                  "included, where declaring it moved nothing, and on none with it on "
+                  "(docs/wp/2017-batch/group_f_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
                  "auto_background (B12's ruling); kept as a pick rather than an abstention "
                  "near the trigger (ruled 2026-10-20) because no near-trigger choice moved a "
@@ -2126,7 +2132,15 @@ ROWS: tuple[Row, ...] = (
                   "refitted with 3° or 8° knots and the air term on or off: no near-trigger choice "
                   "moved a cell, scale or Biso past 0.8 esd; only FAP with its air term left "
                   "out (score 0.75) moved scale 2 esd and Lorentzian size and strain 3 esd, "
-                  "and AIR_SCATTER_UNDECLARED fired there"),
+                  "and AIR_SCATTER_UNDECLARED fired there; "
+                  "WP-2017 group F (2026-11-16), each pattern's trigger moved just across its own "
+                  "score: 11-BM Si SRM 640c in its Kapton capillary scores 0.099 and takes 3 deg "
+                  "knots, within 0.43 plain esd of the measured-blank arm on lambda, zero and Biso; "
+                  "with 8 deg knots lor_size moves 4.0 esd and Biso 3.0 esd from that arm (Rwp "
+                  "0.104 against 0.087), past the 0.8 esd these grounds rest on; cpd-1a to -1h "
+                  "score 0.19-0.36, and 8 deg moves them 0.20-1.23 plain esd and a weight "
+                  "fraction at most 0.19 wt % "
+                  "(docs/wp/2017-batch/group_f_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
                  "auto_background (B12's ruling); kept as a pick rather than an abstention "
                  "near the trigger (ruled 2026-10-20) because no near-trigger choice moved a "
@@ -2140,7 +2154,12 @@ ROWS: tuple[Row, ...] = (
                   "refitted with 3° or 8° knots and the air term on or off: no near-trigger choice "
                   "moved a cell, scale or Biso past 0.8 esd; only FAP with its air term left "
                   "out (score 0.75) moved scale 2 esd and Lorentzian size and strain 3 esd, "
-                  "and AIR_SCATTER_UNDECLARED fired there"),
+                  "and AIR_SCATTER_UNDECLARED fired there; "
+                  "WP-2017 group F (2026-11-16): on Si SRM 640c's Kapton hump 3 deg knots stay "
+                  "within 0.43 esd of the measured-blank arm where 8 deg move lor_size 4.0 and "
+                  "Biso 3.0 esd; on cpd-1a to -1h, 3 against 8 deg: 0.20-1.23 esd, at most 0.19 "
+                  "wt % "
+                  "(docs/wp/2017-batch/group_f_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
                  "auto_background (B12's ruling); kept as a pick rather than an abstention "
                  "near the trigger (ruled 2026-10-20) because no near-trigger choice moved a "
@@ -2154,7 +2173,12 @@ ROWS: tuple[Row, ...] = (
                   "refitted with 3° or 8° knots and the air term on or off: no near-trigger choice "
                   "moved a cell, scale or Biso past 0.8 esd; only FAP with its air term left "
                   "out (score 0.75) moved scale 2 esd and Lorentzian size and strain 3 esd, "
-                  "and AIR_SCATTER_UNDECLARED fired there"),
+                  "and AIR_SCATTER_UNDECLARED fired there; "
+                  "WP-2017 group F (2026-11-16): none of nine patterns scored under the trigger, "
+                  "so 8 deg was reached only by the flipped arm, which on Si SRM 640c moved "
+                  "lor_size 4.0 and Biso 3.0 esd from the measured blank; a smooth-baseline real "
+                  "pattern under 0.05 is still owed "
+                  "(docs/wp/2017-batch/group_f_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
                  "auto_background (B12's ruling); kept as a pick rather than an abstention "
                  "near the trigger (ruled 2026-10-20) because no near-trigger choice moved a "
@@ -3454,7 +3478,14 @@ ROWS: tuple[Row, ...] = (
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "
                   "1.22-1.27x faster on cpd-1a, 1.04x slower on cpd-2, and corundum's strain "
                   "anisotropy past test_acceptance_stephens's bar (3.64 against < 2.0); "
-                  "domain test owed (B10)"),
+                  "domain test owed (B10); "
+                  "WP-2017 group E (2026-11-16), solver='trf' through the closing stage on cpd-1a "
+                  "(QPA protocol), qarr corundum with the Stephens block and 11-BM Si SRM 640c (XND "
+                  "protocol): GTOL 1e-8 is bit-identical on all three, one corundum solve stopping "
+                  "on gtol instead of ftol-and-xtol at the same answer, and WP-1109's corundum "
+                  "anisotropy shift did not recur; cpd-1a and corundum are one laboratory and "
+                  "development data "
+                  "(docs/wp/2017-batch/group_e_summary.md)"),
         grounds=("A number the package chooses once the caller switches TRF on, so not caller "
                  "under the caller-tier ruling (2026-10-21); a numerical setting whose domain "
                  "test is owed, tier 3 under B10 option 2 (ruled 2026-10-19)."),
@@ -3528,7 +3559,12 @@ ROWS: tuple[Row, ...] = (
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "
                   "1.22-1.27x faster on cpd-1a, 1.04x slower on cpd-2, and corundum's strain "
                   "anisotropy past test_acceptance_stephens's bar (3.64 against < 2.0); "
-                  "domain test owed (B10)"),
+                  "domain test owed (B10); "
+                  "WP-2017 group E (2026-11-16), the same three fits: XTOL 1e-8 moves Si SRM 640c "
+                  "0.0049 plain esd (zero shift) at 0.90x the evaluations, one more solve "
+                  "stopping on xtol; bit-identical on cpd-1a and corundum; noise arms 6.8e-6, 0.10 "
+                  "(corundum S004) and 3.5e-6 "
+                  "(docs/wp/2017-batch/group_e_summary.md)"),
         grounds=("A number the package chooses once the caller switches TRF on, so not caller "
                  "under the caller-tier ruling (2026-10-21); a numerical setting whose domain "
                  "test is owed, tier 3 under B10 option 2 (ruled 2026-10-19)."),
@@ -4702,7 +4738,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.strategy.staged.BOUND_HIT_COS_MIN", "constant", tier=3, value=0.0001,
         evidence=("WP-1434: |cos| 1.5e-2 to 2.1e-1 over the 32 binding cases against 5.0e-10 at a "
                   "free optimum, 1e-4 sits 145x and 2e5x inside; FAP, Si SRM 640c, make_lab6; "
-                  "second pass owed (a third family under TRF)"),
+                  "second pass owed (a third family under TRF); "
+                  "WP-2017 group E (2026-11-16), issue #273's construction on cpd-1a under "
+                  "TRF: |cos| 0.165 to 0.472 over 20 binding cases, 1650x above; the 20 free-optimum "
+                  "controls read 1.6e-15 to 3.3e-3, and three of five at ftol 1e-3 sat 18 to 33x "
+                  "above 1e-4, silent only through the distance half; WP-1434's 5.0e-10 free "
+                  "optimum was read at a tighter stop "
+                  "(docs/wp/2017-batch/group_e_summary.md)"),
         grounds=("Reports only, through BOUND_HIT, FLOOR_HIT and at_bound; with f kept on the esd "
                  "(B4) the margins stand as measured (B16, ruled 2026-10-19)."),
         approved="2026-10-19"),
@@ -4710,7 +4752,13 @@ ROWS: tuple[Row, ...] = (
         evidence=("WP-1434: 32 binding cases on FAP and Si SRM 640c, ftol 1e-9 to 1e-3: largest "
                   "binding gap 7.7e-4 esd, early stop 2.36 esd (make_lab6 synthetic), margins 13x "
                   "and 236x with f in the esd; read off LM's exact active set only beyond it; "
-                  "second pass owed (a third family under TRF)"),
+                  "second pass owed (a third family under TRF); "
+                  "WP-2017 group E (2026-11-16), issue #273's construction on cpd-1a under "
+                  "TRF, the third family: two Biso, fluorite lor_size, zincite scale and the zero "
+                  "shift bound 3 esds past their optimum at ftol 1e-9 to 1e-3, 20 binding cases: "
+                  "largest gap 5.7e-5 esd, 174x under, all 20 fired; the 20 free-optimum controls "
+                  "sat 3.5 to 247 esd from their limit and none fired "
+                  "(docs/wp/2017-batch/group_e_summary.md)"),
         grounds=("Reports only, through BOUND_HIT, FLOOR_HIT and at_bound; with f kept on the esd "
                  "(B4) the margins stand as measured (B16, ruled 2026-10-19)."),
         approved="2026-10-19"),

@@ -451,9 +451,16 @@ def summary() -> None:
                   f"|cosine| {min(coss):.2g}, {min(coss) / staged.BOUND_HIT_COS_MIN:.3g}× above "
                   f"it (WP-1434: {WP1434['cos_min'] / staged.BOUND_HIT_COS_MIN:.3g}×)."]
     if free_coss:
-        lines.append(f"Controls: largest |cosine| {max(free_coss):.2g}, "
-                     f"{staged.BOUND_HIT_COS_MIN / max(free_coss):.3g}× under the threshold "
-                     f"(WP-1434: {staged.BOUND_HIT_COS_MIN / WP1434['free_cos']:.3g}×).")
+        over = {f: sum(1 for (n, ff, m), r in ((k[1:], v) for k, v in latest.items()
+                                                if k[0] == "bound" and "error" not in v)
+                       if m == "control" and ff == f and r["residual_cosine"] is not None
+                       and abs(r["residual_cosine"]) >= staged.BOUND_HIT_COS_MIN)
+                for f in FTOLS}
+        lines.append(f"Controls (free optima): largest |cosine| {max(free_coss):.2g}, against the "
+                     f"threshold {staged.BOUND_HIT_COS_MIN:g} (WP-1434's free optimum: "
+                     f"{WP1434['free_cos']:.1g}); controls at or over it, by ftol: "
+                     + ", ".join(f"{f:g} {n}" for f, n in over.items())
+                     + ".  None fired: the distance half held every one.")
     if errors:
         lines += ["", "## Errors", ""] + [f"- {_key(r)}: {r['error']}" for r in errors]
     lines.append("")
