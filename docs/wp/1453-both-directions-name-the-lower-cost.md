@@ -70,6 +70,40 @@ carries the history, not the cold start. The reporter proposes option 1 as a
 (the issue's question 1, open). χ² is unchanged by any exact equivalence, so
 the pair needs no ruling on the issue's § 2.
 
+**The package's own passes, measured** (task 1, 2026-11-16, `[dev]`, darwin
+arm64, tree `bc77a934e`). Issue #267's two-basin construction as WP-1420's
+PR #1401 builds it (`tests/test_identity_point_seed.py` helpers, the
+`tests/repro_1420.py chains` loop): a Cu `F m -3 m` parent and its
+`I 4/m m m` subgroup, present from p004 at 0.15, 0.25 and 0.40 of the
+parent's scale, seven noise draws (20260904 and 1-6), each sign of the true
+distortion, so 42 series. The subgroup starts at the identity point,
+`carry=("*",)`, `direction="both"`, defaults otherwise. Measured before
+WP-1420's probe rung, which was never built (its tasks 2-5 went to issue
+#1402). The cost is Σw·Δ² = `Statistics.chi2`·(N − P) per pattern and pass;
+N was the same in both passes on all 336 pattern pairs.
+
+- **They disagree, and only across basins.** At 36 of the 168 present
+  pairs (p004-p007; 9 of 42 series, three per fraction) the two passes sat
+  on opposite sides of the identity point. Σw·Δ² differed there by 3.6-6.8 %
+  at 0.15, 11-15 % at 0.25 and 33-39 % at 0.40 (relative Rwp 1.8e-2 to
+  1.5e-1), always at equal P. The lower-cost pass was on the true side in
+  36 of 36, and it was the forward pass every time: the backward chain's
+  cold start at p007 from the identity point fell to the wrong side in all
+  42 series, as WP-1420 measured for cold fits. `direction_gaps` already
+  saw these patterns (cell `|gap_esd|` 29-56 there); what it cannot say is
+  which side is lower.
+- **Agreement is not correctness.** At the other 132 present pairs both
+  passes sat on the same wrong side, at costs equal to 1.7e-6 relative or
+  better. A cost comparison is silent there, exactly as the value gaps are.
+- **Off the onset the passes fit different parameter sets.** At p000-p003,
+  where the subgroup is absent, P differed between the passes at 117 of 168
+  pairs (WP-1301 holds the subgroup in one pass and not the other), and
+  Σw·Δ² differed by up to 1.15e-3 relative (relative Rwp ≤ 5.7e-4). The pass
+  with more free parameters was lower at 86 of those 117 and higher at 31.
+  These noise-level differences are the size of #1556's CuCr₂O₄ ones
+  (relative Rwp ≤ 1.4e-3), and a lower cost at a different P is not a better
+  fit, which is "Two limits" above, now measured.
+
 **The design question.** A per-pattern best mixes the two passes, so the
 returned trajectory is no longer one chain. Each entry is still a converged
 optimum of its own pattern. The options:
@@ -101,10 +135,12 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
 
 ## Tasks
 
-- [ ] Measure whether the package's own passes disagree in cost: a synthetic
+- [x] Measure whether the package's own passes disagree in cost: a synthetic
       series with a known two-basin pattern, run with `direction="both"`.
       The WP-1420 fixture (issue #267) may already be one. If the passes
       never disagree in cost, close this WP on that measurement.
+      *(2026-11-16: they do, in 9 of 42 series, so the WP stays open;
+      § Context, "The package's own passes, measured".)*
 - [ ] Option 1: the costs on the finding and on the entry.
 - [ ] Decide whether option 2 or 3 ships, and write the decision here.
 - [ ] Tests: the fixture reports the right pass at the right pattern.
