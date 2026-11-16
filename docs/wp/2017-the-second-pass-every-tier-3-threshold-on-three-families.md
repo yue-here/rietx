@@ -96,7 +96,7 @@ different laboratory, instrument and material:
 | A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven closed by ruling |
 | B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | not run: the third family is unnamed, a question to the maintainer (2026-11-16) |
 | C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | measured 2026-11-16: four read only in an uncalled `bccg.solve`; `_PCG_TOL` at 1e-8 fails silently on FAP; cpd-1a never past the cut |
-| D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four cannot reach it (single fits); joint fits to be fixed before running | open |
+| D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four cannot reach it (single fits); joint fits fixed 2026-11-16: cpd-1a/-1b/-1c, the CuCr₂O₄ ramp's seven cold frames, the synthetic library | open |
 | E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
 | F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
 | G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | measured 2026-11-16: unreached on real trace phases, acts on zircon alone; B1.1's case not produced |
@@ -167,6 +167,27 @@ and have no free factor to measure, so this file's old list named them without c
   case its row cites), cpd-1a, -1b and -1c fitted jointly on one qarr instrument, frames of the
   CuCr₂O₄ ramp, and the Nd₂Ru₂O₇ X-ray and neutron pair, which is evidence for no audit before the
   milestone's close (§ Context).
+- **D, its fits and arms, fixed 2026-11-16 before running** (`2017-batch/group_d.py`). Three
+  joint fits, each a `MultiHistogramRefinement` through its plan's closing stage under the `lm`
+  driver (the only one with a blocked path). `cpd1_joint`: cpd-1a, -1b and -1c together, the QPA
+  acceptance protocol's three phases, `qarr_instrument` for each pattern, `seed_scales` per
+  pattern, `qpa_plan`, the default sharing (scales and instrument per pattern, the specimen
+  shared). `cucr_cold`: the CuCr₂O₄ ramp's seven frames below the published transition near
+  130 K (6.8-122.7 K, `OH_00` to `OH_24`), group G's `cucr_models` for each, `mccusker_default`,
+  with every cell parameter and Biso per pattern (`SharingMap(per_histogram=...)`), since a
+  cell shared across a ramp is not one specimen. `library20`: the synthetic parametric library at
+  20 patterns, the row's cited case, as the harness's positive arm (it must repeat the test's
+  0.01 esd). Arms: `dense` and `blocked` forced through `blocked.set_layout`, `rule` (the shipped
+  size rule, which these three put dense), and `noise` (dense, every free start value that is not
+  zero ×(1 + 1e-12)). Control: each fit's `jacobian_layout` must read its arm's layout, or the
+  arm measured nothing. Read: every free row of `blocked` against `dense` in plain esd over the
+  larger esd (`_shift`, 0.1 bar), past the noise arm, with Rwp, evaluations, status and the
+  diagnostic codes; and each fit's dense Jacobian size against the constant. References: the
+  weighed fractions for cpd-1, the 10 K Fddd cell for the coldest frame (as group G), the library's
+  surface; read beside the bar, not as it. These are two real families (qarr, 11-BM) and one
+  synthetic, against the row's three: no third joint family is on disk but Nd₂Ru₂O₇, which is
+  evidence for no audit before the milestone closes, so whether two close D goes to the maintainer
+  after it runs, not decided here.
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
