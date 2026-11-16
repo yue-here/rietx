@@ -40,6 +40,7 @@ import json
 import math
 import os
 import platform
+import re
 import subprocess
 import sys
 import warnings
@@ -444,6 +445,8 @@ def _fmt(x, spec=".3g") -> str:
     return "—" if x is None or (isinstance(x, float) and not math.isfinite(x)) else format(x, spec)
 
 
+#: the width rows (``RefinedParameter`` carries no unit): Caglioti terms, X/Y, sample widths
+WIDTH = re.compile(r"\.profile\.(u|v|w|x|y)$|\.(lor_size|lor_strain|gauss_size|gauss_strain)$")
 SL = "instrument.geometry.axial_sl"
 HL = "instrument.geometry.axial_hl"
 
@@ -533,7 +536,9 @@ def summary() -> None:
     L += ["", "## (2) `refine._FLAT_AXIS_TEST_DIRECTIONS`", "",
           "Held: the last stage's held rows. Flat axis: the stage record's axis (crystal axes); "
           "angle: between this arm's axis and shipped's. Spy: `_flat_rotation_axis` calls and the "
-          "pairs it read (control: the arm's pair must be among them).", "",
+          "pairs it read (control: the arm's pair must be among them). The patterns are noise-free, so "
+          "an esd here is a rounding-scale number (1e-18 to 1e-13): the moment rows' largest "
+          "absolute change (rad, μ_B) rides beside the esd reading.", "",
           "| Case | Arm | Rwp | evals | status | held | flat axis | angle to shipped's (°) | "
           "turned | spy calls | spy saw arm's pair | against shipped |",
           "|---|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -551,6 +556,10 @@ def summary() -> None:
                 else None
             saw = json.dumps(r["pair"]) in r["spy_pairs"] if r["spy_calls"] else "no call"
             cmp = _cmp_line(r, base) if base and "error" not in base and a != "shipped" else "—"
+            if cmp != "—":
+                d = max(abs(v[0] - base["rows"][k][0]) for k, v in r["rows"].items()
+                        if ".moment." in k and k in base["rows"])
+                cmp += f"; moment rows Δ ≤ {d:.1e}"
             L.append(f"| `{c}` | {a} | {_fmt(r['rwp'], '.6f')} | {r['n_eval']} | {r['status']} | "
                      f"{', '.join(h.rsplit('.', 1)[-1] for h in r['held']) or 'none'} | "
                      f"{'(' + ', '.join(f'{v:.4f}' for v in ax) + ')' if ax else '—'} | "
@@ -584,7 +593,8 @@ def summary() -> None:
     L += ["", "## (4) `params.vector.FLOOR_SEEDS`", "",
           "Floor reads: `least_squares` reads of the table during the fit (control: 0 means the "
           "arm measured nothing). Width esd ratio: the arm's plain esd over shipped's on the rows "
-          "whose unit is in the table, smallest and largest.", "",
+          "whose unit is in the table (the Caglioti terms, X, Y and the sample widths), smallest "
+          "and largest.", "",
           "| Family | Arm | Rwp | evals | status | floor reads | against shipped | width esd ratio "
           "(min, max) | codes that differ |", "|---|---|---|---|---|---|---|---|---|"]
     for f in FLOOR_FAMILIES:
@@ -599,7 +609,8 @@ def summary() -> None:
             ratio, cmp, codes = "—", "—", set()
             if base and "error" not in base and a != "shipped":
                 cmp = _cmp_line(r, base)
-                rs = [r["rows"][k][1] / base["rows"][k][1] for k in r["units"]
+                widths = r["units"] or [k for k in r["rows"] if WIDTH.search(k)]
+                rs = [r["rows"][k][1] / base["rows"][k][1] for k in widths
                       if k in base["rows"] and r["rows"][k][1] and base["rows"][k][1]]
                 ratio = f"{min(rs):.4f}, {max(rs):.4f}" if rs else "no width row"
                 codes = set(r["codes"]) ^ set(base["codes"])
