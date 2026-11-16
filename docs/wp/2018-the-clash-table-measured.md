@@ -609,6 +609,36 @@ where every stage weights at the answer's scale, moves no value by more than 0.0
 against the shipped fit, while dropping the widening moves values up to 0.80 esd, so the arms
 can see a weighting effect of this kind; the lag is about 1/130 of it. Question (16).
 
+**C27, the rules that act on σ** (`zero_sigma.py`; macOS arm64, `[dev]`, about 3 s a fit).
+Re-derived first: WP-1952 has landed, so the row read at 4c55b9011 is out of date. There is no
+`_floor_sigma` any more. A stated σ ≤ 0 leaves the fit under the reader option
+`nonpositive_sigma="exclude"`, the default (`PatternData.in_range_mask`, pattern.py:236), or
+takes the Poisson fallback √max(y, 1) under `"poisson"` (`_poisson_where_nonpositive`,
+pattern.py:41, which `PatternData.sig` applies at :211). `RefinementResult.sig` applies the same
+function to the σ the fit stored (results.py:2466), and the compile still widens σ for a
+measured blank (C26). The dataset as chosen: a copy of `11BM_LaB6_cBN_mg2044.xye` with σ planted
+at the strongest channel in the fitted range (8.070°, LaB₆ 110, y = 122 248, file σ 355.8),
+under `test_acceptance_lab6_cbn.py`'s `PLAN_SHARED`. Arms: original; zero_exclude; zero_poisson;
+floor (the positive arm: σ = 1e-3 × the column's median, 0.0115, what the retired floor gave a
+zero, and which no rule touches).
+
+| Arm | channels fitted (`sigma_rule`) | σ stored at the channel | LaB₆ wt % | worst move (esd) | `sig()` = `sigma` |
+|---|---|---|---|---|---|
+| original | 44 895 file | 355.8 | 17.787(319) | — | bit for bit |
+| zero_exclude | 44 894 file, 1 excluded; reader's `PATTERN_SIGMA_NONPOSITIVE` | not in the fit | 17.729(319) | 0.28 (LaB₆ scale) | bit for bit |
+| zero_poisson | 44 894 file + 1 Poisson | 349.6 | 17.788(319) | 0.009 | bit for bit |
+| floor (positive arm) | 44 895 file | 0.0115 | 18.455(319) | **3.6** (LaB₆ scale); Rwp 6.4e-5, `STAGE_MAX_ITER` | bit for bit |
+
+The rules no longer stack: in every arm the σ the result stores is the σ the fit used and
+`sig()` returns it unchanged, so the second application is a no-op on a fit's own result, as
+its docstring says (it acts only on a hand-built result). A planted zero is now one channel's
+worth of data: dropped by default, it moves the LaB₆ scale 0.28 esd and its fraction 0.18 esd
+because the channel is a peak top; weighted as Poisson, 0.009 esd. The positive arm shows what
+the retired floor did with the same zero: one channel carrying about a million times its
+neighbours' weight, the LaB₆ scale 3.6 esd away and an Rwp of 6.4e-5. The blank's widening was
+measured in C26 and does not meet these rules (it adds to a σ that is already positive).
+Question (17).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -717,6 +747,10 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     0.0061 esd of a fit weighted at the answer throughout. Is C26 recorded *independent* (the
     lag accepted, as forward.py's comment says) on this evidence, and is the bar for "the
     lag is accepted" the maintainer's to state?
+17. **C27.** Since WP-1952 the σ rules no longer stack: `RefinementResult.sig` returns a fit's
+    σ unchanged in every arm, and a planted zero is excluded (0.28 esd on a peak top) or Poisson
+    weighted (0.009 esd), where the retired floor moved the scale 3.6 esd. Is C27 recorded
+    *dissolved* by WP-1952, and should the row's file:line be rewritten to the rules above?
 
 ## Acceptance
 
