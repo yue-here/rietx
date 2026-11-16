@@ -1,6 +1,7 @@
 # WP-1460 — one degeneracy, one finding
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — task 1 (reader audit) done; task 2 waits on Yue's
+replace-or-beside question (§ The reader audit)
 Track: What fires, and what stays silent
 Depends on: — (1454 soft: it removed the commonest source; 1302 soft: the render cap)
 Priority: P3 2026-09-24 — a correct report said once per pair, up to hundreds of times, burying the rows beside it; `summary()` already caps the view and dropping the rows is the workaround
@@ -237,6 +238,38 @@ reachable.
   render cap), WP-1311 (`FLAT_DIRECTION`), WP-1103 (the reader audit).
 
 ## Handover log
+
+- **2026-11-16** — The reader audit is done, and it narrows what the grouping
+  has to protect. Nothing outside the stage loop and the guard code needs a
+  pair row to exist, and the series count comes out the same if a group names
+  the union of its pairs' paths. What a group would change for a caller is a
+  handful of counts and one rule that sets a row's level per purpose. The
+  audit also found that the render cap never reached the GUI's result panel or
+  the compare UI: both print every row, so a user meets the flood there today
+  whatever `summary()` shows. Task 2 was not started, because whether a group
+  replaces the pair rows or rides beside them changes what a result stores,
+  and that is the maintainer's call.
+  *Done:* § The reader audit (a table of every writer, reader, counter and
+  printer, with file and symbol), the tests that pin the current shape, and
+  the question for Yue with its sub-question (per stage or answer stage only).
+  *Inherited pruned:* WP-2050's entry folded into Context, with a new check
+  beside it (the joint fit's `_top_diagnostics` thresholds the solver's
+  matrix without WP-2050's unresolved mask); WP-1906's and WP-1545's
+  workarounds (the skill's worked example and tutorial 01 use a Chebyshev
+  because of the flood) are still true at `bc77a934e` and became one
+  task to run once the grouping lands. *Stale premises:* the guard loop is now
+  `staged._correlation_findings`, shared with the joint fit (WP-2028); the cap
+  bounds two codes on separate budgets, each with an `*_OMITTED` row;
+  `SEQUENTIAL_PERSISTENT_FINDING` is gone (WP-2003, now
+  `SeriesResult.code_counts`); `COVARIANCE_DIRECTION_DISCARDED` (WP-1535) is a
+  new pair-keyed reader. *In flight elsewhere:* PR #1475 (WP-1990, open) adds
+  `Identifiability.correlation`, the answer stage's whole matrix, which is one
+  way to keep every pair reachable under "replace"; it carries no
+  earlier-stage \|ρ\| and is `None` on a joint fit. Prose only: no src or
+  test change, so no suite ran beyond the docs gate (PR #1597).
+  *Next:* Yue answers the question under § The reader audit; then task 2,
+  starting from the table's fixture set re-measured on current main, since
+  its counts are from 2026-09-24.
 
 - **2026-09-24** — created by WP-1454's task 2 on its own branch, from the
   audit above. Next: the reader audit, because it decides whether grouping can
