@@ -1,6 +1,6 @@
 # WP-1524 — The step scan's last two blind spots
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: A long run is not one fit
 Depends on: — (1469 landed the rule this extends)
 Priority: P3 2026-09-29 — a false flag on a run of failed patterns, and a second real step on one path goes unreported; both on paths few series run
