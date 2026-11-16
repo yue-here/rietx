@@ -96,6 +96,19 @@ Read `data` with `.get`, because a later version of rietx may add fields to a ki
 A cancelled fit's `fit_end` carries no statistics.
 An exception raised in your function stops the fit, since the function is yours.
 
+## Draw the fit as it runs
+
+To draw the curve and the atoms while the fit runs, pass `events=rietx.history.EventStream(callback=draw, preview=True)`.
+Each accepted `eval` then reaches `draw` with a `preview` key beside `data`.
+`preview["two_theta"]` and `preview["y_calc"]` are arrays on the grid the stage fits.
+`preview["values"]` holds every parameter that can move in the stage, by its path, with the atom coordinates and lattice parameters as absolute values.
+So `draw` needs no second refinement and no `predict()` call, which compiles a model on every frame.
+
+The preview reaches your function and nothing else.
+The file you name, the run directory and `progress=` write the same lines with it on and off.
+Copy an array you keep after `draw` returns.
+`preview=True` without a callback raises `ValueError`, and so does a joint fit given one.
+
 ## Switch recording off
 
 | Setting | Reaches |

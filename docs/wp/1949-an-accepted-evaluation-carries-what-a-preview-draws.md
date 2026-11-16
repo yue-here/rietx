@@ -163,10 +163,18 @@ threshold, no automatic action). No number is added.
       one in `tests/test_telemetry.py`;
       `tests/output/wp1949_preview_obs_calc_diff.png` is drawn from one
       preview alone.
-- [ ] Manual (`using/refining.md` § events) and the event table in the
+- [x] Manual (`using/refining.md` § events) and the event table in the
       skill's API index.
-- [ ] Skill: one row in the reference that documents `events=`. Nothing in
+      *Done 2026-11-16, superseded in part:* the manual's events section is
+      now `docs/docs/guides/watch.md` § Read the events yourself, and the new
+      § Draw the fit as it runs sits under it. The skill's API index has no
+      event table (`make_api_index.py` renders call signatures, and
+      `EventStream` is not among them), so the row went to the reference
+      below instead.
+- [x] Skill: one row in the reference that documents `events=`. Nothing in
       the body.
+      *Done 2026-11-16:* `references/watching.md` § 9d.11, synced to both
+      committed copies.
 
 ## Acceptance
 

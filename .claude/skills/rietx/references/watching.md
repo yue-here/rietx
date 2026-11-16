@@ -182,3 +182,16 @@ with `node_id` `None`, since a joint fit keeps no history.
 logged one `fit_start`, five `stage_start` and `stage_end`, 38 `eval` and one
 `fit_end`, and the last `stage_end` rows equal each histogram's Rwp in the
 result, 0.0411 and 0.0613.)*
+
+**9d.11 To draw a fit live, ask the stream for a preview rather than
+re-predicting.** `EventStream(callback=cb, preview=True)`, passed as `events=`,
+hands `cb` each accepted `eval` with a `preview` key beside `data`:
+`two_theta`, `y_calc` (ndarrays on the stage's fitted grid) and `values`, every
+moving path's absolute value, tied coordinates and cell included. No file
+receives it, so the run's logs are unchanged. Copy what you keep. A joint fit
+refuses it with a `ValueError`.
+
+*(Measured: WP-1949, `[dev]` venv, macOS arm64. Carrying it costs 0.02 ms an
+accepted `eval`; a `predict()` on a fresh grid, the alternative, took 548 ms
+on a 26 Å MOF cell. The last preview of a fit lies within 4.4e-6 of the curve's
+maximum from `predict()`.)*
