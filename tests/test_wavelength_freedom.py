@@ -26,6 +26,7 @@ from rietx.params.vector import (
     ParameterTable,
     _is_wavelength,
     check_wavelength_freedom,
+    wavelength_pins,
 )
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import EmissionLine, NeutronSource
@@ -246,15 +247,46 @@ def test_an_unshared_cell_refuses_every_free_wavelength():
 
 
 def test_the_check_is_one_function_with_three_cases():
-    """Called by both tables; the messages are its contract."""
-    check_wavelength_freedom([], 2, 2)                  # nothing free: silent
-    check_wavelength_freedom([f"hist.1.{WL}"], 2, 2)    # one of two: fine
+    """Called by both tables; the messages are its contract.
+
+    Since WP-2148 it is handed the wavelengths the pin rule left unpinned
+    (:func:`wavelength_pins`), and only words the refusal by case.
+    """
+    check_wavelength_freedom([], 2, 2)                  # nothing unpinned: silent
     with pytest.raises(ValueError, match="single-histogram"):
         check_wavelength_freedom([WL], 1, 1)
     with pytest.raises(ValueError, match="hold one"):
         check_wavelength_freedom([f"hist.0.{WL}", f"hist.1.{WL}"], 2, 2)
     with pytest.raises(ValueError, match="per-histogram"):
         check_wavelength_freedom([f"hist.1.{WL}"], 2, 2, cell_shared=False)
+
+
+def test_the_pin_rule_is_connectivity_over_free_cells():
+    """``wavelength_pins``: one rule for one histogram and for N (WP-2148).
+
+    A histogram's d scale is pinned by a held wavelength or a held cell length
+    of a phase in it, and a free cell carries a pin to every histogram sharing
+    it.  The old N − 1 count and the single-histogram refusal are two cases.
+    """
+    held_si = "phases.0.cell.a"
+    # one histogram: a held standard beside a free sample pins it
+    assert wavelength_pins([False], [{"0": held_si, "1": None}]) == [held_si]
+    # one histogram, every cell free: the flat direction
+    assert wavelength_pins([False], [{"0": None}]) == [None]
+    # two histograms sharing one free cell: one held λ pins both
+    assert wavelength_pins([True, False], [{"0": None}, {"0": None}]) == [
+        "hist.0", "hist.0"]
+    # ... and none held is the flat direction, for both
+    assert wavelength_pins([False, False], [{"0": None}, {"0": None}]) == [
+        None, None]
+    # a shared held standard pins every histogram with every λ free
+    assert wavelength_pins([False, False], [{"0": held_si, "1": None}] * 2) == [
+        held_si, held_si]
+    # per-histogram free cells: a held λ elsewhere reaches nothing
+    assert wavelength_pins([True, False], [{(0, "0"): None}, {(1, "0"): None}]
+                           ) == ["hist.0", None]
+    # a held cell is named before a held wavelength in the same set
+    assert wavelength_pins([True], [{"0": held_si}]) == [held_si]
 
 
 def test_suggest_never_proposes_a_wavelength():
@@ -686,3 +718,256 @@ def test_the_glob_skip_does_not_depend_on_how_the_caller_batched_it():
     # and the held-cell case still works, or the skip never stops skipping
     alone = ParameterTable(_held_cell(), ins)
     assert WL in alone.set_vary([WL], True)
+
+
+# --- a held standard in a mixture (WP-2148, issue #1550) -------------------
+#
+# Si held at its certificate beside CeO₂ with its cell free: the standard's
+# held cell pins the d scale, so λ and the sample's cell refine together, in
+# one histogram or in a joint fit.  Synthetic Debye-Scherrer patterns,
+# Poisson noise, generated from the model they are fitted with; λ planted
+# 500 ppm above the declared 1.5406 Å (and −300 ppm on the joint Mo pattern).
+
+A_SI = 5.4311946                 # SRM 640 series certificate value
+A_CEO2 = 5.4111
+CEO2_A = "phases.1.cell.a"
+LAM_CU = 1.5406 * (1 + 500e-6)   # planted
+LAM_MO = 0.7107 * (1 - 300e-6)   # planted
+
+
+def _mixture(*, si_free=False, si_scale=0.05, a_ceo2=A_CEO2):
+    """Si (Fd-3m:2) + CeO₂ (Fm-3m), the Si cell held unless ``si_free``."""
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure
+
+    si = Phase(name="Si", space_group="F d -3 m :2",
+               cell=Cell.cubic(A_SI, vary=si_free),
+               scale=P(value=si_scale, min=0.0),
+               atoms=[Atom(label="Si", species="Si", x=P(value=0.125),
+                           y=P(value=0.125), z=P(value=0.125),
+                           biso=P(value=0.5))])
+    ce = Phase(name="CeO2", space_group="F m -3 m",
+               cell=Cell.cubic(a_ceo2, vary=True),
+               scale=P(value=0.05, min=0.0),
+               atoms=[Atom(label="Ce", species="Ce", x=P(value=0.0),
+                           y=P(value=0.0), z=P(value=0.0), biso=P(value=0.4)),
+                      Atom(label="O", species="O", x=P(value=0.25),
+                           y=P(value=0.25), z=P(value=0.25), biso=P(value=0.8))])
+    return Structure(phases=[si, ce])
+
+
+def _ds(wavelength):
+    from rietx.schemas.instrument import BackgroundChebyshev
+
+    ins = Instrument.debye_scherrer(wavelength=wavelength)
+    ins.profile.u.value, ins.profile.v.value, ins.profile.w.value = 0.02, -0.01, 0.008
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in (60.0, -10.0, 4.0)])
+    return ins
+
+
+def _synth(wavelength, lo, hi, *, seed, si_scale=0.05, step=0.02):
+    st = _mixture(si_scale=si_scale)
+    ins = _ds(wavelength)
+    tt = np.arange(lo, hi, step)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(st, ins, blank, mode="rietveld")
+    table = ParameterTable(st, ins)
+    y = model.evaluate(table.decode(table.x0()))
+    y = np.random.default_rng(seed).poisson(np.maximum(y, 1.0)).astype(float)
+    return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+
+
+@pytest.fixture(scope="module")
+def cu_mixture() -> PatternData:
+    return _synth(LAM_CU, 15.0, 140.0, seed=11)
+
+
+@pytest.fixture(scope="module")
+def mo_mixture() -> PatternData:
+    return _synth(LAM_MO, 7.0, 70.0, seed=12)
+
+
+def _start():
+    """The fit's start: CeO₂ 500 ppm high, λ at the declared value."""
+    return _mixture(a_ceo2=A_CEO2 * (1 + 500e-6))
+
+
+def _z(row, truth):
+    return (row.value - truth) / row.stderr
+
+
+def test_a_held_standard_pins_the_scale_for_a_free_sample_cell():
+    """The table-level fence: one held phase is enough (arm A, and A0).
+
+    The skip asked "is any cell free?", so freeing the sample's cell beside λ
+    dropped λ although Si's held cell pinned the scale.  It now asks the pin
+    rule, which the refusal at the solve reads too.  With Si free as well
+    nothing is held and both still decline and refuse.
+    """
+    ins = _ds(1.5406)
+    table = ParameterTable(_mixture(), ins)
+    assert table.wavelength_pin() == "phases.0.cell.a"
+    assert table.set_vary([CEO2_A, WL], True) == [CEO2_A, WL]
+    table.check_wavelength_against_cell()               # must not raise
+
+    flat = ParameterTable(_mixture(si_free=True), ins)
+    assert flat.wavelength_pin() is None
+    assert WL not in flat.set_vary([CEO2_A, WL], True)
+    flat.entries[flat._paths[WL]].vary = True           # a declared claim
+    flat._rebuild()
+    with pytest.raises(ValueError, match="no phase's cell is held"):
+        flat.check_wavelength_against_cell()
+    # the parameter row says the same as the skip (one predicate)
+    def needs(structure):
+        rows = Refinement(structure, ins.model_copy(deep=True),
+                          history=False).parameters()
+        return next(r for r in rows if r.path == WL).needs_held_cell
+    assert needs(_mixture()) is False
+    assert needs(_mixture(si_free=True)) is True
+
+
+def test_the_joint_fence_admits_every_wavelength_beside_a_held_standard():
+    """Arm B at table level, and B0: a held shared cell pins every histogram.
+
+    The N − 1 count refused all N free whatever was held; the pin rule admits
+    them when a phase in the shared structure is held, and keeps refusing the
+    flat case with the Si cell freed.
+    """
+    ins = [_ds(1.5406), _ds(0.7107)]
+    mt = MultiParameterTable(_mixture(), ins)
+    mt.set_vary([CEO2_A, WL], True)
+    assert sum(1 for p in mt.free_paths if p.endswith(".wavelength")) == 2
+    assert mt.wavelength_pins() == ["phases.0.cell.a"] * 2
+
+    flat = MultiParameterTable(_mixture(si_free=True), [_ds(1.5406), _ds(0.7107)])
+    with pytest.raises(ValueError, match="2 of 2 wavelengths are free"):
+        flat.set_vary([CEO2_A, WL], True)
+
+
+@pytest.mark.parametrize("shape", ["own_stage", "one_stage"])
+def test_arm_a_refines_lambda_against_a_held_standard(cu_mixture, shape):
+    """Arm A in both plan shapes: λ lands within 3 esd of the planted value.
+
+    ``one_stage`` is the issue's silent variant: on ``main`` at ``a23d06e14``
+    it dropped λ with no message, reported ``converged``, and put CeO₂ a 496
+    ppm low (z −109).  ``WAVELENGTH_CALIBRATION`` names the held cell it was
+    measured against, never a cell that was not held.
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    first = Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"])
+    stages = ([first, Stage("lam", [WL]), Stage("lam_cell", [CEO2_A, WL])]
+              if shape == "own_stage" else [first, Stage("lam_cell", [CEO2_A, WL])])
+    ref = Refinement(_start(), _ds(1.5406), history=False)
+    result = ref.fit(cu_mixture, plan=RefinementPlan(stages=stages))
+    rows = {p.path: p for p in result.parameters}
+    assert WL in result.stages[-1].freed
+    assert abs(_z(rows[WL], LAM_CU)) < 3.0
+    assert abs(_z(rows[CEO2_A], A_CEO2)) < 3.0
+    assert result.statistics.gof < 1.1
+    codes = {d.code for d in result.diagnostics}
+    assert "WAVELENGTH_NOT_FREED" not in codes
+    cal = [d for d in result.diagnostics if d.code == "WAVELENGTH_CALIBRATION"]
+    assert len(cal) == 1
+    assert "taken against the held cell of phase 0" in cal[0].message
+    if shape == "one_stage":
+        OUT.mkdir(exist_ok=True)
+        result.plot(path=str(OUT / "wp2148_arm_a_one_stage.png"))
+
+
+def test_a_stage_that_frees_every_cell_says_it_declined_lambda(cu_mixture):
+    """Arm A0 in a plan: the glob declines λ, and the record says so.
+
+    ``phases.*.cell.*`` frees the Si cell too, so nothing pins the scale: λ is
+    declined, as before, but now it is on ``StageResult.blocked_by_hold`` and
+    ``WAVELENGTH_NOT_FREED`` names it, where the stage used to drop it in
+    silence.  ``HOLD_BLOCKED_PLAN`` stays the caller's holds only.
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("cells_lam", ["phases.*.cell.*", WL])])
+    ref = Refinement(_start(), _ds(1.5406), history=False)
+    result = ref.fit(cu_mixture, plan=plan)
+    last = result.stages[-1]
+    assert WL not in last.freed
+    assert last.blocked_by_hold == [WL]
+    found = [d for d in result.diagnostics if d.code == "WAVELENGTH_NOT_FREED"]
+    assert len(found) == 1 and found[0].where == [WL]
+    assert "'cells_lam'" in found[0].message
+    assert "HOLD_BLOCKED_PLAN" not in {d.code for d in result.diagnostics}
+
+
+def test_a_held_but_unseen_standard_is_flagged_not_trusted():
+    """A held cell of a phase the data cannot see pins nothing in practice.
+
+    Measured (WP-2148): Si held at scale 0 beside CeO₂ a and λ free gives a
+    λ esd about 900× the visible-standard case's — the same as the flat arm
+    with Si freed (4.7e-4 Å, issue #1550) — and ``FLAT_DIRECTION`` fires.
+    The pin rule here is structural, the support screen running after the
+    glob; this pins what a reader is told when the standard is absent: the
+    flat direction, by name, never a confident λ.
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    data = _synth(LAM_CU, 15.0, 140.0, seed=13, si_scale=0.0)
+    start = _start()
+    start.phases[0].scale.value = 1e-6
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("lam_cell", [CEO2_A, WL])])
+    result = Refinement(start, _ds(1.5406), history=False).fit(data, plan=plan)
+    rows = {p.path: p for p in result.parameters}
+    assert rows[WL].stderr > 1e-4                      # visible Si: ~5e-7 Å
+    assert "FLAT_DIRECTION" in {d.code for d in result.diagnostics}
+
+
+def test_arm_b_refines_both_wavelengths_against_a_held_standard(cu_mixture,
+                                                               mo_mixture):
+    """Arm B: two histograms, Si held and shared, both λ free.
+
+    The N − 1 count refused this; the pin rule admits it, and each λ lands
+    within 3 esd of its planted value.  The calibration clause names the held
+    cell, not a held histogram (none is held).
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("lam_cell", [CEO2_A, WL])])
+    joint = MultiHistogramRefinement(_start(), [_ds(1.5406), _ds(0.7107)])
+    result = joint.fit([cu_mixture, mo_mixture], plan=plan)
+    rows = {p.path: p for p in result.parameters}
+    assert abs(_z(rows[f"hist.0.{WL}"], LAM_CU)) < 3.0
+    assert abs(_z(rows[f"hist.1.{WL}"], LAM_MO)) < 3.0
+    assert abs(_z(rows[CEO2_A], A_CEO2)) < 3.0
+    cal = [d for h in result.histograms for d in h.diagnostics
+           if d.code == "WAVELENGTH_CALIBRATION"]
+    assert len(cal) == 2
+    assert all("taken against the held cell of phase 0" in d.message for d in cal)
+    _plot_histograms(result, "wp2148_arm_b")
+
+
+def _plot_histograms(result, stem):
+    """Obs/calc/diff per histogram of a joint result, to ``tests/output``."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    OUT.mkdir(exist_ok=True)
+    for h, hist in enumerate(result.histograms):
+        tt, yo, yc = (np.asarray(v) for v in (hist.two_theta, hist.y_obs, hist.y_calc))
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.plot(tt, yo, ".", ms=1.5, label="obs")
+        ax.plot(tt, yc, "-", lw=0.7, label="calc")
+        ax.plot(tt, yo - yc - 0.1 * yo.max(), "-", lw=0.5, label="obs - calc")
+        ax.set_xlabel("2θ (°)")
+        ax.set_ylabel("counts")
+        ax.legend(loc="upper right")
+        fig.savefig(OUT / f"{stem}_hist{h}.png", dpi=120)
+        plt.close(fig)
+
+
+OUT = __import__("pathlib").Path(__file__).parent / "output"

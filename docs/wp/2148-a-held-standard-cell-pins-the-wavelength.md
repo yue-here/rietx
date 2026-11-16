@@ -100,7 +100,7 @@ merge.
 - [x] A λ the fence declines in a stage is recorded on `StageResult` and
       reported, never dropped silently.
 - [x] `WAVELENGTH_CALIBRATION`'s text names what the shift is taken against.
-- [ ] Tests: the reporter's arms A, B and the one-stage variant on a seeded
+- [x] Tests: the reporter's arms A, B and the one-stage variant on a seeded
       synthetic pattern; the flat arms A0 and B0 still refused; a held but
       unsupported standard. Obs/calc/diff PNGs to `tests/output/`.
 - [ ] `_audit` rows, `help.py` if a field is added, and the manual's
