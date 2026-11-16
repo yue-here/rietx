@@ -3290,10 +3290,11 @@ class Refinement:
                if self.result_ is not None else {})
         mode = mode or self._mode
         table = self._working_table()
-        # Whether a wavelength could be freed depends on the cell's *current*
-        # state, so it is read here rather than stored on the entry.
+        # Whether a wavelength could be freed depends on the cells' *current*
+        # state, so it is read here rather than stored on the entry: the glob
+        # skip's own predicate, so the row and the skip agree (WP-2148).
         blocked = (table._wavelength_paths()
-                   if table._cell_is_free() else frozenset())
+                   if table.wavelength_pin() is None else frozenset())
         # the same test the stage's drop applies, so the report and the drop
         # cannot disagree about which columns this mode force-fixes (WP-1076's
         # rule, WP-1342's question).  ``entry_reach`` rather than
@@ -4963,7 +4964,7 @@ class Refinement:
 
         Entry order, because the restore in :meth:`_prepare_table` replays
         ``set_vary`` one path at a time and the cell-before-λ ordering is
-        load-bearing there (``ParameterTable._cell_is_free``).
+        load-bearing there (``ParameterTable.wavelength_pin``).
         """
         held = set(self._held)
         self._free_paths = [e.path for e in table.entries
@@ -5055,6 +5056,18 @@ class Refinement:
             if e.held and e.tie is None and not e.locked
             and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
             and not any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_off))
+        # And a wavelength the fence declined (WP-2148): the glob reached it
+        # (``would_free`` replays everything ``set_vary`` does but the skip)
+        # and it is not free, because nothing pinned the d scale.  Recorded
+        # beside the holds, as the floating-origin hold is: a row the table
+        # held against a glob, which ``WAVELENGTH_NOT_FREED`` reports rather
+        # than ``HOLD_BLOCKED_PLAN``.  Before this the stage dropped it in
+        # silence and its answer read ``converged``.
+        free_now = set(table.free_paths)
+        blocked_by_hold = sorted({*blocked_by_hold, *(
+            p for p in table.would_free(stage.turn_on)
+            if _is_wavelength(p) and p not in free_now
+            and not any(fnmatch.fnmatchcase(p, g) for g in stage.turn_off))})
         # What the stage asked for by name and the model does not have
         # (WP-1414).  A literal, or a pattern under a retired spelling: any
         # other pattern matching nothing is how the shipped plans reach
@@ -6054,8 +6067,11 @@ class Refinement:
                                                        outcome))
             diagnostics.extend(_degenerate_cell_diagnostics(
                 [(sr.name, sr.n_degenerate_cell_probes) for sr in stage_results]))
+            declined = _fence_declined(stage_results, table)
             diagnostics.extend(_hold_diagnostics(stage_results,
-                                                 table.origin_holds))
+                                                 [*table.origin_holds, *declined]))
+            diagnostics.extend(_wavelength_not_freed_diagnostics(stage_results,
+                                                                 declined))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
@@ -6659,8 +6675,11 @@ class Refinement:
             # after the StageResult rather than beside the other two extends
             # above, because this one reads the record it has just built; and
             # before the node, so the node carries what the result carries
+            declined = _fence_declined([stage_result], table)
             diagnostics.extend(_hold_diagnostics([stage_result],
-                                                 table.origin_holds))
+                                                 [*table.origin_holds, *declined]))
+            diagnostics.extend(_wavelength_not_freed_diagnostics([stage_result],
+                                                                 declined))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 [stage_result], table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(
@@ -8292,7 +8311,9 @@ def _hold_diagnostics(stage_results: list[StageResult],
     (``ParameterTable.origin_holds``, WP-1912).  They stay on
     ``StageResult.blocked_by_hold``, being holds that blocked a glob, and are
     left out here: :func:`_origin_diagnostics` reports them, with the
-    direction and the atom, and its advice differs from this one's.
+    direction and the atom, and its advice differs from this one's.  A
+    wavelength the λ–cell fence declined is passed here for the same reason
+    (WP-2148): :func:`_wavelength_not_freed_diagnostics` reports it.
     """
     skip = set(origin)
     by_path: dict[str, list[str]] = {}
@@ -8314,6 +8335,58 @@ def _hold_diagnostics(stage_results: list[StageResult],
                  f"{', '.join(where[:5])}{'…' if n > 5 else ''}."),
         where=where, value=float(n),
         suggestion="Call unhold() on them first if you meant the plan to refine them.",
+    )]
+
+
+def _fence_declined(stage_results: list[StageResult], table) -> set[str]:
+    """The wavelengths a stage's glob reached and the fence declined (WP-2148).
+
+    They ride on ``StageResult.blocked_by_hold`` beside the caller's holds,
+    and the table tells the two apart: a wavelength the caller holds is
+    ``held_by`` it, one the fence declined is held by nobody.
+    """
+    return {p for sr in stage_results for p in sr.blocked_by_hold
+            if _is_wavelength(p) and table.held_by(p) is None}
+
+
+def _wavelength_not_freed_diagnostics(stage_results: list[StageResult],
+                                      declined: set[str]) -> list[Diagnostic]:
+    """``WAVELENGTH_NOT_FREED`` — a stage asked for λ and the fence declined it.
+
+    A stage's ``turn_on`` reached the wavelength while no phase in the
+    pattern had a held cell, so λ and every cell length were one exactly flat
+    direction (:meth:`~rietx.params.vector.ParameterTable.wavelength_pin`).
+    ``set_vary`` skips a row it cannot free rather than turning a broad plan
+    into an error, and this says so: before WP-2148 the skip was silent, the
+    stage read ``converged`` and the calibration error went into the cells.
+
+    ``info``, as ``HOLD_BLOCKED_PLAN`` is: λ stayed at its declared value, so
+    the cells are measured against it exactly as in a fit that never asked
+    for λ.  What the reader learns is that the plan did less than it says, and
+    which hold would let it do the rest.  One diagnostic for the fit, keyed on
+    the paths, with the stages named.
+    """
+    by_path: dict[str, list[str]] = {}
+    for sr in stage_results:
+        for path in sr.blocked_by_hold:
+            if path in declined:
+                by_path.setdefault(path, []).append(sr.name)
+    if not by_path:
+        return []
+    where = sorted(by_path)
+    stages = sorted({n for names in by_path.values() for n in names})
+    return [Diagnostic(
+        level="info", code="WAVELENGTH_NOT_FREED",
+        message=(f"{', '.join(where)} was matched by the turn_on glob of "
+                 f"stage{'' if len(stages) == 1 else 's'} "
+                 f"{', '.join(repr(s) for s in stages)} and stayed fixed: no "
+                 "phase in the pattern had a held cell, so the wavelength and "
+                 "the free cells were one flat direction (d = lambda/(2 sin "
+                 "theta) fixes only the product)."),
+        where=where, value=float(len(where)),
+        suggestion=("Hold the cell of a standard in the pattern if you meant "
+                    "to calibrate the wavelength; the other phases' cells then "
+                    "refine beside it."),
     )]
 
 
@@ -9575,7 +9648,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if declared_wavelengths is not None:
         diagnostics = diagnostics + _wavelength_calibration_diagnostics(
             declared_wavelengths, table, values, stderr_phys,
-            pinned_by=_WAVELENGTH_PINNED_BY_HELD_CELL)
+            pinned_by=_wavelength_pinned_by(table.wavelength_pin()))
 
     # A phase the data cannot see (WP-1110), and what the run did about it
     # (WP-1301).  Named here rather than left to HIGH_CORRELATION, which reports
@@ -10426,8 +10499,9 @@ def _wavelength_calibration_diagnostics(
     one (``multi.py``), which is the whole difference in the message's *head*
     and its ``where`` addressing.  The message's *last clause* is passed in as
     ``pinned_by`` because the two are false of each other: a single histogram
-    measures λ against the **held cell**, a joint fit against the cell pinned by
-    the histogram whose λ is held.  ``declared`` is λ per line as taken off the
+    measures λ against the **held cell** of a phase in it, a joint fit against
+    the cell pinned by the histogram whose λ is held or by a held standard's
+    cell; :func:`_wavelength_pinned_by` words it from the fence's own pin.  ``declared`` is λ per line as taken off the
     instrument the ``Refinement`` was **constructed** with (or last edited to) —
     the refined values have been written back by the time a result is built, so
     there is nothing left to compare to otherwise — and is indexed by line,
@@ -10469,12 +10543,33 @@ def _wavelength_calibration_diagnostics(
 
 
 #: the ``WAVELENGTH_CALIBRATION`` clause naming what pins the scale the refined
-#: λ is measured against — the held cell for a single histogram, the cell a
-#: held wavelength pins for a joint fit (the two are false of each other, so
-#: each caller states its own; see :func:`_wavelength_calibration_diagnostics`).
+#: λ is measured against.  The pin is the fence's own answer
+#: (:func:`~rietx.params.vector.wavelength_pins`), so the clause can never name
+#: a held cell where none is held (WP-2148); the two framings are kept as
+#: constants because their wording is what a reader searches for.
 _WAVELENGTH_PINNED_BY_HELD_CELL = "taken against the held cell"
 _WAVELENGTH_PINNED_BY_HELD_HISTOGRAM = (
     "taken against the cell pinned by the histogram whose wavelength is held")
+
+
+def _wavelength_pinned_by(pin: str | None) -> str:
+    """``WAVELENGTH_CALIBRATION``'s last clause, from the fence's pin.
+
+    ``pin`` is what :meth:`~rietx.params.vector.ParameterTable.wavelength_pin`
+    or :meth:`~rietx.params.multi.MultiParameterTable.wavelength_pins` found:
+    a held cell length's path (scoped ``hist.h.`` when that cell is
+    per-histogram), ``"hist.{k}"`` for histogram *k*'s held wavelength, or
+    ``None`` — unreachable through the fence, and said plainly rather than
+    named as a cell no one held.
+    """
+    if pin is None:
+        return ("pinned by no held cell or wavelength, so the cells could "
+                "absorb it and it measures nothing")
+    if pin.startswith("hist.") and pin.count(".") == 1:
+        return (f"{_WAVELENGTH_PINNED_BY_HELD_HISTOGRAM} "
+                f"(histogram {pin.split('.')[1]})")
+    phase = pin.split("phases.", 1)[1].split(".", 1)[0]
+    return f"{_WAVELENGTH_PINNED_BY_HELD_CELL} of phase {phase} ({pin})"
 
 
 def _declared_wavelengths(instrument: Instrument) -> list[float]:

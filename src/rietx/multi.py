@@ -84,7 +84,6 @@ from .refine import (
     _DISPLACEMENT_PATH,
     _PHASE_PREFIX,
     _VERSION,
-    _WAVELENGTH_PINNED_BY_HELD_HISTOGRAM,
     SCALE_B_SEPARATION_FLOOR,
     SCALE_B_STEP,
     CellReset,
@@ -157,6 +156,7 @@ from .refine import (
     _utcnow,
     _vars_driven_cell_escapes,
     _wavelength_calibration_diagnostics,
+    _wavelength_pinned_by,
     _width_census_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
@@ -1640,8 +1640,11 @@ class MultiHistogramRefinement:
         seen: set[str] = set()
         for h, table in enumerate(mt.tables):
             by_path = {e.path: e for e in table.entries}
+            # the joint fence's predicate, asked as a free λ here would ask
+            # it (WP-2148), so the row and the refusal agree
             blocked = (table._wavelength_paths()
-                       if table._cell_is_free() else frozenset())
+                       if mt.wavelength_pins(freed=h)[h] is None
+                       else frozenset())
             reach = table.entry_reach()
             owned = table.body_rows()
             origin = table.origin_holds
@@ -2493,6 +2496,9 @@ class MultiHistogramRefinement:
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
         joint_unmeasured = _joint_unmeasured_phases(models, mt, stage_results)
+        # what pins each histogram's d scale, for WAVELENGTH_CALIBRATION's
+        # clause: the fence's own answer (WP-2148)
+        pins = mt.wavelength_pins()
         for h in range(n):
             table = mt.tables[h]
             model = models[h]
@@ -2597,7 +2603,7 @@ class MultiHistogramRefinement:
                 unsupported_resolution=check_resolution_supported(table, model))))
             diags.extend(_wavelength_calibration_diagnostics(
                 self._declared_wavelengths[h], table, values, esd_h,
-                pinned_by=_WAVELENGTH_PINNED_BY_HELD_HISTOGRAM, h=h))
+                pinned_by=_wavelength_pinned_by(pins[h]), h=h))
             # The two tier-2 flags, per histogram — without which a joint fit
             # gets the tier-1 bound (``_freeze_strain_cap_multi`` /
             # ``_freeze_size_cap_multi``) and none of the interpretation the

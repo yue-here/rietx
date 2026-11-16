@@ -95,11 +95,11 @@ merge.
 - [ ] One predicate: is this histogram's d scale pinned (a held λ, or a held
       cell of a phase the data support)? Read by `check_wavelength_against_cell`,
       the glob skip and the joint check.
-- [ ] The joint fit: replace the N − 1 count by the pin rule over shared
+- [x] The joint fit: replace the N − 1 count by the pin rule over shared
       cells, keeping every case `test_wavelength_freedom.py` refuses today.
-- [ ] A λ the fence declines in a stage is recorded on `StageResult` and
+- [x] A λ the fence declines in a stage is recorded on `StageResult` and
       reported, never dropped silently.
-- [ ] `WAVELENGTH_CALIBRATION`'s text names what the shift is taken against.
+- [x] `WAVELENGTH_CALIBRATION`'s text names what the shift is taken against.
 - [ ] Tests: the reporter's arms A, B and the one-stage variant on a seeded
       synthetic pattern; the flat arms A0 and B0 still refused; a held but
       unsupported standard. Obs/calc/diff PNGs to `tests/output/`.
