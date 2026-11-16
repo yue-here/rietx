@@ -1,6 +1,6 @@
 # WP-2120 — a tail shoulder on its position bound is offered as a line
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — class 1 landed (#1579); class 2 waits on the maintainer's edge bar
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-06 — false lines reach the engines at full weight, but no case yet moves a cell or costs an indexing row
@@ -47,6 +47,12 @@ diffractometer only (the round robin), so the first task is a second family: the
 real lab patterns in `tests/data/` (SRM 660c, the FAP pattern, the certified corundum).
 A change to `usable()` moves what every engine is driven by, so it runs
 `tests/test_acceptance_indexing.py` and goes to the maintainer as a reader-output change.
+Tier of what landed (2026-11-16): class 1's action (`tail_shoulder` in `PEAK_UNUSABLE_FLAGS`)
+is a new judgement, **tier 3, awaiting the maintainer's dated approval**. It was measured
+on three unrelated lab families (the round robin, SRM 660c, SRM 1976a), with fluorapatite as
+a fourth that has no case. The reference is the phases' lattice lines, and every family is
+development data. It adds no number: its two flags' constants are the ones already in use,
+and the `_audit` table has no row for a flag vocabulary.
 
 ### Findings, task 1 (2026-11-16, `bc77a934e`, `[dev]`, macOS arm64)
 
@@ -129,9 +135,9 @@ second family has three such components in all, too few to measure the rule on.
       sit (WP-2055's 0.25 seed FWHM was a census window, not a rule). On the round robin
       that bar would also take six on-lattice lines no other group holds. The second
       family has three such components, too few to measure on.
-- [ ] Land it, with `tests/test_acceptance_indexing.py` green.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: the `axial_tail` or `PEAK_POSITION_AT_BOUND` reference row if what a reader
+- [x] Land it, with `tests/test_acceptance_indexing.py` green.
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`.
+- [x] Skill: the `axial_tail` or `PEAK_POSITION_AT_BOUND` reference row if what a reader
       should do changes; else none.
 
 ## Acceptance
@@ -151,6 +157,51 @@ WP records why such a component stays usable.
 - WP-2055 (the census and the direction test); issue #1166.
 
 ## Handover log
+
+- **2026-11-16** — The picker no longer offers the engines a weak shoulder that sits on a strong
+  line's axial-tail side and that its fit pushed to its position bound. Such a component is now
+  flagged `tail_shoulder` and is unusable; either flag alone still leaves a line usable. On three
+  unrelated lab instruments, every component this catches sits below its strong mate's own
+  reflection. So the round robin's off-lattice shoulders leave the list (782 → 774 usable) with no
+  indexing acceptance row lost. The window-edge re-seeds (class 2) are measured but not placed:
+  that needs an edge bar the WP does not set, and the maintainer is asked for it in PR #1579. Both
+  the tier-3 approval and the class-2 bar are the maintainer's.
+  *Done:* tasks 1-5 (`8ccdda1cf`, `7524ce19e`, `6d906c4f4`, `aaa61b53e`, `c10c1ac97`). The flag
+  is raised in `_flags_for` only on fits `fit_group` judged (`width_at_bound` not `None`), so
+  `fit_peaks` and the peak editor never raise it on named positions, like `width_capped`. It
+  is in `PEAK_UNUSABLE_FLAGS`, and `INDEXING_THRESHOLDS_VERSION` is 1.13. Also updated: the help
+  entries, the `PEAK_AXIAL_TAIL` message (it counts the excluded ones), the manual's flag table,
+  the skill row, the GUI vocabulary and dist, a release note, and `tests/test_peak_tail_shoulder.py`
+  (4 rows, one `slow`).
+  *Measured:* see Findings above. Pearl Linux (shared, co-tenant), `[dev]`, `aaa61b53e`:
+  `test_peak_bounds` + `test_peak_tail_shoulder` + `test_acceptance_indexing` (`-m ""`, `-n 4`) 58 passed, 0 failed (the 54 main rows plus 4 new). Main bc77a934e on the same machine: `test_peak_bounds` + `test_acceptance_indexing`
+  54 passed. Fast suite (`-m "not slow"`, `-n 6`) on `aaa61b53e`: 14850 passed / 3 failed / 280 skipped / 32 xfailed. Three rows were fixed after it: the skill API index (`c10c1ac97`), and two flat-Si rows that count the usable or driven lines (`test_indexing_screen` 16 → 15; `test_indexing_driven_set`'s control now also offers the `tail_shoulder` back, so it keeps its 18 lines). Their three files were re-run locally on macOS arm64 `[dev]`: 212 passed. `tests.reader_output` exit 0 (unchanged).
+  *Rows moved:* `test_peak_bounds`' flat-Si census goes from 16 to 15 usable. The removed
+  component is 35.31°, 0.095° off its line, and `weak_line` goes from 5 to 4, because the
+  false-discovery screen reads usable components only. In two LaB6 acceptance rows, SRM 660c's
+  43.5° slot-swap tail is now `tail_shoulder`: the flag trim and the certificate probe agree, and
+  the tight-window control keeps WP-1040's 0.0078° window by offering that component again. The same
+  35.31° Si component moves `test_indexing_screen` (16 → 15 usable) and `test_indexing_driven_set`'s
+  control, which offers it again.
+  *Review:* a read-only review subagent (no `/code-review`, ghostshift rule) raised four points:
+  - an editor refit drops the flag: now by contract, since named positions are never judged;
+  - `fit_peaks` raised it on named positions: fixed by the judged-fit gate, and a test covers it;
+  - a dead assertion: dropped;
+  - stale table and version texts: fixed.
+
+  *Generality* (judge's verdicts, unedited in substance):
+  - item 1, the action: `weak`, for no positive arm (a genuine weak line planted 1-3 FWHM below
+    a strong one), all-development families, and no dense or synchrotron pattern;
+  - item 2, the `_audit` row: `fails` until the PR asks for the dated approval.
+
+  Author's answer: the PR asks for it. The `PEAK_AXIAL_TAIL` code row is on
+  `UNAUDITED_BASELINE`, and `_audit.py` is WP-2017's lane today, so no row was added here.
+  The help entry names the families and says it is untested beyond them.
+  *Gotchas:* `ObservedPeak.usable` is a property. WP-2055's harness is gone, and this session's
+  is outside the tree (ghostshift scratch `wp-2120/census.py`).
+  *Next:* (1) the maintainer rules the tier-3 approval, or asks for the synthetic positive arm
+  first. (2) The maintainer sets class 2's edge bar, if any. Then a session places class 2 and
+  closes the WP.
 
 - **2026-11-06** — created from WP-2055's handover. No open WP owns either class: WP-1968
   and WP-1977 are closed, and WP-1909 is the background-flank envelope. *Next:* task 1.
