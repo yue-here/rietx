@@ -1794,9 +1794,7 @@ def _ghost_candidates(
     r_lo, r_hi = GHOST_RATIO_RANGE
     out: list[tuple[int, int, float]] = []
     n_searched = 0
-    placed = (np.ones(len(tt), dtype=bool) if esd is None
-              else np.isfinite(esd) & (esd <= GHOST_ESD_MAX_DEG))
-    rank = np.argsort(np.where(placed, inten, -np.inf))[::-1][:GHOST_N_PARENTS]
+    placed, rank = _ghost_parent_rank(inten, esd)
     for ip in rank:
         if not placed[ip]:
             continue
@@ -1861,6 +1859,113 @@ def _ghost_consensus(
         chosen = sorted(per.values(), key=lambda c: c[1])
         best = (n, float(np.median([c[2] for c in chosen])), chosen)
     return best
+
+
+def _ghost_parent_rank(inten: np.ndarray, esd: np.ndarray | None
+                       ) -> tuple[np.ndarray, np.ndarray]:
+    """Which lines have a position (``placed``) and the strongest
+    :data:`GHOST_N_PARENTS` indices, the parents :func:`_ghost_candidates`
+    searches; an unplaced line can rank only when fewer are placed, and is
+    skipped by every caller."""
+    placed = (np.ones(len(inten), dtype=bool) if esd is None
+              else np.isfinite(esd) & (esd <= GHOST_ESD_MAX_DEG))
+    rank = np.argsort(np.where(placed, inten, -np.inf))[::-1][:GHOST_N_PARENTS]
+    return placed, rank
+
+
+def _ghost_control_ratios(
+    tt: np.ndarray, inten: np.ndarray, esd: np.ndarray | None,
+    wavelength: float, *, k: int, span: tuple[float, float],
+    tol_deg: float = GHOST_TOL_DEG, k_sigma: float = GHOST_MATCH_K,
+) -> np.ndarray:
+    """The control's wavelength ratios for one pattern: ``k`` of them, evenly
+    spread over the part of ``span`` where a made-up companion cannot match a
+    line that is really there (WP-1447).
+
+    The control asks the screen's question at ratios that are not an emission
+    line of anything, so whatever agreement it finds is coincidence.  That
+    holds only where the predicted companion of every parent stays clear of
+    the lines the parent *does* put in the pattern, and those are five
+    positions per parent, all read off the anode table rather than written
+    down: the parent itself (ratio 1), its own Kα doublet partner on either
+    side (λKα1/λKα2 and its inverse), and the two real ghosts the screen
+    looks for (Kβ/λ and W Lα1/λ).  A ratio is **excluded** when, for any
+    searched parent, its predicted companion falls within that parent's
+    matching window of one of those five positions — the window the
+    screen itself would match with, ``max(tol_deg, k_sigma·√(σ_cap² + σ_p²))``
+    with the candidate's σ at its cap :data:`GHOST_ESD_MAX_DEG`, so no
+    candidate the screen could pair with a real line is inside the control.
+    The exclusion is exact (an interval per parent and position, in ratio),
+    so no grid step is chosen anywhere.
+
+    This is the near-unity trap WP-1442 hit, derived rather than fenced.
+    Measured on the 16 round-robin patterns (WP-1447), the fitted list's
+    chance consensus rises from a mean of 0.55 to 2.03 in 0.990-0.995 and
+    4.35 above, reaching 8; with these exclusions the largest support at any
+    admitted ratio ≥ 0.95 is 2 on both paths, the bulk's own level.  The
+    band is wider on the fitted path than on the census because its windows
+    are σ-widened, and wider on a pattern whose strongest line sits at low
+    angle, where a ratio moves a line least — which is why a fixed 0.98 could
+    not be right for every pattern, and why it moves with the anode.
+
+    The ``k`` ratios sit at the centres of ``k`` equal slices of the admitted
+    length, so the control is deterministic: the same pattern always gets the
+    same answer.  Neighbouring ratios closer than a matching window are not
+    independent draws; ``k`` sets the resolution of the p-value, not the
+    number of independent coincidences sampled.  Returns an empty array when
+    the wavelength is no tabulated anode or nothing of ``span`` survives.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS
+
+    if int(k) != k or k < 1:
+        raise ValueError(f"k must be a positive integer, got {k!r}")
+    lo_span, hi_span = (float(span[0]), float(span[1]))
+    if not 0.0 < lo_span < hi_span:
+        raise ValueError(f"span must satisfy 0 < lo < hi, got {span!r}")
+    anode = identify_anode(wavelength)
+    if anode is None or not len(tt):
+        return np.empty(0)
+    _, ka2 = _KA_DOUBLETS[anode]
+    real = (1.0, ka2 / wavelength, wavelength / ka2,
+            _KBETA[anode] / wavelength, _W_LA1 / wavelength)
+    placed, rank = _ghost_parent_rank(inten, esd)
+    cut: list[tuple[float, float]] = []
+    for ip in rank:
+        if not placed[ip]:
+            continue
+        s = float(np.sin(np.radians(tt[ip] / 2.0)))
+        if s <= 0.0:
+            continue
+        window = (tol_deg if esd is None else
+                  max(tol_deg, k_sigma * float(np.hypot(GHOST_ESD_MAX_DEG, esd[ip]))))
+        for r_real in real:
+            if s * r_real >= 1.0:
+                continue
+            g = 2.0 * np.degrees(np.arcsin(s * r_real))
+            a = np.sin(np.radians(max(g - window, 0.0) / 2.0)) / s
+            b = np.sin(np.radians(min(g + window, 180.0) / 2.0)) / s
+            cut.append((float(a), float(b)))
+    pieces = [(lo_span, hi_span)]
+    for a, b in cut:
+        nxt: list[tuple[float, float]] = []
+        for p, q in pieces:
+            if b <= p or a >= q:
+                nxt.append((p, q))
+                continue
+            if a > p:
+                nxt.append((p, a))
+            if b < q:
+                nxt.append((b, q))
+        pieces = nxt
+    lengths = np.array([q - p for p, q in pieces])
+    total = float(lengths.sum()) if len(pieces) else 0.0
+    if total <= 0.0:
+        return np.empty(0)
+    edges = np.concatenate([[0.0], np.cumsum(lengths)])
+    at = (np.arange(int(k)) + 0.5) / int(k) * total
+    which = np.clip(np.searchsorted(edges, at, side="right") - 1, 0, len(pieces) - 1)
+    starts = np.array([p for p, _ in pieces])
+    return starts[which] + (at - edges[which])
 
 
 def _contamination_flags(tt: np.ndarray, net: np.ndarray, sigma: np.ndarray,

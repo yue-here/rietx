@@ -73,9 +73,13 @@ when p ≤ α. At K = 199 the smallest achievable p is 0.005.
 
 ## Tasks
 
-- [ ] The control, deterministic: a fixed grid of ratios excluding the
+- [x] The control, deterministic: a fixed grid of ratios excluding the
       near-unity band and a margin around each real ghost ratio, derived from
       the anode rather than hard-coded, since the exclusions move with λ.
+      *`_ghost_control_ratios`: `k` ratios over the admitted part of a `span`,
+      each exclusion an exact interval per parent around five anode-derived
+      positions (the parent, its Kα partner either side, Kβ, W Lα) one
+      matching window wide; no margin or grid step is a new number.*
 - [ ] The permutation p-value, with K and α named constants carrying their
       measured basis, and a floor so a degenerate control cannot lower the bar
       below what a reader would accept as evidence.
