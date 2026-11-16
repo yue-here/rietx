@@ -509,6 +509,8 @@ class MultiParameterTable:
         #: empty when no target is a glob
         self.glob_expansions: list[GlobExpansion] = []
         if any(is_glob(e.target) for e in declared):
+            # the names as given are checked before the expansion renames them
+            _refuse_clashing_declarations(declared, len(instruments), coordinates)
             declared = self._expand_globs(declared, starts, instruments, coordinates)
         if declared:
             _refuse_clashing_declarations(declared, len(instruments), coordinates)
@@ -578,7 +580,20 @@ class MultiParameterTable:
             if scale:
                 table.apply_value_scale(scale)
         if declared or variables:
-            self._install_parametric(declared, coordinates, variables)
+            try:
+                self._install_parametric(declared, coordinates, variables)
+            except ValueError as exc:
+                # a member's refusal names the member: say which glob made it
+                text = str(exc)
+                for record in self.glob_expansions:
+                    hit = next((m for m in record.members
+                                if f"parametric equation {m!r}" in text), None)
+                    if hit is not None:
+                        raise ValueError(
+                            f"{text} ({hit!r} is a member of glob {record.name!r} on "
+                            f"{record.glob}; narrow the glob to leave that path out)"
+                        ) from exc
+                raise
         if len({id(s) for s in starts}) > 1:
             self._check_starts_agree(starts)
         self._check_moment_frames_shared()
@@ -590,13 +605,20 @@ class MultiParameterTable:
                       coordinates: CoordinateTable | None) -> list[ParametricEquation]:
         """Each glob target expanded into one declaration per path (WP-1965).
 
-        Matched against the model of the first pattern of the declaration's
-        subset, on a scratch table built before any of this fit's own, since
-        what a target is decides the sharing map those are built under.  A
-        matched path no equation can drive is skipped and recorded in
-        :attr:`glob_expansions` (``_target_refusal``'s reason, the one a bare
-        target on it would be refused with); every other refusal of a member is
-        made where a bare target's is, on every pattern of the subset.
+        Matched against the models of **every** pattern of the declaration's
+        subset, on scratch tables built before any of this fit's own, since
+        what a target is decides the sharing map those are built under.  The
+        union is matched, so a path one pattern's model has and another's lacks
+        (a background with more terms) becomes a member, and the bare-target
+        refusal names the pattern without it, rather than the path going
+        unmatched there in silence.
+
+        A matched path that is tied, locked or held follows something else or
+        nothing that any stage moves, so no equation can drive it: it is
+        skipped and recorded in :attr:`glob_expansions`.  A path refused for
+        any other reason (a rigid body's increment, a moment DOF) is one the
+        caller may have meant to drive, so the glob is refused, as a bare
+        target on it would be.
         """
         n = len(instruments)
         scratch: dict[int, ParameterTable] = {}
@@ -605,15 +627,39 @@ class MultiParameterTable:
             if not is_glob(equation.target):
                 out.append(equation)
                 continue
-            h = subset_of(equation, coordinates, n)[0]
-            if h not in scratch:
-                scratch[h] = ParameterTable(starts[h].model_copy(deep=True),
-                                            instruments[h].model_copy(deep=True),
-                                            joint=True)
-            table = scratch[h]
-            members, record = expand_glob(
-                equation, [e.path for e in table.entries],
-                lambda p, t=table: _target_refusal(t, t.entries[t._paths[p]]))
+            owner: dict[str, tuple[ParameterTable, object]] = {}
+            for h in subset_of(equation, coordinates, n):
+                if h not in scratch:
+                    scratch[h] = ParameterTable(starts[h].model_copy(deep=True),
+                                                instruments[h].model_copy(deep=True),
+                                                joint=True)
+                for e in scratch[h].entries:
+                    owner.setdefault(e.path, (scratch[h], e))
+
+            def skip_reason(path: str, eq=equation, owner=owner) -> str | None:
+                table, e = owner[path]
+                why = _target_refusal(table, e)
+                if why is None or e.locked or e.held or e.tie is not None:
+                    return why
+                raise ValueError(
+                    f"parametric equation {eq.name!r}: target glob {eq.target!r} "
+                    f"matches {path}, which {why}. Narrow the glob to leave it out")
+
+            members, record = expand_glob(equation, list(owner), skip_reason)
+            driven = {m.target for m in members}
+            for k, (path, why) in enumerate(record.skipped):
+                e = owner[path][1]
+                if e.tie is not None:
+                    sources = [src for src, _ in e.tie.terms]
+                    record.skipped[k] = (path, (
+                        f"is tied to {', '.join(sources)}, which this glob drives"
+                        if set(sources) <= driven else
+                        f"is tied to {', '.join(sources)}; declare an equation on "
+                        f"{', '.join(sources)} to drive it"))
+                elif e.locked:
+                    record.skipped[k] = (path, "is locked by symmetry or by the model")
+                elif e.held:
+                    record.skipped[k] = (path, "is held (Phase.floating_origin fixes it)")
             out.extend(members)
             self.glob_expansions.append(record)
         return out

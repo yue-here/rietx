@@ -1138,7 +1138,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic of the tie map: a path the table ties to another, locks or holds "
                   "has no column of its own, so a second tie onto it cannot be wired and a bare "
                   "target on it is refused (params.multi._target_refusal); fires exactly when a "
-                  "glob target matched such a path and names each with that refusal's reason "
+                  "glob target matched such a path, naming each with why and, for a tied one, "
+                  "whether the glob drives its source; any other refusal of a matched path (a "
+                  "rigid body's increment, a moment DOF) refuses the glob instead, since the "
+                  "caller may have meant to drive it "
                   "(test_a_glob_target_expands_per_path_and_reports_what_it_skips)"),
         grounds=("Unanimity: a glob over a cubic cell asks for the free edge, and no refiner "
                  "would give b, tied to a, or a locked angle a second function; the dissenting "

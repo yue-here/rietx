@@ -277,6 +277,8 @@ def test_term_labels_and_units_name_each_monomial():
     (_equation(where="Temp > 1"), _coords(1.0, 2.0, 3.0), 3, "'Temp', which is not a coordinate"),
     (_equation(where="T > 1"), _coords(1.0, None, 3.0), 3, "undecided"),
     (_equation(where="T > 9"), _coords(1.0, 2.0, 3.0), 3, "holds at no pattern"),
+    (_equation(where="sqrt(T - 1.5) < 100"), _coords(1.0, 2.0, 3.0), 3,
+     "not finite at pattern 0"),
     (_equation(), None, 3, "needs a CoordinateTable"),
     (_equation(), _coords(1.0, 2.0), 3, "2 rows for 3 patterns"),
     (_equation(terms=[[], ["x"]]), _coords(1.0, 2.0, 3.0), 3, "does not have"),
@@ -452,7 +454,9 @@ def test_a_glob_target_expands_per_path_and_reports_what_it_skips():
     assert finding.code == "PARAMETRIC_GLOB_SKIPPED" and finding.level == "info"
     assert finding.value == 5.0 and finding.where == [p for p, _ in record.skipped]
     assert "'cell' on phases.0.cell.* drives 1 path (cell_a)" in finding.message
-    assert "phases.0.cell.b, phases.0.cell.c is tied" in finding.message
+    assert ("phases.0.cell.b, phases.0.cell.c are tied to phases.0.cell.a, which this "
+            "glob drives; phases.0.cell.alpha, phases.0.cell.beta, phases.0.cell.gamma "
+            "are locked") in finding.message
     # the resolved declarations are bare, and refit to the same wiring
     assert [e.target for e in mt.declared] == [r.target for r in mt.parametric]
     again = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
@@ -474,6 +478,20 @@ def test_a_glob_that_drives_nothing_is_refused(equation, fragment):
                             parametric=[equation])
 
 
+def test_a_glob_is_matched_on_every_pattern_of_its_subset():
+    """A path one pattern's model has and another's lacks becomes a member, so
+    the pattern without it refuses by name, rather than the path going
+    unmatched there; and a member's refusal names the glob it came from."""
+    s, _ = perturbed_inputs()
+    instruments = _lab6_instruments(2)
+    instruments[1].background = rx.schemas.instrument.BackgroundChebyshev.with_terms(5)
+    with pytest.raises(ValueError, match=r"'bg_c3'.*not a parameter of histogram 0.*"
+                                         r"member of glob 'bg' on instrument\.background\.c\*"):
+        MultiParameterTable(s, instruments, coordinates=_coords(300.0, 400.0),
+                            parametric=[_equation(name="bg", target="instrument.background.c*",
+                                                  basis="constant", terms=None)])
+
+
 def test_a_glob_member_named_like_another_declaration_is_refused():
     s, _ = perturbed_inputs()
     glob = _equation(name="cell", target="phases.0.cell.*")
@@ -482,6 +500,10 @@ def test_a_glob_member_named_like_another_declaration_is_refused():
     with pytest.raises(ValueError, match="two parametric equations are named 'cell_a'"):
         MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
                             parametric=[glob, clash])
+    # and the names as given: a glob and a bare declaration of one name
+    with pytest.raises(ValueError, match="two parametric equations are named 'cell'"):
+        MultiParameterTable(s, _lab6_instruments(2), coordinates=_coords(300.0, 400.0),
+                            parametric=[glob, clash.model_copy(update={"name": "cell"})])
 
 
 # -- the joint table's wiring ------------------------------------------------

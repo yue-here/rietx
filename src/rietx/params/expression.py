@@ -1135,3 +1135,32 @@ class Condition:
         with np.errstate(all="ignore"):
             v = _Eval(xp, bindings, ()).cond(rewrite(self.tree))
         return np.asarray(v, dtype=bool)
+
+    def undecided(self, bindings: Mapping[str, Any]) -> np.ndarray:
+        """Where a comparison in the condition meets a value that is not finite.
+
+        IEEE reads every comparison with a NaN as false, so ``sqrt(T - 350) <
+        100`` and ``not (sqrt(T - 350) >= 100)`` would disagree at T = 300.
+        A caller deciding membership refuses these places rather than reading
+        the NaN as an answer.  Each side of each comparison is evaluated on
+        its own, numpy, element-wise.
+        """
+        xp = _numpy_xp()
+        ev = _Eval(xp, bindings, ())
+        out = np.asarray(False)
+
+        def walk(n):
+            nonlocal out
+            if isinstance(n, Compare):
+                for side in (n.left, n.right):
+                    v, _ = ev(rewrite(side))
+                    out = out | ~np.isfinite(np.asarray(v, dtype=np.float64))
+            elif isinstance(n, BoolOp):
+                walk(n.left)
+                walk(n.right)
+            elif isinstance(n, Not):
+                walk(n.arg)
+
+        with np.errstate(all="ignore"):
+            walk(self.tree)
+        return np.asarray(out, dtype=bool)

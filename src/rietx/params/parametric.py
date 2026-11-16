@@ -243,8 +243,9 @@ def subset_of(equation: ParametricEquation, coordinates: CoordinateTable | None,
     Refusals, each a ``ValueError`` naming its fix: an index out of range; a
     condition with no coordinate table, or a table of the wrong length; a
     condition naming a column the table lacks; a pattern with no value for a
-    column the condition reads (its membership would be undecided); and a
-    condition that holds at no pattern.
+    column the condition reads, or at which a comparison meets a value that is
+    not finite (its membership would be undecided); and a condition that holds
+    at no pattern.
     """
     name = equation.name
     if equation.where is None:
@@ -285,6 +286,13 @@ def subset_of(equation: ParametricEquation, coordinates: CoordinateTable | None,
                 f"coordinate {c!r}, which where={equation.where!r} reads, so whether "
                 "it is in the subset is undecided; give it a value")
     env = {c: np.asarray(columns[c], dtype=np.float64) for c in condition.names}
+    nan = np.flatnonzero(np.broadcast_to(condition.undecided(env), (n_patterns,)))
+    if nan.size:
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} compares a value "
+            f"that is not finite at pattern {int(nan[0])} (a NaN or an infinity from "
+            "the coordinates there), so whether it is in the subset is undecided; "
+            "rewrite the condition so every comparison is defined there")
     held = np.broadcast_to(condition.holds(env), (n_patterns,))
     patterns = [int(k) for k in np.flatnonzero(held)]
     if not patterns:
