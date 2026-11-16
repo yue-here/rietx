@@ -49,8 +49,11 @@ minima differently on Linux before (WP-2036).
 
 Measured on origin/main bc77a934e with `docs/wp/2084-measure/probe2084.py` (one fit of
 `_protocol("lab6")` through the closing stage, about a second), on macOS arm64 (worktree
-venv `[dev]`, compiled tier on) and on Linux x86_64 (numpy 2.5.3). The two platforms agree
-to every printed digit on all twenty arms both ran.
+venv `[dev]`, compiled tier on) and on Linux x86_64 (numpy 2.5.3, rietx-kernels 1.5.0
+installed; the tier was requested and its state not recorded on that run). The two
+platforms agree to every printed digit on all twenty arms both ran. The table's
+Γ_G² < 0 counts and every esd shift below are computed from the probe's JSON (its `rows`,
+`uvw` and `reflections`) with `test_window_domain._shift`'s rule, not printed by it.
 
 **Which row.** The cone's rows sit at the frozen Bragg angles. LaB6's last reflection in
 range (20.30–150.91°) is h² + k² + l² = 27, (333) and (511), with its Kα1 image at 148.68°
@@ -64,14 +67,17 @@ stage starts with the Kα2 row's Γ_G² at 2.59e-8 under the shipped floor, so t
 (slack +1.6e-8, 48 rows) and the stage stops on it. Under the 0.05 floor it starts at
 4.35e-9 (slack −5.7e-9), so the row is dropped (47 rows) and the stage walks on to the
 Kα1 row. Floors 0.02, 0.025 and 0.03 land on the Kα2 face; 0.04 and 0.05 on the Kα1 face.
+So the floor acts through the sizing it gives every earlier stage, which moves where the
+closing stage starts against that row's face; the row kept or dropped then makes two
+answers out of a difference of 2e-8 in Γ_G².
 
 **The shipped answer is not a fixed point of its own plan.** Refitted from its own answer
-under the same floor, the Kα2 row reads −3.0e-10 (slack −1.0e-8), is dropped from the
-first stage that frees w, and the fit lands deep: χ²_red 3.549230, 0.134 plain esd on w
+under the same floor, the Kα2 row reads −1.2e-9 (slack −1.1e-8) at the start of the
+first stage that frees w and is dropped there, and the fit lands deep: χ²_red 3.549230, 0.134 plain esd on w
 from the floor-0.05 arm, 0.473 on u from the shipped answer. Re-running the plan from its
 own answer moves it.
 
-**Not the FCJ nodes, not the windows, not rounding.**
+**Not the FCJ nodes or the windows at the answers, not rounding.**
 
 | arm (shipped floor unless named) | χ²_red | largest shift from the shipped answer |
 |---|---|---|
@@ -82,9 +88,12 @@ own answer moves it.
 | w start × (1 + k·1e-14), k = ±1, ±3, ±7, ±20 | 3.557722 | identical digits, both platforms |
 | floor 0.05, k = ±1, ±7 | 3.549273 | stays deep, identical digits |
 
-The closing node counts of the shallow and deep answers differ at 3 of 60 (line,
-reflection) pairs and the windows by at most 5 points. The margin that decides is the
-slack's ±1e-8 against the 1e-9 tolerance, ten times wider than a rounding.
+The shipped answer and the deep answer the shipped floor reaches from its own answer,
+both compiled at 0.02, differ in their closing node counts at 3 of 60 (line, reflection)
+pairs and in their windows by at most 5 points. (Against the floor-0.05 arm the counts
+differ almost everywhere, since that floor sizes every compile wider.) Both floors keep
+their minimum for nudges of the w start up to ±1e-6 relative as well (the read-only
+review's re-run), so the strict xfail does not rest on a rounding.
 
 **Holding a near-face row does not make the answer unique.** With `lm._ON_FACE` raised to
 1e-7, floors 0.02, 0.04 and 0.05 all land on the Kα2 face, 0.004 plain esd apart. On that

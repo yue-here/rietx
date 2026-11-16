@@ -129,6 +129,7 @@ def main():
                     rows_.append((il, round(float(tt_[i]), 4), u_ * t * t + v_ * t + w_))
             cone.append({"n_blocks": len(out_),
                          "n_kept": int(sum(b.T.shape[0] for b in out_)),
+                         "applied": a.get("cone") != "off",
                          "free_uvw": [p for p in ("instrument.profile.u", "instrument.profile.v", "instrument.profile.w") if p in table.free_paths],
                          "rows_at_start": sorted(rows_, key=lambda r: r[2])[:4]})
         except Exception as e:
@@ -143,6 +144,7 @@ def main():
     ref = rx.Refinement(st, ins, history=True)
     res = ref.fit(data, plan=plan, **kw)
     wall = time.time() - t0
+    tier = compiled.enabled()
     compiled.set_enabled(was)
 
     rows = {p.path: (p.value, p.stderr_uncorrected) for p in res.parameters}
@@ -168,7 +170,7 @@ def main():
                 t = math.tan(math.radians(t2 / 2))
                 refl.append({"N": N, "line": il, "tt": t2,
                              "gg2": u * t * t + v * t + w})
-    # where Γ_G² crosses zero (u t² + v t + w = 0, the larger root)
+    # where Γ_G² first goes negative (u t² + v t + w = 0, the smallest positive root)
     root = None
     disc = v * v - 4 * u * w
     if u != 0 and disc >= 0:
@@ -209,7 +211,7 @@ def main():
         "n_points": s.n_points, "n_free": s.n_free_parameters,
         "rows": rows, "uvw": [u, v, w], "gg2_root_tt": root, "range": [lo, hi],
         "reflections": refl, "stages": stages, "trace": trace, "diagnostics": diags,
-        "compiles": compiles, "cone": cone,
+        "compiled_tier": tier, "compiles": compiles, "cone": cone,
     }
     (outdir / f"{tag}.json").write_text(json.dumps(out, indent=1))
     (outdir / f"{tag}.state.json").write_text(json.dumps({

@@ -73,9 +73,9 @@ deeper while the shipped arm stays in the shallower (WP-2084).  The two are one
 row of the Γ_G² ≥ 1e-8 cone: the (333)/(511) Kα2 image at 149.71°, which the
 closing stage keeps when it starts feasible (the shipped floor, slack +1.6e-8) and
 drops when it starts past its face by more than ``lm._ON_FACE`` (the 0.05 floor,
-−5.7e-9), walking on to the Kα1 image at 148.68°.  The margin is ten times a
-rounding, so both platforms land the same way at every 1e-14 nudge of the start
-(macOS arm64 and Linux x86_64, 2026-11-16), and the row is a strict xfail.
+−5.7e-9), walking on to the Kα1 image at 148.68°.  Both arms keep their
+minimum for nudges of the w start from 1e-14 to 1e-6 relative, on macOS arm64 and
+Linux x86_64 alike (2026-11-16), so the row is a strict xfail.
 LaB6's Biso row, 1.156 plain esd on ``u`` before WP-2012 and read then as the S/L
 and H/L mirror, now passes at 0.009, both arms on the Kα2 face.
 
