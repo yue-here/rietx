@@ -191,7 +191,7 @@ def _jana_read(**m50_kw) -> list:
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
         for suffix, text in ((".m50", m50(**m50_kw)), (".m40", m40()), (".m41", m41())):
-            (root / f"set{suffix}").write_text(text)
+            (root / f"set{suffix}").write_text(text, encoding="utf-8")
         jana.read_jana(root / "set.m50", diagnostics=found)
     return found
 

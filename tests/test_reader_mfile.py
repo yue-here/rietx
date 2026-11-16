@@ -140,7 +140,7 @@ def write_set(tmp_path, stem="syn", **kw):
              ".m40": kw.pop("m40", None) or m40(two_phase=two),
              ".m41": kw.pop("m41", None) or m41(two_phase=two)}
     for suffix, text in texts.items():
-        (tmp_path / f"{stem}{suffix}").write_text(text)
+        (tmp_path / f"{stem}{suffix}").write_text(text, encoding="utf-8")
     return tmp_path / f"{stem}.m50"
 
 
@@ -338,7 +338,7 @@ def test_every_truncation_raises_naming_the_file_or_reads(tmp_path):
             files = dict(full, **{target: text[:cut]})
             stem = f"t{target[1:]}_{cut}"
             for suffix, body in files.items():
-                (tmp_path / f"{stem}{suffix}").write_text(body)
+                (tmp_path / f"{stem}{suffix}").write_text(body, encoding="utf-8")
             try:
                 model = jana.read_jana(tmp_path / f"{stem}.m50")
                 for index in range(len(model.phases)):
