@@ -110,7 +110,7 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
   API pages is documented or in the shrink-only `UNDOCUMENTED_PARAMETERS` baseline, seeded now
 - [ ] The split of the everyday page under `PAGE_CHAR_CAP`, if the measurement says it is owed now
   (else the measurement and the split's plan go to WP-2025's `### Inherited`)
-- [ ] The Refinement section's 18 calls written (71 parameters), their entries out of the baseline;
+- [x] The Refinement section's 18 calls written (71 parameters), their entries out of the baseline;
   help.py-owned arguments linked or generated, never restated
 - [ ] Tests (above) green; the manual builds `-W`; looked at in chromium, both themes, 390 px
 - [ ] Skill: none expected, and why (the index stays signature-only); re-check at close

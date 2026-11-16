@@ -467,8 +467,8 @@ def test_an_entry_renders_as_a_doc_field_with_its_markup_as_code():
         r":param \*rest: Passed on.",
         r":param \*\*kw: Passed on.",
     ]
-    entry = reference_pages._api_entry(reference_pages._api_index(), "rx.build_report")
-    assert "\n:param result: " in entry
+    entry = reference_pages._api_entry(reference_pages._api_index(), "rx.Refinement.fit")
+    assert "\n:param data: " in entry
 
 
 def test_unindented_prose_inside_the_section_reads_as_a_name_the_gate_refuses():
@@ -523,3 +523,99 @@ def test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line():
     assert not baseline - missing, (
         "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
         + "\n".join(sorted(baseline - missing)))
+
+
+def test_the_refinement_section_is_documented_in_full():
+    """WP-2024's pilot: no call of the everyday page's Refinement section is
+    left in the baseline."""
+    index = reference_pages._api_index()
+    names = dict((title, names) for title, _, names in index.SECTIONS)["Refinement"]
+    left = sorted(line for line in _undocumented_baseline()
+                  if line.split("(")[0] in names)
+    assert not left, left
+
+
+# ----------------------------------------------------------------------
+# The foreign-name map: hand-written, and checked against the code that reads
+# and writes each format
+# ----------------------------------------------------------------------
+
+#: Column -> the modules whose string constants hold that format's names.
+FOREIGN_CODE = {
+    "GSAS-II": ("io/projects/gsas2.py", "io/instrument_profile.py",
+                "io/instrument_tof.py", "io/recipe.py"),
+    "GSAS": ("io/projects/gsas.py", "io/instrument_profile.py"),
+    "TOPAS": ("io/projects/topas.py", "io/projects/topas_input.py",
+              "io/projects/topas_refined.py", "io/projects/coverage.py"),
+    "FullProf": ("io/projects/fullprof.py",),
+}
+
+
+def _string_constants(rel: str) -> set[str]:
+    """Every string literal in a module that is not a docstring."""
+    import ast
+
+    tree = ast.parse((reference_pages.SOURCE_ROOT / rel).read_text(encoding="utf-8"))
+    docstrings = {id(node.body[0].value) for node in ast.walk(tree)
+                  if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef)
+                  and node.body and isinstance(node.body[0], ast.Expr)}
+    return {node.value for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            and id(node) not in docstrings}
+
+
+#: A FullProf column header the reader's module quotes, ``#: ``! Lambda1 ...``.
+_PCR_HEADER = re.compile(r"``!([^`]*)")
+
+
+def _pcr_header_names(rel: str) -> set[str]:
+    """Every name on a ``!`` column header the module quotes from a `.pcr`.
+
+    The FullProf reader cuts at ``!``, so the format's own names live in these
+    quoted headers rather than in string constants, and its constants are
+    mostly rietx's lowercase keys (`x`, `biso`, `scale`).
+    """
+    text = (reference_pages.SOURCE_ROOT / rel).read_text(encoding="utf-8")
+    return {name for header in _PCR_HEADER.findall(text) for name in header.split()}
+
+
+def _foreign_table() -> tuple[list[str], list[list[str]]]:
+    text = (REFERENCE_DIR / "foreign-names.md").read_text(encoding="utf-8")
+    rows = [[c.strip() for c in line.strip().strip("|").split("|")]
+            for line in text.splitlines() if line.startswith("| ")]
+    return rows[0], [r for r in rows[1:] if not set(r[0]) <= {"-", " "}]
+
+
+def test_every_foreign_name_is_one_its_reader_or_writer_uses():
+    header, rows = _foreign_table()
+    assert header[1:] == list(FOREIGN_CODE)
+    unknown = []
+    for column, modules in FOREIGN_CODE.items():
+        known = set().union(*(_string_constants(m) for m in modules))
+        if column == "FullProf":
+            # Exact case: folded, `X` matched rietx's own `x` key, not FullProf's.
+            known = set().union(*(_pcr_header_names(m) for m in modules))
+        for row in rows:
+            for name in re.findall(r"`([^`]+)`", row[header.index(column)]):
+                found = name in known or any(k.startswith(f"{name}(") for k in known)
+                if not found:
+                    unknown.append(f"{column} {name!r} (row {row[0]})")
+    assert not unknown, "names no reader or writer of the format uses:\n" + "\n".join(unknown)
+
+
+def test_every_rietx_path_in_the_foreign_map_is_a_parameter():
+    from fnmatch import fnmatchcase
+
+    from rietx.help import PARAMETER_HELP
+
+    _, rows = _foreign_table()
+    for row in rows:
+        first = re.findall(r"`([^`]+)`", row[0])[0]
+        assert any(fnmatchcase(first, glob) or fnmatchcase(glob, first)
+                   for glob in PARAMETER_HELP), first
+
+
+def test_the_roadmap_page_links_nothing_inside_the_planning_tree():
+    text = reference_pages.roadmap_page()
+    assert re.findall(r"\]\((?!https://)[^)]*\)", text) == []
+    assert "| magnetic |" in text

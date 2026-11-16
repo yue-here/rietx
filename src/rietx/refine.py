@@ -2490,6 +2490,28 @@ def _judge_magnetic_groups(structure: Structure) -> None:
 class Refinement:
     """Refine ``structure`` + ``instrument`` against a powder pattern.
 
+    Parameters
+    ----------
+    structure
+        The phases to refine. It is copied, so the object passed in never changes; the
+        refined copy is ``fitted_structure``.
+    instrument
+        The instrument and its source, copied the same way; the refined copy is
+        ``fitted_instrument``.
+    backend
+        What evaluates the model and its derivatives: ``"numpy"``, ``"jax"``, or the
+        experimental ``"torch"`` and ``"torch-mps"``. ``rx.capabilities()`` says which
+        of them import here.
+    solver
+        The least-squares driver: ``"lm"``, a bounded Levenberg-Marquardt, or ``"trf"``,
+        scipy's Trust Region Reflective.
+    history
+        Where the history of stages and edits is kept. ``True`` keeps it in memory; a
+        path also writes it to that file, which must not hold one already; a
+        ``RefinementTree`` continues that tree; ``False`` keeps none.
+
+    Notes
+    -----
     The input models are deep-copied; refined values are exposed on
     ``fitted_structure`` / ``fitted_instrument`` after :meth:`fit`.
 
@@ -3081,6 +3103,17 @@ class Refinement:
         """Record a change to the model itself, such as adding an impurity phase,
         raising the background order or swapping the geometry.
 
+        Parameters
+        ----------
+        structure
+            The new structure. ``None`` keeps the current one.
+        instrument
+            The new instrument. ``None`` keeps the current one.
+        label
+            The history node's name. Empty is ``"model edited"``.
+
+        Notes
+        -----
         Structural edits are refinement moves too: they belong in the history
         beside the stages, so a branch that adds a phase can be compared
         against one that does not.  Returns the new node id (``None`` when
@@ -3274,6 +3307,14 @@ class Refinement:
     def parameters(self, *, mode: Mode | None = None) -> list[ParameterRow]:
         """Every parameter as data, with fixed, locked and tied rows included.
 
+        Parameters
+        ----------
+        mode
+            The mode each row's ``mode_fixed`` is answered for. ``None`` is the mode the
+            last stage ran in, ``"rietveld"`` before any.
+
+        Notes
+        -----
         The counterpart of ``result_.parameters`` (which lists only what a fit
         refined): this is the whole table, in θ order, with the most recent
         fit's esds merged in and each held row saying *why* it is held.  A cold
@@ -3344,6 +3385,18 @@ class Refinement:
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
 
+        Parameters
+        ----------
+        path_globs
+            One dot-path or a list of them, each of which may be a glob with ``*`` (the
+            [parameter map](parameters.md) gives the names). A literal path the model
+            lacks raises; a glob that matches nothing changes nothing.
+        vary
+            ``True`` frees what matches and ``False`` fixes it. A plan's stage may free
+            a fixed parameter again; :meth:`hold` is what keeps one fixed.
+
+        Notes
+        -----
         Dot-path globs with fnmatch semantics, exactly as a stage's ``turn_on``
         (``"phases.*.cell.*"``).  Returns the paths actually changed, and
         records a ``set_vary`` history node — freeing a parameter is a
@@ -3481,6 +3534,16 @@ class Refinement:
     def set_values(self, values: dict[str, float]) -> None:
         """Set parameter values by dot-path, recording a ``set_value`` node.
 
+        Parameters
+        ----------
+        values
+            ``{dot-path: value}``, applied together as one history node, each in the
+            parameter's own unit (the [parameter map](parameters.md) gives them). An
+            unknown, locked or tied path, or a value outside the parameter's bounds,
+            raises.
+
+        Notes
+        -----
         Plural because a GUI (or a script) edits a table, not a cell: one node
         per keystroke would bury the log, and a set of values applied together
         is one refinement move.  The name is also what
@@ -3809,6 +3872,25 @@ class Refinement:
                      unit: str | None = None) -> str:
         """Declare a named variable other parameters can follow.  Returns its path.
 
+        Parameters
+        ----------
+        name
+            A single identifier. The variable's dot-path is ``"vars." + name``.
+        value
+            Its starting value.
+        vary
+            Whether it is free. :meth:`set_vary` changes that later.
+        min
+            Its lower bound. Give it the bounds of the parameter it stands for, or a
+            width may refine below zero.
+        max
+            Its upper bound.
+        unit
+            Its unit as text, such as ``"Å²"``; nothing is converted. ``None`` gives
+            none.
+
+        Notes
+        -----
         A parameter of the caller's own, with its own value and bounds, living
         outside the model tree — TOPAS's ``prm``.  It exists so a constraint can
         be written in terms of a *quantity* rather than in terms of whichever
@@ -3869,6 +3951,14 @@ class Refinement:
     def remove_variable(self, name: str) -> str:
         """Delete a named variable, refusing while anything follows it.
 
+        Parameters
+        ----------
+        name
+            The name it was declared with, without ``vars.``. Refused while a tie
+            follows it.
+
+        Notes
+        -----
         The refusal names the dependents, because the fix is theirs: untie them
         (or retie them elsewhere) and the variable is free to go.  Deleting it
         under them would leave ties naming a parameter that does not exist,
@@ -3928,6 +4018,25 @@ class Refinement:
             expression: str | None = None) -> str:
         """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
+        Parameters
+        ----------
+        path
+            The dot-path that follows. It stops being refined and takes its implied
+            value at once.
+        source
+            The dot-path it follows, or several, as ``{path: coefficient}`` or a list of
+            ``(path, coefficient)`` pairs. ``None`` only with ``expression``.
+        scale
+            Multiplies every source term.
+        offset
+            Added to the sum.
+        expression
+            A formula over variables declared with :meth:`add_variable`, in the
+            [expression grammar](expressions.md), in place of ``source``. Trigonometry
+            is in radians.
+
+        Notes
+        -----
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
         other one a powder refinement reaches for often::
@@ -4070,6 +4179,18 @@ class Refinement:
                   source: str | None = None) -> list[str]:
         """Make every parameter matching ``paths`` one parameter.
 
+        Parameters
+        ----------
+        paths
+            One dot-path or a list of them, each of which may be a glob with ``*`` (the
+            [parameter map](parameters.md) gives the names). Every match becomes one
+            parameter.
+        source
+            The dot-path the matches follow, which need not be one of them. ``None``
+            takes the first match in :meth:`parameters`' order.
+
+        Notes
+        -----
         The verb §7 of McCusker et al. (1999) asks for twice — equal
         displacement parameters across similar atoms, chemically constrained
         occupancies — spelled the way the recommendation reads::
@@ -4110,6 +4231,16 @@ class Refinement:
     def untie(self, paths: list[str] | str) -> list[str]:
         """Release user ties, recording a ``set_tie`` node.
 
+        Parameters
+        ----------
+        paths
+            One dot-path or a list of them, each of which may be a glob with ``*`` (the
+            [parameter map](parameters.md) gives the names). They match the ties this
+            refinement declared, never a symmetry tie. A released parameter is fixed at
+            its last value.
+
+        Notes
+        -----
         Globs match against the *declared* ties only, so a sweep such as
         ``untie("phases.0.atoms.*.biso")`` releases what this refinement tied
         and leaves symmetry alone.  A literal path that is not a user tie is
@@ -4160,6 +4291,15 @@ class Refinement:
     def hold(self, path_globs: list[str] | str) -> list[str]:
         """Declare that these parameters do not move, whatever a plan asks.
 
+        Parameters
+        ----------
+        path_globs
+            One dot-path or a list of them, each of which may be a glob with ``*`` (the
+            [parameter map](parameters.md) gives the names). An unknown literal path
+            raises; a glob that matches nothing holds nothing.
+
+        Notes
+        -----
         Dot-path globs with fnmatch semantics, exactly as :meth:`set_vary` and
         a stage's ``turn_on`` (``"phases.*.cell.*"``).  Returns the paths this
         call **newly** held, sorted, and records a ``set_hold`` node carrying
@@ -4305,6 +4445,16 @@ class Refinement:
     def unhold(self, path_globs: list[str] | str) -> list[str]:
         """Take back a hold.  Returns the paths released, sorted.
 
+        Parameters
+        ----------
+        path_globs
+            One dot-path or a list of them, each of which may be a glob with ``*`` (the
+            [parameter map](parameters.md) gives the names). They match the holds this
+            refinement declared; a literal path that is not held is refused. A released
+            parameter stays fixed at its current value.
+
+        Notes
+        -----
         Globs match against the **declared** holds only, so a sweep such as
         ``unhold("phases.0.cell.*")`` releases what this refinement held and
         cannot reach anything the space group fixed.  A literal path that is
@@ -4540,6 +4690,28 @@ class Refinement:
                 report=None) -> "SuggestionResult":
         """Which held parameter should be freed next?  Ranked, gated, read-only.
 
+        Parameters
+        ----------
+        data
+            The pattern the candidates are scored against.
+        top_n
+            How many candidate groups to return, best first.
+        include
+            Dot-path globs a candidate must match. ``"*"`` takes every held parameter
+            that could be freed.
+        exclude
+            Dot-path globs that drop candidates ``include`` matched.
+        mode
+            The mode the next stage would run in. ``None`` is the mode the last stage
+            ran in.
+        two_theta_limits
+            ``(low, high)`` in degrees 2θ. ``None`` uses the last run's limits.
+        report
+            A ``FitReport``, or its ``suggested_actions``: a candidate an action names
+            is marked with the action's kind. ``None`` marks none.
+
+        Notes
+        -----
         Every held-but-refinable parameter (the :meth:`parameters` surface:
         locked, tied and mode-fixed rows never enumerate) matching
         ``include``/``exclude`` is scored by its exact Gauss-Newton
@@ -5650,11 +5822,48 @@ class Refinement:
             stage_reports: bool = False, progress=None) -> RefinementResult:
         """Run a staged refinement.
 
-        ``events`` — optional per-iteration telemetry: a path (JSONL appended),
-        a callable (called per event dict), or an
-        :class:`~rietx.history.events.EventStream`.  See that module for the
-        record format; ``rietx watch`` tails it live.
+        Parameters
+        ----------
+        data
+            The powder pattern to fit.
+        mode
+            ``"rietveld"`` refines the structure; ``"lebail"`` and ``"pawley"`` extract
+            each reflection's intensity from the pattern instead.
+        plan
+            The stages to run: a preset name from the [plan presets](plans.md), a
+            ``RefinementPlan`` or its ``PlanSpec``. A preset name is read for the mode,
+            so ``"mccusker_default"`` runs ``profile_only`` under Le Bail and
+            ``pawley_default`` under Pawley.
+        two_theta_limits
+            ``(low, high)`` in degrees 2θ: only the channels between them are fitted.
+            ``None`` fits the whole pattern.
+        events
+            Per-iteration events for the caller: a path they are appended to as JSON
+            lines, a callable given each event as a dict, or an ``EventStream``.
+            ``None`` sends none; the run still records itself (``telemetry``).
+        cancel
+            A ``CancelToken`` another thread can set. The stage in flight is abandoned,
+            the models go back to their values before it, and ``RefinementCancelled`` is
+            raised carrying the stages that completed. ``None`` cannot be cancelled.
+        telemetry
+            The directory the run's own directory is created in, which ``rietx watch``
+            reads. ``False`` records nothing; ``None`` uses the project's ``live/``
+            directory when this refinement came from a project, else ``.rietx/runs``
+            under the working directory.
+        label
+            What the run is called in ``rietx watch``: the phase, the sample or the
+            candidate it fits. ``None`` names it after its directory or its project. It
+            changes no number the fit produces.
+        stage_reports
+            Build the report at every stage boundary and keep the reports on
+            ``stage_reports_``. Off by default, because each one costs a whole report
+            build. It changes no number the fit produces.
+        progress
+            A text stream or a path that gets one line per stage boundary. ``None``
+            writes none.
 
+        Notes
+        -----
         ``progress`` — a text stream or path; one line per stage boundary
         (``[series 7/13] 250C stage cell converged Rwp 0.0812 12s`` under
         :func:`refine_sequential`, ``stage cell converged Rwp 0.0812 12s``
@@ -5683,12 +5892,6 @@ class Refinement:
         sample, the candidate cell.  It is written to the run's ``meta.json``
         and lives nowhere a result reproduces — telemetry, not a refined
         quantity — so naming a run changes no number the fit produces.
-
-        ``cancel`` — an :class:`~rietx.optimize.cancel.CancelToken` another
-        thread can set.  The stage in flight is abandoned (no node, no commit,
-        the models restored to their pre-stage values) and
-        :class:`~rietx.optimize.cancel.RefinementCancelled` is raised carrying
-        the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
         the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
@@ -6497,6 +6700,47 @@ class Refinement:
                   label: str | None = None) -> RefinementResult:
         """Run a single stage from the current state, recording a child node.
 
+        Parameters
+        ----------
+        data
+            The powder pattern to fit.
+        stage
+            The one ``Stage`` to run from the current state ([stage
+            settings](settings.md#stage-settings) describes its fields).
+        mode
+            ``"rietveld"``, ``"lebail"`` or ``"pawley"``. ``None`` is the mode the last
+            stage ran in.
+        two_theta_limits
+            ``(low, high)`` in degrees 2θ. ``None`` uses the last run's limits.
+        correlation_guard
+            The |ρ| above which a pair of free parameters is reported as
+            ``HIGH_CORRELATION``.
+        phase_support_sigma
+            How many esds a phase's scale must stand above the counting noise for the
+            stage to refine the phase's structure. ``None`` holds no phase for that.
+        window_area_tol
+            The fraction of each peak's area the stage's windows may leave out. ``None``
+            is ``CLOSING_WINDOW_TOL``, the fraction a fit's answer is measured at.
+        events
+            Per-iteration events for the caller: a path they are appended to as JSON
+            lines, a callable given each event as a dict, or an ``EventStream``.
+            ``None`` sends none; the run still records itself (``telemetry``).
+        cancel
+            A ``CancelToken`` another thread can set. The stage in flight is abandoned,
+            the models go back to their values before it, and ``RefinementCancelled`` is
+            raised carrying the stages that completed. ``None`` cannot be cancelled.
+        telemetry
+            The directory the run's own directory is created in, which ``rietx watch``
+            reads. ``False`` records nothing; ``None`` uses the project's ``live/``
+            directory when this refinement came from a project, else ``.rietx/runs``
+            under the working directory.
+        label
+            What the run is called in ``rietx watch``: the phase, the sample or the
+            candidate it fits. ``None`` names it after its directory or its project. It
+            changes no number the fit produces.
+
+        Notes
+        -----
         This is the incremental verb: after ``checkout``, it continues down a
         new branch.  (``fit`` is the other verb — it resets the free set and
         runs a whole plan from wherever the working state currently is.)
@@ -6749,6 +6993,15 @@ class Refinement:
     def predict(self, two_theta=None) -> np.ndarray:
         """Evaluate ``y_calc`` at the current parameters, without a fit.
 
+        Parameters
+        ----------
+        two_theta
+            The grid: an array of 2θ values in degrees, or a ``PatternData`` whose 2θ
+            column is used. ``None`` evaluates on the grid of the last fit, so it needs
+            one to have run.
+
+        Notes
+        -----
         With a grid — an array of 2θ values, or a
         :class:`~rietx.PatternData` whose 2θ column is used — this compiles a
         fresh model on it and evaluates.  With no argument it evaluates on the
@@ -6834,6 +7087,17 @@ class Refinement:
     def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
+        Parameters
+        ----------
+        plan
+            The plan the fit ran, its ``PlanSpec`` or its preset name, which the
+            suggested actions are checked against. ``None`` checks none.
+        **kw
+            Passed on to :func:`build_report`: ``top_n``, ``match_tol_deg`` and
+            ``min_peak_sigma``.
+
+        Notes
+        -----
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
@@ -6881,6 +7145,27 @@ class Refinement:
                levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
 
+        Parameters
+        ----------
+        deliverable
+            The purpose whose deciding rows are printed, one of
+            :data:`rietx.purposes.PURPOSES` such as ``"qpa"`` or ``"structure"``.
+            ``None`` prints the three stop conditions and only the errors in full.
+        plot
+            A path to write the ``plot_for_vlm`` montage to, named on the last line.
+            ``None`` writes no file.
+        plan
+            The plan the report is built under when ``report`` is ``None``: the plan the
+            fit ran, its ``PlanSpec`` or its preset name.
+        report
+            A ``FitReport`` this fit's :meth:`report` already built, so it is not built
+            twice. Passing ``plan`` as well is refused. ``None`` builds one.
+        levels
+            Per-code overrides, ``{code: "allow" | "warn" | "deny"}``, which replace the
+            audited level but never lower an error. ``None`` overrides nothing.
+
+        Notes
+        -----
         ``report`` takes the :class:`~rietx.report.schemas.FitReport` this
         fit's :meth:`report` already built, so a caller that wants the text
         *and* the structured report builds one rather than two — the report
@@ -12458,6 +12743,55 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
            label: str | None = None) -> RefinementResult:
     """One-shot functional API: ``refine(data, structure, instrument)``.
 
+    Parameters
+    ----------
+    data
+        The powder pattern to fit.
+    structure
+        The phases to refine. The object passed in never changes.
+    instrument
+        The instrument and its source, which never changes either.
+    mode
+        ``"rietveld"`` refines the structure; ``"lebail"`` and ``"pawley"`` extract each
+        reflection's intensity from the pattern instead.
+    plan
+        The stages to run: a preset name from the [plan presets](plans.md), a
+        ``RefinementPlan`` or its ``PlanSpec``. A preset name is read for the mode, so
+        ``"mccusker_default"`` runs ``profile_only`` under Le Bail and
+        ``pawley_default`` under Pawley.
+    two_theta_limits
+        ``(low, high)`` in degrees 2θ: only the channels between them are fitted.
+        ``None`` fits the whole pattern.
+    backend
+        What evaluates the model and its derivatives: ``"numpy"``, ``"jax"``, or the
+        experimental ``"torch"`` and ``"torch-mps"``. ``rx.capabilities()`` says which
+        of them import here.
+    solver
+        The least-squares driver: ``"lm"``, a bounded Levenberg-Marquardt, or ``"trf"``,
+        scipy's Trust Region Reflective.
+    history
+        ``False`` keeps no history; a path writes it to that file, which must not hold
+        one already.
+    events
+        Per-iteration events for the caller: a path they are appended to as JSON lines,
+        a callable given each event as a dict, or an ``EventStream``. ``None`` sends
+        none; the run still records itself (``telemetry``).
+    cancel
+        A ``CancelToken`` another thread can set. The stage in flight is abandoned, the
+        models go back to their values before it, and ``RefinementCancelled`` is raised
+        carrying the stages that completed. ``None`` cannot be cancelled.
+    telemetry
+        The directory the run's own directory is created in, which ``rietx watch``
+        reads. ``False`` records nothing; ``None`` uses the project's ``live/``
+        directory when this refinement came from a project, else ``.rietx/runs`` under
+        the working directory.
+    label
+        What the run is called in ``rietx watch``: the phase, the sample or the
+        candidate it fits. ``None`` names it after its directory or its project. It
+        changes no number the fit produces.
+
+    Notes
+    -----
     History defaults to *off* here: this call discards the ``Refinement``, so
     an in-memory tree would be unreachable.  Pass a path to keep one.
 
