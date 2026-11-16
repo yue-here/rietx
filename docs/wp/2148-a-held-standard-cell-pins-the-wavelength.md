@@ -1,6 +1,6 @@
 # WP-2148 — A held standard's cell pins the wavelength, and a skipped λ is said
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-15 — a silent wrong answer on a path few fits run (a standard-plus-sample wavelength calibration freed in one stage: λ is dropped, the sample cell takes its error at −496 ppm, z −109, and the fit reports converged), plus a false refusal of the same calibration staged apart
