@@ -167,7 +167,7 @@ def _record(result) -> dict:
 
 def _fractions(result) -> dict | None:
     try:
-        return {f.phase: 100.0 * f.weight_fraction for f in result.qpa.fractions}
+        return {f.name: 100.0 * f.weight_fraction for f in result.qpa.phases}
     except Exception:  # noqa: BLE001
         return None
 

@@ -172,7 +172,7 @@ def fit_one(task: dict) -> dict:
             "png": str(png.relative_to(ROOT)),
         })
         try:
-            row["fractions"] = {f.phase: 100.0 * f.weight_fraction for f in result.qpa.fractions}
+            row["fractions"] = {f.name: 100.0 * f.weight_fraction for f in result.qpa.phases}
         except Exception:  # noqa: BLE001
             row["fractions"] = None
     except Exception as exc:  # noqa: BLE001  a refused fit is a result of the sweep
