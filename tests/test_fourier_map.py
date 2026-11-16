@@ -23,7 +23,8 @@ import pytest
 
 import rietx as rx
 from rietx import PatternData
-from rietx.crystallography.lattice import direct_metric_tensor
+from rietx.crystallography.lattice import d_spacings, direct_metric_tensor
+from rietx.crystallography.structure_factor import structure_factors_ab
 from rietx.crystallography.symmetry import expand_positions, get_spacegroup
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
@@ -143,8 +144,16 @@ def test_a_peak_split_by_a_mirror_between_two_grid_points_is_kept():
 
 
 def test_a_dispersive_source_states_its_phase_convention():
-    """NAC at Cu Kα with f′ and f″ declared: the convention says so, and the
-    observed map still finds the six sites (the f″ path, otherwise untested)."""
+    """NAC at Cu Kα with f′ and f″ declared: the convention says so, the
+    observed map still finds the six sites (the f″ path, otherwise untested),
+    and the map's coefficients carry arg A, the phase of ½(F(h) + F(−h)*).
+
+    The phase is read back from the map itself, so the arm fails when the
+    module phases by arg F = arg(A + iB) instead: those coefficients are not
+    Hermitian, the synthesis drops their imaginary part, and the phases read
+    back are off by up to 0.64 rad here, against 3e-15 under arg A (PR #1613's
+    review; the six-site and ΔF assertions pass either way).
+    """
     structure, model, values = _self_partition(
         "cod_1000236.cif", wavelength=1.5406, dispersion=True, tt_max=150.0)
     maps = fourier_maps_from_model(model, values, structure)
@@ -153,6 +162,22 @@ def test_a_dispersive_source_states_its_phase_convention():
     assert {p.nearest_atom for p in top} == NAC_SITES
     assert max(p.nearest_distance for p in top) < 0.10
     assert np.abs(maps.difference.grid).max() < 1e-9 * maps.observed.sigma
+
+    cp = model.phases[0]
+    hkl = np.asarray(cp.reflections.hkl, dtype=np.int64)
+    hkl = np.concatenate([hkl, -hkl])  # I2₁3 has no inversion: both hands
+    d = np.asarray(d_spacings(hkl, *maps.cell))
+    site_args = model._site_values(0, values, maps.cell)
+    a_pos, b_pos = structure_factors_ab(hkl, d, cp.sites, *site_args)
+    a_neg, b_neg = structure_factors_ab(-hkl, d, cp.sites, *site_args)
+    assert b_pos is not None and np.abs(b_pos).max() > 0.01 * np.abs(a_pos).max()
+    friedel_mean = 0.5 * ((a_pos + 1j * b_pos) + np.conj(a_neg + 1j * b_neg))
+    assert np.abs(friedel_mean - a_pos).max() < 1e-9 * np.abs(a_pos).max()
+    grid = maps.observed.grid
+    coeff = np.fft.ifftn(grid)[tuple(np.mod(hkl[:, i], grid.shape[i]) for i in range(3))]
+    strong = np.abs(coeff) > 1e-3 * np.abs(coeff).max()
+    assert strong.sum() > 100
+    assert np.abs(np.angle(coeff[strong] * np.conj(a_pos[strong]))).max() < 1e-9
 
 
 def test_a_le_bail_model_is_refused(nac_noiseless):

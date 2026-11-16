@@ -121,9 +121,16 @@ class FourierMaps:
     the maps' resolution; ``grid_step`` (Å) the largest spacing of the grid
     the maps were drawn on, which the no-aliasing rule may make finer than
     the step asked for; ``n_reflections`` counts the unique reflections with
-    an observed share, ``n_unobserved`` those the partition could give none
-    (no profile in the fitted range), left out of both maps.  ``units`` is
-    e/Å³ for X-rays and fm/Å³ for neutrons.
+    an observed share, ``n_unobserved`` those the partition could give none,
+    left out of both maps.  A reflection has no share when its calculated
+    counts W_k are zero, for either of two causes: no profile in the fitted
+    range (a dead position, an empty frozen window), or a |F_calc|² that this
+    model makes exactly zero.  The second is model bias at its strongest: a
+    partial model that extinguishes a reflection class, say by lacking the
+    only atom on a sublattice, drops those reflections from the difference
+    map too, though the data carry the missing atom's intensity there
+    (:meth:`~rietx.model.forward.CompiledModel.structure_intensity_partition`).
+    ``units`` is e/Å³ for X-rays and fm/Å³ for neutrons.
     """
 
     phase: str
@@ -243,7 +250,10 @@ def fourier_maps_from_model(model: CompiledModel, values: dict[str, float],
         "look, never evidence for the fit that partitioned it",
         f"resolution: reflections to d_min = {d_min:.3f} Å, "
         f"{int(live.sum())} with an observed share and "
-        f"{int((~live).sum())} without, which are left out of both maps",
+        f"{int((~live).sum())} without, which are left out of both maps "
+        "(no profile in the fitted range, or a |F_calc|² this model makes "
+        "exactly zero, which hides from the difference map what the model "
+        "lacks there)",
         "F(000) is omitted: each map has zero mean over the cell",
     ) + (("negative nuclear density is real for a species with b < 0",)
          if neutron else ())
@@ -322,6 +332,16 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
     ``merge`` (Å, one grid spacing) of an image of a stronger one already
     kept: a map with the space group's symmetry repeats each peak over the
     orbit, and the list keeps one.
+
+    The kept images are filed by their nearest grid point, and a candidate is
+    measured against the images filed within ``reach`` points of its own, in
+    one distance call.  That set holds every image that can merge it, so the
+    lists are those of a test against all kept images, at a cost that does
+    not grow with how many are kept: an image p within ``merge`` of c has
+    |c_i − p_i| ≤ merge·|a*_i| on each axis, c lies within half a grid step
+    of its point (|t*| ≤ ½ at a maximum, below), and p within half a step of
+    its own.  Against every kept image, a 26 Å Fm-3m cell took minutes
+    (PR #1613's review).
     """
     g = sign * grid
     is_max = g > 0.0
@@ -335,8 +355,13 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
     idx = np.argwhere(is_max)
     order = np.argsort(-g[tuple(idx.T)])
     shape = np.array(grid.shape)
+    reach = np.ceil(merge * np.sqrt(np.diag(np.linalg.inv(metric))) * shape
+                    + 1.0).astype(np.int64)
+    windows = [np.arange(n) if 2 * r + 1 >= n else np.arange(-r, r + 1)
+               for r, n in zip(reach, shape)]
+    filed: dict[tuple[int, int, int], list[np.ndarray]] = {}
+    occupied = np.zeros(grid.shape, dtype=bool)
     kept: list[MapPeak] = []
-    kept_images: list[np.ndarray] = []
     n_merged = 0
     for row in idx[order]:
         # f(t) = f0 + ½(f₊ − f₋)t + ½(f₋ − 2f0 + f₊)t² per axis: the vertex
@@ -354,10 +379,16 @@ def _extrema(grid: np.ndarray, sigma: float, group, metric: np.ndarray,
             frac[axis] = (row[axis] + off) / shape[axis]
             height_fit += 0.25 * (fp - fm) * off
         frac = np.mod(frac, 1.0)
-        if any(_min_distance(frac, im, metric) < merge for im in kept_images):
+        box = [np.mod(row[a] + windows[a], shape[a]) for a in range(3)]
+        near = [im for i, j, k in np.argwhere(occupied[np.ix_(*box)])
+                for im in filed[(int(box[0][i]), int(box[1][j]), int(box[2][k]))]]
+        if near and _min_distance(frac, np.array(near), metric) < merge:
             n_merged += 1
             continue
-        kept_images.append(np.array(expand_positions(group, frac)))
+        own = np.array(expand_positions(group, frac))
+        for im, point in zip(own, np.mod(np.rint(own * shape), shape).astype(np.int64)):
+            filed.setdefault((int(point[0]), int(point[1]), int(point[2])), []).append(im)
+            occupied[tuple(point)] = True
         label, dist = None, None
         for name, pos in images:
             r = _min_distance(frac, pos, metric)

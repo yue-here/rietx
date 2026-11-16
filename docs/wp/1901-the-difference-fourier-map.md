@@ -159,8 +159,24 @@ Amendments from the review:
     partition (an edit to `model/forward.py`), or the clause becomes the
     comparison the tests assert now (the missing atom's peak above every
     peak of the complete model's map).
-  - *Next:* the rulings above, then the task line's remainder; then the
-    GUI panel WP from `### Inherited` (still true: grid, σ and peaks are
+  - *Next:* the rulings above, then the task line's remainder.  Two house
+    rules deferred by this slice land with the public entry point: the
+    Theory tab's equation (the synthesis, eq. 8.7.3.1 in lattice-sum form,
+    and the ΔF coefficients, now in the module docstring only), and the
+    `_audit.py` rows for the d_min/3 default grid and the one-grid-spacing
+    orbit merge (tier 3), once #1262 has landed its edit to that file.  Then
+    the GUI panel WP from `### Inherited` (still true: grid, σ and peaks are
     public returns) when this one closes.
+  - *Review fix-ups (PR #1613):* the orbit merge measures each candidate
+    against the kept images filed near its own grid point, in one distance
+    call, instead of against every kept peak's orbit: the lists are
+    identical (asserted on NAC, LaMnO₃, `cod_1567181`, `cod_9007744` and
+    `cod_4002052`), and the 26 Å Fm-3m cell `cod_4002052` (81³ grid) drops
+    from 407 s (the review measured 259-270 s) to 19.5 s a map pair
+    (darwin/arm64, one process).  Most of what is left is
+    `expand_positions` on each kept peak.  The f″ convention test now reads
+    the phases back from the map, so it fails under arg(A + iB).  The `n_unobserved` docstring and the
+    resolution caveat name both causes, including a |F_calc|² the model
+    makes exactly zero.
 - **2026-09-30** — created, from the 2026-09-30 issue triage (issues #562,
   #197). No open WP owns it.
