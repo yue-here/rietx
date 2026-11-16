@@ -318,7 +318,7 @@ because the quartic is homogeneous of degree 4 and $M$ of degree 2, so the
 value does not depend on how far along $\hat{\mathbf u}$ it is read. The
 surface is that sum, the same one the width law evaluates, never a second
 copy of it. Along a reflection $\mathbf h$ it equals the reflection's own
-$\sigma^2(M)\cdot d^4_{hkl}$ in the units of {eq}`ms-sigma`.
+$10^{12}\,\sigma^2(M)\cdot d^4_{hkl}$.
 $\varepsilon(\hat{\mathbf u})$ is the FWHM of ΔM/M along $\hat{\mathbf u}$ in
 ppm, a FWHM and not a standard deviation, as in {eq}`ms-lambda`. The figure
 draws it as the distance from the origin and repeats it in colour, with
@@ -333,7 +333,7 @@ impossible one. Pass the fit's `RefinementResult.diagnostics` and the guard's
 can disagree. The guard tests the fitted reflections, and the figure tests
 the whole sphere. A block the default LM driver held on the cone at every
 reflection can still dip below zero between them, where the pattern measured
-nothing, and the figure then says that the guard did not fire. No confidence
+nothing, and the figure then says that the guard reported nothing. No confidence
 band is drawn: a band needs the coefficients' covariance propagated direction
 by direction, and a diagonal shortcut is wrong in both directions.
 

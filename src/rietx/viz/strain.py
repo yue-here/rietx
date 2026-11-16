@@ -17,13 +17,15 @@ Three rules decide what is drawn.
 * **A direction below zero is drawn, not clipped.**  σ²(M) < 0 is outside the
   physical cone.  Such a facet is drawn at √|σ²| in the ``--bad`` colour, so the
   region keeps its true extent; flooring it to zero would draw a dimple, which
-  reads as a narrow direction rather than an impossible one.  "Below zero" is the
-  guard's own test, ``-STEPHENS_CONE_TOL`` times the largest magnitude, so the
-  figure and ``STEPHENS_STRAIN_NOT_POSITIVE`` agree about what negative means.
+  reads as a narrow direction rather than an impossible one.  "Below zero" takes
+  the guard's relative tolerance, ``STEPHENS_CONE_TOL``, applied to σ²/M² over
+  the sphere rather than to σ²(M) over the reflections, so rounding at the
+  cone's face is not drawn as a region.
 * **The guard's finding goes beside the picture.**  The guard tests the fitted
   reflections and this tests the sphere, so the two can differ: a fit the
   default LM driver held on the cone can still dip between measured directions.
-  The text under the figure says which case it is.
+  The text under the figure quotes the finding, or says the guard reported
+  nothing about this block.
 
 No confidence band is drawn.  The coefficients' esds exist, but a band needs
 the S_HKL block of the covariance propagated direction by direction, which a
@@ -65,8 +67,8 @@ def _surface(s: np.ndarray, cell, n_directions: int) -> dict[str, np.ndarray]:
     ``radius`` and ``bad`` are per direction, ``verts`` (faces, 3, 3),
     ``face_bad`` and ``face_r`` per triangle.  A triangle touching a direction
     below zero is unphysical, so the region is never drawn smaller than it is.
-    "Below zero" is the guard's own test, ``-STEPHENS_CONE_TOL`` times the
-    largest magnitude.
+    "Below zero" is the guard's relative tolerance, ``STEPHENS_CONE_TOL`` times
+    the largest magnitude, applied to σ²/M².
     """
     from scipy.spatial import ConvexHull
 
@@ -171,9 +173,11 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
         ax.set_axis_off()
         ax.view_init(elev=elev, azim=azim)
 
-        cax = fig.add_axes((0.86, 0.30, 0.03, 0.52))
-        bar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), cax=cax)
-        bar.set_label("FWHM of ΔM/M (ppm)")
+        if (~bad).any():
+            # a scale nothing is drawn in would be a legend for no facet
+            cax = fig.add_axes((0.86, 0.30, 0.03, 0.52))
+            bar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), cax=cax)
+            bar.set_label("FWHM of ΔM/M (ppm)")
 
         lines = []
         if bad.any():
@@ -183,12 +187,13 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
         findings = _findings(diagnostics, phase)
         lines += [f"{_GUARD_CODE}: {m}" for m in findings]
         if diagnostics is not None and bad.any() and not findings:
-            lines.append(f"{_GUARD_CODE} did not fire: the guard tests the fitted "
-                         "reflections, and the negative region lies between them.")
+            lines.append(f"{_GUARD_CODE} reported nothing for "
+                         f"phases.{phase}.microstrain; it tests only the "
+                         "fitted reflections.")
         if lines:
             text = "\n".join(textwrap.fill(line, width=74) for line in lines)
             fig.text(0.02, 0.13, text, ha="left", va="top",
-                     fontsize=font_size, color=hue.get("fg", hue["obs"]))
+                     fontsize=font_size)
         if title is not None:
             fig.suptitle(title, fontsize=font_size)
 

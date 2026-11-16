@@ -80,7 +80,10 @@ def test_the_surface_is_the_module_sum_along_every_reflection(symbol, cell):
     d = d_spacings(HKL, *cell)
     expected = np.asarray(sigma2_m(monomial_matrix(HKL), s)) * d**4
     got = directional_sigma2(s, cell, _unit(cell, HKL))
-    assert np.allclose(got, expected, rtol=1e-12, atol=0.0)
+    # a block near the cone has directions where the sum cancels toward zero,
+    # so the bar is relative to the largest value, not to each one (measured:
+    # Linux x86-64 libm missed a per-value 1e-12 on P-3m1, darwin/arm64 did not)
+    assert np.allclose(got, expected, rtol=1e-12, atol=1e-12 * np.abs(expected).max())
 
 
 @pytest.mark.parametrize("cell", CELLS)
@@ -179,27 +182,31 @@ def test_a_block_outside_the_cone_draws_its_region_and_the_finding(
 
     # …at its true extent, never clipped to zero: c* lies inside the region,
     # and the vertex nearest it sits at √|σ²| there, not at the origin
-    sigma2_c = directional_sigma2(s, cell, np.array([[0.0, 0.0, 1.0]]))[0]
+    c_star = reciprocal_frame(cell)[:, 2]
+    c_star = c_star / np.linalg.norm(c_star)
+    sigma2_c = directional_sigma2(s, cell, c_star[None, :])[0]
     assert sigma2_c < 0.0
     tops = surface["verts"].reshape(-1, 3)
-    top = tops[np.argmax(tops[:, 2])]
+    unit = tops / np.linalg.norm(tops, axis=1)[:, None]
+    top = tops[np.argmax(unit @ c_star)]
     assert np.linalg.norm(top) == pytest.approx(np.sqrt(-sigma2_c), rel=1e-3)
 
 
 def test_a_silent_guard_is_said_to_be_silent(outside_the_cone):
-    """Passed diagnostics with no finding: the guard tests reflections and the
-    figure the sphere, so the note says which one spoke."""
+    """Passed diagnostics with no finding for this block: the note says the
+    guard reported nothing, and claims nothing about where the region lies."""
     import matplotlib.pyplot as plt
 
     from rietx.viz import plot_strain_surface
 
     phase, _ = outside_the_cone
     fig = plot_strain_surface(phase, [])
-    assert "did not fire" in _text(fig)
+    assert "reported nothing for phases.0.microstrain" in _text(fig)
+    assert "between" not in _text(fig)
     plt.close(fig)
     # no diagnostics at all: the figure claims nothing about the guard
     fig = plot_strain_surface(phase)
-    assert "did not fire" not in _text(fig)
+    assert "reported nothing" not in _text(fig)
     plt.close(fig)
 
 
@@ -213,7 +220,7 @@ def test_another_phases_finding_is_not_quoted(outside_the_cone):
     # the finding names phases.0; phase 1 is the same block, still drawn red,
     # and the guard is then said to be silent about it
     assert "STEPHENS_STRAIN_NOT_POSITIVE:" not in _text(fig)
-    assert "did not fire" in _text(fig)
+    assert "reported nothing for phases.1.microstrain" in _text(fig)
     plt.close(fig)
 
 

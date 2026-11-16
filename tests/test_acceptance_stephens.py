@@ -332,6 +332,7 @@ def test_the_refined_surface_is_the_module_sum_and_shows_the_cone(brucite_aniso_
     out-of-cone block draws its region beside the guard's finding."""
     import matplotlib.pyplot as plt
 
+    from rietx.crystallography.lattice import d_spacings
     from rietx.crystallography.stephens import directional_sigma2, reciprocal_frame
     from rietx.viz import plot_strain_surface
 
@@ -341,10 +342,11 @@ def test_the_refined_surface_is_the_module_sum_and_shows_the_cone(brucite_aniso_
     cell = phase.cell.lengths_angles()
     hkl = np.asarray(ref._model.phases[0].reflections.hklm, dtype=float)[:, :3]
     q = (reciprocal_frame(cell) @ hkl.T).T
-    m = np.einsum("ij,ij->i", q, q)
-    surface = directional_sigma2(s, cell, q / np.sqrt(m)[:, None])
-    assert np.allclose(surface * m * m, _sigma2_of(ref), rtol=1e-10,
-                       atol=1e-10 * np.abs(_sigma2_of(ref)).max())
+    surface = directional_sigma2(s, cell, q / np.linalg.norm(q, axis=1)[:, None])
+    # d from the lattice, not from the frame, so a wrong frame cannot cancel
+    sigma2 = _sigma2_of(ref)
+    assert np.allclose(surface, sigma2 * d_spacings(hkl, *cell) ** 4, rtol=1e-10,
+                       atol=1e-10 * np.abs(sigma2).max() * d_spacings(hkl, *cell).max() ** 4)
 
     fig = plot_strain_surface(phase, result.diagnostics,
                               path=str(OUT / "stephens_brucite_aniso_surface.png"))
