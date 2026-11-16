@@ -48,27 +48,20 @@ band on the surface is derivable via the covariance (the
 `model/geometry.py` J·Cov·Jᵀ precedent) — include it only if the
 propagation is done properly, absent otherwise, never a diagonal shortcut.
 
-### Inherited
-
-- **2026-10-14, from WP-1960's filing:** spherical-harmonics texture left the
-  v2 fence that day as [WP-1960](1960-spherical-harmonics-texture.md), so the
-  Non-goals bullet's "fenced design" is stale. It stays a non-goal here. Its
-  pole-figure render evaluates a function over the same sphere of hkl
-  directions, so whichever WP lands second reuses the first's sampler rather
-  than building another. WP-1960's positivity guard samples that sphere too.
-- **2026-10-15, from WP-1960:** WP-1960 landed first. The sampler is
-  `crystallography.spherical_harmonics.sphere_points`, and the texture
-  surface is `TextureBasis.evaluate` on those directions, which
-  `CompiledModel.texture_summary` already calls. A strain render reuses the
-  sampler.
+**The sphere sampler exists** (folded from `### Inherited`, 2026-11-16):
+[WP-1960](1960-spherical-harmonics-texture.md) landed first, so the
+directions come from `crystallography.spherical_harmonics.sphere_points`,
+the sampler its texture surface and positivity guard already use, never a
+second one.
 
 ## Non-goals
 
 - **Not Fourier or difference-Fourier maps** — v2+ fence (the McCusker
   audit's entry; the consumer is structure completion, fenced beside
   structure solution). Issue #197 holds that half.
-- **Not spherical-harmonics texture** — issue #131's fenced design; same
-  family of directional plots, different model, not this WP.
+- **Not spherical-harmonics texture** — WP-1960's (shipped, no longer
+  fenced; superseded in part 2026-11-16); same family of directional plots,
+  different model, not this WP.
 - **Not new strain physics, thresholds, or guards** — the cone guard and
   conventions stand as shipped.
 
