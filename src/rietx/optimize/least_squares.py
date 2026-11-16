@@ -2998,6 +2998,17 @@ def _wants_preview(events) -> bool:
     return events is not None and bool(getattr(events, "preview", False))
 
 
+def _refuse_joint_preview(events) -> None:
+    """A joint fit refuses a preview rather than skipping it, so a viewer
+    waiting on one is told why none comes: its data rows are several
+    histograms', and no one grid draws them (WP-1949)."""
+    if _wants_preview(events):
+        raise ValueError(
+            "EventStream(preview=True) is not supported on a joint fit: its "
+            "residual stacks several histograms, and no one grid draws them. "
+            "Pass a stream without preview=True.")
+
+
 def _preview_builder(model: CompiledModel, table: ParameterTable):
     """A function of (θ, r) returning one accepted ``eval``'s preview (WP-1949).
 
@@ -3007,7 +3018,11 @@ def _preview_builder(model: CompiledModel, table: ParameterTable):
     is every *moving* path, a decode of θ that holds the tied coordinates and
     the cell as absolute values, so a viewer draws the atoms with no reset.
     The grid and the path list are taken once, here, since both are frozen for
-    the stage.
+    the stage.  In Le Bail mode the curve is the one the solve minimises, at
+    the intensities extracted before it (``_lebail_snapshot``); ``predict()``
+    reads the ones re-extracted after it, so the two differ by that update
+    (2.6e-4 of the maximum on the synthetic fixture, against 4.4e-6 in
+    Rietveld and 5e-20 in Pawley mode).
     """
     data_rows = row_layout.block(model, "data")
     sigma = model.sigma
@@ -3847,13 +3862,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     """
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
-    if _wants_preview(events):
-        # refused rather than skipped, so a viewer waiting on a preview is
-        # told why none comes: the data rows are several histograms' (WP-1949)
-        raise ValueError(
-            "EventStream(preview=True) is not supported on a joint fit: its "
-            "residual stacks several histograms, and no one grid draws them. "
-            "Pass a stream without preview=True.")
+    _refuse_joint_preview(events)   # the backstop; the fit refuses first
     lapack_start = lapack.retries()
     # dense below a size, blocked above it (WP-1325, ``blocked.choose_layout``)
     n_table = len(mtable.free_paths)

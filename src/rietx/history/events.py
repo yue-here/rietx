@@ -254,8 +254,7 @@ class EventStream:
                 "only, and a file never carries it")
         self.path = Path(path) if path is not None else None
         self.callback = callback
-        #: Whether the solvers build a preview for accepted ``eval`` events.
-        self.preview = bool(preview)
+        self._preview = bool(preview)
         # ``newline="\n"``: JSONL, so the line ending is the format's and
         # not the platform's (WP-1439).
         self._fh = (open(self.path, "a", encoding="utf-8", newline="\n")
@@ -267,6 +266,15 @@ class EventStream:
         self.header_id: str | None = None
         if self._fh is not None:
             self._write_header()
+
+    @property
+    def preview(self) -> bool:
+        """Whether the solvers build a preview for accepted ``eval`` events.
+
+        Read-only, so the constructor's refusal of a preview with no callback
+        to receive it cannot be stepped round afterwards (WP-1949).
+        """
+        return self._preview
 
     def _write_header(self) -> None:
         """Mark where this run begins in the file (WP-1322).

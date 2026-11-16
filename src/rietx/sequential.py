@@ -393,7 +393,7 @@ class _SeriesStream(EventStream):
         self._inner = inner
         self._stamp = stamp
         # the solvers ask the stream they are handed, which is this one
-        self.preview = getattr(inner, "preview", False)
+        self._preview = getattr(inner, "preview", False)
         # Forwarded by *assignment* rather than by a method, so that
         # ``refine._snapshot_sinks``'s ``hasattr`` test keeps telling the truth:
         # a plain ``EventStream`` inner takes no snapshot, and a wrapper that
