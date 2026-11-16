@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-16 — the list and group A landed (PR #1428); group A's hard starts and H in #1494; group G measured in #1577, unreached on real trace phases, three questions to the maintainer; 16 groups open
+Milestone: generality · Status: 🔄 2026-11-16 — the list and group A landed (PR #1428); group A's hard starts and H in #1494; group G measured in #1577, unreached on real trace phases; group C measured in #1577, four of its seven constants unreachable from a fit; B waits on a named family; questions to the maintainer; 15 groups open
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
@@ -95,8 +95,8 @@ different laboratory, instrument and material:
 |---|---|---|---|---|
 | A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven closed by ruling |
 | B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | not run: the third family is unnamed, a question to the maintainer (2026-11-16) |
-| C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | starts and arms fixed 2026-11-16 |
-| D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
+| C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | measured 2026-11-16: four read only in an uncalled `bccg.solve`; `_PCG_TOL` at 1e-8 fails silently on FAP; cpd-1a never past the cut |
+| D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four cannot reach it (single fits); joint fits to be fixed before running | open |
 | E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
 | F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
 | G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | measured 2026-11-16: unreached on real trace phases, acts on zircon alone; B1.1's case not produced |
@@ -159,6 +159,14 @@ and have no free factor to measure, so this file's old list named them without c
   not a Pawley fit's to read, so it is read against its shipped arm only. No polish: an arm over
   the bar past noise is reported as measured and goes to the maintainer. The three are three
   families by laboratory, instrument and material.
+- **D, read 2026-11-16 before choosing its fits.** `DENSE_JACOBIAN_MAX_BYTES` is read only in
+  `blocked.choose_layout`, which only `least_squares.run_multi_least_squares` calls: a joint fit.
+  The four protocol families are single fits, so neither forced layout can reach them, and the
+  families fixed on 2026-11-05 measure nothing. D's families must be joint fits, fixed here before
+  it runs. On disk: the synthetic parametric library `tests/test_parametric_series.library` (the one
+  case its row cites), cpd-1a, -1b and -1c fitted jointly on one qarr instrument, frames of the
+  CuCr₂O₄ ramp, and the Nd₂Ru₂O₇ X-ray and neutron pair, which is evidence for no audit before the
+  milestone's close (§ Context).
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
