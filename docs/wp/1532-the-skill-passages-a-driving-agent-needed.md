@@ -1,6 +1,6 @@
 # WP-1532 — the skill passages a driving agent needed: fourteen rows, placed where each is cheapest
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: — (PR #660 soft: the docstring and diagnostic-text half of the same findings)
 Priority: P3 2026-10-02 — each row is a wrong turn an agent took, and a reader of the docstrings could recover from it
