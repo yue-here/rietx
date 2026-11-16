@@ -4680,7 +4680,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.strategy.magnetic.SOLVE_K_TRIALS", "constant", tier=3, value=2,
         evidence=("magnetic.py docstring: Ba2FeSbSe5 1.5 K (Phys. Rev. B 103, 054115; not "
                   "vendored), two k index the same 11 peaks and intensity separates them; one "
-                  "family"),
+                  "family; "
+                  "WP-2017 group L (2026-11-16), solve_magnetic on Cr2WO6 at 4 K and 150 K (HFIR HB-2A), LaMnO3 at 50 K (NIST BT-1) and Ba2FeSbSe5 at 1.5 K (LLB G4.1, now in tests/data), three laboratories, all development data: reached on Ba2FeSbSe5 alone, the one solve with a runner-up k "
+                  "inside the offset margin: 1 drops the (1/2,1/2,0) trial (best dBIC 47.9 against "
+                  "the winner's 143.9) and keeps the pick and every class's ranking, at 0.21x the "
+                  "wall time; 3 adds no trial; Cr2WO6 150 K tries one k and the k = 0 route of "
+                  "Cr2WO6 4 K and LaMnO3 never reads it, so those arms measured nothing "
+                  "(docs/wp/2017-batch/group_l_summary.md)"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
                  "with the pick; kept at the measured value, untested beyond its one family (B12, "
                  "ruled 2026-10-19)."),
@@ -4695,7 +4701,11 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.strategy.magnetic.SOLVE_MINIMUM_RTOL", "constant", tier=3, value=0.0001,
         evidence=("WP-1327: no stated source, never measured; gates the reported n_minima count, "
-                  "not the pick"),
+                  "not the pick; "
+                  "WP-2017 group L (2026-11-16), solve_magnetic on Cr2WO6 at 4 K and 150 K (HFIR HB-2A), LaMnO3 at 50 K (NIST BT-1) and Ba2FeSbSe5 at 1.5 K (LLB G4.1, now in tests/data), three laboratories, all development data: unreached on all four: every trial ran one start, so no two "
+                  "Rwp were compared, and 1e-5 and 1e-3 gave the shipped answer to every digit "
+                  "recorded; a solve that runs several starts of one class is owed "
+                  "(docs/wp/2017-batch/group_l_summary.md)"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
                  "with the pick; kept at its value, which no family measured (B12, ruled "
                  "2026-10-19)."),
@@ -4735,7 +4745,12 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.strategy.magnetic.SOLVE_TOP_K", "constant", tier=3, value=3,
         evidence=("WP-1326/1418: no stated source, never measured; changes the answer only if a "
-                  "fourth k would win"),
+                  "fourth k would win; "
+                  "WP-2017 group L (2026-11-16), solve_magnetic on Cr2WO6 at 4 K and 150 K (HFIR HB-2A), LaMnO3 at 50 K (NIST BT-1) and Ba2FeSbSe5 at 1.5 K (LLB G4.1, now in tests/data), three laboratories, all development data: on the two satellite-route solves (Cr2WO6 150 K, Ba2FeSbSe5 "
+                  "1.5 K) 2 and 4 change only the length of the ranked list, never the answer: the "
+                  "fourth k matches 0 and 5 satellites against the winners' 2 and 11; the k = 0 "
+                  "route (Cr2WO6 4 K, LaMnO3) never reads it "
+                  "(docs/wp/2017-batch/group_l_summary.md)"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
                  "with the pick; kept at its value, which no family measured (B12, ruled "
                  "2026-10-19)."),
