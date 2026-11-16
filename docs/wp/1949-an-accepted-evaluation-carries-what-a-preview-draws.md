@@ -59,6 +59,20 @@ per-stage charge is judged on the shortest fit (WP-1413). The recorder is
 attached beside a caller's stream, never inside it (WP-1403), so a payload
 can reach the caller's callback and skip the recorder.
 
+**Superseded in part, 2026-11-16 (checked at `bc77a934e`).** The default
+driver is now LM (`DEFAULT_SOLVER`), so the TRF wrapper is the selectable
+path and `trial_cb` the common one. The two emitters are `_tracked`
+(`optimize/least_squares.py:3024`) and `_lm_outcome.trial_cb` (`:3084`), and
+the LM driver calls `on_trial` from one site (`optimize/lm.py:643`), still
+without the residual. The recorder is chained *into* the caller's stream as
+its first callback (`runs.attach`, `_combined`), not beside it, so a payload
+reaching the caller's callback reaches `RunRecorder.record` too, which must
+drop it. The re-measured costs are under Task 1 below.
+
+**The tier of each rule this WP adds.** One switch, off by default, that
+decides nothing for the caller: `caller` (an opt-in the user asks for; no
+threshold, no automatic action). No number is added.
+
 ## Non-goals
 
 - The per-stage `snapshot.json` and `rietx watch` (unchanged).
@@ -67,11 +81,44 @@ can reach the caller's callback and skip the recorder.
 
 ## Tasks
 
-- [ ] Measure first, on a model whose evaluation is dear (the reporter's
+- [x] Measure first, on a model whose evaluation is dear (the reporter's
       MFU-4l class, or the largest structure in `tests/data`): evaluations
       per fit, accepted share, and the per-event cost of (a) the moving-path
       values, (b) an ndarray `y_calc` handed to a callback, (c) a decimated
       JSON `y_calc`. Record the numbers here.
+
+      **Measured 2026-11-16** at `bc77a934e`, `[dev]` venv, macOS arm64,
+      default LM driver, `mccusker_structural`, `RIETX_TELEMETRY=0`; each
+      cost is the best of three `timeit` repeats on the last stage's model.
+      HKUST-1 is `tests/data/cod_4002052.cif` (Cu₃(BTC)₂, Fm-3m,
+      a = 26.3 Å, V = 18 132 Å³, the largest cell in `tests/data` and the
+      reporter's MOF class), fitted to its own synthetic Cu Kα pattern
+      (4-60° 2θ, 0.01° step, Poisson noise, cell started 0.05 % long).
+
+      | | FAP.XRA | HKUST-1 |
+      |---|---|---|
+      | fitted points | 5753 | 5600 |
+      | stages / `eval` events / accepted | 12 / 124 / 124 | 12 / 45 / 45 |
+      | free / moving paths (last stage) | 34 / 47 | 32 / 51 |
+      | one residual evaluation | 3.4 ms | 0.30 ms |
+      | fit wall (solve) | 2.9 s (2.1 s) | 9.5 s (3.4 s) |
+      | today's accepted `eval` line | 988 B | 954 B |
+      | (a) moving-path values, decode + pick | 0.014 ms, 2150 B as JSON | 0.019 ms, 2320 B as JSON |
+      | (b) ndarray `y_calc = y_obs − r·σ` | 0.006 ms | 0.005 ms |
+      | (c) JSON `y_calc` at `MAX_POINTS` (step 2), full / 3 dp | 1.38 / 0.75 ms, 55.7 / 24.8 kB | 1.16 / 0.63 ms, 55.0 / 24.9 kB |
+      | the reporter's shadow `predict(grid)`, one frame | 21.6 ms | 548 ms |
+
+      Every LM `eval` was accepted on both fits (the driver's linear model
+      discards most rejected steps unevaluated), so "accepted only" thins
+      nothing here. (a)+(b) cost 0.02 ms an event, 2.5 ms over FAP's whole
+      fit (0.1 % of its solve) and over 20 000× under one shadow frame on
+      HKUST-1. (c) costs 171 ms and 6.9 MB a FAP fit at full precision (8 %
+      of the solve), 93 ms and 3.1 MB at 3 dp, on every sink the stream
+      writes. `y_obs − r·σ` agrees with `model.evaluate` at the event's
+      values to 1.4e-18 of the curve's maximum on FAP and exactly on
+      HKUST-1. A residual evaluation of the MOF is cheap: what costs the
+      reporter 0.5-0.7 s a frame is the compile `predict` does, which the
+      preview removes.
 - [ ] Decide the spelling and record it as `Decided YYYY-MM-DD:`. The
       options are a `fit(..., eval_payload=...)` flag, or a property of the
       callback the caller passes. Decide too whether `y_calc` reaches only
