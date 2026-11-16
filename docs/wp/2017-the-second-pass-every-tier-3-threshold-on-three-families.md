@@ -432,6 +432,38 @@ and have no free factor to measure, so this file's old list named them without c
   that peak). Neither bar reads the split of such a pair. `report.schemas.LEBAIL_GAP_CYCLES`
   (5 plain cycles from flat) was left alone and now sits beside a partition that runs to a
   tolerance. Both are this WP's to weigh in its second pass.
+- **Q, its fits and arms, fixed 2026-11-16 before running** (`2017-batch/group_q.py`). Two
+  parts, each arm with a noise twin (every refinable non-zero start ×(1 + 1e-12)) and read in
+  plain esd over the larger esd, Rwp, evaluations, status and codes beside.
+  (Q1) **The held SNIP** that issue #1569 reports, the skill's rule "Under a broad hump, hold
+  SNIP" (`docs/skill/rietx/references/judging.md`, SKILL.md §2 item 5), which WP-2008 reads
+  against the table, and the PbSO₄ and #726 re-measure WP-1542 left here. *Synthetic*, #1569's
+  construction: SRM 660c's LaB₆ model (`test_acceptance_srm660c.build_srm_inputs`' structure)
+  with La Biso 0.355 Å² as the truth, Bragg-Brentano Cu Kα₁/Kα₂ with FCJ on, 15-120° at 0.02°,
+  a background of 200 + 60·T₁ plus a Gaussian hump at 28° (FWHM 10°, height 150), Poisson noise
+  from `default_rng(20261112)`; Rietveld under `RefinementPlan.mccusker_default()` with a Biso
+  stage appended, as `_protocol("nac")` does. Arms: a co-refined Chebyshev; P-splines at λ 1
+  and 0.01; SNIP held under a 4-term Chebyshev at a half-window of 3 FWHM in points (7, the
+  rule's) and 6 FWHM (14, the window #1569 did not try); and the true background held under the
+  same 4 terms, the positive arm, which must bring La Biso within two esds of 0.355 or the
+  construction measures something else. Positive arm for the harness: the co-refined and the
+  3-FWHM held arms repeat #1569's La Biso, 0.3789(158) and 0.4749(163), within one esd; if they
+  do not, that is reported and the arms are still read against the truth. Read: La and B Biso
+  against the truth in their esds, the cell, background over truth at 26-30°, and
+  `BACKGROUND_ABSORPTION`'s worst projection, which #1569 found blind to a held curve.
+  *Real*, no truth, so the direction of the move only: #1569's SRM 1976a and FAP under their
+  protocols, co-refined against held at 3 FWHM, every Biso; and PbSO₄ (the Durham TOPAS file,
+  `tests/local_data.py` `durham-topas/pbso4`) and #726's pattern (WP-1910's) in Le Bail with the
+  partition settled at the shipped `lebail_tol`, held against co-refined, on the cell and widths.
+  A pattern not on disk is reported, never substituted.
+  (Q2) **The three rows**, each side of its value: `refine.LEBAIL_CONVERGED_REL` 1e-3 and 1e-5,
+  read only under `lebail_passes > 1`, so its arms run five passes (control: the pass that
+  stopped, and why, recorded per fit); `StageSpec:lebail_tol` 1e-6 and 1e-9, with FAP's
+  (5 0 6)/(10 −5 0) pair split read beside, since neither bar reads it; and
+  `report.schemas.LEBAIL_GAP_CYCLES` 2 and 20 on the layer-0 gap at the converged state, read as
+  the ratio against `LEBAIL_GAP_NOTABLE` (1.5). Families: LaB₆ + cBN
+  (`test_acceptance_lab6_cbn`), `fap` and `cpd1a`, in Le Bail under their protocols' first
+  stages as `mccusker_default()` runs them.
 - **R.** `width_twins_held` has one real two-phase family, 11-BM LaB₆ + cBN. Y's floor went on a
   physical argument with one synthetic cost (Y −0.0059 against 0, `lor_size` 55 % low). The test:
   SRM 660c with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain.
