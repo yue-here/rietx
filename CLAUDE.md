@@ -536,6 +536,12 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
 - **Never spell the distribution name, a format token or the state dir — import it from
   `_about.py`** (WP-1062; 1066 renamed the brand again, format tokens unmoved): its docstring says
   which is which, and why no test can enforce it.
+- **A value somebody chose says so at the value, and names where the alternatives are** (WP-1448).
+  A paper is cited in the docstring and a measurement names its WP; a choice adds
+  `*(Chosen: WP-NNNN, YYYY-MM-DD — what over what)*` (or `docs/DESIGN.md § <heading>` for a choice
+  that binds later WPs), and the alternatives go in that record under that date, never only in
+  the session. `tests/test_chosen_values.py` fails a tag that names no record of its day; it cannot
+  see an untagged choice. A walked number's tier-3 `_audit` row is its approval, not this pointer.
 - **What a name *is* is written in `src/rietx/help.py` and nowhere else** (WP-1202) — parameters,
   peak flags, stage fields, reader options, instrument preset fields, with unit, default and
   typical range. Every arm is crossed against its live vocabulary **both ways**, so a new member

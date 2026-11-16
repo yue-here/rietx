@@ -185,7 +185,7 @@ remembers, and the alternatives are the first thing lost.
       The 161 "ruled YYYY-MM-DD" phrases are the generality rulings, whose
       record is `docs/milestones/generality.md`; converting them is a
       maintainer's call (handover, 2026-11-16).
-- [ ] Root CLAUDE.md § Conventions takes the rule, in the form it takes rules:
+- [x] Root CLAUDE.md § Conventions takes the rule, in the form it takes rules:
       a few lines, evidence compressed, pointing here.
 
 ## Acceptance
