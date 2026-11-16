@@ -27,6 +27,10 @@ Datasets (``<dataset>:<arm>``):
   rh111     the same with the truth on the unique axis, (2, 2, 2): the turned
             polar angle then ends on a direction the pattern is even about,
             which is the stationary-angle test's case (the positive arm)
+  rhn, rh111n
+            the two above with Poisson noise (seed 3) on the fixture's
+            pattern plus its background of 20, so the test's statistic, which
+            divides by χ²_red, is not read at roundoff
 
 Every arm records the moment rows (value, esd, interval), what each stage held,
 released, collapsed and turned, each stage's ``moment_angle_tests``, the
@@ -37,19 +41,24 @@ usage (repo root): python docs/wp/2018-measure/moment_hold.py [dataset:arm ...]
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from functools import cache
 
 import numpy as np
 from common import OUT, diagnostics, emit, patched, provenance
 
-import rietx as rx
+# the fixtures' own fits (``tests/test_magnetic._fit``, the acceptance
+# ``_fit``s) record a run unless told not to, as the suite's conftest tells them
+os.environ.setdefault("RIETX_TELEMETRY", "0")
+
+import rietx as rx  # noqa: E402
 
 refine_module = importlib.import_module("rietx.refine")
 lsq_module = importlib.import_module("rietx.optimize.least_squares")
 
 ARMS = ("shipped", "no_hold", "no_turn", "no_test")
-DATASETS = ("rh", "rh111", "lamno3", "cr2wo6")
+DATASETS = ("rh", "rh111", "rhn", "rh111n", "lamno3", "cr2wo6")
 
 
 def _arm(arm):
@@ -116,8 +125,28 @@ def _fit(dataset):
         return _fit(_with_moment(ref.structure, PN_MA),
                     ref.instrument.model_copy(deep=True), data, MAGNETIC_STAGES)
     from tests.test_magnetic import _fit, _rhombohedral
-    truth = (1.5, 2.0, 3.0) if dataset == "rh" else (2.0, 2.0, 2.0)
-    return _fit(_rhombohedral(truth), _rhombohedral((3.0, 0.2, 0.2)))
+    truth = (1.5, 2.0, 3.0) if dataset in ("rh", "rhn") else (2.0, 2.0, 2.0)
+    if not dataset.endswith("n"):
+        return _fit(_rhombohedral(truth), _rhombohedral((3.0, 0.2, 0.2)))
+    return _noisy_fit(_rhombohedral(truth), _rhombohedral((3.0, 0.2, 0.2)))
+
+
+def _noisy_fit(truth_phase, start_phase, background=20.0):
+    """``tests/test_magnetic._fit`` with Poisson noise on its pattern."""
+    from rietx.optimize.least_squares import DEFAULT_SOLVER
+    from tests.test_magnetic import LAMBDA_CW, _compiled, _grid
+    model, _t, values, *_ = _compiled(truth_phase)
+    y = np.asarray(model.evaluate(values), dtype=np.float64) + background
+    y = np.random.default_rng(3).poisson(y).astype(float)
+    ref = rx.Refinement(rx.Structure(phases=[start_phase]),
+                        rx.Instrument.constant_wavelength_neutron(LAMBDA_CW),
+                        solver=DEFAULT_SOLVER, history=False)
+    data = rx.PatternData(two_theta=_grid().tolist(), intensity=y.tolist())
+    result = ref.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
+        rx.Stage("moment", ["phases.*.atoms.*.moment.dof*"]),
+    ]))
+    return ref, result
 
 
 def _angle_to_111(moment):
