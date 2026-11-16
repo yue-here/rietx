@@ -293,6 +293,15 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
 # suggest an order is the gated Layer-2 action of the WP's task 3.
 
 
+#: A design column counts towards the order screen's rank when its singular
+#: value, on weight-centred columns scaled to the unit norm of their
+#: *unpartitioned* values, is above this (absolute, since the scaling already
+#: makes it a surviving fraction).  ``tests/test_texture.py`` records the gap it
+#: sits in over six Laue classes at orders 2-8: dropped columns at roundoff,
+#: kept ones orders of magnitude above it.
+_ORDER_RANK_TOL = 1e-8
+
+
 @dataclass(frozen=True)
 class _OrderFit:
     """One order's weighted linear solve on a phase's extracted corrections."""
@@ -303,13 +312,20 @@ class _OrderFit:
     r2: float                       # same baseline as the axis score's
     names: tuple[str, ...]
     visibility: tuple[float, ...]   # ‖M·K_t‖_w / ‖K_t‖_w, centred
-    coefficients: tuple[float, ...]  # C_t, in the block's own units
+    coefficients: tuple[float, ...]  # C_t, in the block's own units; NaN when a = 0
     rms_p: float                    # weighted rms of P − 1 at the reflections
+    min_kept_sv: float              # the rank gap, each side of _ORDER_RANK_TOL
+    max_dropped_sv: float
 
 
 @dataclass(frozen=True)
 class _OrderStep:
-    """The nested comparison of one order against the order below it."""
+    """The nested comparison of one order against the order below it.
+
+    ``p_value`` is not calibrated: w_k are calculated areas, inverse variances
+    only under counting noise, and the residual is mostly systematic.  NaN
+    wherever a number was not measured.
+    """
 
     order: int
     added_rank: int
@@ -317,16 +333,16 @@ class _OrderStep:
     f_stat: float
     p_value: float
     delta_bic: float                # n·ln(SS_hi/SS_lo) + Δp·ln n; < 0 favours hi
-    delta_bic_vs_axis: float        # the same, against the best March-Dollase axis
+    delta_bic_vs_axis: float        # against the best axis; NaN when none was scored
 
 
 @dataclass(frozen=True)
 class _OrderScreen:
     phase_index: int
     n_reflections_used: int
-    n_effective: float              # Kish: (Σw)²/Σw²
+    n_effective: float              # Kish: (Σw)²/Σw², beside the n the BIC charges
     axis: tuple[int, int, int] | None
-    axis_r2: float
+    axis_r2: float | None
     fits: tuple[_OrderFit, ...]
     steps: tuple[_OrderStep, ...]
 
@@ -371,10 +387,9 @@ def _partitioned(model: CompiledModel, values: dict[str, float], ip: int,
     return np.where(den[:, None] > 0.0, num / np.where(den > 0.0, den, 1.0)[:, None], 0.0)
 
 
-def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
-                  scale: np.ndarray, rank_rtol: float
-                  ) -> tuple[float, int, np.ndarray, float]:
-    """(SS, rank, b, a) of f ≈ a + design·b under weights w.
+def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray, scale: np.ndarray
+                  ) -> tuple[float, int, np.ndarray, float, float, float]:
+    """(SS, rank, b, a, min kept sv, max dropped sv) of f ≈ a + design·b, weights w.
 
     The columns are weight-centred, so a is the free scale, and divided by
     ``scale`` before the rank is read, so a column's singular value is its
@@ -384,22 +399,26 @@ def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray,
     W = float(w.sum())
     fbar = float((w * f).sum() / W)
     y = sw * (f - fbar)
+    nan = float("nan")
     if design.shape[1] == 0:
-        return float(y @ y), 0, np.zeros(0), fbar
+        return float(y @ y), 0, np.zeros(0), fbar, nan, nan
     centre = (w @ design) / W
     x = sw[:, None] * (design - centre[None, :]) / scale[None, :]
     u, sv, vt = np.linalg.svd(x, full_matrices=False)
-    keep = sv > rank_rtol
+    keep = sv > _ORDER_RANK_TOL
     coef = vt[keep].T @ ((u[:, keep].T @ y) / sv[keep])
     resid = y - x @ coef
     b = coef / scale
-    return float(resid @ resid), int(keep.sum()), b, fbar - float(centre @ b)
+    # a design wider than tall has columns beyond the singular values: zero
+    dropped = np.concatenate([sv[~keep], np.zeros(max(design.shape[1] - len(sv), 0))])
+    return (float(resid @ resid), int(keep.sum()), b, fbar - float(centre @ b),
+            float(sv[keep].min()) if keep.any() else nan,
+            float(dropped.max()) if dropped.size else nan)
 
 
 def _order_screen(model: CompiledModel, values: dict[str, float], *,
                   orders: tuple[int, ...] = (2, 4, 6, 8), max_index: int = 2,
-                  min_weight_frac: float = 1e-3, rank_rtol: float = 1e-8
-                  ) -> list[_OrderScreen]:
+                  min_weight_frac: float = 1e-3) -> list[_OrderScreen]:
     """The per-order solve and the nested comparison, per phase (WP-1974).
 
     For each even order L the extracted corrections are fitted as
@@ -409,15 +428,18 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     its R² has the axis score's baseline (the weighted mean), so the two
     compare directly.  Each order is compared with the one below by the F
     statistic and ΔBIC on the rank it adds, and with the best March-Dollase
-    axis by ΔBIC at one shape parameter.  Measures, decides nothing.
+    axis by ΔBIC at one shape parameter (the search over axes is not charged,
+    which leans towards the axis).  Measures, decides nothing.
 
-    ``rank_rtol``: a column counts towards the rank when its singular value,
-    on columns scaled to the unit norm of their *unpartitioned* values, is
-    above it.  1e-8 separates exact invisibility (c4_3 on a one-atom −3m1
-    phase, 1e-15) from every column the partition leaves anything of (0.36 the
-    least, c6_3 on CPD-2 brucite).  A tolerance of an unwired hook: the action
-    that consumes this (the WP's task 3) brings it and its thresholds to
-    ``rietx._audit``.
+    Three limits a consumer inherits.  The p-values are not calibrated
+    (:class:`_OrderStep`).  The BIC charges n, the live reflection count, which
+    can sit well above the Kish count beside it.  And the constant a stands for
+    the other phases' share of an overlapped reflection, 1 − (M·1)_k, which
+    holds where they fit and a = 1: on overlapped peaks of a multi-phase
+    pattern whose scale absorbed the mean texture the screen carries a bias of
+    (a − 1)(M·1 − 1), as does the axis score.  ``max_index`` and
+    ``min_weight_frac`` are the axis screen's, so both read the same
+    reflections against the same axes.
     """
     from scipy.stats import f as f_dist
 
@@ -427,8 +449,13 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
         texture_term_weights,
     )
 
+    orders = tuple(orders)
+    if not orders or list(orders) != sorted(set(orders)) or any(
+            o < 2 or o % 2 for o in orders):
+        raise ValueError(f"orders {orders}: even, at least 2, strictly ascending")
     if model.mode != "rietveld":
         return []
+    nan = float("nan")
     axes = {r.phase_index: r for r in analyse_texture(
         model, values, max_index=max_index, min_weight_frac=min_weight_frac)}
     corrections = _extracted_corrections(model, values)
@@ -437,6 +464,12 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     for ip, (f, w) in enumerate(corrections):
         live = w > min_weight_frac * (w.max() if w.size and w.max() > 0 else 1.0)
         n = int(live.sum())
+        tex = axes.get(ip)
+        scored = tex is not None and tex.best_axis is not None
+        if n < 2:
+            out.append(_OrderScreen(phase_index=ip, n_reflections_used=n, n_effective=0.0,
+                                    axis=None, axis_r2=None, fits=(), steps=()))
+            continue
         refl = model.phases[ip].reflections
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
@@ -444,36 +477,43 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
         wl = w[live]
         fl = f[live]
         W = float(wl.sum())
-        base = float((wl * (fl - (wl * fl).sum() / W) ** 2).sum()) if W > 0 else 0.0
+        base = float((wl * (fl - (wl * fl).sum() / W) ** 2).sum())
+        # The highest order's terms hold every lower order's as a prefix
+        # (``texture_basis`` builds l = 2 up), so one partition serves all.
+        top = texture_basis(group, orders[-1], cell)
+        top_w = texture_term_weights([t.degree for t in top.terms], psi)
+        raw_all = (top.at_reflections(refl.hkl, cell) * top_w[None, :]
+                   if top.names else np.zeros((len(f), 0)))
+        part_all = _partitioned(model, values, ip, raw_all)[live]
+        rawl_all = raw_all[live]
         fits: list[_OrderFit] = []
         ss: dict[int, tuple[float, int]] = {}
         for order in orders:
-            basis = texture_basis(group, order, cell)
-            weights = texture_term_weights([t.degree for t in basis.terms], psi)
-            raw = (basis.at_reflections(refl.hkl, cell) * weights[None, :]
-                   if basis.names else np.zeros((len(f), 0)))
-            part = _partitioned(model, values, ip, raw)[live]
-            rawl = raw[live]
+            names = texture_basis(group, order, cell).names
+            m = len(names)
+            assert names == top.names[:m], (names, top.names)
+            rawl, part = rawl_all[:, :m], part_all[:, :m]
             centred = rawl - ((wl @ rawl) / W)[None, :]
             norm = np.sqrt(wl @ centred ** 2)
             norm = np.where(norm > 0.0, norm, 1.0)
             pc = part - ((wl @ part) / W)[None, :]
             vis = np.sqrt(wl @ pc ** 2) / norm
-            s, rank, b, a = _weighted_fit(fl, wl, part, norm, rank_rtol)
-            c = b / a if a else b
+            s, rank, b, a, kept, dropped = _weighted_fit(fl, wl, part, norm)
+            c = b / a if a else np.full_like(b, nan)
             dp_k = rawl @ c if c.size else np.zeros(len(fl))
             ss[order] = (s, rank)
             fits.append(_OrderFit(
-                order=order, n_terms=len(basis.names), rank=rank,
-                r2=(1.0 - s / base) if base > 0 else 0.0, names=basis.names,
+                order=order, n_terms=m, rank=rank,
+                r2=(1.0 - s / base) if base > 0 else 0.0, names=names,
                 visibility=tuple(float(v) for v in vis),
                 coefficients=tuple(float(v) for v in c),
-                rms_p=float(np.sqrt((wl * dp_k ** 2).sum() / W)) if W > 0 else 0.0))
-        tex = axes.get(ip)
-        axis_r2 = tex.r2 if tex is not None else 0.0
-        ss_axis = (1.0 - axis_r2) * base
+                rms_p=float(np.sqrt((wl * dp_k ** 2).sum() / W)),
+                min_kept_sv=kept, max_dropped_sv=dropped))
+        axis_r2 = tex.r2 if scored else None
+        ss_axis = (1.0 - axis_r2) * base if axis_r2 is not None else nan
         steps: list[_OrderStep] = []
         lo_ss, lo_rank = base, 0
+        log_n = float(np.log(n))
         for order in orders:
             hi_ss, hi_rank = ss[order]
             dp = hi_rank - lo_rank
@@ -482,12 +522,11 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
                 fs = ((lo_ss - hi_ss) / dp) / (hi_ss / dof)
                 pv = float(f_dist.sf(fs, dp, dof))
             else:
-                fs, pv = float("nan"), float("nan")
-            log_n = float(np.log(max(n, 1)))
+                fs, pv = nan, nan
             dbic = (n * float(np.log(hi_ss / lo_ss)) + dp * log_n
-                    if hi_ss > 0 and lo_ss > 0 else float("nan"))
+                    if hi_ss > 0 and lo_ss > 0 else nan)
             dbic_axis = (n * float(np.log(hi_ss / ss_axis)) + (hi_rank - 1) * log_n
-                         if hi_ss > 0 and ss_axis > 0 else float("nan"))
+                         if hi_ss > 0 and ss_axis > 0 else nan)
             steps.append(_OrderStep(
                 order=order, added_rank=dp,
                 delta_r2=(lo_ss - hi_ss) / base if base > 0 else 0.0,
@@ -496,7 +535,7 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
             lo_ss, lo_rank = hi_ss, hi_rank
         out.append(_OrderScreen(
             phase_index=ip, n_reflections_used=n,
-            n_effective=(W * W / float((wl * wl).sum())) if W > 0 else 0.0,
-            axis=(tex.best_axis if tex is not None else None), axis_r2=axis_r2,
+            n_effective=W * W / float((wl * wl).sum()),
+            axis=tex.best_axis if scored else None, axis_r2=axis_r2,
             fits=tuple(fits), steps=tuple(steps)))
     return out

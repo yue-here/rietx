@@ -507,6 +507,7 @@ def test_the_order_screen_recovers_an_order_4_specimen_fitted_bare():
     truth = {"c2_0": 0.3, "c4_0": 0.4, "c4_3": -0.15}
     fits, steps = _bare_fit_screen(truth)
     assert fits[4].r2 > 0.999 and fits[4].rank == 3
+    assert fits[4].rms_p > 0.1   # 0.366 measured: the strength the other two bound
     got = dict(zip(fits[4].names, fits[4].coefficients))
     for name, value in truth.items():
         assert got[name] == pytest.approx(value, abs=0.01), name
@@ -535,3 +536,53 @@ def test_a_random_powder_fitted_bare_has_no_texture_amplitude():
     suggestion needs beside R²."""
     fits, _steps = _bare_fit_screen(None)
     assert all(f.rms_p < 1e-3 for f in fits.values())
+
+
+#: Laue classes the order screen's rank gap is recorded over: (group, cell, O site).
+_GAP_CASES = {
+    "-1": ("P -1", (4.1, 3.6, 5.3, 85.0, 104.0, 95.0), (0.31, 0.17, 0.23)),
+    "2/m": ("P 1 2/m 1", (4.1, 3.6, 5.3, 90.0, 104.0, 90.0), (0.5, 0.5, 0.5)),
+    "mmm": ("P m m m", (3.6, 4.4, 5.2, 90.0, 90.0, 90.0), (0.5, 0.5, 0.5)),
+    "-3m1": ("P -3 m 1", (3.147, 3.147, 4.769, 90.0, 90.0, 120.0), (1 / 3, 2 / 3, 0.22)),
+    "-3m1 Mg only": ("P -3 m 1", (3.147, 3.147, 4.769, 90.0, 90.0, 120.0), None),
+    "6/mmm": ("P 6/m m m", (3.1, 3.1, 5.0, 90.0, 90.0, 120.0), (1 / 3, 2 / 3, 0.5)),
+    "m-3m": ("P m -3 m", (4.2, 4.2, 4.2, 90.0, 90.0, 90.0), (0.5, 0.5, 0.5)),
+}
+
+
+@pytest.mark.parametrize("label", list(_GAP_CASES))
+def test_the_order_screen_rank_tolerance_sits_in_a_gap(label):
+    """``_ORDER_RANK_TOL`` (1e-8) cuts singular values of the partitioned
+    design, columns scaled to their unpartitioned norm, at orders 2-8.  Measured
+    2026-11-16 over these seven phases: largest dropped 7.6e-16 (the one-atom
+    −3m1 phase's c4_3, c6_3 and c8_3, which the partition averages away),
+    smallest kept 0.13 (−3m1 at order 8), so any tolerance from 1e-14 to 1e-2
+    returns the same ranks here.  The design does not depend on f, so the
+    model is read at its own values."""
+    from rietx.model.forward import WINDOW_AREA_TOL, compile_model
+    from rietx.report.texture import _ORDER_RANK_TOL, _order_screen
+
+    space_group, cell, o_site = _GAP_CASES[label]
+    p = Parameter
+    atoms = [Atom(label="Mg", species="Mg", x=p(value=0.0), y=p(value=0.0), z=p(value=0.0),
+                  biso=p(value=0.5))]
+    if o_site is not None:
+        atoms.append(Atom(label="O", species="O", x=p(value=o_site[0]), y=p(value=o_site[1]),
+                          z=p(value=o_site[2]), biso=p(value=0.8)))
+    structure = Structure(phases=[Phase(
+        name="t", space_group=space_group, scale=p(value=1e-3), atoms=atoms,
+        cell=Cell(**{k: p(value=v) for k, v in zip(
+            ("a", "b", "c", "alpha", "beta", "gamma"), cell)}))])
+    ins = Instrument.bragg_brentano()
+    grid = np.arange(10.0, 120.0, 0.02)
+    y = np.asarray(rx.Refinement(structure, ins).predict(grid)) + 20.0
+    y *= 1.0 + 0.05 * np.random.default_rng(7).standard_normal(len(y))
+    data = rx.PatternData(two_theta=grid.tolist(), intensity=y.tolist())
+    model = compile_model(structure, ins, data, mode="rietveld", window_area_tol=WINDOW_AREA_TOL)
+    table = ParameterTable(structure, ins)
+    (screen,) = _order_screen(model, table.decode(table.x0()))
+    kept = [f.min_kept_sv for f in screen.fits if f.rank]
+    dropped = [f.max_dropped_sv for f in screen.fits if f.rank < f.n_terms]
+    assert kept and min(kept) > 1e4 * _ORDER_RANK_TOL
+    assert all(d < 1e-6 * _ORDER_RANK_TOL for d in dropped)
+    assert bool(dropped) == (label == "-3m1 Mg only")
