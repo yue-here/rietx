@@ -56,21 +56,6 @@ Two consumers read the flag and must move with it: `SeriesResult.discontinuities
 a path can carry two) and the verification pass, which refits each flagged
 pair once. `plot_trajectory` shades each recorded pair.
 
-### Inherited
-
-- **2026-10-17, from WP-1986 (writing the series guides): a cubic cell is
-  flagged three times for one step.** On the synthetic LaB6 ramp of
-  `examples/guides/_lab6_ramp.py` with the 700 K cell made 2 % larger,
-  `SEQUENTIAL_DISCONTINUITY` fires once each for `phases.0.cell.a`, `.b` and
-  `.c`, with identical messages, and `SeriesResult.discontinuities` holds
-  three `SeriesStep`s for one pair of patterns. `b` and `c` are tied to `a`
-  by symmetry. `SeriesResult.moved_paths` already drops a tied path that
-  repeats an earlier candidate's values exactly; the step scan does not. The
-  verification refit is shared, so the cost is three findings where a reader
-  needs one. `examples/guides/path.py` asserts the three, so a fix updates
-  that assertion and its page `docs/docs/guides/path.md`, which says the three
-  flags share one pair of refits.
-
 ## Non-goals
 
 - The fences' thresholds; neither shape is a threshold problem.
@@ -86,15 +71,25 @@ pair once. `plot_trajectory` shades each recorded pair.
       with three consecutive patterns raising on every rung under `skip`
       and under `carry`. Its positive arm: with `adjacent` widened to
       `>= 1`, both cases fail on an extra `(2, 6)` row.
-- [ ] Shape 2: measure how many paths on the suite's real series (round
+- [x] Shape 2: measure how many paths on the suite's real series (round
       robin, the thermal and held-phase ramps) have a second step passing
       both legs; decide, and record here, whether to flag every such step.
       If they are flagged, `SeriesStep` needs a key other than `path`, and
       the verification and the plot follow.
-- [ ] Tests: both shapes, and the suite's clean series firing nothing new
+      *2026-11-16, superseded by WP-2003:* nothing is flagged and every step
+      is a row, so a path with two steps already has both. `SeriesStep`
+      is keyed by `(path, indices)`, and `verify_steps=k` and the plot read
+      rows. No measurement was run: the two legs it would count against
+      are gone, and its answer would move no code. The behaviour is pinned
+      by `tests/test_sequential.py::test_a_path_with_two_planted_steps_lists_both`.
+- [x] Tests: both shapes, and the suite's clean series firing nothing new
       (1469's counting wrapper, `SequentialRefinement._run`, is the recipe).
-- [ ] Skill: the `SEQUENTIAL_DISCONTINUITY` row in `references/series.md` if
+      *2026-11-16:* the two tests above. No source changed, so no series
+      can fire anything new, and the counting wrapper is not needed.
+- [x] Skill: the `SEQUENTIAL_DISCONTINUITY` row in `references/series.md` if
       a path can carry two flags; otherwise "none".
+      *2026-11-16:* none. The code is gone, and `references/series.md`
+      already has `series.steps` and `verify_steps` rows.
 
 ## Acceptance
 

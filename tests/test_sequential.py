@@ -2194,6 +2194,19 @@ def test_a_run_of_quarantined_patterns_is_never_bridged():
     assert sorted(s.indices for s in steps) == [(0, 1), (6, 7), (7, 8), (8, 9)]
 
 
+def test_a_path_with_two_planted_steps_lists_both():
+    """Two transitions on one ramp (WP-1524 shape 2).  The removed scan kept
+    one flag per path, the argmax, so the smaller transition went unreported;
+    every step is a row since WP-2003, so both lead the list, larger first."""
+    ramp = [4.1566 + 2.7e-4 * k + (2e-3 if k >= 3 else 0.0)
+            + (3e-3 if k >= 7 else 0.0) for k in range(10)]
+    steps = _series_steps(_fenced_series("phases.0.cell.a", ramp, [6.6e-6] * 10))
+    assert len(steps) == 9
+    assert [s.indices for s in steps[:2]] == [(6, 7), (2, 3)]
+    assert [s.step for s in steps[:2]] == pytest.approx([3.27e-3, 2.27e-3])
+    assert all(abs(s.step) == pytest.approx(2.7e-4) for s in steps[2:])
+
+
 @pytest.mark.parametrize("above", [{3}, set()])
 def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
     """A pattern whose phase was held carries no row for its cell, so the
