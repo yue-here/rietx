@@ -45,6 +45,74 @@ so the mirror rode along and does not cause it.
 WP, non-strict because only one platform was measured and rounding has picked these
 minima differently on Linux before (WP-2036).
 
+### Findings, 2026-11-16: one row of the Γ_G² cone separates them
+
+Measured on origin/main bc77a934e with `docs/wp/2084-measure/probe2084.py` (one fit of
+`_protocol("lab6")` through the closing stage, about a second), on macOS arm64 (worktree
+venv `[dev]`, compiled tier on) and on Linux x86_64 (numpy 2.5.3). The two platforms agree
+to every printed digit on all twenty arms both ran.
+
+**Which row.** The cone's rows sit at the frozen Bragg angles. LaB6's last reflection in
+range (20.30–150.91°) is h² + k² + l² = 27, (333) and (511), with its Kα1 image at 148.68°
+and its Kα2 image at 149.71°. The shipped answer has Γ_G² on its face at the Kα2 image
+(Γ_G² = 0 at 149.7137°). The floor-0.05 answer has it on its face at the Kα1 image
+(148.6797°), with Γ_G² clamped at ε past it.
+
+**Why a start reaches one or the other.** `gaussian_width_inequalities` drops a row the
+stage's start violates by more than `lm._ON_FACE` (1e-9 of max(|slack|, 1)). The closing
+stage starts with the Kα2 row's Γ_G² at 2.59e-8 under the shipped floor, so the row is kept
+(slack +1.6e-8, 48 rows) and the stage stops on it. Under the 0.05 floor it starts at
+4.35e-9 (slack −5.7e-9), so the row is dropped (47 rows) and the stage walks on to the
+Kα1 row. Floors 0.02, 0.025 and 0.03 land on the Kα2 face; 0.04 and 0.05 on the Kα1 face.
+
+**The shipped answer is not a fixed point of its own plan.** Refitted from its own answer
+under the same floor, the Kα2 row reads −3.0e-10 (slack −1.0e-8), is dropped from the
+first stage that frees w, and the fit lands deep: χ²_red 3.549230, 0.134 plain esd on w
+from the floor-0.05 arm, 0.473 on u from the shipped answer. Re-running the plan from its
+own answer moves it.
+
+**Not the FCJ nodes, not the windows, not rounding.**
+
+| arm (shipped floor unless named) | χ²_red | largest shift from the shipped answer |
+|---|---|---|
+| shipped: 12 closing nodes per FWHM, `closing_window_tol` 1e-3 | 3.557722 | — |
+| 24 closing nodes per FWHM | 3.557722 | 0.000 |
+| 6 closing nodes per FWHM | 3.557745 | 0.048 on `axial_sl` |
+| `closing_window_tol` 1e-4 | 3.557391 | 0.003 on x |
+| w start × (1 + k·1e-14), k = ±1, ±3, ±7, ±20 | 3.557722 | identical digits, both platforms |
+| floor 0.05, k = ±1, ±7 | 3.549273 | stays deep, identical digits |
+
+The closing node counts of the shallow and deep answers differ at 3 of 60 (line,
+reflection) pairs and the windows by at most 5 points. The margin that decides is the
+slack's ±1e-8 against the 1e-9 tolerance, ten times wider than a rounding.
+
+**Holding a near-face row does not make the answer unique.** With `lm._ON_FACE` raised to
+1e-7, floors 0.02, 0.04 and 0.05 all land on the Kα2 face, 0.004 plain esd apart. On that
+face the answer still moves with the path: floor 0.03 lands 0.442 esd on w away, and the
+shipped arm refitted from its own answer 0.580 on w. The deep face shows the same spread:
+its four other arms land up to 0.266 esd on w from the floor-0.05 arm.
+
+**What χ² cannot fake.** With no cone rows in any stage (the clamp in the model left as it
+is), both floors land at a third point.
+
+| arm | χ²_red | points with Γ_G² < 0 (of 5332) | Γ_G² = 0 at | a (Å) | displacement against NIST's −0.07877 mm |
+|---|---|---|---|---|---|
+| shipped | 3.557722 | 75 | 149.71° | 4.1568832(54) | −0.92 esd |
+| floor 0.05 | 3.549273 | 140 | 148.68° | 4.1568842(53) | −1.14 esd |
+| no cone | 3.491663 | 674 | 133.97° | 4.1568955(52) | −3.25 esd |
+
+Each step down in χ² is bought by letting the Caglioti Gaussian width go negative, held at
+the clamp, over more of the range, and the displacement walks away from the certificate's
+as it does. At the 0.24 % step the walk is 0.22 esd, inside its noise, so the reference does
+not separate the shallow answer from the deep one; it separates both from the no-cone
+answer (7.02 esd on u and 2.28 on the cell from the shipped answer). The certificate cell
+separates none of them: all three sit near 4.15688 Å against 4.156780 at 20.85 °C. Every arm
+reports `RESOLUTION_UNCONSTRAINED` (the Gaussian carries 44 % of the width), so u, v and w
+are not quotable at any of them.
+
+**The other two LaB6 start rows** both land on the Kα2 face: `intermediate_ftol` 1e-6
+against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads 0.009 on x.
+
 ### Inherited
 
 - **From WP-2012, 2026-11-03 (found by `/code-review` on PR #1387).** The manual quotes the
@@ -56,8 +124,9 @@ minima differently on Linux before (WP-2036).
 
 ## Tasks
 
-- [ ] Find what separates the two minima: the Γ_G² cone's active rows, the FCJ node
-      counts at each, or the windows. Start from the three arms above.
+- [x] Find what separates the two minima: the Γ_G² cone's active rows, the FCJ node
+      counts at each, or the windows. Start from the three arms above. *Done 2026-11-16:
+      the Kα2 row of (333)/(511), kept or dropped at the closing stage's start (Findings).*
 - [ ] Decide between a plan change that reaches the deeper minimum from the shipped start
       and a finding that says which minimum the fit is in. The deeper χ² is not by itself
       the evidence (root CLAUDE.md: never an Rwp comparison).
