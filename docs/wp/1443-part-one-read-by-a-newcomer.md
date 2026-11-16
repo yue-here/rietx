@@ -207,7 +207,7 @@ folded into this map and deleted. Each passage, read against the new tree:
       worked example's reasoning written out, "glob" defined once and the
       hold sentence rewritten, the plan diagram redrawn and its caption
       corrected.
-- [ ] Passage 11: the symptom-keyed index of Part 1's advice, one row per
+- [x] Passage 11: the symptom-keyed index of Part 1's advice, one row per
       check, linking rather than restating.
 - [ ] #407: `install.md` says what the manual describes and how to install
       `main`; the "since" note derived from the dist version and the release
