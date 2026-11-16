@@ -317,19 +317,19 @@ database files that read right today by luck and are now refused.
   read-only review agent built every one of gemmi's 564 settings (644 symbol
   spellings) as a file stating its own loop: none refused, on gemmi 0.7.5 and
   0.6.6; enantiomorph swaps and same-setting different groups were refused.
-  Fast suite on pearl (`wp1933f`, shared venv `rietx-py312` with gemmi 0.7.5, Linux
-  x86-64 under WSL2, `-n 8` on 8 pinned cores, co-tenant beside five other runs,
+  Fast suite on a shared Linux workstation (`[dev]` with gemmi 0.7.5, x86-64
+  under WSL2, `-n 8` on 8 pinned cores, co-tenant beside five other runs,
   tree `dcea78411`): 14867 passed, 280 skipped, 32 xfailed, 2 failed in 536 s.
   `test_portability` named the three `write_text` calls without `encoding=` in
   the new loop tests, fixed in `bbd945a4c` (the file then passes beside it,
   locally). `test_tutorials[02_simple_rietveld]` failed with "Kernel died before
   replying to kernel_info" and passes alone (`[dev]`, darwin arm64), so a
-  kernel start under load. Total 15181 against 15162 for `pc2084` on the same
+  kernel start under load. Total 15181 against 15162 for another branch's run on the same
   base `bc77a934e`: +19, the 19 cases added here, no new skip. Canary
-  (`wp1933c`, touched files + audit_table + help + docs_consistency, `-n 4`):
+  (touched files + audit_table + help + docs_consistency, `-n 4`):
   146 passed, 34 s, 4 cores, 155 % CPU. The full selection was not run: nothing
   here moves a fitted number.
-  Added tests (`tests.added_test_times`, pearl's junit): 19 cases in 0.15 s
+  Added tests (`tests.added_test_times`, that run's junit): 19 cases in 0.15 s
   together, the dearest 0.12 s for 5 cases, so none joins the slow tail.
   `python -m tests.reader_output`: exit 0, unchanged against `bc77a934e`.
 - **Review.** `/code-review` was not run (it edits the main checkout under
@@ -362,8 +362,7 @@ database files that read right today by luck and are now refused.
   `main` and here: gemmi gives 1.0 for a null cell length, so no NaN reaches
   `_number_fault`. Not in #913's three items; it belongs with the reader's
   null rule (C-e or an issue). A null cell *angle* does give NaN, so it is now
-  refused by tag. The testslot guard refuses `pytest -n` on the Mac while
-  pearl answers, so a test subset there runs serially.
+  refused by tag.
 - **Next**, in order:
   1. The maintainer's two answers above.
   2. C-e once 1918's I-c lands: the reader's setting from the operator loop,
