@@ -109,7 +109,7 @@ Each row names the passage that explains the check, and does not repeat it.
 | What you see | Where to read |
 |---|---|
 | The goodness of fit is far from 1 while the fit looks good | [Which esd weighted the fit](../reference/result.md#which-esd-weighted-the-fit) and [Arrays](../reference/data.md#arrays), because the goodness of fit is read against σ |
-| The peaks sit off in a way that changes with angle | [Trends across the pattern](#trends-across-the-pattern), which reads a constant, cos θ or tan θ shift as zero, displacement or cell |
+| The peaks sit off, by the same amount or by an amount that changes with angle | [Trends across the pattern](#trends-across-the-pattern), which reads a constant, cos θ or tan θ shift as zero, displacement or cell |
 | Displacement parameters rise and phase scales fall while Rwp improves | [How flexible a background should be](parameters.md#how-flexible-a-background-should-be) |
 | A smooth residual runs between the peaks | [How flexible a background should be](parameters.md#how-flexible-a-background-should-be), from the stiff side |
 | A broad feature under the peaks belongs to no phase | [Humps](parameters.md#humps) |
