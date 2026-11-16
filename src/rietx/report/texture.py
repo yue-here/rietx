@@ -38,6 +38,7 @@ from ..crystallography.lattice import reciprocal_metric_tensor
 from ..crystallography.symmetry import reflection_orbits, resolve_group
 from ..model.forward import CompiledModel
 from ..model.preferred_orientation import cos2_alpha, march_term, orbit_layout
+from ..optimize import lapack
 from .schemas import (
     TEXTURE_MIN_R2,
     TEXTURE_MIN_REFLECTIONS,
@@ -404,7 +405,7 @@ def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray, scale: np.nd
         return float(y @ y), 0, np.zeros(0), fbar, nan, nan
     centre = (w @ design) / W
     x = sw[:, None] * (design - centre[None, :]) / scale[None, :]
-    u, sv, vt = np.linalg.svd(x, full_matrices=False)
+    u, sv, vt = lapack.svd(x, full_matrices=False)
     keep = sv > _ORDER_RANK_TOL
     coef = vt[keep].T @ ((u[:, keep].T @ y) / sv[keep])
     resid = y - x @ coef
