@@ -94,8 +94,8 @@ different laboratory, instrument and material:
 | Group | Rows | Arms | Families | State |
 |---|---|---|---|---|
 | A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven closed by ruling |
-| B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | open |
-| C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | open |
+| B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | not run: the third family is unnamed, a question to the maintainer (2026-11-16) |
+| C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | starts and arms fixed 2026-11-16 |
 | D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
 | E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
 | F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
@@ -136,6 +136,29 @@ and have no free factor to measure, so this file's old list named them without c
   closing one, so a refit at 1e-8 and 1e-10 moves both. GSAS-II 5.8.4's default stop is 1e-3.
 - **B to E.** `GTOL` and `XTOL` have one trial: WP-1109's 1e-8 ran 1.22-1.27× faster on cpd-1a
   and 1.04× slower on cpd-2, and put corundum's strain anisotropy past the Stephens suite's bar.
+- **B, 2026-11-16: its third family is not named, so B has not run.** The table's "one more"
+  Stephens family is named nowhere: not in this file, its handover log, `2002-batch/rulings.md`
+  or the open PRs. `generality.md` § The rule lists Stephens strain as a rare feature, "one family
+  on disk or none", and brucite and corundum are one family by that test (the qarr set: one
+  laboratory and instrument). Choosing it after seeing B's answer would not be evidence, so it
+  goes to the maintainer as a question in the handover log, and C runs next.
+- **C, its starts and arms, fixed 2026-11-16 before running** (`2017-batch/group_c.py`). Each
+  fit is `fit(data, mode="pawley")` under the default Pawley plan from
+  `test_window_domain._protocol`'s data, structure and instrument for `fap`, `nac` (after its Le
+  Bail pass, CaF₂ appended) and `cpd1a`. Arms, one each side: `_PCG_TOL` 1e-8 and 1e-12,
+  `_PCG_BUDGET_PER_VARIABLE` 1 and 4, `_CAUCHY_ARMIJO` 1e-5 and 1e-3, `_CONVERGED_FRACTION` 1e-5
+  and 1e-3 (also `solve`'s `tol` default, bound at `def` time), `_CONVERGED_RUNS` 2 and 5,
+  `_SMALL_FACTOR` 100 and 400, `_SMALL_RUNS` 3 and 12; plus the shipped constants and the noise
+  arm (every refinable start value that is not zero ×(1 + 1e-12)). Read off the code before
+  running: the first three are read in `bccg.projected_cg`, the LM step above
+  `lm.BVLS_MAX_COLUMNS`, and the last four only in `bccg.solve`, which no package code has called
+  since WP-1953. So every fit counts the calls to each, with a positive arm for the spy (one extra
+  `solve` call after the fit must be counted). Bar and reads as group A: 0.1 plain esd against
+  the shipped arm, past the noise arm, and `unreached` when rows, Rwp and evaluations match bit
+  for bit. References: FAP's GSAS cell, NAC's and CaF₂'s cells; cpd-1a's weighed fractions are
+  not a Pawley fit's to read, so it is read against its shipped arm only. No polish: an arm over
+  the bar past noise is reported as measured and goes to the maintainer. The three are three
+  families by laboratory, instrument and material.
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
