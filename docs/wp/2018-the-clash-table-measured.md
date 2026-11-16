@@ -639,6 +639,37 @@ neighbours' weight, the LaB₆ scale 3.6 esd away and an Rwp of 6.4e-5. The blan
 measured in C26 and does not meet these rules (it adds to a σ that is already positive).
 Question (17).
 
+**C29, the March-Dollase floor, the tie window and the unseen-phase hold** (`march_minor.py`;
+macOS arm64, `[dev]`, under 1 s a fit). The dataset built as chosen: no vendored pattern has a
+textured minor phase, so the `weak_second_phase` construction of `tests/_synthetic_weak_lines.py`
+(Mo host, α-MoO₃ trace, its synchrotron instrument, Poisson counts on 7700) with the oxide drawn
+at r = 0.6 along [010], at trace 0 (absent), 0.006 (the fixture's) and 0.03. Fitted with both
+phases declared and MoO₃'s r free from 1.0 (plan: scales and background, cells, r; closing
+stage), each trace under shipped, nosupport (`phase_support_sigma = None`), tied (r = 0.5·vars.rv,
+rv free from 2, so `tie_window` gives rv ≥ 2e-6) and tied_nosupport; and a positive arm at trace
+0 with r started at 2e-6 and the hold off, so the floor can be met.
+
+| Trace | shipped | nosupport | tied | tied_nosupport |
+|---|---|---|---|---|
+| 0 | r held from `texture` on (with the cell), `PHASE_UNCONSTRAINED` 0.85σ names r | r 1.04(46), `PHASE_UNCONSTRAINED` 2.33σ names r | rv held, the code names rv | rv 2.08(92), r 1.04(46); the code names the cell only |
+| 0.006 | r 0.6030(23), nothing held | identical | r the same to 7e-10 | identical to tied |
+| 0.03 | r 0.6008(6), nothing held | identical | r the same to 3e-11 | identical to tied |
+| 0, pole (positive arm) | — | Rwp NaN, `STAGE_NOT_FINITE` in all four stages, `MODEL_FAR_FROM_DATA` | — | — |
+
+Where the oxide is there (at 0.006 and 0.03) the hold never acts and the tie window, 2e-6
+against rv ≈ 1.2, never binds: the four arms agree to 7e-10, and r lands 1.33 and 1.30
+esd from the truth. Where it is absent the hold holds r, through the variable as well (the column
+reaches only the unseen phase), and without the hold r wanders to 1.04 ± 0.46, nowhere near the
+floor; so on this fixture the pair never meets. One finding beside it, from the positive arm:
+the floor is not a place the model is defined. MoO₃'s (0k0) lie exactly on the [010] axis, and
+`cos2_alpha` returns their cos²α as 1 ± 2.2e-16 (5 of the 11 off by one ulp, 3 of them above 1).
+At r = 2e-6 the bracket r²cos²α + sin²α/r is then dominated by the rounding (2.2e-16/r = 1.1e-10
+against r² = 4e-12), negative where cos²α rounds above 1, and `march_term` returns NaN for 3 of
+the 11, and 8e14-2e15 instead of 1.25e17 for two more; at the floor itself, 1e-6, the same three
+are NaN. At 1e-5 all eleven are finite, but five still read 7.4e14-1.46e15 against
+1e15. The floor's docstring (structure.py:51) says every factor is finite in fp64 at every
+angle on the bound itself. Question (18).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -751,6 +782,14 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     σ unchanged in every arm, and a planted zero is excluded (0.28 esd on a peak top) or Poisson
     weighted (0.009 esd), where the retired floor moved the scale 3.6 esd. Is C27 recorded
     *dissolved* by WP-1952, and should the row's file:line be rewritten to the rules above?
+18. **C29.** On a synthetic textured MoO₃ trace the floor, the tie window and the hold never
+    meet: the hold holds an absent phase's r (directly or through a variable), and a seen
+    phase's r is the same in all four arms. Is C29 recorded *independent* on this evidence? And
+    the positive arm's finding, for B9's owner: at the 1e-6 floor (and at 2e-6) `march_term`
+    returns NaN for reflections on the texture axis whose cos²α rounds above 1, so a fit started
+    there is NaN in every stage. Should `cos2_alpha` clamp to [0, 1], should the floor rise
+    to where the rounding no longer sets the factor (about 1e-5 here), or both, and does the
+    floor's docstring need correcting either way?
 
 ## Acceptance
 
