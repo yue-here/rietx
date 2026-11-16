@@ -140,7 +140,9 @@ SOLVE_CHUNK = 200_000
 #: entries and 1.14 GB at 1 800 CPU seconds, the unit still unfinished.  The
 #: count is of held entries, which are distinct by construction.  Reaching it
 #: ends the unit as a size cap does, ``complete = False``, and ``found`` is
-#: returned as it stands.
+#: returned as it stands.  About 1.7 GB of keys, some 16 times the largest
+#: finished unit measured (254 344, bethanechol set Ab in manual mode); its
+#: grounds are its ``rietx._audit`` row.
 MAX_SEEN = 4_000_000
 
 
