@@ -59,6 +59,37 @@ def _findings(diagnostics, phase: int) -> list[str]:
             if d.code == _GUARD_CODE and where in (d.where or [])]
 
 
+def _surface(s: np.ndarray, cell, n_directions: int) -> dict[str, np.ndarray]:
+    """The drawn geometry: triangles at radius √|σ²(M)|/M over the sphere.
+
+    ``radius`` and ``bad`` are per direction, ``verts`` (faces, 3, 3),
+    ``face_bad`` and ``face_r`` per triangle.  A triangle touching a direction
+    below zero is unphysical, so the region is never drawn smaller than it is.
+    "Below zero" is the guard's own test, ``-STEPHENS_CONE_TOL`` times the
+    largest magnitude.
+    """
+    from scipy.spatial import ConvexHull
+
+    from ..crystallography.spherical_harmonics import sphere_points
+    from ..crystallography.stephens import directional_sigma2
+    from ..strategy.staged import STEPHENS_CONE_TOL
+
+    u = sphere_points(int(n_directions))
+    sigma2 = directional_sigma2(s, cell, u)
+    bad = sigma2 < -STEPHENS_CONE_TOL * float(np.max(np.abs(sigma2)))
+    radius = np.sqrt(np.abs(sigma2))
+    faces = ConvexHull(u).simplices
+    # the hull's simplices come in either winding; shading reads the normal,
+    # so each is turned to face outward or the surface draws as a checkerboard
+    p0, p1, p2 = u[faces[:, 0]], u[faces[:, 1]], u[faces[:, 2]]
+    inward = np.einsum("ij,ij->i", np.cross(p1 - p0, p2 - p0), p0 + p1 + p2) < 0.0
+    faces[inward] = faces[inward][:, ::-1]
+    return {"radius": radius, "bad": bad,
+            "verts": (u * radius[:, None])[faces],
+            "face_bad": bad[faces].any(axis=1),
+            "face_r": radius[faces].mean(axis=1)}
+
+
 def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
                         path: str | None = None, style: str = "light",
                         n_directions: int = 4000, elev: float = 22.0,
@@ -82,11 +113,7 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
     and ``azim`` are the view, in degrees.  Returns the matplotlib figure and
     writes it to ``path`` when one is given.
     """
-    from scipy.spatial import ConvexHull
-
-    from ..crystallography.spherical_harmonics import sphere_points
-    from ..crystallography.stephens import directional_sigma2, reciprocal_frame
-    from ..strategy.staged import STEPHENS_CONE_TOL
+    from ..crystallography.stephens import reciprocal_frame
 
     hue = _palette(style)
     ph = _phase_of(structure, phase)
@@ -97,19 +124,10 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
         raise ValueError(f"phase {ph.name!r} has an all-zero Stephens block: "
                          "it is the no-broadening identity and has no surface")
     cell = ph.cell.lengths_angles()
-
-    u = sphere_points(int(n_directions))
-    sigma2 = directional_sigma2(s, cell, u)
-    bad = sigma2 < -STEPHENS_CONE_TOL * float(np.max(np.abs(sigma2)))
-    radius = np.sqrt(np.abs(sigma2))
-    faces = ConvexHull(u).simplices
-    # the hull's simplices come in either winding; shading reads the normal,
-    # so each is turned to face outward or the surface draws as a checkerboard
-    p0, p1, p2 = u[faces[:, 0]], u[faces[:, 1]], u[faces[:, 2]]
-    inward = np.einsum("ij,ij->i", np.cross(p1 - p0, p2 - p0), p0 + p1 + p2) < 0.0
-    faces[inward] = faces[inward][:, ::-1]
-    face_bad = bad[faces].any(axis=1)
-    face_r = radius[faces].mean(axis=1)
+    surface = _surface(s, cell, n_directions)
+    verts, face_bad, face_r, bad = (surface["verts"], surface["face_bad"],
+                                    surface["face_r"], surface["bad"])
+    radius = surface["radius"]
     top = float(radius.max())
     good_top = float(radius[~bad].max()) if (~bad).any() else top
 
@@ -132,7 +150,6 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
     with _style_context(plt, style, font_size):
         fig = plt.figure(figsize=(6.4, 6.2), dpi=dpi, FigureClass=_figure_class())
         ax = fig.add_axes((0.0, 0.12, 0.84, 0.86), projection="3d")
-        verts = (u * radius[:, None])[faces]
         ax.add_collection3d(Poly3DCollection(
             verts, facecolors=colours, edgecolors=colours, linewidths=0.0, shade=True,
             lightsource=LightSource(azdeg=225, altdeg=35)))

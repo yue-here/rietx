@@ -80,9 +80,11 @@ second one.
 - [ ] Manual: a short section beside the Stephens material, figure pair via
       `make_figures.py`; glossary/help anchors if any new public name
       appears.
-- [ ] Tests: surface values pinned against the module's scalar evaluation
+- [x] Tests: surface values pinned against the module's scalar evaluation
       on a corpus case (the brucite/corundum cone-count fixtures exist);
-      PNGs to `tests/output/` and looked at.
+      PNGs to `tests/output/` and looked at. (`tests/test_strain_surface.py`,
+      16 fast; the refined pin rides on the brucite TRF fixture in
+      `test_acceptance_stephens.py`, slow.)
 
 ## Acceptance
 
