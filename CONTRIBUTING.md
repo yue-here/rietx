@@ -97,7 +97,9 @@ changes or deletes. At review the `generality-review` agent drafts the case
 against each of those rows, and the case for any action the change removes
 or leaves to the caller. A tier-3 row, and a tier-2 automatic action, waits
 for the maintainer's dated ruling in its `approved` field. The maintainer
-may write that field into your branch.
+may write that field into your branch. A ruling belongs to the value it
+approved, so a pull request that retunes such a row's value waits for a new
+ruling, and CI fails it until the row carries a later date.
 
 **Land the machinery first.** Machinery is what a caller operates: a model,
 a fit, a reported quantity. A heuristic is a choice rietx makes for the

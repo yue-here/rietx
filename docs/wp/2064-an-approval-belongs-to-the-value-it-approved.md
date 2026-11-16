@@ -57,8 +57,8 @@ closes the one gap the survey found that is cheap to close.
 
 - [x] `tests/audit_delta.py`: the retune failure, with its message naming the row, both values and the base date
 - [x] Tests: a changed value under an old date fails, a later date passes, a rename with the same value passes, a demotion to tier 1 passes; make the check fail once on purpose and read the message (`tests/CLAUDE.md` § Guards that go quiet)
-- [ ] `CONTRIBUTING.md` § A heuristic needs its tier: one sentence saying a retuned value waits for a new ruling
-- [ ] Skill: none. The check governs changing the package, and an agent driving rietx never edits the table
+- [x] `CONTRIBUTING.md` § A heuristic needs its tier: one sentence saying a retuned value waits for a new ruling
+- [x] Skill: none. The check governs changing the package, and an agent driving rietx never edits the table
 
 ## Acceptance
 
