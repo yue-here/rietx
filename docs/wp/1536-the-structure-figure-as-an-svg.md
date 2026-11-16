@@ -21,6 +21,9 @@ left it "until a picture shows the need". The maintainer asked for it on
 2026-10-02, together with ray-tracer input (WP-1537) and ambient occlusion
 (WP-1538). No open WP owned it: 1468 is polyhedra rules, 1504 measures the
 existing surface, and 1505 moves the code without adding to it.
+1504's task 6 (`docs/wp/1504-eval/`, fluorapatite for print) is the agent
+task an SVG answers; a later round that re-runs it measures this WP's
+surface (folded from 1504's inherited note, 2026-11-16).
 
 ### Prior art
 
@@ -67,7 +70,8 @@ rectangle closed by two half-ellipses.
   raster still runs, so `image`, `report`, `atoms` and `letters` are the
   PNG's. SVG user units are the PNG's pixels at `size`, so every position in
   `atoms` and `letters` holds for the SVG too. `dpi` sets the physical width
-  as it sets the PNG's `pHYs`. The refusal at `render.py:670` names every
+  as it sets the PNG's `pHYs`. The refusal in `render_structure` (at
+  `render.py:815` on 2026-11-16, superseding the filed `:670`) names every
   suffix it takes. JPEG stays refused.
 - **D2. Painter's algorithm, with the crossing fault repaired.** Every
   primitive gets a depth key, and the writer emits them far to near. Three
@@ -97,9 +101,17 @@ rectangle closed by two half-ellipses.
   sticks and faces, so they cannot be grouped by kind. Each element carries
   a class instead (`atom Ca1`, `stick Ca1`, `face CaO6`, `cell`), so
   Inkscape's select-same selects every Ca1.
-- **D6. No PDF writer.** `rsvg-convert` (installed here at
-  `/opt/homebrew/bin`) and Inkscape both convert SVG to PDF. Check once that
-  the gradients survive, and put the command in the manual.
+- **D6. No PDF writer.** `rsvg-convert` and Inkscape both convert SVG to
+  PDF. Check once that the gradients survive, and put the command in the
+  manual. (Superseded in part 2026-11-16: neither `rsvg-convert` nor
+  Inkscape is installed on the runner's Mac any longer, so the check needs
+  a machine that has one.)
+
+### The tier of each rule this WP adds
+
+None adds a judgement. The suffix is the caller's word for the format, and
+the stick-piece length and gradient stop count are drawing constants that
+change no reported number.
 
 ### Seams
 
@@ -108,16 +120,11 @@ rectangle closed by two half-ellipses.
   extends it.
 - A new `src/rietx/viz/figure3d/vector.py`: scene and frame to a display
   list, then the display list to SVG text. Standard library only.
-- `docs/manual/using/exports.md:219` says "There is no SVG or PDF output."
+- `docs/docs/reference/figures.md:217` says "There is no SVG or PDF output"
+  (the manual moved from `docs/manual/using/exports.md:219`; checked
+  2026-11-16).
 - `docs/skill/rietx/references/api-figure.md`: the paragraph naming what
   `path=` writes.
-
-### Inherited
-
-- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the
-  agent task an SVG answers.** 1504's tasks are in `docs/wp/1504-eval/`. Task 6, fluorapatite
-  for print, is the one an agent could answer with an SVG once this lands. A later round that
-  re-runs it measures this WP's surface. 1504 runs no further round itself.
 
 ## Non-goals
 
