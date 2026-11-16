@@ -130,7 +130,7 @@ Amendments from the review:
     because the scale absorbs the missing density (McCusker 1999 §6 says
     to scale on the part the partial model explains). Each NAC fit takes
     about 1.4 s, Le Bail included, and each map pair under 1.5 s.
-  - *Gates* (pearl, `rietx-py312` venv `[dev]`, Linux x86_64, on 2bd5ac419,
+  - *Gates* (a Linux workstation, `[dev]` venv, x86_64, on 2bd5ac419,
     co-tenant at load 15-37): fast selection 14857 passed, 280 skipped,
     32 xfailed, 0 failed (1481 s at `-n 4`). That is +7 on the 14850 passed /
     280 skipped of the same main (bc77a934e) in the runs log, the 7 fast tests
@@ -138,7 +138,7 @@ Amendments from the review:
     (darwin/arm64, `[dev]`): `test_fourier_map.py` 11 passed, ruff clean,
     `test_audit_table` 23, `test_manual_api` 19, `test_docs_consistency` 26
     passed; `python -m tests.reader_output` exit 0, unchanged. Added-test
-    cost on pearl: 10.2 s over the 7 fast tests, 6.2 s of it the f″ test
+    cost there: 10.2 s over the 7 fast tests, 6.2 s of it the f″ test
     (Cu Kα to 150° 2θ, the one test of the dispersive path, so kept fast).
     The full selection was not run: no shipped number can move, the code
     being a new module read by nothing else.
