@@ -1509,7 +1509,7 @@ class MultiParameterTable:
         The joint fence's one predicate, read by the refusal in the column
         rebuild, by ``ParameterRow.needs_held_cell`` and by the clause of
         ``WAVELENGTH_CALIBRATION``.  A histogram's line-0 wavelength held is a
-        pin; so is a held cell length of a phase in it (a standard in the
+        pin; so is the held cell of a phase in it (a standard in the
         mixture, WP-2148).  A shared cell is one node across the histograms,
         so a free shared cell carries a pin from one histogram to the rest —
         the "one held, N − 1 free" count is this rule's special case.

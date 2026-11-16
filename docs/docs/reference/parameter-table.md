@@ -68,7 +68,7 @@ Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 | `ParameterRow.held` | `bool` | held by `Refinement.hold`, or by a floating-origin declaration |
 | `ParameterRow.esd` | `float` or `None` | the esd from the most recent fit, where the row was free or tied in it |
 | `ParameterRow.mode_fixed` | `bool` | fixed by the Le Bail or Pawley mode |
-| `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while this pattern's cell is free |
+| `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while no phase in this pattern has a held cell |
 | `ParameterRow.origin_axis` | `(int, int, int)` or `None` | the direction along which this row holds a polar group's floating origin |
 | `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) or [instrument parameter map](parameters-instrument.md) entry that describes this row's family |
 
@@ -91,7 +91,7 @@ A row cannot be freed for one of five reasons, and the remedy differs.
 | `tie` | an affine function of other rows, or a formula over named variables, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
 | `mode_fixed` | refinable in principle, but the Le Bail or Pawley mode fixes it: every atom parameter, each phase's scale and a texture coefficient | switching back to `rietveld` |
 | `held` | you declared it does not move, whatever a plan frees; a coordinate held to fix a polar group's origin reads `held` too, and `ParameterRow.origin_axis` names the direction | `Refinement.unhold` |
-| `ParameterRow.needs_held_cell` | a wavelength, while this pattern's cell is free, since d = λ/(2 sin θ) fixes only their product | holding the cell; the one reason another parameter decides |
+| `ParameterRow.needs_held_cell` | a wavelength, while no phase in this pattern has a held cell, since d = λ/(2 sin θ) fixes only their product | holding one phase's cell, a standard's; the one reason another parameter decides |
 
 `ParameterRow.refinable` is false if any of the five holds.
 `ParameterRow.held_because` reports the first that applies, in an order set by what you can do about it.
