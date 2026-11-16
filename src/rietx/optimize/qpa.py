@@ -17,6 +17,18 @@ The load-bearing, unambiguous quantity is the **cell mass** Z·M =
 recovered by reducing the cell composition to integer formula units, and QPA
 never depends on it (weight fractions use Z·M·V directly).
 
+**Mole fractions** (WP-1340) come from the same scales.  W_p ∝ S_p·(Z·M)_p·V_p,
+so W_p/(Z·M)_p ∝ S_p·V_p: the number of unit cells needs no mass at all, and
+``mole_fraction`` is that, renormalised.  A mole fraction *per formula unit*
+multiplies by Z, and Z is exactly the split above that is a convenience: under
+a solid solution or a partial occupancy it falls back to 1, the whole cell, so
+dividing W by the reported molar mass mixes a per-cell basis into a
+per-formula-unit column, and the column still sums to 1.  So
+``mole_fraction_formula_unit`` is reported only when every measured phase's Z
+is established, from its composition or declared by the caller
+(``Phase.formula_units``), and is otherwise withheld for every phase, the
+comparison being between phases.
+
 Scope: these are fractions of the **modelled crystalline** content.  An
 unmodelled amorphous fraction or a missing phase still makes them sum to 1.
 Internal-standard / amorphous quantification is fenced to v2 — that is
@@ -89,7 +101,9 @@ class ZMV:
     ``cell_mass`` (= Z·M) and ``cell_volume`` are unambiguous; ``z`` and
     ``molar_mass`` are the best-effort integer-formula-unit split (``z`` = 1,
     ``molar_mass`` = ``cell_mass`` when the composition does not reduce to
-    integers, e.g. under refined partial occupancy).
+    integers, e.g. under refined partial occupancy).  ``z_resolved`` says
+    which (WP-1340): ``False`` is that fallback, so a ``z`` of 1 there is the
+    whole cell, not a formula unit the composition established.
     """
 
     cell_mass: float      # Z·M, g/mol per unit cell (occupancy-weighted)
@@ -105,6 +119,8 @@ class ZMV:
     # for a table that tells nuclides apart: the neutron attenuation reads
     # these, where ²H scatters incoherently 2.05 barn against ¹H's 80.26
     species_counts: dict[str, float] = field(default_factory=dict)
+    # False: the counts did not reduce and ``z`` = 1 is the fallback (WP-1340)
+    z_resolved: bool = True
 
     @property
     def density(self) -> float:
@@ -112,19 +128,31 @@ class ZMV:
         return self.cell_mass / (0.602214076 * self.cell_volume)
 
 
+def unreduced_counts(element_counts: dict[str, float], *,
+                     tol: float = 0.02) -> dict[str, float]:
+    """The per-cell element counts that are not within ``tol`` of a positive
+    integer — the ones that stop :func:`_formula_units` reducing the cell.
+
+    Empty when the composition reduces.  A count off an integer is a mixed or
+    partially occupied site (a solid solution, a vacancy), which the counts
+    cannot tell apart; QPA's abstention names the elements and their counts
+    rather than guessing which (WP-1340).
+    """
+    return {el: count for el, count in element_counts.items()
+            if round(count) <= 0 or abs(count - round(count)) > tol}
+
+
 def _formula_units(element_counts: dict[str, float], *, tol: float = 0.02) -> int:
     """Formula units per cell = GCD of the integer per-element cell counts.
 
     Returns 1 when any element count is not within ``tol`` of a positive
     integer (partial occupancy / solid solution), i.e. the composition does
-    not reduce and the whole cell is treated as one formula unit.
+    not reduce and the whole cell is treated as one formula unit
+    (:func:`unreduced_counts` names those counts).
     """
-    integers = []
-    for count in element_counts.values():
-        rounded = round(count)
-        if rounded <= 0 or abs(count - rounded) > tol:
-            return 1
-        integers.append(rounded)
+    if unreduced_counts(element_counts, tol=tol):
+        return 1
+    integers = [round(count) for count in element_counts.values()]
     if not integers:
         return 1
     z = integers[0]
@@ -185,7 +213,9 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
     molar_mass = cell_mass / z_units if z_units else cell_mass
     return ZMV(cell_mass=cell_mass, cell_volume=volume, zmv=cell_mass * volume,
                z=z_units, molar_mass=molar_mass, element_counts=element_counts,
-               species_counts=species_counts)
+               species_counts=species_counts,
+               z_resolved=bool(element_counts)
+               and not unreduced_counts(element_counts))
 
 
 def weight_fractions(zmv, scales, scale_cov=None):
@@ -227,6 +257,22 @@ def weight_fractions(zmv, scales, scale_cov=None):
     cov_w_indep = jac @ np.diag(np.diag(cov)) @ jac.T
     sigma_indep = np.sqrt(np.maximum(np.diag(cov_w_indep), 0.0))
     return w, sigma_corr, sigma_indep
+
+
+def mole_fractions(per_cell, scales, scale_cov=None):
+    """Mole fractions and their esds from refined scales (WP-1340).
+
+    W_p ∝ S_p·(Z·M)_p·V_p (Hill & Howard 1987), so the moles of unit cells
+    are n_p ∝ W_p/(Z·M)_p ∝ S_p·V_p and the moles of formula units are
+    Z_p·S_p·V_p.  ``per_cell`` is V_p for the first and Z_p·V_p for the
+    second; x_p = S_p·per_cell_p / Σ_q S_q·per_cell_q is the same ratio
+    :func:`weight_fractions` takes with Z·M·V in that place, so its Jacobian
+    and its ``(x, sigma_corr, sigma_indep)`` return carry over unchanged:
+    J·Cov(S)·Jᵀ over the correlated scale block, and both esds ``None``
+    where that block carries no variance.  The cell volume enters as a
+    constant, as the cell mass and volume do for W.
+    """
+    return weight_fractions(per_cell, scales, scale_cov)
 
 
 def brindley_tau(x: float) -> float:
@@ -481,18 +527,21 @@ def compute_qpa(structure: Structure, values: dict[str, float],
     measured = [ip for ip in range(len(structure.phases)) if ip not in skip]
     w_of: dict[int, float] = {}
     sigma_of: dict[int, float] = {}
+    definitional = False     # W = 1 by definition, not from the scales
     if not measured:
         pass   # no phase seen in range: every fraction is absent
     elif skip and len(measured) == 1:
         # the one phase seen is 100 % of the phases seen by definition, so
         # it carries no esd (a zero one would read as a measurement)
         w_of = {measured[0]: 1.0}
+        definitional = True
     elif sum(zmvs[ip].zmv * scales[ip] for ip in measured) <= 0.0:
         if len(measured) > 1:
             return None
         # one phase is 100 % whatever its scale did; σ(W) is meaningless here
         # (the fraction is a definition, not a measurement), so it stays None
         w_of = {measured[0]: 1.0}
+        definitional = True
     else:
         w, sigma_corr, _ = weight_fractions([zmvs[ip].zmv for ip in measured],
                                             [scales[ip] for ip in measured],
@@ -500,13 +549,52 @@ def compute_qpa(structure: Structure, values: dict[str, float],
         w_of = {ip: float(w[k]) for k, ip in enumerate(measured)}
         if sigma_corr is not None:
             sigma_of = {ip: float(sigma_corr[k]) for k, ip in enumerate(measured)}
+
+    # Mole fractions (WP-1340): the same partition of the same scales, per
+    # unit cell always, per formula unit only where every measured phase's Z
+    # is established.  A declared Z (Phase.formula_units) is the caller's.
+    z_of: dict[int, int] = {}
+    z_source: dict[int, str] = {}
+    for ip, phase in enumerate(structure.phases):
+        if phase.formula_units is not None:
+            z_of[ip], z_source[ip] = int(phase.formula_units), "declared"
+        else:
+            z_of[ip] = zmvs[ip].z
+            z_source[ip] = ("composition" if zmvs[ip].z_resolved
+                            else "unresolved")
+    unresolved = [ip for ip in measured if z_source[ip] == "unresolved"]
+    withheld = unresolved if len(measured) > 1 else []
+    x_cell: dict[int, float] = {}
+    x_cell_sigma: dict[int, float] = {}
+    x_fu: dict[int, float] = {}
+    x_fu_sigma: dict[int, float] = {}
+    if definitional:
+        # the 1.0 of the branches above holds on either basis
+        x_cell = dict.fromkeys(w_of, 1.0)
+        x_fu = dict.fromkeys(w_of, 1.0)
+    elif w_of:
+        def partition(per_cell):
+            x, sx, _ = mole_fractions(per_cell, [scales[ip] for ip in measured],
+                                      scale_cov)
+            return ({ip: float(x[k]) for k, ip in enumerate(measured)},
+                    {} if sx is None
+                    else {ip: float(sx[k]) for k, ip in enumerate(measured)})
+        x_cell, x_cell_sigma = partition([zmvs[ip].cell_volume for ip in measured])
+        if not withheld:
+            x_fu, x_fu_sigma = partition([z_of[ip] * zmvs[ip].cell_volume
+                                          for ip in measured])
     rows = [
         PhaseQuantity(
             name=phase.name,
             weight_fraction=w_of.get(ip),
             weight_fraction_stderr=sigma_of.get(ip),
+            mole_fraction=x_cell.get(ip),
+            mole_fraction_stderr=x_cell_sigma.get(ip),
+            mole_fraction_formula_unit=x_fu.get(ip),
+            mole_fraction_formula_unit_stderr=x_fu_sigma.get(ip),
             scale=float(scales[ip]),
-            z=zmvs[ip].z, molar_mass=zmvs[ip].molar_mass,
+            z=z_of[ip], z_source=z_source[ip],
+            molar_mass=zmvs[ip].cell_mass / z_of[ip],
             cell_mass=zmvs[ip].cell_mass, cell_volume=zmvs[ip].cell_volume,
             zmv=zmvs[ip].zmv,
         )
@@ -518,7 +606,10 @@ def compute_qpa(structure: Structure, values: dict[str, float],
                            if 0 <= ip < len(structure.phases)],
         unmeasured_held=[structure.phases[ip].name for ip in sorted(skip)
                          if ip in {int(h) for h in held}
-                         and 0 <= ip < len(structure.phases)])
+                         and 0 <= ip < len(structure.phases)],
+        formula_unit_withheld=(
+            None if not withheld else _formula_unit_withheld_reason(
+                [(structure.phases[ip].name, zmvs[ip]) for ip in withheld])))
     if skip:
         # Brindley's τ compares each phase's µ with the mixture's volume-mean
         # µ̄, which needs every phase's fraction, the unmeasured one's too
@@ -535,6 +626,53 @@ def compute_qpa(structure: Structure, values: dict[str, float],
         _apply_microabsorption(qpa, structure, zmvs, [w_of[ip] for ip in measured],
                                wavelength, source_kind)
     return qpa
+
+
+def _formula_unit_withheld_reason(phases: list[tuple[str, ZMV]]) -> str:
+    """Why ``mole_fraction_formula_unit`` is withheld, naming each phase.
+
+    The text :attr:`QuantitativePhaseAnalysis.formula_unit_withheld` stores
+    and ``QPA_FORMULA_UNIT_WITHHELD`` quotes (WP-1340).
+    """
+    named = []
+    for name, zmv in phases:
+        odd = unreduced_counts(zmv.element_counts)
+        counts = " and ".join(f"{el} {count:.4g}" for el, count in odd.items())
+        named.append(
+            f"{name}, whose occupancy-weighted counts per cell ({counts}) are "
+            "not whole numbers (a mixed or partially occupied site)"
+            if counts else f"{name}, which has no atoms to count")
+    return ("Mole fractions are given per unit cell only: the formula unit is "
+            "not established for " + "; ".join(named) + ", so its z = 1 and "
+            "molar_mass are the whole cell's, and a per-formula-unit column "
+            "would mix two bases.")
+
+
+def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
+    """``QPA_FORMULA_UNIT_WITHHELD``: the per-formula-unit mole fraction is
+    withheld for every phase, and this names the phase that withheld it.
+
+    Info, not warning: nothing reported is wrong, a column is absent and
+    ``mole_fraction`` (per unit cell) stands.  The reader it protects is the
+    one who would otherwise divide ``weight_fraction`` by the reported
+    ``molar_mass`` and get a column that sums to 1 on two bases at once
+    (WP-1340: +30.8 points on a 50/50 wt % LaFeO3 + La0.6Sr0.4FeO3 mixture).
+    """
+    if qpa.formula_unit_withheld is None:
+        return []
+    names = [r.name for r in qpa.phases if r.z_source == "unresolved"
+             and r.weight_fraction is not None]
+    return [Diagnostic(
+        level="info", code="QPA_FORMULA_UNIT_WITHHELD",
+        where=names,
+        message=qpa.formula_unit_withheld,
+        suggestion=(
+            "Read mole_fraction, which is per unit cell, and never divide "
+            "weight_fraction by molar_mass. For a per-formula-unit fraction, "
+            "declare the formula units per cell on "
+            + ("the phase" if len(names) == 1 else "each phase")
+            + " (Phase.formula_units) and refit."),
+    )]
 
 
 def _phase_mu_xray(zmv: ZMV, wavelength: float) -> float:

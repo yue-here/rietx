@@ -3967,6 +3967,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "fraction."
         ),
     ),
+    "QPA_FORMULA_UNIT_WITHHELD": HelpEntry(
+        title="Mole fractions per unit cell only",
+        description=(
+            "At least one phase's cell contents do not reduce to whole formula units, "
+            "usually a solid solution or a partly occupied site, so its formula unit is "
+            "not known and its reported molar mass is the whole cell's. A mole fraction "
+            "per formula unit would then compare that phase per cell with the others per "
+            "formula unit, and the column would still sum to 100 %. So it is left empty "
+            "for every phase, and the mole fraction per unit cell is given instead. Do not "
+            "divide the weight fraction by the molar mass. Declare the phase's formula "
+            "units per cell to get the per-formula-unit column."
+        ),
+    ),
     "QPA_FRACTION_RANGE": HelpEntry(
         title="Weight fractions a width profile admits",
         description=(

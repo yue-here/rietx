@@ -114,6 +114,7 @@ from .optimize.qpa import (
     compute_qpa,
     estimate_capillary_mu_r,
     estimate_flat_plate_mu_t,
+    formula_unit_diagnostics,
     microabsorption_diagnostics,
     unmeasured_reason,
 )
@@ -11133,7 +11134,8 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                       unmeasured=unmeasured, held=held_only)
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
-    diagnostics = microabsorption_diagnostics(qpa, structure)
+    diagnostics = (microabsorption_diagnostics(qpa, structure)
+                   + formula_unit_diagnostics(qpa))
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))

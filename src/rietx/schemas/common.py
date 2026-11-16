@@ -717,6 +717,13 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-1340): ``PhaseQuantity.mole_fraction``,
+#: ``.mole_fraction_stderr``, ``.mole_fraction_formula_unit``,
+#: ``.mole_fraction_formula_unit_stderr`` and ``.z_source``;
+#: ``QuantitativePhaseAnalysis.formula_unit_withheld``; and
+#: ``Phase.formula_units``, a caller-declared Z read only by QPA.  Additive and
+#: defaulted to ``None``, the 0.25 → 0.26 rule: a result stored before reads
+#: as "not computed"; an older build refuses a document carrying any of them.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -134,15 +134,16 @@ The two inherited entries were checked against `main` and folded here; the
 
 ## Tasks
 
-- [ ] `mole_fraction` on the unit-cell basis, from `S_p · V_p`, with its esd
+- [x] `mole_fraction` on the unit-cell basis, from `S_p · V_p`, with its esd
       through the full covariance and `None` where the covariance cannot
       supply one.
-- [ ] `mole_fraction_formula_unit`, withheld unless **every** phase resolves
-      `z`; and `mole_fraction_basis` beside them.
-- [ ] The abstention diagnostic, naming the phase and the reason.
+- [x] `mole_fraction_formula_unit`, withheld unless **every** phase resolves
+      `z`; and `mole_fraction_basis` beside them (landed as
+      `PhaseQuantity.z_source`; the handover says why).
+- [x] The abstention diagnostic, naming the phase and the reason.
 - [ ] Decide volume fraction in or out, and say which in the handover.
-- [ ] Optional: a caller-declared `z` per phase.
-- [ ] Tests: the LaFeO₃ / La₀.₆Sr₀.₄FeO₃ pair asserts 47.8 / 52.2 and that the
+- [x] Optional: a caller-declared `z` per phase (`Phase.formula_units`).
+- [x] Tests: the LaFeO₃ / La₀.₆Sr₀.₄FeO₃ pair asserts 47.8 / 52.2 and that the
       naive route is not what ships; a mixed table withholds the formula-unit
       column and names the phase.
 - [ ] Skill: the QPA row in `references/diagnostics.md` and the reading rule

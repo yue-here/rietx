@@ -757,3 +757,163 @@ def test_a_source_with_no_table_declines_by_name():
         source_kind="neutron_tof")
     assert mu_r is None
     assert "attenuation unavailable" in reason and "neutron_tof" in reason
+
+
+# -- mole fractions (WP-1340) ----------------------------------------------
+
+def _perovskite(name: str, a_site) -> Phase:
+    """An orthorhombic (Pnma) ABO3 perovskite, Z = 4: the A site on 4c, Fe on
+    4b, O on 4c and 8d.  ``a_site`` is ``[(species, occ), ...]`` sharing the
+    A position, so a mixed site is a solid solution."""
+    def p(v):
+        return Parameter(value=v)
+    atoms = [Atom(label=sp, species=sp, x=p(0.0302), y=p(0.25), z=p(0.9926),
+                  occ=p(occ)) for sp, occ in a_site]
+    atoms += [
+        Atom(label="Fe", species="Fe", x=p(0.0), y=p(0.0), z=p(0.5)),
+        Atom(label="O1", species="O", x=p(0.4859), y=p(0.25), z=p(0.0717)),
+        Atom(label="O2", species="O", x=p(0.2813), y=p(0.0393), z=p(0.7206)),
+    ]
+    return Phase(name=name, space_group="P n m a",
+                 cell=Cell(a=p(5.567), b=p(7.855), c=p(5.553), alpha=p(90.0),
+                           beta=p(90.0), gamma=p(90.0)),
+                 atoms=atoms)
+
+
+def _ferrite_pair(*, declared_z=None, weights=(0.5, 0.5)):
+    """The WP's mixture: LaFeO3 (counts reduce, Z = 4) and La0.6Sr0.4FeO3
+    (La 2.4, Sr 1.6 per cell: no reduction, so z falls back to 1), with the
+    scales set to give ``weights`` by weight."""
+    from rietx.optimize.qpa import compute_qpa
+
+    pure = _perovskite("LaFeO3", [("La", 1.0)])
+    doped = _perovskite("La0.6Sr0.4FeO3", [("La", 0.6), ("Sr", 0.4)])
+    doped.formula_units = declared_z
+    structure = Structure(phases=[pure, doped])
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    zmv = [phase_zmv(ph.space_group, ph.cell.lengths_angles(), _atoms(ph)).zmv
+           for ph in structure.phases]
+    for ip, w in enumerate(weights):
+        values[f"phases.{ip}.scale"] = w / zmv[ip]
+    return structure, values, compute_qpa
+
+
+def test_the_ferrite_pair_is_the_wps_measured_case():
+    structure, _, _ = _ferrite_pair()
+    pure, doped = (phase_zmv(ph.space_group, ph.cell.lengths_angles(), _atoms(ph))
+                   for ph in structure.phases)
+    assert math.isclose(pure.cell_mass, 970.993, abs_tol=1e-3)
+    assert math.isclose(doped.cell_mass, 888.937, abs_tol=1e-3)
+    assert (pure.z, pure.z_resolved) == (4, True)
+    assert (doped.z, doped.z_resolved) == (1, False)
+
+
+def test_a_5050_ferrite_mixture_is_478_522_mol_percent_and_the_naive_route_is_not_shipped():
+    structure, values, compute_qpa = _ferrite_pair()
+    qpa = compute_qpa(structure, values)
+    pure, doped = qpa.phases
+    assert [round(100 * r.weight_fraction, 1) for r in qpa.phases] == [50.0, 50.0]
+    # per unit cell: both are Z = 4 perovskites, so this is the true mol %
+    assert [round(100 * r.mole_fraction, 1) for r in qpa.phases] == [47.8, 52.2]
+    # the naive route, W / reported molar_mass, gives 78.5 / 21.5 here
+    naive = np.array([r.weight_fraction / r.molar_mass for r in qpa.phases])
+    naive = 100 * naive / naive.sum()
+    assert [round(float(v), 1) for v in naive] == [78.5, 21.5]
+    assert not any(math.isclose(r.mole_fraction, n / 100, abs_tol=0.05)
+                   for r, n in zip(qpa.phases, naive, strict=True))
+    # one unresolved phase withholds the per-formula-unit column for both
+    assert pure.mole_fraction_formula_unit is None
+    assert doped.mole_fraction_formula_unit is None
+    assert (pure.z_source, doped.z_source) == ("composition", "unresolved")
+    assert "La0.6Sr0.4FeO3" in qpa.formula_unit_withheld
+    assert "LaFeO3," not in qpa.formula_unit_withheld
+    assert "La 2.4 and Sr 1.6" in qpa.formula_unit_withheld
+
+
+def test_a_declared_z_gives_the_per_formula_unit_column():
+    structure, values, compute_qpa = _ferrite_pair(declared_z=4)
+    qpa = compute_qpa(structure, values)
+    pure, doped = qpa.phases
+    assert qpa.formula_unit_withheld is None
+    assert [round(100 * r.mole_fraction_formula_unit, 1)
+            for r in qpa.phases] == [47.8, 52.2]
+    assert (doped.z, doped.z_source) == (4, "declared")
+    assert math.isclose(doped.molar_mass, 222.234, abs_tol=1e-3)
+    assert pure.z_source == "composition"
+
+
+def test_the_two_bases_differ_by_z_where_both_are_established():
+    from rietx.optimize.qpa import compute_qpa
+
+    structure = make_lab6()                      # Z = 1
+    structure.phases.append(_caf2_phase())       # Z = 4
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    qpa = compute_qpa(structure, values)
+    lab6, caf2 = qpa.phases
+    assert qpa.formula_unit_withheld is None
+    assert (lab6.z_source, caf2.z_source) == ("composition", "composition")
+    cell = caf2.mole_fraction / lab6.mole_fraction
+    fu = caf2.mole_fraction_formula_unit / lab6.mole_fraction_formula_unit
+    assert math.isclose(fu, 4 * cell, rel_tol=1e-12)
+    # the per-formula-unit column is W / M renormalised, where M is established
+    n = np.array([r.weight_fraction / r.molar_mass for r in qpa.phases])
+    np.testing.assert_allclose([r.mole_fraction_formula_unit for r in qpa.phases],
+                               n / n.sum(), rtol=1e-12)
+
+
+def test_the_withheld_column_names_its_phase_in_an_info_diagnostic():
+    from rietx.optimize.qpa import formula_unit_diagnostics
+
+    structure, values, compute_qpa = _ferrite_pair()
+    (diag,) = formula_unit_diagnostics(compute_qpa(structure, values))
+    assert (diag.level, diag.code) == ("info", "QPA_FORMULA_UNIT_WITHHELD")
+    assert diag.where == ["La0.6Sr0.4FeO3"]
+    assert "Phase.formula_units" in diag.suggestion
+    structure, values, compute_qpa = _ferrite_pair(declared_z=4)
+    assert formula_unit_diagnostics(compute_qpa(structure, values)) == []
+
+
+def test_one_phase_seen_is_one_on_either_basis_and_withholds_nothing():
+    from rietx.optimize.qpa import formula_unit_diagnostics
+
+    structure, values, compute_qpa = _ferrite_pair()
+    lone = compute_qpa(structure, values, unmeasured=[0])
+    assert lone.phases[0].mole_fraction is None
+    assert lone.phases[1].mole_fraction == 1.0
+    assert lone.phases[1].mole_fraction_formula_unit == 1.0
+    assert lone.formula_unit_withheld is None
+    assert formula_unit_diagnostics(lone) == []
+    # an unmeasured unresolved phase is out of the sum, so it withholds nothing
+    other = compute_qpa(structure, values, unmeasured=[1])
+    assert other.phases[0].mole_fraction_formula_unit == 1.0
+    assert other.phases[1].mole_fraction_formula_unit is None
+
+
+def test_mole_fraction_esds_go_through_the_correlated_scale_block():
+    structure, values, compute_qpa = _ferrite_pair(declared_z=4)
+    s = np.array([values["phases.0.scale"], values["phases.1.scale"]])
+    cov = np.array([[1.0, -0.6], [-0.6, 1.0]]) * np.outer(0.01 * s, 0.01 * s)
+    qpa = compute_qpa(structure, values, scale_cov=cov)
+    v = np.array([r.cell_volume for r in qpa.phases])
+
+    def x0(scales):
+        n = scales * v
+        return n[0] / n.sum()
+
+    # central difference of x_0 in S: the oracle, independent of the code's J
+    h = 1e-6 * s
+    grad = np.array([(x0(s + h[k] * np.eye(2)[k]) - x0(s - h[k] * np.eye(2)[k]))
+                     / (2 * h[k]) for k in range(2)])
+    sigma = math.sqrt(grad @ cov @ grad)
+    assert math.isclose(qpa.phases[0].mole_fraction_stderr, sigma, rel_tol=1e-6)
+    assert math.isclose(qpa.phases[1].mole_fraction_stderr, sigma, rel_tol=1e-6)
+    # Z is 4 on both, so the per-formula-unit esd is the per-cell one
+    assert math.isclose(qpa.phases[0].mole_fraction_formula_unit_stderr, sigma,
+                        rel_tol=1e-6)
+    # no covariance, no esd: absent rather than zero
+    bare = compute_qpa(structure, values)
+    assert all(r.mole_fraction_stderr is None
+               and r.mole_fraction_formula_unit_stderr is None
+               for r in bare.phases)
