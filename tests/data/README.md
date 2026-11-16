@@ -1787,7 +1787,7 @@ established, from the maintainer-local prototype recorded on issue #135:
 |---|---|---|
 | block shapes seen | `(3134, 2051)` and `(27, 3590)` | a reel is one 2-D block of N patterns against one shared 1-D axis, and the axis length is what picks the orientation |
 | the 2θ span a found axis must have | 0 ≤ x₀ < 180°, x₁ ≤ 180°, span > 5° | `hdf5.MIN_TWO_THETA_SPAN_DEG`; the search tier only, never a declared axis |
-| the Q span | 0 ≤ x₀ < 30 Å⁻¹, x₁ ≤ 30, span > 1 Å⁻¹ | `hdf5.MAX_Q_PER_ANGSTROM`, `MIN_Q_SPAN_PER_ANGSTROM`; a found axis in this span and too narrow for 2θ is refused as Q |
+| the Q span | 0 ≤ x₀ < 30 Å⁻¹, x₁ ≤ 30, span > 1 Å⁻¹ | `hdf5.MAX_Q_PER_ANGSTROM`, `MIN_Q_SPAN_PER_ANGSTROM`; a found axis in this span and too narrow for 2θ is refused, naming both readings, since its values cannot tell Q from a narrow 2θ window |
 | the machine-learning trap | 1290 square 256×256 weight matrices among the archive's HDF5 | a "2-D and big enough" test would take each for a reel; the monotonic-axis requirement refuses them (`test_a_file_of_weight_matrices_is_refused`) |
 | the Poisson self-check | on a simulated file the adjacent-channel difference std was 0.39, against the ~13 that √(2·mean) predicts for counts | not implemented in this slice; at most a diagnostic, never a refusal (the WP's follow-up) |
 

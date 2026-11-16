@@ -342,9 +342,13 @@ def _declared_reel(f: Any, gname: str, *, path: Path, h5py: Any) -> _Reel | None
 def _x_dim(f: Any, by_dim: dict[int, str], ndim: int, *, path: Path,
            gname: str) -> int:
     """Which declared axis is the pattern's abscissa, the other being the
-    series coordinate.  A 2θ name decides; failing one, a name the axis rule
-    refuses (so the refusal is reached); failing both, the one axis declared,
-    or the last dimension, NeXus's fastest-varying."""
+    series coordinate.  A temperature never is; a 2θ name decides; failing one,
+    a name the axis rule refuses (so the refusal is reached).  Failing both,
+    an unclassified axis is taken only where nothing else could be the
+    abscissa — a 1-D signal's, or the one declared on a 2-D signal's last
+    dimension, NeXus's fastest-varying — and reads with
+    ``PATTERN_X_AXIS_ASSUMED``; any other unclassified declaration is refused,
+    since choosing between two unknown axes is the caller's."""
     # a temperature is the series coordinate, never what the points are against
     candidates = {d: a for d, a in by_dim.items() if not _is_temperature(f, a)}
     if not candidates:
@@ -353,8 +357,6 @@ def _x_dim(f: Any, by_dim: dict[int, str], ndim: int, *, path: Path,
             f"{', '.join(repr(a.rsplit('/', 1)[-1]) for a in by_dim.values())} "
             "as an axis, a temperature — the series coordinate of a reel, not the "
             "abscissa its points were measured against")
-    if ndim == 1 or len(candidates) == 1:
-        return next(iter(candidates))
     kinds = {d: _classify(a, _attr(f[a], "units")) for d, a in candidates.items()}
     two_theta = [d for d, (tt, _) in kinds.items() if tt]
     if len(two_theta) == 2:
@@ -364,7 +366,15 @@ def _x_dim(f: Any, by_dim: dict[int, str], ndim: int, *, path: Path,
     if two_theta:
         return two_theta[0]
     named = [d for d, (_, other) in kinds.items() if other is not None]
-    return named[0] if len(named) == 1 else ndim - 1
+    if len(named) == 1:
+        return named[0]
+    if ndim == 1 or list(candidates) == [ndim - 1]:
+        return ndim - 1
+    shown = ", ".join(repr(a.rsplit("/", 1)[-1]) for a in candidates.values())
+    raise ValueError(
+        f"{path.name}: {gname} declares {shown} as the axes of its 2-D signal, "
+        "and no name or unit says which one is the scattering angle, so which "
+        "dimension holds the patterns is not the reader's to choose")
 
 
 def _span(x: np.ndarray) -> tuple[bool, bool]:
@@ -458,8 +468,9 @@ def _check_axis(f: Any, reel: _Reel, *, path: Path,
         x = np.asarray(f[reel.axis][()], dtype=np.float64)
         could_be_2theta, could_be_q = _span(x)
         if could_be_q and not could_be_2theta:
-            other = (f"by its span ({x.min():.4g}–{x.max():.4g}, too narrow for a "
-                     "2θ scan) a momentum transfer Q in Å⁻¹ — " + _Q)
+            other = (f"by its span ({x.min():.4g}–{x.max():.4g}) either a "
+                     "momentum transfer Q in Å⁻¹ or a 2θ window narrower than a "
+                     "powder scan, and the values cannot say which")
     check_axis(reel.axis, path=path,
                field="the axis found by search (no NXdata group declares one)",
                two_theta=False, other=other,

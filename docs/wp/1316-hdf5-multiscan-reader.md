@@ -76,10 +76,14 @@ through axis discovery and `nexus` would describe less than it reads. The
   the 0°/180° ends of a found 2θ axis are physics (tier 1); the span floors
   (`MIN_TWO_THETA_SPAN_DEG` 5°, `MAX_Q_PER_ANGSTROM` 30, `MIN_Q_SPAN_PER_ANGSTROM`
   1) are new judgement (tier 3), from the maintainer's prototype on the
-  archive's ~1290 HDF5 files (issue #135), one family by lab. They decide only
+  archive's ~1290 HDF5 files (issue #135), one family by lab. They decide
   which dataset the **search** tier takes as the axis — never a declared one —
-  and every reading they admit carries `PATTERN_X_AXIS_ASSUMED`; what they
-  refuse is refused naming the file. No action on the data, no default, no new
+  and every reading they admit carries `PATTERN_X_AXIS_ASSUMED`; a found axis
+  that fits Q but is too narrow for 2θ is refused naming both readings. Among
+  declared axes the abscissa is a 2θ name, else the one name the axis rule
+  refuses, else an unclassified axis only where nothing else could be one (a
+  1-D signal's, or the sole one on a 2-D signal's last dimension, NeXus's
+  fastest-varying, tier 3); two unknown axes are refused. No action on the data, no default, no new
   code: the σ tiers and the axis rule are the existing ones.
 
 ### Inherited

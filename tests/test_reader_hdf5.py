@@ -229,6 +229,22 @@ def test_a_temperature_is_never_taken_for_the_abscissa(tmp_path):
         rx.read_pattern(path)
 
 
+def test_two_unknown_axes_or_one_on_the_first_dimension_are_refused(tmp_path):
+    """Which dimension holds the patterns is not the reader's to guess (the
+    generality review, WP-1316)."""
+    tt, block = reel(n_scans=3)
+    path = write_nexus(tmp_path / "u.nxs", tt, block, axis_name="x",
+                       axis_units=None, series=("time", [0.0, 60.0, 120.0], "s"))
+    with h5py.File(path, "a") as f:
+        f["entry/data/time"].attrs["units"] = "frame"
+    with pytest.raises(ValueError, match="not the reader's to choose"):
+        rx.read_pattern(path)
+    with h5py.File(path, "a") as f:
+        f["entry/data"].attrs["axes"] = ["time", "."]
+    with pytest.raises(ValueError, match="not the reader's to choose"):
+        rx.read_pattern(path)
+
+
 def test_a_2theta_axis_in_radians_is_refused_not_read_as_degrees(tmp_path):
     tt, block = reel(n_scans=1)
     path = write_nexus(tmp_path / "rad.nxs", np.radians(tt), block[0],
@@ -275,8 +291,8 @@ def test_a_bare_q_axis_is_refused_by_name_and_by_span(tmp_path):
     with pytest.raises(ValueError, match="momentum transfer Q"):
         rx.read_pattern(write_bare_hdf5(tmp_path / "q.h5", q, block,
                                         axis_name="q"))
-    narrow = np.linspace(0.5, 3.0, block.shape[1])     # too narrow for 2θ
-    with pytest.raises(ValueError, match="by its span"):
+    narrow = np.linspace(0.5, 3.0, block.shape[1])     # Q, or a narrow 2θ window
+    with pytest.raises(ValueError, match="cannot say which"):
         rx.read_pattern(write_bare_hdf5(tmp_path / "s.h5", narrow, block,
                                         axis_name="x"))
 
