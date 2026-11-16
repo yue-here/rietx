@@ -77,9 +77,12 @@ second one.
       (`rx.viz.plot_strain_surface`, `viz/strain.py`. GUI home **not taken**
       2026-11-16: the GUI frontend is being rebuilt under Yue's claims, so it
       goes to the leftovers issue.)
-- [ ] Manual: a short section beside the Stephens material, figure pair via
+- [x] Manual: a short section beside the Stephens material, figure pair via
       `make_figures.py`; glossary/help anchors if any new public name
-      appears.
+      appears. (`theory/microstructure.md` § The strain surface, equation
+      `ms-surface`; `make_figures.strain_surface` draws the pair from the
+      acceptance file's brucite TRF fit. No parameter, flag or setting is
+      new, so `help.py` has nothing to describe.)
 - [x] Tests: surface values pinned against the module's scalar evaluation
       on a corpus case (the brucite/corundum cone-count fixtures exist);
       PNGs to `tests/output/` and looked at. (`tests/test_strain_surface.py`,
