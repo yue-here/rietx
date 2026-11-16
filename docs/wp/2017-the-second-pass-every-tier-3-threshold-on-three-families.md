@@ -474,6 +474,55 @@ and have no free factor to measure, so this file's old list named them without c
 - **P, from WP-2054 (PR #1430).** `NOMINAL_AXIAL_APERTURE` (0.02) needs a third family. On SRM
   660c the action fires at 0.005, 0.01 and 0.02 and not at 0.05, and cpd-1a, -1c and -1f behave
   the same way at 0.02. It is a separate row from `AXIAL_SIZING_FLOOR` and no longer reads it.
+- **P, its fits and arms, fixed 2026-11-16 before running** (`2017-batch/group_p.py`). Four
+  parts. Every refit has a noise twin (every refinable non-zero start ×(1 + 1e-12)) and is read
+  in plain esd over the larger esd on the rows that are not background, with the S/L, H/L pair
+  ordered as the start test orders it, and Rwp, evaluations, status and codes beside. A family
+  is a specimen type with its own instrument (§ Context), so cpd-1a and cpd-1b are one family.
+  (P1) **`AXIAL_SIZING_FLOOR`** at 0.01 and 0.05 against the shipped 0.02, set on
+  `rietx.model.forward` for the whole fit: the four protocols from their own starts, each with
+  the closing stage and with `closing_window_tol=None`, since the row's evidence and its
+  ruling both turn on that difference. *Control*: an arm whose evaluations and rows equal the
+  shipped arm's never read the floor (11-BM NAC frees no axial term, so it is expected there).
+  *Positive arm*: without the closing stage, 0.05 must move LaB₆, FAP or cpd-1a past its noise
+  twin, as the row's 0.229-0.516 esd did, or the arm reached nothing.
+  (P2) **`REFLECTION_MARGIN_DEG`** at 0.25 and 5 against 0.5, with 20 as the reference the
+  window-domain test uses. *Bar 1*, at fixed parameters: each family's shipped answer (the
+  closing stage's) drawn at the declared 2 % windows and at the closing 1e-3 windows under each
+  margin, the largest |Δy|/σ against 20 and the 2θ where it sits. *Bar 2*, from one common
+  start, as § Every refit asks: the shipped answer polished once under each arm (one stage
+  freeing every glob the plan frees, then the closing stage), and the shipped margin's polish
+  as the control that the polish itself moves nothing. *Positive arm*: bar 1 at 2 % repeats the
+  test's 0.124σ on FAP and 0.119σ on cpd-1a within a tenth, or the harness differs from it.
+  (P3) **`STAGE_WINDOWS_STALE`**: no refit of its own, since the warning changes no fit. Every
+  stage's `window_loss` over its own tolerance is read on every P1 fit, the population of
+  fits that reach their answer, and on fits that run away. *The runaway families*: the one
+  measured, the QPA round-robin chain cpd-1a → cpd-1b under the tolerance schedule before
+  WP-2045 (`test_the_hostile_pairs_runaway_reports_its_stale_windows`' construction, the closing
+  compile refused above `axial_sl` 1), with the shipped schedule as its control; the **second**,
+  SRM 660c LaB₆ with every cell length +1 % and +3 %, and the **third**, 11-BM NAC with CaF₂ at
+  +1 % and +3 %: group A's hard starts, where `lab6_x1.01`, `lab6_x1.03` and `nac_x1.03` missed
+  the answer (scale lost, Rwp 9.9× and 1.5× the answer's). cpd-1a +3 % and with zircon declared
+  ride beside as more of the first family, and FAP +3 %, which reached its answer, as a hard start
+  that does not run away. A fit "runs away" when it misses the family's shipped answer by more
+  than 0.1 plain esd on a row that is not background, read against P1's shipped closing fit.
+  A runaway that never puts a stage's windows past its tolerance is a different kind of runaway,
+  and the warning's silence on it is reported as such, not graded. *Arms*, from the recorded
+  losses: the threshold at 0.5×, 1× and 2× the stage's tolerance, and the rule for which stages
+  are read: the last only, the shipped rule (the last, and the one before a closing stage), and
+  every stage. *Read*: on each fit, which arms fire and on which stage, beside whether it ran
+  away. *Positive arm*: the chain under the old schedule reads its warm stage past 0.5 and fires,
+  as its test pins; if not, the harness measures something else.
+  (P4) **`NOMINAL_AXIAL_APERTURE`** at 0.005, 0.01, 0.02, 0.03 and 0.05, set on `rietx.report`
+  between `report()` calls on one fit, so no refit. *Families*: SRM 660c (positive arm: it must
+  repeat WP-2054's fires at 0.005-0.02 and silence at 0.05), and the **third**, FAP, with a fourth,
+  the SRM 1976a plate, each fitted with both apertures 0 and every axial glob taken off its plan,
+  as `test_srm660c_zero_apertures_report_names_axial_asymmetry` and
+  `_fit_on_gsas_own_model` do. *Read*: whether `refine_axial_asymmetry` is active and its
+  confidence, Layer 1's regions passing their gates out of all, and the asymmetry coefficients
+  below 40°. *Reference*: each family's own aperture, its protocol fitted with the axial term
+  free (FAP frees S/L with H/L held at 0.02; SRM 1976a ties the two), so each sweep point is
+  read as above or below the data's aperture.
 - **Q, from WP-1542 (PR #1434).** The held SNIP on PbSO₄ and #726 was not re-measured with
   settled partitions. `StageSpec:lebail_tol` (1e-7) joined the audit table at tier 3 on five
   families of six patterns, with FAP as its stated failing case (a pair 1e-4 Å apart, 1.23 σ at
