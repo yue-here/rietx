@@ -862,7 +862,12 @@ def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
     raised; it answers zeros as ``half_width_at`` beside it does.  The list is
     the issue's own: ``pick_peaks`` on a pattern divided by its maximum, with
     no σ column, so the Poisson fallback puts every point under the noise.  A
-    direct ``validate_by_lebail`` reached the screen with it and raised."""
+    direct ``validate_by_lebail`` reached the screen with it and raised.
+
+    The zeros it now returns are vacuous: no predicted line is testable on such
+    a list, so the true cell and the 8-fold supercell cP 2a0 both read
+    converged with 0 absences.  Those counts are not evidence about the cell
+    (whether the validation should decline instead is open on #1612)."""
     from rietx.indexing.screen import PatternScreen, screen_candidate
     from rietx.indexing.workflow import validate_by_lebail
 
@@ -880,5 +885,11 @@ def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
     system, centring, cell = SI_CELLS["truth cF"]
     screen = screen_candidate(pattern, cell, system, centring)
     assert len(screen.two_theta) and not screen.seen.any()
-    v = validate_by_lebail(_candidate(system, centring, cell), norm, ins, peaks=peaks)
-    assert v.absent_source == "line_screen"
+    assert not screen.testable.any() and screen.n_lines_in_window == 0
+    for name in ("truth cF", "cP 2a0"):  # the right cell and a wrong one read alike
+        system, centring, cell = SI_CELLS[name]
+        assert not screen_candidate(pattern, cell, system, centring).testable.any()
+        v = validate_by_lebail(_candidate(system, centring, cell), norm, ins, peaks=peaks)
+        assert v.status == "converged" and v.absent_source == "line_screen"
+        assert v.predicted_but_absent_uncancellable == 0
+        assert v.predicted_but_absent_uncancellable_in_window == 0
