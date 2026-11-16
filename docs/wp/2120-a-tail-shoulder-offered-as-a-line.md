@@ -1,6 +1,6 @@
 # WP-2120 — a tail shoulder on its position bound is offered as a line
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — class 1 landed (#1579); class 2 waits on the maintainer's edge bar
+Milestone: unscheduled · Status: 🔄 2026-11-16 — class 1 landed with synthetic arms (#1579); its approval and reach, and class 2's edge bar, wait on the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-06 — false lines reach the engines at full weight, but no case yet moves a cell or costs an indexing row
@@ -109,6 +109,69 @@ against 28 of 97 inner re-seeds and 62 of 628 detected components. But six of th
 lattice line that no other group holds. Taking class 2 out would lose those six lines. The
 second family has three such components in all, too few to measure the rule on.
 
+### Findings, the synthetic arms (2026-11-16, `470e6cf0b`, `[dev]`, macOS arm64)
+
+The generality judge rated class 1's action `weak` because nothing showed that the rule
+spares a real line. So a positive arm and a negative arm were built on a synthetic
+pattern. Fluorite (Fm-3m, a = 5.4631 Å) is drawn by `Refinement.predict` on the round-robin
+instrument, with a real axial divergence (FCJ, S/L = H/L), Lorentzian x = 0.04 and
+Caglioti widths that give fitted FWHMs of 0.12-0.16° (the round robin has 0.11-0.23°).
+The strongest line is 10⁴ counts on a background of 30, with Poisson noise from fixed seeds.
+The pattern is picked with the round-robin instrument itself, which declares no axial
+divergence, as the real lab files do. Distances are in the fitted FWHM of the strong line's
+group, the census's measure. The harness is outside the tree (ghostshift scratch
+`wp-2120/arm/`). Two rows of it are tests (`tests/test_peak_tail_shoulder.py`).
+
+**The negative arm: a pure tail** (the strong lines alone, 20 seeds × the six strong lines
+below 90°):
+
+| S/L = H/L | components below a strong line | usable but for the rule | taken by the rule | still usable (`axial_tail` alone) | where they sit |
+|---|---|---|---|---|---|
+| 0 (control) | 0 | — | — | — | — |
+| 0.03 | 25 | 19 | 5 | 14 | 0.72-0.85 FWHM below, 5.8-12.9× weaker |
+| 0.05 | 66 | 27 | 15 | 12 | 0.69-2.29 FWHM, 4.3-25× |
+| 0.07 | 84 | 23 | 0 | 23 | 0.84-2.61 FWHM, 4.1-18× |
+
+With no tail in the data, nothing sits below a strong line. At S/L = 0.03 the tail leaves
+shoulders exactly where the real ones sit (0.62-0.95 FWHM, 4-14×, task 1), so that setting
+is the one most like the lab data. There the rule takes 5 of the 19 shoulders. The other
+14 sit at the same place, but their fits did not reach the position bound, so they stay usable.
+
+**The positive arm: a real line.** A second fluorite phase with cell a(1 + ε), at 1/r of
+the host's scale, puts a real lattice line below each strong line. ε takes 40 values
+from 0.0006 to 0.016, with 3 seeds each, and every strong line below 90° is read. A planted
+line is *kept* if a usable component lies within min(sep/2, 0.5 FWHM) of it. It is *taken
+by the rule* if the component there carries `tail_shoulder` and no other unusable flag.
+*Other* means unusable for another flag (`unresolved_split`, `not_separable`), and
+*not separated* means no component there.
+
+| S/L = H/L | 0.6-1.0 FWHM below, r = 5-14: kept / taken / other / not separated | same band, r = 25: kept / taken | 1.0-3.5 FWHM, r = 5-14: kept / taken | 2.0-3.5 FWHM, r = 25: kept / taken |
+|---|---|---|---|---|
+| 0 | 130 / 3 / 16 / 184 | 10 / 0 | 761 / 0 | 78 / 8 |
+| 0.03 | 96 / 16 / 41 / 171 | 17 / 1 | 731 / 0 | 85 / 3 |
+| 0.05 | 49 / 1 / 86 / 188 | 1 / 6 | 704 / 1 | 73 / 10 |
+
+At r = 3 the rule took nothing at any separation (sweeps at S/L 0 and 0.05), because
+`axial_tail` needs the mate 4× stronger.
+
+What the two arms say (no bar set here):
+
+- **Away from the tail's own position the rule spares real lines.** At 1.0-3.5 FWHM and the
+  census's ratios (5-14×), it took 1 of 2197 resolved lines. In the 0.6-1.0 band it took 3 of
+  133 with no tail in the data and 1 of 50 at S/L = 0.05. Half the planted lines in that band
+  are not resolved at all (Sparrow's limit, which the rule cannot change).
+- **Where the tail's shoulder sits, the rule cannot tell a real line from the tail.** At
+  S/L = 0.03 it took 16 of the 112 resolved real lines in the band. Ten of those 16 are at
+  0.7-0.8 FWHM and 5-7× weaker, against 6 kept there. At that same setting it takes 5 of the
+  19 pure-tail shoulders. So at the lab-like setting, the rule took a real line in 14 % of
+  cases and a tail shoulder in 26 %. That is weak discrimination, and it is a weak catch.
+- **The rule has the reach of `axial_tail`, not the reach of the census.** It reaches 3.5
+  FWHM and has no upper ratio. Very weak real lines (r = 25, beyond every census case) are
+  taken at 2.0-3.5 FWHM: 21 of 257 resolved over the three settings.
+- One structure, one line width, one count level, and only axial divergence as the tail's
+  source. The negative arm's band matching the census is the evidence that this tail stands
+  for the lab one.
+
 ## Non-goals
 
 - The line shape the picker holds (Kα2 weight, apertures): decided in WP-2055.
@@ -157,6 +220,66 @@ WP records why such a component stays usable.
 - WP-2055 (the census and the direction test); issue #1166.
 
 ## Handover log
+
+- **2026-11-16 (second session, PR #1579)** — Class 1 now has the synthetic positive arm the
+  judge asked for, and a negative arm, so the rule's evidence can fail in either direction. A real weak lattice line
+  planted below a strong one survives the rule wherever it does not sit on the tail's own
+  shoulder. Of 2197 resolved real lines at 1.0-3.5 FWHM, 5-14× weaker, the rule took 1. Where
+  the shoulder sits, it cannot tell the two apart. With the lab-like tail (S/L = H/L = 0.03, whose pure-tail shoulders fall in the census's
+  0.6-1.0 FWHM, 4-14× band), the rule takes 16 of 112 resolved real lines in that band and
+  5 of 19 pure-tail shoulders. No code changed. No bar was set and class 2 was not placed.
+  *Done:* findings "the synthetic arms" above; two test rows in
+  `tests/test_peak_tail_shoulder.py` (`470e6cf0b`): the negative arm with its no-tail control
+  (5 taken, 14 left, all 0.6-1.0 FWHM and 4-14×), and the positive arm in one pattern (real
+  lines 0.62 and 0.95 FWHM below kept with `axial_tail`, the 0.75 FWHM one taken), with
+  `tests/output/peaks_tail_shoulder_planted.png`. Each fails if the rule is widened to
+  `axial_tail` alone or dropped.
+  *Measured:* sweep on macOS arm64 `[dev]` (harness in ghostshift scratch `wp-2120/arm/`,
+  about 7 min). Both new rows pass on Linux x86_64 too: pearl canary on `470e6cf0b`,
+  `test_peak_tail_shoulder` + `test_audit_table` + `test_help` (`-m ""`, `-n 4`), 66 passed.
+  Acceptance on pearl, same tree: `test_peak_bounds` + `test_peak_tail_shoulder` +
+  `test_acceptance_indexing` (`-m ""`, `-n 4`): 60 passed, 0 failed (this morning's 58 plus the two new
+  rows). Ruff clean. `tests.reader_output` exit 0, unchanged. `test_docs_consistency` + the test file on macOS: 32 passed.
+  *Questions for the maintainer* (not decided here):
+  1. Does the tier-3 approval stand, given that at the lab-like tail the rule takes a real line
+     in 14 % of resolved cases and a tail shoulder in 26 %?
+  2. Should the rule's reach be narrowed to the census band? It inherits `axial_tail`'s
+     3.5 FWHM and has no upper ratio, so it takes 21 of 257 resolved r = 25 lines at 2.0-3.5
+     FWHM. Narrowing it is a bar.
+  3. The rule catches 0-56 % of pure-tail shoulders, depending on the tail. The rest stay usable with
+     `axial_tail` alone, as before this WP.
+  4. Class 2's edge bar, as before. No `_audit` row was added: `_audit.py` is WP-2017's lane today.
+  5. Is the rule's kind 1, an act, or kind 2, a choice a candidate cell can score? This is the judge's reading.
+     If kind 2, undriven-only (`PEAK_UNDRIVEN_FLAGS`) is the tree's shape for it. The cost of keeping the 11 real
+     shoulders usable was argued in task 2 but never measured.
+  6. Who writes the `action` row for `tail_shoulder` (keyed on `ObservedPeak.flags`), and a
+     test that sees `PEAK_UNUSABLE_FLAGS` membership: WP-2017, or the session that acts on 1?
+  *Generality:* re-run on this tree (read-only subagent, the `generality-review`
+  definition). Its two verdicts and their closing lines, verbatim. The full tables are in PR #1579's body.
+  - item 1, `tail_shoulder` in `PEAK_UNUSABLE_FLAGS`: **`weak`.** "The new synthetic arms
+    move the stronger evidence to the case against. The author's own positive arm shows that,
+    in the band where the rule acts, it cannot tell a real line from a tail. The case for
+    acting still rests on 11 components on development data, called tails because no lattice
+    line lies under them, and no cost of leaving them usable has been measured." It reads the
+    ambiguity as kind 2 (tail or lattice line, which a candidate cell can score), with
+    `PEAK_UNDRIVEN_FLAGS` as the tree's kind-2 shape. It also notes that the tail-free control
+    (S/L = 0) still loses 3 of 133 resolved real lines in the band, and 8 of 86 at r = 25,
+    2.0-3.5 FWHM. *Would change it:* "a real pattern with a known weak line 0.6-1.0 FWHM below
+    a line at least 4× stronger (a weighed minor phase, or synchrotron data) that the rule
+    keeps, together with a measured indexing cost of leaving the 11 shoulders usable, would
+    raise it toward `holds`. A real line taken on real data, or the S/L = 0 takes left
+    standing on a tail-free instrument, would lower it toward `fails`."
+  - item 2, the `_audit` row (none added): **`weak`** (was `fails`). "This morning's condition
+    is met on the author's account: the approval is now asked for. The case against leaving
+    the row out is still the stronger side." No kind of row in the table sees membership of
+    `PEAK_UNUSABLE_FLAGS`, and no step names who writes the row. *Would change it:* "an
+    `action` row keyed on the flag, with ambiguity, evidence naming the families and the
+    synthetic case where the rule fails, grounds, and the date once ruled; or a named task in
+    this WP's or WP-2017's *Next* to write that row, plus a test that sees
+    `PEAK_UNUSABLE_FLAGS` membership."
+  *Next:* the maintainer rules on 1-6. Then a session either keeps the rule, narrows its reach
+  (with these arms as its test), demotes it to undriven, or withdraws it. It writes the `_audit` row the ruling
+  names, then places class 2.
 
 - **2026-11-16** — The picker no longer offers the engines a weak shoulder that sits on a strong
   line's axial-tail side and that its fit pushed to its position bound. Such a component is now

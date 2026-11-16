@@ -14,11 +14,15 @@ Interpretation table, written before the tests were (each arm can fail):
 | SRM 1976a on an X'Pert (a second instrument family) | the two shoulders at 52.53 deg and 76.84 deg flagged and unusable; a usable component still holds each mate's line, 52.57 deg and 76.88 deg | the rule fails to carry to a narrower-line instrument, or takes the strong line |
 | the same shoulder **named** (``fit_peaks``, a negative arm) | ``axial_tail`` and ``position_at_bound`` both raised, ``tail_shoulder`` not, and the line usable: the judgement is detection's, never made on a caller's positions | the flag reaching named positions |
 | fluorite.prn: the picture | ``tests/output/peaks_tail_shoulder_fluorite.png`` with the 46.92 deg shoulder under the fluorite (220) line | — |
+| synthetic, a pure axial tail (the negative arm) and no tail (its control) | no component below a strong line without the tail; with it, shoulders 0.6-1.0 FWHM below and 4-14x weaker, some taken by the rule | a shoulder with no tail in the data, or the rule taking none (or all) of the tail's shoulders |
+| synthetic, a real weak line planted below a strong one (the positive arm) | at 0.62 and 0.95 FWHM below, the real line carries ``axial_tail`` and stays usable; at 0.75 FWHM, where the tail's shoulder sits, the rule takes it | the rule widened to ``axial_tail`` alone (the two kept lines go), or the measured cost gone unexplained |
 
-Real data only: the round robin (``tests/data/qarr``) and SRM 1976a
-(``tests/data/srm1976a_corundum_xpert.xy``), each with its acceptance suite's
-own instrument.  WP-2120's handover carries the lattice distances behind the
-choice; this file pins the flag's logic and the census it moved.
+Real data for the first four rows: the round robin (``tests/data/qarr``) and
+SRM 1976a (``tests/data/srm1976a_corundum_xpert.xy``), each with its
+acceptance suite's own instrument.  WP-2120's handover carries the lattice
+distances behind the choice; this file pins the flag's logic and the census
+it moved.  The last two rows are synthetic (fluorite through the package's
+own forward model); WP-2120's findings carry the full sweep they sample.
 """
 
 from __future__ import annotations
