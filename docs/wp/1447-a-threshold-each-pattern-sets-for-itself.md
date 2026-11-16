@@ -1,6 +1,6 @@
 # WP-1447 — a threshold each pattern sets for itself
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: — (1442 soft)
 Priority: P3 2026-09-23 — a threshold that works on copper and is not the pattern's own
