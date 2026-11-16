@@ -1,6 +1,6 @@
 # WP-1316 — a NeXus/HDF5 multi-scan reader, behind an extra
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — reader, extra and σ tiers in PR #1607; the Poisson self-check and follow-ups in #1618
 Track: One file, many patterns
 Depends on: —
 Priority: P3 2026-09-23 — a reader nobody is waiting for; the reel exports as files
@@ -144,6 +144,52 @@ The shipping PR carries `Closes #135`.
   precedent; WP-1110 item 17.
 
 ## Handover log
+
+- **2026-11-16** — first slice, PR #1607 (ghostshift runner). `read_pattern`
+  now opens a NeXus/HDF5 in-situ reel as N scans when h5py is installed
+  (`pip install 'rietx[hdf5]'`), and without it recognises the file and refuses
+  it by name with that line, where it used to fall to the ASCII reader as
+  "binary". A file that declares its patterns (`NXdata` `@signal`/`@axes`) is
+  trusted; one that declares nothing is searched and always says the axis was
+  assumed; a Q, d, ω, φ, radian or temperature axis is refused rather than read
+  as 2θ. The Poisson self-check is not built; it and six smaller follow-ups are
+  issue #1618.
+  - *Done:* `[hdf5]` extra (h5py ≥ 3.8; also in `[dev]` so CI runs the tests),
+    `_about.HDF5_EXTRA`, `PatternFormat.requires`, `ReaderCapability.available`
+    / `.requires` (the format stays listed, `available=False`, rather than being
+    dropped — the acceptance's "reports it unavailable"), `io/formats/hdf5.py`
+    third in dispatch, `tests/test_reader_hdf5.py` (33), `tests/writers_hdf5.py`,
+    the robust harness's `hdf5`/`hdf5_bare` truncation arms and `hdf5` non-finite
+    row (+11), the manual's pattern-files rows, the io/CLAUDE.md row, the skill's
+    `PATTERN_X_AXIS_ASSUMED` row, the `tests/data/README.md` facts section. A
+    read-only review found two silent misreads (a temperature taken as x; a 2θ
+    in radians read as degrees), both fixed with tests, plus pyFAI's
+    unit-suffixed names, a float legacy `@signal`, non-finite ranges in
+    `list_scans`. The generality judge's findings: span discriminators *weak*
+    (one family; the narrow-span refusal now names both Q and a narrow 2θ
+    window), `_x_dim`'s last-dimension fallback *weak* (now refuses two unknown
+    axes, or one on the first dimension), tie-break and σ *hold*; it recommends
+    walking `hdf5.py` in `_audit.WALKED` (a question for the maintainer below).
+  - *Measured:* fast selection on the final tree (d6c106076), `[dev]` + h5py 3.16.0,
+    darwin/arm64, `-n 4`, beside other sessions' work (the workstation was
+    memory-saturated: two co-tenant runs not admitted in 20 and 12 min):
+    14730 passed, 432 skipped, 32 xfailed, 0 failed, 14:28. This session adds
+    44 tests, all passes with h5py present: 33 in `test_reader_hdf5.py` and 11
+    `hdf5` rows in `test_readers_robust.py`; without h5py all 44 skip (the module
+    and the arms `importorskip`). `tests.added_test_times`: 0.14 s over the
+    27 functions, none near the tail. Workstation canary (`923890c77`, 7 files):
+    607 passed, 1 skipped, 1 failed (this branch's `io/CLAUDE.md` cap, fixed).
+    `python -m tests.reader_output`: exit 0, unchanged.
+  - *Gotchas:* `io/CLAUDE.md` is at its 572-line cap (`test_docs_consistency`);
+    the row fitted by joining one wrapped paragraph. The workstation's shared venv has no
+    h5py: the prcheck installed it `--no-deps --target` into the job dir and
+    put that on `PYTHONPATH`, leaving the venv alone.
+  - *Open question for the maintainer:* should `io/formats/hdf5.py` join
+    `_audit.WALKED`? Then `MAX_TWO_THETA_DEG` is tier 1 and the three span
+    floors tier 3 (grounds: the prototype's archive family, one by lab; every
+    reading they admit warns), each needing your dated approval.
+  - *Next:* the Poisson self-check (#1618 item 1), which needs a code and an
+    audit row; then a way to choose among several `NXdata` groups (#1618 item 2).
 
 - **2026-09-01** — created, from issue #135 (2026-09-01 triage). Settled:
   tiers, discriminators, the extra's shape; first open item is the extra's
