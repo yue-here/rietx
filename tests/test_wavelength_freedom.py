@@ -971,3 +971,52 @@ def _plot_histograms(result, stem):
 
 
 OUT = __import__("pathlib").Path(__file__).parent / "output"
+
+
+def test_a_cell_driven_by_a_variable_is_not_a_held_cell():
+    """A tie onto a free row moves the cell, whatever the entry order.
+
+    ``vars.X`` sits after λ in ``entries``, so a skip asked row by row saw
+    the Si cell still held when λ came up and freed both; it is asked once
+    the whole call is applied.
+    """
+    from rietx.params.vector import AffineTie
+
+    table = ParameterTable(_mixture(), _ds(1.5406))
+    table.add_parameter("vars.T", A_SI)
+    table.set_tie("phases.0.cell.a", AffineTie.identity("vars.T"))
+    assert table.wavelength_pin() == "phases.0.cell.a"   # vars.T not free yet
+    hits = table.set_vary(["vars.T", CEO2_A, WL], True)
+    assert "vars.T" in hits and WL not in hits
+    assert table.wavelength_pin() is None
+
+
+def test_the_stage_settles_the_fence_after_its_turn_off(cu_mixture):
+    """A stage that frees every cell and fixes the standard's keeps λ.
+
+    ``turn_off`` runs after ``turn_on``, so the skip asked mid-stage saw no
+    held cell; the stage asks again on the set it leaves free.
+    """
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("lam_cell", ["phases.*.cell.*", WL], turn_off=["phases.0.cell.*"])])
+    result = Refinement(_start(), _ds(1.5406), history=False).fit(cu_mixture, plan=plan)
+    rows = {p.path: p for p in result.parameters}
+    assert WL in result.stages[1].freed
+    assert abs(_z(rows[WL], LAM_CU)) < 3.0
+    assert "WAVELENGTH_NOT_FREED" not in {d.code for d in result.diagnostics}
+
+
+def test_a_cell_written_by_a_formula_moves_with_its_variable():
+    """A derived cell is a locked row with no tie, so it is asked through its
+    block: held while its variable is held, moving once the variable is free.
+    """
+    table = ParameterTable(_mixture(), _ds(1.5406))
+    table.add_parameter("vars.a0", A_SI)
+    table.add_expression("phases.0.cell.a", "a0", variables={"a0": "vars.a0"})
+    assert table.wavelength_pin() == "phases.0.cell.a"
+    table.set_vary(["vars.a0"], True)
+    assert table.wavelength_pin() is None
+    assert WL not in table.set_vary([WL], True)

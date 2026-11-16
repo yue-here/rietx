@@ -210,7 +210,10 @@ def wavelength_pins(wavelength_held: list[bool],
     by_root: dict[object, str] = {}
     # a held cell is named before a held wavelength: it is the standard the
     # calibration is taken against, and the more specific answer
-    for node, what in sorted(pin.items(), key=lambda kv: kv[1].startswith("hist.")):
+    def is_wavelength_pin(what: str) -> bool:     # "hist.{k}", never a scoped cell
+        return what.startswith("hist.") and what.count(".") == 1
+
+    for node, what in sorted(pin.items(), key=lambda kv: is_wavelength_pin(kv[1])):
         by_root.setdefault(find(node), what)
     return [by_root.get(find(("hist", h))) for h in range(len(wavelength_held))]
 
@@ -3260,15 +3263,26 @@ class ParameterTable:
             moves[ip] = moves.get(ip, False) or self._row_moves(e)
         return {ip: None if moves[ip] else path for ip, path in first.items()}
 
-    def _row_moves(self, e: Entry) -> bool:
+    def _row_moves(self, e: Entry, _seen: frozenset[str] = frozenset()) -> bool:
         """Whether a row can move under the entries' current ``vary`` flags:
-        it is free, or tied with a nonzero coefficient on a free row."""
+        it is free, tied with a nonzero coefficient on a free row, or the
+        output of a derived block (a parent cell's child cell, a formula) one
+        of whose inputs moves.  A derived output is a locked row with no tie,
+        so without the last clause it would read as held (review of WP-2148)."""
         if e.vary:
             return True
-        if e.tie is None:
+        if e.tie is not None:
+            terms, _ = self._flatten(e.tie, (e.path,))
+            return any(c != 0.0 and self._row_moves(self.entries[j], _seen | {e.path})
+                       for j, c in terms)
+        if e.path in _seen:
             return False
-        terms, _ = self._flatten(e.tie, (e.path,))
-        return any(c != 0.0 and self.entries[j].vary for j, c in terms)
+        for block in self.derived:
+            if e.path in block.outputs:
+                return any(self._row_moves(self.entries[self._paths[q]],
+                                           _seen | {e.path})
+                           for q in block.inputs if q in self._paths)
+        return False
 
     def wavelength_pin(self) -> str | None:
         """What pins this histogram's d scale: a held cell's length path, or ``None``.
@@ -3288,14 +3302,11 @@ class ParameterTable:
 
         **Order.**  Read from the entries rather than ``_free_idx``, which is
         rebuilt only at the end of ``set_vary`` and so is one call stale inside
-        it.  Reading ``e.vary`` sees the in-progress state and makes the
-        decision order-independent — but only *given* that the build order puts
-        every phase entry before every instrument entry in ``entries``, so that
-        within one call every cell a glob frees is freed before λ is tested.
-        Flip that order and a single ``*`` glob would free both again;
+        it; ``set_vary`` asks it once, after every other row of the call is
+        applied, so the answer does not depend on where λ sits in ``entries``
+        (a ``vars.X`` driving a cell sits after it).
         ``test_a_glob_skips_it_while_the_cell_is_free_but_not_when_held``'s
-        ``WL not in hits`` assertion on the held-cell table goes red on the
-        flip, which is where the dependence is pinned.
+        ``WL not in hits`` assertion on the held-cell table pins it.
         """
         return wavelength_pins([False], [self.cell_pins()])[0]
 
@@ -4204,21 +4215,30 @@ class ParameterTable:
                         and any(fnmatch.fnmatchcase(path, g) for g in path_globs)):
                     self._origin_wanted[path] = vary
         hits = []
+        asked_lam: list[Entry] = []
         for e in self.entries:
             if self._glob_reaches(e, path_globs, vary):
-                # Asked per row rather than once before the loop.  Computed
-                # once, the contract was order-dependent: two calls freeing
-                # the cell then λ skipped λ, while ONE call carrying both
-                # globs froze the skip set before the cell was free and so
-                # freed both, deferring the refusal to the solve.  Nothing
-                # shipped hits it, and a contract that reads differently
-                # depending on how a caller batched its globs is not one.
+                # Asked after every other row of the call is applied, never
+                # in entry order.  Asked once before the loop, the contract was
+                # order-dependent: two calls freeing the cell then λ skipped λ,
+                # while ONE call carrying both globs froze the skip set before
+                # the cell was free and so freed both.  Asked per row, a
+                # ``vars.X`` driving a cell sat after λ in ``entries`` and was
+                # not yet free when λ was tested (review of WP-2148).  A
+                # contract that reads differently depending on how a caller
+                # batched its globs is not one.
                 if (vary and e.path in lam_paths
-                        and not getattr(self, "_joint", False)
-                        and self.wavelength_pin() is None):
+                        and not getattr(self, "_joint", False)):
+                    asked_lam.append(e)
                     continue
                 e.vary = vary
                 hits.append(e.path)
+        if asked_lam and self.wavelength_pin() is not None:
+            for e in asked_lam:
+                e.vary = True
+                hits.append(e.path)
+            order = self._paths
+            hits.sort(key=order.__getitem__)
         self._rebuild()
         if vary and self._distortion:
             self._refuse_unseeded_distortion()
