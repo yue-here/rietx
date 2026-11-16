@@ -1,6 +1,6 @@
 # WP-1340 — QPA on a molar basis, and the basis travels with the number
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — every task landed, in review as PR #1598; the schema additions and the new code wait on the maintainer
 Track: Render what the fit already knows
 Depends on: — (1320 soft: both touch `PhaseQuantity` and add a diagnostic row)
 Priority: P3 2026-09-23 — a second basis for a number QPA already reports
@@ -141,7 +141,8 @@ The two inherited entries were checked against `main` and folded here; the
       `z`; and `mole_fraction_basis` beside them (landed as
       `PhaseQuantity.z_source`; the handover says why).
 - [x] The abstention diagnostic, naming the phase and the reason.
-- [ ] Decide volume fraction in or out, and say which in the handover.
+- [x] Decide volume fraction in or out, and say which in the handover (out:
+      the 2026-11-16 entry, and issue #1600).
 - [x] Optional: a caller-declared `z` per phase (`Phase.formula_units`).
 - [x] Tests: the LaFeO₃ / La₀.₆Sr₀.₄FeO₃ pair asserts 47.8 / 52.2 and that the
       naive route is not what ships; a mixed table withholds the formula-unit
@@ -170,6 +171,130 @@ available, and withholds the formula-unit column by name where they are not.
   called unambiguous.
 
 ## Handover log
+
+- **2026-11-16** — all seven tasks landed, in PR #1598 (ghostshift runner).
+  A Rietveld fit now reports how many moles of each phase there are, not only
+  their weight, and it says which way it counted. Every phase gets a mole
+  fraction counted in unit cells, which needs no formula unit and so is always
+  right. A second column counts formula units, the chemist's mol %, and it
+  appears only when every phase's formula unit is known. When one phase is a
+  solid solution or has a partly empty site, that column is left empty for
+  every phase, and an info diagnostic names the phase and its odd counts,
+  rather than shipping a column that sums to 100 % on two bases. On the WP's
+  50/50 wt % LaFeO₃ + La₀.₆Sr₀.₄FeO₃ mixture, the per-cell column reads the
+  true 47.8/52.2, and the naive route (78.5/21.5) is pinned as not what
+  ships. A caller can declare a solid solution's formula units to get the
+  per-formula-unit column. Volume fraction is out. What a reader receives
+  changed: six result fields, one input field and one diagnostic code, all
+  waiting on the maintainer's review.
+
+  *Done.*
+  - `PhaseQuantity` has new fields:
+    - `mole_fraction` and `mole_fraction_stderr`, per unit cell, from S·V;
+    - `mole_fraction_formula_unit` and `mole_fraction_formula_unit_stderr`,
+      from Z·S·V;
+    - `z_source` (`composition`, `declared` or `unresolved`).
+  - `QuantitativePhaseAnalysis.formula_unit_withheld` holds the reason the
+    second column is absent. `QPA_FORMULA_UNIT_WITHHELD` (info) quotes it, and
+    its `where` names the phase.
+  - `Phase.formula_units` is the caller's Z. It is read only by QPA, and
+    `molar_mass` follows it. It is deliberately not per-pattern-free in a
+    joint fit, so starting structures that differ in it are refused.
+  - Both esds come from `qpa.mole_fractions`, which is `weight_fractions`
+    with V or Z·V in place of Z·M·V. Same J·Cov(S)·Jᵀ, same `None`
+    discipline. Each is tested against a finite-difference oracle, the
+    per-formula-unit one on LaB₆ + CaF₂ (Z = 1 against Z = 4).
+  - `ZMV.z_resolved` and `qpa.unreduced_counts` record when `_formula_units`
+    fell back. Its 2 % rule is unchanged (a non-goal).
+  - Edge cases:
+    - A lone measured phase reads 1.0 on both bases, with no diagnostic.
+    - A phase with no mass in its cell (every site empty) gets `None`, not
+      0.0. Its cell count rides a blind scale, and it withholds nothing.
+    - A negative scale that leaves Σ S·V ≤ 0 makes that basis absent rather
+      than raising (WP-1028 §(f)).
+  - `help.py` entry, two `_audit` rows (tier 1, ambiguity 1, response info),
+    the skill's diagnostics row, `reference/qpa.md` § Mole fractions (with
+    the reading rule as a heading), a `Phase.formula_units` row in
+    `reference/data.md`, `api.md` regenerated, the GUI help-key fixture, and a
+    0.61 schema note.
+
+  *Decisions, with reasons.*
+  - **Volume fraction: out.** It is nearly free (V_p ∝ S_p·V_p²). But it
+    brings its own basis question: crystalline solid at the X-ray density,
+    porosity and amorphous content not modelled. That wants its own reader
+    rule, and it is one more field for the maintainer to review. Filed in
+    #1600 with the recipe.
+  - **`mole_fraction_basis` landed as `z_source`.** The basis of each
+    column is fixed by its name (per cell, per formula unit). What varied,
+    and what nothing recorded before, is where a row's `z` came from, and so
+    whether its z = 1 was a formula unit or the whole cell.
+  - **The reading rule** ("a mol % column summing to 100 % is no evidence its
+    basis is uniform") went in the skill row and the manual, not in
+    `judging.md`, which is 99 B under its budget.
+  - **`FractionProfile` molar range:** not built (the 1320 note); filed in
+    #1600.
+
+  *Measured* (`[dev]` venv on pearl, Linux x86_64, `-n 8 --dist loadgroup
+  -m "not slow"`; the Mac's runs were single files without `-n`):
+  - Canary wp1340c at `0502772e1`: 378 passed in 29 s.
+  - Fast wp1340f at `0502772e1`: 14855 passed, 280 skipped, 32 xfailed,
+    2 failed. Both failures were mine: a stale `help_keys.json` fixture, and
+    bold in the manual's register. Both are fixed in `dd0d73690`.
+  - Final-tree fast run: wp1340g at `c01b9221c`: 14860 passed, 280 skipped, 32 xfailed, 0 failed, 435 s, 5.9 GB peak, 728 % on 8 cores. That is +3 over wp1340f (the three review tests) with its two failures fixed, so passed+skipped moved by exactly the tests added. The ten added tests cost 0.08 s together in that junit (`tests.added_test_times`), so none joins the slow tail.
+  - `tests/test_qpa.py` went from 39 to 49 tests (+10, none skipped).
+  - `python -m tests.reader_output` exits 0: unchanged against the
+    merge-base. Its fixtures carry no mixed-basis QPA, so the new code shows
+    there nowhere.
+
+  *Review.* Not `/code-review` (a runner may not run it), but a read-only
+  review agent over the branch diff. It found five things, and four were
+  fixed in `c82c80bbe`:
+  - a massless phase took a mole fraction;
+  - one negative scale could raise from inside QPA;
+  - the withheld text was wrong for several phases;
+  - there was no esd test with differing Zs.
+  The fifth, that the CIF writer ignores a declared Z, is in #1600.
+
+  *Generality* (the judge's verdicts, condensed from its tables; full text in
+  the session):
+  - `QPA_FORMULA_UNIT_WITHHELD`, code row: **holds** (tier 1, kind 1).
+    It cautioned on attention cost, since the code fires on every multi-phase
+    fit with a solid solution. What would change the verdict: a count of how
+    often it fires on the suite's multi-phase fits.
+  - Suggestion row: **holds**. Minor: "and refit" is the only route to the
+    declared-Z column.
+  - (a) withholding the whole column: **holds**. It added that composition Z
+    is the reduced formula (benzene reads z = 24). Now said in the
+    docstring and the manual (`d71e309d3`).
+  - (b) lone phase reads 1.0: **holds**. Its esd is `None` on the
+    definitional path but 0.0 on a plain single-phase fit, as σ(W) already
+    was. Filed in #1600.
+  - (c) massless phase: **weak** as first written (0.0). Author's answer:
+    changed to `None` in `d71e309d3`, the judge's own remedy, with the test
+    asserting `z_source`.
+  - (d) declared Z: **weak**, because the CIF export still writes the
+    composition's Z. Author's answer: the field is the caller's (`caller`
+    class), and the CIF reader and writer question is #1600's item 3. It is a
+    file-format decision, not this WP's.
+  - (e) the skill reading rule: **holds**.
+
+  *Gotchas.*
+  - `tests/test_gui_help.py` rewrites `tests/data/gui/help_keys.json` when
+    it is stale. On pearl that left the job tree dirty, and a
+    `git checkout --detach` to the next commit failed silently inside a
+    chained command. Check the tree's `git log -1` before starting a job.
+  - WP-1532's runner edits the same skill references. This branch adds one
+    row to `references/diagnostics.md` and regenerates `api.md` for
+    `Phase`'s new field. A conflict there is resolved by regenerating
+    (`docs/skill/make_api_index.py`, then `rietx skill --install . --copy`).
+
+  *Next.*
+  1. The maintainer rules on the schema additions (six result fields, one
+     `Phase` field) and the new code, then merges or asks for changes.
+  2. If they want it, WP-2073 picks up the export columns from its new
+     Inherited entry.
+  3. #1600 holds the rest. Its items 3 (CIF Z) and 5 (the definitional-esd
+     convention) are the maintainer's calls.
 
 - **2026-09-03** — created, from the 2026-09-03 issue triage (issue #235).
   Given its own WP rather than folded into 1320 because it adds a diagnostic
