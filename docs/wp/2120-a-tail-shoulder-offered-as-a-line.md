@@ -113,8 +113,22 @@ second family has three such components in all, too few to measure the rule on.
 - [x] Measure both classes on a second instrument family: count `axial_tail` ∧
       `position_at_bound` usable components and their distance to the lattice, and the
       usable window-edge re-seeds and whether a neighbouring group already holds their line.
-- [ ] Decide, per class, whether it leaves `usable()`, is undriven only
+- [x] Decide, per class, whether it leaves `usable()`, is undriven only
       (`PEAK_UNDRIVEN_FLAGS`), or stays. Record as `Decided YYYY-MM-DD:`.
+      **Decided 2026-11-16 (class 1): it leaves `usable()`.** A new flag, `tail_shoulder`,
+      is raised on the conjunction and is in `PEAK_UNUSABLE_FLAGS`, while neither flag
+      alone moves. The rule is no bar of ours: it combines two existing flags, and the
+      acceptance above sets the outcome. Task 1 found every such component on three lab
+      families to be its mate's own tail. Undriven-only was weighed and rejected: it keeps
+      the shoulder in scoring, so every candidate would be charged for not indexing a
+      "line" that is the strong line's tail. That is the case `PEAK_UNUSABLE_FLAGS`
+      exists for (`not_separable`'s "a shape, not a line"). It is still a new judgement
+      (tier 3) and a reader-output change, so it goes to the maintainer.
+      **Not decided (class 2): it stays usable, and the question goes to the maintainer.**
+      Placing it needs a bar the WP does not set: how near a window's edge a re-seed must
+      sit (WP-2055's 0.25 seed FWHM was a census window, not a rule). On the round robin
+      that bar would also take six on-lattice lines no other group holds. The second
+      family has three such components, too few to measure on.
 - [ ] Land it, with `tests/test_acceptance_indexing.py` green.
 - [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
 - [ ] Skill: the `axial_tail` or `PEAK_POSITION_AT_BOUND` reference row if what a reader

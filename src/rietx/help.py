@@ -1520,7 +1520,8 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "shoulder on the axial-divergence tail of a much stronger line ends here "
             "too, because the peak shape does not carry all of that tail. That tail is "
             "on the low-2θ side below 90° and the high-2θ side above it. One also "
-            "flagged `axial_tail` often is such a shoulder."
+            "flagged `axial_tail` is treated as such a shoulder: it is flagged "
+            "`tail_shoulder` and is unusable."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(
@@ -1562,7 +1563,7 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "points to. That side is low 2θ below 90° and high 2θ above it. The screen "
             "looks on one side only, because nothing else in a powder pattern flips "
             "sign at 90°. The line stays usable, since a real line can coincide with a "
-            "tail."
+            "tail, unless it also sits on its position bound (`tail_shoulder`)."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),
@@ -1650,6 +1651,19 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "line of the phase that set the width law. It stays in the list and is "
             "unusable."
         ),
+    ),
+    "tail_shoulder": HelpEntry(
+        title="A stronger line's tail, at no position of its own",
+        label="tail shoulder",
+        description=(
+            "The component carries both `axial_tail` and `position_at_bound`. It is a weak "
+            "shoulder on the axial-divergence tail side of a much stronger component in its "
+            "group, and the fit pushed it to its position bound, so the data did not fix "
+            "a position for it. On three laboratory instruments every such component sat "
+            "below the stronger line's own reflection. It stays in the list as part of "
+            "that line's shape and is unusable."
+        ),
+        anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),
 }
 
@@ -3782,7 +3796,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "Weak components lie within 3.5 FWHM of a stronger group-mate on the side "
             "axial divergence points. They may be real lines and are reported rather "
-            "than removed."
+            "than removed, except those the fit also pushed to their position bound, "
+            "which are flagged `tail_shoulder` and are unusable."
         ),
         anchor="theory/profiles.html#finger-cox-jephcoat-axial-divergence",
     ),

@@ -82,18 +82,22 @@ def test_the_census_on_the_reproducer_does_not_move(flat_si):
     two agree.  (Until WP-2002 closed the picker's fits at the closing
     stage's wider peak windows, #1085, the pair was (23, 17) with 10, 5, 6 and
     2 flags; the wider windows let components that ended on a bound or on zero
-    land elsewhere.)"""
+    land elsewhere.)  WP-2120 took the one usable ``tail_shoulder``, 35.31°,
+    out of ``usable()``: it is 0.095° (2.7 FWHM) below the 35.41° silicon line,
+    so no line's count moved.  It was ``weak_line`` too, and the false-discovery
+    screen reads only usable components, so ``weak_line`` went from 5 to 4."""
     _, _, pl, _ = flat_si
     use = pl.usable()
     tt = np.array([p.two_theta for p in use])
     fw = np.array([max(p.fwhm, 0.025) for p in use])
     per = [int(np.sum(np.abs(tt - t) <= fw)) for t in _si_lines()]
-    assert (len(pl.peaks), len(use)) == (20, 16)
+    assert (len(pl.peaks), len(use)) == (20, 15)
     assert per == [1, 1, 1, 2, 1, 3, 1, 1, 1, 1, 1]
     counts = {f: len(_flagged(pl, f)) for f in
-              ("position_at_bound", "no_intensity", "weak_line", "width_capped")}
+              ("position_at_bound", "no_intensity", "weak_line", "width_capped",
+               "tail_shoulder")}
     assert counts == {"position_at_bound": 7, "no_intensity": 3,
-                      "weak_line": 5, "width_capped": 1}
+                      "weak_line": 4, "width_capped": 1, "tail_shoulder": 3}
 
 
 def test_every_position_bound_hit_is_named_with_its_windows_bound(flat_si):

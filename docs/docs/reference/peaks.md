@@ -107,8 +107,8 @@ Q rather than d or 2θ is the working coordinate, because Q is linear in the rec
 
 ### The flags
 
-`ObservedPeak.flags` holds members of a closed vocabulary of nineteen.
-Ten take a line out of `PeakList.usable`; the other nine report evidence and leave it in.
+`ObservedPeak.flags` holds members of a closed vocabulary of twenty.
+Eleven take a line out of `PeakList.usable`; the other nine report evidence and leave it in.
 [Peak flags](settings.md#peak-flags) gives each flag's meaning as the GUI shows it.
 
 | Flag | Written when | Usable? |
@@ -123,6 +123,7 @@ Ten take a line out of `PeakList.usable`; the other nine report evidence and lea
 | `duplicate_line` | a better-measured component of another group already fitted this line | no |
 | `unresolved_split` | the component sits closer than Sparrow's limit to a comparable group-mate, which reports the pair as one line with an esd reaching both | no |
 | `width_capped` | the group's width ran into its bound: a hump, not a line | no |
+| `tail_shoulder` | the line carries both `axial_tail` and `position_at_bound`: a stronger line's tail, at no position the data fixed | no |
 | `sigma_assumed` | σ was supplied rather than fitted (every line of a list built from positions) | yes |
 | `unresolved_shoulder` | the fit never pulled the component more than half a FWHM from a group-mate | yes |
 | `position_at_bound` | the position ran into its bound, half a seed FWHM from where detection put it | yes |
@@ -137,6 +138,7 @@ A contamination line is flagged and left out, never subtracted, because strippin
 
 The evidence flags leave a line in because one pattern cannot say what the line is.
 A real reflection can stand on an extrapolated background, on a stronger line's axial tail or at a predicted Kα2 position, and on the certified laboratory patterns a component under the false-discovery bar is often a real weak line the certified cell indexes.
+Two of them together are another matter: a component on a stronger line's axial tail that the fit also pushed to its position bound is flagged `tail_shoulder` and left out, because on three laboratory instruments every such component sat below the stronger line's own reflection.
 
 `weak_line` sits between the two groups.
 A search is driven by the strongest usable lines and scores a candidate against every usable line, and every line a search is driven by is one an accepted cell must index.
