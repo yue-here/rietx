@@ -27,6 +27,15 @@ a = 0.415 682 6 nm ± 0.000 008 nm at 22.5 °C, expanded uncertainty k = 2, that
 `tests/test_acceptance_srm660c.py` already uses (`A_REFERENCE`). The reporter derived
 the 11 ppm correction from the CIF's own cell and the certificate's (α = 6.7e-6 K⁻¹),
 not from Sirota et al. (1998), which the certificate cites; check it against Sirota.
+*Checked in part, 2026-11-16:* the arithmetic holds. 4.156826 → 4.156780 Å over
+22.5 → 20.85 °C is 11.07 ppm, an α of 6.71e-6 K⁻¹, and 4.156826 × (1 − 6.7e-6 × 1.65)
+= 4.156780 Å. The data block's CIF records `_cell_length_a 4.156780` at
+`_pd_spec_temperature 20.85` (`tests/data/nist_srm660c_100a.cif` lines 65 and 98),
+so the value is NIST's own, as stated. The comparison with Sirota's LaB6 a(T) is
+**not checked**: the paper is not held. The likely match on Crossref is Sirota,
+Novikov, Vinokurov & Paderno, Phys. Solid State 40(11), 1856-1858 (1998),
+doi:10.1134/1.1130671, to be confirmed against the certificate's reference list, which
+our note on the certificate does not transcribe. It is on a contributor's fetch list.
 
 **Measured by the reporter** (main `44de0f62a`; not re-run in triage):
 
@@ -79,6 +88,7 @@ error: `tests/validation_matrix.py` lines 509 and 3096 ("+-8e-6", rendered into
 
 - [x] Correct the five quotations of the certificate's uncertainty (eight, see Context).
 - [ ] Check the temperature correction against Sirota et al. (1998); record the value.
+      Arithmetic and the CIF checked 2026-11-16 (Context); Sirota is not held, so open.
 - [ ] The test: both modes under the NIST protocol within 50 ppm of 4.156780 Å; Pawley
       and Le Bail agree within the esd; the λ × (1 ± 1e-4) positive arm fails the bar
       and the null arm passes. Shares the `srm660c` xdist group. obs/calc/diff PNGs to
@@ -105,7 +115,8 @@ error: `tests/validation_matrix.py` lines 509 and 3096 ("+-8e-6", rendered into
   doi:10.1017/S0885715620000068 (the certification).
 - Cline, J. P. et al. (2015). J. Res. NIST 120, 173, doi:10.6028/jres.120.013 (the
   instrument).
-- Sirota, N. N. et al. (1998), cited by the certificate for LaB6's expansion.
+- Sirota, N. N. et al. (1998), cited by the certificate for LaB6's expansion; likely
+  Phys. Solid State 40(11), 1856-1858, doi:10.1134/1.1130671 (not held, not confirmed).
 
 ## Handover log
 
