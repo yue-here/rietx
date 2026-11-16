@@ -1,6 +1,6 @@
 # WP-2024 — A Parameters list under each call: the format, the gate, and the Refinement calls
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: — (2023 soft: either order works; both edit the same pages' rendering)
 Priority: P3 2026-10-23 — a reference that names every argument and explains a fifth of them; reading the source is the workaround
