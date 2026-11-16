@@ -80,6 +80,36 @@ npm --prefix gui test && npm --prefix gui run check
 
 - WP-1011 (a held row gets no checkbox), WP-1014 (what the table owns).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The refine flag where the model is read** (WP-1214, `Model.svelte`,
+`lib/table.ts`, `session.export`). Four rules. **A flag is set beside the value
+it is about**: the Model panel draws the parameter table's own vary control on
+every value it shows, one `set_vary` node per path, in the *same* `PATCH
+/api/params` as the value edits and **before** the model patches — a whole-model
+PATCH carries whatever `vary` the model it was built from had, so a flag set
+after that read is reverted by it. **The held marks are one vocabulary and there
+were four**: `heldGlyph` is in `lib/table.ts` because two panels draw it, and the fourth
+(`needs_held_cell`) had worn the mode-fixed mark since it arrived, the glyph being a ternary
+whose last arm caught everything — so an unknown reason still draws a mark, an
+empty box reading as a control that failed to render, and
+`test_gui_server.py` reads the fields `ParameterRow.refinable` tests **and `lib/table.ts`'s
+own branches**, so a sixth fails on both sides (it checked only python until WP-1435's `held`
+tripped the wire with nothing behind it). **A field's parameter path is not always its model path prefixed** — `source.polarization` is `instrument.polarization` in θ — so
+`Field.param` carries it and `fieldParam` is what every lookup asks; unprefixed,
+that field rendered off the model, applied past `set_values`' bounds, and had no
+row for a flag to act on. And **an export is gated on what it describes**:
+`instrument_profile` is answered from the project where the rest of the family
+needs a result, `_EXPORT_MODEL_ONLY` declaring the exception so the stricter
+gate stays the default. One more browser trap and it is a width: a rule aimed at
+the value reaches the control beside it, and `.cellrow input { width: 100% }`
+drew the esd next to the box at zero width.
+
 ## Handover log
 
 - **2026-08-28** — Refinement flags can be set where a crystallographer reads

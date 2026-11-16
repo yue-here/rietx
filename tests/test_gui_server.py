@@ -405,6 +405,19 @@ def test_the_built_app_is_served_and_plotly_is_not(blank):
     assert client.get("/assets/nope.js")[0] == 404
 
 
+def test_the_rebuilt_page_is_served_beside_todays(blank):
+    """`/next` serves the rebuild's page (WP-2215) and `/` stays today's."""
+    _, client = blank
+    for path in ("/next", "/next/"):
+        status, payload = client.get(path)
+        assert status == 200
+        assert 'src="/assets/next.js"' in payload["raw"]
+        assert "/assets/app.js" not in payload["raw"]
+    assert 'src="/assets/app.js"' in client.get("/")[1]["raw"]
+    assert client.get("/assets/next.js")[0] == 200
+    assert client.get("/assets/next.css")[0] == 200
+
+
 def test_the_placeholder_explains_itself_when_the_dist_is_absent(blank, tmp_path,
                                                                 monkeypatch):
     """A checkout without the built assets must still say what is going on."""
@@ -447,6 +460,142 @@ def test_new_open_and_recent_round_trip(blank, tmp_path, pattern_file):
 
     status, payload = client.post("/api/project/open", {"path": str(tmp_path)})
     assert status == 400 and payload["error"]["code"] == "PROJECT_ERROR"
+
+
+def test_a_moved_project_stays_on_the_recent_list_until_removed(tmp_path, pattern_file):
+    """The start screen lists a moved project as "Not found" beside Locate…
+    and Remove from list (WP-2131), so the list keeps it and says so, and
+    carries each phase with its space group as written at the last open."""
+    session = GuiSession(state_dir=tmp_path / "state")
+    kept, moved = tmp_path / "kept.rex", tmp_path / "moved.rex"
+    for root in (kept, moved):
+        _project(root, pattern_file)
+        session.project_open({"path": str(root)})
+    session.close()
+    moved.rename(tmp_path / "elsewhere.rex")
+
+    other = GuiSession(state_dir=tmp_path / "state")
+    rows = {Path(r["path"]).name: r for r in other.recent()}
+    assert rows["moved.rex"]["missing"] is True
+    assert rows["kept.rex"]["missing"] is False
+    phase = rx.Project.open(kept).refinement.structure.phases[0]
+    assert rows["kept.rex"]["phases"] == [[phase.name, phase.space_group]]
+
+    httpd = _start(other)
+    try:
+        status, payload = Client(httpd.server_address[1]).post(
+            "/api/recent/remove", {"path": str(moved)})
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert status == 200
+    assert [Path(r["path"]).name for r in payload["recent"]] == ["kept.rex"]
+    # removing what the list does not hold changes nothing and is no error
+    assert other.recent_remove({"path": str(moved)})["recent"] == payload["recent"]
+    assert (tmp_path / "elsewhere.rex" / "project.json").is_file()  # untouched
+    other.close()
+
+
+def test_a_launch_reopens_the_last_project_or_stays_on_the_start_screen(
+        tmp_path, pattern_file):
+    """VS Code's and JetBrains' rule, adopted in round 9 (WP-2131): a launch
+    with no project named returns to the last one, and a head that has moved
+    leaves the session empty rather than failing the launch."""
+    state = tmp_path / "state"
+    root = tmp_path / "last.rex"
+    _project(root, pattern_file)
+    first = GuiSession(state_dir=state)
+    first.project_open({"path": str(root)})
+    first.close()
+
+    again = GuiSession(state_dir=state)
+    assert again.reopen_last() == str(root)
+    assert again.project is not None and again.project.path == root
+    again.close()
+
+    root.rename(tmp_path / "gone.rex")
+    empty = GuiSession(state_dir=state)
+    assert empty.reopen_last() is None and empty.project is None
+    assert GuiSession(state_dir=tmp_path / "fresh").reopen_last() is None
+
+
+def test_rietx_gui_with_no_project_reopens_the_last_one(cli, tmp_path, pattern_file):
+    main, seen = cli
+    state = tmp_path / "state"
+    root = tmp_path / "last.rex"
+    _project(root, pattern_file)
+    first = GuiSession(state_dir=state)
+    first.project_open({"path": str(root)})
+    first.close()
+    assert main(["--no-open", "--state-dir", str(state)]) == 0
+    assert seen["session"].project.path == root
+
+
+def test_a_list_of_structure_forms_is_one_structure(blank, tmp_path, pattern_file):
+    """The New project dialog lists several phases (WP-2131): the structure
+    argument takes a list of the other forms, concatenated in order, and a
+    typed cell anywhere in it refuses rietveld as a lone one does."""
+    session, client = blank
+    cells = [{"space_group": "P m -3 m", "cell": {"a": 4.160}, "name": "LaB6"},
+             {"space_group": "F m -3 m", "cell": {"a": 5.463}, "name": "CaF2"}]
+    body = {"pattern": str(pattern_file), "structure": cells,
+            "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}}
+    status, payload = client.post("/api/project/new", {
+        **body, "path": str(tmp_path / "rv.rex"), "mode": "rietveld"})
+    assert status == 400 and payload["error"]["where"] == ["mode"]
+    status, payload = client.post("/api/project/new", {
+        **body, "path": str(tmp_path / "two.rex"), "mode": "lebail"})
+    assert status == 200, payload
+    assert payload["n_phases"] == 2
+    assert [p.name for p in session.project.refinement.structure.phases] \
+        == ["LaB6", "CaF2"]
+
+
+def test_unnamed_typed_cells_in_one_create_get_distinct_names(blank, tmp_path,
+                                                              pattern_file):
+    """The dialog sends no name for a typed cell, and two of them were both
+    "phase" (WP-2131 review finding 8). In a list each unnamed one takes its
+    place in the joined list, phase_N as the CIF reader names an unnamed
+    block; a name given is kept, and a lone cell stays "phase"."""
+    session, client = blank
+    cells = [{"space_group": "P m -3 m", "cell": {"a": 4.160}},
+             {"space_group": "F m -3 m", "cell": {"a": 5.463}, "name": "CaF2"},
+             {"space_group": "F m -3 m", "cell": {"a": 5.431}}]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells, "mode": "lebail",
+        "path": str(tmp_path / "three.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] \
+        == ["phase_1", "CaF2", "phase_3"]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells[0], "mode": "lebail",
+        "path": str(tmp_path / "one.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] == ["phase"]
+
+
+def test_a_species_refused_in_a_list_names_its_place_in_the_project(
+        blank, tmp_path, pattern_file):
+    """The list form joins its members before the species check, so a refused
+    atom's path carries its phase index in the joined list, never in its own
+    form: the second member's atom is phases.1, not phases.0."""
+    from rietx.schemas.structure import lebail_scaffold
+
+    _session, client = blank
+    bad = lebail_scaffold("F m -3 m", [5.463, 5.463, 5.463, 90, 90, 90],
+                          name="bad").model_dump(mode="json")
+    bad["phases"][0]["atoms"][0]["species"] = "Xx"
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "mode": "lebail",
+        "structure": [{"space_group": "P m -3 m", "cell": {"a": 4.160}}, bad],
+        "path": str(tmp_path / "species.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 400, payload
+    assert payload["error"]["code"] == "UNKNOWN_SPECIES"
+    assert payload["error"]["where"] == ["phases.1.atoms.0.species"]
+    assert not (tmp_path / "species.rex").exists()   # refused before anything is made
 
 
 def test_new_refuses_an_instrument_it_would_have_to_guess(blank, tmp_path,
@@ -2046,6 +2195,32 @@ def test_plan_resolve_is_the_ladder_a_cumulative_plan_climbs(blank, tmp_path,
     assert all(h["held_because"] for h in cell["held"])
     tied = next(h for h in cell["held"] if h["path"] == "phases.0.cell.b")
     assert tied["held_because"].startswith("tied: =")
+
+
+def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
+    """A stage's ``turn_off`` (WP-2208): ``fixes`` names the free paths it took,
+    the free count falls by them, and the buckets still partition the frees."""
+    session, client = blank
+    _open(session, tmp_path / "fixes.rex", pattern_file)
+    plan = {"stages": [
+        {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
+                                    "instrument.zero_shift"]},
+        {"name": "two", "turn_on": ["phases.*.cell.*"],
+         "turn_off": ["instrument.zero_shift"]}]}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
+    ladder = _ladder(client)
+    one, two = ladder["stages"]
+    # the closing stage keeps the fix, as a literal path
+    assert ladder["closing"]["fixes"] == ["instrument.zero_shift"]
+    assert one["fixes"] == [] and "instrument.zero_shift" in one["frees"]
+    assert two["fixes"] == ["instrument.zero_shift"]
+    assert two["turn_off"] == ["instrument.zero_shift"]
+    assert two["n_free"] == one["n_free"] + len(two["frees"]) - 1
+    for stage in (one, two):
+        assert (len(stage["frees"]) + len(stage["already"]) + len(stage["held"])
+                == stage["n_matched"]), stage["name"]
 
 
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,
@@ -4640,3 +4815,212 @@ def test_plan_resolve_force_fixes_a_column_a_tie_drives(blank, tmp_path,
     # and the row agrees with the panel, being the same test
     rows = {r.path: r for r in ref.parameters(mode="lebail")}
     assert rows["vars.B"].mode_fixed and not rows["vars.B"].refinable
+
+
+def test_the_parameters_panel_holds_limits_and_restrains_through_one_patch(
+        blank, tmp_path, pattern_file):
+    """WP-2126: ``hold``, ``limits`` and ``restraints`` ride ``PATCH /api/params``.
+
+    The panel's Apply is one round trip, so the three arms the padlock and the
+    value popover need are verbs of that route.  A limit typed with a value
+    lands in one ``edit_model`` node, because pydantic checks the value
+    against its limits as one object; a restraint is a ``ValueRestraint`` on
+    the phase its path names, and ``null`` removes it.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "panel.rex", pattern_file)
+    path = "phases.0.cell.a"
+    before = len(project.history)
+
+    status, payload = client.patch("/api/params", {"hold": {path: True}})
+    assert status == 200, payload
+    assert payload["changed"]["hold"][path] == [path]
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert row["held"] and not row["refinable"]
+
+    # release and free in one call: the unhold runs before the vary flag
+    status, payload = client.patch("/api/params", {"hold": {path: False},
+                                                   "vary": {path: True}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert not row["held"] and row["vary"]
+
+    # a value outside the old limits is admitted by the limits sent with it
+    status, payload = client.patch("/api/params", {
+        "limits": {path: [4.0, None]}, "values": {path: 4.25}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert (row["lo"], row["hi"]) == (4.0, "Infinity")
+    assert row["value"] == pytest.approx(4.25)
+    assert payload["changed"]["values"] == [path]
+
+    status, payload = client.patch("/api/params", {
+        "restraints": {path: {"target": 4.16, "sigma": 0.01}}})
+    assert status == 200, payload
+    restraints = project.refinement.structure.phases[0].restraints
+    assert [(r.path, r.target, r.sigma) for r in restraints] == [(path, 4.16, 0.01)]
+    status, payload = client.patch("/api/params", {"restraints": {path: None}})
+    assert status == 200, payload
+    assert project.refinement.structure.phases[0].restraints == []
+
+    kinds = [n.action.kind for n in project.history.nodes.values()][before:]
+    assert kinds == ["set_hold", "set_hold", "set_vary", "edit_model",
+                     "edit_model", "edit_model"]
+
+
+def test_a_limit_the_model_cannot_store_is_refused_by_name(blank, tmp_path,
+                                                          pattern_file):
+    """A crossed pair and a path with no stored limits are refusals, not 500s."""
+    session, client = blank
+    project = _open(session, tmp_path / "limits.rex", pattern_file)
+    before = len(project.history)
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": [5, 4]}})
+    assert status == 400, payload
+    assert "above the upper" in payload["error"]["message"]
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.atoms.9.biso": [0, 1]}})
+    assert status == 400, payload
+    assert "stores no limits" in payload["error"]["message"]
+    # a word where a number goes, and a list where a map goes, are 400s too
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": ["x", 5]}})
+    assert status == 400, payload
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params", {"values": [1, 2]})
+    assert status == 400, payload
+    assert len(project.history) == before
+    # the table's polarization is the model's source.polarization
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"instrument.polarization": [0, 1]}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"]
+               if r["path"] == "instrument.polarization")
+    assert (row["lo"], row["hi"]) == (0.0, 1.0)
+
+
+
+def _untouched(project) -> tuple:
+    """What a refused request must leave as it was: the head, the history, the
+    models and the declarations the verbs write (WP-2126)."""
+    ref = project.refinement
+    return (ref._head_id, len(project.history), dict(project.history.refs),
+            ref.structure.model_dump(mode="json"),
+            ref.instrument.model_dump(mode="json"),
+            sorted(ref._user_holds), list(ref._free_paths))
+
+
+def test_a_refused_params_patch_applies_none_of_its_arms(blank, tmp_path,
+                                                         pattern_file):
+    """One ``PATCH /api/params`` is all or nothing (WP-2126).
+
+    Each arm commits its own node, in the route's order: limits and restraints,
+    unholds, values, vary, holds.  A refusal in a later arm used to leave the
+    earlier arms' nodes in the history and their changes in the model.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "whole.rex", pattern_file)
+    held = "phases.0.atoms.0.biso"
+    assert client.patch("/api/params", {"hold": {held: True}})[0] == 200
+    before = _untouched(project)
+
+    # the value lands first, then freeing the held literal refuses
+    status, payload = client.patch("/api/params", {
+        "values": {"phases.0.cell.a": 4.17}, "vary": {held: True}})
+    assert status == 400, payload
+    assert "unhold it first" in payload["error"]["message"]
+    assert payload["error"]["where"] == [held]
+    assert _untouched(project) == before
+    assert payload["error"]["details"][0] == {"arm": "vary", "where": [held]}
+
+    # the limits-and-restraints node commits first, then a tied value refuses
+    status, payload = client.patch("/api/params", {
+        "limits": {"phases.0.cell.a": [4.0, 4.3]},
+        "restraints": {"phases.0.cell.a": {"target": 4.16, "sigma": 0.01}},
+        "values": {"phases.0.cell.b": 4.2}})
+    assert status == 400, payload
+    assert "follows" in payload["error"]["message"]
+    assert _untouched(project) == before
+    assert payload["error"]["details"][0]["arm"] == "values"
+
+    # an unhold of a path nobody held refuses after the limits node
+    status, payload = client.patch("/api/params", {
+        "limits": {"phases.0.cell.a": [4.0, 4.3]},
+        "hold": {"phases.0.cell.a": False}})
+    assert status == 400, payload
+    assert payload["error"]["details"][0]["arm"] == "hold"
+    assert _untouched(project) == before
+
+    # and the same arms without the refused one land, one node each
+    status, payload = client.patch("/api/params", {
+        "values": {"phases.0.cell.a": 4.17}, "vary": {"phases.0.cell.a": True}})
+    assert status == 200, payload
+    assert len(project.history) == before[1] + 2
+
+
+def test_a_refused_settings_patch_changes_no_setting(blank, tmp_path,
+                                                     pattern_file):
+    """``POST /api/project`` validates every setting before writing any (WP-2126).
+
+    Written straight into the live document, a refused region left the mode
+    sent with it in place, unsaved, for the next save to persist.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "settings.rex", pattern_file)
+    on_disk = (project.path / "project.json").read_text(encoding="utf-8")
+    before = project.doc.model_dump(mode="json")
+    for body in ({"mode": "pawley", "excluded_regions": [[30.0, 20.0]]},
+                 {"mode": "pawley", "two_theta_limits": [40.0, 10.0]},
+                 {"ui": {"k": 1}, "excluded_regions": [5.0]},
+                 {"mode": "not-a-mode"}):
+        status, payload = client.post("/api/project", body)
+        assert status == 400, (body, payload)
+        assert project.doc.model_dump(mode="json") == before, body
+        assert project.data.excluded_regions == list(project.doc.excluded_regions)
+    assert (project.path / "project.json").read_text(encoding="utf-8") == on_disk
+    status, payload = client.post("/api/project", {
+        "mode": "pawley", "excluded_regions": [[20.0, 30.0]]})
+    assert status == 200, payload
+    assert project.doc.mode == "pawley"
+    assert project.data.excluded_regions == [(20.0, 30.0)]
+
+
+def test_a_refused_branch_name_leaves_the_head_where_it_was(blank, tmp_path,
+                                                           pattern_file):
+    """``POST /api/history/branch`` tags before it checks out (WP-2126).
+
+    The tag is the half that refuses, so a refused name moves no head.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "branch.rex", pattern_file)
+    root = project.refinement._head_id
+    assert client.patch("/api/params",
+                        {"values": {"phases.0.cell.a": 4.17}})[0] == 200
+    before = _untouched(project)
+    status, payload = client.post("/api/history/branch",
+                                  {"node_id": root, "name": "head"})
+    assert status == 404, payload
+    assert "reserved" in payload["error"]["message"]
+    assert _untouched(project) == before
+
+
+def test_a_refused_text_apply_runs_none_of_its_verbs(blank, tmp_path,
+                                                     pattern_file):
+    """``textdoc.apply`` rehearses its two refusing verbs first (WP-2126).
+
+    ``changes`` already refuses freeing a held row by its ``refinable``, so
+    this hands ``apply`` the delta directly: the all-or-nothing promise is
+    ``apply``'s own, and it no longer rests on the two checks agreeing.
+    """
+    from rietx.gui import textdoc as td
+
+    session, client = blank
+    project = _open(session, tmp_path / "text.rex", pattern_file)
+    held = "phases.0.atoms.0.biso"
+    assert client.patch("/api/params", {"hold": {held: True}})[0] == 200
+    before = _untouched(project)
+    delta = td.Delta(values={"phases.0.cell.a": 4.17}, vary={held: True})
+    with pytest.raises(ValueError, match="unhold it first"):
+        td.apply(project, delta)
+    assert _untouched(project) == before

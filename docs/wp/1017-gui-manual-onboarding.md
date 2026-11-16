@@ -145,6 +145,37 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-0604's manual architecture (fenced constants, `*Source:*` lines,
   cited-bib guard) — the machinery these chapters extend.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The manual is held to this app, and two of its vocabularies by test**
+(WP-1017, `docs/docs/**/gui-*.md`, `tests/test_gui_manual.py`). The GUI is
+documented and no longer beta; its **routes stay provisional by declaration**,
+which is the half of that status the chapters did not retire. Four rules.
+**Routes and panel names are partitioned** the way `tests/api_surface.py`
+partitions the call surface — every route documented in a chapter or excluded
+with a written reason, every tab in the strip named — and each tightens **both
+ways**, so a chapter naming a route the server does not serve fails too: that is
+WP-1037's bug pointed at the reader. **Where no python object knows the fact,
+the authorities swap**: nothing here knows the panels exist, so the strip is
+data in `lib/tabs.ts`, `tabs.test.ts` writes `tests/data/gui/panels.json` and
+pytest reads it — the fnmatch mechanism run backwards, and it keeps the python
+suite node-free. **A screenshot is generated**, by `docs/docs/
+make_screenshots.py` driving this server in-process over a shipped example;
+that script is the one authority for how each was taken, its `SHOTS` table is
+what a chapter may reference, and a picture is judged by **looking at it** —
+never by a digest, which a re-render breaks. Note `*.png` in `.gitignore` has
+swallowed a committed image family three times now, so the negation is asserted
+rather than remembered. And **a first-run aid states what is true, not what was
+remembered**: the checklist's steps are derived from the project, so an undone
+fit un-ticks `Run`, and only the dismissal is persisted — nothing is written
+when the last step completes, because a surprise write is the wrong thing to do
+during a first session.
+
 ## Handover log
 
 - **2026-08-28** — **the GUI has a manual, and the manual has guards that fail

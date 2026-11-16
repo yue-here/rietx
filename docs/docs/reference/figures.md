@@ -161,6 +161,9 @@ The crop is part of the fit, so `atoms`, `letters`, `to_px` and `recipe` stay ri
 | `axis_labels` | `True` | the a, b and c on the cell's edges |
 | `atom_labels` | `False` | each site's label beside its atom |
 | `outline` | `False` | inks the silhouettes, which the GUI does not |
+| `depth_cue` | `False` | fades each surface toward the background with its depth, as the GUI's toggle does; needs an opaque `background` |
+| `planar_rings` | `False` | `True` fills each flat ring of five or six bonded atoms in grey, as the GUI's "fill planar rings" does; a `"#rrggbb"` fills them in that colour |
+| `faces` | none | atom sets to fill, each a mask from `rietx.viz.select` or `rietx.viz.figure3d.cut`'s `plane`, `sphere` or `component`, or a `(mask, "#rrggbb")` pair |
 | `background` | `"white"` | `"white"`, `"black"`, `"#rrggbb"`, three channels from 0 to 1, or `None` for transparent |
 | `bond_tolerance` | 1.15 | the bond threshold, as a multiple of the sum of the two atoms' radii |
 | `max_atoms` | 400 | the most atoms the cell may draw, its face copies included |
@@ -177,6 +180,20 @@ One site is left out by a mask instead ([Drawing part of the structure](#drawing
 
 `cell=False` fits the view to the atoms alone.
 A 22 Å sphere cut from HKUST-1's 26 Å cell draws at 8.5 px/Å with the frame and at 16.4 px/Å without it, at `size=400`.
+
+`depth_cue=True` blends each surface toward the background, from none half-way back through the drawn atoms to 0.7 of the way at the rearmost.
+The ramp follows the view as it turns.
+On a transparent background there is no colour to blend toward, so the call raises.
+
+`planar_rings=True` fills a ring only where it is flat.
+A ring is a cycle of five or six drawn bonds whose atoms lie within 0.1 Å of their mean plane.
+Benzene and pyridine rings on disk sit within 0.025 Å, and cyclohexane chairs at 0.226 Å or more.
+The test is geometric and says nothing about aromaticity, which a CIF without bond orders cannot tell.
+A ring that a cell edge cuts closes only in a block, so draw `build(structure, extent=((0, 2), (0, 2), (0, 2)), max_atoms=2000)`.
+An atom with more than four drawn bonds joins no ring, which keeps the search fast on close-packed metals and leaves out a chelate ring through its metal.
+`faces=[mask]` fills the atoms a mask selects.
+A set within 0.1 Å of one plane is drawn as the convex polygon around it, and any other set as its convex hull.
+An atom the picture does not draw is left out of the face, and the report's `warnings` says how many were.
 
 From a structure, the cell is drawn whole or the call raises.
 `max_atoms` bounds the cell's own atoms with their copies on its faces, and a cell past it raises and names its count.
