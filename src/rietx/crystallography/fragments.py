@@ -67,6 +67,14 @@ references which lines each line's internals can move.  Nothing here refines:
 the parameters, their paths and their composition with a body's pose are the
 rigid-body table's.
 
+**XYZ** (:func:`from_xyz`, :func:`read_xyz`) is the bare molecular format:
+an atom count, a comment line, then one line per atom holding its element and
+its Cartesian coordinates in Å.  It states nothing else (no cell, no bond, no
+bond order, no symmetry), so a fragment read from it declares the bonds its
+caller passes and no others, and a coordinate-only file is untrusted for an
+aromatic or multiple-bond body until those are declared.  One frame is read;
+a file holding several is refused rather than cut.
+
 Internal: nothing here is exported from ``rietx.crystallography`` or
 ``rietx``.  Lengths are in Å and the Z-matrix's angles and dihedrals, which a
 caller types, in degrees.
@@ -77,7 +85,9 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
+import gemmi
 import numpy as np
 
 #: The Z-matrix species of a dummy point: placed, used as a reference, then
@@ -524,3 +534,79 @@ def from_zmatrix(lines: Sequence[Sequence], bonds=None) -> Fragment:
     xyz = np.array([pos[i] for i in keep]).reshape(-1, 3)
     return Fragment(tuple(species[i] for i in keep), xyz,
                     None if declared is None else tuple(declared))
+
+
+def from_xyz(text: str, bonds=None, *, source: str = "XYZ text") -> Fragment:
+    """A fragment from the text of a bare XYZ file: one frame, Å, Cartesian.
+
+    The format (module docstring, "XYZ"): line 1 is the atom count, line 2 a
+    comment, which is ignored, and each of the next ``count`` lines holds an
+    element and three Cartesian coordinates in Å, separated by whitespace.  An
+    element may be a symbol, kept as written, or an atomic number 1–118, read
+    as its symbol.  Blank lines after the frame are allowed.
+
+    ``bonds`` are declared by the caller as pairs of 0-based atom indices in
+    file order (:class:`Fragment`); a file states none, and none is inferred.
+    ``source`` only names the text in the refusals (:func:`read_xyz` passes
+    the path).
+
+    Refusals (``ValueError``, naming ``source`` and the line): a first line
+    that is not a non-negative integer count, fewer atom lines than the count,
+    an atom line with other than four fields or a coordinate that is not a
+    finite number, an atomic number outside 1–118, and anything but blank
+    lines after the frame, which is a second frame or a miscount: this reader
+    takes one frame.
+    """
+    lines = text.splitlines()
+    if not lines or not lines[0].strip():
+        raise ValueError(f"{source}: line 1 must hold the atom count; it is empty")
+    head = lines[0].split()
+    try:
+        count = int(head[0])
+    except ValueError:
+        count = -1
+    if len(head) != 1 or count < 0:
+        raise ValueError(f"{source}: line 1 must hold the atom count, a "
+                         f"non-negative integer; it reads {lines[0].strip()!r}")
+    body = lines[2:2 + count]
+    if len(body) < count:
+        raise ValueError(f"{source}: line 1 counts {count} atoms but the file "
+                         f"has {len(body)} atom lines after the comment line")
+    species: list[str] = []
+    xyz: list[tuple[float, float, float]] = []
+    for k, line in enumerate(body):
+        where = f"{source}, line {k + 3}"
+        fields = line.split()
+        if len(fields) != 4:
+            raise ValueError(f"{where}: an atom line holds an element and three "
+                             f"coordinates (4 fields); it has {len(fields)}: "
+                             f"{line.strip()!r}")
+        element = fields[0]
+        if element.isdigit():
+            z = int(element)
+            if not 1 <= z <= 118:
+                raise ValueError(f"{where}: atomic number {z} is not 1–118")
+            element = gemmi.Element(z).name
+        try:
+            point = tuple(float(v) for v in fields[1:])
+        except ValueError:
+            raise ValueError(f"{where}: a coordinate is not a number: "
+                             f"{line.strip()!r}") from None
+        if not all(math.isfinite(v) for v in point):
+            raise ValueError(f"{where}: a coordinate is not finite: {line.strip()!r}")
+        species.append(element)
+        xyz.append(point)
+    for k, line in enumerate(lines[2 + count:], start=3 + count):
+        if line.strip():
+            raise ValueError(f"{source}, line {k}: text after the {count} atoms "
+                             f"of line 1's count ({line.strip()!r}); a second "
+                             f"frame or a miscount, and this reader takes one frame")
+    return Fragment(tuple(species), np.array(xyz, dtype=np.float64).reshape(-1, 3),
+                    bonds)
+
+
+def read_xyz(path, bonds=None) -> Fragment:
+    """A fragment from a bare XYZ file (:func:`from_xyz`, which has the format
+    and the refusals; ``bonds`` are the caller's, in file order)."""
+    p = Path(path)
+    return from_xyz(p.read_text(encoding="utf-8"), bonds, source=str(p))

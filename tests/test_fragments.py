@@ -658,3 +658,60 @@ def test_zmatrix_points_refuses_by_line_with_or_without_names():
     assert fr.zmatrix_points([], []).shape == (0, 3)
     pos, tan = fr.zmatrix_points([()], [()], tangents=True)
     assert pos.shape == (1, 3) and tan.shape == (0, 1, 3)
+
+
+# --- XYZ read (WP-1813) -------------------------------------------------------
+
+
+def _xyz_text(fragment, comment="a comment line, ignored"):
+    """The bare XYZ text of ``fragment``, written here at repr precision."""
+    rows = [f"{s} {x!r} {y!r} {z!r}" for s, (x, y, z) in
+            zip(fragment.species, fragment.xyz.tolist(), strict=True)]
+    return "\n".join([str(len(fragment)), comment, *rows]) + "\n"
+
+
+def test_an_ideal_benzene_round_trips_through_xyz_with_its_bonds_declared(tmp_path):
+    """The file's coordinates come back bit for bit, in file order; its bonds
+    are the caller's, and a read without them declares none."""
+    ring = _ideal_ring(6, 1.39, 1.09)
+    path = tmp_path / "benzene.xyz"
+    path.write_text(_xyz_text(ring) + "\n\n", encoding="utf-8")
+    back = fr.read_xyz(path, bonds=ring.bonds)
+    assert back.species == ring.species
+    assert np.array_equal(back.xyz, ring.xyz)
+    assert back.bonds == ring.bonds
+    assert fr.read_xyz(path).bonds is None
+    assert fr.from_xyz(_xyz_text(ring)).body_frame().rotation_dofs == 3
+
+
+def test_an_xyz_atomic_number_reads_as_its_symbol():
+    f = fr.from_xyz("3\n\n8 0 0 0\n1 0.96 0 0\nH -0.24 0.93 0\n")
+    assert f.species == ("O", "H", "H")
+    assert fr.from_xyz("0\nempty\n").xyz.shape == (0, 3)
+
+
+@pytest.mark.parametrize("text, match", [
+    ("", r"^XYZ text: line 1 must hold the atom count; it is empty"),
+    ("two\nc\n", r"line 1 must hold the atom count, a non-negative integer; "
+                 r"it reads 'two'"),
+    ("-1\nc\n", r"non-negative integer; it reads '-1'"),
+    ("3\nc\nC 0 0 0\nC 1 0 0\n", r"line 1 counts 3 atoms but the file has 2 atom lines"),
+    ("1\nc\nC 0 0\n", r"line 3: an atom line holds an element and three coordinates "
+                      r"\(4 fields\); it has 3"),
+    ("1\nc\nC 0 0 0 0.5\n", r"line 3: .* it has 5"),
+    ("1\nc\nC 0 zero 0\n", r"line 3: a coordinate is not a number"),
+    ("1\nc\nC 0 inf 0\n", r"line 3: a coordinate is not finite"),
+    ("1\nc\n0 0 0 0\n", r"line 3: atomic number 0 is not 1–118"),
+    ("1\nc\nC 0 0 0\n1\nc\nC 1 0 0\n", r"line 4: text after the 1 atoms of line 1's "
+                                       r"count .* this reader takes one frame"),
+])
+def test_an_xyz_file_that_is_not_one_bare_frame_is_refused_by_line(text, match):
+    with pytest.raises(ValueError, match=match):
+        fr.from_xyz(text)
+
+
+def test_an_xyz_refusal_names_the_file(tmp_path):
+    path = tmp_path / "short.xyz"
+    path.write_text("2\nc\nC 0 0 0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"short\.xyz: line 1 counts 2 atoms"):
+        fr.read_xyz(path)

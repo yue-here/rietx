@@ -40,7 +40,7 @@ optional extra is installed. This is chunk R12 of issue #561, sized M.
 
 ## Tasks
 
-- [ ] XYZ read
+- [x] XYZ read
 - [ ] Z-matrix write
 - [ ] SMILES behind an extra, with a refusal naming the extra when it is absent
 - [ ] Tests (the acceptance below)
