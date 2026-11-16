@@ -44,11 +44,13 @@ The readers are tried in a fixed order, and the first whose test matches reads t
 Magic bytes and archive manifests come first, then a required first line or XML root, then a suffix, then a looser text test.
 The two peak-list refusals and the total-scattering refusal come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
 `ReaderCapability.sniff` gives each format's test in words, `ReaderCapability.sigma` says where its esds come from, and `ReaderCapability.refuses` says why a refused format is declined.
+`ReaderCapability.available` is `False` for a format whose optional dependency, named by `ReaderCapability.requires`, does not import in this install. Such a format is still recognised, and a file in it is refused with the install line.
 
 | Format | `name` | Suffixes | Option | Esds |
 |---|---|---|---|---|
 | Bruker/Siemens DIFFRAC binary, versions 2, 3 and 4 | `bruker_raw` | `.raw` | `scan` | measured per file: whole numbers are counts, a rate whose product with the step time is whole gets √(y·t)/t, anything else withholds σ |
 | Philips PC-APD binary scan | `philips_rd` | `.rd`, `.sd` | none | Poisson on the decoded counts |
+| NeXus/HDF5 reel, one pattern per row of a block (needs the `hdf5` extra) | `hdf5` | `.nxs`, `.h5`, `.hdf5`, `.hdf` | `scan`, `nonpositive_sigma` | the `NXdata` group's errors dataset where it declares one; Poisson for whole numbers; withheld otherwise |
 | Rigaku SmartLab Studio II measurement | `rasx` | `.rasx` | `scan` | measured per file, as for `.ras` |
 | Bruker DIFFRAC.MEASUREMENT experiment | `brml` | `.brml` | `scan` | through the automatic absorber factor a, σ = √(y/a)·a |
 | Rigaku SmartLab or MiniFlex scan | `ras` | `.ras` | `scan` | measured per file: Poisson for whole counts, √(y·t)/t for a rate, withheld otherwise |
@@ -76,9 +78,9 @@ from rietx import capabilities
 
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
-    "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
-    "raw_unclaimed"]
+    "bruker_raw", "philips_rd", "hdf5", "rasx", "brml", "ras", "uxd", "xrdml",
+    "udf", "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering",
+    "xy", "raw_unclaimed"]
 assert [opt.name for opt in caps.reader_options] == [
     "axis", "bank", "block", "nonpositive_sigma", "scan"]
 ```
@@ -89,6 +91,7 @@ Every reader drops a point whose 2θ, count or σ is NaN or infinite, and report
 
 - `bruker_raw` reads versions 2 (`RAW2`), 3 (`RAW1.01`) and 4 (`RAW4.00`). Version 1 is refused by name, because no description of it exists. A version 2 file is read when it holds one range and its header and counts account for its size exactly; a version 2 file with more than one range is refused by name. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
+- `hdf5` is recognised by the HDF5 signature at offset 0, and reading it needs h5py, which `pip install 'rietx[hdf5]'` installs; without it the file is refused with that line. The patterns are the signal an `NXdata` group declares, read against the axis its `@axes` names, one scan per row or column as the declaration says; `@default` picks the group when there are several. A file with no `NXdata` group is searched for the one 2-D block whose dimension matches a monotonic 1-D axis spanning what a 2θ scan can, and reads with [`PATTERN_X_AXIS_ASSUMED`](diagnostics-files.md#pattern_x_axis_assumed), since nothing in the file declared it. A Q, d-spacing, ω or φ axis is refused by name, and so is a block no axis fits, such as a file of square weight matrices. A declared axis of the other dimension labels each scan in `list_scans`, and a temperature in kelvin becomes `temperature_k`.
 - `rasx` and `ras` read an attenuator column and never apply it. [`RAS_ATTENUATOR_PRESENT`](diagnostics-files.md#ras_attenuator_present) names the 2θ range it covers.
 - `brml` locates every column from the file's own data views. A detector frame (a recorded view longer than one point) is refused.
 - `xrdml` applies the beam attenuation factor and reports [`XRDML_ATTENUATOR_APPLIED`](diagnostics-files.md#xrdml_attenuator_applied).

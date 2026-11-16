@@ -96,6 +96,13 @@ class PatternFormat:
     #: stays honest without ``reader_formats`` meaning two things: an entry says
     #: for itself whether it is a reader or a refusal.
     refuses: str | None = None
+    #: the module this format needs beyond the base install, or ``None`` when
+    #: the base install reads it (WP-1316).  The entry stays registered without
+    #: it, so the file is still *recognised* and refused by name with the install
+    #: line, and ``capabilities()`` reports the format unavailable rather than
+    #: dropping it: "we know this format and cannot open it here" is a different
+    #: answer from "we have never heard of it"
+    requires: str | None = None
 
 
 @dataclass(frozen=True)

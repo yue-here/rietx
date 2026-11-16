@@ -66,6 +66,22 @@ standard's own examples with licence checked per file. Real-file facts
 (block shapes `(3134, 2051)`, `(27, 3590)`; the discriminators; the
 counts-vs-synthetic check) go in `tests/data/README.md` without the files.
 
+**The extra is `hdf5`** (the reporter's answer on #135, 2026-10-12, folded
+from `### Inherited` on 2026-11-16): it names the dependency (h5py), not the
+application definition, since the reader also takes attribute-less HDF5
+through axis discovery and `nexus` would describe less than it reads. The
+`_about.py` token is `HDF5_EXTRA`.
+
+- The tier of each rule this WP adds ([generality § The rule](../milestones/generality.md#the-rule)):
+  the 0°/180° ends of a found 2θ axis are physics (tier 1); the span floors
+  (`MIN_TWO_THETA_SPAN_DEG` 5°, `MAX_Q_PER_ANGSTROM` 30, `MIN_Q_SPAN_PER_ANGSTROM`
+  1) are new judgement (tier 3), from the maintainer's prototype on the
+  archive's ~1290 HDF5 files (issue #135), one family by lab. They decide only
+  which dataset the **search** tier takes as the axis — never a declared one —
+  and every reading they admit carries `PATTERN_X_AXIS_ASSUMED`; what they
+  refuse is refused naming the file. No action on the data, no default, no new
+  code: the σ tiers and the axis rule are the existing ones.
+
 ### Inherited
 
 - **2026-11-17, from the issue triage round (issue #1446).** Decided
@@ -76,14 +92,6 @@ counts-vs-synthetic check) go in `tests/data/README.md` without the files.
   message. Recognising one needs the NeXus structure (an `NXevent_data` group,
   or per-pixel detector data without a focused `NXdata`), which only h5py can
   read, so the distinction lives here once h5py is present.
-
-- **2026-10-13, from the issue triage (#135): the reporter's answer on the
-  extra's name is `hdf5`.** Posted 2026-10-12: the extra names the dependency
-  (h5py), not the application definition, and the reader also takes
-  attribute-less I11-style HDF5 through axis discovery, so `nexus` would
-  describe less than it reads. That answers the first open item of the
-  2026-09-01 handover from the reporter's side; the `_about.py` format token
-  is still this WP's to spell, and no date is asked for.
 
 ## Non-goals
 
@@ -98,13 +106,14 @@ counts-vs-synthetic check) go in `tests/data/README.md` without the files.
 
 ## Tasks
 
-- [ ] The extra: `[hdf5]` in `pyproject.toml`, soft import, `capabilities()`
+- [x] The extra: `[hdf5]` in `pyproject.toml`, soft import, `capabilities()`
       formats arm gated on the import; the format token spelled in
       `_about.py`.
-- [ ] The reader: magic dispatch, tiered axis authority, block orientation,
+- [x] The reader: magic dispatch, tiered axis authority, block orientation,
       `scan=`/`ScanInfo`/`PATTERN_MULTISCAN_DEFAULTED`, refusals naming the
       file.
-- [ ] σ tiers + the Poisson self-check as a diagnostic.
+- [x] σ tiers.
+- [ ] The Poisson self-check as a diagnostic.
 - [ ] Synthetic fixtures + `test_readers_robust.py` arm + the README facts
       row; skill row and manual line.
 
