@@ -1372,6 +1372,12 @@ class StageResult(Base):
     #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.  A path the
     #: same stage's ``turn_off`` matches is left out: the stage did not want
     #: it free (WP-2208).
+    #:
+    #: Two rows the *table* held against a glob ride here too, each reported
+    #: by its own diagnostic rather than ``HOLD_BLOCKED_PLAN``: a coordinate
+    #: the floating-origin fix holds (WP-1912, ``ORIGIN_FIXED_ON_POLAR_AXIS``),
+    #: and a wavelength the λ–cell fence declined because no phase in the
+    #: pattern had a held cell (WP-2148, ``WAVELENGTH_NOT_FREED``).
     blocked_by_hold: list[str] = Field(default_factory=list)
     #: paths this stage's ``turn_off`` fixed after its frees (WP-2208), in
     #: table order: the free paths it took, never a row that was already

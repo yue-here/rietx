@@ -47,6 +47,7 @@ from .vector import (
     _tie_text,
     check_wavelength_freedom,
     unknown_paths_among,
+    wavelength_pins,
 )
 
 
@@ -1525,25 +1526,25 @@ class MultiParameterTable:
             lo[idx] = np.maximum(lo[idx], loh)
             hi[idx] = np.minimum(hi[idx], hih)
 
-        # The wavelength count, made where the whole set is visible.  A
+        # The wavelength fence, asked where the whole set is visible.  A
         # wavelength is per-histogram under the default sharing rule (it starts
         # with ``instrument.``), so the scoped ``hist.h.…`` name is what a user
-        # reads and what the refusal must name — the check tests the *unscoped*
+        # reads and what the refusal must name — the rule reads the *unscoped*
         # tail and reports the scoped path.  Asked after every column rebuild
         # rather than only at construction, because a staged plan frees its
         # globs one stage at a time and every :meth:`set_vary` ends here.
         n_wavelengths = sum(1 for t in self.tables for e in t.entries
                             if _is_wavelength(e.path))
         # ``SharingMap`` decides sharing per *path*, not per (path, histogram),
-        # so "the cell is shared with a held-λ histogram" collapses to "the cell
-        # is shared at all" — which is the strongest form this map can express,
-        # and it is the right one: with a per-histogram cell *every* histogram
-        # has its own, so no free λ has anything to be measured against.
+        # so a per-histogram cell is per-histogram everywhere; that picks the
+        # refusal's wording, while which λ is refused is the pin rule's.
         cell_shared = all(
             self.sharing.is_shared(e.path) for t in self.tables
             for e in t.entries if ".cell." in e.path)
+        pins = self.wavelength_pins()
         check_wavelength_freedom(
-            [p for p in combined_paths if _is_wavelength(_unscoped(p))],
+            [p for p in combined_paths if _is_wavelength(_unscoped(p))
+             and any(pins[h] is None for h in self._hists_of(p))],
             n_wavelengths, len(self.tables), cell_shared=cell_shared)
 
         self.shared_paths = shared_order
@@ -1554,6 +1555,42 @@ class MultiParameterTable:
         self._lo = lo
         self._hi = hi
         self.n_shared = len(shared_order)
+
+    def _hists_of(self, path: str) -> range | list[int]:
+        """The histograms a combined path belongs to: its scope, or all."""
+        if path.startswith("hist."):
+            return [int(path.split(".", 2)[1])]
+        return range(len(self.tables))
+
+    def wavelength_pins(self, *, freed: int | None = None) -> list[str | None]:
+        """Per histogram, what pins its d scale (:func:`wavelength_pins`).
+
+        The joint fence's one predicate, read by the refusal in the column
+        rebuild, by ``ParameterRow.needs_held_cell`` and by the clause of
+        ``WAVELENGTH_CALIBRATION``.  A histogram's line-0 wavelength held is a
+        pin; so is a held cell length of a phase in it (a standard in the
+        mixture, WP-2148).  A shared cell is one node across the histograms,
+        so a free shared cell carries a pin from one histogram to the rest —
+        the "one held, N − 1 free" count is this rule's special case.
+
+        ``freed`` asks the question a row's ``needs_held_cell`` asks: would the
+        scale stay pinned if histogram ``freed``'s wavelength were free too?
+        """
+        held: list[bool] = []
+        cells: list[dict[object, str | None]] = []
+        for h, table in enumerate(self.tables):
+            rows = [e for e in table.entries
+                    if _is_wavelength(e.path) and not e.locked]
+            held.append(h != freed and bool(rows)
+                        and not any(table._row_moves(e) for e in rows))
+            own: dict[object, str | None] = {}
+            for ip, path in table.cell_pins().items():
+                shared = self.sharing.is_shared(f"phases.{ip}.cell.a")
+                own[ip if shared else (h, ip)] = (
+                    None if path is None
+                    else path if shared else f"hist.{h}.{path}")
+            cells.append(own)
+        return wavelength_pins(held, cells)
 
     def refresh_bounds(self) -> None:
         """Re-read the sub-tables' bounds after a per-stage freeze changed them.

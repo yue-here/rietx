@@ -291,9 +291,11 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The wavelength of one emission line. Bragg's law fixes only the product of "
             "the wavelength and the cell scale, so the two cannot be separated. A free "
-            "wavelength with a free lattice parameter is a flat direction. The row "
-            "reports `needs_held_cell`, and `set_vary` refuses to free the wavelength "
-            "while any cell parameter is free. Refine it against a standard with a "
+            "wavelength beside free lattice parameters is a flat direction. One phase "
+            "with a held cell pins the scale, so a standard held in the mixture lets the "
+            "wavelength and every other phase's cell refine together. With no held cell "
+            "the row reports `needs_held_cell`, and `set_vary` declines to free the "
+            "wavelength (`WAVELENGTH_NOT_FREED`). Refine it against a standard with a "
             "certified cell, or leave it at the tabulated value."
         ),
         unit="Å", default=None,
@@ -5041,11 +5043,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "You freed the wavelength, and it moved from its declared value by the "
             "amount shown. The shift measures the calibration error of the monochromator "
-            "against the cell that was held. A shift inside its own esd measured "
+            "against what the message names: a held cell, or the cell another "
+            "histogram's held wavelength pins. A shift inside its own esd measured "
             "nothing. A shift beyond the beamline's known drift more likely points at a "
             "modelling error, such as an unmodelled harmonic or a zero shift traded "
             "against the wavelength. Compare it with the calibration history before you "
             "quote the cell."
+        ),
+    ),
+    "WAVELENGTH_NOT_FREED": HelpEntry(
+        title="A stage asked for the wavelength and did not free it",
+        description=(
+            "A stage's pattern reached the wavelength, but no phase in the pattern had "
+            "a held cell. Bragg's law fixes only the product of the wavelength and the "
+            "cell scale, so the wavelength and the free cells were one flat direction. "
+            "The stage left the wavelength at its declared value and refined the cells "
+            "against it. Hold the cell of a standard in the pattern if you meant to "
+            "calibrate the wavelength. One held phase is enough, and the other phases' "
+            "cells then refine beside it."
         ),
     ),
     "XRDML_ATTENUATOR_APPLIED": HelpEntry(
@@ -6330,7 +6345,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Paths this stage's `turn_on` matched and did not free, because the caller "
             "declared a hold on them with `Refinement.hold`. A hold outranks a plan's "
-            "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`."
+            "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`. "
+            "It also lists a coordinate held to fix a floating origin, and a wavelength "
+            "left fixed because no phase had a held cell (`WAVELENGTH_NOT_FREED`)."
         ),
     ),
     "StageResult.fixed": HelpEntry(

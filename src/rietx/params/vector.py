@@ -143,33 +143,98 @@ def _is_wavelength(path: str) -> bool:
             and path.endswith(WAVELENGTH_SUFFIX))
 
 
-def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
+#: The cell lengths, the rows a d scale lives in.  An angle scales nothing,
+#: so a held angle pins nothing (WP-2148): only a held length does.
+_CELL_LENGTHS = ("a", "b", "c")
+
+
+def _cell_length_phase(path: str) -> str | None:
+    """The phase index segment of a cell-length path, or ``None``."""
+    parts = path.split(".")
+    if (len(parts) == 4 and parts[0] == "phases" and parts[2] == "cell"
+            and parts[3] in _CELL_LENGTHS):
+        return parts[1]
+    return None
+
+
+def wavelength_pins(wavelength_held: list[bool],
+                    cells: list[Mapping[object, str | None]]) -> list[str | None]:
+    """Per histogram, what pins its d scale — the wavelength fence's one rule.
+
+    A powder pattern measures d = λ/(2 sin θ), so scaling a histogram's λ and
+    every cell length that histogram sees by one factor leaves every computed
+    position unchanged.  That direction is broken by anything in it that
+    cannot move: a **held wavelength**, or a **held cell length of a phase in
+    the histogram** — a certified standard in the mixture, which is how a
+    wavelength is calibrated (WP-2148, issue #1550).  A free cell carries the
+    scale from one histogram to every other that shares it, so the rule is
+    connectivity: a histogram's scale is pinned when the set it is linked to,
+    through the free cells of its phases, contains a pin.
+
+    ``wavelength_held[h]`` says histogram *h* has a held wavelength.
+    ``cells[h]`` maps a key per phase in histogram *h* (the same key wherever
+    the cell is shared, so a shared cell is one node) to the path of a held
+    length of that phase's cell, or ``None`` when every length moves.  The
+    answer per histogram is the path of one pin its set reaches — a held cell
+    length, else ``"hist.{k}"`` for a held wavelength of histogram *k* — or
+    ``None`` where nothing pins it, which is the flat direction.
+
+    One histogram is the case ``ParameterTable`` asks; N sharing one free cell
+    with one λ held is the "N − 1 free" count this replaces; a per-histogram
+    free cell is a set of its own, refused unless its own phases pin it.  The
+    time-of-flight twin (a bank's DIFC in λ's place) is the same graph, which
+    is why the rule is written over keys rather than over the two tables.
+    """
+    parent: dict[object, object] = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    pin: dict[object, str] = {}
+    for h, (held, phases) in enumerate(zip(wavelength_held, cells, strict=True)):
+        node = ("hist", h)
+        find(node)
+        if held:
+            pin.setdefault(node, f"hist.{h}")
+        for key, held_path in phases.items():
+            cell = ("cell", key)
+            if held_path is not None:
+                pin.setdefault(cell, held_path)
+            a, b = find(node), find(cell)
+            if a != b:
+                parent[b] = a
+    by_root: dict[object, str] = {}
+    # a held cell is named before a held wavelength: it is the standard the
+    # calibration is taken against, and the more specific answer
+    for node, what in sorted(pin.items(), key=lambda kv: kv[1].startswith("hist.")):
+        by_root.setdefault(find(node), what)
+    return [by_root.get(find(("hist", h))) for h in range(len(wavelength_held))]
+
+
+def check_wavelength_freedom(unpinned: list[str], n_wavelengths: int,
                              n_histograms: int, *,
                              cell_shared: bool = True) -> None:
-    """Refuse a wavelength freedom the data cannot support.  Three cases.
+    """Refuse the free wavelengths whose d scale nothing pins.  Three wordings.
+
+    ``unpinned`` are the free wavelength paths :func:`wavelength_pins` left
+    without a pin, spelled as the caller's own surface spells them;
+    ``n_wavelengths`` is how many wavelength rows the whole problem has and
+    ``n_histograms`` how many patterns it stacks.  Which of them is refused is
+    the pin rule's answer; this function only says why, in the case's words.
 
     A powder pattern measures d = λ/(2 sin θ), which fixes only the *product*
     λ·(1/d) — so for **one** histogram a free λ beside a free cell is a flat
-    direction, exactly, and no amount of data removes it.  Across **N**
-    histograms of one specimen sharing one cell the degeneracy breaks: holding
-    one λ pins the cell's scale, and the remaining N − 1 are then
-    over-determined by that shared cell and genuinely measurable.  Holding
+    direction, exactly, unless a phase with a held cell is in the pattern.
+    Across **N** histograms of one specimen sharing one cell the degeneracy
+    breaks: holding one λ pins the cell's scale, and the remaining N − 1 are
+    then over-determined by that shared cell and genuinely measurable.  Holding
     *all* of them instead forces every monochromator's calibration error into
-    the shared cell; freeing all of them restores the flat direction.
-
-    **The shared cell is the whole mechanism, so it is part of the rule**:
-
-        a free wavelength requires its histogram's cell to be *shared* with at
-        least one histogram whose wavelength is held.
-
-    "Exactly one held, at most N − 1 free" is that statement's special case
-    when every histogram shares one cell, which is the default
-    (:class:`~rietx.params.multi.SharingMap` shares everything that is not
-    ``instrument.*`` or ``*.scale``).  Un-share the cell — a legitimate thing to
-    want, when two histograms are two preparations — and the degeneracy of a
-    single-histogram fit is back inside the joint one, per histogram, which is
-    why ``cell_shared=False`` refuses every free λ rather than letting the fit
-    wander.
+    the shared cell; freeing all of them restores the flat direction, unless a
+    held standard's cell pins it (WP-2148).
 
     **Which one to hold is not arbitrary**: hold the wavelength of the
     histogram that determines the cell.  On a synchrotron-plus-neutron pair
@@ -184,50 +249,47 @@ def check_wavelength_freedom(free_wavelengths: list[str], n_wavelengths: int,
     set, the rest free — and the same argument fixes *where* each is enforced.
     A line weight's scale lives inside one source, so line 0 can be locked in
     the collector.  A wavelength's scale lives in the *cell*, which is shared
-    across instruments, so no single instrument can count the set and the check
+    across instruments, so no single instrument can see the set and the check
     has to sit at the two constructors that see it: :class:`ParameterTable`
     (which sees one instrument, hence always the N = 1 case) and
     :class:`~rietx.params.multi.MultiParameterTable` (which sees all of them).
     That is why this is a function and not a validator on ``EmissionLine``.
 
-    ``free_wavelengths`` are the free wavelength paths, spelled as the caller's
-    own surface spells them; ``n_wavelengths`` is how many wavelength rows the
-    whole problem has and ``n_histograms`` how many patterns it stacks.
+    ``cell_shared`` picks the wording only: with a per-histogram cell no other
+    histogram's held λ can reach this one, which is the remedy to name.
 
-    **Scope: constant-wavelength only.**  The same fence generalises verbatim to
-    a time-of-flight multi-bank fit, where each bank carries its own DIFC
-    calibration and exactly one of them must be held to pin the cell; nothing
-    here implements TOF.
+    **Scope: constant-wavelength only.**  The same rule generalises verbatim to
+    a time-of-flight multi-bank fit, a bank's DIFC in λ's place; nothing here
+    implements TOF.
     """
-    if not free_wavelengths:
+    if not unpinned:
         return
-    if not cell_shared:
-        raise ValueError(
-            f"{free_wavelengths[0]} cannot vary while the cell is "
-            "per-histogram: λ is measurable only against a cell some *other* "
-            "histogram's held wavelength has pinned, so a histogram with its "
-            "own cell is back in the single-histogram degeneracy — inside a "
-            "joint fit, where it looks solved.  Share the cell "
-            "(SharingMap's default does) or hold every wavelength")
     if n_histograms < 2:
         raise ValueError(
-            f"{free_wavelengths[0]} cannot vary in a single-histogram fit: "
-            "d = λ/(2 sin θ) fixes only the product, so a free wavelength "
-            "beside a free cell is an exactly flat direction — the same "
-            "degeneracy that makes a certified standard's cell the thing you "
-            "hold in order to calibrate λ.  It becomes measurable only in a "
-            "joint fit of several histograms of one specimen sharing one cell "
-            "(rietx.refine_multi), where one wavelength is held and the rest "
-            "are free")
-    if len(free_wavelengths) >= n_wavelengths:
+            f"{unpinned[0]} cannot vary in a single-histogram fit with no "
+            "phase's cell held: d = λ/(2 sin θ) fixes only the product, so a "
+            "free wavelength beside free cells is an exactly flat direction.  "
+            "Hold the cell of a standard in the pattern (how a wavelength is "
+            "calibrated), or fit several histograms of one specimen sharing "
+            "one cell (rietx.refine_multi), where one wavelength is held and "
+            "the rest are free")
+    if not cell_shared:
         raise ValueError(
-            f"{len(free_wavelengths)} of {n_wavelengths} wavelengths are "
-            f"free; hold one.  Across {n_histograms} histograms of one "
-            "specimen the shared cell makes N − 1 wavelengths measurable, but "
-            "only because the held one pins the cell's scale — free them all "
-            "and the flat direction of a single-histogram fit is back.  Hold "
-            f"{sorted(free_wavelengths)[0]} (the convention is to hold the "
-            "best-calibrated histogram's) and leave the others free")
+            f"{unpinned[0]} cannot vary while the cell is per-histogram and "
+            "no phase in its histogram has a held cell: λ is measurable only "
+            "against a cell something has pinned, and a histogram with its own "
+            "free cell is back in the single-histogram degeneracy — inside a "
+            "joint fit, where it looks solved.  Share the cell (SharingMap's "
+            "default does), hold a standard's cell, or hold every wavelength")
+    raise ValueError(
+        f"{len(unpinned)} of {n_wavelengths} wavelengths are free; hold one, or "
+        f"hold the cell of a standard in the mixture.  Across {n_histograms} "
+        "histograms of one specimen the shared cell makes N − 1 wavelengths "
+        "measurable, but only because something held pins the cell's scale — "
+        "free every wavelength beside every cell and the flat direction of a "
+        f"single-histogram fit is back.  Hold {sorted(unpinned)[0]} (the "
+        "convention is to hold the best-calibrated histogram's) and leave the "
+        "others free")
 
 
 def background_parameters(bkg) -> list[tuple[str, Parameter]]:
@@ -3126,7 +3188,14 @@ class ParameterTable:
     _CELL_SUFFIXES = ("a", "b", "c", "alpha", "beta", "gamma")
 
     def check_wavelength_against_cell(self) -> None:
-        """Refuse a free λ beside a free cell.  Called once per **solve**.
+        """Refuse a free λ that nothing pins.  Called once per **solve**.
+
+        Pinned means :meth:`wavelength_pin` finds a phase whose cell has a held
+        length (:func:`wavelength_pins`, the rule with one histogram): a
+        certified standard held in the mixture pins the d scale for every other
+        phase, whose cells then refine against it (WP-2148).  With no held
+        length anywhere, λ and every cell length scale together, an exactly
+        flat direction.
 
         The condition is *dynamic* — a cumulative plan can free the cell in one
         stage and λ in a later one — so it cannot be frozen at construction,
@@ -3144,31 +3213,86 @@ class ParameterTable:
         the solve.
 
         Single-histogram only.  The joint case is ``MultiParameterTable``'s,
-        where the rule is "exactly one held, at most N − 1 free" and the shared
-        cell is the mechanism; that check runs there and this one must not
-        second-guess it.
+        which asks the same rule over every histogram at once; this one must
+        not second-guess it.
         """
         if getattr(self, "_joint", False):
             return
         free = {self.entries[i].path for i in self._free_idx}
-        lam = sorted(p for p in free
-                     if p.startswith("instrument.source.lines.")
-                     and p.endswith(".wavelength"))
-        if not lam:
+        lam = sorted(p for p in free if _is_wavelength(p))
+        if not lam or self.wavelength_pin() is not None:
             return
         cell = sorted(p for p in free
                       if ".cell." in p and p.rsplit(".", 1)[-1] in self._CELL_SUFFIXES)
-        if cell:
-            raise ValueError(
-                f"{lam[0]} and {cell[0]} cannot both be free: d = λ/(2 sin θ) "
-                "fixes only the product, so scaling λ and every reciprocal "
-                "lattice length together leaves every computed position "
-                "unchanged — an exactly flat direction no amount of data "
-                "removes.  Hold the cell (what a certified standard is for, "
-                "and how a wavelength is calibrated) or hold λ.  Across "
-                "several histograms of one specimen sharing a cell the "
-                "degeneracy breaks and N − 1 wavelengths are measurable: "
-                "rietx.refine_multi")
+        beside = (f"{lam[0]} and {cell[0]} cannot both be free"
+                  if cell else f"{lam[0]} cannot be free")
+        raise ValueError(
+            f"{beside}: no phase's cell is held, and d = λ/(2 sin θ) fixes "
+            "only the product, so scaling λ and every reciprocal lattice "
+            "length together leaves every computed position unchanged — an "
+            "exactly flat direction no amount of data removes.  Hold the cell "
+            "of a standard in the pattern (what a certified standard is for, "
+            "and how a wavelength is calibrated; one held phase pins the scale "
+            "for the others) or hold λ.  Across several histograms of one "
+            "specimen sharing a cell the degeneracy breaks and N − 1 "
+            "wavelengths are measurable: rietx.refine_multi")
+
+    def cell_pins(self) -> dict[str, str | None]:
+        """Per phase index, the path of a held length of its cell, or ``None``.
+
+        :func:`wavelength_pins`' input for this table: a phase pins the d
+        scale when any of its cell lengths cannot move.  Read from the
+        **entries**, not ``_free_idx``, for :meth:`set_vary`'s reason (see
+        :meth:`wavelength_pin`).  A length tied to a free one moves with it, so
+        a cubic ``b`` follows ``a``; one tied to held rows only is held.
+        """
+        out: dict[str, str | None] = {}
+        for e in self.entries:
+            ip = _cell_length_phase(e.path)
+            if ip is None:
+                continue
+            if out.get(ip) is None:
+                out[ip] = None if self._row_moves(e) else e.path
+        return out
+
+    def _row_moves(self, e: Entry) -> bool:
+        """Whether a row can move under the entries' current ``vary`` flags:
+        it is free, or tied with a nonzero coefficient on a free row."""
+        if e.vary:
+            return True
+        if e.tie is None:
+            return False
+        terms, _ = self._flatten(e.tie, (e.path,))
+        return any(c != 0.0 and self.entries[j].vary for j, c in terms)
+
+    def wavelength_pin(self) -> str | None:
+        """What pins this histogram's d scale: a held cell length, or ``None``.
+
+        The one predicate the single-histogram fence reads, at three seats:
+        :meth:`check_wavelength_against_cell` (the refusal at the solve), the
+        glob skip in :meth:`set_vary`, and ``ParameterRow.needs_held_cell``
+        (``Refinement.parameters``).  Three readers of one answer, so a plan
+        cannot free what the solve refuses, nor skip what it would admit
+        (WP-2148: the skip asked "is any cell free?", and a stage freeing the
+        sample's cell beside λ dropped λ in silence although a held standard
+        pinned it).
+
+        The histogram's own wavelength is never a pin here: it is the row being
+        asked about, and a secondary line's is locked to line 0 by atomic
+        physics, so it carries line 0's scale rather than fixing one.
+
+        **Order.**  Read from the entries rather than ``_free_idx``, which is
+        rebuilt only at the end of ``set_vary`` and so is one call stale inside
+        it.  Reading ``e.vary`` sees the in-progress state and makes the
+        decision order-independent — but only *given* that the build order puts
+        every phase entry before every instrument entry in ``entries``, so that
+        within one call every cell a glob frees is freed before λ is tested.
+        Flip that order and a single ``*`` glob would free both again;
+        ``test_a_glob_skips_it_while_the_cell_is_free_but_not_when_held``'s
+        ``WL not in hits`` assertion on the held-cell table goes red on the
+        flip, which is where the dependence is pinned.
+        """
+        return wavelength_pins([False], [self.cell_pins()])[0]
 
     def constraint_block(self) -> tuple[sparse.csr_matrix, np.ndarray]:
         """The current (C, d) with rows in entry order, columns in θ order."""
@@ -4052,15 +4176,17 @@ class ParameterTable:
         ``StageResult.blocked_by_hold``, and ``Refinement.set_vary`` refuses a
         literal path outright.
         """
-        # A wavelength is freeable only while the cell is held, and that is a
-        # *dynamic* fact, so it cannot be an ``Entry.locked`` flag.  Skipping it
+        # A wavelength is freeable only while a held cell pins the scale
+        # (:meth:`wavelength_pin`, WP-2148), and that is a *dynamic* fact, so
+        # it cannot be an ``Entry.locked`` flag.  Skipping it
         # by glob rather than raising is the same treatment a symmetry-fixed
         # cell angle gets, and for the reason this method's docstring gives: a
         # staged plan frees by glob, and turning a broad plan into an error
         # would be worse than declining one row of it.  A *declared*
         # ``vary=True`` is a claim rather than a broad sweep, and is refused
         # loudly instead — at the solve, by
-        # :meth:`check_wavelength_against_cell`.
+        # :meth:`check_wavelength_against_cell`.  A plan learns what was
+        # declined from :meth:`would_free`, which does not replay the skip.
         lam_paths = self._wavelength_paths()
         if self._origin_held:
             # a row the origin fix holds is not freed, but what the glob asked
@@ -4084,7 +4210,7 @@ class ParameterTable:
                 # depending on how a caller batched its globs is not one.
                 if (vary and e.path in lam_paths
                         and not getattr(self, "_joint", False)
-                        and self._cell_is_free()):
+                        and self.wavelength_pin() is None):
                     continue
                 e.vary = vary
                 hits.append(e.path)
@@ -4143,27 +4269,6 @@ class ParameterTable:
         return frozenset(e.path for e in self.entries
                          if e.path.startswith("instrument.source.lines.")
                          and e.path.endswith(".wavelength"))
-
-    def _cell_is_free(self) -> bool:
-        """Any free cell parameter, read from the **entries**, not ``_free_idx``.
-
-        ``_free_idx`` is rebuilt only at the end of ``set_vary``, so inside that
-        loop it is one call stale — which made a single call carrying both a
-        cell glob and a λ glob free both, because the cell had not been seen to
-        move yet.  Reading ``e.vary`` sees the in-progress state and makes the
-        decision order-independent — but only *given* that the build order puts
-        every phase entry before every instrument entry in ``entries``.  The
-        cell is entry 0 and λ sits among the instrument entries well after it
-        (index 26 with a single line, 27/28 with a Kα doublet), so within one
-        call the cell is always freed before λ is tested.  Flip that order and a
-        single ``*`` glob would free both again;
-        ``test_a_glob_skips_it_while_the_cell_is_free_but_not_when_held``'s
-        ``WL not in hits`` assertion on the held-cell table goes red on the
-        flip, which is where the dependence is pinned.
-        """
-        return any(e.vary and e.tie is None and ".cell." in e.path
-                   and e.path.rsplit(".", 1)[-1] in self._CELL_SUFFIXES
-                   for e in self.entries)
 
     def seed_floored(self, paths: list[str], value: float) -> list[str]:
         """Lift each free row sitting on a floor at or above 0 to ``value``.

@@ -1794,6 +1794,21 @@ ROWS: tuple[Row, ...] = (
                  "and GSAS-II prints a warning on a variable it freezes at a limit "
                  "(docs/practice.md § When one twin reaches its limit, and a re-run)."),
         approved="2026-11-20"),
+    Row("WAVELENGTH_NOT_FREED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of an act the package took (WP-2148, issue #1550). Fires "
+                  "exactly when a stage's turn_on reached a wavelength and set_vary declined "
+                  "it because no phase in the pattern had a held cell length "
+                  "(ParameterTable.wavelength_pin), the path riding on "
+                  "StageResult.blocked_by_hold beside the caller's holds. Before it the skip "
+                  "was silent: a synthetic Si-held + CeO2 pattern freeing the CeO2 cell and "
+                  "lambda in one stage reported converged with lambda dropped and the CeO2 "
+                  "cell 496 ppm low (z -109)"),
+        grounds=("Physics: d = lambda/(2 sin theta) fixes only the product, so lambda beside "
+                 "cells that all move is an exactly flat direction (Bragg's law); declining "
+                 "it is the fence's act and the diagnostic says it took it."),
+        response="info",
+        responds=("read the cells as measured against the declared wavelength, and hold a "
+                  "standard's cell before rerunning if the wavelength was meant to refine")),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
     Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
         evidence=("info; a record of an act the file's own heading asks for. Two claims, "
@@ -6146,6 +6161,11 @@ ROWS: tuple[Row, ...] = (
                   "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
+    Row("WAVELENGTH_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("physics: names the one hold that makes the wavelength measurable in one "
+                  "pattern, a standard's cell (Bragg's law); it is advice only if the "
+                  "caller meant to calibrate the wavelength, which the plan asking for it says")),
     Row("INSTRUMENT_WIDTH_HELD.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
         evidence=("practice: every program that separates instrument from specimen "
                   "broadening fixes the instrument from a standard (FullProf's resolution "
