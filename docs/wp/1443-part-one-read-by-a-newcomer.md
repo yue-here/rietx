@@ -209,7 +209,7 @@ folded into this map and deleted. Each passage, read against the new tree:
       corrected.
 - [x] Passage 11: the symptom-keyed index of Part 1's advice, one row per
       check, linking rather than restating.
-- [ ] #407: `install.md` says what the manual describes and how to install
+- [x] #407: `install.md` says what the manual describes and how to install
       `main`; the "since" note derived from the dist version and the release
       records.
 - [ ] `tests/test_manual_api.py` and `tests/test_manual.py` green; the
