@@ -85,9 +85,12 @@ N was the same in both passes on all 336 pattern pairs.
 - **They disagree, and only across basins.** At 36 of the 168 present
   pairs (p004-p007; 9 of 42 series, three per fraction) the two passes sat
   on opposite sides of the identity point. Σw·Δ² differed there by 3.6-6.8 %
-  at 0.15, 11-15 % at 0.25 and 33-39 % at 0.40 (relative Rwp 1.8e-2 to
-  1.5e-1), always at equal P. The lower-cost pass was on the true side in
-  36 of 36, and it was the forward pass every time: the backward chain's
+  at 0.15, 11-15 % at 0.25 and 33-39 % at 0.40, taken over the lower
+  (forward) pass's Σw·Δ², always at equal P. The relative Rwp gap, 1.8e-2 to
+  1.5e-1, is taken over the higher (backward) pass's Rwp; at equal N, Rwp
+  goes as √(Σw·Δ²), so over the forward pass it is 1.8e-2 to 1.8e-1, and a
+  39 % cost gap is an 18 % Rwp gap there. The lower-cost pass was on the
+  true side in 36 of 36, and it was the forward pass every time: the backward chain's
   cold start at p007 from the identity point fell to the wrong side in all
   42 series, as WP-1420 measured for cold fits. `direction_gaps` already
   saw these patterns (cell `|gap_esd|` 29-56 there); what it cannot say is
@@ -96,10 +99,17 @@ N was the same in both passes on all 336 pattern pairs.
   passes sat on the same wrong side, at costs equal to 1.7e-6 relative or
   better. A cost comparison is silent there, exactly as the value gaps are.
 - **Off the onset the passes fit different parameter sets.** At p000-p003,
-  where the subgroup is absent, P differed between the passes at 117 of 168
-  pairs (WP-1301 holds the subgroup in one pass and not the other), and
-  Σw·Δ² differed by up to 1.15e-3 relative (relative Rwp ≤ 5.7e-4). The pass
-  with more free parameters was lower at 86 of those 117 and higher at 31.
+  where the subgroup is absent, P differed between the passes in 39 of 56
+  (draw, sign, pattern) cases (WP-1301 holds the subgroup in one pass and not
+  the other). The count is the same at every fraction, because the
+  pre-onset patterns do not depend on the fraction: p000-p003 are
+  byte-identical across the three, so the 117 of 168 pairs over all three
+  fractions are those 39 cases counted three times, not 117 independent
+  ones. Σw·Δ² differed by up to 1.15e-3 relative (relative Rwp ≤ 5.7e-4).
+  The pass with more free parameters was lower at 86 of the 117 pairs and
+  higher at 31; that split too is over the 39 cases three times, though not
+  identically, since the backward cost there moves with the fraction (the
+  PR #1594 review's rerun found 28/11 at 0.15 and 27/12 at 0.40).
   These noise-level differences are the size of #1556's CuCr₂O₄ ones
   (relative Rwp ≤ 1.4e-3), and a lower cost at a different P is not a better
   fit, which is "Two limits" above, now measured.
@@ -141,16 +151,27 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
       never disagree in cost, close this WP on that measurement.
       *(2026-11-16: they do, in 9 of 42 series, so the WP stays open;
       § Context, "The package's own passes, measured".)*
-- [ ] Option 1: the costs on the finding and on the entry.
+- [ ] Option 1: the two costs at each pattern, on every `DirectionGap` row
+      or once per pattern beside the rows, as the ruling on the handover's
+      question 1 says. *(2026-11-16: was "the costs on the finding and on
+      the entry"; WP-2003 removed the `SEQUENTIAL_PATH_DEPENDENT` finding,
+      and the entry's backward cost is already reachable through
+      `series.backward`.)*
 - [ ] Decide whether option 2 or 3 ships, and write the decision here.
 - [ ] Tests: the fixture reports the right pass at the right pattern.
+      *(Waits on PR #1401's `tests/test_identity_point_seed.py` helpers,
+      unmerged on 2026-11-16, which build the fixture and which the task 1
+      probe imported: land #1401 first, or copy the helpers.)*
 - [ ] Skill: `references/series.md`'s `direction="both"` paragraph says
       which pass to quote when the two disagree.
 
 ## Acceptance
 
-On the fixture, the finding at the disagreeing pattern names the pass with
-the lower cost, and quotes both costs.
+On the fixture, at each disagreeing pattern the series result names the
+pass with the lower cost and quotes both costs, on the `DirectionGap` rows
+or the per-pattern pair, whichever the ruling on option 1 picks.
+*(2026-11-16: was "the finding at the disagreeing pattern"; WP-2003 removed
+`SEQUENTIAL_PATH_DEPENDENT`.)*
 
 ```sh
 .venv/bin/python -m pytest tests/test_sequential.py -q
@@ -170,7 +191,8 @@ the lower cost, and quotes both costs.
   two-basin series from issue #267, 9 of 42 runs had the forward and
   backward chains settle in opposite basins over the last four patterns,
   and there the weighted residual picked the true basin in all 36 patterns, by
-  3.6 to 39 %. So this WP does not close on task 1. Two limits came with it:
+  3.6 to 39 % of the cheaper pass's Σw·Δ². So this WP does not close on
+  task 1. Two limits came with it:
   in most runs both chains settled in the same wrong basin, which no cost
   comparison can see; and before the onset the two chains often fit
   different numbers of parameters, so a lower cost there is not a better
@@ -198,11 +220,16 @@ the lower cost, and quotes both costs.
   `forward_chi2`/`backward_chi2`), where it repeats once per path at each
   pattern, or once per pattern beside the rows. (2) Option 2 or 3. Option 2
   would have returned the true basin at all 36 disagreeing patterns here,
-  but it needs an equal-P condition (the 117 pre-onset pairs) and a floor
+  but it needs an equal-P condition (the 39 pre-onset cases, 117 pairs over
+  the three fractions) and a floor
   under which two costs count as tied (pre-onset differences reach 1.15e-3
   in Σw·Δ², the size of #1556's whole range). Option 3's cold rung from the
-  declared start would not have helped: it lands in the wrong basin 42 of 42
-  times here. Recommendation: option 1 first; then option 2 limited to equal
+  declared start would not have helped where it was measured: here the
+  backward chain's own cold start at p007 landed in the wrong basin in 42 of
+  42 series, and WP-1420's cold grid (PR #1401) found a cold single fit of
+  p004 or p007 from the identity point on the wrong side in 42 of 42. No cold
+  fit at p005-p006 was measured. Recommendation: option 1 first; then
+  option 2 limited to equal
   P with a floor measured from noise draws; option 3 only as #1402's
   two-sided start, if that issue's option B is taken.
   *Next:* the maintainer's ruling on the two questions above. Then option 1
