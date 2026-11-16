@@ -113,15 +113,6 @@ are not quotable at any of them.
 **The other two LaB6 start rows** both land on the Kα2 face: `intermediate_ftol` 1e-6
 against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads 0.009 on x.
 
-### Inherited
-
-- **From WP-2012, 2026-11-03 (found by `/code-review` on PR #1387).** The manual quotes the
-  same both-free LaB6 number as the `_audit.py` strings of the last task.
-  `docs/docs/reference/refinement.md` (the intermediate-ftol table, SRM 660c row) reads "8.82
-  esd, between two minima", and the text under it says the 8.82 esd is `axial_sl` against
-  `axial_hl`. Under today's presets H/L is held, so that mirror no longer exists. Re-measure
-  the row with the last task and re-word both sentences.
-
 ## Tasks
 
 - [x] Find what separates the two minima: the Γ_G² cone's active rows, the FCJ node
@@ -133,14 +124,22 @@ against None reads 0.000 plain esd (1.8e-7 on w), and Biso 0.5 against 1.5 reads
 - [x] Make the lab6 axial-floor row strict, or drop its mark. *Done 2026-11-16: strict,
       since both platforms land the same way at every 1e-14 nudge (Findings). If the
       ruling on the task above makes the floors agree, the mark drops then.*
-- [ ] Re-word three `_audit.py` evidence strings that still quote LaB6 from before WP-2012:
+- [x] Re-word three `_audit.py` evidence strings that still quote LaB6 from before WP-2012:
       `AXIAL_SIZING_FLOOR` (the floors' answers agreeing behind the closing stage, now
       0.582 plain esd on u), and `INTERMEDIATE_FTOL` with `StageResult.ftol` ("fails on
       SRM 660c, 8.82 esd on axial_sl"; the row passes since WP-2036 ordered the pair and
       still passes with H/L held). WP-2012 left them because a table edit sends the
       branch to the generality judge. The three LaB6 strict xfails in
       `tests/test_window_domain.py` also quote both-free numbers; they still fail as
-      expected and were not re-measured.
+      expected and were not re-measured. *Done 2026-11-16: `AXIAL_SIZING_FLOOR` gains the
+      0.582 and its cause; the same SRM 660c sentence sat in four rows (`INTERMEDIATE_FTOL`,
+      `StageResult.ftol`, `PlanSpec:intermediate_ftol`, `StageSpec:ftol`), each now 0.000
+      (1.8e-7 on w) and 101/76 evaluations (1.33×), re-measured three interleaved rounds on
+      macOS arm64 `[dev]`, None 0.56-0.62 s against 1e-6's 0.50-0.60 s, Rwp equal to 7
+      digits. The manual's row and its two sentences (the Inherited item) say the same. Only
+      evidence strings moved; `AXIAL_SIZING_FLOOR`'s approved grounds still say the floor
+      "passes on LaB6", which is a question for the maintainer (handover entry). The three
+      `test_window_domain.py` xfails were not re-measured.*
 
 ## Acceptance
 

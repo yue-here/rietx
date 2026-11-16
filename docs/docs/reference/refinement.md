@@ -245,13 +245,12 @@ Measured on five single fits from the acceptance suites against the same plans w
 | fluorapatite | 52 → 49 (1.06×) | 1.34-1.62 → 1.30-1.35 | 0.000 esd |
 | 11-BM NAC | 51 → 46 (1.11×) | 0.52-0.55 → 0.50-0.60 | 0.000 esd |
 | cpd-1a | 277 → 175 (1.58×) | 2.18-2.28 → 1.89-1.97 | 0.0004 esd |
-| SRM 660c LaB6 | 116 → 90 (1.29×) | 0.55-0.57 → 0.48-1.26 | 8.82 esd, between two minima |
+| SRM 660c LaB6 | 101 → 76 (1.33×) | 0.56-0.62 → 0.50-0.60 | 0.000 esd |
 | cpd-1a, absent zircon | 1221 → 311 (3.93×) | 21.5-22.4 → 9.6-11.0 | 0.0092 esd |
 
 Rwp agreed to 1e-6 in every case.
-LaB6's 1.26 s was the process's first fit.
-The 8.82 esd is `Geometry.axial_sl` against `Geometry.axial_hl`.
-The two ratios can trade places for an equally good fit, and each schedule lands in a different one.
+LaB6's row was re-measured on 2026-11-16, after its protocol came to hold H/L at its declared value.
+Before that it read 8.82 esd on `Geometry.axial_sl` against `Geometry.axial_hl`: with both free, the two ratios could trade places for an equally good fit, and each schedule landed in a different one.
 The absent zircon phase has nothing to fit, and at 1e-9 two of its stages run to their limit of 400 evaluations.
 
 A series is the case to measure rather than assume.
