@@ -2,7 +2,7 @@
 
 Rows: 55 fits, head `51e56e95f`, Linux x86_64, numpy 2.5.3, rietx-kernels 1.5.0.  Written by `group_g.py summary`; the raw rows are not committed.
 
-Columns: the minor phase's scale over its esd at the answer; the stages that held it; its weight fraction and the reference; the share of the off start's cell displacement left against the database start's `s3` answer (0 recovered, 1 never moved); Rwp; evaluations; the largest shift of any other row against the same start's `s3` arm, in plain esd (background rows apart); and whether `PHASE_UNCONSTRAINED` fired.
+Columns: the minor phase's scale over its esd at the answer; the stages that held it; its weight fraction and the reference; the share of the off start's cell displacement left against the database start's `s3` answer (0 recovered, 1 never moved); Rwp; evaluations; the largest shift of any other row against the same start's `s3` arm, in plain esd (background rows apart); and whether `PHASE_UNCONSTRAINED` fired.  The scale/esd column is the reported scale over its plain esd, not the statistic the hold compares with its threshold (`refine._answer_significance`); and under `None` the code still reports `PHASE_UNCONSTRAINED` against 3, so `off` and `s1` can differ there on bit-identical fits.
 
 | start | arm | minor | scale/esd | held in | wt % (ref) | cell left | Rwp | evals | shift vs s3 | bkg shift | PHASE_UNCONSTRAINED |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -64,11 +64,15 @@ Columns: the minor phase's scale over its esd at the answer; the stages that hel
 
 ## Off starts
 
-- `cpd1a_off`: line (1, 0, 4) at 35.1604°, FWHM 0.10003°, cell × 1.002755
-- `cpd1b_off`: line (1, 0, 1) at 36.2069°, FWHM 0.14039°, cell × 1.003748
-- `cpd1c_off`: line (2, 2, 0) at 47.0138°, FWHM 0.11176°, cell × 1.002242
-- `cucr_cold_off`: line (1, 1, 1) at 10.2290°, FWHM 0.01297°, cell × 1.001264
-- `cucr_hot_off`: line (1, 1, 1) at 10.2007°, FWHM 0.00642°, cell × 1.000627
+Each start's distance from the database start's `s3` answer, per cell length, in that answer's FWHM at the line (positive: the start's line sits at lower angle).  The displacement is applied to the database cell, so where the database cell already sits off the answer the off start can be the nearer one.
+
+- `cpd1a_off`: line (1, 0, 4) at 35.1604°, FWHM 0.10003°, cell × 1.002755; from the answer (a / b / c, FWHM): database start +0.06 / +0.06 / +0.05, off start +1.06 / +1.06 / +1.05
+- `cpd1b_off`: line (1, 0, 1) at 36.2069°, FWHM 0.14039°, cell × 1.003748; from the answer (a / b / c, FWHM): database start +0.07 / +0.07 / +0.09, off start +1.07 / +1.07 / +1.09
+- `cpd1c_off`: line (2, 2, 0) at 47.0138°, FWHM 0.11176°, cell × 1.002242; from the answer (a / b / c, FWHM): database start +0.08 / +0.08 / +0.08, off start +1.08 / +1.08 / +1.08
+- `cucr_cold_off`: line (1, 1, 1) at 10.2290°, FWHM 0.01297°, cell × 1.001264; from the answer (a / b / c, FWHM): database start -0.27 / -0.05 / -0.24, off start +0.73 / +0.95 / +0.76
+- `cucr_hot_off`: line (1, 1, 1) at 10.2007°, FWHM 0.00642°, cell × 1.000627; from the answer (a / b / c, FWHM): database start -2.17 / -4.88 / -2.62, off start -1.17 / -3.88 / -1.62
+
+CuCr2O4 on the cold frame (6.78 K, `s3`) against Suchomel et al. (2012) Table I at 10 K, in the paper's axis order: a -19 ppm, b +110 ppm, c -114 ppm.
 
 ## Every fit's weight fractions against the reference
 
@@ -134,7 +138,7 @@ Columns: the minor phase's scale over its esd at the answer; the stages that hel
 
 ## The ramp, 17 frames chained
 
-| start | arm | frames CuO held at the answer | CuO wt %, median (range) | CuO cell left, last frame | frames rejected | codes |
+| start | arm | frames CuO held at the answer | CuO wt %, median (range) | CuO cell left, first frame | frames rejected | codes |
 |---|---|---|---|---|---|---|
 | off | off | 0 of 17 | 0.58 (0.38-0.64) | 0.000 | 0 |  |
 | db | s3 | 0 of 17 | 0.58 (0.38-0.64) | — | 0 |  |
@@ -143,3 +147,5 @@ Columns: the minor phase's scale over its esd at the answer; the stages that hel
 | off | s3 | 0 of 17 | 0.58 (0.38-0.64) | 0.000 | 0 |  |
 
 Group H on the ramp: 190 solves, a free cell column bounded in 0.
+
+Frames 2-17 start warm from the frame before, so the off start is tested on the first frame alone; the later frames test the arms on a chain, not the start.  Rows written at 51e56e95f carry no `rejected`; the column then counts `diverged` frames.

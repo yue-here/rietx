@@ -2,9 +2,10 @@
 
 Three audit rows read it: the constant ``schemas.plan.PHASE_SUPPORT_SIGMA`` and its two
 defaults, ``PlanSpec:phase_support_sigma`` and ``Refinement.run_stage:phase_support_sigma``.
-Their evidence owes two cases (WP-1523): a weighed phase near 1 wt %, and a minor phase
+Their evidence owed two cases (WP-1523): a weighed phase at 0.1-1 wt %, and a minor phase
 started one FWHM off its cell, the case PR #1050's B1.1 named, where a scale that reads
-under 3 sigma holds the cell that keeps it there.
+under 3 sigma holds the cell that keeps it there.  The trace phases on disk are weighed at
+1.15-1.36 wt %, so the first case is run near 1 wt %, not under it.
 
 Arms, families and starts were fixed in WP-2017 § The list before anything ran
 (families 2026-11-05, starts and arms 2026-11-16):
@@ -41,8 +42,11 @@ Starts, each a whole fit through the closing stage:
   The line is the phase's strongest primary-line reflection in the ``s3`` answer from the
   database start, and the FWHM is the instrument's at that line in that answer
   (``indexing.peaks.predicted_fwhm``: TCH from U, V, W, X, Y; sample broadening left
-  out, so the displacement is at most one whole peak width).  Δd/d = FWHM / (2 tan θ),
-  FWHM in radians.  The database start is what the off start is read against.
+  out).  Δd/d = FWHM / (2 tan θ), FWHM in radians.  The displacement is applied to the
+  database cell, not to the answer, so the off start's distance from the answer is that
+  FWHM plus or minus the database cell's own: ``summary`` prints both per axis, in the
+  answer's FWHM at that line.  ``mccusker_default`` refines U, V, W, X and Y on the
+  specimen, so on the ramp that "instrument" FWHM is the fitted total width.
 
 The ramp: the 17 frames chained by ``SequentialRefinement`` under ``mccusker_default``,
 CuO started one FWHM off (the factor of ``cucr_cold_off``), on the arms ``s3``, ``s1``,
@@ -73,6 +77,7 @@ import json
 import math
 import os
 import platform
+import re
 import signal
 import subprocess
 import sys
@@ -98,6 +103,7 @@ from rietx.indexing.peaks import predicted_fwhm  # noqa: E402
 from rietx.model import compiled  # noqa: E402
 from rietx.optimize import least_squares as ls  # noqa: E402
 from rietx.schemas.instrument import BackgroundChebyshev  # noqa: E402
+from rietx.schemas.sequential import _rejected  # noqa: E402
 from tests import test_window_domain as w  # noqa: E402
 from tests.test_staged_start_invariance import _axial_pair_ordered  # noqa: E402
 
@@ -111,7 +117,7 @@ WORKERS = int(os.environ.get("WP2017G_WORKERS", "4"))
 
 ARMS = {"s3": 3.0, "s1": 1.0, "off": None, "window_off": 3.0, "noise": 3.0}
 RAMP_ARMS = ("s3", "s1", "off", "window_off")
-#: start: (family, trace or minor phase, weighed or reference wt %)
+#: start: (family, trace or minor phase)
 STARTS = {"cpd1a": ("cpd-1a", "corundum"), "cpd1b": ("cpd-1b", "zincite"),
           "cpd1c": ("cpd-1c", "fluorite"), "cpd1a_zircon": ("cpd-1a", "zircon"),
           "cucr_cold": ("cucr", "CuO"), "cucr_hot": ("cucr", "CuO")}
@@ -121,10 +127,11 @@ CUO_WT = 1.1
 #: Suchomel et al. (2012) Table I, 10 K, the paper's axis order; the tutorial's CIF has
 #: b and c the other way round (``measure_real_ramp.report``)
 FDDD_10K = {"a": 7.71271, "b": 8.53611, "c": 8.54357}
+#: an anisotropic or isotropic displacement path, as ``refine._DISPLACEMENT_PATH``
+DISPLACEMENT = re.compile(r"\.atoms\.\d+\.(?:biso|adp\.\d+|u11|u22|u33|u12|u13|u23)$")
 FIT_GUARD_S = 1200
 NUDGE = 1e-12
 COORDINATE_SCALE = 0.25
-ESD_BAR = 0.1
 
 
 class FitTimeout(BaseException):
@@ -339,12 +346,16 @@ def _nudged(ref: rx.Refinement, plan) -> dict:
 
 
 def _support_held(stage) -> list[str]:
-    """The stage's held paths less the width twins and the scale-B holds."""
-    twins = {p for ps in (stage.width_twins_held or {}).values() for p in ps}
-    twins |= set(stage.width_twins_held or {})
+    """The stage's held paths less the width twins and the scale-B holds.
+
+    ``width_twins_held`` is keyed by the held twin; its values are the specimen columns
+    the twin rule leaves free, so only the keys come out.  The rows written on
+    2026-11-16 took the values out too, dropping a collapsed phase's width paths from
+    ``support_held``; ``held_phases`` and ``held_at_answer`` were unaffected."""
+    twins = set(stage.width_twins_held or {})
     scale_b = {f"phases.{i}." for i in (stage.scale_b_held or {})}
     return [p for p in stage.held if p not in twins
-            and not (any(p.startswith(s) for s in scale_b) and ".biso" in p)]
+            and not (any(p.startswith(s) for s in scale_b) and DISPLACEMENT.search(p))]
 
 
 def _phase_of(path: str) -> int | None:
@@ -465,7 +476,8 @@ def ramp_one(task: dict) -> dict:
                 frames.append({"T": entry.x, "status": entry.status, "rung": entry.rung})
                 continue
             rec = fit_record(fit, None, st0, "CuO")
-            rec.update(T=entry.x, rung=entry.rung, entry_status=entry.status)
+            rec.update(T=entry.x, rung=entry.rung, entry_status=entry.status,
+                       rejected=_rejected(entry))
             frames.append(rec)
         row.update(frames=frames, codes=sorted({d.code for d in result.diagnostics}),
                    cell_window=windows)
@@ -589,7 +601,7 @@ def _cell_text(row: dict, db: dict | None) -> str:
     """The minor phase's cell, as the share of the start's displacement still left
     against the database start's ``s3`` answer."""
     m = row["minor"]
-    if db is None or "minor" not in db:
+    if db is None or "minor" not in db or m["cell"] is None or db["minor"]["cell"] is None:
         return "—"
     target = np.asarray(db["minor"]["cell"])
     start, got = np.asarray(m["cell_start"]), np.asarray(m["cell"])
@@ -613,7 +625,11 @@ def summary() -> None:
              "cell displacement left against the database start's `s3` answer (0 recovered, "
              "1 never moved); Rwp; evaluations; the largest shift of any other row against "
              "the same start's `s3` arm, in plain esd (background rows apart); and whether "
-             "`PHASE_UNCONSTRAINED` fired.", ""]
+             "`PHASE_UNCONSTRAINED` fired.  The scale/esd column is the reported scale over "
+             "its plain esd, not the statistic the hold compares with its threshold "
+             "(`refine._answer_significance`); and under `None` the code still reports "
+             "`PHASE_UNCONSTRAINED` against 3, so `off` and `s1` can differ there on "
+             "bit-identical fits.", ""]
     head = ("| start | arm | minor | scale/esd | held in | wt % (ref) | cell left | Rwp | "
             "evals | shift vs s3 | bkg shift | PHASE_UNCONSTRAINED |")
     lines += [head, "|" + "---|" * 12]
@@ -642,12 +658,36 @@ def summary() -> None:
                 f"{'—' if sh is None else f'{sh[2]:.3g}'} | "
                 f"{'yes' if 'PHASE_UNCONSTRAINED' in row['codes'] else 'no'} |")
     lines += ["", "## Off starts", ""]
+    lines += ["Each start's distance from the database start's `s3` answer, per cell length, "
+              "in that answer's FWHM at the line (positive: the start's line sits at lower "
+              "angle).  The displacement is applied to the database cell, so where the "
+              "database cell already sits off the answer the off start can be the nearer one.",
+              ""]
     for s in OFF_STARTS:
         path = RAW / f"off_{s}.json"
         if path.exists():
             o = json.loads(path.read_text(encoding="utf-8"))
+            ans = fits.get((s, "s3"))
+            far = {}
+            for name in (s, f"{s}_off"):
+                row = fits.get((name, "s3"))
+                if ans and row and "minor" in row and ans["minor"]["cell"]:
+                    rel = np.asarray(row["minor"]["cell_start"]) / np.asarray(ans["minor"]["cell"])
+                    tan = math.tan(math.radians(o["two_theta"] / 2.0))
+                    far[name] = " / ".join(
+                        f"{x:+.2f}" for x in (rel - 1.0) * 2.0 * tan * 180.0 / math.pi / o["fwhm"])
             lines.append(f"- `{s}_off`: line {tuple(o['hkl'])} at {o['two_theta']:.4f}°, "
-                         f"FWHM {o['fwhm']:.5f}°, cell × {o['factor']:.6f}")
+                         f"FWHM {o['fwhm']:.5f}°, cell × {o['factor']:.6f}; from the answer "
+                         f"(a / b / c, FWHM): database start {far.get(s, '—')}, off start "
+                         f"{far.get(f'{s}_off', '—')}")
+    cold = fits.get(("cucr_cold", "s3"))
+    if cold and "rows" in cold:
+        # the CIF's b and c are the paper's c and b (``measure_real_ramp.report``)
+        got = {"a": "phases.0.cell.a", "b": "phases.0.cell.c", "c": "phases.0.cell.b"}
+        parts = [f"{n} {1e6 * (cold['rows'][p][0] - FDDD_10K[n]) / FDDD_10K[n]:+.0f} ppm"
+                 for n, p in got.items() if p in cold["rows"]]
+        lines += ["", "CuCr2O4 on the cold frame (6.78 K, `s3`) against Suchomel et al. (2012) "
+                  "Table I at 10 K, in the paper's axis order: " + ", ".join(parts) + "."]
     lines += ["", "## Every fit's weight fractions against the reference", ""]
     for start in order:
         for arm in ARMS:
@@ -674,7 +714,7 @@ def summary() -> None:
     if ramp_rows:
         lines += ["", "## The ramp, 17 frames chained", "",
                   "| start | arm | frames CuO held at the answer | CuO wt %, median (range) | "
-                  "CuO cell left, last frame | frames rejected | codes |",
+                  "CuO cell left, first frame | frames rejected | codes |",
                   "|---|---|---|---|---|---|---|"]
         db = next((r for r in ramp_rows if r["start"] == "db"), None)
         for row in ramp_rows:
@@ -685,19 +725,24 @@ def summary() -> None:
             held = sum(f["minor"]["held_at_answer"] for f in frames)
             wts = [_wt(f, "CuO")[0] for f in frames]
             wts = [x for x in wts if x is not None]
-            last = frames[-1] if frames else None
-            dbl = db["frames"][-1] if db and "frames" in db else None
+            first = frames[0] if frames else None
+            db0 = db["frames"][0] if db and db.get("frames") else None
             lines.append(
                 f"| {row['start']} | {row['arm']} | {held} of {len(row['frames'])} | "
                 f"{_fmt(float(np.median(wts)) if wts else None, '.2f')} "
                 f"({_fmt(min(wts) if wts else None, '.2f')}-{_fmt(max(wts) if wts else None, '.2f')}) | "
-                f"{_cell_text(last, dbl) if last and row['start'] == 'off' else '—'} | "
-                f"{sum(f.get('entry_status') == 'quarantined' for f in row['frames'])} | "
+                f"{_cell_text(first, db0) if first and row['start'] == 'off' else '—'} | "
+                f"{sum(f.get('rejected', f.get('entry_status') == 'diverged') for f in row['frames'])} | "
                 f"{', '.join(row['codes'])} |")
         rec = sum(len(r.get("cell_window", [])) for r in ramp_rows)
         app = sum(bool(x["applied"]) for r in ramp_rows for x in r.get("cell_window", []))
         lines.append("")
         lines.append(f"Group H on the ramp: {rec} solves, a free cell column bounded in {app}.")
+        lines.append("")
+        lines.append("Frames 2-17 start warm from the frame before, so the off start is "
+                     "tested on the first frame alone; the later frames test the arms on a "
+                     "chain, not the start.  Rows written at 51e56e95f carry no "
+                     "`rejected`; the column then counts `diverged` frames.")
     SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(SUMMARY)
 
