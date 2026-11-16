@@ -8,7 +8,7 @@ from .plots import plot_for_vlm, plot_pattern, plot_result, plot_trajectory
 
 __all__ = ["LiveSession", "component", "keep", "periodicity", "plane", "plot_candidates",
            "plot_for_vlm", "plot_indexing", "plot_pattern", "plot_peak_list",
-           "plot_result", "plot_trajectory", "plot_validation", "recolour",
+           "plot_result", "plot_strain_surface", "plot_trajectory", "plot_validation", "recolour",
            "render_structure", "select", "sphere", "write_html"]
 
 _FIGURE3D = ("component", "keep", "periodicity", "plane", "recolour", "render_structure",
@@ -22,6 +22,10 @@ def __getattr__(name: str):
         from . import figure3d
 
         return getattr(figure3d, name)
+    if name == "plot_strain_surface":
+        from .strain import plot_strain_surface
+
+        return plot_strain_surface
     if name == "write_html":
         from .html import write_html
 
