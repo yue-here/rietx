@@ -5056,18 +5056,6 @@ class Refinement:
             if e.held and e.tie is None and not e.locked
             and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
             and not any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_off))
-        # And a wavelength the fence declined (WP-2148): the glob reached it
-        # (``would_free`` replays everything ``set_vary`` does but the skip)
-        # and it is not free, because nothing pinned the d scale.  Recorded
-        # beside the holds, as the floating-origin hold is: a row the table
-        # held against a glob, which ``WAVELENGTH_NOT_FREED`` reports rather
-        # than ``HOLD_BLOCKED_PLAN``.  Before this the stage dropped it in
-        # silence and its answer read ``converged``.
-        free_now = set(table.free_paths)
-        blocked_by_hold = sorted({*blocked_by_hold, *(
-            p for p in table.would_free(stage.turn_on)
-            if _is_wavelength(p) and p not in free_now
-            and not any(fnmatch.fnmatchcase(p, g) for g in stage.turn_off))})
         # What the stage asked for by name and the model does not have
         # (WP-1414).  A literal, or a pattern under a retired spelling: any
         # other pattern matching nothing is how the shipped plans reach
@@ -5101,6 +5089,34 @@ class Refinement:
         if fixed:
             gone = set(fixed)
             freed = [p for p in freed if p not in gone]
+        # The λ fence settled on the set this stage leaves free (WP-2148).
+        # ``set_vary``'s glob skip asked while the turn_on was being applied,
+        # before the lift above re-freed a cell the last stage held and before
+        # the turn_off held one — either can move whether a held cell pins
+        # the scale.  So a wavelength the turn_on reached is asked again here:
+        # freed if a held cell now pins it, held for the stage if none does.
+        # One it is not free for is recorded beside the holds, as the
+        # floating-origin hold is (a row the table held against a glob), and
+        # ``WAVELENGTH_NOT_FREED`` reports it rather than ``HOLD_BLOCKED_PLAN``.
+        # Before this the stage dropped it in silence and read ``converged``.
+        asked = [p for p in table.would_free(stage.turn_on)
+                 if _is_wavelength(p)
+                 and not any(fnmatch.fnmatchcase(p, g) for g in stage.turn_off)]
+        if asked:
+            free_now = set(table.free_paths)
+            if table.wavelength_pin() is None:
+                drop = [p for p in asked if p in free_now]
+                if drop:
+                    table.set_vary(drop, False)
+                    freed = [p for p in freed if p not in set(drop)]
+            else:
+                add = [p for p in asked if p not in free_now]
+                if add:
+                    freed = freed + [p for p in table.set_vary(add, True)
+                                     if p not in freed]
+            free_now = set(table.free_paths)
+            blocked_by_hold = sorted({*blocked_by_hold,
+                                      *(p for p in asked if p not in free_now)})
         if mode in ("lebail", "pawley"):
             # never refine what ``mode_fixed_path`` force-fixes against the
             # intensity model (structure, the phase scale, texture, a magnetic
