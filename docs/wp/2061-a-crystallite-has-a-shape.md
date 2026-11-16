@@ -21,6 +21,8 @@ A phase can carry a size broadening that depends on hkl, in two declared forms, 
 
 WP-1946's non-goals note that brucite's platelets "may carry" anisotropic size instead of the Stephens strain that WP fits. That is a live case where the two mechanisms compete.
 
+*Superseded in part, 2026-11-16 (checked against the tree at bc77a934e).* The Laue-class harmonic machinery this WP planned to derive now exists, built for texture by WP-1960: `crystallography/spherical_harmonics.py`. `texture_basis(space_group, order, cell)` returns every function the Laue class allows for even l from 2 to `order`, from the operators through a Reynolds projector (Bunge's real harmonics, orthonormal over the sphere, GSAS-II's C(l, n) names). Its frame rule covers every setting, rhombohedral axes included (z ∥ [111]). `TextureBasis.evaluate` and `reflection_directions` are backend-routed, so the frame follows a refined cell and the traced twin takes them unchanged. Positivity has a precedent there too: an LM inequality (`optimize.least_squares.texture_positivity_inequalities`) and a guard over sampled sphere points (`strategy.staged.check_texture_positive`, `TEXTURE_NOT_POSITIVE`, `TEXTURE_SPHERE_SAMPLES`). A probe on this tree gave one term at order 2 in every uniaxial class (`c2_0` for 6/mmm, 4/mmm, -3m1 and R-3m on rhombohedral axes), so `lor_size` plus `c2_0` is the uniaxial two-coefficient case. The cubic classes have none below order 4 (`c4_1`). `tests/test_spherical_harmonics.py` already pins invariance in every setting and the character-formula counts. AS-1's subspace is therefore reuse rather than a new derivation, and its cost moves to the wiring. That wiring waits on the schema question below.
+
 **Practice (read 2026-10-26).** All three programs carry anisotropic size on the analytical profile, without fundamental parameters.
 
 - GSAS-II 5.8.4: `SizeType` is `isotropic`, `uniaxial` or ellipsoidal (`GSASIIstrMath.py:3237-3249`). The uniaxial width is (1.8λ/π)/(Size;i·Size;a·cosθ)·√((sinφ·Size;a)² + (cosφ·Size;i)²), with φ the angle between H and the axis. The ellipsoidal one is 1.8λ/(π cosθ · `ellipseSize(H, Sij)`) over six coefficients. Read from the installed source.
@@ -32,6 +34,12 @@ So the seam does not need FPA. FPA would change how a size convolves, not which 
 
 **The shape to copy.** WP-0503's Stephens block is the template one rank over: a subspace derived from the operators rather than tabulated (`crystallography/stephens.py`, `wyckoff._nullspace_int`), absolute DOFs, an out-of-subspace set refused, an isotropic seed, and a lock on the isotropic parameter whose direction the block contains (`lor_strain` there, `lor_size` here). The Stephens rules in root CLAUDE.md apply in kind: the width must stay non-negative in every direction, and that couples all coefficients, so it is a guard or an LM linear inequality, never a box bound.
 
+*Two templates since 2026-11-16.* The texture block (WP-1960) is the closer one for the harmonic subspace, its frame and its sphere-sampled positivity. The Stephens block remains the one for the lock. Whether a lock is needed at all depends on a design choice: if the size block starts at l = 2, as the texture basis does, `lor_size` stays the isotropic (l = 0) term and nothing is locked.
+
+**The schema question (issue #1065, question 2; folded from `### Inherited`, 2026-11-16).** The issue's reporter (2026-10-28) proposed a separate `Phase.size_harmonics` beside `Phase.microstrain`, and AS-2 as a third field `Phase.size_families`, rather than one microstructure block. Their reasons: `microstrain` appears in 34 files under `src/` and 70 with `tests/` (the GSAS-II, TOPAS and FullProf project readers and writers, `io/recipe.py`, `params/vector.py`, the GUI, `help.py`), so a block would migrate a landed field and every saved project and recipe path naming it. `model/microstructure.py` already joins size and strain in the report. GSAS-II (`Size`/`Mustrain`), FullProf (separate model codes) and TOPAS (`CS_L`/`Strain_L`) keep size and strain apart, so an exporter maps field to field. The cost they name: the `lor_size` lock and the non-negativity guard are written across two fields, as WP-0503 already does for Stephens. They answered question 1 (leaving WP-1131's "with FPA at v2+"), settled by this WP's placement, and question 3: they found no public anisotropic-size dataset either. The schema shape stays the maintainer's decision, and a block would be a stored-format change.
+
+**WP-2107 (folded from `### Inherited`, 2026-11-16).** If WP-2107's peak equation lands, a user can write an anisotropic size by hand, and its task "The harmonic" puts a real harmonic of the hkl direction in the grammar. That route lacks this WP's symmetry-derived subspace, which this WP still owns. Read 2107's rule on a non-invariant equation before designing the block. 2107 also covers "a width on a family of hkl" (its Priority line and FullProf's selective size in its references), which overlaps AS-2. 2107 was ⬜ on 2026-11-16.
+
 **Seams to extend.** `schemas/structure.py` (`Phase`), `params/vector.py` (`_collect_microstrain`'s neighbour, and the lock), `model/forward.py` and `profiles/` (the Lorentzian FWHM sum), `model/microstructure.py` (a size per direction with esds), `params/multi.py` (`SIZE_LAMBDA_POWER` gains the new rows, since a size coefficient goes as λ), `help.py`, `capabilities()` features, `tests/test_cross_backend.py` configs (a new derivative path), the manual's Theory tab (each equation with its *Source* line), and `viz/compare.py` with `tests/test_compare_ui.py` (a new correction adds its row).
 
 **Tier.** Every term is declared by the caller and off by default, so nothing decides for the user. No `suggestion=` points at it from a residual statistic: strain, preferred orientation and stacking faults are competing explanations of an hkl-dependent width, and a powder pattern often cannot rank them. The one new diagnostic is a size sum that goes negative in some direction, the analogue of `STEPHENS_STRAIN_NOT_POSITIVE`. A negative width is unphysical, so it is tier 1 with its `_audit` row. The harmonic subspace is physics (Popa 1998); the selective rule is named practice (FullProf's selective broadening, TOPAS's hkl conditions).
@@ -39,31 +47,6 @@ So the seam does not need FPA. FPA would change how a size convolves, not which 
 **Reference before code.** The isotropic control is the ceria size-strain round robin (Balzar et al. 2004, CC BY). No published anisotropic-size refinement with data rietx may hold is known yet. Until one is found the harmonic and family terms ship "not yet validated", with GSAS-II as a black-box oracle on a synthetic uniaxial pattern (the two parameterisations meet on the uniaxial case). The FullProf manual's selective example (Önnerud et al. 1997, Pd₃MnD₀.₈) is the candidate for the family term if its data can be held.
 
 **Licensing.** GSAS-II source may be read for the concept and as an oracle; FullProf and TOPAS by manual and paper only.
-
-### Inherited
-
-- 2026-11-04, from WP-2107: if a peak equation lands, a user can write an anisotropic
-  size by hand without this WP's symmetry-derived subspace. This WP still owns that
-  subspace. Read 2107's rule on a non-invariant equation before designing the block.
-- 2026-10-31, from the issue triage (issue #1065): the reporter (2026-10-28)
-  answered the issue's questions 1 and 2 for this WP's first task. Question 1
-  (leaving WP-1131's "with FPA at v2+") is settled by this WP's placement, and
-  they agree. Question 2 (the schema shape), their view: a separate
-  `Phase.size_harmonics` beside `Phase.microstrain`, and AS-2 as a third field
-  `Phase.size_families`, rather than one microstructure block. Their reasons:
-  `microstrain` appears in 34 files under `src/` and 70 with `tests/` (the
-  GSAS-II, TOPAS and FullProf project readers and writers, `io/recipe.py`,
-  `params/vector.py`, the GUI, `help.py`), so a block would migrate a landed
-  field and every saved project and recipe path naming it;
-  `model/microstructure.py` already joins size and strain in the report;
-  GSAS-II (`Size`/`Mustrain`), FullProf (separate model codes) and TOPAS
-  (`CS_L`/`Strain_L`) keep size and strain apart, so an exporter maps field to
-  field. The cost they name: the `lor_size` lock and the non-negativity guard
-  are written across two fields, as WP-0503 already does for Stephens.
-  Question 3: no public anisotropic-size dataset found by them either. Checked
-  against the tree at d87c8cc91: no landing on this subject since 2026-10-26.
-  The schema shape stays the maintainer's decision (this WP's task "Decide the
-  schema shape with the maintainer"); a block would be a stored-format change.
 
 ## Non-goals
 
