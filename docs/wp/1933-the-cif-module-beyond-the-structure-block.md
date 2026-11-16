@@ -276,6 +276,102 @@ the NAC + CaF₂ file reads back with its su.
 
 ## Handover log
 
+### 2026-11-16 — #913 items 1-3: two refusals and the gemmi floor (PR #1587)
+
+The CIF reader no longer builds the wrong structure in silence when a file's
+operator loop and its H-M symbol name different groups: it stops and names
+both, so a C2/m file whose loop lost the centring, or a P6₁ loop under
+`P 61 2 2`, can no longer come back as half the atoms. A coordinate written
+`.` or `?` is refused by file, site and tag instead of failing with an
+anonymous NaN error. The declared gemmi floor is now one under which the
+reader runs at all. A loop at another setting or origin of the symbol's group
+still reads as before, and so does a loop that is no group. Two questions go
+to the maintainer (below): the occupancy null's default, and the 7
+database files that read right today by luck and are now refused.
+
+- **Done.** Claimed (draft PR #1587). Item 1 (`4d22205fc`): `_number_fault`
+  refuses a null coordinate and says what the null means; an occupancy null
+  still reads 1.0. Item 3 (`b3ce12859`): `_closed_operations` tests the loop's
+  closure exactly (gemmi's 1/24 units, translations mod one cell), spglib names
+  the closed loop's type, and `_refuse_operators_against_symbol` refuses when
+  that type number differs from the symbol's. A magCIF and a bracketed rietx
+  label skip it. Item 2 (`dcea78411`): `gemmi>=0.6.6`. Release notes staged in
+  `releases/1.12.0.md` (§ Code to check, two; § Requirements that rise, one).
+  `### Inherited` was left as it stands: open PR #1471 adds entries to it, and
+  the #913 entry there is now half consumed (items 1-3 here; C-e's setting
+  from the loop stays). Forward reference to 1921's Inherited: the adapter's
+  "`.` as 0" must now run before the core reader, and the 7 `B 1 21 1` export
+  entries are refused.
+- **Measured.** The issue's cases A-L on this branch: C, C′, F, H, J, K and L
+  refused naming both groups; A, G, I, origin-2 `F d -3 m` and B (no group)
+  read as on `main`. On `main` 8 of the 13 new loop tests and 3 of the 5 new
+  null tests fail (the 2 occupancy rows pin unchanged behaviour). gemmi floor,
+  measured in scratch venvs (`[dev]`, darwin arm64): 0.6.5 lacks
+  `SmallStructure.spacegroup` and every new reader test fails on it; 0.6.6 has
+  it and the CIF test files pass (`test_cif_*`, crystallography, magcif,
+  operator_list_phase, exporters, symmetry_orbits, wyckoff, species_fallback,
+  site_twins_merged, projects_gsas2: 830 passed before this branch's tests
+  were added; 835 on 0.7.0 with them). The full fast suite was not run under
+  0.6.6. A sweep of the 19 CIFs in the repository and 28 COD files in the
+  maintainer's local reference set reads identically on `main` and here. A
+  read-only review agent built every one of gemmi's 564 settings (644 symbol
+  spellings) as a file stating its own loop: none refused, on gemmi 0.7.5 and
+  0.6.6; enantiomorph swaps and same-setting different groups were refused.
+  Fast suite on pearl (`wp1933f`, shared venv `rietx-py312` with gemmi 0.7.5, Linux
+  x86-64 under WSL2, `-n 8` on 8 pinned cores, co-tenant beside five other runs,
+  tree `dcea78411`): 14867 passed, 280 skipped, 32 xfailed, 2 failed in 536 s.
+  `test_portability` named the three `write_text` calls without `encoding=` in
+  the new loop tests, fixed in `bbd945a4c` (the file then passes beside it,
+  locally). `test_tutorials[02_simple_rietveld]` failed with "Kernel died before
+  replying to kernel_info" and passes alone (`[dev]`, darwin arm64), so a
+  kernel start under load. Total 15181 against 15162 for `pc2084` on the same
+  base `bc77a934e`: +19, the 19 cases added here, no new skip. Canary
+  (`wp1933c`, touched files + audit_table + help + docs_consistency, `-n 4`):
+  146 passed, 34 s, 4 cores, 155 % CPU. The full selection was not run: nothing
+  here moves a fitted number.
+  Added tests (`tests.added_test_times`, pearl's junit): 19 cases in 0.15 s
+  together, the dearest 0.12 s for 5 cases, so none joins the slow tail.
+  `python -m tests.reader_output`: exit 0, unchanged against `bc77a934e`.
+- **Review.** `/code-review` was not run (it edits the main checkout under
+  ghostshift); a read-only review agent read the diff and found no
+  correctness bug. Observations kept, not changed: a malformed symbol gemmi
+  reads by dropping spaces (`'P 3 2'` → P 32) can now refuse a file whose
+  loop is a proper P 3 1 2; a loop missing every non-identity operation is
+  refused, as the ruling intends; a primitive-basis loop of an origin-2 group
+  under its bare symbol still reads as origin 1 with nothing said (on `main`
+  too; C-e's).
+- **Generality.** No row added to `_audit.py`, and no heuristic the table
+  cannot see: the two refusals choose no threshold (the type comes from
+  spglib, the null meaning from CIF). Judge not dispatched; the tier line is
+  in Context.
+- **Questions for the maintainer.**
+  1. *The occupancy default.* The ruling reads an occupancy null "by the
+     `cif_core` default, checked against the dictionary". Checked: the DDLm
+     core 3.3.0 vendored in `tests/data` states **no** default for
+     `_atom_site.occupancy`, nor does the DDL1 2.5.0-dev in COMCIFS's legacy
+     repository; the IUCr DDL1 core 2.4.5 states `_enumeration_default 1.0`.
+     The reader keeps 1.0 (as on `main`) citing 2.4.5. If the current
+     dictionary is the authority, an occupancy null has no default and would
+     be refused like a coordinate.
+  2. *Files that read right by luck.* #913's follow-up counts 7 `B 1 21 1`
+     entries whose closed loop is a B-centred P-1. `main` built them as
+     `B 1 21 1` because gemmi tabulates no setting for that list and fell back
+     on the symbol. The ruling's rule ("a different group, beyond a setting or
+     origin choice") refuses them now, with the other contradictions.
+- **Gotchas.** `_cell_length_a ?` reads as **1.0 Å** with no diagnostic, on
+  `main` and here: gemmi gives 1.0 for a null cell length, so no NaN reaches
+  `_number_fault`. Not in #913's three items; it belongs with the reader's
+  null rule (C-e or an issue). A null cell *angle* does give NaN, so it is now
+  refused by tag. The testslot guard refuses `pytest -n` on the Mac while
+  pearl answers, so a test subset there runs serially.
+- **Next**, in order:
+  1. The maintainer's two answers above.
+  2. C-e once 1918's I-c lands: the reader's setting from the operator loop,
+     which also fixes COD 9000775 (α-quartz at an origin shifted c/3, still
+     read with the table's operators, Si₆O₆ for Si₃O₆) and the null cell
+     length.
+  3. #752's decision, then C-g.
+
 - **2026-11-03** — the maintainer's ruling on #913, recorded for a later build.
   The answer to the operator-loop question is "minimum": refuse what reads
   wrong in silence, and build nothing for the rare cases. That is three
