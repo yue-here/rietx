@@ -2692,7 +2692,9 @@ ROWS: tuple[Row, ...] = (
                   "H/L, SRM 660c reads 0.582 plain esd on u behind it, a strict xfail: the 0.05 "
                   "floor's closing stage starts past the (333)/(511) Ka2 row of the Gamma_G^2 cone "
                   "and drops it, so the two arms stop on two rows of the cone; the floor only moves "
-                  "where that stage starts "
+                  "where that stage starts; the row drop is not its only effect: floor 0.03 keeps "
+                  "the Ka2 row yet lands 0.442 plain esd on w from the shipped answer at a higher "
+                  "chi2, so the floor moves the answer past the 0.1 bar without dropping a row "
                   "(WP-2084, 2026-11-16)"),
         grounds=("A numerical setting whose domain test fails over part of the domain it claims; "
                  "tier 3 under B10 option 2 (ruled 2026-10-19).  The seventh round's Q2 (ruled "
