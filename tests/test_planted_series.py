@@ -37,7 +37,6 @@ from pathlib import Path
 import pytest
 
 from rietx.model import compiled
-from rietx.sequential import GOF_STEP_FACTOR
 from tests.planted_series import (
     EVENTS,
     TABLE_PATHS,
@@ -136,16 +135,14 @@ def test_the_null_series_raises_no_event_signal(null):
         EVENTS)
 
 
-def test_the_null_series_takes_no_gof_step(null):
-    """The GoF step (WP-2080) escalates nothing on a clean chain: every warm
-    pattern keeps its collapsed first rung, its ratio recorded and under the
-    factor.  WP-2003's 247-pattern null arm, read retrospectively, never
-    passed 1.126."""
+def test_the_null_series_records_a_warm_gof_ratio_near_one(null):
+    """Every warm pattern of a clean chain keeps its collapsed first rung and
+    carries its GoF over its seed's, a record (WP-2080); WP-2003's 247-pattern
+    null arm, read retrospectively, never passed 1.126."""
     warm = null.entries[1:]
     assert all(e.rungs_tried == ["warm"] for e in warm)
-    assert not any(e.escalated_on_gof for e in null.entries)
     assert all(e.warm_gof_over_seed is not None
-               and e.warm_gof_over_seed < GOF_STEP_FACTOR for e in warm)
+               and e.warm_gof_over_seed < 1.25 for e in warm)
 
 
 def test_the_background_step_is_the_largest_step_of_its_constant(planted):

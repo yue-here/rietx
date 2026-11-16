@@ -111,21 +111,17 @@ climbed every pattern from T134, where an unmodelled phase appears, for 4.1×
 the evaluations.  Rwp tracks Rexp, so it rose on falling counts under a right
 model as readily as on a wrong one (WP-1469).
 
-**One narrower trigger reaches the middle rung only: the GoF step** (WP-2080,
-option B, :data:`GOF_STEP_FACTOR`).  A collapsed warm rung that converged
-clean can still stop in a wrong basin: on issue #1214's two-phase chain it kept
-a minor phase's ``c`` 0.34 Å off at twice its seed pattern's GoF, under the Rwp
-fence and with no code apart from a good fit, while the staged plan from the
-same start found the truth.  So a first rung whose GoF exceeds 1.25 times the
-GoF of the pattern its warm start came from climbs to ``"warm_staged"``, and
-:func:`_prefer` keeps the better of the two.  It never sends a pattern
-``"cold"`` and never quarantines one: those stay :func:`_reseed_needed`'s and
-:func:`~rietx.schemas.sequential._rejected`'s, so a pattern the step escalates
-keeps its warm start and the chain is unbroken there.  GoF, not Rwp, because it
-divides by the pattern's own noise; the seed, not a median, because a median
-of accepted GoFs fired on 115 of 247 patterns of the planted ramp, where the
-seed fires on one.  ``SeriesEntry.warm_gof_over_seed`` and
-``SeriesEntry.escalated_on_gof`` record it on every warm pattern.
+**No GoF step retries a pattern** (WP-2080, the maintainer's ruling of
+2026-11-16).  A collapsed warm rung that converged clean can still stop in a
+wrong basin: on issue #1214's two-phase chain it kept a minor phase's ``c``
+0.34 Å off at twice its seed pattern's GoF, under the Rwp fence, while the
+staged plan from the same start found the truth.  Whether to rerun such a
+pattern is the caller's call, because two refiners would act differently on
+the same ratio (DESIGN.md § Rules, 1) and GoF is Rwp over its expected value
+(§ Rules, 4).  So the ratio is a record and no trigger:
+``SeriesEntry.warm_gof_over_seed`` is the first warm attempt's GoF over the GoF
+of the pattern its warm start came from, written on every warm pattern, and
+``refit="stages"`` is the rerun.
 Two candidates were considered and rejected, and the reasons are the rule a new
 trigger has to satisfy.  *Guard findings* (``HIGH_CORRELATION``, at-bounds) fire
 legitimately on perfectly converged patterns: a correlated pair is a property of
@@ -362,22 +358,6 @@ ON_ERROR_POLICIES = ("raise", "skip", "carry")
 #: also what the *first* pattern of every chain runs, having no predecessor.
 RUNGS = ("warm", "warm_staged", "cold")
 
-#: The GoF step that sends a warm first rung up one rung (WP-2080, option B):
-#: a collapsed warm refit whose GoF exceeds this multiple of the GoF of the
-#: pattern its warm start came from climbs to ``"warm_staged"``, and the better
-#: of the two attempts is kept (:func:`_prefer`).  The step escalates to the
-#: middle rung only, never to ``"cold"``, and never quarantines: the cold rung
-#: and the quarantine stay :func:`_reseed_needed`'s and
-#: :func:`~rietx.schemas.sequential._rejected`'s.  Measured on issue #1214's
-#: two-phase chain over 20 noise draws: the two first rungs it fires on sat at a
-#: GoF ratio of 2.01 with the hexagonal ``c`` 0.34 Å off, and ``warm_staged``
-#: took both to within 1e-4 Å of the truth; the 18 it left kept their first rung
-#: at 0.994-1.034.  Over the 537 warm fits of WP-2003's nine series it fires on
-#: 3.  The margin is thin: the largest ratio kept without need there is 1.126
-#: (cpd) and the smallest a rescue followed is 1.279 (cpd-noclose 1b), so a
-#: family with kept fits near 1.2 reopens the number (``docs/wp/2080-*.md``).
-GOF_STEP_FACTOR = 1.25
-
 
 class _PatternRaised(Exception):
     """A pattern's own :meth:`Refinement.fit` raised; ``original`` is what.
@@ -582,8 +562,7 @@ def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
     warm-staged, 2863 cold.  So the pre-WP-1051 fallback — straight from the
     first rung to the last — paid roughly triple to discard a starting point
     that had not been shown to be the problem.  A rung is reached only when the
-    trigger still fires on the *best attempt so far* (:func:`_reseed_needed`;
-    the middle rung also on the GoF step, :data:`GOF_STEP_FACTOR`),
+    trigger still fires on the *best attempt so far* (:func:`_reseed_needed`),
     which is what makes the escalation stop at the first one that works:
     :func:`_prefer` ranks an attempt the quarantine accepts above a rejected
     one, so once any attempt clears the trigger the best one does too.
@@ -1795,9 +1774,8 @@ class SequentialRefinement:
         one's.
 
         Each pattern climbs ``ladder`` (:func:`_ladder`) until an attempt clears
-        :func:`_reseed_needed` (and, for the climb to ``"warm_staged"`` alone, the
-        GoF step, :data:`GOF_STEP_FACTOR`), and keeps the best attempt by
-        :func:`_prefer` whichever rung produced it; ``previous`` is the last **accepted** pattern, which is
+        :func:`_reseed_needed`, and keeps the best attempt by :func:`_prefer` whichever
+        rung produced it; ``previous`` is the last **accepted** pattern, which is
         not always the last one walked (see the quarantine below).
 
         A cancelled pattern ends the walk.  Cancelled on its *first* attempt it
@@ -1881,10 +1859,9 @@ class SequentialRefinement:
             best_ref = best = None
             best_rung = ""
             best_truncated = False
-            #: the first returned attempt's GoF over the seed's, and whether
-            #: the GoF step alone sent the pattern up a rung (WP-2080)
+            #: the first returned attempt's GoF over the seed's, a record
+            #: that triggers nothing (WP-2080)
             gof_ratio: float | None = None
-            gof_escalated = False
             tried: list[str] = []
             rwp_of: dict[str, float] = {}
             #: every rung that raised rather than returned, with ``repr(exc)``
@@ -1913,17 +1890,9 @@ class SequentialRefinement:
                         # like any escalation, when the caller asked for none
                         if not reseed:
                             break
-                    else:
-                        needed = _reseed_needed(best, accepted_rwp,
-                                                reseed_factor)
-                        # the GoF step (WP-2080, option B) reaches the middle
-                        # rung only: never "cold", never the quarantine
-                        step = (rung == "warm_staged" and gof_ratio is not None
-                                and gof_ratio > GOF_STEP_FACTOR)
-                        if not forced and not (reseed and (needed or step)):
-                            break
-                        gof_escalated = gof_escalated or (
-                            step and not needed and not forced)
+                    elif not forced and not (reseed and _reseed_needed(
+                            best, accepted_rwp, reseed_factor)):
+                        break
                 unbounded_plan = rung_plan
                 if not tried and budget is not None:
                     rung_plan = _bounded_plan(rung_plan, budget)
@@ -2056,9 +2025,6 @@ class SequentialRefinement:
             # been fenced against, a record with no threshold (WP-2003, C1)
             entry.rwp_over_median = _rwp_over_median(best, accepted_rwp)
             entry.warm_gof_over_seed = gof_ratio
-            # set only once the climb it caused was attempted: a cancel
-            # before the warm_staged rung leaves an entry that never escalated
-            entry.escalated_on_gof = gof_escalated and "warm_staged" in tried
 
             entries[k] = entry
             results[k] = best
@@ -2527,14 +2493,12 @@ def _gof_over_seed(result: RefinementResult | None,
     """``result``'s GoF over ``seed_gof``, the GoF of the pattern its warm start
     came from, or ``None`` (WP-2080).
 
-    What :data:`GOF_STEP_FACTOR` is compared with, and the record
-    :attr:`SeriesEntry.warm_gof_over_seed` carries.  GoF, not Rwp: GoF divides
-    the misfit by the pattern's own counting noise, so a seed at a different
-    R\\ :sub:`exp` does not move the reference, which is how issue #1214's first
-    rung sat under the Rwp fence at twice its seed's GoF.  The seed, not a
-    median: the step is a fact about one warm start, and a series whose misfit
-    grows smoothly takes no step, where a median of earlier patterns fired on
-    115 of 247 patterns of the planted ramp.  ``None`` where there is no
+    The record :attr:`SeriesEntry.warm_gof_over_seed` carries, and no trigger.
+    GoF, not Rwp: GoF divides the misfit by the pattern's own counting noise,
+    so a seed at a different R\\ :sub:`exp` does not move the reference, which
+    is how issue #1214's first rung sat under the Rwp fence at twice its seed's
+    GoF.  The seed, not a median: the ratio is a fact about one warm start.
+    ``None`` where there is no
     attempt, no seed, or either GoF is not a positive finite number.
     """
     if result is None or result.statistics is None or seed_gof is None:

@@ -1,6 +1,6 @@
 # WP-2080 — A warm fit that stopped in a wrong basin is kept, and nothing escalates it
 
-Milestone: unscheduled · Status: ✅ 2026-11-08 — option B landed: the GoF step climbs a warm first rung to warm_staged (PR #1473)
+Milestone: unscheduled · Status: ✅ 2026-11-16 — the maintainer ruled option A: the GoF ratio is a record, no automatic retry (PR #1473)
 Track: What fires, and what stays silent
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
 
@@ -188,6 +188,29 @@ this session).
 - Root CLAUDE.md § Series; DESIGN.md § Rules, 1 and 4.
 
 ## Handover log
+
+### 2026-11-16 — the maintainer's ruling: the ratio as a field, no automatic retry (PR #1473)
+
+The maintainer ruled that a series does not retry a pattern on the GoF step. This reverses
+option B, which a Claude session settled under delegation on 2026-11-02 and the entries
+below record as landed. Grounds: DESIGN.md Rule 1 needs unanimity for an automatic action
+and this WP names two refiners who would act otherwise; Rule 4 bars an Rwp comparison as
+the evidence for one, and GoF is Rwp over its expected value; the 1.25 rests on
+development data and fired on the T186 transition with nothing to rescue. The field
+follows the 2026-11-03 ruling on `rwp_over_median`. Issue #1474 (the factor on more
+families) no longer blocks the PR.
+
+Removed: the climb in `_chain`, `sequential.GOF_STEP_FACTOR`, `SeriesEntry.escalated_on_gof`,
+their two `_audit` rows (the `fit:reseed` row's text is main's again), the `help.py` entry,
+the GUI chip text that depended on the climb (`Series.svelte` is main's), the practice-table
+and series-guide sentences, and the skill api row's field. Kept: `SeriesEntry.warm_gof_over_seed`
+on every warm pattern, with its help entry and its tier-1 audit row, and the split of
+`reference/series.md` into two pages. The ladder page now says what a high ratio means (a
+wrong minimum, or more counts at the same systematic misfit) and that `refit="stages"` is
+the rerun. The #1214 test asserts the recorded ratio (about 2.0) and the unchanged kept
+attempt; the planted null asserts every warm ratio under 1.25 with no retry. Everything
+below this entry describes option B as it stood on 2026-11-08, including its Generality
+rows for `GOF_STEP_FACTOR` and `escalated_on_gof`, which no longer exist.
 
 ### 2026-11-08 — option B landed; the WP closes (PR #1473)
 

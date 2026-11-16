@@ -1716,34 +1716,35 @@ def _dictate_gof(runner, gofs):
     return runner
 
 
-def test_a_gof_step_climbs_to_warm_staged_and_never_cold(thermal_patterns):
-    """A clean warm rung at twice its seed's GoF climbs one rung and no
-    further, whatever the staged rung reports; it is neither reseeded nor
-    quarantined.  Its successor's reference is its own kept GoF."""
+def test_a_high_warm_gof_is_recorded_and_the_pattern_is_not_retried(
+        thermal_patterns):
+    """A clean warm rung at twice its seed's GoF is kept as it is: the ratio is
+    a record and no trigger (the maintainer's ruling of 2026-11-16, WP-2080), so
+    the ladder stays at its first rung and nothing is reseeded.  The next
+    pattern's reference is the kept GoF."""
     structure, ins = _start_models()
     gofs = {"p000": [1.0], "p001": [2.0, 2.0, 2.0], "p002": [1.0]}
     series = _dictate_gof(SequentialRefinement(structure, ins), gofs).fit(
         thermal_patterns[:3], plan=_CHEAP)
 
-    stepped = series[1]
+    high = series[1]
     assert series[0].warm_gof_over_seed is None            # no warm start
-    assert stepped.rungs_tried == ["warm", "warm_staged"]
-    assert stepped.escalated_on_gof and not stepped.reseeded
-    assert stepped.warm_gof_over_seed == pytest.approx(2.0)
-    assert stepped.rwp_warm is not None                    # the ladder ran
+    assert high.rungs_tried == ["warm"] and high.rung == "warm"
+    assert not high.reseeded and high.rwp_warm is None     # the ladder never ran
+    assert high.warm_gof_over_seed == pytest.approx(2.0)
     assert {d.code for d in series.diagnostics}.isdisjoint(
         {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"})
     assert series[2].rungs_tried == ["warm"]
     assert series[2].warm_gof_over_seed == pytest.approx(0.5)
-    assert not series[2].escalated_on_gof
 
 
 @pytest.mark.parametrize("gof, kw", [
-    (1.25, {}),                     # at the factor: strictly above it fires
-    (2.0, {"reseed": False}),       # the caller declined every escalation
-    (2.0, {"refit": "stages"}),     # the first rung already is warm_staged
+    (1.25, {}),
+    (2.0, {"reseed": False}),
+    (2.0, {"refit": "stages"}),
 ])
-def test_the_gof_step_is_recorded_where_it_does_not_act(thermal_patterns, gof, kw):
+def test_the_warm_gof_ratio_is_recorded_whatever_the_ladder_does(
+        thermal_patterns, gof, kw):
     structure, ins = _start_models()
     gofs = {"p000": [1.0], "p001": [gof]}
     series = _dictate_gof(SequentialRefinement(structure, ins), gofs).fit(
@@ -1751,61 +1752,15 @@ def test_the_gof_step_is_recorded_where_it_does_not_act(thermal_patterns, gof, k
     first = "warm_staged" if kw.get("refit") == "stages" else "warm"
     assert series[1].rungs_tried == [first]
     assert series[1].warm_gof_over_seed == pytest.approx(gof)
-    assert not series[1].escalated_on_gof
 
 
-def test_a_caller_fence_past_the_gof_step_is_not_called_a_gof_escalation(
-        thermal_patterns):
-    """A first rung over the caller's ``reseed_factor`` climbs on the fence,
-    so the GoF step it also crosses is recorded and not credited."""
-    structure, ins = _start_models()
-    script = {"p000": [("converged", 0.10)], "p001": [("converged", 0.30)]}
-    runner = _dictate(SequentialRefinement(structure, ins), script)
-    runner = _dictate_gof(runner, {"p000": [1.0], "p001": [3.0]})
-    series = runner.fit(thermal_patterns[:2], plan=_CHEAP, reseed_factor=1.25)
-    assert series[1].rungs_tried[:2] == ["warm", "warm_staged"]
-    assert series[1].warm_gof_over_seed == pytest.approx(3.0)
-    assert not series[1].escalated_on_gof
-
-
-def test_a_rejected_rung_past_the_gof_step_is_not_called_a_gof_escalation(
-        thermal_patterns):
-    """A warm rung the ladder climbs past anyway (here diverged) records its
-    ratio, and the flag stays for the step alone."""
-    structure, ins = _start_models()
-    gofs = {"p000": [1.0], "p001": [3.0]}
-    runner = _dictate_gof(SequentialRefinement(structure, ins), gofs)
-    real = runner._fit_one
-    calls = []
-
-    def diverge_first(*args, **kw):
-        ref, result = real(*args, **kw)
-        if args[1] == "p001":
-            calls.append(1)
-            if len(calls) == 1:
-                result.status = "diverged"
-        return ref, result
-
-    runner._fit_one = diverge_first
-    series = runner.fit(thermal_patterns[:2], plan=_CHEAP)
-    assert series[1].rungs_tried[:2] == ["warm", "warm_staged"]
-    assert series[1].warm_gof_over_seed == pytest.approx(3.0)
-    assert not series[1].escalated_on_gof
-
-
-def test_the_gof_steps_factor_is_the_one_its_prose_quotes():
-    """The help entries and the series guide spell the factor; a retune of
-    ``GOF_STEP_FACTOR`` fails here until they say the new number."""
-    from pathlib import Path
-
-    from rietx.help import help_registry
-    from rietx.sequential import GOF_STEP_FACTOR
-    factor = f"{GOF_STEP_FACTOR:g}"
-    fields = help_registry()["result_fields"]
-    assert factor in fields["SeriesEntry.warm_gof_over_seed"]["description"]
-    assert factor in fields["SeriesEntry.escalated_on_gof"]["description"]
-    guide = Path(__file__).parents[1] / "docs" / "docs" / "reference" / "series-ladder.md"
-    assert f"more than {factor} times the GoF" in guide.read_text(encoding="utf-8")
+def test_the_gof_step_is_gone():
+    """WP-2080's ruling removed the climb with its constant and flag: neither
+    may come back without a new ruling."""
+    import rietx.sequential as seq
+    assert not hasattr(seq, "GOF_STEP_FACTOR")
+    assert "escalated_on_gof" not in SeriesEntry.model_fields
+    assert "warm_gof_over_seed" in SeriesEntry.model_fields
 
 
 #: Issue #1214's chain (contributor mustachefeeling, its ``repro.py``): a
@@ -1879,14 +1834,13 @@ _W_PLAN = staged.RefinementPlan(stages=[
 ])
 
 
-def test_issue_1214s_warm_fit_in_a_wrong_basin_climbs_and_lands_on_the_truth():
-    """Noise draw 2 of the issue: on main before WP-2080 the collapsed warm rung
-    converged clean at GoF 2.05, twice its seed's 1.02, with the hexagonal c
-    0.34 Å short, and was kept (macOS arm64).  The GoF step takes it to the
-    staged plan from the same start, which lands c within its esd of the truth
-    (measured 5.20194(11) against 5.202).  The assertion is the kept answer,
-    and the step is checked wherever the first rung landed high, since which
-    basin a local solver's first rung reaches is a platform's rounding."""
+def test_issue_1214s_warm_fit_in_a_wrong_basin_is_recorded_at_twice_its_seed():
+    """Noise draw 2 of the issue: the collapsed warm rung converges clean at
+    GoF 2.05, twice its seed's 1.02, with the hexagonal c 0.34 Å short (macOS
+    arm64).  Since the maintainer's ruling of 2026-11-16 (WP-2080) nothing
+    retries it: the record carries the ratio, about 2.0, and the kept attempt
+    is the first rung, as before the issue was worked.  The rerun is
+    ``refit="stages"``."""
     p0 = _w_simulate([_w_hex(_W_A, _W_C, 1.0, 0.03),
                       _w_orth(_W_A + 0.005, _W_A - 0.003, _W_C - 0.01, 0.4, 0.05)],
                      seed=1)
@@ -1900,15 +1854,10 @@ def test_issue_1214s_warm_fit_in_a_wrong_basin_climbs_and_lands_on_the_truth():
         [p0, p1], x=[0.0, 1.0], plan=_W_PLAN)
 
     entry = series[1]
-    from rietx.sequential import GOF_STEP_FACTOR
     assert entry.warm_gof_over_seed is not None
-    if entry.warm_gof_over_seed > GOF_STEP_FACTOR:
-        assert entry.escalated_on_gof
-        assert entry.rungs_tried == ["warm", "warm_staged"]
-        assert entry.rung == "warm_staged" and not entry.reseeded
-    assert entry.statistics.gof < 1.2
-    c, esd = entry.value("phases.0.cell.c"), entry.stderr("phases.0.cell.c")
-    assert esd is not None and abs(c - (_W_C + 0.002)) < esd
+    assert entry.warm_gof_over_seed == pytest.approx(2.0, abs=0.25)
+    assert entry.rungs_tried == ["warm"] and entry.rung == "warm"
+    assert not entry.reseeded
 
 
 @pytest.mark.slow

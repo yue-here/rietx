@@ -105,7 +105,7 @@ The temperature also appears in its `label`, since the scans of a reel are other
 | `refit` | `"single"` | `"single"` collapses the plan into one stage for a warm-started pattern; `"stages"` walks it again |
 | `two_theta_limits` | `None` | one fit range, applied to every pattern |
 | `direction` | `"forward"` | `"forward"`, `"backward"` or `"both"` ([Forward and backward chains](#forward-and-backward-chains)) |
-| `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start, or one past the GoF step, climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
+| `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
 | `first_rung_factor` | `None` | your own bound on the first attempt, a multiple of the dearest one this chain has converged; none by default |
 | `verify_steps` | 0 | how many of the largest steps to re-measure, each by refitting its two patterns cold and independently ([Steps between patterns](#steps-between-patterns)) |
 | `prepare` | `None` | `(index, data, structure, instrument) -> None`, called on the warmed models before each pattern's fit |
@@ -237,8 +237,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.rungs_tried` | every attempt made, in ladder order |
 | `SeriesEntry.rungs_raised` | the attempts among those whose fit raised, each with `repr` of the exception |
 | `SeriesEntry.rwp_over_median` | the kept attempt's Rwp over the median Rwp of the patterns accepted before it in the walk, with no threshold; `None` where no median existed, on the first pattern walked or after every earlier pattern was quarantined |
-| `SeriesEntry.warm_gof_over_seed` | the first warm attempt's GoF over the GoF of the pattern its warm start came from, what the GoF step reads; `None` without a warm start or when that attempt raised |
-| `SeriesEntry.escalated_on_gof` | the GoF step alone sent this pattern from the collapsed warm refit to `"warm_staged"` ([Restart ladder](#restart-ladder)) |
+| `SeriesEntry.warm_gof_over_seed` | the first warm attempt's GoF over the GoF of the pattern its warm start came from, a record and no trigger: a high value is a reason to rerun that pattern with `refit="stages"` ([Restart ladder](series-ladder.md#restart-ladder)); `None` without a warm start or when that attempt raised |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
 | `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
@@ -526,7 +525,7 @@ A path whose value is a step from where its fit began, in `SeriesResult.relative
 ### Restart ladder
 
 A warm fit that diverged, raised or carries an `error` code climbs a ladder of attempts: the collapsed warm refit, the full staged plan from the warm state, then the full staged plan from the starting models.
-A clean warm fit at more than 1.25 times its seed pattern's GoF climbs to the middle attempt only.
+A clean warm fit never climbs on its GoF: `SeriesEntry.warm_gof_over_seed` records the ratio and you decide.
 The entry keeps the best attempt, and `SeriesEntry.rung` says which one it was.
 [Restart ladder and quarantine](series-ladder.md#restart-ladder) gives the triggers, the first-rung bound and the attempts that raise.
 

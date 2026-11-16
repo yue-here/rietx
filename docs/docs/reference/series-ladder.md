@@ -21,17 +21,14 @@ The 1.25 fence that was the default before 1.11 escalated 116 patterns across ei
 On a series where an unmodelled phase appears part-way, it refitted every later pattern for 4.1 times the evaluations.
 A guard finding such as `HIGH_CORRELATION` is neither, since it fires on converged patterns and no attempt changes the model or data behind it.
 
-One more trigger reaches the middle attempt only: the GoF step.
+A GoF step is not a trigger.
 A collapsed warm fit can converge with no `error` code and still stop in a wrong minimum.
 On a two-phase synthetic chain it kept the minor phase's c axis 0.34 Å off, at a GoF of 2.05 where the pattern it started from reached 1.02, while the staged plan from the same start found the truth.
-So a first attempt whose GoF is more than 1.25 times the GoF of the pattern its warm start came from climbs to `"warm_staged"`, and the better of the two fits is kept.
-`SeriesEntry.warm_gof_over_seed` records that ratio on every warm pattern, and `SeriesEntry.escalated_on_gof` says when the step alone sent a pattern up.
-The step never sends a pattern to the cold attempt and never quarantines one, so it never sets `reseeded` and the chain stays unbroken there.
-It compares GoF, which divides the misfit by the pattern's own noise, and not Rwp, which moves with the counts.
-GoF moves with the counts too once a systematic misfit dominates, so a pattern counted much longer than its seed can climb with no wrong minimum, at the cost of one fit.
-It compares against the seed and not a median of the accepted patterns, because on a series where an unmodelled phase appears part-way a median of GoFs fired on 115 of 247 patterns, and the seed on one.
-Over the 537 warm fits of nine measured series it fired 3 times, and the largest ratio kept without need was 1.126.
-`reseed=False` turns it off with the rest of the ladder, and under `refit="stages"` it has nothing to climb to.
+The ladder does not retry such a pattern, because two refiners would act differently on the same ratio, and GoF is Rwp over its expected value, which is no evidence for an automatic action.
+`SeriesEntry.warm_gof_over_seed` records the ratio on every warm pattern: the first warm attempt's GoF over the GoF of the pattern its warm start came from.
+A ratio near 1 says the warm fit fitted as well as its seed.
+A high ratio means one of two things the ratio cannot tell apart: a wrong minimum, as above (about 2.0 there), or more counts at the same systematic misfit, since GoF moves with the counts once a misfit dominates.
+So compare the counts, then rerun that pattern with `refit="stages"`, which walks the full plan from the warm start; the staged fit that fits better is the answer.
 
 The first attempt is unbounded unless you pass `first_rung_factor`.
 Each stage of it, the closing one included, may then spend that multiple of the dearest stage of the first attempts this chain has converged, once three have.

@@ -475,7 +475,6 @@
   "result_fields:RefinementResult.y_calc",
   "result_fields:RefinementResult.y_obs",
   "result_fields:SeriesEntry.diagnostics",
-  "result_fields:SeriesEntry.escalated_on_gof",
   "result_fields:SeriesEntry.floored",
   "result_fields:SeriesEntry.index",
   "result_fields:SeriesEntry.label",
