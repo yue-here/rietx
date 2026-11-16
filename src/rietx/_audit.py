@@ -4313,12 +4313,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.instrument.EXTRA_PEAK_FWHM_MIN", "constant", value=0.005),
     Row("rietx.schemas.instrument.HARMONIC_WEIGHT_SEED", "constant", tier=3, value=0.01,
         evidence=("answer-invariant behind the closing stage only: seeds 0.001 and 0.3 against "
-                  "0.01 within 0.1 plain esd (at most 0.015 on 2026-11-16, macOS arm64 and Linux "
-                  "x86_64, against 0.003 quoted on 2026-10-23) at true lambda/2 weights 0, 0.003 "
+                  "0.01 within 0.1 plain esd (at most 0.015 on 2026-11-16, Linux x86_64 and "
+                  "macOS arm64, where WP-2017 group M's positive arm expected the 0.003 quoted on "
+                  "2026-10-23 and missed it) at true lambda/2 weights 0, 0.003 "
                   "and 0.05, a synthetic CW neutron corundum drawn by the package's own forward "
                   "model (tests/test_staged_start_invariance.py, the sixth round's Q2 bar); "
                   "without the closing stage (closing_window_tol=None) 0.26-1.44 plain esd on "
-                  "the O Biso and the scale, past a 1e-12 noise floor of 5e-7 (WP-2017 group M); "
+                  "the O Biso and the scale, past a 1e-12 noise floor of 6e-7, with "
+                  "FROZEN_COMPILE_STALE on seven of those twelve fits and none of the closing "
+                  "stage's (WP-2017 group M); "
                   "the one family a harmonic has here: no protocol family declares one, and the "
                   "only real lambda/2 pattern on disk, Nd2Ru2O7's neutron half, is evidence for "
                   "no audit before the milestone closes"),
@@ -4499,8 +4502,8 @@ ROWS: tuple[Row, ...] = (
                   "15.6 on fluorite's lor_strain, the width twin hold's cost (WP-2002, a strict "
                   "xfail); without the closing stage (closing_window_tol=None) 0.119 on FAP's Ca2 "
                   "Biso, 0.008 on NAC, 0.199 on LaB6's La Biso and 14.8 on cpd-1a, past a 1e-12 "
-                  "noise floor of 2e-6, so invariant behind the closing stage only (WP-2017 group "
-                  "M, 2026-11-16, Linux x86_64); the Atom.biso default, also read by "
+                  "noise floor of 2e-6, so start-dependent without it on FAP and LaB6 (WP-2017 "
+                  "group M, 2026-11-16, Linux x86_64); the Atom.biso default, also read by "
                   "crystallography/cif.py, io/recipe.py and io/projects/topas.py for a site with "
                   "no ADP"),
         grounds=("The maintainer delegated this tier to the lead on 2026-10-23 ('use your best "
