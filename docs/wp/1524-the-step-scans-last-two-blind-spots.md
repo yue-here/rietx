@@ -21,7 +21,8 @@ with two real steps reports both.
 > test. Shape 2 is moot: no argmax is left, so a path with two steps has two
 > rows. Since no threshold acts, task 2's measurement would count against
 > legs that no longer exist, and it informs no code. The text below is the
-> WP as filed. The tasks record what was done instead.
+> WP as filed, less its *Inherited* note, which is now #1590. The tasks
+> record what was done instead.
 
 `sequential._discontinuity_steps` flags a step that is over
 `DISCONTINUITY_FACTOR` (5) × the path's median step **and** over
@@ -144,6 +145,8 @@ existing series fire nothing new.
   *Generality.* No `_audit.py` change, and no heuristic, default or threshold added. The judge
   was not dispatched.
 
-  Next: none here. #1590 waits for the maintainer's ruling, and WP-2003's C4 touch takes it.- **2026-09-29** — created, from WP-1469's session: shape 1 was the review's
+  Next: none here. #1590 waits for the maintainer's ruling, and WP-2003's C4 touch takes it.
+
+- **2026-09-29** — created, from WP-1469's session: shape 1 was the review's
   declined finding, shape 2 the limit its decision 2 recorded. Next: task 1,
   which is small; task 2 is a measurement first.
