@@ -1,6 +1,6 @@
 # WP-1536 — the structure figure as an SVG
 
-Milestone: rietview · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: rietview · Status: 🔄 2026-11-16 — SVG writer in PR #1606; parity, PDF check and ASE read open (#1614)
 Depends on: —
 Priority: P3 2026-10-02 — a workaround covers it: a 3000 px PNG, or a CIF exported to VESTA's own vector output
 
@@ -181,6 +181,83 @@ measurement set. Inkscape opens the file with one element per atom.
 - `docs/wp/1470-spike/mpl_baseline.py`, for the crossing fault.
 
 ## Handover log
+
+### 2026-11-16 — first slice (ghostshift runner), PR #1606
+
+`render_structure(..., path="figure.svg")` now writes the picture as vector
+shapes: every atom an ellipse with a shaded gradient, every bond a run of short
+stick pieces, every polyhedron face a translucent polygon, the letters as text,
+each element classed by its site. Looked at side by side with the PNG on
+rutile (balls with octahedra, and ellipsoids) and on the largest corpus phase,
+the two read as the same figure. What is not yet known is how close they are
+in numbers: no rasteriser for SVG is installed where this ran, so the parity
+row, the pixel test of the crossing case and the PDF check are all still open.
+
+- **Done.** D1: `render.WRITERS` is `(".png", ".svg")`, the refusal quotes it,
+  and the raster runs either way, so `image`, `atoms`, `letters` and `report`
+  are the PNG's. The display list and writer are `figure3d/vector.py` (numpy
+  and the standard library). D2 as filed, with three choices of this session:
+  a stick is trimmed where the **first rim point** leaves its atom (the least
+  `t` over 16 rim directions, √(R² − r²) on a sphere), not where the axis
+  leaves it, since the axis trim left a background notch; **lines are trimmed
+  the same way** at any atom they end in (cell corners, polyhedron vertices),
+  or their near pieces sorted in front of the ball they start in; and a half's
+  atom is found **by position**, because a bond's far end is often an image
+  of atom `j`, not atom `j`. Pieces are no longer than the smallest drawn
+  semi-axis, floored at `PIECE_FLOOR` = 0.15 Å, and overlap by half a pixel
+  so no seam shows. Atoms tie-break on how far they reach toward the viewer,
+  so of two sites sharing a position the one the raster shows is drawn last
+  (the corpus's mixed Fe/Mg sites showed it). Each face keys on its own
+  centroid (one polygon per plane), which puts a centre atom between its
+  polyhedron's back and front faces; D2's per-polyhedron order is not kept,
+  issue #1614 item 4. D3 as filed (radial focus at the half vector, stops
+  along the ray from it; linear gradient across a stick, exact). D4, D5 as
+  filed; D5's open question is answered by the formula with its subscripts,
+  so `face TiO₆` selects every TiO₆.
+- **Review.** `/code-review` edits the main checkout, so a read-only review
+  agent read the diff instead. Fixed from it: the two trims above, quotes in a
+  site label breaking the document, one fog value for a whole half, round
+  line caps where the raster's are square, and a crossing test whose
+  assertion could not fail (the bond now tilts so a whole half would sort
+  wrong, and the test asserts per piece). Not fixed, filed as #1614: the
+  outline drawn as a centred stroke and never fogged, ring and named-face
+  fills that may seam per triangle, the radial gradient's dark rim on the
+  highlight side (a limit of D3), face order, `dominant-baseline` in librsvg,
+  and the class-token details.
+- **Measured.** Element counts at 600 px: rutile with octahedra 49 ellipses,
+  72 face polygons, 1380 line pieces, 187 kB; rutile ellipsoids 51 ellipses,
+  696 stick paths, 116 linear gradients, 33 ring arcs, 255 kB; the largest
+  `polyhedra_phases.json` phase 116 ellipses, 168 faces, 3214 line pieces,
+  436 kB. Lines dominate; if an editor slows, cut only pieces whose screen box
+  meets an atom (D2's fallback). Writing an SVG adds well under 0.1 s.
+  reader_output: exit 0, unchanged.
+- **Tests** (`[dev]` venv, macOS 26 arm64 for the targeted runs; pearl,
+  Linux, for the suites): the canary selection (this file's tests,
+  `test_structure3d_browser.py`, audit_table, help, docs_consistency, skill;
+  pearl, `-n 4`) gave 401 passed, 1 skipped on 07f6ff48d. The fast selection
+  (`-m "not slow" -n 8 --dist loadgroup`, pearl, 2176fd57b, beside other
+  jobs at load 25-32) gave 14859 passed, 280 skipped, 32 xfailed, 0 failed
+  in 1005 s. Nine cases were added (seven tests), costing 1.11 s together
+  in that run's junit, the slowest the end-to-end SVG test at 0.54 s; the
+  browser module skips here as everywhere without playwright. Main's own
+  count on the same day was not run, so the +9 is the added cases, not a
+  measured delta. ruff clean; Vale 0 errors.
+- **Not done.** Task 1: reading ASE's writer is a question for the user (see
+  Next). The crossing task is half done: the order-level repair is tested, the
+  rasterised pixels are not. Parity, the PDF check and the manual's PDF
+  command need chromium (playwright) or `rsvg-convert`/Inkscape, none of
+  which is installed on the runner's Mac. The docs and skill tasks are done
+  except the PDF command and the measured tag (the skill clause is tagged a
+  hypothesis). Figure pairs: the SVG and PNG are written to
+  `tests/output/figure3d/`, the rasterised SVG is not.
+- **Next.** First, on a machine with playwright's chromium: the parity row
+  (21 phases × ball, ball with polyhedra, ellipsoid), which also measures
+  #1614's items 1-4 and decides which to repair; then the rasterised crossing
+  test from the same harness. Then `rsvg-convert -f pdf` and Inkscape once,
+  the PDF command into `figures.md`, and the measured tag on the skill clause.
+  Task 1 waits on the user's answer: the house clean-room rule says an
+  agent never opens a reference implementation's source, while this task
+  asks to read ASE's LGPL writer for concepts.
 
 ### 2026-10-02 — filed
 
