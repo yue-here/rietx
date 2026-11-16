@@ -518,6 +518,35 @@ current value, so the guard sees a window centred on the answer rather than the 
 stopped on. That reaches any binding support window, tied or not; this fixture is the only one
 here where one binds. Question (13).
 
+**C22, `solve_magnetic`'s one-site release against the flat-moment hold** (`release_hold.py`;
+macOS arm64, `[dev]`, 12-15 s an arm). The chosen dataset cannot exercise the pair: Cr₂WO₆
+has one magnetic site, and `_starts` returns before any release when a class has fewer than two
+(magnetic.py:1553-1554, read; `test_a_single_site_class_is_started_once`), so it was not run.
+The two-site Pnma fixture of `tests/test_magnetic_solve.py` (Mn1 3.5 µB and Mn2 0.7 µB along x,
+A-type 62.448, CW neutrons) was run through `solve_magnetic` instead: four classes, each fitted
+from the flat seed and from each site alone then released, 21 fits an arm with the nuclear
+reference. Arms: shipped; no_hold (`_flat_moment_scan` holding nothing, C7's arm); tiny (the
+release at 1e-4 of the seed rather than 0.05); tiny_no_hold.
+
+| Class (BNS) | shipped: start, ΔBIC | no_hold | tiny | tiny_no_hold |
+|---|---|---|---|---|
+| 62.448 (the truth) | flat, 1037.42 (Rwp 0.011395) | identical | identical | identical |
+| 62.441 | Mn2 released, 144.628 | the same to 1e-6 | the same to 1e-6 | the same to 1e-6 |
+| 62.447 | Mn2 released, 3.4185 | identical | 3.4185 | 3.4185 |
+| 62.446 | Mn2 released, **−19.99** | Mn1 released, **−29.98** | flat, −19.99 | Mn2 released, −29.98 |
+
+The hold acts in 8 of the 20 shipped trial fits, always on an azimuth: of a moment the leg
+left on the polar axis (held at the moment stage's start and released at its answer), or, in
+62.446, of both sites once their moduli collapse to 0.11 µB with esds of 540-550 µB. A released
+site's angles are held only there (two fits), as the flat start's fit of the same class holds
+them too. The verdict, the winner, its start and its ΔBIC are the same in every arm, and so is
+the runner-up's to 1e-6. Two things move, both in the class the data reject. First, at 1e-4
+the released starts of 62.446 end in another minimum (Rwp 0.5060993 against 0.5060964) with no
+hold acting, so the release fraction does decide where a released site lands. Second, the hold
+moves 62.446's ΔBIC by 9.99 at an Rwp equal to 1e-9 relative, because ΔBIC's parameter charge is
+the count of *free* moment rows in the result (`n_moment`, magnetic.py:1610-1611, read): a held
+azimuth is not charged. Question (14).
+
 ### Questions for the maintainer (2026-11-16)
 
 Measured above; the verdict on each is a ruling, so none is written into the table yet.
@@ -605,6 +634,13 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     silent, because the guard recomputes the window around the committed answer: should
     `check_guards` read the bounds the solver used (frozen with the window set), and is that
     the owner's fix (WP-1110's window) or a new row?
+14. **C22.** On the two-site fixture the release and the flat-moment hold never meet on a class
+    the data support: winner, start and ΔBIC are the same with the hold off and with the release
+    at 1e-4. Is C22 recorded *independent* on this evidence, given that the dataset chosen for it
+    (Cr₂WO₆, one site) cannot exercise it? And one finding beside the pair: a held azimuth is not
+    charged in ΔBIC (`n_moment` counts free moment rows), so the hold raised the rejected class
+    62.446's ΔBIC by 9.99 at an unchanged χ². Should ΔBIC charge the class's moment DOFs whatever
+    a stage held, or is a held direction rightly free of charge?
 
 ## Acceptance
 
