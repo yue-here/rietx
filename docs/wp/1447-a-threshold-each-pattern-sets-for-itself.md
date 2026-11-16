@@ -81,7 +81,9 @@ when p ≤ α. At K = 199 the smallest achievable p is 0.005.
       *`_ghost_control_ratios`: `k` ratios over the admitted part of a `span`,
       each exclusion an exact interval per parent around five anode-derived
       positions (the parent, its Kα partner either side, Kβ, W Lα) one
-      matching window wide; no margin or grid step is a new number.*
+      matching window wide; no margin or grid step is a new number. The
+      near-unity band is cleared on the 16 round-robin patterns, not in
+      general: see the PR review in the 2026-11-16 entry.*
 - [ ] The permutation p-value, with K and α named constants carrying their
       measured basis, and a floor so a degenerate control cannot lower the bar
       below what a reader would accept as evidence.
@@ -112,8 +114,9 @@ when p ≤ α. At K = 199 the smallest achievable p is 0.005.
 
 - WP-1442 (the screen, the control, and every number above).
 - North, B. V., Curtis, D. & Sham, P. C. (2002), *Am. J. Hum. Genet.* **71**,
-  439-441 — the (r+1)/(K+1) Monte Carlo p-value, and why the naive r/K is
-  biased.
+  439-441, doi:10.1086/341527 — the (r+1)/(K+1) Monte Carlo p-value, and why
+  the naive r/K is biased. Erratum: (2003), *Am. J. Hum. Genet.* **72**,
+  498-499, doi:10.1086/346173.
 - Davison, A. C. & Hinkley, D. V. (1997), *Bootstrap Methods and their
   Application*, §4.4 — Monte Carlo tests.
 - Hölzer et al. (1997), *Phys. Rev. A* **56**, 4554, Table VI — the 0.14 an
@@ -139,8 +142,8 @@ parents at p = 0.005 on a line that is not there.
 fixed constant in the screen, and `ghost_searches` (WP-1445) now skips a
 declared monochromator, which the round-robin fixtures do not declare. Still
 open: the maintainer chose on 2026-09-22 not to build this, with "a pattern
-from a different instrument class" as the trigger to revisit. The ghostshift
-lead dispatched tasks 1-2. This entry builds the machinery and leaves the
+from a different instrument class" as the trigger to revisit. The session took
+up tasks 1-2. This entry builds the machinery and leaves the
 default to the maintainer, which keeps that decision where it was.
 
 *Done*:
@@ -156,12 +159,13 @@ default to the maintainer, which keeps that decision where it was.
   make the observation look rare. `_ghost_parent_rank` is factored out of
   `_ghost_candidates` with no change in behaviour. Task 2 stays unticked:
   K, α, span and floor are arguments, not named constants.
-- 13 tests in `test_background_auto.py`. Each control has a positive arm:
+- 13 tests in `test_background_auto.py` (14 with the review's limit row,
+  below). Each control has a positive arm:
   removing the self exclusions fails 7 of them. The near-unity row checks that
   a naive sweep reaches ≥ 5 on the fitted list before asserting the control
   stays at ≤ 2.
 
-*Measured* (`[dev]` venv, macOS arm64; scripts in the runner's scratch, ~60
+*Measured* (`[dev]` venv, macOS arm64; throwaway scripts, not committed, ~60
 lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
 
 | arm (16 patterns, k=199, span 0.80-1.0) | census pool | fitted list |
@@ -175,7 +179,11 @@ lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
   has a chance mean of 0.55 in the bulk, 2.03 in 0.990-0.995 and 4.35 above,
   with a maximum of 8. It starts at about 0.99, not 0.98. The census pool
   shows no wall at all. Admitted control ratios ≥ 0.95 reach at most 2 on
-  both paths.
+  both paths. This is measured on these 16 patterns, not derived (review,
+  below): the parent and its Kα partner can never be candidates, since their
+  intensity ratios lie outside `GHOST_RATIO_RANGE`. What the parent's own
+  exclusion removes is weak flank lines 0.11-0.18° below each parent, one
+  matching window away.
 - **Cost:** `ghost_control` at k=199 takes 6.8-7.6 ms on fluorite's 18-line
   list and 8.1-8.5 ms on cpd-4's 113 lines (macOS arm64, five runs each).
 - **Zircon, Kβ image 0.10, fitted:** the W Lα search reaches 3 at p = 0.005
@@ -205,6 +213,19 @@ lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
   images of non-parent lines are not excluded. Two test rows sit with zero
   margin: corundum at its bar of 2, and zircon's W Lα with 3 against 2. Both
   passed on Linux x86_64.
+- PR review (#1609), the known limit: the near-unity wall is closed on these
+  16 patterns by where their flank lines sit, not by derivation. Eight
+  parents between 24° and 33°, each with a 10 % line 0.20° below it, reach 8
+  at admitted control ratios (9 of 199 reach ≥ 5). With a real Kβ image at
+  10 % added, the fixed bar reports the leak and `decide(alpha=0.01,
+  floor=5)` does not: p = 0.015, since the control's maximum is also 8. A
+  loss of power, not a false alarm, on a pattern whose strongest lines sit
+  in a narrow low-angle band. Pinned by
+  `test_flank_lines_outside_the_exclusions_reopen_the_wall`; it bears on
+  the #1615 decision. Not fixed here: one route excludes companions within
+  one window of any placed line that itself lies within one window of a
+  parent (the screen's own window, no new number); another bounds the
+  span's upper end per pattern.
 - *Generality*: no `_audit.py` change, and no number added to a default
   path. Every new knob is a required argument, so the judge was not
   dispatched.
@@ -213,7 +234,8 @@ lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
 list does, so a test of the control has to use the fitted list to fail.
 
 Next: the maintainer's answer on #1615 (option (a): floor 5, α 0.01, K 199,
-span 0.80-1.0, which moves no answer measured here; or a lower floor). Then
+span 0.80-1.0, which moves no answer measured here but loses the
+narrow-band leak above; or a lower floor). Then
 wire it into `_ghost_screen` with named constants and audit rows, and work
 tasks 3-5 in order. Task 3's table decides whether task 5's version bump is
 owed.

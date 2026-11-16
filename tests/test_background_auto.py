@@ -428,13 +428,16 @@ def test_the_control_degenerates_to_nothing_not_to_a_guess():
 
 @pytest.mark.parametrize("host", ["corundum.prn", "cpd-1c.prn", "zincite.prn"])
 def test_the_control_has_no_wall_near_unity(host):
-    """WP-1442's trap, closed by derivation rather than by a fence.
+    """WP-1442's trap, closed on these patterns (not in general).
 
     On the fitted list a made-up ratio just under 1 lands its companion in
     the parent's own neighbourhood, and the chance consensus climbs: swept
     naively at 0.9900, 0.9925, 0.9950 and 0.9975 they reach 5 or more (the positive arm,
     so this row can fail).  The control's admitted ratios at or above 0.95
     gather no more than 2, the bulk's own level (WP-1447, 16 patterns).
+    What feeds the wall here is weak flank lines 0.11-0.18° below their
+    parents, which the parent's own exclusion happens to cover; a list whose
+    flank lines sit further out reopens it (the narrow-band row below).
     """
     from rietx.background.diagnostics import (
         GHOST_MATCH_K,
@@ -488,6 +491,11 @@ def test_the_control_is_silent_where_the_screen_is():
         update={"kbeta": "monochromator"})
     assert ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0),
                          source=mono) == []
+    from rietx.schemas.instrument import NeutronSource
+
+    # 1.5405929 Å is CuKα1 to identify_anode, so only the source can say neutron
+    assert ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0),
+                         source=NeutronSource(wavelength=1.5405929)) == []
     found = ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0))
     assert [g.kind for g in found] == ["kbeta", "tungsten_la"]
     # one control, each search reading the ratios that asked as many parents
@@ -558,6 +566,52 @@ def test_a_quiet_control_is_why_the_floor_exists():
     assert w.p_value == pytest.approx(1 / 200)
     assert not w.decide(alpha=0.01, floor=5)
     assert w.decide(alpha=0.01, floor=3)
+
+
+def test_flank_lines_outside_the_exclusions_reopen_the_wall():
+    """The known limit, pinned: the near-unity wall is closed on the 16
+    round-robin patterns, not in general (WP-1447 review).
+
+    Eight strong lines between 24° and 33°, each with a weak line (10 %)
+    0.20° below it, then a real Kβ image of every one at 10 %.  The flank
+    lines sit outside each parent's own exclusion, and over so narrow a 2θ
+    band the companion's tan θ scaling barely spreads them, so several
+    admitted control ratios gather all eight parents.  The fixed bar reports
+    the leak; ``decide(alpha=0.01, floor=5)`` does not, p = 3/200 = 0.015.
+    A loss of power, not a false alarm.  If this row starts failing, the
+    control has learned to exclude such lines: update WP-1447 and #1615.
+    """
+    from rietx.background import contamination_flags_from_peaks, ghost_control
+    from rietx.background.diagnostics import _KBETA
+
+    lam = 1.5405929
+    parents = np.array([24.0, 25.3, 26.5, 27.6, 28.9, 30.1, 31.4, 32.6])
+    inten = np.linspace(100.0, 93.0, len(parents))
+    flank = parents - 0.20
+    image = _companion(parents, _KBETA["CuKa"] / lam)
+
+    def kbeta(tt, i):
+        o = np.argsort(tt)
+        return [g for g in ghost_control(tt[o], i[o], None, lam, k=199,
+                                         span=(0.80, 1.0), tt_range=(10.0, 80.0))
+                if g.kind == "kbeta"][0]
+
+    clean = kbeta(np.concatenate([parents, flank]),
+                  np.concatenate([inten, 0.10 * inten]))
+    assert clean.n_parents_searched == 8
+    assert max(clean.control) == 8                    # the wall, at admitted ratios
+    assert sum(c >= 5 for c in clean.control) == 9    # measured: 9 of 199
+
+    tt = np.concatenate([parents, flank, image])
+    i = np.concatenate([inten, 0.10 * inten, 0.10 * inten])
+    o = np.argsort(tt)
+    flags = contamination_flags_from_peaks(tt[o], i[o], None, lam,
+                                           tt_range=(10.0, 80.0))
+    assert any(f.kind == "kbeta" for f in flags)      # the fixed bar finds it
+    leak = kbeta(tt, i)
+    assert leak.observed == 8 and max(leak.control) == 8
+    assert leak.p_value == pytest.approx(3 / 200)
+    assert not leak.decide(alpha=0.01, floor=5)       # the control does not
 
 
 @pytest.mark.parametrize("host", ["corundum.prn", "zincite.prn"])

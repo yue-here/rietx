@@ -463,10 +463,11 @@ class GhostControl(Base):
     :func:`ghost_control` asks the screen's question twice on one peak list:
     once at the real ghost ratio (``observed``, the consensus count
     :data:`GHOST_MIN_PARENTS` is compared with), and once at each of
-    ``ratios``, wavelengths that are not an emission line of anything and
-    whose companions stay clear of the lines the anode names, so a count in
+    ``ratios``, wavelength ratios that match no emission line and whose
+    companions stay clear of the lines the anode names, so a count in
     ``control`` is this pattern's coincidence rate (see
-    :func:`_ghost_control_ratios` for the lines it cannot exclude).
+    :func:`_ghost_control_ratios` for the lines it cannot exclude, and for
+    where that leaves a wall near a ratio of 1 the exclusions do not reach).
     ``p_value`` is the Monte Carlo p of :func:`ghost_p_value`: how often this
     pattern's coincidences reach what the real ratio found.
 
@@ -1957,18 +1958,32 @@ def _ghost_control_ratios(
     matching window of one of those five positions — the widest window the
     screen could match that parent with, ``max(tol_deg, k_sigma·√(σ_c² +
     σ_p²))`` with σ_c the largest position esd of any line that can be a
-    candidate (a placed one).  So a line sitting at one of those five
-    predicted positions cannot feed the control.  What it does not exclude:
+    candidate (a placed one).  So a ratio whose companion would land on one
+    of those five predicted positions is not drawn.  What it does not exclude:
     lines the five do not name (W Lα2, the Kβ image of a Kα2 component, a
     leak's images of lines too weak to be parents), so on a leaking pattern
     the control is not pure coincidence.  The exclusion is exact (an interval
     per parent and position, in ratio), so no grid step is chosen anywhere.
 
-    This is the near-unity trap WP-1442 hit, derived rather than fenced.
-    Measured on the 16 round-robin patterns (WP-1447), the fitted list's
-    chance consensus rises from a mean of 0.55 to 2.03 in 0.990-0.995 and
-    4.35 above, reaching 8; with these exclusions the largest support at any
-    admitted ratio ≥ 0.95 is 2 on both paths, the bulk's own level.  The
+    **The near-unity trap WP-1442 hit is closed on the 16 round-robin
+    patterns, measured, not derived.**  There the fitted list's chance
+    consensus rises from a mean of 0.55 to 2.03 in 0.990-0.995 and 4.35
+    above, reaching 8; with these exclusions the largest support at any
+    admitted ratio ≥ 0.95 is 2 on both paths, the bulk's own level.  What
+    feeds that wall is not one of the five positions (the parent and its Kα
+    partner can never be candidates: their intensity ratios, 1 and about
+    0.5 or 2, lie outside :data:`GHOST_RATIO_RANGE`).  It is weak flank
+    lines 0.11-0.18° below their parents, at 4-17 % of them (corundum,
+    zincite, cpd-1c at r = 0.9965), which the parent's own exclusion covers
+    because one matching window is about that wide, while the companion's
+    offset, scaling with tan θ, splits their agreement across parents spread
+    over a wide 2θ range.  **The known limit:** flank lines further out,
+    beside parents spread over a narrow 2θ band (so the companion's tan θ
+    scaling does not break their agreement), reopen it.  Eight parents in 24-33° with a 10 %
+    line 0.20° below each reach 8 at admitted ratios, and a real Kβ leak on
+    that list gets p = 0.015, which the fixed bar reports and
+    ``decide(alpha=0.01, floor=5)`` does not (pinned by
+    ``test_flank_lines_outside_the_exclusions_reopen_the_wall``).  The
     band is wider on the fitted path than on the census because its window
     carries the list's position esds (the census has none), and wider on a
     pattern whose strongest line sits at low angle, where a ratio moves a line least — which is why a fixed 0.98 could
@@ -2067,7 +2082,8 @@ def ghost_control(
     same, so the counts are the screen's own; ``k`` and ``span`` choose the
     control, ``k`` wavelength ratios spread evenly over the part of ``span``
     no named line can reach (the exclusions are derived from the anode and
-    the matching window, see :func:`_ghost_control_ratios`).
+    the matching window; :func:`_ghost_control_ratios` says what they leave
+    open).
 
     **A control ratio is compared only where it asks as many parents.**  A
     ratio whose companions fall off the measured range for some parents
