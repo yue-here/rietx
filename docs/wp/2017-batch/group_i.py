@@ -349,7 +349,8 @@ def summary() -> None:
     lines = [
         "# WP-2017 group I: the position bounds' removal on three flat plates",
         "",
-        "Written by `docs/wp/2017-batch/group_i.py summary` from its raw rows (not committed).",
+        "Written by `group_i.py summary` from the raw rows of the workstation run; families, "
+        "ranges and arms in its docstring.",
         f"Commit `{meta.get('head', '?')[:9]}`, {meta.get('platform', '?')}, numpy "
         f"{meta.get('numpy', '?')}, rietx-kernels {meta.get('kernels', '?')}, compiled tier on, "
         "one kernel thread.",
@@ -376,8 +377,10 @@ def summary() -> None:
         "at old bound | codes |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
-    cmp_lines = ["", "| Family | Range | b−f | f−s | noise | bounded reached |",
-                 "|---|---|---|---|---|---|"]
+    cmp_lines = ["", "`walk`: each cell row, free against shipped, in ppm and in the larger "
+                 "reported esd of the two (the reference page's claim is that the esd covers it).",
+                 "", "| Family | Range | b−f | f−s | noise | walk | bounded reached |",
+                 "|---|---|---|---|---|---|---|"]
     for f in (*FAMILIES, "nac"):
         cell_ref, _, _ = REFERENCES[f]
         for rng in (RANGES if f != "nac" else ("full",)):
@@ -422,11 +425,22 @@ def summary() -> None:
                 bf = _shift(bd["rows"], fr["rows"])
                 fs = _shift(fr["rows"], sh["rows"]) if sh in ok else (None, None)
                 nn = _shift(nz["rows"], fr["rows"]) if nz in ok else (None, None)
+                walk = []
+                if sh in ok:
+                    for p in _cell_paths(fr["rows"]):
+                        if p not in sh["rows"]:
+                            continue
+                        v1, v0 = fr["rows"][p][0], sh["rows"][p][0]
+                        es = [e for e in ((fr.get("esd_reported") or {}).get(p),
+                                          (sh.get("esd_reported") or {}).get(p)) if e]
+                        k = abs(v1 - v0) / max(es) if es else float("nan")
+                        walk.append(f"{p.rsplit('.', 1)[1]} {1e6 * (v1 - v0) / v0:+.0f} "
+                                    f"({_fmt(k, '.2f')})")
                 verdict = "unreached (bit-identical)" if same and not reached else (
                     "yes" if reached else "no, but not identical")
                 cmp_lines.append(
                     f"| `{f}` | {rng} | {_fmt(bf[0])} `{bf[1]}` | {_fmt(fs[0])} `{fs[1]}` | "
-                    f"{_fmt(nn[0])} | {verdict} |")
+                    f"{_fmt(nn[0])} | {'; '.join(walk) or '—'} | {verdict} |")
     lines += cmp_lines
     lines += ["", "Figures: `tests/output/wp2017_groupI_<family>_<range>_<arm>.png`.", ""]
     SUMMARY.write_text("\n".join(lines), encoding="utf-8")
