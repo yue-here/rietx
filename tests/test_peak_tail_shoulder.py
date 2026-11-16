@@ -136,3 +136,139 @@ def test_a_named_shoulder_is_the_callers_and_is_not_judged():
     assert p.origin == "manual"
     assert {"axial_tail", "position_at_bound"} <= set(p.flags), p.flags
     assert "tail_shoulder" not in p.flags and p.usable, p.flags
+
+
+# ---------------------------------------------------------------------------
+# The synthetic arms (WP-2120, 2026-11-16): fluorite drawn by the package's own
+# forward model with a real axial divergence (FCJ, S/L = H/L), and picked with
+# the round-robin instrument, which declares none, as the real lab files are.
+# A pure tail is the negative arm; a real weak lattice line planted just below a
+# strong one (a second fluorite phase at a(1 + eps), scale 1/r) is the positive
+# arm.  Idealised structure, Poisson counts from fixed seeds, no data file read.
+# ---------------------------------------------------------------------------
+
+FLUORITE_A = 5.4631
+#: the round robin's Kα1, and fluorite's strong lines below 90° 2θ
+_HKL = ((1, 1, 1), (2, 2, 0), (3, 1, 1), (4, 0, 0), (3, 3, 1), (4, 2, 2))
+
+
+def _kalpha1_line(a: float, hkl) -> float:
+    from tests.test_acceptance_qpa_roundrobin import qarr_instrument
+    lam = float(qarr_instrument().source.lines[0].wavelength.value)
+    d = a / np.sqrt(sum(i * i for i in hkl))
+    return float(np.degrees(2.0 * np.arcsin(lam / (2.0 * d))))
+
+
+def _fluorite(a: float, ins) -> np.ndarray:
+    from tests._synthetic_weak_lines import _cif, _structure
+    cif = _cif("CaF2", 225, "F m -3 m", (a, a, a, 90, 90, 90),
+               [("Ca1", "Ca", 0, 0, 0, 1, 0.5), ("F1", "F", 0.25, 0.25, 0.25, 1, 0.7)])
+    tt = np.round(np.arange(20.0, 100.0, 0.02), 3)
+    return tt, np.asarray(rx.Refinement(_structure(cif), ins,
+                                        history=False).predict(two_theta=tt))
+
+
+def _drawn(axial: float, *, eps: float = 0.0, ratio: float = 0.0):
+    """The strong fluorite lines (strongest 1e4 counts on 30) with axial
+    divergence ``axial``, plus, when ``ratio``, the planted phase."""
+    from tests.test_acceptance_qpa_roundrobin import qarr_instrument
+    ins = qarr_instrument()
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = axial
+    ins.profile.u.value, ins.profile.v.value, ins.profile.w.value = 0.008, -0.004, 0.010
+    ins.profile.x.value = 0.04
+    tt, y = _fluorite(FLUORITE_A, ins)
+    norm = y.max()
+    if ratio:
+        y = y + _fluorite(FLUORITE_A * (1.0 + eps), ins)[1] / ratio
+    return tt, y / norm * 1e4 + 30.0
+
+
+def _counts(tt, y, seed: int) -> rx.PatternData:
+    obs = np.random.default_rng(seed).poisson(y).astype(float)
+    return rx.PatternData(two_theta=list(tt), intensity=list(obs),
+                          sigma=list(np.sqrt(np.maximum(obs, 1.0))))
+
+
+def _below_strong(pl, fits):
+    """Each component within 4 fitted FWHM below a strong fluorite line:
+    (separation in FWHM, strong/component area, component)."""
+    out = []
+    for hkl in _HKL:
+        t = _kalpha1_line(FLUORITE_A, hkl)
+        strong = min(pl.peaks, key=lambda p: abs(p.two_theta - t))
+        fw = float(fits[strong.group].fwhm)
+        for p in pl.peaks:
+            sep = (strong.two_theta - p.two_theta) / fw
+            if p is not strong and 0.0 < sep < 4.0:
+                out.append((sep, strong.intensity / p.intensity, p))
+    return out
+
+
+def _taken_by_the_rule(p) -> bool:
+    """``tail_shoulder`` is the only flag keeping ``p`` out of ``usable()``."""
+    rest = set(p.flags) - {"tail_shoulder", "weak_line"}
+    return "tail_shoulder" in p.flags and not rest & PEAK_UNUSABLE_FLAGS
+
+
+def test_a_pure_axial_tail_leaves_a_shoulder_the_rule_takes_in_part():
+    """The negative arm, and its control.  Without axial divergence nothing
+    sits below a strong line.  With S/L = H/L = 0.03 the unmodelled tail leaves
+    shoulders where the real ones sit (0.6-1.0 FWHM below, 4-14x weaker), and
+    the rule takes some of them, not all: on 20 seeds, 5 of the 19 that would
+    be usable (macOS arm64 and Linux x86_64 alike; WP-2120's handover)."""
+    from tests.test_acceptance_qpa_roundrobin import qarr_instrument
+    tt, y = _drawn(0.0)
+    for seed in range(500, 503):
+        pl, _, fits = pick_peaks_with_state(_counts(tt, y, seed), qarr_instrument())
+        assert not _below_strong(pl, fits), seed
+    tt, y = _drawn(0.03)
+    taken, left = [], []
+    for seed in range(500, 520):
+        pl, _, fits = pick_peaks_with_state(_counts(tt, y, seed), qarr_instrument())
+        for sep, ratio, p in _below_strong(pl, fits):
+            if "axial_tail" not in p.flags:
+                continue
+            if _taken_by_the_rule(p):
+                taken.append((sep, ratio))
+            elif p.usable:
+                left.append((sep, ratio))
+    assert (len(taken), len(left)) == (5, 14), (taken, left)
+    for sep, ratio in taken + left:
+        assert 0.6 <= sep <= 1.0 and 4.0 <= ratio <= 14.0, (sep, ratio)
+
+
+def test_a_real_weak_line_below_a_strong_one_is_kept_or_taken_by_where_it_sits():
+    """The positive arm: a second fluorite phase 0.165 % larger, at 1/5 of the
+    host's scale, puts a real lattice line below every strong line.  In one
+    pattern, the line 0.95 FWHM below (400) carries ``axial_tail`` and stays
+    usable (the flag alone takes nothing), and the line 0.62 FWHM below (220)
+    does too.  The line 0.75 FWHM below (311), where the pure tail's shoulder
+    sits, is a real line the rule takes: the measured cost, 16 of 112 resolved
+    planted lines at 0.6-1.0 FWHM and ratios 5-14 (WP-2120's open question)."""
+    from tests.test_acceptance_qpa_roundrobin import qarr_instrument
+    eps = 0.00165
+    tt, y = _drawn(0.03, eps=eps, ratio=5.0)
+    data = _counts(tt, y, 5)
+    ins = qarr_instrument()
+    pl, det, fits = pick_peaks_with_state(data, ins)
+    seen = {}
+    for hkl in ((2, 2, 0), (3, 1, 1), (4, 0, 0)):
+        ts, tw = _kalpha1_line(FLUORITE_A, hkl), _kalpha1_line(FLUORITE_A * (1 + eps), hkl)
+        strong = min(pl.peaks, key=lambda p: abs(p.two_theta - ts))
+        assert strong.usable and abs(strong.two_theta - ts) < 0.03, strong
+        fw = float(fits[strong.group].fwhm)
+        p = min((q for q in pl.peaks if q is not strong),
+                key=lambda q: abs(q.two_theta - tw))
+        assert abs(p.two_theta - tw) < 0.2 * fw, (hkl, p.two_theta, tw)
+        seen[hkl] = ((ts - tw) / fw, p)
+    for hkl in ((2, 2, 0), (4, 0, 0)):
+        sep, p = seen[hkl]
+        assert "axial_tail" in p.flags and p.usable, (hkl, sep, p.flags)
+    sep, p = seen[(3, 1, 1)]
+    assert 0.7 < sep < 0.8 and _taken_by_the_rule(p), (sep, p.flags)
+    tw = _kalpha1_line(FLUORITE_A * (1 + eps), (3, 1, 1))
+    path = draw_pick("tail_shoulder_planted", data, ins, pl, det, fits,
+                     truth=[_kalpha1_line(FLUORITE_A, (3, 1, 1)), tw], zoom=(55.2, 56.2),
+                     title="synthetic fluorite + a real line 0.75 FWHM below (311): "
+                           "taken as tail_shoulder")
+    assert path.exists()
