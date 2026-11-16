@@ -442,6 +442,28 @@ and have no free factor to measure, so this file's old list named them without c
   the QPA esd, and the grid's best point against shipped (0.1 σ of a point, the table's bar).
   *Positive arm*: on the shipped grid the two-basin fixture shows the basins its test pins, or
   the harness measures something else.
+- **O, what its bullet left open, fixed 2026-11-16 before running** (`2017-batch/group_o.py`).
+  *The two seeds*: a `screen` step fits seeds 0-19 (14 aside) without intervals, and the two
+  lowest whose answer stage passes the stationary-angle test (`moment_angle_tests`, `zeroed`)
+  join seed 14. A seed that fails the test has no left-out angle to profile. *The rows*, read
+  off each protocol's converged fit on the Mac (macOS arm64) before choosing: FAP's interior
+  Biso is `atoms.0.biso`, but **no FAP width row sits on its floor** at that answer (both
+  `lor_size` and `lor_strain` interior, no instrument width free), so FAP carries the Biso
+  alone and the floor case is cpd-1a's. On cpd-1a, zincite is `phases.1`: its scale and its
+  `lor_strain` (on 0, plain esd 0.027). Its `gauss_*` rows also sit on 0, but with the
+  41.5-plain-esd floor seeds group N measured, so they are not the case. *How each interval
+  runs*: `strategy.parameter_interval.profile_interval(..., record=False)`, the call
+  `attach_stationary_intervals` makes, so the Pnma angle rows are the automatic intervals. The
+  four search constants are set on that module for the arm; `MAX_REFITS` goes through
+  `max_refits`, since it is the argument's bound default. *Control that the explicit call is
+  the fit's*: on each Pnma seed, the shipped plain arm also refits with `_auto_intervals` on
+  and records the intervals the fit attached. *Read in units of*: the row's plain esd
+  (`stderr_uncorrected`), and for an angle with no esd its stationary half-width, the step the
+  interval walks in; the reported esd rides beside. *Several crossings*: on each side, points
+  sorted by distance from the value, a crossing is each change of sign of Δχ² − cut. *O2's
+  grid* is the three module globals of `strategy.fraction_profile`, set for the arm; every
+  refit's codes are read through a spy on `Refinement.run_stage`. *Noise twin*: the plain fit
+  refitted from every refinable non-zero start ×(1 + 1e-12), and every arm runs on both.
 - **P.** At the closing stage's windows the margin errs 0.186 σ and 0.124 σ at the last points of
   FAP and cpd-1a, moving answers 0.026 and 0.043 esd. An edge rule was built and reverted because
   it freed a scale-B ridge (`waiting.md` § B10). The axial floor reads 0.010 on cpd-1a since the
