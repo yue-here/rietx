@@ -1,6 +1,6 @@
 # WP-2007 — Indexing: its codes, constants and gates
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: The audits
 Depends on: 2001
 Priority: P3 2026-10-19 — 2001 closed, so nothing blocks it; provisional by declaration, so a verdict here already carries a caveat; several sessions
