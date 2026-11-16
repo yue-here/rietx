@@ -181,6 +181,19 @@ lines each over `_ghost_candidates`/`_ghost_consensus` and `pick_peaks`):
 - **Zircon, Kβ image 0.10, fitted:** the W Lα search reaches 3 at p = 0.005
   against a control maximum of 2. The fixed bar is silent on it.
 
+*Gates*, on cb8ca426d (Linux x86_64, the workstation's `rietx-py312` venv):
+- Canary: 223 passed (background_auto, peak_picking, audit_table, help,
+  docs_consistency; `-n 4`).
+- Fast suite (`-m "not slow"`, `-n 4`): 14864 passed, 280 skipped, 32 xfailed,
+  0 failed, in 25:34 beside co-tenants. Main was not re-measured, so the +13
+  is not checked against a baseline here.
+- The 13 added cases cost 6.5 s in that run, led by the zircon row at 3.5 s
+  (one `pick_peaks`).
+- On the Mac (`[dev]`, arm64): `reader_output` exit 0 (unchanged), ruff
+  clean, `test_manual_api` 19, `test_audit_table` 23, `test_capabilities` 43
+  and `test_docs_consistency` 26 passed.
+- No slow selection: no engine or acceptance path is touched.
+
 *Review*: a read-only subagent in the worktree (the runner rules forbid
 `/code-review`).
 - Applied: `span` must be finite (an unbounded span filled the control with
