@@ -86,7 +86,7 @@ READ = {
 def test_a_loop_of_another_group_is_refused_naming_both(tmp_path, name):
     text, symbol_group, loop_group = REFUSED[name]
     path = tmp_path / "toy.cif"
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     with pytest.raises(ValueError, match="a different group") as info:
         structure_from_cif(path)
     message = str(info.value)
@@ -100,7 +100,7 @@ def test_a_loop_of_another_group_is_refused_naming_both(tmp_path, name):
 def test_a_loop_of_the_same_group_or_no_group_reads_as_before(tmp_path, name):
     text, group = READ[name]
     path = tmp_path / "toy.cif"
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     diagnostics = []
     phase = structure_from_cif(path, diagnostics=diagnostics).phases[0]
     assert phase.space_group == group
@@ -113,6 +113,6 @@ def test_the_legacy_loop_tag_is_named(tmp_path):
     text = (_cif(_ops("P 1 2/m 1"), "C 1 2/m 1", cell=_MONO)
             .replace("_space_group_symop_operation_xyz", "_symmetry_equiv_pos_as_xyz"))
     path = tmp_path / "legacy.cif"
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     with pytest.raises(ValueError, match="_symmetry_equiv_pos_as_xyz loop"):
         structure_from_cif(path)
