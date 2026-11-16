@@ -89,16 +89,21 @@ W<sub>p</sub> ∝ S<sub>p</sub>·(Z·M)<sub>p</sub>·V<sub>p</sub>, so dividing 
 `PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts formula units, which is what reaction stoichiometry and phase diagrams use.
 The Z it uses is the reduced formula, the greatest common divisor of the whole-number counts in the cell, so a molecular crystal of benzene counts CH units (z = 24 for its Z = 4 cell); declare `Phase.formula_units` where the formula unit you mean is a larger one.
 Both esds go through the correlated scale block, as the weight fraction's does.
+Both mole fractions come from the uncorrected scales: no Brindley-corrected mole fraction is reported beside `weight_fraction_corrected`.
 
 ### A column that sums to 100 % can still mix two bases
 
 A mole-fraction column that sums to 100 % is no evidence that its basis is uniform.
-Z is recovered from the cell contents, and a solid solution or a partly occupied site does not reduce to whole formula units, so its `z` is 1 and its `molar_mass` is the whole cell's.
+Z is recovered from the cell contents, and a solid solution or a partly occupied site has no formula unit those contents establish.
+When its counts per cell are not whole numbers, its `z` is 1 and its `molar_mass` is the whole cell's.
+When they happen to be whole, as La<sub>0.5</sub>Sr<sub>0.5</sub>FeO<sub>3</sub> in a Z = 4 cell counts La 2 and Sr 2, its `z` is their greatest common divisor, which is not the formula unit either.
 Dividing `weight_fraction` by that `molar_mass` puts one phase per cell and the others per formula unit, and the column still sums to 1.
 On a 50/50 wt % mixture of LaFeO<sub>3</sub> and La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub>, both perovskites with Z = 4, the true composition is 47.8/52.2 mol %, and that route gives 78.5/21.5.
 So the per-formula-unit column is reported only when every measured phase's formula unit is known, and is otherwise `None` on every row: one phase on the other basis spoils the comparison for all of them.
-`QuantitativePhaseAnalysis.formula_unit_withheld` and the info diagnostic [`QPA_FORMULA_UNIT_WITHHELD`](diagnostics-refinement.md#qpa_formula_unit_withheld) name the phase and its counts.
+A phase with a mixed or partly occupied site withholds it, whatever its counts per cell.
+`QuantitativePhaseAnalysis.formula_unit_withheld` and the info diagnostic [`QPA_FORMULA_UNIT_WITHHELD`](diagnostics-refinement.md#qpa_formula_unit_withheld) name the phase and its counts or occupancies.
 `PhaseQuantity.mole_fraction` still stands, and for that pair, both cells holding four formula units, it is the 47.8/52.2 itself.
+It counts unit cells, so it equals the mol % of formula units only where every phase's cell holds the same number of them; where the cells differ, declare the formula units.
 
 A solid solution's formula unit is a choice its occupancies cannot express, so declare it: `Phase.formula_units = 4` on La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub> gives the per-formula-unit column, `z_source` reads `"declared"`, and `molar_mass` follows the declared Z.
 

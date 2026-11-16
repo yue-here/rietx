@@ -172,11 +172,23 @@ available, and withholds the formula-unit column by name where they are not.
 
 ## Handover log
 
+- **2026-11-16** — review fix-ups on PR #1598 (ghostshift runner). The
+  per-formula-unit column now also withholds when a phase has a mixed or
+  partly occupied site whose counts per cell happen to be whole
+  (La0.75Sr0.25FeO3 and La0.5Sr0.5FeO3 in a Z = 4 cell shipped 79.1/20.9 and
+  64.1/35.9 for a true 48.6/51.4 and 47.2/52.8). `ZMV.partial_sites` and
+  `qpa.partial_occupancy_sites` carry it; two tests pin both rows. The help
+  text, suggestion, audit row and manual now say `mole_fraction` counts cells
+  and is the mol % only where every cell holds the same number of formula
+  units; both mole fractions are on the uncorrected (non-Brindley) basis.
+  Left for the maintainer: listed in the PR body.
+
 - **2026-11-16** — all seven tasks landed, in PR #1598 (ghostshift runner).
   A Rietveld fit now reports how many moles of each phase there are, not only
   their weight, and it says which way it counted. Every phase gets a mole
   fraction counted in unit cells, which needs no formula unit and so is always
-  right. A second column counts formula units, the chemist's mol %, and it
+  a correct count of cells (the chemist's mol % only where every cell holds the
+  same number of formula units). A second column counts formula units, the chemist's mol %, and it
   appears only when every phase's formula unit is known. When one phase is a
   solid solution or has a partly empty site, that column is left empty for
   every phase, and an info diagnostic names the phase and its odd counts,
@@ -234,7 +246,7 @@ available, and withholds the formula-unit column by name where they are not.
   - **`FractionProfile` molar range:** not built (the 1320 note); filed in
     #1600.
 
-  *Measured* (`[dev]` venv on pearl, Linux x86_64, `-n 8 --dist loadgroup
+  *Measured* (`[dev]` venv on the workstation, Linux x86_64, `-n 8 --dist loadgroup
   -m "not slow"`; the Mac's runs were single files without `-n`):
   - Canary wp1340c at `0502772e1`: 378 passed in 29 s.
   - Fast wp1340f at `0502772e1`: 14855 passed, 280 skipped, 32 xfailed,
@@ -280,7 +292,7 @@ available, and withholds the formula-unit column by name where they are not.
 
   *Gotchas.*
   - `tests/test_gui_help.py` rewrites `tests/data/gui/help_keys.json` when
-    it is stale. On pearl that left the job tree dirty, and a
+    it is stale. On the workstation that left the job tree dirty, and a
     `git checkout --detach` to the next commit failed silently inside a
     chained command. Check the tree's `git log -1` before starting a job.
   - WP-1532's runner edits the same skill references. This branch adds one

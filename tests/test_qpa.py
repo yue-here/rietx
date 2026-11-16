@@ -990,3 +990,44 @@ def test_a_negative_scale_leaves_a_basis_absent_rather_than_raising():
     qpa = compute_qpa(structure, values)
     assert all(r.weight_fraction is not None for r in qpa.phases)
     assert all(r.mole_fraction is None for r in qpa.phases)
+
+
+@pytest.mark.parametrize("x_sr, cell_z, x_fu", [
+    (0.25, 1, (48.6, 51.4)),     # La 3, Sr 1 per cell: the GCD is 1
+    (0.5, 2, (47.2, 52.8)),      # La 2, Sr 2 per cell: the GCD is 2
+])
+def test_a_solid_solution_whose_counts_happen_to_reduce_withholds_too(x_sr, cell_z, x_fu):
+    """A mixed A site with whole per-cell counts (x a multiple of 1/Z) still
+    has no formula unit its sites establish: the GCD of La3SrFe4O12 is the
+    whole cell, of La2Sr2Fe4O12 half of it, and neither is ABO3.  Shipping
+    either gives 79.1/20.9 or 64.1/35.9 for a true 48.6/51.4 or 47.2/52.8
+    (review of PR #1598, F1).  Declaring Z = 4 gives the true figures."""
+    from rietx.optimize.qpa import compute_qpa, formula_unit_diagnostics
+
+    name = f"La{1 - x_sr:g}Sr{x_sr:g}FeO3"
+    pure = _perovskite("LaFeO3", [("La", 1.0)])
+    doped = _perovskite(name, [("La", 1.0 - x_sr), ("Sr", x_sr)])
+    structure = Structure(phases=[pure, doped])
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    values = table.decode(table.x0())
+    zmvs = [phase_zmv(ph.space_group, ph.cell.lengths_angles(), _atoms(ph))
+            for ph in structure.phases]
+    for ip in range(2):
+        values[f"phases.{ip}.scale"] = 0.5 / zmvs[ip].zmv
+    # the counts reduce: the composition alone cannot see the mixed site
+    assert zmvs[1].z == cell_z
+    assert not zmvs[1].z_resolved
+    qpa = compute_qpa(structure, values)
+    assert [r.z_source for r in qpa.phases] == ["composition", "unresolved"]
+    assert all(r.mole_fraction_formula_unit is None for r in qpa.phases)
+    assert name in qpa.formula_unit_withheld
+    assert "LaFeO3," not in qpa.formula_unit_withheld
+    (diag,) = formula_unit_diagnostics(qpa)
+    assert (diag.code, diag.where) == ("QPA_FORMULA_UNIT_WITHHELD", [name])
+    # per unit cell the two Z = 4 cells already give the true ABO3 mol %
+    assert tuple(round(100 * r.mole_fraction, 1) for r in qpa.phases) == x_fu
+    doped.formula_units = 4
+    declared = compute_qpa(structure, values)
+    assert declared.formula_unit_withheld is None
+    assert tuple(round(100 * r.mole_fraction_formula_unit, 1)
+                 for r in declared.phases) == x_fu

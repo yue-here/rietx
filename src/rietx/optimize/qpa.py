@@ -102,8 +102,11 @@ class ZMV:
     ``molar_mass`` are the best-effort integer-formula-unit split (``z`` = 1,
     ``molar_mass`` = ``cell_mass`` when the composition does not reduce to
     integers, e.g. under refined partial occupancy).  ``z_resolved`` says
-    which (WP-1340): ``False`` is that fallback, so a ``z`` of 1 there is the
-    whole cell, not a formula unit the composition established.
+    whether that ``z`` is a formula unit (WP-1340): ``False`` when the counts
+    do not reduce (``z`` = 1 is then the whole cell) **or** when any site is
+    mixed or partly occupied (``partial_sites``).  The second case catches a
+    solid solution whose counts happen to be whole numbers: La0.5Sr0.5FeO3 in
+    a Z = 4 cell counts La 2, Sr 2, Fe 4, O 12, whose GCD 2 is no ABO3 unit.
     """
 
     cell_mass: float      # Z·M, g/mol per unit cell (occupancy-weighted)
@@ -119,8 +122,14 @@ class ZMV:
     # for a table that tells nuclides apart: the neutron attenuation reads
     # these, where ²H scatters incoherently 2.05 barn against ¹H's 80.26
     species_counts: dict[str, float] = field(default_factory=dict)
-    # False: the counts did not reduce and ``z`` = 1 is the fallback (WP-1340)
+    # False: the counts did not reduce (``z`` = 1 is the fallback), or a site
+    # is mixed or partly occupied, so ``z`` is no formula unit (WP-1340)
     z_resolved: bool = True
+    # (species, occupancy) of each asymmetric-unit atom whose occupancy is
+    # neither empty nor full (to the counts' tolerance): a mixed or partly
+    # occupied site, which leaves the formula unit unresolved whatever the
+    # per-cell totals do
+    partial_sites: tuple[tuple[str, float], ...] = ()
 
     @property
     def density(self) -> float:
@@ -140,6 +149,19 @@ def unreduced_counts(element_counts: dict[str, float], *,
     """
     return {el: count for el, count in element_counts.items()
             if round(count) <= 0 or abs(count - round(count)) > tol}
+
+
+def partial_occupancy_sites(atoms, *, tol: float = 0.02
+                            ) -> tuple[tuple[str, float], ...]:
+    """The ``(species, occ)`` of each atom on a mixed or partly occupied site.
+
+    An occupancy within ``tol`` of 1 is a full site and one within ``tol`` of
+    0 an empty one; anything else (a share of a mixed site, a vacancy, an
+    overfull refined value) means the cell's contents are not whole formula
+    units, even when the per-cell totals happen to be integers (WP-1340).
+    """
+    return tuple((species, float(occ)) for species, _x, _y, _z, occ in atoms
+                 if abs(float(occ)) > tol and abs(float(occ) - 1.0) > tol)
 
 
 def _formula_units(element_counts: dict[str, float], *, tol: float = 0.02) -> int:
@@ -211,11 +233,13 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
         species_counts[species] = species_counts.get(species, 0.0) + count
     z_units = _formula_units(element_counts)
     molar_mass = cell_mass / z_units if z_units else cell_mass
+    partial = partial_occupancy_sites(atoms)
     return ZMV(cell_mass=cell_mass, cell_volume=volume, zmv=cell_mass * volume,
                z=z_units, molar_mass=molar_mass, element_counts=element_counts,
                species_counts=species_counts,
                z_resolved=bool(element_counts)
-               and not unreduced_counts(element_counts))
+               and not unreduced_counts(element_counts) and not partial,
+               partial_sites=partial)
 
 
 def weight_fractions(zmv, scales, scale_cov=None):
@@ -652,17 +676,21 @@ def _formula_unit_withheld_reason(phases: list[tuple[str, ZMV]]) -> str:
     named = []
     for name, zmv in phases:
         odd = unreduced_counts(zmv.element_counts)
-        counts = " and ".join(f"{el} {count:.4g}" for el, count in odd.items())
-        named.append(
-            f"{name}, whose occupancy-weighted counts per cell ({counts}) are "
-            "not whole numbers (a mixed or partially occupied site)")
-    one = len(phases) == 1
+        if odd:
+            counts = " and ".join(f"{el} {count:.4g}" for el, count in odd.items())
+            named.append(
+                f"{name}, whose occupancy-weighted counts per cell ({counts}) "
+                "are not whole numbers (a mixed or partially occupied site), "
+                "so its z = 1 and molar_mass are the whole cell's")
+        else:
+            sites = ", ".join(f"{sp} {occ:.4g}" for sp, occ in zmv.partial_sites)
+            named.append(
+                f"{name}, which has a mixed or partially occupied site "
+                f"(occupancies {sites}), so its z = {zmv.z} is the greatest "
+                "common divisor of its counts per cell, not a formula unit")
     return ("Mole fractions are given per unit cell only: the formula unit is "
             "not established for " + "; ".join(named)
-            + (", so its z = 1 and molar_mass are" if one
-               else ", so their z = 1 and molar_mass are each")
-            + " the whole cell's, and a per-formula-unit column would mix two "
-            "bases.")
+            + ". A per-formula-unit column would mix two bases.")
 
 
 def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
@@ -684,8 +712,10 @@ def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]
         where=names,
         message=qpa.formula_unit_withheld,
         suggestion=(
-            "Read mole_fraction, which is per unit cell, and never divide "
-            "weight_fraction by molar_mass. For a per-formula-unit fraction, "
+            "mole_fraction counts unit cells: it is the mol % of formula units "
+            "only where every phase's cell holds the same number of them. "
+            "Never divide weight_fraction by molar_mass. For a per-formula-unit "
+            "fraction, "
             "declare the formula units per cell on "
             + ("the phase" if len(names) == 1 else "each phase")
             + " (Phase.formula_units) and refit."),

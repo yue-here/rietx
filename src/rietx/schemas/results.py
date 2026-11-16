@@ -466,14 +466,20 @@ class PhaseQuantity(Base):
     established: otherwise it is ``None`` on every row, since one phase on the
     per-cell basis spoils the comparison for all of them, and
     :attr:`QuantitativePhaseAnalysis.formula_unit_withheld` says which phase.
-    ``z_source`` is where this row's ``z`` came from: ``"composition"`` (the
-    occupancy-weighted counts reduce to integers), ``"declared"``
-    (``Phase.formula_units``, the caller's claim, which ``molar_mass`` then
-    follows), or ``"unresolved"`` (they do not reduce, and ``z`` = 1 is the
-    whole cell).  ``None`` only on a result stored before the field.  Both
+    ``z_source`` is where this row's ``z`` came from: ``"composition"`` (every
+    site full or empty and the occupancy-weighted counts reduce to integers),
+    ``"declared"`` (``Phase.formula_units``, the caller's claim, which
+    ``molar_mass`` then follows), or ``"unresolved"`` (a mixed or partly
+    occupied site, or counts that do not reduce: ``z`` is then 1, the whole
+    cell, or the GCD of counts that happen to be whole, and in neither case a
+    formula unit).  ``mole_fraction`` counts cells, so it is the mol % of
+    formula units only where every phase's cell holds the same number of them.  ``None`` only on a result stored before the field.  Both
     esds go through the correlated scale block as σ(W) does, and are ``None``
-    exactly where σ(W) is.  The number divides weight by the cell mass, so it
-    has W's scope: the modelled crystalline content.  A phase whose cell has
+    wherever σ(W) is, and also where the molar basis is absent (a massless
+    phase, or Σ S·V ≤ 0).  The number divides weight by the cell mass, so it
+    has W's scope: the modelled crystalline content.  Both are on the
+    uncorrected basis: no Brindley-corrected mole fraction is reported beside
+    ``weight_fraction_corrected``.  A phase whose cell has
     no mass (every site empty) has W = 0 but no mole fraction on either
     basis: its cell count rides a scale the data cannot move.  Its basis
     withholds nothing, being out of both sums.  ``z`` from the composition is
