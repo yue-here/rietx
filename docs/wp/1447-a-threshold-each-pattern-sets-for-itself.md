@@ -83,6 +83,12 @@ when p ≤ α. At K = 199 the smallest achievable p is 0.005.
 - [ ] The permutation p-value, with K and α named constants carrying their
       measured basis, and a floor so a degenerate control cannot lower the bar
       below what a reader would accept as evidence.
+      *Machinery landed: `ghost_p_value`, `ghost_control` → `GhostControl`
+      (`p_value`, and `decide(alpha=, floor=)`). K, α, the span and the floor
+      are the caller's arguments, not named defaults, and the screen does not
+      read them: a named default is a new `_audit` row, and a tier-3
+      `approved` date is the maintainer's (ruled 2026-11-01). The measured
+      recommendation and the question are in the 2026-11-16 entry.*
 - [ ] Re-measure WP-1442's whole table under it: the 17 monochromated patterns
       (must stay silent), the six-host injection ladder (the floor may move —
       report where it lands rather than assuming it improves), the demo
