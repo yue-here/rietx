@@ -18,8 +18,9 @@ counted, so that ``k`` addresses a pattern and not a byte-blob:
 - dotfiles, which include an office suite's lock file (``.~lock.<name>#``, as
   the real archive carries) and macOS's ``__MACOSX/._<name>`` resource forks;
 - a member no reader claims, and a member claimed only by a *refusal*
-  (``dif_peaklist``, ``total_scattering``, ``raw_unclaimed``): those are
-  recognised in order to be declined, so they are not patterns this build reads;
+  (``dif_peaklist``, ``peak_list``, ``total_scattering``, ``raw_unclaimed``):
+  those are recognised in order to be declined, so they are not patterns this
+  build reads;
 - a member that is itself a plain zip.  Nested containers are WP-1315's
   non-goal; a ``.rasx`` or ``.brml`` member is a pattern, since a reader here
   claims it by its manifest;
@@ -101,6 +102,10 @@ _VENDOR_MANIFEST = re.compile(r"(^|/)(root\.xml|DataContainer\.xml)$")
 
 #: What may stand in a staged file's name; anything else becomes ``_``.
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._+-]")
+#: A staged name standing whole in a message: not inside a longer name made of
+#: the characters :data:`_SAFE_NAME` keeps (a full stop after it may end the
+#: sentence, so only one followed by a name character continues the name).
+_WHOLE = r"(?<![\w.+-]){}(?![\w+-]|\.\w)"
 
 
 @dataclass(frozen=True)
@@ -251,9 +256,12 @@ def _read_member(zip_archive: zipfile.ZipFile, directory: Path, member: _Member,
                          "member may be, so it was not read")
     file = staged[0]
     here = f"{member.name} in {path.name}"
+    # one pass, so the replacement is never rewritten again, and the bare name
+    # only where it stands whole: a member called ``s`` is inside most words
+    staged_name = re.compile(re.escape(str(file)) + "|" + _WHOLE.format(re.escape(file.name)))
 
     def named(text: str) -> str:
-        return text.replace(str(file), here).replace(file.name, here)
+        return staged_name.sub(lambda _: here, text)
 
     inner: list[Diagnostic] = []
     try:

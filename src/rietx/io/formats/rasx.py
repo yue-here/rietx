@@ -319,7 +319,7 @@ def looks_rasx(p: Path) -> bool:
     try:
         with zipfile.ZipFile(p) as zip_archive:
             return any(_PROFILE_MEMBER.match(name) for name in zip_archive.namelist())
-    except (zipfile.BadZipFile, OSError):
+    except (zipfile.BadZipFile, NotImplementedError, OSError):   # a version past 6.3
         return False
 
 

@@ -10,7 +10,9 @@ reader claims.
 
 from __future__ import annotations
 
+import struct
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -268,9 +270,22 @@ def test_nothing_is_left_on_disk(two, tmp_path, monkeypatch):
     staging = tmp_path / "tmp"
     staging.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(staging))
+    used: list[Path] = []
+    stage = zip_collection._staging
+
+    @contextmanager
+    def spy():
+        with stage() as directory:
+            used.append(directory)
+            assert directory.parent == staging     # staging went where we look
+            assert directory.name.startswith("rietx-zip-")
+            yield directory
+
+    monkeypatch.setattr(zip_collection, "_staging", spy)
     rx.read_pattern(two, scan=1)
     list_scans(two)
     identify_format(two)
+    assert used                                     # the positive arm: it staged
     assert list(staging.iterdir()) == []
 
 
@@ -354,3 +369,57 @@ def test_empty_members_and_windows_directory_entries_are_not_patterns(tmp_path):
                                                      ("folder\\", ""),
                                                      ("b.xye", xye_text(10.0))])
     assert [s.label for s in list_scans(path)] == ["b.xye"]
+
+
+def test_a_short_member_name_is_substituted_once_and_only_whole(tmp_path):
+    """A member named ``s`` is a substring of most words in a message, so the
+    staged name is replaced only where it stands as a whole name."""
+    rows = "".join(f"{30.0 - 0.02 * i:.2f} {500 + i % 7}\n" for i in range(20))
+    path = write_zip_collection(tmp_path / "short_s.zip", [("s", rows)])
+    found: list = []
+    rx.read_pattern(path, diagnostics=found)
+    (d,) = [d for d in found if d.code == "PATTERN_SCAN_REVERSED"]
+    assert d.message.count(" in ") == 1, d.message
+    assert d.message.startswith("s in short_s.zip"), d.message
+
+
+def test_a_full_staged_path_is_named_once(tmp_path):
+    """The xy reader quotes the whole staged path; that path holds the staged
+    name too, and it is rewritten once, not twice."""
+    path = write_zip_collection(tmp_path / "readme.zip",
+                                [("README.txt", "a log, not a pattern\n"),
+                                 ("a.xy", xye_text(10.0))])
+    for call in (lambda: rx.read_pattern(path), lambda: list_scans(path)):
+        with pytest.raises(ValueError) as exc:
+            call()
+        message = str(exc.value)
+        assert "README.txt in readme.zip" in message
+        assert "in readme.zip in readme.zip" not in message, message
+
+
+def zip_needing_version(path: Path, version: int) -> Path:
+    """A one-member zip whose central directory says version-needed ``version``
+    (tenths): ``zipfile`` refuses past 63 with ``NotImplementedError``."""
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("x.xy", xye_text(10.0))
+    raw = bytearray(path.read_bytes())
+    at = raw.index(b"PK\x01\x02")
+    raw[at + 6:at + 8] = struct.pack("<H", version)
+    path.write_bytes(bytes(raw))
+    return path
+
+
+def test_a_nested_zip_of_an_unknown_version_does_not_break_the_read(tmp_path):
+    """Every candidate is sniffed, so the ``rasx``/``brml`` sniffs meet the
+    nested member too; they decline it as they decline any zip they cannot open
+    (issue #1593 item 3)."""
+    inner = zip_needing_version(tmp_path / "inner.zip", 70)
+    with pytest.raises(NotImplementedError):        # the input #1593 names
+        zipfile.ZipFile(inner)
+    assert identify_format(inner).name == "zip_collection"    # refused by its read
+    path = write_zip_collection(tmp_path / "outer.zip",
+                                [("b.xy", xye_text(10.0)),
+                                 ("inner.zip", inner.read_bytes())])
+    assert identify_format(path).name == "zip_collection"
+    assert rx.read_pattern(path, scan=0).tt()[0] == pytest.approx(10.0)
+    assert [s.label for s in list_scans(path)] == ["b.xy"]

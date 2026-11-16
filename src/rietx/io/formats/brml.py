@@ -476,7 +476,7 @@ def looks_brml(p: Path) -> bool:
     try:
         with zipfile.ZipFile(p) as zip_archive:
             names = zip_archive.namelist()
-    except (zipfile.BadZipFile, OSError):
+    except (zipfile.BadZipFile, NotImplementedError, OSError):   # a version past 6.3
         return False
     return (any(_MANIFEST.search(n) for n in names)
             and any(_RAW_DATA.search(n) for n in names))

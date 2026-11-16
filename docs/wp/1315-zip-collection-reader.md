@@ -168,6 +168,15 @@ The shipping PR carries `Closes #134`.
   the module docstring instead). The `rasx`/`brml` `NotImplementedError` the review found
   predates this WP and is #1593 item 3.
 
+  *Review fix-ups* (a second read-only review of the PR, 2026-11-16). A short member name
+  was rewritten inside other words of a message, and a quoted staged path was rewritten
+  twice (`… in readme.zip in readme.zip`); the staged name is now replaced in one pass and
+  only where it stands whole. `test_nothing_is_left_on_disk` now asserts that staging used
+  the directory it inspects. The PR also opened a second route to #1593 item 3: a nested
+  zip of version 7.0 is sniffed by `rasx`/`brml` on every read of the outer archive, so
+  `scan=0` on a good member crashed. Item 3's one-class fix (`NotImplementedError` in both
+  sniffs) is applied here, with a test that fails without it.
+
   *Gotchas.* The ZipExtFile reads at most the declared size and checks the CRC, so the
   `len(raw) > cap` branch is defensive only (a lying header fails as a bad CRC, refused by
   name). An `.xlsx`/`.docx` is now a zip collection refused through a member.
