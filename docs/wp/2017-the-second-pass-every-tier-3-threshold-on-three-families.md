@@ -305,6 +305,41 @@ No row this WP lists still names the second pass as owed.
 
 ## Handover log
 
+- **2026-11-16 (group C)** — Of the seven constants of the conjugate-gradient solve, four can no longer be reached by any fit: they live in the original BCCG routine, which the package stopped calling in WP-1953. The other three steer the step the solver takes on large Pawley problems, and only two of the three families are large enough to use it. There, loosening `_PCG_TOL` a hundredfold sent FAP to a different answer while every stage still said "converged", its c axis 1.29 esds away and ten times further from GSAS's. The shipped value and a tighter one agree. No value moved and no tier changed. The four unreachable rows now name the synthetic test that does reach them, and the other three say what was reached and what is still owed. Group B did not run: its third Stephens family is named nowhere, so that is a question for the maintainer. Group D cannot run as fixed, since its constant is read only by joint fits.
+
+  *Done.* In PR #1577. `2017-batch/group_c.py` and `group_c_summary.md`; starts, arms and reads fixed in § What each group inherits, "C, its starts and arms", before anything ran (commit 174276095). Evidence rewritten on the seven `rietx.optimize.bccg` rows `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE`, `_CAUCHY_ARMIJO`, `_CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`; tier, value and approval unchanged. Group B's missing family and group D's unreachable families are written into § What each group inherits.
+
+  *Measured* (the workstation, Linux x86_64, `rietx-py312` venv with the tree on `PYTHONPATH`, rietx-kernels 1.5.0, numpy 2.5.3, compiled tier on, one kernel thread, at `174276095`; 48 Pawley fits, 30 s for the last 46 on 8 workers, 511 MB peak):
+
+  | Family | Solve columns past the cut (Pawley intensities) | Shipped Rwp | Noise arm, plain esd | Reached |
+  |---|---|---|---|---|
+  | FAP | 343 (329), 37 projected-CG solves | 0.0786244 | 1.75e-6 | `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` |
+  | NAC with CaF₂ | 154 (140), 35 solves | 0.0751638 | 2.5e-6 | `_PCG_TOL` (under 2e-7 esd) |
+  | cpd-1a | never past 128 (111) | 0.1643022 | 2.2e-6 | none |
+
+  | Constant | Arms | What moved |
+  |---|---|---|
+  | `_PCG_TOL` | 1e-8, 1e-12 | 1e-8: FAP's c 1.29 plain esd, 4.9e-5 Å from GSAS's Rietveld c against 4.7e-6 (a moved 4.2e-5 against 4.8e-5), Rwp 0.0806 against 0.0786, six stages `converged`. 1e-12: FAP 0.026 esd (background 0.103) at 1.46× the evaluations. NAC under 2e-7 esd both sides |
+  | `_PCG_BUDGET_PER_VARIABLE` | 1, 4 | FAP 0.007 esd (background 0.036) at 1.05× and 1.10× the evaluations; NAC bit-identical |
+  | `_CAUCHY_ARMIJO` | 1e-5, 1e-3 | bit-identical on all three |
+  | `_CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS` | 1e-5 and 1e-3, 2 and 5, 100 and 400, 3 and 12 | bit-identical on all three; `bccg.solve` called 0 times in 48 fits, the spy counting the one call added after each fit |
+
+  GSAS's cell is a Rietveld answer under another protocol, so against a Pawley fit it reads drift, not truth; FAP and NAC are development data, and WP-1953 set the two reached constants on them. FAP's Pawley Rwp matched the Mac's run to seven digits.
+
+  *Canary*: FAP and NAC at the shipped constants, 11.5 s, 330 MB, 125 % of 2 cores, commit 174276095.
+
+  *Tests.* Fast selection at 0522460d8 on the workstation (Linux x86_64, `rietx-py312` venv, tree on `PYTHONPATH`, `-n 8 --dist loadgroup -m "not slow"`): 14850 passed, 280 skipped, 32 xfailed in 7 min 54 s, as a co-tenant (paused once by its memory guard), 6.6 GB peak. No test added. `tests/test_audit_table.py` 23 passed and `tests.audit_delta` exit 0 after the last row edit, `tests/test_docs_consistency.py` 26 passed (macOS arm64, worktree `[dev]` venv). Reader output unchanged (exit 0). Full suite not run: no measured number in the package can move.
+
+  *Gotchas.* `lm.BVLS_MAX_COLUMNS` counts every column of the solve, not the Pawley intensities: NAC's 140 intensities cross it by 26, cpd-1a's 111 never do. `bccg.solve`'s `tol` is a keyword default bound at `def` time, so `_CONVERGED_FRACTION`'s arms patch `solve.__kwdefaults__` too. A wsrun job directory keeps the canary's `DONE`, so `watch_wsjob.sh` reports the next task done at once: delete it before starting the next task.
+
+  *Generality.* The judge (Opus, following `.claude/agents/generality-review.md`, read-only) on the rows as first written, condensed: `_PCG_TOL` **weak** (two families; the GSAS cell reads drift; FAP and NAC development data; no record field says a stop was premature), `_PCG_BUDGET_PER_VARIABLE` **weak** (one family, and far below the 1 493-1 499 columns WP-1953 set it on), `_CAUCHY_ARMIJO` **cannot tell** (unreached; the 2026-11-05 rule asks for a named synthetic case, not a third family), the four `bccg.solve` constants **holds** (unreachable, verified; the rows should name the test that reaches them). It confirmed the design was committed before the first fit. *Author:* agreed on all; the rows now carry the drift label, the development-data label, the size gap, the synthetic-case close for `_CAUCHY_ARMIJO`, and `tests/test_bccg.py::test_published_termination_is_deliberately_inexact` and `::test_removal_scheme_is_cheap_and_harmless` for the four. No record field was added: that is a design change.
+
+  *Not done, and why.* A third family past the cut, ideally a Pawley block over 1 000 columns on the sparse path, for `_PCG_TOL` and the budget; a synthetic case reaching `_CAUCHY_ARMIJO`. Groups B and D, for the reasons above; E, F and I-S not started.
+
+  *Questions for the maintainer.* (4) Group B: which third Stephens family, or does B close under the rare-feature clause (`generality.md` § The rule) on qarr brucite and corundum? (5) The four constants read only by `bccg.solve`: stay at tier 3 on `tests/test_bccg.py`, or does the uncalled routine leave the audit's reach? (6) `_PCG_TOL` at 1e-8 stops FAP elsewhere with every stage `converged` and nothing in the record: is a field saying a projected-CG solve stopped on its budget or tolerance owed?
+
+  *Next.* (1) Group D: fix its joint fits in § What each group inherits (candidates listed there), then force each layout. (2) Groups E and F in order. (3) Group H's removal once #1494 merges.
+
 - **2026-11-16** — The absent-phase hold's 3σ threshold was run on the cases its approval left owed, and on real trace phases it never acts. Three weighed phases near 1 wt % and the CuO impurity in an 11-BM ramp read 9 to 34 esds at every stage. From their database cells, and with their cells moved about one peak width off, holding at 1σ, at 3σ or not at all gave bit-identical fits, and every cell found its way back. The one start where the threshold mattered is a phase weighed at zero (zircon declared in cpd-1a): 3σ holds it at the end, 1σ and off do not, and nothing else in the fit moves by more than the noise. The case the threshold was most suspected of, a real phase pushed under 3σ by its own offset and then held there, was not produced: one peak width is not far enough. So no value moved and no tier changed; the three rows now say what was measured and what is still owed.
 
   *Done.* PR #1577, a second PR beside #1494 (expect a trivial conflict in this file's Status line, group table and log head, and in `docs/wp/README.md`). `2017-batch/group_g.py` and `group_g_summary.md`; starts and arms fixed in § The list's "G, its starts and arms" bullet before anything ran (commit 51e56e95f). Evidence rewritten on `schemas.plan.PHASE_SUPPORT_SIGMA`, `PlanSpec:phase_support_sigma` and `Refinement.run_stage:phase_support_sigma`; tier, value and approval unchanged.
