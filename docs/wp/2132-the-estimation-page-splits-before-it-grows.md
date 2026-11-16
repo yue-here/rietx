@@ -77,7 +77,8 @@ splits only the Theory page.
 `reference/refinement` 49 987, this page 49 940 and `reference/series` 49 924, which PR #1473 splits
 (45 502 merged).
 
-**The class.** Five pages sit within 100 characters of the cap, and each is found by the session whose addition fails. The
+**The class.** Five pages sit within 100 characters of the cap (*superseded, 2026-11-16:* four, per
+the note above), and each is found by the session whose addition fails. The
 skill's sizes (`tests/skill_caps.py`) answer the same problem with a ceiling per file plus a budget
 below it that fails only growth, so concurrent PRs land in the gap. Whether the manual wants that is
 a question for this WP to measure and report, never to build unasked.
@@ -116,7 +117,7 @@ a question for this WP to measure and report, never to build unasked.
 
 ## Handover log
 
-- **2026-11-16** — measured and reported, nothing split (ghostshift runner; draft PR #1578). The page is
+- **2026-11-16** — measured and reported, nothing split (ghostshift runner; PR #1578). The page is
   not about to break from the two PRs the WP was waiting on: on current main it has 60 characters to
   spare, and #1383 and #1473 merged in, alone or together, move it by one character. What does
   threaten it is growth nobody makes on this page: a citation added to another Theory page renumbered
@@ -136,12 +137,15 @@ a question for this WP to measure and report, never to build unasked.
   - Each open PR touching the four near-cap pages or `src/rietx/help.py` (25: #1043 #1262 #1285 #1286
     #1332 #1372 #1383 #1388 #1405 #1410 #1422 #1472 #1473 #1475 #1477 #1480 #1482 #1493 #1510 #1532
     #1548 #1549 #1562 #1566 #1567), merged into main one at a time with `git merge-tree` and built.
-    18 merge clean and build green; none takes any twin over the cap; none adds to a near-cap twin
-    (#1472 `indexing` −24, #1332 `estimation` −7, #1473 splits `series` to 45 502 with a new
+    18 merge clean and build green; none of the 18 takes any twin over the cap or adds to a near-cap
+    twin (#1472 `indexing` −24, #1332 `estimation` −7, #1473 splits `series` to 45 502 with a new
     `series-ladder` page). The largest growth any of them puts on an existing page is 3 935
-    (`reference/extinction`, #1286). Seven conflict with main: #1262 and #1383 in
+    (`reference/extinction`, #1286). Seven conflict with main and were not built: #1262 and #1383 in
     `schemas/common.py` and `tests/test_magnetic.py`, #1480 and #1548 in the skill's `api.md`
-    copies, #1562, #1566 and #1567 in `docs/milestones/v1.12.md`.
+    copies, #1562, #1566 and #1567 in `docs/milestones/v1.12.md`. Three of the seven edit a
+    near-cap page: #1383 adds 1 to the `theory/estimation` twin (its estimation hunk alone, the
+    Context's dated note), #1262 nets +1 source character on `reference/refinement` (+748/−747) and
+    #1567 −21 on `reference/indexing`, read from `gh pr diff`, their twins not built.
   - Worst 24 hours of source growth on main's first-parent merges, 2026-10-16 to 2026-11-16, bytes:
     `theory/estimation` 5 930 (2026-10-20), `reference/refinement` 6 138 (10-22), `reference/indexing`
     2 906 (10-25), `reference/series` 910 (10-26).
@@ -155,7 +159,12 @@ a question for this WP to measure and report, never to build unasked.
   budget reads source deltas, which cannot see the citation renumbering above, one of the two cap
   failures on record (the other, #1383 dropping an equation, a source budget would see). (2) Twice
   this month's worst day is about 12 000 characters, a budget near 38 000 that would close 17 pages
-  today. (3) The concurrent load it guards against measured zero: no open PR grows a near-cap twin.
+  today. The worst days are source bytes and the cap counts twin characters (ratio 1.094, less
+  where `é`, `−` and `σ` take two bytes or more), a difference of about 10 % that leaves the
+  argument standing. (3) The concurrent load it guards against is about one character: of the 18
+  open PRs that build, none grows a near-cap twin; of the seven that conflict, #1383 adds 1 to this
+  twin, #1262 nets +1 source character on `reference/refinement` and #1567 −21 on
+  `reference/indexing` (not built).
   Options, none built: **A** no budget, plus a headroom report (`python -m tests.<name>`, the skill's
   report without its gate) and the five nearest pages named in the cap test's failure message;
   **B** a source-delta budget on the skill's pattern, stdlib and cheap, blind to non-local growth;
