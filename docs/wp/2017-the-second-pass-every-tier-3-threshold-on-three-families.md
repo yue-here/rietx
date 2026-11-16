@@ -373,6 +373,29 @@ No row this WP lists still names the second pass as owed.
 
 ## Handover log
 
+- **2026-11-16 (group D)** — The size at which a joint fit stops building one dense Jacobian and keeps it in per-pattern blocks makes no difference to the answer on real data. Two real joint fits, the three cpd-1 round-robin mixtures together and seven frames of the CuCr₂O₄ ramp, were each run both ways, and on the synthetic library its test already uses. Every refined number agreed within 0.005 esd, which is exactly the scatter a 1e-12 nudge to the start produces, with the same Rwp, the same rows measured and the same diagnostics. None of these fits is large enough for the size rule to choose the blocked path by itself (110 MiB at most against 256), so only the forced arm reached it. No value moved and no tier changed; the row now says this and that a third real joint family is still owed.
+  *Done.* In PR #1577. `2017-batch/group_d.py` and `group_d_summary.md`; fits, arms and reads fixed in § What each group inherits, "D, its fits and arms", before anything ran (commit bc89a5054). Evidence rewritten on `rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES`; tier, value and approval unchanged. Groups E and F fixed in the same section before running (5dde13f3a, f3857c487), scripts `group_e.py` and `group_f.py`.
+
+  *Measured* (the workstation, Linux x86_64, `rietx-py312` venv with the tree on `PYTHONPATH`, rietx-kernels 1.5.0, numpy 2.5.3, compiled tier on, one kernel thread, at `bf012fbc5`; 12 joint fits, 193 s on 4 workers, 864 MB peak):
+
+  | Fit | Joint solves | Largest dense J | blocked vs dense, plain esd | noise arm | esds, largest relative difference (noise) |
+  |---|---|---|---|---|---|
+  | library20 (synthetic) | 6 | 43.6 MiB | 8.5e-6 | 1.7e-5 | 2.9e-5 (4.4e-6) |
+  | cpd-1a, -1b, -1c joint (qarr) | 9 | 11.3 MiB | 3.6e-6 | 3.5e-6 | 7.0 % on W (8.5 %) |
+  | CuCr₂O₄ ramp, 7 frames ≤ 122.7 K (11-BM) | 6 | 110.0 MiB | 0.0050 | 0.0050 | 0.068 % (0.057 %) |
+
+  Rwp equal to nine digits and the diagnostic codes equal on every pair; the same rows carry an esd in both layouts; the `rule` arm took dense on all three and is bit-identical to it. Both real families are development data, and the reference is rietx's own dense answer, so this verifies and validates nothing beside it: the coldest frame's cell reads −19, +110 and −114 ppm against Suchomel et al. (2012) Table I under both layouts. The cpd-1 weighed fractions were fixed as a reference but the harness read the wrong field names, so they were not recorded (fixed in the script; the fractions are functions of rows that agree to 3.6e-6 esd).
+
+  *Canary*: library20 dense and blocked, 11 s, 340 MB, 134 % of 2 cores, commit bf012fbc5; blocked against dense 8.5e-6 esd, the row's cited test repeated.
+
+  *Generality.* The judge (Opus, following `.claude/agents/generality-review.md`, read-only) on the row as first written: **weak** — the esds and which rows carry one were not compared, though `blocked.py` names the near-cut case where the two layouts can discard different directions; development data not stated; the layout reaches no record field; the fractions read was broken. *Author:* the esd comparison was added from the raw rows (no new fits) and the row states it, the development data and the unproduced near-cut case; the script is fixed. The record field is a design change, so it is question (8).
+
+  *Not done, and why.* A third real joint family (only Nd₂Ru₂O₇ is on disk, evidence for no audit before the milestone closes) and the near-cut case.
+
+  *Questions for the maintainer.* (7) Group D: two real joint families and the synthetic case agree to the noise floor; does D close on them, or is a third joint family owed, and from where? (8) `LSQOutcome.jacobian_layout` reaches no field of the result or history: should the layout a joint fit took be recorded?
+
+  *Next.* (1) Groups E and F, run as fixed in § What each group inherits (scripts committed, not yet run). (2) Groups I to S in order. (3) Group H's removal once #1494 merges.
+
 - **2026-11-16 (group C)** — Of the seven constants of the conjugate-gradient solve, four can no longer be reached by any fit: they live in the original BCCG routine, which the package stopped calling in WP-1953. The other three steer the step the solver takes on large Pawley problems, and only two of the three families are large enough to use it. There, loosening `_PCG_TOL` a hundredfold sent FAP to a different answer while every stage still said "converged", its c axis 1.29 esds away and ten times further from GSAS's. The shipped value and a tighter one agree. No value moved and no tier changed. The four unreachable rows now name the synthetic test that does reach them, and the other three say what was reached and what is still owed. Group B did not run: its third Stephens family is named nowhere, so that is a question for the maintainer. Group D cannot run as fixed, since its constant is read only by joint fits.
 
   *Done.* In PR #1577. `2017-batch/group_c.py` and `group_c_summary.md`; starts, arms and reads fixed in § What each group inherits, "C, its starts and arms", before anything ran (commit 174276095). Evidence rewritten on the seven `rietx.optimize.bccg` rows `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE`, `_CAUCHY_ARMIJO`, `_CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`; tier, value and approval unchanged. Group B's missing family and group D's unreachable families are written into § What each group inherits.
