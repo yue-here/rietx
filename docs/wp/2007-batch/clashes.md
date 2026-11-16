@@ -13,8 +13,7 @@ statistic/threshold/action triple for codes). **Nothing here is a ruling.** Each
 a question for the maintainer.
 
 **Measurements.** Two, both run on 2026-11-16 on the Mac (darwin/arm64, worktree `.venv`), one at
-a time through the ghostshift serial runner. Logs: `~/.cache/ghostshift/rietx-src/wp-2007/clash_1.log`
-and `clash_8.log`; the scripts are in this session's scratchpad and are quoted in each section.
+a time through the ghostshift serial runner. The logs and scripts were kept locally; each section quotes what it ran.
 (M1) `synthetic_peaks("cubic", two_theta_max=150.0)` (the fixture of `tests/test_indexing_ceiling.py:42`),
 systems cubic, tetragonal, hexagonal, `preset="full"`, peaks only: 10.3 s, 12 candidates.
 (M2) `index_pattern(data=data, instrument=ins)` on qarr SRM 676a corundum

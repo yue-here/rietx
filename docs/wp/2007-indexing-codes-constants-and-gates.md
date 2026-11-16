@@ -158,11 +158,11 @@ ranking over one population and is the regression gate, not a family.
   `/code-review` (a ghostshift runner may not run it): its two must-fix findings (the audit
   table's `Row("CODE", "code")` read as 50 false raise sites; a derived number the walk sees
   dropped) and four should-fix findings were taken in `d7b605611`; of its four nits, all taken.
-  *Measured*: Bethanechol benchmark, whole protocol, `python -m tests.bethanechol_benchmark` on `bc77a934e` (the branch changes no `src/`), pearl (Linux x86_64, `~/venvs/rietx-py312`, one pinned core): default −3 (Bb, E, F rank 1; Db rank 2), manual −2, global −5 over 20 runs, ceiling +8, 3735 s. Against the 2026-10-13 default −6 (Linux) it is no worse, and it equals WP-1959's macOS −3. No nightly runs this benchmark, so there is no nightly ranking to compare. It did not run alone: pearl carried load 12-23 from other sessions, WP-2110's own bethanechol run until about 12:35Z and this branch's fast suite; with wall-clock budgets a quiet machine can only find more.
+  *Measured*: Bethanechol benchmark, whole protocol, `python -m tests.bethanechol_benchmark` on `bc77a934e` (the branch changes no `src/`), a shared Linux x86_64 workstation (Python 3.12 venv, one pinned core): default −3 (Bb, E, F rank 1; Db rank 2), manual −2, global −5 over 20 runs, ceiling +8, 3735 s. Against the 2026-10-13 default −6 (Linux) it is no worse, and it equals WP-1959's macOS −3. No nightly runs this benchmark, so there is no nightly ranking to compare. It did not run alone: the machine carried load 12-23 from other sessions, WP-2110's own bethanechol run until about 12:35Z and this branch's fast suite; with wall-clock budgets a quiet machine can only find more.
   Clash measurements (Mac, darwin arm64, `.venv` `[dev]`, `clashes.md` header): a synthetic cubic
   run, 10.3 s, and a default `quick` run on qarr corundum, 107.3 s, 12 candidates listed, 4
   validated and checked, all 12 `low` with `fom_panel_disagrees` on every row. Fast selection on
-  pearl (Linux x86_64, `~/venvs/rietx-py312`, `-n 4`): 14850 passed, 280 skipped, 32 xfailed in 948 s, at `d7b605611`; 8.6 GB peak. The branch adds no test.
+  a Linux x86_64 workstation (Python 3.12 venv, `-n 4`): 14850 passed, 280 skipped, 32 xfailed in 948 s, at `d7b605611`; 8.6 GB peak. The branch adds no test.
   *Forward*: the benchmark WP-1924 owed went to its `### Inherited`; clash K5 to WP-2112's. The
   lanes measurement (`session_usage.py lanes`) found no lane under this session id, since the lanes
   ran as background agents; their cost is not in this entry.
