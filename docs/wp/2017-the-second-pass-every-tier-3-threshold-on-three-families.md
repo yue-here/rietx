@@ -254,6 +254,43 @@ and have no free factor to measure, so this file's old list named them without c
   off, on the four arms that are not noise, and once from the database cell. The cpd-1 suite
   and cpd-1a with zircon are one family by laboratory, instrument and material, so this set
   is two families, not three; the WP fixed it so on 2026-11-05, and it is run as fixed.
+- **I, read 2026-11-16 before choosing its fits.** The removal has no `_audit` row: it is the
+  default of four `Parameter`s (`Instrument.zero_shift`, `Geometry.sample_displacement` and the
+  two capillary offsets lost ±0.5° and ±1 mm, `sample_transparency` its ceiling of 0.05; commit
+  3d63e9db5), and its evidence lives in the schema comment above `sample_displacement` and in
+  `docs/docs/reference/instrument.md`. The three flat-plate protocols all hold the zero shift
+  (FAP as GSAS, SRM 660c on a calibrated goniometer, SRM 1976a as its TOPAS file does, whose
+  comment says not to refine zero and displacement together), so at their shipped plans the
+  removed bounds never bind and the fits measure nothing. Group I's arms must free the zero with
+  the displacement, as the NAC case freed the zero with both offsets.
+- **I, its fits and arms, fixed 2026-11-16 before running** (`2017-batch/group_i.py`). Three
+  laboratory flat plates in Bragg-Brentano, three laboratories, instruments and materials: `fap`
+  (FAP under its GSAS protocol, 15-130°; reference GSAS's converged cell, a 9.371724(36),
+  c 6.885867(37) Å, verifies), `lab6` (SRM 660c under the NIST calibrated protocol, 20.3-150.9°;
+  reference the CIF block's cell 4.156780 Å and displacement −0.07877 mm, validates) and `srm1976a`
+  (the sintered SRM 1976a plate on an X'Pert under its TOPAS-mirrored textured protocol, 20-118.6°,
+  with a cell stage added after the displacement stage, since that protocol holds the cell;
+  reference the TOPAS file's cell, 4.758877 and 12.992880 Å, which it holds, and its refined
+  displacement −0.08930 mm, read beside the bar). Two ranges each: `full`, the protocol's, and
+  `narrow`, from the protocol's low end to the 2θ at which the smallest eigenvalue of the
+  unit-column Gram of the three position shapes {1, cos θ, tan θ} (zero, displacement, cell) on
+  the pattern's own channels falls to that of NAC's capillary trio {1, sin 2θ, cos 2θ} over its
+  2-24°, 1.6e-5, the one case where the bound was measured to matter. Arms: `shipped` (the
+  protocol, zero held); `free` (the zero shift turned on in the displacement stage, one block, all
+  three refined together with the cell in the closing stage, no bounds: the default since
+  1.10.0); `bounded` (`free` with the pre-1.10 defaults: zero ±0.5°, displacement ±1 mm,
+  transparency 0-0.05); `noise` (`free`, every free start value that is not zero ×(1 + 1e-12)).
+  Control: `bounded` measured something only where a bounded path ends within 1e-6 of its bound
+  or `BOUND_HIT` fires; otherwise rows, Rwp and evaluations must match `free` bit for bit and the
+  pair reads `unreached`. Positive arm for the harness: 11-BM NAC over 2-24°, the zero and both
+  capillary offsets free (`test_capillary_displacement.nac_pair`'s construction), `free` against
+  `bounded` (±1 mm, ±0.5°), which must repeat the cited 1097 and about 5111 ppm. Read: every cell
+  row `bounded` against `free` and each against `shipped`, in plain esd over the larger esd
+  (`_shift`, 0.1 bar), past `noise`; each cell's distance from its reference in ppm and in its own
+  esd (the reference page's claim: the cell's esd grows to cover the walk); the zero and
+  displacement values and esds; Rwp, evaluations, status, and whether `FLAT_DIRECTION`,
+  `HIGH_CORRELATION` and `BOUND_HIT` fire. Whether the removal stands on what this shows is the
+  maintainer's; no default moves here.
 - **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
   starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
   to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
