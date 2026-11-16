@@ -1,6 +1,6 @@
 # WP-1933 — the CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook
 
-Milestone: unscheduled · Status: 🔄 2026-10-09 — C-d landed (#854); C-e waits on 1918's I-c, #752 on a decision
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling (#913 items 1-3)
 Track: Coming from another code
 Depends on: 1319 (#756, #752)
 Priority: P2 2026-10-09 — was P3 until 1319 landed the registry, number rule and structure block it builds on; #756's later chunks, a named user waiting
