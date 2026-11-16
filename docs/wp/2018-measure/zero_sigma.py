@@ -20,7 +20,8 @@ inside the fitted range, refined under ``tests/test_acceptance_lab6_cbn.py``'s
 
 Per arm: Rwp, the channel count and ``sigma_rule``, the reader's diagnostics,
 the σ the result stores at the channel, whether ``result.sig()`` equals
-``result.sigma`` bit for bit, both cells, both weight fractions and scales.
+``result.sigma`` bit for bit, the cell rows the fit reports (cBN; LaB₆'s cell is not
+free under this plan), both weight fractions and scales.
 
 usage (repo root): python docs/wp/2018-measure/zero_sigma.py [arm ...]
 """

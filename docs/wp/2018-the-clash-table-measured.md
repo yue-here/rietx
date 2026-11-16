@@ -521,7 +521,7 @@ here where one binds. Question (13).
 **C22, `solve_magnetic`'s one-site release against the flat-moment hold** (`release_hold.py`;
 macOS arm64, `[dev]`, 12-15 s an arm). The chosen dataset cannot exercise the pair: Cr₂WO₆
 has one magnetic site, and `_starts` returns before any release when a class has fewer than two
-(magnetic.py:1553-1554, read; `test_a_single_site_class_is_started_once`), so it was not run.
+(`strategy/magnetic.py`:1553-1554, read; `test_a_single_site_class_is_started_once`), so it was not run.
 The two-site Pnma fixture of `tests/test_magnetic_solve.py` (Mn1 3.5 µB and Mn2 0.7 µB along x,
 A-type 62.448, CW neutrons) was run through `solve_magnetic` instead: four classes, each fitted
 from the flat seed and from each site alone then released, 21 fits an arm with the nuclear
@@ -537,14 +537,17 @@ release at 1e-4 of the seed rather than 0.05); tiny_no_hold.
 
 The hold acts in 8 of the 20 shipped trial fits, always on an azimuth: of a moment the leg
 left on the polar axis (held at the moment stage's start and released at its answer), or, in
-62.446, of both sites once their moduli collapse to 0.11 µB with esds of 540-550 µB. A released
+62.446, of both sites once their moduli collapse to 0.11 µB with esds of 542-552 µB. A released
 site's angles are held only there (two fits), as the flat start's fit of the same class holds
 them too. The verdict, the winner, its start and its ΔBIC are the same in every arm, and so is
-the runner-up's to 1e-6. Two things move, both in the class the data reject. First, at 1e-4
-the released starts of 62.446 end in another minimum (Rwp 0.5060993 against 0.5060964) with no
-hold acting, so the release fraction does decide where a released site lands. Second, the hold
+the runner-up's to 1e-6. Two things move, both in the class the data reject. First, in the tiny
+arm both released starts of 62.446 end in another minimum (Rwp 0.5060993 and 0.5060991 against
+0.5060964), with no hold acting in the released fits themselves but the hold having held Mn2's
+azimuth in the Mn2-only leg they start from; with the hold off as well (tiny_no_hold) the
+Mn1-released start returns to 0.5060964. So the release fraction decides where a released site
+lands, in combination with what the hold did to the leg. Second, the hold
 moves 62.446's ΔBIC by 9.99 at an Rwp equal to 1e-9 relative, because ΔBIC's parameter charge is
-the count of *free* moment rows in the result (`n_moment`, magnetic.py:1610-1611, read): a held
+the count of *free* moment rows in the result (`n_moment`, `strategy/magnetic.py`:1610-1611, read): a held
 azimuth is not charged. Question (14).
 
 **C25, the size cap against `SIZE_LAMBDA_POWER` in a joint fit** (`joint_size_cap.py`; macOS
@@ -559,12 +562,12 @@ cap of 4.05e-5°, just under the fitted size); and three arms starting both size
 
 | Arm | lor_size (°, column) | gauss_size | Rwp X-ray, neutron | what the cap did |
 |---|---|---|---|---|
-| shipped | 4.81(25)e-5 | 3.2(55)e-5 | 0.0919566, 0.0623754 | never armed |
+| shipped | 4.8e-5 ± 2.5e-4 | 3.2e-5 ± 5.5e-4 | 0.0919566, 0.0623754 | never armed |
 | no_cap, tight, tight6 | identical to shipped, every digit | | | never armed |
-| no_lambda, tight_no_lambda | 4.80(25)e-5 | 3.6(59)e-5 | 0.0919565, 0.0623747 | never armed |
-| seeded | 6.81(25)e-5 | 5.2(55)e-5 | 0.0919567, 0.0623754 | never armed |
-| tight6_seeded | 5.13(25)e-5 | 0, on its floor (`FLOOR_HIT`) | 0.0919534, 0.0623760 | armed in `size` only |
-| tight6_seeded_no_lambda | 5.26(25)e-5 | 0, on its floor | 0.0919534, 0.0623762 | armed in `size` only (`gauss_size`) |
+| no_lambda, tight_no_lambda | 4.8e-5 ± 2.5e-4 | 3.6e-5 ± 5.9e-4 | 0.0919565, 0.0623747 | never armed |
+| seeded | 6.8e-5 ± 2.5e-4 | 5.2e-5 ± 5.5e-4 | 0.0919567, 0.0623754 | never armed |
+| tight6_seeded | 5.1e-5 ± 2.5e-4 | 0, on its floor (`FLOOR_HIT`) | 0.0919534, 0.0623760 | armed in `size` only |
+| tight6_seeded_no_lambda | 5.3e-5 ± 2.5e-4 | 0, on its floor | 0.0919534, 0.0623762 | armed in `size` only (`gauss_size`) |
 
 The sizes are not resolved on this pair (each within its esd of 0). Started at 0 they sit at 0
 at every stage's compile until the closing stage moves them, so the cap, which arms only on a copy that
@@ -573,10 +576,11 @@ off or narrowing it to 1/119 of the fitted size changes no digit. `SIZE_LAMBDA_P
 the sizes 0.0006 and 0.0064 esd and the cell 5e-5 esd. The seeded positive arm shows the two
 meeting as WP-1131's docstring says (least_squares.py:3294-3313): at the `size` stage's compile
 the neutron copy of `lor_size` (7.45e-5°) arms and the X-ray copy (2e-5°) does not, so the
-intersected bound is the neutron table's, 1.0866e-5 in column units (4.05e-5° / 3.727); both
+intersected bound is the neutron table's, 1.0867e-5 in column units (4.05e-5° / 3.727); both
 copies of `gauss_size` arm and the neutron's binds, 1.18e-10 (1.64e-9 / 13.89). The stage
 starts above both bounds and ends with both sizes at 0. The closing stage then compiles at 0,
-nothing arms, and it takes `lor_size` to 5.13e-5°, 1.27× the cap, unchecked. In every arm the
+nothing arms, and it takes `lor_size` to 5.13e-5°, 1.27× the 4.05e-5° cap and 4.7× the column bound the
+`size` stage held it under; the closing compile declares the cap again, but nothing arms at 0. In every arm the
 closing stage sets the size the caller reads, and it compiles before any copy reaches a cap.
 Question (15).
 
@@ -598,15 +602,16 @@ compile reads it only for σ); no_sigma (the blank's esd column dropped: no wide
 | start_conv, start_3 | 0.837415 | the same | 2.5e-6, 1.4e-6 | up to 0.24 % |
 | again | 0.837429 | the same to 1.3e-7 | 9.3e-5 | up to 0.24 % |
 | pinned (σ at 0.841316 in every stage) | (σ at 0.841316) | 0.84128(1075) | **0.0061** (c0; scale 0.0036, `lor_size` 0.0047) | 0.0024 % |
-| no_sigma (positive arm) | — | 0.84528(999) | **0.80** (c0; `lor_size` 0.67, scale 0.40, Biso 0.22) | the widening itself is up to 45 % of σ_y |
+| no_sigma (positive arm) | — | 0.84528(999) | **0.78** (c0; `lor_size` 0.67, blank scale 0.37, Si scale 0.34, Biso 0.22) | the widening itself is up to 45 % of σ_y |
 
 The per-stage lag does not survive the plan: only the first compiles see the start (1.0, 0.85
-or 3.0), and from the fourth compile on every arm compiles at the same scale to 1e-6. What reaches
+or 3.0), and from the fourth compile on start_1, start_conv, start_3 and again compile at the
+same scale to 1e-6. What reaches
 the caller is the closing stage's own move: it compiles at 0.837415 and lands at 0.841316, 0.36
 of the scale's esd, so the σ the result divides by is the one at 0.837415, within 0.24 % of
 the σ at the answer on every channel (the widening it carries is up to 45 %). The pinned arm,
 where every stage weights at the answer's scale, moves no value by more than 0.0061 esd
-against the shipped fit, while dropping the widening moves values up to 0.80 esd, so the arms
+against the shipped fit, while dropping the widening moves values up to 0.78 esd, so the arms
 can see a weighting effect of this kind; the lag is about 1/130 of it. Question (16).
 
 **C27, the rules that act on σ** (`zero_sigma.py`; macOS arm64, `[dev]`, about 3 s a fit).
@@ -614,7 +619,7 @@ Re-derived first: WP-1952 has landed, so the row read at 4c55b9011 is out of dat
 `_floor_sigma` any more. A stated σ ≤ 0 leaves the fit under the reader option
 `nonpositive_sigma="exclude"`, the default (`PatternData.in_range_mask`, pattern.py:236), or
 takes the Poisson fallback √max(y, 1) under `"poisson"` (`_poisson_where_nonpositive`,
-pattern.py:41, which `PatternData.sig` applies at :211). `RefinementResult.sig` applies the same
+pattern.py:41, which `PatternData.sig` applies at :221). `RefinementResult.sig` applies the same
 function to the σ the fit stored (results.py:2466), and the compile still widens σ for a
 measured blank (C26). The dataset as chosen: a copy of `11BM_LaB6_cBN_mg2044.xye` with σ planted
 at the strongest channel in the fitted range (8.070°, LaB₆ 110, y = 122 248, file σ 355.8),
@@ -627,15 +632,15 @@ zero, and which no rule touches).
 | original | 44 895 file | 355.8 | 17.787(319) | — | bit for bit |
 | zero_exclude | 44 894 file, 1 excluded; reader's `PATTERN_SIGMA_NONPOSITIVE` | not in the fit | 17.729(319) | 0.28 (LaB₆ scale) | bit for bit |
 | zero_poisson | 44 894 file + 1 Poisson | 349.6 | 17.788(319) | 0.009 | bit for bit |
-| floor (positive arm) | 44 895 file | 0.0115 | 18.455(319) | **3.6** (LaB₆ scale); Rwp 6.4e-5, `STAGE_MAX_ITER` | bit for bit |
+| floor (positive arm) | 44 895 file | 0.0115 | 18.455(319) | **3.2** (LaB₆ scale); Rwp 6.4e-5, `STAGE_MAX_ITER` | bit for bit |
 
 The rules no longer stack: in every arm the σ the result stores is the σ the fit used and
 `sig()` returns it unchanged, so the second application is a no-op on a fit's own result, as
 its docstring says (it acts only on a hand-built result). A planted zero is now one channel's
 worth of data: dropped by default, it moves the LaB₆ scale 0.28 esd and its fraction 0.18 esd
 because the channel is a peak top; weighted as Poisson, 0.009 esd. The positive arm shows what
-the retired floor did with the same zero: one channel carrying about a million times its
-neighbours' weight, the LaB₆ scale 3.6 esd away and an Rwp of 6.4e-5. The blank's widening was
+the retired floor did with the same zero: one channel weighted about a million times a median channel
+(and 9.6e8 times its own file σ's weight), the LaB₆ scale 3.2 esd away and an Rwp of 6.4e-5. The blank's widening was
 measured in C26 and does not meet these rules (it adds to a σ that is already positive).
 Question (17).
 
@@ -662,11 +667,13 @@ esd from the truth. Where it is absent the hold holds r, through the variable as
 reaches only the unseen phase), and without the hold r wanders to 1.04 ± 0.46, nowhere near the
 floor; so on this fixture the pair never meets. One finding beside it, from the positive arm:
 the floor is not a place the model is defined. MoO₃'s (0k0) lie exactly on the [010] axis, and
-`cos2_alpha` returns their cos²α as 1 ± 2.2e-16 (5 of the 11 off by one ulp, 3 of them above 1).
+`cos2_alpha` returns their cos²α as 1 ± 2.2e-16 (probed with the script's own metric,
+diag(1/a², 1/b², 1/c²) from the stored cell, not the compiled model's) (5 of the 11 off by one or two ulps, 3 of them above 1).
 At r = 2e-6 the bracket r²cos²α + sin²α/r is then dominated by the rounding (2.2e-16/r = 1.1e-10
 against r² = 4e-12), negative where cos²α rounds above 1, and `march_term` returns NaN for 3 of
 the 11, and 8e14-2e15 instead of 1.25e17 for two more; at the floor itself, 1e-6, the same three
-are NaN. At 1e-5 all eleven are finite, but five still read 7.4e14-1.46e15 against
+are NaN. That the pole arm's NaN comes from these reflections is inferred from the probe, not
+traced inside the fit. At 1e-5 all eleven are finite, but five still read 7.4e14-1.46e15 against
 1e15. The floor's docstring (structure.py:51) says every factor is finite in fp64 at every
 angle on the bound itself. Question (18).
 
@@ -687,7 +694,7 @@ at two more points along every stage's path; it is run from 0 and from +0.1°.
 | +0.1, repeated | identical | 0 | the same to 2.3e-7 Å | 0.039° |
 | +0.6 | as +0.1 | 0 | 10.2450(65), 0.594(11), Rwp 0.831 | 0.0033° |
 
-Recompiling three times as often changes no answer: from 0 the repeated arms agree to 1e-11,
+Recompiling three times as often changes no answer: from 0 the repeated arms agree to 2e-11,
 and from +0.1° the Pawley fit lands in the same wrong basin to 2.3e-7 Å. In the converged fits
 no stage moves the zero more than 0.0056°, under 2 % of the 0.3° of movement headroom every
 window carries (`WINDOW_MIN_DEG`), and the Pawley off-data ridge marks the same eight reflections either
@@ -709,24 +716,25 @@ true cell and widths). Arms: zero (`auto_background`, the default: every coeffic
 
 | Pattern | arm | Rwp | background / truth at 50° | W (truth 0.25) | Y (truth 0) | cell axis furthest from the truth, in its esds (ppm) |
 |---|---|---|---|---|---|---|
-| #740 | zero / seed / truth | 0.0108 / 0.0107 / 0.0108 | 1.004 / 1.004 / 0.994 | 0.2500 / 0.2499 / 0.2498 (6e-4) | within 1.2 esd of 0 in all three | b, −4.7(13) in all three |
-| flat | zero | 0.0547 | 0.978 | 0.219(20) | **0.079(25)**, U −0.016(8), X on its floor | c, −36(36) |
+| #740 | zero / seed / truth | 0.0108 / 0.0107 / 0.0108 | 1.004 / 1.004 / 0.994 | 0.2500 / 0.2499 / 0.2498 (6e-4) | within 1.2 esd of 0 in all three | b, −4.6 to −4.8 (esd 1.3) |
+| flat | zero | 0.0547 | 0.978 | 0.219(20) | **0.079(25)**, U −0.016(8), X on its floor | c, −36(35) |
 | flat | seed | 0.0468 | 0.983 | 0.249(12) | 0.034(14) | b, −38(20) |
-| flat | truth | 0.0425 | 0.987 | 0.254(10) | 0.012(11) | b, −40(16) |
+| flat | truth | 0.0425 | 0.987 | 0.254(9) | 0.012(11) | b, −40(16) |
 | hump | zero | 0.1001 | 0.817 | 0.190(55), `RESOLUTION_NOT_POSITIVE` | 0.030(67) | a, −60(130) |
-| hump | seed | 0.0934 | 0.830 | 0.255(47) | −0.017(59) | a, −72(106) |
-| hump | truth | 0.0405 | 0.996 | 0.253(10) | 0.010(12) | b, −41(16) |
+| hump | seed | 0.0934 | 0.830 | 0.255(47) | −0.017(59) | a, −71(106) |
+| hump | truth | 0.0405 | 0.996 | 0.253(10) | 0.010(12) | b, −40(16) |
 
 On #740's pattern, where the peaks dwarf the pedestal, the start changes nothing (cell within
 0.6 esd, widths within 0.4 esd, across all three). Where the phase is weak against the
 pedestal the partition against an unfitted background does reach the answer: from zero, Y
-ends 3.1 esd from its true 0 and U 2.0 esd negative on the flat pattern, and W 1.1 esd low with
+ends 3.1 esd from its true 0 and U 1.9 esd negative on the flat pattern, and W 1.1 esd low with
 `RESOLUTION_NOT_POSITIVE` on the hump; the seed takes W to within 0.1 esd of the truth on
 both, but Y stays 2.4 esd off on the flat pattern and the hump's background still ends at 0.83
 of the truth (WP-1542's 0.83, reproduced). Only the true curve held brings every width within
-1.2 esd and the background to within 1.3 %. The cells move less: between the zero and truth arms by at most 1.2 of the truth arm's esds
+1.2 esd and the background to within 1.4 %. The cells move less: between the zero and truth arms by at most 1.2 of the truth arm's esds
 on the flat pattern and 2.5 on the hump (0.4 of the zero arm's own, which are 6× wider), and
-the axis furthest from the truth is as far in the truth arm (2.6 esd) as in any other, so what
+on the two weak-phase patterns the axis furthest from the truth is furthest in the truth arm
+(2.6 esd, against at most 1.9 in the others; #740's b sits 3.5-3.7 esd off in all three), so what
 the start moves first is the profile and the esds. Question (20).
 
 **C37, a free measured-background scale beside the Chebyshev rows** (`blank_chebyshev.py`;
@@ -738,12 +746,12 @@ correlation with each coefficient is read from the closing solve's correlation m
 
 | Arm | blank scale | largest ρ(scale, c_k) | Si scale (×1e-4) | Biso (Å²) | `lor_size` (°) | Rwp (own σ) |
 |---|---|---|---|---|---|---|
-| free, 2 terms | 0.501(16) | −0.81 (c0) | 2.94234(12) | 0.4170(96) | 0.002169(83) | 0.0921 |
-| free, 3 terms | 0.841(11) | −0.88 (c0) | 2.94487(53) | 0.4217(43) | 0.002287(37) | 0.0734 |
-| free, 6 terms | 0.693(19) | −0.95 (c0) | 2.94526(57) | 0.4220(46) | 0.002295(39) | 0.0735 |
-| free, 10 terms | 0.695(24) | −0.95 (c0) | 2.94512(57) | 0.4219(46) | 0.002293(39) | 0.0733 |
-| held at 1, 3 terms | 1 | — | 2.94628(54) | 0.4228(44) | 0.002304(38) | 0.0736 |
-| held at 1, 10 terms | 1 | — | 2.94555(50) | 0.4222(40) | 0.002303(35) | 0.0724 |
+| free, 2 terms | 0.501(16) | −0.81 (c0) | 2.942(12) | 0.4170(96) | 0.002169(83) | 0.0921 |
+| free, 3 terms | 0.841(11) | −0.88 (c0) | 2.9449(53) | 0.4217(43) | 0.002287(37) | 0.0734 |
+| free, 6 terms | 0.693(19) | −0.95 (c0) | 2.9453(57) | 0.4220(46) | 0.002295(39) | 0.0735 |
+| free, 10 terms | 0.695(24) | −0.95 (c0) | 2.9451(57) | 0.4219(46) | 0.002293(39) | 0.0733 |
+| held at 1, 3 terms | 1 | — | 2.9463(54) | 0.4228(44) | 0.002304(38) | 0.0736 |
+| held at 1, 10 terms | 1 | — | 2.9456(50) | 0.4222(40) | 0.002303(35) | 0.0724 |
 
 The blank's scale is not a measurement independent of the polynomial beside it: from three
 terms to six it moves from 0.841 to 0.693, 7.7 of the six-term esd and 14 of the three-term
@@ -753,7 +761,7 @@ order to −0.95, under the 0.98 guard, so nothing fires (no `HIGH_CORRELATION`,
 the span they are projected onto).
 The specimen does not follow it: from three to ten terms, free or held, the Si scale, Biso and
 `lor_size` move at most 0.44 esd (`lor_size`, held against free at 3 terms). Two terms are too
-few (Rwp 0.092): there the scale falls to 0.50 and `lor_size` sits 3.2 esd low, which is the
+few (Rwp 0.092): there the scale falls to 0.50 and `lor_size` sits 3.2 of the three-term fit's esds low, which is the
 polynomial's shortfall rather than the pair's. Question (21).
 
 **C35, not measured.** Its dataset is a series carry (`seqrefine_cucr2o4/` chained under Le
@@ -845,7 +853,7 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     source as "refined without signal" while it carries the visible cell's esd: should the
     finding leave out a column whose reach includes a seen phase, as the hold already does?
     (b) When a support window binds (the ±0.01 % positive arm), `at_bound` and `BOUND_HIT` stay
-    silent, because the guard recomputes the window around the committed answer: should
+    silent; read, not traced, the guard recomputes the window around the committed answer: should
     `check_guards` read the bounds the solver used (frozen with the window set), and is that
     the owner's fix (WP-1110's window) or a new row?
 14. **C22.** On the two-site fixture the release and the flat-moment hold never meet on a class
@@ -871,7 +879,7 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     lag is accepted" the maintainer's to state?
 17. **C27.** Since WP-1952 the σ rules no longer stack: `RefinementResult.sig` returns a fit's
     σ unchanged in every arm, and a planted zero is excluded (0.28 esd on a peak top) or Poisson
-    weighted (0.009 esd), where the retired floor moved the scale 3.6 esd. Is C27 recorded
+    weighted (0.009 esd), where the retired floor moved the scale 3.2 esd. Is C27 recorded
     *dissolved* by WP-1952, and should the row's file:line be rewritten to the rules above?
 18. **C29.** On a synthetic textured MoO₃ trace the floor, the tie window and the hold never
     meet: the hold holds an absent phase's r (directly or through a variable), and a seen
@@ -883,7 +891,7 @@ Measured above; the verdict on each is a ruling, so none is written into the tab
     at 1e-5 five of eleven factors are still off), or both, and does the
     floor's docstring need correcting either way?
 19. **C33.** On NAC cold-fitted from a cell 0.1 % short, recompiling the list and the windows
-    three times as often changes no answer (1e-11 from a zero of 0; the same wrong basin from
+    three times as often changes no answer (2e-11 from a zero of 0; the same wrong basin from
     +0.1°), and no converged stage moves the zero more than 0.0056°. Is C33 recorded
     *independent* on this evidence? A larger start error fails before the freeze can act (the
     Rietveld scale floors in the first stage; Pawley lands in the zero-cell basin at ρ 0.985),
@@ -920,7 +928,7 @@ Every pair in `2002-batch/clashes.md` has a measured row or a stated reason it w
 
 ## Handover log
 
-- **2026-11-16 (fourth round)** — Nine more pairs of the clash table are measured, so 21 of the 22 live pairs now have numbers; the last, C35, needs a harness that fits a series of patterns, which the tree does not have. On the datasets chosen for them, none of the nine changes an answer a caller reads in a way the code does not intend, but four of them found something worth a ruling. When a support window does bind (forced in a positive arm), nothing reports it, because the bound test recomputes the window around the answer (C3a). The magnetic solver's ranking does not charge a moment direction the flat-moment hold froze, so a held class pays fewer parameters (C22). The March-Dollase texture factor is NaN at its own floor for reflections lying on the texture axis, so the floor is not, as its docstring says, a place the model is defined (C29). And a measured blank's refined scale moves 7.7 esd with the order of the polynomial beside it, with no code firing, while the specimen does not follow (C37). Nine questions for the maintainer, (13)-(21), join the twelve already waiting; nothing was fixed. *Done* (PR #1576, docs and measurement scripts only): § Measured gains C3a, C22, C25, C26, C27, C29, C33, C36, C37 and a line on C35; scripts `tied_window.py`, `release_hold.py`, `joint_size_cap.py`, `blank_sigma_scale.py`, `zero_sigma.py`, `march_minor.py`, `frozen_positions.py`, `lebail_bkg_seed.py`, `blank_chebyshev.py` with their raw JSON lines in `docs/wp/2018-measure/`. Task 3 not ticked: C35 and the CuCr₂O₄ ramp halves of C3 and C18 wait on a series harness. *Measured*: C3a on the absent-phase fixture with a user tie from the absent cell to the visible one: the window never binds (the visible cell is the untied answer to 1e-14 Å); a ±0.01 % window binds four stages running, stops the visible cell 2.34e-3 Å short, and `at_bound`/`BOUND_HIT` stay silent; `PHASE_UNCONSTRAINED` calls the tied source "refined without signal". C22 on the two-site Pnma fixture through `solve_magnetic` (Cr₂WO₆ has one site, so no release): winner, start and ΔBIC identical with the hold off and with the release at 1e-4; the hold raises the rejected class's ΔBIC by 9.99. C25 on the Nd₂Ru₂O₇ joint pair: the size cap never arms; seeded positive arms show the neutron copy arming first and its bound kept by the intersection, and the closing stage moving the size 1.27× past a cap it never re-reads. C26 on Si 640c in Kapton: the per-stage lag washes out; the closing stage's own move leaves σ within 0.24 % and values within 0.0061 esd of a fit weighted at the answer. C27 re-derived after WP-1952 (no floor any more) and measured with a planted zero σ: `sig()` returns the stored σ bit for bit, exclusion moves the LaB₆ scale 0.28 esd, Poisson 0.009, the retired floor 3.6. C29 on a synthetic textured MoO₃ trace: floor, tie window and hold never meet; started at 2e-6 every stage is NaN. C33 on NAC cold from a cell 0.1 % short: recompiling three times as often changes nothing (1e-11), and larger zero errors fail first on the scale's floor or the zero-cell basin. C36 on three Le Bail patterns: from a zero background the weak-phase widths end 1.1-3.1 esd off, the seed fixes W but not Y, the true curve fixes both. C37: the blank's scale 0.501/0.841/0.693/0.695 at 2/3/6/10 terms, the specimen within 0.44 esd from 3 terms up. *Gotchas*: C27's row was written before WP-1952 landed and is out of date (re-derived in § Measured). Two chosen datasets cannot exercise their pair (C22's Cr₂WO₆, C29's, which had to be built), and C33's positive arm cannot make the freeze act, since the scale's floor or the basin decides first. The report's fresh compile at the answer keeps the solve's σ (refine.py:6433), so a compile log's last entry is not the closing stage's (C26). `magnetic._fit` returns `(ref, result)`. *Tests*: no file under `src/` or `tests/` changed, so the fast suite was not rerun (last run at 2ee0c3af3, entry below); `tests/test_docs_consistency.py`, ruff and `python -m tests.reader_output` as in the PR body. Every fit ran on macOS arm64, `[dev]` (under 1 s to 15 s an arm), so the workstation was not used. *Review*: REVIEW_PENDING. Next: (1) the maintainer's rulings on questions (1)-(21); (2) a series harness for WP-2003's family B, which C35 and the ramp halves of C3 and C18 wait on.
+- **2026-11-16 (fourth round)** — Nine more pairs of the clash table are measured, so 21 of the 22 live pairs now have numbers; the last, C35, needs a harness that fits a series of patterns, which the tree does not have. On the datasets chosen for them, none of the nine changes an answer a caller reads in a way the code does not intend, but four of them found something worth a ruling. When a support window does bind (forced in a positive arm), nothing reports it, because (read, not traced) the bound test recomputes the window around the answer (C3a). The magnetic solver's ranking does not charge a moment direction the flat-moment hold froze, so a held class pays fewer parameters (C22). The March-Dollase texture factor is NaN at its own floor for the reflections on the texture axis whose cos²α rounds above 1 (3 of 11 on the fixture), so the floor is not, as its docstring says, a place the model is defined (C29). And a measured blank's refined scale moves 7.7 esd with the order of the polynomial beside it, with no code firing, while the specimen does not follow (C37). Nine questions for the maintainer, (13)-(21), join the twelve already waiting; nothing was fixed. *Done* (PR #1576, docs and measurement scripts only): § Measured gains C3a, C22, C25, C26, C27, C29, C33, C36, C37 and a line on C35; scripts `tied_window.py`, `release_hold.py`, `joint_size_cap.py`, `blank_sigma_scale.py`, `zero_sigma.py`, `march_minor.py`, `frozen_positions.py`, `lebail_bkg_seed.py`, `blank_chebyshev.py` with their raw JSON lines in `docs/wp/2018-measure/`. Task 3 not ticked: C35 and the CuCr₂O₄ ramp halves of C3 and C18 wait on a series harness. *Measured*: C3a on the absent-phase fixture with a user tie from the absent cell to the visible one: the window never binds (the visible cell is the untied answer to 1e-14 Å); a ±0.01 % window binds four stages running, stops the visible cell 2.34e-3 Å short, and `at_bound`/`BOUND_HIT` stay silent; `PHASE_UNCONSTRAINED` calls the tied source "refined without signal". C22 on the two-site Pnma fixture through `solve_magnetic` (Cr₂WO₆ has one site, so no release): winner, start and ΔBIC identical with the hold off and with the release at 1e-4; the hold raises the rejected class's ΔBIC by 9.99. C25 on the Nd₂Ru₂O₇ joint pair: the size cap never arms; seeded positive arms show the neutron copy arming first and its bound kept by the intersection, and the closing stage moving the size 1.27× past a cap that arms only at a compile, where the size sat at 0. C26 on Si 640c in Kapton: the per-stage lag washes out; the closing stage's own move leaves σ within 0.24 % and values within 0.0061 esd of a fit weighted at the answer. C27 re-derived after WP-1952 (no floor any more) and measured with a planted zero σ: `sig()` returns the stored σ bit for bit, exclusion moves the LaB₆ scale 0.28 esd, Poisson 0.009, the retired floor 3.2. C29 on a synthetic textured MoO₃ trace: floor, tie window and hold never meet; started at 2e-6 every stage is NaN. C33 on NAC cold from a cell 0.1 % short: recompiling three times as often changes nothing (2e-11), and larger zero errors fail first on the scale's floor or the zero-cell basin. C36 on three Le Bail patterns: from a zero background the weak-phase widths end 1.1-3.1 esd off, the seed fixes W but not Y, the true curve fixes both. C37: the blank's scale 0.501/0.841/0.693/0.695 at 2/3/6/10 terms, the specimen within 0.44 esd from 3 terms up. *Gotchas*: C27's row was written before WP-1952 landed and is out of date (re-derived in § Measured). Two chosen datasets cannot exercise their pair (C22's Cr₂WO₆, C29's, which had to be built), and C33's positive arm cannot make the freeze act, since the scale's floor or the basin decides first. The report's fresh compile at the answer keeps the solve's σ (refine.py:6433), so a compile log's last entry is not the closing stage's (C26). `magnetic._fit` returns `(ref, result)`. *Tests*: no file under `src/` or `tests/` changed, so the fast suite was not rerun (last run at 2ee0c3af3, entry below); `tests/test_docs_consistency.py`, ruff and `python -m tests.reader_output` as in the PR body. Every fit ran on macOS arm64, `[dev]` (under 1 s to 15 s an arm), so the workstation was not used. *Review*: a read-only review agent recomputed every figure from the JSON and confirmed each arm's patch reaches the code it switches off and every cited line; it found the C25 size esds and the C37 Si-scale esds written ten to a hundred times too small, C26's no_sigma moves on two esd bases (0.80 for 0.78) and its "every arm" covering two arms it does not, the C27 floor arm's 3.6 esd on its own esd (3.2 on the original's), the C22 tiny arm's minimum stated without the hold upstream of it, the C3a mechanism stated as traced in question (13), C29's NaN stated for every on-axis reflection and its probe's metric unstated, C36's furthest-axis claim and seven roundings, and C25's "never re-reads"; all corrected (REVIEW_SHA). Next: (1) the maintainer's rulings on questions (1)-(21); (2) a series harness for WP-2003's family B, which C35 and the ramp halves of C3 and C18 wait on.
 
 - **2026-11-16 (third round)** — Six more pairs of the clash table are measured, so 12 of the 22 live pairs now have numbers. Two of them change what a caller gets. First, a user-supplied anisotropic-strain block that starts outside the physically allowed region makes the default solver fit it with no positivity constraint at all, for the whole refinement, and nothing in the result says so; the easiest way to get there is to follow the existing warning's own advice and refit an unconstrained answer with the default solver (C12). Second, the profile-likelihood interval for a weak phase's scale can be cut short by the hold that freezes an unseen phase's cell, because each refit inside the interval re-decides that hold: on the trace-phase fixture the upper end lands 0.56 esd early, on a jump the hold made rather than where the profile crosses the threshold (C2). The other four do not interact on their datasets: the intermediate stage tolerance changes no hold decision on cpd-1a with zircon (the flip WP-2002 recorded no longer reproduces), never even binds on the Le Bail fixture, the roughness seed matters for Pitschke's model only on CPD corundum, and extinction and roughness never both turn on. Six questions for the maintainer, (7)-(12), join the six already waiting; nothing was fixed. *Done* (PR #1576, docs and measurement scripts only): § Measured gains C12, C2, C18, C19, C20, C21; scripts `stephens_start.py`, `scale_interval.py`, `ftol_holds.py`, `lebail_ftol.py`, `roughness_seed.py`, `extinction_roughness.py` with their raw JSON lines in `docs/wp/2018-measure/`. *Measured*: C12 on brucite (LM protocol of `test_acceptance_stephens.py`) from eight starts: from a block outside the cone the rows drop in all three strain stages and the fit ends 19 of 43 reflections out, Rwp 0.18054, TRF's answer to 0.14 of TRF's esds; the carried TRF answer refitted under LM ends 19 of 43 out again; with the seed's skip removed both end inside. C2 on the trace and on cpd-1a's corundum: trace upper end 4.609e-6 shipped against 5.146e-6 with the hold off during the interval (lower ends equal to 3e-7); on cpd-1a no refit holds anything and both arms agree to every digit. C18 on cpd-1a + zircon at 1e-6 and None, with and without the closing stage: identical hold decisions in every stage, values within 0.0053 plain esd (0.065 without the closing stage), iterations halved. C19 on #740's pattern: 1e-6, None, and the positive arms 1e-2, 1e-1, 5e-1 bit-identical (2-3 iterations a stage). C20 on five lab patterns: Pitschke's c start-invariant except CPD corundum, where the start at 0 reaches τ's ceiling outside the regime and moves Al Biso 0.83 plain esd. C21 on the same five: at most one of extinction and roughness leaves its identity, either order within 0.0072 plain esd; the idle partner inflates neighbours' esds up to 2.3×. *Gotchas*: the C12 dataset row's "user block outside the cone" is reached naturally by carrying a TRF answer into an LM refit. The C19 fixture cannot exercise its pair: a positive arm there cannot fail (question 9). The C2 cpd-1a row cannot either: corundum's trace is too well determined for a pinned scale to reach the support threshold, so the trace fixture is the one that does. The CuCr₂O₄ ramp half of C18 waits on the same series harness as C3. Plain esds (`stderr_uncorrected`) are used for C18, C20, C21 as WP-2002 did. *Tests*: no file under `src/` or `tests/` changed, so the fast suite was not rerun (last run at 2ee0c3af3, entry below); `tests/test_docs_consistency.py`, ruff and `python -m tests.reader_output` as in the PR body. A Linux x86_64 workstation (py3.12) ran C2 on cpd-1a and the four C18 arms (11-45 s each, ≤ 380 MB, one pinned core each); the rest ran on macOS arm64, `[dev]` (≤ 4 s a fit). *Review*: a read-only review agent confirmed every arm's patch acts as stated and the numbers against the JSON; it found the C2 hold's mechanism stated beyond what was traced (a prior that `run_stage` does not pass), the C20 χ² signs and FAP's own outside-the-regime flag missing, and five figures (a tolerance of 0.13 for 0.133, an esd rounded wrong, a Δχ² range, fluorite's roughness esds taken from the wrong arm, a χ² tolerance of 2.8e-4 for 3.8e-4); all corrected (1827dc79d). Next: (1) the maintainer's rulings on questions (1)-(12); (2) C22, C25, C26, C27, C29, C33, C35, C36, C37 and C3a by § Datasets, of which C35 waits on the series harness.
 
