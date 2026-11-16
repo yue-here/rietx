@@ -179,6 +179,14 @@ one declaration per matched path, each with its own coefficients.
   - *Measured:* reader_output exit 0 ("unchanged against the merge-base"). Sphinx
     `-W` build of `docs/docs` exit 0. Pearl canary gs1965c (f2b581c48, `[dev]` venv
     rietx-py312, Linux): 557 passed, 80 skipped, 68 s, 479 MB, 4 cores at 211 %.
+    Fast suite on pearl gs1965g (b3a1fd92d, same venv, `-m "not slow" -n 8 --dist
+    loadgroup`): 14 870 passed, 280 skipped, 32 xfailed, 2 failed, 601 s, 5.4 GB,
+    755 % on 8 cores. Both failures were the manual's 50 000-character page cap on
+    `reference/parametric.md`, which the new sections pushed over; they moved to
+    `reference/parametric-spellings.md` (ba6ffb371), and `tests/test_manual.py` then
+    passed on the Mac (arm64, `[dev]`, py3.12; fast selection, 65 passed). A rerun of
+    the whole fast suite on ba6ffb371 was memory-starved on pearl and stopped. Vale
+    (`rietx_vale.sh`, whole manual): 0 errors.
   - *Gotchas:* `tests/test_gui_help.py` rewrites `tests/data/gui/help_keys.json` when
     a code is added; commit the rewrite. `series.md` in the skill sits 3 B under its
     budget after this branch.
