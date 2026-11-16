@@ -62,73 +62,30 @@ one declaration per matched path, each with its own coefficients.
   as a target today. A blocked glob is reported, never silent (root
   CLAUDE.md § A hold), so the expansion skips them and says which.
 
-### Inherited
+### Carried from 1325 (folded from § Inherited on 2026-11-16)
 
-- **2026-11-22, from the issue triage (#141): the planted-events generator
-  has shipped.** The entry below says #141 "still owes its generator". It
-  landed in PR #1011 (merged 2026-10-21) as `tests/planted_series.py`, a
-  seeded ramp with planted events and a null twin, runnable as
+- **A resolved spelling is refittable.** `RefinementResult.parametric` carries each
+  declaration as resolved, the form a refit passes back (1325's seventh session, PR #977).
+  A condition or glob spelling resolves to that same `ParametricEquation`, so a result read
+  back refits whichever spelling declared it.
+- **Where a boundary goes is a physical fact, declared or detected, never "every N
+  patterns"** (@mustachefeeling, PR #977 comments, numbers as reported). A condition
+  is how a declared boundary is written. A detector that *proposes* one is not this
+  WP's: their own detector's calibration inverted within seven weeks, so it is
+  calibrated inside the suite against a seeded planted-events series first (#141,
+  [1317](1317-series-scrubber.md)).
+- **2026-11-22, from the issue triage (#141): the planted-events generator has
+  shipped.** It landed in PR #1011 (merged 2026-10-21) as `tests/planted_series.py`,
+  a seeded ramp with planted events and a null twin, runnable as
   `.venv/bin/python -m tests.planted_series --length 248 --seed 0 --out DIR`.
   Its outputs are in `tests/data/planted_series/` and its test is
   `tests/test_planted_series.py`. Checked at `f590981ab`.
-- **2026-11-12, from [1325](1325-parametric-series.md) (closed): `rietx events`
-  could print one line per parametric equation of a joint fit.** 1325 held this
-  in its own § Inherited since 1322 closed without it, and moved it here at its
-  close, because the line reports this WP's subset and detectors. This is
-  @mustachefeeling's point from the PR #977 comments. A joint fit keeps no
-  history (`multi.py`), but it has emitted events since #926, and `rietx events`
-  (`history.aggregate.summarize_events`) shipped in PR #902. The line would
-  carry the subset size, the form verdict, and whether a detector fired inside
-  the subset. Two rules for whoever builds it:
-  - Pair events in file order, never by `(series_index, series_pass)`, since
-    indices recur on reseeds and restarted segments. The aggregator already
-    clears its open stages at each `fit_start` (`aggregate.py:185`).
-  - A segmented chain's summed fit time is not its wall time: 700 s against
-    148 s on one chain, as reported and not re-measured.
-
-- **2026-10-15, from [1325](1325-parametric-series.md), from @mustachefeeling's comments on PR #977: where a subset's boundary goes.** Numbers as
-  reported, not re-measured. Since 2026-10-15 the declaration is
-  `ParametricEquation` and the resolved one `RefinedParametricEquation`
-  (1325 decision 7), so read the entry below in those names.
-  - Their draft's default for equations per phase field: a phase transition
-    breaks cell, Biso, profile and composition equations; a gas switch
-    breaks composition only; isothermal ↔ ramp breaks nothing. Biso is
-    never tied across a transition. Each default is overridable per path and
-    boundary, with the override recorded. Boundaries are physical, declared
-    or detected, never "every N patterns".
-  - A misplaced edge is the expensive error: 1325's kink row covers its gap
-    0.66 of the time.
-  - Their blind event detector (Le Bail, one high-symmetry model along the
-    chain): a cell discontinuity did not fire, since a high-symmetry cell
-    fitted to lower-symmetry patterns wanders and the jump was 3× the median
-    step against `SEQUENTIAL_DISCONTINUITY`'s 5×. What held: the GoF step
-    (30× the median), a sustained Rwp regime shift (ratio 1.87), and the
-    tallest unmatched peak collapsing (h/σ 510 to 24). The null control fired
-    nothing. At a real transition the two directions disagree by one step,
-    so agreement is corroboration rather than a test.
-  - A ΔBIC symmetry test needs a negative control: a cubic null once
-    "required" R-3m at ΔBIC +1.4 × 10⁶ before a cell-window guard.
-  - A continuous reaction needs another detector: a reduction onset showed
-    as an agreement shift of 1.2σ, and the abrupt logic fired only at the
-    gas switch.
-  - **The detector's calibration inverted in seven weeks** (their addendum,
-    re-run on 1.9.0.dev0): the positive series is now missed, the null
-    control now fires, and a subgroup screen gives one false "lower symmetry
-    required" per run on a different compound each time. So a detector that
-    proposes a boundary is calibrated inside the test suite, against a
-    seeded planted-events series (#141, which still owes its generator;
-    [1317](1317-series-scrubber.md)).
-  - A cheap first step they propose: report, beside each equation, whether
-    any detector on main (`SeriesResult.discontinuities`, `moved_paths`,
-    the `MagneticOnset` bracket, `split_localisation`) fired inside its
-    subset.
-
-- **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
-  PR #977): a result now carries each equation as resolved.**
-  `RefinementResult.parametric`'s resolved equation is the declaration with its
-  reference and scale filled in, the form a refit passes back. A condition
-  or glob spelling should resolve to that same `ParametricEquation`,
-  so a result read back can be refitted whichever spelling declared it.
+- **Not this WP's tasks, still true:** a `rietx events` line per parametric equation of a
+  joint fit (subset size, form verdict, any detector firing inside the subset), and the
+  report of which detector on main fired inside each subset. Both go to an issue at
+  this WP's close, with 1325's two rules for the events line: pair events in file order,
+  never by `(series_index, series_pass)`, and a segmented chain's summed fit time is
+  not its wall time.
 
 ## Non-goals
 
