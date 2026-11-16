@@ -45,7 +45,11 @@ TEXTURE_SAMPLE_PSI_DEG[geometry.kind])` for w_l.
 - **March-Dollase is one parameter.** On CPD-2 brucite (WP-1960) the worst
   weighed-fraction error was 2.80 wt % under March-Dollase, 3.41 at order 4
   and 2.71 at order 6. A screen that prefers an order where one axis explains
-  as much is wrong.
+  as much is wrong. *Superseded in part 2026-11-16:* on main at `bc77a934e`
+  (darwin/arm64, `[dev]`) the same protocol reads 3.01 under March-Dollase
+  (r = 0.668), 3.71 at order 4, 2.91 at order 6 and 3.60 at order 8, the
+  1.10.0 numbers `test_sample2_brucite_spherical_harmonics` already quotes.
+  The order is unchanged: order 6 just ahead of the axis, order 4 behind it.
 - **A suggestion passes the FitReport's four gates**, and is never a confident
   wrong singleton (root CLAUDE.md).
 
