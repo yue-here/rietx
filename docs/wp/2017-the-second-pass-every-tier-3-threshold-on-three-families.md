@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-16 — the list and group A landed (PR #1428); group A's hard starts and H in #1494; group G measured in #1577, unreached on real trace phases; group C measured in #1577, four of its seven constants unreachable from a fit; groups D, E and F measured in #1577, D's layouts agreeing to the noise floor, E's angle half over its threshold at ftol 1e-3, F's knot step not inert on a real hump; group I measured in #1577, no old position bound binding on three flat plates; group J measured in #1577, Pawley's line ratio agreeing with Rietveld's and Le Bail's not; group L measured in #1577, no magnetic-solve count changing a conclusion; group M measured in #1577, both starts invariant only behind the closing stage; group N measured in #1577, two hand rows holding and tested, two not; B waits on a named family and K on a harness and a sparse family; questions to the maintainer; 6 groups open
+Milestone: generality · Status: 🔄 2026-11-16 — the list and group A landed (PR #1428); group A's hard starts and H in #1494; group G measured in #1577, unreached on real trace phases; group C measured in #1577, four of its seven constants unreachable from a fit; groups D, E and F measured in #1577, D's layouts agreeing to the noise floor, E's angle half over its threshold at ftol 1e-3, F's knot step not inert on a real hump; group I measured in #1577, no old position bound binding on three flat plates; group J measured in #1577, Pawley's line ratio agreeing with Rietveld's and Le Bail's not; group L measured in #1577, no magnetic-solve count changing a conclusion; group M measured in #1577, both starts invariant only behind the closing stage; group N measured in #1577, two hand rows holding and tested, two not; group Q measured in #1577, #1569's held-SNIP bias repeated on its synthetic and in direction on SRM 1976a and FAP; B waits on a named family and K on a harness and a sparse family; questions to the maintainer; 5 groups open
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
@@ -109,7 +109,7 @@ different laboratory, instrument and material:
 | N. Hand rows | Le Bail and Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter` and `tol`, `vector.FLOOR_SEEDS` | a test for each claim of invariance | named by each test | measured 2026-11-16: the intensity seed and the flat-axis pair hold, now tested; arPLS picks unmoved but its stop unconverged on SRM 660c; `FLOOR_SEEDS` sets floor-row esds on cpd-1a |
 | O. Domain tests | `interval.PARAMETER_INTERVAL_*` (five), `fraction.FRACTION_PROFILE_FWHM_MIN`, `_N_FWHM`, `_FWHM_MAX_SPAN` | state a domain, then 0.1 σ of a point and 0.1 esd | the two-site Pnma fixtures; `fap`, `cpd1a` | open |
 | P. Window numerics | `forward.AXIAL_SIZING_FLOOR`, `REFLECTION_MARGIN_DEG`, `STAGE_WINDOWS_STALE`, `report.NOMINAL_AXIAL_APERTURE` | each side | the four; a second and third family that runs away | open |
-| Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL`, `StageSpec:lebail_tol`, `report.schemas.LEBAIL_GAP_CYCLES` | each side | LaB₆ + cBN, `fap`, `cpd1a` | open |
+| Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL`, `StageSpec:lebail_tol`, `report.schemas.LEBAIL_GAP_CYCLES` | each side | LaB₆ + cBN, `fap`, `cpd1a` | measured 2026-11-16: `LEBAIL_CONVERGED_REL` reached on none; `lebail_tol` moves cpd-1a 0.8 esd either side; the gap not at its fixed point at 5 cycles on FAP and cpd-1a; the held SNIP (#1569) 8.8 esd high on its synthetic |
 | R. Width terms | `StageResult.width_twins_held`, `ProfileTCHZ:y` unfloored | see below | a real multi-phase fit freeing a twin pair; SRM 660c | open |
 | S. Tier-2 citations | `SCHERRER_K`, `BOND_SLACK_ANG`, `STEPS_PER_FWHM_*` | read each citation | none: they stay at tier 2 unless a source fails | open |
 
@@ -416,6 +416,32 @@ and have no free factor to measure, so this file's old list named them without c
   the stationary test leaves out, 20-32 refits an angle, and the grid on every `profile_fraction`
   call. The bars are in `tests/test_window_domain.py`. `PARAMETER_INTERVAL_BRACKET_GROWTH` can
   choose between crossings where window recompiles give several.
+- **O, its domains and arms, fixed 2026-11-16 before running** (`2017-batch/group_o.py`, not
+  written yet). Each set gets a stated domain first, and the run grades only inside it; a case
+  outside it is reported, never graded. Every arm has a noise twin as in Q.
+  (O1) **The five interval constants** govern `Refinement.profile_interval` and the automatic
+  interval on a moment angle the stationary test leaves out. *Domain claimed*: a converged
+  fit's row, interior or on a bound, whose profile crosses the Δχ² threshold at most once a side.
+  A profile with several crossings (window recompiles, the growth constant's own docstring) is
+  outside it. *Families*: the two-site Pnma set (`test_stationary_moment_angle._fit`, seed 14
+  and two seeds the harness fixes from 0-19 before running): Mn2's modulus and the automatic
+  angle intervals; `fap`: one interior Biso and one width row on its floor; `cpd1a`: zincite's
+  scale and one width on its floor, each the protocol's converged fit. *Arms*, each side:
+  `MAX_REFITS` 30 and 120, `SETTLE_RUNS` 2 and 8, `XTOL` 1e-2 and 1e-4, `BRACKET_GROWTH` 1.5
+  and 3, `CHI2_TOL` 0.003 and 0.03. `PARAMETER_INTERVAL_LEVEL` is tier 2, a convention, and is
+  not armed. *Read*: each end against shipped in units of the row's esd, bar 0.1 esd; refits
+  spent; each side's stop reason. *Control*: a reference at `XTOL` 1e-5, `SETTLE_RUNS` 8,
+  `MAX_REFITS` 200, run twice from the two noise twins. The shipped end is read against it, and
+  if the two references differ by more than 0.1 esd, that row is outside the domain.
+  (O2) **The three fraction-grid constants** govern `profile_fraction`'s default grid.
+  *Domain claimed*: a phase whose admissible weight fraction is reached somewhere on the grid,
+  and whose grid ends neither cut the admissible set nor outrun the frozen windows
+  (`FROZEN_COMPILE_STALE` read on every arm). *Families*: `test_qpa_multimodal`'s two-basin
+  fixture and its control, and cpd-1a's three phases. *Arms*: `N_FWHM` 5 and 21, `FWHM_MIN`
+  0.003 and 0.03, `FWHM_MAX_SPAN` 0.3 and 0.7. *Read*: the admissible set's ends in wt % and in
+  the QPA esd, and the grid's best point against shipped (0.1 σ of a point, the table's bar).
+  *Positive arm*: on the shipped grid the two-basin fixture shows the basins its test pins, or
+  the harness measures something else.
 - **P.** At the closing stage's windows the margin errs 0.186 σ and 0.124 σ at the last points of
   FAP and cpd-1a, moving answers 0.026 and 0.043 esd. An edge rule was built and reverted because
   it freed a scale-B ridge (`waiting.md` § B10). The axial floor reads 0.010 on cpd-1a since the
@@ -586,6 +612,51 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-16 (group Q)** — The held SNIP of issue #1569 biases Biso upward, and the bias reproduces on the real patterns. On #1569's synthetic LaB₆, rebuilt from the reporter's harness, the skill's recipe (SNIP held at 3 FWHMs under a 4-term Chebyshev) puts La Biso at 0.4749(137) against a truth of 0.355, 8.8 esd high. The co-refined Chebyshev gives 0.3789 and the true background held gives 0.3735, so the construction's own floor is about 1.4 esd. Doubling the window to 6 FWHMs (14 points) still leaves it 6.0 esd high. The excess holds on two more Poisson draws (8.0 and 4.6 esd) and at ten times the counts (7.9 esd), and shrinks to 2.3 esd at a tenth. On SRM 1976a and FAP, under their acceptance protocols rather than #1569's bench plan, the held arm raises every Biso, by 12-18 esd on SRM 1976a's two sites and FAP's first three. So the direction #1569 reported is repeated on both real patterns. In Le Bail, the held arm moves PbSO₄'s cell 9.3 esd on b and its widths up to 31 esd, and leaves #726's corundum within 1.4 esd. Of the three Le Bail rows, `LEBAIL_CONVERGED_REL` was never reached on its three families, `lebail_tol` moves cpd-1a 0.8 esd either side, and `LEBAIL_GAP_CYCLES` is not at its fixed point on two families of three. No value moved; four questions go to the maintainer, and #1569's proposed changes stay with WP-2008.
+  *Done.* In PR #1577. `2017-batch/group_q.py`, `group_q_summary.md`; fits and arms fixed in "Q, its fits and arms" (89934d719) and "Q, what its bullet left open" (2d6bcc737, 26bf690c9) before the workstation run. Evidence rewritten on `refine.LEBAIL_CONVERGED_REL` and `StageSpec:lebail_tol` (tier, value, grounds and approval unchanged), and added on `report.schemas.LEBAIL_GAP_CYCLES`, which stays unaudited, for the maintainer's tier. The held-SNIP rule is a skill rule with no `_audit` row; the skill is not edited here.
+
+  *Cross-references.* Issue #1569 reports the bias. The 2026-11-16 issue triage (#1585) folds it into WP-2008, which reads the skill against the table and owns the judging rule, the abstention row and the docstring sentence #1569 proposes. This entry is the measurement twin the triage names. The issue is not commented on from here.
+
+  *Measured* (the workstation, Linux x86_64, `rietx-py312` venv with the tree on `PYTHONPATH`, rietx-kernels 1.5.0, numpy 2.5.3, compiled tier on, one kernel thread, at `f148d8abb`: 58 tasks, 81 s on 6 workers after the canary, 418 MB peak):
+
+  | Arm, #1569's synthetic (strongest peak 2e4, seed 20261112) | La Biso | from truth 0.355 | B Biso (truth 0.276) | background/truth at 26-30° | worst absorption |
+  |---|---|---|---|---|---|
+  | Chebyshev co-refined (`auto_background`, 16 terms) | 0.3789(132) | +1.80 esd | 0.280(86) | 0.971 | 0.012 |
+  | P-spline λ 1 | 0.3687(146) | +0.94 | 0.256(95) | 0.892 | 0.012 |
+  | P-spline λ 0.01 | 0.3730(130) | +1.38 | 0.276(84) | 0.992 | 0.015 |
+  | SNIP held, 7 points (3 FWHMs, the rule) | 0.4749(137) | **+8.76** | 0.299(85) | 0.987 | 0.011 |
+  | SNIP held, 14 points (6 FWHMs) | 0.4369(136) | +6.02 | 0.326(87) | 0.989 | 0.010 |
+  | true background held, 4 terms (positive arm) | 0.3735(128) | +1.44 | 0.268(83) | 0.997 | 0.011 |
+
+  The esds are the unscaled ones (`stderr_uncorrected`); #1569 quoted the inflated ones, 0.0158 and 0.0163. At the other draws and count levels the three arms read, in La Biso from truth: seed 20261113 +1.71, +8.00, +1.26 esd (co-refined, held, truth); seed 20261114 −1.86, +4.57, −2.28; strongest peak 2e3 +0.75, +2.31, +0.07; 2e5 +0.02, +7.89, −0.18. On every one the held arm sits 0.034-0.140 Å² above the co-refined one, and the truth arm within 0.007 of it, except at 2e3 counts (0.056, under one esd of 0.08). `BACKGROUND_ABSORPTION`'s worst projection is 0.011 on the held arm at the main draw, as #1569 found: the screen projects onto the freed terms, and the held curve has none.
+
+  | Real pattern | Mode | Held window | Co-refined → held | Codes the held arm adds |
+  |---|---|---|---|---|
+  | SRM 1976a | Rietveld, its texture protocol | 23 points | Al Biso 0.992(18) → 1.271(20), +14.0 esd; O 0.963(27) → 1.314(29), +12.1 | `HIGH_CORRELATION` |
+  | FAP | Rietveld, GSAS-II protocol | 10 | every Biso up: `atoms.0` 0.374 → 0.847 (+14.4), `.1` 0.250 → 0.733 (+18.1), `.2` 0.245 → 0.726 (+13.4), the four others +1.6 to +5.3; cell a +8.3, c +5.7 | `BACKGROUND_ABSORPTION` (worst 0.199 → 0.272) |
+  | PbSO₄ (X-ray, Durham) | Le Bail | 13 | cell b +9.3 esd, c +6.0, a +0.5; widths −31 (Y) to +18 (V) | none (two dropped) |
+  | #726, SRM 676a corundum, 20-90° | Le Bail | 24 | every row within 1.4 esd | none |
+
+  | Row | Arms | Largest move against shipped | Its control |
+  |---|---|---|---|
+  | `LEBAIL_CONVERGED_REL` 1e-4 | 1e-3, 1e-5, five passes | none: bit-identical on all three | LaB₆ + cBN and cpd-1a stop at a pass that raised Rwp (13.609 → 13.649 %; 22.561 → 33.879 %); FAP reaches the cap still falling 1.3 % at its last pass (10.108 → 8.710 %), so no gain fell between the arms |
+  | `StageSpec:lebail_tol` 1e-7 | 1e-6, 1e-9 (cap 100 000) | LaB₆ + cBN 0.0002 plain esd; FAP 0.0095 and 0.0005; **cpd-1a 0.76 and 0.82** (corundum a), at 516 and 517 evaluations against 474 | FAP's (5 0 6) share of its pair 0.0010 shipped, 0.048 at 1e-6, 0.0000 at 1e-9 |
+  | `LEBAIL_GAP_CYCLES` 5 | 2, 20 cycles, read from one converged Rietveld state | ratio LaB₆ + cBN 0.977/0.978/0.978 (2/5/20); cpd-1a 0.536/0.549/0.626; FAP 0.764/0.980/1.052 | `n_cycles` echoed 2, 5, 20 on every read |
+
+  Every noise twin (every refinable non-zero start ×(1 + 1e-12)) read 0.072 plain esd or less, the largest on PbSO₄'s co-refined `u`, and 2e-6 or less everywhere else. Every fit converged. *Canary*: #1569's co-refined and truth arms, FAP's `lebail_tol` 1e-6, the PbSO₄ pair and FAP's gap read, 210 s, 516 MB, 109 % of 2 cores, at `f148d8abb`; the gap echoed its three cycle counts. *Positive arms*: the harness repeats #1569's La Biso to four digits, 0.3789 and 0.4749, and its background ratios at the hump, 0.971 against 0.966 and 0.987 against 0.983 (the issue's own read of that window may differ in its averaging). The truth arm lands 1.44 esd from the truth at the main draw, inside its two-esd bar, but −2.28 at seed 20261114, outside it. So one draw of three puts even the true background past two esds, and the held arm's excess is read against the co-refined and truth arms on the same draw, where it is 0.086-0.096 Å² at 2e4 counts on all three.
+
+  *How this was reached.* #1569 attaches no harness, and the first version of `group_q.py` built the bullet's reading of it (SRM 660c's instrument, `mccusker_default()`, a 6-term Chebyshev). The triage PR (#1585) said the synthetic had been reproduced with the issue's harness, and the reporter's copy was found and read before the workstation ran. The harness was rebuilt to it, and the bullet "Q, what its bullet left open" records both versions. The first version's six Mac fits are discarded; they also put the held arm above the co-refined one.
+
+  *Generality.* The judge (Opus, following `.claude/agents/generality-review.md`, read-only), condensed: `LEBAIL_CONVERGED_REL` **holds** as evidence that the constant was never reached (the per-pass wording fixed); `lebail_tol` **holds, with a scope caveat**: cpd-1a's Le Bail fit ends at Rwp 22.56 %, above the 16.31 % its Rietveld protocol reaches, so its 0.8 esd may read a fit off its minimum rather than the tolerance (added to the row); `LEBAIL_GAP_CYCLES` **weak as evidence for the value**: every arm is a correct model far below 1.5, so none could change the notable verdict, and more cycles raise the ratio on two families (both added). Q1 read correctly, the one gap the truth arm's −2.28 at seed 20261114, now stated above.
+
+  *Tests.* TESTS_PLACEHOLDER
+
+  *Not done, and why.* The held SNIP on the PbSO₄ neutron histogram WP-1542 named: only the X-ray pattern is on this machine. A reference for the real patterns: none has a truth, so the move's direction is all they give. `LEBAIL_GAP_CYCLES` on a fit whose model is wrong (the pore proxy of its docstring), the only kind of arm that could cross 1.5: not in the table's three families.
+
+  *Questions for the maintainer.* (24) The skill's rule "Under a broad hump, hold SNIP" biases La Biso 8.8 esd high on #1569's synthetic, and its direction repeats on SRM 1976a and FAP at 12-18 esd. Does the rule stand, change or go? That ruling is WP-2008's, with #1569's three proposals; this entry is its measurement. (25) `LEBAIL_CONVERGED_REL` is reached on none of three families: two alternations stop on a pass that raised Rwp, and FAP still gains at five passes. Is a second family that reaches it owed, or does the row's tier rest on WP-1323's one? (26) `lebail_tol` moves cpd-1a's corundum cell 0.76 and 0.82 plain esd either side, past bar 2. Is cpd-1a's Le Bail fit, 6 points of Rwp above its Rietveld one, a family the bar should hold on? (27) `LEBAIL_GAP_CYCLES` is unaudited; at 5 cycles the gap is 0.07 under its 20-cycle value on FAP. What tier, and is a fixed point by cycle 2, measured on one fixture, still the reason for 5?
+
+  *Next:* group O, whose domains and arms are now fixed in "O, its domains and arms" (written this session, nothing run): write `group_o.py`, canary, run; then P, R, S. K waits on the harness and a sparse family, B on its third family, H on #1494.
 
 - **2026-11-16 (group N)** — Of the four hand rows, two hold their claims and two do not. Starting the Le Bail and Pawley intensities a hundred times lower or higher, or with a random shape, changed no answer on FAP, 11-BM NAC or SRM 660c by more than 1.4e-4 esd. Changing the two directions the magnetic flat-axis probe stacks held the same axis and the same answer on #599's case, fitted alone and jointly. Those two claims now have tests. Making arPLS iterate longer or shorter never changed a λ or a background pick on six patterns, but its shipped stop is not converged everywhere: a tighter stop moves SRM 660c's baseline 4.6σ at the λ the selector picks. The finite-difference sizes of the width rows leave every answer alone, but on cpd-1a they set the esd of every width row sitting on its floor, and of W beside them: ten times the size gives ten times the esd, and a tenth of it gives a twelfth. No value moved; two questions go to the maintainer.
   *Done.* In PR #1577. `2017-batch/group_n.py`, `group_n_summary.md`; claims, fits and arms fixed in "N, its four claims and arms" before anything ran (d4ec227ed). New `tests/test_hand_row_claims.py` (`slow`): the intensity seed ×0.01, ×100 and shaped on FAP, NAC and SRM 660c in both modes, and the flat-axis pair turned and redrawn on #599's single and joint cases, each arm with its control (the seeds rewritten counted; the spy on `_flat_rotation_axis` seeing the arm's pair). No `_audit` row: the four are hand rows.
