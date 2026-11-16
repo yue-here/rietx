@@ -223,6 +223,9 @@ def fit_one(task: dict) -> dict:
         plt.close("all")
         row.update({
             "rows": {p.path: [p.value, p.stderr_uncorrected] for p in result.parameters},
+            # the reported esd (Bérar-Lelann inflated), the one the reference page means
+            "esd_reported": {p.path: p.stderr for p in result.parameters},
+            "esd_factor": getattr(result.statistics, "esd_inflation", None),
             "rwp": result.statistics.rwp, "status": result.status,
             "n_eval": int(sum(s.n_iterations for s in result.stages)),
             "codes": sorted({d.code for d in result.diagnostics}),
@@ -363,7 +366,8 @@ def summary() -> None:
                      f"{r['narrow'][0]:.1f}-{r['narrow'][1]:.1f}° | {r['eig_narrow']:.2g} |")
     lines += [
         "",
-        "Cell: each cell row's distance from the reference in ppm, then in its own plain esd. "
+        "Cell: each cell row's distance from the reference in ppm, then in its own plain esd and "
+        "in its reported (inflated) esd. "
         "Zero (°) and displacement (mm) with plain esds. `b−f`: largest shift of any "
         "non-background row, bounded against free, in plain esd over the larger esd "
         "(0.1 bar); `f−s` the same, free against shipped; `noise`: free against its nudged twin.",
@@ -392,7 +396,9 @@ def summary() -> None:
                     v, e = r["rows"][p]
                     ppm = 1e6 * (v - cell_ref[ax]) / cell_ref[ax]
                     k = abs(v - cell_ref[ax]) / e if e else float("nan")
-                    cells.append(f"{ax} {ppm:+.0f} ({_fmt(k, '.2f')})")
+                    er = (r.get("esd_reported") or {}).get(p)
+                    kr = abs(v - cell_ref[ax]) / er if er else float("nan")
+                    cells.append(f"{ax} {ppm:+.0f} ({_fmt(k, '.2f')}; {_fmt(kr, '.2f')})")
                 z = r["rows"].get(ZERO)
                 d = r["rows"].get(DISP) or next(
                     (v for p, v in r["rows"].items() if "capillary_offset" in p), None)
