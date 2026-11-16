@@ -120,7 +120,11 @@ one declaration per matched path, each with its own coefficients.
   § A subset by condition and § A target glob, each with an executed example;
   `reference/expressions.md` § Conditions names `where` as a second place a
   condition appears.)*
-- [ ] Skill: the series reference's parametric row, or "none" and why.
+- [x] Skill: the series reference's parametric row, or "none" and why.
+  *(2026-11-16: the row names both spellings, "(`where=` subset, glob target)",
+  paid for in the same row so `series.md` stays inside its budget (34 597 of
+  34 600 B); `PARAMETRIC_GLOB_SKIPPED` joined the parametric codes' row in
+  `diagnostics.md`.)*
 
 ## Acceptance
 
