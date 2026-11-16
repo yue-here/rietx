@@ -3269,6 +3269,36 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`n_unindexed` forbids both retries."
         ),
     ),
+    "JANA_CONSTRAINTS_NOT_CARRIED": HelpEntry(
+        title="Jana's constraint commands were not carried",
+        description=(
+            "The REFINE section of the .m50 holds equation, restric, fixed or keep "
+            "commands, which tie or fix parameters beyond the .m40 refinement keys. "
+            "The reader does not apply them, so each parameter is free or held only as "
+            "its own key says. Tie or hold those parameters yourself to reproduce the "
+            "Jana protocol."
+        ),
+    ),
+    "JANA_KEYS_MAY_BE_IGNORED": HelpEntry(
+        title="Jana's refinement keys may not be the refined set",
+        description=(
+            "Jana's automatic mode ignores the .m40 refinement keys of everything but "
+            "scales and occupancies, and the Jana98 manual gives it as the default. The "
+            ".m50 did not state autkeys 0, so the vary flags read from the keys may not "
+            "be the parameters the Jana run refined. Check the run's protocol before "
+            "reusing it."
+        ),
+    ),
+    "JANA_NOT_CARRIED": HelpEntry(
+        title="Parts of a Jana set were not carried",
+        description=(
+            "The message lists what the Jana files state that the structure does not "
+            "hold: the scale, seeded at a small value because Jana's is not a rietx "
+            "scale; .m41 sections other than the cell; the phase volume fractions of a "
+            "multiphase set; and coordinate keys symmetry does not allow. The model "
+            "returned by the reader still has every number."
+        ),
+    ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
         title="Two propagation vectors fit equally well",
         description=(

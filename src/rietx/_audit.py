@@ -952,6 +952,35 @@ ROWS: tuple[Row, ...] = (
                   "5 % of the strongest, and check those set-aside lines against the leading "
                   "candidate's predicted positions"),
         scope=("all",)),
+    Row("JANA_CONSTRAINTS_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=("warning; a record of what a read did not carry: the .m50's REFINE "
+                  "section states equation/restric/fixed/keep commands (Jana98 manual "
+                  "p. 224), which the reader keeps on JanaModel.constraints and applies "
+                  "to no vary flag; fires exactly when one is present and diagnostics= "
+                  "is passed; acts on nothing"),
+        response="warning",
+        responds=("tie or hold the coordinates, occupancies or ADPs the listed "
+                  "commands name before comparing them with the Jana run's"),
+        scope=("all",)),
+    Row("JANA_KEYS_MAY_BE_IGNORED", "code", tier=1, ambiguity=1,
+        evidence=("warning; a reading rule from the format's documentation: the "
+                  "Jana98 manual states that REFINE in automatic mode ignores the .m40 "
+                  "keys of all but scales, occupancies and twin volumes (p. 225, Table "
+                  "13) and gives autkeys 1 as the default (p. 236); fires exactly when "
+                  "the .m50's REFINE section does not state autkeys 0; acts on nothing"),
+        response="warning",
+        responds=("confirm which coordinates, occupancies and ADPs the Jana run "
+                  "refined before its vary flags are taken as the plan"),
+        scope=("all",)),
+    Row("JANA_NOT_CARRIED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of what a build did not carry: the scale (seeded "
+                  "at 1e-3, as the .EXP and .gpx conversions seed theirs), .m41 "
+                  "sections other than the cell, a multiphase set's volume fractions, "
+                  "and coordinate keys a fully fixed site or the one-flag merge drops; "
+                  "fires on every build with diagnostics=; acts on nothing"),
+        response="info",
+        responds="refine the scale before reading any scale-derived number",
+        scope=("all",)),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -5537,6 +5566,10 @@ ROWS: tuple[Row, ...] = (
                   "predicts them, lists the three readings of a line it does not predict "
                   "(second phase, picker artefact, a supercell's ordering line) without "
                   "ranking them, and names the argument that forbids the retry")),
+    Row("JANA_KEYS_MAY_BE_IGNORED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1, evidence="arithmetic: names the record the reader cannot see"),
+    Row("JANA_NOT_CARRIED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the parameter the reader seeded"),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

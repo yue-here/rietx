@@ -190,13 +190,18 @@ flipping).
 
 ## Tasks
 
-- [ ] Spec tables for `.m50`/`.m40`/`.m41` from the Jana documentation
+- [x] Spec tables for `.m50`/`.m40`/`.m41` from the Jana documentation
       (source files closed; `ATTRIBUTION.md` row), with the refusal list
       (modulation, composites, an incommensurate magnetic phase) written
       first; a commensurate magnetic phase reads through 1327's model, as
-      the TOPAS and `.pcr` readers do (1328).
-- [ ] The reader: triplet → model + refine flags under the 1118 contract,
-      every uncarried construct named in diagnostics.
+      the TOPAS and `.pcr` readers do (1328). *2026-11-16: the tables are
+      `jana.M50_STANCES` and the module docstring; the documentation
+      describes no magnetic keyword, so a commensurate magnetic phase is
+      refused too (Handover log).*
+- [x] The reader: triplet → model + refine flags under the 1118 contract,
+      every uncarried construct named in diagnostics. *2026-11-16:
+      `io/projects/jana.py` (`read_jana`, `to_structure`), not yet in the
+      registry (Handover log).*
 - [ ] Fixtures: Jana-distributed examples licence-checked per file, else
       synthetic; perturbation fuzz in `test_readers_robust.py`'s arm;
       cross-check against at least one published Jana refinement's numbers.
