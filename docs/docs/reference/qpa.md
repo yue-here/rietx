@@ -85,12 +85,14 @@ An esd measures how well this model fixes the scales against this pattern, and i
 
 A mole fraction comes from the same scales as the weight fraction.
 W<sub>p</sub> ∝ S<sub>p</sub>·(Z·M)<sub>p</sub>·V<sub>p</sub>, so dividing by the cell mass leaves S<sub>p</sub>·V<sub>p</sub>, the number of unit cells, with no mass in it.
-`PhaseQuantity.mole_fraction` is that number renormalised, counted in **unit cells**, and it is reported wherever the weight fraction is.
-`PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts **formula units**, which is what reaction stoichiometry and phase diagrams use.
+`PhaseQuantity.mole_fraction` is that number renormalised, counted in unit cells, and it is reported wherever the weight fraction is.
+`PhaseQuantity.mole_fraction_formula_unit` multiplies by Z and counts formula units, which is what reaction stoichiometry and phase diagrams use.
 The Z it uses is the reduced formula, the greatest common divisor of the whole-number counts in the cell, so a molecular crystal of benzene counts CH units (z = 24 for its Z = 4 cell); declare `Phase.formula_units` where the formula unit you mean is a larger one.
 Both esds go through the correlated scale block, as the weight fraction's does.
 
-**A mole-fraction column that sums to 100 % is no evidence that its basis is uniform.**
+### A column that sums to 100 % can still mix two bases
+
+A mole-fraction column that sums to 100 % is no evidence that its basis is uniform.
 Z is recovered from the cell contents, and a solid solution or a partly occupied site does not reduce to whole formula units, so its `z` is 1 and its `molar_mass` is the whole cell's.
 Dividing `weight_fraction` by that `molar_mass` puts one phase per cell and the others per formula unit, and the column still sums to 1.
 On a 50/50 wt % mixture of LaFeO<sub>3</sub> and La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub>, both perovskites with Z = 4, the true composition is 47.8/52.2 mol %, and that route gives 78.5/21.5.

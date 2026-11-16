@@ -220,6 +220,7 @@
   "diagnostics:PHASE_UNCONSTRAINED",
   "diagnostics:PLAN_FREES_NO_MOMENT",
   "diagnostics:QPA_ESD_UNAVAILABLE",
+  "diagnostics:QPA_FORMULA_UNIT_WITHHELD",
   "diagnostics:QPA_FRACTION_RANGE",
   "diagnostics:QPA_UNAVAILABLE",
   "diagnostics:RAS_ATTENUATOR_PRESENT",
