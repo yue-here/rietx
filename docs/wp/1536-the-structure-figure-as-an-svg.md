@@ -138,13 +138,13 @@ change no reported number.
 
 - [ ] Read ASE's EPS/SVG writer and VESTA's vector-export thread. Record
   what each does about bonds and overlap in Context.
-- [ ] D1: the suffix dispatch, with the refusal naming each suffix.
-- [ ] The display list (`vector.py`): projected ellipses, trimmed and cut
+- [x] D1: the suffix dispatch, with the refusal naming each suffix.
+- [x] The display list (`vector.py`): projected ellipses, trimmed and cut
   stick pieces, faces, lines, ring arcs and letters, each with a depth key.
   Unit tests: sample points on a projected ellipse lie on the raster's
   silhouette within half a pixel, and a trimmed end lies on its atom's
   surface.
-- [ ] The SVG writer: D3's gradients, background or transparent,
+- [x] The SVG writer: D3's gradients, background or transparent,
   `outline=`, `dpi=`, D5's classes.
 - [ ] The crossing fault: 1470's baseline case drawn correctly. Rasterise the
   SVG and test the pixels where the bond passes behind the ball.
