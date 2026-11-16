@@ -4370,8 +4370,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.plan.PHASE_SUPPORT_SIGMA", "constant", tier=3, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
-                  "one's scale, seen in 1 fit of 8; own fixtures only; second pass owed (a weighed "
-                  "phase at 0.1-1 wt %, a minor phase started one FWHM off its cell)"),
+                  "one's scale, seen in 1 fit of 8 (own fixtures). WP-2017 group G (2026-11-16): "
+                  "weighed trace phases at 1.15-1.36 wt % (IUCr CPD cpd-1a, -1b, -1c, lab "
+                  "Bragg-Brentano) and CuO at 1.1 wt % (Suchomel 2012) in APS 11-BM CuCr2O4, two "
+                  "frames and the 17-frame ramp, from database cells and from one instrument FWHM "
+                  "off: scales 8.7-33.8 sigma, never held, every off cell recovered, and 1, 3 and "
+                  "None bit-identical, so unreached there; cpd-1a with zircon declared (weighed "
+                  "0): 3 holds zircon at the answer (1.3 sigma), 1 and None leave it free, the "
+                  "other phases' rows within 0.014 plain esd (noise 0.025) and every weight "
+                  "fraction within 0.01 wt %; no start dropped a scale under 3 sigma, so no "
+                  "failing case; two families by lab, instrument and material"),
         grounds=("The hold it gates passes the judgement ground; the 3 sigma is rietx's own, "
                  "which Currie (1968) does not carry; kept at its value as the default of a "
                  "caller's option, PlanSpec.phase_support_sigma with None for off (B1, ruled "
@@ -4844,8 +4852,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
-                  "one's scale, seen in 1 fit of 8; own fixtures only; second pass owed (a weighed "
-                  "phase at 0.1-1 wt %, a minor phase started one FWHM off its cell)"),
+                  "one's scale, seen in 1 fit of 8 (own fixtures). WP-2017 group G (2026-11-16): "
+                  "weighed trace phases at 1.15-1.36 wt % (IUCr CPD cpd-1a, -1b, -1c, lab "
+                  "Bragg-Brentano) and CuO at 1.1 wt % (Suchomel 2012) in APS 11-BM CuCr2O4, two "
+                  "frames and the 17-frame ramp, from database cells and from one instrument FWHM "
+                  "off: scales 8.7-33.8 sigma, never held, every off cell recovered, and 1, 3 and "
+                  "None bit-identical, so unreached there; cpd-1a with zircon declared (weighed "
+                  "0): 3 holds zircon at the answer (1.3 sigma), 1 and None leave it free, the "
+                  "other phases' rows within 0.014 plain esd (noise 0.025) and every weight "
+                  "fraction within 0.01 wt %; no start dropped a scale under 3 sigma, so no "
+                  "failing case; two families by lab, instrument and material"),
         grounds=("On by default: the hold touches only parameters the data cannot determine, "
                  "and an unseen phase's free cell walked 14.9 A from the truth while Rwp did "
                  "not move; no other code holds by default (TOPAS's Remove_Phase is opt-in), "
@@ -5035,8 +5051,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.Refinement.run_stage:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
-                  "one's scale, seen in 1 fit of 8; own fixtures only; second pass owed (a weighed "
-                  "phase at 0.1-1 wt %, a minor phase started one FWHM off its cell)"),
+                  "one's scale, seen in 1 fit of 8 (own fixtures). WP-2017 group G (2026-11-16): "
+                  "weighed trace phases at 1.15-1.36 wt % (IUCr CPD cpd-1a, -1b, -1c, lab "
+                  "Bragg-Brentano) and CuO at 1.1 wt % (Suchomel 2012) in APS 11-BM CuCr2O4, two "
+                  "frames and the 17-frame ramp, from database cells and from one instrument FWHM "
+                  "off: scales 8.7-33.8 sigma, never held, every off cell recovered, and 1, 3 and "
+                  "None bit-identical, so unreached there; cpd-1a with zircon declared (weighed "
+                  "0): 3 holds zircon at the answer (1.3 sigma), 1 and None leave it free, the "
+                  "other phases' rows within 0.014 plain esd (noise 0.025) and every weight "
+                  "fraction within 0.01 wt %; no start dropped a scale under 3 sigma, so no "
+                  "failing case; two families by lab, instrument and material"),
         grounds=("On by default: the hold touches only parameters the data cannot determine, "
                  "and an unseen phase's free cell walked 14.9 A from the truth while Rwp did "
                  "not move; no other code holds by default (TOPAS's Remove_Phase is opt-in), "
