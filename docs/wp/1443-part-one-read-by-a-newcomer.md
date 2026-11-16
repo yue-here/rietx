@@ -202,7 +202,7 @@ folded into this map and deleted. Each passage, read against the new tree:
       shows its output, σ's three consumers get verbs, "shipped" leaves Part 1,
       the coordinate refusal is named, "histogram" is defined at first use and
       in the glossary.
-- [ ] Passages 6–10 (`concepts.md`): the correlation figure names its effect
+- [x] Passages 6–10 (`concepts.md`): the correlation figure names its effect
       (regenerate the pair from `make_figures.py`), the restraint sentence, the
       worked example's reasoning written out, "glob" defined once and the
       hold sentence rewritten, the plan diagram redrawn and its caption

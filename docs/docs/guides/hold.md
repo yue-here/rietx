@@ -17,6 +17,7 @@ A hold lasts across every plan.
 
 Pass `hold` a parameter's name, such as `phases.0.cell.a`, or a list of names.
 A `*` in a name matches any run of characters, dots included, so `phases.0.cell.*` is every lattice parameter of the first phase.
+A name with a `*` in it is called a glob, and the messages and the plan's `turn_on` lists use that word.
 [Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 It returns the paths it held.
 
