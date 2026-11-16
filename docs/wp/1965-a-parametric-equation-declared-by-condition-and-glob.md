@@ -1,6 +1,6 @@
 # WP-1965 — a parametric equation declared by condition and glob
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Depends on: 1325 (the declaration this lowers onto); 1964 soft (an expression as what a glob expands)
 Priority: P3 2026-11-04 — writing the lists by hand is the workaround, and no user has asked yet; last in the milestone's order
 
