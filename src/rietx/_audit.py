@@ -3906,9 +3906,10 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.texture._EQUIV_REF_R", "constant", value=0.5),
     Row("rietx.report.texture._ORDER_RANK_TOL", "constant", tier=1, value=1e-08,
         evidence=("numerical floor: the rank cut of the order screen's weighted solve "
-                  "(WP-1974), on columns scaled to their unpartitioned norm, so a singular "
-                  "value is the fraction of a harmonic term the extraction's partition "
-                  "leaves; measured and asserted: tests/test_texture.py::"
+                  "(WP-1974), on columns scaled to their unpartitioned norm, so for a column "
+                  "orthogonal to the rest a singular value is the fraction of a harmonic "
+                  "term the extraction's partition leaves (collinear visible terms also "
+                  "give small ones); measured and asserted: tests/test_texture.py::"
                   "test_the_order_screen_rank_tolerance_sits_in_a_gap records orders 2-8 "
                   "over -1, 2/m, mmm, -3m1 (with and without O), 6/mmm and m-3m: largest "
                   "dropped 7.6e-16 (c4_3, c6_3, c8_3 on a one-atom -3m1 phase), smallest "

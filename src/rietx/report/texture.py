@@ -297,7 +297,8 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
 #: A design column counts towards the order screen's rank when its singular
 #: value, on weight-centred columns scaled to the unit norm of their
 #: *unpartitioned* values, is above this (absolute, since the scaling already
-#: makes it a surviving fraction).  ``tests/test_texture.py`` records the gap it
+#: makes it a surviving fraction for a column orthogonal to the rest;
+#: collinearity among visible terms also makes small ones).  ``tests/test_texture.py`` records the gap it
 #: sits in over six Laue classes at orders 2-8: dropped columns at roundoff,
 #: kept ones orders of magnitude above it.
 _ORDER_RANK_TOL = 1e-8
@@ -343,7 +344,8 @@ class _OrderScreen:
     n_reflections_used: int
     n_effective: float              # Kish: (Σw)²/Σw², beside the n the BIC charges
     axis: tuple[int, int, int] | None
-    axis_r2: float | None
+    axis_r: float | None            # r polished on the best axis, not the grid's
+    axis_r2: float | None           # at axis_r; the steps' ΔBIC vs axis reads this
     fits: tuple[_OrderFit, ...]
     steps: tuple[_OrderStep, ...]
 
@@ -393,8 +395,8 @@ def _weighted_fit(f: np.ndarray, w: np.ndarray, design: np.ndarray, scale: np.nd
     """(SS, rank, b, a, min kept sv, max dropped sv) of f ≈ a + design·b, weights w.
 
     The columns are weight-centred, so a is the free scale, and divided by
-    ``scale`` before the rank is read, so a column's singular value is its
-    surviving fraction.
+    ``scale`` before the rank is read, so for a column orthogonal to the rest
+    its singular value is its surviving fraction.
     """
     sw = np.sqrt(w)
     W = float(w.sum())
@@ -429,8 +431,14 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     its R² has the axis score's baseline (the weighted mean), so the two
     compare directly.  Each order is compared with the one below by the F
     statistic and ΔBIC on the rank it adds, and with the best March-Dollase
-    axis by ΔBIC at one shape parameter (the search over axes is not charged,
-    which leans towards the axis).  Measures, decides nothing.
+    axis by ΔBIC at one shape parameter.  The axis's r is polished off the
+    axis screen's grid (a bounded solve in ln r between the grid's neighbours
+    of its best r), since the order solve is exact and the grid's step would
+    otherwise charge the axis its quantisation: on a −3m1 specimen built with
+    r = 0.8 the grid made order 4 win by ΔBIC −16.7 (PR #1604 review).  The
+    search over axes is not charged, which leans towards the axis; the axis
+    screen's own r and R² (:func:`analyse_texture`) are not changed.  Measures,
+    decides nothing.
 
     Three limits a consumer inherits.  The p-values are not calibrated
     (:class:`_OrderStep`).  The BIC charges n, the live reflection count, which
@@ -442,6 +450,7 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     ``min_weight_frac`` are the axis screen's, so both read the same
     reflections against the same axes.
     """
+    from scipy.optimize import minimize_scalar
     from scipy.stats import f as f_dist
 
     from ..crystallography.spherical_harmonics import texture_basis
@@ -469,7 +478,8 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
         scored = tex is not None and tex.best_axis is not None
         if n < 2:
             out.append(_OrderScreen(phase_index=ip, n_reflections_used=n, n_effective=0.0,
-                                    axis=None, axis_r2=None, fits=(), steps=()))
+                                    axis=None, axis_r=None, axis_r2=None, fits=(),
+                                    steps=()))
             continue
         refl = model.phases[ip].reflections
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
@@ -510,8 +520,33 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
                 coefficients=tuple(float(v) for v in c),
                 rms_p=float(np.sqrt((wl * dp_k ** 2).sum() / W)),
                 min_kept_sv=kept, max_dropped_sv=dropped))
-        axis_r2 = tex.r2 if scored else None
-        ss_axis = (1.0 - axis_r2) * base if axis_r2 is not None else nan
+        axis_r = axis_r2 = None
+        ss_axis = nan
+        if scored and base > 0:
+            members, seg, counts = orbit_layout(reflection_orbits(group, refl.hkl))
+            cos2 = cos2_alpha(members, np.array(tex.best_axis, dtype=np.int64),
+                              reciprocal_metric_tensor(*cell))
+            w_live = np.where(live, w, 0.0)
+
+            def axis_ss(log_r: float) -> float:
+                # _score_axis's free-scale SS at one r, a negative scale inadmissible
+                p = np.bincount(seg, weights=march_term(cos2, float(np.exp(log_r))),
+                                minlength=len(counts)) / counts
+                denom = float((w_live * p * p).sum())
+                scale = float((w_live * f * p).sum()) / denom if denom > 0.0 else 0.0
+                if scale <= 0.0:
+                    return base
+                return min(float((w_live * (f - scale * p) ** 2).sum()), base)
+
+            step = float(np.log(_R_GRID[1] / _R_GRID[0]))
+            lo_r = float(np.log(tex.march_coefficient))
+            bounds = (max(lo_r - step, float(np.log(_R_GRID[0]))),
+                      min(lo_r + step, float(np.log(_R_GRID[-1]))))
+            polished = minimize_scalar(axis_ss, bounds=bounds, method="bounded",
+                                       options={"xatol": 1e-10})
+            ss_axis, log_r = min((axis_ss(lo_r), lo_r),
+                                 (float(polished.fun), float(polished.x)))
+            axis_r, axis_r2 = float(np.exp(log_r)), 1.0 - ss_axis / base
         steps: list[_OrderStep] = []
         lo_ss, lo_rank = base, 0
         log_n = float(np.log(n))
@@ -537,6 +572,6 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
         out.append(_OrderScreen(
             phase_index=ip, n_reflections_used=n,
             n_effective=W * W / float((wl * wl).sum()),
-            axis=tex.best_axis if scored else None, axis_r2=axis_r2,
+            axis=tex.best_axis if scored else None, axis_r=axis_r, axis_r2=axis_r2,
             fits=tuple(fits), steps=tuple(steps)))
     return out

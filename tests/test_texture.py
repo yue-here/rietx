@@ -464,15 +464,16 @@ def test_the_sampled_sphere_minimum_meets_the_true_one(order):
 
 
 # ------------------------------------------------- the order screen (WP-1974)
-def _bare_fit_screen(texture, *, mg_only=False):
-    """A −3m1 phase built with ``texture``, fitted bare (scale and background
-    only, noise-free), and the order screen run on the answer."""
+def _bare_screen(texture, *, mg_only=False, march_r=None):
+    """A −3m1 phase built with ``texture`` (or March-Dollase ``march_r`` on
+    (001)), fitted bare (scale and background only, noise-free), and the order
+    screen run on the answer."""
     from rietx.model.forward import WINDOW_AREA_TOL, compile_model
     from rietx.report.texture import _order_screen
 
     p = Parameter
 
-    def phase(tex):
+    def phase(tex, r=None):
         atoms = [Atom(label="Mg", species="Mg", x=p(value=0.0), y=p(value=0.0),
                       z=p(value=0.0), biso=p(value=0.5))]
         if not mg_only:
@@ -480,12 +481,16 @@ def _bare_fit_screen(texture, *, mg_only=False):
                               z=p(value=0.22), biso=p(value=0.8)))
         kw = {"texture": SphericalHarmonicTexture(order=4, coefficients={
             k: p(value=v) for k, v in tex.items()})} if tex else {}
+        if r is not None:
+            kw = {"preferred_orientation": PreferredOrientation(axis=(0, 0, 1),
+                                                                r=p(value=r))}
         return Phase(name="t", space_group="P -3 m 1",
                      cell=_cell(3.147, 4.769, 120.0), scale=p(value=1e-3), atoms=atoms, **kw)
 
     ins = Instrument.bragg_brentano()
     grid = np.arange(10.0, 120.0, 0.02)
-    y = np.asarray(rx.Refinement(Structure(phases=[phase(texture)]), ins).predict(grid))
+    y = np.asarray(rx.Refinement(Structure(phases=[phase(texture, march_r)]), ins)
+                   .predict(grid))
     data = rx.PatternData(two_theta=grid.tolist(), intensity=(y * 2e4 / y.max() + 50.0).tolist())
     bare = phase(None)
     bare.scale.value *= 2e4 / y.max()
@@ -496,6 +501,11 @@ def _bare_fit_screen(texture, *, mg_only=False):
     table = ParameterTable(fs, fi)
     model = compile_model(fs, fi, data, mode="rietveld", window_area_tol=WINDOW_AREA_TOL)
     (screen,) = _order_screen(model, table.decode(table.x0()))
+    return screen
+
+
+def _bare_fit_screen(texture, *, mg_only=False):
+    screen = _bare_screen(texture, mg_only=mg_only)
     return {f.order: f for f in screen.fits}, {s.order: s for s in screen.steps}
 
 
@@ -512,6 +522,25 @@ def test_the_order_screen_recovers_an_order_4_specimen_fitted_bare():
     for name, value in truth.items():
         assert got[name] == pytest.approx(value, abs=0.01), name
     assert steps[6].delta_r2 < 1e-3 < steps[4].delta_r2
+    # the statistics say the same (measured 2026-11-16: ΔBIC(4|2) −229.8 at
+    # F p 4e-46, ΔBIC(6|4) +10.4 at p 0.99, ΔBIC vs the polished axis −189.7)
+    assert steps[4].delta_bic < 0 < steps[6].delta_bic
+    assert steps[4].p_value < 1e-6 and steps[6].p_value > 0.05
+    assert steps[4].delta_bic_vs_axis < 0
+
+
+def test_a_march_dollase_specimen_keeps_the_axis_against_every_order():
+    """The other arm: −3m1 built with March-Dollase r = 0.8 on (001).  The
+    axis is scored at r polished off the axis screen's grid, so the exact
+    order solve is not compared with a quantised one: on the grid (R² 0.99852
+    against 0.99994 at the polished r) orders 4-8 read ΔBIC vs axis −16.7,
+    −65.7 and −57.3, polished +92.5, +43.6 and +52.0 (PR #1604 review,
+    measured 2026-11-16).  The axis screen's own r and R² stay the grid's."""
+    screen = _bare_screen(None, march_r=0.8)
+    assert screen.axis == (0, 0, 1)
+    assert all(s.delta_bic_vs_axis > 0 for s in screen.steps)
+    assert screen.axis_r == pytest.approx(0.8, abs=0.002)
+    assert screen.axis_r2 > 0.9999
 
 
 def test_a_term_the_partition_averages_away_adds_no_rank():
@@ -534,8 +563,9 @@ def test_a_random_powder_fitted_bare_has_no_texture_amplitude():
     order explains a fraction of (on m-3m order 6 at F p 0.026, WP-1974's
     log).  Its amplitude, 7.9e-5 to 2.6e-4 rms P − 1 here, is the strength a
     suggestion needs beside R²."""
-    fits, _steps = _bare_fit_screen(None)
+    fits, steps = _bare_fit_screen(None)
     assert all(f.rms_p < 1e-3 for f in fits.values())
+    assert all(s.delta_bic > 0 for s in steps.values())   # +3.5 to +10.6 measured
 
 
 #: Laue classes the order screen's rank gap is recorded over: (group, cell, O site).
@@ -557,8 +587,10 @@ def test_the_order_screen_rank_tolerance_sits_in_a_gap(label):
     2026-11-16 over these seven phases: largest dropped 7.6e-16 (the one-atom
     −3m1 phase's c4_3, c6_3 and c8_3, which the partition averages away),
     smallest kept 0.13 (−3m1 at order 8), so any tolerance from 1e-14 to 1e-2
-    returns the same ranks here.  The design does not depend on f, so the
-    model is read at its own values."""
+    returns the same ranks here (those cases only: on a short-range P −1 phase,
+    collinearity among visible terms keeps singular values of 5.9e-3 at order
+    6 and 2.1e-4 at order 8, inside that range; PR #1604 review).  The design
+    does not depend on f, so the model is read at its own values."""
     from rietx.model.forward import WINDOW_AREA_TOL, compile_model
     from rietx.report.texture import _ORDER_RANK_TOL, _order_screen
 
