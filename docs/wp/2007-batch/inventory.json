@@ -11,16 +11,16 @@
    "2": 18,
    "3": 6
   },
-  "code_sites": 110,
+  "code_sites": 60,
   "codes_by_proposed_action_tier": {
    "1": 12,
    "3": 36,
    "caller": 2
   },
-  "constants": 186,
-  "constants_seen_by_audit_walk": 161,
+  "constants": 188,
+  "constants_seen_by_audit_walk": 163,
   "constants_by_tier_now": {
-   "unaudited": 146,
+   "unaudited": 148,
    "1": 7,
    "3": 6,
    "None": 25,
@@ -29,11 +29,11 @@
   "constants_by_role": {
    "cap": 26,
    "threshold": 70,
-   "tolerance": 21,
+   "tolerance": 22,
    "physics": 8,
    "enumeration": 9,
    "arithmetic": 14,
-   "count": 11,
+   "count": 12,
    "budget": 7,
    "numerical floor": 13,
    "label": 4,
@@ -41,10 +41,10 @@
    "seed": 1
   },
   "constants_by_proposed_tier": {
-   "3": 101,
+   "3": 102,
    "invariant": 12,
    "1": 54,
-   "2": 19
+   "2": 20
   },
   "constants_with_no_reader": 0,
   "defaults": 32,
@@ -80,13 +80,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:673",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:1015",
      "level": "info",
      "function": "extinction_class_diagnostics",
@@ -119,13 +112,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:674",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:992",
      "level": "warning",
      "function": "extinction_class_diagnostics",
@@ -157,13 +143,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:675",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:1129",
      "level": "info",
@@ -200,13 +179,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:676",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:1272",
      "level": "computed",
      "function": "_prior_diagnostic",
@@ -236,13 +208,6 @@
     "error"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:677",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/extinction.py:1347",
      "level": "error",
@@ -289,13 +254,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:678",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:1069",
      "level": "warning",
      "function": "extinction_diagnostics",
@@ -331,13 +289,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:690",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:1003",
      "level": "info",
@@ -407,13 +358,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:799",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:896",
      "level": "computed",
      "function": "index_diagnostics",
@@ -445,13 +389,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:800",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:751",
      "level": "warning",
@@ -485,13 +422,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:801",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:2314",
      "level": "warning",
      "function": "budget_exhausted_diagnostic",
@@ -522,13 +452,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:802",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:2261",
      "level": "info",
      "function": "candidates_truncated_diagnostic",
@@ -558,13 +481,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:803",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:963",
      "level": "info",
@@ -608,13 +524,6 @@
     "error"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:804",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:614",
      "level": "error",
@@ -685,13 +594,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:805",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/trial_error.py:567",
      "level": "warning",
      "function": "_dominant_zone_probe",
@@ -729,13 +631,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:806",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:730",
      "level": "warning",
      "function": "candidate_diagnostics",
@@ -768,13 +663,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:807",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:833",
      "level": "warning",
      "function": "candidate_diagnostics",
@@ -806,13 +694,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:808",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/engines.py:1329",
      "level": "info",
@@ -848,13 +729,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:809",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:881",
      "level": "warning",
      "function": "index_diagnostics",
@@ -887,13 +761,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:810",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:914",
      "level": "warning",
      "function": "index_diagnostics",
@@ -925,13 +792,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:811",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:622",
      "level": "warning",
@@ -969,13 +829,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:812",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:790",
      "level": "computed",
      "function": "candidate_diagnostics",
@@ -1008,13 +861,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:825",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/priors.py:387",
      "level": "info",
@@ -1055,13 +901,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:826",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:2218",
      "level": "warning",
      "function": "incomplete_diagnostic",
@@ -1094,13 +933,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:827",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:1311",
      "level": "info",
      "function": "shift_allowance_diagnostic",
@@ -1132,13 +964,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:828",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:655",
      "level": "warning",
@@ -1176,13 +1001,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:829",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:1362",
      "level": "info",
      "function": "shift_from_pairs_diagnostic",
@@ -1212,13 +1030,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:830",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:668",
      "level": "warning",
@@ -1256,13 +1067,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:831",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/engines.py:2279",
      "level": "info",
      "function": "single_engine_diagnostic",
@@ -1292,13 +1096,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:832",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:814",
      "level": "warning",
@@ -1332,13 +1129,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:845",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:923",
      "level": "info",
      "function": "index_diagnostics",
@@ -1370,13 +1160,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:846",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/workflow.py:560",
      "level": "warning",
@@ -1412,13 +1195,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:847",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:845",
      "level": "warning",
      "function": "candidate_diagnostics",
@@ -1450,13 +1226,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:861",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:1115",
      "level": "info",
@@ -1493,13 +1262,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1073",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:214",
      "level": "warning",
      "function": "peak_diagnostics",
@@ -1534,13 +1296,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1074",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:177",
      "level": "info",
@@ -1577,13 +1332,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1075",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:204",
      "level": "info",
      "function": "peak_diagnostics",
@@ -1619,13 +1367,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1076",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:247",
      "level": "info",
      "function": "_false_line_diagnostic",
@@ -1655,13 +1396,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1077",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:402",
      "level": "info",
@@ -1698,13 +1432,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1078",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:191",
      "level": "info",
      "function": "peak_diagnostics",
@@ -1739,13 +1466,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1079",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:97",
      "level": "warning",
@@ -1782,13 +1502,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1080",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:131",
      "level": "warning",
      "function": "peak_diagnostics",
@@ -1824,13 +1537,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1081",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:350",
      "level": "info",
      "function": "_bound_diagnostics",
@@ -1847,7 +1553,7 @@
     "rietx/indexing/diagnostics.py"
    ],
    "suggestion_sites": 1,
-   "tests_naming_it": 7,
+   "tests_naming_it": 1,
    "condition": "Fires on components flagged `no_intensity`: on the fit's zero-intensity bound, under PEAK_NO_INTENSITY_SIGMA of their own esd, or marked by hand (indexing/diagnostics.py:350).",
    "kind": 1,
    "statistic": 1,
@@ -1865,13 +1571,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1094",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:319",
      "level": "info",
@@ -1908,13 +1607,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1106",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:637",
      "level": "computed",
      "function": "quality_diagnostics",
@@ -1949,13 +1641,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1107",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:412",
      "level": "info",
@@ -1992,13 +1677,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1108",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:109",
      "level": "warning",
      "function": "peak_diagnostics",
@@ -2033,13 +1711,6 @@
     "info"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1109",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:120",
      "level": "info",
@@ -2076,13 +1747,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1110",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:144",
      "level": "info",
      "function": "peak_diagnostics",
@@ -2118,13 +1782,6 @@
    ],
    "sites": [
     {
-     "where": "src/rietx/_audit.py:1111",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
-    {
      "where": "src/rietx/indexing/diagnostics.py:158",
      "level": "info",
      "function": "peak_diagnostics",
@@ -2159,13 +1816,6 @@
     "warning"
    ],
    "sites": [
-    {
-     "where": "src/rietx/_audit.py:1112",
-     "level": null,
-     "function": null,
-     "guards": [],
-     "constants_in_function": []
-    },
     {
      "where": "src/rietx/indexing/diagnostics.py:483",
      "level": "warning",
@@ -2329,6 +1979,26 @@
    "question": ""
   },
   {
+   "name": "rietx.indexing.ambiguity.UNCANCELLABLE_METRIC_RTOL",
+   "where": "src/rietx/indexing/ambiguity.py:472",
+   "shape": "call:float",
+   "value": "float(np.sin(np.radians(max(BRAVAIS_OBLIQUITIES))))",
+   "n_numbers": 0,
+   "walked_by_audit": true,
+   "cites": [],
+   "tier_now": "unaudited",
+   "read_by": [
+    "indexing.ambiguity.lattice_point_group",
+    "indexing.ambiguity.uncancellable"
+   ],
+   "role": "tolerance",
+   "decides": "The metric deviation up to which a lattice symmetry still counts when deciding which reflections an extinction could cancel, the sine of the Bravais screen's loosest obliquity (ambiguity.py:466-472).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Derived with no free factor from reduce.BRAVAIS_OBLIQUITIES' loosest entry, 3 degrees (reduce.py:118, Le Page obliquities), so it inherits that tuple's tier; the tuple itself is not walked as a row of its own here and its 3 degrees are rietx's sweep, loose on purpose per the comment.",
+   "question": "Is the 3 degree loosest obliquity of the Le Page sweep (reduce.py:118) a published default (Le Page 1982 uses a tolerance of the same order), which would make this tier 2 by derivation?"
+  },
+  {
    "name": "rietx.indexing.consensus.CONSENSUS_CHECK_TOP",
    "where": "src/rietx/indexing/consensus.py:94",
    "shape": "scalar",
@@ -2445,12 +2115,7 @@
    "cites": [],
    "tier_now": "unaudited",
    "read_by": [
-    "indexing.dichotomy._search_one",
-    "params.expression.exponent",
-    "params.expression.expr",
-    "params.expression.parse",
-    "params.expression.unary_operand",
-    "runs.discover"
+    "indexing.dichotomy._search_one"
    ],
    "role": "cap",
    "decides": "How many bisections one box may undergo before it is sent to the assign-refine loop as it stands (dichotomy.py:112, used at :1286).",
@@ -3008,7 +2673,7 @@
    "measured_on": "qarr corundum (SRM 676a), NIST SRM 660c (where 0.060° manufactured a wrong high cell)",
    "proposed": 2,
    "evidence": "The indexing programs' default matching windows bracket it: DICVOL06 0.03° 2θ (dicvol06.inf:139-157), ITO15 TOLG 0.06° (ito15.inf:337-342), TOPAS index_max_th2_error 0.05° (inferred from a summarised manual fetch), docs/practice.md:279-286; a value between two programs' values is inside the range. Every result reports it as INDEX_SHIFT_ALLOWANCE, and shift_allowance_assumed keeps high unreachable on real data.",
-   "question": ""
+   "question": "The seven programs of generality.md's tier 2 are Rietveld programs; DICVOL06 and ITO15 are indexing programs, which the WP names as tier-2 sources for indexing, and TOPAS's 0.05 degrees is inferred, not read (docs/practice.md:280). Does an indexing program's default count here, or is this tier 3 on the corundum and SRM 660c measurements?"
   },
   {
    "name": "rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM",
@@ -3550,10 +3215,7 @@
    "cites": [],
    "tier_now": null,
    "read_by": [
-    "crystallography.magnetic.operators.from_xyz",
-    "crystallography.magnetic.operators.xyz",
-    "indexing.extinction.reflection_conditions",
-    "viz.figure3d.views.direction"
+    "indexing.extinction.reflection_conditions"
    ],
    "role": "enumeration",
    "decides": "The vocabulary of the axes on which reflection conditions are stated when deriving an extinction class's conditions; each is kept only if it reproduces the absence set exactly.",
@@ -3650,7 +3312,6 @@
     "indexing.fom.resolution_half_width",
     "indexing.fom.seen_at_resolution",
     "indexing.screen.from_peaks",
-    "indexing.workflow.validate_by_lebail",
     "viz.indexing.plot_candidates"
    ],
    "role": "threshold",
@@ -3659,6 +3320,31 @@
    "proposed": 3,
    "evidence": "rietx's own 3σ on a σ measured to be calibrated (pull mean +0.03, std 0.97; −0.08, 0.98 on a doublet), the same shape as the absent-phase hold's 3σ, which generality.md § The rule puts on trial under the mechanical ground. The families behind WP-1018's pulls are not named in the comment.",
    "question": "Is a 3σ window on a calibrated σ tier 1 (Gaussian arithmetic, once the calibration is tested) or tier 3 (a chosen coverage), and which families did WP-1018's pull ensemble use (fom.py:45)?"
+  },
+  {
+   "name": "rietx.indexing.fom.FOM_N",
+   "where": "src/rietx/indexing/fom.py:56",
+   "shape": "Name",
+   "value": "PEAK_MIN_USABLE_LINES",
+   "n_numbers": 0,
+   "walked_by_audit": true,
+   "cites": [
+    "WP-1043",
+    "WP-1436"
+   ],
+   "tier_now": "unaudited",
+   "read_by": [
+    "indexing.fom._reversed_pair",
+    "indexing.fom.f_n",
+    "indexing.fom.m20",
+    "indexing.fom.panel_undefined"
+   ],
+   "role": "count",
+   "decides": "The N of F_N the panel computes, an alias of PEAK_MIN_USABLE_LINES (fom.py:56), so the scoring precondition and the figure it guards cannot drift apart.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "It takes PEAK_MIN_USABLE_LINES' ground: de Wolff (1968) defines M20 on the first twenty lines; fom.py:46-55 records that the 20 for F_N is the package's own choice, since Smith & Snyder (1979) fix no N (WP-1436).",
+   "question": "Should FOM_N carry its own row at tier 3, since fom.py:50-55 says twenty is this package's choice for F_N, or ride PEAK_MIN_USABLE_LINES' tier as an alias with no free factor?"
   },
   {
    "name": "rietx.indexing.fom.LINE_COINCIDENCE_RTOL",
@@ -4453,7 +4139,7 @@
    "decides": "How many Selling steps a reduction may take before the pair keeps the answer of the vectors as given (reduce.py:768).",
    "measured_on": "n/a",
    "proposed": 1,
-   "evidence": "A termination guard: each Selling step strictly lowers the sum of the four vectors' squared lengths, so a finite lattice reduces in far fewer steps; no test reaches the limit.",
+   "evidence": "A termination guard, by an arithmetic argument rather than a test: each Selling step strictly lowers the sum of the four vectors' squared lengths, so a finite lattice reduces in far fewer steps; no test reaches the limit, which tier 1 for a numerical setting asks for (generality.md:58-61).",
    "question": "Should a synthetic case reach the cap before the row is recorded?"
   },
   {
@@ -5882,8 +5568,7 @@
    "cites": [],
    "tier_now": null,
    "read_by": [
-    "solve.chemistry._clash_overlaps",
-    "solve.cluster._pair_d2"
+    "solve.chemistry._clash_overlaps"
    ],
    "role": "enumeration",
    "decides": "The 27 lattice translations around a minimum image for the clash term (solve/chemistry.py:364).",
@@ -5921,7 +5606,6 @@
    "cites": [],
    "tier_now": null,
    "read_by": [
-    "solve.chemistry._clash_overlaps",
     "solve.cluster._pair_d2"
    ],
    "role": "enumeration",

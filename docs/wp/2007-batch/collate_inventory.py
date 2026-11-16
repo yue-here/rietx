@@ -47,12 +47,15 @@ OWNED_FILES = ("schemas/indexing.py",)
 B13_MODULE = "rietx.background.diagnostics"
 B13_PREFIXES = ("GHOST_", "_ANODE_MATCH_TOL", "_KBETA")
 LEVELS = {"info", "warning", "error"}
+#: Modules that name every code without raising one: the audit table's ``Row("CODE", "code")``
+#: and the help entries would read as positional raise sites (WP-2007 review).
+NOT_RAISERS = {"rietx._audit", "rietx.help"}
 KINDS = {1: "the data settle it", 2: "the data can rank it", 3: "the data cannot settle it"}
 TIERS = {1, 2, 3, "invariant", "caller", "unaudited", "n/a"}
 ROLES = {"threshold", "budget", "cap", "tolerance", "numerical floor", "unit", "arithmetic",
          "physics", "count", "seed", "version", "enumeration", "label", "protocol"}
 CITE = re.compile(r"WP-\d{4}|#\d{3,4}\b|[A-Z][a-zà-ÿ]+(?: (?:&|and) [A-Z][a-zà-ÿ]+| et al\.)? \(?(?:19|20)\d\d")
-ABBREV_STOP = re.compile(r"(?:\bet al|\bi\.e|\be\.g|\bcf|\bca|\bvs|\bFig|\bEq|\bNo|\bpp?)\.$")
+ABBREV_STOP = re.compile(r"(?:\bet al|\bVol|\bi\.e|\be\.g|\bcf|\bca|\bvs|\bFig|\bEq|\bNo|\bTable|\bpp?)\.$")
 
 
 def rel(p: Path) -> str:
@@ -70,7 +73,7 @@ def module_of(path: Path) -> str:
 
 def cut(text: str) -> bool:
     t = text.rstrip()
-    return (not t.endswith((".", ")")) or bool(ABBREV_STOP.search(t))
+    return (not t.endswith((".", ")", "?")) or bool(ABBREV_STOP.search(t))
             or t.count("(") > t.count(")"))
 
 
@@ -143,8 +146,8 @@ def constants(mods: list[Module]) -> list[dict]:
                 continue
             names = [e.id for t in tg for e in (t.elts if isinstance(t, ast.Tuple) else [t])
                      if isinstance(e, ast.Name) and not e.id.startswith("__")]
-            if not names or not n_numbers(val):
-                continue
+            if not names or not (n_numbers(val) or any(f"{m.name}.{nm}" in walked for nm in names)):
+                continue  # a derived number the walk sees (UNCANCELLABLE_METRIC_RTOL) is kept
             above = comment_above(m.lines, node.lineno)
             for nm in names:
                 full = f"{m.name}.{nm}"
@@ -159,10 +162,21 @@ def constants(mods: list[Module]) -> list[dict]:
     return out
 
 
-def readers(mods: list[Module], names: set[str]) -> dict[str, list[str]]:
-    """Every function, anywhere in the package, whose body names one of `names` (bare
-    name or attribute), as `module.function`."""
+def readers(mods: list[Module], full: set[str]) -> dict[str, list[str]]:
+    """Every function or module/class body reading one of the constants in `full`, keyed
+    by the constant's full name: in its defining module by bare name, elsewhere only through
+    an import of that name or an attribute of an imported module (`engines.NAME`), so two
+    modules' same bare name never merge (WP-2007 review)."""
     out: dict[str, set[str]] = defaultdict(set)
+
+    def resolve_from(m: Module, node: ast.ImportFrom) -> str:
+        if node.level == 0:
+            return node.module or ""
+        base = m.name.split(".")
+        if not m.path.name == "__init__.py":
+            base = base[:-1]
+        base = base[:len(base) - (node.level - 1)]
+        return ".".join(base + ([node.module] if node.module else []))
 
     def outside_functions(node: ast.AST):
         for ch in ast.iter_child_nodes(node):
@@ -171,27 +185,51 @@ def readers(mods: list[Module], names: set[str]) -> dict[str, list[str]]:
             yield ch
             yield from outside_functions(ch)
 
+    modnames = {m.name for m in mods}
     for m in mods:
-        # a module-level or class-body read (a dataclass field default, a dict of presets)
+        names = {f.rsplit(".", 1)[1]: f for f in full if f.rsplit(".", 1)[0] == m.name}
+        aliases: dict[str, str] = {}
+        for node in ast.walk(m.tree):
+            if isinstance(node, ast.ImportFrom):
+                src = resolve_from(m, node)
+                for a in node.names:
+                    if f"{src}.{a.name}" in full:
+                        names[a.asname or a.name] = f"{src}.{a.name}"
+                    elif f"{src}.{a.name}" in modnames:
+                        aliases[a.asname or a.name] = f"{src}.{a.name}"
+            elif isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name in modnames and a.asname:
+                        aliases[a.asname] = a.name
+
+        def hit(n: ast.AST) -> str | None:
+            if isinstance(n, ast.Name):
+                return names.get(n.id)
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+                tm = aliases.get(n.value.id)
+                return f"{tm}.{n.attr}" if tm and f"{tm}.{n.attr}" in full else None
+            return None
+
+        here = m.name.removeprefix("rietx.")
         for n in outside_functions(m.tree):
-            key = (n.id if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) else
-                   n.attr if isinstance(n, ast.Attribute) else None)
-            if key in names:
-                out[key].add(f"{m.name.removeprefix('rietx.')}.<module or class body>")
+            k = hit(n)
+            # the defining assignment itself is a Store, not a read
+            if k and not (isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)):
+                out[k].add(f"{here}.<module or class body>")
         for fn in ast.walk(m.tree):
-            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            for n in ast.walk(fn):
-                key = (n.id if isinstance(n, ast.Name) else
-                       n.attr if isinstance(n, ast.Attribute) else None)
-                if key in names:
-                    out[key].add(f"{m.name.removeprefix('rietx.')}.{fn.name}")
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for n in ast.walk(fn):
+                    k = hit(n)
+                    if k:
+                        out[k].add(f"{here}.{fn.name}")
     return {k: sorted(v) for k, v in out.items()}
 
 
 def raise_sites(mods: list[Module], wanted: set[str], const_short: set[str]) -> list[dict]:
     out = []
     for m in mods:
+        if m.name in NOT_RAISERS:
+            continue
         for node in ast.walk(m.tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -220,7 +258,7 @@ def tests_naming(codes: set[str]) -> dict[str, int]:
     for p in TESTS.rglob("test_*.py"):
         t = p.read_text(encoding="utf-8", errors="replace")
         for c in codes:
-            if c in t:
+            if re.search(rf"\b{c}\b", t):
                 count[c] += 1
     return dict(count)
 
@@ -234,7 +272,7 @@ def collect():
     consts = constants(mods)
     short = {c["name"].rsplit(".", 1)[-1] for c in consts}
     sites = raise_sites(mods, wanted, short)
-    rd = readers(mods, short)
+    rd = readers(mods, {c["name"] for c in consts})
     rows = {r.name: r for r in _audit.ROWS}
     defaults = [r for r in _audit.ROWS if r.kind == "default"
                 and _audit.DEFAULT_SEATS.get(r.name.split(":")[0]) == 2007]
@@ -253,14 +291,13 @@ def skeleton() -> None:
     for s in sites:
         by[s["code"]].append(s)
     out = {"codes": {c: {"tier": rows[c].tier if c in rows else None,
-                         "explanation": DIAGNOSTIC_HELP.get(c, {}).get("explanation", "")[:400]
-                         if isinstance(DIAGNOSTIC_HELP.get(c), dict) else str(DIAGNOSTIC_HELP.get(c, ""))[:400],
+                         "explanation": getattr(DIAGNOSTIC_HELP.get(c), "description", "")[:400],
                          "sites": [{k: s[k] for k in ("where", "level", "function", "guards",
                                                       "constants_in_function")} for s in by[c]]}
                      for c in sorted(wanted)},
            "constants": {c["name"]: {**{k: c[k] for k in ("where", "value", "tier", "comment",
                                                             "walked_by_audit")},
-                                     "read_by": rd.get(c["name"].rsplit(".", 1)[-1], [])[:12]}
+                                     "read_by": rd.get(c["name"], [])[:12]}
                          for c in consts},
            "defaults": {r.name: {"value": repr(r.value), "tier": r.tier} for r in defaults}}
     print(json.dumps(out, indent=1, ensure_ascii=False))
@@ -278,7 +315,10 @@ def build() -> dict:
         sys.exit(f"no judgement for: {sorted(missing)}\njudgement for an item the tree no longer has: {sorted(gone)}")
     texts = ({f"codes:{k}:{f}": v[f] for k, v in jc.items() for f in ("condition", "evidence")}
              | {f"constants:{k}:{f}": v[f] for k, v in jk.items() for f in ("decides", "evidence")}
-             | {f"defaults:{k}:{f}": v[f] for k, v in jd.items() for f in ("decides", "evidence")})
+             | {f"defaults:{k}:{f}": v[f] for k, v in jd.items() for f in ("decides", "evidence")}
+             | {f"{g}:{k}:question": v["question"] for g, jj in (("codes", jc), ("constants", jk),
+                                                                ("defaults", jd))
+                for k, v in jj.items() if v.get("question")})
     bad = [k for k, t in texts.items() if cut(t)]
     bad += [f"codes:{k}:kind" for k, v in jc.items() if v["kind"] not in KINDS]
     bad += [f"codes:{k}:{p}" for k, v in jc.items() for p in ("statistic", "threshold", "action")
@@ -313,7 +353,7 @@ def build() -> dict:
         crows.append({**{k: c[k] for k in ("name", "where", "shape", "value", "n_numbers",
                                           "walked_by_audit", "cites")},
                       "tier_now": c["tier"],
-                      "read_by": rd.get(c["name"].rsplit(".", 1)[-1], []),
+                      "read_by": rd.get(c["name"], []),
                       **{k: j[k] for k in ("role", "decides", "measured_on", "proposed", "evidence")},
                       "question": j.get("question", "")})
     drows = [{"name": r.name, "value": repr(r.value), "tier_now": r.tier,

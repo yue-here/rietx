@@ -583,7 +583,8 @@
    "decides": "The systematic 2θ allowance added in quadrature to every line's σ when no shift is measured, the cap on the width-derived allowance (engines.py:266).",
    "measured_on": "qarr corundum (SRM 676a), NIST SRM 660c (where 0.060° manufactured a wrong high cell)",
    "proposed": 2,
-   "evidence": "The indexing programs' default matching windows bracket it: DICVOL06 0.03° 2θ (dicvol06.inf:139-157), ITO15 TOLG 0.06° (ito15.inf:337-342), TOPAS index_max_th2_error 0.05° (inferred from a summarised manual fetch), docs/practice.md:279-286; a value between two programs' values is inside the range. Every result reports it as INDEX_SHIFT_ALLOWANCE, and shift_allowance_assumed keeps high unreachable on real data."
+   "evidence": "The indexing programs' default matching windows bracket it: DICVOL06 0.03° 2θ (dicvol06.inf:139-157), ITO15 TOLG 0.06° (ito15.inf:337-342), TOPAS index_max_th2_error 0.05° (inferred from a summarised manual fetch), docs/practice.md:279-286; a value between two programs' values is inside the range. Every result reports it as INDEX_SHIFT_ALLOWANCE, and shift_allowance_assumed keeps high unreachable on real data.",
+   "question": "The seven programs of generality.md's tier 2 are Rietveld programs; DICVOL06 and ITO15 are indexing programs, which the WP names as tier-2 sources for indexing, and TOPAS's 0.05 degrees is inferred, not read (docs/practice.md:280). Does an indexing program's default count here, or is this tier 3 on the corundum and SRM 660c measurements?"
   },
   "rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM": {
    "role": "tolerance",
@@ -1597,7 +1598,7 @@
    "decides": "How many Selling steps a reduction may take before the pair keeps the answer of the vectors as given (reduce.py:768).",
    "measured_on": "n/a",
    "proposed": 1,
-   "evidence": "A termination guard: each Selling step strictly lowers the sum of the four vectors' squared lengths, so a finite lattice reduces in far fewer steps; no test reaches the limit.",
+   "evidence": "A termination guard, by an arithmetic argument rather than a test: each Selling step strictly lowers the sum of the four vectors' squared lengths, so a finite lattice reduces in far fewer steps; no test reaches the limit, which tier 1 for a numerical setting asks for (generality.md:58-61).",
    "question": "Should a synthetic case reach the cap before the row is recorded?"
   },
   "rietx.indexing.reduce._AF_ROW": {
@@ -1831,6 +1832,22 @@
    "measured_on": "acridine-shaped synthetic case and APS 11-BM NAC",
    "proposed": 1,
    "evidence": "Current tier 1 (_audit.py:4326): a numerical setting; tests/test_solve_engine.py::test_running_sums_stay_on_a_rebuild holds the drift under 1e-10 J at the cadence."
+  },
+  "rietx.indexing.fom.FOM_N": {
+   "role": "count",
+   "decides": "The N of F_N the panel computes, an alias of PEAK_MIN_USABLE_LINES (fom.py:56), so the scoring precondition and the figure it guards cannot drift apart.",
+   "measured_on": "n/a",
+   "proposed": 2,
+   "evidence": "It takes PEAK_MIN_USABLE_LINES' ground: de Wolff (1968) defines M20 on the first twenty lines; fom.py:46-55 records that the 20 for F_N is the package's own choice, since Smith & Snyder (1979) fix no N (WP-1436).",
+   "question": "Should FOM_N carry its own row at tier 3, since fom.py:50-55 says twenty is this package's choice for F_N, or ride PEAK_MIN_USABLE_LINES' tier as an alias with no free factor?"
+  },
+  "rietx.indexing.ambiguity.UNCANCELLABLE_METRIC_RTOL": {
+   "role": "tolerance",
+   "decides": "The metric deviation up to which a lattice symmetry still counts when deciding which reflections an extinction could cancel, the sine of the Bravais screen's loosest obliquity (ambiguity.py:466-472).",
+   "measured_on": "not measured",
+   "proposed": 3,
+   "evidence": "Derived with no free factor from reduce.BRAVAIS_OBLIQUITIES' loosest entry, 3 degrees (reduce.py:118, Le Page obliquities), so it inherits that tuple's tier; the tuple itself is not walked as a row of its own here and its 3 degrees are rietx's sweep, loose on purpose per the comment.",
+   "question": "Is the 3 degree loosest obliquity of the Le Page sweep (reduce.py:118) a published default (Le Page 1982 uses a tolerance of the same order), which would make this tier 2 by derivation?"
   }
  },
  "defaults": {

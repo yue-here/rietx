@@ -116,7 +116,7 @@ one (`quality.py:343-375`; `TRUSTED_SHIFT_SOURCES`, `schemas/indexing.py:496`).
 **Refuted in part.** The pair screen detects on every fitted list in the corpus (z ≥ 4.2), and on
 none of the ten bethanechol position lists or HL2 (z ≈ 0) (`pairs.py:35-38`). The corundum and
 LaB6 acceptance rows assert the caveat is gone (`tests/test_acceptance_indexing.py:1140-1142`,
-`:2123-2127`), and M2 logged `INDEX_SHIFT_FROM_PAIRS` (allowance 0.0690°). `rietx index` always
+`:2135-2136`), and M2 logged `INDEX_SHIFT_FROM_PAIRS` (allowance 0.0690°). `rietx index` always
 picks from a pattern (`cli.py:362-365`). So on the corpus the CLI's exit 1 does not come from this
 caveat. It comes from `engines_disagree`, `fom_panel_disagrees` (K9) and two `high` cells (K10).
 The dossier sentence "On real data with no measured shift, `high` is unreachable"

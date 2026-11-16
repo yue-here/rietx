@@ -15,17 +15,19 @@ Run it with `.venv/bin/python docs/wp/2007-batch/collate_inventory.py`.
 
 ## The counts, at `94a35558b` (2026-11-16)
 
-- **50 codes**, not the WP's 48, at 110 raise sites: 45 `unaudited`, 3 tier 3, 2 tier 1. Kind: 26 the
+- **50 codes**, not the WP's 48, at 60 raise sites: 45 `unaudited`, 3 tier 3, 2 tier 1. Kind: 26 the
   data settle, 18 the data can rank, 6 the data cannot settle. Proposed, by part: statistic 29 tier 1,
   9 tier 2, 12 tier 3; threshold 3 / 4 / 32 (11 have none); action 12 tier 1, 36 tier 3, 2 `caller`.
   50 suggestion rows (47 `unaudited`), tiered with their code.
-- **186 module-level numbers**, not 76: 161 the audit walk sees (146 `unaudited`, 7 tier 1, 2 tier 2,
+- **188 module-level numbers**, not 76: 163 the audit walk sees (148 `unaudited`, 7 tier 1, 2 tier 2,
   6 tier 3) and 25 it cannot (dicts, lists, enumerations; mostly crystallographic tables, plus
   `engines.SEARCH_PRESET_INFO`, `svd.CONTROL` and `schemas.indexing.METRIC_DOF`). Proposed: 54 tier 1,
-  19 tier 2, 101 tier 3, 12 invariant. Two names the walk drops are recorded by hand in the default rows:
+  20 tier 2, 102 tier 3, 12 invariant. Two names the walk drops are recorded by hand in the default rows:
   `engines.DEFAULT_SEARCH_PRESET = "quick"` (under `index_pattern:preset`) and `workflow.VALIDATION_MODE
   = "pawley"` (under `index_pattern:validate`). `engines.SEARCH_PRESETS` holds names, not numbers, so the
-  120 s is `QUICK_TOTAL_BUDGET_SECONDS`'s row; `fom.FOM_N` is an alias of `PEAK_MIN_USABLE_LINES`.
+  120 s is `QUICK_TOTAL_BUDGET_SECONDS`'s row. `fom.FOM_N` (an alias of `PEAK_MIN_USABLE_LINES`) and
+  `ambiguity.UNCANCELLABLE_METRIC_RTOL` (a sine of `reduce.BRAVAIS_OBLIQUITIES`) hold no literal and are
+  kept because the walk sees them.
 - **32 defaults** at `index_pattern` and `SearchSpec`: 31 `unaudited`. Proposed: 14 tier 3, 10 `caller`,
   3 tier 2, 3 tier 1, 2 `n/a` (`spec` and `quality` hand off to other rows; whether `n/a` is allowed
   there is a question).
@@ -36,11 +38,12 @@ Run it with `.venv/bin/python docs/wp/2007-batch/collate_inventory.py`.
   PR #1237, `schemas/indexing.py:218`). Of PR #1016's six `solve/chemistry.py` constants none is in the
   tree; `OCCUPANCY_MAX_DENOMINATOR` and `_CELLS27` are.
 
-## Task 3: `best_or_none()` is called on five default paths
+## Task 3: `best_or_none()` is called on six default paths
 
 The WP asks to confirm that no default path calls it. **It does not hold.** `IndexingResult.best_or_none`
 (`schemas/indexing.py:2245`) is called by the result's own text display (`_verdict_lines`, `:2231`,
-printing `CELL:` or `NO CELL`), by `workflow._emit_end`'s `index_end` event (`workflow.py:1211`, its
+printing `CELL:` or `NO CELL`), by `index_diagnostics`, which raises `INDEX_ABSTAINED` on every run it
+returns `None` (`indexing/diagnostics.py:893`, a report), by `workflow._emit_end`'s `index_end` event (`workflow.py:1211`, its
 `cell` and `abstained` fields), by the CLI's exit code (`cli.py:374`) and by the GUI's `picked` row and
 adopt label (`gui/session.py:2593`, `:2836`). `ExtinctionScreen.best_or_none` (`:2614`) is called by
 the GUI's extinction route (`gui/session.py:2803`), which badges the class. None of them applies a cell
@@ -65,4 +68,4 @@ the data separate (K10). For extinction classes the margin is `DECISIVE_DELTA_BI
 - The proposals come from four read-only agents, one per slice, each told the rule, the tier
   vocabulary and the held-out fence; this session checked a sample against the tree (Z_INTEGER_TOLERANCE's
   removal, the caveat builder at `consensus.py:640-700`, the practice survey's windows, every
-  `best_or_none` call site). The 86 questions they raised ride in `judgements.json`.
+  `best_or_none` call site). The 89 questions they and the review raised ride in `judgements.json`.
