@@ -351,6 +351,30 @@ and have no free factor to measure, so this file's old list named them without c
   maintainer's calls. WP-2005 owns the code's level, and the code's row is still `unaudited`.
 - **M.** Since WP-2012 LaB₆'s Biso row passes (`tests/test_staged_start_invariance.py`). cpd-1a's
   reads 15.68 plain esd on zincite's `lor_strain`, a strict xfail, the twin hold's cost.
+- **M, its starts and arms, fixed 2026-11-16 before running** (`2017-batch/group_m.py`). Both
+  rows' grounds owe "the start without the closing stage on three families", so every fit runs
+  twice: under its protocol's shipped closing stage (`closing_window_tol` 1e-3) and with
+  `closing_window_tol=None`, the plan ending on its last declared stage. `BISO_SEED`: the four
+  protocol families as `test_window_domain._protocol` builds them (`fap`, `nac`, `cpd1a`, `lab6`),
+  with every atom's Biso started at 0.5 (the seed) and at 1.5 (the start test's other arm), and
+  the noise arm (0.5, every refinable start value that is not zero ×(1 + 1e-12)). Control: an arm
+  reaches the start only if the fit refines Biso rows (recorded per fit); otherwise the start is
+  the answer and the arm measured nothing. `HARMONIC_WEIGHT_SEED`: no protocol family declares a
+  harmonic (recorded per fit), so the four cannot reach it; its one family is the start test's
+  synthetic constant-wavelength neutron corundum (`_synthetic`, `_harmonic_fit`: λ/2 at true
+  weights 0, 0.003 and 0.05), seeds 0.001, 0.01 (shipped) and 0.3, and the noise arm on 0.01.
+  Control: the weight row must be among the refined rows. Positive arm for the harness: under
+  the closing stage the pairs must repeat the start test's readings (FAP and NAC 0.000, LaB₆
+  ≤ 0.1, cpd-1a near 15.68, the harmonic ≤ 0.003), or the protocol differs from the one the rows
+  cite. Read: 1.5 against 0.5 (and each seed against 0.01) in plain esd over the larger esd on
+  every row that is not a background coefficient (`_shift`, S/L and H/L ordered as the start
+  test orders them, 0.1 bar), past the noise arm, per closing setting; and the closing stage's
+  own move (none against shipped at the seed). Rwp, evaluations, status and codes beside, and
+  the references beside the bar, not as it: FAP's GSAS cell, NAC's and CaF₂'s cells, cpd-1a's
+  weighed fractions, LaB₆'s CIF cell, the synthetic's true weight. These are four real families
+  for the Biso start and one synthetic for the harmonic: the only real harmonic on disk is the
+  Nd₂Ru₂O₇ neutron pattern, evidence for no audit before the milestone closes (§ Context), so
+  whether one synthetic closes the harmonic row goes to the maintainer after it runs.
 - **N.** 2002's § The hand rows that stay lists them.
 - **O.** Neither set has a stated domain. The interval runs automatically on every moment angle
   the stationary test leaves out, 20-32 refits an angle, and the grid on every `profile_fraction`
