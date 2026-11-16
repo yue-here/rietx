@@ -1,6 +1,6 @@
 # WP-1513 — The contacts a chemist checks by eye
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
 Track: Data and metadata in, a structure out
 Depends on: —
 Priority: P3 2026-09-28 — a view over what the package already computes, plus the diagnostic that reads it; the person caught the clash by eye
