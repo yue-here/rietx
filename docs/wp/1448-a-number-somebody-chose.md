@@ -103,13 +103,46 @@ remembers, and the alternatives are the first thing lost.
 
 ## Tasks
 
-- [ ] The vocabulary: a third tag beside the skill's two, for a value chosen
+- [x] The vocabulary: a third tag beside the skill's two, for a value chosen
       rather than derived, naming the date, that it was a decision, and where
       the alternatives are. Decide whether it reads in code comments, in the
       WP, in DESIGN.md, or in more than one, and write the answer here.
-- [ ] Where the alternatives live. DESIGN.md § Locked decisions already has the
+      **Decided 2026-11-16.** The tag takes the skill's shape, because a
+      reader who knows `*(Measured: WP-1500 — a run)*` reads this one
+      without a key (DESIGN.md Rule 5, convention first):
+
+      `*(Chosen: WP-1447, 2026-09-22 — a fixed bar over a control run per pattern)*`
+
+      The pointer comes first, as a `Measured` tag's WP does: `WP-NNNN`, or
+      a `docs/` path and a heading (`docs/DESIGN.md § Locked decisions`).
+      Then the date the choice was made, then what was chosen over what.
+      **It reads in the code**, in the `#:` comment or docstring of the
+      value, because the goal is that the value declares itself where a
+      reader meets it. The tag is a pointer and never the argument, which
+      stays in the record it names, so this is not a second citation system.
+      The other two kinds keep the form they already have: a paper is cited
+      in the docstring (author, year, journal), and a measurement names the
+      WP whose handover holds the run. Neither takes a tag here.
+      **Not in the skill.** A skill row resting on rietx's own choice is cut
+      by DESIGN.md Rule 3, so a `Chosen` skill row would be a contradiction.
+      **Beside the audit table, not instead of it.** A walked number keeps
+      its `_audit.ROWS` row, whose tier 3 is the maintainer's approval to
+      keep it. The tag says where the alternatives are, and the row says it
+      was approved. Whether a tier-3 row must also name that pointer is the
+      maintainer's call (handover, 2026-11-16).
+- [x] Where the alternatives live. DESIGN.md § Locked decisions already has the
       format and the dated-amendment habit; the question is whether a
       WP-scoped decision belongs there or in the WP, and what the rule is.
+      **The rule: in the record where the choice was made, under its date.**
+      A choice made inside one WP goes in that WP's handover entry of the
+      day, alternatives and all, because the WP is what the code already
+      cites and its log is dated. A choice that binds later WPs (a
+      package-wide default, a convention) goes in DESIGN.md § Locked
+      decisions, as an entry or a dated *Amendment*. A maintainer ruling
+      recorded in a milestone file (`docs/milestones/generality.md`
+      § Decisions with the maintainer, 2026-10-18) stays there. The tag
+      names whichever holds it. A choice later revisited gets a new dated
+      entry and a new tag date; the old entry stays.
 - [ ] The meta-test, modelled on `test_skill.py`'s: a tag that names nothing is
       a failure. Decide what it can actually check — a date, a resolvable WP or
       DESIGN.md anchor — and do not claim more.
