@@ -17,7 +17,9 @@ maintainer-local prototype's *rules* and not from its code::
     @default   on the root and on an NXentry: the group to show first
 
 **Dispatch is structural**: the eight-byte signature at offset 0, which no
-other registered format can imitate.  Recognising the file needs nothing; reading
+other registered format can imitate (a file with a userblock, its signature at
+512, 1024, …, is not recognised and meets ``xy``'s "looks binary" refusal).
+Recognising the file needs nothing; reading
 it needs h5py, which is the ``hdf5`` extra and **not** a dependency, so without
 it the file is refused by name with the install line rather than falling to the
 ASCII catch-all as "it looks binary".  There is no pure-python HDF5, so the
@@ -28,7 +30,12 @@ format, the numba precedent).
 ``@signal``/``@axes`` is schema-named: it says which dataset is the intensity and
 which is the axis of each dimension, and it cannot disagree with itself, so it is
 trusted — and a declaration that does contradict itself (an axis whose length is
-not its dimension's) is refused, never repaired.  A file with no usable
+not its dimension's) is refused, never repaired, as is one that does not say
+which dimension a name labels (an ``@axes`` shorter than the signal's rank with
+no ``@<axis>_indices``).  ``@default`` is followed from the root, or from the
+one NXentry where the root names nothing; a file of several NXentry groups each
+declaring a pattern is refused, since ``@default`` names what to show and not
+that the rest is not data.  A file with no usable
 ``NXdata`` (attribute-less HDF5, as some beamlines write) is **searched**: a 2-D
 numeric block, and a 1-D numeric dataset whose length matches one of the block's
 dimensions, is strictly monotonic, and spans what a 2θ scan can
@@ -37,7 +44,8 @@ Q axis can (0 ≤ x₀ < 30 Å⁻¹, x₁ ≤ 30, a span over
 :data:`MIN_Q_SPAN_PER_ANGSTROM`).  The matching length picks the block's
 orientation.  Those discriminators are also what refuse the machine-learning
 trap — a naive "2-D and big enough" test would take a 256×256 weight matrix for
-a reel.  A found axis is inference, so it always reads with
+a reel.  A temperature (by name or unit) is never taken for the axis, however
+2θ-like its span.  A found axis is inference, so it always reads with
 ``PATTERN_X_AXIS_ASSUMED``, whatever it is called.
 
 **The axis rule is the package's, unchanged** (:func:`base.check_axis`): a
@@ -128,6 +136,8 @@ _OTHER_UNITS: dict[str, str] = {
     **{u: "a photon energy — an energy-dispersive scan" for u in ("ev", "kev")},
     **{u: "an angle in radians, which this reader does not convert to degrees"
        for u in ("rad", "radian", "radians", "mrad")},
+    **{u: "a d-spacing" for u in ("a", "å", "ang", "angstrom", "angstroms",
+                                  "nm", "nanometre", "nanometer")},
 }
 #: Series-axis names that are the specimen temperature, normalised.
 _TEMPERATURE_NAMES = frozenset({"temperature", "temp", "sampletemperature"})
@@ -203,15 +213,18 @@ def _classify(name: str, units: str | None) -> tuple[bool, str | None]:
 
     A unit that says what the axis is outranks the name, so ``two_theta`` in
     radians is refused rather than read as degrees.  A name carrying its unit
-    as a suffix (pyFAI writes ``2th_deg``, ``q_nm^-1``) is split once at its
-    first ``_``, when the whole name is not already a vocabulary word."""
+    as a suffix (pyFAI writes ``2th_deg``, ``q_nm^-1``; other writers
+    ``two_theta_rad``) is split at the last ``_`` that leaves a vocabulary word
+    before it, when the whole name is not already one."""
     raw = name.rsplit("/", 1)[-1]
     key = _norm(raw)
     known = _TWO_THETA_NAMES | set(_OTHER_NAMES)
-    if key not in known and "_" in raw:
-        head, _, tail = raw.partition("_")
-        if _norm(head) in known:
-            key, units = _norm(head), units or tail
+    if key not in known:
+        cuts = [i for i, c in enumerate(raw) if c == "_"]
+        for i in reversed(cuts):
+            if _norm(raw[:i]) in known:
+                key, units = _norm(raw[:i]), units or raw[i + 1:]
+                break
     said = _OTHER_UNITS.get(_norm(units or ""))
     if said is not None:
         return False, said
@@ -247,9 +260,28 @@ def _nxdata_groups(f: Any, h5py: Any) -> list[str]:
     return found
 
 
+def _entries(f: Any, h5py: Any) -> list[str]:
+    """The root's NXentry groups."""
+    return [g.name for g in f.values()
+            if isinstance(g, h5py.Group) and _attr(g, "NX_class") == "NXentry"]
+
+
+def _holds_signal(group: Any, h5py: Any) -> bool:
+    """An NXdata group declaring a 1-D or 2-D numeric signal."""
+    name = _signal(group, h5py)
+    return (name is not None and _numeric(group[name], h5py)
+            and group[name].ndim in (1, 2))
+
+
 def _default_group(f: Any, h5py: Any) -> str | None:
-    """The NXdata the file's ``@default`` chain names, if it names one."""
+    """The NXdata the file's ``@default`` chain names, if it names one: from
+    the root, or, where the root names nothing, from its one NXentry."""
     node = f
+    if _attr(f, "default") is None:
+        entries = _entries(f, h5py)
+        if len(entries) != 1:
+            return None
+        node = f[entries[0]]
     for _ in range(3):
         name = _attr(node, "default")
         if name is None or name not in node:
@@ -296,6 +328,22 @@ def _declared_reel(f: Any, gname: str, *, path: Path, h5py: Any) -> _Reel | None
         return None
     axes = (_names(group.attrs.get("axes"))
             or _names(signal.attrs.get("axes")) or [])
+    if len(axes) != signal.ndim:
+        # a name's position is its dimension only in a full list: a short one
+        # read by position puts a square reel's 2θ on the wrong dimension, and
+        # no length check can see it
+        bare = [n for n in axes if n not in (".", "")
+                and f"{n}_indices" not in group.attrs]
+        if bare:
+            raise ValueError(
+                f"{path.name}: {gname} @axes names {len(axes)} "
+                f"{'axis' if len(axes) == 1 else 'axes'} for its "
+                f"{signal.ndim}-D signal {sname!r}, and "
+                f"{', '.join(repr(f'{n}_indices') for n in bare)} "
+                f"{'is' if len(bare) == 1 else 'are'} not given, so which "
+                "dimension each name labels is not stated. Declare one "
+                "@axes entry per dimension ('.' for the scan dimension) or "
+                "@<axis>_indices")
     by_dim: dict[int, str] = {}
     for position, name in enumerate(axes):
         if name in (".", ""):
@@ -408,8 +456,11 @@ def _found_reel(f: Any, *, path: Path, h5py: Any) -> _Reel:
 
     f.visititems(visit)
     dims = {int(d) for b in blocks for d in f[b].shape}
+    # a temperature is a series coordinate, by name or unit, as in the
+    # declared tier, however 2θ-like its span
     axes = [name for name, n in lines
-            if n in dims and any(_span(np.asarray(f[name][()], dtype=np.float64)))]
+            if n in dims and not _is_temperature(f, name)
+            and any(_span(np.asarray(f[name][()], dtype=np.float64)))]
     pairs = [(b, dim, a) for b in blocks for dim, n in enumerate(f[b].shape)
              for a in axes if f[a].shape[0] == n]
     if len(pairs) > 1:
@@ -436,6 +487,18 @@ def _found_reel(f: Any, *, path: Path, h5py: Any) -> _Reel:
 
 def _reel(f: Any, *, path: Path, h5py: Any) -> _Reel:
     """The declared tier if the file has one, else the search tier."""
+    # one NXentry per measurement is a common layout, and @default names the
+    # entry to show, not that the others are not data: reading one would be a
+    # silent selection, and no option selects an entry yet
+    measured = [e for e in _entries(f, h5py)
+                if any(_holds_signal(f[g], h5py) for g in _nxdata_groups(f[e], h5py))]
+    if len(measured) > 1:
+        raise ValueError(
+            f"{path.name} holds {len(measured)} NXentry groups each declaring a "
+            f"pattern ({', '.join(measured[:5])}), and which entry is the "
+            "measurement is not the reader's to choose (@default names the one "
+            "to show, not that the others are not data). Save the entry you "
+            "mean to a file of its own")
     chosen = _default_group(f, h5py)
     if chosen is not None:
         reel = _declared_reel(f, chosen, path=path, h5py=h5py)
@@ -444,11 +507,14 @@ def _reel(f: Any, *, path: Path, h5py: Any) -> _Reel:
     reels = [r for g in _nxdata_groups(f, h5py)
              if (r := _declared_reel(f, g, path=path, h5py=h5py)) is not None]
     if len(reels) > 1:
+        named = ("names none of them with @default" if chosen is None else
+                 f"its @default names {chosen}, which declares no 1-D or 2-D "
+                 "signal")
         raise ValueError(
             f"{path.name} holds {len(reels)} NXdata groups with a 1-D or 2-D "
-            f"signal ({', '.join(r.group or '' for r in reels[:5])}) and names "
-            "none of them with @default, so which one is the pattern is not the "
-            "reader's to choose")
+            f"signal ({', '.join(r.group or '' for r in reels[:5])}) and "
+            f"{named}, so which one is the pattern is not the reader's to "
+            "choose")
     if reels:
         return reels[0]
     return _found_reel(f, path=path, h5py=h5py)

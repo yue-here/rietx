@@ -330,3 +330,145 @@ def test_garbage_after_the_signature_is_refused_naming_the_file(tmp_path):
     assert identify_format(path).name == "hdf5"
     with pytest.raises(ValueError, match="junk.h5"):
         rx.read_pattern(path)
+
+
+# --------------------------------------------- review fix-ups (PR #1607)
+def _short_axes_reel(path, block, axis, *, legacy=False, indices=None):
+    """A 2-D signal whose ``@axes`` names one axis only."""
+    with h5py.File(path, "w") as f:
+        d = f.create_group("entry/data")
+        d.attrs["NX_class"] = "NXdata"
+        d["I"] = block
+        d["two_theta"] = axis
+        if legacy:
+            d["I"].attrs["signal"] = 1
+            d["I"].attrs["axes"] = "two_theta"
+        else:
+            d.attrs["signal"] = "I"
+            d.attrs["axes"] = "two_theta"
+        if indices is not None:
+            d.attrs["two_theta_indices"] = indices
+    return path
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_a_2d_signal_whose_axes_name_one_axis_is_refused(legacy, tmp_path):
+    """Square, the position fallback put the 2θ axis on dimension 0 and read a
+    column for a scan with nothing said; the length check cannot see it."""
+    tt, block = reel(n_scans=300, n_points=300)
+    path = _short_axes_reel(tmp_path / "short.nxs", block, tt, legacy=legacy)
+    with pytest.raises(ValueError, match="names 1 axis for its 2-D signal") as r:
+        rx.read_pattern(path, scan=5)
+    assert "two_theta_indices" in str(r.value) and "short.nxs" in str(r.value)
+
+
+def test_a_short_axes_list_with_its_indices_reads(tmp_path):
+    """The positive arm: ``@<axis>_indices`` states the dimension."""
+    tt, block = reel(n_scans=300, n_points=300)
+    path = _short_axes_reel(tmp_path / "ok.nxs", block, tt, indices=1)
+    pat, found = _read(path, scan=5)
+    assert found == [] and pat.intensity == list(block[5])
+
+
+@pytest.mark.parametrize("name,units", [("temperature", None), ("ramp", "degC")])
+def test_the_search_never_takes_a_temperature_for_the_abscissa(name, units,
+                                                               tmp_path):
+    """A °C ramp spans what a 2θ scan can; by name or by unit it is a series."""
+    _, block = reel(n_scans=20)
+    path = tmp_path / "vt.h5"
+    with h5py.File(path, "w") as f:
+        f["entry/I"] = block
+        f[f"entry/{name}"] = np.linspace(25.0, 120.0, 20)
+        if units is not None:
+            f[f"entry/{name}"].attrs["units"] = units
+    with pytest.raises(ValueError, match="nothing in it reads as a reel"):
+        rx.read_pattern(path)
+    tt, _ = reel(n_scans=20)
+    with h5py.File(path, "a") as f:                     # the positive arm
+        f["entry/tth"] = tt
+    pat, found = _read(path, scan=3)
+    assert [d.code for d in found] == ["PATTERN_X_AXIS_ASSUMED"]
+    assert pat.intensity == list(block[3])
+    assert pat.metadata["scan_axis"] == "tth"
+
+
+def _two_nxdata_entry(path, tt, block, *, entry_default):
+    with h5py.File(path, "w") as f:
+        e = f.create_group("entry")
+        e.attrs["NX_class"] = "NXentry"
+        if entry_default:
+            e.attrs["default"] = "data"
+        for g, axis, x in (("data", "two_theta", tt),
+                           ("data_q", "q", np.linspace(1.0, 5.0, tt.size))):
+            d = e.create_group(g)
+            d.attrs["NX_class"] = "NXdata"
+            d.attrs["signal"] = "I"
+            d.attrs["axes"] = [".", axis]
+            d["I"] = block
+            d[axis] = x
+    return path
+
+
+def test_default_on_the_entry_alone_chooses_the_group(tmp_path):
+    tt, block = reel(n_scans=4)
+    pat, _ = _read(_two_nxdata_entry(tmp_path / "e.nxs", tt, block,
+                                     entry_default=True), scan=2)
+    assert pat.intensity == list(block[2])
+    assert pat.metadata["scan_axis"] == "two_theta"
+    with pytest.raises(ValueError, match="names none of them with @default"):
+        rx.read_pattern(_two_nxdata_entry(tmp_path / "n.nxs", tt, block,
+                                          entry_default=False))
+
+
+def test_several_entries_each_holding_a_pattern_are_refused(tmp_path):
+    """The root's @default names the entry to show, not that the others are
+    not data, so reading entry1 alone is a silent selection."""
+    tt, block = reel(n_scans=2)
+    path = tmp_path / "multi.nxs"
+    with h5py.File(path, "w") as f:
+        f.attrs["default"] = "entry1"
+        for k in (1, 2):
+            e = f.create_group(f"entry{k}")
+            e.attrs["NX_class"] = "NXentry"
+            e.attrs["default"] = "data"
+            d = e.create_group("data")
+            d.attrs["NX_class"] = "NXdata"
+            d.attrs["signal"] = "I"
+            d.attrs["axes"] = ["two_theta"]
+            d["I"] = block[k - 1]
+            d["two_theta"] = tt
+    with pytest.raises(ValueError, match="2 NXentry groups") as r:
+        rx.read_pattern(path)
+    assert "/entry1" in str(r.value) and "/entry2" in str(r.value)
+    with pytest.raises(ValueError, match="2 NXentry groups"):
+        list_scans(path)
+    with h5py.File(path, "a") as f:                     # the positive arm
+        del f["entry2/data"]
+    pat, found = _read(path)
+    assert found == [] and pat.intensity == list(block[0])
+
+
+@pytest.mark.parametrize("units", ["Angstrom", "Å", "nm"])
+def test_an_axis_in_a_length_unit_is_refused_as_a_d_spacing(units, tmp_path):
+    _, block = reel(n_scans=1)
+    path = write_nexus(tmp_path / "d.nxs", np.linspace(0.8, 6.0, 300), block[0],
+                       axis_name="x", axis_units=units)
+    with pytest.raises(ValueError, match="d-spacing"):
+        rx.read_pattern(path)
+
+
+@pytest.mark.parametrize("name,refused", [("two_theta_rad", True),
+                                          ("polar_angle_rad", True),
+                                          ("two_theta_deg", False)])
+def test_a_unit_suffix_after_a_multi_word_name_is_read(name, refused, tmp_path):
+    """The suffix split tries every ``_``, not only the first."""
+    tt, block = reel(n_scans=1)
+    x = np.radians(tt) if refused else tt
+    path = write_nexus(tmp_path / "s.nxs", x, block[0], axis_name=name,
+                       axis_units=None)
+    if refused:
+        with pytest.raises(ValueError, match="radians"):
+            rx.read_pattern(path)
+    else:
+        pat, found = _read(path)
+        assert found == [] and pat.intensity == list(block[0])
