@@ -108,7 +108,9 @@ reader that keys on `where` without naming the code is the one it misses.
 rows are written, read, counted or printed, found by grepping both codes, the
 `GuardReport` fields `high_correlations`/`flat_directions`, the
 `*_OMITTED` codes, and every `.where` and `len(...diagnostics)` reader in
-`src/` and `gui/src/`. *Counts* means the reader's output changes with the
+`src/` and `gui/src/`, then the asserts in `examples/` (a guide script is a
+test pin, since `tests/test_examples.py` runs every one, and a published
+page). *Counts* means the reader's output changes with the
 number of rows; *pair* means it keys on the two paths of one row; *prints*
 means a person or client sees each row.
 
@@ -116,25 +118,27 @@ means a person or client sees each row.
 |---|---|---|---|---|---|
 | the finding loop | `staged._correlation_findings`; called by `check_guards` and the joint fit's `MultiRefinement._top_diagnostics` | — | writes one finding per pair | — | the seam: a group is built here or just after it |
 | the converter | `refine._guard_diagnostics` (one `Diagnostic` per finding: `where` = the pair, `value` = ρ) | — | yes | — | `value` is one float; a group's \|ρ\| range has no field to sit in |
-| per-stage record | `refine` stage loop: each stage's `stage_diagnostics` goes onto its history node and `stage_reports_` uncapped and not deduplicated | stores | yes | via GUI | every stage keeps every pair today |
+| per-stage record | `refine` stage loop: each stage's `stage_diagnostics` goes onto its history node and `stage_reports_` uncapped and not deduplicated | stores | yes | via GUI | every stage keeps every pair today; but `stage_reports_` is off by default (`fit(stage_reports=False)`, refine.py near 5694) and the history lives on the `Refinement`, not on `RefinementResult`, so a caller holding only a result (a series entry, a saved JSON, a batch item) has neither |
 | GUI history row | `gui/session.py` node route, `n_diagnostics = len(node.diagnostics)` | **yes** | — | yes | the count on a node falls with grouping |
+| `Refinement` repr | `_display.refinement_text` (near 571): "`{len(result.diagnostics)} diagnostics`" on the last-fit line | **yes** | — | yes | the count falls with grouping, as the summary header's |
 | stage-loop collection | `refine` `correlation_hits`, keyed `(code, frozenset(where))` | — | **yes** | — | a component whose membership changes from stage to stage has no stable key |
 | cross-stage dedup | `refine._dedup_high_correlations`: worst \|ρ\| over every stage, "Flagged in stages", sorted by \|`value`\| | — | **yes** | — | needs a key and a sort value for a group |
 | discarded-direction gate | `staged.check_discarded_directions` (and `multi.py` beside the joint loop): drops `COVARIANCE_DIRECTION_DISCARDED` when its touched set ⊆ a `FLAT_DIRECTION`'s paths | — | **yes** (subset test) | — | a group of n paths would silence every touched set inside it, not only one that is a single pair |
-| render cap | `results._cap_one_code`/`_cap_high_correlation`: >10 rows per code → the worst 10 plus an `*_OMITTED` row whose `value` is the count | **yes** | — | yes | by design; with grouping it rarely fires |
+| render cap | `results._cap_one_code`/`_cap_high_correlation`: >10 rows per code → the worst 10 plus an `*_OMITTED` row whose `value` is the count | **yes** | — | yes | by design; with grouping it rarely fires. Its `*_OMITTED` row (results.py near 1652) suggests "result.identifiability for the full correlation matrix", which `Identifiability` does not have at `bc77a934e` (only `top_correlations`, the worst five): the suggestion is false until PR #1475 merges |
 | summary header | `results._diagnostic_header`: "N rows, E errors" off the stored list | **yes** | — | yes | the header count falls |
 | purpose levels | `results.level_under` / `diagnostic_view`: a row is a warning under a purpose if any `where` path bears on it | — | per path | sets level | a group is a warning under every purpose **any** member bears on; today each pair is judged alone, so a background–scale pair and a background–background pair differ |
 | batch tally | `report/batch.py`: `CodeTally.n_rows`, `n_warning`, and the Pareto of warnings by row count | **yes** | — | yes | today the flood dominates the Pareto's shares; grouping changes every share |
-| series counts | `sequential._code_counts` → `SeriesResult.code_counts`: once per pattern per `(code, path)`, each path of a row counted | per pattern | per path | yes | **unchanged** if a group's `where` is the union of its pairs' paths |
+| series counts | `sequential._code_counts` → `SeriesResult.code_counts`: once per pattern per `(code, path)`, each path of a row counted | per pattern | per path | yes | **unchanged** only if the group row keeps the code name (`HIGH_CORRELATION`/`FLAT_DIRECTION`; a new group code moves every count to a new key) **and** its `where` is the union of its above-threshold pairs' paths (a group built from eigen-directions rather than components can name a different member set) |
 | GUI result panel | `gui/session.py` result route sends every row; `gui/src/lib/report.ts` `orderDiagnostics` ("none dropped") | — | — | **every row, uncapped** | the cap never reached the GUI: a flood is printed in full there today |
 | compare UI | `viz/compare.py` `RunRecord.diagnostics` → `compare_app/static/compare-core.mjs` `diagnosticsHtml` | — | — | **every row, uncapped** | as the GUI panel |
+| guide pages (`examples/`) | `guides/holder_cell.py:152` asserts a `FLAT_DIRECTION` with `set(d.where) == {"vars.zero", "vars.height"}`; `guides/calibrate.py:97,104` assert `[d.code for d in …diagnostics] == ["HIGH_CORRELATION"]`; `tutorials/02b_steering_a_refinement.py:100` filters on `"instrument.zero_shift" in d.where`, and its prose (line 104) speaks of a pair | **yes** (calibrate) | **yes** (holder_cell, an exact match) | yes, on the published pages | under "replace", holder_cell fails if the pair falls in a component with a third path (the union is no longer the pair): the one case where "replace" breaks a user-facing page; under "beside", calibrate fails if a group row is added next to a lone pair, unless groups need three or more members; 02b survives a union, but its prose would need a word |
 | magnetic fold | `strategy/magnetic.py` (docstring near 1667) | — | — | — | **not a reader**: it reads `_answer_covariance` because the deduped rows keep an earlier stage's \|ρ\| (#592) |
 | identifiability | `Identifiability.top_correlations` (five worst pairs, answer stage); PR #1475 (WP-1990, open) adds `Identifiability.correlation`, the whole answer-stage matrix, `None` on a joint fit | — | — | — | a route to "every pair reachable" that is not a row, but answer stage only: no earlier stage's \|ρ\|, no "Flagged in stages" |
 | vocabulary | `help.py` entries for the four codes, `_audit.py` rows for them and for `HIGH_CORRELATION_MAX`/`FLAT_DIRECTION_RHO` | — | — | — | a new code needs both, and CI's `audit_delta` refuses it at `unaudited` |
 | prose only | `optimize/identifiability.py`, `optimize/statistics.py`, `io/recipe.py`, `viz/compare.py` (variant notes), `schemas/instrument.py`, `schemas/plan.py`, `crystallography/wyckoff.py`, `sequential.py` docstring, `refine.py` origin messages | — | — | text | no reader |
 
 Tests that pin the current shape: `tests/test_high_correlation_dedup.py`
-(15 stored `HIGH_CORRELATION` rows on a real fit, "15 rows" in the header,
+(15 stored `HIGH_CORRELATION` rows on a constructed result, "15 rows" in the header,
 pair-keyed dedup, the cap's counts); `tests/test_walking_bounds.py` (one
 `HIGH_CORRELATION` and one `FLAT_DIRECTION` per flat pair, keyed apart, each
 capped at 10 with `value` 4.0 on the omitted row);
@@ -144,20 +148,23 @@ capped at 10 with `value` 4.0 on the omitted row);
 `extra_components`, by `frozenset(where)`); `tests/test_capillary_displacement.py`
 (a `FLAT_DIRECTION` whose `where` holds the cell and an offset, which a
 superset still passes); `gui/src/App.test.ts` (a node row whose `where` is a
-pair). **One test keys on `message`, not `where`**:
-`tests/test_magnetic.py` (near 1835) asserts no correlation row's *message*
-names a moment DOF, so a group message listing n paths would change what it
-tests. Every other test reads presence or absence of the code
+pair); and the guide scripts in the table's `examples/` row (holder_cell's
+exact pair, calibrate's exact code list). **One test keys on `message`, not
+`where`**: `tests/test_magnetic.py` (near 1835) asserts no correlation row's
+*message* names the moment DOF `dof1`, so a group message listing n paths
+would change what it tests. Every other test reads presence or absence of the code
 (`test_floating_origin`, `test_acceptance_si640c`, `test_phase_significance`,
 `test_background_measured`, `test_v02_core`, `test_acceptance_lab6_cbn`,
 `validation_matrix.py`'s `!HIGH_CORRELATION`), which any grouping that keeps
 the code name leaves alone.
 
-What the audit settles. **No reader outside `refine.py`/`staged.py` needs a
-pair row to exist**: the series count is invariant if a group's `where` is the
-union, and the pair-keyed readers are internal (`correlation_hits`, the dedup,
-the discarded-direction gate). What changes for a caller is counts (the
-header, the batch tally, the GUI node count) and one level rule
+What the audit settles. **No reader in `src/` outside `refine.py`/`staged.py`
+needs a pair row to exist**: the series count is invariant if a group keeps
+the code name and its `where` is the union, and the pair-keyed readers in
+`src/` are internal (`correlation_hits`, the dedup, the discarded-direction
+gate). Outside `src/`, one guide (holder_cell's exact-pair assert) does key
+on a pair. What changes for a caller is counts (the header, the batch tally,
+the GUI node count, the `Refinement` repr) and one level rule
 (`level_under` over a union). The cap is not what a user sees in the GUI or
 the compare UI: both print every row, so the flood reaches those surfaces
 today. **What it does not settle** is the question below, which is the
@@ -166,14 +173,19 @@ maintainer's because it changes what `RefinementResult.diagnostics` stores.
 **Question for Yue (before task 2).** Does a group finding **replace** the pair
 rows in `RefinementResult.diagnostics`, or **ride beside** them?
 - *Replace*: one row per group, `where` = the union, the pairs reachable
-  through `Identifiability.correlation` (PR #1475) and the stage records.
+  through `Identifiability.correlation` (PR #1475), and through the stage
+  records only with `stage_reports=True` or the live `Refinement`'s history.
+  So "replace" depends on PR #1475 merging first: without its matrix a caller
+  holding only a result has five pairs (`top_correlations`), not every pair.
   Callers lose a row per pair and the earlier-stage \|ρ\| the dedup keeps;
-  `level_under` judges the union; the GUI and compare UI stop flooding.
+  `level_under` judges the union; the GUI and compare UI stop flooding;
+  holder_cell's guide assert needs rewriting.
 - *Beside*: the pair rows stay and the group row is added, as `FLAT_DIRECTION`
   rides beside `HIGH_CORRELATION` (WP-1311). No caller loses anything, but
   stored rows grow by one per group, and the acceptance ("no component
   reported as more findings than it has independent directions") cannot hold
-  unless the pair rows are demoted (`info`) or moved under the group.
+  unless the pair rows are demoted (`info`) or moved under the group;
+  calibrate's guide asserts break unless a group needs three or more members.
 - A sub-question either way: is a group built **per stage** (each stage's
   matrix, then deduplicated by membership) or **from the answer stage** only
   (the matrix PR #1475 stores and the magnetic fold reads)? The dedup today
@@ -240,9 +252,10 @@ reachable.
 ## Handover log
 
 - **2026-11-16** — The reader audit is done, and it narrows what the grouping
-  has to protect. Nothing outside the stage loop and the guard code needs a
-  pair row to exist, and the series count comes out the same if a group names
-  the union of its pairs' paths. What a group would change for a caller is a
+  has to protect. Nothing in `src/` outside the stage loop and the guard code
+  needs a pair row to exist (one guide script, holder_cell, asserts an exact
+  pair), and the series count comes out the same if a group keeps the code
+  name and names the union of its pairs' paths. What a group would change for a caller is a
   handful of counts and one rule that sets a row's level per purpose. The
   audit also found that the render cap never reached the GUI's result panel or
   the compare UI: both print every row, so a user meets the flood there today
