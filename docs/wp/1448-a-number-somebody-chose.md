@@ -208,6 +208,58 @@ remembers, and the alternatives are the first thing lost.
 
 ## Handover log
 
+### 2026-11-16 — the tag, its test and a first pass; PR #1628, follow-ups in #1629
+
+A value somebody chose can now say so where a reader meets it, and say where
+the alternatives are written. The tag has the same shape as the skill's
+`Measured` tag, and points at the WP entry or design-record section of the day
+the choice was made. A test fails any tag that does not land on a record of
+that day. Five values carry it. The pass mostly showed how little can be
+tagged honestly: five more values argue a choice and have no record of what
+was rejected. The WP's own worked example, `GHOST_RATIO_TOL`, is one of them,
+because its sweep was written into the docstring and never into the WP. What
+it ruled out: the audit table already holds the *approval* of a chosen number
+(WP-2001, after this WP was filed), so the tag is only a pointer, and the
+question of whether a tier-3 row must carry the same pointer goes to the
+maintainer.
+
+*Done* (PR #1628, draft until this entry). Premise checked against
+`bc77a934e` and the Context updated in place; the moot `### Inherited` entry
+(`BISO_BOUNDS`, deleted by WP-1534) removed. Tasks 1-2 decided above. Task 3
+is `tests/test_chosen_values.py` (16 cases: the live scan, 4 passing and 10
+failing fixture tags, the line-wrap reader). Task 4 tagged five sites in
+`background/diagnostics.py` and `report/`, with no number moved. Task 5 is a
+four-line bullet in root CLAUDE.md § Conventions; CLAUDE.md sat exactly on its
+995-line cap, so the cap is now 1000 with its logged row, landed at 999.
+Review (a read-only subagent, not `/code-review`): two findings, both taken. A
+`docs/` pointer could not name a heading with a comma, and the
+`GHOST_RATIO_TOL` tag pointed at a record without its alternatives, so it was
+removed.
+
+*Not done, deliberately.* The `Status:` line stays ⬜ and `docs/wp/README.md`
+is untouched, because open PR #1601 edits the index; flipping it to ✅ after
+#1601 merges is in #1629. The WP is otherwise complete.
+
+*Generality.* No judge dispatched: the branch does not touch `_audit.py`, and
+adds no heuristic, only comments on existing values and a test.
+
+*Measured* (pearl, `~/venvs/rietx-py312`, Linux x86-64, [dev]-equivalent,
+co-tenant beside one other job): canary `pc1448c` 102 passed in 25 s on 4
+pinned cores; fast suite `pc1448f` 14 866 passed, 280 skipped, 32 xfailed in 522 s (8 pinned cores, 746 % CPU, peak 6.2 GB) on `9c06c4414`, the tree before this entry. Local (darwin arm64, worktree
+`.venv` [dev]): the acceptance files `test_docs_consistency`, `test_skill`,
+`test_chosen_values` and `test_audit_table` 238 passed before the review fixes
+(the review added one case); ruff clean; `python -m tests.reader_output` exit 0
+(reader output unchanged); `rietx_vale.sh` 0 errors.
+
+*Gotchas.* A tag's record check reads the whole WP file for the date, so a
+Status line alone can satisfy it; the test's docstring says so. The date of a
+`docs/` pointer may sit in the heading itself (generality.md's decisions
+heading), so the section read includes the heading line.
+
+Next, in order: the maintainer rules #1629's four questions (the first decides
+whether `test_audit_table.py` grows a pointer check); after #1601 merges, flip
+this WP to ✅ and regenerate the index; new choices take the tag as they land.
+
 ### 2026-09-22 — filed
 
 The repo is careful about where an idea came from when the idea came from a
