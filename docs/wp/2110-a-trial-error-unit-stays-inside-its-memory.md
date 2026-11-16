@@ -129,17 +129,17 @@ on …"), and returns every candidate it had already built.
   with a raised `budget_seconds`, and prints the wall, the peak footprint,
   the unit's clock and completeness, candidate 0, and the sampled curve on
   `--trace`. Record the line count it builds against the reporter's 49.
-- [ ] Profile one unit on main under a raised budget (§ Context, *How to
+- [x] Profile one unit on main under a raised budget (§ Context, *How to
   profile*). Name the allocation that grows, its size as a function of
   bases walked and solutions scored, and whether it is released. If no
   allocation grows on main, say so with the curve, and close the WP with a
   test pinning the bound that holds.
-- [ ] The bound: a named constant on what the profile names. Reaching it
+- [x] The bound: a named constant on what the profile names. Reaching it
   ends the unit `complete = False` through the existing `capped` path, keeps
   `found`, and records the count in `stats`. Add the audit row (tier 3,
   `grounds`, approval asked in the PR). Finished units replay to their
   digests (`tests.unit_replay`).
-- [ ] Tests in `tests/test_indexing_engines.py`, beside
+- [x] Tests in `tests/test_indexing_engines.py`, beside
   `test_a_dichotomy_unit_stops_at_its_harvest_cap`. On a small synthetic case
   whose uncapped unit finishes with at least two candidates (assert it, so the
   test cannot go quiet), monkeypatch the constant low and assert:
