@@ -39,7 +39,12 @@ from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
-from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
+from .parametric import (
+    ResolvedParametric,
+    least_squares_start,
+    resolve_parametric,
+    subset_of,
+)
 from .vector import (
     AffineTie,
     ParameterTable,
@@ -214,7 +219,8 @@ def _display_unit(path: str) -> str | None:
     return None if entry is None else entry.unit
 
 
-def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) -> None:
+def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int,
+                                  coordinates: CoordinateTable | None = None) -> None:
     """Two declarations may share no name, nor a target on one pattern (WP-1325).
 
     A name is its coefficients' paths, so two of one name would be one set of
@@ -233,7 +239,7 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
         names.add(equation.name)
         if equation.target is None:          # an intermediate drives nothing
             continue
-        mine = set(range(n)) if equation.patterns is None else set(equation.patterns)
+        mine = set(subset_of(equation, coordinates, n))
         for other, theirs in targets.get(equation.target, []):
             both = sorted(mine & theirs)
             if both:
@@ -242,7 +248,8 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
                     f"{equation.target} on pattern{'' if len(both) == 1 else 's'} "
                     f"{', '.join(map(str, both[:5]))}{' …' if len(both) > 5 else ''}: "
                     "a target follows one function per pattern. Give the two "
-                    "declarations disjoint subsets (patterns=…), or combine them "
+                    "declarations disjoint subsets (patterns=… or where=…), or "
+                    "combine them "
                     "into one")
         targets.setdefault(equation.target, []).append((equation.name, mine))
 
@@ -496,7 +503,7 @@ class MultiParameterTable:
         variables = dict(variables or {})
         self.sharing = sharing or SharingMap()
         if declared:
-            _refuse_clashing_declarations(declared, len(instruments))
+            _refuse_clashing_declarations(declared, len(instruments), coordinates)
             # a private copy: the targets (and, below, what follows them)
             # become per-histogram, which is the caller's map plus this fit's
             # declarations and never an edit of the caller's object
@@ -778,13 +785,7 @@ class MultiParameterTable:
             # an intermediate has no patterns of its own: it is evaluated at
             # each later equation's, whose coordinate values are checked there
             patterns = ([] if equation.target is None
-                        else list(range(n)) if equation.patterns is None
-                        else list(equation.patterns))
-            bad = [k for k in patterns if k >= n]
-            if bad:
-                raise ValueError(
-                    f"parametric equation {name!r}: pattern index {bad[0]} is out of "
-                    f"range for {n} patterns (indices 0…{n - 1})")
+                        else subset_of(equation, coordinates, n))
             names_v: list[str] = []
             names_c: list[str] = []
             for nm in expr.names:

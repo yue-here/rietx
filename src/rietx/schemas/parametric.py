@@ -148,6 +148,14 @@ class ParametricEquation(Base):
       subset, in subset order.
     * ``patterns`` — the subset, by index into the patterns as passed; ``None``
       is every pattern.
+    * ``where`` — the subset as a condition on the coordinate columns
+      (WP-1965), in the expression grammar's condition syntax: ``"T < 800"``,
+      ``"x >= 0.1 and x <= 0.3"``.  It is **stored and re-evaluated at every
+      resolution**, so a pattern that joins inside it joins the equation and
+      one dropped from the campaign shifts no other pattern's membership,
+      while the reference and scale stay frozen at the first resolution.
+      Exclusive with ``patterns``; refused on a ``design`` basis, whose rows
+      follow the subset's order, and on an intermediate.
     * ``reference``/``scale`` — per coordinate a polynomial uses: terms are
       evaluated on (z − reference)/scale.  Left out, they are the subset's
       mid-range and half-range, computed once at resolution and stored.
@@ -162,6 +170,7 @@ class ParametricEquation(Base):
     terms: list[list[str]] | None = None
     design: list[list[float]] | None = None
     patterns: list[int] | None = None
+    where: str | None = None
     reference: dict[str, float] | None = None
     scale: dict[str, float] | None = None
     expression: str | None = None
@@ -180,11 +189,11 @@ class ParametricEquation(Base):
                     f"a {self.basis} basis needs a target: only an expression "
                     "equation can be an intermediate (target=None), named by a "
                     "later expression equation")
-            if self.patterns is not None:
+            if self.patterns is not None or self.where is not None:
                 raise ValueError(
                     f"parametric equation {self.name!r} is an intermediate "
-                    "(target=None), so it takes no patterns: it is evaluated at the "
-                    "patterns of each later equation that names it")
+                    "(target=None), so it takes no patterns and no where: it is "
+                    "evaluated at the patterns of each later equation that names it")
         elif not t or _GLOB_CHARS & set(t):
             raise ValueError(
                 f"target {t!r} must be one bare dot-path, not a glob: one "
@@ -201,6 +210,8 @@ class ParametricEquation(Base):
                 raise ValueError(f"pattern indices are non-negative: {self.patterns}")
             if len(set(self.patterns)) != len(self.patterns):
                 raise ValueError(f"a pattern appears twice in the subset: {self.patterns}")
+        if self.where is not None:
+            self._check_where()
         if self.basis != "expression" and self.expression is not None:
             raise ValueError(
                 f"a {self.basis} basis takes no expression: an equation written as "
@@ -237,6 +248,20 @@ class ParametricEquation(Base):
                              "the caller wants each coefficient in",
                    "expression": "the expression names its own variables and "
                                  "coordinates"}[basis])
+
+    def _check_where(self) -> None:
+        if self.patterns is not None:
+            raise ValueError(
+                "give the subset as patterns=[…] or as where='…', not both: a "
+                "condition decides membership at every resolution, a list fixes it")
+        if self.basis == "design":
+            raise ValueError(
+                "a design basis takes no where: its rows follow the subset's order, "
+                "one per pattern, and a condition's subset moves as patterns join "
+                "or leave. Give patterns=[…], or a polynomial over the coordinates")
+        from ..params.expression import Condition
+
+        Condition(self.where)
 
     def _check_terms(self) -> None:
         if not self.terms:
