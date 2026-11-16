@@ -1,6 +1,6 @@
 # WP-1949 — an accepted evaluation carries what a preview draws
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-16 — built in #1623; the spelling waits on Yue's ruling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-11 — a live preview keeps a shadow refinement and re-predicts every frame (about 0.7 s a frame on a large framework); the workaround works and costs a throttle
@@ -195,6 +195,52 @@ today's.
 
 ## Handover log
 
+- **2026-11-16** — built, in PR #1623 (ghostshift runner). A program
+  watching a fit can now draw the current curve, the atom positions and the
+  cell from the event stream alone. It asks once, with
+  `EventStream(callback=..., preview=True)`, and nothing written to disk
+  changes. The reporter's alternative, a second refinement re-predicted every
+  frame, costs about half a second a frame on a large MOF cell. Carrying the
+  preview costs 0.02 ms an accepted evaluation. What is not settled is the
+  spelling, which touches the event dict a callback receives. That is Yue's
+  call, so Task 2 stays open with the proposal written into it.
+  *Done:* Tasks 1 and 3-7 (each ticked with its note). Read-only review
+  agent, four findings, all answered:
+  - the joint-fit refusal now fires before a run is recorded;
+  - the flag is a read-only property;
+  - Pawley and Le Bail are tested, and the Le Bail step is documented;
+  - magnetic moment components are not in `values`, which went to issue
+    #1626 together with joint fits.
+  *Measured:* Task 1's table. The last accepted preview sits from
+  `predict()` by 4.38e-6 of the curve maximum in Rietveld mode (both
+  drivers), 4.8e-20 in Pawley mode and 2.6e-4 in Le Bail mode. Le Bail's
+  residual uses intensities frozen per solve. Gates:
+  - fast suite on pearl: 14859 passed, 280 skipped, 32 xfailed, 0 failed,
+    in 1130 s (shared venv `rietx-py312`, Linux x86_64, `-n 4`, at
+    `91cf502c1`, beside another job). The 7 added tests (9 cases) cost
+    2.4 s together on that run;
+  - canary (`gs1949c`, touched files + audit_table + help +
+    docs_consistency + lm_solver, `-n 4`): 234 passed, 1 skipped in 38 s,
+    436 MB;
+  - `python -m tests.reader_output`: exit 0;
+  - Vale (whole-manual CI step): 0 errors;
+  - ruff clean.
+
+  9 cases added: 8 in `test_events_viz_history.py` and 1 in
+  `test_telemetry.py`. The telemetry test fails when the recorder's drop is
+  removed (checked once). No generality judge: no `_audit.py` change and no
+  heuristic (one off-by-default switch, tier `caller`).
+  *Gotchas:* the recorder sits *inside* the caller's callback chain, despite
+  the WP's original Context, so any new sink chained there must drop the key
+  too (`events._without_preview`). The WP's manual path
+  (`using/refining.md`) and "event table in the API index" are stale. The
+  manual section is now `docs/docs/guides/watch.md`, and the index has no
+  event table.
+  *Next:* Yue rules on the spelling (PR body § Decision). If he keeps it,
+  tick Task 2 as `Decided` and close the WP at merge. If he moves the key,
+  the change is local to `events._with_preview`/`_without_preview` and the
+  two emit sites in `optimize/least_squares.py`. Issue #1626 holds the
+  joint-fit and magnetic-moment follow-ups.
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #892).
   Checked against the tree at `d80ca5f4`: an `eval` event carries only the
   free values on both drivers, the decode it filters already holds the
