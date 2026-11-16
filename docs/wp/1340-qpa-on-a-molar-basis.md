@@ -19,13 +19,14 @@ conversion and extent of reaction, phase-diagram tie lines, solid-solution
 site balance. Getting to one today means redoing the arithmetic outside rietx.
 
 Everything needed is already computed. `ZMV` carries `cell_mass`,
-`cell_volume`, `zmv`, `z` and `molar_mass` (`optimize/qpa.py:87`), and
-`PhaseQuantity` surfaces all five (`schemas/results.py:305`).
+`cell_volume`, `zmv`, `z` and `molar_mass` (`optimize/qpa.py:86`), and
+`PhaseQuantity` surfaces all five (`schemas/results.py:434`; line numbers
+re-read 2026-11-16 at `bc77a934e`).
 
 **Why this is not a one-line derivation, which is the whole content of the
 WP.** The obvious form is `x_p ∝ W_p / M_p` using the reported `molar_mass`.
 That is **silently wrong for exactly the systems where mol % matters most**.
-`_formula_units` (`optimize/qpa.py:110`) returns `z = 1` whenever any
+`_formula_units` (`optimize/qpa.py:115`) returns `z = 1` whenever any
 occupancy-weighted element count is not within 2 % of a positive integer, and
 `molar_mass` then becomes `cell_mass` — the whole cell as one formula unit.
 The docstrings say so plainly. Measured on realistic compositions:
@@ -104,25 +105,24 @@ row in `references/diagnostics.md`, a file that had **86 B of headroom**
 until PR #111 split it (see 1338). That is planned here rather than discovered at the cap. Against that, this adds
 no new physics and no new dependency.
 
-### Inherited
+### Folded in on arrival (2026-11-16, at `bc77a934e`)
 
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): `references/diagnostics.md` is closed to growth.**
-  Every skill file now has a ceiling and a budget below it
-  (`tests/skill_caps.py`), and the budget fails a change that grows a file
-  past it. `diagnostics.md` (35 111 B) and `diagnostics-indexing.md`
-  (35 124 B) sit over their 34 600 B budget, so a row this WP adds there
-  comes with an equal cut in the same change, or goes to the file a reader
-  meets the code in (the criterion in the `REFERENCE_MAX_BYTES` comment).
-  CI's lint job reports each changed file's headroom on the draft PR.
+The two inherited entries were checked against `main` and folded here; the
+`### Inherited` heading is gone.
 
-- **2026-09-27, from [1320](1320-qpa-multimodal-fraction.md).** 1320 touched
-  no `PhaseQuantity` field. Its answer is a separate `FractionProfile`
-  (`schemas/fraction.py`), weight fractions only, and `SCHEMA_VERSION` is now
-  0.33. A molar basis on `PhaseQuantity` should decide whether the profile
-  reports a molar range too, and if it does, convert per grid point from each
-  refit's own QPA row, never the range afterwards (W is nonlinear in every
-  scale). 1320's diagnostic row is `QPA_FRACTION_UNDETERMINED`, beside
-  `QPA_UNAVAILABLE` in `references/diagnostics.md`.
+- **From 1338 (superseded in part).** `references/diagnostics.md` is no longer
+  over its budget: it was split further and now sits at 28 861 B against
+  `tests/skill_caps.py`'s 34 600 B budget, so a QPA row there costs no cut.
+  `references/judging.md` is the tight one, 34 501 B, **99 B under budget**, so
+  this WP's reading rule goes in the diagnostics row and the manual's
+  `reference/qpa.md`, not in `judging.md`.
+- **From 1320 (superseded in part).** `SCHEMA_VERSION` is 0.61, not 0.33, and
+  1320's diagnostic `QPA_FRACTION_UNDETERMINED` was replaced by
+  `QPA_FRACTION_RANGE` (B12 3(a), ruled 2026-10-19). `FractionProfile`
+  (`schemas/fraction.py`) is still weight fractions only. Whether it reports a
+  molar range too is still open; if it does, it converts per grid point from
+  each refit's own QPA row, never the range afterwards (W is nonlinear in
+  every scale).
 
 ## Non-goals
 
