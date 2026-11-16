@@ -58,7 +58,13 @@ Amendments from the review:
 - [x] `solve/fourier.py`: F_obs and F_calc maps from a fit, peak picking, a significance in σ of the map
 - [x] The alias in `structure_factor.py`
 - [ ] Tests: NAC minus one atom puts the top ΔF peak within 0.10 Å of the removed site and above 3σ; the intact model has no peak above the threshold; the observed map has NAC's six maxima at the six sites
-- [ ] Skill: a routing row only if it ships a public entry point, otherwise none
+  — **2026-11-16, landed in part** (`tests/test_fourier_map.py`): the six
+  observed maxima, and NAC minus Na1, F3 or Al1 putting the top ΔF peak
+  nearest the removed site, above 3σ and above the complete model's top
+  peak. Two clauses do not hold as written and wait on a ruling (handover
+  entry): the 0.10 Å bar holds for Al1 (0.008 Å) but not Na1 (0.119 Å) or
+  F3 (0.110 Å), and the complete model's map has peaks to 4.9σ of its rms.
+- [x] Skill: a routing row only if it ships a public entry point, otherwise none — none: `rietx.solve` exports nothing from `rietx` yet (2026-11-16)
 
 ## Acceptance
 
