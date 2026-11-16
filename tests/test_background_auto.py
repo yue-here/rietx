@@ -432,7 +432,7 @@ def test_the_control_has_no_wall_near_unity(host):
 
     On the fitted list a made-up ratio just under 1 lands its companion in
     the parent's own neighbourhood, and the chance consensus climbs: swept
-    naively over 0.990-0.999 these three reach 7, 7 and 6 (the positive arm,
+    naively at 0.9900, 0.9925, 0.9950 and 0.9975 they reach 5 or more (the positive arm,
     so this row can fail).  The control's admitted ratios at or above 0.95
     gather no more than 2, the bulk's own level (WP-1447, 16 patterns).
     """
@@ -490,7 +490,9 @@ def test_the_control_is_silent_where_the_screen_is():
                          source=mono) == []
     found = ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0))
     assert [g.kind for g in found] == ["kbeta", "tungsten_la"]
-    assert found[0].control == found[1].control       # one control, two searches
+    # one control, each search reading the ratios that asked as many parents
+    for g in found:
+        assert 0 < len(g.ratios) == len(g.control) <= 19
 
 
 def test_the_real_wavelength_is_unremarkable_against_its_own_control():
