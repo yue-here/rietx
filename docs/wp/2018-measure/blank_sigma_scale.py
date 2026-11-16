@@ -10,8 +10,9 @@ answer's ``s``.  The dataset is ``tests/test_acceptance_si640c.py``'s Si SRM
 blank_scale=…, free_scale=True)``, the ``blank_free`` fixture's protocol), in arms:
 
   start_1       shipped: the scale starts at 1.0 (the fixture's start)
-  start_conv    the scale starts at ``CONVERGED`` (the shipped answer), so
-                every stage compiles at the answer's ``s``
+  start_conv    the scale starts at ``CONVERGED`` (0.85), near the shipped
+                answer (0.8413): the first compile sees it, later ones follow
+                the solve, as in start_1
   start_3       the positive arm: the scale starts at 3.0, so the first stages
                 weight by a scale far from the answer
   again         start at 1.0, with one declared stage appended that frees every

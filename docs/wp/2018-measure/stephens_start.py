@@ -33,7 +33,11 @@ stephens=True)`` (strain seed 800 ppm in ``sample_broadening``,
 
 Each record carries, per LM solve, whether the strain rows were built or
 dropped and why (``cone``), how many of the stage's reflections start and
-end with σ²(M) < 0, and the guard's codes.
+end with σ²(M) < 0, and the guard's codes.  Two start counts:
+``n_negative_at_start`` is the strict σ²(M) < 0, and ``n_violated_at_start``
+the drop test itself (``LinearInequality.violated``, which allows ``_ON_FACE``
+of the block's largest |σ²(M)|), so a block can be built with a few rows
+strictly negative on its face.
 
 usage (repo root): python docs/wp/2018-measure/stephens_start.py [arm ...]
 """
@@ -57,6 +61,7 @@ from tests.test_acceptance_stephens import _plan  # noqa: E402
 
 refine_module = importlib.import_module("rietx.refine")
 ls_module = importlib.import_module("rietx.optimize.least_squares")
+lm_module = importlib.import_module("rietx.optimize.lm")
 vector_module = importlib.import_module("rietx.params.vector")
 
 ARMS = ("zero", "ray", "out", "out_seeded", "out_trf", "zero_trf", "trf_then_lm",
@@ -87,9 +92,12 @@ def _cone_spy(log, stage):
             rows = [table._paths[f"phases.0.microstrain.{n}"] for n in S_NAMES]
             mono = np.asarray(cp.strain_monomials, dtype=np.float64)
             T = mono @ C.toarray()[rows, :]
-            sig = T @ x0 + mono @ d[rows]
+            c = mono @ d[rows]
+            sig = T @ x0 + c
+            drop = lm_module.LinearInequality(T=T, c=c).violated(x0)
             rec.update(free=bool(np.any(T)), n_refl=int(len(sig)),
                        n_negative_at_start=int((sig < 0).sum()),
+                       n_violated_at_start=int(drop.sum()),
                        min_over_max=float(sig.min() / max(abs(sig).max(), 1e-300)))
         log.append(rec)
         return out

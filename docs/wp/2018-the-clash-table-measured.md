@@ -199,6 +199,8 @@ The no_hold patch also empties the "unseen" set the width-twin hold reads (refin
 free answer, 5.024 Å, is inside it, and window_only equals neither exactly). The reset fires only
 when an escape is injected (it does not walk since WP-1938, as `test_cell_runaway_safety.py`
 says). The hold and the collapse are interchangeable: either one alone gives the default answer.
+No arm runs the hold without the collapse; in the default arm the collapse takes nothing (the
+hold has already taken the cell, so `collapsed` is empty in every stage), so default is the hold alone.
 The two answers the caller can get differ in the absent phase alone. Held: a = 5.2 with no esd and
 the scale on its floor. Free: a phase at 2.62σ with a cell at 5.0243(21) Å, which is noise fitted
 by a phase that is not there. The visible phase moves 7e-9 Å in a (0.002 esd) and 0.004 esd in
@@ -343,7 +345,12 @@ reorders the two; each removes one.
 `[dev]`, 4 s a fit). Brucite under `tests/test_acceptance_stephens.py`'s LM protocol (strain seed
 800 ppm in `sample_broadening`, `intermediate_ftol` 1e-6, no closing stage), from five starting
 blocks. The record says, per solve that frees the block, whether the σ²(M) ≥ 0 rows were built
-and how many of the stage's 43 reflections start outside the cone.
+and how many of the stage's 43 reflections start outside the cone, counted two ways:
+`n_negative_at_start` strictly (σ²(M) < 0) and `n_violated_at_start` by the drop test itself
+(`LinearInequality.violated`, which allows `_ON_FACE` of the block's largest |σ²(M)|; added in
+the review fix-ups, rerun at a4f540e14 with every other field unchanged). The start counts in
+the table are the drop test's. The two agree wherever rows were dropped; where rows were built
+the drop test counts 0 while the strict count is up to 2, rows on the face (zero's `biso` stage).
 
 | Arm (start; driver) | seed | rows in the 3 strain stages | reflections out at the end | Rwp | what the caller sees |
 |---|---|---|---|---|---|
@@ -636,7 +643,12 @@ zero, and which no rule touches).
 
 The rules no longer stack: in every arm the σ the result stores is the σ the fit used and
 `sig()` returns it unchanged, so the second application is a no-op on a fit's own result, as
-its docstring says (it acts only on a hand-built result). A planted zero is now one channel's
+its docstring says (it acts only on a hand-built result). That column cannot fail by itself,
+since no arm's fit stores a σ ≤ 0, so each arm also hands `sig()` a copy of its result with
+σ = 0 planted at the strongest fitted channel (`sig_on_stored_zero`, added in the review
+fix-ups and rerun at a4f540e14 with every other field unchanged): in all four arms `sig()`
+returns √max(y, 1) there (349.6 at 8.070°; 343.1 at 8.069° under zero_exclude, whose 8.070°
+channel is not in the fit) and every other channel bit for bit. A planted zero is now one channel's
 worth of data: dropped by default, it moves the LaB₆ scale 0.28 esd and its fraction 0.18 esd
 because the channel is a peak top; weighted as Poisson, 0.009 esd. The positive arm shows what
 the retired floor did with the same zero: one channel weighted about a million times a median channel
