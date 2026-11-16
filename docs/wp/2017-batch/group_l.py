@@ -5,7 +5,9 @@ count as two minima), ``SOLVE_TOP_K`` (3, candidate k's carried down) and
 ``SOLVE_K_TRIALS`` (2, k's given a full trial).  Solves and arms were fixed in WP-2017 § What
 each group inherits, "L, its solves and arms", before anything ran (2026-11-16).
 
-Solves (``rx.solve_magnetic`` from the nuclear fit each acceptance suite builds):
+Solves (``rx.solve_magnetic`` from the nuclear fit each acceptance suite builds; the compiled tier on, where
+``test_magnetic_series``'s ramp fixture runs numpy, so its fit is built the same way, not
+bit for bit):
 
 - ``cr2wo6_4k``, ``cr2wo6_150k``: HFIR HB-2A, ``conftest.cr2wo6_nuclear``'s construction,
   ``sites=["Cr1"]``, ``ion="Cr3+"``.
@@ -109,7 +111,7 @@ def _lamno3():
 
 
 def _ba2fesbse5():
-    """``test_magnetic_series._ba2fesbse5_ramp_fits``'s nuclear fit at 1.5 K, verbatim."""
+    """``test_magnetic_series._ba2fesbse5_ramp_fits``'s nuclear fit at 1.5 K, built as there."""
     from tests.test_magnetic_series import BA_ATOMS, BA_LAMBDA, BA_LOW, _ba_pattern
 
     def par(v, **kw):
@@ -268,11 +270,13 @@ def summary() -> None:
         "one kernel thread.",
         "",
         "`same answer`: verdict, pick, k, route, every trial's status, ΔBIC and Rwp, and the "
-        "k-trial table all equal to `shipped`'s.  `minima`: each trial's n_minima/n_starts.",
+        "k-trial table all equal to `shipped`'s; `class trials same`: the class trials alone, "
+        "every field.  `ranked k`: the list `top_k` cuts, with satellites matched.  `minima`: "
+        "each trial's n_minima/n_starts.",
         "",
-        "| Solve | Arm | verdict | pick | k (route) | k trials | minima | same answer | "
-        "can act | wall s |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Solve | Arm | verdict | pick | k (route) | ranked k (matched) | k trials | minima | "
+        "same answer | class trials same | can act | wall s |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for s in SOLVES:
         sh = rows.get((s, "shipped"))
@@ -281,7 +285,7 @@ def summary() -> None:
             if r is None:
                 continue
             if "error" in r:
-                lines.append(f"| `{s}` | {a} | {r['error']} ||||||||")
+                lines.append(f"| `{s}` | {a} | {r['error']} ||||||||||")
                 continue
             same = "—" if a == "shipped" or sh is None or "error" in sh else (
                 "yes" if _answer(r) == _answer(sh) else "**no**")
@@ -290,9 +294,13 @@ def summary() -> None:
             kt = "; ".join(f"({','.join(k['k'])}) ΔBIC {_fmt(k['best_delta_bic'], '.1f')}"
                            for k in r["k_trials"]) or "—"
             k = f"({','.join(r['k'])})" if r["k"] else "—"
+            ranked = ", ".join(f"{c[0]} ({c[1]})" for c in r["k_candidates"]) or "—"
+            tsame = "—" if a == "shipped" or sh is None or "error" in sh else (
+                "yes" if r["trials"] == sh["trials"] else "**no**")
             can = _reached(a, sh) if sh and "error" not in sh else ""
             lines.append(f"| `{s}` | {a} | {r['verdict']} | {r['space_group'] or '—'} | "
-                         f"{k} ({r['k_route']}) | {kt} | {minima} | {same} | {can} | "
+                         f"{k} ({r['k_route']}) | {ranked} | {kt} | {minima} | {same} | "
+                         f"{tsame} | {can} | "
                          f"{r['wall_s']:.0f} |")
     lines += ["", "Shipped trials (class, group, status, ΔBIC, Rwp):", ""]
     for s in SOLVES:
