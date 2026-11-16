@@ -27,10 +27,15 @@ under it, and no section opening on a back-reference ("as above").
 (`python -m sphinx -W -q -E -b html docs/docs <out>`) and reading `len()` of each of the 129 twins:
 `theory/estimation.html.md` is 49 998 characters, 2 under the cap. The issue's number reproduces
 exactly. The source is 45 843 characters.
+*Superseded in part, 2026-11-16 (`bc77a934e`):* 132 twins; this one is 49 940 (60 to spare), the
+source 45 647. WP-1419's `da3a2d301` trimmed four wordings after #1108's `{cite}` on another page
+renumbered Sphinx's global citation ids and took this twin 48 over the cap with its source unedited.
 
 **Two open PRs edit the page**, both mustachefeeling's: PR #1383 (WP-1998) adds a net 193 source
 characters to it, and PR #1473 (WP-2080) changes 150 characters for 150. Whichever lands first takes
 the room. A split made while they are open conflicts with both. So the first task reads their state.
+*Superseded in part, 2026-11-16:* #1383's head (`fa35f671d`) now adds 1 twin character and #1473's
+(`eca5fafbc`) none, and PR #1332 is a third that edits the page (−7). Task 1's line has the state.
 
 **Where a split could fall**, source characters per H2 at `9979cee7c`:
 
@@ -42,13 +47,16 @@ the room. A split made while they are open conflicts with both. So the first tas
 | Staged strategy and series; Solvers; Convergence; The fp64 floor; From fit to report; Which parameter to free next | 15 125 |
 
 The last group reads as one chapter on how the fit is solved and steered, and the middle group as one
-on esds where the curvature misleads. Either leaves both halves near 23 000 source characters. Which
+on esds where the curvature misleads (the second and third rows). *Corrected 2026-11-16:* only the
+second choice leaves both halves near 23 000: moving the esd rows keeps 21 123 source characters and
+moves 24 524, and moving the last group keeps 30 522 and moves 15 125 (first row 5 840 now). Which
 boundary, and the new page's title, is this WP's first decision. The Theory tab's titles are short
 nouns (`Estimation`, `Profiles`, `Background`), so the title should be one too.
 
 **What a move breaks.** 27 links from other manual pages name a section of this page by fragment,
 over 13 of its 16 sections, and 9 places under `src/` cite `theory/estimation`. Sphinx's `-W` build
 fails a broken in-manual link. Nothing checks a docstring's link, so those 9 are checked by grep.
+*2026-11-16:* 28 fragment links from 19 files, over the same 13 sections; still 9 under `src/`.
 `docs/docs_versions.py`'s `RETIRED` maps the old tree's `estimation` to `theory/estimation` with no
 fragment, so it keeps working whichever half keeps the old file name. `theory/index.md` lists the
 chapters twice (a sentence each, and the toctree), and both take the new page. The Theory tab's
@@ -64,6 +72,10 @@ characters) and `refinement.md` (49 757) are hand-written, so the issue's "the R
 generated" holds for one of three. Open WPs already plan around the cap on their own pages: WP-2024,
 WP-2025 and WP-2027 for the API pages, WP-1335 and WP-1931 for `reference/refinement`. This WP
 splits only the Theory page.
+*Superseded in part, 2026-11-16 (`bc77a934e`):* `reference/parameters` is no longer near the cap
+(WP-2087 split the parameter map; 27 316). The four within 100 are `reference/indexing` 49 994,
+`reference/refinement` 49 987, this page 49 940 and `reference/series` 49 924, which PR #1473 splits
+(45 502 merged).
 
 **The class.** Five pages sit within 100 characters of the cap, and each is found by the session whose addition fails. The
 skill's sizes (`tests/skill_caps.py`) answer the same problem with a ceiling per file plus a budget
