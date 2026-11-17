@@ -116,26 +116,18 @@ typed into the Model panel's forms and the Text document. Those apply through
 their own buttons and are not in the action bar's count. The Text document is
 kept as you typed it, comments included.
 
-Opening the project again shows `Unapplied edits`, with when the project closed
-and what was kept, each part named by where it lives: "Not applied when the
-project closed on Nov 17, 2026, 12:44 AM: 1 edit waiting at Apply, 1 edit in the
-Model forms, and the Text document." Only the parts present are named. "Edits
-waiting at Apply" is the action bar's count: the Parameters panel, the
-Interactive sliders and the plan. `Restore` puts them back as pending edits,
-and `Discard` deletes them. `Escape` closes the dialog and keeps the copy
-without restoring it. The dialog comes back the next time the project opens.
-Edits you make before then are not kept. If the project has been refined or
-edited since, for example by a fit run from Python, the dialog adds "The project
-has been refined or edited since. Restored values will replace the current
-ones." Restored edits still wait for their `Apply`, in the action bar or in
-their own panel. When the copy holds a Text document, the dialog adds "The Text
-document comes back marked out of date. Copy what you need from it, then
-re-read." Re-read the project, then type the edit again. A Text document typed
-before the project changed comes back that way too. A copy that holds only a
-Text document shows the first sentence and the Text sentence, since it has no
-values to replace. The console says what came back in the same words: "#
-Restored: 1 edit waiting at Apply, 1 edit in the Model forms, and the Text
-document."
+Opening the project again shows `Unapplied edits`, naming each part by where it
+lives: "Not applied when the project closed on Nov 17, 2026, 12:44 AM: 1 edit
+waiting at Apply, 1 edit in the Model forms, and the Text document." Only the
+parts present are named. `Restore` puts them back as pending edits, and
+`Discard` deletes them. `Escape` closes the dialog and keeps the copy without
+restoring it, and offers it again at the next open. Edits you make before then
+are not kept.
+
+If the project has been refined or edited since, for example by a fit run from
+Python, the dialog adds "The project has been refined or edited since. Restored
+values will replace the current ones." A Text document adds "The Text document
+comes back marked out of date. Copy what you need from it, then re-read."
 
 The copy is deleted once the edits are applied, reverted or discarded. It
 follows the project through `Rename…` and `Move to…`. `Save a copy…`, and a
