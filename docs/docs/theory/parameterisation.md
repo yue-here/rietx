@@ -426,6 +426,13 @@ axis, are a disorder model, a sum over 1 is the double count. The
 remedy for both is to put the origin on the element the atoms share
 (`body_from_atoms(..., origin=...)`).
 
+`RIGID_BODY_PARTIAL_TURN` refuses a stage that leaves two of a body's three turn
+directions free. The turn is an increment composed into the stored quaternion
+at each commit, and two small turns about different axes compose into a third
+that the two free directions do not carry, so the re-chart after the solve
+misses the fresh solve by about 2.6 % of an esd. None, one, or all three
+directions are exact, and a turn tied to one axis counts as one.
+
 A named-bond torsion turns a declared set of the body's atoms by an angle
 $\varphi$ about the line through two other body atoms, before the pose, in
 the right-handed sense from the first axis atom to the second (TOPAS's
