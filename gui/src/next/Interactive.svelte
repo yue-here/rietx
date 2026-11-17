@@ -375,10 +375,11 @@
 
 {#if popSlider && popAt}
   {@const s = popSlider}
+  {@const last = formatParts(s, s.ref)}
   <div class="rangepop" role="dialog" aria-label={`Range and scale for ${s.name}`}
     style:left={`${popAt.left}px`} style:top={`${popAt.top}px`}>
     <strong>{s.name}{#if s.unit}<span class="muted unit">({unitText(s.unit)})</span>{/if}</strong>
-    <p class="muted">Last fit <span class="mono">{editText(s.ref)}</span></p>
+    <p class="muted">Last fit <span class="mono">{last.int}{last.frac}{#if last.exp}×10<sup>{last.exp}</sup>{/if}</span></p>
     <label><span>From</span>
       <input class="mono" bind:value={rangeLo} aria-label="Lowest value"
         onchange={() => setRange(s)} onkeydown={(e) => e.key === "Enter" && setRange(s)} />
@@ -653,16 +654,18 @@
     margin: 0;
   }
 
-  .rangepop label,
-  .scale {
+  .rangepop label {
     display: grid;
     grid-template-columns: 4.5em minmax(0, 1fr) 3.5em;
     align-items: center;
     gap: 8px;
   }
 
-  .scale .segmented {
-    grid-column: 2 / 4;
+  /* the prototype's: the word above, the choice across the pop-up */
+  .scale {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .rangepop input {
