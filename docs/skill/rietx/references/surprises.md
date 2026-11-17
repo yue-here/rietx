@@ -481,7 +481,7 @@ a Stephens block frees nothing and is healthy. A path with no `*`, `?` or `[`
 names one parameter, so a missing row (`instrument.source.wavelength` for
 `…lines.0.wavelength`) fires §7 `STAGE_PATH_UNKNOWN` with the nearest real
 path, and `set_vary` raises instead, changing nothing. A glob naming one site
-is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
+or one cell is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
 `STAGE_PATH_NOT_FREE` (WP-1951). **A typo inside a glob (`phases.*.cel.*`)
 still cannot be told from a healthy miss, so read `StageResult.freed` for each
 stage you wrote.** On a joint fit the
