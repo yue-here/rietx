@@ -124,6 +124,17 @@ hand-staged one section for section.
 
 ## Handover log
 
+- **2026-11-17, review fix-ups** — The PR review's five findings, applied.
+  The round trip now always runs on the released `1.11.0.md`, and on the live
+  staged file only when it holds two bullets or more. As first opened, 1.12.0.md
+  held none, so the old test would have gone red the day after the 1.12 cut.
+  The live check now runs the real join. One-bullet notes in a section that
+  starts empty join as one tight list, which supersedes "left as designed"
+  below. A note with a line of only `-` or `=` (a setext heading or a rule) is
+  refused. A note for a section the new staged file lacks is refused with the
+  file's name and the remedy, and the README says to rebase after a cut.
+  PR #1645.
+
 - **2026-11-17** — A release note can now be a file of its own, and two pull
   requests that each add one no longer conflict. A note goes in
   `docs/releases/unreleased/`, named for the pull request and for a heading of

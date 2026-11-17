@@ -1304,9 +1304,13 @@ def test_every_release_note_fragment_names_a_section_of_the_staged_notes():
     assert head.is_file(), (
         f"{head.relative_to(ROOT)} is missing; RELEASING.md step 11 opens the "
         "next release's staged notes, and every fragment is placed under them")
+    head_text = head.read_text(encoding="utf-8")
     frags, problems = release_notes.read_fragments()
-    problems += release_notes.check(head.read_text(encoding="utf-8"), frags)
+    problems += release_notes.check(head_text, frags, str(head.relative_to(ROOT)))
     assert not problems, "release-note fragments:\n" + "\n".join(problems)
+    # The real join, once per PR that adds a note: it raises on a fragment it
+    # cannot place, so the cut is not the first time a real fragment is joined.
+    release_notes.join(head_text, frags)
 
 
 _HEAD = """\
@@ -1403,6 +1407,45 @@ def test_a_fragment_naming_no_heading_or_holding_one_is_refused(tmp_path):
         release_notes.join(_HEAD, frags)
 
 
+def test_a_fragment_with_a_setext_underline_or_a_rule_is_refused(tmp_path):
+    """`---` or `===` under a line of text makes it a heading the ATX scan does
+    not see, and the join would put a new section inside the one named."""
+    _frag(tmp_path, "1.new.md", "A paragraph\n---\n\n- X.\n")
+    _frag(tmp_path, "2.new.md", "- Y.\n  A title\n  ===\n")
+    _frag(tmp_path, "3.new.md", "- Z.\n\n---\n")
+    _frag(tmp_path, "4.new.md", "- A fenced one is code.\n\n  ```\n  ---\n  ```\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert [p.split(":")[0] for p in problems] == ["1.new.md", "2.new.md", "3.new.md"]
+    assert all("heading" in p for p in problems)
+    assert [f.path.name for f in frags] == ["4.new.md"]
+
+
+def test_a_fragment_for_a_section_the_new_staged_notes_lack_says_how_to_mend_it(tmp_path):
+    """A branch that forked before a cut can merge a note for a section the
+    next staged file does not open; the refusal names the file and the remedy."""
+    _frag(tmp_path, "1700.foreign-files.md", "- A note.\n")
+    frags, _ = release_notes.read_fragments(tmp_path)
+    [problem] = release_notes.check(_HEAD, frags, "docs/releases/9.9.0.md")
+    assert "docs/releases/9.9.0.md" in problem and "'foreign-files'" in problem
+    assert "rebase onto main" in problem
+
+
+def test_one_bullet_notes_in_a_section_that_starts_empty_join_as_a_tight_list(tmp_path):
+    """Every section of a freshly opened staged file is empty, so this is the
+    usual case: separate PRs' notes make one list, not paragraphs."""
+    _frag(tmp_path, "1700.magnetic-structures.md", "- A.\n")
+    _frag(tmp_path, "1701.magnetic-structures.md", "- B.\n  Continued.\n")
+    _frag(tmp_path, "1702.magnetic-structures.md", "- C.\n")
+    _frag(tmp_path, "1703.numbers-that-move.md", "- D.\n")
+    _frag(tmp_path, "1704.numbers-that-move.md", "- E.\n\n- F, loose.\n")
+    _frag(tmp_path, "1705.numbers-that-move.md", "- G.\n")
+    frags, _ = release_notes.read_fragments(tmp_path)
+    joined = release_notes.join(_HEAD, frags)
+    assert joined.endswith("## Magnetic structures\n\n- A.\n- B.\n  Continued.\n- C.\n")
+    # Once a note brings a blank-separated pair, the section is loose from there on.
+    assert "### Numbers that move\n\n- D.\n- E.\n\n- F, loose.\n\n- G.\n\n## New" in joined
+
+
 def _blocks(lines):
     """A section's text as its blocks: each bullet with its continuation, each paragraph."""
     blocks, cur = [], []
@@ -1426,10 +1469,18 @@ def _by_section(text):
             for k, (i, _, name) in enumerate(marks)}
 
 
-def test_the_staged_notes_split_into_fragments_join_back_section_for_section(tmp_path):
-    """The acceptance: every bullet of the live staged notes moved into a
+# A released file never changes, so the round trip always has bullets to split;
+# the live staged file opens with none (RELEASING.md step 11) and may stay so,
+# since notes now go to fragments.
+_ROUND_TRIP_HEADS = {"released-1.11.0": ROOT / "docs" / "releases" / "1.11.0.md", "live": None}
+
+
+@pytest.mark.parametrize("which", list(_ROUND_TRIP_HEADS))
+def test_the_staged_notes_split_into_fragments_join_back_section_for_section(which, tmp_path):
+    """The acceptance: every bullet of a staged-notes file moved into a
     fragment of its own, joined onto what is left, gives the same sections."""
-    head_text = release_notes.head_path().read_text(encoding="utf-8")
+    head = _ROUND_TRIP_HEADS[which] or release_notes.head_path()
+    head_text = head.read_text(encoding="utf-8")
     lines = head_text.splitlines()
     marks = release_notes.headings(lines)
     kept, n = lines[:marks[0][0]], 0
@@ -1446,12 +1497,29 @@ def test_the_staged_notes_split_into_fragments_join_back_section_for_section(tmp
                 item.append(line)
             elif not item:
                 kept.append(line)
-    assert n >= 2, "the staged notes hold under two bullets; nothing was split"
+    if n < 2 and which == "live":
+        pytest.skip(f"{head.relative_to(ROOT)} holds {n} bullet(s); the released file "
+                    "carries the round trip")
+    assert n >= 2, f"{head.relative_to(ROOT)} holds under two bullets; nothing was split"
     frags, problems = release_notes.read_fragments(tmp_path)
     assert not problems and len(frags) == n
     joined = release_notes.join("\n".join(kept) + "\n", frags)
     assert _by_section(joined) == _by_section(head_text)
     assert release_notes.sections(joined) == release_notes.sections(head_text)
+
+
+def test_a_freshly_opened_staged_file_skips_the_live_round_trip(tmp_path, monkeypatch):
+    """1.12.0.md as step 11 opened it: headings, no bullets.  The live arm must
+    skip there, not fail, or every PR goes red from the day after a cut."""
+    opened = tmp_path / "9.9.0.md"
+    opened.write_text("# rietx 9.9.0\n\n> Staged.\n\n## Upgrading\n\n### Code to check\n\n"
+                      "## New\n\n## Changed\n", encoding="utf-8")
+    monkeypatch.setattr(release_notes, "head_path", lambda *a, **k: opened)
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    (tmp_path / "frags").mkdir()
+    with pytest.raises(pytest.skip.Exception, match="holds 0 bullet"):
+        test_the_staged_notes_split_into_fragments_join_back_section_for_section(
+            "live", tmp_path / "frags")
 
 
 # ----------------------------------------------------------------------

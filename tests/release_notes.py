@@ -26,12 +26,16 @@ At the cut (``docs/RELEASING.md`` step 2)::
 
 Each fragment goes at the end of its section's own text, before the next
 heading of level 2 or more, in the order of its ``<id>`` (numbers first, by value).
-A section whose bullets sit on consecutive lines gets its fragments the same
-way; any other gets a blank line before each.  The joined file is then edited
-as a reader's document, like any other step-2 draft.
+A bullet goes straight under the bullet before it, with no blank line, while
+the section's bullets so far sit on consecutive lines, which a section that
+starts empty does: notes from separate PRs then make one tight list.  In a
+section whose bullets are already blank-separated, each fragment gets a blank
+line before it.  The joined file is then edited as a reader's document, like
+any other step-2 draft.
 
-``tests/test_docs_consistency.py`` checks that every fragment names a section
-of the staged notes, and that a join leaves no fragment unplaced.
+``--check``, which ``tests/test_docs_consistency.py`` also runs, checks that
+every fragment names a section of the staged notes, and joins them to check
+that the join leaves no fragment unplaced.
 """
 
 from __future__ import annotations
@@ -54,6 +58,9 @@ FRAGMENT_NAME = re.compile(
 HEADING = re.compile(r"^ {0,3}(?P<hashes>#{1,6})(?:\s+(?P<text>.*?))?(?:\s+#+)?\s*$")
 FENCE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
 BULLET = re.compile(r"^[-*] ")
+# A line of only `-` or only `=`: under a line of text it makes that text a
+# setext heading, and on its own it draws a rule.  Neither belongs in a note.
+UNDERLINE = re.compile(r"^\s*(?:-+|=+)\s*$")
 
 # Files in the fragment directory that are not fragments.
 NOT_FRAGMENTS = frozenset({"README.md"})
@@ -88,11 +95,12 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def _scan(lines: list[str]) -> tuple[list[tuple[int, int, str]], bool]:
-    """Every ATX heading outside a code fence as (line index, level, slug), and
-    whether every fence closed.  A fence closes only on its own character, at
-    least as long as its opener."""
-    found, fence = [], ""
+def _scan(lines: list[str]) -> tuple[list[tuple[int, int, str]], bool, list[int]]:
+    """Every ATX heading outside a code fence as (line index, level, slug),
+    whether every fence closed, and the index of every line of only `-` or `=`
+    outside a fence.  A fence closes only on its own character, at least as long
+    as its opener."""
+    found, fence, underlines = [], "", []
     for i, line in enumerate(lines):
         f = FENCE.match(line)
         if f and not fence:
@@ -102,10 +110,14 @@ def _scan(lines: list[str]) -> tuple[list[tuple[int, int, str]], bool]:
                 and not line.strip().strip(fence[0]):
             fence = ""
             continue
-        m = None if fence else HEADING.match(line)
+        if fence:
+            continue
+        m = HEADING.match(line)
         if m:
             found.append((i, len(m["hashes"]), slug(m["text"] or "")))
-    return found, not fence
+        elif UNDERLINE.match(line):
+            underlines.append(i)
+    return found, not fence, underlines
 
 
 def headings(lines: list[str]) -> list[tuple[int, int, str]]:
@@ -144,9 +156,14 @@ def read_fragments(directory: Path = FRAGMENT_DIR) -> tuple[list[Fragment], list
         if not text.strip():
             problems.append(f"{path.name}: empty")
             continue
-        found, closed = _scan(text.splitlines())
+        found, closed, underlines = _scan(text.splitlines())
         if found:
             problems.append(f"{path.name}: holds a heading; a fragment is the text under one")
+            continue
+        if underlines:
+            problems.append(f"{path.name}: line {underlines[0] + 1} is only '-' or '=', which "
+                            "makes the line above it a heading (or draws a rule); a fragment "
+                            "is the text under one")
             continue
         if not closed:
             problems.append(f"{path.name}: a code fence never closes, which would turn every "
@@ -156,18 +173,24 @@ def read_fragments(directory: Path = FRAGMENT_DIR) -> tuple[list[Fragment], list
     return frags, problems
 
 
-def check(head_text: str, frags: list[Fragment]) -> list[str]:
-    """A problem line for every fragment whose section the staged notes do not have."""
+def check(head_text: str, frags: list[Fragment], head_name: str = "the staged notes") -> list[str]:
+    """A problem line for every fragment whose section the staged notes do not have.
+
+    After a cut, a branch that forked before it can carry a fragment for a
+    section the new staged notes lack; the line says how to mend that."""
     known = set(sections(head_text))
-    return [f"{f.path.name}: no heading in the staged notes is section {f.section!r}; "
-            f"known: {', '.join(sorted(known))}"
+    return [f"{f.path.name}: no heading in {head_name} is section {f.section!r} "
+            f"(known: {', '.join(sorted(known))}). Add that heading to {head_name}, or "
+            "rename the fragment to a known section; if a release was cut after this "
+            "branch forked, rebase onto main first, so the check reads the new staged notes"
             for f in frags if f.section not in known]
 
 
 def _tight(body: list[str]) -> bool:
-    """True when the section's bullets sit on consecutive lines, with no blank between them."""
+    """True when the section's bullets sit on consecutive lines, with no blank
+    between them; a section with fewer than two bullets has nothing loose yet."""
     starts = [i for i, line in enumerate(body) if BULLET.match(line)]
-    return len(starts) >= 2 and all(body[i - 1].strip() for i in starts[1:])
+    return all(body[i - 1].strip() for i in starts[1:])
 
 
 def join(head_text: str, frags: list[Fragment]) -> str:
@@ -187,15 +210,17 @@ def join(head_text: str, frags: list[Fragment]) -> str:
         body = lines[start + 1:end]
         while body and not body[-1].strip():
             body.pop()
-        tight = _tight(body)
         out.append(lines[start])
         out.extend(body)
         for f in by_section.get(name, []):
             flines = f.text.splitlines()
-            joined_on = (tight and body and BULLET.match(flines[0])
+            # Judged on the section as joined so far, so that one-bullet notes
+            # from separate PRs in a section that started empty stay one tight list.
+            joined_on = (body and BULLET.match(flines[0]) and _tight(body)
                          and (body[-1].startswith(" ") or BULLET.match(body[-1])))
             if not joined_on:
                 out.append("")
+                body = body + [""]
             out.extend(flines)
             body = body + flines
         if k + 1 < len(marks):
@@ -227,17 +252,17 @@ def main(argv: list[str] | None = None) -> int:
     head_text = head.read_text(encoding="utf-8")
     frags, problems = read_fragments()
     try:
-        problems += check(head_text, frags)
+        problems += check(head_text, frags, str(head.relative_to(ROOT)))
     except ValueError as err:  # two headings with one slug
         problems.append(f"{head.relative_to(ROOT)}: {err}")
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1
+    joined = join(head_text, frags)
     if args.check:
         print(f"{len(frags)} fragment(s), every one names a section of "
-              f"{head.relative_to(ROOT)}")
+              f"{head.relative_to(ROOT)} and joins")
         return 0
-    joined = join(head_text, frags)
     if not args.write:
         sys.stdout.write(joined)
         return 0

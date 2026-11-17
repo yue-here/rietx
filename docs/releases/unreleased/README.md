@@ -23,7 +23,15 @@ notes already are. Several bullets for one section go in one file.
 **Check** with `python -m tests.release_notes --check`, which
 `tests/test_docs_consistency.py` also runs. `python -m tests.release_notes`
 prints the notes with every fragment placed: each goes at the end of its
-section, in `<id>` order, numbers first.
+section, in `<id>` order, numbers first. One-bullet notes from separate pull
+requests make one tight list; a section whose bullets are already
+blank-separated gets a blank line before each note.
+
+**After a cut**, the staged notes are a new file, and it may lack the heading
+a note on an older branch names. `--check` then refuses that note, naming the
+new file, and so does the docs job on main once the branch merges. Rebase onto
+main, or re-run CI, after a release is cut; then add the heading to the new
+file or rename the note to a section it has.
 
 At the cut, `docs/RELEASING.md` step 2 joins the fragments into the staged
 notes with `--write`, which deletes them, and the result is then edited as a
