@@ -172,7 +172,7 @@ entry of that date.)*
       skill API index: the three calls, with the phase-free `predict` named
       as the workaround it replaces.
 - [x] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
-      pattern. **Landed 2026-11-17:** six tests in
+      pattern. **Landed 2026-11-17:** five tests (nine cases) in
       `tests/test_refine_synthetic.py` § the model read at its values;
       `tests/output/evaluate_before_any_fit.png` (looked at: the perturbed
       start, peaks offset in the difference curve, as expected).
