@@ -135,11 +135,11 @@ Every view is fitted to the frame, and the projection is parallel.
 
 `size=` is the long side in pixels, 1000 by default, or a `(width, height)` pair.
 Line widths and letters grow with it, as they do in the GUI's export, so a larger picture is the same figure at a higher resolution.
-`dpi=` goes only into the PNG's `pHYs` chunk.
+`dpi=` goes into the PNG's `pHYs` chunk, or sets the SVG's printed size.
 A 17 cm figure at 300 dpi is `size=2008, dpi=300`.
 `supersample=` sets how many samples are taken along each side of a pixel, from 1 to 4, and 2 by default.
 More samples draw smoother edges.
-`path=` writes a PNG and refuses any other suffix.
+`path=` writes a PNG or, for a `.svg` suffix, an SVG (see Vector output below), and refuses any other suffix.
 `pad=` is the share of the frame's width and height left empty on each side, 0.05 by default as in ChimeraX's `view`.
 `pad=0` crops the picture to its ink, keeping only the room a line's half-width, the a, b and c, and any atom labels need.
 YBa₂Cu₃O₇ without its cell, at 1000 px, keeps 35 to 53 px of margin at the default and 3 px at `pad=0`, and fluorapatite with its cell keeps 15 px.

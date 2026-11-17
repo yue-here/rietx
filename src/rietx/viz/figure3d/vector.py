@@ -48,6 +48,7 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 
+from ..._about import DIST_NAME
 from .raster import Frame
 from .scene import CELL_WIDTH_PX, LOOK, POLY_ALPHA, polyhedron_formula
 
@@ -526,7 +527,7 @@ def svg(items: Sequence[dict], frame: Frame, *, background=None, dpi: float | No
     else:
         size = f'width="{w}" height="{h}"'
     head = [f'<svg xmlns="http://www.w3.org/2000/svg" {size} viewBox="0 0 {w} {h}">',
-            "<title>rietx structure figure</title>"]
+            f"<title>{DIST_NAME} structure figure</title>"]
     defs: list[str] = []
     body: list[str] = []
     if background is not None:
