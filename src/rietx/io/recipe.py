@@ -105,7 +105,12 @@ from typing import Any
 
 import numpy as np
 
-from ..crystallography.dispersion import dispersion
+from ..crystallography.attenuation import _HC_EV_ANGSTROM
+from ..crystallography.dispersion import (
+    bundled_band,
+    dispersion,
+    normalize_element,
+)
 from ..crystallography.lattice import cell_volume
 from ..model.forward import seed_phase_scales
 from ..model.profiles.caglioti import (
@@ -685,9 +690,15 @@ def _decline_dispersion_off_table(instrument: Instrument, structure: Structure,
     Extrapolating the table past its band would still be wrong, so the reader
     declines and says so.
 
-    Declined **only** on the exception the table itself raises, and only for the
-    species this structure actually has — a recipe inside the band keeps
-    dispersion on and stays bit-identical to a hand-built model.
+    Since WP-1925 the lookup itself reaches 200 keV, with rows computed above
+    the bundled 70 keV; the reader still declines above the *bundled* band, so
+    a recipe's numbers do not move with that change.  Whether it should follow
+    the lookup instead is the maintainer's ruling, asked in WP-1925's handover.
+
+    Declined **only** outside the bundled band or on the exception the table
+    itself raises, and only for the species this structure actually has — a
+    recipe inside the band keeps dispersion on and stays bit-identical to a
+    hand-built model.
     """
     if instrument.source.dispersion is None:
         return
@@ -695,6 +706,13 @@ def _decline_dispersion_off_table(instrument: Instrument, structure: Structure,
     species = sorted({a.species for ph in structure.phases for a in ph.atoms})
     try:
         for sym in species:
+            lo, hi = bundled_band(sym)
+            energy = _HC_EV_ANGSTROM / lam
+            if not lo <= energy <= hi:
+                raise ValueError(
+                    f"wavelength {lam} A (E = {energy / 1e3:.3f} keV) is "
+                    f"outside the bundled table's {lo / 1e3:.0f}-"
+                    f"{hi / 1e3:.0f} keV band for {normalize_element(sym)}")
             dispersion(sym, lam)
     except ValueError as exc:
         instrument.source.dispersion = None

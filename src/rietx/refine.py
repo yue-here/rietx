@@ -10062,9 +10062,11 @@ def _dispersion_diagnostics(structure: Structure,
     are knowingly mis-scaled.  The size reported is the change in |f|² at k = 0,
     ((Z + f′)² + f″²)/Z², which is the fraction by which every reflection of
     that species' contribution is mis-scaled.  A refinement is never blocked
-    by a lookup failure here: an untabulated element or an on-edge wavelength
-    is skipped, because enabling the block is what should raise, not
-    describing it.
+    by a lookup failure here, because enabling the block is what should raise,
+    not describing it; but an element the table cannot size (an untabulated
+    element, a wavelength outside the band or in an edge interval) is named
+    as "off, and not sized" rather than skipped (WP-1925), or a decline the
+    table forced would read as a correction known to be small.
     """
     import gemmi
 
@@ -10081,33 +10083,47 @@ def _dispersion_diagnostics(structure: Structure,
         return []
     lam = instrument.source.primary_wavelength
     effects: dict[str, float] = {}
+    unsized: list[str] = []
     for phase in structure.phases:
         for atom in phase.atoms:
             try:
                 sym = normalize_element(atom.species)
-                if sym in effects:
-                    continue
+            except KeyError:
+                continue
+            if sym in effects or sym in unsized:
+                continue
+            try:
                 z = float(gemmi.Element(sym).atomic_number)
                 fp, fpp = dispersion(sym, lam)
             except (KeyError, ValueError):
+                unsized.append(sym)
                 continue
             if z <= 0.0:
                 continue
             effects[sym] = abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)
     flagged = {s: v for s, v in effects.items() if v >= DISPERSION_NEGLECT_FRAC}
-    if not flagged:
+    if not flagged and not unsized:
         return []
-    worst = max(flagged.values())
-    named = ", ".join(f"{s} {v:.0%}" for s, v in
-                      sorted(flagged.items(), key=lambda kv: -kv[1]))
+    parts = []
+    if flagged:
+        named = ", ".join(f"{s} {v:.0%}" for s, v in
+                          sorted(flagged.items(), key=lambda kv: -kv[1]))
+        parts.append(f"Anomalous scattering is off, but at lambda = "
+                     f"{lam:.5f} A it changes the scattering power of "
+                     f"{named}.")
+    if unsized:
+        parts.append(f"Anomalous scattering is off, and at lambda = "
+                     f"{lam:.5f} A the dispersion table cannot size it for "
+                     f"{', '.join(unsized)}, so how much that changes is "
+                     "not known.")
+    worst = max(flagged.values(), default=0.0)
     return [Diagnostic(
         level="warning" if worst >= DISPERSION_NEGLECT_SEVERE else "info",
         code="DISPERSION_NEGLECTED",
-        message=(f"Anomalous scattering is off, but at lambda = {lam:.5f} A it "
-                 f"changes the scattering power of {named}."),
+        message=" ".join(parts),
         suggestion="Restore it with Dispersion(). If the wavelength sits in "
-                   "an absorption-edge interval, supply the measured pair "
-                   "through Dispersion.overrides instead.",
+                   "an absorption-edge interval or outside the table, supply "
+                   "the measured pair through Dispersion.overrides instead.",
     )]
 
 

@@ -511,8 +511,17 @@ def test_hydrogen_is_zero_not_a_refusal():
 def test_out_of_band_wavelength_is_refused():
     with pytest.raises(ValueError, match="outside the tabulated"):
         dispersion("Fe", 6.0)      # 2.07 keV, below the 3 keV floor
-    with pytest.raises(ValueError, match="outside the tabulated"):
-        dispersion("Fe", 0.1)      # 124 keV, above the 70 keV ceiling
+    with pytest.raises(ValueError, match="outside the tabulated 3-200 keV"):
+        dispersion("Fe", 0.05)     # 248 keV, above the 200 keV ceiling
+
+
+def test_the_refusal_names_both_ways_round_it():
+    """WP-1925: whoever hits the band edge is told what to type, not sent to
+    the source."""
+    with pytest.raises(ValueError) as exc:
+        dispersion("U", 0.05)
+    assert "Dispersion.overrides" in str(exc.value)
+    assert "Source.dispersion = None" in str(exc.value)
 
 
 def test_unknown_element_is_refused():

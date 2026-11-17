@@ -41,6 +41,14 @@ Its known weaknesses, recorded so they are not rediscovered as bugs:
   differ.  Between edges in the 3–70 keV powder band the two agree closely,
   which is the regime this package models.
 
+**Above 70 keV the rows are computed, not read** (WP-1925).  70 keV is the
+upper limit of the original tabulation, and high-energy beamlines run to 130
+keV and beyond, where the K edges of Pt to U lie.  Between 70 keV and
+:data:`CEILING_EV` f″ is gemmi's Cromer-Liberman and f′ follows from it by
+the dispersion relation, anchored on the bundled table (``_continuation``
+says how, and why gemmi's own f′ is not used there).  Z = 93-98 keep the
+3-70 keV band.
+
 **Edges are not interpolated across.**  f″ falls smoothly with energy between
 edges and jumps by nearly an order of magnitude at one (Fe K: 0.47 → 3.95 e
 across a single grid interval), so a rise across the bracketing interval means
@@ -150,13 +158,148 @@ def edges(element: str) -> tuple[float, ...]:
     return tuple(float(np.sqrt(lo * hi)) for lo, hi in edge_intervals(element))
 
 
+@lru_cache(maxsize=None)
 def _table_for(sym: str) -> np.ndarray:
+    """The bundled 3-70 keV rows, continued to :data:`CEILING_EV` where
+    :func:`_continuation` can (Z <= 92); the bundled rows are returned as
+    read, so every number inside 3-70 keV is the file's own."""
     table = _load_table()
     if sym not in table:
         raise KeyError(
             f"no Cromer-Liberman dispersion data for element {sym!r} "
             f"(the tabulation covers Z = 3-98)")
-    return table[sym]
+    rows = table[sym]
+    extra = _continuation(sym, rows)
+    return rows if extra is None else np.vstack([rows, extra])
+
+
+def bundled_band(element: str) -> tuple[float, float]:
+    """(E_lo, E_hi) in eV of the rows read from the bundled file for this
+    element, without the computed continuation above it (3-70 keV)."""
+    sym = normalize_element(element)
+    _table_for(sym)                       # the same KeyError for Z outside it
+    rows = _load_table()[sym]
+    return float(rows[0, 0]), float(rows[-1, 0])
+
+
+#: Upper end of the served band.  The bundled table stops at 70 keV, the limit
+#: of the original tabulation; above it rows are computed (see
+#: :func:`_continuation`) up to here, which covers the high-energy powder
+#: beamlines (#792 names 130 keV).  f″ there is checked against the McMaster
+#: photoelectric cross section only to 120 keV, where that table stops.
+CEILING_EV = 200_000.0
+
+#: The f″ samples behind the dispersion integral: log-spaced, 100 eV to
+#: 10 MeV, at this ratio, with a node pair placed on each absorption edge.
+#: Below 100 eV and above 10 MeV the integrand's share of f′ between 70 and
+#: 200 keV is under 1e-3 e and is absorbed by the anchoring constant.
+_KK_SAMPLES = (100.0, 1.0e7, 1.002)
+
+
+def _kk_samples(z: int) -> tuple[np.ndarray, np.ndarray]:
+    """(ε, f″(ε)) from gemmi's Cromer-Liberman, with every edge resolved.
+
+    A rise of f″ between two samples is an edge; it is bisected to 0.01 eV and
+    a sample placed either side, so the trapezoid integral sees a step rather
+    than a ramp 0.2 % wide (which costs up to 0.05 e of f′ within a few keV
+    of a K edge).
+    """
+    import gemmi
+
+    lo, hi, ratio = _KK_SAMPLES
+    eps = np.exp(np.arange(np.log(lo), np.log(hi), np.log(ratio)))
+
+    def f2(e: float) -> float:
+        return gemmi.cromer_liberman(z=z, energy=float(e))[1]
+
+    vals = np.array([f2(e) for e in eps])
+    nodes: list[tuple[float, float]] = []
+    for i in np.flatnonzero(np.diff(vals) > 0.0):
+        a, b, fa = float(eps[i]), float(eps[i + 1]), float(vals[i])
+        while b - a > 0.01:
+            m = 0.5 * (a + b)
+            if f2(m) > fa:
+                b = m
+            else:
+                a, fa = m, f2(m)
+        nodes += [(a, f2(a)), (b, f2(b))]
+    if nodes:
+        extra = np.array(nodes)
+        eps = np.concatenate([eps, extra[:, 0]])
+        vals = np.concatenate([vals, extra[:, 1]])
+        order = np.argsort(eps, kind="stable")
+        eps, vals = eps[order], vals[order]
+    return eps, vals
+
+
+def _dispersion_integral(energies: np.ndarray, eps: np.ndarray,
+                         f2: np.ndarray) -> np.ndarray:
+    """(2/π)·P∫ ε f″(ε) / (E² − ε²) dε at each E, over the sampled range.
+
+    The principal value is taken by subtracting g(E) = E·f″(E) from the
+    integrand, which leaves it finite at ε = E; the subtracted term is
+    integrated in closed form, using P∫₀^∞ dε/(E² − ε²) = 0.
+    """
+    g = eps * f2
+    e0, e1 = eps[0], eps[-1]
+    out = np.empty(len(energies))
+    for k, energy in enumerate(energies):
+        g_e = float(np.interp(energy, eps, g))
+        den = energy ** 2 - eps ** 2
+        with np.errstate(divide="ignore", invalid="ignore"):
+            integrand = (g - g_e) / den
+        bad = ~np.isfinite(integrand)
+        if bad.any():
+            integrand[bad] = np.interp(eps[bad], eps[~bad], integrand[~bad])
+        inside = (np.log((e1 + energy) / (e1 - energy))
+                  - np.log((energy + e0) / (energy - e0))) / (2.0 * energy)
+        out[k] = np.trapezoid(integrand, eps) + g_e * inside
+    return 2.0 / np.pi * out
+
+
+def _continuation(sym: str, rows: np.ndarray) -> np.ndarray | None:
+    """Rows above the bundled table, on its own log spacing, to the ceiling.
+
+    f″ is gemmi's Cromer-Liberman, the same calculation the bundled table
+    holds (they agree to 1e-4 e inside it).  f′ is **not** gemmi's: above a
+    K edge at Z >= 79 its f′ has spurious excursions of tens of electrons
+    (Pb −32.8 e at 100 keV, U −10.2 e at 130 keV, where the neighbouring
+    energies give about −1.6 and −2), so f′ is computed here from f″ by the
+    dispersion (Kramers-Kronig) relation
+
+        f′(E) = C + (2/π)·P∫ ε f″(ε) / (E² − ε²) dε
+
+    with C the energy-independent part, taken from the bundled table itself:
+    the median of f′_table − integral over its rows from half its top energy
+    up.  The continuation therefore continues the table rather than replacing
+    it.  Measured 2026-11-17: the integral plus C reproduces the bundled f′
+    over 35-70 keV to ≤ 0.005 e for every element more than 1 keV from an
+    edge, and C equals the high-energy limit the table carries (−0.015 e at
+    Si, −0.99 at Pb, −1.31 at U).
+
+    None where gemmi has no Cromer-Liberman data (Z > 92), so those elements
+    keep the bundled band.
+    """
+    import gemmi
+
+    z = gemmi.Element(sym).atomic_number
+    top = float(rows[-1, 0])
+    if not 0 < z <= 92 or top >= CEILING_EV:
+        return None
+    if gemmi.cromer_liberman(z=z, energy=CEILING_EV) == (0.0, 0.0):
+        return None
+    ratio = (rows[-1, 0] / rows[0, 0]) ** (1.0 / (len(rows) - 1))
+    n = int(np.ceil(np.log(CEILING_EV / top) / np.log(ratio)))
+    new_e = top * ratio ** np.arange(1, n + 1)
+    new_e[-1] = min(new_e[-1], CEILING_EV)
+    eps, f2 = _kk_samples(z)
+    anchor = rows[rows[:, 0] >= 0.5 * top]
+    c = float(np.median(anchor[:, 1]
+                        - _dispersion_integral(anchor[:, 0], eps, f2)))
+    fp = c + _dispersion_integral(new_e, eps, f2)
+    fpp = np.array([gemmi.cromer_liberman(z=z, energy=float(e))[1]
+                    for e in new_e])
+    return np.column_stack([new_e, fp, fpp])
 
 
 def near_edge(element: str, wavelength: float,
@@ -190,7 +333,10 @@ def dispersion(element: str, wavelength: float) -> tuple[float, float]:
     if not (e[0] <= energy <= e[-1]):
         raise ValueError(
             f"wavelength {wavelength} A (E = {energy / 1e3:.3f} keV) is outside "
-            f"the tabulated {e[0] / 1e3:.0f}-{e[-1] / 1e3:.0f} keV band for {sym}")
+            f"the tabulated {e[0] / 1e3:.0f}-{e[-1] / 1e3:.0f} keV band for "
+            f"{sym}; supply a measured pair through Dispersion.overrides, or "
+            "set Source.dispersion = None to model without the correction "
+            "(a fit then reports it as not sized)")
     i = int(np.searchsorted(e, energy)) - 1
     i = max(0, min(i, len(e) - 2))
     if grid[i + 1, 2] > grid[i, 2]:

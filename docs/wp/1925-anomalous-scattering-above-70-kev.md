@@ -67,14 +67,29 @@ short of 130 keV, so it is a partial answer.
 
 ## Tasks
 
-- [ ] Measure what the correction is worth above 70 keV, before choosing a
+- [x] Measure what the correction is worth above 70 keV, before choosing a
       source: the same pattern predicted with `dispersion = None` against an
       independent f′/f″ (gemmi's `cromer_liberman` for f″ as WP-0504 used it,
       and the Kissel-Pratt (1990) high-energy limit that FPRIME 3F applies) at
       80, 100 and 130 keV, for Si, Fe, Pb and U. At 60 keV Si the maximum
       intensity moves by 0.04 % between the default and `None` (2026-10-08,
       Debye-Scherrer, 5d1f5f67); the heavy elements are the question.
-- [ ] Decide the source. **Ruled by the maintainer 2026-11-02: extend the
+      **Measured 2026-11-17** (macOS arm64, worktree `.venv` `[dev]`,
+      Debye-Scherrer, one element per phase, d ≥ 0.45 Å; the same pattern with
+      the block on against `dispersion = None`; change of the maximum
+      intensity): Si −0.14/−0.19/−0.23 %, Fe +0.03/−0.19/−0.36 %, Pb
+      −6.2/−4.2/−2.2 %, U −4.3/−5.7/−4.9 % at 80/100/130 keV. The heavy
+      elements move their intensities by 2-6 %, past
+      `DISPERSION_NEGLECT_SEVERE`, so declining is not a small approximation
+      there. **gemmi's `cromer_liberman` f′ is not usable above the K edge for
+      Z ≥ 79**: it has spurious excursions (Pb −32.8 e at 100 keV and +28.4 e
+      at 125 keV; U −10.2 e at 130 keV; Au +17.4 e at 92.5 keV), which would
+      move Pb's intensities by −71 % at 100 keV. Its f″ is regular, puts the
+      edges where they are (Pt 78.5, Au 80.8, Pb 88.1, Bi 90.4, Th 109.8, U
+      115.4 keV), and matches McMaster's photoelectric cross section through
+      the optical theorem to within 3 % for Mo-U to 119 keV (Fe 12 %, where
+      f″ < 0.05 e). gemmi returns (0, 0) for Z = 93-98.
+- [x] Decide the source. **Ruled by the maintainer 2026-11-02: extend the
       table past 70 keV from a permissively licensed source**, so declining
       above 70 keV with a better message is no longer an option. The choice
       left is which source, recorded with task 1's numbers and a licence
@@ -82,6 +97,23 @@ short of 130 keV, so it is a partial answer.
       plus an analytic f′, xraylib, the Elam tables, or another. xraydb's
       Chantler extract is out unless NIST's terms are cleared (Inherited,
       2026-11-03).
+      **Decided 2026-11-17: no new data file.** f″ above 70 keV is gemmi's
+      Cromer-Liberman, the calculation the bundled table already holds (they
+      agree to 1e-4 e inside it); gemmi is a hard dependency (MPL-2.0), so
+      nothing new is redistributed. f′ is computed from that f″ by the
+      dispersion (Kramers-Kronig) relation, plus one constant taken from the
+      bundled table's own f′ (median over its rows from 35 keV), so the rows
+      above 70 keV continue the table. Checks: anchored on 35-55 keV only, the
+      computation reproduces the bundled f′ over 55-70 keV to ≤ 0.0073 e for
+      every element Z = 3-92 more than 1 keV from an edge (≤ 0.015 e from
+      0.3 keV); it agrees with gemmi's f′ wherever that is regular (Si, Fe,
+      Mo, W to 200 keV, Pb at 80, U at 80 and 100 keV) to ≤ 0.008 e; and the
+      constant is the high-energy limit the table carries (−0.015 e at Si,
+      −0.99 at Pb, −1.31 at U). The band now ends at 200 keV
+      (`dispersion.CEILING_EV`); f″ is checked against McMaster only to 120
+      keV, where that table stops. Rejected: xraylib's f′ (`fi.dat`) is from
+      EPDL97 (LLNL), which states no licence; McMaster's f″ alone stops at
+      120 keV and carries no f′.
 - [ ] If a table is added: bundle it with an ATTRIBUTION.md entry and a header
       stating its status (the wheel rule in root CLAUDE.md § Licensing), extend
       the band, keep the 3-70 keV rows bit-identical, and keep the edge guard.
