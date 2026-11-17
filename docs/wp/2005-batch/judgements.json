@@ -392,6 +392,11 @@
    "condition": "A wavelength was free in the fit; the message gives its shift from the declared value in ppm, with no test on its size.",
    "kind": 1,
    "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
+  },
+  "PARENT_STRAIN_HELD": {
+   "condition": "A `Phase.parent_cell` phase had a parent cell edge free in some stage while one of its declared Γ strains was never freed.",
+   "kind": 1,
+   "kind_reason": "It records a hold the plan's globs produced (the cell glob never frees a strain), which no reading of the data changes."
   }
  },
  "literals": {
@@ -530,6 +535,18 @@
   "_in|3|len(ids) <= 3": {
    "role": "listing cap",
    "reason": "Names up to three documents in full, beyond that the first and the last with the count."
+  },
+  "_owner_words|2|len(parts) > 2": {
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
+  },
+  "_owner_words|2|len(parts) == 2": {
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
+  },
+  "_owner_words|4|len(parts) == 4": {
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
   }
  }
 }
