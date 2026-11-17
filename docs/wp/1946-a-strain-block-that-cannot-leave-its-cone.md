@@ -78,32 +78,17 @@ S = ε²·[M²] is rank one in this form. M = vᵀg with g = (G\*₁₁, G\*₂�
 
 **Licensing.** GSAS-II for concepts only. TOPAS through its manual only.
 
-### Inherited
-
-- **2026-10-12, from WP-1930 (#832's sweep of 2026-10-08): brucite split
-  by platform before WP-1938.** TRF stopped at `max_iter` on Linux (Rwp
-  0.18030) and converged on macOS (0.17844), so `docs/VALIDATION.md`'s
-  17.84 % brucite figure is the macOS value. The default driver has been LM
-  since WP-1938; whether the split survives is unmeasured. This WP re-fits
-  brucite's Stephens block, so it is the cheapest place to check both
-  platforms.
-
-- **2026-11-02, from WP-1467 (closing): its messages landed, and a joint fit
-  still starts a block at S ≡ 0.** 1467 made a block replace the
-  `lor_strain` it locks, and `STEPHENS_STRAIN_NOT_POSITIVE` now names the
-  intensity share the clamp left at zero strain width (19-52 % over the four
-  phases 1467 probed under TRF on three CPD patterns). So the soft
-  dependency is discharged. Two findings bear on a formulation that cannot
-  leave the cone. (1) Carried from WP-2002 (PR #1113, 2026-10-23):
-  `MultiHistogramRefinement.fit`'s stage loop calls only `seed_floored`
-  (`multi.py` ~1619), never `seed_stephens`, so a joint fit through
-  `lab_sample_refine` starts a freed all-zero block at S ≡ 0, where the
-  width's square root has unbounded slope, and nothing says so. A joint fit
-  also holds no cone under either driver. Fixing the seed moves joint fits
-  that seed a block. (2) Measured on brucite (`[dev]`, macOS arm64), the start
-  barely matters under LM (χ²_red 7.8939-7.8945 from 1000 ppm, 800 ppm and the
-  isotropic fit's 29 ppm, all 0 of 43 reflections outside the cone) and
-  matters under TRF (7.7965-7.9267, 19-23 of 43 outside).
+**A joint fit never seeds the block** (WP-1467's close, carried from WP-2002,
+PR #1113; still true on 2026-11-17 at `7b761b54d`).
+`MultiHistogramRefinement.fit`'s stage loop calls `seed_floored` alone
+(`multi.py` ~2030), never `seed_stephens`, so a joint fit through
+`lab_sample_refine` starts a freed all-zero block at S ≡ 0, where the width's
+square root has unbounded slope, and nothing says so. A joint fit also holds
+no cone under either driver. Fixing the seed moves joint fits that seed a
+block. On brucite (`[dev]`, macOS arm64) the start barely matters under LM
+(χ²_red 7.8939-7.8945 from 1000 ppm, 800 ppm and the isotropic fit's 29 ppm,
+all 0 of 43 reflections outside the cone) and matters under TRF
+(7.7965-7.9267, 19-23 of 43 outside); measured by WP-1467.
 
 ## Non-goals
 
