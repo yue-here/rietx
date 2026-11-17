@@ -84,11 +84,12 @@ a: phases.0.cell.a at T=293 = 4.1564527(29) Å (extrapolating in T; form not rej
 ## Check that every coefficient refined
 
 A coefficient refines only where a stage frees it.
-An esd of `None` in `result.parametric` means it did not refine, and its value is the one it started from.
+A row of `result.parametric` with `vary` False did not refine, so its esd is `None` and its value is the one it started from.
+An esd of `None` alone does not say this, because a freed coefficient the data cannot see has none either.
 Two declarations leave a coefficient at its start.
 
 A formula equation's variable is held when it is declared with `vary=False`, which is the default of `rx.Parameter`.
-This writes the same line as a formula and leaves the slope at its default:
+This writes the same line as a formula and leaves the slope held at 0:
 
 ```{literalinclude} ../../../examples/guides/equation.py
 :language: python
@@ -104,7 +105,7 @@ slope 0.0 +/- None
 ```
 
 With the slope held at 0, every pattern has the same cell edge.
-The form test then rejects the line, and its message suggests revising the expression.
+The form test then rejects the line, and its suggestion is to revise the expression.
 Check each variable's `vary` before changing the formula.
 [Formula equations](../reference/parametric.md#formula-equations) says which stage frees a variable.
 

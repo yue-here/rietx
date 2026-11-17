@@ -272,7 +272,8 @@ These steps port such an input:
    If it returns, the `TOPAS_FEATURES_NOT_IMPORTED` diagnostics and `model.coverage` list what the import left out.
    The ZrMo₂O₈ ramp's input reads this way, as the first of its 68 runs, and `TOPAS_FIRST_RUN_READ` says so.
 2. If it raises, port from the input's text.
-   Expand the preprocessor first, since `#list`, `#define`, `#ifdef`, `macro` and `for xdds` are text substitution.
+   Expand the preprocessor and the loops first.
+   `#list`, `#define`, `#ifdef` and `macro` act on the text, and `for xdds` repeats its body.
    TOPAS writes the input with every macro expanded to `TOPAS.LOG` when it runs, so read that file where TOPAS is at hand.
    By hand, each `#list` row is one pattern and one row of the `rx.CoordinateTable`.
    A `#define` decides which `#ifdef` branch is live, and a macro call is its body with the arguments substituted.

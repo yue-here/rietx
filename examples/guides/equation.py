@@ -100,7 +100,10 @@ assert [d.code for d in held.diagnostics if d.code.startswith("PARAMETRIC")] == 
 # A line on a B that no stage of mccusker_default frees: both coefficients keep
 # their starts, with no esd and no diagnostic, while the cell line refines.
 b_rows = [c for c in unreached.parametric if c.equation == "b"]
-assert [(f"{c.value:.6g}", c.esd) for c in b_rows] == [("0.4", None), ("0", None)]
-assert all(c.esd is not None for c in unreached.parametric if c.equation == "a")
+assert [(f"{c.value:.6g}", c.esd, c.vary) for c in b_rows] == [("0.4", None, False),
+                                                               ("0", None, False)]
+assert [(f"{c.value:.6g}", f"{c.esd:.1e}") for c in unreached.parametric
+        if c.equation == "a"] == [("4.16283", "1.6e-06"), ("2.07819e-05", "8.0e-09")]
+assert held.parametric[1].vary is False
 assert not any(d.code.startswith("PARAMETRIC") for d in unreached.diagnostics)
 assert not any("biso" in p.path for p in unreached.parameters)
