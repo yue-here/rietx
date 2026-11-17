@@ -27,6 +27,7 @@ unchanged, while a scoped glob (``hist.1.*``) targets one.
 
 from __future__ import annotations
 
+import copy
 import fnmatch
 import math
 from dataclasses import dataclass, field
@@ -1423,10 +1424,14 @@ class MultiParameterTable:
         ``Phase.floating_origin``.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
-        hits = sorted(n for n in self.user_holds
-                      if any(fnmatch.fnmatchcase(n, g) for g in globs))
+        # a register name matches as a stage glob matches a row: by its joint
+        # name or its bare path, so ``unhold`` takes back what ``hold`` took
+        def reached(n: str, g: str) -> bool:
+            return fnmatch.fnmatchcase(n, g) or fnmatch.fnmatchcase(_unscoped(n), g)
+
+        hits = sorted(n for n in self.user_holds if any(reached(n, g) for g in globs))
         for glob in globs:
-            if not is_literal_path(glob) or glob in hits:
+            if not is_literal_path(glob) or any(reached(n, glob) for n in hits):
                 continue
             self._refuse_unknown_literals([glob])
             origin = any(self._canonical(h, p) == glob
@@ -1529,14 +1534,19 @@ class MultiParameterTable:
                             f"{source!r} is fixed or follows another parameter, so "
                             "it carries no freedom of its own; tie to what it "
                             "follows instead, or name a variable")
-                    by_h.setdefault(h, (t, []))[1].append((s, c))
+                    # a size row is stored in each pattern's units (WP-1131), so
+                    # the tie is written in them: c·f_t/f_s on the source
+                    by_h.setdefault(h, (t, []))[1].append(
+                        (s, c * self._scale(h, t) / self._scale(h, s)))
             for h, (t, pairs) in by_h.items():
                 e = self._entry(h, t)
-                implied = const + sum(c * self._entry(h, s).value for s, c in pairs)
+                k = const * self._scale(h, t)
+                implied = k + sum(c * self._entry(h, s).value for s, c in pairs)
                 if not (e.lo <= implied <= e.hi):
-                    raise ValueError(f"the tie puts {target}={implied:g} outside "
-                                     f"its bounds [{e.lo}, {e.hi}]")
-                writes.append((h, t, AffineTie(terms=tuple(pairs), const=const)))
+                    f = self._scale(h, t)
+                    raise ValueError(f"the tie puts {target}={implied / f:g} outside "
+                                     f"its bounds [{e.lo / f}, {e.hi / f}]")
+                writes.append((h, t, AffineTie(terms=tuple(pairs), const=k)))
         before = [{e.path: (e.value, e.tie, e.vary) for e in t.entries}
                   for t in self.tables]
         try:
@@ -1599,6 +1609,11 @@ class MultiParameterTable:
                     f"{target!r} is a displacement from where the fit began (a "
                     "site DOF or a rigid-body increment), so a formula cannot "
                     "set it absolutely; tie it linearly")
+            if any(self._scale(k, t) != 1.0 for k in range(self.n_histograms)):
+                raise ValueError(
+                    f"{target!r} is stored in each pattern's own units (a size "
+                    "across wavelengths, WP-1131), which a formula cannot "
+                    "follow; tie it linearly")
             missing = [n for n in expr.names if f"vars.{n}" not in table._paths]
             if missing:
                 raise ValueError(
@@ -1624,15 +1639,19 @@ class MultiParameterTable:
                                  f"{target}={value:g}, outside its bounds "
                                  f"[{e.lo:g}, {e.hi:g}]; loosen that bound or set "
                                  "the variables nearer")
-        for h, t in where:
-            table = self.tables[h]
-            held = self._entry(h, t).held
-            if held:
-                table.set_held([t], False)
-            table.add_expression(t, expr,
-                                 variables={n: f"vars.{n}" for n in expr.names})
-            if held:
-                table.set_held([t], True)
+        # the table's own refusals (a follower reading the target beside
+        # another source) are asked of a copy of every table first, because a
+        # table cannot take a formula back
+        for live in (False, True):
+            for h, t in where:
+                table = self.tables[h] if live else copy.deepcopy(self.tables[h])
+                held = table.entries[table._paths[t]].held
+                if held:
+                    table.set_held([t], False)
+                table.add_expression(t, expr,
+                                     variables={n: f"vars.{n}" for n in expr.names})
+                if held:
+                    table.set_held([t], True)
         self.user_ties[target] = TieSpec(expression=text, user=True)
         self._rebuild_columns()
         self.apply_to_models()
