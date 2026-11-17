@@ -179,7 +179,7 @@ Cryst. 24, 1. Issue #1219; WP-1517 row 6; WP-1033 (the fitted mask).
       rows for the two acceptance tests. The API partition is now met by a § Fit range section in
       `reference/result.md`. Deferring the names failed once main's `DEFERRED_CEILING` fell to 36.
     - No `main` baseline was measured, so the added-test delta is CI's to read.
-    - The full selection did not run. Pearl was not answering, and only the two acceptance rows
+    - The full selection did not run. The workstation was not answering, and only the two acceptance rows
       above could move, run on their own: 1 passed each.
   - After merging origin/main at 2026-11-09T01:2xZ, the touched selection was re-run: 1111 passed,
     1 failed (the red-by-design row). The selection was `test_fit_range`, `test_exporters`,

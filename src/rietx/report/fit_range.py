@@ -67,8 +67,13 @@ def fit_range_record(data: PatternData,
     ``excluded_applied`` keeps a declared region only where it removed a
     channel the limits had kept, clipped to the limits, so a region lying
     wholly outside them is declared and not applied.  ``outside`` is built
-    from the unfitted runs of the fitted mask: a range end and an excluded
-    region that touch are one stretch of channels, and one span.
+    from the runs of channels the limits and the excluded regions cut: a
+    range end and an excluded region that touch are one stretch of channels,
+    and one span.  A channel that left the fit only because its σ is zero or
+    negative (``nonpositive_sigma="exclude"``, the default, WP-1952) is no
+    caller's cut and is in no span: ``n_fitted`` and ``counts_fitted`` leave
+    it out, and ``RefinementResult.sigma_rule.n_nonpositive_excluded`` counts
+    it.
     """
     from ..project import fitted_mask
 
@@ -82,10 +87,13 @@ def fit_range_record(data: PatternData,
 
     limits_applied = None
     kept = np.ones(n, dtype=bool)
+    # the caller's cut: the limits and the excluded regions, without the σ rule
+    cut_mask = data._region_mask()
     if two_theta_limits is not None:
         lo, hi = (float(v) for v in two_theta_limits)
         limits_applied = (max(lo, file_lo), min(hi, file_hi))
         kept = (tt >= lo) & (tt <= hi)
+        cut_mask &= kept
     window = limits_applied or (file_lo, file_hi)
 
     applied: list[tuple[float, float]] = []
@@ -95,7 +103,7 @@ def fit_range_record(data: PatternData,
 
     total = float(y.sum())
     outside: list[OutsideSpan] = []
-    for i0, i1 in _runs(~mask):
+    for i0, i1 in _runs(~cut_mask):
         kind = "below" if i0 == 0 else "above" if i1 == n - 1 else "excluded"
         outside.append(OutsideSpan(
             kind=kind, lo=float(tt[i0]), hi=float(tt[i1]),

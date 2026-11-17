@@ -22,7 +22,7 @@ import pytest
 import rietx as rx
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
-from rietx.report.fit_range import model_reflections
+from rietx.report.fit_range import fit_range_record, model_reflections
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.results import RefinementResult
@@ -65,6 +65,36 @@ def test_an_uncut_fit_reports_the_file_range_and_nothing_else(uncut):
     assert fr.excluded_declared == fr.excluded_applied == []
     assert fr.outside == []
     assert fr.counts_fitted == pytest.approx(fr.counts_file)
+
+
+def test_channels_the_sigma_rule_drops_are_no_cut_of_the_callers():
+    """With no limits and no regions, the channels WP-1952's default
+    (``nonpositive_sigma="exclude"``) drops for σ = 0 are in no span: they
+    are counted by ``sigma_rule``, not reported as a range end or an excluded
+    region the caller declared.  Before the fix the record held three spans
+    here, ``below``, ``excluded`` and ``excluded``."""
+    data = synthesize()
+    sig = np.sqrt(np.maximum(np.asarray(data.intensity), 1.0))
+    zeros = [0, 500, 501, 900]
+    sig[zeros] = 0.0
+    data = data.model_copy(update={"sigma": sig.tolist()})
+    _ref, result = _fit(data)
+    fr = result.fit_range
+    assert fr.limits_requested is None
+    assert fr.excluded_declared == fr.excluded_applied == []
+    assert fr.outside == []
+    assert fr.n_fitted == len(result.two_theta) == fr.n_file - len(zeros)
+    assert result.sigma_rule.n_nonpositive_excluded == len(zeros)
+    assert "outside" not in fr.line()
+    # with limits, the spans are the limits' alone, and the three counts
+    # still add up to the file's
+    rec = fit_range_record(data, LIMITS)
+    assert [s.kind for s in rec.outside] == ["below", "above"]
+    assert rec.outside[0].hi < LIMITS[0] < LIMITS[1] < rec.outside[1].lo
+    n_sigma = data.sigma_rule(
+        (data.tt() >= LIMITS[0]) & (data.tt() <= LIMITS[1])).n_nonpositive_excluded
+    assert n_sigma == 3
+    assert rec.n_fitted + sum(s.n_points for s in rec.outside) + n_sigma == rec.n_file
 
 
 def test_a_cut_fit_records_the_limits_and_regions_as_asked_and_applied(cut):
@@ -183,10 +213,19 @@ def _fit_family_a(data, limits):
 def test_c7_a_low_cut_reports_the_rise_it_left_out(family_a, cut):
     """C7: whatever the lower limit, the span below it carries its share of
     the counts and its level, at the cut and at the file's start, rising
-    away from the fitted range."""
+    away from the fitted range.
+
+    Family A's own Chebyshev background already rises toward low angle, so
+    each fact is read against the same fit of the same draw without the rise.
+    Without the rise (rise / no rise, 2026-11-17): ``level_ratio_far`` 19.4 /
+    1.35 at 9 degrees and 19.7 / 1.37 at 22, about 14x at every cut;
+    ``count_share`` 0.268 / 0.041 at 9 and 0.437 / 0.166 at 22, 2.6x at the
+    least; ``slope_at_cut`` 0.271 / 0.013 at 9 and 0.053 / 0.037 at 22."""
     draw, _r420 = family_a
     data = draw(rise=True)
     ref, result = _fit_family_a(data, (cut, 130.0))
+    _ref0, plain = _fit_family_a(draw(rise=False), (cut, 130.0))
+    [plain_below] = plain.fit_range.outside
     fr = result.fit_range
     assert fr.limits_requested == (cut, 130.0)
     assert fr.n_fitted == len(result.two_theta)
@@ -199,6 +238,10 @@ def test_c7_a_low_cut_reports_the_rise_it_left_out(family_a, cut):
     # the rise grows toward the file's start, and rises away from the cut
     assert below.level_ratio_far > below.level_ratio_at_cut > 1.0
     assert below.slope_at_cut > 0.0
+    # ... and the record sees the rise, not the background beneath it
+    assert below.level_ratio_far > 5.0 * plain_below.level_ratio_far
+    assert below.count_share > 2.0 * plain_below.count_share
+    assert below.slope_at_cut > plain_below.slope_at_cut
     assert any(line.strip() == fr.line() for line in ref.summary().splitlines())
 
 

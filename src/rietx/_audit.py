@@ -1850,8 +1850,12 @@ ROWS: tuple[Row, ...] = (
                   "Acta Cryst. A26, 682 (docstring)")),
     Row("rietx.schemas.results.RefinementResult.fit_range", "action", tier="caller", ambiguity=1,
         evidence=("restates the caller's own act (WP-2075, #1219): two_theta_limits handed to "
-                  "fit and PatternData.excluded_regions, both off by default, read through "
-                  "project.fitted_mask, the authority compile_model is pinned to (WP-1033); "
+                  "fit and PatternData.excluded_regions, both off by default; n_fitted and "
+                  "counts_fitted are read through project.fitted_mask, the authority "
+                  "compile_model is pinned to (WP-1033), which also drops WP-1952's default "
+                  "sigma <= 0 channels, but the outside spans are built from the limits and "
+                  "regions alone, so a package default is never reported as the caller's "
+                  "cut (sigma_rule.n_nonpositive_excluded counts those channels); "
                   "the record moves no value and gates nothing. The file's range, the limits "
                   "and regions as asked and as applied, and each unfitted span's share of "
                   "the file's counts are arithmetic on the pattern")),

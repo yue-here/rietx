@@ -184,8 +184,10 @@ def pattern_items(result, wavelength: float, pattern=None
         ("_pd_meas_2theta_range_min", number("_pd_meas_2theta_range_min", meas_lo)),
         ("_pd_meas_2theta_range_max", number("_pd_meas_2theta_range_max", meas_hi)),
     ]
-    # the loop is the whole file only where nothing was cut
-    step = _constant_step(tt) if record is None or not record.outside else None
+    # the loop is the whole file only where every channel was fitted (a σ ≤ 0
+    # channel left out by WP-1952's default is in no span, but not in the loop)
+    step = (_constant_step(tt) if record is None or record.n_fitted == record.n_file
+            else None)
     if step is not None:
         pairs.append(("_pd_meas_2theta_range_inc", _g(step)))
     pairs += [

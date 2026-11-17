@@ -326,14 +326,14 @@ Each fact restates the limits and exclusions the fit was handed, and nothing in 
 | `FitRange.excluded_applied` | the regions that removed a channel the limits kept, clipped to the limits | a region outside the limits is declared and not applied |
 | `FitRange.fitted_range`, `FitRange.n_fitted` | the first and last fitted channel, and the fitted count | `n_fitted` equals `len(result.two_theta)` |
 | `FitRange.counts_file`, `FitRange.counts_fitted` | the summed observed intensity in the file and in the fitted channels | |
-| `FitRange.count_share_outside` | the share of the file's counts the fit left out | |
-| `FitRange.outside` | one `OutsideSpan` per stretch of channels the fit left out | empty when nothing was cut |
+| `FitRange.count_share_outside` | the share of the file's counts the limits and excluded regions cut | |
+| `FitRange.outside` | one `OutsideSpan` per stretch of channels the limits and excluded regions cut | empty when nothing was cut; a channel left out only for a σ of zero or below is in no span, and `RefinementResult.sigma_rule.n_nonpositive_excluded` counts it |
 | `FitRange.cut_window_deg`, `FitRange.straddle_fwhm` | the two reporting widths the spans' facts were read with | `None` when nothing was cut |
 
 `FitRange.line()` is the line `summary()` prints beside `excluded:`.
 An uncut fit prints a fitted range equal to the file's range and nothing else.
 
-An `OutsideSpan` is one unfitted stretch.
+An `OutsideSpan` is one stretch the caller's limits or excluded regions cut.
 `OutsideSpan.kind` is `"below"` from the file's start, `"above"` to its end, or `"excluded"` with fitted channels on both sides.
 `OutsideSpan.lo`, `OutsideSpan.hi` and `OutsideSpan.n_points` are its first and last channel and its count.
 `OutsideSpan.count_share` is its share of the file's counts.

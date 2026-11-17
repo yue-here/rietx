@@ -45,6 +45,7 @@ B(La) 0.453890 → 0.470545 and B(B) 0.205395 → 0.222049, both +0.0166542 Å²
 against a predicted 0.0166542.
 """
 
+import math
 from pathlib import Path
 
 import pytest
@@ -256,7 +257,7 @@ def test_the_result_records_both_cuts_and_the_lines_above_60_degrees(plain):
     """WP-2075 on real data: the suite's limits cut both ends of the file,
     and the stretch above 60° holds lines the fit never saw (issue #1219)."""
     data = rx.read_pattern(DATA / "11BM_LaB6_660a.fxye")
-    _ref, result = plain
+    ref, result = plain
     fr = result.fit_range
     assert fr.file_range == (data.two_theta[0], data.two_theta[-1])
     assert fr.n_file == len(data.two_theta)
@@ -267,6 +268,18 @@ def test_the_result_records_both_cuts_and_the_lines_above_60_degrees(plain):
     assert below.lo == data.two_theta[0] and below.hi < LIMITS[0]
     assert above.lo > LIMITS[1] and above.hi == data.two_theta[-1]
     assert below.count_share > 0.0 and above.count_share > 0.0
-    # the strongest peak-like feature past the upper limit is a line
+    # the strongest peak-like feature past the upper limit is a line.
+    # peak_sigma is a location, not a detection, so it is read against the
+    # same statistic over the span below 2 degrees, which holds no LaB6 line
+    # (the first, (100), is near 5.7 degrees): 11.6 sigma above against 7.4
+    # below (2026-11-17), the below span's at its first channel
     assert above.peak_two_theta > LIMITS[1]
-    assert above.peak_sigma > 5.0
+    assert above.peak_sigma > below.peak_sigma
+    # and it sits on a LaB6 reflection of the refined cell: 62.824 against
+    # h2+k2+l2 = 110 at 62.823, well inside the line's FWHM of about 0.02
+    a = ref.structure.phases[0].cell.a.value
+    sums = {h * h + k * k + m * m for h in range(15) for k in range(15)
+            for m in range(15)} - {0}
+    lines = [2.0 * math.degrees(math.asin(WAVELENGTH * math.sqrt(n) / (2.0 * a)))
+             for n in sums if WAVELENGTH * math.sqrt(n) / (2.0 * a) < 1.0]
+    assert min(abs(above.peak_two_theta - t) for t in lines) < 0.01

@@ -2140,8 +2140,10 @@ class ReflectionOutside(Base):
 
 
 class OutsideSpan(Base):
-    """One contiguous stretch of the file's channels that the fit left out
-    (WP-2075), and what lies in it.
+    """One contiguous stretch of the file's channels that the fit's 2θ limits
+    or excluded regions cut (WP-2075), and what lies in it.  A channel left out
+    only for a σ of zero or below (WP-1952's default) is in no span; the
+    result's ``sigma_rule.n_nonpositive_excluded`` counts it.
 
     ``kind`` says why: ``"below"`` runs from the file's first channel to the
     fitted range's start, ``"above"`` from its end to the file's last channel,
@@ -2223,9 +2225,13 @@ class FitRange(Base):
     reflection list was at hand), so a stored result says what "at the cut"
     meant when it was written.
 
-    ``outside`` holds one :class:`OutsideSpan` per stretch the fit left out:
-    empty when nothing was cut, which is the one case where ``fitted_range``
-    equals ``file_range`` with nothing else to say.  Before WP-2075 a result
+    ``outside`` holds one :class:`OutsideSpan` per stretch the limits and the
+    excluded regions cut: empty when nothing was cut.  Channels the σ ≤ 0 rule
+    left out (``nonpositive_sigma="exclude"``, the default, WP-1952) are no
+    caller's cut and are in no span, so ``n_fitted`` plus the spans'
+    ``n_points`` plus ``RefinementResult.sigma_rule.n_nonpositive_excluded``
+    is ``n_file``; such a channel at a file end moves ``fitted_range`` off
+    ``file_range`` with ``outside`` empty.  Before WP-2075 a result
     said none of this: the fitted ends could be read off ``two_theta``, but
     not that a cut happened or what it removed.
 
@@ -2251,7 +2257,8 @@ class FitRange(Base):
 
     @property
     def count_share_outside(self) -> float:
-        """The share of the file's summed intensity the fit left out."""
+        """The share of the file's summed intensity the limits and excluded
+        regions cut."""
         return float(sum(s.count_share for s in self.outside))
 
     def line(self) -> str:
