@@ -103,8 +103,11 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [ ] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
   diagnostic changes what a fit prints, so the maintainer rules first (handover entry
   2026-11-17 has the brief).
-- [ ] A worked `design` scan over a held scalar, in `examples/`, included into
-  `guides/equation.md`, with its missing esd stated.
+- [x] A worked `design` scan over a held scalar, in `examples/`, included into
+  `guides/equation.md`, with its missing esd stated. *Withdrawn 2026-11-17:* a formula
+  equation now refines the nonlinear scalar itself, with an esd (`guides/formula.md`,
+  θ = 500.17 ± 0.61 K), so the scan is a weaker spelling of a fit the manual already
+  shows.
 - [ ] The refusal message names `.parameters()`.
 - [x] Skill: the series reference's parametric row, or "none" and why. *Done
   2026-11-17:* the existing row in `series.md` carries the plan-reach rule, tightened to
