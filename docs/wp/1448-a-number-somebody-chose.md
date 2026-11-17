@@ -133,16 +133,17 @@ remembers, and the alternatives are the first thing lost.
 - [x] Where the alternatives live. DESIGN.md § Locked decisions already has the
       format and the dated-amendment habit; the question is whether a
       WP-scoped decision belongs there or in the WP, and what the rule is.
-      **The rule: in the record where the choice was made, under its date.**
-      A choice made inside one WP goes in that WP's handover entry of the
-      day, alternatives and all, because the WP is what the code already
-      cites and its log is dated. A choice that binds later WPs (a
-      package-wide default, a convention) goes in DESIGN.md § Locked
+      **The rule: in the record where the choice was made, under its date.** A
+      choice made inside one WP goes in that WP under its date, normally the
+      handover entry of the day (a dated "Decided" paragraph in Context, as
+      WP-1339 has, holds it too), alternatives and all, because the WP is what
+      the code already cites and its record is dated. A choice that binds later
+      WPs (a package-wide default, a convention) goes in DESIGN.md § Locked
       decisions, as an entry or a dated *Amendment*. A maintainer ruling
-      recorded in a milestone file (`docs/milestones/generality.md`
-      § Decisions with the maintainer, 2026-10-18) stays there. The tag
-      names whichever holds it. A choice later revisited gets a new dated
-      entry and a new tag date; the old entry stays.
+      recorded in a milestone file (`docs/milestones/generality.md` § Decisions
+      with the maintainer, 2026-10-18) stays there. The tag names whichever
+      holds it. A choice later revisited gets a new dated entry and a new tag
+      date; the old entry stays.
 - [x] The meta-test, modelled on `test_skill.py`'s: a tag that names nothing is
       a failure. Decide what it can actually check — a date, a resolvable WP or
       DESIGN.md anchor — and do not claim more.

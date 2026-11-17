@@ -9,8 +9,8 @@ skill's ``*(Kind: pointer — text)*`` shape::
     *(Chosen: docs/DESIGN.md § Locked decisions, 2026-07-24 — torch before jax-metal)*
 
 The pointer names the record where the choice was made and the alternatives
-are written: a WP, whose handover entry of that date holds it, or a ``docs/``
-file and one of its headings.  The rule and the reasons are in
+are written: a WP, which holds it under that date (normally its handover
+entry of the day), or a ``docs/`` file and one of its headings.  The rule and the reasons are in
 ``docs/wp/1448-a-number-somebody-chose.md``.
 
 **What this checks**, as ``tests/test_skill.py`` checks a ``Measured`` tag
@@ -20,8 +20,10 @@ its WP file exists, or its ``docs/`` file has that heading; and the record
 mentions the date, in the WP file or inside the named section.
 
 **What it cannot check**: that the record really holds the alternatives (it
-checks only that the pointer lands on a record of that day), and that an
-untagged value was not chosen.  The second is why the tag is a convention in
+checks only that the date appears in the record: for a WP pointer the date may
+appear anywhere in the WP file, a Filed or Status line included, so a tag
+dated the day the WP was filed passes whatever the handover log says), and
+that an untagged value was not chosen.  The second is why the tag is a convention in
 root ``CLAUDE.md`` § Conventions and not a gate on every number; the audit
 table (``rietx._audit``) is what gates walked numbers.
 """
@@ -38,8 +40,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "rietx"
 
 #: Where a tag starts.  Anything matching this must parse as :data:`_TAG`,
-#: so a misspelt tag fails instead of passing unread.
-_TAG_START = re.compile(r"\*\(Chosen\b")
+#: so a misspelt tag fails instead of passing unread: any case, spaces after
+#: the parenthesis, and a tag whose asterisks were dropped but which still
+#: names a record.  Code such as ``f(chosen, x)`` or ``def f(chosen: str)``
+#: has neither the ``*`` nor a record after the colon, so it is not read.
+_TAG_START = re.compile(r"\*\(\s*chosen\b|\(\s*chosen\s*:\s*(?:WP-|docs/)", re.I)
 #: The whole tag, matched at a :data:`_TAG_START` on flattened text.
 _TAG = re.compile(
     r"\*\(Chosen: "
@@ -191,3 +196,20 @@ def test_a_tag_wrapped_across_comment_and_docstring_lines_is_read_whole():
         "*(Chosen: WP-0001, 2026-09-22 — parents over ghosts)*",
         "*(Chosen WP-0001 2026-09-22)*",
     ]
+
+
+@pytest.mark.parametrize("source", [
+    "#: bar *(chosen: WP-0001, 2026-09-22 — A over B)*",
+    "#: bar *( Chosen: WP-0001, 2026-09-22 — A over B)*",
+    "#: bar (Chosen: WP-0001, 2026-09-22 — A over B)*",
+])
+def test_a_tag_misspelt_at_its_start_is_found_and_fails(tree, source):
+    tags = _tags(source)
+    assert len(tags) == 1, tags
+    problems = _tag_problems(tags[0], tree, TODAY)
+    assert len(problems) == 1 and "is not a whole tag" in problems[0], problems
+
+
+def test_code_that_says_chosen_is_not_read_as_a_tag():
+    source = "x = f(chosen, sets.get(chosen))\ndef g(chosen: str) -> None: ...\n"
+    assert _tags(source) == []
