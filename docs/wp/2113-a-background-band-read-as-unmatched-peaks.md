@@ -52,9 +52,7 @@ constant to the Layer 0 every `FitReport` reads and leaves the validation at Rwp
 acceptance lists, and a two-phase list where the unmatched lines are real), with the known impurity as
 the reference. It answers by kind 3: report the number with its meaning.
 
-### Inherited
-
-- **2026-11-15, from WP-2041 (PR #1570): a third family, a strong line's tail past the fit's
+**Folded in from the former Inherited section; not consumed by route A, not measured under it (WP closed).** **2026-11-15, from WP-2041 (PR #1570): a third family, a strong line's tail past the fit's
   profile window.** Tutorial 03's synthetic aragonite (one phase, true Lorentzian X = 0.05),
   cut to 10-45° 2θ and indexed with the notebook's `spec`, ranks the true cell first and reports
   `unmatched_observed` 1, `INDEX_IMPURITY_LINES` "strongest region near 25.540°". That is the
