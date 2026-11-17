@@ -180,7 +180,7 @@ root's precedence against `telemetry=` and the working directory.
     `test_runs.py`, `test_pyinstaller_hook.py`, `test_watch_app.py` 205 passed,
     1 skipped; `test_manual_api.py` + `test_docs_consistency.py` +
     `test_pyinstaller_hook.py` 50 passed; manual `sphinx -W` clean; Vale 0
-    errors. Pearl (Linux x86_64, `rietx-py312`, tree on `PYTHONPATH`): canary
+    errors. The workstation (Linux x86_64, `rietx-py312`, tree on `PYTHONPATH`): canary
     at 691ee826c 287 passed, 1 failed (the audit walk had no place for
     `__pyinstaller`, fixed in 073495b20), then 288 passed, 4 skipped at
     073495b20. Fast selection on the merged tree 9d69c40d5 (`origin/main` f1187a062 merged in): 14873
@@ -191,7 +191,7 @@ root's precedence against `telemetry=` and the working directory.
     PyInstaller now sits. Fixed in 7b5cfba9e; both files then 64 passed on the Mac.
     The suite added 17 tests (12 + 5); the one extra skip against other
     branches' runs (281, not 280) is the hook's entry-point test, which skips
-    wherever the installed dist-info predates the branch (pearl's shared
+    wherever the installed dist-info predates the branch (the workstation's shared
     venv); CI installs fresh.
   - *Review.* A read-only reviewer found the banner silent for a root under
     a dot-directory of the working directory (fixed), pruning once per process
