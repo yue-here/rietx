@@ -442,7 +442,8 @@ def test_a_stated_automatic_mode_is_said_plainly(tmp_path):
 
 # --------------------------------------------------------------- second review (PR #1627)
 
-def _p63mmc_set(tmp_path, u: tuple[float, ...], stem: str = "hex"):
+def _p63mmc_set(tmp_path, u: tuple[float, ...], stem: str = "hex", *,
+                ai_text: str | None = None, u_text: list[str] | None = None):
     """Mg on 2c (1/3, 2/3, 1/4) of P6_3/mmc, anisotropic: ai = 2/24 = 1/12, and
     the site's 3m symmetry ties U22 = U11, U12 = U11/2, U13 = U23 = 0."""
     sg = gemmi.SpaceGroup("P 63/m m c")
@@ -459,12 +460,15 @@ def _p63mmc_set(tmp_path, u: tuple[float, ...], stem: str = "hex"):
          "cell 3.21 3.21 5.21 90 90 120", "spgroup P63/mmc 194 6", "centro",
          "lattice P"] + [f"symmetry {op}" for op in ops]
         + ["atom Mg", "end", "*" * 60, "refine", "autkeys 0", "end"]) + "\n"
+    ai = (ai_text or _num(1 / 12)).rjust(9)
+    keyed_u = (_keyed(u, "0000111100") if u_text is None else
+               "".join(t.rjust(9) for t in u_text).ljust(60) + "0000111100")
     text40 = "\n".join([
         "    1    0    0    0",
         _keyed([1.0, 0, 0, 0, 0, 0], "100000"), _num(0.0),
         _keyed([0] * 6, "000000"), _keyed([0] * 6, "000000"),
-        "Mg1       1  2     " + "".join(_num(v) for v in (1 / 12, 1 / 3, 2 / 3, 0.25)),
-        _keyed(u, "0000111100")]) + "\n"
+        "Mg1       1  2     " + ai + "".join(_num(v) for v in (1 / 3, 2 / 3, 0.25)),
+        keyed_u]) + "\n"
     text41 = "\n".join([
         "bckgtype 1 bckgnum 3", "end", "*" * 60,
         "# Cell parameters - a,b,c,alpha,beta,gamma",
@@ -525,3 +529,82 @@ def test_commands_on_the_refine_line_are_read(tmp_path):
     text = m50(refine="").replace("\nrefine\n", "\nrefine autkeys 0\n")
     model = jana.read_jana(write_set(tmp_path, stem="b", m50=text), diagnostics=diags)
     assert model.autkeys == 0 and diags == []
+
+
+# --------------------------------------------------------------- third review (PR #1627)
+
+def _info(diags):
+    (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
+    return info
+
+
+def test_a_uij_key_on_some_components_is_reported_as_merged(tmp_path):
+    """Ti1 on 4g allows U11, U22, U33 and U12; a key on U11 alone is read by
+    ParameterTable as one flag for all four: said, as the xyz merge is."""
+    ti = _keyed([0.011, 0.012, 0.013, 0.001, 0, 0], "0110100000")
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path, m40=m40(ti_adp=ti))),
+                      phase="Alpha", diagnostics=diags)
+    info = _info(diags)
+    assert "per-component Uij keys of Ti1" in info.message
+    assert "phases.0.atoms.1.aniso.u11" in info.where
+
+
+def test_a_uij_key_on_every_allowed_component_reports_no_merge(tmp_path):
+    """The default fixture keys U11, U22, U33 and U12 and leaves the two the
+    4g symmetry fixes at zero: that is the whole allowed set, not a merge."""
+    ti = _keyed([0.011, 0.012, 0.013, 0.001, 0, 0], "0110111100")
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path, m40=m40(ti_adp=ti))),
+                      phase="Alpha", diagnostics=diags)
+    assert "Uij keys" not in _info(diags).message
+
+
+def test_a_nonzero_origin_shift_is_refused_and_a_zero_one_read(tmp_path):
+    """No page of M98 says the listed operators include the shift, so a nonzero
+    one could land the structure at the wrong origin without a signal."""
+    shifted = m50(extra_phase="sgshift 0.5 0 0")
+    model = jana.read_jana(write_set(tmp_path, m50=shifted))
+    assert model.phases[0].sgshift == (0.5, 0.0, 0.0)
+    with pytest.raises(jana.JanaError, match=r"syn\.m50.*origin shift"):
+        jana.to_structure(model, phase="Alpha")
+    zero = m50(extra_phase="sgshift 0 0 0")
+    jana.to_structure(jana.read_jana(write_set(tmp_path, stem="z", m50=zero)),
+                      phase="Alpha")
+
+
+def test_a_stated_form_factor_table_is_reported_not_carried(tmp_path):
+    with_table = m50(extra_phase="formtab 4\n 1.0 2.0 3.0 4.0")
+    diags: list[Diagnostic] = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path, m50=with_table)),
+                      phase="Alpha", diagnostics=diags)
+    assert "formtab" in _info(diags).message
+    diags = []
+    jana.to_structure(jana.read_jana(write_set(tmp_path, stem="b")),
+                      phase="Alpha", diagnostics=diags)
+    assert "formtab" not in _info(diags).message
+
+
+def test_ai_is_read_to_its_own_last_printed_digit(tmp_path):
+    """1/12 printed 0.083 is 0.996 of a full 2c site, inside half a unit of
+    its own last digit (5e-4 x the order 12): full, and said. Six-decimal
+    printing, which the first slice assumed for every file, would leave 0.996."""
+    diags: list[Diagnostic] = []
+    s = jana.to_structure(jana.read_jana(_p63mmc_set(
+        tmp_path, (0.012347, 0.012347, 0.015, 0.006174, 0, 0), ai_text="0.083")),
+        diagnostics=diags)
+    assert s.phases[0].atoms[0].occ.value == 1.0
+    assert "phases.0.atoms.0.occ" in _info(diags).where
+
+
+def test_a_uij_is_moved_within_its_own_last_printed_digit(tmp_path):
+    """U11 = 0.0123 with U12 printed 0.0062 (the tie wants 0.00615): 5e-5 off,
+    half a unit of a four-decimal token, so read on the site; the same offset
+    on six-decimal tokens (U12 0.006180) is refused above."""
+    model = jana.read_jana(_p63mmc_set(
+        tmp_path, (0, 0, 0, 0, 0, 0),
+        u_text=["0.0123", "0.0123", "0.0150", "0.0062", "0.0000", "0.0000"]))
+    s = jana.to_structure(model)
+    aniso = s.phases[0].atoms[0].aniso
+    assert aniso.u12.value == pytest.approx(aniso.u11.value / 2, abs=1e-12)
+    assert abs(aniso.u12.value - 0.0062) <= 5e-5 + 1e-12

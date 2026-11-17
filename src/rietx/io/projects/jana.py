@@ -98,9 +98,17 @@ class JanaError(ValueError):
 
 # ---------------------------------------------------------------- the stances
 #
-# One stance per ``.m50`` keyword of M98 Table 9 (pp. 80-82) plus the four the
-# Jana2000 examples write without a table row, with its arity.  A keyword not
-# here is refused, so this table is the reader's whole ``.m50`` vocabulary.
+# One stance per ``.m50`` keyword of M98 Table 9 (pp. 80-82) plus six it
+# carries without a Table 9 row, with its arity.  A keyword not here is
+# refused, so this table is the reader's whole ``.m50`` vocabulary.  The six:
+#   - ``monangle`` and ``end``: M98's own ``.m50`` listing (Figure 55, p. 78),
+#     which writes them though Table 9 does not list them;
+#   - ``lattvec``: Table 9 prints the entry as ``lattvect``, while its own
+#     text names "the lattvec command" (pp. 81, twice), which is the spelling
+#     taken;
+#   - ``phase``, ``chemform`` and ``datcolltemp``: the Jana2000 part-1
+#     multiphase listings (M2000 pp. 50-54; ``phase`` and the table layout at
+#     p. 53), which M98 does not describe.
 # Arity: an int is that many tokens; "line" takes the rest of its line;
 # "ndim" takes three (the only dimension read); "formtab" takes a count and
 # then that many numbers.
@@ -129,8 +137,9 @@ M50_STANCES: dict[str, Stance] = {
     "lattvec": Stance("ndim", "read", "an explicit centring vector"),
     "centro": Stance(0, "read", "inversion at the origin, its images not listed"),
     "symmetry": Stance("line", "read", "one operator; three components only"),
-    "sgshift": Stance("ndim", "read", "origin shift; the operators already "
-                      "state the setting"),
+    "sgshift": Stance("ndim", "read", "origin shift in ITA's convention (M98 "
+                      "p. 81); no page says the listed operators include it, "
+                      "so a nonzero shift is refused at build"),
     "ndim": Stance(1, "read", "above 3 is a modulated structure: refused"),
     "ncomp": Stance(1, "read", "above 1 is a composite: refused"),
     "qi": Stance(3, "refused", "a modulation vector"),
@@ -213,6 +222,10 @@ class JanaAtom:
     xyz: tuple[float, float, float]
     adp: tuple[float, ...]   # U11 U22 U33 U12 U13 U23 (U in U11 when isotropic)
     keys: tuple[bool, ...]   # ai, x, y, z, U11..U23
+    # half a unit in each token's own last printed digit, as the CIF reader
+    # reads a file's precision (cif._printed_half); no width is assumed
+    ai_half: float = 0.0
+    adp_half: tuple[float, ...] = ()
 
 
 @dataclass
@@ -336,6 +349,23 @@ def _keyed_line(line: str, *, where: str, n_keys: int | None = None) -> Keyed:
             f"{'no' if not tail else len(tail)} refinement key(s) on "
             f"{line.strip()!r}; this line takes {want}")
     return Keyed(values, [c != "0" for c in tail])
+
+
+def _halves(text: str) -> list[float]:
+    """Half a unit in the last printed digit of each number on ``text``.
+
+    Read off the token itself, as ``cif._printed_half`` does for a CIF value,
+    so no print width is assumed (the manuals state none): ``0.012347`` stands
+    for any value within 5e-7, ``0.0123`` within 5e-5, ``1.5E-3`` within
+    5e-5 (the exponent scales it).
+    """
+    from decimal import Decimal
+
+    from ...crystallography.cif import _printed_half
+
+    return [float(_printed_half(Decimal(m.group().replace("D", "E")
+                                        .replace("d", "e"))))
+            for m in _NUMBER.finditer(text)]
 
 
 def _numbers(text: str, *, where: str) -> list[float]:
@@ -474,7 +504,8 @@ def _apply(key: str, arg: str, phase: JanaPhase, phases: list[JanaPhase],
         raise JanaError(f"ncomp {arg} is a composite structure, refused by name")
     elif key == "atom":
         phase.atom_types.append(JanaAtomType(arg))
-    elif key in ("atweight", "atradius", "formula", "f'", 'f"', "fneutron"):
+    elif key in ("atweight", "atradius", "formula", "f'", 'f"', "fneutron",
+                 "formtab"):  # formtab: the count; its table is not kept
         if not phase.atom_types:
             raise JanaError(f"{key!r} before any 'atom' line")
         phase.atom_types[-1].values[key] = _float(arg)
@@ -628,12 +659,15 @@ def _atom(first: str, second: str, *, where: str) -> JanaAtom:
                             f"waves or special functions ({' '.join(tail)}), "
                             f"refused by name")
     ai, x, y, z = _values(rest[:values[3].end()], where=where)
+    ai_half = _halves(rest[:values[3].end()])[0]
     adp = _keyed_line(second, where=f"{where} (+1)", n_keys=10)
+    adp_half = _halves(second)
     if len(adp.values) != 6:
         raise JanaError(f"{where}: atom {label!r}: the displacement line holds "
                         f"U11..U23 (M98 p. 118), not {len(adp.values)} values")
     return JanaAtom(label=label, type_index=int(ctype), adp_type=ttype_i, ai=ai,
-                    xyz=(x, y, z), adp=tuple(adp.values), keys=tuple(adp.keys))
+                    xyz=(x, y, z), adp=tuple(adp.values), keys=tuple(adp.keys),
+                    ai_half=ai_half, adp_half=tuple(adp_half))
 
 
 # ------------------------------------------------------------- .m41
@@ -790,12 +824,12 @@ def _m41_block(model: JanaModel, index: int) -> JanaM41Phase:
     return model.m41_phases[index]
 
 
-def _tensor_within_print(sg, xyz, u: tuple[float, ...]
+def _tensor_within_print(sg, xyz, u: tuple[float, ...], halves: tuple[float, ...]
                          ) -> tuple[tuple[float, ...], list[str]]:
     """A printed Uij moved onto its site's allowed form where the print admits it.
 
-    Jana prints Uij to six decimals, so each stands for any value within 5e-7
-    of it, and a tied pair on a special site (U12 = U11/2 on a three-fold
+    Each Uij stands for any value within half a unit of its own last printed
+    digit (``halves``, read off the token: no print width is assumed), and a tied pair on a special site (U12 = U11/2 on a three-fold
     axis) misses its tie whenever the last digit rounds the other way.  The
     CIF reader's repair (``crystallography.cif._project_printed_adps``):
     the allowed tensor nearest the print inside that box, a zero held exact,
@@ -820,13 +854,31 @@ def _tensor_within_print(sg, xyz, u: tuple[float, ...]
         return u, []
     if adp_projection(basis, printed)[2]:
         return u, []
-    half = np.where(printed != 0.0, 5e-7, 0.0)
+    half = np.where(printed != 0.0, np.asarray(halves, dtype=np.float64), 0.0)
     target = nearest_allowed_within_print(
         np.asarray(basis, dtype=np.float64).T, printed, half)
     if target is None or not adp_projection(basis, target)[2]:
         return u, []
     names = [n for n, a, t in zip(U_NAMES, printed, target, strict=True) if a != t]
     return tuple(float(t) for t in target), names
+
+
+def _uij_key_narrower(sg, xyz, keys: tuple[bool, ...]) -> bool:
+    """Whether the keys leave a Uij component the site allows unkeyed.
+
+    ``ParameterTable`` frees an atom's whole symmetry-allowed tensor on one
+    flag, so keys that name only some of the components the site's symmetry
+    lets move are merged to all of them.  A component the symmetry fixes
+    (U13 on the 4g site of Pbam) is rightly unkeyed and does not count.
+    """
+    from ...crystallography.wyckoff import adp_basis, stabilizer_rotations
+
+    try:
+        basis = adp_basis(stabilizer_rotations(sg, xyz))
+    except ValueError:
+        return False
+    allowed = [any(abs(row[i]) > 1e-12 for row in basis) for i in range(6)]
+    return any(a and not k for a, k in zip(allowed, keys, strict=True))
 
 
 def to_structure(model: JanaModel, *, phase: int | str | None = None,
@@ -839,8 +891,11 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
     A stated number that disagrees with the operators is refused.
 
     Each site's **occupancy** is Jana's ``ai`` times the general multiplicity
-    over the site's own (M98 p. 116: the ``ai`` of a special position is the
-    reciprocal of its multiplicity).  U values become ``Biso`` through 8π²;
+    over the site's own: ``ai`` times the site's symmetry order (the number
+    of general-position images that fall on it), so 2a of Pbam, of order 4,
+    has ``ai`` 1/4 for a full site.  M98 p. 116 words this as "the reciprocal
+    value of its multiplicity", which only reads so if "multiplicity" means
+    that order and not the Wyckoff multiplicity (that would give 1/2).  U values become ``Biso`` through 8π²;
     an anisotropic site keeps its U-form Uij (M98 E14, the CIF convention).
     The keys map onto ``vary``: ai to ``occ``, x/y/z each to its coordinate,
     the fifth to ``biso`` and any of the fifth to tenth to the anisotropic
@@ -893,6 +948,13 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                         f"{chosen.space_group_number} ({chosen.space_group}) "
                         f"but its operators are {sg.xhm()} (No. {sg.number})")
 
+    if chosen.sgshift is not None and any(abs(v) > 1e-9 for v in chosen.sgshift):
+        raise JanaError(
+            f"{named}: phase {label!r} states a nonzero origin shift "
+            f"(sgshift {list(chosen.sgshift)}); M98 p. 81 gives it in ITA's "
+            f"convention and no page says whether the listed operators "
+            f"already include it, so the structure's origin could not be "
+            f"established. The shift is on the model")
     # the refined cell is the .m41's, in the phase's block, or in the common
     # part of a single-phase file that writes no "### phase" line; a block is
     # the phase's by name where both files name them (read_jana refused two
@@ -920,17 +982,18 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         raise JanaError(f"{named}: phase {label!r} states no cell")
 
     general = len(list(sg.operations()))
-    sites, frozen, merged, snapped, moved = [], [], [], [], []
+    sites, frozen, merged, merged_adp, snapped, moved = [], [], [], [], [], []
     for atom in model.atoms[index]:
         xyz = np.array(atom.xyz, dtype=float)
         orbit = site_orbit(sg, xyz)
-        # M98 p. 116: ai is the occupancy over the site's symmetry order,
-        # printed to six decimals, so the occupancy is known to 5e-7 times
-        # that order: a full site within it reads as full, and one past it
-        # is more than full, which is another program's convention
+        # M98 p. 116: ai is the occupancy over the site's symmetry order, and
+        # the token's own last digit bounds ai, so the occupancy is known to
+        # that half-unit times the order: a full site within it reads as
+        # full, and one past it is more than full, which is another
+        # program's convention
         order = general / orbit.multiplicity
         occupancy = atom.ai * order
-        printed = 5e-7 * order + 1e-12
+        printed = atom.ai_half * order + 1e-12
         if occupancy > 1.0 + printed:
             raise JanaError(
                 f"{named}: phase {label!r}: atom {atom.label!r} has ai "
@@ -949,9 +1012,12 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         if vary_xyz and len(coordinate_basis(list(orbit.stabilizer))) == 0:
             frozen.append(atom.label)
             vary_xyz = False
+        if atom.adp_type == 2 and any(atom.keys[4:10]) and _uij_key_narrower(
+                sg, xyz, atom.keys[4:10]):
+            merged_adp.append(atom.label)
         u = atom.adp
         if atom.adp_type == 2:
-            u, names = _tensor_within_print(sg, xyz, u)
+            u, names = _tensor_within_print(sg, xyz, u, atom.adp_half)
             if names:
                 moved.append((atom.label, names))
         sites.append(dict(
@@ -1007,6 +1073,12 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                 f"any axis frees every direction the site allows, so an axis "
                 f"the Jana run held (a polar group's origin, say) moves unless "
                 f"held again, e.g. by Phase.floating_origin")
+        if merged_adp:
+            not_carried.append(
+                f"the per-component Uij keys of {', '.join(merged_adp)}: a key "
+                f"on any of U11..U23 frees every tensor direction the site "
+                f"allows, so a component the Jana run held moves unless held "
+                f"again")
         if snapped:
             not_carried.append(f"the last printed digit of ai for "
                                f"{', '.join(snapped)}, read as fully occupied")
@@ -1018,14 +1090,18 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                 + ", moved within it onto the form the site's symmetry allows")
         where += [f"phases.0.atoms.{labels.index(n)}.x"
                   for n in dict.fromkeys(frozen + merged)]
+        where += [f"phases.0.atoms.{labels.index(n)}.aniso.u11"
+                  for n in merged_adp]
         where += [f"phases.0.atoms.{labels.index(n)}.occ" for n in snapped]
         where += [f"phases.0.atoms.{labels.index(n)}.aniso.{c}"
                   for n, cs in moved for c in cs]
         stated = sorted({k for t in chosen.atom_types for k in t.values
-                         if k in ("f'", 'f"', "fneutron")})
+                         if k in ("f'", 'f"', "fneutron", "formtab")})
         if stated:
-            not_carried.append(f"the .m50's stated {', '.join(stated)}, rietx "
-                               f"computing its own scattering factors")
+            not_carried.append(f"the .m50's stated {', '.join(stated)}"
+                               + (" (a tabulated form factor)"
+                                  if "formtab" in stated else "")
+                               + ", rietx computing its own scattering factors")
         if len(model.phases) > 1:
             not_carried.append("the .m40 scale line's phase volume fractions, "
                                "whose positions no published document states")

@@ -3295,8 +3295,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The message lists what the Jana files state that the structure does not "
             "hold: the scale, seeded at a small value because Jana's is not a rietx "
             "scale; .m41 sections other than the cell; the phase volume fractions of a "
-            "set with several phases; and coordinate keys symmetry does not allow. The model "
-            "returned by the reader still has every number."
+            "set with several phases; stated f', f'', neutron scattering length and "
+            "tabulated form factors, which rietx replaces with its own; and coordinate "
+            "keys symmetry does not allow. It also names three changes that move values: "
+            "an occupancy within the last printed digit of full, read as full; a `U^ij` "
+            "moved within its last printed digit onto the form the site allows; and a "
+            "key on some axes or some `U^ij` components, which frees every direction the "
+            "site allows. The model returned by the reader still has every number."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(

@@ -966,18 +966,33 @@ ROWS: tuple[Row, ...] = (
         evidence=("warning; a reading rule from the format's documentation: the "
                   "Jana98 manual states that REFINE in automatic mode ignores the .m40 "
                   "keys of all but scales, occupancies and twin volumes (p. 225, Table "
-                  "13) and gives autkeys 1 as the default (p. 236); fires exactly when "
-                  "the .m50's REFINE section does not state autkeys 0; acts on nothing"),
+                  "13) and gives autkeys 1 as the default (p. 236), a default that rests on "
+                  "the Jana98 manual alone (no later document states it); fires "
+                  "exactly when the .m50's REFINE section does not state autkeys 0; "
+                  "acts on nothing"),
         response="warning",
         responds=("confirm which coordinates, occupancies and ADPs the Jana run "
                   "refined before its vary flags are taken as the plan"),
         scope=("all",)),
     Row("JANA_NOT_CARRIED", "code", tier=1, ambiguity=1,
-        evidence=("info; a record of what a build did not carry: the scale (seeded "
-                  "at 1e-3, as the .EXP and .gpx conversions seed theirs), .m41 "
+        evidence=("info; a record of what a build did not carry or changed: the scale "
+                  "(seeded at 1e-3, as the .EXP and .gpx conversions seed theirs), .m41 "
                   "sections other than the cell, a multiphase set's volume fractions, "
-                  "and coordinate keys a fully fixed site or the one-flag merge drops; "
-                  "fires on every build with diagnostics=; acts on nothing"),
+                  "stated f'/f''/fneutron and formtab, and keys on fully fixed sites; "
+                  "and three repairs it reports, each within the file's own last "
+                  "printed digit or its flag model: ai read as full where a full "
+                  "site's occupancy lies within half a unit of the token's last digit "
+                  "(read off the token, as cif._printed_half does, no print width "
+                  "assumed), Uij moved onto the site's allowed form within the same "
+                  "box (cif._project_printed_adps' rule), and a per-axis xyz key or a "
+                  "partial Uij key freeing every allowed direction (ParameterTable has "
+                  "one flag per atom); tests: "
+                  "test_ai_is_read_to_its_own_last_printed_digit, "
+                  "test_a_uij_is_moved_within_its_own_last_printed_digit, "
+                  "test_a_tied_tensor_rounded_in_its_last_digit_is_read_on_the_site, "
+                  "test_a_uij_key_on_some_components_is_reported_as_merged, "
+                  "test_the_cubic_phase_reads_its_setting_from_the_operators; "
+                  "fires on every build with diagnostics="),
         response="info",
         responds="refine the scale before reading any scale-derived number",
         scope=("all",)),
