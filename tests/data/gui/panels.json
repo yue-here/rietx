@@ -6,6 +6,10 @@
       "label": "Parameters"
     },
     {
+      "id": "interactive",
+      "label": "Interactive"
+    },
+    {
       "id": "plan",
       "label": "Plan"
     },
@@ -42,6 +46,14 @@
     {
       "id": "pattern",
       "label": "Pattern"
+    },
+    {
+      "id": "single",
+      "label": "Single peaks"
+    },
+    {
+      "id": "background",
+      "label": "Background"
     }
   ]
 }

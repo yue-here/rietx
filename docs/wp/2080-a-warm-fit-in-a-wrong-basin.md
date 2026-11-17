@@ -1,7 +1,6 @@
 # WP-2080 — A warm fit that stopped in a wrong basin is kept, and nothing escalates it
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — option B ruled (settled by Claude under Yue's delegation); the trigger waits on PR #1310
-Track: What fires, and what stays silent
+Milestone: series · Status: 🔄 2026-11-16 — Yue ruled option A, the ratio as a field and no automatic retry; this reverses option B, and PR #1473 is to be reworked
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
 Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with no warning that separates it from a good fit; the workaround (`refit="stages"`) is cheap once known
 
@@ -113,9 +112,11 @@ this session).
 - [x] The maintainer's ruling (Handover log, 2026-11-02): option A, B or C, and the
       factor if B. Option B at 1.25, settled by Claude under Yue's delegation,
       2026-11-02 (handover entry of that date). The tier-3 audit row task 3 lands is
-      approved under the same delegation.
-- [ ] After PR #1310 merges: land the ruled option on `schemas.sequential._rejected`'s
-      seam. Under B: the trigger joins the ladder's escalation test only (never the
+      approved under the same delegation. **Reversed by Yue on 2026-11-16: option A**
+      (handover entry of that date). The delegation's approval of the tier-3 row for
+      the factor lapses with it.
+- [ ] Land option A (PR #1310 has merged; PR #1473 implements B and is to be reworked).
+      The text below is the task as written before the reversal. Under B: the trigger joins the ladder's escalation test only (never the
       quarantine), escalates to `warm_staged` and not to `cold`, names the fact in a
       record field on `SeriesEntry` (the GoF ratio and whether it fired), an `_audit`
       row at tier 3 with its approval, a `help.py` entry, the manual's series guide
@@ -143,6 +144,45 @@ this session).
 - Root CLAUDE.md § Series; DESIGN.md § Rules, 1 and 4.
 
 ## Handover log
+
+### 2026-11-16 — Yue's ruling: option A, a field and no automatic retry
+
+Yue ruled option A in chat, in a session discussing series design rules for WP-2081.
+The question put was "Should PR #1473 store the goodness-of-fit ratio as a field and
+drop the automatic retry?" and the answer was "Yes, field only". Yue's words on the PR
+before ruling: "1473 seems like quite an arbitrary rule, would it not be more in keeping
+to notify the caller?" This reverses option B below, which a Claude session settled
+under delegation.
+
+*What the ruling means for the code.* The ratio of a warm pattern's GoF to the GoF of
+the pattern it started from is stored on every warm pattern's `SeriesEntry`
+(`warm_gof_over_seed` in PR #1473), with no threshold. The series does not climb to
+`warm_staged` on it. No diagnostic code is raised on it. `GOF_STEP_FACTOR` and
+`escalated_on_gof` are not needed. A caller who reads a high ratio reruns with
+`refit="stages"`.
+
+*Grounds, as put to Yue.* DESIGN.md Rule 1 lets the package act alone only where no
+competent refiner would act otherwise, and PR #1473 names two who would. Rule 4 bars an
+Rwp comparison as the evidence for an automatic action, and GoF is Rwp over its expected
+value. The factor of 1.25 rests on development data, the generality judge rated it weak,
+and it fired on a real transition (planted T186) with nothing to rescue. The field
+follows Yue's ruling of 2026-11-03 on `rwp_over_median`. Rule 1 names a series
+discontinuity as a case for reporting the statistic and stopping.
+
+*The cost Yue was shown.* On issue #1214's chain, 2 of 20 noise draws keep a cell
+0.34 Å off, and with a field alone a caller who never reads the ratio keeps it. The
+ratio there is 2.01 against 0.99 to 1.03 on the good fits.
+
+*What would reopen it.* Evidence that agents or users do not read the field.
+
+*Posted.* A comment on PR #1473 asks the contributor to rework it to option A (Yue
+approved the text, 2026-11-16; issuecomment-6931533068). It leaves open whether the
+reworked PR still closes issue #1214.
+
+*Not done.* PR #1473's code is unchanged. The edits in this entry are uncommitted in
+worktree `series-refinement-strategy-86d433`.
+
+*Next:* the contributor reworks PR #1473 to option A; Yue says whether #1214 stays open.
 
 ### 2026-11-02 (2nd session) — the ruling: option B
 

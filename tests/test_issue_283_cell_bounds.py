@@ -458,7 +458,7 @@ def test_run_multi_least_squares_guards_both_closures_and_reports_the_count(
         assert np.array_equal(jac(np.asarray(x0)), J)         # last good one
         return SimpleNamespace(x=np.asarray(x0), cost=0.5 * float(r @ r),
                                nfev=3, status=1, jac=J, fun=r,
-                               termination="ftol", n_truncated=0,
+                               termination="ftol", n_truncated=0, truncated_by={},
                                active_mask=np.zeros(len(x0), dtype=int))
 
     if solver == "trf":

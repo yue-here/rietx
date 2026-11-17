@@ -1,8 +1,7 @@
 # WP-2127 — the Plan tab
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built; PR #1483 waits for the maintainer's review and merges after #1476
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the Plan tab merged in #1483; the fixing stage is the milestone's row, the prototype's picker an owed item
 Depends on: 2123 (the layout shell, PR #1476)
-Priority: P2 2026-11-09 — piece 3 of the open gui-overhaul milestone
 
 ## Goal
 
@@ -216,6 +215,22 @@ stage, and the milestone's row 8 (a five-stage plan read top to bottom) holds in
 
 ## Handover log
 
+- **2026-11-10** — closed. PR #1483 merged on 2026-11-09, so the Plan tab reads as a recipe on
+  `main` and plan edits wait in the action bar beside the Parameters edits. The stage that fixes
+  as well as frees is the one large thing left. The maintainer ruled it required, with the
+  mechanism Claude's, and it is the row "Fixing plan stages" in
+  `docs/milestones/gui-overhaul.md` § Designed, not yet filed. That row points back here for the
+  ruling, the two acceptance cases and the brief's fields.
+
+  *Leftovers, and where each went.* The fixing stage: the milestone's row above. The
+  prototype's grouped picker and its "never freed" row both need the refinable set from a route,
+  so they went to § Owed to the port as one item. Named plans ("Save as new plan…") need a store
+  rietx does not have, and are noted in that item. The stage badges in the Parameters panel went
+  to § Owed to the port with WP-2126's close. The twelve settled calls were reviewed with the
+  PR at its merge. The narrative went to `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here. The fixing stage is filed when the milestone reaches its row.
 - **2026-11-09** — the maintainer ruled the fixing stage required (§ Ruled: a stage that fixes):
   a follow-up WP, not this PR, with the mechanism Claude's to settle and two acceptance cases,
   Pawley-then-Rietveld and series. Recorded only; nothing built.

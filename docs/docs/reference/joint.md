@@ -32,7 +32,7 @@ Both return an ordinary `RefinementResult`, with the per-pattern half on `Refine
 | `coordinates`, `parametric` | constructor, `refine_multi` | `None` | a parameter declared as an equation of each pattern's coordinates ([Parametric refinement](parametric.md)) |
 | `backend`, `solver` | constructor, `refine_multi` | `"numpy"`, `"lm"` | as for a single fit ([Entry points](refinement.md#entry-points)) |
 | `plan` | `fit`, `refine_multi` | `"mccusker_default"` | a preset name, a `RefinementPlan` or its `PlanSpec` |
-| `mode` | `fit` | `"rietveld"` | any other mode raises `NotImplementedError` |
+| `mode` | `fit`, `refine_multi` | `"rietveld"` | `"rietveld"` or `"pawley"` ([Modes](#modes)); `"lebail"` raises `NotImplementedError` |
 | `two_theta_limits` | `fit`, `refine_multi` | `None` | one `(low, high)` for every pattern, or one per pattern |
 | `weights` | `fit`, `refine_multi` | `None`, 1.0 each | one positive relative weight per pattern's residual block |
 | `events`, `cancel`, `telemetry`, `label`, `progress` | `fit`, `refine_multi` | `None` | as on `Refinement.fit` ([Events and cancellation](#events-and-cancellation)) |
@@ -47,8 +47,26 @@ Both return an ordinary `RefinementResult`, with the per-pattern half on `Refine
 | `MultiHistogramRefinement.result_` | after a fit, the result |
 | `MultiHistogramRefinement.report` | the `FitReport` for one pattern ([Report per pattern](#report-per-pattern)) |
 
-A joint fit runs in Rietveld mode only.
-Le Bail and Pawley intensities are per-pattern extractions rather than shared quantities, so a joint fit of them would be independent single fits.
+## Modes
+
+A joint fit runs in Rietveld or Pawley mode.
+`fit(mode="lebail")` raises `NotImplementedError`.
+Le Bail's partition runs between solves, and the joint solve has no place for it.
+
+In Pawley mode each pattern keeps its own block of per-reflection intensities, and no intensity is shared.
+The patterns are coupled only through what else they share: the cell, an instrument parameter, or a parametric equation's coefficients.
+A Pawley fit that shares none of these is N single fits, and `fit` refuses it with a `NotImplementedError` that says so.
+A parametric equation on a parameter Pawley cannot refine, such as an atom's `biso`, is refused with a `ValueError`.
+
+Every stage leaves out what a single Pawley fit leaves out: each atom parameter, each phase scale and each texture coefficient.
+The test reads what each column moves in every pattern, so a coefficient that drives only `biso` is left out too.
+`MultiHistogramRefinement.parameters()` marks those rows `mode_fixed` after a Pawley fit, or when called with `mode="pawley"`.
+The intensities count as free parameters in each pattern's statistics and in the pooled ones.
+`PAWLEY_OVERLAP_UNRESOLVED` and `PAWLEY_OFF_DATA_RIDGED` go on the pattern they are about, in its `HistogramResult.diagnostics`.
+A Pawley result keeps the last stage's compile, as a single Pawley fit does, so it never carries `FROZEN_COMPILE_STALE`.
+
+Each pattern's intensities are its own columns of the solve, so a large Pawley library takes the blocked layout ([Large libraries](parametric.md#large-libraries)).
+On a synthetic LaB6 ramp of 4 200 points and 19 reflections a pattern, 100 patterns refined 2 208 columns in 1.05 GB, 1 900 of them intensities.
 
 ## Shared parameters
 
@@ -284,7 +302,7 @@ Each copy is the same finding about one pattern, so count it once.
 
 The rule is written as data.
 `rietx.multi.DIAGNOSTIC_SCOPES` places the output of each function that writes diagnostics, and `rietx.multi.GUARD_SCOPES` each field of a `GuardReport`, each row with its reason.
-Six rows are marked absent, for diagnostics a joint fit does not compute: the two Pawley ones (a joint fit is Rietveld-only), `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb), `RESTRAINT_TENSION` (restraints are refused), and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
+Four rows are marked absent, for diagnostics a joint fit does not compute: `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb), `RESTRAINT_TENSION` (restraints are refused), and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
 The magnetic-width checks read the single-pattern plan, so a joint fit's width-before-moment ordering is unchecked.
 `DATA_SUPPORT_LOW` is withheld on purpose.
 Its ratio of observations to parameters has no agreed definition across patterns, and one pattern's reflections counted against the shared columns would warn about a fit the other patterns support.

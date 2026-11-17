@@ -192,6 +192,19 @@ $\Gamma_A(hkl)$, with the $\tan\theta$ inside it. $\Lambda$ is this manual's
 letter for the coefficient alone, because $\Gamma$ is already the FWHM in
 {ref}`ch-profiles`. FullProf calls the same thing $D_{ST}$.
 
+The block is opt-in per phase, and no plan frees it until
+`phase.microstrain = StephensStrain.isotropic(1000, phase.cell)` declares it.
+`lab_sample_refine` then frees it in the sample-broadening stage.
+Declare it where the widths depend on direction as well as on 2θ.
+Once `lor_strain` has refined, reflections at similar angles stay broader along
+some directions than along others, and the difference curve shows a
+width-shaped misfit on those reflections alone.
+`FitReport.strain` measures that from the observed peak widths and names the broadest and
+narrowest directions with their width ratio.
+Anisotropic crystallite size and a peak split by too high a symmetry also
+broaden some directions more than others, and `FitReport.strain` fits the
+tan θ form alone, so rule them out before quoting the coefficients.
+
 ```{warning}
 Three independent labelling conventions sit behind these $S_{HKL}$, and getting
 any one wrong rescales every published number. Transfer a literature value
