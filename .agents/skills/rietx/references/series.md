@@ -59,8 +59,8 @@ What an operator must know, all measured:
   established or refuted transition by transition.
 - **An equation across the patterns is a joint fit, not a line through a
   chain**:
-  `rx.refine_multi(..., coordinates=, variables=, parametric=[...])`
-  (`where=` subset, glob target), read on `result.parametric`, never the scaled `vars.` rows.  No structure:
+  `rx.refine_multi(..., coordinates=, variables=, parametric=[...])`,
+  read on `result.parametric`, never the scaled `vars.` rows.  No structure:
   `mode="pawley"`.  It pays only where a pattern cannot see the parameter
   alone (slope esd 0.72-0.76× the line's, minor phase); elsewhere it equals
   the line, and a shared instrument cut the esd 2.6×.  `result.parametric_form`
