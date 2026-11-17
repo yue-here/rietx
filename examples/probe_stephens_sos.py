@@ -6,7 +6,7 @@ Run: ``.venv/bin/python examples/probe_stephens_sos.py [--classes]
 The idea under test: write σ²(hkl) = ‖Lᵀv‖², v = (h², k², l², kl, hl, hk),
 so σ² cannot be negative for any hkl, and refine L instead of S_HKL.
 
-**Symmetry (``--classes``).**  Let ρ(g) act on v by h → Rᵀh and R̄ be the
+**Symmetry (``--classes``).**  Let R̄ be the
 Reynolds operator on the fifteen quartic coefficients, the average of the
 monomial action over the Laue group (``stephens._invariance_rows`` + 1).
 The map is S(L) = R̄·π(L·Lᵀ), π taking a Gram matrix to its quartic.  Its image
@@ -18,8 +18,9 @@ table checks the rest numerically per class: the Jacobian of S(L) has rank m
 (the allowed dimension) at a random L, and the image lies in the allowed span
 and is non-negative.  It also counts the directions in L that move nothing:
 15 − m for a lower-trapezoidal L, and c − m for a Gram matrix restricted to
-the c-dimensional invariant (commuting) family.  Only the triclinic class has
-none.
+the c-dimensional invariant family (Tᵀ·Q·T = Q, T the action of h → Rᵀh
+on v).  Only the triclinic class has none in the first count, and no class
+has none in the second.
 
 **Brucite (``--forms``).**  The round-robin brucite fit of
 ``probe_driver_grid.py --fits brucite_aniso``, five starts 1e-14 apart under
@@ -32,7 +33,7 @@ Patched internals, so each form runs in its own subprocess.
 * ``hilbert_axis``: lower-trapezoidal 6×3 L, seeded from
   (x²+y²+z²)² = (x²+y²−z²)² + (2xz)² + (2yz)², x = Cᵀh, G* = C·Cᵀ, z along c*.
 * ``hilbert_turned``: the same identity in a turned orthonormal frame, so no
-  slot of the seed is zero.
+  column of S's Jacobian vanishes at the seed.
 * ``trigonal``: four parameters for -3m1, p = (a·r² + b·z²)² + |c·E₁ + d·E₂|²
   with r² = x²+y², E₁ = (x²−y², −2xy), E₂ = (xz, yz), seeded at
   (a, b, c, d) = ε·(1, −1, 0, 2).  ``--classes`` also checks that it reaches
@@ -50,17 +51,20 @@ hilbert_turned  7.910398294-7.911857845    1.8e-4  2 (sample_broadening, biso)
 trigonal        7.903062730-8.126564772    2.8e-2  0 or 1 (biso)
 ==============  =========================  ======  ===============================
 
-``hilbert_axis`` never leaves its seed, and its strain stage ends
-``no_descent``.  Five of its fifteen columns have no true derivative there
+``hilbert_axis`` never leaves its seed: its strain stage ends ``converged``
+with LM's reason ``no_descent``, moving no parameter.  Five of its fifteen columns have no true derivative there
 (the group average cancels it) and read as rounding noise, about 1e-8 of the
 others; the step's column equilibration promotes them to full directions, so
 every trial step fails.  The other two refine, and every start of every form
 ends with ``FLAT_DIRECTION`` and ``HIGH_CORRELATION``.  Under ``trigonal`` c
 and d go to 0, or towards it in the starts still moving at max_iter: brucite's
 best non-negative quartic is the rank-one (a·r² + b·z²)² with a ≈ 73,
-b ≈ −2026, which vanishes on the real cone |z|/r = √(−a/b) ≈ 0.19.  That is
-the boundary of the cone.  There the form's c and d columns vanish, which is
-the cone's edge seen again through the parametrisation.
+b ≈ −2026 in four starts, which vanishes on the real cone
+|z|/r = √(−a/b) ≈ 0.19.  That is the boundary of the cone.  There the form's
+c and d columns vanish, which is the cone's edge seen again through the
+parametrisation.  The fifth start stops at a = 47.4, b = −2159 and χ²_red
+8.127, and it alone makes the form's 2.8e-2 spread.  Away from c = d = 0 the
+form has full rank, so its flat directions are the edge's, not the map's.
 
 Licensing: Hilbert (1888) and the Reynolds operator are textbook; no program
 was read or run beyond rietx.
@@ -204,7 +208,7 @@ def classes() -> str:
         basis = st.stephens_basis(sg).astype(np.float64)
         m = len(basis)
         rbar = reynolds(sg)
-        # T_g: v(Rᵀh) = T_g·v(h); the invariant Gram matrices are its commutant
+        # T_g: v(Rᵀh) = T_g·v(h); the invariant Gram matrices solve Tᵀ·Q·T = Q
         ts = [np.linalg.lstsq(_v(pts), _v(pts @ r), rcond=None)[0].T
               for r in _rotations(sg)]
         units = []
@@ -325,6 +329,8 @@ def run_cell(form: str, out: Path) -> None:
                 seed = np.asarray(_install.state["seed"])
                 moved = float(np.abs(np.asarray(slots) - seed).max()
                               / np.abs(seed).max())
+                # ``codes`` carries a spurious STEPHENS_STRAIN_NOT_POSITIVE: the
+                # guard reads the slots as S_HKL, and here they are not
                 row.update(chi2=res.statistics.chi2, rwp=res.statistics.rwp,
                            slots=slots, moved=moved, s=_install.state["to_s"](slots).tolist(),
                            codes=sorted({d.code for d in res.diagnostics}))
@@ -372,6 +378,9 @@ def main(argv: list[str] | None = None) -> int:
         from rietx._about import COMPILED_THREADS_ENV, TELEMETRY_ENV
 
         forms = a.forms.split(",")
+        unknown = sorted(set(forms) - set(FORMS))
+        if unknown:
+            p.error(f"unknown form(s) {unknown}; choose from {', '.join(FORMS)}")
         a.out.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, MPLBACKEND="Agg",
                    **{TELEMETRY_ENV: "0", COMPILED_THREADS_ENV: "1"})

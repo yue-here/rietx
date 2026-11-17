@@ -265,9 +265,9 @@ linear inequality per reflection of the stage, and the guard
 (`STEPHENS_STRAIN_NOT_POSITIVE`) falls silent with nothing left to report
 ({ref}`ch-estimation`). Both read the fitted reflections only. Between them the
 quartic can still go negative: at LM's answer on round-robin brucite it does so
-over about 1 % of directions, where no reflection is fitted (WP-1946). Under
-`solver="trf"` the guard is the only check. A joint fit builds no cone under either driver, so the
-guard fires there too. The width law clamps a negative $\sigma^2(M)$ to zero
+over about 1 % of directions sampled uniformly in $hkl$, where no reflection is
+fitted (WP-1946). Under `solver="trf"` the guard is the only check. A joint fit
+builds no cone under either driver, so the guard fires there too. The width law clamps a negative $\sigma^2(M)$ to zero
 width, so a fit outside the cone has leaned on the clamp. The reflections past
 it lost all strain width, and the solver can use that set as a free hinge. Read
 a firing as "these coefficients are not quotable, and the fit leaned on the

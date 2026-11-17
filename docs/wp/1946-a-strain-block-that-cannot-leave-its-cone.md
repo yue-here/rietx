@@ -103,16 +103,18 @@ all 0 of 43 reflections outside the cone) and matters under TRF
       L → S_HKL per class. *Done 2026-11-17: it reaches every class's cone,
       by one argument for all classes, with S = R̄·π(L·Lᵀ) the map for each
       (R̄ the group average from the operators). Every class but -1 carries
-      flat directions in that map. Proof, map and per-class counts:
-      `examples/probe_stephens_sos.py --classes`.*
+      flat directions in that map. Proof and map in the docstring of
+      `examples/probe_stephens_sos.py`, per-class counts from its `--classes`.*
 - [x] Prototype on brucite outside the package: five starts 1e-14 apart under
       LM with no cone inequality. Compare χ²_red and its spread with WP-1938's
       7.7177-7.7202 and with TRF's 7.636 outside the cone. *Done 2026-11-17
       (`examples/probe_stephens_sos.py --forms …`). Those two references have
       moved: on today's main LM gives 7.888124-7.894550 (spread 8.1e-4) and
-      TRF 7.803376-7.926666 (1.6e-2). No sum-of-squares form comes near the
-      1e-9 bar: 1.8e-4 for the general form and 2.8e-2 for a four-parameter
-      -3m1 form. Numbers in the 2026-11-17 handover entry.*
+      TRF 7.803376-7.926666 (1.6e-2). No form that leaves its seed comes near
+      the 1e-9 bar: 1.8e-4 for the general form from a turned seed and 2.8e-2
+      for a four-parameter -3m1 form. The general form seeded along c* reads
+      1.3e-9 only because it never moves. Numbers in the 2026-11-17 handover
+      entry.*
 - [x] Decide from the prototype: adopt it, or close 🛑 with the numbers.
       *Closed 🛑 2026-11-17: the 2026-11-17 handover entry has the numbers.*
 - [ ] ~~If adopted: the parameter rows and their seed, S_HKL reported with
@@ -147,12 +149,13 @@ spread under 1e-9, the bar of WP-1938's grid, with no cone inequality built.
 
 - **2026-11-17** — closed 🛑. Writing the strain variance as a sum of squares
   does reach every Laue class's physical set, and one argument proves it for all
-  classes at once. It fails as a refinement on brucite, for two reasons. Every
-  form that reaches the set has directions that move nothing, except in the
-  triclinic class. And brucite's best physical answer sits on the edge of the
+  classes at once. It fails as a refinement on brucite, for two reasons. Both
+  general maps (a lower-trapezoidal L, or an invariant Gram matrix) have
+  directions that move nothing in every class but the triclinic one. And
+  brucite's best physical answer sits on the edge of the
   set, where a sum-of-squares form loses its derivative, so the cone's edge
-  comes back through the parametrisation. Five starts 1e-14 apart spread by
-  1.8e-4 and 2.8e-2, against the 1e-9 bar and today's default driver's 8.1e-4.
+  comes back through the parametrisation. Five starts 1e-14 apart that leave
+  their seed spread by 1.8e-4 and 2.8e-2, against the 1e-9 bar and today's default driver's 8.1e-4.
   The search also found that the default driver's cone holds only at the fitted
   reflections. Its brucite answer is negative on about 1 % of directions between
   them, and the manual now says so.
@@ -190,7 +193,7 @@ spread under 1e-9, the bar of WP-1938's grid, with no cone inequality built.
   |---|---|---|---|
   | default LM, cone rows on (today's main) | 7.888124-7.894550 | 8.1e-4 | Rwp 0.18140-0.18147 |
   | default TRF (today's main) | 7.803376-7.926666 | 1.6e-2 | Rwp 0.18042-0.18184 |
-  | general form, seed axis along c* | 9.548344 | 1.3e-9 | never leaves the seed: stage `no_descent` |
+  | general form, seed axis along c* | 9.548344 | 1.3e-9 | never leaves the seed: stage `converged`, reason `no_descent`, no parameter moves |
   | general form, turned seed frame | 7.910398-7.911858 | 1.8e-4 | 2 stages at max_iter, every start |
   | -3m1 form, 4 parameters | 7.903063-8.126565 | 2.8e-2 | c, d → 0 |
 
@@ -200,23 +203,32 @@ spread under 1e-9, the bar of WP-1938's grid, with no cone inequality built.
   1e-8 of the others. The step's column equilibration promotes that noise to
   full directions, so every trial step fails. The four-parameter -3m1 form is
   p = (a·r² + b·z²)² + |c·E₁ + d·E₂|². It reaches 200 random members of the
-  -3m1 cone to 3e-16, so its own reach is not the problem. On brucite c and d
-  go to 0, and a ≈ 73, b ≈ −2026. So the best non-negative quartic is the
-  rank-one (a·r² + b·z²)², which is zero on a real cone of directions
-  (|z|/r ≈ 0.19). At that point c's and d's columns vanish. No reparametrisation
-  of the same model gives LM a regular minimum there.
+  -3m1 cone to 3e-16, so its own reach is not the problem. Away from c = d = 0
+  its Jacobian has full rank, so it has no flat direction of its own. On
+  brucite c and d go to 0, and a ≈ 73, b ≈ −2026 in four of the five starts.
+  The fifth stops at a = 47.4, b = −2159, χ²_red 8.127, and alone makes the
+  2.8e-2 spread. So the best non-negative quartic is the rank-one
+  (a·r² + b·z²)², which is zero on a real cone of directions (|z|/r ≈ 0.19).
+  At that point c's and d's columns vanish, and the form gives LM no regular
+  minimum there.
 
   The default LM's answer is outside the true cone. Sampling 200 000 random
   directions in hkl at each of the five LM answers, σ² is negative on
-  0.96-1.38 % of them, down to −2514 in units of (1 ppm)²·M², while all 43 fitted reflections are
-  ≥ 0. The best sum-of-squares answers cost χ²_red +0.015 to +0.022 over it, which is
-  the price of the true cone.
+  0.96-1.38 % of them, down to −2514 in units of (1 ppm)²·M², while all 43
+  fitted reflections are ≥ 0. The best sum-of-squares answers cost χ²_red
+  +0.015 to +0.022 over it, which is the price of the true cone.
 
-  *Gotchas.* A seed with zero slots puts an exactly flat column into LM, and the
-  equilibration turns its noise into a direction. Any future nonlinear block
+  *Gotchas.* A seed where a column has no true derivative puts an exactly flat
+  column into LM, and the equilibration turns its noise into a direction. Any future nonlinear block
   seeded at a symmetric point meets the same trap.
 
-  *Review.* A read-only review of the branch was still running at the pause; its findings land in the next commit.
+  *Review.* `/code-review` was not run (it edits the main checkout); a
+  read-only review agent read the branch instead. It found no bug and no
+  error in the algebra, and checked every quoted number against the probe's
+  output. It found three overstated claims (the seed's zero slots, "no form
+  comes near the bar", "every form has flat directions") and nine nits, all
+  applied: wording, an unused symbol, a `--forms` name check, and a note that
+  the probe's recorded `STEPHENS_STRAIN_NOT_POSITIVE` reads L as S.
 
   *Generality.* No flag, threshold, default or automatic action is added. The
   probe is outside the package, and the manual edit corrects a sentence. No
