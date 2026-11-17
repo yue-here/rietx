@@ -92,56 +92,45 @@ equation over named parameters. GSAS-II carries linear constraints and
 equivalences as (coefficient, parameter) lists. The (path, coefficient) pair
 form here follows WP-1119's decision 4, which kept strings out of storage.
 
-### Inherited
+**Issue #349's three exports come with this WP** (from the 2026-10-11 issue
+triage; WP-1325's mailbox, 2026-09-21): `rietx.navigate` (#349, fenced at
+v2+) reads the same quantity. The three: `PhaseQuantity.element_counts:
+dict[str, float]`; a weight-fraction covariance beside the existing
+`weight_fraction_stderr` diagonal; and `FitReport.unidentified_phase`
+(`present`, `n_foreign`, `n_shift_matched`, `strongest_two_theta`), which a
+program today recovers by parsing `layer0_actions` for
+`add_impurity_phase`. Rechecked at `6f704aaa5` (2026-11-17): none of the
+three exists; `optimize/qpa.py`'s `ZMV.element_counts` is still internal.
+The third shares no code with the row and may split off if it grows.
+**Decided 2026-09-21** (posted on #349): when `navigate` is cut, the nominal
+composition is an argument to `sample_from_result`, never a field on a
+result, which records measurements only. The same rule binds the ratio
+helper here: the declared ratio is an input, and no result field stores it
+as if measured.
 
-- **2026-10-11, from the issue triage: issue #349's three exports come with
-  this WP.** WP-1325's mailbox recorded on 2026-09-21 that whichever WP cuts
-  the #212 row exports them, since `rietx.navigate` (#349, fenced at v2+)
-  reads the same quantity. The three:
-  `PhaseQuantity.element_counts: dict[str, float]` (a `SCHEMA_VERSION`
-  bump); a weight-fraction covariance beside the existing
-  `weight_fraction_stderr` diagonal; and `FitReport.unidentified_phase`
-  (`present`, `n_foreign`, `n_shift_matched`, `strongest_two_theta`), which a
-  program today recovers by parsing `layer0_actions` for
-  `add_impurity_phase`. Checked at `f11e22d3`: none of the three exists. The
-  third shares no code with the row and may split off if it grows.
-  **Decided 2026-09-21** (posted on #349, moved here from 1325): when
-  `navigate` is cut it lives inside the package on `indexing`'s pattern, and
-  the nominal composition is an argument to `sample_from_result`, never a
-  field on a result, which records measurements only. The same rule binds
-  the ratio helper here: the declared ratio is an input, and no result
-  field stores it as if measured.
-- **2026-10-13, from the issue triage (#212): the reporter's answers to task
-  1's two questions.** Posted 2026-10-12. (1) The row lives on
-  `Structure.restraints`: a row over several phases has no single owner, and
-  in one phase's list it dangles when phases are removed or reordered or the
-  phase is copied into a structure where its paths do not resolve; the
-  per-phase union stays for rows inside one phase. (2) It is an item inside
-  the `soft_restraint` block, not a new `BLOCK_ORDER` entry:
-  r = (Σ aᵢ·pᵢ − t)/σ is `ValueRestraint`'s form generalised to (path,
-  coefficient) pairs, with the same χ² term and `RESTRAINT_TENSION`
-  reporting. Checked against the tree at c3d0367: `_Value`
-  (`model/restraints.py:100`) holds one `path` and the block makes one row
-  per item (`CompiledRestraints.n_rows`), so the item shape fits without a
-  new block. Task 1 still records the maintainer's decision.
-- **2026-10-13, from the issue triage (#727): a second consumer is waiting on
-  this item.** WP-1912's floating-origin fix gains a `"centroid"` mode once
-  this WP's (path, coefficient) item exists: the Flack & Schwarzenbach (1988)
-  restraint is one such row per floating direction, a weighted sum of the
-  coordinates along it held at its starting value. Keep the item general
-  enough for coordinate paths and per-atom weights, not only phase scales and
-  cross-phase composition. *Superseded 2026-10-13 (WP-1912): the consumer no
-  longer waits.* The centroid landed without this item, as a row block of its
-  own (`origin_restraint`, `model/origin.py`). The paper's restraint has no σ
-  and data-derived weights, and the soft-restraint block's √c_w would free
-  the origin at c_w = 0. What this item can reuse is the shape: a linear row
-  whose partials are a constant matrix over entry paths, chained through C
-  (`origin.origin_partials`, beside `restraints.restraint_partials`).
+**What WP-1912 left to reuse** (from the 2026-10-13 triage, #727). The
+floating-origin centroid landed without this item, as a row block of its own
+(`origin_restraint`, `model/origin.py`), because its restraint has no σ and
+the soft-restraint block's √c_w would free the origin at c_w = 0. What this
+item reuses is the shape: a linear row whose partials are a constant matrix
+over entry paths, chained through C (`origin.origin_partials`, beside
+`restraints.restraint_partials`).
+
+**The tier of each rule this WP adds** ([generality § The rule](../milestones/generality.md#the-rule)).
+The row is arithmetic on the caller's own prior (tier 1, Waser 1963), and
+the helper's coefficients are physics (tier 1, Hill & Howard 1987's
+W ∝ S·ZMV). `RESTRAINT_TENSION` reuses its existing 3σ threshold. The
+stale-coefficient report is arithmetic (a coefficient is a function of the
+occupancies it was computed from), reports and acts on nothing, so it has no
+kind of ambiguity. No published reference exists for the worked case: it
+ships verified on synthetic known answers and not yet validated.
 
 ## Non-goals
 
-- Nonlinear expressions over parameters. That is `Parameter.expr`'s
-  designed-but-unbuilt DSL (WP-1119 § Non-goals).
+- Nonlinear expressions over parameters. That is the formula tie
+  (`Refinement.tie(path, expression=...)`, WP-2118; *superseded in part
+  2026-11-17*: `Parameter.expr` left the schema at 0.61 and the DSL landed
+  as ties over named variables, not as restraints).
 - A hard linear constraint. `Refinement.tie` with several sources is one
   already (WP-1119).
 - A parametric function of the series axis. That is WP-1325.
