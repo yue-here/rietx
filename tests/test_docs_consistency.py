@@ -1287,6 +1287,171 @@ def test_current_focus_stays_a_focus_not_a_diary():
 
 
 # ----------------------------------------------------------------------
+# Release-note fragments (WP-1941)
+#
+# A change stages its note as docs/releases/unreleased/<id>.<section>.md, and
+# the cut joins the fragments into the next release's staged notes
+# (tests/release_notes.py; docs/RELEASING.md step 2).  These hold the two
+# halves a stranger cannot see from one PR: that a fragment names a heading the
+# staged notes have, and that a join drops nothing.
+# ----------------------------------------------------------------------
+
+from tests import release_notes  # noqa: E402
+
+
+def test_every_release_note_fragment_names_a_section_of_the_staged_notes():
+    head = release_notes.head_path()
+    assert head.is_file(), (
+        f"{head.relative_to(ROOT)} is missing; RELEASING.md step 11 opens the "
+        "next release's staged notes, and every fragment is placed under them")
+    frags, problems = release_notes.read_fragments()
+    problems += release_notes.check(head.read_text(encoding="utf-8"), frags)
+    assert not problems, "release-note fragments:\n" + "\n".join(problems)
+
+
+_HEAD = """\
+# rietx 9.9.0
+
+> Staged.
+
+## Upgrading
+
+Code written against 9.8.0 runs unaltered.
+
+### Code to check
+
+- A loose bullet.
+  Its second line.
+
+- Another.
+
+### Numbers that move
+
+## New
+
+- One.
+- Two.
+
+## Magnetic structures
+"""
+
+
+def _frag(tmp_path, name, text):
+    (tmp_path / name).write_text(text, encoding="utf-8")
+
+
+def test_a_join_places_each_fragment_under_its_heading(tmp_path):
+    _frag(tmp_path, "12.new.md", "- Twelve.\n  Continued.\n")
+    _frag(tmp_path, "3.new.md", "- Three.\n")
+    _frag(tmp_path, "wp1941.new.md", "- A note filed before its PR.\n")
+    _frag(tmp_path, "7.code-to-check.md", "- Seven.\n")
+    _frag(tmp_path, "8.numbers-that-move.md", "- Eight.\n")
+    _frag(tmp_path, "9.magnetic-structures.md", "- Nine.\n")
+    _frag(tmp_path, "README.md", "# Not a fragment\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert not problems and len(frags) == 6
+    joined = release_notes.join(_HEAD, frags)
+    assert joined == """\
+# rietx 9.9.0
+
+> Staged.
+
+## Upgrading
+
+Code written against 9.8.0 runs unaltered.
+
+### Code to check
+
+- A loose bullet.
+  Its second line.
+
+- Another.
+
+- Seven.
+
+### Numbers that move
+
+- Eight.
+
+## New
+
+- One.
+- Two.
+- Three.
+- Twelve.
+  Continued.
+- A note filed before its PR.
+
+## Magnetic structures
+
+- Nine.
+"""
+
+
+def test_a_fragment_naming_no_heading_or_holding_one_is_refused(tmp_path):
+    _frag(tmp_path, "5.fixed.md", "- No such section.\n")
+    _frag(tmp_path, "6.new.md", "## New\n\n- A heading inside.\n")
+    _frag(tmp_path, "notes.md", "- No section in the name.\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert [p.split(":")[0] for p in problems] == ["6.new.md", "notes.md"]
+    assert [f.path.name for f in frags] == ["5.fixed.md"]
+    assert release_notes.check(_HEAD, frags)[0].startswith("5.fixed.md: no heading")
+    with pytest.raises(ValueError, match="5.fixed.md"):
+        release_notes.join(_HEAD, frags)
+
+
+def _blocks(lines):
+    """A section's text as its blocks: each bullet with its continuation, each paragraph."""
+    blocks, cur = [], []
+    for line in lines:
+        if not line.strip() or release_notes.BULLET.match(line):
+            if cur:
+                blocks.append(" ".join(s.strip() for s in cur))
+            cur = [line] if line.strip() else []
+        else:
+            cur.append(line)
+    if cur:
+        blocks.append(" ".join(s.strip() for s in cur))
+    return blocks
+
+
+def _by_section(text):
+    lines = text.splitlines()
+    marks = release_notes.headings(lines)
+    return {name: sorted(_blocks(lines[i + 1:(marks[k + 1][0] if k + 1 < len(marks)
+                                                  else len(lines))]))
+            for k, (i, _, name) in enumerate(marks)}
+
+
+def test_the_staged_notes_split_into_fragments_join_back_section_for_section(tmp_path):
+    """The acceptance: every bullet of the live staged notes moved into a
+    fragment of its own, joined onto what is left, gives the same sections."""
+    head_text = release_notes.head_path().read_text(encoding="utf-8")
+    lines = head_text.splitlines()
+    marks = release_notes.headings(lines)
+    kept, n = lines[:marks[0][0]], 0
+    for k, (start, _, name) in enumerate(marks):
+        end = marks[k + 1][0] if k + 1 < len(marks) else len(lines)
+        kept.append(lines[start])
+        item: list[str] = []
+        for line in lines[start + 1:end] + [""]:
+            if item and (not line.strip() or release_notes.BULLET.match(line)):
+                n += 1
+                _frag(tmp_path, f"{n}.{name}.md", "\n".join(item) + "\n")
+                item = []
+            if release_notes.BULLET.match(line) or (item and line.strip()):
+                item.append(line)
+            elif not item:
+                kept.append(line)
+    assert n >= 2, "the staged notes hold under two bullets; nothing was split"
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert not problems and len(frags) == n
+    joined = release_notes.join("\n".join(kept) + "\n", frags)
+    assert _by_section(joined) == _by_section(head_text)
+    assert release_notes.sections(joined) == release_notes.sections(head_text)
+
+
+# ----------------------------------------------------------------------
 # Agent-protocol coverage (WP-1105, re-pointed at the skill tree by WP-1304)
 #
 # Root CLAUDE.md's rule — "a WP that adds a diagnostic code or a correction

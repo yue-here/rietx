@@ -58,6 +58,30 @@ alternative. Compare them on what `1.7.0.md` needs:
   that pattern.
 - CONTRIBUTING.md does not tell a contributor to stage a note. Its one
   mention of release notes is the rule on data that cannot be published.
+- The tier of each rule this WP adds: none. It changes how the repository's
+  own notes are staged, and nothing in the package decides anything new.
+
+**Decided 2026-11-17 (task 1): a stdlib script, `tests/release_notes.py`.**
+Both tools fail the first two needs, the exception the task allows.
+towncrier writes its fragments in after one marker (`start_string`), and
+scriv at one insert marker. Each renders them through a template from a
+configured list of types. Neither places a note under a heading of a file a
+person wrote, so `## Upgrading`'s opening line and the paragraphs under
+`### Files that change` would move into a template edited every release, or
+be lost. The script makes the staged file itself the configuration. Every
+heading of level 2 or more is a section, named by its slug
+(`### Numbers that move` is `numbers-that-move`), so a new section is one new
+heading and nested sections cost nothing. A fragment's multi-line bullets are
+copied as written. It is 228 lines with its docstring, and adds no dependency. The tool
+facts are from each tool's own configuration pages, read 2026-11-17.
+
+**Decided 2026-11-17 (task 3): keep the staged file as the head.** On
+2026-11-17, 24 of the 104 open PRs edit `docs/releases/1.12.0.md`, all from
+one fork. Moving its bullets into fragments would make every one of them
+conflict once more. Keeping it as the head leaves them conflict-free: an
+existing note stays where its PR put it, and the join appends fragments
+under the same headings. The two kinds coexist until the 1.12 cut, and the
+next release's file starts with headings and no bullets.
 
 ## Non-goals
 
@@ -68,19 +92,19 @@ alternative. Compare them on what `1.7.0.md` needs:
 
 ## Tasks
 
-- [ ] Pick towncrier, scriv or a stdlib script against the three needs in
+- [x] Pick towncrier, scriv or a stdlib script against the three needs in
       Context. Record the choice and why in this file. A supported tool wins
       unless it cannot hold the hand-written prose or the nested sections.
-- [ ] The fragment directory and its naming (`<PR>.<section>.md`), inside
+- [x] The fragment directory and its naming (`<PR>.<section>.md`), inside
       `ci.yml`'s `PLANNING` pattern.
-- [ ] Move the bullets now in the next release's file (`1.8.0.md` on
+- [x] Move the bullets now in the next release's file (`1.8.0.md` on
       2026-10-10) into fragments, or keep that file as the head the fragments are appended under. Choose the one that leaves
       open PRs a single rebase.
 - [ ] `docs/RELEASING.md` step 2: join the fragments, then edit the result as
       a reader's document.
 - [ ] ROADMAP rule 6 says a change stages its note as a new fragment file,
       and CONTRIBUTING.md gains the same sentence for contributors.
-- [ ] A test in `test_docs_consistency.py` that every fragment names a known
+- [x] A test in `test_docs_consistency.py` that every fragment names a known
       section, and that a joined file has no fragment left unplaced.
 - [ ] Tell the outside contributor on their open PRs once it lands, since
       every one of them touches the file.
