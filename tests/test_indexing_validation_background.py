@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
+from rietx.background.select import CHEBYSHEV_MAX_ORDER
 from rietx.indexing.workflow import _size_validation_background, validate_by_lebail
 from rietx.schemas.indexing import CellCandidate
 from rietx.schemas.instrument import BackgroundChebyshev, BackgroundPSpline
@@ -75,6 +76,11 @@ def test_the_steep_band_is_not_read_as_unmatched_lines(steep, candidate):
     assert below == [], below
     assert validation.background_terms is not None
     assert validation.background_terms > len(INSTRUMENT.background.coefficients)
+    # the band takes the scan to its cap, and the record says so
+    # (CHEBYSHEV_MAX_ORDER's audit grounds: a scan ending at the cap says so)
+    assert validation.background_terms == CHEBYSHEV_MAX_ORDER
+    [note] = [d for d in validation.diagnostics if d.code == "BACKGROUND_ORDER_AT_CAP"]
+    assert note.level == "info" and "size_background=False" in note.suggestion
     from rietx.viz import plot_validation
 
     OUT.mkdir(exist_ok=True)
@@ -89,6 +95,7 @@ def test_the_declared_background_still_reads_the_band(steep, candidate):
     below = [t for t in validation.unmatched_observed_two_theta if t < FIRST_SI_LINE]
     assert len(below) >= 40, len(below)
     assert validation.background_terms == len(INSTRUMENT.background.coefficients)
+    assert not [d for d in validation.diagnostics if d.code == "BACKGROUND_ORDER_AT_CAP"]
 
 
 def test_a_planted_impurity_line_stays_reported(steep, candidate):
@@ -109,9 +116,11 @@ def test_sizing_keeps_a_declared_background(steep):
     wide = INSTRUMENT.model_copy(deep=True)
     wide.background = BackgroundChebyshev.with_terms(20)
     wide.background.coefficients[0].value = 1234.0
-    assert _size_validation_background(wide, steep, LIMITS) is wide
+    kept, notes = _size_validation_background(wide, steep, LIMITS)
+    assert kept is wide and notes == []
 
-    sized = _size_validation_background(INSTRUMENT, steep, LIMITS)
+    sized, notes = _size_validation_background(INSTRUMENT, steep, LIMITS)
+    assert [d.code for d in notes] == ["BACKGROUND_ORDER_AT_CAP"]
     n = len(sized.background.coefficients)
     assert n > len(INSTRUMENT.background.coefficients)
     assert len(INSTRUMENT.background.coefficients) == 4, "the input is never mutated"
@@ -123,4 +132,5 @@ def test_sizing_keeps_a_declared_background(steep):
 
     spline = INSTRUMENT.model_copy(deep=True)
     spline.background = BackgroundPSpline.for_range(*LIMITS, knot_step_deg=8.0)
-    assert _size_validation_background(spline, steep, LIMITS) is spline
+    kept, notes = _size_validation_background(spline, steep, LIMITS)
+    assert kept is spline and notes == []

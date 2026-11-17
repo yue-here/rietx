@@ -2110,13 +2110,23 @@ ROWS: tuple[Row, ...] = (
                   "terms than declared). GSAS-II, FullProf and TOPAS take the background order "
                   "from the user (not checked in a run). Untested: a broad impurity or amorphous "
                   "hump, a narrow 2-theta window, a wrong cell under the raised order"),
-        grounds=("A band of background misfit is not lines the cell fails to own, and Layer 0 "
-                 "counts each maximum of one as an observed peak, so a background that cannot "
-                 "follow the data reports dozens of impurity lines on a pure phase "
-                 "(INDEX_IMPURITY_LINES). The order is read from the data once per index_pattern "
-                 "call, every candidate is fitted under it, no rank or grade reads rwp, gof or "
-                 "unmatched_observed, and validate_by_lebail(size_background=False) is the way "
-                 "back. Route A ruled by Michael 2026-11-09; the tier-3 approval is Yue's.")),
+        grounds=("Judgement: a background too stiff for the data leaves a band of misfit "
+                 "whose every maximum Layer 0 counts as an observed line, so a pure phase is "
+                 "reported with dozens of impurity lines (INDEX_IMPURITY_LINES); a competent "
+                 "refiner raises the background order before reading such a band as lines the "
+                 "cell fails to own. Named dissent, unmeasured (#1496): a caller whose evidence "
+                 "for a second phase is an amorphous hump, and one keeping the background stiff "
+                 "under dense weak low-angle organic lines; validate_by_lebail("
+                 "size_background=False) is their way back, background_terms records the "
+                 "order, and a scan ending at CHEBYSHEV_MAX_ORDER says so (BACKGROUND_ORDER_AT_CAP, "
+                 "on the validation, or once on the run from index_pattern). Mechanical: the "
+                 "fault is measured on one synthetic family (steep Si, 72 unmatched lines to 0, "
+                 "all six planted lines kept, two on the band); on the eleven acceptance "
+                 "datasets the ranked system, centring, confidence, status and "
+                 "predicted_but_absent did not move, and unmatched_observed fell on nine. The "
+                 "order is read once per index_pattern call and every candidate is fitted under "
+                 "it. Route A ruled by Michael 2026-11-09; the tier-3 approval is "
+                 "Yue's.")),
     Row("rietx.schemas.results.Statistics.esd_inflation", "action", tier=3, ambiguity=1,
         evidence=("Berar & Lelann (1991) J. Appl. Cryst. 24, 1, § IV (docstring; not in the "
                   "corpus); f 1.13 on uncorrelated residuals, 2.15 on FAP, 8.07 on NAC; GSAS-II "
@@ -5844,6 +5854,13 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
     Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
+    Row("rietx.indexing.workflow._size_validation_background.suggestion", "suggestion",
+        tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the two ways to fit a background of the caller's own "
+                  "under the validation (validate_by_lebail(size_background=False), or a "
+                  "declared P-spline, which the sizing leaves alone) and ranks neither; it "
+                  "travels on the BACKGROUND_ORDER_AT_CAP note the sizing scan returned "
+                  "(WP-2113)")),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
     Row("rietx.schemas.results._cap_one_code.suggestion", "suggestion", value=1),
 )

@@ -412,10 +412,11 @@ def seed_widths(instrument: Instrument, peaks: PeakList) -> tuple[Instrument, bo
 
 def _size_validation_background(instrument: Instrument, data: PatternData,
                                two_theta_limits: tuple[float, float] | None = None
-                               ) -> Instrument:
+                               ) -> tuple[Instrument, list[Diagnostic]]:
     """Give the validation fit a Chebyshev background as flexible as the data ask.
 
-    Returns a copy of ``instrument`` whose Chebyshev background carries the
+    Returns ``(instrument, notes)``: a copy of ``instrument`` whose Chebyshev
+    background carries the
     number of terms :func:`~rietx.background.auto_background` (``kind="chebyshev"``,
     over ``two_theta_limits``) selects, and never fewer than it declared: the
     declared coefficients are kept as starts and zeros appended.  A background of
@@ -442,30 +443,45 @@ def _size_validation_background(instrument: Instrument, data: PatternData,
     its ``BACKGROUND_ORDER_AT_CAP`` warning (a statement about a pick a caller
     asked for; here the cap is a flexibility ceiling for a nuisance term) would
     need a process-wide warnings filter to silence, which is not thread-safe
-    under the GUI's worker.  Any failure of the scan falls back to the declared
-    background rather than aborting the run.
+    under the GUI's worker.  The scan *returns* that note rather than warning,
+    so when the order it raised the background to is the cap, ``notes`` carries
+    it (info), restated for the validation, and the caller puts it on the record:
+    ``CHEBYSHEV_MAX_ORDER``'s audit row rests on a scan ending at the cap saying
+    so.  ``notes`` is empty whenever the declared background is kept.  Any
+    failure of the scan falls back to the declared background rather than
+    aborting the run.
     """
     from ..background.select import select_chebyshev_order
     from ..schemas.common import Parameter
 
     declared = instrument.background
     if not isinstance(declared, BackgroundChebyshev):
-        return instrument
+        return instrument, []
     try:
         scanned = data if two_theta_limits is None else data.crop(
             float(two_theta_limits[0]), float(two_theta_limits[1]))
-        n = int(select_chebyshev_order(scanned).selected)
+        selection = select_chebyshev_order(scanned)
+        n = int(selection.selected)
     except Exception:                               # noqa: BLE001
-        return instrument
+        return instrument, []
     if n <= len(declared.coefficients):
-        return instrument
+        return instrument, []
     out = instrument.model_copy(deep=True)
     # the appended terms carry the declared ones' flag: the plan frees the
     # background by glob, so the flag is a record, and one background reads alike
     vary = declared.coefficients[-1].vary if declared.coefficients else True
     out.background.coefficients += [Parameter(value=0.0, vary=vary)
                                     for _ in range(n - len(declared.coefficients))]
-    return out
+    notes = [d.model_copy(update=dict(
+                 message=("The indexing validation's background was sized from the "
+                          "data (WP-2113) and took the order scan's cap: "
+                          + d.message),
+                 suggestion=("The background_terms of each validation is the cap, not "
+                             "an order the data settled; pass size_background=False "
+                             "to validate_by_lebail, or declare a P-spline background, "
+                             "to fit one of your own.")))
+             for d in selection.diagnostics if d.code == "BACKGROUND_ORDER_AT_CAP"]
+    return out, notes
 
 
 def _chebyshev_terms(instrument: Instrument) -> int | None:
@@ -614,8 +630,9 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                     instrument=instrument, two_theta_limits=two_theta_limits,
                     p0_floor_deg=MATCH_SIGMA * DEFAULT_UNKNOWN_SHIFT_DEG)
             screen = screen_for(pattern_screen, candidate, peaks)
+    sizing_notes: list[Diagnostic] = []
     if size_background:
-        ins = _size_validation_background(ins, data, two_theta_limits)
+        ins, sizing_notes = _size_validation_background(ins, data, two_theta_limits)
     tt_max = float(np.max(data.tt()))
     if two_theta_limits is not None:
         tt_max = min(tt_max, float(two_theta_limits[1]))
@@ -644,7 +661,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                 where=[f"cell {candidate.cell}"],
                 suggestion=("Check the instrument first, since a mis-declared "
                             "profile or a wavelength on an absorption edge "
-                            "fails every candidate alike."))])
+                            "fails every candidate alike."))] + sizing_notes)
         return (failed, None) if with_result else failed
 
     rows = [r for r in ref.reflection_table() if r.line == 0]
@@ -679,7 +696,8 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         predicted_but_absent_two_theta=[round(v, 4) for v in absent_tt],
         unmatched_observed_two_theta=[round(float(v), 4) for v in unmatched],
         status=result.status, n_stages=len(result.stages),
-        mode=VALIDATION_MODE, background_terms=_chebyshev_terms(ins), **extra)
+        mode=VALIDATION_MODE, background_terms=_chebyshev_terms(ins),
+        diagnostics=list(sizing_notes), **extra)
     return (validation, result) if with_result else validation
 
 
@@ -1245,8 +1263,10 @@ def index_pattern(peaks: PeakList | None = None, *,
         # and not at all when no fit will run
         validation_instrument = instrument
         if checked and not (run_cancel is not None and bool(run_cancel)):
-            validation_instrument = _size_validation_background(
+            # once per call, so its cap note goes on the run, not on each fit
+            validation_instrument, sizing_notes = _size_validation_background(
                 instrument, data, two_theta_limits)
+            outcome.diagnostics.extend(sizing_notes)
         # under a declared ceiling the fits run cheapest first, by the
         # reflections each will refine, and each runs on whatever the clock
         # holds (WP-2011): for a common deadline that order maximises the fits
