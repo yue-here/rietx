@@ -604,6 +604,50 @@ and have no free factor to measure, so this file's old list named them without c
   with `_SIGNED_WIDTHS`, so a caller's X or `lor_strain` with min < 0 takes the offset's step of
   1, an error of 1.4e-3 to 1.5e-2 in a width column. A fix declares which rows are widths as table
   data, a design change.
+- **R, its fits and arms, fixed 2026-11-17 before running** (`2017-batch/group_r.py`). Three
+  parts. Every arm has a noise twin of its shipped arm (every refinable non-zero start
+  ×(1 + 1e-12)) and is read in plain esd over the larger esd on the rows that are not
+  background, with Rwp, evaluations, status, codes and every stage's `width_twins_held` beside.
+  (R1) **`width_twins_held`** on multi-phase fits that free an instrument width and every seen
+  phase's twin in one stage. *Families*: 11-BM LaB₆ + cBN under `PLAN_DEGENERATE`, the one the
+  row has, as the positive arm: the shipped arm must repeat its test's record (X against both
+  `lor_size`, Y against both `lor_strain`) and LaB₆ 16.779(194) wt %, or the harness differs.
+  The **second**, the CPD round robin's cpd-1a under `qpa_plan()`, a laboratory Bragg-Brentano
+  instrument: its closing stage frees the profile stage's U, V, X, Y with the
+  `sample_broadening` stage's widths, so the hold acts there and only there (control: the
+  stages before it record no hold). The **third**, 11-BM NAC with CaF₂ under its protocol with
+  a `size_strain` stage (`phases.*.lor_size`, `phases.*.lor_strain`, seed 1e-4) inserted after
+  `profile`, as `PLAN_DEGENERATE` adds it; and beside it the CuCr₂O₄ ramp's coldest frame with
+  CuO (group G's `cucr_cold` start, `mccusker_default()` with the same stage inserted). NAC and
+  CuCr₂O₄ were measured on 11-BM, as LaB₆ + cBN was, in other years with other calibrations,
+  so by beamline they are one family with it: that is reported, not hidden. *Arms*, all by
+  replacing `refine._hold_width_twins` for the fit: `held` (shipped); `none`, which holds
+  nothing, so the flat direction stays free; and `specimen`, which holds the specimen columns
+  the record pairs with instead of the instrument column (the alternative "measured and not
+  adopted" in the row). *Read*: the QPA in wt % against its reference (cpd-1a's weighed
+  fractions; TOPAS's 17.907-17.950 for LaB₆), the cells (cBN's against TOPAS's 3.616463 Å), every
+  instrument and specimen width with its esd, which specimen widths end on their 0 floor, any
+  coefficient on ±`TCHZ_CEILING_DEG`, and the flat-direction codes (`HIGH_CORRELATION`,
+  `COVARIANCE_DIRECTION_DISCARDED`). A family is reached if `held` records a hold; `none`
+  identical to `held` means the hold changed nothing.
+  (R2) **`ProfileTCHZ:y` unfloored** against Y ≥ 0 (`instrument.profile.y` min 0 for the whole
+  fit). *Families*: the four protocols, each from its own start, with the closing stage, since
+  a floor that no fit's Y reaches measures nothing (control: an arm identical to shipped never
+  met the floor). *The row's test*: SRM 660c (the NIST diffractometer) read on its certified
+  cell (the CIF block's 4.156780 Å at 20.85 °C, `test_acceptance_srm660c.A_REFERENCE`) and, with
+  a `size_strain` stage inserted after `profile`, on the specimen's `lor_size` and `lor_strain`
+  under each arm. SRM 660c has no certified size or strain, so those two are read as the
+  difference between the arms in their esds, not as a distance from a truth.
+  (R3) **TRF and the ±180 bound**. Brucite (isotropic, and with its Stephens block) and
+  corundum under `test_acceptance_stephens._plan`, each under LM (the default driver) and TRF,
+  with no closing stage as the suite runs them and with the closing stage at 1e-3, which frees
+  the instrument and specimen widths together, so the hold acts. *Read*: every width
+  coefficient and whether it sits within 1e-6 of ±180, the smallest Lorentzian FWHM
+  Γ_L = (X + `lor_size`)/cos θ + (Y + `lor_strain`) tan θ over the pattern, and
+  `RESOLUTION_NOT_POSITIVE`. *Control*: the LM fit holds Γ_L ≥ 0 by inequality, so a negative
+  Γ_L there means the harness reads something else.
+  `_fd_typicals`' step for a signed width is not measured here: its fix is a design change
+  (§ R above), so it goes to the maintainer as a question.
 - **Reading a wrong answer.** The esd yardstick is blind there, since `_shift` skips a row with
   no esd and a lost phase's rows have none, and a two-valued verdict hides how far a fit
   missed. One noise draw is a weak floor on a chaotic start (cpd-1a +3 % reads 3.99 esd). A
