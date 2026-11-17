@@ -1733,6 +1733,12 @@ class MultiHistogramRefinement:
         ``HOLD_BLOCKED_PLAN``.  This is how a series that calibrated its setup
         keeps it (the maintainer's ruling of 2026-11-03).  Returns the rows
         newly held, sorted.
+
+        A held row tied onto a variable (:meth:`add_variable`) keeps the
+        variable fixed when a glob reaches the row, and the block is recorded
+        the same way.  The row still follows its variable when the variable
+        is freed another way: a glob naming ``vars.<name>``, or a glob reaching
+        another row tied onto it that is not held.
         """
         return self.mtable.hold(path_globs)
 
@@ -1794,6 +1800,10 @@ class MultiHistogramRefinement:
         """
         globs = [paths] if isinstance(paths, str) else list(paths)
         scoped = {g.split(".", 2)[1] for g in globs if g.startswith("hist.")}
+        bad = sorted(k for k in scoped if not k.isdigit())
+        if bad:
+            raise ValueError(f"'hist.{bad[0]}.' names no pattern; one pattern's "
+                             "rows are 'hist.<h>.…', <h> its index from 0")
         if scoped and (len(scoped) != 1
                        or not all(g.startswith("hist.") for g in globs)):
             raise ValueError("tie_equal() takes bare globs, or globs scoped to "
@@ -1819,8 +1829,11 @@ class MultiHistogramRefinement:
     def untie(self, paths: list[str] | str) -> list[str]:
         """Release the caller's linear ties; the rows come back fixed.
 
-        Globs match the declared ties only.  A formula tie is refused, since a
-        joint fit's tables cannot take one back: build the fit again.
+        Globs match the declared ties only, by joint name or bare path, as
+        :meth:`unhold` matches holds: ``untie("hist.0.<path>")`` releases
+        pattern 0's copy of a tie declared bare, and the other patterns keep
+        theirs.  A formula tie is refused, since a joint fit's tables cannot
+        take one back: build the fit again.
         """
         return self.mtable.untie(paths)
 

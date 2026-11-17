@@ -292,3 +292,115 @@ def test_a_refused_formula_leaves_no_table_holding_it():
     entry = ref.mtable._entry(0, "phases.0.atoms.1.biso")
     assert not entry.locked and entry.tie is None
     assert list(ref.mtable.user_ties) == ["hist.1.phases.0.atoms.0.biso"]
+
+
+# --- second review findings (2026-11-17) -------------------------------------
+
+@pytest.mark.parametrize(("source", "expression", "value"), [
+    ("vars.B", None, 0.5),
+    (None, "B + 0.1", 0.6),
+])
+def test_a_held_row_tied_onto_a_variable_stays_put_and_the_block_is_said(
+        pair, source, expression, value):
+    """The adp glob reaches the held row; the variable under it must stay
+    fixed, and the block is recorded as any held row's is."""
+    ref = _ref()
+    ref.add_variable("B", 0.5, min=0.0)
+    if expression is None:
+        ref.tie("phases.0.atoms.1.biso", source)
+        ref.hold("phases.0.atoms.1.biso")
+    else:
+        ref.hold("phases.0.atoms.1.biso")
+        ref.tie("phases.0.atoms.1.biso", expression=expression)
+    result = ref.fit(pair, plan=_plan(), telemetry=False)
+    adp = next(s for s in result.stages if s.name == "adp")
+    assert not any("vars.B" in s.freed for s in result.stages)
+    assert adp.blocked_by_hold == ["phases.0.atoms.1.biso"]
+    (said,) = [d for d in result.diagnostics if d.code == "HOLD_BLOCKED_PLAN"]
+    assert "phases.0.atoms.1.biso" in said.where
+    row = _rows(ref)["phases.0.atoms.1.biso"]
+    assert row.held is True
+    assert row.value == pytest.approx(value, abs=1e-12)
+
+
+def test_a_held_tied_row_follows_its_variable_freed_another_way(pair):
+    """The documented limit: a glob naming the variable frees it, and the
+    held row follows; no block is claimed for a row that moved."""
+    ref = _ref()
+    ref.add_variable("B", 0.5, min=0.0)
+    ref.tie("phases.0.atoms.1.biso", "vars.B")
+    ref.hold("phases.0.atoms.1.biso")
+    plan = RefinementPlan(stages=[*_cheap_joint_plan().stages,
+                                  Stage("adp", ["phases.*.atoms.*.biso", "vars.B"],
+                                        max_iter=8)])
+    result = ref.fit(pair, plan=plan, telemetry=False)
+    adp = next(s for s in result.stages if s.name == "adp")
+    assert "vars.B" in adp.freed
+    assert adp.blocked_by_hold == []
+
+
+def test_a_formula_on_a_tied_rows_source_is_refused_naming_the_follower():
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    ref.add_variable("b", 0.4, min=0.0)
+    ref.tie("phases.0.atoms.1.biso", "phases.0.atoms.0.biso")
+    with pytest.raises(ValueError, match="'phases.0.atoms.1.biso' follows it"):
+        ref.tie("phases.0.atoms.0.biso", expression="b + 0.1")
+    assert list(ref.mtable.user_ties) == ["phases.0.atoms.1.biso"]
+    for h in (0, 1):
+        assert not ref.mtable._entry(h, "phases.0.atoms.0.biso").locked
+    assert ref.untie("phases.0.atoms.1.biso") == ["phases.0.atoms.1.biso"]
+
+
+def test_untie_of_several_names_releases_all_or_none():
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    ref.add_variable("B", 0.5, min=0.0)
+    ref.add_variable("C", 0.5, min=0.0)
+    ref.tie("phases.0.atoms.0.biso", "vars.B")
+    ref.tie("phases.0.atoms.1.biso", "vars.C")
+    # a row the tables fixed since: untie cannot release it
+    ref.mtable._entry(1, "phases.0.atoms.1.biso").locked = True
+    with pytest.raises(ValueError, match="nothing was released"):
+        ref.untie(["phases.0.atoms.0.biso", "phases.0.atoms.1.biso"])
+    assert list(ref.mtable.user_ties) == ["phases.0.atoms.0.biso",
+                                          "phases.0.atoms.1.biso"]
+    assert ref.mtable._entry(0, "phases.0.atoms.0.biso").tie is not None
+
+
+def test_untie_takes_back_a_tie_by_either_spelling_as_unhold_does():
+    """A bare tie released in one pattern leaves the other's declared; a tie
+    declared per pattern is released by its bare path."""
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    ref.tie("phases.0.atoms.1.biso", "phases.0.atoms.0.biso")
+    assert ref.untie("hist.0.phases.0.atoms.1.biso") == ["hist.0.phases.0.atoms.1.biso"]
+    rows = _rows(ref)
+    assert rows["hist.0.phases.0.atoms.1.biso"].tie is None
+    assert rows["hist.1.phases.0.atoms.1.biso"].tie.user is True
+    assert list(ref.mtable.user_ties) == ["hist.1.phases.0.atoms.1.biso"]
+    ref.tie("hist.0.phases.0.atoms.1.biso", "phases.0.atoms.0.biso")
+    assert ref.untie("phases.0.atoms.1.biso") == [
+        "hist.1.phases.0.atoms.1.biso", "hist.0.phases.0.atoms.1.biso"]
+    assert ref.mtable.user_ties == {}
+    with pytest.raises(ValueError, match="not tied by this refinement"):
+        ref.untie("hist.0.phases.0.atoms.1.biso")
+
+
+def test_a_scoped_name_of_a_bare_tie_gets_the_tie_reasons():
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    ref.add_variable("b", 0.4, min=0.0)
+    ref.tie("phases.0.atoms.1.biso", expression="b + 0.1")
+    with pytest.raises(ValueError, match=r"follows b \+ 0.1 \(a user tie\); set the variables"):
+        ref.set_values({"hist.0.phases.0.atoms.1.biso": 0.9})
+    with pytest.raises(ValueError, match=r"already follows b \+ 0.1 \(a user tie\)"):
+        ref.tie("hist.0.phases.0.atoms.1.biso", "phases.0.atoms.0.biso")
+
+
+def test_a_row_tied_to_itself_in_two_spellings_is_refused_as_a_self_tie():
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    with pytest.raises(ValueError, match="cannot be tied to itself"):
+        ref.tie("hist.0.phases.0.atoms.0.biso", "phases.0.atoms.0.biso")
+    assert ref.mtable.user_ties == {}
+
+
+def test_tie_equal_names_the_pattern_spelling_for_a_bad_scope():
+    with pytest.raises(ValueError, match=r"hist\.<h>\."):
+        _ref().tie_equal("hist.x.phases.0.atoms.*.biso")
