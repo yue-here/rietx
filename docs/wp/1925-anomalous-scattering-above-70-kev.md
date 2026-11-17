@@ -1,6 +1,6 @@
 # WP-1925 — anomalous scattering above 70 keV
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: — (1532 soft: it words the `dispersion = None` workaround in the skill, and this WP removes the need for it above 70 keV)
 Priority: P3 2026-10-08 — a workaround covers it: `Source.dispersion = None` declines the correction; the refusal is loud and the named user (a high-energy synchrotron beamline) has one line to type. The workaround is itself unflagged above 70 keV (see Context), which is why the first task is a measurement and the row is not P4
