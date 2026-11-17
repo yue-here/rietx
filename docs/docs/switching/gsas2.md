@@ -74,6 +74,27 @@ Staging is cumulative, so the cell stays free in the profile and atom stages.
 The fit ends with a closing stage, which frees all 34 parameters again with wider peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
 [About a fit](../concepts/fit.md#the-plan) describes the stages, and the [plan presets](../reference/plans.md) draw the ones rietx ships.
 
+### A sequential refinement is a chain
+
+GSAS-II refines the histograms a sequential refinement selects one after another, with one set of refinement flags for all of them.
+rietx does the same with `rx.refine_sequential` ([Sequential refinement](../reference/series.md)).
+Each GSAS-II control has a rietx argument:
+
+| GSAS-II | rietx |
+| --- | --- |
+| the histograms selected for the sequential refinement, in order | `rx.refine_sequential(patterns, structure, instrument, x=temperatures, x_label="T (K)")`, in the order of `patterns` |
+| the refinement flags, the same for every histogram | `plan=`, run whole on the first pattern |
+| Copy results to next histogram? | the default, `carry=["*"]`: each pattern starts from the one before |
+| the same box unticked, each histogram from the project's values | `carry=[]` with `refit="stages"`: each pattern starts from the starting models and walks the whole plan |
+| Reverse order? | `direction="backward"`. `direction="both"` runs both orders and lists each parameter's gap between them in `SeriesResult.direction_gaps` |
+| the sequential results table | `series.to_table(paths=[...])` and `series.write_csv(path)`; `series.trajectory("phases.0.cell.a")` for one column |
+| a pseudo-variable over the table's columns | a derived path such as `qpa.<phase>` in `to_table`; other expressions have no rietx counterpart with an esd |
+
+After the first pattern, rietx collapses the plan into one stage by default (`refit="single"`), since a converged neighbour is a good start.
+GSAS-II refines every histogram with its whole set of flags at once.
+`refit="stages"` walks the whole plan on every pattern.
+On three patterns of a synthetic LaB₆ ramp, `carry=[]` with `refit="stages"` took 107 iterations against 68 for the default, and both gave the same cell edges to 10⁻⁶ Å.
+
 ### A parametric equation is fitted with the patterns
 
 GSAS-II fits an equation to the sequential results table after a sequential refinement.

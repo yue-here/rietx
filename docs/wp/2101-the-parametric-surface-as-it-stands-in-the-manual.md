@@ -92,8 +92,12 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   *Done 2026-11-17:* a sentence in `api-io.md`'s projects paragraph (authored in
   `docs/skill/make_api_index.py`), keyed by `TopasInpError` and `read_project_model`,
   which the agent already holds when porting starts. No new shape file.
-- [ ] `switching/gsas2.md`: the same for GSAS-II's sequential refinement and its
-  parametric fit afterwards. Read that program's docs before writing.
+- [x] `switching/gsas2.md`: the same for GSAS-II's sequential refinement and its
+  parametric fit afterwards. Read that program's docs before writing. *Done
+  2026-11-17:* § A sequential refinement is a chain, written from GSAS-II 5.8.4's
+  `GSASIIscriptable.set_Controls` docstring, its Controls tab labels and
+  `GSASIIstrMain.SeqRefine`. The parametric fit afterwards was already WP-1964's
+  § A parametric equation is fitted with the patterns.
 - [x] `reference/parametric.md`: one table of the target kinds accepted. *Done
   2026-11-15:* § Targets, with an executing block asserting every kind and five
   refusals.
