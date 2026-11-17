@@ -148,6 +148,11 @@ documentation only.
       whose intensities do not look like counts. Built 2026-11-17 as
       `PATTERN_INTENSITY_NOT_COUNTS` on `read_pattern`'s hook, for every
       format: an intensity between 0 and 1 or below 0, with no threshold.
+- [x] The second `TEMP` value (Inherited, issue #1064). Decided 2026-11-17
+      (settled by Claude, see the handover entry): the first value stays
+      `temperature_k`, the one the manual names, and the others are not
+      surfaced (`io/CLAUDE.md` § Metadata). No code change; the evidence is
+      in `io/formats/xy.py`'s docstring and a test on two D1B files.
 
 ## Acceptance
 
