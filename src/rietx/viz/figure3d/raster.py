@@ -762,9 +762,9 @@ OCCLUSION_DIRECTIONS = LOOK["occlusion_directions"]
 OCCLUSION_MAP_SIZE = LOOK["occlusion_map_size"]
 OCCLUSION_BIAS = LOOK["occlusion_bias"]
 
-#: Samples looked up in one go, so a band's (samples × directions) arrays
-#: stay near 50 MB.
-_OCCLUSION_CHUNK = 1 << 16
+#: Samples looked up in one go: :func:`occlusion` holds about seven
+#: (samples × directions) float64 arrays at once, some 60 MB at this size.
+_OCCLUSION_CHUNK = 1 << 14
 
 
 def occlusion_directions(n: int = OCCLUSION_DIRECTIONS) -> np.ndarray:
@@ -819,7 +819,7 @@ def _depths(pk: dict, frame: Frame, ids: np.ndarray) -> np.ndarray:
     are the numpy path's to the bit."""
     out = np.full(ids.shape, -np.inf)
     iy, ix = np.nonzero(ids >= 0)
-    k = ids[iy, ix].astype(np.int64)
+    k = ids[iy, ix].astype(np.intp)
     na = len(pk["atom_c"])
     y_px = frame.y0 - (iy + 0.5) / frame.ppa
     x_px = frame.x0 + (ix + 0.5) / frame.ppa
@@ -862,8 +862,8 @@ def occlusion_maps(scene: dict, *, directions: int = OCCLUSION_DIRECTIONS,
 
     Each is an :func:`id_plane` of the scene's atoms and bond halves seen
     along the light, orthographic, over the square of side ``2·depth`` round
-    ``scene["center"]`` (``depth`` bounds every atom the payload can draw, so
-    the maps' texel is the same whichever species are hidden).  The cell
+    ``scene["center"]`` (``depth`` bounds every atom the scene can draw, so
+    every caster falls inside each map).  The cell
     frame and the polyhedron faces cast nothing (D4, D5): a frame line's
     width is in CSS px, so in Å it would follow the framing, and a face at
     ``POLY_ALPHA`` would darken its own centre atom.  The maps hold no view,
@@ -911,8 +911,8 @@ def occlusion(maps: OcclusionMaps, points: np.ndarray, normals: np.ndarray) -> n
         pu = p @ B[:, 0, :].T
         pv = p @ B[:, 1, :].T
         pz = p @ B[:, 2, :].T
-        col = np.clip(np.floor((pu - o[:, 0]) * maps.ppa), 0, last).astype(np.int64)
-        row = np.clip(np.floor((o[:, 1] - pv) * maps.ppa), 0, last).astype(np.int64)
+        col = np.clip(np.floor((pu - o[:, 0]) * maps.ppa), 0, last).astype(np.intp)
+        row = np.clip(np.floor((o[:, 1] - pv) * maps.ppa), 0, last).astype(np.intp)
         k = np.broadcast_to(np.arange(len(d)), col.shape)
         lit = ~(pz + maps.bias < maps.depth[k, row, col])
         total = w.sum(axis=1)

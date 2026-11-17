@@ -788,9 +788,10 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     one.  ``ambient_occlusion=True`` darkens each atom and stick by the
     share of directions from which ambient light cannot reach it, read from
     64 depth maps of the scene's atoms and sticks (WP-1538): the ambient term
-    scales by the unoccluded share and the key light keeps its own.  It shows
-    in ball mode, where the atoms crowd one another, and hardly in ellipsoid
-    mode.  The cell frame and the translucent faces neither cast nor receive
+    scales by the unoccluded share and the key light keeps its own.  Ball
+    mode's atoms lose 3-25 % of their ambient light on the 21 phases WP-1538
+    measured, and ellipsoid mode's about half that, the sticks a small
+    ellipsoid meets shading it.  The cell frame and the translucent faces neither cast nor receive
     it.  Off by default; the GUI's drawing drawer has the same toggle.
     ``planar_rings=True`` fills each ring of five or six bonded atoms
     lying within ``rings.PLANAR_RING_TOLERANCE`` (0.1 Å) of one plane as a

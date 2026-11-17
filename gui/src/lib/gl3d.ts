@@ -471,6 +471,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   let ambientOcclusion = false;
   /** the occlusion maps and the scene they were built from (WP-1538 D5) */
   let maps: { texture: WebGLTexture; scene: Scene } | null = null;
+  /** a scene whose maps could not be allocated, so it is not tried every frame */
+  let mapsFailed: Scene | null = null;
   const directions = occlusionDirections().flat();
   const MAPS_UNIT = 1;
   let lost = false;
@@ -590,7 +592,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     const texture = context.createTexture()!;
     context.activeTexture(context.TEXTURE0 + MAPS_UNIT);
     context.bindTexture(context.TEXTURE_2D_ARRAY, texture);
+    while (context.getError() !== context.NO_ERROR) { /* clear earlier errors */ }
     context.texStorage3D(context.TEXTURE_2D_ARRAY, 1, context.DEPTH_COMPONENT32F, size, size, n);
+    if (context.getError() !== context.NO_ERROR) {
+      // 64 MB the GPU would not give: draw without occlusion rather than
+      // reading a zeroed map as a scene that shadows everything
+      context.bindTexture(context.TEXTURE_2D_ARRAY, null);
+      context.activeTexture(context.TEXTURE0);
+      context.deleteTexture(texture);
+      mapsFailed = scene;
+      return;
+    }
     for (const p of [context.TEXTURE_MIN_FILTER, context.TEXTURE_MAG_FILTER]) {
       context.texParameteri(context.TEXTURE_2D_ARRAY, p, context.NEAREST);
     }
@@ -612,6 +624,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     const solids = [[programs.atom, batches.atoms], [programs.half, batches.halves]] as const;
     for (let k = 0; k < n; k += 1) {
       context.framebufferTextureLayer(context.FRAMEBUFFER, context.DEPTH_ATTACHMENT, texture, 0, k);
+      if (k === 0 && context.checkFramebufferStatus(context.FRAMEBUFFER)
+          !== context.FRAMEBUFFER_COMPLETE) {
+        context.bindFramebuffer(context.FRAMEBUFFER, bound);
+        context.deleteFramebuffer(fb);
+        context.deleteTexture(texture);
+        mapsFailed = scene;
+        return;
+      }
       context.clear(context.DEPTH_BUFFER_BIT);
       const basis = lightBasis(directions.slice(3 * k, 3 * k + 3));
       for (const [p, b] of solids) {
@@ -658,7 +678,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     const span = cue ? fogSpan(scene, view.rotation) : null;
     const fogUniform = span ? [span[0], span[1], LOOK.fog_max] : [0, -1, 0];
     const occlude = ambientOcclusion;
-    if (occlude && maps?.scene !== scene) buildMaps();
+    if (occlude && maps?.scene !== scene && mapsFailed !== scene) buildMaps();
     const s = pixelsPerAngstrom(scene, view, cssWidth, cssHeight);
     const pxScale = width / cssWidth;
     context.activeTexture(context.TEXTURE0 + MAPS_UNIT);
@@ -905,6 +925,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   return {
     setScene(next: Scene) {
       scene = next;
+      // maps of a scene no longer drawn are 64 MB of nothing
+      if (!lost && !ambientOcclusion) releaseMaps();
       if (!lost) upload();
     },
     setDepthCue(on: boolean) {
@@ -912,6 +934,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     },
     setAmbientOcclusion(on: boolean) {
       ambientOcclusion = on;
+      if (!on && !lost) releaseMaps();
     },
     draw,
     exportPng,
