@@ -66,8 +66,8 @@ What an operator must know, all measured:
   the line, and a shared instrument cut the esd 2.6×.  `result.parametric_form`
   tests the form its esd assumes.  A minor phase stalls a quadratic at
   `max_iter`. **A coefficient no stage frees keeps its start,
-  `esd=None`, no code**: `mccusker_default` reaches scales, background,
-  zero, cell, widths. *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104;
+  `vary` False, no code**: `mccusker_default` frees scales, background,
+  zero, cell, U-Y. *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104;
   WP-2101.)*
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early

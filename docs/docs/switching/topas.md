@@ -282,7 +282,8 @@ These steps port such an input:
    A construct in the list under that table has no rietx spelling yet.
 4. Call `MultiHistogramRefinement.preview_equations` before fitting.
    It evaluates every formula at its starting values, so compare its cells with the ones the input states.
-5. Fit, and compare a refined value the input states, such as a cell edge, with rietx's in units of its esd.
+5. Fit, and compare a refined value the input states, such as a cell edge, with rietx's in ppm, with both esds beside it.
+   Two programs can differ by more than either esd.
    Compare Rwp only loosely, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
 
 ### Writing an `.inp`
