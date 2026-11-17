@@ -226,7 +226,7 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
 
 ## Handover log
 
-- **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR (pending), stacked on
+- **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR #1654, stacked on
   #1632. The milestone's agent-port row now has numbers to judge against. WO₃'s input fits
   584 400 channels with 1163 free parameters, and ZrP₂O₇'s fits 163 133 with 1167. Every
   WO₃ parameter has a rietx spelling. Eight of ZrP₂O₇'s wait on 2107: the two
