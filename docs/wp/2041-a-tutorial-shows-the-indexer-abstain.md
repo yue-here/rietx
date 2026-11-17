@@ -1,9 +1,8 @@
 # WP-2041 — a tutorial shows the indexer abstain
 
-Milestone: unscheduled · Status: 🔄 2026-10-24 — example found (a 45° cut); held until WP-1956 lands, by the maintainer's choice
+Milestone: unscheduled · Status: ✅ 2026-11-15 — PR #1570; notebook 03 shows the indexer abstain on a 45° cut
 Track: The repo's own process
 Depends on: 1956
-Priority: P4 2026-11-08 — teaching content; WP-1956, its one blocker, closed on 2026-11-08 (PR #1469)
 
 ## Goal
 
@@ -11,6 +10,10 @@ One tutorial runs a search that ends with `best_or_none()` returning `None`, and
 the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
 
 ## Context
+
+*Superseded in part 2026-11-15: the abstaining example has landed in notebook 03, and the
+full range now reads 24 of 87 lines absent under the Pawley validation. See the newest
+handover entry. The bullets below are the record as written.*
 
 - Notebook 03 (`examples/tutorials/03_peaks_indexing_lebail.py`) used to be the example. Since
   WP-2002 removed the U, V and Y width floors (`879fb1bcc`), its candidate validates with 0 of
@@ -50,32 +53,6 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
   issue #916's mechanism (a candidate's fit buys its absences by sinking the background) on the
   *correct* cell. WP-1956 owns the repair; this WP changes no indexer code.
 
-### Inherited
-
-- **2026-11-08, from WP-1956 (closed, PR #1469): the grades on record after the repair, not
-  re-measured.** WP-1956's repair is complete on `main` (PRs #941, #1177, #1302; #1353 and
-  the 2026-11-07 ruling changed no code). Neither cut was re-run for that close, so this is
-  what the record holds, with its tree. *Full range:* the committed notebook, built by
-  1.11.0's rebuild `3791ef632` (2026-11-04, after all three PRs), prints CELL at `high`,
-  orthorhombic P 5.73930 4.96157 7.97039 Å, 51 of 54 lines indexed, Pawley Rwp 0.0444,
-  24 of 87 lines absent, and no capping caveat. So the repair did not drop the full range to
-  NO CELL, and the confident section stands as WP-2011 rewrote it. *45° cut:* last measured
-  on PR #941's merge (`0070d696`, 2026-10-24, before #1177 and #1302): NO CELL, the true cell
-  `medium`, capped by `fom_panel_reduced` and `shift_allowance_assumed`, 6 of 23 lines absent
-  and none uncancellable. Under #941 an absent count alone caps at `medium` rather than
-  refuting, so the abstention now rests on the two capping caveats. *Caveat for task 3:*
-  `src/rietx/indexing/` has moved since `3791ef632` (WP-2076's extinction-screen prefit among
-  12 commits), so both readings are to be taken again on `main` before the cut goes into the
-  notebook. WP-1956's other follow-ups are issue #1468; none bears on this tutorial.
-- **2026-10-27, from WP-2011: notebook 03's indexing prose was rewritten for the
-  Pawley validation.** The candidate now validates at Rwp 0.044 with 0 unmatched
-  peaks, so the `INDEX_IMPURITY_LINES` paragraph went, and the row's 24 of 87
-  absent lines are stated with what the gate reads of them: the absent lines no
-  space group could remove, inside the first twenty lines, of which there are
-  none (`examples/tutorials/03_peaks_indexing_lebail.py`, near line 163). The
-  verdict is still `high`. The 125-against-200 background quoted in § Context
-  was the Le Bail fit's; not re-measured under Pawley.
-
 ## Non-goals
 
 - Changing when the indexer abstains: WP-1969 and `src/rietx/indexing/`.
@@ -88,11 +65,12 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
       validation background. *Decided 2026-10-24: hold this WP until WP-1956 lands* (option
       C of four: correct the confident section now and add the example; add the example
       alone; hold; do nothing).
-- [ ] After WP-1956: re-run the 45° cut and the full range on `main`. Add the cut to notebook
+- [x] After WP-1956: re-run the 45° cut and the full range on `main`. Add the cut to notebook
       03 after the confident search, with prose that reads the output, and rewrite the
       confident section's "none of the reflections it predicts is missing" to what the
-      repaired count says.
-- [ ] Skill: none. The skill's indexing reference already covers `best_or_none()`.
+      repaired count says. *(The rewrite had already landed with WP-2011; the full range's
+      output is unchanged, so the confident section stands.)*
+- [x] Skill: none. The skill's indexing reference already covers `best_or_none()`.
 
 ## Acceptance
 
@@ -106,6 +84,72 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
 None.
 
 ## Handover log
+
+### 2026-11-15 — notebook 03 shows the indexer abstain on a 45° cut
+
+Tutorial 03 now runs a second indexing search on its own pattern cut at 45° 2θ, and that
+search abstains. The true cell still ranks first, found by all three engines, but at `medium`.
+Two caveats hold it there, and both say the data are too short: 15 lines is below the 20 the
+classical figures of merit are scored on, and 15 lines give no measured 2θ shift. The prose reads
+the verdict line, `INDEX_ABSTAINED` and `best_or_none()` returning `None` off that output. The
+full range's confident section needed no change, because WP-2011 had already rewritten it and
+its output is the same on today's `main`. One thing in the new output is a false alarm: an
+`INDEX_IMPURITY_LINES` warning on the strongest line's tail, which the prose explains and
+WP-2113 inherits.
+
+- *Measured* (arm64 venv, `[dev]`, macOS, on `978bf43c1` = `main` `98d7ba8e3` plus the claim;
+  load average 9-11 throughout). Probe `~/.cache/ghostshift/rietx/wp-2041/probe.py <hi>`: the
+  notebook's setup cell, `data.crop(10, hi)`, `rx.pick_peaks`, then `rx.index_pattern` with the
+  notebook's `spec` (`budget_seconds=120`).
+  - 45° cut, three sequential runs, byte-identical output, 13.6, 16.5 and 13.8 s: `NO CELL: the
+    result abstains`. Rank 1 orthorhombic P 7.97064 5.73879 4.96143 Å, V = 226.94 Å³, `medium`,
+    not higher because `fom_panel_reduced`, `shift_allowance_assumed`; found by dichotomy, svd and
+    trial_error; 14 of 15 lines; Pawley Rwp 0.0474; 6 of 23 lines absent. Same grade and caveats
+    as the 2026-10-24 record on `0070d696`, so #1177, #1302 and WP-2076 moved nothing here.
+    New since then: `INDEX_IMPURITY_LINES`, 1 region near 25.540°.
+  - Full range, one run, 16.1 s: CELL at `high`, identical to the committed notebook (51 of 54
+    lines, Pawley Rwp 0.0444, 24 of 87 absent, 0 uncancellable in window).
+  - The impurity region is the 26.22° line's low-angle tail. The Pawley calculated curve sits at
+    its background (211) up to 25.60° and starts the line's profile at 25.62°. The truth there is
+    251-282 counts, and a noise high at 25.54° (307 observed) reaches Δ/σ 5.5. Plot of the
+    validation fit looked at (`val_45.png` in the scratch directory). Recorded in WP-2113.
+  - The rebuild also moved notebook 03's Le Bail cells, through code that landed since the
+    1.11.0 rebuild: best pass Rwp 0.0533 → 0.0515, GoF 1.24 → 1.20, Y −0.0061(58) →
+    −0.0052(56). Their prose ("no diagnostic", Y zero within its esd, ticks over no peak near
+    11° and 15.5°) still holds; the plot was looked at.
+- *Done* (PR #1570): the new section in `examples/tutorials/03_peaks_indexing_lebail.py`, the rebuilt
+  notebook, the tutorials README row. The old one-line pointer to `INDEX_ABSTAINED` moved into
+  the section.
+- *Code review* (`/code-review high --fix`, eight findings). Fixed: the manual's tutorial
+  table row (`docs/docs/start/tutorials.md`) now matches the README's; the assumed 0.050° is
+  added "in quadrature"; the runtime line names two searches; "15 usable lines" became "15
+  lines", since the cell shows only the indexing header. Declined: a timing report for the
+  fast tier (no test added; the new cell adds one search, 13.6-16.5 s at load 9-11); this
+  Context (now marked superseded in part). Not fixed here, no owner found: `INDEX_PANEL_REDUCED`
+  says "The search runs over cubic, hexagonal, orthorhombic, tetragonal, trigonal", reading
+  `quality.systems_supported` (`indexing/diagnostics.py:626`), while the search ran
+  orthorhombic only (`spec.systems` ∩ supported, `workflow._restrict_to_supported`). The new
+  cell prints it beside `INDEX_SYSTEMS_NOT_COVERED`, which says four of those were not
+  searched. A fix changes reader output, so it goes to the maintainer.
+- *Runtime not re-measured quietly*: the notebook still claims "under a minute". A rebuild at
+  load average 23 on 10 cores took 137 s wall, 99.5 s user CPU.
+- *Not run*: the generality judge (no heuristic added); the fast and full suites (no library
+  code or test changed). The acceptance ran: `build.py --check` clean, and
+  `tests/test_tutorials.py` 35 passed (arm64 macOS, `[dev]`), before the review's markdown-only
+  fixes; after them `build.py --check` is clean and the outputs rebuilt unchanged.
+- *Forward*: WP-2113's `### Inherited` (the tail family, and that a fix there changes this
+  notebook's output).
+- *CI on PR #1570* (steward, 2026-11-15) found two failures. `ruff format --check
+  examples/tutorials` refused the new `index_pattern` call at 87 columns. And the section put
+  notebook 03's markdown twin at 55 688 characters, over the page contract's 50 000
+  (`tests/test_manual.py::test_every_page_has_a_twin_that_keeps_the_contract`, whose remedy
+  is "split it"). So the section moved to its own notebook, `03b_when_the_indexer_abstains`,
+  as 02's steering moved to 02b in 1.10. It repeats notebook 03's setup cell and reads notebook
+  03's full-range numbers by name. Notebook 03 is back to `main`'s cells, plus a two-line
+  pointer to 03b where the old one-line pointer to `INDEX_ABSTAINED` stood. Both tutorial
+  tables carry a 03b row. *Settled by Claude under the page contract's cap and the 02b
+  precedent*; the alternative was to trim notebook 03's outputs, which no cut of the new
+  section alone brings under the cap (printing it without explanations saves 2 485).
 
 ### 2026-10-24 (2nd session) — an abstaining example found, and the confident grade it sits beside rests on a sunk background
 
