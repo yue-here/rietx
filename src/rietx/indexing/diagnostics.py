@@ -1336,10 +1336,10 @@ def _uncounted_lines(prior, z) -> list[str]:
     not whole, so no group was removed for them and none was counted."""
     if not (prior.ordered and prior.formula and z is not None):
         return []
-    from ..crystallography.atomic_volume import formula_counts
+    from ..crystallography.atomic_volume import _exact_formula_counts
     from .extinction import uncounted_elements
 
-    skipped = uncounted_elements(z, formula_counts(prior.formula))
+    skipped = uncounted_elements(z, _exact_formula_counts(prior.formula))
     return [f"ordered: {el} not counted, {per_cell:g} atoms per cell at z={z} "
             "is not whole, so no ordered model holds it (the other elements "
             "were counted)" for el, per_cell in skipped.items()]
