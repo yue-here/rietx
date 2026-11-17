@@ -245,7 +245,14 @@ with the kernel and the paper.
 - **Tests:** +7 in `test_render_structure.py` (directions, isolated atom, touching pair, D3
   shade, both modes darken; the `occluded` bit-identity row and the recipe row), +1 parity
   case in `test_structure3d_browser.py` (skips where playwright or chromium is missing, so in
-  CI), +1 vitest. Counts below.
+  CI), +1 vitest. Fast suite on the workstation at `8ea887b5e` (main `bc77a934e` merged in;
+  Linux, its `rietx-py312` venv over the tree's `src`, `-n 4 --dist loadgroup -m "not slow"`):
+  14866 passed, 280 skipped, 32 xfailed, 0 failed in 914 s (a `-n 8` run was memory-paused
+  three times by co-tenants and stopped). The added tests cost 1.64 s in that run, the
+  slowest 1.32 s (`test_ambient_occlusion_darkens_both_modes_and_is_off_by_default`), so none
+  joins the slow tail. Vitest 796 passed, svelte-check 0 errors, Vale 0 errors,
+  `tests.reader_output` exit 0 (unchanged). The full selection was not run: the option is off
+  by default and moves no measured number.
 - **Review:** a read-only reviewer found no correctness bug; transforms and texel addressing
   were checked numerically. Its two GL risks (an unchecked 64 MB allocation, maps kept when
   off) and four nits (a wrong memory comment, two docstrings out of step with the
