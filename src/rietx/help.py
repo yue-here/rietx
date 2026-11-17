@@ -4234,7 +4234,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A free rotation or shift of a rigid body has no effect on the pattern. The "
             "usual cause is a turn that moves only zero-occupancy atoms, or a turn about "
             "an axis the template is symmetric under. The value and the esds of the body "
-            "atoms are not measurements. Hold those parameters and refit."
+            "atoms are not measurements. Hold what the suggestion names and refit."
         ),
     ),
     "ROUGHNESS_ABSORPTION": HelpEntry(
@@ -4569,7 +4569,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model holds it fixed, there is nothing to refine. A pattern that names one "
             "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
             "frees nothing at that site. An atom on a fully fixed special position has "
-            "no directions, so its `dof.*` pattern matches no parameter."
+            "no directions, so its `dof.*` pattern matches no parameter. A pattern "
+            "that names one phase's cell, such as `phases.0.cell.*`, gets it too. On "
+            "a phase whose cell is derived from its parent's, it reaches no free "
+            "row, and `phases.0.parent_cell.cell.*` frees the parent's edges."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
