@@ -22,13 +22,13 @@
    "the data cannot settle it": 11
   },
   "codes_by_audit_tier": {
-   "1": 42,
-   "2": 4,
-   "unaudited": 25,
+   "1": 38,
+   "2": 2,
+   "unaudited": 31,
    "3": 3,
    "caller": 1
   },
-  "codes_on_unaudited_baseline": 25,
+  "codes_on_unaudited_baseline": 31,
   "codes_with_a_suggestion_site": 72,
   "codes_no_test_names": 0,
   "named_constants_read": 39,
@@ -74,14 +74,14 @@
    "explanation": "You gave a specimen radius or thickness, but the package could not estimate the absorption from it.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_absorption.py",
@@ -125,14 +125,14 @@
    "explanation": "The estimated absorption of the capillary lies beyond the range of the published fit used to correct it.",
    "audit_row": {
     "tier": "2",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_absorption.py"
@@ -261,14 +261,14 @@
    "explanation": "A refined anisotropic displacement tensor has a negative eigenvalue, so it does not describe an ellipsoid.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_aniso_adp.py",
@@ -462,14 +462,14 @@
    "explanation": "A refined isotropic displacement parameter is below zero.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_acceptance_srm1976a_texture.py",
@@ -549,14 +549,14 @@
    "explanation": "The refined value finished on its minimum or maximum, and the data were pushing it further.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/api_surface.py",
@@ -615,14 +615,14 @@
    "explanation": "A phase absorbs too strongly for the Brindley correction.",
    "audit_row": {
     "tier": "2",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_acceptance_qpa_roundrobin.py",
@@ -838,14 +838,14 @@
    "explanation": "The data do not constrain one combination of several parameters.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_acceptance_lab6_cbn.py",
@@ -879,14 +879,14 @@
    "explanation": "The solver returned, but the calculation of the esds raised an error afterwards.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_covariance_scaling.py"
@@ -933,14 +933,14 @@
    },
    "explanation": "The number of independent reflections is low compared with the number of structural parameters refined.",
    "audit_row": {
-    "tier": "2",
+    "tier": "unaudited",
     "response": null,
-    "ambiguity": 1
+    "ambiguity": null
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
+   "on_unaudited_baseline": true,
    "on_response_baseline": true,
    "tests": {
     "files": [
@@ -972,14 +972,14 @@
    "explanation": "An older release stored this parameter with no limits, because it was set by hand.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_project.py"
@@ -1121,14 +1121,14 @@
    "explanation": "The area of a declared peak finished at zero.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_extra_components.py",
@@ -1217,14 +1217,14 @@
    "explanation": "Two parameters are correlated so completely that the data measure only one combination of them.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/eval_skill_placement/runner.py",
@@ -1663,14 +1663,14 @@
    "constants_read": {},
    "explanation": "A Le Bail fit alternates between extracting intensities and refining the other parameters.",
    "audit_row": {
-    "tier": "1",
+    "tier": "unaudited",
     "response": null,
-    "ambiguity": 1
+    "ambiguity": null
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
+   "on_unaudited_baseline": true,
    "on_response_baseline": true,
    "tests": {
     "files": [
@@ -1861,14 +1861,14 @@
    "explanation": "A particle radius was given for at least one phase, but the correction could not run.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_qpa.py",
@@ -1906,15 +1906,15 @@
    },
    "explanation": "Rwp is so high that the model does no better than one that predicts no intensity.",
    "audit_row": {
-    "tier": "1",
-    "response": "error",
-    "ambiguity": 1
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/silence.py",
@@ -2104,14 +2104,14 @@
    "explanation": "The space group has an axis along which the whole structure can slide without changing any intensity.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_floating_origin.py"
@@ -2255,14 +2255,14 @@
    },
    "explanation": "The typical peak is covered by too few measured points across its width.",
    "audit_row": {
-    "tier": "2",
+    "tier": "unaudited",
     "response": "warning",
-    "ambiguity": 1
+    "ambiguity": null
    },
    "suggestion_row": {
-    "tier": "2"
+    "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
+   "on_unaudited_baseline": true,
    "on_response_baseline": false,
    "tests": {
     "files": [
@@ -2303,14 +2303,14 @@
    "explanation": "Some reflections have no emission line centred inside the fitted data.",
    "audit_row": {
     "tier": "1",
-    "response": "info",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_parametric_series.py",
@@ -2398,15 +2398,15 @@
    },
    "explanation": "The scale of a phase is too close to zero for the data to tell it from an absent phase, or none of its reflections lie in the fitted range.",
    "audit_row": {
-    "tier": "1",
-    "response": "warning",
-    "ambiguity": 1
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/planted_series.py",
@@ -2492,14 +2492,14 @@
    "explanation": "A phase scale refined to a value at which its uncertainty could not be measured, usually zero.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_absent_phase.py",
@@ -2530,14 +2530,14 @@
    "explanation": "The refined scales, weighted by the cell contents, sum to zero or less, so there is nothing to normalise into weight fractions.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_robustness_external.py"
@@ -2745,14 +2745,14 @@
    "explanation": "A free rotation or shift of a rigid body has no effect on the pattern.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_rigid_body.py"
@@ -2939,14 +2939,14 @@
    "explanation": "Over the fitted range the scale of a phase and its displacement parameters act on the data in the same way.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_joint_report.py",
@@ -3081,15 +3081,15 @@
    },
    "explanation": "The ion named for a site has no entry in the form-factor table.",
    "audit_row": {
-    "tier": "1",
-    "response": "warning",
-    "ambiguity": 1
+    "tier": "unaudited",
+    "response": null,
+    "ambiguity": null
    },
    "suggestion_row": {
-    "tier": "1"
+    "tier": "unaudited"
    },
-   "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_unaudited_baseline": true,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_joint_xray_neutron.py",
@@ -3162,14 +3162,14 @@
    "explanation": "A stage ran out of iterations before it converged.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
-    "tier": "1"
+    "tier": "unaudited"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_budget_and_tolerance_invariance.py",
@@ -3325,14 +3325,14 @@
    "explanation": "A stage asked to refine a parameter by a name that no parameter of the model has.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_joint_report.py",
@@ -3458,14 +3458,14 @@
    "explanation": "The refined anisotropic strain coefficients give a negative variance at some reflections.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "unaudited"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_acceptance_stephens.py",
@@ -3545,14 +3545,14 @@
    "explanation": "The truncated spherical-harmonics series goes below zero somewhere on the sphere.",
    "audit_row": {
     "tier": "1",
-    "response": "warning",
+    "response": null,
     "ambiguity": 1
    },
    "suggestion_row": {
     "tier": "1"
    },
    "on_unaudited_baseline": false,
-   "on_response_baseline": false,
+   "on_response_baseline": true,
    "tests": {
     "files": [
      "tests/test_acceptance_qpa_roundrobin.py",

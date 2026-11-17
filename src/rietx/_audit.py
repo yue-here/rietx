@@ -564,16 +564,10 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
 ROWS: tuple[Row, ...] = (
     # code: 258
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("read the Biso, scale and fraction of each phase as uncorrected for "
-                  "specimen absorption until mu_r or mu_t is set by hand"),
         evidence=("arithmetic: fires exactly when the absorption record carries skipped, so "
                   "the radius or thickness the caller declared entered no correction "
                   "(refine.py _absorption_diagnostics); the record says why; gates nothing")),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code", tier=2, ambiguity=1,
-        response="warning",
-        responds=("read the Biso and scale as corrected by an extrapolated formula; quote "
-                  "them with that named, or bring muR inside the fit's domain"),
         evidence=("Rouse, Cooper, York & Chakera (1970) Acta Cryst. A26, 682: the "
                   "correction's fit domain ends at muR = 1 "
                   "(model.absorption.CYLINDER_MU_R_MAX, tier 2); fires exactly past it and "
@@ -581,8 +575,6 @@ ROWS: tuple[Row, ...] = (
     Row("ABSORPTION_PLATE_THICKNESS", "code"),
     Row("ABSORPTION_THICKNESS_MATTERS", "code"),
     Row("ADP_NOT_POSITIVE_DEFINITE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="report no anisotropic ADP of the named site as measured",
         evidence=("physics: a displacement tensor with a non-positive eigenvalue makes the "
                   "Debye-Waller factor diverge at high Q; fires exactly when the smallest "
                   "eigenvalue is <= 0 (staged.check_adp_positive_definite)")),
@@ -610,25 +602,17 @@ ROWS: tuple[Row, ...] = (
                   "the scan's choice, before holding that baseline fixed"),
         scope=("all",)),
     Row("BISO_NEGATIVE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote no Biso of the named site as measured until its cause is corrected "
-                  "or it is held"),
         evidence=("physics: Biso = 8 pi^2 <u^2> cannot be negative; fires exactly when a "
                   "refined isotropic value is below zero (staged.check_biso_negative, no "
                   "tolerance)")),
     Row("BISO_UNUSUALLY_LARGE", "code"),
     Row("BOUND_HIT", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="read the named cell, width or scale as set by its limit, not by the data",
         evidence=("arithmetic: one finding per path staged.bound_findings reports on a "
                   "caller's limit that carried load; its tests are BOUND_HIT_RTOL (tier 1) "
                   "and BOUND_HIT_ESD_FRAC, BOUND_HIT_COS_MIN (tier 3, approved 2026-10-19); "
                   "the code tiers its own part and the threshold keeps its row, as "
                   "STAGE_SLOW_DESCENT does; settled by Claude 2026-11-17 (WP-2005)")),
     Row("BRINDLEY_OUTSIDE_REGIME", "code", tier=2, ambiguity=1,
-        response="warning",
-        responds=("quote the named phases' weight fractions with microabsorption named as an "
-                  "unquantified systematic"),
         evidence=("Brindley (1945) Phil. Mag. 36, 347: the correction's medium-powder class "
                   "ends at mu*D = 0.1 (optimize.qpa.BRINDLEY_MU_R_FENCE, tier 2, FullProf's "
                   "classes agree); fires exactly past it and gates nothing")),
@@ -729,31 +713,15 @@ ROWS: tuple[Row, ...] = (
                   "when the count is above zero; the inequalities are physics (a variance "
                   "cannot be negative); gates nothing")),
     Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote no esd for the named parameters (a cell, coordinate or width among "
-                  "them)"),
         evidence=("arithmetic: names the parameters sharing a direction the covariance build "
                   "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
                   "holds (staged.check_discarded_directions)")),
     Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote the named stage's cell, coordinates and widths without esds; none "
-                  "were computed"),
-        scope=('all',),
         evidence=("arithmetic: fires exactly when the esd calculation raised after the "
                   "solver returned (refine.py _covariance_diagnostics), so the stage's "
                   "values stand with no esds")),
-    Row("DATA_SUPPORT_LOW", "code", tier=2, ambiguity=1,
-        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36, "
-                  "section 9: the observation/parameter ratio should be at least three and "
-                  "preferably five (optimize.statistics.OBS_PER_PARAMETER_MIN, _PREFERRED, "
-                  "quoted, 2004's rows); the count is effective_observations (Altomare et "
-                  "al. 1995); info below five, a warning below three, so its level is "
-                  "computed and it keeps no response until split")),
+    Row("DATA_SUPPORT_LOW", "code"),
     Row("DECLARED_RANGE_NOT_RESTORED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("check the named cell, width or scale before quoting it: it now refines "
-                  "with no limits"),
         evidence=("arithmetic: an older file's hand-set parameter has no limits and "
                   "migration found no declared range for its path (schemas/migrate.py "
                   "_not_restored_note); fires exactly then; a record of what migration did")),
@@ -782,15 +750,10 @@ ROWS: tuple[Row, ...] = (
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
     Row("EXTRA_PEAK_NO_INTENSITY", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="quote no parameter of the named extra peak: its intensity is zero",
         evidence=("arithmetic: a declared extra peak's area finished on its zero floor "
                   "within staged.BOUND_HIT_RTOL (tier 1); fires exactly then")),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
     Row("FLAT_DIRECTION", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote neither named parameter (a cell, width or scale) as measured from "
-                  "this fit"),
         evidence=("arithmetic: fires at |rho| >= staged.FLAT_DIRECTION_RHO, 1 - 5e-4, the "
                   "half-width of rho's three-decimal print (tier 1), so it claims only "
                   "'1.000 as printed'")),
@@ -911,10 +874,11 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds="nothing: the held paths stayed where the caller held them",
         evidence=("opt-in: Refinement.hold(), nothing held by default "
-                  "(StageResult.blocked_by_hold's row, caller); no default path calls hold "
-                  "(refine.py:4184 and sequential.py:1412 are docstrings; searched "
-                  "2026-11-17); reports which turn_on glob met the caller's hold and moves "
-                  "no value")),
+                  "(StageResult.blocked_by_hold's row, caller); the package calls hold only "
+                  "at strategy/magnetic.py:1369, under solve_magnetic(tie_to_parent=True), "
+                  "default False; refine.py:4184 and sequential.py:1412 are docstrings "
+                  "(searched 2026-11-17); reports which turn_on glob met the caller's hold "
+                  "and moves no value")),
     Row("HUMP_TOO_NARROW", "code"),
     Row("INDEX_ABSTAINED", "code"),
     Row("INDEX_BRAVAIS_AMBIGUOUS", "code"),
@@ -979,11 +943,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("physics: g_J from (S, L, J), Ashcroft & Mermin (1976) eq. 31.27 (docstring); "
                   "fires exactly when used")),
     Row("LAUE_CLASS_NOT_SEPARABLE", "code"),
-    Row("LEBAIL_ALTERNATION_STOPPED", "code", tier=1, ambiguity=1,
-        evidence=("arithmetic: fires once per Le Bail fit, naming why the alternation "
-                  "stopped (converged, non-monotone, or the passes cap); its level is "
-                  "computed from that reason, so it keeps no response until split "
-                  "(test_audit_table's rule)")),
+    Row("LEBAIL_ALTERNATION_STOPPED", "code"),
     Row("LEBAIL_CYCLES_AT_CAP", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when StageResult.lebail_settled is False on the "
                   "last stage, a partition there having reached Stage.lebail_cycles; "
@@ -1012,22 +972,11 @@ ROWS: tuple[Row, ...] = (
     Row("MAGNETIC_WIDTH_UNMEASURED", "code"),
     Row("MAGNETIC_WIDTH_UNMODELLED", "code"),
     Row("MICROABSORPTION_SKIPPED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="quote the weight fractions as not corrected for microabsorption",
         evidence=("arithmetic: fires exactly when a particle radius was given and "
                   "qpa.microabsorption_skipped says the Brindley correction could not run (a "
                   "phase without a radius, or no attenuation entry at this wavelength); the "
                   "fractions are then the uncorrected ones; gates nothing")),
-    Row("MODEL_FAR_FROM_DATA", "code", tier=1, ambiguity=1,
-        response="error",
-        responds=("read no value or esd from this fit; check the cell, wavelength, zero and "
-                  "range, then refit"),
-        scope=('all',),
-        evidence=("arithmetic: fires exactly when Rwp exceeds "
-                  "refine.MODEL_FAR_FROM_DATA_RWP, whose row (tier 3, approved 2026-10-19) "
-                  "names this code and its error level as what it gates; the code tiers its "
-                  "own part and the threshold keeps its row, as STAGE_SLOW_DESCENT does; "
-                  "settled by Claude 2026-11-17 (WP-2005)")),
+    Row("MODEL_FAR_FROM_DATA", "code"),
     Row("MOMENT_ANGLE_STATIONARY", "code", tier=3, ambiguity=1,
         evidence=("WP-1929: two-site Pnma moduli 0.0015/0.0011 mu_B with the angle columns out, "
                   "0.031/0.159 in, 0.0035-0.47 as ftol moved; LaMnO3 BT-1: a polar angle 5.2 deg "
@@ -1081,8 +1030,6 @@ ROWS: tuple[Row, ...] = (
                   "fixed it and names how (refine.py _origin_diagnostics, "
                   "_centroid_finding); gates nothing")),
     Row("ORIGIN_NOT_FIXED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="quote no coordinate along the polar axis: the origin there is not fixed",
         evidence=("physics: in a polar space group with nothing holding the origin along the "
                   "polar axis, every coordinate along it shares one zero-gradient direction "
                   "(Flack & Schwarzenbach 1988); fires exactly then")),
@@ -1192,14 +1139,7 @@ ROWS: tuple[Row, ...] = (
         responds=("nothing to fit: open the diffraction pattern the reduction started from, or "
                   "rename a 2θ scan that only carries a .gr, .sq or .fq suffix"),
         scope=("all",)),
-    Row("PATTERN_UNDERSAMPLED", "code", tier=2, ambiguity=1,
-        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36, "
-                  "section 2: at least five steps per FWHM "
-                  "(background.diagnostics.STEPS_PER_FWHM_MIN, tier 2); fires exactly below "
-                  "it on the typical peak; which peaks the census counts is "
-                  "SAMPLING_HEIGHT_FRACTION's and SAMPLING_PROMINENCE_SIGMA's, each on its "
-                  "own row"),
-        response="warning",
+    Row("PATTERN_UNDERSAMPLED", "code", response="warning",
         responds=("read an intensity- or width-derived number (a fraction, an ADP, a size, "
                   "a strain, an instrument width) as less certain than its esd, and "
                   "re-collect at a step near FWHM/5 where it must be quotable"),
@@ -1228,14 +1168,11 @@ ROWS: tuple[Row, ...] = (
         responds=("nothing: the points of weight 0 are excluded, every other point keeps "
                   "its sigma")),
     Row("PAWLEY_OFF_DATA_RIDGED", "code", tier=1, ambiguity=1,
-        response="info",
-        responds="export or use none of the named intensities: no data point measured them",
         evidence=("arithmetic: a Pawley reflection with no emission line centred inside the "
-                  "fitted data has no data column, so its intensity is set by the ridge "
-                  "alone (model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR's row, tier 3, approved "
-                  "2026-10-28); fires exactly when such reflections exist; the code tiers "
-                  "its own part and the threshold keeps its row, as STAGE_SLOW_DESCENT does; "
-                  "settled by Claude 2026-11-17 (WP-2005)")),
+                  "fitted data has no data column, so only the ridge sets its intensity; "
+                  "fires exactly when such reflections exist; the ridge's floor "
+                  "(model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR, tier 3) shapes the ridge and "
+                  "decides nothing here")),
     Row("PAWLEY_OVERLAP_UNRESOLVED", "code"),
     Row("PEAK_ASYMMETRY_UNMODELLED", "code"),
     Row("PEAK_AXIAL_TAIL", "code"),
@@ -1287,16 +1224,7 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("read a value in a listed pattern's row, or that pattern's fraction of "
                   "the phase, as the value handed in rather than a measurement")),
-    Row("PHASE_UNCONSTRAINED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote no cell, coordinate or fraction of the named phase: the data did "
-                  "not see it"),
-        evidence=("arithmetic: states the absent-phase hold StageResult.held records (tier "
-                  "3, approved 2026-11-04) and its trigger, a scale under "
-                  "PHASE_SUPPORT_SIGMA of its counting-noise esd (tier 3, approved "
-                  "2026-10-19) or no line in range; the code tiers its own part and the "
-                  "threshold keeps its row, as STAGE_SLOW_DESCENT does; settled by Claude "
-                  "2026-11-17 (WP-2005)")),
+    Row("PHASE_UNCONSTRAINED", "code"),
     Row("PLAN_FREES_NO_MOMENT", "code", tier=1, ambiguity=1,
         evidence=("a statement about the plan: fires exactly when a phase has a moment DOF "
                   "neither locked nor held by the caller and no glob of run_stages() frees "
@@ -1311,9 +1239,6 @@ ROWS: tuple[Row, ...] = (
                   "under a plan that frees phases.*.atoms.*.moment.dof* before quoting a "
                   "moment or the nuclear values beside it")),
     Row("QPA_ESD_UNAVAILABLE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote the weight fractions without esds, or remove the phase whose scale "
-                  "has none"),
         evidence=("arithmetic: a weight fraction normalises by the sum of scales, so a scale "
                   "with no measurable esd (statistics.normal_covariance drops its column) "
                   "leaves every fraction's esd unmeasured; fires exactly then (CLAUDE.md: "
@@ -1324,8 +1249,6 @@ ROWS: tuple[Row, ...] = (
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
     Row("QPA_UNAVAILABLE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="quote no weight fraction: they do not exist for this fit",
         evidence=("arithmetic: weight fractions divide by the sum of the weighted scales, "
                   "which is zero or less; fires exactly then (refine.py "
                   "_qpa_unavailable_diagnostics)")),
@@ -1370,9 +1293,6 @@ ROWS: tuple[Row, ...] = (
     Row("RESTRAINT_TENSION", "code"),
     Row("RIGID_BODY_MISFIT", "code"),
     Row("RIGID_BODY_UNSUPPORTED", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote no coordinate the named rotation or shift moves until it is held "
-                  "and refitted"),
         evidence=("arithmetic: a free rigid-body rotation or shift whose Jacobian column is "
                   "zero has no information in the data; fires exactly then (refine.py "
                   "_rigid_body_unsupported)")),
@@ -1380,9 +1300,6 @@ ROWS: tuple[Row, ...] = (
     Row("ROUGHNESS_OUTSIDE_REGIME", "code"),
     Row("ROUGHNESS_UNCONSTRAINED", "code"),
     Row("SCALE_B_INSEPARABLE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("quote no Biso of the named phase from this fit, and read its scale as "
-                  "conditional on the held B"),
         evidence=("arithmetic: over the fitted range a phase's scale and Biso columns "
                   "separate by less than SCALE_B_SEPARATION_FLOOR (2*sqrt(PINV_RCOND), tier "
                   "1), where pinv cannot tell them apart; names the hold "
@@ -1545,13 +1462,7 @@ ROWS: tuple[Row, ...] = (
     Row("SOLVE_B_TIED_PER_PARENT_SITE", "code", tier="caller", ambiguity=2,
         evidence="opt-in: solve_magnetic(tie_to_parent=True), default False"),
     Row("SPACE_GROUP_SETTING_ASSUMED", "code"),
-    Row("SPECIES_FALLBACK_NEUTRAL", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("read the named site's occupancy and Biso as fitted with the neutral "
-                  "atom's scattering"),
-        evidence=("arithmetic: fires on every substitution of the neutral atom's form factor "
-                  "for an untabulated ion (refine.SPECIES_FALLBACK_MIN_DELTA_FRAC = 0, tier "
-                  "1, the maintainer's choice on issue #202); a record of the substitution")),
+    Row("SPECIES_FALLBACK_NEUTRAL", "code"),
     Row("STAGE_FREED_NOTHING", "code", tier=1, ambiguity=3,
         response="info",
         responds=("nothing, where the stage was meant for the other histograms; otherwise add "
@@ -1563,9 +1474,6 @@ ROWS: tuple[Row, ...] = (
                   "since one histogram can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
     Row("STAGE_MAX_ITER", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="read the stage as not converged: its values are where the cap stopped it",
-        scope=('all',),
         evidence=("arithmetic: fires exactly when a stage's solver stopped at its iteration "
                   "cap before its convergence test passed; the cap is the stage's max_iter, "
                   "tiered on its own default row")),
@@ -1602,9 +1510,6 @@ ROWS: tuple[Row, ...] = (
                   "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
                   "glob answered by the same request's biso are excluded")),
     Row("STAGE_PATH_UNKNOWN", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("the plan did not refine the named path; correct it before reading what "
-                  "the stage was meant to free"),
         evidence=("arithmetic: a stage named a path the model's ParameterTable does not "
                   "hold, so the stage did not refine it; fires exactly then, at three sites "
                   "(a retired spelling, an undeclared opt-in, anything else)")),
@@ -1642,16 +1547,11 @@ ROWS: tuple[Row, ...] = (
                   "polishing, and compare Rwp and the axial terms"),
         scope=("all",)),
     Row("STEPHENS_STRAIN_NOT_POSITIVE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds=("report no Stephens strain coefficient as measured, and read the phase's "
-                  "widths as leaning on the clamp"),
         evidence=("physics: sigma^2(M) is a variance and cannot be negative (Stephens 1999); "
                   "fires exactly where the refined coefficients give one below zero past "
                   "staged.STEPHENS_CONE_TOL (tier 1)")),
     Row("STRAIN_UNUSUALLY_LARGE", "code"),
     Row("TEXTURE_NOT_POSITIVE", "code", tier=1, ambiguity=1,
-        response="warning",
-        responds="report no texture coefficient as measured, nor the intensities it scales",
         evidence=("physics: a pole density cannot be negative; fires exactly where the "
                   "truncated series goes below zero on the sphere past "
                   "TEXTURE_POSITIVITY_TOL (tier 1)")),
@@ -1673,8 +1573,7 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
     Row("WAVELENGTH_CALIBRATION", "code", tier=1, ambiguity=1,
         response="info",
-        responds=("nothing: compare the ppm shift with the instrument's calibration before "
-                  "quoting the cell"),
+        responds="nothing: the message states the ppm shift of the free wavelength",
         evidence=("arithmetic: fires exactly when a wavelength was free, and states its "
                   "shift from the declared value in ppm with no test on its size; gates "
                   "nothing")),
@@ -5620,8 +5519,7 @@ ROWS: tuple[Row, ...] = (
                   "points counted zero is the writer's fact, so the message gives how many "
                   "record y = 0 for the reader to weigh. It moves nothing by itself")),
     Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", value=1),
-    Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
-        evidence="McCusker et al. (1999) section 2: a step near FWHM/5, the same source"),
+    Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_IMPLAUSIBLE.suggestion", "suggestion", value=1),
     Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
@@ -5741,17 +5639,13 @@ ROWS: tuple[Row, ...] = (
                   "declares a size per histogram instead (multi.py:2293-2298)")),
     Row("SIZE_UNUSUALLY_SMALL.suggestion", "suggestion", value=1),
     Row("SPACE_GROUP_SETTING_ASSUMED.suggestion", "suggestion", value=1),
-    Row("SPECIES_FALLBACK_NEUTRAL.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
-        evidence=("arithmetic: names accepting the neutral atom or substituting a nearby "
-                  "ion; picks neither")),
+    Row("SPECIES_FALLBACK_NEUTRAL.suggestion", "suggestion", value=1),
     Row("STAGE_FREED_NOTHING.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names how to list the histogram's rows and the two ways to "
                   "change the plan, a glob that reaches them or a stage scoped to one "
                   "histogram, and picks neither (multi.py:2579-2582)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion", "suggestion", value=1),
-    Row("STAGE_MAX_ITER.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
-        evidence=("arithmetic: names two levers, fewer free parameters and the run's "
-                  "correlation or bound findings; picks neither")),
+    Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
     Row("STAGE_NOT_FINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names the two levers that change what a stage reaches, its "
                   "free set and its start, and picks neither; under solver='trf' alone, "
@@ -5845,6 +5739,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "CIF_SPECIES_NORMALISED",
     "CONSTRAINT_ACTIVE.suggestion",
     "COVARIANCE_UNAVAILABLE.suggestion",
+    "DATA_SUPPORT_LOW",
     "DATA_SUPPORT_LOW.suggestion",
     "DECLARED_RANGE_RESTORED.suggestion",
     "DISPERSION_NEGLECTED",
@@ -5995,6 +5890,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "INDEX_VOLUME_UNPHYSICAL.suggestion",
     "LAUE_CLASS_NOT_SEPARABLE",
     "LAUE_CLASS_NOT_SEPARABLE.suggestion",
+    "LEBAIL_ALTERNATION_STOPPED",
     "LEBAIL_ALTERNATION_STOPPED.suggestion",
     "LOW_ANGLE_UNMODELLED",
     "LOW_ANGLE_UNMODELLED.suggestion",
@@ -6005,6 +5901,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "MAGNETIC_WIDTH_UNMODELLED",
     "MAGNETIC_WIDTH_UNMODELLED.suggestion",
     "MICROABSORPTION_SKIPPED.suggestion",
+    "MODEL_FAR_FROM_DATA",
     "MODEL_FAR_FROM_DATA.suggestion",
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
@@ -6025,6 +5922,8 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "PATTERN_SCAN_REVERSED",
     "PATTERN_SIGMA_CONSTANT",
     "PATTERN_SIGMA_CONSTANT.suggestion",
+    "PATTERN_UNDERSAMPLED",
+    "PATTERN_UNDERSAMPLED.suggestion",
     "PATTERN_X_AXIS_ASSUMED",
     "PATTERN_X_AXIS_ASSUMED.suggestion",
     "PATTERN_X_AXIS_IMPLAUSIBLE",
@@ -6061,6 +5960,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "PEAK_WIDTH_CAPPED.suggestion",
     "PEAK_WIDTH_LAW_MISMATCH",
     "PEAK_WIDTH_LAW_MISMATCH.suggestion",
+    "PHASE_UNCONSTRAINED",
     "PHASE_UNCONSTRAINED.suggestion",
     "RAS_ATTENUATOR_PRESENT",
     "RAS_ATTENUATOR_PRESENT.suggestion",
@@ -6110,8 +6010,11 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SIZE_UNUSUALLY_SMALL.suggestion",
     "SPACE_GROUP_SETTING_ASSUMED",
     "SPACE_GROUP_SETTING_ASSUMED.suggestion",
+    "SPECIES_FALLBACK_NEUTRAL",
+    "SPECIES_FALLBACK_NEUTRAL.suggestion",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion",
+    "STAGE_MAX_ITER.suggestion",
     "STAGE_PATH_NOT_FREE.suggestion",
     "STEPHENS_STRAIN_NOT_POSITIVE.suggestion",
     "STRAIN_UNUSUALLY_LARGE",
@@ -6585,11 +6488,17 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
 #: column opened (WP-2037, 2026-10-24); it shrinks as WPs 2004-2007 give each
 #: code its response, so a code new to the table enters with one.
 RESPONSE_BASELINE: tuple[str, ...] = (
+    "ABSORPTION_ESTIMATE_UNAVAILABLE",
+    "ABSORPTION_MU_R_OUT_OF_RANGE",
     "ABSORPTION_PLATE_THICKNESS",
     "ABSORPTION_THICKNESS_MATTERS",
+    "ADP_NOT_POSITIVE_DEFINITE",
     "AIR_SCATTER_UNDECLARED",
     "BACKGROUND_ABSORPTION",
+    "BISO_NEGATIVE",
     "BISO_UNUSUALLY_LARGE",
+    "BOUND_HIT",
+    "BRINDLEY_OUTSIDE_REGIME",
     "BRML_ABSORBER_ENGAGED",
     "CELL_RUNAWAY",
     "CHILD_GROUP_UNNAMED",
@@ -6608,7 +6517,10 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "CIF_SITE_MULTIPLICITY_DISAGREES",
     "CIF_SITE_TWINS_MERGED",
     "CIF_SPECIES_NORMALISED",
+    "COVARIANCE_DIRECTION_DISCARDED",
+    "COVARIANCE_UNAVAILABLE",
     "DATA_SUPPORT_LOW",
+    "DECLARED_RANGE_NOT_RESTORED",
     "DECLARED_RANGE_RESTORED",
     "DISPERSION_NEGLECTED",
     "EXTINCTION_CONDITIONS_PARTIAL",
@@ -6617,7 +6529,9 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "EXTINCTION_PRIOR_APPLIED",
     "EXTINCTION_SCREEN_FAILED",
     "EXTINCTION_SYMBOL_AMBIGUOUS",
+    "EXTRA_PEAK_NO_INTENSITY",
     "EXTRA_PEAK_ON_REFLECTION",
+    "FLAT_DIRECTION",
     "FLAT_DIRECTION_OMITTED",
     "FROZEN_COMPILE_STALE",
     "FULLPROF_MAGNETIC_PHASE_OMITTED",
@@ -6711,10 +6625,13 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "MAGNETIC_WIDTH_MOVED_MOMENT",
     "MAGNETIC_WIDTH_UNMEASURED",
     "MAGNETIC_WIDTH_UNMODELLED",
+    "MICROABSORPTION_SKIPPED",
+    "MODEL_FAR_FROM_DATA",
     "MOMENT_ANGLE_STATIONARY",
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
     "OCCUPANCY_ABOVE_ONE",
+    "ORIGIN_NOT_FIXED",
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_TARGET_UNSEEN",
     "PATTERN_DEAD_CHANNELS",
@@ -6726,6 +6643,7 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "PATTERN_SIGMA_CONSTANT",
     "PATTERN_X_AXIS_ASSUMED",
     "PATTERN_X_AXIS_IMPLAUSIBLE",
+    "PAWLEY_OFF_DATA_RIDGED",
     "PAWLEY_OVERLAP_UNRESOLVED",
     "PEAK_ASYMMETRY_UNMODELLED",
     "PEAK_AXIAL_TAIL",
@@ -6742,7 +6660,10 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "PEAK_UNRESOLVED_SPLIT",
     "PEAK_WIDTH_CAPPED",
     "PEAK_WIDTH_LAW_MISMATCH",
+    "PHASE_UNCONSTRAINED",
+    "QPA_ESD_UNAVAILABLE",
     "QPA_FRACTION_RANGE",
+    "QPA_UNAVAILABLE",
     "RAS_ATTENUATOR_PRESENT",
     "READER_OPTION_IGNORED",
     "RECIPE_BACKGROUND_PEAK_DEGENERATE",
@@ -6763,17 +6684,24 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "RESOLUTION_NOT_POSITIVE",
     "RESTRAINT_TENSION",
     "RIGID_BODY_MISFIT",
+    "RIGID_BODY_UNSUPPORTED",
     "ROUGHNESS_ABSORPTION",
     "ROUGHNESS_OUTSIDE_REGIME",
     "ROUGHNESS_UNCONSTRAINED",
+    "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",
+    "SPECIES_FALLBACK_NEUTRAL",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
+    "STAGE_MAX_ITER",
+    "STAGE_PATH_UNKNOWN",
+    "STEPHENS_STRAIN_NOT_POSITIVE",
     "STRAIN_UNUSUALLY_LARGE",
+    "TEXTURE_NOT_POSITIVE",
     "TOPAS_BLOCK_SKIPPED",
     "TOPAS_CELL_COUPLING_DROPPED",
     "TOPAS_FEATURES_NOT_IMPORTED",

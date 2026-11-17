@@ -129,8 +129,8 @@ its tier.
       *2026-11-17:* 32 tier-1 literals now (three new counts in `_owner_words`). Each of
       the 4 thresholds waits on its code's ruling in `2005-batch/batch.md`, since a code
       that goes takes its literal with it.
-- [ ] Tier each code per part, with evidence and families. *2026-11-17:* 50 of 75 tiered
-      (39 this session); the other 25 need a ruling (`2005-batch/batch.md`).
+- [ ] Tier each code per part, with evidence and families. *2026-11-17:* 44 of 75 tiered
+      (33 this session); the other 31 need a ruling (`2005-batch/batch.md`).
 - [ ] The batch to the maintainer; rulings dated into the table. *2026-11-17:* written,
       `2005-batch/batch.md`; no ruling yet.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
