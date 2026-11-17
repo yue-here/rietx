@@ -293,7 +293,7 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          its per-format row; landed 562
 #   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
 #                                                          case (a name-only refusal) and the table
-#                                                          row's no-fixture sentence; landed LANDED
+#                                                          row's no-fixture sentence; landed 565
 #   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
 #                                                          reader-repair row and one rule for every
 #                                                          reader's pre-drop decisions; landed 571
