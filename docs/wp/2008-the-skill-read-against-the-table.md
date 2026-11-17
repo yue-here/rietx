@@ -219,3 +219,4 @@ star, puts it back, because the skill's role is now narrower than interpreting v
   §2 item 5 and the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row now say to co-refine, with
   #1569's measurement; `optimize.statistics.background_absorption`'s docstring says the
   screen cannot see a held curve. This WP's tasks are otherwise unchanged.
+  PR: #1630.
