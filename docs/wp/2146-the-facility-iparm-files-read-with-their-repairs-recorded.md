@@ -108,6 +108,32 @@ output, so its wording goes to the maintainer before merge.
 
 ### Inherited
 
+- **2026-11-17, from the issue triage round (issue #1446).** Decided
+  2026-11-16 by the maintainer: reducing raw time-of-flight data to focused
+  banks is out of scope. That covers per-pixel event or histogram NeXus,
+  empty-can subtraction, vanadium normalisation, per-pixel calibration and
+  grouping. rietx starts at the focused bank file. Two follow-ups land here,
+  because the files this WP makes readable are what Mantid writes after
+  focusing:
+  - A how-to: focus the raw run with Mantid, save the banks with `SaveGSS`
+    (or FXYE) and the instrument file, then `read_pattern` the `.gss` and
+    `read_gsas_tof_iparm` the file. It belongs on
+    `reference/instrument-files.md` or a Guides page beside it. Write it after
+    tasks (a) to (d), since the HRPD and POLARIS files Mantid writes are
+    refused until then.
+  - A named refusal when someone opens a raw `.nxs`. Checked against the tree
+    at `96f721c26` on a file opening with the HDF5 magic: `read_pattern`
+    raises `ValueError` "… is not a powder pattern this build can read (it
+    looks binary)" and lists the supported formats (`io/readers.py:352`). It
+    names neither HDF5 nor focusing. The new
+    message says rietx reads focused banks, and that a raw run is focused with
+    Mantid first. The HDF5 magic (`\x89HDF\r\n\x1a\n` at offset 0) identifies
+    the file without h5py, so this needs no new dependency. Its text is
+    reader output, so its wording goes to the maintainer before merge.
+  The same ruling settles issue #113's part (c), a resonance correction at
+  raw-TOF level. Only pre-rebinning data could use it, and rietx never sees
+  that data.
+
 ## Non-goals
 
 - The TOF profile, spectrum and forward model (T-2/T-3) and multi-bank fits
