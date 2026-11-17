@@ -126,8 +126,13 @@ its tier.
       reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
       their tiers, since a new constant enters the table tiered. The fifth threshold
       refuses a Chebyshev scan in `background/select.py` and gates no code, so it stays.
-- [ ] Tier each code per part, with evidence and families.
-- [ ] The batch to the maintainer; rulings dated into the table.
+      *2026-11-17:* 32 tier-1 literals now (three new counts in `_owner_words`). Each of
+      the 4 thresholds waits on its code's ruling in `2005-batch/batch.md`, since a code
+      that goes takes its literal with it.
+- [ ] Tier each code per part, with evidence and families. *2026-11-17:* 50 of 75 tiered
+      (39 this session); the other 25 need a ruling (`2005-batch/batch.md`).
+- [ ] The batch to the maintainer; rulings dated into the table. *2026-11-17:* written,
+      `2005-batch/batch.md`; no ruling yet.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
       code replaced by an `info` record with no threshold that states the number (the
       record § Demotion); the explanation's observation sentence updated where the verdict

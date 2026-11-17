@@ -1,4 +1,7 @@
-# WP-2005 batch, part 1
+# WP-2005 batch
+
+*Part 2, 2026-11-17:* 39 more codes are tiered in `src/rietx/_audit.py`, and `batch.md` holds the
+25 that wait on the maintainer. The paragraph below describes part 1 as it was.
 
 What this folder is: the collated inventory for WP-2005, with **no row of the audit table tiered** (a literal's role, recorded here, is the WP's "recorded tier 1 with the reason"). It follows WP-2006's part 1
 (`../2006-batch/`, merged as #1101). The tiers, the lifts and the batch to the maintainer wait for
@@ -10,6 +13,7 @@ moves or removes anything.
 |---|---|
 | `inventory.json` | One row per code: raise sites with level and guarding conditions (enclosing `if`s and earlier early exits), the named constants its raising function and the same-file functions it calls read (with each one's audit tier and value; `via` names the helper), the explanation's first sentence, the code's audit rows, the tests naming it, and the hand-written condition and kind of ambiguity. Then one row per numeric literal in a raising function or a same-file function it calls by name, with its role. Made by `collate_inventory.py`. |
 | `judgements.json` | The only hand-written input: per code the condition in words and the kind of ambiguity of its verdict (DESIGN.md § Rules, 1) with the reason; per literal its role and the reason. The script stops on a code or literal with none, on a judgement the tree no longer has, and on a text cut short (WP-2006's rule). |
+| `batch.md` | Part 2 (2026-11-17): the 25 codes this WP could not tier without a ruling, sorted by the gate's two questions into four classes, with a proposal and a question for each class. The 50 tiered codes are rows of `src/rietx/_audit.py`. |
 | `collate_inventory.py` | Derives the rest from the tree: codes from `docs/reference_pages.diagnostic_index()`, raise sites and literals by AST, tiers from `rietx._audit.ROWS`, explanations from `rietx.help.DIAGNOSTIC_HELP`. |
 
 Run it with `.venv/bin/python docs/wp/2005-batch/collate_inventory.py`; `--skeleton` prints
