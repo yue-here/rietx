@@ -183,7 +183,14 @@ root's precedence against `telemetry=` and the working directory.
     errors. Pearl (Linux x86_64, `rietx-py312`, tree on `PYTHONPATH`): canary
     at 691ee826c 287 passed, 1 failed (the audit walk had no place for
     `__pyinstaller`, fixed in 073495b20), then 288 passed, 4 skipped at
-    073495b20. Fast selection: FAST_RESULT. The hook's entry-point test skips
+    073495b20. Fast selection on the merged tree 9d69c40d5 (`origin/main` f1187a062 merged in): 14873
+    passed, 281 skipped, 32 xfailed, 2 failed in 612 s, 6.6 GB peak, 725 % on
+    8 cores. Both failures were this branch's: the metadata-reader pin in
+    `test_capabilities.py` matched the hook's `copy_metadata(DIST_NAME)`, and
+    Vale's accept list is generated from `docs/vale/terms.txt`, where
+    PyInstaller now sits. Fixed in 7b5cfba9e; both files then 64 passed on the Mac.
+    The suite added 17 tests (12 + 5); the one extra skip against other
+    branches' runs (281, not 280) is the hook's entry-point test, which skips
     wherever the installed dist-info predates the branch (pearl's shared
     venv); CI installs fresh.
   - *Review.* A read-only reviewer found the banner silent for a root under
