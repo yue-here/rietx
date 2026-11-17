@@ -271,16 +271,25 @@ def _wd(row: dict, keys) -> str:
     out = []
     for k in keys:
         if k in w:
-            v, e, vary, at, lo, hi = w[k]
+            v, e, _vary, _at, lo, _hi = w[k]
             tag = " floor" if (lo is not None and abs(v - lo) <= 1e-9 and lo == 0.0) else ""
             tag += " ±180" if abs(abs(v) - TCHZ_CEILING_DEG) <= 1e-6 else ""
-            out.append(f"{k.split('.', 1)[1]} {_pm(v, e)}{'' if vary else ' (fixed)'}{tag}")
+            out.append(f"{k.split('.', 1)[1]} {_pm(v, e)}{tag}")
     return "; ".join(out)
 
 
 def _twin_stages(row: dict) -> str:
-    named = [f"{n}: {sorted(t)}" for n, t in row["twins"] if t]
-    return ", ".join(named) if named else "none recorded"
+    named = [(n, t) for n, t in row["twins"] if t]
+    if not named:
+        return "none recorded"
+    keys = sorted({k.rsplit(".", 1)[1] for _, t in named for k in t})
+    return f"{', '.join(keys)} from `{named[0][0]}` ({len(named)} stages)"
+
+
+def _off_widths(rows: dict) -> dict:
+    """Rows that are not a width (instrument U-Y or a phase's four), read off a flat pair."""
+    return {k: v for k, v in rows.items()
+            if not k.startswith("instrument.profile.") and not k.endswith(PHASE_WIDTHS)}
 
 
 def _flat_codes(row: dict) -> str:
@@ -312,8 +321,9 @@ def summary() -> None:
               "sides only; a held row has none), background beside.", ""]
 
     lines += ["## R1. `width_twins_held`", "",
-              "| family | arm | Rwp | evals | status | shift esd | row | bkg esd | QPA wt % | "
-              "twins recorded | flat/bound codes |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| family | arm | Rwp | evals | status | shift esd | row | off the widths | row | "
+              "bkg esd | QPA wt % | twins recorded | flat/bound codes |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for fam in R1_FAMILIES:
         base = by.get(("r1", fam, "held", "", ""))
         for arm in R1_ARMS:
@@ -322,8 +332,10 @@ def summary() -> None:
                 continue
             s, p = gp._shift(r["rows"], base["rows"]) if base else (None, None)
             b, _ = gp._shift(r["rows"], base["rows"], background=True) if base else (None, None)
+            o, q = (gp._shift(_off_widths(r["rows"]), _off_widths(base["rows"])) if base
+                    else (None, None))
             lines.append(f"| {fam} | {arm} | {r['rwp']:.6f} | {r['n_eval']} | {r['status']} | "
-                         f"{f(s)} | {p or '—'} | {f(b)} | {_frac(r)} | {_twin_stages(r)} | "
+                         f"{f(s)} | {p or '—'} | {f(o)} | {q or '—'} | {f(b)} | {_frac(r)} | {_twin_stages(r)} | "
                          f"{_flat_codes(r)} |")
     lines += ["", "Widths at the answer (value(plain esd); fixed = not free at the end; floor = on "
               "a 0 lower bound; ±180 = on the ceiling):", ""]
