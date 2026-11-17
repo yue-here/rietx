@@ -10085,7 +10085,8 @@ def _dispersion_diagnostics(structure: Structure,
     not describing it; but an element the table cannot size (an untabulated
     element, a wavelength outside the band or in an edge interval) is named
     as "off, and not sized" rather than skipped (WP-1925), or a decline the
-    table forced would read as a correction known to be small.
+    table forced would read as a correction known to be small.  In an edge
+    interval that is a warning, since the neglect is largest there.
     """
     import gemmi
 
@@ -10103,19 +10104,23 @@ def _dispersion_diagnostics(structure: Structure,
     lam = instrument.source.primary_wavelength
     effects: dict[str, float] = {}
     unsized: list[str] = []
+    on_edge = False
     for phase in structure.phases:
         for atom in phase.atoms:
             try:
                 sym = normalize_element(atom.species)
             except KeyError:
-                continue
+                sym = atom.species
             if sym in effects or sym in unsized:
                 continue
             try:
                 z = float(gemmi.Element(sym).atomic_number)
                 fp, fpp = dispersion(sym, lam)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError) as exc:
                 unsized.append(sym)
+                # an edge interval is where the neglect is largest, not
+                # smallest: said as a warning, unlike an untabulated band
+                on_edge = on_edge or "absorption edge" in str(exc)
                 continue
             if z <= 0.0:
                 continue
@@ -10127,19 +10132,18 @@ def _dispersion_diagnostics(structure: Structure,
     if flagged:
         named = ", ".join(f"{s} {v:.0%}" for s, v in
                           sorted(flagged.items(), key=lambda kv: -kv[1]))
-        parts.append(f"Anomalous scattering is off, but at lambda = "
-                     f"{lam:.5f} A it changes the scattering power of "
-                     f"{named}.")
+        parts.append(f"it changes the scattering power of {named}")
     if unsized:
-        parts.append(f"Anomalous scattering is off, and at lambda = "
-                     f"{lam:.5f} A the dispersion table cannot size it for "
+        parts.append(f"the dispersion table cannot size it for "
                      f"{', '.join(unsized)}, so how much that changes is "
-                     "not known.")
+                     "not known")
     worst = max(flagged.values(), default=0.0)
+    severe = worst >= DISPERSION_NEGLECT_SEVERE or on_edge
     return [Diagnostic(
-        level="warning" if worst >= DISPERSION_NEGLECT_SEVERE else "info",
+        level="warning" if severe else "info",
         code="DISPERSION_NEGLECTED",
-        message=" ".join(parts),
+        message=(f"Anomalous scattering is off, but at lambda = {lam:.5f} A "
+                 + "; and ".join(parts) + "."),
         suggestion="Restore it with Dispersion(). If the wavelength sits in "
                    "an absorption-edge interval or outside the table, supply "
                    "the measured pair through Dispersion.overrides instead.",

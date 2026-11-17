@@ -821,15 +821,37 @@ def test_no_report_for_a_light_structure_at_short_wavelength():
 
 
 def test_lookup_failure_never_blocks_a_refinement():
-    """An untabulated element is skipped, not raised: describing the omission
-    must not be able to break a fit that would otherwise run."""
+    """A failed lookup is reported, not raised: describing the omission must
+    not be able to break a fit that would otherwise run.  Since WP-1925 the
+    element is named rather than skipped; He is zero, not a failure."""
     import rietx as rx
     from rietx.refine import _dispersion_diagnostics
 
     structure = _zincite_structure()
-    structure.phases[0].atoms[1].species = "He"      # absent from the table
-    ins = rx.Instrument.debye_scherrer(wavelength=6.0)   # outside 3-70 keV
-    assert _dispersion_diagnostics(structure, ins) == []
+    structure.phases[0].atoms[1].species = "He"      # zero at every energy
+    ins = rx.Instrument.debye_scherrer(wavelength=6.0)   # below 3 keV
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(structure, ins)
+    assert "cannot size it for Zn," in d.message
+    assert "He" not in d.message
+    assert d.level == "info"
+
+
+def test_an_edge_interval_decline_is_a_warning():
+    """Inside an edge interval the table refuses where the neglect is
+    largest, so the unsized element is a warning, not info."""
+    import rietx as rx
+    from rietx.crystallography.attenuation import _HC_EV_ANGSTROM
+    from rietx.crystallography.dispersion import edge_intervals
+    from rietx.refine import _dispersion_diagnostics
+
+    lo, hi = edge_intervals("Zn")[0]
+    ins = rx.Instrument.debye_scherrer(
+        wavelength=_HC_EV_ANGSTROM / np.sqrt(lo * hi))
+    ins.source.dispersion = None
+    (d,) = _dispersion_diagnostics(_zincite_structure(), ins)
+    assert "cannot size it for Zn" in d.message
+    assert d.level == "warning"
 
 
 # ----------------------------------------------------------------------
@@ -912,12 +934,10 @@ def test_matches_gemmi_where_its_f_prime_is_regular(sym, kev):
 
 def test_gemmis_own_f_prime_is_not_what_is_served():
     """Why f′ is computed: above Pb's K edge gemmi's f′ swings by tens of
-    electrons between neighbouring energies.  The served f′ stays between
-    its 95 and 105 keV values, as a curve with no edge between them must."""
-    import gemmi
-
-    g100 = gemmi.cromer_liberman(z=82, energy=100e3)[0]
-    assert g100 < -20.0                     # the excursion this avoids
+    electrons between neighbouring energies (−32.8 e at 100 keV with gemmi
+    0.7.5, measured 2026-11-17; not asserted, so a gemmi fix cannot fail
+    this).  The served f′ stays between its 95 and 105 keV values, as a
+    curve with no edge between them must."""
     lo = dispersion("Pb", _at_kev(95))[0]
     mid = dispersion("Pb", _at_kev(100))[0]
     hi = dispersion("Pb", _at_kev(105))[0]
@@ -974,6 +994,7 @@ def test_a_model_at_130_kev_predicts_with_a_stated_pair():
     from rietx import Instrument, PatternData
     from rietx.crystallography.dispersion import resolve
     from rietx.model.forward import compile_model
+    from rietx.schemas.instrument import Dispersion
     from rietx.schemas.structure import Structure
 
     lam = _at_kev(130.0)
@@ -985,10 +1006,32 @@ def test_a_model_at_130_kev_predicts_with_a_stated_pair():
     tt = np.arange(1.0, 12.0, 0.01)
     pattern = PatternData(two_theta=tt.tolist(),
                           intensity=np.zeros_like(tt).tolist())
-    compile_model(Structure(phases=[ph]), ins, pattern, mode="rietveld")
-    fp, fpp = resolve(["U"], (lam,))["U"].real, resolve(["U"], (lam,))["U"].imag
-    assert (fp, fpp) == dispersion("U", lam)
+    from rietx.params.vector import ParameterTable
+
+    def predicted(block):
+        ins.source.dispersion = block
+        structure = Structure(phases=[ph])
+        model = compile_model(structure, ins, pattern, mode="rietveld")
+        table = ParameterTable(structure, ins)
+        return np.asarray(model.evaluate(table.decode(table.x0())))
+
+    on, off = predicted(Dispersion()), predicted(None)
+    fp, fpp = dispersion("U", lam)
     assert -2.5 < fp < -1.5 and 2.0 < fpp < 3.0
+    # |f|² at k = 0 falls by ((Z + f′)² + f″²)/Z² − 1 ≈ −4 %, and the peak
+    # (high f₀, low angle) moves by about that
+    assert on.max() / off.max() - 1.0 == pytest.approx(
+        ((92 + fp) ** 2 + fpp ** 2) / 92 ** 2 - 1.0, abs=0.01)
+    assert resolve(["U"], (lam,))["U"] == complex(fp, fpp)
+
+
+def test_the_zero_elements_have_an_unbounded_band():
+    """H, D and He are zero at every energy, so `read_recipe`'s band check
+    must not refuse them (it read `KeyError` before this was handled)."""
+    from rietx.crystallography.dispersion import bundled_band
+
+    for sym in ("H", "D", "He", "2H"):
+        assert bundled_band(sym) == (0.0, float("inf"))
 
 
 def test_an_element_the_table_cannot_size_is_named_not_skipped():
@@ -1021,3 +1064,26 @@ def test_the_neglect_is_sized_at_130_kev():
     (d,) = _dispersion_diagnostics(Structure(phases=[ph]), ins)
     assert "changes the scattering power of U" in d.message
     assert "cannot size" not in d.message
+
+
+def test_the_integral_grid_is_converged(monkeypatch):
+    """`_KK_SAMPLES`' ratio halved moves the computed f′ by under 1e-3 e
+    from 72 to 199 keV, away from edges (measured over every Z = 3-92 on
+    2026-11-17: 3.6e-4 e at worst, Pa; every seventh element here)."""
+    import gemmi
+
+    from rietx.crystallography import dispersion as disp
+
+    energies = np.array([72e3, 90e3, 110e3, 130e3, 160e3, 199e3])
+    lo, hi, _ = disp._KK_SAMPLES
+    for z in range(3, 93, 7):
+        coarse = disp._kk_samples(z)
+        monkeypatch.setattr(disp, "_KK_SAMPLES", (lo, hi, 1.001))
+        fine = disp._kk_samples(z)
+        monkeypatch.undo()
+        sym = gemmi.Element(z).name
+        far = np.array([all(abs(e - x) > 1000 for x in disp.edges(sym))
+                        for e in energies])
+        moved = np.abs(disp._dispersion_integral(energies[far], *coarse)
+                       - disp._dispersion_integral(energies[far], *fine))
+        assert moved.max() < 1e-3, sym

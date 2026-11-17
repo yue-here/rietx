@@ -175,8 +175,12 @@ def _table_for(sym: str) -> np.ndarray:
 
 def bundled_band(element: str) -> tuple[float, float]:
     """(E_lo, E_hi) in eV of the rows read from the bundled file for this
-    element, without the computed continuation above it (3-70 keV)."""
+    element, without the computed continuation above it (3-70 keV).  H, D
+    and He have no edge anywhere and are zero at every energy, so their band
+    is unbounded."""
     sym = normalize_element(element)
+    if sym in _ZERO_DISPERSION:
+        return 0.0, float("inf")
     _table_for(sym)                       # the same KeyError for Z outside it
     rows = _load_table()[sym]
     return float(rows[0, 0]), float(rows[-1, 0])
@@ -199,10 +203,11 @@ _KK_SAMPLES = (100.0, 1.0e7, 1.002)
 def _kk_samples(z: int) -> tuple[np.ndarray, np.ndarray]:
     """(ε, f″(ε)) from gemmi's Cromer-Liberman, with every edge resolved.
 
-    A rise of f″ between two samples is an edge; it is bisected to 0.01 eV and
-    a sample placed either side, so the trapezoid integral sees a step rather
-    than a ramp 0.2 % wide (which costs up to 0.05 e of f′ within a few keV
-    of a K edge).
+    Each rise of f″ between two samples is bisected to 0.01 eV and a sample
+    placed either side, so the trapezoid integral sees an edge as a step
+    rather than a ramp 0.2 % wide (which costs up to 0.05 e of f′ within a
+    few keV of a K edge).  Below about 400 eV gemmi's f″ also rises gently
+    for the heaviest elements; bisecting those adds samples, nothing else.
     """
     import gemmi
 
@@ -232,13 +237,19 @@ def _kk_samples(z: int) -> tuple[np.ndarray, np.ndarray]:
     return eps, vals
 
 
+#: numpy >= 2 names it ``trapezoid``; 1.26, which pyproject still admits, has
+#: only ``trapz``.
+_trapezoid = getattr(np, "trapezoid", None) or getattr(np, "trapz")  # noqa: B009
+
+
 def _dispersion_integral(energies: np.ndarray, eps: np.ndarray,
                          f2: np.ndarray) -> np.ndarray:
     """(2/π)·P∫ ε f″(ε) / (E² − ε²) dε at each E, over the sampled range.
 
     The principal value is taken by subtracting g(E) = E·f″(E) from the
     integrand, which leaves it finite at ε = E; the subtracted term is
-    integrated in closed form, using P∫₀^∞ dε/(E² − ε²) = 0.
+    integrated in closed form over the sampled range [ε₀, ε₁], which is
+    minus the integral outside it, since P∫₀^∞ dε/(E² − ε²) = 0.
     """
     g = eps * f2
     e0, e1 = eps[0], eps[-1]
@@ -253,7 +264,7 @@ def _dispersion_integral(energies: np.ndarray, eps: np.ndarray,
             integrand[bad] = np.interp(eps[bad], eps[~bad], integrand[~bad])
         inside = (np.log((e1 + energy) / (e1 - energy))
                   - np.log((energy + e0) / (energy - e0))) / (2.0 * energy)
-        out[k] = np.trapezoid(integrand, eps) + g_e * inside
+        out[k] = _trapezoid(integrand, eps) + g_e * inside
     return 2.0 / np.pi * out
 
 
@@ -273,7 +284,7 @@ def _continuation(sym: str, rows: np.ndarray) -> np.ndarray | None:
     the median of f′_table − integral over its rows from half its top energy
     up.  The continuation therefore continues the table rather than replacing
     it.  Measured 2026-11-17: the integral plus C reproduces the bundled f′
-    over 35-70 keV to ≤ 0.005 e for every element more than 1 keV from an
+    over 35-70 keV to ≤ 0.01 e for every element more than 1 keV from an
     edge, and C equals the high-energy limit the table carries (−0.015 e at
     Si, −0.99 at Pb, −1.31 at U).
 
