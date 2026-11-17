@@ -787,6 +787,19 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds="note that the bank's one profile set was read as set 1; nothing to do",
         scope=("all",)),
+    Row("GSAS_IPARM_TRAILING_ZEROS_READ", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the record's own characters: a record's last field ran "
+                  "past its FORTRAN columns (GSAS Technical Manual p. 221-223) into the "
+                  "columns after it, which no field claims; fires exactly when every "
+                  "character past the field is a zero and the column read and the token "
+                  "read are one number (the HRPD file of issue #1447: CTOF 0.001000 in "
+                  "columns 26-33, read 0.00100 by column); a non-zero digit, zeros that "
+                  "change the number, or a spill into a field's columns stay refused"),
+        grounds=("Arithmetic: the characters past the field belong to no field and "
+                 "change no number, so the file states one value."),
+        response="info",
+        responds="note which record's last value ran past its columns; nothing to do",
+        scope=("all",)),
     Row("GSAS_PRM_FIELD_DROPPED", "code"),
     Row("GSAS_PRM_FIELD_NOT_WRITTEN", "code"),
     Row("GSAS_PRM_GEOMETRY_ASSUMED", "code"),

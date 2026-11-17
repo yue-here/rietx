@@ -2852,6 +2852,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "numbered set, the unnumbered one is skipped instead."
         ),
     ),
+    "GSAS_IPARM_TRAILING_ZEROS_READ": HelpEntry(
+        title="A number ran past its columns into trailing zeros",
+        description=(
+            "The reader takes each value from the columns the GSAS manual gives it. "
+            "Here the last value on a record ran past its columns, into columns that "
+            "belong to no field, and the extra characters are zeros. The number in "
+            "the value's own columns and the whole number are the same, so the value "
+            "was read. Nothing to do. Any other overrun is still refused."
+        ),
+    ),
     "GSAS_PRM_FIELD_DROPPED": HelpEntry(
         title="Some parameter-file fields were read and not kept",
         description=(

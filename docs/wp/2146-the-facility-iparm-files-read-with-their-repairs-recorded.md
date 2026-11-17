@@ -152,8 +152,13 @@ output, so its wording goes to the maintainer before merge.
       declined with its bank read, the decline now naming the function.
       Whether that case should be refused like a numbered set 1 of
       function 2 is the open question in the handover.*
-- [ ] (b): read a CTOF whose overrun is trailing zeros, with a diagnostic.
-      Every other overrun is still refused.
+- [x] (b): read a CTOF whose overrun is trailing zeros, with a diagnostic.
+      Every other overrun is still refused. *Done 2026-11-17
+      (`GSAS_IPARM_TRAILING_ZEROS_READ`), for the last field of every
+      parsed record rather than CTOF alone: the columns after a record's
+      last field belong to no field, so the one-reading argument is the
+      same on all of them. A spill into the next field's columns stays
+      refused.*
 - [ ] (c): read the GSAS manual on a declared NTERMS below the full count.
       Write the finding here, then repair with a record or keep the refusal.
 - [ ] (d): replace the per-coefficient sign test on sig-2 with σ²(d) > 0

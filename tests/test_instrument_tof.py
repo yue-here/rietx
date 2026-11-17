@@ -450,6 +450,45 @@ def test_a_number_running_across_a_field_boundary_is_refused(tmp_path):
         read_gsas_tof_iparm(write(tmp_path, iparm(b)))
 
 
+def test_trailing_zeros_past_the_last_field_are_read_and_recorded(tmp_path):
+    """The HRPD file writes CTOF ``0.001000`` in columns 26-33, one column past
+    CTOF's 23-32 into columns no field claims.  The column read ``0.00100``
+    and the token read are one number, so it is read and recorded once."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (26, "0.001000"))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))),
+                              diagnostics=notes)
+    assert got[1].source.profile_tof.alpha1.value == 0.45
+    (read,) = [n for n in notes if n.code == "GSAS_IPARM_TRAILING_ZEROS_READ"]
+    assert read.level == "info"
+    assert read.where == ["INS  1PRCF1"]
+    assert "'0.001000' in columns 26-33, past CTOF (columns 23-32)" in read.message
+    assert "read as 0.001" in read.message
+
+
+@pytest.mark.parametrize("text, col, why", [
+    ("0.001005", 26, "a digit that is not zero"),
+    ("10000000", 26, "zeros that change an integer's value"),
+])
+def test_any_other_overrun_past_the_last_field_is_still_refused(tmp_path, text, col,
+                                                                why):
+    """Only zeros that leave the number unchanged are read; every other
+    overrun keeps the column-boundary refusal."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (col, text))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    with pytest.raises(ValueError, match="runs across the boundary"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))))
+
+
+def test_trailing_zeros_across_an_inner_boundary_are_still_refused(tmp_path):
+    """A zero spilling into the *next* field's columns is that field's digit
+    too, so it has two readings and stays refused."""
+    b = _with(bank(1), "BNKPAR", rec("INS  1BNKPAR", (13, f10(2.5)), (27, "61.2000")))
+    with pytest.raises(ValueError, match="runs across the boundary"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(b)))
+
+
 def test_the_right_aligned_record_reads_its_angle(tmp_path):
     """The same record right-aligned."""
     b = _with(bank(1), "BNKPAR", "INS  1BNKPAR      2.50     61.20")

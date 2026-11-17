@@ -92,6 +92,15 @@ span, which no right-aligned field produces, and the record is refused
 naming its key, both fields' columns and the raw text.  Blank fields keep
 their FORTRAN reading of zero.
 
+**One overrun has one reading and is read** (WP-2146): the last field's
+number running into the columns after it, which no field claims, where
+every character past the field is a zero and the column read and the token
+read give one number.  The HRPD file writes CTOF ``0.001000`` in columns
+26-33; by column it is ``0.00100``, the same number.  It is read and
+recorded once per record (``GSAS_IPARM_TRAILING_ZEROS_READ``).  A zero
+spilling into the next field's columns is that field's digit too, so it has
+two readings and stays refused, as does any other spill.
+
 What this cannot see, stated rather than hidden:
 
 * **an overrun that ends exactly on a field boundary** — ``       61.`` then
@@ -236,10 +245,12 @@ class _Record:
     are not records), which is the number an error message quotes.
     """
 
-    def __init__(self, path: Path, number: int, text: str):
+    def __init__(self, path: Path, number: int, text: str, diagnostics=None):
         self.path = path
         self.number_in_file = number
         self.text = text.rstrip("\r\n").ljust(80)
+        self.diagnostics = diagnostics
+        self._repaired = False
 
     def cols(self, a: int, b: int) -> str:
         return self.text[a - 1:b]
@@ -287,9 +298,10 @@ class _Record:
         produces.
         """
         spans = list(fields)
-        if spans[-1][1] < 80:
+        tail = spans[-1][1] < 80
+        if tail:
             spans.append((spans[-1][1] + 1, 80, "the columns after the last field"))
-        for (a1, b1, n1), (a2, b2, n2) in zip(spans, spans[1:]):
+        for k, ((a1, b1, n1), (a2, b2, n2)) in enumerate(zip(spans, spans[1:])):
             left, right = self.cols(a1, b1), self.cols(a2, b2)
             if left[-1] == " " or right[0] == " " or " " not in right:
                 continue
@@ -297,6 +309,9 @@ class _Record:
             while start > a1 and self.text[start - 2] != " ":
                 start -= 1
             end = a2 + right.index(" ") - 1
+            if (tail and k == len(spans) - 2
+                    and self._trailing_zeros(start, a1, b1, end, n1)):
+                continue
             raise self.fail(
                 f"the text {self.text[start - 1:end]!r} in columns {start}-{end} "
                 f"runs across the boundary between {n1} (columns {a1}-{b1}) and "
@@ -304,6 +319,37 @@ class _Record:
                 f"{left.strip()!r} and {n2} would begin {right.strip()!r} — a "
                 f"misaligned field, refused rather than read as a truncated "
                 f"number; right-align each value inside its columns")
+
+    def _trailing_zeros(self, start: int, first: int, last: int, end: int,
+                        name: str) -> bool:
+        """Whether the last field's overrun into the columns no field claims
+        is trailing zeros that leave its number unchanged (module docstring,
+        § Column overrun), recorded once per record when it is.
+
+        Those columns belong to no field, so the characters there have one
+        reading: the end of the last field's number.  Only zeros whose
+        column read and token read give one number are read.
+        """
+        field = self.text[start - 1:last]
+        token = self.text[start - 1:end]
+        spill = self.text[last:end]
+        try:
+            same = float(field.replace("D", "E")) == float(token.replace("D", "E"))
+        except ValueError:
+            return False
+        if spill.strip("0") or not same:
+            return False
+        if not self._repaired:
+            self._repaired = True
+            _note(self.diagnostics, "info", "GSAS_IPARM_TRAILING_ZEROS_READ",
+                  f"{self.path.name}: record {self.number_in_file} "
+                  f"({self.text[:12].rstrip()!r}) writes {token!r} in columns "
+                  f"{start}-{end}, past {name} (columns {first}-{last}). The "
+                  f"columns past {name} hold only zeros, so {name} was read "
+                  f"as {float(field.replace('D', 'E'))!r}, the number in its "
+                  f"own columns.",
+                  where=[self.text[:12].rstrip()])
+        return True
 
 
 def _read_records(path: Path) -> list[tuple[str, str]]:
@@ -663,7 +709,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         line = key + payload
         if not line.startswith("INS "):
             continue
-        rec = _Record(path, number, line)
+        rec = _Record(path, number, line, diagnostics)
         bb = rec.cols(5, 6)
         name = rec.cols(7, 12)
         if not bb.strip():
