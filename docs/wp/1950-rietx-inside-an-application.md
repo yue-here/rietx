@@ -102,8 +102,11 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
 - [x] Verify it with a real freeze of a one-fit script in CI or a temporary
       branch workflow (no docker here): the frozen fit loads the kernels,
       stamps the real version, and writes its run where the root says.
+      Done as a local macOS freeze by hand, with a control arm (handover
+      log); the CI freeze, and Linux and Windows, are issue #1651.
 - [x] Manual: an "Embedding rietx" section in `using/` covering telemetry
-      off or redirected, the hook, and `RIETX_COMPILED_THREADS`.
+      off or redirected, the hook, and `RIETX_COMPILED_THREADS`. Landed as
+      the guide page `guides/embed.md`, the manual having no `using/` tree.
 - [x] Tests for the root's precedence (`tests/test_telemetry.py`).
 - [x] Skill: none expected, since an agent driving rietx does not freeze it.
       Said at close (2026-11-17): no skill row; an agent that wants its runs

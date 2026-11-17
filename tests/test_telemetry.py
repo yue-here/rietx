@@ -1249,6 +1249,33 @@ def test_a_run_one_level_deeper_is_out_of_reach(tmp_path):
     assert nested.exists()
 
 
+@pytest.mark.parametrize("max_bytes,warns", [(3000, False), (500, True)])
+def test_only_run_directories_count_toward_the_ceiling(tmp_path, max_bytes,
+                                                       warns):
+    """A configured root may hold the user's own data (``RIETX_RUNS_DIR=.``).
+
+    Its 5000-byte data directory must not put a root holding one 1000-byte
+    run over a 3000-byte ceiling, nor be called "the run directory" in a
+    warning that tells them to delete things. The 500-byte arm is the
+    positive control: the run itself still counts, and still warns.
+    """
+    root = tmp_path / "shared"
+    data = root / "data"
+    data.mkdir(parents=True)
+    (data / "big.raw").write_bytes(b"x" * 5000)
+    run = _stub_run(root, "20260101-120000-1", created=NOW - 60)
+    runs._WARNED = False
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert runs.prune(root, max_bytes=max_bytes, now=NOW) == []
+    assert (data / "big.raw").exists() and run.exists()
+    messages = [str(w.message) for w in caught]
+    if warns:
+        assert len(messages) == 1 and "retention ceiling" in messages[0]
+    else:
+        assert messages == []
+
+
 # ----------------------------------------------------------------------
 # a process-wide root (WP-1950, issue #893)
 # ----------------------------------------------------------------------

@@ -5671,7 +5671,9 @@ class Refinement:
         accident (WP-1322 measured three of three doing exactly that).  A path
         names the *root* to put the run directory in; ``False`` declines;
         ``None`` derives one — a project's ``live/`` if this refinement came
-        from one, else ``.rietx/runs`` under the working directory.
+        from one, else the root ``RIETX_RUNS_DIR`` or
+        :func:`rietx.runs.set_root` names for the process, else
+        ``.rietx/runs`` under the working directory.
         :data:`~rietx._about.TELEMETRY_ENV` outranks all of it, and there is
         deliberately no value here that argues back.  Recording never breaks a
         fit: a failure latches, says so in the run's status, and warns once.

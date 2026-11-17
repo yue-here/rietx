@@ -7,7 +7,8 @@ things rietx needs at run time are not imports PyInstaller can see:
 * **Data files.** The scattering, dispersion and attenuation tables load
   through ``importlib.resources`` from ``rietx.data``, and the browser pages
   (``gui``, ``watch``, ``compare_app``, ``viz``) serve a ``static`` directory
-  by path. ``collect_data_files`` takes every non-Python file in the package.
+  by path. ``collect_data_files`` takes every non-Python file in the package
+  but the ``CLAUDE.md`` rulebooks, which the wheel leaves out too.
 * **Submodules reached by name.** ``rietx.__getattr__`` imports a submodule on
   first attribute access, and the schema exports are found with
   ``pkgutil.iter_modules``, so the package's modules are collected whole
@@ -32,4 +33,9 @@ hiddenimports = collect_submodules(
     PACKAGE, filter=lambda name: not name.startswith(f"{PACKAGE}.__pyinstaller"))
 hiddenimports.append(KERNELS)
 
-datas = collect_data_files(PACKAGE) + copy_metadata(DIST_NAME)
+#: the subsystem rulebooks are for changing the package, and the wheel leaves
+#: them out (pyproject's ``exclude``); an editable install would carry them
+CONTRIBUTOR_ONLY = ["**/CLAUDE.md"]
+
+datas = (collect_data_files(PACKAGE, excludes=CONTRIBUTOR_ONLY)
+         + copy_metadata(DIST_NAME))

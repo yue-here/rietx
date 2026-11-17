@@ -74,6 +74,22 @@ def test_the_hook_asks_for_what_a_freeze_cannot_see():
     assert "import rietx_kernels" in Path(compiled.__file__).read_text(encoding="utf-8")
 
 
+def test_the_hook_leaves_out_what_the_wheel_leaves_out():
+    """An editable install has the ``CLAUDE.md`` rulebooks inside the package,
+    and ``collect_data_files`` would take them; the wheel excludes them."""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    wheel_excludes = project["tool"]["hatch"]["build"]["targets"]["wheel"]["exclude"]
+    tree = ast.parse(_hook().read_text(encoding="utf-8"))
+    (call,) = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+               and isinstance(n.func, ast.Name) and n.func.id == "collect_data_files"]
+    assert [k.arg for k in call.keywords] == ["excludes"]
+    (excluded,) = [ast.literal_eval(n.value) for n in ast.walk(tree)
+                   if isinstance(n, ast.Assign) and ast.unparse(n.targets[0])
+                   == ast.unparse(call.keywords[0].value)]
+    assert "**/CLAUDE.md" in wheel_excludes
+    assert set(wheel_excludes) <= set(excluded)
+
+
 def test_the_static_directories_the_hook_collects_are_inside_the_package():
     """``collect_data_files`` takes only files under the package, so a page
     directory that moved outside it would leave a frozen app without it."""

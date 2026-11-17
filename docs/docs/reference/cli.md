@@ -132,7 +132,7 @@ rietx watch: 2 run(s) under /Users/yue/work/demo
 
 Every fit records a run directory unless recording is switched off.
 A fit that came from a project records into that project's `live/` directory.
-Every other fit records under `.rietx/runs/` in its working directory.
+Every other fit records under the directory `RIETX_RUNS_DIR` or `rietx.runs.set_root` names for the process, or, when neither does, under `.rietx/runs/` in its working directory.
 A run is any directory holding an `events.jsonl`, so a project's `live/` and a directory passed to a `LiveSession` count too.
 
 ```console

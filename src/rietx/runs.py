@@ -1817,11 +1817,15 @@ def prune(root: str | Path, *, max_bytes: int = RETENTION_MAX_BYTES,
     :data:`RETENTION_MIN_AGE_SECONDS` for the batch this rule exists to
     survive.
 
-    The root's whole size decides *whether* to prune, including directories
-    that may not be deleted; only :func:`_is_prunable` decides *what*. So a root
+    The size of every run directory in the root (each direct child whose name
+    matches :data:`RUN_ID_RE`) decides *whether* to prune, including runs that
+    may not be deleted; only :func:`_is_prunable` decides *what*. So a root
     filled with runs too young to touch **warns and keeps**: using somebody's
     disk is better than deleting their evidence, and a silent cap on either
-    would be worse than both.
+    would be worse than both. Anything else in the root is not counted: a
+    configured root (``RIETX_RUNS_DIR``, :func:`set_root`) may be a directory
+    that also holds the user's own data, and that is not this package's to
+    weigh or to warn about.
 
     Every ``rmtree`` here is guarded three times over, because a recursive
     delete is the one thing in this track that can destroy data and the guards
@@ -1833,7 +1837,8 @@ def prune(root: str | Path, *, max_bytes: int = RETENTION_MAX_BYTES,
     now = time.time() if now is None else now
     try:
         entries = [Path(e.path) for e in os.scandir(root)
-                   if e.is_dir(follow_symlinks=False)]
+                   if e.is_dir(follow_symlinks=False)
+                   and RUN_ID_RE.match(e.name)]
     except OSError:
         return []
 

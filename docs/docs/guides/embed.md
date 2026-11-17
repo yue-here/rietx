@@ -52,7 +52,7 @@ The hook adds four things that following imports would miss:
 - `rietx_kernels`, the compiled kernels, which rietx imports inside a function;
 - the package metadata, from which every result reads the version it stamps.
 
-Without the kernels a frozen fit still runs, on the numpy path at about half the speed, and warns once.
+Without the kernels a frozen fit still runs, on the numpy path, slower, and warns once.
 Without the metadata it warns and stamps every result with a development version.
 To check a frozen build, read `rietx.capabilities()` in it, or `rietx.model.compiled.unavailable()`, which is `None` when the kernels loaded.
 
