@@ -669,8 +669,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "The d⁴ term of the Gaussian variance, σ²(d) = σ₀² + σ₁²·d² + σ₂²·d⁴. It is "
             "the instrument's share of a variance that grows as d⁴. A calibration may "
             "write it negative, which is legal only while σ²(d) stays positive over the "
-            "bank's d range. The `.iparm` reader checks that at read, and reads such a "
-            "value without the floor at zero."
+            "bank's d range. The `.iparm` reader checks it over the file's `I ITYP` "
+            "flight-time window, the range the spectrum was fitted over, and reads such "
+            "a value without the floor at zero. Check that your data stay inside that "
+            "range."
         ),
         unit="µs²/Å⁴", default="0.0",
         typical="0-50 µs²/Å⁴; a facility file may write a small negative value",
