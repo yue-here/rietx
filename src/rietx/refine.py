@@ -6771,8 +6771,12 @@ class Refinement:
         refinement's values, history, ``result_`` and compiled model are left
         as they were.  ``mode`` defaults to this refinement's own, the last
         fit's (``"rietveld"`` before one), so a Le Bail refinement is read in
-        Le Bail; ``two_theta_limits`` means what it means to :meth:`fit`,
-        ``None`` being the whole pattern.
+        Le Bail; ``two_theta_limits`` likewise defaults to the last fit's, as
+        :meth:`run_stage` and :meth:`suggest` read it (the whole pattern before
+        a fit, or after one that had none), so a fitted refinement is
+        evaluated over the range it was fitted on and the statistics are
+        comparable with its own.  Pass the pattern's own ends to evaluate the
+        whole of it after a restricted fit.
 
         **Under Le Bail and Pawley the intensities are still extracted**, at
         the current cell and profile, because they are not computed from a
@@ -6784,6 +6788,7 @@ class Refinement:
         compile, no statistics, and no extraction.
         """
         require_two_theta(data, "Refinement.evaluate()", instrument=self.instrument)
+        _refuse_without_phases(self.structure, "evaluate")
         return self._evaluated(data, mode, two_theta_limits).result_
 
     def _evaluated(self, data: PatternData, mode: Mode | None,
@@ -6791,11 +6796,13 @@ class Refinement:
         """A private trial that has run the empty stage on ``data``.
 
         The one route :meth:`evaluate` and ``reflection_table(data)`` share,
-        so the result and the rows are the same evaluation's.
+        so the result and the rows are the same evaluation's.  Unset, the
+        mode and the limits are this refinement's own, the last fit's.
         """
         trial = self._trial(record=False)
         trial.fit(data, mode=mode or self._mode,
-                  two_theta_limits=two_theta_limits,
+                  two_theta_limits=(two_theta_limits if two_theta_limits is not None
+                                    else self._two_theta_limits),
                   plan=RefinementPlan(stages=[Stage("evaluate", [])]),
                   telemetry=False)
         return trial
@@ -7358,16 +7365,19 @@ class Refinement:
         needed** (WP-1947, issue #891): the rows of :meth:`evaluate` on that
         pattern at the current values, which are the rows an empty-stage fit
         reports, from the same phase peaks the forward model draws, so a tick
-        list needs no extinction test of its own.  ``mode`` (default this
-        refinement's own, as the no-pattern form reads it) and
-        ``two_theta_limits`` mean what they mean to :meth:`evaluate`, and only
-        with ``data``.  Nothing on this refinement is written or replaced.
+        list needs no extinction test of its own.  ``mode`` and
+        ``two_theta_limits`` (default this refinement's own, the last fit's, as
+        the no-pattern form reads them) mean what they mean to
+        :meth:`evaluate`, and only with ``data``; after a fit, on the pattern it
+        ran on, the two forms therefore list the same reflections.  Nothing
+        on this refinement is written or replaced.
         """
         from .io.exporters import reflection_table
 
         if data is not None:
             require_two_theta(data, "Refinement.reflection_table()",
                               instrument=self.instrument)
+            _refuse_without_phases(self.structure, "reflection_table")
             return self._evaluated(data, mode, two_theta_limits).reflection_table()
         if mode is not None or two_theta_limits is not None:
             raise ValueError(

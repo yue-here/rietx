@@ -114,6 +114,8 @@ pawley = refinement.evaluate(data, mode="pawley")
 ```
 
 Unasked, `mode` is the refinement's own: the last fit's, or Rietveld before one.
+So is `two_theta_limits`: the last fit's range, or the whole pattern before a fit, as `Refinement.run_stage` reads it, so the statistics are comparable with the fit's own.
+To evaluate the whole pattern after a restricted fit, pass its two ends.
 It runs the plan of one stage that frees nothing, `RefinementPlan(stages=[Stage("evaluate", [])])`, on a private copy of the refinement.
 Calling `Refinement.fit` with that plan gives the same answer, but it writes history nodes and replaces `result_`.
 In Le Bail and Pawley mode the intensities are still extracted at the current cell and profile, because nothing else supplies them.
@@ -125,7 +127,9 @@ A stage takes at least one iteration.
 ### The background alone
 
 `Refinement.background` returns the background curve at the current values, with the same two forms as `Refinement.predict`.
-It is the curve `RefinementResult.y_background` holds after a fit: the background terms, a measured background and any declared background peaks.
+It holds the background terms, a measured background and any declared background peaks.
+With no grid it is the curve `RefinementResult.y_background` holds after a fit.
+A grid form equals that curve only on the grid the fit ran on: the Chebyshev terms span the grid's own range, so after a fit with `two_theta_limits` the whole pattern's grid remaps them, as it does for `Refinement.predict`.
 It changes nothing, so it replaces two workarounds.
 One set the phase scales to zero and called `predict`, which writes `set_value` nodes and clears `result_`.
 The other called `predict` on a refinement with no phases, `Refinement(Structure(phases=[]), refinement.instrument)`.
@@ -139,7 +143,7 @@ background = refinement.background(data)
 
 `Refinement.reflection_table` returns one row per emission line and reflection of every phase, after a fit.
 Given a pattern, `refinement.reflection_table(data)`, it needs no fit: the rows are those of `Refinement.evaluate` on that pattern, so a tick list before a fit needs no extinction rule of its own.
-It takes the same `mode` and `two_theta_limits` as `Refinement.evaluate`, and writes nothing.
+It takes the same `mode` and `two_theta_limits` as `Refinement.evaluate`, with the same defaults, so after a fit both forms list the reflections of the fitted range; it writes nothing.
 `reflection_table` is the same table as a function.
 It takes the compiled model, the decoded parameter values and the structure, for a program that holds those instead of a `Refinement`.
 `Refinement.write_reflection_table` writes it to a file, with every column below but `phase_index`.

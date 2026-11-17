@@ -242,8 +242,14 @@ fit reports.
   an empty stage with `max_iter=0` now renders a line that raises, and
   `cherry_pick` of it raises, which is the intended refusal; (3) `evaluate`
   and `reflection_table(data)` now default to the refinement's own mode, so
-  a Le Bail refinement is read in Le Bail and the two `reflection_table`
-  forms agree; (4) one test comment overclaimed what an assertion could see,
+  a Le Bail refinement is read in Le Bail and, on an unrestricted fit, the
+  two `reflection_table` forms agree (corrected 2026-11-17, PR #1640's
+  second review: after `fit(..., two_theta_limits=(9, 21))` they listed 12
+  and 19 rows, because only the mode was inherited; `evaluate` and
+  `reflection_table(data)` now also default to the last fit's
+  `two_theta_limits`, as `run_stage` and `suggest` do, and both list 12;
+  `background(data)` equals `y_background` only on the fitted grid, which
+  `exports.md` now says; phase-free refusals name the verb called); (4) one test comment overclaimed what an assertion could see,
   reworded. Follow-ups filed as issue #1652: the Plan panel's iteration
   field has no `min` (needs a dist rebuild), and
   `docs/docs/reference/exports.md` says `predict()` and `predict(grid)`

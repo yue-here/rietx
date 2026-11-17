@@ -280,6 +280,20 @@ def test_evaluate_is_the_empty_stage_and_changes_nothing(synthetic_pattern, mode
     # a fitted caller's tree is checked by the test after this one)
     assert not (tmp_path / "h.jsonl").exists(), "an evaluation is not a fit"
     assert not (tmp_path / STATE_DIR_NAME).exists(), "and records no run"
+    # the positive arm: in the same directory, with recording on, a fit does
+    # write both, so the two absences above are the evaluation's and not the
+    # setup's
+    from rietx import RefinementPlan, Stage
+
+    recorder = Refinement(*_with_background(), history=tmp_path / "h.jsonl")
+    was = runs.set_enabled(True)
+    try:
+        recorder.fit(synthetic_pattern, mode=mode,
+                     plan=RefinementPlan(stages=[Stage(_EMPTY_STAGE, [])]))
+    finally:
+        runs.set_enabled(was)
+    assert (tmp_path / "h.jsonl").exists()
+    assert (tmp_path / STATE_DIR_NAME).exists()
 
     _, fitted = _empty_stage_fit(synthetic_pattern, mode)
     assert result.status == fitted.status == "converged"
@@ -342,6 +356,47 @@ def test_reflections_before_a_fit_are_the_empty_stage_rows(synthetic_pattern, mo
     fitted_ref, _ = _empty_stage_fit(synthetic_pattern, mode)
     assert rows == fitted_ref.reflection_table()
     assert rows and {(r.h, r.k, r.l) for r in rows} >= {(1, 0, 0), (1, 1, 0)}
+
+
+def test_evaluation_inherits_the_fitted_range(synthetic_pattern):
+    """After a fit with ``two_theta_limits``, ``evaluate`` and
+    ``reflection_table(data)`` read the fit's range unless told otherwise, as
+    ``run_stage`` and ``suggest`` do (PR #1640's review).  Over 9-21 degrees
+    the fit lists 12 reflections and the whole pattern 19, so a whole-pattern
+    default would fail both checks."""
+    limits = (9.0, 21.0)
+    ref = Refinement(*_with_background())
+    fitted = ref.fit(synthetic_pattern, plan="profile_only",
+                     two_theta_limits=limits, telemetry=False)
+    rows = ref.reflection_table()
+    assert len(rows) == 12
+    assert ref.reflection_table(synthetic_pattern) == \
+        ref.reflection_table(synthetic_pattern, two_theta_limits=limits)
+    assert len(ref.reflection_table(synthetic_pattern)) == len(rows)
+
+    result = ref.evaluate(synthetic_pattern)
+    assert result.statistics.n_points == fitted.statistics.n_points
+    assert result.statistics == \
+        ref.evaluate(synthetic_pattern, two_theta_limits=limits).statistics
+    # the whole pattern is still one argument away
+    tt = synthetic_pattern.two_theta
+    whole = (min(tt), max(tt))
+    assert len(ref.reflection_table(synthetic_pattern,
+                                    two_theta_limits=whole)) == 19
+    assert ref.evaluate(synthetic_pattern, two_theta_limits=whole) \
+        .statistics.n_points > fitted.statistics.n_points
+
+
+def test_evaluation_without_phases_names_its_own_verb(synthetic_pattern):
+    """A phase-free refinement is refused under the verb that was called."""
+    from rietx import Structure
+    from rietx.refine import NoPhasesError
+
+    ref = Refinement(Structure(phases=[]), _with_background()[1])
+    with pytest.raises(NoPhasesError, match=r"^evaluate needs"):
+        ref.evaluate(synthetic_pattern)
+    with pytest.raises(NoPhasesError, match=r"^reflection_table needs"):
+        ref.reflection_table(synthetic_pattern)
 
 
 def test_reflections_without_a_pattern_still_need_a_fit(synthetic_pattern):
