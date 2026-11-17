@@ -114,7 +114,7 @@ reads.
   stretched by 0.3 Å, ΔBIC is +20.8 under the riding arm, against −137.1 with
   every member freed. The arm is also public, as `Refinement.released_arm`.
   Whether the stretched body fires is part 2's to test. No threshold or
-  verdict changed.
+  verdict changed. Entry by a ghostshift close-only runner (PR #1648).
 
   *Done (PR #1280, Mike):* `report/body_misfit.released_arm` builds one
   body's arm and `rigid_body_misfit` calls it. Each rider's coordinate DOFs
