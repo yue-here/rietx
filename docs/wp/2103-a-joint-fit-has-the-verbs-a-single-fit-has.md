@@ -1,6 +1,6 @@
 # WP-2103 — a joint fit has the verbs a single fit has
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: an expert steers a fit by hand, and a joint fit offers them almost nothing to steer with
 
