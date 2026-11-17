@@ -325,28 +325,70 @@ UNNUMBERED_PRCF = (
 )
 
 
-def test_a_prcf_set_without_its_number_is_declined_and_the_bank_read(tmp_path):
-    """An older writer's file omits the set number in column 11.  The bank's
-    calibration is read; the set is declined with the set-number reason (not
-    read as set 1, which the file does not say it is), and the profile is
-    left at zero as for a bank with no set."""
+#: The shape of an ISIS HRPD or POLARIS file's profile set: a type-3 set
+#: written with no set number (``PRCF  `` then ``PRCF 1`` … ``PRCF 6``), with
+#: invented numbers at the files' column widths.
+LONE_TYPE3 = (
+    ["INS  1PRCF      3   21   0.00100"]
+    + [line.replace("PRCF1", "PRCF ") for line in prcf(1, 1, 3, TYPE3)[1:]])
+
+
+def test_a_lone_set_without_its_number_is_read_as_set_one(tmp_path):
+    """One set in the bank has one reading: set 1, the default.  The read is
+    recorded, and the coefficients are the numbered set's."""
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=LONE_TYPE3))),
+                              diagnostics=notes)
+    numbered = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1)), "n.iparm"))
+    assert got[1].source.profile_tof == numbered[1].source.profile_tof
+    (assumed,) = [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+    assert assumed.level == "info"
+    assert assumed.where == ["bank 1", "PRCF"]
+    assert "read as set 1" in assumed.message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    # read as set 1, the lone set meets every later check
+    short = [LONE_TYPE3[0].replace("   21", "   14")] + LONE_TYPE3[1:5]
+    with pytest.raises(ValueError, match="with 14 coefficients"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=short)), "s.iparm"))
+
+
+def test_a_lone_set_of_a_function_not_evaluated_is_declined_and_the_bank_read(
+        tmp_path):
+    """The older GEM shape: its one unnumbered set declares function 2, which
+    this package does not evaluate.  The bank's calibration is read and the
+    profile is left at zero, as PR #1503 had it, the decline naming the
+    function (the handover's open question: a numbered set 1 of function 2
+    is refused)."""
     notes = []
     got = read_gsas_tof_iparm(write(tmp_path, UNNUMBERED_PRCF), diagnostics=notes)
     src = got[1].source
     assert (src.difc.value, src.difa.value, src.tzero.value) == (500.0, -0.1, -1.0)
     assert src.two_theta_bank_deg == 9.0
     assert src.profile_tof == ProfileTOF()
-    declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
-    assert len(declined) == 1
-    assert declined[0].level == "warning"
-    assert "set number in column 11" in declined[0].message
-    # beside a numbered set 1, the unnumbered one is only reported
+    (declined,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    assert declined.level == "warning"
+    assert "profile function 2" in declined.message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+
+
+def test_an_unnumbered_set_beside_a_numbered_one_is_declined(tmp_path):
+    """Beside a numbered set the unnumbered one has two readings, so it is
+    only reported, and the numbered set 1 is read."""
     notes = []
     both = UNNUMBERED_PRCF + "\n".join(prcf(1, 1, 3, TYPE3)) + "\n"
     got = read_gsas_tof_iparm(write(tmp_path, both, "both.iparm"), diagnostics=notes)
     assert got[1].source.profile_tof.alpha1.value == 0.45
     declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
     assert [n.level for n in declined] == ["info"]
+    assert "set number in column 11" in declined[0].message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+    # two unnumbered sets in one bank: declined, and the bank has no profile
+    two = iparm(bank(1, profile=LONE_TYPE3 + LONE_TYPE3[:1]))
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, two, "two.iparm"), diagnostics=notes)
+    assert got[1].source.profile_tof == ProfileTOF()
+    assert [n.level for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"] == [
+        "warning"]
 
 
 def test_the_whole_older_isis_shape_reads_through_the_legacy_reader(tmp_path):

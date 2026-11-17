@@ -144,9 +144,14 @@ output, so its wording goes to the maintainer before merge.
 
 ## Tasks
 
-- [ ] (a): read a lone unnumbered PRCF set as set 1, with a diagnostic
+- [x] (a): read a lone unnumbered PRCF set as set 1, with a diagnostic
       naming the assumption. Keep the decline beside a numbered set. Rerun
-      #1503's GEM fixture first.
+      #1503's GEM fixture first. *Done 2026-11-17
+      (`GSAS_IPARM_SET_NUMBER_ASSUMED`). The GEM fixture declares function
+      2, which would meet the default-function refusal as set 1; it stays
+      declined with its bank read, the decline now naming the function.
+      Whether that case should be refused like a numbered set 1 of
+      function 2 is the open question in the handover.*
 - [ ] (b): read a CTOF whose overrun is trailing zeros, with a diagnostic.
       Every other overrun is still refused.
 - [ ] (c): read the GSAS manual on a declared NTERMS below the full count.

@@ -53,8 +53,13 @@ bank number ``bb`` in columns 5-6.
 * ``INS bbPRCFn `` (2I5,F10.5; PTYP, NCOF, CTOF) and ``INS bbPRCFnc``
   (4E15.6) — the NTYP profile sets; **set n = 1 is the default** whatever its
   PTYP (p. 223) and is the only set read.  A set written without its number
-  (``INS bbPRCF  ``, an older writer's form) is declined, not read as set 1:
-  the bank keeps its calibration, as a bank with no set does.
+  (``INS bbPRCF  ``, the form ISIS files write) has one reading where it is
+  the bank's only set: set 1, read as such and recorded
+  (``GSAS_IPARM_SET_NUMBER_ASSUMED``).  Beside a numbered set, or beside a
+  second unnumbered one, it has two, and it is declined: the bank keeps its
+  calibration, as a bank with no set does.  A lone unnumbered set of a
+  function this package does not evaluate is declined the same way, where a
+  numbered set 1 of one is refused (WP-2146's open question).
 
 **Named assumption — PRCF coefficient order.**  The manual lists each
 function's coefficients "respectively" against their GSAS names (function 1,
@@ -492,20 +497,46 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
 
 def _profile(path: Path, bank: int, headers: dict[int, _Record],
              conts: dict[int, dict[int, _Record]], diagnostics,
-             unnumbered: _Record | None = None) -> ProfileTOF:
-    if unnumbered is not None:
-        _note(diagnostics, "warning" if not headers else "info",
-              "GSAS_IPARM_PROFILE_DECLINED",
-              f"Bank {bank}: a PRCF set was not read, because the PRCF set "
-              f"number in column 11 is ' '; the manual numbers the sets "
-              f"n = 1 … NTYP (GSAS Technical Manual p. 223), so which set it "
-              f"is the file does not say.",
-              where=[f"bank {bank}", "PRCF"])
+             lone: list[_Record] = (), lone_c: dict[int, _Record] | None = None
+             ) -> ProfileTOF:
+    lone_c = lone_c or {}
+    if lone or lone_c:
+        if headers or conts or len(lone) > 1:
+            # beside a numbered set, or as one of several, an unnumbered set
+            # has more than one reading: declined, the bank keeping the rest
+            _note(diagnostics, "warning" if not headers else "info",
+                  "GSAS_IPARM_PROFILE_DECLINED",
+                  f"Bank {bank}: a PRCF set was not read, because the PRCF set "
+                  f"number in column 11 is ' ' and the bank holds another set; "
+                  f"the manual numbers the sets n = 1 … NTYP (GSAS Technical "
+                  f"Manual p. 223), so which set it is the file does not say.",
+                  where=[f"bank {bank}", "PRCF"])
+        elif not lone:
+            raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
+                             f"and no PRCF header")
+        else:
+            rec = lone[0]
+            rec.check_columns(_PRCF_FIELDS)
+            ptyp = rec.integer(13, 17, "PTYP")
+            if ptyp in _PRCF_NOT_EVALUATED:
+                _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
+                      f"Bank {bank}: its one PRCF set, written without a set "
+                      f"number, declares profile function {ptyp}, "
+                      f"{_PRCF_NOT_EVALUATED[ptyp]}, which this package does not "
+                      f"evaluate; the profile coefficients are left at zero.",
+                      where=[f"bank {bank}", "PRCF"])
+                return ProfileTOF()
+            _note(diagnostics, "info", "GSAS_IPARM_SET_NUMBER_ASSUMED",
+                  f"Bank {bank}: the PRCF set number in column 11 is blank. The "
+                  f"bank holds one set, so it was read as set 1, the default "
+                  f"(GSAS Technical Manual p. 223).",
+                  where=[f"bank {bank}", "PRCF"])
+            headers, conts = {1: rec}, ({1: lone_c} if lone_c else {})
     if not headers:
         if conts:
             raise ValueError(f"{path}: bank {bank} has PRCF coefficient records "
                              f"and no PRCF header")
-        if unnumbered is None:
+        if not (lone or lone_c):
             _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
                   f"Bank {bank} has no PRCF profile set, so the profile "
                   f"coefficients are left at zero.",
@@ -654,7 +685,8 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
             raise rec.fail(f"columns 5-6 hold {bb!r}, not a bank number")
         bank = banks.setdefault(int(bb), {
             "icons": None, "bnkpar": None, "ityp": None, "icoff": {},
-            "iecof": {}, "prcf": {}, "prcf_c": {}, "dropped": [], "bad_key": None})
+            "iecof": {}, "prcf": {}, "prcf_c": {}, "lone": [], "lone_c": {},
+            "dropped": [], "bad_key": None})
         if name == " ICONS":
             bank["icons"] = rec
         elif name == "BNKPAR":
@@ -666,10 +698,17 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         elif name.startswith("PRCF"):
             n, c = name[4], name[5]
             if n == " ":
-                # an older writer's form (an ISIS GEM calibration file): no set
-                # number.  Which set it is, the file does not say, so the set
-                # is declined, not read as set 1; the bank keeps the rest
-                bank["prcf_unnumbered"] = bank.get("prcf_unnumbered") or rec
+                # a facility writer's form (ISIS GEM, HRPD and POLARIS files):
+                # no set number.  Sorted here and judged in _profile, which
+                # knows whether the bank has any other set
+                if c == " ":
+                    bank["lone"].append(rec)
+                elif c.isdigit():
+                    bank["lone_c"][int(c)] = rec
+                else:
+                    bank["bad_key"] = bank["bad_key"] or rec.fail(
+                        f"column 12 of a PRCF key is {c!r}; it is blank on a "
+                        f"header and a digit on a coefficient record")
             elif not n.isdigit() or n == "0":
                 # refused when this bank is processed, so the file-level
                 # refusals (HTYPE, NBANK) and earlier banks speak first
@@ -732,7 +771,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         if bank["bad_key"] is not None:
             raise bank["bad_key"]
         profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics,
-                           bank.get("prcf_unnumbered"))
+                           bank["lone"], bank["lone_c"])
         try:
             source = TOFSource(difc=difc, difa=difa, tzero=zero,
                                two_theta_bank_deg=ttheta, l1_m=l1_m,

@@ -772,6 +772,21 @@ ROWS: tuple[Row, ...] = (
     Row("GSAS_IPARM_LEGACY_LAYOUT", "code"),
     Row("GSAS_IPARM_PROFILE_DECLINED", "code"),
     Row("GSAS_IPARM_PROFILE_READ", "code"),
+    # WP-2146's rows, kept apart from the io rows WP-2006 tiers
+    Row("GSAS_IPARM_SET_NUMBER_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=("a reading rule with one reading: the manual numbers a bank's PRCF sets "
+                  "n = 1 … NTYP and makes set 1 the default (GSAS Technical Manual p. 223), "
+                  "so a bank holding one set, written without its number in column 11, holds "
+                  "set 1; fires exactly when such a set is read, and never beside a numbered "
+                  "set or a second unnumbered one, which are declined. GSAS-II 5.8.4 reads "
+                  "the unnumbered key 'INS  1PRCF  ' as the bank's profile by default "
+                  "(GSASIIfiles.py:308-327, checked 2026-11-17). Real files: the ISIS HRPD "
+                  "and POLARIS instrument files of issue #1447"),
+        grounds=("Practice and logic agree: GSAS-II reads the set, and a bank with one "
+                 "set has no second reading for it."),
+        response="info",
+        responds="note that the bank's one profile set was read as set 1; nothing to do",
+        scope=("all",)),
     Row("GSAS_PRM_FIELD_DROPPED", "code"),
     Row("GSAS_PRM_FIELD_NOT_WRITTEN", "code"),
     Row("GSAS_PRM_GEOMETRY_ASSUMED", "code"),

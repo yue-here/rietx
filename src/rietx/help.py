@@ -2828,6 +2828,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A time-of-flight bank can hold several peak-shape sets. Only the default "
             "set is read, so any other set is skipped. A bank with no set at all comes "
             "back with every profile coefficient at zero, and a fit refuses it by name. "
+            "So does a bank whose one set is a peak shape this package does not "
+            "compute. "
             "Enter the profile yourself, or read it from another file for the same bank."
         ),
     ),
@@ -2838,6 +2840,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "names the coefficients but never says that the record holds them in that "
             "order, so the order is an assumption. One cutoff value is read and not "
             "used. Check the values against a known profile before you refine from them."
+        ),
+    ),
+    "GSAS_IPARM_SET_NUMBER_ASSUMED": HelpEntry(
+        title="A peak-shape set without its number was read as set 1",
+        description=(
+            "The file wrote a bank's peak-shape set without the set number that the "
+            "GSAS manual puts in column 11. Instrument files written at ISIS do this. "
+            "The bank holds no other set, so the set can only be set 1, the default, "
+            "and it was read as set 1. Nothing to do. Where a bank also holds a "
+            "numbered set, the unnumbered one is skipped instead."
         ),
     ),
     "GSAS_PRM_FIELD_DROPPED": HelpEntry(
