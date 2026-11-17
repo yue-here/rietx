@@ -444,6 +444,21 @@ class _Schur:
     :func:`.statistics._psd_pinv`'s: an eigenvalue at or under ``cut`` is
     discarded, a kept one inverted by its magnitude.  The discarded
     directions are kept for :func:`discarded_directions`.
+
+    **Once a direction is discarded, that form is a generalised inverse G of
+    E, not its pseudo-inverse, and it is projected to one** (WP-2028).  A
+    direction S discards is z = [u; −Y₀u; −Y₁u; …], u the border part, and G
+    gives it to the border alone: the own blocks' E_pp⁺ answer as if the
+    border were held, so a border column on the direction reads the rounding
+    left in S.  On a joint fit freeing a shared W beside each pattern's
+    ``gauss_size`` and ``gauss_strain``, which W + size/cos²θ + strain·tan²θ
+    makes exactly flat, W came back at 2.7e-17 where the dense pseudo-inverse
+    gave 3.9e-7, and its rounding ρ with the zero shift fired a
+    ``FLAT_DIRECTION``.  Since E·G·E = E, the pseudo-inverse is E⁺ = P·G·P,
+    P the projector off the discarded directions (E⁺E = EE⁺ = P for a
+    symmetric E), which is the dense path's answer.  ``Q`` is an
+    orthonormal basis of those directions, ``None`` when nothing was
+    discarded, so a fit that cuts nothing keeps its bits.
     """
 
     def __init__(self, arrow: _Arrow, cut: float):
@@ -462,6 +477,46 @@ class _Schur:
             s -= e_bp @ y
         s = 0.5 * (s + s.T)
         self.s_inv, self.s_gone = _cut_pinv(s, cut)
+        self.q = self._discarded_basis()
+
+    def _discarded_basis(self) -> np.ndarray | None:
+        """An orthonormal basis of every discarded direction, in
+        :meth:`_Arrow.order`, or ``None`` when there is none."""
+        n_gone = int(self.s_gone.shape[1]) + sum(int(g.shape[1]) for g in self.pp_gone)
+        if n_gone == 0:
+            return None
+        m = len(self.arrow.order())
+        nb = len(self.arrow.b_idx)
+        z = np.zeros((m, n_gone), dtype=np.float64)
+        k = int(self.s_gone.shape[1])
+        if k:
+            z[:, :k] = self.w() @ self.s_gone          # [u; −Y_h u]
+        at = nb
+        for gone in self.pp_gone:
+            p = gone.shape[0]
+            g = int(gone.shape[1])
+            z[at:at + p, k:k + g] = gone
+            k += g
+            at += p
+        q, _ = np.linalg.qr(z)
+        return q
+
+    def _g_times(self, v: np.ndarray) -> np.ndarray:
+        """G·v for the Schur-form generalised inverse G, without forming it."""
+        nb = len(self.arrow.b_idx)
+        wt = v[:nb].copy()
+        at = nb
+        for y in self.y:
+            p = y.shape[0]
+            wt -= y.T @ v[at:at + p]
+            at += p
+        out = self.w() @ (self.s_inv @ wt)
+        at = nb
+        for inv in self.pp_inv:
+            p = inv.shape[0]
+            out[at:at + p] += inv @ v[at:at + p]
+            at += p
+        return out
 
     def w(self) -> np.ndarray:
         """W = [I; −Y₀; −Y₁; …], so that the inverse is W·S⁺·Wᵀ plus the own
@@ -479,6 +534,10 @@ class _Schur:
             m = inv.shape[0]
             k[at:at + m, at:at + m] += inv
             at += m
+        if self.q is not None:
+            q = self.q
+            kq = k @ q
+            k = k - q @ kq.T - kq @ q.T + q @ (q.T @ kq) @ q.T
         return 0.5 * (k + k.T)
 
     def inverse_diagonal(self) -> np.ndarray:
@@ -490,6 +549,11 @@ class _Schur:
             m = inv.shape[0]
             diag[at:at + m] += np.diag(inv)
             at += m
+        if self.q is not None:
+            q = self.q
+            gq = self._g_times(q)
+            diag = (diag - 2.0 * np.einsum("ij,ij->i", q, gq)
+                    + np.einsum("ij,jk,ik->i", q, q.T @ gq, q))
         return diag
 
 
@@ -557,12 +621,9 @@ def discarded_directions(bj: BlockJacobian) -> tuple[int, np.ndarray]:
     if n_gone < 1:
         return none
     kept = sch.inverse_diagonal()
-    nb = len(arrow.b_idx)
-    lost_parts = [(sch.s_gone ** 2).sum(axis=1)]
-    for y, gone in zip(sch.y, sch.pp_gone, strict=True):
-        through = (-y @ sch.s_gone) if nb else np.zeros((y.shape[0], 0))
-        lost_parts.append((through ** 2).sum(axis=1) + (gone ** 2).sum(axis=1))
-    lost = np.concatenate(lost_parts) / sch.cut
+    # the projector's diagonal, as the dense test sums its discarded
+    # eigenvectors: an orthonormal basis, never the unnormalised [u; −Y_h u]
+    lost = (sch.q ** 2).sum(axis=1) / sch.cut
     order = arrow.order()
     touched = np.sort(order[lost >= kept])
     return (n_gone, touched) if len(touched) >= 1 else none
