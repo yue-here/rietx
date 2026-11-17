@@ -1,6 +1,6 @@
 # WP-1942 — a soft restraint on a sum of parameters across phases
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Track: Coming from another code
 Depends on: —
 Priority: P3 2026-10-11 — a named user has waited since 2026-09-01; a variable, a tie and a value restraint cover it today, clumsily
