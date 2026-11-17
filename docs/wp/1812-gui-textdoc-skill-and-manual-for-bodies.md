@@ -1,6 +1,6 @@
 # WP-1812 — GUI, textdoc, skill and manual for bodies
 
-Milestone: rigid-bodies · Status: ⬜
+Milestone: rigid-bodies · Status: 🔄 2026-11-17 — claimed by ghostshift runner (@yue-here)
 Depends on: 1805
 Priority: P4 2026-10-06 — the surfaces over a feature that already works from python
 
