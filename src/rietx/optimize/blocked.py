@@ -477,6 +477,8 @@ class _Schur:
             s -= e_bp @ y
         s = 0.5 * (s + s.T)
         self.s_inv, self.s_gone = _cut_pinv(s, cut)
+        nb = len(arrow.b_idx)
+        self._w = np.vstack([np.eye(nb), *[-y for y in self.y]])
         self.q = self._discarded_basis()
 
     def _discarded_basis(self) -> np.ndarray | None:
@@ -521,8 +523,7 @@ class _Schur:
     def w(self) -> np.ndarray:
         """W = [I; −Y₀; −Y₁; …], so that the inverse is W·S⁺·Wᵀ plus the own
         blocks' E_pp⁺ on the diagonal, in :meth:`_Arrow.order`."""
-        nb = len(self.arrow.b_idx)
-        return np.vstack([np.eye(nb), *[-y for y in self.y]])
+        return self._w
 
     def inverse(self) -> np.ndarray:
         """The full pseudo-inverse over the live columns, in

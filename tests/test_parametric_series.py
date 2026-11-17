@@ -1195,8 +1195,22 @@ def _flat_across_the_border(seed: int) -> BlockJacobian:
     return BlockJacobian(blocks, bj.col_maps, bj.n_data, bj.n_pen, bj.n_cols)
 
 
-@pytest.mark.parametrize("seed", [0, 4])
-def test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses(seed):
+def _flat_inside_a_block(seed: int) -> BlockJacobian:
+    """:func:`_flat_across_the_border` plus a second flat direction inside
+    block 2's own columns (one own column a multiple of another), so the
+    projection carries an own block's discard beside the border's."""
+    bj = _flat_across_the_border(seed)
+    blocks = [b.copy() for b in bj.blocks]
+    own = _own(bj, 2)
+    blocks[2][:, own[3]] = 1.5 * blocks[2][:, own[2]]
+    return BlockJacobian(blocks, bj.col_maps, bj.n_data, bj.n_pen, bj.n_cols)
+
+
+@pytest.mark.parametrize("build,seed,n_gone", [(_flat_across_the_border, 0, 1),
+                                               (_flat_across_the_border, 4, 1),
+                                               (_flat_inside_a_block, 0, 2)])
+def test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses(build, seed,
+                                                                          n_gone):
     """With a discarded direction, the Schur form is a generalised inverse of
     the arrow and not its pseudo-inverse: it gave the whole direction to the
     border, so shared column 0 read 1.3e-20 against the dense 9.1e-5 (seed 0;
@@ -1205,7 +1219,7 @@ def test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses(seed):
     path's.  Both layouts discard the one direction here (smallest
     equilibrated eigenvalue 1.4e-16 and 9.3e-18 of the largest, under the
     1e-15 cut)."""
-    bj = _flat_across_the_border(seed)
+    bj = build(seed)
     r = np.random.default_rng(4).standard_normal(bj.shape[0])
     n_data = sum(bj.n_data)
     esd_b, corr_b = covariance_estimates(bj, r, bj.n_cols, n_data=n_data)
@@ -1215,7 +1229,7 @@ def test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses(seed):
     np.testing.assert_allclose(corr_b, corr_d, rtol=0, atol=1e-10)
     n_b, touched_b = discarded_directions(bj)
     n_d, touched_d = discarded_directions(bj.toarray())
-    assert n_b == n_d == 1
+    assert n_b == n_d == n_gone
     np.testing.assert_array_equal(touched_b, touched_d)
     assert 0 in touched_b
 
