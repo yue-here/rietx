@@ -3602,6 +3602,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "diagnostic says when the column contradicts its label."
         ),
     ),
+    "PATTERN_INTENSITY_NOT_COUNTS": HelpEntry(
+        title="Intensities no count can take, weighted as counts",
+        description=(
+            "The file gives no esds, so each point is weighted by the Poisson σ = "
+            "√max(y, 1), which holds for raw counts. Some intensities lie between 0 and "
+            "1, or below 0, and no count does, so the column is not raw counts. The "
+            "fallback gives each such point σ = 1. On a pattern scaled below one count "
+            "that is every point, and the fit is unweighted. A column proportional to "
+            "counts and never below 1 is weighted correctly up to one factor, which "
+            "moves χ² but no parameter or esd, so it is not reported. The message "
+            "counts the points, how many are below 0, and gives their 2θ; the code's "
+            "value is the count. If the intensities were scaled or had a background "
+            "subtracted, supply esds carried from the raw counts."
+        ),
+    ),
     "PATTERN_INTENSITY_SCALED": HelpEntry(
         title="The intensity scale could not be established",
         description=(

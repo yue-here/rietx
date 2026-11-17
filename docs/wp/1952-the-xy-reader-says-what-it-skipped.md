@@ -144,9 +144,10 @@ documentation only.
       `RefinementResult.sigma_rule` and `HistogramResult.sigma_rule`, a
       `SigmaRule` of three counts, built by `PatternData.sigma_rule` at
       compile.
-- [ ] The counts warning (Inherited, WP-2002 B5.2): a file with no σ column
-      whose intensities do not look like counts. Not built with the two
-      above; see the 2026-11-12 handover entry.
+- [x] The counts warning (Inherited, WP-2002 B5.2): a file with no σ column
+      whose intensities do not look like counts. Built 2026-11-17 as
+      `PATTERN_INTENSITY_NOT_COUNTS` on `read_pattern`'s hook, for every
+      format: an intensity between 0 and 1 or below 0, with no threshold.
 
 ## Acceptance
 

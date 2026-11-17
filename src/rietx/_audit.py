@@ -1114,6 +1114,23 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("note which column was read as the intensity and hold the background "
                   "at zero only if the column's minimum agrees with its label")),
+    Row("PATTERN_INTENSITY_NOT_COUNTS", "code", tier=1, ambiguity=1,
+        evidence=("warning; arithmetic, no threshold: fires exactly when a pattern read "
+                  "with no σ holds an intensity strictly between 0 and 1 or below 0, the "
+                  "count, how many are below 0 and the 2θ runs in the message. No count "
+                  "takes such a value, and the Poisson fallback √max(y, 1) gives it "
+                  "σ = 1, so a pattern normalised below one count is fitted unweighted. A "
+                  "zero is not counted: one count at a zero count is the floor's purpose "
+                  "(TOPAS 1/Max(Yobs, 1), Technical Reference section 6.2). A column "
+                  "proportional to counts and never below 1 is weighted right up to a "
+                  "factor that moves χ² and no parameter or esd, so it is silent. "
+                  "Proposed in WP-2002 B5.2, agreed by the maintainer on PR #1050; "
+                  "silent on all 59 tracked files read with no σ (2026-11-17), and "
+                  "not raised again where the reader said PATTERN_INTENSITY_SCALED"),
+        response="warning",
+        responds=("quote χ² and esds knowing the weights are assumed, and supply σ "
+                  "carried from the raw counts where the intensities were scaled or had a "
+                  "background subtracted")),
     Row("PATTERN_INTENSITY_SCALED", "code"),
     Row("PATTERN_MULTISCAN_DEFAULTED", "code"),
     Row("PATTERN_NET_HAS_BACKGROUND", "code", tier=3, ambiguity=3,
@@ -5678,6 +5695,12 @@ ROWS: tuple[Row, ...] = (
         grounds="Says how to test for the strain the glob left held (PR #1108, ruled 2026-10-27).",
         approved="2026-10-27"),
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
+    Row("PATTERN_INTENSITY_NOT_COUNTS.suggestion", "suggestion", tier=1, ambiguity=3,
+        value=1,
+        evidence=("names the two ways out: σ carried from the raw counts, or χ² and esds "
+                  "quoted as resting on assumed weights. Kind 3: whether the column was "
+                  "scaled, background-subtracted or rebinned is the writer's fact, not "
+                  "the pattern's. It moves nothing by itself")),
     Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", value=6),
     Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", value=1),
     Row("PATTERN_NET_HAS_BACKGROUND.suggestion", "suggestion", tier=1, ambiguity=3, value=1,

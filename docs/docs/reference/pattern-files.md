@@ -139,6 +139,7 @@ A deviation that makes the measurement ambiguous is refused.
 | the same σ on every point | keeps it, [`PATTERN_SIGMA_CONSTANT`](diagnostics-files.md#pattern_sigma_constant) |
 | a σ of zero or below on some points | keeps the values and leaves the points out of the fit, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
 | a σ column with no positive entry | does not read the column, so the Poisson σ applies, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
+| no σ, and an intensity between 0 and 1 or below 0 | weights it at the Poisson floor σ = 1, [`PATTERN_INTENSITY_NOT_COUNTS`](diagnostics-files.md#pattern_intensity_not_counts) |
 | dead detector channels | keeps them, [`PATTERN_DEAD_CHANNELS`](diagnostics-files.md#pattern_dead_channels) |
 
 A constant σ makes the fit unweighted.
@@ -157,6 +158,12 @@ So a reader decides which of the two a file holds:
 - A unit the format states structurally is trusted. `.uxd` names it in the token that opens the data block, and `.xrdml` in an attribute of the data element.
 - A unit stated as free text is checked by arithmetic. Counts are whole numbers, and so is a rate multiplied by its counting time. A real `.ras` file declares counts and stores 84.3047.
 - Where neither settles it, σ is withheld and the reader reports [`PATTERN_INTENSITY_SCALED`](diagnostics-files.md#pattern_intensity_scaled).
+
+The fallback's floor is where a scaled column goes wrong.
+An intensity between 0 and 1, or below 0, is no count, and √max(y, 1) gives it σ = 1.
+A pattern normalised below one count is then fitted unweighted.
+So `read_pattern` counts such points and gives their 2θ, [`PATTERN_INTENSITY_NOT_COUNTS`](diagnostics-files.md#pattern_intensity_not_counts).
+A column proportional to counts and never below 1 is weighted right up to one factor, which moves χ² and no parameter or esd, so it is not reported.
 
 The intensities need not be the file's numbers.
 Vendors disagree about whether an attenuator factor is already applied: four formats have one, and they give three answers.

@@ -1116,3 +1116,56 @@ def test_no_real_fixture_carries_a_nonpositive_sigma(fixture, _reader):
     found = []
     rx.read_pattern(DATA / fixture, diagnostics=found)
     assert "PATTERN_SIGMA_NONPOSITIVE" not in {d.code for d in found}
+
+
+# ------------------------------------------------- intensities no count takes
+def test_a_pattern_normalised_below_one_count_is_reported(tmp_path):
+    """WP-2002 B5.2: with no σ, every point of a pattern scaled below one count
+    took the Poisson floor σ = 1, an unweighted fit, in silence."""
+    from tests.test_readers import write_xy
+
+    y = [v / 1000.0 for v in _NF_Y]
+    found = []
+    rx.read_pattern(write_xy(tmp_path / "norm.xy", _NF_TT, y), diagnostics=found)
+    (d,) = [d for d in found if d.code == "PATTERN_INTENSITY_NOT_COUNTS"]
+    assert d.level == "warning" and d.value == 12.0
+    assert "12 of 12 points have an intensity no count can take (12 between 0 and 1)" in d.message
+    assert "at 2θ 10-10.22°" in d.message
+    assert d.where == ["10.000-10.220"]
+
+
+def test_a_negative_intensity_is_reported_and_a_zero_is_not(tmp_path):
+    """A background-subtracted point below zero is no count; a zero is, and the
+    floor's one count is its intended σ."""
+    from tests.test_readers import write_xy
+
+    y = [-3.0 if i == 4 else (0.0 if i == 6 else v) for i, v in enumerate(_NF_Y)]
+    found = []
+    rx.read_pattern(write_xy(tmp_path / "net.xy", _NF_TT, y), diagnostics=found)
+    (d,) = [d for d in found if d.code == "PATTERN_INTENSITY_NOT_COUNTS"]
+    assert d.value == 1.0
+    assert "1 of 12 points has an intensity no count can take (1 below 0)" in d.message
+    assert d.where == ["10.080-10.080"]
+
+
+def test_counts_or_a_sigma_column_say_nothing(tmp_path):
+    """Integer counts, a scaled column that never drops below one, and a
+    fractional column that carries its own σ: the Poisson floor binds on no
+    value that is not a count, so nothing is reported."""
+    from tests.test_readers import write_xy
+
+    found = []
+    rx.read_pattern(write_xy(tmp_path / "counts.xy", _NF_TT, _NF_Y), diagnostics=found)
+    rx.read_pattern(write_xy(tmp_path / "scaled.xy", _NF_TT,
+                             [v * 1.37 for v in _NF_Y]), diagnostics=found)
+    rx.read_pattern(write_xy(tmp_path / "own.xye", _NF_TT,
+                             [v / 1000.0 for v in _NF_Y], [0.01] * _NF_N),
+                    diagnostics=found)
+    assert "PATTERN_INTENSITY_NOT_COUNTS" not in {d.code for d in found}
+
+
+@pytest.mark.parametrize("fixture,_reader", REAL_FIXTURES)
+def test_no_real_fixture_reads_as_not_counts(fixture, _reader):
+    found = []
+    rx.read_pattern(DATA / fixture, diagnostics=found)
+    assert "PATTERN_INTENSITY_NOT_COUNTS" not in {d.code for d in found}
