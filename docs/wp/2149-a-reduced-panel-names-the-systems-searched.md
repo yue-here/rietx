@@ -134,7 +134,7 @@ it needs its row.
       diagnostic can read it. The split reads `quality.systems_supported`,
       already on the result and the authority the restriction reads, so no
       second record was added (handover entry says why).
-- [ ] The help entries (`help.py` 3101, 3220, 5202) and
+- [x] The help entries (`help.py` 3101, 3220, 5202) and
       `reference/peaks.md:431` say the same as the new messages.
 - [ ] Rebuild tutorial 03b, whose saved output prints both codes, and read
       the new text in it.
