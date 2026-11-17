@@ -299,7 +299,18 @@ def _body_phase() -> Phase:
     body = body_from_atoms(phase, ["C1", "O1", "H1"], "coh")
     body = body.model_copy(update={"torsions": [
         BodyTorsion(name="t", axis=("C1", "O1"), moves=["H1"])]})
-    return phase.model_copy(update={"rigid_bodies": [body]})
+    phase = phase.model_copy(update={"rigid_bodies": [body]})
+    # a Z-matrix body (WP-1814), so its internals' families are in the vocabulary
+    from rietx.crystallography.bodies import add_body
+    from rietx.schemas.structure import ZLine
+
+    p = Parameter
+    zm = [ZLine(atom="Z0"), ZLine(atom="Z1", b=0, r=p(value=1.5)),
+          ZLine(atom="Z2", b=1, c=0, r=p(value=1.5), angle=p(value=110.0)),
+          ZLine(atom="Z3", b=2, c=1, d=0, r=p(value=1.5), angle=p(value=110.0),
+                dihedral=p(value=60.0))]
+    return add_body(phase, "z", ["Z0", "Z1", "Z2", "Z3"], ["C"] * 4, None,
+                    (0.6, 0.6, 0.6), zmatrix=zm, biso=0.5)
 
 
 def _distortion_phase() -> Phase:

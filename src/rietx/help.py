@@ -1160,6 +1160,40 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="a few degrees to a few tens of degrees from a sensible start",
         anchor="theory/parameterisation.html#rigid-bodies",
     ),
+    "phases.*.rigid_bodies.*.zmatrix.*.r": HelpEntry(
+        title="Z-matrix bond length",
+        description=(
+            "The distance, in Å, at which one line of a rigid body's Z-matrix places "
+            "its atom from the line it names first. Refined as the length itself, not "
+            "a step, and moves only the atoms the line reaches. Bounded below by zero."
+        ),
+        unit=None, default=None,
+        typical="within a few hundredths of an Å of the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
+    "phases.*.rigid_bodies.*.zmatrix.*.angle": HelpEntry(
+        title="Z-matrix bond angle",
+        description=(
+            "The angle, in degrees, between a Z-matrix line's atom and the second "
+            "line it names, seen from the first. Refined as the angle itself and "
+            "bounded to [0, 180]."
+        ),
+        unit=None, default=None,
+        typical="within a few degrees of the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
+    "phases.*.rigid_bodies.*.zmatrix.*.dihedral": HelpEntry(
+        title="Z-matrix dihedral angle",
+        description=(
+            "The dihedral angle, in degrees, of a Z-matrix line's atom about the bond "
+            "from its first to its second named line, measured from the third. "
+            "Refined as the angle itself; unbounded, it is wrapped into (−180, 180] "
+            "at every stage's commit."
+        ),
+        unit=None, default=None,
+        typical="a few degrees to a few tens of degrees from the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
     "phases.*.distortion_modes.modes.*.amplitude": HelpEntry(
         title="Distortion-mode amplitude",
         description=(
