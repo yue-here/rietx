@@ -282,6 +282,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-08  docs/ROADMAP.md               618 -> 623  for the gui-overhaul milestone (WP-2123): one table
 #                                                          row, one section of one paragraph; landed 623, no
 #                                                          headroom
+#   2026-11-16  docs/ROADMAP.md               623 -> 628  for the series milestone (WP-2081): one table
+#                                                          row, one section of one paragraph, one Current focus
+#                                                          clause; landed 628, no headroom
 #   2026-10-06  src/rietx/io/CLAUDE.md        501 -> 561  for the time-of-flight readers and axis (issue
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
@@ -622,7 +625,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # its WP-level paragraphs moved to the v1.6 record.  From here the cap is
     # a budget on prose alone, and the per-row bump above ends.  Landed 570,
     # +1 headroom.
-    "docs/ROADMAP.md": 623,
+    "docs/ROADMAP.md": 628,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
