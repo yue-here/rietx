@@ -150,7 +150,9 @@ macro, with the fragment left to the caller and the help entries.
       angles, Z dropped misses by > 1e-3; and against TOPAS's own Y_calc,
       runs 10 and 11 at 2.1e-3 and 2.5e-3 with the signature-order arm at
       0.41 and 0.087, and run 10's slots against run 11 missing.*
-- [ ] Skill: one line in `references/api.md`'s reader list, generated.
+- [x] Skill: one line in `references/api.md`'s reader list, generated.
+      *Done in `api-io.md`, where the readers moved: one sentence in the
+      instrument-files row and `to_instrument`'s generated entry (+571 B).*
 
 ## Acceptance
 
