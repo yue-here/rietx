@@ -1,9 +1,8 @@
 # WP-1455 — a TOPAS TCHZ profile reads in
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-17 — `TCHZ_Peak_Type` and `Rs` read into an `Instrument` (PR #1646); three measurements left are issue #1650
 Track: Coming from another code
 Depends on: — (1433 soft: the `.inp` grammar the reader still refuses)
-Priority: P3 2026-09-24 — a hand translation works; it cost an agent six source reads, and nothing checks the letters
 
 ## Goal
 
@@ -176,6 +175,64 @@ definition otherwise. The WP says which bar was used.
   (the diagnostic flood that hid the radius finding).
 
 ## Handover log
+
+- **2026-11-17** — closed. A TOPAS input that states its instrument profile
+  as one `TCHZ_Peak_Type(…)` call now reads into an `Instrument` with no hand
+  translation: the six values map by the position TOPAS 6 actually computes,
+  the Z/cos²θ term folds exactly into U and W, and the secondary radius `Rs`
+  becomes the goniometer radius. Two agent sessions spent their effort on
+  that translation, and the printed macro signature, which a careful reader
+  would have trusted, is wrong by position; the reader follows TOPAS's own
+  output instead. What TOPAS does with a negative Gaussian variance, which both
+  sessions hit, is still unmeasured, so that profile is refused rather than
+  clamped.
+
+  *Done* (ghostshift runner, PR #1646): fixtures 37bf551ee (two black-box TOPAS
+  6 runs from #732, inputs and zero-cycle Y_calc with sha256 and README rows);
+  reader, help and manual 68dcc6645; skill index 5820eaf5d; review fixes
+  f6ad0af01. `read_topas_inp` records every call (`TopasModel.tchz`,
+  `TopasTCHZ`) and every secondary radius (`secondary_radii`,
+  `radius_unread`) and judges nothing; `topas.to_instrument(model, instrument,
+  *, phase=None)` maps and refuses. The caller's instrument supplies the
+  source and geometry kind. `goniometer_radius_mm` changed meaning: it was
+  `Radius(…)`'s first argument, which is `Rp` by the printed order, and is now
+  the one positive secondary radius the file states (`Rs`, `Radius(r)`,
+  `Radius(r, r)`). A file with only `Rp 217.5 Rs 217.5` now reads 217.5 where
+  it read `None`.
+  lanes: keep fixtures ~6 · keep reader ~25 · keep help ~4 · keep tests ~10 ·
+  keep skill ~4 (no lane dispatched; context under 150K at each start).
+  *Review*: a read-only subagent in the worktree (in place of `/code-review`,
+  which a runner may not run) found seven problems, all fixed in f6ad0af01
+  with eleven new cases, each failing on the previous reader: an `Rs` inside
+  an equation read as a radius (`/Rs -0.002;` gave −0.002); `Rs` before a line
+  break missed; a non-positive radius accepted; a `Radius(…)` call with an
+  equation or `200.` silently dropped; a caller's narrower box widened below
+  the W and X floors; a call in an `hkl_Is`/`xo_Is` phase treated as dataset
+  level, so `phase=` could not select it; a non-finite slot accepted. Nothing
+  declined. No audit row moved (`tests.audit_delta`), no heuristic added, so no
+  generality judge.
+  *Measured* (`[dev]` venv, darwin/arm64 unless said): rietx `predict()`
+  against TOPAS's own Y_calc 2.1e-3 (run 10) and 2.5e-3 (run 11), the case's
+  floor; the printed signature's order 0.41 and 0.087 (largest |ΔY| over the
+  largest Y of that reading); run 10's slots against run 11 missing; Γ_G and
+  Γ_L by the TCHZ formula and by rietx's laws equal to 1e-12 over 5-150°, Z
+  dropped > 1e-3. `tests/test_topas_tchz.py`: 29 passed, 3.9 s. The workstation (Linux
+  x86_64, the workstation's rietx-py312 venv with the tree on PYTHONPATH),
+  f6ad0af01, before the manual fix: canary gs1455c (the touched files + audit_table, help, skill,
+  docs_consistency, manual_api, `-n 4`) 1042 passed in 36 s, 435 MB, 230 % on
+  4 cores; fast gs1455f `1 failed, 14879 passed, 280 skipped, 32 xfailed in 663.33s` (5.6 GB, 744 % on 8 cores; a
+  co-tenant on a loaded workstation). The one failure was mine: bold in the new manual
+  section, which `test_manual.py::test_the_manual_keeps_its_register` forbids, fixed in 553007390
+  (`tests/test_manual.py` then 65 passed on the Mac). No base run was made for a count
+  delta; the new file adds 29 tests. Vale (the CI step, whole manual) 0
+  errors; `tests.reader_output` exit 0, unchanged; ruff clean.
+  *Gotchas*: TOPAS names the tanθ Lorentzian term X and the 1/cosθ one Y, the
+  reverse of rietx's letters; the help entries now say which slot is which.
+  The names in a TCHZ call are user labels (`pkx`/`pkz` for the fourth pair).
+  Next: issue #1650 holds the three measurements left (a negative Gaussian
+  variance, `Radius(a, b)`'s order, building the source from the file);
+  reading back the writer's `pv_fwhm`/`pv_lor` equations went to WP-1911's
+  Inherited.
 
 - **2026-09-24** — created from the review of an agent session on a private
   series. The readers and the absent TCHZ handling were checked against the
