@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-15 — first slice in review (#1573): the TOPAS mapping and the target table
+Milestone: parametric · Status: 🔄 2026-11-17 — claimed by ghostshift (second slice)
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
