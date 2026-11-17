@@ -136,8 +136,9 @@ change no reported number.
 
 ## Tasks
 
-- [ ] Read ASE's EPS/SVG writer and VESTA's vector-export thread. Record
-  what each does about bonds and overlap in Context.
+- [x] ~~Read ASE's EPS/SVG writer and VESTA's vector-export thread. Record
+  what each does about bonds and overlap in Context.~~ Superseded 2026-11-16:
+  D2 is built and tested by its own crossing case (decisions walk, settled).
 - [x] D1: the suffix dispatch, with the refusal naming each suffix.
 - [x] The display list (`vector.py`): projected ellipses, trimmed and cut
   stick pieces, faces, lines, ring arcs and letters, each with a depth key.
