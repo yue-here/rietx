@@ -1669,6 +1669,11 @@ def test_a_pov_scene_draws_each_atom_where_the_png_did_and_in_its_depth_order(na
         assert (u, v) == pytest.approx((drawn["x"], drawn["y"]), abs=1e-6)
         assert p[2] == pytest.approx(-drawn["depth"], abs=1e-9)
         assert p[2] > cam["location"][2]          # in front of the camera
+    # the key light comes from LOOK's view-space direction, mirrored
+    light = re.search(r"light_source \{\n\s+(<[^>]*>).*?point_at (<[^>]*>)", text, re.S)
+    toward = np.array(_pov_numbers(light.group(1))) - np.array(_pov_numbers(light.group(2)))
+    look = np.asarray(sc.LOOK["light"]) / np.linalg.norm(sc.LOOK["light"])
+    assert toward / np.linalg.norm(toward) == pytest.approx(look * [1, 1, -1], abs=1e-9)
     # the frame POV-Ray is told to draw is the PNG's, in Å
     ppa = fig.pixels_per_angstrom
     assert cam["right"][0] == pytest.approx(width / ppa) and cam["up"][1] == pytest.approx(
@@ -1735,6 +1740,26 @@ def test_a_glb_parses_and_its_nodes_are_each_atoms_shape(nac, tmp_path):
             signs = np.sign(np.sum(got * m, axis=0))
             assert np.abs(got * signs - m).max() < 1e-12
             assert np.abs(np.asarray(node["translation"]) - atom["pos"]).max() < 1e-12
+        # a bond half's node carries the unit cylinder (y from 0 to 1) from
+        # its atom to the bond's middle
+        half = scene["halves"][0]
+        node = next(n for n in doc["nodes"] if n["name"] == f"bond {half['bond']}")
+        ends = [_node_matrix(node) @ y + node["translation"] for y in ([0, 0, 0], [0, 1, 0])]
+        assert np.abs(np.array(ends) - [half["from"], half["to"]]).max() < 1e-12
+        # every stroke of the letters lies in the camera's plane, on the PNG's pixels
+        to_px = np.array([[1, 0, 0], [0, -1, 0]]) * fig.pixels_per_angstrom
+        for node in (n for n in doc["nodes"] if n["name"] == "stroke"):
+            for y in ([0, 0, 0], [0, 1, 0]):
+                v = R @ (_node_matrix(node) @ y + node["translation"])
+                px = to_px @ v - to_px @ [fig.origin[0], fig.origin[1], 0]
+                assert 0 <= px[0] <= fig.image.shape[1] and 0 <= px[1] <= fig.image.shape[0]
+        strokes = [n for n in doc["nodes"] if n["name"] == "stroke"]
+        assert strokes and len({round(float((R @ n["translation"])[2]), 9) for n in strokes}) == 1
+        # the light shines down its own -z, toward -LOOK['light'] in the view
+        light = next(n for n in doc["nodes"] if "extensions" in n)
+        shines = R @ -scene3d.rotation_of(light["rotation"])[:, 2]
+        look = np.asarray(sc.LOOK["light"]) / np.linalg.norm(sc.LOOK["light"])
+        assert np.abs(shines + look).max() < 1e-12
         camera = next(n for n in doc["nodes"] if "camera" in n)
         assert np.abs(scene3d.rotation_of(camera["rotation"]) - R.T).max() < 1e-12
         ortho = doc["cameras"][0]["orthographic"]
@@ -1749,21 +1774,27 @@ def test_a_sheared_shape_is_baked_into_its_own_mesh(tmp_path):
     """glTF allows no shear in a node, so an atom whose matrix does not
     decompose carries it in its points: each is ``M·u`` of the unit sphere's."""
     from rietx.viz.figure3d import scene3d
-    geo = _one_atom(_general_ellipsoid())
-    geo["atoms"] = [dict(geo["atoms"][0], ellipsoid=[[0.2, 0.08, 0.0], [0.0, 0.15, 0.0],
-                                                     [0.0, 0.0, 0.1]])]
-    shape = np.asarray(sc.build_scene(geo, "ellipsoid")["atoms"][0]["shape"]).reshape(3, 3)
-    assert scene3d.trs(shape) is None
-    path = tmp_path / "sheared.glb"
-    render_structure(geo, mode="ellipsoid", size=64, path=path)
-    doc, binary = _glb(path.read_bytes())
-    _check_glb(doc, binary)
-    [node] = [n for n in doc["nodes"] if n["name"].startswith("atom ")]
-    assert "rotation" not in node and "scale" not in node
-    unit, _, _ = scene3d.ring_sphere()
-    pts = _accessor(doc, binary, doc["meshes"][node["mesh"]]["primitives"][0]["attributes"][
-        "POSITION"])
-    assert np.abs(pts - unit @ shape.T).max() < 1e-6       # float32
+    unit, band, rest = scene3d.ring_sphere()
+    for last in (0.1, -0.1):             # a mirroring matrix is folded, not drawn inside out
+        geo = _one_atom(_general_ellipsoid())
+        geo["atoms"] = [dict(geo["atoms"][0], ellipsoid=[[0.2, 0.08, 0.0], [0.0, 0.15, 0.0],
+                                                         [0.0, 0.0, last]])]
+        shape = np.asarray(sc.build_scene(geo, "ellipsoid")["atoms"][0]["shape"]).reshape(3, 3)
+        assert scene3d.trs(shape) is None
+        path = tmp_path / "sheared.glb"
+        render_structure(geo, mode="ellipsoid", size=64, path=path)
+        doc, binary = _glb(path.read_bytes())
+        _check_glb(doc, binary)
+        [node] = [n for n in doc["nodes"] if n["name"].startswith("atom ")]
+        assert "rotation" not in node and "scale" not in node
+        prims = doc["meshes"][node["mesh"]]["primitives"]
+        pts = _accessor(doc, binary, prims[0]["attributes"]["POSITION"])
+        folded = shape if last > 0 else shape @ np.diag([-1.0, 1.0, 1.0])
+        assert np.abs(pts - unit @ folded.T).max() < 1e-6       # float32
+        for prim in prims:
+            tri = pts[_accessor(doc, binary, prim["indices"]).reshape(-1, 3)].astype(float)
+            n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+            assert (np.einsum("ij,ij->i", n, tri.sum(axis=1)) > 0).all()
 
 
 def test_the_ringed_sphere_lays_its_triangles_on_the_rings_edges():

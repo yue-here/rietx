@@ -250,7 +250,7 @@ One glTF unit is one ångström: glTF's unit is the metre, so the cell arrives a
 glTF has no background, so the world colour in Blender is the background.
 
 The PNG shades its sRGB colours directly, as the GUI does, and a ray tracer shades in linear light.
-Each format is given the colours as sRGB, so a line or a letter keeps the PNG's colour exactly and the shading of a lit surface differs.
+POV-Ray is given the sRGB values and glTF their linear equivalents, so a line or a letter keeps the PNG's colour exactly and the shading of a lit surface differs.
 
 ## Legend, axis triad and scale bar
 

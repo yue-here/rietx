@@ -559,30 +559,45 @@ def glb(scene: dict, R, frame, text: Sequence = ()) -> bytes:
     v = _View(scene, R, frame)
     g = _Glb()
     sphere_pts, band, rest = ring_sphere()
-    sp = g.accessor(sphere_pts, "VEC3")
-    s_band = g.accessor(np.asarray(band), "SCALAR")
-    s_rest = g.accessor(np.asarray(rest), "SCALAR")
-    s_all = g.accessor(np.asarray(band + rest), "SCALAR")
     cyl_pts, cyl_n, cyl_tri = unit_cylinder()
-    cp = g.accessor(cyl_pts, "VEC3")
-    cn = g.accessor(cyl_n, "VEC3")
-    ci = g.accessor(np.asarray(cyl_tri), "SCALAR")
+    shared = {
+        "sphere points": (sphere_pts, "VEC3"),
+        "sphere normals": (sphere_pts, "VEC3"),
+        "band": (np.asarray(band), "SCALAR"),
+        "rest": (np.asarray(rest), "SCALAR"),
+        "all": (np.asarray(band + rest), "SCALAR"),
+        "cylinder points": (cyl_pts, "VEC3"),
+        "cylinder normals": (cyl_n, "VEC3"),
+        "cylinder": (np.asarray(cyl_tri), "SCALAR"),
+    }
+    written: dict = {}
+
+    def acc(name: str) -> int:
+        # written on first use, so the file holds no accessor nothing reads
+        if name not in written:
+            written[name] = g.accessor(*shared[name])
+        return written[name]
+
     meshes: dict = {}
 
-    def sphere_mesh(colour, ringed: bool) -> int:
-        key = ("sphere", tuple(colour), ringed)
+    def sphere_mesh(colour, ringed: bool, kind: str = "lit") -> int:
+        key = ("sphere", tuple(colour), ringed, kind)
         if key not in meshes:
-            lit = g.material(colour, "lit")
-            prims = ([(sp, sp, s_band, g.material(_ring_ink(colour), "lit")),
-                      (sp, sp, s_rest, lit)] if ringed else [(sp, sp, s_all, lit)])
-            meshes[key] = g.mesh("ringed atom" if ringed else "atom", prims)
+            sp, sn = acc("sphere points"), acc("sphere normals")
+            lit = g.material(colour, kind)
+            prims = ([(sp, sn, acc("band"), g.material(_ring_ink(colour), kind)),
+                      (sp, sn, acc("rest"), lit)] if ringed
+                     else [(sp, sn, acc("all"), lit)])
+            meshes[key] = g.mesh("ringed atom" if ringed else
+                                 "atom" if kind == "lit" else "dot", prims)
         return meshes[key]
 
     def cylinder_mesh(colour, kind: str) -> int:
         key = ("cylinder", tuple(colour), kind)
         if key not in meshes:
-            meshes[key] = g.mesh("stick" if kind == "lit" else "line",
-                                 [(cp, cn, ci, g.material(colour, kind))])
+            meshes[key] = g.mesh("stick" if kind == "lit" else "line", [(
+                acc("cylinder points"), acc("cylinder normals"), acc("cylinder"),
+                g.material(colour, kind))])
         return meshes[key]
 
     def segment(a, b, r, mesh: int, parent: list, name: str) -> None:
@@ -608,14 +623,18 @@ def glb(scene: dict, R, frame, text: Sequence = ()) -> bytes:
                     "translation": [float(x) for x in a["pos"]],
                     "rotation": rotation, "scale": scale}, structure)
             continue
-        # sheared: the points carry the matrix, the normals its inverse transpose
+        # sheared: the points carry the matrix, the normals its inverse
+        # transpose.  A mirroring M would turn every triangle inside out, so
+        # one axis is negated first, which the ellipsoid and its rings allow
+        if np.linalg.det(m) < 0:
+            m = m @ np.diag([-1.0, 1.0, 1.0])
         pts = sphere_pts @ m.T
         normals = sphere_pts @ np.linalg.inv(m)
         normals /= np.linalg.norm(normals, axis=1)[:, None]
         p, n = g.accessor(pts, "VEC3"), g.accessor(normals, "VEC3")
         lit = g.material(a["color"], "lit")
-        prims = ([(p, n, s_band, g.material(_ring_ink(a["color"]), "lit")),
-                  (p, n, s_rest, lit)] if ringed else [(p, n, s_all, lit)])
+        prims = ([(p, n, acc("band"), g.material(_ring_ink(a["color"]), "lit")),
+                  (p, n, acc("rest"), lit)] if ringed else [(p, n, acc("all"), lit)])
         g.node({"name": name, "mesh": g.mesh(name, prims),
                 "translation": [float(x) for x in a["pos"]]}, structure)
     for h in scene["halves"]:
@@ -638,8 +657,13 @@ def glb(scene: dict, R, frame, text: Sequence = ()) -> bytes:
         letters: list[int] = []
         g.node({"name": "letters", "children": letters}, None)
         for a, b, r, colour in strokes:
-            segment(to_world @ a, to_world @ b, r, cylinder_mesh(colour, "ink"), letters,
-                    "stroke")
+            a, b = to_world @ a, to_world @ b
+            segment(a, b, r, cylinder_mesh(colour, "ink"), letters, "stroke")
+            # each end rounded, as the PNG's and POV-Ray's strokes are
+            for end in (a, b):
+                g.node({"name": "stroke end", "mesh": sphere_mesh(colour, False, "ink"),
+                        "translation": [float(x) for x in end], "scale": [r, r, r]},
+                       letters)
     eye = to_world @ np.array([v.cx, v.cy, v.z_eye])
     g.doc["cameras"] = [{"type": "orthographic", "name": "rietx figure",
                          "orthographic": {"xmag": v.w / 2, "ymag": v.h / 2,
@@ -654,7 +678,9 @@ def glb(scene: dict, R, frame, text: Sequence = ()) -> bytes:
     # a diffuse term of LOOK's ``diffuse``·base on a Lambertian surface needs
     # an irradiance of diffuse·π W/m²; glTF gives a directional light in lux
     lux = LOOK["diffuse"] * math.pi * LUMENS_PER_WATT
-    g.doc["extensionsUsed"] = ["KHR_lights_punctual", "KHR_materials_unlit"]
+    inked = any("extensions" in m for m in g.doc["materials"])
+    g.doc["extensionsUsed"] = ["KHR_lights_punctual"] + (["KHR_materials_unlit"] if inked
+                                                         else [])
     g.doc["extensions"] = {"KHR_lights_punctual": {"lights": [
         {"type": "directional", "name": "rietx key light", "color": [1.0, 1.0, 1.0],
          "intensity": lux}]}}
