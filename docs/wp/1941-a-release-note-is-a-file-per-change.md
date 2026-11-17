@@ -1,6 +1,6 @@
 # WP-1941 — a release note is a file per change
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-06 — a cost paid in contributor round trips; a rebase covers it every time

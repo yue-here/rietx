@@ -31,6 +31,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
+| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 2026-11-17 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | 2026-11-13 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -818,7 +819,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1907](1907-the-skill-stays-in-sync.md) | The skill stays in sync: constants and formulas pinned to the package, a changed-surface check at review, the judge-free tier nightly | ✅ 2026-10-07 | — | — ([1905](1905-the-skill-eval-suite.md) soft) |
 | [1920](1920-the-api-index-splits-by-shape.md) | The API index splits by shape: another program's files go to `api-io.md` | ✅ 2026-10-11 | — | — |
 | [1928](1928-the-toy-anomalous-golden-reads-a-frozen-y-obs.md) | The toy_anomalous golden reads a frozen y_obs | ✅ 2026-10-08 | — | — |
-| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | ⬜ | P3 | — |
+| [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 🔄 2026-11-17 | P3 | — |
 | [1954](1954-cut-1-8-0.md) | Cut 1.8.0 from what main holds | ✅ 2026-10-12 | — | [1546](1546-cut-1-7-0.md), [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md) |
 | [1961](1961-cut-1-9-0.md) | Cut 1.9.0 from what main holds | ✅ 2026-10-14 | — | [1954](1954-cut-1-8-0.md), [1959](1959-the-dichotomy-grid-compiled-again.md) |
 | [1975](1975-manual-rebuild-findings.md) | The manual rebuilt: findings brief | ✅ 2026-10-16 | — | — |
