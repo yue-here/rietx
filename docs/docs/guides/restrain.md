@@ -105,6 +105,65 @@ Name the image yourself when an atom may move far enough to change which copy is
 - `BondRestraint.op_index` selects the symmetry operation applied to `atom_j`, and `BondRestraint.translation` the lattice translation;
 - `AngleRestraint.op_index_i` and `AngleRestraint.translation_i` do the same for `atom_i`, and `AngleRestraint.op_index_k` and `AngleRestraint.translation_k` for `atom_k`.
 
+## Restrain a sum across phases
+
+A `LinearRestraint` holds a weighted sum of parameters near a target, and its parameters may belong to different phases.
+It goes in `Structure.restraints`, not in a phase's list, so it survives a phase being removed or reordered.
+Its row is √weight × (Σ coefficient × value − target) / sigma {eq}`par-linear-restraint`.
+
+```python
+import rietx as rx
+from rietx.examples import examples_dir
+from rietx.schemas.structure import LinearRestraint
+
+structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+other = rx.Structure.from_cif(examples_dir() / "cod_1000236.cif")  # Na2Ca3Al2F14
+two = rx.Structure(phases=[structure.phases[0], other.phases[0]])
+two.restraints = [LinearRestraint(
+    terms=[("phases.0.scale", 0.6), ("phases.1.scale", -1.0)],
+    target=0.0, sigma=1e-5, label="scale ratio 1/0.6")]
+```
+
+| Field | What it holds |
+|---|---|
+| `LinearRestraint.terms` | (parameter name, coefficient) pairs, each name an entry and not a glob |
+| `LinearRestraint.target` | the sum's target, 0 by default |
+| `LinearRestraint.sigma` | the uncertainty claimed for the sum, in its unit |
+| `LinearRestraint.weight` | multiplies the row, 1 by default |
+| `LinearRestraint.label` | a name for the row in the report; nothing reads it |
+| `LinearRestraint.occupancy_phases` | the phases whose occupancies the coefficients were computed from |
+A restraint is soft, unlike a tie: a phase that really did change can still pull away from it, and the report says how far.
+To make one parameter an exact function of others, use [a tie](tie.md) instead.
+
+The common case is a conserved elemental ratio.
+When a specimen loses only oxygen, say, a ratio such as Cu/(Ca+Al) keeps its as-prepared value, and diffraction alone may not split the mass between two phases.
+`elemental_ratio_restraint` builds the row from each phase's element counts and cell volume {eq}`par-ratio-restraint`:
+
+```python
+import rietx as rx
+from rietx.examples import examples_dir
+from rietx.model.restraints import elemental_ratio_restraint
+
+two = rx.Structure(phases=[
+    rx.Structure.from_cif(examples_dir() / "fluorapatite.cif").phases[0],
+    rx.Structure.from_cif(examples_dir() / "cod_1000236.cif").phases[0]])
+two.restraints = [elemental_ratio_restraint(two, "Ca", ["P", "Al"], 1.2, sigma=0.05)]
+print(two.restraints[0].label)     # Ca/(Al+P) = 1.2
+```
+
+Here `sigma` is a σ on the ratio itself, at the scales the structure holds when you build the row.
+Build it after the scales are refined, never from placeholder scales.
+The ratio you declare is your input, and no result reports it as a measurement.
+
+Read the row in the report like any other restraint, as kind `linear` keyed `restraints.0`.
+Two cases need care:
+
+- Where the data cannot measure the partition at all, a wrong ratio is never in tension, because nothing in the pattern disagrees with it.
+  `RESTRAINT_TENSION` can only fire where the data measure the partition themselves.
+- The row reads each phase's occupancies once, when it is built.
+  A stage that refines one of those occupancies reports `LINEAR_RESTRAINT_STALE`.
+  Rebuild the row from the refined occupancies, or hold them while the row is on.
+
 ## Make the restraints stiff early and relax them later
 
 The IUCr guidelines {cite}`mccusker1999` give restraints a large weight while a model is approximate, and a smaller one as it improves.
