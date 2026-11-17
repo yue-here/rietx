@@ -40,9 +40,11 @@ and it is decided the same way — by :func:`base.sigma_by_arithmetic`.
 
 from __future__ import annotations
 
+import lzma
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -65,6 +67,15 @@ from .ras import RIGAKU_OTHER_AXES, RIGAKU_TWO_THETA_AXES, rigaku_attenuator
 #: The local ``.zip`` header every member starts with — checked before the
 #: archive is opened at all, so a text file never reaches ``zipfile``.
 ZIP_MAGIC = b"PK\x03\x04"
+
+#: What reading one member can raise besides a refusal by name.  ``zipfile``
+#: raises ``NotImplementedError`` for a compression method it lacks (Deflate64,
+#: which Windows writes for large archives), ``RuntimeError`` for an encrypted
+#: member, and ``zlib.error`` or ``lzma.LZMAError`` for a corrupt stream: none
+#: of them is a ``ValueError`` or an ``OSError``, so each is converted at the
+#: member read (``io/CLAUDE.md`` § Refusals).  Shared with ``.brml``.
+MEMBER_READ_ERRORS = (zipfile.BadZipFile, EOFError, NotImplementedError,
+                      RuntimeError, zlib.error, lzma.LZMAError)
 
 #: A profile member, which is what distinguishes this container from a ``.brml``.
 _PROFILE_MEMBER = re.compile(r"^Data\d+/Profile\d+\.txt$")
@@ -90,7 +101,7 @@ def _archive(path: Path) -> zipfile.ZipFile:
     """The open archive, with ``zipfile``'s exception converted at this boundary."""
     try:
         return zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError) as exc:
         raise ValueError(f"{path.name} begins like a zip archive but is not a "
                          f"readable one ({exc}); a .rasx that stops early is "
                          "usually a copy that was interrupted") from None
@@ -110,7 +121,7 @@ def _member(zip_archive: zipfile.ZipFile, name: str, *, path: Path) -> bytes:
         raise ValueError(f"{path.name}: its manifest names a member {name!r} "
                          "that the archive does not contain, so the file is "
                          "internally inconsistent") from None
-    except (zipfile.BadZipFile, EOFError) as exc:
+    except MEMBER_READ_ERRORS as exc:
         raise ValueError(f"{path.name}: member {name!r} could not be "
                          f"decompressed ({exc})") from None
     if len(raw) > MAX_MEMBER_BYTES:
@@ -313,13 +324,16 @@ def looks_rasx(p: Path) -> bool:
     Two gates because ``.brml`` is a zip too: the magic says "an archive" and
     only a ``Data<N>/Profile<N>.txt`` member says *whose*.  The archive is opened
     to answer that, which reads its central directory and not its contents.
+    An archive ``zipfile`` cannot open is not claimed: one whose version-needed
+    byte is past 6.3 raises ``NotImplementedError`` there, which would otherwise
+    escape ``identify_format`` (issue #1593).
     """
     if not head(p, n=len(ZIP_MAGIC)).raw.startswith(ZIP_MAGIC):
         return False
     try:
         with zipfile.ZipFile(p) as zip_archive:
             return any(_PROFILE_MEMBER.match(name) for name in zip_archive.namelist())
-    except (zipfile.BadZipFile, OSError):
+    except (zipfile.BadZipFile, NotImplementedError, OSError):
         return False
 
 
