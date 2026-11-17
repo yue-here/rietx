@@ -1,6 +1,6 @@
 # WP-1947 — the model read at its values, without a solve
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-11 — an application reads statistics, ticks and the background before a fit through an undocumented empty stage or by mutating its own refinement; each has a workaround
