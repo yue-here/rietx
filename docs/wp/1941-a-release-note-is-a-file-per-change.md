@@ -1,6 +1,6 @@
 # WP-1941 — a release note is a file per change
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-17 — fragments and the join landed (#1645); ROADMAP rule 6 and task 7 are the maintainer's
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-06 — a cost paid in contributor round trips; a rebase covers it every time
@@ -123,6 +123,73 @@ hand-staged one section for section.
   https://scriv.readthedocs.io.
 
 ## Handover log
+
+- **2026-11-17** — A release note can now be a file of its own, and two pull
+  requests that each add one no longer conflict. A note goes in
+  `docs/releases/unreleased/`, named for the pull request and for a heading of
+  the next release's staged notes. The cut joins the files under those
+  headings with one command, and a test refuses a note that names no heading.
+  Nothing already staged moved: the 24 open pull requests that edit
+  `1.12.0.md` keep their edits, and the join appends beside them. Two pieces
+  are the maintainer's, because they are ROADMAP's and the PRs' (below).
+  PR #1645.
+
+  *Done.* Tasks 1-4 and 6. `tests/release_notes.py` (joins, `--check`,
+  `--write`), `docs/releases/unreleased/README.md` (how to name and write a
+  note), RELEASING step 2 (join, then edit) and step 11 (the next staged
+  file's headings are the sections), and CONTRIBUTING § Release notes, which
+  is the contributor half of task 5. The choice and its reasons are under
+  Context. No `ci.yml` edit: `docs/releases/` already covers the directory,
+  so a PR adding only a note runs the docs job.
+
+  *Measured* (`[dev]`, darwin/arm64, this tree):
+  - `tests/test_docs_consistency.py` 30 passed (4 new); `test_skill.py` 174,
+    `test_portability.py` 16 and `test_no_stale_name.py` 4 passed.
+  - `ruff` clean.
+  - With no fragments, the join reproduces `1.12.0.md`, `1.11.0.md`,
+    `1.10.0.md` and `1.7.0.md` byte for byte.
+  - Acceptance, in a scratch clone: two branches that each add a note merged
+    onto a base with exit 0, and the join placed both under `## Changed`. Two
+    branches that each append a line to `1.12.0.md` conflicted on it.
+  - The round-trip test moves all 16 bullets of the live `1.12.0.md` into
+    fragments and joins them back, section for section. It went red when one
+    fragment was dropped on purpose.
+  - The fast and full suites were not run locally: the branch touches no
+    package code, and the ready PR's matrix runs the fast one.
+
+  *Review.* A read-only reviewer found no high-severity bug. Fixed:
+  - a fenced `# comment` in a note read as a heading;
+  - a note whose code fence never closes was accepted, and it turned every
+    later heading into code (now refused);
+  - CommonMark's heading indent and closing-`#` rules;
+  - an unplaced check that a short note could satisfy by substring;
+  - a duplicate heading name raised a traceback instead of a message;
+  - RELEASING and CONTRIBUTING wording on patch releases and on the id.
+
+  Left as designed: a section that holds fewer than two bullets gets a blank
+  line before each note, so the lists in a release file opened with no
+  bullets render loose. The round trip compares each section's blocks as a
+  set, not their order. Order is the release editor's in step 2.
+
+  *For the maintainer* (each is a process choice the WP left open):
+  1. ROADMAP rule 6, the other half of task 5. Runners do not edit ROADMAP.
+     Proposed: after "staged on the day it lands, in the release record and
+     the staged notes", add "the notes as a new file in
+     `releases/unreleased/` (WP-1941)".
+  2. `1.12.0.md`'s staging notice still says to stage under its headings.
+     Either way joins correctly. Changing it now edits a file 24 open PRs
+     edit, though not at those lines. Changing it at the 1.12 cut costs
+     nothing.
+  3. The note's id: the README allows any unique name before the PR exists
+     (`wp1941`), where the WP says `<PR>`. Keep, or require the number.
+  4. Task 7. Every open PR that edits `1.12.0.md` is from one fork, and none
+     needs a rebase for this change. Whether new PRs there switch to
+     fragments is for that fork to hear on the next PR it opens.
+  5. Optional: `/pr-review`'s bookkeeping paragraph could say a note in
+     `unreleased/` never conflicts.
+
+  *Next:* item 1, then tick task 5. Item 4 then closes task 7, and the WP
+  closes at the 1.12 cut, the first join.
 
 - **2026-10-10** — Recovered and renumbered. The 2026-10-06 commit that filed
   this WP was pushed after PR #796 had merged, so it never reached `main`,
