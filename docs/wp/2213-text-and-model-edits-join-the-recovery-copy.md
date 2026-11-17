@@ -1,6 +1,6 @@
 # WP-2213 — the Text buffer and the Model forms join the recovery copy
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-17 — claimed by @yue-here (ghostshift runner)
 Depends on: 2209 (the recovery copy); #1523 (its pull request)
 Priority: P2 2026-11-13 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; WP-2209's store, which it lands on, is on main since #1523 and WP-2209 is closed
 
