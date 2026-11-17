@@ -175,8 +175,12 @@ output, so its wording goes to the maintainer before merge.
       where σ² crosses zero. sig-0 and sig-1 keep their sign tests. The
       `.instprm` reader keeps its sign test on all three: it states no
       range.*
-- [ ] `.gss`: the per-bank Mantid header line into three declared metadata
-      keys.
+- [x] `.gss`: the per-bank Mantid header line into three declared metadata
+      keys. *Done 2026-11-17: `total_flight_path_m`, `two_theta_bank_deg`,
+      `difc_geometric`, as written, only where exactly one such line sits
+      between the bank's record and the previous bank's. The DIFC is
+      geometric, measured: 2·95.89·sin(84.2835°)/(h/mₙ) = 48236.6 against
+      the 48236.8 written.*
 - [ ] Tests on synthetic fixtures at the two files' column widths: each
       repair with its diagnostic, the refusal it replaces, and a bank whose
       σ² turns negative inside its range still refused.

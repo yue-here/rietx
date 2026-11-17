@@ -279,6 +279,14 @@ temperature field, and Rigaku's `CW_Temperature*` axes are the cooling water.
 Reading a specimen coordinate off an axis named for something else is inventing
 a convention, which is the one repair a reader may never make.
 
+**A `.gss` bank's Mantid line is focusing geometry, never the calibration**
+(WP-2146): `# Total flight path …m, tth …deg, DIFC …` before a `BANK` record
+becomes `total_flight_path_m`, `two_theta_bank_deg` and `difc_geometric`, as
+written, only where one such line sits between that bank and the one before.
+Its DIFC follows from L and 2θ (HRPD bank 1: 48236.8); the instrument file's
+`ICONS` DIFC was refined against a standard (48275.36). Nothing reads either
+key to set a `TOFSource`.
+
 ## Per format
 
 | format | claimed by | σ | notes |

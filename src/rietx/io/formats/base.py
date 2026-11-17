@@ -236,6 +236,17 @@ METADATA_KEYS: dict[str, str] = {
                               "is the one case `Source.kbeta` acts on; the same "
                               "element before the sample is not mapped. Absent "
                               "means undeclared, as for `beam_optics`",
+    "total_flight_path_m": "a time-of-flight bank's total flight path L1 + L2 "
+                           "in metres, from the comment line Mantid's SaveGSS "
+                           "writes before the bank. Recorded, never used",
+    "two_theta_bank_deg": "a time-of-flight bank's scattering angle 2θ in "
+                          "degrees, from the same Mantid comment line. "
+                          "Recorded, never used",
+    "difc_geometric": "the DIFC in µs/Å that the same Mantid comment line "
+                      "states, computed from the bank's flight path and angle. "
+                      "**Recorded, never used as the calibration**: it is the "
+                      "focusing geometry, not a value refined against a "
+                      "standard, and an instrument file's ICONS DIFC is that",
 }
 
 

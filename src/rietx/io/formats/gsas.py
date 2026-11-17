@@ -608,8 +608,39 @@ def _read_bank(p: Path, lines: list[str],
     sigma = None if sig is None else sig[:n]
     x, y, sig = ascending(x, y, sigma, path=p, fmt=GSAS, axis=axis,
                           diagnostics=diagnostics)
+    after = records[which - 1][0] + 1 if which else 0
     return pattern_data(p, x, y, sig, axis=axis,
-                   source_file=p.name, format=f"gsas-{type_flag.lower()}")
+                   source_file=p.name, format=f"gsas-{type_flag.lower()}",
+                   **_mantid_bank_header(lines[after:start_line]))
+
+
+#: The comment line Mantid's SaveGSS writes before each bank, e.g.
+#: ``# Total flight path 95.89m, tth 168.567deg, DIFC 48236.8`` (ISIS HRPD,
+#: issue #1447; an ISIS GEM file writes the same shape).
+_MANTID_BANK_HEADER = re.compile(
+    r"^#\s*Total flight path\s+([0-9.Ee+-]+)\s*m\s*,\s*tth\s+([0-9.Ee+-]+)\s*deg"
+    r"\s*,\s*DIFC\s+([0-9.Ee+-]+)\s*$")
+
+
+def _mantid_bank_header(between: list[str]) -> dict[str, str]:
+    """The flight path, 2θ and DIFC of Mantid's comment line for one bank, as
+    declared metadata, or nothing.
+
+    The line is a **record of how the bank was focused**, never its
+    calibration: the DIFC it states follows from the flight path and angle
+    (2·L·sin θ over h/mₙ, 48236.6 against the 48236.8 written for HRPD bank 1),
+    while an instrument file's ICONS DIFC was refined against a standard
+    (48275.36 for the same bank).  Read only where exactly one such line sits
+    between the previous bank's record and this one, since two would leave
+    which bank it describes to a guess; the text is kept as written.
+    """
+    found = [m for line in between
+             if (m := _MANTID_BANK_HEADER.match(line.rstrip("\r\n")))]
+    if len(found) != 1:
+        return {}
+    path_m, tth, difc = found[0].groups()
+    return {"total_flight_path_m": path_m, "two_theta_bank_deg": tth,
+            "difc_geometric": difc}
 
 
 def _synth_axis(axis: AxisKind, bintype: str, lines: list[str], bank_line: str,
