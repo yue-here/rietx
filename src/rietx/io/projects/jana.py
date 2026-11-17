@@ -504,7 +504,12 @@ def _read_control_sections(lines: list[str], model: JanaModel, where: str) -> No
                 current = "<repeat>"
             else:
                 model.sections.append(head)
-            continue
+            # a command may follow the program's name on its own line
+            # (``refine restric O1 1``): read the rest as a line of the section
+            if len(tokens) == 1:
+                continue
+            text, tokens = text.split(None, 1)[1], tokens[1:]
+            head = tokens[0].lower()
         if head == "end":
             current = None
             continue
@@ -699,6 +704,13 @@ def read_jana(path: str | Path, *,
         raise JanaError(
             f"{files['.m41']}: {len(model.m41_phases)} phase block(s) for "
             f"the {len(model.phases)} phase(s) of {files['.m50']}")
+    m50_names = [p.name for p in model.phases]
+    m41_names = [p.name for p in model.m41_phases]
+    if (model.m41_phases and all(m50_names) and all(m41_names)
+            and sorted(m50_names) != sorted(m41_names)):
+        raise JanaError(
+            f"{files['.m41']}: phase blocks {m41_names} do not name the "
+            f"phases {m50_names} of {files['.m50']}")
     if diagnostics is not None:
         _report(model, diagnostics)
     return model
@@ -769,6 +781,54 @@ def _operators(phase: JanaPhase) -> list[str]:
     return list(dict.fromkeys(full))
 
 
+def _m41_block(model: JanaModel, index: int) -> JanaM41Phase:
+    """The ``.m41`` block of phase ``index``: by name where both files name
+    every phase, else by position."""
+    name = model.phases[index].name
+    if all(p.name for p in model.phases) and all(b.name for b in model.m41_phases):
+        return next(b for b in model.m41_phases if b.name == name)
+    return model.m41_phases[index]
+
+
+def _tensor_within_print(sg, xyz, u: tuple[float, ...]
+                         ) -> tuple[tuple[float, ...], list[str]]:
+    """A printed Uij moved onto its site's allowed form where the print admits it.
+
+    Jana prints Uij to six decimals, so each stands for any value within 5e-7
+    of it, and a tied pair on a special site (U12 = U11/2 on a three-fold
+    axis) misses its tie whenever the last digit rounds the other way.  The
+    CIF reader's repair (``crystallography.cif._project_printed_adps``):
+    the allowed tensor nearest the print inside that box, a zero held exact,
+    and the table's own test after it.  Returns the tensor and the names of
+    the components moved, none where it already lies on the form or nothing
+    allowed lies within the print (left for ``ParameterTable`` to refuse).
+    """
+    import numpy as np
+
+    from ...crystallography.adp import U_NAMES
+    from ...crystallography.wyckoff import (
+        adp_basis,
+        adp_projection,
+        nearest_allowed_within_print,
+        stabilizer_rotations,
+    )
+
+    printed = np.asarray(u, dtype=np.float64)
+    try:
+        basis = adp_basis(stabilizer_rotations(sg, xyz))
+    except ValueError:
+        return u, []
+    if adp_projection(basis, printed)[2]:
+        return u, []
+    half = np.where(printed != 0.0, 5e-7, 0.0)
+    target = nearest_allowed_within_print(
+        np.asarray(basis, dtype=np.float64).T, printed, half)
+    if target is None or not adp_projection(basis, target)[2]:
+        return u, []
+    names = [n for n, a, t in zip(U_NAMES, printed, target, strict=True) if a != t]
+    return tuple(float(t) for t in target), names
+
+
 def to_structure(model: JanaModel, *, phase: int | str | None = None,
                  diagnostics: list[Diagnostic] | None = None) -> Structure:
     """Build a :class:`~rietx.schemas.Structure` from a read :class:`JanaModel`.
@@ -834,8 +894,10 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
                         f"but its operators are {sg.xhm()} (No. {sg.number})")
 
     # the refined cell is the .m41's, in the phase's block, or in the common
-    # part of a single-phase file that writes no "### phase" line
-    m41 = (model.m41_phases[index].sections if model.m41_phases
+    # part of a single-phase file that writes no "### phase" line; a block is
+    # the phase's by name where both files name them (read_jana refused two
+    # lists of names that differ), by position only where either is silent
+    m41 = (_m41_block(model, index).sections if model.m41_phases
            else model.m41_common if len(model.phases) == 1 else {})
     cell_section = next((v for k, v in m41.items()
                          if _title_key(k) == "Cell parameters"), None)
@@ -858,7 +920,7 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         raise JanaError(f"{named}: phase {label!r} states no cell")
 
     general = len(list(sg.operations()))
-    sites, frozen, merged, snapped = [], [], [], []
+    sites, frozen, merged, snapped, moved = [], [], [], [], []
     for atom in model.atoms[index]:
         xyz = np.array(atom.xyz, dtype=float)
         orbit = site_orbit(sg, xyz)
@@ -888,6 +950,10 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
             frozen.append(atom.label)
             vary_xyz = False
         u = atom.adp
+        if atom.adp_type == 2:
+            u, names = _tensor_within_print(sg, xyz, u)
+            if names:
+                moved.append((atom.label, names))
         sites.append(dict(
             atom=atom, species=chosen.atom_types[atom.type_index - 1].symbol,
             occupancy=occupancy, vary_xyz=vary_xyz,
@@ -944,8 +1010,17 @@ def to_structure(model: JanaModel, *, phase: int | str | None = None,
         if snapped:
             not_carried.append(f"the last printed digit of ai for "
                                f"{', '.join(snapped)}, read as fully occupied")
+        if moved:
+            not_carried.append(
+                "the last printed digit of the Uij of "
+                + ", ".join(f"{n} ({', '.join(c.upper() for c in cs)})"
+                            for n, cs in moved)
+                + ", moved within it onto the form the site's symmetry allows")
         where += [f"phases.0.atoms.{labels.index(n)}.x"
-                  for n in dict.fromkeys(frozen + merged + snapped)]
+                  for n in dict.fromkeys(frozen + merged)]
+        where += [f"phases.0.atoms.{labels.index(n)}.occ" for n in snapped]
+        where += [f"phases.0.atoms.{labels.index(n)}.aniso.{c}"
+                  for n, cs in moved for c in cs]
         stated = sorted({k for t in chosen.atom_types for k in t.values
                          if k in ("f'", 'f"', "fneutron")})
         if stated:

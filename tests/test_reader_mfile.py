@@ -223,9 +223,9 @@ def test_the_cubic_phase_reads_its_setting_from_the_operators(tmp_path):
     s = jana.to_structure(jana.read_jana(write_set(tmp_path)), phase=1)
     phase = s.phases[0]
     assert gemmi.SpaceGroup(phase.space_group).number == 225
-    # ai = 1/48 printed to six decimals: the occupancy carries 48x the
-    # rounding, and is not snapped (a repair the reader cannot report)
-    assert [a.occ.value for a in phase.atoms] == pytest.approx([1.0, 1.0], abs=48 * 5e-7)
+    # ai = 1/48 printed to six decimals: 0.020833 x 48 = 0.999984 lies within
+    # 48 x 5e-7 of a full site, so it is read as full (and reported)
+    assert [a.occ.value for a in phase.atoms] == [1.0, 1.0]
     assert phase.cell.a.vary and phase.cell.a.value == 5.641
 
 
@@ -344,7 +344,7 @@ def test_every_truncation_raises_naming_the_file_or_reads(tmp_path):
                 for index in range(len(model.phases)):
                     jana.to_structure(model, phase=index)
             except jana.JanaError as exc:
-                assert str(tmp_path) in str(exc) or "phase" in str(exc), exc
+                assert str(tmp_path) in str(exc), exc
 
 
 # --------------------------------------------------------------- review findings
@@ -438,3 +438,90 @@ def test_a_stated_automatic_mode_is_said_plainly(tmp_path):
     diags: list[Diagnostic] = []
     jana.read_jana(write_set(tmp_path, m50=m50(refine="autkeys 1")), diagnostics=diags)
     assert "are not the set" in diags[0].message
+
+
+# --------------------------------------------------------------- second review (PR #1627)
+
+def _p63mmc_set(tmp_path, u: tuple[float, ...], stem: str = "hex"):
+    """Mg on 2c (1/3, 2/3, 1/4) of P6_3/mmc, anisotropic: ai = 2/24 = 1/12, and
+    the site's 3m symmetry ties U22 = U11, U12 = U11/2, U13 = U23 = 0."""
+    sg = gemmi.SpaceGroup("P 63/m m c")
+    seen, ops = set(), []
+    for op in sg.operations().sym_ops:
+        rot = tuple(map(tuple, op.rot))
+        neg = tuple(tuple(-c for c in row) for row in op.rot)
+        if rot in seen or neg in seen:
+            continue
+        seen.add(rot)
+        ops.append(op.triplet().replace(",", " "))
+    text50 = "\n".join(
+        ["title hexagonal", "lambda 1.5406 radtype 1", "-" * 40,
+         "cell 3.21 3.21 5.21 90 90 120", "spgroup P63/mmc 194 6", "centro",
+         "lattice P"] + [f"symmetry {op}" for op in ops]
+        + ["atom Mg", "end", "*" * 60, "refine", "autkeys 0", "end"]) + "\n"
+    text40 = "\n".join([
+        "    1    0    0    0",
+        _keyed([1.0, 0, 0, 0, 0, 0], "100000"), _num(0.0),
+        _keyed([0] * 6, "000000"), _keyed([0] * 6, "000000"),
+        "Mg1       1  2     " + "".join(_num(v) for v in (1 / 12, 1 / 3, 2 / 3, 0.25)),
+        _keyed(u, "0000111100")]) + "\n"
+    text41 = "\n".join([
+        "bckgtype 1 bckgnum 3", "end", "*" * 60,
+        "# Cell parameters - a,b,c,alpha,beta,gamma",
+        _keyed([3.21, 3.21, 5.21, 90, 90, 120], "101000")]) + "\n"
+    return write_set(tmp_path, stem=stem, m50=text50, m40=text40, m41=text41,
+                     two_phase=False)
+
+
+def test_a_tied_tensor_rounded_in_its_last_digit_is_read_on_the_site(tmp_path):
+    """U12 = U11/2 = 0.0061735 prints 0.006174: the file's rounding, not a
+    contradiction of the 2c site's symmetry, so it is read on the site and said."""
+    model = jana.read_jana(_p63mmc_set(tmp_path, (0.012347, 0.012347, 0.015,
+                                                  0.006174, 0, 0)))
+    diags: list[Diagnostic] = []
+    s = jana.to_structure(model, diagnostics=diags)
+    aniso = s.phases[0].atoms[0].aniso
+    assert aniso.u12.value == pytest.approx(aniso.u11.value / 2, abs=1e-12)
+    assert abs(aniso.u12.value - 0.006174) <= 5e-7 + 1e-12
+    assert abs(aniso.u11.value - 0.012347) <= 5e-7 + 1e-12
+    assert aniso.u13.value == 0.0 and aniso.u33.value == 0.015
+    (info,) = [d for d in diags if d.code == "JANA_NOT_CARRIED"]
+    assert "Uij of Mg1" in info.message
+    assert any(w.startswith("phases.0.atoms.0.aniso.") for w in info.where)
+    # the snapped ai (1/12 printed 0.083333) points at the occupancy
+    assert "phases.0.atoms.0.occ" in info.where
+
+
+def test_a_tied_tensor_off_by_more_than_its_print_is_still_refused(tmp_path):
+    model = jana.read_jana(_p63mmc_set(tmp_path, (0.012347, 0.012347, 0.015,
+                                                  0.006180, 0, 0)))
+    with pytest.raises(jana.JanaError, match="hex.m50"):
+        jana.to_structure(model)
+
+
+def test_m41_phase_blocks_are_matched_by_name(tmp_path):
+    alpha, nacl = m41().split("### phase NaCl\n")
+    head, alpha = alpha.split("### phase Alpha\n")
+    swapped = head + "### phase NaCl\n" + nacl + "### phase Alpha\n" + alpha
+    model = jana.read_jana(write_set(tmp_path, m41=swapped))
+    s = jana.to_structure(model, phase="Alpha")
+    assert s.phases[0].cell.a.value == 8.11
+    assert jana.to_structure(model, phase="NaCl").phases[0].cell.a.value == 5.641
+
+
+def test_m41_phase_names_that_differ_from_the_m50_are_refused(tmp_path):
+    text = m41().replace("### phase NaCl", "### phase Halite")
+    with pytest.raises(jana.JanaError, match=r"syn\.m41.*Halite.*syn\.m50"):
+        jana.read_jana(write_set(tmp_path, m41=text))
+
+
+def test_commands_on_the_refine_line_are_read(tmp_path):
+    diags: list[Diagnostic] = []
+    text = m50(refine="").replace("\nrefine\n", "\nrefine restric O1 1\n")
+    model = jana.read_jana(write_set(tmp_path, m50=text), diagnostics=diags)
+    assert model.constraints == ["restric O1 1"]
+    assert "JANA_CONSTRAINTS_NOT_CARRIED" in [d.code for d in diags]
+    diags.clear()
+    text = m50(refine="").replace("\nrefine\n", "\nrefine autkeys 0\n")
+    model = jana.read_jana(write_set(tmp_path, stem="b", m50=text), diagnostics=diags)
+    assert model.autkeys == 0 and diags == []

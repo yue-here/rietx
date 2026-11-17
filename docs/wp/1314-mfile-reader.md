@@ -237,6 +237,15 @@ The shipping PR carries `Closes #147`.
 
 ## Handover log
 
+- **2026-11-17** — review fix-ups on PR #1627 (ghostshift). An anisotropic
+  tensor whose symmetry tie misses only in its last printed digit (U12 =
+  U11/2 on P6₃/mmc 2c, printed 0.012347 / 0.006174) is moved onto the site's
+  form within the print, as the CIF reader does, and named in
+  `JANA_NOT_CARRIED`; one off by more is still refused. `.m41` phase blocks are
+  matched to the `.m50` phases by name where both name them, and two lists of
+  names that differ are refused naming both files. A command on the REFINE
+  section's own line (`refine restric O1 1`) is read. `where` points a snapped
+  ai at `.occ`. `tests/test_reader_mfile.py`: 53 passed.
 - **2026-11-16** — first slice, ghostshift runner, PR #1627. **What it means:** rietx
   can now read a Jana powder project (the `.m50`/`.m40`/`.m41` trio) into the
   file's own model and build a `Structure` from it with Jana's refine keys on
@@ -257,7 +266,7 @@ The shipping PR carries `Closes #147`.
     part-I `end`, run-together positive values, an occupancy past one;
     `ATTRIBUTION.md` row; three codes (`JANA_KEYS_MAY_BE_IGNORED`,
     `JANA_CONSTRAINTS_NOT_CARRIED` at read, `JANA_NOT_CARRIED` at build) with
-    help, audit rows, silence pairs and skill rows (`JANA_` joins
+    help, audit and skill rows, and silence pairs for the two warnings (`JANA_` joins
     `FOREIGN_FILE_PREFIXES`). Fixtures are **synthesized** from the manuals
     (`tests/test_reader_mfile.py`, 48 tests incl. a truncation arm): the Jana2020
     licence covers the program and documentation and says nothing of example
