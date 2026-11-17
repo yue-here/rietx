@@ -109,17 +109,47 @@ macro, with the fragment left to the caller and the help entries.
       measurement), committed as fixtures with README rows. Archive file 8 was
       not needed: its own TOPAS output would measure the same slots on private
       numbers, and a synthetic input can be shipped.*
-- [ ] Verify what `Rs` means against the TOPAS Technical Reference, and read
+- [x] Verify what `Rs` means against the TOPAS Technical Reference, and read
       it into `goniometer_radius_mm` if it is that radius.
-- [ ] Help entries: each `instrument.profile.*` entry names its TOPAS and
+      *Done: the v6 TR (2015) names `Rs` the secondary radius (§ 2.11, p. 15;
+      keyword `[Rp #] [Rs #]`, p. 139, default 217.5 mm) and divides a
+      specimen displacement by it (`th2_offset = -2 Rad (c) Cos(Th) / Rs;`,
+      p. 144), which is what `goniometer_radius_mm` does. Read from `Rs`,
+      `Radius(r)` and `Radius(r, r)` into `TopasModel.secondary_radii`; one
+      value is the radius, two different ones are refused by `to_instrument`.
+      `Radius(a, b)` with a ≠ b is not read: its printed order is
+      `(rp, rs)`, but the TCHZ macro's printed order proved wrong, and no run
+      measures this one (`TopasModel.radius_unordered`). The old reader took
+      `Radius`'s first argument, which is `Rp` by the printed order.*
+- [x] Help entries: each `instrument.profile.*` entry names its TOPAS and
       GSAS-II equivalent, and U and W say how a Z term folds into them.
       `tests/test_help.py` crosses the vocabulary both ways.
-- [ ] Read `TCHZ_Peak_Type(…)` from an `.inp` into an `Instrument`, beside
+      *Done: the TCHZ slot by position and the GSAS-II letter with its unit
+      factor (`instprm_factor`), pinned against `TCHZ_SLOT_TERMS` by
+      `test_topas_tchz.py::test_each_profile_entry_names_its_topas_and_gsas2_equivalent`.*
+- [x] Read `TCHZ_Peak_Type(…)` from an `.inp` into an `Instrument`, beside
       the GSAS readers or through `read_topas_inp`. Decide which, and write it
       here.
-- [ ] Tests: a synthetic `.inp` with a nonzero Z round-trips to the same
+      *Decided: through `read_topas_inp`, which already parses the file's
+      symbols, blocks and phases. It records every call on `TopasModel.tchz`
+      (`TopasTCHZ`: args, six values by position, refine flags, owning phase)
+      and judges nothing, so a structure import never fails on a profile;
+      `rietx.io.projects.topas.to_instrument(model, instrument, *, phase=None)`
+      maps and refuses, beside `to_structure`. The caller's `instrument`
+      supplies the source and geometry kind (as `TopasModel.geometry` already
+      advises); the five profile terms come back `vary=False`. Refused by
+      name: no call, a call without twelve arguments, a slot that does not
+      resolve, differing calls without `phase=`, W = v3 + v4 < 0 or X < 0
+      (the GSAS-II reader's rule; TOPAS's behaviour is unmeasured), a
+      Lorentzian negative below 180°, two secondary radii. Reads the macro
+      only: the writer's `pv_fwhm`/`pv_lor` equations stay WP-1911's.*
+- [x] Tests: a synthetic `.inp` with a nonzero Z round-trips to the same
       Γ_G(θ) to 1e-12 across 5-150°. The Z fold is algebra, so this tolerance
       is exactness, not a measured spread.
+      *Done: `tests/test_topas_tchz.py`. Γ_G and Γ_L to 1e-12 over 2901
+      angles, Z dropped misses by > 1e-3; and against TOPAS's own Y_calc,
+      runs 10 and 11 at 2.1e-3 and 2.5e-3 with the signature-order arm at
+      0.41 and 0.087, and run 10's slots against run 11 missing.*
 - [ ] Skill: one line in `references/api.md`'s reader list, generated.
 
 ## Acceptance
@@ -129,7 +159,7 @@ A TCHZ `.inp` reads to an `Instrument` whose Γ_G and Γ_L match the bar task
 definition otherwise. The WP says which bar was used.
 
 ```sh
-.venv/bin/python -m pytest tests/test_help.py tests/test_projects_topas.py -q
+.venv/bin/python -m pytest tests/test_help.py tests/test_projects_topas.py tests/test_topas_tchz.py -q
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
 ```

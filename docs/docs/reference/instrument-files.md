@@ -1,14 +1,14 @@
 # Instrument files
 
-This page gives the instrument files rietx reads and writes: its own JSON instrument profile, the GSAS-I `.prm` and GSAS-II `.instprm` of a constant-wavelength instrument, and the GSAS-I `.iparm` and GSAS-II `.instprm` of a time-of-flight bank.
+This page gives the instrument files rietx reads and writes: its own JSON instrument profile, the GSAS-I `.prm` and GSAS-II `.instprm` of a constant-wavelength instrument, a TOPAS `TCHZ_Peak_Type` profile, and the GSAS-I `.iparm` and GSAS-II `.instprm` of a time-of-flight bank.
 
-Every reader on this page returns an `Instrument` with every parameter `vary=False`.
+Every reader on this page returns an `Instrument` with every parameter `vary=False`; the TOPAS profile freezes what it reads and leaves the rest of the instrument you pass as it was.
 An instrument-parameter file is a calibration refined against a standard, so it is data rather than a starting guess.
 Freeing the zero shift or a bank's DIFC beside a free cell reopens the correlation the calibration was made to remove.
 [The instrument](instrument.md) gives the fields each reader fills.
 [How to calibrate an instrument on a standard and reuse it](../guides/calibrate.md) gives the procedure the profile file serves.
 
-Each reader and writer takes `diagnostics=`.
+Each reader and writer takes `diagnostics=`, except the TOPAS profile, which reads a value or refuses and has nothing to report.
 Pass a list and the reader's assumptions and dropped fields come back in it.
 Pass none and the read is silent and returns the same instrument.
 [Diagnostics: reading files](diagnostics-files.md) gives every code this page names.
@@ -241,6 +241,69 @@ It also names a peak shape or extra components the format cannot state.
 Refused by name: a `flat_plate_transmission` geometry, which `Diff-type` cannot name; more than two emission lines; a harmonic on a neutron source; a time-of-flight bank; and a non-finite value.
 
 The structure half of what GSAS-II imports is a phase CIF from `write_gsas2_phase_cif`.
+
+## A TOPAS TCHZ profile
+
+A TOPAS input often states its instrument profile as one `TCHZ_Peak_Type(…)` call: six (name, value) pairs.
+`rietx.io.projects.topas.to_instrument` reads that call from a parsed `.inp` into an `Instrument`, together with the secondary radius.
+
+```python
+import tempfile
+from pathlib import Path
+
+import rietx as rx
+from rietx.io.projects import topas
+
+path = Path(tempfile.mkdtemp()) / "lab.inp"
+path.write_text("""xdd "lab.xy" xye_format
+  Rp 217.5 Rs 240
+str
+  phase_name "LaB6"
+  space_group "P m -3 m"
+  a 4.15689 b 4.15689 c 4.15689 al 90 be 90 ga 90
+  TCHZ_Peak_Type(pku, 0.004, pkv, -0.002, pkw, 0.003, pkz, 0.001, pkx, 0.008, pky, 0.02)
+  site La x 0 y 0 z 0 occ La 1 beq 0.5
+  site B x 0.1975 y 0.5 z 0.5 occ B 1 beq 0.5
+""", encoding="utf-8")
+model = topas.read_topas_inp(path)
+instrument = topas.to_instrument(model, rx.Instrument.bragg_brentano(radiation="CuKa"))
+print({name: round(getattr(instrument.profile, name).value, 6) for name in "uvwxy"})
+print(instrument.geometry.goniometer_radius_mm)
+```
+
+```text
+{'u': 0.005, 'v': -0.002, 'w': 0.004, 'x': 0.02, 'y': 0.008}
+240.0
+```
+
+The instrument you pass supplies the source and the geometry kind; the file supplies U, V, W, X and Y, and the radius where it states one.
+The five profile parameters come back with `vary=False`.
+
+The six values are read **by position**, never by the names the file gives them.
+Those names are labels, and tutorial inputs call the fourth pair `pkx` in some files and `pkz` in others.
+What each position does was measured against TOPAS 6's own computed pattern:
+
+| value | what TOPAS adds | where it lands here |
+|---|---|---|
+| 1, 2, 3 | U·tan²θ + V·tanθ + W to Γ_G² | `profile.u`, `profile.v`, `profile.w` |
+| 4 | Z/cos²θ to Γ_G² | U and W both: Z/cos²θ = Z·tan²θ + Z, so U + Z and W + Z give the same width at every angle |
+| 5 | a tanθ term to Γ_L | `profile.y` |
+| 6 | a 1/cosθ term to Γ_L | `profile.x` |
+
+The Technical Reference prints the signature as `(u, uv, v, vv, w, wv, x, xv, y, yv, z, zv)`.
+Taken by position, that order does not reproduce what TOPAS computes, so it is not used here.
+In the reference's formula the tanθ Lorentzian term is X and the 1/cosθ one is Y, the opposite of this package's letters for the same physics.
+
+The secondary radius is the `Rs` keyword, or a `Radius(r)` call.
+It is the radius the reference divides a specimen displacement by, so it becomes `geometry.goniometer_radius_mm`.
+
+`to_instrument` refuses, naming the file:
+
+- an input with no call, a call that does not have twelve arguments (TOPAS 6 itself stops on a ten-argument one), or a value that is not a number;
+- calls in several phases stating different values, unless `phase=` names the one to read;
+- a negative W (value 3 plus value 4) or X, which this package's profile bounds at zero. What TOPAS does with a negative width has not been measured;
+- a Lorentzian width X/cosθ + Y·tanθ that turns negative below 2θ = 180°;
+- two different secondary radii, including a `Radius(a, b)` with two different values, whose argument order has not been measured.
 
 ## Time-of-flight instrument files
 
