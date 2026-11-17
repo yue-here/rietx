@@ -20,8 +20,13 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import (AXIS_UNITS, POISSON_FLOOR_COUNTS, AxisKind, SigmaRule,
-                      _poisson_where_nonpositive)
+from .pattern import (
+    AXIS_UNITS,
+    POISSON_FLOOR_COUNTS,
+    AxisKind,
+    SigmaRule,
+    _poisson_where_nonpositive,
+)
 
 
 # ----------------------------------------------------------------------
