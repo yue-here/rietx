@@ -32,11 +32,12 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
+from pydantic import BaseModel
 
 from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
-from ..schemas.structure import Structure
+from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
 from .vector import (
@@ -317,7 +318,8 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     patterns: a rigid body's increment, which restarts at zero at every commit
     while its record moves (WP-1805), and a moment DOF, read in a frame rebuilt
     from the cell at every stage start (#598).  The intensity modes'
-    force-fix does not arise: a joint fit is Rietveld-only.
+    force-fix is refused at fit, where the mode is known
+    (``multi._refuse_joint_mode``, WP-2104).
     """
     if e.locked:
         return ("is structurally fixed by symmetry or by the model (locked), so "
@@ -339,16 +341,86 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     return None
 
 
+#: :class:`~rietx.schemas.structure.Phase` fields a per-pattern start may
+#: change although they are not parameters: ``name`` labels the phase (a CIF
+#: takes it from its data block, which per-temperature files spell
+#: differently), and ``particle_radius_um`` never enters the least-squares fit
+#: (its schema docstring; only QPA's Brindley correction and the exporters read it)
+_PHASE_FIELDS_FREE_PER_PATTERN = frozenset({"name", "particle_radius_um"})
+
+
+def _model_differences(a, b, path: str = ""):
+    """Every place two starting structures differ outside a parameter's
+    value, as ``(dotted path, a's, b's)``, in field order.
+
+    A :class:`~rietx.schemas.common.Parameter` is skipped whole: its value is
+    what a per-pattern start may change, and its bounds and vary flag are
+    either per-histogram or intersected and replaced by a plan.  So are
+    :data:`_PHASE_FIELDS_FREE_PER_PATTERN`.  Everything else is compared
+    exactly, recursing through models, lists and dicts.  A list of another
+    length is one difference at the list.  A dict is compared by key, never by
+    key order, and a key one side leaves out is no difference where the other
+    side's value is a parameter: a texture term the block leaves out enters
+    the table at 0, held (``ParameterTable._collect_texture``), so ``{}`` and a
+    fitted coefficient set are one model with different values.
+    """
+    if isinstance(a, Parameter) and isinstance(b, Parameter):
+        return
+    if isinstance(a, BaseModel) and isinstance(b, BaseModel) and type(a) is type(b):
+        for name in type(a).model_fields:
+            if isinstance(a, Phase) and name in _PHASE_FIELDS_FREE_PER_PATTERN:
+                continue
+            yield from _model_differences(getattr(a, name), getattr(b, name),
+                                          f"{path}.{name}" if path else name)
+        return
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        if len(a) != len(b):
+            yield path, a, b
+            return
+        for k, (x, y) in enumerate(zip(a, b, strict=True)):
+            yield from _model_differences(x, y, f"{path}.{k}")
+        return
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in {**a, **b}:
+            if k not in a or k not in b:
+                if not isinstance(a.get(k, b.get(k)), Parameter):
+                    yield f"{path}.{k}", a.get(k), b.get(k)
+                continue
+            yield from _model_differences(a[k], b[k], f"{path}.{k}")
+        return
+    if type(a) is not type(b) or a != b:
+        yield path, a, b
+
+
+def _enclosed_paths(where: str, paths: set[str]) -> set[str]:
+    """The table paths under the nearest enclosing part of the model, from
+    ``where`` up, that holds any: what a field at ``where`` shapes."""
+    parts = where.split(".")
+    while parts:
+        prefix = ".".join(parts)
+        found = {q for q in paths if q == prefix or q.startswith(prefix + ".")}
+        if found:
+            return found
+        parts.pop()
+    return set()
+
+
+def _short(value: object, limit: int = 60) -> str:
+    text = repr(value)
+    return text if len(text) <= limit else text[:limit - 3] + "..."
+
+
 def _starting_structures(structure: Structure | list[Structure],
                          n: int) -> list[Structure]:
     """One starting structure per histogram: the one given, or each its own.
 
     A list is the per-pattern form (WP-1325): a library's specimens start from
     their own cells, occupancies and widths.  It must describe **one model**,
-    so the topology is checked here (phase count, space groups, atoms); the
-    shared values are checked by :meth:`MultiParameterTable._check_starts_agree`
-    once the tables exist, the table being the authority on which paths a
-    model has.
+    so the topology is checked here (phase count, space groups, atoms); every
+    other field, and the shared values, are checked by
+    :meth:`MultiParameterTable._check_starts_agree` once the tables exist,
+    the table being the authority on which paths a model has and the sharing
+    map on which of them are shared.
     """
     if isinstance(structure, Structure):
         return [structure] * n
@@ -499,7 +571,19 @@ class MultiParameterTable:
 
     # -- per-pattern starting values and parametric equations (WP-1325) -----
     def _check_starts_agree(self, starts: list[Structure]) -> None:
-        """Refuse per-pattern starts that disagree on a shared path.
+        """Refuse per-pattern starts that are not one model, or that disagree
+        on a shared path.
+
+        **A field that is not a parameter** (:func:`_model_differences`) may
+        differ only where nothing it shapes is shared.  What it shapes is read
+        off the nearest enclosing part of the model that holds table paths
+        (:func:`_enclosed_paths`): a preferred-orientation axis shapes
+        ``phases.i.preferred_orientation.r``; a magnetic symmetry or a
+        restraint, holding none of their own, shapes the phase.  Two axes under
+        one shared ``r`` are two models under one column, refused naming the
+        field.  Under ``SharingMap(per_histogram=["phases.*.preferred_orientation.*"])``
+        each pattern has its own ``r`` and the axes may differ, as GSAS-II
+        keeps texture per histogram (``docs/practice.md``).
 
         A shared path is one column, so it has one starting value: the column
         map writes each histogram's into it and keeps the last, which would
@@ -508,6 +592,18 @@ class MultiParameterTable:
         rescaled a shared size term into a histogram's own units, which is
         compared as the caller wrote it.
         """
+        for h, start in enumerate(starts[1:], start=1):
+            paths = {e.path for t in (self.tables[0], self.tables[h]) for e in t.entries}
+            for where, v0, v in _model_differences(starts[0], start):
+                shaped = _enclosed_paths(where, paths)
+                if any(self.sharing.is_shared(q) for q in shaped):
+                    raise ValueError(
+                        f"starting structure {h} differs from structure 0 at {where} "
+                        f"({_short(v)} against {_short(v0)}), which is not a "
+                        f"parameter and shapes the shared {sorted(shaped)[0]}: "
+                        "per-pattern starting structures are one model with "
+                        "different values. Give every structure the same "
+                        f"{where}, or make what it shapes per-histogram")
         scaled = set().union(*(set(s) for s in self.value_scales))
         shared0 = {e.path: e.value for e in self.tables[0].entries
                    if self.sharing.is_shared(e.path)}
@@ -1084,6 +1180,19 @@ class MultiParameterTable:
         """The scoped name of ``path`` in histogram ``h`` (bare if shared)."""
         return path if self.sharing.is_shared(path) else f"hist.{h}.{path}"
 
+    def row_names(self) -> list[tuple[str, str]]:
+        """Every row as ``(scoped, bare)``, the two names :meth:`set_vary` matches.
+
+        A shared row is listed once.  ``staged.fixed_at_end`` reads it for the
+        closing stage of a plan that fixes (WP-2208), so that replay matches a
+        glob the way this table does.
+        """
+        out: dict[str, str] = {}
+        for h, table in enumerate(self.tables):
+            for e in table.entries:
+                out.setdefault(self._canonical(h, e.path), e.path)
+        return list(out.items())
+
     def set_vary(self, path_globs: list[str], vary: bool) -> list[str]:
         """Free/fix by glob across every histogram; returns scoped hits.
 
@@ -1477,8 +1586,18 @@ class MultiParameterTable:
         return combined
 
     def apply_to_models(self) -> None:
+        """Each histogram's table into its own model copies.
+
+        A parametric or expression target the coefficients put past its own
+        bounds is written at the bound it crossed (``clamp``): the fit
+        finishes, and ``PARAMETRIC_OUT_OF_RANGE`` reports the value the
+        equation gave it, which this table keeps (WP-1325).
+        """
         for h, table in enumerate(self.tables):
-            table.apply_to_models(self.structures[h], self.instruments[h])
+            targets = {r.target for r in (*self.parametric, *self.expressions)
+                       if h in r.patterns}
+            table.apply_to_models(self.structures[h], self.instruments[h],
+                                  clamp=targets)
 
     def reframe_moments(self) -> list[str]:
         """:meth:`ParameterTable.reframe_moments` per histogram, at a stage start.

@@ -107,9 +107,10 @@ PHASES = ("empty", "opened", "fitted", "forked")
 SHOTS: tuple[Shot, ...] = (
     Shot(
         "empty-state",
-        "The screen with no project open: the shipped examples, the way out "
-        "to a filesystem browser, and the four-step wizard under them.",
-        selector=".side",
+        "The start screen, with no project open and no recent list yet: New "
+        "project, Open and the two links on the left, the shipped examples on "
+        "the right.",
+        selector=".start",
         when="empty",
     ),
     Shot(
@@ -133,15 +134,29 @@ SHOTS: tuple[Shot, ...] = (
         selector=".plotcol",
     ),
     Shot(
+        "background-tab",
+        "The Background graph tab: the data greyed, the background curve, the "
+        "band it may move in, and the per-term holds under it.",
+        selector=".plotcol",
+        tab="Background",
+    ),
+    Shot(
         "parameters",
-        "The parameter table: the filter box that is the selection, and the "
-        "marks on rows nothing can free.",
+        "The Parameters panel: a band per phase with its space group, the "
+        "cell's held edges folded into one line, and one row per atom.",
         selector=".side",
         tab="Parameters",
     ),
     Shot(
+        "interactive",
+        "The Interactive tab at rest: a slider per value a person adjusts by "
+        "hand, grouped under the instrument and each phase.",
+        selector=".side",
+        tab="Interactive",
+    ),
+    Shot(
         "plan-ladder",
-        "The plan as a ladder — per stage, what it frees and what stays held.",
+        "The plan as a recipe — one row per stage, what it frees and what stays held.",
         selector=".side",
         tab="Plan",
     ),
@@ -165,6 +180,15 @@ SHOTS: tuple[Shot, ...] = (
         "The project as an `.rxt` document, where `@` frees a parameter.",
         selector=".side",
         tab="Text",
+    ),
+    # Last of the fitted pass: it switches the graph strip, and every shot of
+    # the graph column above wants the Pattern tab.
+    Shot(
+        "single-peaks",
+        "The Single peaks graph: three windows on single reflections at the "
+        "last fit's scale.",
+        selector=".plotcol",
+        tab="Single peaks",
     ),
 )
 
@@ -320,14 +344,19 @@ def main() -> int:
     work = Path(tempfile.mkdtemp(prefix="rietx-shots-"))
     httpd = None
     try:
-        httpd, url = _serve(work / "state")
         executable = chromium_path()
-        print(f"serving at {url}")
         print(f"chromium: {executable or 'playwright default'}")
 
         with sync_playwright() as p:
             browser = p.chromium.launch(executable_path=executable or None)
             for theme in THEMES:
+                # A server and a state directory per theme: the empty state's
+                # subject is the absence of a project and of a recent list, and
+                # the light pass leaves both behind it (WP-2131).
+                if httpd is not None:
+                    httpd.shutdown()
+                httpd, url = _serve(work / f"state-{theme}")
+                print(f"serving at {url}")
                 context = browser.new_context(
                     viewport=VIEWPORT, device_scale_factor=2, color_scheme=theme
                 )
@@ -337,7 +366,7 @@ def main() -> int:
                 # session: its subject is the *absence* of a project, so it
                 # cannot be taken after the others.
                 page.goto(url)
-                page.wait_for_selector(".side", timeout=60_000)
+                page.wait_for_selector(".start", timeout=60_000)
                 page.wait_for_timeout(1_200)
                 _set_theme(page, theme)
                 for shot in SHOTS:

@@ -173,6 +173,43 @@ npm --prefix gui test
 - CLAUDE.md FitReport invariant (never a confident wrong singleton) — the
   panel renders abstentions and non-separability as such.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **history and report panels** (WP-1012) are the GUI's read-and-act half, and
+the module that carries them is `report/apply.py` — the *how* beside Layer 2's
+*what*, in a separate file because the two version differently (the vocabulary is
+a contract; the mapping onto verbs changes when a verb arrives). Four rules.
+**An applicable action is one stage**: `stage_for` returns a `StageSpec` and runs
+nothing, so applying a suggestion travels the path the per-stage Run button
+travels — one `run_stage`, one history node, the same 409 — and *undo is a
+`checkout`*, not an inverse verb. **The action's own `parameter_paths` are the
+globs**; `RECIPES` declares only how each `ActionKind` is carried
+out (`stage`, `index` or `advice`, pinned complete against `get_args`), and
+the four advice notes *are* the deliverable — the background-flexibility pair is
+advice because it changes what the background can absorb rather than which
+parameters move, and the statistic that catches the cost (the block projection R²
+behind `BACKGROUND_ABSORPTION`) is not in the report. **Applicability and
+reachability are different questions**: `unreachable` separates a glob matching
+*nothing* (a `preferred_orientation` block not declared) from one whose every match
+is *held*, quoting `held_because`, and `GET /api/report` serves the answer as an
+`apply` arm **parallel to** `suggested_actions` — positional, because a kind is not
+unique — so a button's enabled-ness and the route's willingness to act are one
+answer. And **`expected_delta_chi2` is one number per report, not per action**:
+`build_report` stamps the same figure on every Layer-1-derived action and it bounds
+only the misfit attributed inside the *gated* regions (measured 16.19 predicted
+against 16.33 observed), so the panel prints it once and says what it is. Two
+traps a browser found and jsdom could not: the two `unmatched` kinds are opposite
+diagnoses (an observed peak with no reflection is an impurity; a calculated peak
+with no intensity is what a *mispositioned* model produces at every peak — 15 of
+them read as "unindexed" once), and a `checkout` clears the result server-side
+while `Plot` still holds it, so the panel redraws from the curves route, which
+then sends the pattern alone.
+
 ## Handover log
 
 - **2026-07-29** — created from the v1.0 GUI plan.
