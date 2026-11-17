@@ -63,12 +63,12 @@ What an operator must know, all measured:
   read on `result.parametric`, never the scaled `vars.` rows.  No structure:
   `mode="pawley"`.  It pays only where a pattern cannot see the parameter
   alone (slope esd 0.72-0.76× the line's, minor phase); elsewhere it equals
-  the line (`rx.fit_trajectory(series, path, expr, variables)`), and a shared instrument cut the esd 2.6×.  `result.parametric_form`
+  the line, and a shared instrument cut the esd 2.6×.  `result.parametric_form`
   tests the form its esd assumes.  A minor phase stalls a quadratic at
   `max_iter`. **A coefficient no stage frees keeps its start,
   `vary` False, no code**: `mccusker_default` frees scales, background,
   zero, cell, U-Y. *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104;
-  WP-2101; WP-2106.)*
+  WP-2101.)*
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early
   stages conditioned from a *poor* starting model; a converged neighbour is not
