@@ -1,9 +1,8 @@
 # WP-1946 — a strain block that cannot leave its cone
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🛑 2026-11-17 — no sum-of-squares form reaches the bar: brucite's physical optimum sits on the cone's edge
 Track: What fires, and what stays silent
 Depends on: 1938 (LM the default driver, and the measurement below); 1467 (the clamp's messages; closed 2026-11-02)
-Priority: P3 2026-10-11 — no quoted number rests on the scatter it removes, since brucite's S_HKL are declared unquotable; 1938 landed (#883), so nothing hard blocks it
 
 ## Goal
 
@@ -114,13 +113,15 @@ all 0 of 43 reflections outside the cone) and matters under TRF
       TRF 7.803376-7.926666 (1.6e-2). No sum-of-squares form comes near the
       1e-9 bar: 1.8e-4 for the general form and 2.8e-2 for a four-parameter
       -3m1 form. Numbers in the 2026-11-17 handover entry.*
-- [ ] Decide from the prototype: adopt it, or close 🛑 with the numbers.
-- [ ] If adopted: the parameter rows and their seed, S_HKL reported with
+- [x] Decide from the prototype: adopt it, or close 🛑 with the numbers.
+      *Closed 🛑 2026-11-17: the 2026-11-17 handover entry has the numbers.*
+- [ ] ~~If adopted: the parameter rows and their seed, S_HKL reported with
       full-covariance esds, the manual's Part 2 equation with its `*Source:*`
       line, a `test_cross_backend.py` config for the new derivative path, and
-      tests plus obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: the `STEPHENS_STRAIN_NOT_POSITIVE` and `CONSTRAINT_ACTIVE` rows,
-      if the default driver no longer builds a cone.
+      tests plus obs/calc/diff PNGs to `tests/output/`.~~ **Not adopted.**
+- [ ] ~~Skill: the `STEPHENS_STRAIN_NOT_POSITIVE` and `CONSTRAINT_ACTIVE` rows,
+      if the default driver no longer builds a cone.~~ **Not reached**: the
+      default driver still builds its cone.
 
 ## Acceptance
 
@@ -143,6 +144,88 @@ spread under 1e-9, the bar of WP-1938's grid, with no cone inequality built.
 - Coelho, A. A. TOPAS-Academic V5 Technical Reference, §4.2 and §7.23.
 
 ## Handover log
+
+- **2026-11-17** — closed 🛑. Writing the strain variance as a sum of squares
+  does reach every Laue class's physical set, and one argument proves it for all
+  classes at once. It fails as a refinement on brucite, for two reasons. Every
+  form that reaches the set has directions that move nothing, except in the
+  triclinic class. And brucite's best physical answer sits on the edge of the
+  set, where a sum-of-squares form loses its derivative, so the cone's edge
+  comes back through the parametrisation. Five starts 1e-14 apart spread by
+  1.8e-4 and 2.8e-2, against the 1e-9 bar and today's default driver's 8.1e-4.
+  The search also found that the default driver's cone holds only at the fitted
+  reflections. Its brucite answer is negative on about 1 % of directions between
+  them, and the manual now says so.
+
+  *Done.* Inherited pruned on arrival. The platform split (WP-1930) is answered
+  without a second platform: on macOS alone, five starts 1e-14 apart put TRF's
+  brucite Rwp anywhere in 0.18042-0.18184. That is rounding choosing between
+  minima (the 1e-14 rule). `docs/VALIDATION.md` already quotes the current
+  values. The joint-fit seed finding is folded into Context and filed as
+  yue-here/rietx#1663, since it outlives this WP. New
+  `examples/probe_stephens_sos.py`, outside the package, holds the symmetry
+  argument (docstring), the per-class table (`--classes`) and the brucite forms
+  (`--forms`). Manual `theory/microstructure.md` § The positivity cone now
+  says that the LM rows and the guard read the fitted reflections only. WP-1318
+  inherits that finding, since a render is where a negative lobe would show.
+  PR #1662.
+
+  *Symmetry* (task 1). S(L) = R̄·π(L·Lᵀ), with R̄ the group average of the
+  monomial action and π the Gram-to-quartic map. Its image is a class's
+  non-negative cone, exactly. Each π(L·Lᵀ)∘g is non-negative, so their average
+  is, and it is invariant. Conversely, an invariant non-negative quartic is a
+  sum of three squares (Hilbert), and R̄ fixes it. So no per-class proof is
+  needed, and the map is the same expression in every class. Measured per class
+  (`--classes`): the Jacobian has rank m at a random L in all twelve
+  representatives, the image is in the allowed span (≤ 6e-16) and is
+  non-negative. Flat directions (directions that move nothing) number
+  15 − m for a lower-trapezoidal L, so 0 for -1 and up to 13 for cubic. For a
+  Gram matrix restricted to the invariant family (c parameters) they number
+  c − m, between 1 and 6, never 0.
+
+  *Measured* (macOS arm64, `[dev]`, `src` at `7b761b54d`; brucite + block, five
+  starts 1e-14 apart, LM, cone rows off):
+
+  | form | χ²_red | spread | note |
+  |---|---|---|---|
+  | default LM, cone rows on (today's main) | 7.888124-7.894550 | 8.1e-4 | Rwp 0.18140-0.18147 |
+  | default TRF (today's main) | 7.803376-7.926666 | 1.6e-2 | Rwp 0.18042-0.18184 |
+  | general form, seed axis along c* | 9.548344 | 1.3e-9 | never leaves the seed: stage `no_descent` |
+  | general form, turned seed frame | 7.910398-7.911858 | 1.8e-4 | 2 stages at max_iter, every start |
+  | -3m1 form, 4 parameters | 7.903063-8.126565 | 2.8e-2 | c, d → 0 |
+
+  Every start of every form reports `FLAT_DIRECTION` and `HIGH_CORRELATION`.
+  The axis-seeded general form has five columns with no true derivative at the
+  seed, where the group average cancels it. They read as rounding noise, about
+  1e-8 of the others. The step's column equilibration promotes that noise to
+  full directions, so every trial step fails. The four-parameter -3m1 form is
+  p = (a·r² + b·z²)² + |c·E₁ + d·E₂|². It reaches 200 random members of the
+  -3m1 cone to 3e-16, so its own reach is not the problem. On brucite c and d
+  go to 0, and a ≈ 73, b ≈ −2026. So the best non-negative quartic is the
+  rank-one (a·r² + b·z²)², which is zero on a real cone of directions
+  (|z|/r ≈ 0.19). At that point c's and d's columns vanish. No reparametrisation
+  of the same model gives LM a regular minimum there.
+
+  The default LM's answer is outside the true cone. Sampling 200 000 random
+  directions in hkl at each of the five LM answers, σ² is negative on
+  0.96-1.38 % of them, down to −2514 in units of (1 ppm)²·M², while all 43 fitted reflections are
+  ≥ 0. The best sum-of-squares answers cost χ²_red +0.015 to +0.022 over it, which is
+  the price of the true cone.
+
+  *Gotchas.* A seed with zero slots puts an exactly flat column into LM, and the
+  equilibration turns its noise into a direction. Any future nonlinear block
+  seeded at a symmetric point meets the same trap.
+
+  *Review.* A read-only review of the branch was still running at the pause; its findings land in the next commit.
+
+  *Generality.* No flag, threshold, default or automatic action is added. The
+  probe is outside the package, and the manual edit corrects a sentence. No
+  `_audit.py` row; the judge was not dispatched.
+
+  *Next.* None for this WP. yue-here/rietx#1663 (a joint fit never seeds the
+  block) is the one leftover. A per-class flat-free form, as for -1 or a cubic
+  two-ray sum, was not tried: brucite's optimum on the cone's edge would defeat
+  it the same way.
 
 - **2026-10-11** — created from WP-1938's decision D9: the maintainer chose
   a recorded exception there and this WP for the formulation. No open WP owns a

@@ -61,6 +61,15 @@ propagation is done properly, absent otherwise, never a diagonal shortcut.
   surface is `TextureBasis.evaluate` on those directions, which
   `CompiledModel.texture_summary` already calls. A strain render reuses the
   sampler.
+- **2026-11-17, from WP-1946 (closed 🛑):** a negative lobe can reach the
+  picture under the default driver too. LM's cone rows and
+  `STEPHENS_STRAIN_NOT_POSITIVE` both read the fitted reflections only, so
+  Context's "or the lm-solver constraint prevents" holds at those
+  reflections and not between them. At LM's answer on round-robin brucite
+  the quartic is negative on about 1 % of sampled directions, none of them a
+  fitted reflection, and no diagnostic says so. The render is then the first
+  place a user sees it, so draw it as the Context asks. How it was measured
+  is in WP-1946's handover entry of that date.
 
 ## Non-goals
 
