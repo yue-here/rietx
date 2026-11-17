@@ -243,7 +243,7 @@ indices int32, so a browser reads each array without copying it.
 | Route | Is |
 |---|---|
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
-| `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
+| `GET /api/project` · `POST /api/project` | the project document; a merge into its settings. The document carries `data_diagnostics` and `history_diagnostics`, what the pattern reader and the history reader repaired or assumed when this session read the project (a reversed scan, a declared range restored or left off), as diagnostics with `code`, `level`, `message` and `where`; empty for a project that needed nothing |
 | `POST /api/project/save` | write the settings file |
 | `POST /api/project/copy` | copy the `.rex` folder, history included, to a `directory` under a `name`; the session stays on the original |
 | `POST /api/project/rename` · `POST /api/project/move` | rename the folder in place; move it into another `directory` |
