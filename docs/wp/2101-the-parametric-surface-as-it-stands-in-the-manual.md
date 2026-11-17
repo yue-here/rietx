@@ -92,8 +92,12 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [x] `reference/parametric.md`: one table of the target kinds accepted. *Done
   2026-11-15:* § Targets, with an executing block asserting every kind and five
   refusals.
-- [ ] Document the held-slope trap where a reader meets it, in `guides/equation.md`.
-  Decide whether it also earns a diagnostic, under Rule 1 of DESIGN.md.
+- [x] Document the held-slope trap where a reader meets it, in `guides/equation.md`.
+  *Done 2026-11-17:* § Check that every coefficient refined, with the plan-reach
+  sibling beside it, both executed by `examples/guides/equation.py`.
+- [ ] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
+  diagnostic changes what a fit prints, so the maintainer rules first (handover entry
+  2026-11-17 has the brief).
 - [ ] A worked `design` scan over a held scalar, in `examples/`, included into
   `guides/equation.md`, with its missing esd stated.
 - [ ] The refusal message names `.parameters()`.
