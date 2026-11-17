@@ -39,11 +39,6 @@ from .plan import StageSpec as _StageSpec
 from .results import Statistics
 from .structure import Structure
 
-#: what a ``Stage`` runs when its partition settings are not given, read off
-#: the mirror so a retuned default cannot drop a keyword ``api_call`` needs
-_STAGE_LEBAIL_CYCLES = _StageSpec.model_fields["lebail_cycles"].default
-_STAGE_LEBAIL_TOL = _StageSpec.model_fields["lebail_tol"].default
-
 #: What produced a node.  **Every member is committed by some verb** — a
 #: vocabulary is a claim about what the package does, and one member is not a
 #: reservation for later.  It carried a ``"lebail_update"`` until WP-1076 that
@@ -173,11 +168,13 @@ class NodeAction(Base):
                  ("ftol", self.ftol, None),
                  ("window_slack_deg", self.window_slack_deg, None),
                  # the partition's budget and test, against the Stage's own
-                 # defaults rather than this class's 3 and 0.0, which are an
-                 # old node's (WP-1947): a node that ran other values renders
-                 # a call that runs them
-                 ("lebail_cycles", self.lebail_cycles, _STAGE_LEBAIL_CYCLES),
-                 ("lebail_tol", self.lebail_tol, _STAGE_LEBAIL_TOL),
+                 # defaults, read off its mirror, rather than this class's 3
+                 # and 0.0, which are an old node's (WP-1947): a node that ran
+                 # other values renders a call that runs them
+                 ("lebail_cycles", self.lebail_cycles,
+                  _StageSpec.model_fields["lebail_cycles"].default),
+                 ("lebail_tol", self.lebail_tol,
+                  _StageSpec.model_fields["lebail_tol"].default),
                  # the stage's fixes (WP-2208), a stage's own as of that WP
                  ("turn_off", list(self.turn_off), []))
                 if v != off)
