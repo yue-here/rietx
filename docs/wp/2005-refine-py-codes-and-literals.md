@@ -191,7 +191,7 @@ its tier.
      no catchall (ruled 2026-10-21). Alternative: caller, since both inputs are opt-in.
   5. `HOLD_BLOCKED_PLAN` at caller. Grounds: `StageResult.blocked_by_hold`'s caller row; the
      package's one `hold()` call sits under an opt-in flag (`strategy/magnetic.py:1369`).
-  *Measured* (darwin arm64, `.venv` `[dev]`, Python 3.12): FAST_COUNTS.
+  *Measured* (darwin arm64, `.venv` `[dev]`, Python 3.12): fast selection (`-m "not slow"`, `-n auto` through the Mac suite lock): 14 681 passed, 433 skipped, 32 xfailed, 4 errors in 642 s. The 4 errors are `tests/test_gui_dist.py`'s wheel build failing a DNS lookup of pypi.org for hatchling, a network fault; the same four passed on this session's first run (14 684 passed, 1 failed: the silence-pair test, since fixed). The branch adds no test, and 14 685 tests ran both times.
   `tests.reader_output`: unchanged (exit 0). `tests.audit_delta`: exit 0. CI's lint steps as
   CI runs them: ruff clean, `ruff format --check examples/tutorials` clean, Vale 0 errors.
   *Review*: `/code-review` was not run. The diff's only code is table data, and a ghostshift
