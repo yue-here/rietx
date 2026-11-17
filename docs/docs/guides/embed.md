@@ -22,8 +22,8 @@ runs.set_root("/path/to/your/app/cache/runs")
 ```
 
 `RIETX_RUNS_DIR` in the environment does the same, and `runs.set_root` outranks it.
-The directory holds the run directories themselves, as a `telemetry=` path does.
-A relative path is taken against the working directory at the call.
+The directory holds the run directories themselves, as a `telemetry=` path does, so name one used for nothing else.
+A relative path given to `runs.set_root` is taken against the working directory at the call, and a relative `RIETX_RUNS_DIR` against the working directory at each fit.
 `runs.set_root(None)` goes back to the environment, then to the working directory.
 
 The configured directory replaces the working directory's `.rietx/runs` and nothing else:
@@ -37,7 +37,7 @@ The configured directory replaces the working directory's `.rietx/runs` and noth
 | `.rietx/runs` in the working directory | none of the above |
 
 rietx treats the configured directory as its own.
-It creates it, puts a `.gitignore` in it and prunes it by the same rules as the working directory's: over 1 GiB, finished runs older than a week are deleted, oldest first.
+It creates it, puts a `.gitignore` in it if it was empty, and prunes it by the same rules as the working directory's: over 1 GiB, finished runs older than a week are deleted, oldest first.
 To look at the runs, start `rietx watch` with the directory as its argument.
 Started with no argument in a shell where `RIETX_RUNS_DIR` names a directory elsewhere, `rietx watch` prints where a fit started there records.
 

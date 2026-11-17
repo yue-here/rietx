@@ -207,7 +207,7 @@ A fit given `telemetry=` records into the directory it names instead.
 The generated table above gives what each file holds.
 The `.gitignore` holds `*`, so runs stay out of `git status`.
 rietx writes it only into a runs root it chose itself, and leaves a directory named with `telemetry=` alone.
-A directory named for the whole process by `RIETX_RUNS_DIR` or `rietx.runs.set_root` counts as one rietx chose, so it gets the `.gitignore` and the retention below.
+A directory named for the whole process by `RIETX_RUNS_DIR` or `rietx.runs.set_root` counts as one rietx chose, so it gets the retention below, and the `.gitignore` too if it was empty.
 
 Two directories are spelled `.rietx`, and they have nothing to do with each other.
 `$HOME/.rietx` holds the GUI's per-user state: the recent list and the theme.

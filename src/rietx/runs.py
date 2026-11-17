@@ -1115,18 +1115,16 @@ def set_root(path: str | Path | None) -> Path | None:
     themselves, exactly as a ``telemetry=<path>`` does, and is made absolute
     here, so a later change of working directory cannot move it. It is still
     a root rietx chose for the caller (WP-1950): :func:`run_root` creates it,
-    hides it from git and prunes it, where a call's ``telemetry=`` is left
-    alone.
+    hides it from git if it was empty and prunes it, where a call's
+    ``telemetry=`` is left alone.
 
     It moves the root and turns nothing on. ``RIETX_TELEMETRY=0`` still
     records nothing, and a call's ``telemetry=`` and a project's ``live/``
     still win over it (:func:`attach`).
     """
-    global _ROOT, _PRUNED
+    global _ROOT
     was = _ROOT
     _ROOT = None if path is None else Path(os.path.abspath(Path(path).expanduser()))
-    if _ROOT != was:
-        _PRUNED = False         # a new root is pruned once too
     return was
 
 
@@ -1136,12 +1134,14 @@ def configured_root() -> Path | None:
 
     Not created and not checked: :func:`run_root` does that, inside
     :func:`attach`'s guard, so an unwritable one declines a run rather than
-    breaking a fit. An empty variable is unset.
+    breaking a fit. An empty variable is unset, and a relative one is taken
+    against the working directory at each fit, since the variable is read at
+    each fit.
     """
     if _ROOT is not None:
         return _ROOT
     value = os.environ.get(RUNS_DIR_ENV, "").strip()
-    return Path(value).expanduser() if value else None
+    return Path(os.path.abspath(Path(value).expanduser())) if value else None
 
 
 def run_root(base: str | Path | None = None) -> Path:
@@ -1157,17 +1157,24 @@ def run_root(base: str | Path | None = None) -> Path:
     wants that directory bounded): a caller who passed ``telemetry=`` named
     their own directory, and neither writing an ignore file into it nor
     deleting anything out of it is a decision this package gets to make there.
+
+    A configured root gets the ignore file only when it starts out empty or
+    absent. ``RIETX_RUNS_DIR=.`` names a directory that holds other things,
+    and a ``*`` there would hide all of them from git; ``.rietx/runs`` is
+    always this package's alone. Pruning needs no such care, its guards
+    deleting only what a recorder wrote.
     """
-    global _PRUNED
     configured = configured_root() if base is None else None
     root = (configured if configured is not None
             else (Path.cwd() if base is None else Path(base)) / STATE_DIR_NAME / RUNS_DIR_NAME)
+    ours = configured is None or not root.exists() or not any(root.iterdir())
     root.mkdir(parents=True, exist_ok=True)
     marker = root / GITIGNORE_FILE
-    if not marker.exists():
+    if ours and not marker.exists():
         marker.write_text("*\n", encoding="utf-8")
-    if not _PRUNED:
-        _PRUNED = True
+    key = os.path.abspath(root)
+    if key not in _PRUNED:
+        _PRUNED.add(key)
         try:
             prune(root)
         except Exception:      # retention is telemetry; it breaks no fit
@@ -1889,12 +1896,14 @@ def _guarded_rmtree(child: Path, root: Path) -> bool:
     return True
 
 
-#: Has this process already pruned its derived root? Once, not once per fit: a
-#: batch of two hundred candidates in one process should pay the walk once.
+#: The roots this process has already pruned (absolute paths): each once, not
+#: once per fit, since a batch of two hundred candidates in one process should
+#: pay the walk once. A set rather than a flag since WP-1950, because a
+#: configured root can change mid-process and a new one is owed its walk.
 #: Measured on ``[dev]`` / macOS arm64 over six-file run directories: 0.2 ms at
 #: 10 runs, 2.2 ms at 100, 27.6 ms at 1000 (197 MB) — so the walk stays under a
 #: tenth of a second right up to the ceiling, and a fit pays it once.
-_PRUNED = False
+_PRUNED: set[str] = set()
 
 
 #: Marks a stream as already carrying a recorder. One job is one run directory,

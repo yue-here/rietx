@@ -69,7 +69,7 @@ def recording(monkeypatch):
     monkeypatch.delenv(RUNS_DIR_ENV, raising=False)
     was = runs.set_enabled(True)
     root_was = runs.set_root(None)
-    runs._PRUNED = False
+    runs._PRUNED.clear()
     runs._WARNED = False
     try:
         yield
@@ -1368,21 +1368,48 @@ def test_a_process_root_it_cannot_create_declines_and_the_fit_still_returns(
     assert not (tmp_path / STATE_DIR_NAME).exists()
 
 
-def test_the_process_root_is_pruned_once_and_a_new_one_again(
+def test_each_root_is_pruned_once_however_it_was_named(
         tmp_path, monkeypatch, recording):
     """Retention keeps working under the configured root (WP-1403's rules,
-    guards and all, live in ``prune``), and a root changed mid-process is a
-    root not yet pruned."""
+    guards and all, live in ``prune``), and a root changed mid-process, by
+    the call or by the variable, is a root not yet pruned."""
     pruned: list[Path] = []
     monkeypatch.setattr(runs, "prune", lambda root, **kw: pruned.append(root))
-    first, second = tmp_path / "a", tmp_path / "b"
+    first, second, third = tmp_path / "a", tmp_path / "b", tmp_path / "c"
 
     runs.set_root(first)
     assert runs.run_root() == first
     assert runs.run_root() == first
     runs.set_root(second)
     assert runs.run_root() == second
-    assert pruned == [first, second]
+    runs.set_root(None)
+    monkeypatch.setenv(RUNS_DIR_ENV, str(third))
+    assert runs.run_root() == third
+    runs.set_root(first)
+    assert runs.run_root() == first
+    assert pruned == [first, second, third]
+
+
+def test_a_relative_variable_is_the_working_directory_at_the_fit(
+        tmp_path, monkeypatch, recording):
+    monkeypatch.setenv(RUNS_DIR_ENV, "runs-here")
+    monkeypatch.chdir(tmp_path)
+    assert runs.configured_root() == tmp_path / "runs-here"
+
+
+def test_a_configured_root_that_holds_other_things_is_not_hidden_from_git(
+        tmp_path, monkeypatch, recording):
+    """``RIETX_RUNS_DIR=.`` in a repository must not ignore the repository.
+    The ignore file goes only into a root that starts out empty."""
+    shared, fresh = tmp_path / "shared", tmp_path / "fresh"
+    shared.mkdir()
+    (shared / "notes.txt").write_text("the user's\n", encoding="utf-8")
+    runs.set_root(shared)
+    runs.run_root()
+    assert not (shared / runs.GITIGNORE_FILE).exists()
+    runs.set_root(fresh)
+    runs.run_root()
+    assert (fresh / runs.GITIGNORE_FILE).is_file()
 
 
 def test_watch_names_a_process_root_it_is_not_scanning(tmp_path, monkeypatch,
@@ -1393,8 +1420,14 @@ def test_watch_names_a_process_root_it_is_not_scanning(tmp_path, monkeypatch,
 
     work = tmp_path / "work"
     work.mkdir()
-    assert _configured_root_elsewhere(work.resolve()) is None
+    here = work.resolve()
+    assert _configured_root_elsewhere(here) is None
     monkeypatch.setenv(RUNS_DIR_ENV, str(tmp_path / "cache"))
-    assert _configured_root_elsewhere(work.resolve()) == tmp_path / "cache"
-    monkeypatch.setenv(RUNS_DIR_ENV, str(work / "inside"))
-    assert _configured_root_elsewhere(work.resolve()) is None
+    assert _configured_root_elsewhere(here) == tmp_path / "cache"
+    # what the scan lists: the directory itself and its own .rietx/runs
+    for listed in (work, work / STATE_DIR_NAME / RUNS_DIR_NAME):
+        monkeypatch.setenv(RUNS_DIR_ENV, str(listed))
+        assert _configured_root_elsewhere(here) is None
+    # under a dot-directory the scan never enters, so it is named
+    monkeypatch.setenv(RUNS_DIR_ENV, str(work / ".myapp" / "runs"))
+    assert _configured_root_elsewhere(here) == work / ".myapp" / "runs"

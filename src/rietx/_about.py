@@ -84,11 +84,12 @@ RUNS_DIR_NAME = "runs"
 #: Names the directory every fit in this process records its run into, in
 #: place of ``<working directory>/.rietx/runs`` (WP-1950, issue #893). The
 #: directory holds run directories itself, as a ``telemetry=<path>`` does,
-#: and is treated as the root rietx chose: created, given a ``.gitignore`` and
-#: pruned. ``runs.set_root`` is the in-process twin and outranks it. It moves
-#: the root and turns nothing on: :data:`TELEMETRY_ENV` still outranks it, and
-#: a call's ``telemetry=`` and a project's ``live/`` still win over it. For an
-#: application whose working directory is the user's home or its own bundle.
+#: and is treated as the root rietx chose: created, pruned, and given a
+#: ``.gitignore`` if it starts out empty. ``runs.set_root`` is the in-process
+#: twin and outranks it. It moves the root and turns nothing on:
+#: :data:`TELEMETRY_ENV` still outranks it, and a call's ``telemetry=`` and a
+#: project's ``live/`` still win over it. For an application whose working
+#: directory is the user's home or its own bundle.
 RUNS_DIR_ENV = "RIETX_RUNS_DIR"
 
 #: Where the GUI offers to put a *new* project, under ``$HOME``.  Not hidden and

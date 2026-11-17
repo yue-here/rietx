@@ -106,7 +106,7 @@ An exception raised in your function stops the fit, since the function is yours.
 | `telemetry="/some/dir"` on a call | records, into the directory you name |
 | `RIETX_RUNS_DIR=/some/dir` or `rietx.runs.set_root("/some/dir")` | records, every fit in the process, into the directory you name |
 
-The environment setting wins over `telemetry=`.
+`RIETX_TELEMETRY=0` wins over `telemetry=`.
 Only `rietx.runs.set_enabled(True)` turns recording back on in a process started with `RIETX_TELEMETRY=0`.
 A run that is not recorded can't be watched, and has no stop button.
 Where an application sets these once for itself is in [How to embed rietx in an application](embed.md).

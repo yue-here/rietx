@@ -65,7 +65,7 @@ import urllib.parse
 from pathlib import Path
 
 from .. import runs as runs_mod
-from .._about import DIST_NAME, PROJECT_SUFFIX
+from .._about import DIST_NAME, PROJECT_SUFFIX, RUNS_DIR_NAME, STATE_DIR_NAME
 from ..viz import theme as theme_mod
 from ..viz.chart import CHART_DIR, CHART_FILES
 
@@ -810,16 +810,23 @@ def _configured_root_elsewhere(directory: Path) -> Path | None:
     than the default moving: a project in the working directory still
     records into its own ``live/``, and silently swapping which directory is
     scanned would hide those.
+
+    Quiet only where the scan is sure to list the root: the directory itself,
+    or its ``.rietx/runs``. Anywhere else under it may sit below a dotted or
+    pruned directory, or past the depth bound, which ``discover`` never
+    enters, so the line is printed. A root that cannot even be resolved is
+    no reason to stop a viewer, and prints nothing.
     """
-    root = runs_mod.configured_root()
-    if root is None:
-        return None
-    root = Path(os.path.abspath(root))
     try:
-        root.resolve().relative_to(directory)
-    except ValueError:
-        return root
-    return None
+        root = runs_mod.configured_root()
+        if root is None:
+            return None
+        resolved = root.resolve()
+    except (RuntimeError, OSError):
+        return None
+    if resolved in (directory, directory / STATE_DIR_NAME / RUNS_DIR_NAME):
+        return None
+    return root
 
 
 def serve(directory: str | Path | None = None, *, port: int = 8899,
