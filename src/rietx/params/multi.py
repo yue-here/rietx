@@ -1139,18 +1139,39 @@ class MultiParameterTable:
             out.update(self._canonical(h, p) for h in hit for p in r.paths
                        if p not in self._fixed_variables)
         # a caller's tie onto a variable is the same shape (WP-2103): its
-        # target is a tied row the glob alone would skip
-        for target, spec in self.user_ties.items():
-            reads = [p.split(".", 2)[2] if p.startswith("hist.") else p
-                     for p in spec.sources]
-            for h, t in self.places(target, every=True):
-                if not any(fnmatch.fnmatchcase(name, g)
-                           for name in (t, f"hist.{h}.{t}", target)
-                           for g in path_globs):
-                    continue
-                out.update(self._canonical(h, p) for p in reads
-                           if is_variable_path(p) and p not in self._fixed_variables)
+        # target is a tied row the glob alone would skip.  A held one frees
+        # nothing: the hold is on the row, and the variable is what moves it
+        for h, t, variables in self._user_tie_reach(path_globs):
+            if not self._entry(h, t).held:
+                out.update(variables)
         return out
+
+    def _user_tie_reach(self, path_globs: list[str]):
+        """``(h, path, variables)`` for each place of a caller's tie a glob reaches.
+
+        ``variables`` are the joint names of the variables the tie reads that
+        reaching it would free (bar one declared ``vary=False``); a tie that
+        reads none is left out, since reaching it frees nothing.
+        """
+        for target, spec in self.user_ties.items():
+            reads = [_unscoped(p) for p in spec.sources]
+            free = [p for p in reads
+                    if is_variable_path(p) and p not in self._fixed_variables]
+            if not free:
+                continue
+            for h, t in self.places(target, every=True):
+                if any(fnmatch.fnmatchcase(name, g)
+                       for name in (t, f"hist.{h}.{t}", target)
+                       for g in path_globs):
+                    yield h, t, [self._canonical(h, p) for p in free]
+
+    def _user_tie_at(self, h: int, path: str) -> tuple[str, TieSpec] | None:
+        """The caller's tie declared on histogram ``h``'s ``path``, under
+        whichever spelling it was declared (bare or ``hist.<h>.``), or None."""
+        for name, spec in self.user_ties.items():
+            if (h, path) in self.places(name, every=True):
+                return name, spec
+        return None
 
     def variable_rows(self, r) -> list[str]:
         """The joint rows of a declaration's coefficients or variables, in order.
@@ -1282,6 +1303,26 @@ class MultiParameterTable:
                 if any(fnmatch.fnmatchcase(canon, g)
                        or fnmatch.fnmatchcase(e.path, g) for g in path_globs):
                     blocked[canon] = None
+        # a held row the caller tied onto a variable: the glob would have
+        # freed the variable, and the hold kept it fixed.  Not when the
+        # variable is freed another way (a glob naming it, or an unheld row
+        # tied onto it), since then the held row moves with it
+        held_ties = [(h, t, v) for h, t, v in self._user_tie_reach(path_globs)
+                     if self._entry(h, t).held]
+        if held_ties:
+            coupled = self._parametric_reached(path_globs)
+
+            def freed(var: str) -> bool:
+                where = self.places(var, every=True)
+                named = any(fnmatch.fnmatchcase(var, g)
+                            or fnmatch.fnmatchcase(_unscoped(var), g)
+                            for g in path_globs)
+                return ((var in coupled or named)
+                        and not any(self._entry(k, p).held for k, p in where))
+
+            for h, t, variables in held_ties:
+                if not any(freed(v) for v in variables):
+                    blocked[self._canonical(h, t)] = None
         return sorted(blocked)
 
     # -- the caller's steering (WP-2103) --------------------------------
@@ -1357,11 +1398,11 @@ class MultiParameterTable:
         for name, value in values.items():
             for h, path in self.places(name):
                 e = self._entry(h, path)
-                spec = self.user_ties.get(name)
-                if spec is not None and spec.expression is not None:
+                declared = self._user_tie_at(h, path)
+                if declared is not None and declared[1].expression is not None:
                     raise ValueError(
-                        f"{name!r} follows {spec.describe()} (a user tie); set "
-                        "the variables it reads instead")
+                        f"{name!r} follows {declared[1].describe()} (a user tie); "
+                        "set the variables it reads instead")
                 if e.locked:
                     raise ValueError(
                         f"{name!r} is structurally fixed (symmetry, or a "
@@ -1479,6 +1520,8 @@ class MultiParameterTable:
                 if s not in self.tables[h]._paths:
                     raise ValueError(f"unknown parameter path {source!r} in "
                                      f"pattern {h}")
+            if s == t:
+                raise ValueError(f"{target!r} cannot be tied to itself")
             if self.sharing.is_shared(t) and not self.sharing.is_shared(s):
                 raise ValueError(
                     f"{target!r} is shared and {source!r} is a row per pattern, "
@@ -1490,9 +1533,9 @@ class MultiParameterTable:
 
     def _check_target(self, name: str, h: int, path: str) -> None:
         e = self._entry(h, path)
-        spec = self.user_ties.get(name)
-        if spec is not None:
-            raise ValueError(f"{name!r} already follows {spec.describe()} "
+        declared = self._user_tie_at(h, path)
+        if declared is not None:
+            raise ValueError(f"{name!r} already follows {declared[1].describe()} "
                              "(a user tie); untie it first")
         if e.locked:
             raise ValueError(f"{name!r} is structurally fixed (symmetry, or a "
@@ -1614,6 +1657,19 @@ class MultiParameterTable:
                     f"{target!r} is stored in each pattern's own units (a size "
                     "across wavelengths, WP-1131), which a formula cannot "
                     "follow; tie it linearly")
+            # a caller's tie reading the target would become the formula's
+            # locked follower, a tie neither untie nor the register could name
+            i = table._paths[t]
+            for f in table.entries:
+                if f.tie is None or f.path == t:
+                    continue
+                terms, _ = table._flatten(f.tie, (f.path,))
+                declared = self._user_tie_at(h, f.path)
+                if declared is not None and any(j == i for j, _ in terms):
+                    raise ValueError(
+                        f"{declared[0]!r} follows it (a user tie), so a formula "
+                        f"on {target!r} would lock that row with it; untie "
+                        f"{declared[0]!r} first, or tie it to the formula too")
             missing = [n for n in expr.names if f"vars.{n}" not in table._paths]
             if missing:
                 raise ValueError(
@@ -1661,34 +1717,73 @@ class MultiParameterTable:
         """Release the caller's linear ties; returns the joint names released.
 
         Globs match the declared ties only, so symmetry and a parametric
-        equation are never reached.  A literal that is not a user tie is
-        refused with the reason.  An untied row comes back **fixed** at the
+        equation are never reached: a declared name by its joint name or its
+        bare path, as :meth:`unhold` matches, and a bare tie of a row per
+        pattern in the patterns a ``hist.<h>.`` glob names (the others keep
+        theirs, declared scoped).  A literal that is not a user tie is
+        refused with the reason, and nothing is released unless all is.  An untied row comes back **fixed** at the
         value its tie last gave it.  A formula tie is refused: a joint fit's
         tables cannot take a formula back, so build the fit again without it.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
-        hits = [n for n in self.user_ties
-                if any(fnmatch.fnmatchcase(n, g) for g in globs)]
+
+        # a declared name matches as ``unhold`` matches one: by its joint name
+        # or its bare path, so a tie declared per pattern is released by the
+        # bare path too
+        def reached(n: str, g: str) -> bool:
+            return fnmatch.fnmatchcase(n, g) or fnmatch.fnmatchcase(_unscoped(n), g)
+
+        hits = [n for n in self.user_ties if any(reached(n, g) for g in globs)]
+        # and a bare tie of a row per pattern is released in the patterns a
+        # scoped glob names, the other patterns keeping theirs, declared scoped
+        part: dict[str, list[int]] = {}
+        for n in self.user_ties:
+            if n in hits or n.startswith("hist."):
+                continue
+            hs = [h for h, t in self.places(n, every=True)
+                  if not self.sharing.is_shared(t)
+                  and any(fnmatch.fnmatchcase(f"hist.{h}.{t}", g) for g in globs)]
+            if hs:
+                part[n] = hs
+        released = [*hits, *(f"hist.{h}.{n}" for n, hs in part.items() for h in hs)]
         for glob in globs:
-            if not is_literal_path(glob) or glob in hits:
+            if not is_literal_path(glob) or glob in released or any(
+                    reached(n, glob) for n in hits):
                 continue
             self._refuse_unknown_literals([glob])
             raise ValueError(f"{glob!r} is not tied by this refinement; a tie "
                              "symmetry or a parametric equation holds is not "
                              "the caller's to release")
-        formula = [n for n in hits if self.user_ties[n].expression is not None]
+        formula = [n for n in (*hits, *part) if self.user_ties[n].expression is not None]
         if formula:
             raise ValueError(
                 f"{formula[0]!r} follows a formula, which a joint fit's tables "
                 "cannot take back; build the MultiHistogramRefinement again "
                 "without that tie")
-        for name in hits:
-            for h, path in self.places(name, every=True):
-                self.tables[h].set_tie(path, None)
-            del self.user_ties[name]
-        if hits:
+        where = [(n, h, t) for n in hits for h, t in self.places(n, every=True)]
+        where += [(n, h, n) for n, hs in part.items() for h in hs]
+        for n, h, t in where:
+            if self._entry(h, t).locked:
+                raise ValueError(
+                    f"cannot untie {n!r}: its row in pattern {h} is structurally "
+                    "fixed now, so nothing was released")
+        for _, h, t in where:
+            self.tables[h].set_tie(t, None)
+        kept: dict[str, TieSpec] = {}
+        for n, spec in self.user_ties.items():
+            if n in hits:
+                continue
+            if n in part:
+                kept.update((f"hist.{h}.{t}", spec)
+                            for h, t in self.places(n, every=True)
+                            if h not in part[n])
+            else:
+                kept[n] = spec
+        self.user_ties.clear()
+        self.user_ties.update(kept)
+        if released:
             self._rebuild_columns()
-        return hits
+        return released
 
     def add_variable(self, name: str, param: Parameter) -> str:
         """Add ``vars.<name>`` to every table, a column of the caller's own.
