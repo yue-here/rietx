@@ -99,9 +99,13 @@ all 0 of 43 reflections outside the cone) and matters under TRF
 
 ## Tasks
 
-- [ ] Symmetry: show the group-averaged Gram form reaches each Laue class's
+- [x] Symmetry: show the group-averaged Gram form reaches each Laue class's
       non-negative cone, or find the class where it fails. Write the map
-      L → S_HKL per class.
+      L → S_HKL per class. *Done 2026-11-17: it reaches every class's cone,
+      by one argument for all classes, with S = R̄·π(L·Lᵀ) the map for each
+      (R̄ the group average from the operators). Every class but -1 carries
+      flat directions in that map. Proof, map and per-class counts:
+      `examples/probe_stephens_sos.py --classes`.*
 - [ ] Prototype on brucite outside the package: five starts 1e-14 apart under
       LM with no cone inequality. Compare χ²_red and its spread with WP-1938's
       7.7177-7.7202 and with TRF's 7.636 outside the cone.
