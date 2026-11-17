@@ -3227,7 +3227,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "specimen, and it is no evidence of a mixture. Where the list has enough lines "
             "to determine a cell in a missing system, search it before you draw a "
             "conclusion. Where it has too few, the message says so, and more lines are "
-            "the remedy."
+            "the remedy. Where the list supports no search at all, nothing was searched, "
+            "and INDEX_DATA_INSUFFICIENT says why."
         ),
     ),
     "INDEX_VALIDATION_FAILED": HelpEntry(

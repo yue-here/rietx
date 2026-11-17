@@ -583,7 +583,14 @@ def _in_system_order(systems) -> list[str]:
     side by side list them alike (``DataQualityReport.systems_supported`` is
     sorted by name)."""
     from .engines import SYSTEM_ORDER
-    return [s for s in SYSTEM_ORDER if s in set(systems)]
+    wanted = set(systems)
+    return [s for s in SYSTEM_ORDER if s in wanted]
+
+
+#: the remedies that add usable lines, shared by every message whose fix is a
+#: longer list (``INDEX_DATA_INSUFFICIENT``, ``INDEX_SYSTEMS_NOT_COVERED``)
+_ADD_LINES = ("Extend the 2θ range, count for longer or re-pick with a lower "
+              "PEAK_MIN_HEIGHT_SIGMA")
 
 
 def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
@@ -601,8 +608,7 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
     where_range = [f"2θ {report.two_theta_min:.2f}-{report.two_theta_max:.2f}°"]
 
     if report.abstained_reason is not None:
-        suggestion = ("Extend the 2θ range, count for longer or re-pick with "
-                      "a lower PEAK_MIN_HEIGHT_SIGMA.")
+        suggestion = _ADD_LINES + "."
         # the instrument is named first because it is the cheapest of the
         # remedies: a re-pick, where the others are a new measurement
         # only a fitted list was picked with an instrument; a position list
@@ -633,17 +639,16 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
         # inside assess_peak_list, before any search exists, and a caller may run
         # it with none.  What a run searched is IndexingResult.systems_searched,
         # and INDEX_SYSTEMS_NOT_COVERED is its message.
+        # never empty here: an empty support list is an abstention, the branch above
         supported = _in_system_order(report.systems_supported)
         out.append(Diagnostic(
             level="warning", code="INDEX_PANEL_REDUCED",
             message=(f"The list has {report.n_usable} usable lines, below the "
                      f"{PEAK_MIN_USABLE_LINES} that the classical figures of "
                      f"merit are defined on, so the ranking panel omits: "
-                     f"{absent}. "
-                     + (f"Only {', '.join(supported)} "
-                        f"{'has' if len(supported) == 1 else 'have'} "
-                        if supported else "No crystal system has ")
-                     + f"at least {MIN_LINES_PER_DOF:g} usable lines per "
+                     f"{absent}. Only {', '.join(supported)} "
+                     f"{'has' if len(supported) == 1 else 'have'} "
+                     f"at least {MIN_LINES_PER_DOF:g} usable lines per "
                      "metric degree of freedom, enough to determine a cell."),
             where=where_range,
             suggestion=("Read quality.fom_undefined for the reason each "
@@ -957,9 +962,13 @@ def _not_covered_text(missing: list[str], quality) -> tuple[str, str]:
     fix.  Where the list has :data:`MIN_LINES_PER_DOF` usable lines per metric
     degree of freedom, searching it is the remedy, whatever kept it out (not
     requested, or a budget that never reached it: ``INDEX_BUDGET_EXHAUSTED``
-    names those).  Where it has fewer, the list cannot determine a cell there,
-    and below the scoring bar ``workflow._restrict_to_supported`` drops such a
-    system from the request again on a re-run, so the remedy is more lines.
+    names those).  Where it has fewer, the list cannot determine a cell there
+    (the definition ``systems_supported`` carries), so the remedy is more lines.
+    Below the scoring bar it is also the only remedy, since
+    ``workflow._restrict_to_supported`` drops such a system from the request
+    again on a re-run.  At or above the bar a re-run would search it, and the
+    suggestion still names the line count, because a cell found there is not
+    over-determined.
 
     Both kinds are read off ``quality.systems_supported``, the authority the
     restriction itself reads, so no second record of what was dropped is kept.
@@ -986,14 +995,13 @@ def _not_covered_text(missing: list[str], quality) -> tuple[str, str]:
         parts.append(f"Search {', '.join(searchable)} before you conclude "
                      "anything about the specimen.")
     if short:
-        needs = [f"{s} {math.ceil(MIN_LINES_PER_DOF * METRIC_DOF[s])}"
+        needs = [(s, math.ceil(MIN_LINES_PER_DOF * METRIC_DOF[s]))
                  for s in short]
-        first, rest = needs[0].split(" "), needs[1:]
-        parts.append(f"A cell in {first[0]} needs {first[1]} usable lines"
-                     + "".join(f", in {r}" for r in rest)
-                     + f", and the list has {quality.n_usable}. Extend the 2θ "
-                     "range, count for longer or re-pick with a lower "
-                     "PEAK_MIN_HEIGHT_SIGMA to add lines.")
+        (system, n), rest = needs[0], needs[1:]
+        parts.append(f"A cell in {system} needs {n} usable lines"
+                     + "".join(f", in {s} {k}" for s, k in rest)
+                     + f", and the list has {quality.n_usable}. "
+                     + _ADD_LINES + " to add lines.")
     return message, " ".join(parts)
 
 
