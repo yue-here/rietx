@@ -1,8 +1,7 @@
 # WP-2103 — a joint fit has the verbs a single fit has
 
-Milestone: parametric · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: parametric · Status: ✅ 2026-11-17 — a joint fit holds, ties, sets values and restarts from its answer in one stage (PR #1643; follow-ups #1649)
 Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes)
-Priority: P2 2026-11-04 — a feature the open milestone was opened for: an expert steers a fit by hand, and a joint fit offers them almost nothing to steer with
 
 ## Goal
 
@@ -47,54 +46,6 @@ The seams:
 
 [WP-2081](2081-how-a-series-holds-what-the-setup-fixes.md) is a design discussion about
 the chain, and its answer on what "held" means should govern here. Read it first.
-
-### Inherited
-
-- **From WP-2102 (2026-11-05): the soft dependency is discharged.**
-  `MultiHistogramRefinement.fit` and `.report` read every plan through
-  `resolve_plan`, as `Refinement` does, and `multi.py` no longer imports
-  `PLAN_PRESETS`. A verb added here that takes a plan or a stage calls the same
-  authority, never a preset lookup of its own. `_cheap_joint_plan` and the
-  `plan_and_spec_fits` fixture at the end of `tests/test_multi_histogram.py`
-  give a converged joint fit in about 2 s for a verb's test.
-- **From WP-1964 (2026-11-06): the mirrored WO₃ run is this WP's.** The milestone's
-  WO₃ row asks for the input's own protocol: one B per pattern tied across every atom,
-  and the W coordinates and strains shared as `parametric_06.inp` shares them. That needs
-  the tie this WP gives a joint fit. `docs/wp/1964-measure/wo3_formula.py` runs WP-1325's
-  protocol instead (B held at the chain's, coordinates at TOPAS's, strains per pattern),
-  with arms for the design equations, the same equations as text, θ free and θ pinned.
-  Extend it with the tie rather than writing a second script. On TOPAS's 11 patterns
-  the text arm matched the design arm to 2.9e-8 esd, and θ free went to 9.6 ± 1954 K,
-  so θ is not determined on that protocol. The milestone asks the session that runs the
-  mirrored protocol to set the gate on the gap to TOPAS, which is still unset.
-- **From WP-1964 (2026-11-06): the tie owes the form test a case.** A formula's form
-  test leaves out any pattern where a variable reaches a row no formula writes
-  (`usable` in `multi._parametric_form_tests`), since its recovered column would be
-  wrong there. No joint fit can tie a path onto `vars.X` today, so no test makes that
-  predicate False (generality review, WP-1964's entry). Once the tie lands, add a joint
-  fit with a tie onto `vars.X` beside a formula reading X, and assert that the formula's
-  test drops that pattern.
-- **From WP-2118 (2026-11-07): the joint fit's `tie` takes `expression=` too.** The
-  maintainer ruled on 2026-11-07 that one command serves both kinds of fit. A single
-  refinement now has `Refinement.tie(path, expression="...")`: a formula over named
-  variables only (`vars.<name>`) and numbers, stored as `TieSpec.expression` in the one
-  register of user ties, re-declared after the linear ties on every table build through
-  `ParameterTable.add_expression` (`refine._add_formula` binds each name to `vars.<name>`),
-  and released by `untie`. A formula always runs as a formula, and a linear tie stays on the
-  constant matrix (ruling 3). When this WP gives a joint fit `tie`, give it the same keyword
-  with the same refusals (`tests/test_tie_expression.py` lists them), and say how a
-  per-histogram target meets the formula: once per histogram on each table, as
-  `_install_parametric` does for a `ParametricEquation`. WP-2118 left `multi.py` and
-  `params/multi.py` untouched.
-
-- **From WP-2101 (2026-11-15): WO₃'s one B per pattern spells without the tie.** A
-  formula equation on each site's `biso`, `"<site's B> + b"`, with `vars.b` named in
-  `SharingMap.per_histogram`, gives one refined B per pattern on every site today
-  (`switching/topas.md`'s overall-B block). On a seven-pattern synthetic LaB₆ ramp six
-  patterns returned b within 0.04 Å² of the truth 0, esd 0.10 Å², and the seventh failed
-  the same way with or without the formula (a probe-plan local minimum). So the mirrored
-  WO₃ run may not need this WP's tie. Decide whether it moves out of this WP, and say
-  which spelling the milestone row should judge.
 
 ## Non-goals
 
@@ -164,6 +115,62 @@ rerun from stored values, `load_save_locals`), and the WO₃ protocol of
 - WP-1325 (the joint path), WP-1435 (the hold), WP-1070 (user ties), WP-2081.
 
 ## Handover log
+
+- **2026-11-17** — A joint fit can now be steered by hand the way a single fit is. A
+  person can hold a calibrated setup through every pattern, tie each pattern's sites to one
+  B (WO₃'s protocol) or to a variable of their own, set values, and rerun a converged fit
+  from its answer in one stage, in process or from a result saved to JSON. Nothing a joint
+  fit already did moves: the reader output is unchanged, and the new hold report fires only
+  on a caller's hold. Left for #1649: a joint profile interval, taking a formula tie or a
+  variable back, and the mirrored WO₃ run.
+
+  *Done.* `MultiHistogramRefinement.hold`/`unhold`/`tie`/`tie_equal`/`untie`/`add_variable`/
+  `set_values`/`refit`, each a thin call onto `MultiParameterTable`, which holds the
+  registers (`user_holds`, `user_ties`, `user_variables`), the authority every stage reads.
+  Rows are named as `parameters()` prints them. A bare tie target is tied in every pattern,
+  each to its own source; a source in another pattern, a bare target onto one pattern's row,
+  and a shared target onto a per-pattern source are refused naming `sharing=`. A stage glob
+  reaching a row tied onto a variable frees the variable, as a parametric expression's are
+  freed (`_parametric_reached`), unless it is declared `vary=False`. `_hold_diagnostics`
+  moved from ABSENT to FIT in `multi.py`'s placement table: a joint result now says
+  `HOLD_BLOCKED_PLAN`. `parameters()` marks a caller's tie `user=True`. `refit` runs one
+  stage, `"restart"`, through a private `_RestartPlan` whose stage compiles at the window
+  fraction the answer's last stage ran at, with no closing stage. The WP-1964 inherited case
+  is `test_a_tie_onto_an_expression_variable_drops_that_pattern_from_the_form_test`. The
+  survey is in § Tasks.
+
+  *Measured* (macOS arm64, worktree venv `[dev]`, Python 3.12). The restart bar: 1 iteration,
+  0.0 esd moved, in process and from saved JSON, on the cheap LaB6 pair; a one-stage restart
+  at the default window fraction moved 2.9 esd, which is why `_RestartPlan` exists. Positive
+  arm: `cell.a` set 50 esd off comes back within 3e-5 esd in 4 iterations. Form test on the
+  five-pattern line: 5 patterns, 3 dof untied; 4 and 2 with pattern 4's background tied onto
+  `vars.c0`. `tests/test_joint_verbs.py` is 19 tests, about 6.5 s serial. Related files
+  (multi_histogram, parametric_series, manual_api, multi_diagnostics, audit_table,
+  parametric_expression, joint_report) 410 passed serially before the review fixes. On the
+  workstation (venv rietx-py312, Linux): canary gs2103c 113 passed in 36 s on d60b979bc.
+  Its fast suite was paused for memory beside other jobs and not re-admitted for 20 min, so
+  it ran on the Mac instead (`-n 4`, behind the shared suite lock): 14706 passed, 432 skipped,
+  32 xfailed, 0 failed, on d60b979bc plus this entry. Added tests: 3.5 s in all. ruff clean; Vale 0 errors; `python -m tests.reader_output` exit 0.
+
+  *Review.* A read-only reviewer found three bugs, each fixed with a test that fails on the
+  parent (d60b979bc): a tie on a shared size row ignored the WP-1131 value scales (it is now
+  written in each pattern's units, and a formula on such a row is refused); `unhold` missed
+  per-pattern rows a bare `hold` had held; and a refused formula could stay installed in an
+  earlier pattern's table (every table's refusal is now asked of a copy first).
+
+  *Decisions.* Inherited from WP-2101: the mirrored WO₃ run moves out of this WP to #1649,
+  and which spelling of one B per pattern the milestone row judges (this WP's tie, or
+  WP-2101's formula) is the maintainer's; #1649 recommends the tie. `add_variable` defaults
+  to `vary=True`, unlike `Refinement.add_variable`, matching the constructor's `variables=`
+  rule that a stage frees a variable through the rows it drives.
+
+  *Gotchas.* A joint fit's per-pattern tables are never rebuilt, so the registers stand in
+  for `Refinement._ties` only as the list `untie`/`unhold` read; a formula or a variable
+  cannot be taken back (#1649). `tie_equal` with `hist.*.` raises a plain int-conversion
+  error rather than a worded refusal.
+
+  Next: #1649's three items, the WO₃ decision first, since it sets what the milestone row
+  judges.
 
 - **2026-11-04** — Filed on the opening of the milestone. No open WP owned it: 2081
   discusses the chain, whose surface differs, and 1325's task "Ties and variables reach
