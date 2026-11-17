@@ -90,26 +90,25 @@ differ.
 is in question. A verb that reports must not write: no history node and no
 run directory unless asked, because an evaluation is not a fit.
 
+**Superseded in part, 2026-11-17 (checked at `6f704aaa5`).** The four call
+sites above moved; what changed: `predict` is now `predict(two_theta=None)`, a
+grid or a `PatternData` (`refine.py:6749`), and still refuses Le Bail and
+Pawley before a fit (`:6823`). `reflection_table()` is at `:7233` and reads the
+answer frozen with the result (WP-1421, ✅). The empty stage now runs the
+plan's appended closing stage too: on the synthetic LaB6 it returns
+`converged`, stages `evaluate` and `closing` at 0 iterations, nothing moved,
+no esds, and three history nodes. Under Pawley each of the two stages ran 2
+iterations on the intensity block (19 intensities), not 10. LM is the default
+driver (WP-1938 landed): a freeing stage with `max_iter=0` raises scipy's
+`max_nfev` wording on both drivers, and an empty one with `max_iter=0` is
+still accepted. `cherry_pick` now passes `max_iter` and `lebail_cycles`
+through unchanged, an explicit 0 included (`refine.py:4895`). The
+displacement tick defect is fixed (WP-1908, ✅).
+
 ### Inherited
 
-- **2026-11-06, from the issue triage (issue #1381): the `api.md` row "a
-  reflection table without a fit" is now this WP's alone.** WP-1532 dropped
-  it, so the skill task here writes the row new for the documented call
-  rather than changing an existing one. Nothing under `docs/skill/rietx/`
-  teaches the `run_stage` spelling today (checked at `a84379aac`).
-
-- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: two `lebail_cycles` slips.** A node's `api_call` drops `lebail_cycles` (`schemas/history.py:126-135`), so a stage run with a non-default value renders a call that runs a different stage; this WP's replay already reads `lebail_cycles or 3`. And `rietx.help`'s `lebail_cycles` text, shown on `docs/docs/reference/settings.md`, says Pawley mode ignores it, where `refine.py:3916-3920` uses it to seed the Pawley intensities.
-
-- **2026-10-11, from WP-1938 (PR #883): LM refuses `max_iter=0` now, in
-  scipy's words.** `lm.minimize` raises "`max_nfev` must be None or positive
-  integer." for a budget under one evaluation, on the single and the joint
-  fit (`tests/test_lm_solver.py`, both drivers). So the refusal this WP
-  rewords is the same on either driver. Two findings from that change's
-  review are this WP's. `Refinement.cherry_pick` rebuilds a stage with
-  `max_iter=node.action.max_iter or 100` (`refine.py`, the `Stage(...)` call),
-  so a node recorded with `max_iter=0` replays as 100 iterations, silently;
-  `lebail_cycles or 3` has the same shape. And `Stage.max_iter` has no
-  `ge=1`, so a plan with 0 is stored and fails only mid-fit, after compile.
+*(Pruned 2026-11-17 on arrival; what each entry became is in the handover
+entry of that date.)*
 
 ## Non-goals
 
@@ -120,15 +119,31 @@ run directory unless asked, because an evaluation is not a fit.
 
 ## Tasks
 
-- [ ] Decide the spelling, and record it here as `Decided YYYY-MM-DD:`. One
+- [x] Decide the spelling, and record it here as `Decided YYYY-MM-DD:`. One
       option is a named verb, `Refinement.evaluate(data, mode=...)`,
       returning a `RefinementResult` with no esds, no history node and no
       run directory, and keeping the Le Bail and Pawley extraction. The
       other documents the empty stage as the spelling, with a test pinning
       what its result holds. Read the four call sites above before choosing.
+      **Decided 2026-11-17: the named verb.** The empty stage writes three
+      history nodes and a run directory unless told not to, which the rule
+      above refuses for a verb that reports, and the acceptance asks for none.
+      `Refinement.evaluate(data, *, mode="rietveld", two_theta_limits=None)`
+      runs exactly the empty stage, on the private history-free working tree
+      `Refinement._trial(record=False)` already builds for the package's own
+      discarded fits, with `telemetry=False`. So it returns the object the
+      empty-stage fit returns, by construction rather than by a second
+      implementation, keeps the Le Bail and Pawley extraction, and leaves the
+      caller's values, history, `result_` and compiled model untouched.
+      `reflection_table(data)` takes the same route, so its rows are the
+      empty-stage fit's in every mode. `background(two_theta)` is
+      `predict`'s twin over `CompiledModel.background`: one compile, no fit,
+      no extraction, so it serves Le Bail and Pawley before a fit too.
 - [ ] `max_iter=0`: a refusal rietx owns, naming `max_iter` and the
       evaluation spelling, on both drivers (`ge=1` on the field, or a check
       in the runner). Coordinate with WP-1938 if its LM default has landed.
+      (It has. `Stage.max_iter` still has no lower bound, so a plan holding
+      0 is built and fails only mid-fit, after compile.)
 - [ ] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.
@@ -141,8 +156,14 @@ run directory unless asked, because an evaluation is not a fit.
       as the workaround it replaces.
 - [ ] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
       pattern.
-- [ ] Skill: WP-1532's `api.md` row (a reflection table without a fit)
-      changes to the new call. Nothing else expected.
+- [ ] Skill: the `api.md` row "a reflection table without a fit", written
+      new for the documented call (WP-1532 dropped it, issue #1381; nothing
+      under `docs/skill/rietx/` teaches the `run_stage` spelling). Nothing
+      else expected.
+- [ ] `NodeAction.api_call` renders `lebail_cycles` and `lebail_tol` when
+      they differ from the `Stage` default (from WP-1986): today a stage run
+      with a non-default value renders a call that runs a different stage
+      (`schemas/history.py`, the `extras` tuple).
 
 ## Acceptance
 
