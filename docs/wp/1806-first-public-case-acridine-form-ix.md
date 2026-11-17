@@ -72,7 +72,7 @@ of issue #561, sized M.
   changes text only: the known-answer row's `measured` now quotes the worst
   |Δ|/esd over eight seeds (0.64 to 2.27, median 1.5) against the bound of 4.
   No test, bar or claim moved. Status stays ✅. Entry by a ghostshift close-only
-  runner.
+  runner (PR #1648).
 
 - **2026-11-12** — Part 2 is done and the WP closes. The rigid body on the real
   acridine pattern now has the bar Yue chose: the same model refined with its 14
