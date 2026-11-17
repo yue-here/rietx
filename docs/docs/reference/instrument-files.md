@@ -279,7 +279,7 @@ print(instrument.geometry.goniometer_radius_mm)
 The instrument you pass supplies the source and the geometry kind; the file supplies U, V, W, X and Y, and the radius where it states one.
 The five profile parameters come back with `vary=False`.
 
-The six values are read **by position**, never by the names the file gives them.
+The six values are read by position, never by the names the file gives them.
 Those names are labels, and tutorial inputs call the fourth pair `pkx` in some files and `pkz` in others.
 What each position does was measured against TOPAS 6's own computed pattern:
 
