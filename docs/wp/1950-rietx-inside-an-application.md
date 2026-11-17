@@ -1,6 +1,6 @@
 # WP-1950 — rietx inside an application
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: —
 Priority: P3 2026-10-11 — an application that freezes rietx with PyInstaller and runs it from a user's working directory has a workaround for each step; nothing documents them
