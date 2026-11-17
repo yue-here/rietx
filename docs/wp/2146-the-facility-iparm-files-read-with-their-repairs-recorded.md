@@ -1,6 +1,6 @@
 # WP-2146 — The ISIS iparm files read, with each repair recorded
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by ghostshift MacBook-Air-c4aacd
+Milestone: unscheduled · Status: 🔄 2026-11-17 — (a), (b), (d) and the `.gss` metadata landed (PR #1639); (c) waits on the GSAS Technical Manual, and one reconciliation waits on the maintainer
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (2032 soft, closed: the T-1 readers' last follow-ups; 1927 soft, closed: the T-1 cut)
 Priority: P3 2026-11-15 — a reader with a workaround (edit three columns of the file by hand); no TOF fit consumes the profile on main yet, but facility-written HRPD and POLARIS files are what TOF users bring
@@ -225,6 +225,93 @@ output, so its wording goes to the maintainer before merge.
 - Howieson 2023 (thesis dataset), Collins et al. 2021, *Angew. Chem.*
 
 ## Handover log
+
+- **2026-11-17** — PR #1639. The POLARIS instrument file's two refusals are
+  gone: its unnumbered profile sets read as set 1, and its bank 5's negative
+  sig-2 passes because the variance stays positive over the bank's range. The
+  HRPD file gets past two of its three refusals and still stops at the third,
+  a 14-coefficient type-3 block, because deciding that needs the GSAS
+  Technical Manual, which is not in the corpus. Mantid's per-bank `.gss`
+  line now survives as three metadata keys. Nothing a Rietveld fit prints
+  changed (`tests.reader_output` exit 0).
+  - *Done:* tasks (a), (b), (d), `.gss`, tests, audit/manual/rulebook,
+    skill. Codes `GSAS_IPARM_SET_NUMBER_ASSUMED` (tier 2) and
+    `GSAS_IPARM_TRAILING_ZEROS_READ` (tier 1), both info. (b) covers the
+    last field of every parsed record, since the argument (columns no field
+    claims) is the same on all of them. (d) reads a passing sig-2 as a
+    `Parameter` with `min=-inf`; the schema floor stays.
+  - *Review (`/code-review high --fix`):* 9 findings, 5 fixed in
+    `7c427732c` (a lone unnumbered LANSCE 8-slot block is declined, since
+    the legacy pointer would lead to a reader that refuses it too; the
+    no-window message; a lowercase `d` exponent; the comment scan; a type
+    hint) plus the sig2 help entry. Declined: a fit-time σ² check (no TOF
+    evaluator exists); refusing a duplicated PRCF continuation record (the
+    numbered path has the same behaviour, older than this WP); quoting the
+    file's own key spelling after the lone set is rekeyed as set 1
+    (cosmetic).
+  - *Generality (generality-review agent, sections condensed):*
+    `SET_NUMBER_ASSUMED` **holds** (GSAS-II reads the key, checked; one
+    family, ISIS). `TRAILING_ZEROS_READ` **holds** (arithmetic). sig-2 over
+    the range **weak**: the `I ITYP` window is the range the spectrum was
+    fitted over, and `IncidentSpectrum`'s docstring says nothing clips to
+    it, so it is not proven to be where the bank has data. Author's answer:
+    the WP's 2026-11-15 settlement names that window; the help entry now
+    says which window is checked and tells the user to keep their data
+    inside it; a fit-time check belongs to the TOF evaluator (ROADMAP § v2+,
+    no open WP). Lone function-2/4/5 decline **weak**: one set gets two
+    outcomes depending on column 11. That is the open question below.
+    Mantid metadata **holds** (recorded, never used).
+  - *Measured:* fast selection (`-m "not slow"`), `[dev]` venv, macOS arm64, on this branch merged with origin/main at `c63cc4cb0`: 14699 passed, 433 skipped, 32 xfailed, 1 failed. The failure was `test_the_committed_help_key_fixture_is_current`, which rewrote `tests/data/gui/help_keys.json` for the two new codes; it is committed and the test passes on rerun. 14 tests added (15 cases), 0.04 s together. The GUI vitest did not run here (no `gui/node_modules`, node 24).
+  - *Gotchas:* the real files are not on this machine; downloading them
+    needs the maintainer's yes, so acceptance's "read on a local copy" is
+    not met. `ProfileTOF(sig2=-x)` raises even with an explicit
+    `Parameter` unless `min` is stated on it (issue #204's inherited-bounds
+    rule). io/CLAUDE.md sits at its cap, 575.
+  - *Inherited:* the #1446 follow-ups stay in `### Inherited`, unworked:
+    this session's brief limited the work to the checklist.
+  - *Settled by Claude* (grounds, then the alternative):
+    1. (d)'s no-window case keeps the sign test, under the reader-repair
+       rule (a reader may not invent a range the file does not state).
+       Alternative: take the range from the `.gss` pattern, which this
+       reader never sees.
+    2. A passing sig-2 is handed over without the floor (`min=-inf`) rather
+       than the schema's sig2 floor being dropped for everyone, under
+       smallest-change and the schema's documented door (an explicit
+       `Parameter` keeps its own bounds). Alternative: drop the floor in
+       `ProfileTOF`.
+    3. (b) generalised from CTOF to every record's last field, under the
+       generalise-the-class rule; the one-reading argument is identical.
+       Alternative: CTOF only, as the WP worded it.
+    4. Skill rows added despite the WP's "none expected", under root
+       CLAUDE.md ("a diagnostic code adds its row").
+    5. Metadata key names `total_flight_path_m` (Mantid's "Total flight
+       path"), `two_theta_bank_deg` (mirrors `TOFSource.two_theta_bank_deg`)
+       and `difc_geometric` (measured: it is computed from L and 2θ).
+       Alternative: `difc`, which would read as the calibration.
+  - *Question for the maintainer (two written rules conflict):* a bank's
+    one unnumbered PRCF set of a function rietx does not evaluate (2, 4,
+    5; the GEM fixture of PR #1503 is function 2), or an unnumbered 8-slot
+    type-1 block, is **declined** (calibration read, zero profile, a
+    warning), while a numbered set 1 of the same is **refused** (no banks
+    returned). Task (a) says the lone set *is* set 1, so the two should
+    agree. Declining everywhere keeps every such file's calibration;
+    refusing everywhere would make the GEM file unreadable, as it was before
+    PR #1503. My lean: decline everywhere, since a bank with no PRCF set is
+    already declined that way. The interim keeps the GEM file readable.
+  - *Reader output for review:* the two new codes' messages, e.g.
+    "Bank 1: the PRCF set number in column 11 is blank. The bank holds one
+    set, so it was read as set 1, the default (GSAS Technical Manual
+    p. 223)." and "bank.iparm: record 5 ('INS  1PRCF') writes '0.001000' in
+    columns 26-33, past CTOF (columns 23-32). The columns past CTOF hold
+    only zeros, so CTOF was read as 0.001, the number in its own columns.";
+    `GSAS_IPARM_PROFILE_READ`'s added sentence " sig2 = -1.81041 is
+    negative. The variance stays positive over the bank's range
+    0.108-2.762 Å and turns negative past d = 4.017 Å."
+  - *Next:* (1) the maintainer sends the GSAS Technical Manual PDF
+    (pp. 144, 148, 221-223) and rules on the question above; (2) a session
+    reads it and settles (c), which is the HRPD file's last refusal; (3)
+    read both real files on a local copy once the download is approved;
+    (4) then the #1446 how-to, which needs both files readable.
 
 - **2026-11-15** — created, from the 2026-11-15 issue triage (issue #1447).
   Checked against the tree at `98d7ba8e3`: refusals (b) and (c) reproduce on
