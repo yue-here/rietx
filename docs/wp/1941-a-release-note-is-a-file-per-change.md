@@ -100,7 +100,7 @@ next release's file starts with headings and no bullets.
 - [x] Move the bullets now in the next release's file (`1.8.0.md` on
       2026-10-10) into fragments, or keep that file as the head the fragments are appended under. Choose the one that leaves
       open PRs a single rebase.
-- [ ] `docs/RELEASING.md` step 2: join the fragments, then edit the result as
+- [x] `docs/RELEASING.md` step 2: join the fragments, then edit the result as
       a reader's document.
 - [ ] ROADMAP rule 6 says a change stages its note as a new fragment file,
       and CONTRIBUTING.md gains the same sentence for contributors.

@@ -52,6 +52,13 @@ which is the backlog this rule exists to prevent.
    so it is written for a reader upgrading, not for a maintainer. The
    precedents are [1.0.0](releases/1.0.0.md), a milestone, and
    [1.0.1](releases/1.0.1.md), a patch that changed no source file.
+   Start by joining the notes staged as fragments in
+   [releases/unreleased/](releases/unreleased/README.md) (WP-1941):
+   `python -m tests.release_notes --write` places each under its heading of
+   the staged file and deletes it, and `--version X.Y.Z` names the file for a
+   patch release. Then edit the result as a reader's document, like any other
+   draft: order, merge, reword, and replace the staging notice with the
+   release's framing.
    In the same change, read the names the manual still owes prose for, in
    `tests/api_surface_deferred.txt`. `python -m tests.api_surface` prints the
    count beside its ceiling. Record the count in the release record's ship
@@ -131,7 +138,8 @@ They land on `main` as one pull request.
     follow-ons: the reinstall, the skill's `metadata.version` and its two
     copies, and the rebuilt tutorial notebooks. Then open that version's
     record. That means `docs/milestones/vX.Y.md` and its staged notes
-    `docs/releases/X.Y.0.md`, plus its row in ROADMAP's milestone table and
+    `docs/releases/X.Y.0.md`, whose headings are the sections a fragment can
+    name, plus its row in ROADMAP's milestone table and
     the "next release" line in its Current focus. The precedents are
     `2163a4a85` (1.10) and `e67490927` (1.11).
 
