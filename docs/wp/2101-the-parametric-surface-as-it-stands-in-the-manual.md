@@ -226,6 +226,52 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
 
 ## Handover log
 
+- **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR (pending), stacked on
+  #1632. The milestone's agent-port row now has numbers to judge against. WO₃'s input fits
+  584 400 channels with 1163 free parameters, and ZrP₂O₇'s fits 163 133 with 1167. Every
+  WO₃ parameter has a rietx spelling. Eight of ZrP₂O₇'s wait on 2107: the two
+  coefficients of its 2θ curve in `Xo`, and each phase's own TCHZ V and W.
+
+  *Done.* § Inventory: a counts table and one construct table per input. In
+  `switching/topas.md`, four rows for constructs that had none (`fn`, a phase's
+  `TCHZ_Peak_Type`, a height written in `Cos(Th)`, `load_save_locals`), the list's
+  reflection bullet naming a phase's V and W, and the `Strain_G`/`Strain_L` conversion
+  under § The peak shape. The old row "a phase's parameter under one name ..., such as its
+  `TCHZ_Peak_Type` terms" was wrong: rietx has no per-phase V or W, so its example is now
+  a strain or a coordinate.
+
+  *Measured* (runner's scratch scripts, `[dev]` venv, macOS arm64, not in the repo).
+  Channels from `rx.read_pattern(..., scan=range - 1)`: 5844 a pattern in 20-80° on
+  `d9_02592.raw`, 4409 a pattern in 15-90° on `d8_02999.raw`, with no point on a limit.
+  Free parameters from each input's text by TOPAS's naming rules. The WO₃ count gives 1163
+  for 100 data sets and 184 for 11, the two figures its header states. ZrP₂O₇'s input
+  states none, and its 31 a pattern equals Stinton & Evans's (2007) 53 for an
+  independent fit less the 22 terms the input shares or fixes. The TCHZ and `Strain_G`
+  forms were read from the TOPAS 5 Technical Reference.
+
+  *Gotchas.* The Al₂O₃ `B1`-`B3` macros drop their `param` argument, so those
+  coordinates are fixed whatever the `!` says. WO₃'s input states no `Rs`, so a port
+  sets `goniometer_radius_mm` to TOPAS's default. ZrP₂O₇'s count includes no
+  temperature-calibration coefficient, because the input holds all of them. The
+  milestone's run that frees them is a different protocol.
+
+  *Settled by Claude 2026-11-17:* the inventory lives in this WP file, because the
+  milestone's row names "2101's inventory"; the alternative was a manual page, which would
+  publish a judge's answer key. *Settled by Claude 2026-11-17:* a phase's TCHZ V and W and
+  the `Xo` curve are marked 2107, under the milestone's ZrP₂O₇ row ("join the protocol
+  once 2107 lands"); the alternative was a non-goal. *Settled by Claude 2026-11-17:* the
+  four missing rows went into `switching/topas.md` in this slice, under the milestone's
+  agent row (a line per construct or a named non-goal); the alternative was listing the
+  gaps here for a later slice.
+
+  *Gates* (on this branch, `[dev]` venv, macOS arm64). `tests/test_docs_consistency.py
+  tests/test_manual.py tests/test_manual_api.py`: 110 passed. Sphinx `-W`: clean. CI's lint
+  steps from the top level: ruff check and the tutorials' format check clean; Vale 0 errors,
+  and its one warning on `topas.md` is on line 82, which this slice did not write. No code
+  changed, so no other suite ran.
+
+  Next: the maintainer's two rulings in the entry below, then task 9.
+
 - **2026-11-17** — Second slice, by a ghostshift runner, in PR #1632. A TOPAS user whose
   parametric input does not read now has a five-step route from the reader's error to a
   fit checked against the input's own numbers. A GSAS-II user finds each sequential
