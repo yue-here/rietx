@@ -1,6 +1,6 @@
 # WP-2149 — INDEX_PANEL_REDUCED names the systems the run searched
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-17 — a message that names crystal systems a run never searched, beside a neighbour that says so; `systems_searched` on the result is right, so a reader who checks it has the truth
