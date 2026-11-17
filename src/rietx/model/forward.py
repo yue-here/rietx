@@ -191,6 +191,7 @@ from .profiles.voigt import (
 from .restraints import (
     CompiledRestraints,
     resolve_phase_restraints,
+    resolve_structure_restraints,
     restraint_residual,
 )
 
@@ -5116,6 +5117,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     "(parenthesised names are no CIF's) or drop the "
                     "PeakComponent.")
 
+    # Structure-level rows (WP-1942) follow every phase's own, in list order:
+    # Rietveld-only for the reason the phase rows are, since a linear sum over
+    # phase scales is a statement about the intensities Le Bail and Pawley
+    # extract rather than compute.
+    if mode == "rietveld":
+        restraint_items.extend(resolve_structure_restraints(structure))
     pawley = _build_pawley_block(phases) if mode == "pawley" else None
     restraints = (CompiledRestraints(restraint_items, restraint_findings)
                   if restraint_items else None)

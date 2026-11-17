@@ -799,3 +799,11 @@ defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
 refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 version now says why.
+
+Also in 0.62 (WP-1942): ``Structure.restraints``, a list of
+``LinearRestraint`` (a soft row on Σ c·p over (path, coefficient) pairs,
+which may span phases), with ``RestraintRow.kind`` gaining ``"linear"``;
+``PhaseQuantity.element_counts``; ``QPAResult.weight_fraction_covariance``;
+and ``FitReport.unidentified_phase``.  Additive and defaulted (an empty list,
+``None``), the 0.25 → 0.26 rule, so every stored document opens unchanged;
+an older build refuses a document carrying any of the keys.
