@@ -139,5 +139,10 @@ Filled in by the session that builds each PR.
 3. **A rule reconciled.** gui/CLAUDE.md (WP-1210) says state rides on a mark's shape and never
    on a second colour, and today's page dashes the last fit under a preview. `gui/STYLE.md`
    § Plots and the prototype turn it grey. `/next` follows STYLE.md.
+4. **The last fit is hard to see in dark under a preview.** In
+   `interactive-preview-zoom-crop-dark.png` the grey line sits close to the orange preview
+   and reads faintly against the plot's ground. The prototype's dark grey is darker still. A
+   lighter grey would need to clear the palette's floor against the observed crosses and the
+   difference curve. Keep it, or ask for a lighter one?
 
 ## Handover log
