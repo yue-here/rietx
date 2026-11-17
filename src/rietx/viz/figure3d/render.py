@@ -790,7 +790,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     64 depth maps of the scene's atoms and sticks (WP-1538): the ambient term
     scales by the unoccluded share and the key light keeps its own.  Ball
     mode's atoms lose 3-25 % of their ambient light on the 21 phases WP-1538
-    measured, and ellipsoid mode's about half that, the sticks a small
+    measured, and ellipsoid mode's about 0.6 of that, the sticks a small
     ellipsoid meets shading it.  The cell frame and the translucent faces neither cast nor receive
     it.  Off by default; the GUI's drawing drawer has the same toggle.
     ``planar_rings=True`` fills each ring of five or six bonded atoms

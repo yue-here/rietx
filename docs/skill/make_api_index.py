@@ -303,7 +303,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "one cell, 16 in 2×2×2). `ambient_occlusion=True` darkens "
                 "each atom and stick by the ambient light its neighbours "
                 "block, as the GUI's toggle does; ball mode's atoms lose "
-                "3-25 % of it and ellipsoid mode's about half that, the "
+                "3-25 % of it and ellipsoid mode's about 0.6 of that, the "
                 "sticks shading them (Measured: WP-1538, 21 phases). It "
                 "draws on the numpy path, 2-16 s at 3000 px, so iterate "
                 "without it. `faces=[mask]` fills the masked "

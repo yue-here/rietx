@@ -1637,7 +1637,7 @@ def test_occlusion_scales_the_ambient_term_and_leaves_the_key_light():
 def test_ambient_occlusion_darkens_both_modes_and_is_off_by_default(nac):
     """Off by default, refused unless a bool, and on it only darkens, in both
     modes: the sticks a small ellipsoid meets shade it too, so ellipsoid mode
-    loses about half what ball mode does on its atoms, not the filing's
+    loses about 0.6 of what ball mode does on its atoms, not the filing's
     atoms-only 1-3 % (``docs/wp/1538-measure/results.txt``)."""
     with pytest.raises(ValueError, match="ambient_occlusion"):
         render_structure(nac, size=100, ambient_occlusion="yes")
