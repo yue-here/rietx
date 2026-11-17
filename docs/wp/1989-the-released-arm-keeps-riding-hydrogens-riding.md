@@ -1,6 +1,6 @@
 # WP-1989 — the rigid-body check's released arm keeps riding hydrogens riding
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — part 1 (the riding released arm, and its public builder) landed via #1280 as `f1187a062`; part 2, whether the stretched body fires and the skill row, is next
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling (part 2: the stretched body fires, the deposited one does not, and the skill row; part 1 landed via #1280 as `f1187a062`)
 Track: What fires, and what stays silent
 Depends on: — (1806 soft: the public case it shows on, and its pdCIF reader task)
 Priority: P2 2026-10-16 — a check that cannot fire on the commonest organic body, so a 0.3 Å bond error passes; a path few fits run, and the Hamilton p and ranked deviations are still printed
