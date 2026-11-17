@@ -800,6 +800,28 @@ def _launch_gui(project: Path) -> dict:
                      f"{GUI_BOOT_TIMEOUT:.0f} s"}
 
 
+def _configured_root_elsewhere(directory: Path) -> Path | None:
+    """The process's configured runs root, when it lies outside ``directory``.
+
+    With :data:`~rietx._about.RUNS_DIR_ENV` set (or :func:`runs.set_root
+    <rietx.runs.set_root>` called), a plain fit records there and not under
+    the working directory, so a ``watch`` that defaulted to the working
+    directory would list none of it (WP-1950). The banner names it rather
+    than the default moving: a project in the working directory still
+    records into its own ``live/``, and silently swapping which directory is
+    scanned would hide those.
+    """
+    root = runs_mod.configured_root()
+    if root is None:
+        return None
+    root = Path(os.path.abspath(root))
+    try:
+        root.resolve().relative_to(directory)
+    except ValueError:
+        return root
+    return None
+
+
 def serve(directory: str | Path | None = None, *, port: int = 8899,
           open_browser: bool = False, block: bool = True,
           allow_cancel: bool = True, allow_gui: bool = True):
@@ -825,6 +847,7 @@ def serve(directory: str | Path | None = None, *, port: int = 8899,
     really about: a reader who is not the person who should be stopping things,
     which is a situation you know about beforehand.
     """
+    defaulted = directory is None
     directory = Path.cwd() if directory is None else Path(directory)
     if not directory.is_dir():
         raise FileNotFoundError(f"{directory} is not a directory")
@@ -843,6 +866,10 @@ def serve(directory: str | Path | None = None, *, port: int = 8899,
     found = index.runs()
     print(f"rietx watch: {len(found)} run(s) under {directory}")
     print(f"             {url}  (Ctrl-C to stop)")
+    elsewhere = _configured_root_elsewhere(directory) if defaulted else None
+    if elsewhere is not None:
+        print(f"             a fit here records under {elsewhere} "
+              f"({DIST_NAME} watch {elsewhere} lists those)")
     # Read off both flags, because they are two. `--read-only` clears the pair
     # and this line then reads as it always did; a caller that declines one of
     # them gets a banner that is true rather than one that names the other.

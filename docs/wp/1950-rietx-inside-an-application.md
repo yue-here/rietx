@@ -101,7 +101,7 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
 
 ## Tasks
 
-- [ ] A process-wide run root: an environment variable or a
+- [x] A process-wide run root: an environment variable or a
       `runs.set_root(path)` beside `runs.set_enabled`, its name imported
       from `_about.py` (root CLAUDE.md § Conventions). It sits between
       `telemetry=` and the working directory in the precedence. Retention
@@ -115,7 +115,7 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
       stamps the real version, and writes its run where the root says.
 - [ ] Manual: an "Embedding rietx" section in `using/` covering telemetry
       off or redirected, the hook, and `RIETX_COMPILED_THREADS`.
-- [ ] Tests for the root's precedence (`tests/test_telemetry.py`).
+- [x] Tests for the root's precedence (`tests/test_telemetry.py`).
 - [ ] Skill: none expected, since an agent driving rietx does not freeze it.
       Say so at close.
 

@@ -35,7 +35,12 @@ import pytest
 
 import rietx as rx
 from rietx import runs
-from rietx._about import RUNS_DIR_NAME, STATE_DIR_NAME, TELEMETRY_ENV
+from rietx._about import (
+    RUNS_DIR_ENV,
+    RUNS_DIR_NAME,
+    STATE_DIR_NAME,
+    TELEMETRY_ENV,
+)
 from rietx.history.events import EventStream, read_events
 from rietx.model.forward import CompiledModel
 from rietx.optimize.cancel import CancelToken, RefinementCancelled
@@ -50,20 +55,27 @@ def pattern():
 
 
 @pytest.fixture
-def recording():
+def recording(monkeypatch):
     """Switch recording on for one test, and put it back.
 
     ``runs.set_enabled`` rather than the environment: it is the seam that
     exists for this, it mirrors ``model.compiled.set_enabled``, and it cannot
     leak into another xdist worker the way an ``os.environ`` write can.
+
+    The process root is cleared too (WP-1950): a developer who exported
+    ``RIETX_RUNS_DIR`` would otherwise move every working-directory run this
+    file asserts on.
     """
+    monkeypatch.delenv(RUNS_DIR_ENV, raising=False)
     was = runs.set_enabled(True)
+    root_was = runs.set_root(None)
     runs._PRUNED = False
     runs._WARNED = False
     try:
         yield
     finally:
         runs.set_enabled(was)
+        runs.set_root(root_was)
 
 
 def _fit(pattern, **kw):
@@ -1235,3 +1247,154 @@ def test_a_run_one_level_deeper_is_out_of_reach(tmp_path):
         warnings.simplefilter("always")
         runs.prune(root, max_bytes=1, now=NOW)
     assert nested.exists()
+
+
+# ----------------------------------------------------------------------
+# a process-wide root (WP-1950, issue #893)
+# ----------------------------------------------------------------------
+def _only_run_under(root: Path) -> Path:
+    """The one run directory directly under ``root``."""
+    (run,) = [p for p in root.iterdir() if p.is_dir()]
+    assert runs.RUN_ID_RE.match(run.name)
+    return run
+
+
+def test_the_process_root_replaces_the_working_directory(
+        tmp_path, monkeypatch, pattern, recording):
+    """WP-1950's acceptance in the suite: the variable names the directory the
+    runs go into, and the working directory is left alone."""
+    work, root = tmp_path / "work", tmp_path / "cache" / "runs"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    monkeypatch.setenv(RUNS_DIR_ENV, str(root))
+
+    _fit(pattern)
+
+    run = _only_run_under(root)
+    assert (run / runs.STATUS_FILE).is_file()
+    assert not (work / STATE_DIR_NAME).exists()
+    # a root rietx chose for the caller, so it is hidden from git like the
+    # working directory's
+    assert (root / runs.GITIGNORE_FILE).read_text(encoding="utf-8").strip() == "*"
+    (listed,) = runs.discover(root)
+    assert listed.path == run
+
+
+def test_set_root_outranks_the_variable_and_none_hands_back(
+        tmp_path, monkeypatch, pattern, recording):
+    """The in-process twin outranks the environment, as ``set_enabled`` does,
+    and ``None`` re-reads it."""
+    monkeypatch.chdir(tmp_path)
+    by_env, by_call = tmp_path / "env", tmp_path / "call"
+    monkeypatch.setenv(RUNS_DIR_ENV, str(by_env))
+
+    assert runs.set_root(by_call) is None
+    _fit(pattern)
+    _only_run_under(by_call)
+    assert not by_env.exists()
+
+    assert runs.set_root(None) == by_call
+    assert runs.configured_root() == by_env
+    monkeypatch.delenv(RUNS_DIR_ENV)
+    assert runs.configured_root() is None
+
+
+def test_set_root_is_absolute_at_the_call(tmp_path, monkeypatch, recording):
+    """A relative path is the working directory's *at the call*, so an
+    application that changes directory later still records where it said."""
+    monkeypatch.chdir(tmp_path)
+    runs.set_root("runs-here")
+    monkeypatch.chdir(tmp_path.parent)
+    assert runs.configured_root() == tmp_path / "runs-here"
+
+
+def test_an_empty_variable_is_unset(tmp_path, monkeypatch, recording):
+    monkeypatch.setenv(RUNS_DIR_ENV, "  ")
+    assert runs.configured_root() is None
+    monkeypatch.chdir(tmp_path)
+    assert runs.run_root() == tmp_path / STATE_DIR_NAME / RUNS_DIR_NAME
+
+
+def test_the_keyword_outranks_the_process_root(tmp_path, monkeypatch, pattern,
+                                               recording):
+    """``telemetry=`` names this call's directory, and it wins."""
+    monkeypatch.chdir(tmp_path)
+    runs.set_root(tmp_path / "process")
+    _fit(pattern, telemetry=str(tmp_path / "mine"))
+    _only_run_under(tmp_path / "mine")
+    assert not (tmp_path / "process").exists()
+    assert not (tmp_path / STATE_DIR_NAME).exists()
+
+
+def test_a_project_outranks_the_process_root(tmp_path, recording):
+    """A project's ``live/`` is the project's record and stays there; the
+    process root replaces only the working directory's default. Asserted on
+    ``attach``, the one place the order is written."""
+    runs.set_root(tmp_path / "process")
+    live = tmp_path / "p.rex" / "live"
+    recorder = runs.attach(None, None, project_hint=live)
+    try:
+        assert recorder is not None
+        assert recorder.dir.parent == live
+    finally:
+        recorder.close("done")
+    assert not (tmp_path / "process").exists()
+
+
+def test_switched_off_writes_nothing_under_the_process_root(
+        tmp_path, monkeypatch, pattern, recording):
+    """The root moves recording and never turns it on."""
+    monkeypatch.chdir(tmp_path)
+    runs.set_root(tmp_path / "process")
+    runs.set_enabled(None)
+    monkeypatch.setenv(TELEMETRY_ENV, "0")
+    _fit(pattern)
+    assert not (tmp_path / "process").exists()
+    assert not (tmp_path / STATE_DIR_NAME).exists()
+
+
+def test_a_process_root_it_cannot_create_declines_and_the_fit_still_returns(
+        tmp_path, monkeypatch, pattern, recording):
+    """The configured root is made inside ``attach``'s guard, like the
+    working directory's: a bad one costs the run, never the fit."""
+    monkeypatch.chdir(tmp_path)
+    with _a_root_whose_parent_is_a_file(tmp_path) as bad:
+        monkeypatch.setenv(RUNS_DIR_ENV, bad)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = _fit(pattern)
+    assert result.status == "converged"
+    assert any(str(w.message).startswith("telemetry ") for w in caught)
+    assert not (tmp_path / STATE_DIR_NAME).exists()
+
+
+def test_the_process_root_is_pruned_once_and_a_new_one_again(
+        tmp_path, monkeypatch, recording):
+    """Retention keeps working under the configured root (WP-1403's rules,
+    guards and all, live in ``prune``), and a root changed mid-process is a
+    root not yet pruned."""
+    pruned: list[Path] = []
+    monkeypatch.setattr(runs, "prune", lambda root, **kw: pruned.append(root))
+    first, second = tmp_path / "a", tmp_path / "b"
+
+    runs.set_root(first)
+    assert runs.run_root() == first
+    assert runs.run_root() == first
+    runs.set_root(second)
+    assert runs.run_root() == second
+    assert pruned == [first, second]
+
+
+def test_watch_names_a_process_root_it_is_not_scanning(tmp_path, monkeypatch,
+                                                       recording):
+    """``rietx watch`` with no directory scans the working directory; with a
+    root configured elsewhere the banner says where a fit here records."""
+    from rietx.watch import _configured_root_elsewhere
+
+    work = tmp_path / "work"
+    work.mkdir()
+    assert _configured_root_elsewhere(work.resolve()) is None
+    monkeypatch.setenv(RUNS_DIR_ENV, str(tmp_path / "cache"))
+    assert _configured_root_elsewhere(work.resolve()) == tmp_path / "cache"
+    monkeypatch.setenv(RUNS_DIR_ENV, str(work / "inside"))
+    assert _configured_root_elsewhere(work.resolve()) is None

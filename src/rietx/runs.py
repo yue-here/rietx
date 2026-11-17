@@ -79,6 +79,7 @@ from pydantic import ConfigDict
 from ._about import (
     LIVE_DIR_NAME,
     PROJECT_SUFFIX,
+    RUNS_DIR_ENV,
     RUNS_DIR_NAME,
     STATE_DIR_NAME,
     TELEMETRY_ENV,
@@ -1098,18 +1099,69 @@ def set_enabled(flag: bool | None) -> bool | None:
     return was
 
 
+#: The process-wide root :func:`set_root` named, or ``None`` to read
+#: :data:`~rietx._about.RUNS_DIR_ENV`. Never a cache of that read, for the
+#: reason :data:`_ENABLED` is not one.
+_ROOT: Path | None = None
+
+
+def set_root(path: str | Path | None) -> Path | None:
+    """Record every fit in this process under ``path``; ``None`` re-reads the
+    environment. Returns the previous setting, so a caller can restore it.
+
+    The process-wide twin of :data:`~rietx._about.RUNS_DIR_ENV`, and it
+    outranks the variable as :func:`set_enabled` outranks
+    :data:`~rietx._about.TELEMETRY_ENV`. ``path`` holds the run directories
+    themselves, exactly as a ``telemetry=<path>`` does, and is made absolute
+    here, so a later change of working directory cannot move it. It is still
+    a root rietx chose for the caller (WP-1950): :func:`run_root` creates it,
+    hides it from git and prunes it, where a call's ``telemetry=`` is left
+    alone.
+
+    It moves the root and turns nothing on. ``RIETX_TELEMETRY=0`` still
+    records nothing, and a call's ``telemetry=`` and a project's ``live/``
+    still win over it (:func:`attach`).
+    """
+    global _ROOT, _PRUNED
+    was = _ROOT
+    _ROOT = None if path is None else Path(os.path.abspath(Path(path).expanduser()))
+    if _ROOT != was:
+        _PRUNED = False         # a new root is pruned once too
+    return was
+
+
+def configured_root() -> Path | None:
+    """The root a process configured with :func:`set_root` or
+    :data:`~rietx._about.RUNS_DIR_ENV`, else ``None`` (the working directory).
+
+    Not created and not checked: :func:`run_root` does that, inside
+    :func:`attach`'s guard, so an unwritable one declines a run rather than
+    breaking a fit. An empty variable is unset.
+    """
+    if _ROOT is not None:
+        return _ROOT
+    value = os.environ.get(RUNS_DIR_ENV, "").strip()
+    return Path(value).expanduser() if value else None
+
+
 def run_root(base: str | Path | None = None) -> Path:
-    """``<base or the working directory>/.rietx/runs``, created.
+    """The runs root rietx chose, created: ``<base>/.rietx/runs`` when ``base``
+    is given, else :func:`configured_root`, else
+    ``<working directory>/.rietx/runs``.
 
     Creates the root and drops a ``.gitignore`` of ``*`` into it, so a fit
     inside somebody's repository does not turn up in their ``git status``, and
-    prunes it once per process (:func:`prune`). All three only for the root *this
-    package chose*: a caller who passed ``telemetry=`` named their own
-    directory, and neither writing an ignore file into it nor deleting anything
-    out of it is a decision this package gets to make there.
+    prunes it once per process (:func:`prune`). All three only for a root *this
+    package chose*, which a configured root is (it replaces the working
+    directory's, and an application pointing every fit at a cache directory
+    wants that directory bounded): a caller who passed ``telemetry=`` named
+    their own directory, and neither writing an ignore file into it nor
+    deleting anything out of it is a decision this package gets to make there.
     """
     global _PRUNED
-    root = (Path.cwd() if base is None else Path(base)) / STATE_DIR_NAME / RUNS_DIR_NAME
+    configured = configured_root() if base is None else None
+    root = (configured if configured is not None
+            else (Path.cwd() if base is None else Path(base)) / STATE_DIR_NAME / RUNS_DIR_NAME)
     root.mkdir(parents=True, exist_ok=True)
     marker = root / GITIGNORE_FILE
     if not marker.exists():
@@ -1908,7 +1960,9 @@ def attach(stream, events, *, telemetry=None, project_hint=None,
     Where the directory comes from, first hit winning: an explicit
     ``telemetry=``; a ``project_hint`` (what ``Project.fit`` sets, and the
     derived fallback for a bare ``fit()`` on a project-built ``Refinement``);
-    else :func:`run_root` under the working directory. Each is a *root*, and
+    else :func:`run_root`, which is the process's configured root
+    (:func:`set_root`, :data:`~rietx._about.RUNS_DIR_ENV`) when there is one
+    and the working directory's ``.rietx/runs`` otherwise. Each is a *root*, and
     the run is a fresh ``<run id>`` directory inside it — which is what keeps an
     agent fitting a project and a human with the GUI open on it from
     interleaving one log.
