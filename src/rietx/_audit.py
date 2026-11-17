@@ -978,7 +978,10 @@ ROWS: tuple[Row, ...] = (
                   'one corpus spinel file agrees '
                   '(tests/test_projects_fullprof.py::test_the_symbol_is_case_normalised_and_the_origin_chosen). '
                   'The reader then re-derives multiplicities under the setting and refuses the '
-                  'phase if Occ x M_general/M_site stops agreeing'),
+                  'phase if Occ x M_general/M_site stops agreeing. Checked 2026-11-17 in '
+                  "FullProf 8.20's FullProf_Manual.pdf, the note after the space-group line of "
+                  "the .pcr: 'By default the program uses the setting with the inversion centre "
+                  "at the origin'."),
         grounds=("FullProf's documented default is the one the reader applies; no other program "
                  'reads a FullProf file.'),
         response='info',
@@ -1233,7 +1236,7 @@ ROWS: tuple[Row, ...] = (
         response='warning',
         responds=('set the background, displacement and absorption in GSAS-II and reset the '
                   'refine flags before comparing any peak width, position or intensity')),
-    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED", "code", tier=2, ambiguity=1,
+    Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED", "code", tier=2, ambiguity=3,
         evidence=('read the site at instrument_profile.py:1605 and :1497-1503: with no Diff-type '
                   'the geometry is Debye-Scherrer for one wavelength and Bragg-Brentano for a '
                   "doublet, GSAS-II's own rule: 'a single-wavelength file will set "
@@ -1243,8 +1246,9 @@ ROWS: tuple[Row, ...] = (
                   'is the other arm'),
         grounds="The program's documented fallback is the one applied.",
         response='warning',
-        responds=('set geometry.kind if the diffractometer is not the fallback, since the '
-                  'geometry decides the intensity and displacement corrections')),
+        responds=("set geometry.kind to the instrument's real geometry before quoting a cell, an "
+                  'ADP or a phase fraction, since the geometry decides the displacement and '
+                  'absorption corrections')),
     Row("GSAS2_INSTPRM_VALUE_DEFAULTED", "code", tier=1, ambiguity=1,
         evidence=('read the site at instrument_profile.py:1587: fires when an item the format '
                   "declares (INSTPRM_CW_SINGLE or _DOUBLET, GSAS-II's own key list) is absent "
@@ -2034,16 +2038,7 @@ ROWS: tuple[Row, ...] = (
         response='warning',
         responds=('add refine flags to the recipe, since the plan stage frees nothing and no '
                   'cell or scale will move')),
-    Row("RECIPE_PLAN_STAGED", "code", tier=2, ambiguity=1,
-        evidence=('read the site at recipe.py:1376 and _RECIPE_STAGE_ORDER (:1393-1410): the '
-                  'flagged parameters are freed over several stages in McCusker et al. (1999, J. '
-                  'Appl. Cryst. 32, 36) turn-on order, cumulatively, so the last stage frees '
-                  "exactly the recipe's set "
-                  '(tests/test_recipe.py::test_the_plan_is_staged_but_ends_at_the_recipes_own_free_set); '
-                  "one stage, sample_broadening, is rietx's own addition before the coordinates"),
-        grounds="A cited order; the final free set is the recipe's own.",
-        response='info',
-        responds='nothing, unless a stage-by-stage trajectory is needed'),
+    Row("RECIPE_PLAN_STAGED", "code"),
     Row("RECIPE_SCALE_RESEEDED", "code", tier=1, ambiguity=1,
         evidence=('read the site at recipe.py:1263 and forward.seed_phase_scales (:4906-4935): '
                   "the recipe's scale (every recipe says 1) is replaced by the closed-form "
@@ -3356,13 +3351,7 @@ ROWS: tuple[Row, ...] = (
                   'builds the small irreps of every group at the zone-boundary and '
                   'denominator-3/4/6 k sets, so every check at 1e-8 passes there, and asserts '
                   'the worst character orthonormality under 1e-10, two orders inside it')),
-    Row("rietx.crystallography.representation.irreps.K_FLOAT_TOL", "constant", tier='invariant', value=1e-09,
-        evidence=('answer-invariant, as subgroups._FLOAT_SNAP_TOL: a float within 1e-9 of a '
-                  'ratio with denominator <= K_MAX_DENOMINATOR is that ratio to double precision '
-                  '(such ratios are at least 1/64^2 = 2.4e-4 apart, float error ~1e-17), so any '
-                  'tolerance between gives the same accepted k; a farther float is refused, '
-                  'never snapped (irreps.py:191-195; '
-                  'tests/test_incommensurate_irreps.py::test_door_refusals refuses 1/sqrt(5))')),
+    Row("rietx.crystallography.representation.irreps.K_FLOAT_TOL", "constant", value=1e-09),
     Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", value=64),
     Row("rietx.crystallography.representation.irreps._H", "constant", tier=1, value=0.5,
         evidence=('arithmetic: the exact rational Fraction(1, 2) used to write the '
@@ -3622,10 +3611,7 @@ ROWS: tuple[Row, ...] = (
                   '9.999999999998899e-05 (ICSD 18318 B11 and B16, issue #215) falls on one side '
                   'by crystallography rather than binary rounding (symmetry.py:787-793); '
                   'tests/test_symmetry_orbits.py asserts shift <= SITE_TOL x (1 + 1e-9)')),
-    Row("rietx.crystallography.symmetry._SNAP_MESSAGE_SITES", "constant", tier='invariant', value=4,
-        evidence=('answer-invariant: shortens the spelled-out list of a '
-                  'SITE_SNAPPED_TO_SPECIAL_POSITION message only; where carries every snapped '
-                  "site and the message says 'and N more' (symmetry.py:1283-1285, 1322-1326)")),
+    Row("rietx.crystallography.symmetry._SNAP_MESSAGE_SITES", "constant", value=4),
     Row("rietx.crystallography.symmetry._SNAP_NOISE", "constant", tier=1, value=1e-12,
         evidence=('numerical floor: below 1e-12 a snap did nothing and SiteOrbit.shift reports '
                   '0.0, a site on its position averaging to itself only to an ulp or two; seven '
@@ -3948,14 +3934,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL", "constant", value=0.001),
     Row("rietx.io.projects.fullprof._USER_B_ATOL_FM", "constant", value=0.001),
     Row("rietx.io.projects.registry.INP_SNIFF_BYTES", "constant", value=65536),
-    Row("rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM", "constant", tier=1, value=16,
-        evidence=('numerical setting: sets convolution_step so TOPAS computes 16 points across '
-                  'the narrowest FWHM; step 1 left TOPAS 6.3e-2 of the peak from rietx on the '
-                  'NaCl P-spline case and 16 brought it to 2.6e-3; the three oracle tests hold '
-                  "the written file to ORACLE_TOL = 1e-2 against TOPAS 6's own Y_calc "
-                  '(tests/test_topas_whole_input.py::test_the_neutron_case_is_what_topas_computes, '
-                  '::test_the_xray_case_is_what_topas_computes, '
-                  '::test_the_pspline_case_is_what_topas_computes)')),
+    Row("rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM", "constant", value=16),
     Row("rietx.io.projects.topas_input.DEFAULT_RADIUS_MM", "constant", value=217.5),
     Row("rietx.io.projects.topas_input._BESSEL_SWITCH", "constant", tier=1, value=3.75,
         evidence=("published: Abramowitz & Stegun (1964) NBS AMS 55 eqs 9.8.1-9.8.4, the closest TOPAS spelling of e^(-x)(I0 + I1), which has no Bessel function; within 3.6e-8 of i0e + i1e (tests/test_topas_whole_input.py::test_the_written_laue_factor_is_within_its_stated_bound)")),
@@ -7233,6 +7212,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "RECIPE_BACKGROUND_PEAK_DEGENERATE",
     "RECIPE_BACKGROUND_RESEEDED",
     "RECIPE_ENGINE_DEFAULT_DECLINED",
+    "RECIPE_PLAN_STAGED",
     "RESOLUTION_NOT_POSITIVE",
     "RESOLUTION_NOT_POSITIVE.suggestion",
     "RESOLUTION_UNCONSTRAINED",
@@ -7326,6 +7306,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.representation.distortion._PROBE_AMPLITUDE",
     "rietx.crystallography.representation.distortion._PROBE_SYMPREC",
     "rietx.crystallography.representation.distortion._RANK_TOL",
+    "rietx.crystallography.representation.irreps.K_FLOAT_TOL",
     "rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR",
     "rietx.crystallography.representation.irreps._SEEDS",
     "rietx.crystallography.representation.modes.MODE_ATOL",
@@ -7336,6 +7317,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.symmetry.SITE_TOL",
     "rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG",
     "rietx.crystallography.symmetry.TWIN_DISTANCE",
+    "rietx.crystallography.symmetry._SNAP_MESSAGE_SITES",
     "rietx.gui.imports.MAX_UPLOAD_BYTES",
     "rietx.gui.imports.PREVIEW_POINTS",
     "rietx.gui.imports.WAVELENGTH_RTOL",
@@ -7495,6 +7477,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL",
     "rietx.io.projects.fullprof._USER_B_ATOL_FM",
     "rietx.io.projects.registry.INP_SNIFF_BYTES",
+    "rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM",
     "rietx.io.projects.topas_input.DEFAULT_RADIUS_MM",
     "rietx.optimize.identifiability.EXCHANGE_MIN_LOADING",
     "rietx.optimize.identifiability.SOFT_MODES_K",
@@ -7780,6 +7763,7 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "RECIPE_BACKGROUND_RESEEDED",
     "RECIPE_ENGINE_DEFAULT_DECLINED",
     "RECIPE_FIELD_DROPPED",
+    "RECIPE_PLAN_STAGED",
     "RESOLUTION_NOT_POSITIVE",
     "RESTRAINT_TENSION",
     "RIGID_BODY_MISFIT",

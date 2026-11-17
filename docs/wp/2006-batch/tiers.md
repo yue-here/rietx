@@ -4,7 +4,7 @@ Made from the three tiering lanes of the 2026-11-17 session (`/wp-handover` name
 
 A row marked **magnetic** is a magnetic-path decision, which is Mike's since 2026-11-04 (#1075).
 
-## Tier-3 candidates (35)
+## Tier-3 candidates (36)
 
 Each row is rietx's own choice. The rule's two grounds are given: **Q1**, would every competent refiner act on it; **Q2**, the dataset families it holds on. **Stakes** is the reported quantity it can move, a case on disk, and the dissenter.
 
@@ -87,6 +87,14 @@ Each row is rietx's own choice. The rule's two grounds are given: **Q1**, would 
 - **Q2**: One family: the LaB6 recipe (one reference engine output for the default values); no second. Fails whenever the cross-engine comparison, not the physics, is the aim.
 - **Stakes**: Rwp and the broadening coefficients (the docstring: the cells are the comparable quantity, not the broadening); case on disk: the LaB6 fixture; dissenter: PowderLine's rule 3 (translate the recipe, do not define one) reads toward adopting.
 - **Note**: The measured values are tier 2 evidence for what GSAS-II does; the choice to decline is the tier-3 part.
+
+### `RECIPE_PLAN_STAGED`
+
+- **What it does**: read the site at recipe.py:1376 and _RECIPE_STAGE_ORDER (:1393-1410): the flagged parameters are freed over several stages in McCusker et al. (1999, J. Appl. Cryst. 32, 36) turn-on order, cumulatively, so the last stage frees exactly the recipe's set (tests/test_recipe.py::test_the_plan_is_staged_but_ends_at_the_recipes_own_free_set); one stage, sample_broadening, is rietx's own addition before the coordinates
+- **Q1**: Judge (2026-11-17): PowderLine, the recipe's own engine, runs one pass over everything flagged (recipe.py:1317), and the root CLAUDE.md rule on comparing with another code asks for its protocol, so a caller reproducing the reference engine would refine in one pass while one starting from a poor model would stage. Two careful people differ, so the staging is not a unanimous act.
+- **Q2**: No measurement that one pass fails on any recipe, or that staging lands at the same values; test_the_plan_is_staged_but_ends_at_the_recipes_own_free_set checks the free set, not the refined values. The sample_broadening stage is rietx's own (recipe.py:1390-1392).
+- **Stakes**: Every refined value of a recipe read, where intermediate stages stop at the looser ftol on a correlated set; no case on disk measured; dissenter PowderLine itself.
+- **Note**: PowderLine's own engines run one pass; staging is rietx's shape. Cumulative staging moves a converged value by up to 0.0004 esd on one fit (root CLAUDE.md, WP-2045), measured, not zero.
 
 ### `SPACE_GROUP_SETTING_ASSUMED`
 
@@ -286,7 +294,7 @@ Each row is rietx's own choice. The rule's two grounds are given: **Q1**, would 
 - **Stakes**: a refusal only; none on disk; none found.
 - **Note**: Could be caller-shaped if a Fraction input bypasses it; not checked.
 
-## Left at `unaudited` (33)
+## Left at `unaudited` (36)
 
 A numerical setting is tier 1 only where a test bounds its error (B10, ruled 2026-10-19). These have no such test yet, or need one the lane could not write read-only. Each line says what would close it.
 
@@ -303,11 +311,13 @@ A numerical setting is tier 1 only where a test bounds its error (B10, ruled 202
 | `rietx.crystallography.representation.distortion._PROBE_AMPLITUDE` | Leave: closing test as isotropy._PROBE_RMS's (tests/test_distortion_candidates.py::test_the_probe_tolerance_and_scale_decide_no_child), run on distortion's probe. |
 | `rietx.crystallography.representation.distortion._PROBE_SYMPREC` | Leave: closing test as isotropy._PROBE_SYMPREC's, on this module. |
 | `rietx.crystallography.representation.distortion._RANK_TOL` | Leave: closing test records the singular values cut and kept over the distortion suites and asserts a gap around 1e-8, as LINE_ATOL's test does. |
+| `rietx.crystallography.representation.irreps.K_FLOAT_TOL` | Judge (2026-11-17): not answer-invariant over all inputs (at 1e-4 a typed 0.3333 would read as 1/3; at 1e-9 it is refused), and no invariance test asserts the margin. Closing: retier to 1 as a numerical floor with a test that every exactly meant k passes at 1e-9 and 1e-12. |
 | `rietx.crystallography.representation.irreps._SEEDS` | Leave: a different successful seed can give a different basis within an irrep, and the direction labels are gauge-dependent (isotropy.py, magnetic candidates). Closing test: start the sequence at seed 3 and assert the same characters and direction labels over the 230-group sweep (then invariant). |
 | `rietx.crystallography.representation.modes.MODE_ATOL` | Leave: closing test asserts a gap in the values it cuts over the mode suites. |
 | `rietx.crystallography.representation.modes.POSITION_ATOL` | Leave: closing test holds the mode suites at 1e-8 and 1e-4 to the same matches. |
 | `rietx.crystallography.representation.order_parameter.ISOTROPY_ATOL` | Leave: closing test asserts a gap in the values it cuts over the isotropy suites. |
 | `rietx.crystallography.spherical_harmonics._TOL` | Leave: closing test asserts the projector residuals over the harmonic suites sit far below 1e-9 and a non-member far above. |
+| `rietx.crystallography.symmetry._SNAP_MESSAGE_SITES` | Judge (2026-11-17): a cap on what a report lists is tier 1 only once a test shows the report complete inside it (generality.md, tier 1). Closing test: five snapped sites, where holds all five and the message says 'and 1 more'. |
 | `rietx.gui.imports.MAX_UPLOAD_BYTES` | leave: no test reaches the cap (grep tests/ for MAX_UPLOAD_BYTES finds none). A test that would close it: a Content-Length of cap+1 gets the 413 naming both numbers and reads no body; a body of exactly the cap is accepted; and the largest committed pattern/CIF is under cap/10. Then tier 1 (a cap whose refusal states the distance). |
 | `rietx.gui.imports.PREVIEW_POINTS` | leave: the invariance is plausible but no test asserts it. It would assert that the project committed through the wizard is byte-identical with PREVIEW_POINTS patched to 100 and to 5000, and that the 900-point curve keeps the strongest peak of a 40 000-point pattern (decimation_index's own property). Then 'invariant'. |
 | `rietx.gui.imports.WAVELENGTH_RTOL` | leave, with a finding: the tolerance is 5e-4 but a header that quotes Mo as 0.71 A (two decimals, as Cu is quoted 1.54 and matches) is not recognised and is offered as a single-wavelength capillary, though a two-decimal rounding bound would be 7e-3 and still 11x under the 8 % gap. The docstring says 'tight enough that no two anodes overlap' but gives 3 ppm as the loosest case it has to absorb. No test refers to the constant. A test that would close it: every common header spelling (1.54, 1.5406, 1.5418, 0.71, 0.7107, 0.56, 1.79) maps to its anode and no value in the table's range maps to two. Not changed: it moves a pre-filled instrument. |
@@ -324,6 +334,7 @@ A numerical setting is tier 1 only where a test bounds its error (B10, ruled 202
 | `rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL` | leave: same closing test as _RHOMBOHEDRAL_ANGLE_ATOL. |
 | `rietx.io.projects.fullprof._USER_B_ATOL_FM` | leave, with a finding: the 1e-3 admits a FullProf-rewritten file only if FullProf prints DFP with four decimals, which no test records (the neighbouring FullProf oracle says DEU 0.6671 is used as 6.67 fm, i.e. FullProf shows two decimals of b). A refusal is loud, so the direction is safe. A test that would close it: take the DFP a FullProf run writes into its .new/.pcr for each isotope (measured, FullProf 8.20) and assert the reader accepts all of them. |
 | `rietx.io.projects.registry.INP_SNIFF_BYTES` | leave: a cap that decides whether a file is claimed. A test would place the first str block at 60 000 and at 70 000 bytes and assert the first is claimed and the second is refused by name (not read as another format), and that every committed .inp has its opener inside a quarter of the cap. |
+| `rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM` | Judge (2026-11-17): the three oracle tests named compare predict() with frozen TOPAS output and check convolution_step only by a regex, so setting the constant to 1 passes them. Closing test: assert the convolution_step written for each oracle case equals the value its frozen fixture was produced with (B10). |
 | `rietx.io.projects.topas_input.DEFAULT_RADIUS_MM` | leave: no test shows the answer does not depend on the number. It would write the same instrument at goniometer_radius_mm = 100, 217.5 and 500 and assert the written displacement and Finger terms give identical values at every 2-theta (a small calculator over the written equations), or TOPAS's own Y_calc agrees across the three. Then 'invariant'. |
 
 ## Reader decisions audited by hand
@@ -391,7 +402,6 @@ Questions the lanes raised on rows they did tier. None changed a level or a mess
 | `RECIPE_CONVENTION_ASSUMED` | The docstring's 'adopted, not measured' is out of date against the GSAS-II source; the row evidence is from the source. |
 | `RECIPE_DISPERSION_DECLINED` | For W (K edge 69.5 keV) at 74.5 keV the f' and f'' are not small, so f = f0 is a real approximation, stated in the docstring. |
 | `RECIPE_FIELD_DROPPED` | No response: levels are info and warning (two). The sub-step gamma test (width < one step) is a threshold set by the data's own grid, tiered here as arithmetic. |
-| `RECIPE_PLAN_STAGED` | PowderLine's own engines run one pass; staging is rietx's shape. Cumulative staging moves a converged value by up to 0.0004 esd on one fit (root CLAUDE.md, WP-2045), measured, not zero. |
 | `RECIPE_ZERO_WEIGHT_EXCLUDED` | Row #1006's pdCIF weight-column question is the pdcif reader's, not this one. |
 | `SITE_SNAPPED_TO_SPECIAL_POSITION` | The existing row's response and responds are kept word for word. The cif.py site moves the coordinate, which GSAS-II never does; it acts on the file's own stated multiplicity, and that tolerance is batched on CIF_STATED_MULTIPLICITY_SNAP_TOL. |
 | `TOPAS_FIRST_RUN_READ` | The reader offers no run selection (compare scan= for patterns, io/CLAUDE.md), so for a multi-run file the first run is the only one reachable; reported, not changed. |
@@ -404,12 +414,10 @@ Questions the lanes raised on rows they did tier. None changed a level or a mess
 | `rietx.crystallography.atomic_volume.TABLE_TEMPERATURE` | Hofmann's sample is CSD organic and metal-organic crystals (VOLUME_RATIO_BOUNDS' row). |
 | `rietx.crystallography.magnetic.p1._WRAP_TOL` | No test names it; a test wrapping -1e-17 would pin it. |
 | `rietx.crystallography.satellites._ORDERS` | Higher-order satellites (a squared-up modulation) are outside this rung by its docstring. |
-| `rietx.crystallography.symmetry._SNAP_MESSAGE_SITES` | No test varies it; rietx.refine.RESTRAINT_PAIRS_STALE_LISTED's invariant row has one, and a matching test would close the gap. cif.py's twin of this cap is an inline 4 (cif.py:1457, 1471). |
 | `rietx.crystallography.symmetry._SNAP_NOISE` | No test names it; the reach of the floor follows from SITE_TOL's tests. |
 | `rietx.crystallography.symmetry._TRANSLATION_DEN` | No test asserts the 1/12 claim; a non-tabulated operator with a 1/8 translation would round to 1/6 and could compare equal to a tabulated one. A test over gemmi.spacegroup_table() would pin it. |
 | `rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS` | The real file is not vendored (copyright); the width is checked on a synthetic copy of its layout. |
 | `rietx.io.instrument_profile._PRM_CUTOFF` | Dissent: GSAS-II's own test inputs state 0.01 (tests/testinp/INST_XRY.PRM, inst_d1a.prm), so the program uses both; the exporter's value is the default it writes. Tier 2 rests on the exporter. |
-| `rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM` | Three cases (neutron, X-ray, neutron P-spline) pass the bar with the constant; the step-1 failure is recorded in the docstring and not asserted by an arm test. The worst case is the sharpest peak on a coarse step, which the cases do not push to the limit. |
 | `rietx.io.projects.topas_input._SABINE_XPOL` | No test pins the topas_input copy to model.extinction's; a second copy of a constant. |
 | `rietx.io.projects.topas_input._TCH_ETA` | A second copy of the constant; no test pins this copy to pseudovoigt's. The written file carries rietx's, so TOPAS matches it (oracle tests). |
 | `rietx.io.projects.topas_input._TCH_GAMMA` | As _TCH_ETA. |
