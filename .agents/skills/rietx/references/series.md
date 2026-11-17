@@ -67,9 +67,8 @@ What an operator must know, all measured:
   `vary` False, no code**: `mccusker_default` frees scales, background,
   zero, cell, U-Y. *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104;
   WP-2101.)*
-  Steer it as a single fit: `hold`, `tie`/`tie_equal` (a bare target: each
-  pattern to its own source), `set_values`; `refit()` reruns from the answer
-  in one stage.  *(Measured: WP-2103.)*
+  Steer it like a single fit: `hold`, `tie`/`tie_equal`, `set_values`;
+  `refit()` reruns it in one stage.  *(Measured: WP-2103.)*
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early
   stages conditioned from a *poor* starting model; a converged neighbour is not
