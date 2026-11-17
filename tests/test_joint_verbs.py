@@ -251,3 +251,44 @@ def test_a_tie_onto_an_expression_variable_drops_that_pattern_from_the_form_test
         (form,) = result.parametric_form
         forms.append((form.n_patterns, form.tied.dof))
     assert forms == [(5, 3), (4, 2)]
+
+
+# --- review findings (2026-11-17) ---------------------------------------------
+
+def test_a_tie_on_a_size_row_is_written_in_each_patterns_units():
+    """A shared size coefficient is stored in each pattern's units (WP-1131):
+    the tie must be too, or the two patterns describe two crystallites."""
+    ref = _ref()
+    mt = ref.mtable
+    scales = [mt.value_scales[h].get("phases.0.lor_size", 1.0) for h in (0, 1)]
+    assert scales[0] == 1.0 and scales[1] != 1.0       # two wavelengths
+    ref.add_variable("L", 0.05, min=0.0)
+    ref.tie("phases.0.lor_size", "vars.L", offset=0.01)
+    for h in (0, 1):
+        assert mt._entry(h, "phases.0.lor_size").value == pytest.approx(0.06 * scales[h])
+    assert _rows(ref)["phases.0.lor_size"].value == pytest.approx(0.06)
+    with pytest.raises(ValueError, match="each pattern's own units"):
+        ref.tie("phases.0.gauss_size", expression="L * 2")
+
+
+def test_unhold_takes_back_a_bare_hold_of_rows_per_pattern():
+    ref = _ref()
+    ref.hold("instrument.zero_shift")
+    assert ref.unhold("instrument.zero_shift") == [
+        "hist.0.instrument.zero_shift", "hist.1.instrument.zero_shift"]
+    assert ref.mtable.user_holds == set()
+
+
+def test_a_refused_formula_leaves_no_table_holding_it():
+    """``add_expression`` refuses a follower reading the target beside another
+    source; asked in pattern 1 only, pattern 0 must not keep the formula."""
+    ref = _ref(sharing=SharingMap(per_histogram=["phases.0.atoms.*.biso"]))
+    ref.add_variable("B", 0.5, min=0.0)
+    ref.add_variable("b", 0.4, min=0.0)
+    ref.tie("hist.1.phases.0.atoms.0.biso",
+            [("hist.1.phases.0.atoms.1.biso", 1.0), ("vars.B", 1.0)], offset=-0.5)
+    with pytest.raises(ValueError):
+        ref.tie("phases.0.atoms.1.biso", expression="b + 0.1")
+    entry = ref.mtable._entry(0, "phases.0.atoms.1.biso")
+    assert not entry.locked and entry.tie is None
+    assert list(ref.mtable.user_ties) == ["hist.1.phases.0.atoms.0.biso"]
