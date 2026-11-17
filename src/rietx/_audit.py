@@ -1276,6 +1276,16 @@ ROWS: tuple[Row, ...] = (
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("LINEAR_RESTRAINT_STALE", "code", tier=1, ambiguity=1, response="warning",
+        responds=("before quoting a fraction the ratio row decided, rebuild the row with "
+                  "elemental_ratio_restraint from the refined occupancies and refit, or hold "
+                  "those occupancies in the stages the row is on"),
+        evidence=("arithmetic: a LinearRestraint's coefficients are a function of the "
+                  "occupancies elemental_ratio_restraint read (its occupancy_phases), so a stage "
+                  "whose moving paths include one of those phases' occupancies fitted against "
+                  "a row for other values; a warning that names the occupancies, moves no value "
+                  "and gates nothing (WP-1942)"),
+        scope=("qpa",)),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -5576,6 +5586,8 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("LINEAR_RESTRAINT_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the two remedies (rebuild the row from the refined occupancies, or hold them) and picks neither"),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),

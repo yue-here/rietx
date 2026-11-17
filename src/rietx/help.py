@@ -4174,6 +4174,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measure the instrument on a standard, and hold that profile in this fit."
         ),
     ),
+    "LINEAR_RESTRAINT_STALE": HelpEntry(
+        title="A ratio restraint was computed for other occupancies",
+        description=(
+            "A linear restraint built by `elemental_ratio_restraint` reads each phase's "
+            "occupancies once, when it is built, and its coefficients keep those values. "
+            "This stage refined an occupancy of one of those phases, so the fit was held "
+            "to a ratio computed for the old composition. Nothing was changed. Rebuild the "
+            "restraint from the refined occupancies and refit, or hold those occupancies "
+            "in the stages that carry the restraint."
+        ),
+    ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(
         title="Some contacts have no anti-bump row",
         description=(

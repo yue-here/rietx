@@ -118,6 +118,62 @@ class _Value:
 
 
 @dataclass
+class _Linear:
+    """A structure-level row on Σ cₖ·pₖ over entry paths (WP-1942).
+
+    Linear in the physical values, so its partials are the constant
+    coefficients: the shape ``origin.origin_partials`` chains through C,
+    inside the soft-restraint block.  ``index`` is its place in
+    ``Structure.restraints``, the stable key its report row and every
+    ``RESTRAINT_TENSION`` finding carry (``restraints.<index>``), so a series
+    counts one row as one row however many paths it reads.
+    """
+
+    index: int
+    paths: tuple
+    coefficients: tuple
+    target: float
+    sigma: float
+    weight: float
+    phase: int | None = None
+
+    @property
+    def key(self) -> str:
+        return f"restraints.{self.index}"
+
+
+def resolve_structure_restraints(structure) -> list:
+    """The compiled rows of ``structure.restraints``, in list order (WP-1942).
+
+    Nothing is frozen but the coefficients, which a ``LinearRestraint``
+    already holds frozen: the row is linear, so no image, no orbit and no
+    geometry is resolved here, and an empty list compiles to nothing.
+    """
+    return [_Linear(k, tuple(p for p, _ in r.terms),
+                    tuple(float(c) for _, c in r.terms),
+                    float(r.target), float(r.sigma), float(r.weight))
+            for k, r in enumerate(getattr(structure, "restraints", ()))]
+
+
+def _linear_value(it: "_Linear", values: dict):
+    """Σ cₖ·pₖ, traceable: each coefficient a python float on the left."""
+    total = 0.0
+    for path, c in zip(it.paths, it.coefficients, strict=True):
+        total = total + c * values[_linear_path(it, path, values)]
+    return total
+
+
+def _linear_path(it: "_Linear", path: str, held) -> str:
+    """``path``, or a ``ValueError`` naming the row when ``held`` lacks it."""
+    if path not in held:
+        raise ValueError(
+            f"linear restraint {it.index} names {path}, which this fit's "
+            f"parameter table does not hold; name an entry path "
+            f"(Refinement.parameters() lists them)")
+    return path
+
+
+@dataclass
 class _Plane:
     """A planarity restraint: one row per entry, its distance to the LS plane.
 
@@ -401,6 +457,8 @@ def restraint_residual(compiled: CompiledRestraints, values: dict):
             computed, target = _bond_distance(it, values), it.target
         elif isinstance(it, _Angle):
             computed, target = _angle_deg(it, values), it.target_deg
+        elif isinstance(it, _Linear):
+            computed, target = _linear_value(it, values), it.target
         else:  # _Value
             computed, target = values[it.path], it.target
         dev = computed - target
@@ -600,6 +658,9 @@ def restraint_partials(compiled: CompiledRestraints, values: dict, table,
             _bond_row_partials(r_phys, row, it, values, idx, pref)
         elif isinstance(it, _Angle):
             _angle_row_partials(r_phys, row, it, values, idx, pref)
+        elif isinstance(it, _Linear):  # ∂row/∂pₖ = cₖ·√w/σ, constant
+            for path, c in zip(it.paths, it.coefficients, strict=True):
+                r_phys[row, idx[_linear_path(it, path, idx)]] += c * pref
         else:  # _Value: ∂row/∂path = √w/σ
             r_phys[row, idx[it.path]] += pref
         if gross is not None:
@@ -904,6 +965,9 @@ def summarise_restraints(compiled: CompiledRestraints | None, values: dict,
         elif isinstance(it, _Angle):
             computed, target = _angle_value_np(it, values), it.target_deg
             kind, atoms, path, ph = "angle", [it.i, it.j, it.k], None, it.phase
+        elif isinstance(it, _Linear):
+            computed, target = float(_linear_value(it, values)), it.target
+            kind, atoms, path, ph = "linear", None, it.key, None
         else:  # _Value
             computed, target = float(values[it.path]), it.target
             kind, atoms, path, ph = "value", None, it.path, it.phase
@@ -1128,3 +1192,84 @@ def stale_anti_bump_pairs(phase, *, since=None) -> list[tuple[int, int, float, f
         seen.add(tag)
         out.append((key[0], key[1], d, r0))
     return sorted(out, key=lambda p: p[2] - p[3])
+
+
+# ----------------------------------------------------------------------
+# building a conserved elemental ratio (WP-1942, issue #212)
+# ----------------------------------------------------------------------
+def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
+                              sigma: float, *, phases=None, weight: float = 1.0,
+                              label: str | None = None):
+    """A :class:`~rietx.schemas.structure.LinearRestraint` holding an elemental ratio.
+
+    The moles of element E in a specimen are proportional to
+    Σ_p S_p·V_p·n_{E,p}, where n_{E,p} is the occupancy-weighted count of E in
+    one cell of phase p: Hill & Howard's (1987, *J. Appl. Cryst.* 20, 467)
+    W_p ∝ S_p·(ZMV)_p, divided by the cell mass (ZM)_p, is the number of cells.
+    So the ratio r = Σ_E∈num / Σ_E∈den is held by the row
+
+        Σ_p a_p·S_p = 0,   a_p = V_p·(n_{num,p} − r·n_{den,p}) / D₀,
+
+    which is linear in the scales, with constant partials.  D₀ =
+    Σ_p S_p·V_p·n_{den,p} at the scales ``structure`` holds now, so near the
+    target the row reads r − ``ratio`` and ``sigma`` is a σ on the ratio
+    itself.  It is that only while the scales stay near the ones the row was
+    declared at: the row's σ on the ratio is ``sigma``·D/D₀, so declare it
+    once the scales are refined, never from placeholder ones.
+
+    ``numerator`` and ``denominator`` are element symbols (a string or an
+    iterable of them); ``phases`` the phase indices the row spans, every
+    phase by default.  A phase holding none of the elements has a zero
+    coefficient and leaves the row.  The cell volumes and the occupancies
+    are read now and frozen: the row records the phases it read occupancies
+    from (``occupancy_phases``), and a stage freeing one of their
+    occupancies reports ``LINEAR_RESTRAINT_STALE``.  The declared ratio is
+    the caller's input, and no result field stores it as measured.
+
+    The coefficients assume Hill & Howard's relation as written, with no
+    microabsorption correction: under Brindley's correction a phase's
+    fraction is the scale times its τ, and this row does not carry it.
+    """
+    from ..crystallography.symmetry import resolve_group
+    from ..optimize.qpa import phase_zmv
+    from ..schemas.structure import LinearRestraint
+
+    num = {numerator} if isinstance(numerator, str) else set(numerator)
+    den = {denominator} if isinstance(denominator, str) else set(denominator)
+    if not num or not den:
+        raise ValueError("an elemental ratio needs a numerator and a denominator")
+    if num & den:
+        raise ValueError(f"{sorted(num & den)} is on both sides of the ratio")
+    if not (math.isfinite(ratio) and ratio >= 0.0):
+        raise ValueError(f"ratio must be finite and non-negative, got {ratio}")
+    span = range(len(structure.phases)) if phases is None else list(phases)
+    terms: list = []
+    occ: list = []
+    d0 = 0.0
+    rows = []
+    for ip in span:
+        phase = structure.phases[ip]
+        zmv = phase_zmv(resolve_group(phase.space_group, phase.symmetry_operations),
+                        phase.cell.lengths_angles(),
+                        [(a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
+                         for a in phase.atoms])
+        n_num = sum(zmv.element_counts.get(e, 0.0) for e in num)
+        n_den = sum(zmv.element_counts.get(e, 0.0) for e in den)
+        d0 += float(phase.scale.value) * zmv.cell_volume * n_den
+        rows.append((ip, zmv.cell_volume * (n_num - ratio * n_den)))
+        if n_num + n_den > 0.0:
+            occ.append(ip)
+    if not d0 > 0.0:
+        raise ValueError(
+            f"no phase spanned holds {sorted(den)} at a positive scale, so the "
+            f"ratio has no denominator")
+    for ip, a in rows:
+        if a != 0.0:
+            terms.append((f"phases.{ip}.scale", a / d0))
+    if not terms:
+        raise ValueError("every coefficient is zero: no phase spanned holds "
+                         "the elements named")
+    return LinearRestraint(
+        terms=terms, target=0.0, sigma=sigma, weight=weight,
+        label=label or f"{'+'.join(sorted(num))}/({'+'.join(sorted(den))}) = {ratio:g}",
+        occupancy_phases=occ)

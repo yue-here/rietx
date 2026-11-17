@@ -714,7 +714,7 @@ def _lineless_phases(model: CompiledModel) -> set[int]:
 
 def _restrained_scale_phases(model: CompiledModel,
                              table: ParameterTable) -> set[int]:
-    """The phases whose ``scale`` a caller's ``ValueRestraint`` pulls: its row
+    """The phases whose ``scale`` a caller's ``ValueRestraint`` or ``LinearRestraint`` pulls: its row
     gives the scale a column even with no line in range, so the WP-1958 hold
     leaves that scale to the restraint (its fraction stays absent all the
     same, the value being the caller's target and not the data's).
@@ -733,12 +733,19 @@ def _restrained_scale_phases(model: CompiledModel,
     reach = table.entry_reach()
     out: set[int] = set()
     for it in items:
-        path = getattr(it, "path", None)
-        if not path or not getattr(it, "weight", 1.0) > 0.0:
+        # a value row names one path, a linear row (WP-1942) several: a row
+        # reaches a scale through any term whose coefficient is nonzero
+        paths = ((getattr(it, "path", None),) if not hasattr(it, "paths")
+                 else tuple(p for p, c in zip(it.paths, it.coefficients,
+                                              strict=True) if c != 0.0))
+        if not getattr(it, "weight", 1.0) > 0.0:
             continue
-        for name in (path, *reach.get(path, ())):
-            if (m := _SCALE_PATH.match(name)):
-                out.add(int(m.group(1)))
+        for path in paths:
+            if not path:
+                continue
+            for name in (path, *reach.get(path, ())):
+                if (m := _SCALE_PATH.match(name)):
+                    out.add(int(m.group(1)))
     return out
 
 
@@ -9476,6 +9483,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if restraints_report is not None:
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
+    if model.restraints is not None:
+        diagnostics = diagnostics + _linear_stale_diagnostics(
+            structure, set(table.moving_paths))
 
     # Bonding geometry, with esds through the *whole* covariance (WP-1072,
     # McCusker §10) — built here because that covariance is read off the final
@@ -10514,7 +10524,7 @@ def _restraint_tension_diagnostics(report, structure: Structure) -> list[Diagnos
             k += 1
             found = (None if abs(row.deviation_over_sigma) <= RESTRAINT_TENSION_SIGMA
                      else (_restraint_where(row, structure),
-                           f"The {row.kind} restraint deviates "
+                           f"The {_restraint_name(row, structure)} deviates "
                            f"{row.deviation_over_sigma:+.1f}σ from its target "
                            f"({row.computed:.4g} vs {row.target:.4g})."))
         if found is None:
@@ -12333,6 +12343,47 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
                        "the contact is real, lower that species pair's minimum "
                        "distance"))
     return out
+
+
+def _linear_stale_diagnostics(structure: Structure, moving: set[str]) -> list[Diagnostic]:
+    """A ``LinearRestraint`` whose coefficients this stage made stale (WP-1942).
+
+    ``elemental_ratio_restraint`` reads each phase's occupancies once and
+    freezes them into the coefficients (``occupancy_phases``), so a stage
+    that moves an occupancy of one of those phases fitted against a row
+    computed for other occupancies.  Nothing is changed; the finding says so,
+    once per row, naming the occupancies that moved.
+    """
+    out: list[Diagnostic] = []
+    for k, r in enumerate(structure.restraints):
+        moved = sorted(p for p in moving for ip in r.occupancy_phases
+                       if p.startswith(f"phases.{ip}.atoms.") and p.endswith(".occ"))
+        if not moved:
+            continue
+        name = f"restraints.{k}" + (f" ({r.label})" if r.label else "")
+        out.append(Diagnostic(
+            level="warning", code="LINEAR_RESTRAINT_STALE",
+            where=[f"restraints.{k}", *moved],
+            message=(f"The linear restraint {name} has coefficients computed from "
+                     f"occupancies this stage refined ({', '.join(moved)}), so the "
+                     f"fit was held to a row for the occupancies it was declared "
+                     f"at."),
+            suggestion=("Rebuild the row with elemental_ratio_restraint from the "
+                        "refined occupancies and refit, or hold those occupancies "
+                        "in the stages the row is on."),
+        ))
+    return out
+
+
+def _restraint_name(row, structure: Structure) -> str:
+    """How a tension message names its restraint: the kind, and for a
+    structure-level linear row (WP-1942) its key and the caller's label."""
+    if row.kind != "linear":
+        return f"{row.kind} restraint"
+    k = int(row.path.rsplit(".", 1)[1])
+    label = (structure.restraints[k].label
+             if k < len(structure.restraints) else None)
+    return f"linear restraint {row.path}" + (f" ({label})" if label else "")
 
 
 def _restraint_where(row, structure: Structure) -> list[str]:

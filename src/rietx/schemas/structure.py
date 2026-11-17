@@ -649,6 +649,61 @@ class ValueRestraint(Base):
     weight: float = Field(default=1.0, ge=0.0)
 
 
+class LinearRestraint(Base):
+    """A soft restraint on a linear sum of parameters, which may span phases (WP-1942).
+
+    Contributes one residual row √weight·(Σₖ cₖ·pₖ − target)/sigma, kept in
+    the covariance and out of Rwp, Durbin-Watson and Bérar-Lelann like every
+    soft restraint (Waser, 1963, *Acta Cryst.* 16, 1091), and weighted by the
+    stage's c_w.  It is :class:`ValueRestraint`'s row generalised from one
+    path to (path, coefficient) pairs, the form ``TieSpec.terms`` stores.
+
+    It lives on :attr:`Structure.restraints`, never on a phase: a row over
+    several phases has no single owner, and in one phase's list it would
+    dangle when phases are removed, reordered or copied (issue #212).  A path
+    is any dot-path in the model tree a fit's table holds, including another
+    phase's, a ``vars.<name>`` or an instrument parameter.
+
+    ``label`` names the row in the report, for a reader; nothing reads it.
+    ``occupancy_phases`` lists the phases whose atom occupancies the
+    coefficients were computed from (:func:`rietx.elemental_ratio_restraint`
+    fills it).  The coefficients are frozen at declaration, so a stage that
+    frees an occupancy of one of these phases fits against a stale row, and
+    reports so (``LINEAR_RESTRAINT_STALE``) rather than staying silent.
+    """
+
+    terms: list[tuple[str, float]] = Field(min_length=1)
+    target: float = 0.0
+    sigma: float = Field(gt=0.0)
+    weight: float = Field(default=1.0, ge=0.0)
+    label: str | None = None
+    occupancy_phases: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _terms_are_a_row(self) -> "LinearRestraint":
+        """Refuse a repeated path, a non-finite coefficient or an all-zero row.
+
+        A repeated path is one term written twice, which a reader would add
+        and a writer could mean either way; a row of zeros restrains nothing
+        and has no honest deviation.
+        """
+        paths = [p for p, _ in self.terms]
+        if len(set(paths)) != len(paths):
+            raise ValueError(f"a linear restraint names a path twice: {paths}")
+        if any(any(ch in p for ch in "*?[") for p in paths):
+            raise ValueError(
+                f"a linear restraint names entries, not globs: {paths}")
+        if not all(math.isfinite(c) for _, c in self.terms):
+            raise ValueError("a linear restraint's coefficients must be finite")
+        if not any(c != 0.0 for _, c in self.terms):
+            raise ValueError("a linear restraint needs a nonzero coefficient")
+        if not math.isfinite(self.target):
+            raise ValueError("a linear restraint's target must be finite")
+        if any(p < 0 for p in self.occupancy_phases):
+            raise ValueError("occupancy_phases holds phase indices, which are >= 0")
+        return self
+
+
 #: How far (Å) a body atom's stored coordinates may sit from where its body
 #: places it before a table refuses to build (``RIGID_BODY_TEMPLATE_DRIFT``).
 #: The write-back stores what the map computed, so a fitted model drifts by
@@ -1904,6 +1959,8 @@ class Phase(_InheritsDeclaredDefaults):
 
 #: A ``ValueRestraint`` path on an atom: its phase and atom index.
 _VALUE_ATOM_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)(?=\.|$)")
+#: A path on a phase: its index.
+_LINEAR_PHASE_PATH = re.compile(r"^phases\.(\d+)(?=\.|$)")
 
 
 class Structure(Base):
@@ -1934,6 +1991,45 @@ class Structure(Base):
     """
 
     phases: list[Phase]
+    #: Soft restraints on a linear sum of parameters across phases (WP-1942);
+    #: a row inside one phase stays in that phase's ``restraints``.
+    restraints: list[LinearRestraint] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _linear_rows_name_phases_it_has(self) -> "Structure":
+        """Every phase a :class:`LinearRestraint` names is one of ``phases``.
+
+        A new kind, so construction checks it: no stored document predates
+        it.  The atom half is :meth:`_check_atom_references`'s, run at an
+        edit, for the reason :meth:`Phase._check_restraint_indices` gives.
+        """
+        n = len(self.phases)
+        for k, r in enumerate(self.restraints):
+            for path, _ in r.terms:
+                m = _LINEAR_PHASE_PATH.match(path)
+                if m is not None and int(m.group(1)) >= n:
+                    raise ValueError(
+                        f"linear restraint {k} names {path}, but the structure "
+                        f"has {n} phase(s)")
+            for ip in r.occupancy_phases:
+                if ip >= n:
+                    raise ValueError(
+                        f"linear restraint {k} names occupancy phase {ip}, but "
+                        f"the structure has {n} phase(s)")
+        return self
+
+    def _linear_restraints_name_atoms_it_has(self) -> None:
+        """A :class:`LinearRestraint` term on an atom names an atom this structure has."""
+        for k, r in enumerate(self.restraints):
+            for path, _ in r.terms:
+                m = _VALUE_ATOM_PATH.match(path)
+                if m is None:
+                    continue
+                ip, j = int(m.group(1)), int(m.group(2))
+                if not (ip < len(self.phases) and j < len(self.phases[ip].atoms)):
+                    raise ValueError(
+                        f"linear restraint {k} references {path}, but the "
+                        f"structure has no such atom")
 
     def _value_restraints_name_atoms_it_has(self) -> None:
         """A ``ValueRestraint`` path on an atom names a phase and an atom this structure has.
@@ -1964,6 +2060,8 @@ class Structure(Base):
         for phase in self.phases:
             phase._check_atom_references()
         self._value_restraints_name_atoms_it_has()
+        self._linear_restraints_name_atoms_it_has()
+        self._linear_rows_name_phases_it_has()
 
     @classmethod
     def from_cif(cls, path: str | os.PathLike[str], *, phase_name: str | None = None,

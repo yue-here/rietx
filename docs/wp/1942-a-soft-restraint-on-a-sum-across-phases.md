@@ -147,17 +147,22 @@ ships verified on synthetic known answers and not yet validated.
       the row lives on `Structure.restraints`, and it is an item kind inside
       the `soft_restraint` block, not a new `BLOCK_ORDER` entry: the
       reporter's answers in § Inherited, taken as written.
-- [ ] The schema type, (path, coefficient) pairs plus target, σ and weight,
+- [x] The schema type, (path, coefficient) pairs plus target, σ and weight,
       with its JSON round-trip and the `SCHEMA_VERSION` or project-format
-      bump it needs.
-- [ ] Compile, residual and analytic partials; the geometry-esd path
+      bump it needs. *Done 2026-11-17:* `LinearRestraint` (`terms` as
+      `TieSpec.terms` stores them) on `Structure.restraints`, additive under
+      the open 0.61 (no bump; its note in `schemas/common.py`); carried and
+      renumbered through `carry_restraints` like a phase's own list.
+- [x] Compile, residual and analytic partials; the geometry-esd path
       handles or excludes it; `summarise_restraints` and
-      `RESTRAINT_TENSION` report it under one stable `where`.
-- [ ] The elemental-ratio helper: coefficients from `element_counts` and
+      `RESTRAINT_TENSION` report it under one stable `where`. *Done
+      2026-11-17:* `_Linear` in the soft-restraint block, key
+      `restraints.<index>`; geometry builds its own items and never sees it.
+- [x] The elemental-ratio helper: coefficients from `element_counts` and
       cell volumes, σ stated on the ratio, and a report when a stage frees
       an occupancy of a phase in the row.
 - [ ] The three #349 exports from § Inherited.
-- [ ] Tests: the probe above as a regression, a synthetic two-phase series
+- [x] Tests: the probe above as a regression, a synthetic two-phase series
       where the ratio decides the partition, cross-backend agreement for the
       new partials (`tests/test_cross_backend.py`); obs/calc/diff PNGs to
       `tests/output/`.

@@ -717,6 +717,14 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-1942): ``Structure.restraints``, a list of
+#: ``LinearRestraint`` (a soft row on Σ c·p over (path, coefficient) pairs,
+#: which may span phases), with ``RestraintRow.kind`` gaining ``"linear"``;
+#: ``PhaseQuantity.element_counts``;
+#: ``QPAResult.weight_fraction_covariance``; and
+#: ``FitReport.unidentified_phase``.  Additive and defaulted (an empty list,
+#: ``None``), the 0.25 → 0.26 rule, so every stored document opens unchanged;
+#: an older build refuses a document carrying any of the keys.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
