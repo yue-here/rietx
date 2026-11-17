@@ -815,8 +815,11 @@ def _configured_root_elsewhere(directory: Path) -> Path | None:
     or its ``.rietx/runs``. Anywhere else under it may sit below a dotted or
     pruned directory, or past the depth bound, which ``discover`` never
     enters, so the line is printed. A root that cannot even be resolved is
-    no reason to stop a viewer, and prints nothing.
+    no reason to stop a viewer, and prints nothing; nor does a process with
+    recording switched off, where a fit records nowhere.
     """
+    if not runs_mod.enabled():
+        return None
     try:
         root = runs_mod.configured_root()
         if root is None:

@@ -1431,3 +1431,6 @@ def test_watch_names_a_process_root_it_is_not_scanning(tmp_path, monkeypatch,
     # under a dot-directory the scan never enters, so it is named
     monkeypatch.setenv(RUNS_DIR_ENV, str(work / ".myapp" / "runs"))
     assert _configured_root_elsewhere(here) == work / ".myapp" / "runs"
+    # and with recording off a fit records nowhere, so nothing is claimed
+    runs.set_enabled(False)
+    assert _configured_root_elsewhere(here) is None
