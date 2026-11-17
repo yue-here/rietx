@@ -133,8 +133,13 @@ short of 130 keV, so it is a partial answer.
       new range is refused) + obs/calc/diff PNGs to `tests/output/` if a
       fixture is fitted. In `tests/test_dispersion.py` § above the bundled
       70 keV; no fixture is fitted, so no PNGs.
-- [ ] Skill: the routing or reference row an agent driving rietx needs from
+- [x] Skill: the routing or reference row an agent driving rietx needs from
       this WP, or "none" and why (1532 owns the workaround wording).
+      The `RECIPE_DISPERSION_DECLINED` row in `references/diagnostics-projects.md`
+      said 74.5 keV was outside the table and f = f₀ the correct limit there;
+      it now says the lookup reaches 200 keV, the reader still declines above
+      the bundled rows, and how to apply the correction. No new row: a
+      hand-built model above 70 keV now just works.
 
 ## Acceptance
 
