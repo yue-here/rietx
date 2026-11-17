@@ -123,13 +123,17 @@ it needs its row.
 
 ## Tasks
 
-- [ ] Rewrite `INDEX_PANEL_REDUCED`'s systems clause by one of the two routes
+- [x] Rewrite `INDEX_PANEL_REDUCED`'s systems clause by one of the two routes
       above. A test covers the three cases: a narrowed request, a disjoint
-      request, and `assess_peak_list` alone.
-- [ ] `INDEX_SYSTEMS_NOT_COVERED` names the systems the list could not
+      request, and `assess_peak_list` alone. Route 1 (a statement about the
+      list); `tests/test_indexing_quality.py` § What the messages say was
+      searched.
+- [x] `INDEX_SYSTEMS_NOT_COVERED` names the systems the list could not
       support apart from those not requested, and its suggestion fits each.
       Record which systems `_restrict_to_supported` dropped where the
-      diagnostic can read it.
+      diagnostic can read it. The split reads `quality.systems_supported`,
+      already on the result and the authority the restriction reads, so no
+      second record was added (handover entry says why).
 - [ ] The help entries (`help.py` 3101, 3220, 5202) and
       `reference/peaks.md:431` say the same as the new messages.
 - [ ] Rebuild tutorial 03b, whose saved output prints both codes, and read
