@@ -617,7 +617,8 @@ The order scan is a `BackgroundSelection`, the same object `rietx.background.sel
 ### Fixed curve plus Chebyshev
 
 `BackgroundFixedPlusChebyshev` holds a fixed curve in the model and refines a polynomial on top of it.
-The curve is a measured blank or an estimated baseline.
+The curve is normally a measured blank.
+An estimated baseline can be held the same way, but this is not recommended: a held SNIP curve takes intensity from the tails of the reflections and biases Biso high, and the background-absorption screen cannot see a held curve.
 Holding it in the model keeps the counting statistics intact, where subtracting it would not.
 
 | Field | Type | Default | Meaning |

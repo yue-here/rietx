@@ -198,7 +198,9 @@ smoothing strength. A larger $\lambda$ gives the second-difference term more
 weight, so $z$ comes out stiffer. arPLS {cite}`baek2015` iterates the solve
 with asymmetric reweighting so peaks are progressively excluded from the
 baseline. SNIP {cite}`ryan1988`
-is available as an independent alternative.
+is available as an independent alternative, for a quick look or a comparison.
+It is not recommended as a background held in a fit: the curve rises under
+the tails of the reflections and takes their intensity, which biases Biso high.
 
 ## Choosing the flexibility
 

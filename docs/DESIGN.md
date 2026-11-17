@@ -602,7 +602,8 @@ exact-input-equality hit survives (WP-0605).
 Two-stage default: (1) diagnostics on the raw pattern → structured object an
 agent can reason over; (2) robust estimate via arPLS (default) / iarPLS
 (amorphous hump) / SNIP (dense patterns), λ auto-selected; then either hold
-the estimate additively + small Chebyshev correction (v0.1 behavior) or —
+the estimate additively + small Chebyshev correction (v0.1 behavior; not
+recommended since 2026-11, because a held SNIP curve biases Biso, #1569) or —
 the v0.2 default — co-refine a **penalized P-spline** whose 2nd-difference
 smoothness penalty rides as extra residual rows: linear, differentiable,
 esd-propagating, and physically unable to absorb broad Bragg intensity (the

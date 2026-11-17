@@ -85,6 +85,16 @@ def snip(y: np.ndarray, max_half_window: int, *, decreasing: bool = True) -> np.
 
     ``max_half_window`` should be at least the half-width (in points) of the
     widest peak to suppress.
+
+    Not recommended as a background held in a fit.  Held under a small
+    Chebyshev (:class:`~rietx.BackgroundFixedPlusChebyshev`), the curve rises
+    under the tails of the reflections and takes their intensity, so Biso
+    comes out high: on a synthetic LaB₆ with a known background, La Biso is
+    8.8 esd high at a half-window of 3 FWHM and still 6.0 esd high at 6 FWHM,
+    and every Biso rises on SRM 1976a and FAP (#1569; WP-2017 group Q).
+    ``BACKGROUND_ABSORPTION`` cannot see a held curve, so nothing in the
+    report flags it.  Co-refine the background instead.  The estimator is kept
+    for a quick look at a pattern or a comparison while debugging.
     """
     y = np.asarray(y, dtype=np.float64)
     # log-log-sqrt (LLS) transform compresses dynamic range (Ryan et al.)
