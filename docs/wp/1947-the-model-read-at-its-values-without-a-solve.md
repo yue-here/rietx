@@ -149,8 +149,11 @@ entry of that date.)*
       `StageSpec` holding 0 is refused when `fit` or `refine_multi` converts
       it, before any compile or history write, on either driver. The empty
       stage with 0 is refused too, since it has the verb now. `rietx.help`'s
-      `max_iter` entry says so. `StageSpec` keeps no bound, so a stored plan
-      still loads (a schema change was not needed for the refusal).
+      `max_iter` entry says so. `StageSpec.max_iter` carries `ge=1` too (the
+      review's finding 1): without it the GUI stored a plan holding 0 and
+      then answered 500 on every read of it, and the mirror accepted what
+      the dataclass refuses. Now the plan route answers 4xx at
+      `plan.stages.0.max_iter` (probed on the `fap` example).
 - [x] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.

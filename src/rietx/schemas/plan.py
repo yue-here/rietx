@@ -207,8 +207,10 @@ class StageSpec(Base):
             "dot-path globs this stage fixes after it frees turn_on, e.g. "
             "'instrument.profile.*'; the flag carries to later stages until "
             "a later turn_on frees the path again"))
-    max_iter: int = Field(100, description=(
-        "approximate solver iterations for this stage; both drivers cap "
+    max_iter: int = Field(100, ge=1, description=(
+        "approximate solver iterations for this stage, at least 1 (to read "
+        "the model at its values without a fit, Refinement.evaluate); both "
+        "drivers cap "
         "evaluations rather than iterations, so it is scaled by the "
         "measured worst-case rejection rate (NFEV_PER_ITERATION)"))
     ftol: float | None = Field(None, gt=0.0, description=(

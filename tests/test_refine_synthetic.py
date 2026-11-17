@@ -312,6 +312,8 @@ def test_evaluate_is_the_empty_stage_and_changes_nothing(synthetic_pattern, mode
     finally:
         runs.set_enabled(was)
     assert _state(ref) == before
+    # no tree is made for it either (the caller has none before a first fit;
+    # a fitted caller's tree is checked by the test after this one)
     assert not (tmp_path / "h.jsonl").exists(), "an evaluation is not a fit"
     assert not (tmp_path / STATE_DIR_NAME).exists(), "and records no run"
 
@@ -346,7 +348,8 @@ def _draw_evaluation(result, data):
 
 def test_evaluate_after_a_fit_leaves_its_answer_alone(synthetic_pattern):
     """On a fitted refinement the evaluation is at the fitted values and the
-    fit's own result, model and history stay the caller's."""
+    fit's own result, model and history stay the caller's: no node joins its
+    tree.  Unasked, it reads the refinement in the mode it was fitted in."""
     ref = Refinement(*_with_background())
     fitted = ref.fit(synthetic_pattern, plan="profile_only", telemetry=False)
     before = _state(ref)
@@ -355,6 +358,12 @@ def test_evaluate_after_a_fit_leaves_its_answer_alone(synthetic_pattern):
     assert ref.result_ is fitted
     assert result is not fitted
     assert result.y_calc == pytest.approx(fitted.y_calc, rel=1e-12, abs=1e-9)
+
+    lebail = Refinement(*_with_background())
+    lebail.fit(synthetic_pattern, mode="lebail", plan="profile_only",
+               telemetry=False)
+    assert lebail.evaluate(synthetic_pattern).mode == "lebail"
+    assert lebail.evaluate(synthetic_pattern, mode="rietveld").mode == "rietveld"
 
 
 @pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
