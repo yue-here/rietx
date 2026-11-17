@@ -1,6 +1,6 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: parametric · Status: 🔄 2026-11-17 — claimed by a ghostshift runner (MacBook-Air-c4aacd)
+Milestone: parametric · Status: 🔄 2026-11-17 — the surface waits on the maintainer (PR #1635); nothing built
 Depends on: 1964 (the grammar, evaluated on arrays)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
@@ -226,6 +226,121 @@ then adds both to its protocol.
 - WP-1964 (the grammar), WP-0503 (Stephens), WP-1102 (the expression clause), WP-2061.
 
 ## Handover log
+
+- **2026-11-17 (a ghostshift runner; PR #1635)** — Nothing is built yet. The first task
+  names a field on `Phase` and a top-level type, so it is the maintainer's to rule, and
+  every later task builds on the field it names. This session read the seams and the
+  rulings the surface rests on, and wrote the decision below with the call each option
+  produces. The stored-format task rides on the same answer.
+  - *Decision for the maintainer: where a peak equation is declared.* It reaches you as
+    a new field and a new top-level name on the main surface.
+    - **Why it matters.** A peak equation adds a term to each reflection's width or
+      position, or multiplies its intensity, as `Phase.microstrain` and `Phase.texture`
+      already do with built-in forms. Its coefficients must be ordinary parameters of
+      the phase (§ Rules this WP inherits), so they get bounds, esds, holds and sharing
+      like any other. Where the equation is declared decides whether those coefficients
+      travel with the model. A series carries the models from pattern to pattern, and a
+      fact kept only in the refinement's own record reaches pattern 1 and nothing after
+      (root CLAUDE.md, WP-1441). A joint fit takes structures and instruments, and
+      shares a phase's parameters across patterns by default while an instrument's stay
+      per pattern (`params/multi.py` `SharingMap`). Importance: moderate. The choice is
+      cheap to change before anyone stores a file, and costly after.
+    - **Aim.** Machinery for the expert who writes their own model, ported from TOPAS by
+      an agent (the 2026-11-03 and 2026-11-04 rulings). The milestone's ZrP₂O₇ row is the
+      first case.
+    - **The worked case.** ZrP₂O₇'s 2θ calibration curve on the whole pattern, and Stinton
+      & Evans's extra Lorentzian width on 0kl reflections. Names below are illustrative
+      until ruled.
+    - **Option A, a field on the model** (the WP's placeholder):
+
+      ```python
+      phase.peak_equations = [rx.PeakEquation(
+          target="lor_fwhm", expression="if(h == 0, w, 0) * tan(theta)",
+          coefficients={"w": rx.Parameter(value=0.01, vary=True, min=0.0)})]
+      instrument.peak_equations = [rx.PeakEquation(
+          target="shift", expression="sq * (two_theta - 60)^2 + ln * (two_theta - 60)",
+          coefficients={"sq": rx.Parameter(value=0.0, vary=True),
+                        "ln": rx.Parameter(value=0.0, vary=True)})]
+      ```
+
+      The coefficients are entries at `phases.0.peak_equations.0.w` and
+      `instrument.peak_equations.0.sq`. A series carries them, a joint fit shares `w` and
+      keeps `sq` per pattern unless `SharingMap(shared=...)` says otherwise, and the model
+      JSON and the `.rxt` text show them. Cost: one additive field on `Phase` and one on
+      `Instrument`, defaulted to `[]`. Under the 0.25 → 0.26 rule that is "Also in 0.61"
+      (1.12 has not shipped), and an older build refuses a file that carries one.
+      `gui/textdoc.FORMAT_VERSION` moves 1 → 2 for the new block. Undoable until a release
+      stores one.
+    - **Option B, a command in the tie family:**
+
+      ```python
+      ref.add_peak_equation(phase=0, target="lor_fwhm",
+                            expression="if(h == 0, w, 0) * tan(theta)",
+                            coefficients={"w": 0.01})
+      ```
+
+      The equation lives in the refinement's record, as ties and variables do. The
+      models stay unchanged. Cost: a new record fact and history node kind. A series
+      then carries the equation nowhere until someone builds it the path WP-1441 says is
+      missing. A joint fit needs its own argument, since `refine_multi` takes models.
+    - **Option C, park the WP.** Neither curve can be written, and the ZrP₂O₇ row ports
+      without its calibration curve.
+    - Dropped: reusing `ParametricEquation`. It indexes patterns, and a peak equation
+      indexes reflections. One type carrying both indices would make every validator ask
+      which one it holds.
+    - **Practice** (`docs/practice.md` § An equation over a reflection, checked
+      2026-11-04, plus recall). TOPAS writes the equation as a keyword at the level it
+      acts on: `th2_offset` on the pattern, `lor_fwhm` inside the phase. FullProf chooses
+      a closed model by an integer in the phase. Both put the declaration in the model,
+      which is option A. rietx's own precedents agree: `Phase.texture` keeps its
+      coefficients as a `dict[str, Parameter]` inside the block (paths
+      `phases.0.texture.c4_1`), and `Instrument.extra_components` is a list addressed by
+      index (`instrument.extra_components.0.fwhm`).
+    - **A ruling that reads the other way.** On WP-1964 (decision (a), 2026-11-05) you
+      ruled that a formula in a single refinement is declared by a command in the tie
+      family, "never by a field on the parameter". Its grounds were that one place
+      declares what a parameter follows. A peak equation makes no existing parameter
+      follow anything. It adds a physical term, as `microstrain` does. So the ruling
+      does not cover it on my reading. If you meant it to cover every formula a user
+      writes, option B follows.
+    - **Recommendation: option A, a lean towards a clear call.** The crux is whether the
+      coefficients are model values. Under A they behave like every other phase
+      parameter with no new path. Under B a series and a joint fit each need one built,
+      and the series half is the absence the root CLAUDE.md already warns about. This
+      flips if your WP-1964 ruling was meant to cover any user formula.
+  - *Consent list, if option A stands.* Each stands unless you object.
+    1. The type is `rx.PeakEquation(target, expression, coefficients)`, mirroring
+       `ParametricEquation(target=, expression=)`. The fields are `Phase.peak_equations`
+       and `Instrument.peak_equations`. At most one equation per target per level, since
+       a sum goes in one expression. Paths use the list index, as `extra_components`
+       does. That has one trap. Deleting an equation renumbers the later ones, so a
+       stored hold on `peak_equations.1.*` then names another equation.
+    2. Targets, in the package's words and units. `lor_fwhm` adds to the Lorentzian FWHM
+       in degrees 2θ. `gauss_fwhm` adds in quadrature, in degrees. `gauss_fwhm_squared`
+       is a signed term in deg², added where U, V and W are. `shift` is degrees 2θ added
+       to the position. `intensity_factor` multiplies the reflection's intensity. The
+       instrument level takes `shift` only and reads no hkl. The manual's table maps
+       TOPAS's keywords onto these.
+    3. Reflection names, bound only inside a peak equation and reserved nowhere else.
+       `h`, `k`, `l`, `m` (multiplicity) and `d` (Å), plus `theta` in radians, so that
+       `tan(theta)` works under the grammar's radians-only trigonometry, and `two_theta`
+       in degrees, the position before the equation acts, as every rietx 2θ is. A
+       coefficient may not take one of these names. Nor may it be called `scale`, which
+       `SharingMap` would make per pattern by its suffix.
+    4. Two grammar functions. `orbit_mean(x)` averages x over the reflection's orbit
+       images. `harmonic(l, n)` is Bunge's symmetrised spherical harmonic K_l^n of the
+       reflection's direction, named as `crystallography/spherical_harmonics.py` names
+       texture terms. Both move `GRAMMAR_VERSION` 1 → 2, which `capabilities()` quotes.
+    5. A pattern's coordinate is not read inside a peak equation. In a joint fit a
+       coefficient follows a coordinate through a `ParametricEquation` whose target is
+       its path, such as `phases.0.peak_equations.0.w`. That is one mechanism where the
+       task "A joint fit" asked for two.
+  - *Gotchas.* The WP's line numbers have drifted, but the names still hold:
+    `generation_window` is now called at `model/forward.py:4367`, and `_shift_est` sits at
+    4347 and `_size_family` at 4478. WP-2101 (the parametric surface in the manual) is
+    held by another runner, so the manual task here coordinates with it.
+  - *Next.* Your ruling on the surface and on the consent list. Then the compile task,
+    which is the first to build anything.
 
 - **2026-11-04 (the ruling)** — The maintainer ruled for robust machinery with no
   overfitting to TOPAS, so this WP joined the milestone with all three targets, and the
