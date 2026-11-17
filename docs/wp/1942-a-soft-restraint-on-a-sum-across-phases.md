@@ -178,8 +178,11 @@ ships verified on synthetic known answers and not yet validated.
       `guides/restrain.md` § Restrain a sum across phases and Part 2
       `theory/parameterisation.md`'s `par-linear-restraint` and
       `par-ratio-restraint`.
-- [ ] Skill: a reference row for the new restraint kind and the ratio
-      helper, keyed by their names.
+- [x] Skill: a reference row for the new restraint kind and the ratio
+      helper, keyed by their names. *Done 2026-11-17:* one
+      `references/diagnostics.md` row, keyed by `LINEAR_RESTRAINT_STALE`,
+      naming `LinearRestraint`, `elemental_ratio_restraint` and the
+      flat-partition trap; the API rows are the regenerated `api.md`.
 
 ## Acceptance
 
