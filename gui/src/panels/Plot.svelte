@@ -43,6 +43,7 @@
   } from "../lib/plot";
   import type { Curves, Overlay, PatternChart } from "../lib/pattern";
   import type { Theme } from "../lib/theme";
+  import type { PreviewAnswer } from "../lib/interactive";
 
   let {
     result,
@@ -67,6 +68,8 @@
     ontogglepeak = () => {},
     onremovepeak = () => {},
     onprotocol = () => {},
+    preview = null,
+    oncurves = () => {},
   }: {
     result: any;
     plotKey: number;
@@ -127,6 +130,10 @@
       two_theta_limits?: [number, number] | null;
       excluded_regions?: [number, number][];
     }) => void;
+    /** the Interactive tab's preview, drawn over the last fit at its scale (WP-2128) */
+    preview?: PreviewAnswer | null;
+    /** the curves payload each fetch brought, for the graphs that read it too */
+    oncurves?: (curves: Curves | null) => void;
   } = $props();
 
   let node: HTMLDivElement | undefined = $state();
@@ -332,11 +339,14 @@
       chart.fig.onCursor = (hit) => hovering(hit ? hit.x : null);
       chart.fig.onSelect = (lo, hi) => { if (arm) selected(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
+      const p = untrack(() => preview);
+      if (p) chart.setPreview(p.curves);
     } else {
       chart.setCurves(c, mod.sameGrid(curves, c));
       chart.update(overlayNow());
     }
     curves = c;
+    oncurves(c);
     if (pendingZoom) {
       chart.fig.unpin();
       chart.fig.setX(...pendingZoom);
@@ -360,6 +370,7 @@
     applied = null;
     held = null;
     shown = null;
+    oncurves(null);
   }
 
   /**
@@ -626,6 +637,23 @@
     const mode = arm ? "select" : "zoom";
     untrack(() => chart?.fig.setMode(mode));
   });
+
+  // The preview is a repaint over the payload in hand, never a refetch
+  // (WP-2128). Each one drawn leaves a `rx-preview-redraw` User Timing entry
+  // from the moment its values were set to the frame after it painted, which
+  // is the drag-to-redraw latency the layout browser test reads.
+  $effect(() => {
+    const p = preview;
+    untrack(() => {
+      if (!chart) return;
+      chart.setPreview(p?.curves ?? null);
+      // the timeline keeps every entry, so a long session's drags would pile
+      // up there; a revert or an apply ends the set the test reads
+      if (!p) performance.clearMeasures?.("rx-preview-redraw");
+      else requestAnimationFrame(() => requestAnimationFrame(() =>
+        performance.measure("rx-preview-redraw", { start: p.sentAt })));
+    });
+  });
 </script>
 
 <svelte:window onpointermove={moved} onpointerup={up}
@@ -636,7 +664,7 @@
     <p class="hint bad">{error}</p>
   {:else if !result && !peaks?.peaks?.length}
     <p class="hint muted">
-      No fitted curves yet. Press <strong>Run</strong> — or, if you just moved the
+      No fitted curves yet. Press <strong>Refine</strong> — or, if you just moved the
       history, run again: a checkout restores parameter values, not a fit.
     </p>
   {:else if !result && peaksActive}
@@ -985,11 +1013,11 @@
   }
 
   .arming {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   .arming strong {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   /* A register of its own, and deliberately not `.knobs`: a rule above the

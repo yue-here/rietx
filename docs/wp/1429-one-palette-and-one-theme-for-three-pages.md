@@ -164,6 +164,22 @@ skip.
 - `tests/test_gui_palette.py`, `viz/plots.PALETTES`, `compare_app.py` lines
   215–219 and 313.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The token *values* are Python and `gui/src/tokens.css` is generated**
+(WP-1429, `src/rietx/viz/theme.py`; regenerate with `python -m rietx.viz.theme >
+gui/src/tokens.css`, then rebuild the dist). `rietx watch` and `rietx compare`
+ship inside the wheel and this workspace does not, so a colour the two Python
+pages serve cannot live in `gui/src`; they link a `/tokens.css` route rendered
+from that module. `app.css` imports the file and keeps everything that is not a
+colour, and `tests/test_gui_palette.py` reads the palette from the module and
+holds the committed file equal to the emitter byte for byte.
+
 ## Handover log
 
 - **2026-09-16** — **the three pages agree about colour, and two of them

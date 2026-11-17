@@ -179,8 +179,10 @@ print(indexing.best_or_none())
 
 # %% [markdown]
 # The candidate prints every field, its figures of merit included.
-# When no candidate reaches high confidence, `best_or_none()` returns `None` and the result carries [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained).
 # [Indexing](https://rietx.org/docs/stable/theory/indexing.html#figures-of-merit-in-both-directions) explains the figures of merit behind the ranking.
+#
+# When no candidate reaches high confidence, `best_or_none()` returns `None` and the result carries [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained).
+# Notebook 03b runs this search on a shorter scan of the same pattern, where rietx names no cell.
 #
 # ## Check the candidate with Le Bail
 #

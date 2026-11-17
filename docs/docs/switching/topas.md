@@ -95,10 +95,76 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `local dT 0` read by each phase's cell equation | `variables={"dT": rx.Parameter(value=0.0, vary=True)}` with `rx.SharingMap(per_histogram=["vars.dT"])` |
 | `prm !calib = T + b*(T - 738)/369;` read by the cell equations | `rx.ParametricEquation(name="calib", target=None, basis="expression", expression="T + b*(T - 738)/369")`, declared before the formulas that name `calib` |
 | `min` and `max` on a `prm` | `rx.Parameter(min=..., max=...)` |
+| `for xdds { ... }`, with `existing_prm i += 1;` and `#T_val(i)` | a python loop over the files, with each file's `T` at the same row of the coordinate table |
+| `#define`, `#ifdef` and `macro` | no equivalent: write out what they expand to, or a python function that builds the repeated part |
+| a phase's parameter under one name in every `xdd`, such as its `TCHZ_Peak_Type` terms | nothing: every pattern shares a phase's parameters unless `SharingMap.per_histogram` names them |
+| `local` on a phase's parameter, such as each temperature's `beq` | `rx.SharingMap(per_histogram=["phases.0.atoms.0.biso"])` |
+| `local` on a scale, a `bkg` term, `th2_offset` or a specimen height | nothing: each phase scale, and every parameter under `instrument.`, is one per pattern already |
+| an instrument term under one name in every `xdd` | `rx.SharingMap(shared=["instrument.zero_shift"])` |
+| `Specimen_Displacement(h_si, =h_zrp2o7;)`, one height for every phase of a pattern | nothing: every phase of a pattern reads its `instrument.geometry.sample_displacement` |
+| `!` on a coordinate the site symmetry leaves free, such as `x !x_O1 0.3064` | a `PlanSpec` stage with `turn_off=["phases.2.atoms.1.dof.*"]` (below) |
+| one B per pattern for every site: `local b` and `scale_pks = Exp(-2*b/(2 D_spacing)^2);` | a formula on each site's `biso` adding a per-pattern variable `b` (below) |
+| `be = b0*(1 + b1*1e-6*te + b2*1e-9*te^2);` on a monoclinic cell | a formula on `phases.0.cell.beta`, in degrees |
+| `a0 (1 + ax1 (T - 273))`, a product written with a space | `a0*(1 + ax1*(T - 273))`: a name before a parenthesis reads as a function call, and the formula is refused as an unknown function |
+| `range 3` of a multi-range RAW file | `rx.read_pattern(path, scan=2)`, since `scan` counts from 0 |
+| `Get(r_wp)`, `Out(Get(a), ...)` and `MVW(...)` | `result.histograms[h].statistics`, the rows of `result.parameters` (a per-pattern row is `hist.<h>.<path>`), and `result.histograms[h].qpa` |
+| `val_on_continue = Val*Rand(0.99, 1.01);` | no equivalent: rietx refines once from its starting values, so a python loop over starting values repeats the fit |
 
 A formula is evaluated in radians, and `pi` is the constant.
 `MultiHistogramRefinement.preview_equations` evaluates every formula at its starting values before any fit.
 Comparing that with the cells a TOPAS input stores checks a port line by line.
+
+TOPAS's `scale_pks` factor exp(−2b/(2d)²) is the Debye-Waller factor on the intensity, exp(−2bs²) with s = 1/(2d).
+Adding `b` to every site's B gives each reflection the same factor.
+A joint fit has no `hold` yet, so a stage's `turn_off` keeps a parameter fixed.
+A plan frees an equation's coefficients only where one of its stages reaches the target.
+`mccusker_default` frees no coordinate and no B, so a port that refines them names them in its own stages:
+
+```python
+import rietx as rx
+from rietx.schemas.plan import PlanSpec, StageSpec
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0), y=rx.Parameter(value=0.0),
+                   z=rx.Parameter(value=0.0), biso=rx.Parameter(value=0.25)),
+           rx.Atom(label="B", species="B", x=rx.Parameter(value=0.1975), y=rx.Parameter(value=0.5),
+                   z=rx.Parameter(value=0.5), biso=rx.Parameter(value=0.40))],
+)])
+temperatures = [300.0, 450.0, 600.0, 750.0, 900.0]
+instruments = [rx.Instrument.debye_scherrer(wavelength=0.4139) for _ in temperatures]
+
+overall_b = [
+    rx.ParametricEquation(name="b_la", target="phases.0.atoms.0.biso", basis="expression",
+                          expression="0.25 + b"),
+    rx.ParametricEquation(name="b_b", target="phases.0.atoms.1.biso", basis="expression",
+                          expression="0.40 + b"),
+]
+joint = rx.MultiHistogramRefinement(
+    lab6, instruments, coordinates=rx.CoordinateTable(columns={"T": temperatures}),
+    variables={"b": rx.Parameter(value=0.0, vary=True, min=-1.0, max=10.0)},
+    parametric=overall_b, sharing=rx.SharingMap(per_histogram=["vars.b"]))
+plan = PlanSpec(stages=[
+    StageSpec(name="scale_bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+    StageSpec(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+    StageSpec(name="atoms", turn_on=["phases.*.atoms.*.dof.*", "phases.*.atoms.*.biso"],
+              turn_off=["phases.0.atoms.1.dof.*"]),
+])
+print([row.path for row in joint.parameters() if row.path.endswith("vars.b")])
+```
+
+```text
+['hist.0.vars.b', 'hist.1.vars.b', 'hist.2.vars.b', 'hist.3.vars.b', 'hist.4.vars.b']
+```
+
+`joint.fit(patterns, plan=plan)` then refines one `b` per pattern and keeps the boron coordinate where it started.
+
+Four things a TOPAS input does have no rietx spelling yet:
+
+- A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
+- A restraint or a `penalty` in a joint fit, which refuses soft restraints.
+- An equation over a reflection or a point: `th2_offset` written in `Xo`, or a width, position or intensity written in `Th` or `D_spacing`. An overall B is the exception, through the formulas above.
+- `fit_obj`, a term added to the calculated pattern.
 
 ### Coordinates are refined along the symmetry directions
 
@@ -191,6 +257,34 @@ TOPAS_FEATURES_NOT_IMPORTED | refined.inp: this import is partial. The file stat
 A construct the reader cannot carry without misrepresenting the file is refused by name.
 A rigid body, `occ_merge`, a stacking-fault phase and a time-of-flight dataset are refused, because the numbers read back fine and the model would be wrong.
 [Names in other programs](../reference/foreign-names.md) maps each rietx parameter to its TOPAS name and gives the unit conversions.
+
+### Porting an input that does not read
+
+A parametric input usually does not read.
+`read_project_model` raises `rietx.io.projects.topas.TopasInpError`, a `ValueError`, naming the first construct it cannot place.
+In the Durham TOPAS tutorials, both parametric inputs of the WO₃ ramp stop at their `for xdds` loop.
+The ZrP₂O₇ ramp's input stops at a site whose coordinates are written as macro calls, `B1(!xAl1,0.0000,0.0000)`.
+The error names one construct and stops there, so it does not list what else the file uses.
+
+These steps port such an input:
+
+1. Call `rx.read_project_model(path, diagnostics=[])`.
+   If it returns, the `TOPAS_FEATURES_NOT_IMPORTED` diagnostics and `model.coverage` list what the import left out.
+   The ZrMo₂O₈ ramp's input reads this way, as the first of its 68 runs, and `TOPAS_FIRST_RUN_READ` says so.
+2. If it raises, port from the input's text.
+   Expand the macros and the loops first.
+   `#list`, `#define`, `#ifdef` and `macro` act on the text, and `for xdds` repeats its body.
+   TOPAS writes the input with every macro expanded to `TOPAS.LOG` when it runs, so read that file where TOPAS is at hand.
+   By hand, each `#list` row is one pattern and one row of the `rx.CoordinateTable`.
+   A `#define` decides which `#ifdef` branch is live, and a macro call is its body with the arguments substituted.
+   `for xdds { ... }` is its body once per `xdd`.
+3. Translate each line with the table in [A parametric equation is a formula](#a-parametric-equation-is-a-formula) and with [Names in other programs](../reference/foreign-names.md).
+   A construct in the list under that table has no rietx spelling yet.
+4. Call `MultiHistogramRefinement.preview_equations` before fitting.
+   It evaluates every formula at its starting values, so compare its cells with the ones the input states.
+5. Fit, and compare a refined value the input states, such as a lattice parameter, with rietx's in ppm, with both esds beside it.
+   Two programs can differ by more than either esd.
+   Rwp is a weaker check, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
 
 ### Writing an `.inp`
 

@@ -10,8 +10,9 @@ scattering, which this model does not describe.  ``ext`` is therefore a squared
 block size D², in µm², not a secondary-extinction (mosaic-spread) coefficient.
 It is *not* a peak-shape effect: it removes intensity from the integrated area
 of the strongest (usually low-angle, large-|F|) reflections, so an uncorrected
-refinement compensates with a spuriously large Biso and a spuriously small
-scale.
+refinement compensates with a spuriously small scale and a spuriously small
+Biso, below zero when the extinction is strong (Sabine, Von Dreele &
+Jørgensen 1988, p. 374; measured in WP-2087 on rutile and in WP-1944 on LaB6).
 
 Sabine (1988, eq. 17) gives the extinction factor at scattering angle 2θ as
 the average of the Laue (forward-scattering) and Bragg (backscattering)
