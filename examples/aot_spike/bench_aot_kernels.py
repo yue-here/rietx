@@ -31,10 +31,11 @@ Three measurements:
    says whether the comparison can be made in this run.  On macOS x86_64 under
    numpy 2.4.6 built on Accelerate, two identical numpy-path fits in one
    process differ by up to 7.1e-1 esd (WP-1940), and in some runs they agree.
-   So where the platform and the BLAS are in :data:`NONDETERMINISTIC` the
-   twins' gap is reported, never gated, even when the third fit agreed
-   (:func:`twins_verdict`).  The same platform on OpenBLAS reproduces itself,
-   and ``kernels.yml`` runs its gate there (WP-1987).  Serial: the pool's worker count is
+   So on a platform in :data:`NONDETERMINISTIC` the twins' gap is reported,
+   never gated, even when the third fit agreed (:func:`twins_verdict`).  The
+   same platform on OpenBLAS reproduces itself, so with numpy and SciPy both
+   on OpenBLAS the gate holds there, and ``kernels.yml`` installs them so
+   (WP-1987).  Serial: the pool's worker count is
    forced to 1, so each call covers all its rows.  The comparison is over the
    rows the call wrote, in window.  Per kernel the table gives the calls, the
    calls that were bit-identical, the largest relative difference (the largest
@@ -163,13 +164,18 @@ ON_MEASURED = (sys.platform, platform.machine()) == MEASURED_PLATFORM
 #: numpy-path fits per arm).  On Accelerate, as installed, trigger gave 3
 #: distinct results in 5 and cpd-1a 4 in 5; with ``VECLIB_MAXIMUM_THREADS=1``
 #: trigger still gave 3 in 5, so it is not Accelerate's threading.  With the
-#: same numpy and SciPy versions built on OpenBLAS (the macOS 10.13 wheels,
+#: same numpy and SciPy versions built on OpenBLAS (the pre-macOS-14 wheels,
+#: for python 3.11 numpy's ``macosx_10_9`` and SciPy's ``macosx_10_14``, on
 #: scipy-openblas 0.3.31 and 0.3.30), every fit of both cases was
-#: bit-identical to the first.  So an entry names the BLAS too, as numpy's and
-#: SciPy's build configurations name it, and one library on it is enough.
-#: A build that does not name its BLAS stays exempt there, as before WP-1987.
-NONDETERMINISTIC = {("darwin", "x86_64", "accelerate"),
-                    ("darwin", "x86_64", "unknown")}
+#: bit-identical to the first.  So the exemption is lifted only for what was
+#: measured: on these platforms the numpy path counts as reproducible when
+#: both numpy's and SciPy's build configurations name an OpenBLAS
+#: (:data:`REPRODUCIBLE_BLAS`).  Any other name, ``"unknown"`` included (a
+#: build that does not say), stays exempt, as before WP-1987.
+NONDETERMINISTIC = {("darwin", "x86_64")}
+#: the BLAS a :data:`NONDETERMINISTIC` platform was measured reproducible on,
+#: matched as a substring of the lower-cased name (``"scipy-openblas"``)
+REPRODUCIBLE_BLAS = "openblas"
 
 
 def _blas() -> tuple[str, str]:
@@ -186,9 +192,11 @@ def _blas() -> tuple[str, str]:
 
 
 def nondeterministic(system: str, machine: str, blas: tuple[str, ...]) -> bool:
-    """Whether the numpy path on ``system``/``machine`` under any of ``blas``
-    is one :data:`NONDETERMINISTIC` names."""
-    return any((system, machine, b) in NONDETERMINISTIC for b in blas)
+    """Whether the numpy path on ``system``/``machine`` under ``blas`` is
+    exempt: the platform is in :data:`NONDETERMINISTIC` and not every library
+    is on :data:`REPRODUCIBLE_BLAS`."""
+    return ((system, machine) in NONDETERMINISTIC
+            and not all(REPRODUCIBLE_BLAS in b for b in blas))
 
 
 BLAS = _blas()

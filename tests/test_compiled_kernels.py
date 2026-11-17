@@ -294,17 +294,37 @@ def test_the_exemption_names_the_blas_not_only_the_platform(aot_bench):
     OpenBLAS (five fits of each case bit-identical) and not on Accelerate,
     with one Accelerate thread or several.  So the gate is held there when
     both numpy and SciPy are on OpenBLAS, as kernels.yml installs them, and
-    reported when either is on Accelerate.  Other platforms are unaffected.
+    reported otherwise: on Accelerate, and on any BLAS name that was not
+    measured there (conda-forge's generic ``blas`` can be Accelerate
+    underneath).  Other platforms are unaffected.
     """
     nd = aot_bench.nondeterministic
     assert nd("darwin", "x86_64", ("accelerate", "accelerate"))
     assert nd("darwin", "x86_64", ("scipy-openblas", "accelerate"))
     assert not nd("darwin", "x86_64", ("scipy-openblas", "scipy-openblas"))
+    assert not nd("darwin", "x86_64", ("openblas", "scipy-openblas"))
+    assert nd("darwin", "x86_64", ("blas", "blas"))
+    assert nd("darwin", "x86_64", ("mkl", "scipy-openblas"))
     assert not nd("darwin", "arm64", ("accelerate", "accelerate"))
     assert not nd("linux", "x86_64", ("scipy-openblas", "scipy-openblas"))
     assert nd("darwin", "x86_64", ("unknown", "unknown"))
     # the build configuration this test runs under names both libraries
     assert "unknown" not in aot_bench.BLAS
+
+
+def test_a_build_config_that_cannot_be_read_is_unknown_and_exempt(
+        aot_bench, monkeypatch):
+    """``_blas()`` turns a ``show_config`` that raises, or that has no BLAS
+    entry, into ``"unknown"``, and on macOS x86_64 that stays exempt."""
+    def raises(mode="stdout"):
+        raise TypeError("show_config() got an unexpected keyword 'mode'")
+
+    monkeypatch.setattr(aot_bench.np, "show_config", raises)
+    monkeypatch.setattr(aot_bench.scipy, "show_config",
+                        lambda mode="stdout": {"Build Dependencies": {}})
+    blas = aot_bench._blas()
+    assert blas == ("unknown", "unknown")
+    assert aot_bench.nondeterministic("darwin", "x86_64", blas)
 
 
 @pytest.mark.parametrize("hl", [0.030, 0.0])

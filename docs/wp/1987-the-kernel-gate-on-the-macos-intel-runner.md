@@ -59,7 +59,7 @@ the gate runs them, pool workers 1):
 |---|---|---|---|
 | Accelerate (the macOS 14 wheels, as installed) | default | 3 | 4 |
 | Accelerate | `VECLIB_MAXIMUM_THREADS=1` | 3 | 3 |
-| OpenBLAS (the same versions' macOS 10.13 wheels) | default (4) | 1 | 1 |
+| OpenBLAS (the same versions' pre-macOS-14 wheels: numpy `macosx_10_9`, SciPy `macosx_10_14`) | default (4) | 1 | 1 |
 | OpenBLAS | `OPENBLAS_NUM_THREADS=1` | 1 | 1 |
 
 The gaps on Accelerate are of the size the gate met (trigger up to 3.0e-06 esd, cpd-1a up
@@ -92,8 +92,9 @@ kernel that is wrong. WP-1940 built the gate; its record is in its WP file (clos
       *(2026-11-16: the source is Accelerate, and one Accelerate thread does not pin it,
       so neither listed fix applies. `kernels.yml` swaps numpy and SciPy on that runner
       for the same versions built on OpenBLAS, asserting the swap took, and
-      `NONDETERMINISTIC` names the BLAS beside the platform, so the gate holds the
-      twins there again and still reports them on an Accelerate install.)*
+      the bench lifts that platform's exemption only when numpy and SciPy are both on
+      OpenBLAS, so the gate holds the twins there again and still reports them on
+      Accelerate or any other BLAS.)*
 - [x] If the numpy path is deterministic and the twins still drift, treat it as a kernel
       defect on x86_64 macOS and bisect the kernels the trigger fit calls. *(2026-11-16:
       not reached. The numpy path is not deterministic under Accelerate; whether the twins
@@ -136,15 +137,27 @@ runs in a row, or fails with a message that names the platform's non-determinism
     bench, one test file and the workflow, and none of them moves a measured number.
   - *Done*: `kernels.yml` gains a `macos-x86_64`-only step after the install. It
     reinstalls numpy and SciPy at their resolved versions with `--python-platform
-    x86_64-apple-darwin` and `MACOSX_DEPLOYMENT_TARGET=13.0`, which selects the macOS 10.13
-    OpenBLAS wheels, and asserts that both report an OpenBLAS BLAS. In the bench,
-    `NONDETERMINISTIC` holds (platform, machine, BLAS) triples, and `nondeterministic()`
-    and `BLAS` read both libraries' `show_config(mode="dicts")`. A build that names no BLAS
-    stays exempt on macOS x86_64. The header line prints the BLAS. No thread pin is set:
+    x86_64-apple-darwin` and `MACOSX_DEPLOYMENT_TARGET=13.0`, which selects the pre-macOS-14
+    OpenBLAS wheels (for python 3.11 numpy's `macosx_10_9` and SciPy's `macosx_10_14`),
+    with no source build allowed, and asserts that both report an OpenBLAS BLAS. In the bench,
+    `nondeterministic()` exempts a `NONDETERMINISTIC` platform unless both numpy and SciPy
+    name an OpenBLAS (`REPRODUCIBLE_BLAS`), as read by `BLAS` from both libraries'
+    `show_config(mode="dicts")`. Any other name, or a build that names no BLAS, stays
+    exempt on macOS x86_64. The header line prints the BLAS. No thread pin is set:
     OpenBLAS gave the same digest at one thread and at four.
   - *Review*: a read-only review subagent found no bugs. It made three findings, and all
     were applied: the unknown-BLAS case stays exempt, the test asserts that the BLAS is
     read on the platform it runs on, and the spacing around the new test.
+    A second read-only review (on PR #1599, 2026-11-17) made four findings, all applied.
+    The swap allows no source build (`--only-binary numpy --only-binary scipy`; `uv pip`
+    has no `--no-build-package`), so a missing wheel fails at once by name. The exemption
+    is an allowlist, lifted only when both libraries name an OpenBLAS, so conda-forge's
+    generic `blas`, `mkl` or a source build's `none` stay reported. The wheel wording names
+    the pre-macOS-14 tags. A test drives `_blas()`'s fallback to `"unknown"`
+    (`test_a_build_config_that_cannot_be_read_is_unknown_and_exempt`). Local, macOS arm64,
+    python 3.12, numpy 2.5.5: `tests/test_compiled_kernels.py` 29 passed, 1 skipped. The
+    workflow change is checked only by CI. `MACOSX_DEPLOYMENT_TARGET=13.0` is kept: it
+    documents the wheel choice.
   - *Not done*: why Accelerate on that CPU (i7-8700B, AVX2) varies from fit to fit. Every
     BLAS call probed on a fixed 7000 × 30 matrix was bit-identical 40 times at all eight
     alignments, so the variation needs inputs the probe did not build. It does not reach
@@ -152,8 +165,9 @@ runs in a row, or fails with a message that names the platform's non-determinism
     not show it (WP-1999).
   - *Generality*: not dispatched. `_audit.py` is unchanged, and the one new rule
     (`NONDETERMINISTIC`) is in the CI bench under `examples/`, not in the package.
-  - Next: nothing for this WP. If GitHub retires `macos-15-intel`, or numpy stops
-    publishing macOS 10.13 x86_64 wheels, the swap step's assert fails by name. The choice
+  - Next: nothing for this WP. If GitHub retires `macos-15-intel`, or numpy or SciPy stops
+    publishing pre-macOS-14 x86_64 wheels, the swap step fails by name (it allows no source
+    build) or its assert does. The choice
     then is between dropping the platform from the gate and restoring WP-1999's report.
 
 - **2026-10-16** — filed at the maintainer's request from WP-1985's PR (#1017), where the
