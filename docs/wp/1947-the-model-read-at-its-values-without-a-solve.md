@@ -180,10 +180,15 @@ entry of that date.)*
       new for the documented call (WP-1532 dropped it, issue #1381; nothing
       under `docs/skill/rietx/` teaches the `run_stage` spelling). Nothing
       else expected.
-- [ ] `NodeAction.api_call` renders `lebail_cycles` and `lebail_tol` when
+- [x] `NodeAction.api_call` renders `lebail_cycles` and `lebail_tol` when
       they differ from the `Stage` default (from WP-1986): today a stage run
       with a non-default value renders a call that runs a different stage
-      (`schemas/history.py`, the `extras` tuple).
+      (`schemas/history.py`, the `extras` tuple). **Landed 2026-11-17:**
+      compared with `StageSpec`'s field defaults, never `NodeAction`'s 3 and
+      0.0 (an old node's, which now render, since they are what it ran).
+      `report.apply.api_call` passes the stage's two values, so an Apply
+      tooltip and the node's line still agree
+      (`test_a_stage_call_carries_its_partition_settings`).
 
 ## Acceptance
 

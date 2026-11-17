@@ -35,8 +35,14 @@ from .instrument import Instrument
 # pre-freeze (WP-1003), so import both from there.
 from .params import TieSpec
 from .plan import CLOSING_WINDOW_TOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, PlanSpec
+from .plan import StageSpec as _StageSpec
 from .results import Statistics
 from .structure import Structure
+
+#: what a ``Stage`` runs when its partition settings are not given, read off
+#: the mirror so a retuned default cannot drop a keyword ``api_call`` needs
+_STAGE_LEBAIL_CYCLES = _StageSpec.model_fields["lebail_cycles"].default
+_STAGE_LEBAIL_TOL = _StageSpec.model_fields["lebail_tol"].default
 
 #: What produced a node.  **Every member is committed by some verb** — a
 #: vocabulary is a claim about what the package does, and one member is not a
@@ -166,6 +172,12 @@ class NodeAction(Base):
                  ("restraint_weight_scale", self.restraint_weight_scale, 1.0),
                  ("ftol", self.ftol, None),
                  ("window_slack_deg", self.window_slack_deg, None),
+                 # the partition's budget and test, against the Stage's own
+                 # defaults rather than this class's 3 and 0.0, which are an
+                 # old node's (WP-1947): a node that ran other values renders
+                 # a call that runs them
+                 ("lebail_cycles", self.lebail_cycles, _STAGE_LEBAIL_CYCLES),
+                 ("lebail_tol", self.lebail_tol, _STAGE_LEBAIL_TOL),
                  # the stage's fixes (WP-2208), a stage's own as of that WP
                  ("turn_off", list(self.turn_off), []))
                 if v != off)

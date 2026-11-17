@@ -131,7 +131,9 @@ def test_an_applicable_action_is_one_stage_named_after_its_kind():
 
     # the node an applied stage writes: run_stage records the closing fraction
     assert line == NodeAction(kind="stage", name=stage.name, turn_on=stage.turn_on,
-                              window_area_tol=CLOSING_WINDOW_TOL).api_call()
+                              window_area_tol=CLOSING_WINDOW_TOL,
+                              lebail_cycles=stage.lebail_cycles,
+                              lebail_tol=stage.lebail_tol).api_call()
 
     with pytest.raises(ValueError, match="not carried out by a stage"):
         stage_for(_action("collect_better_data"))
@@ -152,7 +154,9 @@ def test_the_echoed_line_carries_the_plan_settings_the_stage_will_run_at():
     assert line.endswith("correlation_guard=0.9, phase_support_sigma=None)")
     assert line == NodeAction(kind="stage", name=stage.name, turn_on=stage.turn_on,
                               phase_support_sigma=None, correlation_guard=0.9,
-                              window_area_tol=CLOSING_WINDOW_TOL).api_call()
+                              window_area_tol=CLOSING_WINDOW_TOL,
+                              lebail_cycles=stage.lebail_cycles,
+                              lebail_tol=stage.lebail_tol).api_call()
 
 
 def test_advice_kinds_refuse_in_their_own_words_rather_than_silently():
