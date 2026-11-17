@@ -426,6 +426,13 @@ axis, are a disorder model, a sum over 1 is the double count. The
 remedy for both is to put the origin on the element the atoms share
 (`body_from_atoms(..., origin=...)`).
 
+`RIGID_BODY_PARTIAL_TURN` refuses a stage that leaves two of a body's three turn
+directions free. The turn is an increment composed into the stored quaternion
+at each commit, and two small turns about different axes compose into a third
+that the two free directions do not carry, so the re-chart after the solve
+misses the fresh solve by about 2.6 % of an esd. None, one, or all three
+directions are exact, and a turn tied to one axis counts as one.
+
 A named-bond torsion turns a declared set of the body's atoms by an angle
 $\varphi$ about the line through two other body atoms, before the pose, in
 the right-handed sense from the first axis atom to the second (TOPAS's
@@ -460,6 +467,47 @@ data (C–H 0.93–0.98 Å, O–H 0.82 Å, the electron-density centroid) and th
 neutron means of the *International Tables* Vol. C § 9.5 for neutron data
 (C–H 1.06–1.10 Å, N–H 1.009 Å, O–H 0.967 Å). A joint X-ray and neutron fit takes the
 neutron lengths, because the hydrogen signal is in the neutron histogram.
+
+### Placing the origin
+
+A body's origin is the point it turns about. `body_from_atoms` puts it at the
+listed atoms' unit-weight centroid unless `origin=` names an atom or a
+fractional point, and `add_body` centres its template there unless
+`centre=False`.
+
+Moving the origin by a Cartesian vector $\mathbf{d}$ is an exact
+reparameterisation of the pose. The rotation is unchanged, and to first order
+the origin's shift becomes
+$\mathbf{t}' = \mathbf{t} - [\mathbf{d}]_\times\,\delta\boldsymbol{\omega}$,
+with $[\mathbf{d}]_\times$ the cross-product matrix of $\mathbf{d}$. Atom
+positions, atom esds and χ² are the same at either origin. Only the origin's
+own esds and their correlations with the rotation change.
+
+The data place an atom better the more strongly it scatters, so the origin's
+correlation with the rotation is smallest near the centroid weighted by $Z^2$
+for X-rays (the low-angle limit of $f^2$) or $b^2$ for neutrons. For atoms of
+similar $Z$ it is close to the default. When one heavy atom dominates and
+the origin's esd will be quoted, pass the weighted centroid as `origin=`, here
+for acridine form IX (COD 2242872, in `tests/data`):
+
+```python
+import gemmi
+import numpy as np
+import rietx as rx
+from rietx.crystallography.bodies import body_from_atoms
+from rietx.crystallography.species import element_symbol
+
+phase = rx.Structure.from_cif("tests/data/cod_2242872.cif").phases[0]
+labels = ["N1"] + [f"C{i}" for i in range(1, 14)]
+atoms = [next(a for a in phase.atoms if a.label == k) for k in labels]
+frac = np.array([[a.x.value, a.y.value, a.z.value] for a in atoms])
+w = np.array([gemmi.Element(element_symbol(a.species)).atomic_number
+              for a in atoms]) ** 2
+body = body_from_atoms(phase, labels, "acridine", origin=w @ frac / w.sum())
+```
+
+For neutrons `w` is `b_coh(a.species) ** 2`, from
+`rietx.crystallography.neutron`.
 
 ## Distortion-mode amplitudes
 
