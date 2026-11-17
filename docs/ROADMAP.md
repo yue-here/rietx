@@ -102,7 +102,7 @@ placement, link resolution, and the size caps on this file and CLAUDE.md.
 **The next release is 1.12** (`pyproject.version` `1.12.0.dev0`), cut from what `main` holds
 ([record](milestones/v1.12.md), [staged notes](releases/1.12.0.md)). 1.11.0 shipped 2026-11-04 ([notes](releases/1.11.0.md)).
 
-**Four milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
+**Five milestones are open and three are queued, by name.** [series](#series--a-series-a-scientist-can-predict-and-drive) opened 2026-11-16; [magnetic](#magnetic--the-magnetic-structure)
 opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on)
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
 opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
@@ -158,6 +158,7 @@ covers (1119 § Gotchas).
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
 | parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
 | gui-overhaul | The GUI redesigned around the pattern and the model, ported into `rietx gui` in five pieces (the layout shell, the Parameters panel, the Plan tab, previews, the Background tab), then rebuilt beside it from 2026-11-11 — [§ gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) | 🔄 **opened 2026-11-08** ([record](milestones/gui-overhaul.md)) | ten rows written at the open, the record's § Acceptance |
+| series | A series a scientist can predict and drive: each parameter declared per pattern, common, fixed or by equation, a series call and a joint call each taking the kinds it can honour, strategy left to the caller, problems reported as numbers — [§ series](#series--a-series-a-scientist-can-predict-and-drive) | 🔄 **opened 2026-11-16** ([record](milestones/series.md)) | six rows drafted at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -443,6 +444,10 @@ Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The re
 ### gui-overhaul — the GUI redesigned around the pattern and the model
 
 Opened 2026-11-08 by the maintainer ([record](milestones/gui-overhaul.md)), on twelve rounds of prototypes reviewed on screen between 2026-11-06 and 2026-11-08. It redesigns today's `rietx gui` before agent access, the desktop app and the browser build, in that order. Five pieces port it: the layout shell first (2123), then the Parameters panel (2126), the Plan tab (2127), previews (the route 2125, the sliders and graphs 2128) and the Background tab (2129, whose band is rietx's own covariance of the background curve). Each WP restates the designs it builds with the ruling behind each, and every merge leaves every panel reachable. The block 22xx is claimed for the pieces after the first. 2130 repairs two gaps the design rounds found in today's Peaks panel before its own redesign: the search's coverage said whatever the run found, and Adopt on every row. The palette piece (2200) moves the GUI to the site's palette, light and dark, and carries the peak-mark colour (ruled 2026-11-09). The start screen and the New project dialog (2131) port the round-9 design of 2026-11-08, outside the five pieces. Every piece is judged against the style guide, `gui/STYLE.md` (2142), and the record lists the designed pieces not yet filed. The File menu on the project name (2133) ports the file-and-project I/O ruling of 2026-11-07: autosave with no Save command, and the folder copied, renamed, moved or closed on server routes. On 2026-11-11 the maintainer ruled to rebuild the front end from the prototype beside today's, keeping the server, `gui/src/lib`, the chart module and the tokens, and to swap it in at parity; 2214 holds the plan and an inventory giving every old feature a home, and 2215 builds its first piece, the frame, at `/next`. [The WPs](wp/README.md#gui-overhaul).
+
+### series — a series a scientist can predict and drive
+
+Opened 2026-11-16 by the maintainer ([record](milestones/series.md)), beside parametric and separate from it. The record holds six rules for series work, each accepted by the maintainer, and the decisions still open. The default stays as it is, and a joint fit starting from a series result waits on 2103. The block 23xx is claimed. [The WPs](wp/README.md#series).
 
 ### Unscheduled
 

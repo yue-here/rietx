@@ -34,6 +34,12 @@ test.
 The practice behind the design is `docs/practice.md` § A parameter set by an equation
 the user writes, surveyed across fields on 2026-11-03.
 
+How a series declares its parameters, and when a series becomes a joint fit, is the
+[series](series.md) milestone's question (opened 2026-11-16, kept separate from this one
+by the maintainer's ruling of that day). Its rule 1 names the four kinds of parameter a
+series can declare, and two of them, a common value and an equation, are this milestone's
+machinery.
+
 | WP | What it adds |
 |---|---|
 | [2101](../wp/2101-the-parametric-surface-as-it-stands-in-the-manual.md) | the surface that exists today, documented for someone arriving from TOPAS or GSAS-II |
