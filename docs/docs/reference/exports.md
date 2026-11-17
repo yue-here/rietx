@@ -107,12 +107,13 @@ It writes no history node and no run directory, and it leaves the refinement's v
 
 <!-- api-doc: no-exec — needs a structure, an instrument and a pattern -->
 ```python
-start = refinement.evaluate(data)              # Rietveld
+start = refinement.evaluate(data)    # in the refinement's own mode
 print(start.statistics.rwp, start.statistics.gof)
 
 pawley = refinement.evaluate(data, mode="pawley")
 ```
 
+Unasked, `mode` is the refinement's own: the last fit's, or Rietveld before one.
 It runs the plan of one stage that frees nothing, `RefinementPlan(stages=[Stage("evaluate", [])])`, on a private copy of the refinement.
 Calling `Refinement.fit` with that plan gives the same answer, but it writes history nodes and replaces `result_`.
 In Le Bail and Pawley mode the intensities are still extracted at the current cell and profile, because nothing else supplies them.
