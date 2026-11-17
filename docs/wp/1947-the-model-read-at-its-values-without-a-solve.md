@@ -139,11 +139,18 @@ entry of that date.)*
       empty-stage fit's in every mode. `background(two_theta)` is
       `predict`'s twin over `CompiledModel.background`: one compile, no fit,
       no extraction, so it serves Le Bail and Pawley before a fit too.
-- [ ] `max_iter=0`: a refusal rietx owns, naming `max_iter` and the
+- [x] `max_iter=0`: a refusal rietx owns, naming `max_iter` and the
       evaluation spelling, on both drivers (`ge=1` on the field, or a check
       in the runner). Coordinate with WP-1938 if its LM default has landed.
       (It has. `Stage.max_iter` still has no lower bound, so a plan holding
-      0 is built and fails only mid-fit, after compile.)
+      0 is built and fails only mid-fit, after compile.) **Landed
+      2026-11-17:** `Stage.__post_init__` refuses `max_iter < 1` where the
+      stage is built, naming `max_iter` and `ref.evaluate(data)`, so a stored
+      `StageSpec` holding 0 is refused when `fit` or `refine_multi` converts
+      it, before any compile or history write, on either driver. The empty
+      stage with 0 is refused too, since it has the verb now. `rietx.help`'s
+      `max_iter` entry says so. `StageSpec` keeps no bound, so a stored plan
+      still loads (a schema change was not needed for the refusal).
 - [ ] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.
