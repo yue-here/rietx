@@ -151,14 +151,15 @@ change.
 
 ## Tasks
 
-- [ ] The `.pov` writer: atoms, rings, halves, faces, lines, letters,
+- [x] The `.pov` writer: atoms, rings, halves, faces, lines, letters,
   camera and light. Test: the handedness check on a chiral phase, an
   unrendered text comparison against a committed small case, and each
   atom's `matrix`, read in POV-Ray's column order, mapping the unit sphere
   onto `pos + M·u` on an ellipsoid whose M is not symmetric.
 - [ ] The `.glb` writer. Test: the file parses as GLB (magic, version,
   chunk lengths), node transforms reproduce each atom's `shape` to 1e-12,
-  and the validator reports no errors on the corpus.
+  and the validator reports no errors on the corpus. *2026-11-17: built and
+  tested; the Khronos validator's own run is open (handover).*
 - [ ] Render the fluorapatite and NAC figures once with POV-Ray and once in
   Blender (Cycles, the imported camera). Commit each beside the PNG under
   `docs/wp/1537-renders/` and record the commands in the handover.
