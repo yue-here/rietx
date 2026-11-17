@@ -88,8 +88,9 @@ promise stages every break).
 - [x] The reachability walk over `derive_surface()`'s 2 238 entries, as a script in
       `tests/` run by hand (a Haiku-grade task: collate, do not judge), its output a table
       with one row per unreached entry and where it *is* referenced.
-- [ ] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
-      table with a recommendation per row.
+- [x] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
+      table with a recommendation per row. (2026-11-17: `2006-batch/tiers.md` and
+      `2006-batch/surface.md`.)
 - [ ] Approved demotions (expected few); rulings dated into the table.
 - [ ] Tests; the fast count moved by exactly the tests added.
 - [ ] Skill: `references/diagnostics-projects.md` and the io rows of `diagnostics.md`

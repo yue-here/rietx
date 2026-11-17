@@ -6,7 +6,7 @@ can actually do, each with a confidence, the alternatives it could not rule
 out, and a predicted Δχ².  Three rules keep it honest:
 
 1. **The strategy engine holds the veto.**  :func:`apply_strategy_veto` marks
-   any action the staged plan already performs (or a guard forbids); a vetoed
+   any action the staged plan already performs or the refinement already frees; a vetoed
    action stays in the report — silently dropping it would hide the reasoning
    — but ``active`` is False and an agent must not execute it.
 2. **Ambiguity is reported, never resolved by fiat.**  Over a short 2θ range
