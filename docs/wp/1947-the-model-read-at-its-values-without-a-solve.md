@@ -266,7 +266,7 @@ fit reports.
   `test_history.py` updated for the partition settings. Workstation runs
   (Linux, the shared py3.12 venv + PYTHONPATH to the tree): canary
   `wp1947c` on `e01bf80df`, 213 passed in 40 s; fast `wp1947f` on the
-  main-merged `7b458d0da`, FAST_COUNTS. `python -m tests.reader_output`:
+  main-merged `7b458d0da`, 14871 passed, 280 skipped, 32 xfailed, 0 failed in 698 s on 8 cores beside another job (one memory pause), 6.6 GB peak; the added cases cost 1.45 s in that run. `python -m tests.reader_output`:
   exit 0, unchanged against the merge-base. Vale (the CI step): 0 errors.
   Manual `sphinx -W`: exit 0. Full suite not run: nothing here moves a
   fitted number.
