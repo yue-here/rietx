@@ -1,6 +1,6 @@
 # WP-2006 — Readers, crystallography and GUI codes, and the dead surface
 
-Milestone: generality · Status: 🔄 2026-11-17 — claimed by ghostshift (part 2, the tiers; part 1 merged as PR #1101)
+Milestone: generality · Status: 🔄 2026-11-17 — part 2's tiers in PR #1636: 218 rows tiered; 36 tier-3 candidates, the FullProf occupancy repair and three writer warnings wait on the maintainer
 Track: The audits
 Depends on: 2001
 Priority: P3 2026-10-19 — 2001 closed, so nothing blocks it; expected mostly tier 1 (records of what was done to a file); the fast one
@@ -71,7 +71,7 @@ Pruned 2026-11-17 (part 2's session; the handover entry says why each other entr
       candidates and 36 left, `2006-batch/tiers.md`.)
 - [x] Tier each; for the few thresholds (`CIF_ANGLE_CORRECT_MAX_DEG`, the attenuator
       conventions measured per format, the axis refusal), evidence and families.
-      (2026-11-17: 218 of 290 rows tiered, 87 responses given; 36 tier-3 candidates and
+      (2026-11-17: 218 of 290 rows tiered, 56 responses given; 36 tier-3 candidates and
       36 left rows in `2006-batch/tiers.md`.)
 - [x] The reachability walk over `derive_surface()`'s 2 238 entries, as a script in
       `tests/` run by hand (a Haiku-grade task: collate, do not judge), its output a table
@@ -99,6 +99,86 @@ Pruned 2026-11-17 (part 2's session; the handover entry says why each other entr
   derived surface).
 
 ## Handover log
+
+- **2026-11-17** — part 2, the tiers, by a ghostshift runner. PR #1636.
+  Ruled by Yue, 2026-11-16 (decision walk): run 2005-2007 now under the gate as written.
+  Three of every four reader, crystallography and GUI rows in the audit table now carry a
+  tier with its evidence. Almost all of them are tier 1, because a reader's code records a
+  repair the file's format forces, which is what the WP expected. The rest are rietx's own
+  numbers or conventions. They need the maintainer's approval or a test before they can be
+  tiered, and each is written up with what it waits on. Nothing was removed, and no level or
+  message changed, so a reader receives the same text. One inherited suspicion is now a
+  confirmed defect: the FullProf reader builds a 0.4 % vacancy as a full site and says
+  nothing.
+
+  *Done*: 218 of the 290 unaudited rows tiered (98 codes, 56 of them given a response; 58
+  suggestion sites; 62 constants): 190 tier 1, 25 tier 2, 2 caller, 1 invariant. `2006-batch/tiers.md` holds the other 72: 36
+  tier-3 candidates with both grounds and their stakes (14 codes, 22 constants, the magnetic
+  ones marked for Mike) and 36 constants left at `unaudited` with the test that would close
+  each, plus the three reader decisions audited by hand and 59 lanes' notes on tiered rows.
+  `2006-batch/surface.md`: the walk re-run at HEAD (2 504 entries), 29 entries reached by no
+  use, all rigid-body and restraint constructor fields, each recommended kept; the three
+  exports the WP named, kept; the declared names with no writer. `SuggestedAction.vetoed_by`'s
+  two docstrings now say what sets it. `docs/practice.md` gained this session's tier-2
+  program-default rows. Inherited pruned: the `VOLUME_RATIO_BOUNDS` entry went (tiered 2 under
+  the #1121 ruling, 2026-10-24); the seven-programs rule went (it is in `generality.md`); the
+  WP-2001 mechanics went, and its GUI guard note with it (`Plan.svelte`'s 0.98 is an initial
+  value replaced by `GET /api/plan` on load, so the GUI holds no second copy); the five reader
+  decisions went (dif, peaklist and gsas are walked rows, bruker_raw and pdcif are audited in
+  `tiers.md`, and pdcif's zero-weight note was stale: WP-1952 excludes the point and reports
+  it); the B15 entry went (the form-factor rows follow 2002's ruling); the #1058 triage line
+  went (part 1 landed). `PATTERN_DEAD_CHANNELS` is shared with `refine.py` and left to WP-2005.
+  `/code-review high --fix` did not run: the branch's python is table data and two docstrings,
+  and the generality judge read the table.
+  *Measured* (Darwin arm64, `[dev]`, merged with `origin/main`): fast selection 14 685 passed, 433
+  skipped, 32 xfailed, 1 failed in 645 s: `test_silence.py`, because a code row declaring a
+  `warning` response needs a silence pair (a fixture where it fires and one where it stays
+  silent). The 31 warning responses without one were held back, each proposed sentence kept in
+  `tiers.md`'s notes; `test_silence.py` and `test_audit_table.py` then passed (59). No test added. `tests.reader_output` exits 0 (unchanged against the merge-base). `session_usage.py lanes` finds no lanes
+  under this runner's id; three read-only lanes wrote the rows (Opus on crystallography,
+  Sonnet on the pattern readers and the project readers).
+  *Findings, nothing fixed*: (1) `fullprof._OCCUPANCY_RTOL` (5e-3) builds a site at Occ ×0.996
+  beside full ones as full, with no record; ×0.995 is refused (probed); it also gates the
+  magnetic Scale × f² match. (2) `FULLPROF_OCCUPANCY_UNCHECKED` warns on every one-atom phase,
+  including symbols with one setting (F m -3 m probed). (3) `GSAS2_CIF_FIELD_NOT_WRITTEN`,
+  `GSAS2_INSTPRM_FIELD_NOT_WRITTEN` and `GSAS_PRM_FIELD_NOT_WRITTEN` warn on every write, which
+  § Attention is a cost's clause 1 does not admit. (4) `CIF_MAGNETIC_SYMMFORM`,
+  `GSAS2_GPX_PHASE_MAGNETIC` and `RECIPE_FIELD_DROPPED` raise at two levels under one code. (5)
+  `cif.py:98`: a fixed angle within 1e-3° of its value is neither snapped nor reported (≤ 8.3
+  ppm in d). (6) `gui/imports.WAVELENGTH_RTOL` (5e-4) matches Cu but not a header's 0.71 (Mo)
+  or 0.56 (Ag). (7) `bruker_raw.py:346`'s `atol=1e-6` runs with numpy's default `rtol=1e-5`, so
+  the tolerance applied is about 1e-4°. (8) GSAS-II 5.8.4's CW `.prm` importer never reads
+  PRCF12 (in `docs/practice.md`).
+  *Gotchas*: a reader code's `where` is an interval or a column name, never a parameter path,
+  so every reader row with a response declares `scope`. Seven code rows are tiered on the act
+  alone, and each holds only as far as the threshold rows it names, all of them in `tiers.md`.
+  *Generality* (judge, 2026-11-17; 104 of 222 rows read in full, 31 evidence claims checked):
+  tier 2, 23 of 26 hold; caller, both hold; warning sentences, 33 of 37 name a result number;
+  tier-1 sample, 44 of 45 hold; escalation family, none. Weak: `RECIPE_PLAN_STAGED` (PowderLine
+  dissents; author: agreed, now a tier-3 candidate); `GSAS2_INSTPRM_GEOMETRY_ASSUMED` (kind 3,
+  sentence named no number; author: fixed); `CALC_POINTS_PER_FWHM` (the tests do not exercise
+  it; author: agreed, back to unaudited); `K_FLOAT_TOL` and `_SNAP_MESSAGE_SITES` (no invariance
+  or cap test; author: agreed, back to unaudited); the three writer warnings' level (author:
+  agreed, a level change is the maintainer's). Cannot tell: `FULLPROF_ORIGIN_CHOICE`'s manual
+  quote (author: checked in FullProf 8.20's manual, cited in the row). Magnetic rows that settle
+  a reading default: `CIF_MAGNETIC_CENTERING_ASSUMED`, `CIF_MAGNETIC_ION_UNCHARGED` (info, yet
+  its sentence asks for an act), `TOPAS_MOMENT_ION_UNCHARGED`, for Mike.
+  *Settled by Claude* (most important first): code rows tiered on their act with the
+  threshold left separate, under § The rule's "each part tiered on its own" (the alternative
+  held the code row back with its threshold); `RAS_ATTENUATOR_PRESENT` at tier 2 on GSAS-II's
+  default although no `.ras` on disk varies the column, under tier 2's program-default clause
+  (alternative: a tier-3 candidate); two caller rows, under the caller class's two conditions;
+  the judge's weak rows taken back to unaudited rather than argued, under B10 and the
+  invariance rule; `/code-review` skipped, under its prose-only clause read for table data;
+  `vetoed_by` documented rather than written, under WP-1076; `PATTERN_DEAD_CHANNELS` left to
+  WP-2005 to avoid a shared row.
+  *For the maintainer*: approve or demote the 36 tier-3 candidates (`tiers.md`; magnetic ones
+  are Mike's); rule on the FullProf occupancy repair, the one-atom warning and the three
+  writer warnings (each changes what a reader receives); the recipe hump `0.0` (still on the
+  2026-11-16 list); write or retire the declared names in `surface.md`.
+  Next: the maintainer's batch. Then the 31 silence pairs, which give the held warning responses. Then the approved rows dated into the table, and the 36 left
+  constants closed by the tests `tiers.md` names (one small test each), then the numbers
+  inside dicts and lists (still unaudited by hand).
 
 - **2026-10-24** — PR #1101 merged (`50bc4555`, review round 4), by `/pr-review`.
   *Done*: part 1, which removes and rules on nothing.

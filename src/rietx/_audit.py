@@ -674,10 +674,7 @@ ROWS: tuple[Row, ...] = (
                   'with no threshold and no record. FullProf, TOPAS and the rest not checked.'),
         grounds=("The act, putting a symmetry-fixed angle on its symmetry value, is GSAS-II's by "
                  "default; the band it acts in is CIF_ANGLE_CORRECT_MAX_DEG's row, and past it "
-                 'the reader refuses rather than chooses.'),
-        response='warning',
-        responds=('check the stored angle against the source before quoting a cell, since a real '
-                  'deviation needs a space group that leaves the angle free')),
+                 'the reader refuses rather than chooses.')),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
                   "AUDIT category and its children under PUBLICATION, recording the data "
@@ -770,11 +767,7 @@ ROWS: tuple[Row, ...] = (
         grounds=('Arithmetic: the stored numbers are a deterministic function of the operators '
                  "the model is built from; which of the file's two statements is wrong depends "
                  "on the file's source, so the code reports both and picks neither for the "
-                 'model.'),
-        response='warning',
-        responds=("check the operator and centring loops against the file's source before "
-                  'quoting a moment, since the operators may be a smaller group than the stated '
-                  'number names')),
+                 'model.')),
     Row("CIF_MAGNETIC_PARENT_TAG_UNDEFINED", "code", tier=1, ambiguity=1,
         evidence=("a record of which tag was read: the file states its parent symbol only "
                   "under _parent_space_group.name_H-M, which cif_mag.dic 0.9.9 does not "
@@ -939,10 +932,7 @@ ROWS: tuple[Row, ...] = (
                   "pure magnetic phase); each reports the requested omission with the phase's "
                   'R_Bragg and changes no value'),
         grounds=('The caller declared the nuclear subset by name and the package chose nothing '
-                 'inside it.'),
-        response='warning',
-        responds=('quote no moment or magnetic intensity from this structure, since its magnetic '
-                  "phases were left off at the caller's request")),
+                 'inside it.')),
     Row("FULLPROF_MAGNETIC_PHASE_READ", "code", tier=1, ambiguity=1,
         evidence=('read the site at fullprof.py:3694: fires when a Jbt = +-1 phase (or a Jbt 10 '
                   'pair) was read onto its nuclear counterpart by magnetic_reading, which is '
@@ -964,10 +954,7 @@ ROWS: tuple[Row, ...] = (
                   'synthetic single-site .pcr fires it for F m -3 m, P 42/m n m and F d -3 m '
                   'alike'),
         grounds=('The arithmetic fact is exact; the code does not ask whether the symbol has a '
-                 'second setting to test.'),
-        response='warning',
-        responds=('check the space-group setting against the published structure before quoting '
-                  'a coordinate or an occupancy of this phase')),
+                 'second setting to test.')),
     Row("FULLPROF_ORIGIN_CHOICE", "code", tier=2, ambiguity=1,
         evidence=('read the site at fullprof.py:3774 and normalize_space_group (:1176-1257): '
                   'FullProf writes no origin suffix, and for a symbol with two origins the '
@@ -1046,11 +1033,7 @@ ROWS: tuple[Row, ...] = (
                   'tie is refused, never dropped '
                   '(tests/test_projects_fullprof.py::test_an_ambiguous_cross_atom_tie_still_refuses)'),
         grounds=('The Structure has no tie field, so a loss is forced by the model and each arm '
-                 'names the restoring call.'),
-        response='warning',
-        responds=('re-declare the tie with tie_equal or tie before fitting, or quote no cell, '
-                  'Biso or occupancy the tie constrained, since the model has more free '
-                  "parameters than the file's refinement")),
+                 'names the restoring call.')),
     Row("GSAS2_CIF_DEUTERIUM_AS_D", "code", tier=1, ambiguity=1,
         evidence=('read the site at gsas2.py:2131: fires when deuterium sites are written as D '
                   "(2H respelled). D is the symbol GSAS-II's importer reads as deuterium, and "
@@ -1068,10 +1051,7 @@ ROWS: tuple[Row, ...] = (
                   'always, and the March-Dollase, texture, extinction, microstrain and restraint '
                   'terms where the structure carries them; a CIF has no field for any of these. '
                   'A record of what the format cannot hold'),
-        grounds='The target format has no field for them, so the omission is forced.',
-        response='warning',
-        responds=('set the scale, sample size and strain broadening, and any refine flags, in '
-                  'GSAS-II before comparing any result, since the file states none of them')),
+        grounds='The target format has no field for them, so the omission is forced.'),
     Row("GSAS2_CIF_RHOMBOHEDRAL_RESTATED", "code", tier=1, ambiguity=1,
         evidence=("the writer's report from symmetry.rhombohedral_restated_diagnostic (called at "
                   "gsas2.py:2022, level 'warning' in the helper): a rhombohedral-axes phase is "
@@ -1112,10 +1092,7 @@ ROWS: tuple[Row, ...] = (
                   'none is applied, all stay on model.constraints, the equivalences are counted. '
                   'The built model has more free parameters than the refinement the file records '
                   '(tests/test_projects_gsas2.py::test_the_constraints_are_resolved_into_names)'),
-        grounds='The Structure carries no constraint field, so the loss is forced and named.',
-        response='warning',
-        responds=('restore each equivalence with tie_equal before quoting a cell, coordinate or '
-                  'occupancy, since the built model frees parameters the file held together')),
+        grounds='The Structure carries no constraint field, so the loss is forced and named.'),
     Row("GSAS2_GPX_COORDINATES_SYMMETRY_FIXED", "code", tier=1, ambiguity=1,
         evidence=("read the site at gsas2.py:1852: fires when sites carry GSAS-II's X refine "
                   'flag but sit on fully fixed special positions, where a coordinate cannot move '
@@ -1128,11 +1105,7 @@ ROWS: tuple[Row, ...] = (
         evidence=('read the site at gsas2.py:1398: one warning per entry of model.unsupported, '
                   "the reader's own list of .gpx constructs it did not build (with the reason); "
                   'a record of a capability limit, naming each item'),
-        grounds='A capability limit of the reader, reported item by item.',
-        response='warning',
-        responds=('read the named item before quoting any cell, scale, intensity or width from '
-                  'this project, since the model was built without it'),
-        scope=('all',)),
+        grounds='A capability limit of the reader, reported item by item.'),
     Row("GSAS2_GPX_PHASE_MAGNETIC", "code", tier=1, ambiguity=1,
         evidence=('read the two sites at gsas2.py:1423 (a magnetic phase is not built; level '
                   'warning) and :1449 (a nuclear phase carries a magPhases partner: warning '
@@ -1232,10 +1205,7 @@ ROWS: tuple[Row, ...] = (
                   'displacement or transparency, and no refine flags; the peak shape and extra '
                   'components are named when the instrument carries them '
                   '(tests/test_gsas2_instprm.py::test_the_written_file_says_what_it_could_not_state)'),
-        grounds='The format has no items for them.',
-        response='warning',
-        responds=('set the background, displacement and absorption in GSAS-II and reset the '
-                  'refine flags before comparing any peak width, position or intensity')),
+        grounds='The format has no items for them.'),
     Row("GSAS2_INSTPRM_GEOMETRY_ASSUMED", "code", tier=2, ambiguity=3,
         evidence=('read the site at instrument_profile.py:1605 and :1497-1503: with no Diff-type '
                   'the geometry is Debye-Scherrer for one wavelength and Bragg-Brentano for a '
@@ -1256,10 +1226,7 @@ ROWS: tuple[Row, ...] = (
                   "neutron; the absent items come back at the package's default and are named "
                   '(tests/test_gsas2_instprm.py::test_an_item_the_format_declares_and_a_file_omits_is_named)'),
         grounds=("Which items the format declares is the format's list, and the report names "
-                 'each default taken.'),
-        response='warning',
-        responds=('supply the named items before quoting a width or intensity, since they were '
-                  "defaults rather than the file's values")),
+                 'each default taken.')),
     Row("GSAS2_INSTPRM_VALUE_FLOORED", "code", tier=1, ambiguity=1,
         evidence=('read the site at instrument_profile.py:1851: fires on write when SH/L '
                   '(axial_sl + axial_hl) is below INSTPRM_SHL_FLOOR = 0.002, which GSAS-II '
@@ -1268,10 +1235,7 @@ ROWS: tuple[Row, ...] = (
                   'floor it '
                   '(tests/test_gsas2_instprm.py::test_an_axial_sum_below_gsas_ii_own_floor_is_named)'),
         grounds=("The floor is the target program's own, so the report states what that program "
-                 'will do.'),
-        response='warning',
-        responds=('expect GSAS-II to draw the profile with the floored axial term, so quote no '
-                  'width or intensity compared against this instrument without that floor')),
+                 'will do.')),
     Row("GSAS2_INSTPRM_VALUE_MERGED", "code", tier=2, ambiguity=1,
         evidence=('read the site at instrument_profile.py:1840 and the sum at :1798: unequal '
                   'axial_sl and axial_hl are written as one SH/L = sl + hl, and read back as '
@@ -1279,10 +1243,7 @@ ROWS: tuple[Row, ...] = (
                   "evaluates S/L = H/L = SH/L/2 (pypowder.for:146), so the sum is the program's "
                   'own definition and the evenness is what it computes '
                   '(tests/test_gsas2_instprm.py::test_an_uneven_axial_pair_is_merged_and_the_merge_is_named)'),
-        grounds="The program's definition of the single parameter fixes the sum.",
-        response='warning',
-        responds=('expect GSAS-II to draw a symmetric axial profile, so quote no width or '
-                  'intensity from it that depended on the uneven apertures')),
+        grounds="The program's definition of the single parameter fixes the sum."),
     Row("GSAS_BANK_COMMENTED", "code"),
     Row("GSAS_EXP_BACKGROUND_NOT_CARRIED", "code", tier=1, ambiguity=1,
         evidence=('read the site at gsas.py:1324: fires once per histogram with a fitted GSAS '
@@ -1303,19 +1264,12 @@ ROWS: tuple[Row, ...] = (
         evidence=('read the site at gsas.py:1316: one warning per entry of model.unsupported, '
                   "the reader's own list of histogram constructs it did not read, each with its "
                   'reason; no where (the item is a histogram of the file, not a model path)'),
-        grounds='A capability limit of the reader, named item by item.',
-        response='warning',
-        responds=('read the named histogram before quoting any scale, width or intensity from '
-                  'this project, since it was not read'),
-        scope=('all',)),
+        grounds='A capability limit of the reader, named item by item.'),
     Row("GSAS_EXP_PHASE_MAGNETIC", "code", tier=1, ambiguity=1,
         evidence=('read the site at gsas.py:1337: fires per phase whose GSAS type is magnetic; '
                   'the cell and sites are on model.phases and no magnetism is built; a '
                   'capability limit'),
-        grounds='No magnetic model is read from a .EXP.',
-        response='warning',
-        responds=('quote no moment or magnetic intensity from this project, and read a magCIF '
-                  'for the magnetic structure')),
+        grounds='No magnetic model is read from a .EXP.'),
     Row("GSAS_EXP_REFINE_FLAG_MERGED", "code"),
     Row("GSAS_EXP_SCALE_NOT_COMPARABLE", "code"),
     Row("GSAS_EXP_SPECIES_NORMALISED", "code", tier=1, ambiguity=1,
@@ -1345,10 +1299,7 @@ ROWS: tuple[Row, ...] = (
                   'asterisks, a Fortran overflow; the field is optional and is read as absent '
                   '(tests/test_gsas_prm.py::test_an_overflowed_prcf_cutoff_is_reported_once); '
                   'the format defines asterisks as an overflow, so the field carries no value'),
-        grounds="The format's overflow convention leaves no number to read.",
-        response='warning',
-        responds=('check the named record against the source before quoting any width or scale '
-                  'that rests on it, since an absent field is read as its default')),
+        grounds="The format's overflow convention leaves no number to read."),
     Row("GSAS_IPARM_FIELD_DROPPED", "code", tier=1, ambiguity=1,
         evidence=('info; fires when a GSAS-I TOF .iparm holds a record or field the schema has '
                   'no slot for, listing them (instrument_tof.py:747-751). The fields it names '
@@ -1427,10 +1378,7 @@ ROWS: tuple[Row, ...] = (
                   'written, the peak shape and extra components named when present, and the PRCF '
                   'refine flags are blank '
                   '(tests/test_gsas_prm.py::test_the_channel_reports_what_the_instrument_does_not_carry)'),
-        grounds='The format has no records for them.',
-        response='warning',
-        responds=('set the geometry and corrections in GSAS and reset the refine flags before '
-                  'comparing any peak width or intensity')),
+        grounds='The format has no records for them.'),
     Row("GSAS_PRM_GEOMETRY_ASSUMED", "code"),
     Row("GSAS_PRM_PROFILE_SET_DEFAULTED", "code", tier=2, ambiguity=1,
         evidence=('read the site at instrument_profile.py:690 and :543: with several type-3 '
@@ -1673,12 +1621,7 @@ ROWS: tuple[Row, ...] = (
                   '::test_the_real_v4_fixture_withholds_sigma_because_no_scale_verifies, '
                   '::test_a_udf_with_scaled_intensities_withholds_sigma_and_says_so)'),
         grounds=('The act is withholding a number that cannot be derived, never faking one; the '
-                 "base site's decision rests on INTEGRAL_TOL, which has its own row."),
-        response='warning',
-        responds=('quote every esd and chi-squared as from Poisson weights of an unverified '
-                  'intensity scale, or supply sigma or re-export in counts, before quoting a '
-                  'scale, fraction or intensity-derived number'),
-        scope=('all',)),
+                 "base site's decision rests on INTEGRAL_TOL, which has its own row.")),
     Row("PATTERN_MULTISCAN_DEFAULTED", "code"),
     Row("PATTERN_NET_HAS_BACKGROUND", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when a column the file labels background-subtracted "
@@ -1727,12 +1670,7 @@ ROWS: tuple[Row, ...] = (
                   'and gsas); silent on all 13 real fixtures '
                   '(::test_no_real_fixture_trips_a_check_on_what_its_reader_hands_back)'),
         grounds=('The statistic is arithmetic and the package acts on nothing; it reports the '
-                 'number with its meaning (Rule 1, third kind).'),
-        response='warning',
-        responds=('read the cell, scale and every esd as from an equally weighted fit unless the '
-                  "constant sigma is the file's real esd; set sigma to None for Poisson weights "
-                  'if it is a placeholder'),
-        scope=('all',)),
+                 'number with its meaning (Rule 1, third kind).')),
     Row("PATTERN_SIGMA_NONPOSITIVE", "code", tier=1, ambiguity=1,
         evidence=("warning; arithmetic, no threshold: fires exactly when a file's σ column "
                   "holds an entry of zero or below, the count, how many record y = 0 and the "
@@ -1806,11 +1744,7 @@ ROWS: tuple[Row, ...] = (
                   'not checked. '
                   'tests/test_readers.py::test_an_unrecognisable_axis_is_read_as_two_theta_and_says_so'),
         grounds=('The same default GSAS-II applies, plus a stated report; the data cannot rank '
-                 'the alternatives, so the number is reported with its meaning.'),
-        response='warning',
-        responds=("check the file's axis is 2theta in degrees before quoting a cell, since an "
-                  'axis in another unit refines to a confidently wrong cell'),
-        scope=('all',)),
+                 'the alternatives, so the number is reported with its meaning.')),
     Row("PATTERN_X_AXIS_IMPLAUSIBLE", "code", tier=1, ambiguity=3,
         evidence=('warning; fires when the x axis of a 2theta pattern starts at or below 0 '
                   'degrees and some points are at or below 0 (readers.py:243-278). Nothing is '
@@ -1824,12 +1758,7 @@ ROWS: tuple[Row, ...] = (
                   'readable files of tests/data none fires and the smallest start is 0.4995 '
                   'degrees (probe, 2026-11-17)'),
         grounds=('The 0 degrees bound is the direct beam, physics; the code acts on nothing and '
-                 'states the number with what to do next.'),
-        response='warning',
-        responds=('exclude the named interval or confirm the axis is 2theta before quoting a '
-                  'cell or width, since points at or below 0 degrees are a header row or an '
-                  'offset, not diffraction'),
-        scope=('all',)),
+                 'states the number with what to do next.')),
     Row("PATTERN_ZERO_WEIGHT_EXCLUDED", "code", tier=1, ambiguity=1,
         evidence=("info; a record of an act the file's own value asks for: the pdCIF "
                   "dictionary defines _pd_proc_ls_weight = 0 as 'a data point not used for "
@@ -1926,12 +1855,7 @@ ROWS: tuple[Row, ...] = (
                   'because those were measured. FullProf, TOPAS: not checked. '
                   'tests/test_readers.py::test_an_attenuator_column_is_reported_and_never_applied'),
         grounds=('Not applying is the established default and the one the unmeasured case '
-                 'permits; the report states that the convention is unresolved.'),
-        response='warning',
-        responds=('treat the relative intensities, and any scale or Biso fitted from the named '
-                  'points, as unverified until the export is checked against the instrument '
-                  'software'),
-        scope=('phase_id', 'qpa', 'structure', 'magnetic')),
+                 'permits; the report states that the convention is unresolved.')),
     Row("READER_OPTION_IGNORED", "code", tier=1, ambiguity=1,
         evidence=("info; fires exactly when a reader option is passed that the chosen format's "
                   'options tuple does not contain, and it is not applied (base.py:279-292). An '
@@ -2014,10 +1938,7 @@ ROWS: tuple[Row, ...] = (
                   'the reference engine '
                   '(tests/test_recipe.py::test_an_off_state_half_is_held_and_said)'),
         grounds=("No parameter exists to receive the flag, and upstream's rule 4 forbids "
-                 'ignoring one silently.'),
-        response='warning',
-        responds=('expect one free profile width term fewer than the reference engine, so quote '
-                  'no size, strain or width compared against it without allowing for that')),
+                 'ignoring one silently.')),
     Row("RECIPE_FLAG_TRANSLATED", "code", tier=1, ambiguity=1,
         evidence=('read the site at recipe.py:1230: fires when LG_eta is flagged and both halves '
                   "are on, so the recipe's (magnitude, eta) pair becomes two free coefficients "
@@ -2034,10 +1955,7 @@ ROWS: tuple[Row, ...] = (
         evidence=('read the site at recipe.py:1358: fires exactly when _flagged_paths returns '
                   'nothing, so the plan is one stage that frees nothing '
                   '(tests/test_recipe.py::test_a_recipe_that_flags_nothing_is_a_simulation)'),
-        grounds='Deterministic from the flags.',
-        response='warning',
-        responds=('add refine flags to the recipe, since the plan stage frees nothing and no '
-                  'cell or scale will move')),
+        grounds='Deterministic from the flags.'),
     Row("RECIPE_PLAN_STAGED", "code"),
     Row("RECIPE_SCALE_RESEEDED", "code", tier=1, ambiguity=1,
         evidence=('read the site at recipe.py:1263 and forward.seed_phase_scales (:4906-4935): '
@@ -2052,10 +1970,7 @@ ROWS: tuple[Row, ...] = (
         evidence=('read the site at recipe.py:320: fires exactly when schema_version is not in '
                   'KNOWN_SCHEMA_VERSIONS, the versions the reader was checked against; nothing '
                   'is changed'),
-        grounds='A membership test on a list of versions the reader was checked on.',
-        response='warning',
-        responds=("check the cell, scale and width values the recipe's units were read as "
-                  'against the source engine, since this version was never checked')),
+        grounds='A membership test on a list of versions the reader was checked on.'),
     Row("RECIPE_ZERO_WEIGHT_EXCLUDED", "code", tier=1, ambiguity=1,
         evidence=('read the site at recipe.py:403: channels with weight <= 0 become excluded '
                   'regions (their run edges), with sigma set to 1 only as a placeholder under '
@@ -2354,29 +2269,20 @@ ROWS: tuple[Row, ...] = (
                   'model.skipped_blocks with what it lacked and carried, and reported; '
                   'to_structure then refuses to build while other phases would (weight fractions '
                   'would not sum), so nothing is dropped in silence'),
-        grounds='The block cannot be named a phase; the report and the later refusal are exact.',
-        response='warning',
-        responds=('add the named keyword to the block, or quote no phase fraction or scale from '
-                  'this structure, since a phase of the file is not in it')),
+        grounds='The block cannot be named a phase; the report and the later refusal are exact.'),
     Row("TOPAS_CELL_COUPLING_DROPPED", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:3717: fires when a cell tie (b = Get(a)) is copied '
                   'as a value and the space group does not tie the edges; silent where '
                   '_symmetry_reproduces says it does (tests/test_projects_topas.py:3696-3733); '
                   'the model has no tie field, so the loss is forced and the restoring call is '
                   'named'),
-        grounds='The model cannot hold the tie, and the report is raised only where it is lost.',
-        response='warning',
-        responds=('tie the named cell edges on the refinement before fitting, or quote no cell '
-                  'from this fit, since one edge would sit frozen at its copied value')),
+        grounds='The model cannot hold the tie, and the report is raised only where it is lost.'),
     Row("TOPAS_FEATURES_NOT_IMPORTED", "code", tier=1, ambiguity=1,
         evidence=('read the two sites at topas.py:3732 (constructs coverage.py declares '
                   'REPORTED) and :3743 (calls the file makes without a definition and the table '
                   "has no row for); the stance table is completeness-tested against the format's "
                   'phase scope (coverage.PHASE_SCOPE, tests/test_projects_topas.py)'),
-        grounds='A per-construct declaration, each stated in coverage.py with its own reason.',
-        response='warning',
-        responds=('read model.coverage before quoting any cell, scale or width, since a model '
-                  'construct of the file was not built')),
+        grounds='A per-construct declaration, each stated in coverage.py with its own reason.'),
     Row("TOPAS_FEATURE_REFUSED", "code", tier=1, ambiguity=1,
         evidence=('read the two sites at topas.py:3752 (constructs coverage.py declares REFUSED, '
                   'each with a stated reason: a rigid body generates coordinates, occ_merge '
@@ -2385,10 +2291,7 @@ ROWS: tuple[Row, ...] = (
                   'constant-wavelength only); to_structure refuses to build without them, so the '
                   "diagnostic is the reader's early notice"),
         grounds=('Building without the construct would misrepresent the file, which is an '
-                 'exactness reason and not a threshold.'),
-        response='warning',
-        responds=('read model.phases instead, since to_structure will refuse; no cell, scale or '
-                  'fraction can be built from this file as stated')),
+                 'exactness reason and not a threshold.')),
     Row("TOPAS_FIELD_NOT_WRITTEN", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:5329: fires when a written phase carries a texture, '
                   'extinction or magnetic-only width the writer does not state (extinction and '
@@ -2396,20 +2299,14 @@ ROWS: tuple[Row, ...] = (
                   'states none of them and TOPAS computes each phase without them; names the '
                   'phases and terms'),
         grounds=('The writer has no TOPAS statement for them, so the omission is forced and '
-                 'listed.'),
-        response='warning',
-        responds=('state the named texture, extinction or width terms in TOPAS before comparing '
-                  'any intensity or scale')),
+                 'listed.')),
     Row("TOPAS_FIRST_RUN_READ", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:3693: fires when a #if or #elseif tests Run_Number '
                   'and the file states num_runs other than 1 (or one the reader cannot '
                   "evaluate); the branches are read as Run_Number 0 reads them, TOPAS's own "
                   'first run (tests/test_projects_topas.py:1910-1914)'),
         grounds=('Run_Number starts at 0 in TOPAS, and a file with no num_runs has only that '
-                 'run.'),
-        response='warning',
-        responds=("check that run 0's model is the one wanted before quoting any cell, scale or "
-                  'intensity, since later runs read other branches')),
+                 'run.')),
     Row("TOPAS_MAGNETIC_GROUP_READ", "code", tier=1, ambiguity=1,
         evidence=("read the site at topas.py:4102: fires when the magnetic group is the file's "
                   'own mag_space_group number resolved to BNS/OG operators in the standard '
@@ -2452,10 +2349,7 @@ ROWS: tuple[Row, ...] = (
                   "refine flag; Moment.g is a plain float, so g is held at the file's value and "
                   "the model has one free parameter fewer than the file's refinement "
                   '(tests/test_magcif.py::test_a_refined_lande_g_is_reported_held)'),
-        grounds='The model has no g parameter, so the hold is forced and named.',
-        response='warning',
-        responds=('set Atom.moment.g on the built structure if g was refined, or quote no moment '
-                  'from this fit as refined with g free')),
+        grounds='The model has no g parameter, so the hold is forced and named.'),
     Row("TOPAS_MOMENT_ION_UNCHARGED", "code", tier=1, ambiguity=1,
         evidence=('read the site at topas.py:4145: fires when a site with a moment has an '
                   'uncharged species (a one- or two-letter element token), so the magnetic form '
@@ -7650,7 +7544,9 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "CAPILLARY_OFFSET_UNAVAILABLE",
     "CELL_DEGENERATE_PROBE",
     "CELL_RUNAWAY",
+    "CIF_CELL_ANGLE_CORRECTED",
     "CIF_MAGNETIC_NUCLEAR_GROUP",
+    "CIF_MAGNETIC_NUMBER_MISMATCH",
     "CIF_MAGNETIC_SYMMFORM",
     "CONSTRAINT_ACTIVE",
     "COVARIANCE_DIRECTION_DISCARDED",
@@ -7670,18 +7566,32 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "FLAT_DIRECTION",
     "FLAT_DIRECTION_OMITTED",
     "FROZEN_COMPILE_STALE",
+    "FULLPROF_MAGNETIC_PHASE_OMITTED",
+    "FULLPROF_OCCUPANCY_UNCHECKED",
     "FULLPROF_RHOMBOHEDRAL_RESTATED",
     "FULLPROF_SPECIES_WRITTEN_NEUTRAL",
+    "FULLPROF_TIE_DROPPED",
+    "GSAS2_CIF_FIELD_NOT_WRITTEN",
     "GSAS2_CIF_RHOMBOHEDRAL_RESTATED",
     "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL",
+    "GSAS2_GPX_CONSTRAINT_NOT_CARRIED",
+    "GSAS2_GPX_ITEM_NOT_READ",
     "GSAS2_GPX_PHASE_MAGNETIC",
     "GSAS2_GPX_SCALE_NOT_COMPARABLE",
     "GSAS2_GPX_TEXTURE_NOT_CARRIED",
+    "GSAS2_INSTPRM_FIELD_NOT_WRITTEN",
+    "GSAS2_INSTPRM_VALUE_DEFAULTED",
+    "GSAS2_INSTPRM_VALUE_FLOORED",
+    "GSAS2_INSTPRM_VALUE_MERGED",
     "GSAS_BANK_COMMENTED",
+    "GSAS_EXP_HISTOGRAM_NOT_READ",
+    "GSAS_EXP_PHASE_MAGNETIC",
     "GSAS_EXP_REFINE_FLAG_MERGED",
     "GSAS_EXP_SCALE_NOT_COMPARABLE",
     "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL",
+    "GSAS_FIELD_OVERFLOW",
     "GSAS_IPARM_PROFILE_DECLINED",
+    "GSAS_PRM_FIELD_NOT_WRITTEN",
     "GSAS_PRM_GEOMETRY_ASSUMED",
     "HARMONIC_ABSENT",
     "HARMONIC_FRACTION",
@@ -7736,8 +7646,12 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_TARGET_UNSEEN",
     "PATTERN_DEAD_CHANNELS",
+    "PATTERN_INTENSITY_SCALED",
     "PATTERN_MULTISCAN_DEFAULTED",
     "PATTERN_ROWS_DROPPED",
+    "PATTERN_SIGMA_CONSTANT",
+    "PATTERN_X_AXIS_ASSUMED",
+    "PATTERN_X_AXIS_IMPLAUSIBLE",
     "PAWLEY_OFF_DATA_RIDGED",
     "PAWLEY_OVERLAP_UNRESOLVED",
     "PEAK_ASYMMETRY_UNMODELLED",
@@ -7759,11 +7673,15 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "QPA_ESD_UNAVAILABLE",
     "QPA_FRACTION_RANGE",
     "QPA_UNAVAILABLE",
+    "RAS_ATTENUATOR_PRESENT",
     "RECIPE_BACKGROUND_PEAK_DEGENERATE",
     "RECIPE_BACKGROUND_RESEEDED",
     "RECIPE_ENGINE_DEFAULT_DECLINED",
     "RECIPE_FIELD_DROPPED",
+    "RECIPE_FLAG_DROPPED",
+    "RECIPE_NOTHING_REFINED",
     "RECIPE_PLAN_STAGED",
+    "RECIPE_SCHEMA_UNTESTED",
     "RESOLUTION_NOT_POSITIVE",
     "RESTRAINT_TENSION",
     "RIGID_BODY_MISFIT",
@@ -7785,6 +7703,13 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "STEPHENS_STRAIN_NOT_POSITIVE",
     "STRAIN_UNUSUALLY_LARGE",
     "TEXTURE_NOT_POSITIVE",
+    "TOPAS_BLOCK_SKIPPED",
+    "TOPAS_CELL_COUPLING_DROPPED",
+    "TOPAS_FEATURES_NOT_IMPORTED",
+    "TOPAS_FEATURE_REFUSED",
+    "TOPAS_FIELD_NOT_WRITTEN",
+    "TOPAS_FIRST_RUN_READ",
+    "TOPAS_MOMENT_G_HELD",
     "TOPAS_PHASE_TERM_READ",
     "TOPAS_SPECIES_WRITTEN_NEUTRAL",
     "WAVELENGTH_CALIBRATION",
