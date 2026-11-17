@@ -128,7 +128,7 @@ def test_an_edit_survives_a_restarted_server_and_restores(served, browser):
     dialog = page.locator(".rc-dialog")
     dialog.wait_for()
     assert dialog.locator("h2").inner_text() == "Unapplied edits"
-    assert "1 edit from" in dialog.inner_text()
+    assert ": 1 edit waiting at Apply." in dialog.inner_text()
     dialog.get_by_role("button", name="Restore", exact=True).click()
     dialog.wait_for(state="detached")
     assert page.locator(".actions .pending").inner_text() == "1 pending edit"
