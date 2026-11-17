@@ -166,8 +166,12 @@ ships verified on synthetic known answers and not yet validated.
       where the ratio decides the partition, cross-backend agreement for the
       new partials (`tests/test_cross_backend.py`); obs/calc/diff PNGs to
       `tests/output/`.
-- [ ] Manual: Part 1 `using/constraints.md` (restraint vs constraint, the
+- [x] Manual: Part 1 `using/constraints.md` (restraint vs constraint, the
       worked ratio); Part 2 the row's equation with its *Source* line.
+      *Done 2026-11-17:* the manual has moved, so Part 1 is
+      `guides/restrain.md` § Restrain a sum across phases and Part 2
+      `theory/parameterisation.md`'s `par-linear-restraint` and
+      `par-ratio-restraint`.
 - [ ] Skill: a reference row for the new restraint kind and the ratio
       helper, keyed by their names.
 

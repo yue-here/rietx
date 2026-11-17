@@ -699,6 +699,43 @@ two equations at $\sigma = w = 1$. A chain with a straight bond angle has
 $\mathbf{n}_1$ or $\mathbf{n}_2$ zero and no torsion, and compiling a
 restraint on one raises.
 
+A linear restraint names a sum of parameters rather than one, and
+its terms may belong to different phases, so it lives on the structure rather
+than on a phase. Its row is
+
+```{math}
+:label: par-linear-restraint
+
+r_{\mathrm{lin}} \;=\; \sqrt{w}\,
+\frac{\sum_k c_k\,p_k(\theta) - \mathrm{target}}{\sigma},
+```
+
+{source}`rietx.model.restraints.restraint_residual`
+
+with constant partials $\partial r_{\mathrm{lin}}/\partial p_k = \sqrt{w}\,c_k/\sigma$,
+chained through the constraint matrix like every other row. A conserved
+elemental ratio is one such row. The moles of element $E$ are proportional to
+$\sum_p S_p V_p n_{E,p}$, where $n_{E,p}$ is the occupancy-weighted count of $E$
+in one cell of phase $p$, since $W_p \propto S_p (ZMV)_p$ {cite}`hill1987` and
+$(ZM)_p$ is the cell's mass. A ratio $r$ of the elements in a set $N$ to those
+in a set $D$ is then the row
+
+```{math}
+:label: par-ratio-restraint
+
+\sum_p a_p S_p = 0, \qquad
+a_p = \frac{V_p\,\bigl(n_{N,p} - r\, n_{D,p}\bigr)}{D_0}, \qquad
+D_0 = \sum_p S_p^{(0)} V_p\, n_{D,p},
+```
+
+{source}`rietx.model.restraints.elemental_ratio_restraint`
+
+where $S_p^{(0)}$ are the scales at declaration. Near its target the row reads
+the ratio's own deviation, so $\sigma$ is a σ on the ratio. Away from the
+declared scales it is a σ of $\sigma D/D_0$ on the ratio. The cell volumes and
+occupancies are frozen into $a_p$, and a stage refining an occupancy they were
+read from reports so.
+
 ## Weighting the restraints
 
 A stage scales every restraint at once. The minimised quantity is then
