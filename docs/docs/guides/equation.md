@@ -104,7 +104,7 @@ slope 0.0 +/- None
 ['PARAMETRIC_FORM_REJECTED']
 ```
 
-With the slope held at 0, every pattern has the same cell edge.
+With the slope held at 0, every pattern has the same lattice parameter.
 The form test then rejects the line, and its suggestion is to revise the expression.
 Check each variable's `vary` before changing the formula.
 [Formula equations](../reference/parametric.md#formula-equations) says which stage frees a variable.

@@ -272,7 +272,7 @@ These steps port such an input:
    If it returns, the `TOPAS_FEATURES_NOT_IMPORTED` diagnostics and `model.coverage` list what the import left out.
    The ZrMo₂O₈ ramp's input reads this way, as the first of its 68 runs, and `TOPAS_FIRST_RUN_READ` says so.
 2. If it raises, port from the input's text.
-   Expand the preprocessor and the loops first.
+   Expand the macros and the loops first.
    `#list`, `#define`, `#ifdef` and `macro` act on the text, and `for xdds` repeats its body.
    TOPAS writes the input with every macro expanded to `TOPAS.LOG` when it runs, so read that file where TOPAS is at hand.
    By hand, each `#list` row is one pattern and one row of the `rx.CoordinateTable`.
@@ -282,9 +282,9 @@ These steps port such an input:
    A construct in the list under that table has no rietx spelling yet.
 4. Call `MultiHistogramRefinement.preview_equations` before fitting.
    It evaluates every formula at its starting values, so compare its cells with the ones the input states.
-5. Fit, and compare a refined value the input states, such as a cell edge, with rietx's in ppm, with both esds beside it.
+5. Fit, and compare a refined value the input states, such as a lattice parameter, with rietx's in ppm, with both esds beside it.
    Two programs can differ by more than either esd.
-   Compare Rwp only loosely, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
+   Rwp is a weaker check, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
 
 ### Writing an `.inp`
 
