@@ -95,12 +95,12 @@ whatever kind of editor it is. Nothing new to survey.
 - [x] Text: a `text` arm in `Draft` and `readDraft`, `draft()`/`restoreDraft()` on
   `Text.svelte`, the shell's `$effect` reading it, the restore at the same and at a moved
   revision; vitest beside `lib/recovery.test.ts` and `App.test.ts`'s WP-2209 block
-- [ ] Text: a browser test in `tests/test_gui_recovery_browser.py`: type into the Text panel,
+- [x] Text: a browser test in `tests/test_gui_recovery_browser.py`: type into the Text panel,
   close the tab, reopen, Restore, the buffer is back and dirty; by real keys and clicks
-- [ ] Model: a `model` arm over the pieces above, each restored through its form's state;
+- [x] Model: a `model` arm over the pieces above, each restored through its form's state;
   vitest and one browser case
 - [ ] The offer's wording for the new arms (open question 1), shown to the maintainer
-- [ ] Manual: `reference/gui-guide.md` § Edits not yet applied drops the sentence saying the
+- [x] Manual: `reference/gui-guide.md` § Edits not yet applied drops the sentence saying the
   Model forms and the Text document are not kept
 - [ ] Dist rebuilt; every `tests/*_browser.py` run locally, since CI has no playwright
 
