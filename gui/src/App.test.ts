@@ -6466,13 +6466,16 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     app = mount(App, { target: host });
     await flush();
     expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
-    expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
+    expect(dialog()?.querySelector("p")?.textContent).toMatch(
+      /^Not applied when the project closed on Nov 10, 2026, \d{1,2}:05 [AP]M: 1 edit waiting at Apply\.$/);
     expect(dialog()?.textContent).not.toContain("since");
 
     [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
     await flush();
     expect(dialog()).toBeNull();
     expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    expect(host.querySelector("section.console")?.textContent).toContain(
+      "# Restored: 1 edit waiting at Apply.");
     // the server holds exactly these, so nothing is written until they change
     await wait();
     expect(recoveryPuts(stub)).toEqual([]);
@@ -6663,7 +6666,7 @@ describe("the Text buffer and the Model forms join the recovery copy (WP-2213)",
       draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
       saved_utc: null, head: "n0000", head_now: "n0000" }));
     expect(dialog()?.textContent).toContain(
-      "An edited Text document not applied when the project closed.");
+      "Not applied when the project closed: the Text document.");
     answer("Restore");
     await flush();
     expect(dialog()).toBeNull();
@@ -6684,6 +6687,12 @@ describe("the Text buffer and the Model forms join the recovery copy (WP-2213)",
     const stub = await start(routes({
       draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
       saved_utc: null, head: "n0042", head_now: "n0000" }, "r2", TEXTDOC_MOVED));
+    // a Text arm alone: no values to replace, and the buffer is said to come back out of date
+    expect([...dialog()!.querySelectorAll("p")].map((p) => p.textContent)).toEqual([
+      "Not applied when the project closed: the Text document.",
+      "The project has been refined or edited since. "
+      + "The Text document comes back marked out of date. Copy what you need from it, then re-read.",
+    ]);
     answer("Restore");
     await flush();
     button("Text")!.click();
@@ -6715,7 +6724,7 @@ describe("the Text buffer and the Model forms join the recovery copy (WP-2213)",
     await start(routes({ draft: { count: 0, model }, saved_utc: null,
                          head: "n0000", head_now: "n0000" }));
     expect(dialog()?.textContent).toContain(
-      "1 edit in the Model forms not applied when the project closed.");
+      "Not applied when the project closed: 1 edit in the Model forms.");
     answer("Restore");
     await flush();
     button("Model")!.click();

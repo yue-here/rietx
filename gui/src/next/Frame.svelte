@@ -23,7 +23,7 @@
   import Palette from "../panels/Palette.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
-  import { RecoveryWriter, combine, readDraft, type Draft, type InteractiveDraft,
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft, type InteractiveDraft,
            type ModelDraft, type PlanDraft, type TextDraft } from "../lib/recovery";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import Splitter from "../panels/Splitter.svelte";
@@ -279,7 +279,7 @@
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
     recoveryWriter.arm(o.path, o.draft);
     modelTab = "params";
-    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+    say(restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -711,7 +711,7 @@
             <div class="pane"><p class="unbuilt">Not built yet.</p></div>
           {/if}
           <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
-            {busy} {blocked} stats={barStats} onapply={() => applyPending()}
+            {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
         {/if}
       </section>
@@ -839,7 +839,8 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
+    /* the page ground, as the prototype's columns: the plot is a panel-ground card on it */
+    background: var(--bg);
   }
 
   .model {
@@ -847,7 +848,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
+    background: var(--bg);
   }
 
   .graphs + .model {

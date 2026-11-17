@@ -524,6 +524,20 @@ class GuiSession:
             # it is a summary rather than a second authority — the phases live
             # in the history like every other model fact.
             "n_phases": len(p.refinement.structure.phases),
+            # What the readers repaired or assumed on the read this session
+            # holds (WP-1522): the pattern reader's (a reversed scan, dropped
+            # rows, a scaled intensity) and the history reader's (a declared
+            # range restored or left off, an earlier tree skipped).  A repair
+            # that changes how the next fit moves must be readable where that
+            # fit is started, and these are its only carrier: `Project` keeps
+            # them in memory, never in project.json.  On the document rather
+            # than on the open route's answer alone, so a reload's
+            # `GET /api/project` still says it; in the readers' order, as
+            # `Diagnostic` dumps, the order to show them being the panel's.
+            "data_diagnostics": [d.model_dump(mode="json")
+                                 for d in p.data_diagnostics],
+            "history_diagnostics": [d.model_dump(mode="json")
+                                    for d in p.history_diagnostics],
         }
 
     def project_patch(self, body: dict) -> dict:

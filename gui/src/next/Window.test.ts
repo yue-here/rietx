@@ -144,6 +144,24 @@ describe("the recovery offer", () => {
     expect(document.body.textContent).toMatch(/Unapplied edits/);
   });
 
+  it("names the Text and Model parts beside the Parameters edits, so Discard is understood", async () => {
+    // WP-2213 (ruled 2026-11-17): this page has no Text or Model tab yet, and the
+    // dialog still says what Discard would drop
+    kept = { draft: { count: 1, params: { values: { "phases.0.scale": "2" } },
+                      text: { buffer: "rxt 1\n# note\n", revision: "r1" },
+                      model: { count: 1, edits: { "phases.0.name": "x" }, params: {},
+                               positions: {}, vary: {}, atom: null } },
+             saved_utc: null, head: "n1", head_now: "n2" };
+    await boot();
+    const lines = [...document.querySelectorAll(".rc-dialog p")].map((p) => p.textContent);
+    expect(lines).toEqual([
+      "Not applied when the project closed: 1 edit waiting at Apply, "
+      + "1 edit in the Model forms, and the Text document.",
+      "The project has been refined or edited since. Restored values will replace the current ones. "
+      + "The Text document comes back marked out of date. Copy what you need from it, then re-read.",
+    ]);
+  });
+
   it("offers nothing when no edits were kept", async () => {
     await boot();
     expect(document.body.textContent).not.toMatch(/Unapplied edits/);

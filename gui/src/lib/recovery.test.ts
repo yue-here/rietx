@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Draft, RecoveryWriter, combine, keptParts, offerText, readDraft } from "./recovery";
+import { type Draft, RecoveryWriter, combine, keptParts, movedText, offerText, readDraft, restoredText } from "./recovery";
 
 const PARAMS = { edits: { "phases.0.cell.a": "5.4312" }, vary: {}, hold: {}, limits: {},
                  restraints: {}, positions: {} };
@@ -60,23 +60,55 @@ describe("the draft", () => {
     expect(readDraft({ params: PARAMS })).toEqual({ ...DRAFT, count: 0 });
   });
 
-  it("says how many edits and when", () => {
-    expect(offerText({ ...DRAFT, count: 3 }, "2026-11-10T09:05:00+00:00", "en-GB"))
-      .toMatch(/^3 edits from .*2026.*, not applied when the project closed\.$/);
-    expect(offerText(DRAFT, null)).toBe("1 edit not applied when the project closed.");
-    expect(offerText({ ...DRAFT, count: 0 }, "not a date")).toMatch(/^1 edit not applied/);
+  it("says when the project closed, then what was kept", () => {
+    expect(offerText({ ...DRAFT, count: 3 }, "2026-11-10T09:05:00+00:00", "en-US"))
+      .toMatch(/^Not applied when the project closed on Nov 10, 2026, \d{1,2}:05 [AP]M: 3 edits waiting at Apply\.$/);
+    expect(offerText(DRAFT, null)).toBe("Not applied when the project closed: 1 edit waiting at Apply.");
+    expect(offerText({ ...DRAFT, count: 0 }, "not a date"))
+      .toBe("Not applied when the project closed: 1 edit waiting at Apply.");
   });
 
-  it("names the Model forms and the Text document beside the counted edits", () => {
-    const at = "2026-11-10T09:05:00+00:00";
-    expect(offerText({ ...DRAFT, params: null, count: 0, text: TEXT }, null))
-      .toBe("An edited Text document not applied when the project closed.");
-    expect(offerText({ ...DRAFT, params: null, count: 0, model: MODEL }, null))
-      .toBe("2 edits in the Model forms not applied when the project closed.");
-    expect(offerText({ ...DRAFT, count: 3, text: TEXT, model: { ...MODEL, count: 1 } }, at, "en-GB"))
-      .toMatch(/^3 edits, 1 edit in the Model forms and an edited Text document from .*2026.*, not applied when the project closed\.$/);
-    expect(keptParts({ ...DRAFT, text: TEXT }, "unapplied edit"))
-      .toBe("1 unapplied edit and an edited Text document");
+  it("names each part by where it lives, in one sentence", () => {
+    const at = "2026-11-17T00:44:00+00:00";
+    const one = { ...DRAFT, params: null, count: 0 };
+    // one part alone, singular and plural
+    expect(keptParts(DRAFT)).toBe("1 edit waiting at Apply");
+    expect(keptParts({ ...DRAFT, count: 2 })).toBe("2 edits waiting at Apply");
+    expect(offerText({ ...one, text: TEXT }, null))
+      .toBe("Not applied when the project closed: the Text document.");
+    expect(offerText({ ...one, model: { ...MODEL, count: 1 } }, null))
+      .toBe("Not applied when the project closed: 1 edit in the Model forms.");
+    expect(offerText({ ...one, model: MODEL }, null))
+      .toBe("Not applied when the project closed: 2 edits in the Model forms.");
+    // two parts join with "and" and no comma
+    expect(keptParts({ ...DRAFT, count: 2, model: { ...MODEL, count: 3 } }))
+      .toBe("2 edits waiting at Apply and 3 edits in the Model forms");
+    expect(keptParts({ ...DRAFT, text: TEXT })).toBe("1 edit waiting at Apply and the Text document");
+    expect(keptParts({ ...one, model: MODEL, text: TEXT })).toBe("2 edits in the Model forms and the Text document");
+    // three parts take the serial comma
+    const three = { ...DRAFT, text: TEXT, model: { ...MODEL, count: 1 } };
+    expect(keptParts(three)).toBe("1 edit waiting at Apply, 1 edit in the Model forms, and the Text document");
+    expect(offerText(three, at, "en-US")).toMatch(new RegExp(
+      "^Not applied when the project closed on Nov 1[67], 2026, \\d{1,2}:44 [AP]M: "
+      + "1 edit waiting at Apply, 1 edit in the Model forms, and the Text document\\.$"));
+  });
+
+  it("restates the offer's parts in the console line", () => {
+    const three = { ...DRAFT, text: TEXT, model: { ...MODEL, count: 1 } };
+    expect(restoredText(three))
+      .toBe("# Restored: 1 edit waiting at Apply, 1 edit in the Model forms, and the Text document.");
+    expect(restoredText({ ...DRAFT, count: 2 })).toBe("# Restored: 2 edits waiting at Apply.");
+  });
+
+  it("says what a moved project does to each arm", () => {
+    const moved = "The project has been refined or edited since.";
+    const values = "Restored values will replace the current ones.";
+    const stale = "The Text document comes back marked out of date. Copy what you need from it, then re-read.";
+    expect(movedText(DRAFT)).toBe(`${moved} ${values}`);
+    expect(movedText({ ...DRAFT, params: null, count: 0, model: MODEL })).toBe(`${moved} ${values}`);
+    // a Text arm alone has no values to replace
+    expect(movedText({ ...DRAFT, params: null, count: 0, text: TEXT })).toBe(`${moved} ${stale}`);
+    expect(movedText({ ...DRAFT, text: TEXT })).toBe(`${moved} ${values} ${stale}`);
   });
 });
 

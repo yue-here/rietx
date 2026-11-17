@@ -105,27 +105,50 @@ export function readDraft(value: unknown): Draft | null {
 
 const plural = (n: number, noun: string) => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);
 
-/** What a copy holds, in words: the action bar's count (`noun` names it),
- *  then the Model forms' edits, then the Text document. */
-export function keptParts(draft: Draft, noun = "edit"): string {
+/** What a copy holds, in words, each part named by where it lives (the
+ *  maintainer's ruling of 2026-11-17): the action bar's counted edits
+ *  (Parameters, Interactive, the plan), the Model forms' edits, the Text
+ *  document.  Two parts join with "and", three with a serial comma.  The one
+ *  authority for these words: the offer and the console line both read it. */
+export function keptParts(draft: Draft): string {
   const counted = draft.params || draft.interactive || draft.plan;
   const parts: string[] = [];
-  if (counted || (!draft.text && !draft.model)) parts.push(plural(Math.max(1, draft.count), noun));
+  if (counted || (!draft.text && !draft.model)) {
+    parts.push(`${plural(Math.max(1, draft.count), "edit")} waiting at Apply`);
+  }
   if (draft.model) parts.push(`${plural(Math.max(1, draft.model.count), "edit")} in the Model forms`);
-  if (draft.text) parts.push("an edited Text document");
-  return parts.length > 1
-    ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+  if (draft.text) parts.push("the Text document");
+  if (parts.length < 3) return parts.join(" and ");
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
 }
 
-/** The offer's sentence: what was kept, and when. */
+/** The offer's sentence: when the project closed, then what was kept. */
 export function offerText(draft: Draft, savedUtc: string | null | undefined,
                           locale?: string): string {
   const what = keptParts(draft);
-  const lead = what.charAt(0).toUpperCase() + what.slice(1);
   const when = savedUtc ? new Date(savedUtc) : null;
-  if (!when || Number.isNaN(when.getTime())) return `${lead} not applied when the project closed.`;
+  if (!when || Number.isNaN(when.getTime())) return `Not applied when the project closed: ${what}.`;
   const stamp = when.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
-  return `${lead} from ${stamp}, not applied when the project closed.`;
+  return `Not applied when the project closed on ${stamp}: ${what}.`;
+}
+
+/** The console line after a restore. */
+export function restoredText(draft: Draft): string {
+  return `# Restored: ${keptParts(draft)}.`;
+}
+
+/** What the offer adds when the project has been refined or edited since the
+ *  copy was kept: the values replace the current ones, and a Text document
+ *  comes back marked out of date (`lib/sync.ts`). */
+export function movedText(draft: Draft): string {
+  const out = ["The project has been refined or edited since."];
+  if (draft.params || draft.interactive || draft.plan || draft.model) {
+    out.push("Restored values will replace the current ones.");
+  }
+  if (draft.text) {
+    out.push("The Text document comes back marked out of date. Copy what you need from it, then re-read.");
+  }
+  return out.join(" ");
 }
 
 type Put = (project: string, head: string | null, draft: Draft | null) => Promise<unknown>;

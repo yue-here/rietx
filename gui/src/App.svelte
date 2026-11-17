@@ -41,7 +41,7 @@
   import Start from "./panels/Start.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
   import Recovery from "./panels/Recovery.svelte";
-  import { RecoveryWriter, combine, keptParts, readDraft, type Draft } from "./lib/recovery";
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -449,7 +449,7 @@
     if (o.draft.text) void textPanel?.restoreDraft(o.draft.text);
     // the server holds exactly this, so it is not written again until it changes
     recoveryWriter.arm(o.path, o.draft);
-    say(`# ${keptParts(o.draft, "unapplied edit")} restored`);
+    say(restoredText(o.draft));
   }
 
   async function discardKept() {
