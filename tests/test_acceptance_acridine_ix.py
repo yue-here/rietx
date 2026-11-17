@@ -499,7 +499,7 @@ def free_control(pattern):
 
 @pytest.fixture(scope="module")
 def real_stretched(pattern):
-    """#1008's negative arm: the deposited body with C3 moved 0.3 Å along
+    """#1008's positive arm: the deposited body with C3 moved 0.3 Å along
     C2→C3 (H3 with it), refined under the same plan, then checked."""
     phase = _deposited_phase()
     body = _stretch_c2c3(_deposited_body(phase), 0.3)
@@ -654,9 +654,13 @@ def test_issue_1008s_stretched_body_fires_on_the_deposited_pattern(pattern, real
     assert row.n_added == 3 * len(HEAVY) - 6 == 36
     assert row.fires
     assert row.p_value < MISFIT_ALPHA and row.delta_bic > MISFIT_BIC
-    assert row.deviations[0][0] == "C2–C3"
+    label, template, _, _ = row.deviations[0]
+    assert label == "C2–C3" and template == pytest.approx(1.7045, abs=1e-4)
     arm = ref.released_arm("acridine", freed=HEAVY + HYDROGENS)
     _, res = _by_hand(ref, pattern, arm, "acridine_ix_real_stretched_all_freed", globs=_BKG)
+    # a stalled control would pass the threshold below for the wrong reason
+    assert res.status == "converged"
+    assert _chi2_absolute(res.statistics) < row.chi2_body
     added = res.statistics.n_free_parameters - row.n_free_body
     assert added == 3 * len(HEAVY + HYDROGENS) - 6 == 63
     assert delta_bic(row.chi2_body, _chi2_absolute(res.statistics), row.n_points, added,

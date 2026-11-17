@@ -245,7 +245,9 @@ def acridine():
 
 def _by_hand(ref, pattern, arm, stem, globs=RIDING_GLOBS):
     """The arm fitted through the public verbs only, as the manual spells it;
-    its obs/calc/diff goes to ``tests/output/{stem}.png``."""
+    its obs/calc/diff goes to ``tests/output/{stem}.png``.  It carries none of
+    ``ref``'s own ties, holds, 2θ limits or plan settings, so it matches the
+    check's arm only where those are defaults or not refined."""
     hand = Refinement(arm.structure, ref.instrument, history=False)
     for path, source in arm.ties.items():
         hand.tie(path, source)
@@ -353,7 +355,7 @@ ACRIDINE_STRETCH = 0.2
 
 def _stretch_c2c3(body, stretch: float):
     """``body`` with C3 moved ``stretch`` Å along C2→C3 in its template and H3
-    moved with it, so the C3–H3 vector is kept: #1008's negative arm."""
+    moved with it, so the C3–H3 vector is kept: #1008's positive arm."""
     tpl = np.array(body.template, dtype=float)
     i2, i3, ih3 = (body.atoms.index(lab) for lab in ("C2", "C3", "H3"))
     u = (tpl[i3] - tpl[i2]) / np.linalg.norm(tpl[i3] - tpl[i2])
@@ -388,6 +390,7 @@ def test_a_stretched_body_with_riding_h_fires_and_names_its_bond(acridine_stretc
     assert row.p_value < MISFIT_ALPHA and row.delta_bic > MISFIT_BIC
     label, template, released, dev = row.deviations[0]
     assert label == "C2–C3"
+    assert template == pytest.approx(1.4045 + ACRIDINE_STRETCH, abs=1e-4)
     # the data pull it most of the way back to the deposited 1.405 Å
     assert released < template - ACRIDINE_STRETCH / 2 and dev < -5.0
     (diag,) = out.diagnostics
@@ -403,6 +406,9 @@ def test_the_stretch_does_not_fire_with_every_member_freed(acridine_stretched):
     (row,) = out.rows
     arm = ref.released_arm("acridine", freed=ACRIDINE_HEAVY + ACRIDINE_H)
     _, res = _by_hand(ref, pattern, arm, "body_misfit_acridine_stretched_all_freed")
+    # a stalled control would pass the threshold below for the wrong reason
+    assert res.status == "converged"
+    assert _chi2_absolute(res.statistics) < row.chi2_body
     added = res.statistics.n_free_parameters - row.n_free_body
     assert added == 63
     assert delta_bic(row.chi2_body, _chi2_absolute(res.statistics), row.n_points, added,
