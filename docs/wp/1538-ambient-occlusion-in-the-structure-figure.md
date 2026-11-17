@@ -116,20 +116,6 @@ bound on what sticks add. The multishadow number is the WP's to measure.
 - `gui/src/panels/Structure3D.svelte`: the toggle.
 - `scene.LOOK`, if D2's constants become shared look values.
 
-### Inherited
-
-- **2026-10-10, from WP-1940 (4th session, PR #864).** The rasteriser's numba twin is
-  deleted in that PR, and its port into `kernels/src/lib.rs` is the next
-  kernel release, 1.1.0 (1940 § Decisions item 9). An occlusion kernel joins
-  that port or a later minor release, held to `raster.py`'s numpy functions
-  on the bit.
-
-- **2026-10-10, from WP-1940 (3rd session).** numba leaves rietx at the
-  kernel migration (1940 § Decisions item 8), and the rasteriser's numba
-  twin is deleted then. The task "the numba kernel, held bit-identical to
-  the numpy path" becomes a kernel in `kernels/src/lib.rs` once 1940 ports
-  the rasteriser, or the numpy path alone before that.
-
 ## Non-goals
 
 - Ambient occlusion in the SVG (WP-1536). Darkening per pixel has no vector
@@ -140,15 +126,23 @@ bound on what sticks add. The multishadow number is the WP's to measure.
 
 ## Tasks
 
-- [ ] Ask for Tarini, Cignoni & Montani (2006), and read it before fixing
-  D2's constants.
+- [x] Ask for Tarini, Cignoni & Montani (2006), and read it before fixing
+  D2's constants (2026-11-17: asked, on the fetch list; it is closed access
+  and was not read. D2's constants were measured instead, and reading it
+  went to #1647).
 - [x] The depth-map pass and the lookup in the numpy path, with unit tests:
   an isolated atom is unoccluded everywhere, and a point between two touching
   atoms is darker than the far side of either (2026-11-17:
   `raster.occlusion_maps` builds each map as an `id_plane` along the light
   and reads the depth back from the ids, so the maps are the same on either
   tier; `raster.occlusion` weighs each direction by its cosine).
-- [ ] The numba kernel, held bit-identical to the numpy path.
+- [x] The numba kernel, held bit-identical to the numpy path (2026-11-17:
+  superseded. WP-1940 deleted the numba twin and ported the rasteriser to
+  `kernels/src/raster.rs`, so this is a kernel in a minor wheel release. Until
+  one lands the occluded picture is drawn on the numpy path on either tier,
+  from maps the tier's own `id_plane` builds, so the two tiers agree on the
+  bit (`test_the_two_paths_draw_the_same_bits_in_any_banding[occluded]`).
+  The kernel went to #1647).
 - [x] `ambient_occlusion=` on `render_structure`, with D5's cache. Measure
   the cost at 1000 px and 3000 px on the 21 phases. Quote ranges (2026-11-17,
   `1538-measure/results.txt`: the maps 0.06-0.53 s a scene; occluded
