@@ -830,6 +830,27 @@ def _stale_silent() -> list:
 
 
 
+def _linear_stale(occupancy: float) -> list:
+    """A ratio row declared at Cu occupancy 1.0, read against a fit whose
+    occupancy is ``occupancy`` (the shape of
+    ``test_freeing_an_occupancy_the_coefficients_read_is_reported``)."""
+    from rietx.refine import _linear_stale_diagnostics
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.structure import Atom, Cell, LinearRestraint, Phase, Structure
+
+    def fcc(name: str) -> Phase:
+        return Phase(name=name, space_group="F m -3 m", cell=Cell.cubic(3.6),
+                     atoms=[Atom(label=name, species=name, x=P(value=0.0),
+                                 y=P(value=0.0), z=P(value=0.0), biso=P(value=0.5))],
+                     scale=P(value=1.0, min=0.0))
+
+    occ = "phases.0.atoms.0.occ"
+    row = LinearRestraint(terms=[("phases.0.scale", 1.0), ("phases.1.scale", -1.0)],
+                          sigma=0.01, occupancies={occ: 1.0})
+    structure = Structure(phases=[fcc("Cu"), fcc("Ni")], restraints=[row])
+    return _linear_stale_diagnostics(structure, {occ: occupancy})
+
+
 def _read_text_pattern(name: str, text: str) -> list:
     """``read_pattern``'s diagnostics for a text file, whether or not it is
     refused: the refusal appends its record before it raises."""
@@ -999,6 +1020,9 @@ SILENCE: dict[str, Pair] = {
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
     "HISTORY_EARLIER_TREE_SKIPPED": Pair(
         _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
+    "LINEAR_RESTRAINT_STALE": Pair(
+        functools.partial(_linear_stale, 0.9), functools.partial(_linear_stale, 1.0),
+        "tests/test_linear_restraint.py"),
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),
