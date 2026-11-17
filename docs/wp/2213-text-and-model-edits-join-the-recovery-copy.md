@@ -1,6 +1,6 @@
 # WP-2213 — the Text buffer and the Model forms join the recovery copy
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-17 — claimed by @yue-here (ghostshift runner)
+Milestone: gui-overhaul · Status: 🔄 2026-11-17 — built, PR #1633 waits on the maintainer's wording (questions 1-4 in the handover log)
 Depends on: 2209 (the recovery copy); #1523 (its pull request)
 Priority: P2 2026-11-13 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; WP-2209's store, which it lands on, is on main since #1523 and WP-2209 is closed
 
@@ -102,7 +102,7 @@ whatever kind of editor it is. Nothing new to survey.
 - [ ] The offer's wording for the new arms (open question 1), shown to the maintainer
 - [x] Manual: `reference/gui-guide.md` § Edits not yet applied drops the sentence saying the
   Model forms and the Text document are not kept
-- [ ] Dist rebuilt; every `tests/*_browser.py` run locally, since CI has no playwright
+- [x] Dist rebuilt; every `tests/*_browser.py` run locally, since CI has no playwright
 
 ## Acceptance
 
@@ -121,6 +121,46 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1009 and WP-1013 (the `.rxt` document and the Text pane's sync rules).
 
 ## Handover log
+
+### 2026-11-17 — the Text buffer and the Model forms join the recovery copy; PR #1633 waits on the maintainer
+
+Typed edits in the Text document and in the Model panel's forms are now kept the way the action bar's edits are. They survive a closed project, a closed tab and a stopped server. Reopening the project offers them in the same dialog. The Text document comes back as typed, with the person's own comments, which an Apply would drop. A buffer typed before the project changed comes back marked stale, so it stays on screen to copy from, and the person re-reads and types the edit again. Building this found a sibling defect: opening another project carried both panes' typed edits into it. That is fixed. The offer's wording is a proposal for the maintainer (question 1 below).
+
+*Done.*
+- `lib/recovery.ts`: `Draft` gains a `text` arm (`{buffer, revision}`) and a `model` arm (the forms' typed maps `edits`, `params`, `positions`, `vary`, the new-atom row, and `count`, the number the panel shows). Neither arm is in the action bar's count. `combine` now takes the arms as one object. `readDraft` reads a copy written before this WP as having neither arm. `keptParts` puts what a copy holds into words for the dialog and the console line.
+- `lib/sync.ts`: a `restored` event. At the revision the buffer was typed against, the buffer comes back dirty. At another revision it comes back stale and keeps its old revision, so a copy kept again is still stale when restored.
+- `Text.svelte` exports `draft()`, `restoreDraft()` and `forget()`. While a restore is still fetching the rendering, `draft()` answers with the kept buffer, so the copy is not rewritten without it in the meantime.
+- `Model.svelte` exports the same three functions. A restore sets the form's own maps and never patches the model. The arm is triggered by the typed maps, not by the panel's `dirty` count. Before the panel's first load, `dirty` reads 0, so triggering on it would delete the arm when a restore lands with the tab unopened. The atom row's state variable is renamed `atomRow`, since `draft` is now the exported function's name.
+- `App.svelte` reads both arms, restores them, and calls `forget()` on both panes in `leaveEdits`. This fixes the carry-over defect, and a mutation test turns the new vitest red without the fix.
+- `/next`'s Frame carries both arms as it already carried the Interactive and Plan ones, so a Parameters edit made there does not drop them.
+- Manual: § Edits not yet applied says both are kept, says a Text document from before a change comes back stale, and says a typed space-group symbol is not kept.
+- Screenshots of the offer, light and dark, are in `docs/wp/2213-screenshots/`. Each full window has the dialog boxed in red, with a crop beside it. Dist rebuilt.
+
+*Review* (`/code-review high --fix`; eight findings, four fixed in their own commit). A Text restore now goes through the pane's one read path, `load()`. A failed read leaves the kept buffer waiting, where it used to drop it from the copy, and two reads in flight restore it once. `forget()` also clears the Model panel's loaded model, so a restored form is not measured against the project left behind. `readDraft` takes a Model arm only when its four maps are objects. Three findings are wording and go to the maintainer as questions 3 and 4 below. One is outside this WP: `forget()` leaves the selected phase index alone, which was already the case before this change. A three-phase project followed by a one-phase project can therefore point the Model tab at a phase that does not exist. Declined here as an existing gap that this WP does not widen.
+
+*Settled by Claude.*
+- A space-group symbol typed but not applied is not kept. The Model panel's `load()` drops it on every change to the project, so keeping it across a close would let it outlive what it survives in an open session. The alternative was to keep it as a seventh field. Grounds: the panel's own behaviour.
+- The new-atom row is kept, and counts as one edit in the Model arm. The panel itself never counts it. Grounds: the WP lists it among the pending pieces, and practice (WP-2209 § Practice) keeps every dirty editor.
+
+*Measured* (darwin/arm64, `[dev]` venv plus `playwright` 1.65 installed locally, node v24.22.1):
+- vitest: 806 passed, 11 more than before (5 in `App.test.ts`, 3 in `sync.test.ts`, 2 in `recovery.test.ts`, 1 in `next/Window.test.ts`). svelte-check: 444 files, 0 errors.
+- `test_gui_recovery`, `test_gui_manual`, `test_gui_dist` and `test_gui_recovery_browser`: 42 passed (the browser file went from 3 to 5).
+- Every `tests/*_browser.py` file, run locally (CI has no playwright): gui and layout 40 passed; peaks, structure3d and recovery 15 passed; watch and compare 59 passed. These ran before the review fixes. The fast suite reran all of them on the final tree.
+- Fast suite (`-m "not slow"`, through ghostshift's `serial.py`, browser files included, current main merged in at 44ae52fc7, load about 2): 14852 passed, 424 skipped, 32 xfailed, 13:31. The two added browser cases cost 7.6 s and 5.7 s on this run (`tests.added_test_times`). Both are in a file that already sits in the fast tier.
+- `python -m tests.reader_output` exit 0. ruff clean. Vale at warning level: no alert on a line this branch wrote.
+- A mutation that removes the two `forget()` calls turns the carry-over vitest red.
+
+*Not covered.* No vitest drives a Parameters edit on `/next` with a kept Text or Model arm present. A mutation that stops `/next` carrying the arms stays green, because `/next`'s Window test has no parameter rows to edit. That test asserts the half it can reach: the offer is not shown and the copy is left alone. In the rebuild the carrying code is shared with the Interactive and Plan arms, which have no such test either.
+
+*Scope against the rebuild.* WP-2214 and the gui-overhaul milestone say this WP shrinks in the rebuild. There a Text edit becomes a pending edit (R4), and the Model forms become dialogs that commit at once, so a Model arm has nothing to keep. This WP builds the arms for today's page, which is what `rietx gui` serves until the swap. The `text` arm in `lib/recovery.ts` and the `restored` event in `lib/sync.ts` sit in the logic layer the rebuild keeps. R4 can reuse them. The Model arm goes with today's Model panel at the swap.
+
+*Open for the maintainer.*
+1. The offer's wording (the WP's question 1). Proposed: the action bar's count first, then "N edit(s) in the Model forms", then "an edited Text document", joined with commas and "and". An example is "1 edit, 1 edit in the Model forms and an edited Text document from Nov 17, 2026, 12:44 AM, not applied when the project closed." See `docs/wp/2213-screenshots/offer-light.png` and the crops. The line for a moved head still reads "Restored values will replace the current ones." That is not quite true of a stale Text document, which replaces nothing until re-applied.
+2. Whether a Text buffer typed before the project changed should be offered at all (the WP's question 2). Built as the WP's default: it is restored stale.
+3. On `/next`, the offer names everything in the copy, the Text document and the Model forms included. Restore there brings back only the Parameters edits and carries the rest unseen. Should `/next`'s sentence name only what it restores?
+4. The console line after Restore mixes nouns: "# 1 unapplied edit and 2 edits in the Model forms restored". It goes with question 1's wording.
+
+Next: the maintainer's answers to 1-4, then the merge.
 
 - **2026-11-13** — re-rated by the close-only bookkeeping batch of 2026-11-13 (PR #1563),
   which closed WP-2209. Its recovery copy merged in PR #1523 on 2026-11-11, so nothing this WP
