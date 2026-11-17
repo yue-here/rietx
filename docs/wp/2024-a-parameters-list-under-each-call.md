@@ -161,7 +161,7 @@ WP-2025 and WP-2026 then write the rest without deciding anything.
     lines, with it 0 (the residue check's positive arm). Gate made to fail on purpose by deleting
     one baseline line. Mac arm64, worktree venv `[dev]`, each file alone: test_reference_pages 41
     passed, test_manual 67, test_manual_api 19, test_help 37, test_skill 174; `sphinx -W` exit 0;
-    `make_api_index.py --check` 0; ruff clean; `rietx_vale.sh` 0 errors. Fast suite on pearl (Linux x86-64, `rietx-py312`
+    `make_api_index.py --check` 0; ruff clean; `rietx_vale.sh` 0 errors. Fast suite on the workstation (Linux x86-64, `rietx-py312`
     venv, `-n 4`, co-tenant, tip 6079db766): 14859 passed, 280 skipped, 32 xfailed, 0 failed
     in 1006 s, 6.6 GB peak; the 7 added tests cost 0.03 s together (`tests.added_test_times`),
     plus two cases on an existing residue test; no main baseline was run, so the delta is the

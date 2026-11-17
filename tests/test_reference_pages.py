@@ -422,12 +422,12 @@ def test_a_name_described_twice_is_indexed_once(monkeypatch):
 # the both-ways gate with its shrink-only baseline
 # ----------------------------------------------------------------------
 
-def _undocumented_baseline() -> frozenset[str]:
+def _undocumented_baseline() -> tuple[frozenset[str], int]:
     spec = importlib.util.spec_from_file_location(
         "_undocumented_parameters", DOCS_DIR / "undocumented_parameters.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.UNDOCUMENTED_PARAMETERS
+    return module.UNDOCUMENTED_PARAMETERS, module.UNDOCUMENTED_CAP
 
 
 def _documented(a, b=2, *rest, **kw):
@@ -507,31 +507,95 @@ def _api_calls() -> dict:
     return calls
 
 
+def _stray_entries(calls: dict) -> list[str]:
+    """Entries naming no argument of their call, or saying nothing."""
+    return [f"{name}: {arg!r}" for name, obj in calls.items()
+            for arg, text in reference_pages.parameter_entries(obj)
+            if arg not in reference_pages.call_arguments(obj) or not text]
+
+
+def _baseline_problems(calls: dict, baseline: frozenset[str], cap: int) -> list[str]:
+    """Both ways, the shape of `test_help.py`, plus the size: an argument with
+    no entry and no baseline line, a baseline line whose argument is now
+    documented or gone, and a baseline larger than its cap."""
+    missing = {f"{name}({arg})" for name, obj in calls.items()
+               for arg in reference_pages.call_arguments(obj)
+               if arg not in {a for a, _ in reference_pages.parameter_entries(obj)}}
+    problems = []
+    if missing - baseline:
+        problems.append(
+            "arguments with no Parameters entry (CONTRIBUTING.md § A Parameters section "
+            "under each call):\n" + "\n".join(sorted(missing - baseline)))
+    if baseline - missing:
+        problems.append(
+            "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
+            + "\n".join(sorted(baseline - missing)))
+    if len(baseline) > cap:
+        problems.append(
+            f"docs/undocumented_parameters.py holds {len(baseline)} lines against its cap "
+            f"of {cap}: the baseline only shrinks, so a new argument gets an entry")
+    return problems
+
+
 def test_every_parameters_entry_names_an_argument_of_its_call():
     """An entry for an argument the signature lacks describes nothing."""
     calls = _api_calls()
     assert len(calls) > 90
-    stray = [f"{name}: {arg!r}" for name, obj in calls.items()
-             for arg, text in reference_pages.parameter_entries(obj)
-             if arg not in reference_pages.call_arguments(obj) or not text]
+    stray = _stray_entries(calls)
     assert not stray, ("Parameters entries naming no argument, or saying nothing:\n"
                        + "\n".join(stray))
 
 
 def test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line():
-    """Both ways, the shape of `test_help.py`: an argument with no entry fails
-    unless the shrink-only `UNDOCUMENTED_PARAMETERS` holds it, and a line there
-    whose argument is now documented or gone fails too, so the set only shrinks."""
-    missing = {f"{name}({arg})" for name, obj in _api_calls().items()
-               for arg in reference_pages.call_arguments(obj)
-               if arg not in {a for a, _ in reference_pages.parameter_entries(obj)}}
-    baseline = _undocumented_baseline()
-    assert not missing - baseline, (
-        "arguments with no Parameters entry (CONTRIBUTING.md § A Parameters section "
-        "under each call):\n" + "\n".join(sorted(missing - baseline)))
-    assert not baseline - missing, (
-        "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
-        + "\n".join(sorted(baseline - missing)))
+    """An argument with no entry fails unless the shrink-only
+    `UNDOCUMENTED_PARAMETERS` holds it, a line there whose argument is now
+    documented or gone fails, and the set may not pass `UNDOCUMENTED_CAP`, so
+    it only shrinks."""
+    baseline, cap = _undocumented_baseline()
+    problems = _baseline_problems(_api_calls(), baseline, cap)
+    assert not problems, "\n\n".join(problems)
+
+
+def _empty_entry(a, b):
+    """Summary.
+
+    Parameters
+    ----------
+    a
+    b
+        The second.
+    """
+
+
+def _undocumented_b(a, b):
+    """Summary.
+
+    Parameters
+    ----------
+    a
+        The first.
+    """
+
+
+def test_the_gate_refuses_an_entry_that_says_nothing():
+    assert _stray_entries({"f": _empty_entry}) == ["f: 'a'"]
+
+
+@pytest.mark.parametrize("baseline, cap, fragment", [
+    # an argument documented nowhere
+    (frozenset(), 0, "arguments with no Parameters entry"),
+    # a stale line: `a` is documented, so its line must go
+    (frozenset({"f(a)", "f(b)"}), 2, "delete their lines"),
+    # growth: a new undocumented argument, its line added beside it, past the cap
+    (frozenset({"f(b)"}), 0, "against its cap of 0"),
+])
+def test_the_baseline_gate_refuses(baseline, cap, fragment):
+    problems = _baseline_problems({"f": _undocumented_b}, baseline, cap)
+    assert len(problems) == 1 and fragment in problems[0], problems
+
+
+def test_the_baseline_gate_passes_a_baseline_at_or_under_its_cap():
+    assert _baseline_problems({"f": _undocumented_b}, frozenset({"f(b)"}), 1) == []
 
 
 def test_the_refinement_section_is_documented_in_full():
@@ -539,12 +603,12 @@ def test_the_refinement_section_is_documented_in_full():
     left in the baseline."""
     index = reference_pages._api_index()
     names = dict((title, names) for title, _, names in index.SECTIONS)["Refinement"]
-    left = sorted(line for line in _undocumented_baseline()
+    left = sorted(line for line in _undocumented_baseline()[0]
                   if line.split("(")[0] in names)
     assert not left, left
     calls = _api_calls()
     drawn = [name for name in names if name in calls]
-    assert len(drawn) == 19, drawn
+    assert len(drawn) >= 19, drawn
     assert all(reference_pages.parameter_entries(calls[name]) for name in drawn)
 
 

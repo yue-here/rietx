@@ -104,8 +104,9 @@ rest of the docstring stays where `help()` and an IDE show it.
 - **The gate**, `tests/test_reference_pages.py`: every name an entry gives is
   an argument of its call, and every argument of a call on the API pages has
   an entry or a line in the shrink-only baseline `UNDOCUMENTED_PARAMETERS`
-  (`docs/undocumented_parameters.py`). Write the entry and delete the line in
-  the same commit; a baseline line whose argument is documented or gone fails.
+  (`docs/undocumented_parameters.py`). Write the entry, delete the line and
+  lower `UNDOCUMENTED_CAP` in the same commit; a baseline line whose argument
+  is documented or gone fails, and so does a baseline larger than its cap.
 
 One worked entry, from `Refinement.fit`:
 
