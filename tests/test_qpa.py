@@ -757,3 +757,66 @@ def test_a_source_with_no_table_declines_by_name():
         source_kind="neutron_tof")
     assert mu_r is None
     assert "attenuation unavailable" in reason and "neutron_tof" in reason
+
+
+# -- the #349 exports (WP-1942): element counts and Cov(W) on the result -----
+
+
+def test_element_counts_are_the_refined_cells_atoms_per_cell():
+    """CaF2 holds 4 Ca and 8 F per cell (4a and 8c), LaB6 1 La and 6 B; the
+    row carries the counts the Z·M·V pass weighed, at the refined occupancy."""
+    structure, values, compute_qpa = _two_phase_decoded([None, None])
+    qpa = compute_qpa(structure, values)
+    lab6, caf2 = qpa.phases
+    assert lab6.element_counts == pytest.approx({"La": 1.0, "B": 6.0})
+    assert caf2.element_counts == pytest.approx({"Ca": 4.0, "F": 8.0})
+    occ = next(k for k in values if k.startswith("phases.1.atoms.1.occ"))
+    values = {**values, occ: 0.5}
+    assert compute_qpa(structure, values).phases[1].element_counts == \
+        pytest.approx({"Ca": 4.0, "F": 4.0})
+    round_trip = QuantitativePhaseAnalysis.model_validate_json(qpa.model_dump_json())
+    assert round_trip.phases[1].element_counts == caf2.element_counts
+
+
+def test_weight_fractions_covariance_is_extra_and_leaves_the_three_unchanged():
+    scale_cov = np.array([[4.0, 3.5], [3.5, 4.0]])
+    three = weight_fractions([100.0, 300.0], [1.0, 2.0], scale_cov)
+    w, sc, si, cov_w = weight_fractions([100.0, 300.0], [1.0, 2.0], scale_cov,
+                                        with_covariance=True)
+    for a, b in zip(three, (w, sc, si), strict=True):
+        assert np.array_equal(a, b)
+    assert np.allclose(np.sqrt(np.diag(cov_w)), sc, rtol=0, atol=0)
+    assert weight_fractions([1.0, 1.0], [1.0, 1.0], None,
+                            with_covariance=True)[3] is None
+
+
+def test_the_weight_fraction_covariance_diagonal_is_stderr_squared():
+    """Two phases: the diagonal is σ(W)², each row sums to zero (W sums to
+    one), and the off-diagonal is the anticorrelation that forces."""
+    structure, values, compute_qpa = _two_phase_decoded([None, None])
+    scale_cov = np.array([[4e-4, 1e-4], [1e-4, 9e-4]])
+    qpa = compute_qpa(structure, values, scale_cov)
+    cov = np.array(qpa.weight_fraction_covariance, dtype=float)
+    stderr = np.array([p.weight_fraction_stderr for p in qpa.phases])
+    assert cov.shape == (2, 2)
+    assert np.allclose(np.diag(cov), stderr ** 2, rtol=1e-12, atol=0)
+    assert np.allclose(cov.sum(axis=1), 0.0, atol=1e-15)
+    assert cov[0, 1] < 0
+    assert compute_qpa(structure, values).weight_fraction_covariance is None
+
+
+def test_an_unmeasured_phase_leaves_the_covariance_without_a_number():
+    structure, values, compute_qpa = _three_phase_decoded([None] * 3)
+    scale_cov = np.array([[4e-4, 1e-4], [1e-4, 9e-4]])
+    qpa = compute_qpa(structure, values, scale_cov, unmeasured=[1])
+    cov = qpa.weight_fraction_covariance
+    assert [row[1] for row in cov] == [None, None, None]
+    assert cov[1] == [None, None, None]
+    measured = np.array([[cov[i][j] for j in (0, 2)] for i in (0, 2)])
+    assert np.all(np.isfinite(measured))
+    assert np.allclose(np.diag(measured),
+                       [qpa.phases[0].weight_fraction_stderr ** 2,
+                        qpa.phases[2].weight_fraction_stderr ** 2], rtol=1e-12)
+    # the lone phase seen is whole by definition: no esd, so no matrix
+    lone = compute_qpa(structure, values, scale_cov[:1, :1], unmeasured=[1, 2])
+    assert lone.weight_fraction_covariance is None

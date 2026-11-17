@@ -58,6 +58,7 @@ from .layer2 import (
     resolution_limited_action,
     suggest_actions,
     texture_actions,
+    unidentified_phase,
 )
 from .localisation import (
     cumulative_chi2,
@@ -101,6 +102,7 @@ from .schemas import (
     TextureAnalysis,
     TrendAnalysis,
     TrendTemplate,
+    UnidentifiedPhase,
     UnmatchedPeak,
     VerificationOutcome,
 )
@@ -142,6 +144,7 @@ __all__ = [
     "TextureAnalysis",
     "TrendAnalysis",
     "TrendTemplate",
+    "UnidentifiedPhase",
     "UnmatchedPeak",
     "VerificationOutcome",
     "abstention_flavour",
@@ -533,6 +536,11 @@ def build_report(result: RefinementResult, *, model=None, values=None,
             f"Phase identification does not rest on that misfit.")
 
     ticks = [t for positions in result.ticks.values() for t in positions]
+    # Layer 0's impurity evidence as numbers, from the computation both
+    # branches' layer0_actions call words (same unmatched, attributions and
+    # ticks), so the record and the action agree on every branch
+    report.unidentified_phase = unidentified_phase(report.unmatched,
+                                                   attributions, ticks=ticks)
     reason = maturity_gate(result.statistics.rwp, attributions)
     if reason is not None:
         # Abstain from *parameter-level* statements: keep the per-region

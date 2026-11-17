@@ -32,6 +32,7 @@ this module made either.
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 
 import numpy as np
 
@@ -57,6 +58,7 @@ from .schemas import (
     RivalFit,
     SuggestedAction,
     TrendAnalysis,
+    UnidentifiedPhase,
     UnmatchedPeak,
     VerificationOutcome,
 )
@@ -453,6 +455,89 @@ def _trend_actions(trend: TrendAnalysis,
     return actions
 
 
+class _ImpurityEvidence(NamedTuple):
+    """What :func:`layer0_actions` counts before it words an impurity call."""
+
+    strong: list[UnmatchedPeak]     # strong, not inside a shifted region
+    foreign: list[UnmatchedPeak]    # of those, not matched by shift evidence
+    n_flank: int                    # rows over IMPURITY_SIGMA on a drawn flank
+    n_paired: int                   # strong rows paired with an unmatched_calc
+
+
+def _impurity_evidence(unmatched: list[UnmatchedPeak],
+                       attributions: list[RegionAttribution] | None = None,
+                       *, ticks: list[float] | None = None
+                       ) -> _ImpurityEvidence:
+    """The one computation behind ``add_impurity_phase`` (the tests are in
+    :func:`layer0_actions`'s docstring); :func:`unidentified_phase` and that
+    action both read it, so the numbers and the prose cannot disagree."""
+    atts = attributions or []
+    shifted_regions = [
+        a for a in atts
+        if any(c.kind == "position" and c.significant for c in a.coefficients)
+    ]
+    far_regions = [a for a in atts
+                   if any(f.code == "outside_validity_radius"
+                          for f in a.gate_failures)]
+    fwhms = [a.mean_fwhm for a in atts if a.mean_fwhm > 0]
+    fwhm_ref = float(np.median(fwhms)) if fwhms else 0.0
+    tick_arr = np.sort(np.asarray(ticks, dtype=float)) if ticks else None
+    ucalc = np.sort([u.two_theta for u in unmatched
+                     if u.kind == "unmatched_calc"])
+
+    def explained_by_shift(u: UnmatchedPeak) -> bool:
+        # a mispositioned peak leaves a derivative-shaped residual whose lobes
+        # sit up to ~1 FWHM outside the region, so the region is padded before
+        # the containment test
+        for a in shifted_regions:
+            pad = max(a.mean_fwhm, 0.05)
+            if a.two_theta_lo - pad <= u.two_theta <= a.two_theta_hi + pad:
+                return True
+        return False
+
+    def matches_shift_evidence(u: UnmatchedPeak) -> bool:
+        if tick_arr is not None and fwhm_ref > 0 and (
+                np.min(np.abs(tick_arr - u.two_theta))
+                <= SHIFT_TICK_PROXIMITY_FWHM * fwhm_ref):
+            return True
+        return bool(far_regions and len(ucalc) and (
+            np.min(np.abs(ucalc - u.two_theta)) <= SHIFT_PAIR_WINDOW_DEG))
+
+    strong = [u for u in _strong_unmatched(unmatched)
+              if not explained_by_shift(u)]
+    n_flank = sum(1 for u in unmatched
+                  if u.kind == "unmatched_obs"
+                  and u.height_over_sigma > IMPURITY_SIGMA
+                  and _on_drawn_flank(u))
+    foreign = [u for u in strong if not matches_shift_evidence(u)]
+    n_paired = sum(
+        1 for u in strong
+        if far_regions and len(ucalc)
+        and np.min(np.abs(ucalc - u.two_theta)) <= SHIFT_PAIR_WINDOW_DEG)
+    return _ImpurityEvidence(strong, foreign, n_flank, n_paired)
+
+
+def unidentified_phase(unmatched: list[UnmatchedPeak],
+                       attributions: list[RegionAttribution] | None = None,
+                       *, ticks: list[float] | None = None
+                       ) -> UnidentifiedPhase:
+    """Layer 0's impurity evidence as numbers (``FitReport.unidentified_phase``).
+
+    A projection of :func:`_impurity_evidence`, the computation
+    :func:`layer0_actions` words: ``present`` is exactly whether that
+    function emits ``add_impurity_phase`` for the same arguments, and
+    ``strongest_two_theta`` is the position its ``two_theta_range`` names.
+    """
+    ev = _impurity_evidence(unmatched, attributions, ticks=ticks)
+    if not ev.strong:
+        return UnidentifiedPhase(present=False, n_foreign=0, n_shift_matched=0)
+    worst = max(ev.foreign or ev.strong, key=lambda u: u.height_over_sigma)
+    return UnidentifiedPhase(
+        present=True, n_foreign=len(ev.foreign),
+        n_shift_matched=len(ev.strong) - len(ev.foreign),
+        strongest_two_theta=worst.two_theta)
+
+
 def layer0_actions(unmatched: list[UnmatchedPeak],
                    attributions: list[RegionAttribution] | None = None,
                    *, ticks: list[float] | None = None
@@ -496,50 +581,13 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
     the alternatives: on that evidence a phantom phase is the less likely
     reading (the confident-wrong-singleton rule applied to impurity calls).
     """
-    atts = attributions or []
-    shifted_regions = [
-        a for a in atts
-        if any(c.kind == "position" and c.significant for c in a.coefficients)
-    ]
-    far_regions = [a for a in atts
-                   if any(f.code == "outside_validity_radius"
-                          for f in a.gate_failures)]
-    fwhms = [a.mean_fwhm for a in atts if a.mean_fwhm > 0]
-    fwhm_ref = float(np.median(fwhms)) if fwhms else 0.0
-    tick_arr = np.sort(np.asarray(ticks, dtype=float)) if ticks else None
-    ucalc = np.sort([u.two_theta for u in unmatched
-                     if u.kind == "unmatched_calc"])
-
-    def explained_by_shift(u: UnmatchedPeak) -> bool:
-        # a mispositioned peak leaves a derivative-shaped residual whose lobes
-        # sit up to ~1 FWHM outside the region, so the region is padded before
-        # the containment test
-        for a in shifted_regions:
-            pad = max(a.mean_fwhm, 0.05)
-            if a.two_theta_lo - pad <= u.two_theta <= a.two_theta_hi + pad:
-                return True
-        return False
-
-    def matches_shift_evidence(u: UnmatchedPeak) -> bool:
-        if tick_arr is not None and fwhm_ref > 0 and (
-                np.min(np.abs(tick_arr - u.two_theta))
-                <= SHIFT_TICK_PROXIMITY_FWHM * fwhm_ref):
-            return True
-        return bool(far_regions and len(ucalc) and (
-            np.min(np.abs(ucalc - u.two_theta)) <= SHIFT_PAIR_WINDOW_DEG))
-
-    strong = [u for u in _strong_unmatched(unmatched)
-              if not explained_by_shift(u)]
+    ev = _impurity_evidence(unmatched, attributions, ticks=ticks)
+    strong, foreign, n_flank = ev.strong, ev.foreign, ev.n_flank
     if not strong:
         return []
-    n_flank = sum(1 for u in unmatched
-                  if u.kind == "unmatched_obs"
-                  and u.height_over_sigma > IMPURITY_SIGMA
-                  and _on_drawn_flank(u))
     flank_note = (f"  ({n_flank} further unmatched peak(s) sit unresolved on "
                   f"the flank of a calculated peak and are not counted here: "
                   f"see UnmatchedPeak.flank.)" if n_flank else "")
-    foreign = [u for u in strong if not matches_shift_evidence(u)]
     n_matched = len(strong) - len(foreign)
 
     if foreign:
@@ -566,10 +614,7 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
             two_theta_range=(worst.two_theta, worst.two_theta))]
 
     worst = max(strong, key=lambda u: u.height_over_sigma)
-    n_paired = sum(
-        1 for u in strong
-        if far_regions and len(ucalc)
-        and np.min(np.abs(ucalc - u.two_theta)) <= SHIFT_PAIR_WINDOW_DEG)
+    n_paired = ev.n_paired
     return [SuggestedAction(
         kind="add_impurity_phase",
         confidence=IMPURITY_SHIFT_CAP,

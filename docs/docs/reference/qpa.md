@@ -28,6 +28,7 @@ for row in result.qpa.phases:
 | `QuantitativePhaseAnalysis.unmeasured_held` | the part of that list a stage held while a reflection is in range at the answer |
 | `QuantitativePhaseAnalysis.microabsorption` | the `MicroabsorptionCorrection` record, when the correction ran |
 | `QuantitativePhaseAnalysis.microabsorption_skipped` | why it did not run, when a phase asked for it |
+| `QuantitativePhaseAnalysis.weight_fraction_covariance` | the covariance of the uncorrected fractions, a square matrix in `phases` order, or `None` when the esds are `None` |
 
 `PhaseQuantity` is one phase's row.
 
@@ -42,6 +43,7 @@ for row in result.qpa.phases:
 | `PhaseQuantity.zmv` | their product, the quantity the fractions are proportional to |
 | `PhaseQuantity.z` | formula units per cell |
 | `PhaseQuantity.molar_mass` | one formula unit's mass, in g/mol |
+| `PhaseQuantity.element_counts` | atoms per unit cell by element symbol, at the refined occupancies |
 | `PhaseQuantity.particle_radius_um` | the particle radius you supplied, in µm, when the correction ran |
 | `PhaseQuantity.mu_cm` | the phase's linear attenuation coefficient µ, in cm⁻¹ |
 | `PhaseQuantity.mu_r` | its µ·R, with R the particle radius |
@@ -58,6 +60,9 @@ The site multiplicities are the ones the model compiled, so a coordinate that dr
 `PhaseQuantity.weight_fraction_stderr` is propagated through the covariance of all the scales together, rather than from each scale's esd alone, so it carries the same conditioning as every other esd rietx reports.
 W<sub>p</sub> divides by a sum over every phase, so one scale the data carry no gradient in makes every fraction's esd unknown.
 The whole block of esds is then `None`, and [`QPA_ESD_UNAVAILABLE`](diagnostics-refinement.md#qpa_esd_unavailable) names the phase that withheld it.
+`QuantitativePhaseAnalysis.weight_fraction_covariance` is the whole propagated matrix, so a ratio or sum of two fractions takes its esd from it rather than from the two esds alone.
+Its diagonal is each `PhaseQuantity.weight_fraction_stderr` squared, and each row sums to zero because the fractions sum to one.
+An unmeasured phase's row and column hold `None`, not zero.
 Where the refined scales give a non-positive Σ S·ZMV, there are no fractions to form: `RefinementResult.qpa` is `None`, and [`QPA_UNAVAILABLE`](diagnostics-refinement.md#qpa_unavailable) names the scales at or below zero.
 
 ### A mixture of three phases

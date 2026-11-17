@@ -721,9 +721,10 @@ from .._nearmiss import did_you_mean
 #: ``LinearRestraint`` (a soft row on Σ c·p over (path, coefficient) pairs,
 #: which may span phases), with ``RestraintRow.kind`` gaining ``"linear"``;
 #: ``PhaseQuantity.element_counts``;
-#: ``QPAResult.weight_fraction_covariance``; and
-#: ``FitReport.unidentified_phase``.  Additive and defaulted (an empty list,
-#: ``None``), the 0.25 → 0.26 rule, so every stored document opens unchanged;
+#: ``QuantitativePhaseAnalysis.weight_fraction_covariance``; and
+#: ``FitReport.unidentified_phase``, an ``UnidentifiedPhase``.  Additive and
+#: defaulted (an empty list, ``None``), the 0.25 → 0.26 rule, so every stored
+#: document opens unchanged;
 #: an older build refuses a document carrying any of the keys.
 SCHEMA_VERSION = "0.61"
 
