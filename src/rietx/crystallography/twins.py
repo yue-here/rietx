@@ -566,36 +566,61 @@ def _carry_linear_restraints(old: Structure, new: Structure, atoms, atom_exists,
     """``new.restraints`` with each row carried from ``old`` read into the new numbering.
 
     The structure-level rows (``LinearRestraint``, WP-1942) name phases and
-    atoms by index in their term paths and ``occupancy_phases``, so the same
-    place rule holds as for a phase's own list: a row equal to the one
-    ``old`` held at its index was carried and is renumbered, through
-    :func:`renumber_path`; any other was written for ``new`` and is left as
-    written.  A carried row naming a phase or atom ``new`` lacks is dropped
-    and named in ``dropped``.  Returns (the rows, whether any changed).
+    atoms by index in their term paths and ``occupancies``, so the place rule
+    of a phase's own list holds (WP-2121): a row equal to the one ``old``
+    held at its index was carried and is renumbered, through
+    :func:`renumber_path`; one appended past the old list, or one reading the
+    same entries in either numbering, is left as written; any other changed
+    in the edit that renumbered what it names, and could mean either, so it
+    raises ``ValueError``.  A carried row naming a phase or atom ``new``
+    lacks, including a trailing phase :func:`atom_moves` gives no key, is
+    dropped and named in ``dropped``.  Returns (the rows, whether any changed).
     """
+    n_new = len(new.phases)
+
+    def gone(path: str | None) -> bool:
+        if path is None or not atom_exists(path):
+            return True
+        m = _PHASE_PATH.match(path)
+        return m is not None and int(m.group(1).split(".")[1]) >= n_new
+
+    def read_old(r):
+        terms = [(renumber_path(p, atoms), c) for p, c in r.terms]
+        occ = {renumber_path(p, atoms): v for p, v in r.occupancies.items()}
+        if any(gone(p) for p, _ in terms) or any(gone(p) for p in occ):
+            return None
+        update = {}
+        if terms != list(r.terms):
+            update["terms"] = terms
+        if occ != dict(r.occupancies):
+            update["occupancies"] = occ
+        return r.model_copy(update=update) if update else r
+
     out: list = []
     moved = False
     for k, r in enumerate(new.restraints):
         prior = old.restraints[k] if k < len(old.restraints) else None
-        if prior is None or r != prior:
+        carried = read_old(r)
+        if prior is not None and r == prior:
+            if carried is None:
+                dropped.append(f"the linear restraint {k}"
+                               + (f" ({r.label})" if r.label else "")
+                               + " on " + ", ".join(p for p, _ in r.terms))
+                moved = True
+            else:
+                out.append(carried)
+                moved = moved or carried is not r
+        elif prior is None or carried == r:
             out.append(r)
-            continue
-        terms = [(renumber_path(p, atoms), c) for p, c in r.terms]
-        phases = [renumber_path(f"phases.{ip}", atoms) for ip in r.occupancy_phases]
-        if any(p is None or not atom_exists(p) for p, _ in terms) or None in phases:
-            dropped.append(f"the linear restraint {k}"
-                           + (f" ({r.label})" if r.label else "")
-                           + " on " + ", ".join(p for p, _ in r.terms))
-            moved = True
-            continue
-        update = {}
-        if terms != list(r.terms):
-            update["terms"] = terms
-        occ = [int(p.split(".")[1]) for p in phases]
-        if occ != list(r.occupancy_phases):
-            update["occupancy_phases"] = occ
-        out.append(r.model_copy(update=update) if update else r)
-        moved = moved or bool(update)
+        else:
+            raise ValueError(
+                f"linear restraint {k} differs from the one the structure held "
+                f"at that place. This change also renumbers the phases or atoms "
+                f"it names, so its paths could mean either numbering. Deleting "
+                f"a row counts as changing every one after it, since each moves "
+                f"up a place. Make the phase or atom change alone, which carries "
+                f"every row onto what it named, and then change the rows. A row "
+                f"appended after the carried ones is read in the new numbering")
     return out, moved
 
 

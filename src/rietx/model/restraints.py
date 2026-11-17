@@ -1365,31 +1365,38 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
         Σ_p a_p·S_p = 0,   a_p = V_p·(n_{num,p} − r·n_{den,p}) / D₀,
 
     which is linear in the scales, with constant partials.  D₀ =
-    Σ_p S_p·V_p·n_{den,p} at the scales ``structure`` holds now, so near the
-    target the row reads r − ``ratio`` and ``sigma`` is a σ on the ratio
-    itself.  It is that only while the scales stay near the ones the row was
-    declared at: the row's σ on the ratio is ``sigma``·D/D₀, so declare it
-    once the scales are refined, never from placeholder ones.
+    Σ_p S_p·V_p·n_{den,p} at the scales ``structure`` holds now.  The row is
+    (D/D₀)·(r − ``ratio``), so at the declared scales ``sigma`` is a σ on the
+    ratio itself, and away from them a σ of ``sigma``·D₀/D: declare it once
+    the scales are refined, never from placeholder ones, and rebuild it where
+    the scales drift (a series whose overall scale moves).
 
     ``numerator`` and ``denominator`` are element symbols (a string or an
     iterable of them); ``phases`` the phase indices the row spans, every
     phase by default.  A phase holding none of the elements has a zero
-    coefficient and leaves the row.  The cell volumes and the occupancies
-    are read now and frozen: the row records the phases it read occupancies
-    from (``occupancy_phases``), and a stage freeing one of their
-    occupancies reports ``LINEAR_RESTRAINT_STALE``.  The declared ratio is
-    the caller's input, and no result field stores it as measured.
+    coefficient and leaves the row; an element no spanned phase holds is
+    refused by name, since a misspelt symbol would otherwise build a row that
+    drives the other side's scales to zero.  The cell volumes and the
+    occupancies are read now and frozen.  The row records each occupancy it
+    read (``occupancies``), and a fit whose occupancies have moved from them
+    reports ``LINEAR_RESTRAINT_STALE``; a refined cell volume moves a
+    coefficient by its own relative change and is not reported.  The
+    declared ratio is the caller's input, and no result field stores it as
+    measured.
 
     The coefficients assume Hill & Howard's relation as written, with no
     microabsorption correction: under Brindley's correction a phase's
     fraction is the scale times its τ, and this row does not carry it.
     """
+    from ..crystallography.species import element_symbol
     from ..crystallography.symmetry import resolve_group
     from ..optimize.qpa import phase_zmv
     from ..schemas.structure import LinearRestraint
 
-    num = {numerator} if isinstance(numerator, str) else set(numerator)
-    den = {denominator} if isinstance(denominator, str) else set(denominator)
+    num = {element_symbol(e) for e in
+           ([numerator] if isinstance(numerator, str) else numerator)}
+    den = {element_symbol(e) for e in
+           ([denominator] if isinstance(denominator, str) else denominator)}
     if not num or not den:
         raise ValueError("an elemental ratio needs a numerator and a denominator")
     if num & den:
@@ -1398,7 +1405,8 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
         raise ValueError(f"ratio must be finite and non-negative, got {ratio}")
     span = range(len(structure.phases)) if phases is None else list(phases)
     terms: list = []
-    occ: list = []
+    occ: dict = {}
+    held: set = set()
     d0 = 0.0
     rows = []
     for ip in span:
@@ -1407,12 +1415,19 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
                         phase.cell.lengths_angles(),
                         [(a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
                          for a in phase.atoms])
+        held |= {e for e, n in zmv.element_counts.items() if n > 0.0}
         n_num = sum(zmv.element_counts.get(e, 0.0) for e in num)
         n_den = sum(zmv.element_counts.get(e, 0.0) for e in den)
         d0 += float(phase.scale.value) * zmv.cell_volume * n_den
         rows.append((ip, zmv.cell_volume * (n_num - ratio * n_den)))
         if n_num + n_den > 0.0:
-            occ.append(ip)
+            occ.update({f"phases.{ip}.atoms.{j}.occ": float(a.occ.value)
+                        for j, a in enumerate(phase.atoms)})
+    missing = sorted((num | den) - held)
+    if missing:
+        raise ValueError(
+            f"no phase spanned holds {missing}; name elements by symbol "
+            f"(the phases hold {sorted(held)})")
     if not d0 > 0.0:
         raise ValueError(
             f"no phase spanned holds {sorted(den)} at a positive scale, so the "
@@ -1426,4 +1441,4 @@ def elemental_ratio_restraint(structure, numerator, denominator, ratio: float,
     return LinearRestraint(
         terms=terms, target=0.0, sigma=sigma, weight=weight,
         label=label or f"{'+'.join(sorted(num))}/({'+'.join(sorted(den))}) = {ratio:g}",
-        occupancy_phases=occ)
+        occupancies=occ)

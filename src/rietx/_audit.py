@@ -1402,10 +1402,10 @@ ROWS: tuple[Row, ...] = (
                   "elemental_ratio_restraint from the refined occupancies and refit, or hold "
                   "those occupancies in the stages the row is on"),
         evidence=("arithmetic: a LinearRestraint's coefficients are a function of the "
-                  "occupancies elemental_ratio_restraint read (its occupancy_phases), so a stage "
-                  "whose moving paths include one of those phases' occupancies fitted against "
-                  "a row for other values; a warning that names the occupancies, moves no value "
-                  "and gates nothing (WP-1942)"),
+                  "occupancies elemental_ratio_restraint read (recorded on the row), so a fit "
+                  "whose occupancies differ from those values fitted against a row for another "
+                  "composition; a warning that names each occupancy with its declared and "
+                  "current value, moves no value and gates nothing (WP-1942)"),
         scope=("qpa",)),
     Row("RESTRAINT_BODY_CONTACTS_UNCHECKED", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate of a body whose torsion turned, read the "

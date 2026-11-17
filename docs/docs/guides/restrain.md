@@ -131,7 +131,7 @@ two.restraints = [LinearRestraint(
 | `LinearRestraint.sigma` | the uncertainty claimed for the sum, in its unit |
 | `LinearRestraint.weight` | multiplies the row, 1 by default |
 | `LinearRestraint.label` | a name for the row in the report; nothing reads it |
-| `LinearRestraint.occupancy_phases` | the phases whose occupancies the coefficients were computed from |
+| `LinearRestraint.occupancies` | each occupancy the coefficients were computed from, with its value then |
 A restraint is soft, unlike a tie: a phase that really did change can still pull away from it, and the report says how far.
 To make one parameter an exact function of others, use [a tie](tie.md) instead.
 
