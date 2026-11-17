@@ -142,9 +142,12 @@ bound on what sticks add. The multishadow number is the WP's to measure.
 
 - [ ] Ask for Tarini, Cignoni & Montani (2006), and read it before fixing
   D2's constants.
-- [ ] The depth-map pass and the lookup in the numpy path, with unit tests:
+- [x] The depth-map pass and the lookup in the numpy path, with unit tests:
   an isolated atom is unoccluded everywhere, and a point between two touching
-  atoms is darker than the far side of either.
+  atoms is darker than the far side of either (2026-11-17:
+  `raster.occlusion_maps` builds each map as an `id_plane` along the light
+  and reads the depth back from the ids, so the maps are the same on either
+  tier; `raster.occlusion` weighs each direction by its cosine).
 - [ ] The numba kernel, held bit-identical to the numpy path.
 - [ ] `ambient_occlusion=` on `render_structure`, with D5's cache. Measure
   the cost at 1000 px and 3000 px on the 21 phases. Quote ranges.

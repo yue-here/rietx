@@ -724,7 +724,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                      hidden=(), boundary: bool = True, cell: bool = True, polyhedra=None,
                      axis_labels: bool = True, atom_labels: bool = False,
                      outline: bool = False, depth_cue: bool = False,
-                     planar_rings=False, faces=(), background="white", pad: float = FIT_PAD,
+                     ambient_occlusion: bool = False, planar_rings=False, faces=(), background="white", pad: float = FIT_PAD,
                      path=None, dpi: float | None = None) -> StructureFigure:
     """Draw one phase of a structure as the GUI's structure viewer draws it.
 
@@ -785,7 +785,14 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     the drawn atoms to the rearmost, where it is ``scene.LOOK["fog_max"]`` of
     the way there, as the GUI's toggle does (WP-1548).  It needs an opaque
     ``background``, there being no colour to fade toward over a transparent
-    one.  ``planar_rings=True`` fills each ring of five or six bonded atoms
+    one.  ``ambient_occlusion=True`` darkens each atom and stick by the
+    share of directions from which ambient light cannot reach it, read from
+    64 depth maps of the scene's atoms and sticks (WP-1538): the ambient term
+    scales by the unoccluded share and the key light keeps its own.  It shows
+    in ball mode, where the atoms crowd one another, and hardly in ellipsoid
+    mode.  The cell frame and the translucent faces neither cast nor receive
+    it.  Off by default; the GUI's drawing drawer has the same toggle.
+    ``planar_rings=True`` fills each ring of five or six bonded atoms
     lying within ``rings.PLANAR_RING_TOLERANCE`` (0.1 Å) of one plane as a
     translucent face, grey (``scene.FILL_COLOR``) or in the colour given
     instead of ``True``.  Flat is all it claims: from coordinates the package
@@ -825,6 +832,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         raise ValueError("depth_cue=True fades toward the background, and "
                          "background=None has no colour to fade toward; "
                          "give an opaque background")
+    if not isinstance(ambient_occlusion, bool):
+        raise ValueError(f"ambient_occlusion {ambient_occlusion!r}: True or False")
     if not isinstance(planar_rings, (bool, str)):
         raise ValueError(f"planar_rings {planar_rings!r}: True, False or a colour "
                          "'#rrggbb'")
@@ -950,8 +959,10 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         if span is not None:
             shift = float(R[2] @ np.asarray(scene["center"], dtype=np.float64))
             fog = (span[0] + shift, span[1] + shift, sc.LOOK["fog_max"], bg)
+    # the maps are the scene's and hold no view (WP-1538 D5)
+    maps = raster.occlusion_maps(scene) if ambient_occlusion else None
     image = raster.draw(scene, R, frame, supersample=s, background=bg, text=strokes,
-                        outline=ol, fog=fog)
+                        outline=ol, fog=fog, occlusion=maps)
     atoms = []
     for a in scene["atoms"]:
         c = R @ np.asarray(a["pos"], dtype=np.float64)
@@ -1015,7 +1026,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         "max_atoms": max_atoms, "exaggeration": exaggeration, "stick": stick,
         "hidden": hidden_asked, "boundary": boundary, "cell": cell, "polyhedra": polyhedra,
         "axis_labels": asked_axis_labels, "atom_labels": atom_labels, "outline": outline,
-        "depth_cue": depth_cue, "planar_rings": planar_rings,
+        "depth_cue": depth_cue, "ambient_occlusion": ambient_occlusion,
+        "planar_rings": planar_rings,
         "faces": faces,
         "background": background, "pad": pad, "dpi": dpi}.items()}
     return StructureFigure(image=image, rotation=views.as_list(R),
