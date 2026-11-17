@@ -121,11 +121,10 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
   - *Gotcha: the page is at its size cap.* `tests/test_manual.py::
     test_every_page_has_a_twin_that_keeps_the_contract` caps a page's
     markdown twin at 50 000 characters, and the first draft of this
-    subsection put `parameterisation` at 50 568. The subsection was cut to
-    about 1 860 source characters, leaving roughly 500 of headroom by
-    estimate (not measured on the twin). Mike's open PR #1388 adds 451
-    characters to the same page, so the two fit together with little to
-    spare. Further rigid-body prose goes in the Part 1 chapter, or the page
+    subsection put `parameterisation` at 50 568. Cut to about 1 860 source
+    characters, the subsection leaves the twin at 49 485, so 515 to spare.
+    Mike's open PR #1388 adds 451 characters of source to the same page, so
+    the two fit together with about 60 left, whichever merges first. Further rigid-body prose goes in the Part 1 chapter, or the page
     is split. Cut for room, and kept here instead: GSAS-II 5.8.4 places a
     residue body's origin on its first reference atom, or at the unit-weight
     centroid under `Center RB?` (`GSASIIconstrGUI.py:3728` and `:3832-3838`
@@ -147,9 +146,11 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
     per-shape reference, the Part 1 chapter, and the #1508 ring line, which
     waits on WP-1814's Z-matrix chunk (PR #1510). Mike's open rigid-body PRs
     (#1388 #1510 #1610 #1655) were not touched.
-  - *Measured.* sphinx `-W` clean; `tests/test_manual.py`,
-    `test_manual_api.py`, `test_vale.py`, `test_docs_consistency.py` and
-    CI's Vale steps on this tree (counts in PR #1661's body).
+  - *Measured.* On `[dev]`, macOS arm64, Python 3.12.10: sphinx `-W`
+    clean; `tests/test_manual.py`, `test_manual_api.py`, `test_vale.py` and
+    `test_docs_consistency.py` 131 passed; CI's Vale steps 0 errors (271
+    warnings, none on these lines); ruff clean; `tests.reader_output`
+    unchanged. No full suite: the change is prose and one executed block.
   - Next: the Part 1 chapter, once WP-1814's Z-matrix bodies land, so the
     ring line and this subsection can move into it together.
 
