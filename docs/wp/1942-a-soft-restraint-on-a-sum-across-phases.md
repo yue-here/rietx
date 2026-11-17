@@ -171,7 +171,13 @@ carries no closing keyword by design, so #212 is closed by hand once
 - [x] The elemental-ratio helper: coefficients from `element_counts` and
       cell volumes, σ stated on the ratio, and a report when a stage frees
       an occupancy of a phase in the row.
-- [ ] The three #349 exports from § Inherited.
+- [x] The three #349 exports from § Inherited (now in Context). *Done
+      2026-11-17 (a lane):* `PhaseQuantity.element_counts`,
+      `QuantitativePhaseAnalysis.weight_fraction_covariance` (phase order,
+      `None` where an esd is, rows summing to zero) and
+      `FitReport.unidentified_phase`, a projection of the evidence
+      `layer0_actions` words its `add_impurity_phase` from
+      (`layer2._impurity_evidence`).
 - [x] Tests: the probe above as a regression, a synthetic two-phase series
       where the ratio decides the partition, cross-backend agreement for the
       new partials (`tests/test_cross_backend.py`); obs/calc/diff PNGs to
