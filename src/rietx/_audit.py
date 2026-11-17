@@ -553,6 +553,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.sequential.SeriesEntry.tree_id",
     "rietx.schemas.sequential.SeriesEntry.x",
     "rietx.schemas.sequential.SeriesResult.angle_paths",
+    "rietx.schemas.sequential.SeriesResult.dihedral_paths",
     "rietx.schemas.sequential.SeriesResult.atom_labels",
     "rietx.schemas.sequential.SeriesResult.backward",
     "rietx.schemas.sequential.SeriesResult.diagnostics",

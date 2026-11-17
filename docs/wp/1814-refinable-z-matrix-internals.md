@@ -1,6 +1,6 @@
 # WP-1814 — refinable internal geometry: Z-matrix lengths, angles and dihedrals
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-09 — the placement's exact tangent built; design adjudicated (four chunks); chunk C1, the restraint refusal on bodies with no Z-matrix, is on branch `wp1814/c1-restrain-or-refine`; the table, block and refusals wait on #1388
+Milestone: rigid-bodies · Status: 🔄 2026-11-18 — Z-matrix bodies refine, with every stage-start refusal; C1's restraint warning (#1510) is merged and leaves Z bodies alone; acceptance on acridine and the skill row remain
 Depends on: 1815 (the derived-geometry table its esds are reported through); 1805
 Priority: P3 2026-10-16 — TOPAS users expect it, and a refined bond with its esd is what a paper reports; nothing is wrong without it
 
@@ -48,7 +48,7 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 ## Tasks
 
 - [ ] `ZLine`/`PointLine` on `RigidBody`, the frozen c₀, and the dot-paths.
-- [ ] The tangent-propagation Jacobian; the six placement partials checked against complex step.
+- [x] The tangent-propagation Jacobian; the six placement partials checked against complex step.
 - [ ] The restrain-or-refine refusals and the torsion-reach refusal.
 - [ ] Tests: placement partials vs complex step < 1e-12; the map's Jacobian vs FD < 1e-9; a freed C–C on acridine IX (COD 2242872) within its published esd
 - [ ] Skill: the routing row for refining a Z-matrix body
@@ -67,6 +67,44 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 - Issue #759.
 
 ## Handover log
+
+### 2026-11-17 — Z-matrix bodies refine
+
+A body built from a Z-matrix now refines its bond lengths, angles and
+dihedrals as ordinary parameters with esds, and a stage refuses at its start
+every free internal the construction cannot carry.
+
+- *Done*: `ZLine` and `RigidBody.zmatrix`/`zmatrix_origin` (c₀, frozen at
+  declaration; `template` is the record Z(ζ) − c₀, checked at construction);
+  the paths `phases.i.rigid_bodies.b.zmatrix.k.{r,angle,dihedral}`, absolute
+  entries boxed to r ≥ 0 and the angle in [0, 180]; the block reads the
+  internals after the twists and seeds `zmatrix_points`' tangent into the
+  torsion loop, with a traced twin; an unboxed dihedral wraps at commit; the
+  write-back stores the internals, then the template.  Stage-start refusals
+  (`ParameterTable.refuse_free_internals`, beside `refuse_partial_turns`):
+  `RIGID_BODY_TORSION_REACH`, `RIGID_BODY_INERT_DIHEDRAL`,
+  `RIGID_BODY_RIDING_INTERNAL`, `RIGID_BODY_LINEAR_BEND`,
+  `RIGID_BODY_NOT_INVARIANT` for a site body, an angle over a collinear
+  triple, and an internal that moves only dummies.  Builders:
+  `add_body(zmatrix=)` and `zmatrix_body_from_atoms(..., tree=)`.  A riding
+  H on a Z body rides on its line's b.  The misfit check's body arm frees the
+  internals the model frees.  A series compares the dihedrals modulo 360°
+  (`SeriesResult.dihedral_paths`).  Task 2's block half; task 1 lacks
+  `PointLine`, which waits on the maintainer (the review asks to defer it).
+- *Measured* (`tests/test_zmatrix_body.py`, numpy, arm64 macOS, a dev venv):
+  σ of each line's own bond, angle and torsion equals σ of its internal to
+  1e-9 relative through the real table; the composed block against central
+  differences under 1e-9 at three states (two chained torsions, a turned
+  anchor, triclinic), its reach covering every nonzero at 20; a planted
+  r 1.51 → 1.56 Å and a dihedral across ±180° recovered on a simulated
+  pattern.  An expression tie on an internal is refused by `add_derived`
+  (declaration order).
+- *Gotcha*: the numpy fit's columns come from `_peak_chain_column`, which
+  decodes through the block, so a wrong Z tangent moves the esds and the
+  geometry table, not the fit: test the esds, never only a recovery.
+- *Next*: the acceptance chunk (T7 simulated acridine, T8 the real-data
+  record against WP-1806 Part 2's free-atom control) and the skill's routing
+  row; the restraint rule on bodies with no Z-matrix is #1510.
 
 ### 2026-11-09 — the placement and its exact tangent
 

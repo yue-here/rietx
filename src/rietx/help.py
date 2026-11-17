@@ -6544,6 +6544,13 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
         ),
     ),
+    "SeriesResult.dihedral_paths": HelpEntry(
+        title="Z-matrix dihedral paths",
+        description=(
+            "The Z-matrix dihedral angles (degrees), whose differences across patterns are "
+            "taken modulo 360°. Recorded as `angle_paths` is, and `None` means the same."
+        ),
+    ),
     "SeriesResult.phase_names": HelpEntry(
         title="Series phase names",
         description=(

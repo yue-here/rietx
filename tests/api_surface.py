@@ -91,7 +91,10 @@ DEFERRED_PATH = TESTS_DIR / "api_surface_deferred.txt"
 #: a reviewed edit with a reason in its commit (WP-1981, 2026-10-16).
 #: 37 on 2026-10-24: `Phase.parent_cell` (WP-1419, #1108) is a technique field kept out
 #: of `api.md` and deferred like `Phase.rigid_bodies`, until the technique index lands.
-DEFERRED_CEILING = 37
+#: 49 on 2026-11-17: `ZLine` and `RigidBody.zmatrix`/`zmatrix_origin` (WP-1814), the
+#: Z-matrix body's schema, deferred with `BodyTorsion` and `Phase.rigid_bodies` for the
+#: same reason; the acceptance chunk's skill row documents the route.
+DEFERRED_CEILING = 49
 
 
 # --- what is off the surface, and why -------------------------------------
