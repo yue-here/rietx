@@ -282,6 +282,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-08  docs/ROADMAP.md               618 -> 623  for the gui-overhaul milestone (WP-2123): one table
 #                                                          row, one section of one paragraph; landed 623, no
 #                                                          headroom
+#   2026-11-16  docs/ROADMAP.md               623 -> 628  for the series milestone (WP-2081): one table
+#                                                          row, one section of one paragraph, one Current focus
+#                                                          clause; landed 628, no headroom
 #   2026-10-06  src/rietx/io/CLAUDE.md        501 -> 561  for the time-of-flight readers and axis (issue
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
@@ -290,12 +293,15 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          its per-format row; landed 562
 #   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
 #                                                          case (a name-only refusal) and the table
-#                                                          row's no-fixture sentence; landed LANDED
+#                                                          row's no-fixture sentence; landed 565
 #   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
 #                                                          reader-repair row and one rule for every
 #                                                          reader's pre-drop decisions; landed 571
 #   2026-11-12  src/rietx/io/CLAUDE.md        571 -> 572  for the σ ≤ 0 rule (WP-1952, WP-2002 B5): one
 #                                                          reader-repair row; landed 572
+#   2026-11-16  src/rietx/io/CLAUDE.md        572 -> 575  for the container member-read rule (issue #1593):
+#                                                          the exceptions `zipfile` raises that are not a
+#                                                          ValueError; landed 575, no headroom
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -619,7 +625,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # its WP-level paragraphs moved to the v1.6 record.  From here the cap is
     # a budget on prose alone, and the per-row bump above ends.  Landed 570,
     # +1 headroom.
-    "docs/ROADMAP.md": 623,
+    "docs/ROADMAP.md": 628,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
@@ -799,7 +805,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 572,
+    "src/rietx/io/CLAUDE.md": 575,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs
