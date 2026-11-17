@@ -772,6 +772,34 @@ ROWS: tuple[Row, ...] = (
     Row("GSAS_IPARM_LEGACY_LAYOUT", "code"),
     Row("GSAS_IPARM_PROFILE_DECLINED", "code"),
     Row("GSAS_IPARM_PROFILE_READ", "code"),
+    # WP-2146's rows, kept apart from the io rows WP-2006 tiers
+    Row("GSAS_IPARM_SET_NUMBER_ASSUMED", "code", tier=2, ambiguity=1,
+        evidence=("a reading rule with one reading: the manual numbers a bank's PRCF sets "
+                  "n = 1 … NTYP and makes set 1 the default (GSAS Technical Manual p. 223), "
+                  "so a bank holding one set, written without its number in column 11, holds "
+                  "set 1; fires exactly when such a set is read, and never beside a numbered "
+                  "set or a second unnumbered one, which are declined. GSAS-II 5.8.4 reads "
+                  "the unnumbered key 'INS  1PRCF  ' as the bank's profile by default "
+                  "(GSASIIfiles.py:308-327, checked 2026-11-17). Real files: the ISIS HRPD "
+                  "and POLARIS instrument files of issue #1447"),
+        grounds=("Practice and logic agree: GSAS-II reads the set, and a bank with one "
+                 "set has no second reading for it."),
+        response="info",
+        responds="note that the bank's one profile set was read as set 1; nothing to do",
+        scope=("all",)),
+    Row("GSAS_IPARM_TRAILING_ZEROS_READ", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the record's own characters: a record's last field ran "
+                  "past its FORTRAN columns (GSAS Technical Manual p. 221-223) into the "
+                  "columns after it, which no field claims; fires exactly when every "
+                  "character past the field is a zero and the column read and the token "
+                  "read are one number (the HRPD file of issue #1447: CTOF 0.001000 in "
+                  "columns 26-33, read 0.00100 by column); a non-zero digit, zeros that "
+                  "change the number, or a spill into a field's columns stay refused"),
+        grounds=("Arithmetic: the characters past the field belong to no field and "
+                 "change no number, so the file states one value."),
+        response="info",
+        responds="note which record's last value ran past its columns; nothing to do",
+        scope=("all",)),
     Row("GSAS_PRM_FIELD_DROPPED", "code"),
     Row("GSAS_PRM_FIELD_NOT_WRITTEN", "code"),
     Row("GSAS_PRM_GEOMETRY_ASSUMED", "code"),

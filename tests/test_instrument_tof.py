@@ -285,6 +285,64 @@ def test_a_default_set_of_a_function_not_evaluated_is_refused(tmp_path, ptyp):
         read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=prcf(1, 1, ptyp, coeffs)))))
 
 
+#: POLARIS bank 5's shape (issue #1447): sig-0 = 0 and a negative sig-2, so
+#: σ²(d) = 29.2187 d² − 1.81041 d⁴ is positive for d < 4.02 Å.
+NEGATIVE_SIG2 = [0.45, 0.055, 0.003, 0.0, 29.2187, -1.81041] + [0.0] * 15
+
+
+def polaris_bank(tmax_ms: float = 20.4, spectrum: bool = True):
+    lines = [icons(1, 7391.35, -2.16, 1.88), bnkpar(1, 1.0, 146.8)]
+    if spectrum:
+        lines += spectrum_records(1, 0, [], tmin=0.8, tmax=tmax_ms)
+    return lines + prcf(1, 1, 3, NEGATIVE_SIG2)
+
+
+def test_a_negative_sig2_reads_where_the_variance_is_positive_over_the_banks_range(
+        tmp_path):
+    """The bank's I ITYP window, 0.8-20.4 ms, is d 0.108-2.762 Å through its
+    calibration, and σ² > 0 there.  The value is read as written, without the
+    schema's floor at zero, and the report says where σ² turns negative."""
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank())), diagnostics=notes)
+    sig2 = got[1].source.profile_tof.sig2
+    assert sig2.value == -1.81041 and not sig2.vary
+    assert sig2.unit == ProfileTOF().sig2.unit
+    (read,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_READ"]
+    assert "range 0.108-2.762 Å and turns negative past d = 4.017 Å" in read.message
+
+
+def test_a_negative_sig2_is_refused_where_the_variance_turns_negative_in_range(
+        tmp_path):
+    """A window to 40 ms reaches d ≈ 5.4 Å, past where σ² crosses zero."""
+    with pytest.raises(ValueError, match=r"sig2 = -1\.81041 makes the variance .* "
+                                         r"inside the bank's own range"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank(tmax_ms=40.0))))
+
+
+def test_a_negative_sig2_is_refused_where_the_bank_states_no_range(tmp_path):
+    """No I ITYP record, no window: the per-coefficient sign test stands."""
+    with pytest.raises(ValueError, match="states no flight-time range"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank(spectrum=False))))
+
+
+def test_a_negative_sig2_is_refused_where_the_window_maps_to_no_d_range(tmp_path):
+    """A window starting below ZERO gives no d range; the refusal says the
+    window does not map, rather than that the bank has none."""
+    lines = [icons(1, 7391.35, -2.16, 900.0), bnkpar(1, 1.0, 146.8)]
+    lines += spectrum_records(1, 0, [], tmin=0.8, tmax=20.4)
+    with pytest.raises(ValueError, match="lie above ZERO"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(lines + prcf(1, 1, 3, NEGATIVE_SIG2))))
+
+
+def test_a_negative_sig0_or_sig1_is_still_refused_by_its_sign(tmp_path):
+    """Only sig-2's test moved (the handover says why)."""
+    for k in (3, 4):
+        coeffs = list(TYPE3)
+        coeffs[k] = -1.0
+        with pytest.raises(ValueError, match="is a variance coefficient and is negative"):
+            read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=prcf(1, 1, 3, coeffs)))))
+
+
 def test_a_non_default_set_is_reported_and_skipped(tmp_path):
     """The first set is the default regardless of PTYP; the rest are
     not read (here a type-4 alternative, which is also not evaluated)."""
@@ -325,28 +383,86 @@ UNNUMBERED_PRCF = (
 )
 
 
-def test_a_prcf_set_without_its_number_is_declined_and_the_bank_read(tmp_path):
-    """An older writer's file omits the set number in column 11.  The bank's
-    calibration is read; the set is declined with the set-number reason (not
-    read as set 1, which the file does not say it is), and the profile is
-    left at zero as for a bank with no set."""
+#: The shape of an ISIS HRPD or POLARIS file's profile set: a type-3 set
+#: written with no set number (``PRCF  `` then ``PRCF 1`` … ``PRCF 6``), with
+#: invented numbers at the files' column widths.
+LONE_TYPE3 = (
+    ["INS  1PRCF      3   21   0.00100"]
+    + [line.replace("PRCF1", "PRCF ") for line in prcf(1, 1, 3, TYPE3)[1:]])
+
+
+def test_a_lone_set_without_its_number_is_read_as_set_one(tmp_path):
+    """One set in the bank has one reading: set 1, the default.  The read is
+    recorded, and the coefficients are the numbered set's."""
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=LONE_TYPE3))),
+                              diagnostics=notes)
+    numbered = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1)), "n.iparm"))
+    assert got[1].source.profile_tof == numbered[1].source.profile_tof
+    (assumed,) = [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+    assert assumed.level == "info"
+    assert assumed.where == ["bank 1", "PRCF"]
+    assert "read as set 1" in assumed.message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    # read as set 1, the lone set meets every later check
+    short = [LONE_TYPE3[0].replace("   21", "   14")] + LONE_TYPE3[1:5]
+    with pytest.raises(ValueError, match="with 14 coefficients"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=short)), "s.iparm"))
+
+
+def test_a_lone_set_of_a_function_not_evaluated_is_declined_and_the_bank_read(
+        tmp_path):
+    """The older GEM shape: its one unnumbered set declares function 2, which
+    this package does not evaluate.  The bank's calibration is read and the
+    profile is left at zero, as PR #1503 had it, the decline naming the
+    function (the handover's open question: a numbered set 1 of function 2
+    is refused)."""
     notes = []
     got = read_gsas_tof_iparm(write(tmp_path, UNNUMBERED_PRCF), diagnostics=notes)
     src = got[1].source
     assert (src.difc.value, src.difa.value, src.tzero.value) == (500.0, -0.1, -1.0)
     assert src.two_theta_bank_deg == 9.0
     assert src.profile_tof == ProfileTOF()
-    declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
-    assert len(declined) == 1
-    assert declined[0].level == "warning"
-    assert "set number in column 11" in declined[0].message
-    # beside a numbered set 1, the unnumbered one is only reported
+    (declined,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    assert declined.level == "warning"
+    assert "profile function 2" in declined.message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+
+
+def test_a_lone_legacy_type1_block_is_declined_not_sent_to_the_legacy_reader(tmp_path):
+    """An unnumbered 8-coefficient type-1 set is the legacy LANSCE block, which
+    the legacy reader restates only under a numbered key.  Refusing it with
+    the pointer would send the caller to a reader refusing the same file, so
+    both readers decline it and read the bank."""
+    from rietx.io.legacy import read_lansce_iparm
+    lone8 = [line.replace("PRCF1", "PRCF ")
+             for line in prcf(1, 1, 1, TYPE1[:8], ncof=8)]
+    p = write(tmp_path, iparm(bank(1, profile=lone8)))
+    for reader in (read_gsas_tof_iparm, read_lansce_iparm):
+        notes = []
+        assert reader(p, diagnostics=notes)[1].source.profile_tof == ProfileTOF()
+        (declined,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+        assert "legacy LANSCE layout" in declined.message
+
+
+def test_an_unnumbered_set_beside_a_numbered_one_is_declined(tmp_path):
+    """Beside a numbered set the unnumbered one has two readings, so it is
+    only reported, and the numbered set 1 is read."""
     notes = []
     both = UNNUMBERED_PRCF + "\n".join(prcf(1, 1, 3, TYPE3)) + "\n"
     got = read_gsas_tof_iparm(write(tmp_path, both, "both.iparm"), diagnostics=notes)
     assert got[1].source.profile_tof.alpha1.value == 0.45
     declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
     assert [n.level for n in declined] == ["info"]
+    assert "set number in column 11" in declined[0].message
+    assert not [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+    # two unnumbered sets in one bank: declined, and the bank has no profile
+    two = iparm(bank(1, profile=LONE_TYPE3 + LONE_TYPE3[:1]))
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, two, "two.iparm"), diagnostics=notes)
+    assert got[1].source.profile_tof == ProfileTOF()
+    assert [n.level for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"] == [
+        "warning"]
 
 
 def test_the_whole_older_isis_shape_reads_through_the_legacy_reader(tmp_path):
@@ -405,6 +521,56 @@ def test_a_number_running_across_a_field_boundary_is_refused(tmp_path):
     with pytest.raises(ValueError, match=r"'INS  1BNKPAR'.*'61\.20' in columns "
                                          r"30-34.*TTHETA \(columns 23-32\).*TILT "
                                          r"\(columns 33-42\)"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(b)))
+
+
+def test_trailing_zeros_past_the_last_field_are_read_and_recorded(tmp_path):
+    """The HRPD file writes CTOF ``0.001000`` in columns 26-33, one column past
+    CTOF's 23-32 into columns no field claims.  The column read ``0.00100``
+    and the token read are one number, so it is read and recorded once."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (26, "0.001000"))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))),
+                              diagnostics=notes)
+    assert got[1].source.profile_tof.alpha1.value == 0.45
+    (read,) = [n for n in notes if n.code == "GSAS_IPARM_TRAILING_ZEROS_READ"]
+    assert read.level == "info"
+    assert read.where == ["INS  1PRCF1"]
+    assert "'0.001000' in columns 26-33, past CTOF (columns 23-32)" in read.message
+    assert "read as 0.001" in read.message
+
+
+def test_trailing_zeros_after_a_lowercase_d_exponent_are_read(tmp_path):
+    """The column read accepts ``d`` as the exponent letter, so the overrun
+    test does too."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (26, "1.000d00"))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    notes = []
+    read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))),
+                        diagnostics=notes)
+    assert [n.code for n in notes].count("GSAS_IPARM_TRAILING_ZEROS_READ") == 1
+
+
+@pytest.mark.parametrize("text, col, why", [
+    ("0.001005", 26, "a digit that is not zero"),
+    ("10000000", 26, "zeros that change an integer's value"),
+])
+def test_any_other_overrun_past_the_last_field_is_still_refused(tmp_path, text, col,
+                                                                why):
+    """Only zeros that leave the number unchanged are read; every other
+    overrun keeps the column-boundary refusal."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (col, text))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    with pytest.raises(ValueError, match="runs across the boundary"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))))
+
+
+def test_trailing_zeros_across_an_inner_boundary_are_still_refused(tmp_path):
+    """A zero spilling into the *next* field's columns is that field's digit
+    too, so it has two readings and stays refused."""
+    b = _with(bank(1), "BNKPAR", rec("INS  1BNKPAR", (13, f10(2.5)), (27, "61.2000")))
+    with pytest.raises(ValueError, match="runs across the boundary"):
         read_gsas_tof_iparm(write(tmp_path, iparm(b)))
 
 

@@ -280,12 +280,17 @@ The reader holds to the layout the GSAS manual documents and refuses anything el
 - A type-1 default set must carry the documented 12 coefficients and a type-3 set 21. A block of another length is refused, never padded or truncated.
 - The coefficients are read in the order the manual lists their names. The manual never states the record order, so [`GSAS_IPARM_PROFILE_READ`](diagnostics-files.md#gsas_iparm_profile_read) says the order is an assumption. The cut-off `CTOF` is read and not used.
 - A default set of profile function 2, 4 or 5, which this package does not evaluate, is refused.
-- A non-zero anisotropic or peak-shift coefficient is refused rather than dropped, and so is a negative `sig` variance.
+- A non-zero anisotropic or peak-shift coefficient is refused rather than dropped.
+- A negative `sig-0` or `sig-1` is refused. A negative `sig-2` is tested on the variance it gives, σ²(d) = sig-0 + sig-1·d² + sig-2·d⁴, over the bank's d range, which is the `I ITYP` time window mapped through DIFC, DIFA and ZERO.
+  It is read where σ² stays positive over that range, and [`GSAS_IPARM_PROFILE_READ`](diagnostics-files.md#gsas_iparm_profile_read) says where σ² turns negative.
+  It is refused where σ² turns negative inside the range, and where the bank has no `I ITYP` window to give one.
 - A non-zero fifth coefficient pair of an `ITYP` 1 or 2 incident spectrum is refused, since the documented layout stops short of it. `ITYP` 10, whose spectrum is in another file, is refused too.
 - A non-zero `POLA`, `IPOLA` or `KRATIO` on `ICONS` is refused, naming its columns, since the manual says they are absent for neutron data.
   Each field may be blank or zero, which the record's Fortran format reads identically.
 - A bank with no `PRCF` set keeps its calibration and gets an all-zero `ProfileTOF`, reported as `GSAS_IPARM_PROFILE_DECLINED`.
-  A `PRCF` set written without its set number, as some older files are, is treated the same way: it is declined, not read as set 1.
+- A `PRCF` set written without its set number, as ISIS files write it, is read as set 1 where it is the bank's only set, reported as [`GSAS_IPARM_SET_NUMBER_ASSUMED`](diagnostics-files.md#gsas_iparm_set_number_assumed).
+  Beside a numbered set, or beside a second unnumbered set, it could be either, so it is declined.
+  A bank's one unnumbered set of profile function 2, 4 or 5 is declined too, and the bank keeps its calibration.
 
 Fields with no place in the schema, such as the incident spectrum's `CHKSUM` and `IECOR`, are reported as [`GSAS_IPARM_FIELD_DROPPED`](diagnostics-files.md#gsas_iparm_field_dropped).
 
@@ -303,6 +308,12 @@ One is an overrun that ends exactly on a field boundary: `       61.` then `6000
 The other is a value moved wholly into the wrong field, which reads as a well-formed number in the wrong slot.
 The check also refuses a full field followed directly by a left-aligned one (`      2.5061.20`), although Fortran would read it.
 Right-align the second value.
+
+One overrun is read.
+A record's last value may run into the columns after it, which belong to no field.
+Where the extra characters are zeros and leave the number unchanged, the value is read and [`GSAS_IPARM_TRAILING_ZEROS_READ`](diagnostics-files.md#gsas_iparm_trailing_zeros_read) names the record.
+The HRPD instrument file writes `CTOF` as `0.001000` in columns 26-33, one column past `CTOF`'s 23-32, and it reads as 0.001.
+A zero that runs into the next field's columns is still refused, because it could be that field's digit.
 An `.instprm` is `key:value` lines, so none of this applies to it.
 
 ### Legacy LANSCE layout
