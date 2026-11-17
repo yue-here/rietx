@@ -59,7 +59,7 @@ another Rietveld code attributable. The Kissel & Pratt high-energy-limit
 correction {cite}`kissel1990` is applied on top of it, and reaches −1.3 e at
 uranium.
 
-The tabulation stops at 70 keV, and high-energy beamlines run above it. From
+The tabulation stops at 70 keV, and high-energy synchrotron sources run above it. From
 70 to 200 keV, $f''$ is the same Cromer-Liberman calculation, computed by
 gemmi, and $f'$ is computed from that $f''$ by the dispersion relation, plus
 one constant taken from the tabulated $f'$ so the two join. The same
