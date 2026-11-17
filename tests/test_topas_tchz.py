@@ -242,7 +242,7 @@ def test_two_phases_stating_two_profiles_need_a_choice(tmp_path):
         topas.to_instrument(model, ref.fitted_instrument)
     inst = topas.to_instrument(model, ref.fitted_instrument, phase="KCl")
     assert inst.profile.u.value == pytest.approx(0.004 + 0.02)
-    with pytest.raises(ValueError, match="for phase 'LiF'"):
+    with pytest.raises(ValueError, match="phase='LiF' names no phase"):
         topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
 
 
@@ -297,7 +297,7 @@ def test_a_phase_call_against_a_dataset_level_one_is_refused(tmp_path):
                          + call.replace("0.03", "0.02") + "\n")
     model = _inp(tmp_path, text)
     ref, _ = case_nacl_xray()
-    with pytest.raises(ValueError, match="the call in phase 'NaCl' and a dataset-level"):
+    with pytest.raises(ValueError, match="The call in phase 'NaCl' and a dataset-level"):
         topas.to_instrument(model, ref.fitted_instrument, phase="NaCl")
 
 
@@ -316,3 +316,86 @@ def test_the_caller_box_opens_no_further_than_the_value(tmp_path):
     assert inst.profile.x.min == 0.0 and inst.profile.x.value == 0.0
     assert inst.profile.w.min == inst.profile.w.value > 0.0
     assert base.profile.x.min == 0.002 and base.profile.x.value == 0.01
+
+
+def _dataset_level(text):
+    """``text`` with run 10's call moved from the phase to the dataset."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    return text.replace(f"  {call}\n", "").replace(
+        "  convolution_step 3\n", f"  convolution_step 3\n  {call}\n")
+
+
+def _second_dataset(radius="Rs 240", call=None):
+    call = call or TCHZ_LINE.search(RUN10).group(0).replace("0.03", "0.02")
+    return f'xdd "b.xye" xye_format\n  {radius}\n  {call}\n'
+
+
+def test_two_datasets_are_chosen_by_dataset_not_phase(tmp_path):
+    """Two ``xdd`` blocks, each with its own dataset-level call and radius
+    (review of #1646): the refusal names the datasets and ``dataset=``, and
+    ``dataset=`` or a phase of one dataset reads that dataset's profile and
+    radius. ``phase=`` was the only advice, and it could not help."""
+    model = _inp(tmp_path, _dataset_level(RUN10) + _second_dataset())
+    assert [(c.phase, c.dataset) for c in model.tchz] == [("", 0), ("", 1)]
+    assert model.secondary_radii == [217.5, 240.0]
+    assert model.secondary_radius_datasets == [0, 1]
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="datasets 0, 1.*pass dataset=") as info:
+        topas.to_instrument(model, ref.fitted_instrument)
+    assert "phase=" not in str(info.value)
+    for kw, u, radius in ((dict(dataset=0), 0.034, 217.5),
+                          (dict(phase="NaCl"), 0.034, 217.5),
+                          (dict(dataset=1), 0.024, 240.0)):
+        inst = topas.to_instrument(model, ref.fitted_instrument, **kw)
+        assert inst.profile.u.value == pytest.approx(u), kw
+        assert inst.geometry.goniometer_radius_mm == radius, kw
+    with pytest.raises(ValueError, match="opens 2 dataset"):
+        topas.to_instrument(model, ref.fitted_instrument, dataset=2)
+    with pytest.raises(ValueError, match="'NaCl' sits in dataset"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NaCl", dataset=1)
+
+
+def test_two_datasets_radii_are_not_one_radius_stated_two_ways(tmp_path):
+    """One profile, and a radius per dataset: the refusal says so and names
+    both ways past it, rather than "states the secondary radius two ways"."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    model = _inp(tmp_path, _dataset_level(RUN10) + _second_dataset(call=call))
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="different secondary radius in datasets "
+                                         "0, 1 .*dataset=.*radius_mm="):
+        topas.to_instrument(model, ref.fitted_instrument)
+    inst = topas.to_instrument(model, ref.fitted_instrument, dataset=1)
+    assert inst.geometry.goniometer_radius_mm == 240.0
+
+
+def test_a_phase_that_names_no_phase_is_refused(tmp_path):
+    """With only a dataset-level call, a ``phase=`` naming no phase returned
+    that call's profile without complaint (review of #1646). A Pawley phase
+    with no call of its own is still a phase."""
+    pawley = ('hkl_Is\n  phase_name "LiF"\n  space_group "F m -3 m"\n'
+              '  a 4.03 b 4.03 c 4.03 al 90 be 90 ga 90\n')
+    model = _inp(tmp_path, _dataset_level(RUN10) + pawley)
+    assert model.phase_datasets == {"NaCl": (0,), "LiF": (0,)}
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="phase='NoSuchPhase' names no phase "
+                                         "of the file .*'NaCl', 'LiF'"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NoSuchPhase")
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
+    assert inst.profile.u.value == pytest.approx(0.034)
+
+
+@pytest.mark.parametrize("cards", ["Radius(217.5, 200)", "Rs 200\n  Radius(217.5)"])
+def test_radius_mm_reads_the_profile_past_a_radius_refusal(tmp_path, cards):
+    """A radius this reader refuses blocked the whole profile, and the advice
+    to set the radius on the instrument could not be followed: there was no
+    instrument (review of #1646). The refusal names ``radius_mm=``, and that
+    reads the profile with the caller's radius."""
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="Pass radius_mm="):
+        topas.to_instrument(model, ref.fitted_instrument)
+    inst = topas.to_instrument(model, ref.fitted_instrument, radius_mm=200)
+    assert inst.geometry.goniometer_radius_mm == 200.0
+    assert inst.profile.u.value == pytest.approx(0.034)
+    with pytest.raises(ValueError, match="radius_mm=-1 is not a radius"):
+        topas.to_instrument(model, ref.fitted_instrument, radius_mm=-1)

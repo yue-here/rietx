@@ -24,6 +24,8 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.geometry` | `"debye_scherrer"` only where the file states a capillary construct, `None` where every dataset is time of flight, and otherwise `"bragg_brentano"`. That last value is the reader's default, so read this field only as "a capillary was declared, or not" |
 | `TopasModel.goniometer_radius_mm` | the secondary radius `Rs`, the one a specimen displacement divides by, where the file states one positive value for it. `None` where it states none, two different ones, or one that is not a radius |
 | `TopasModel.secondary_radii` | every secondary radius the file states, in mm and file order: each `Rs` value and each `Radius(r)` or `Radius(r, r)` call |
+| `TopasModel.secondary_radius_datasets` | the dataset each of `secondary_radii` is stated in, in the same order: the index of its `xdd` block, or `None` above every one |
+| `TopasModel.phase_datasets` | every phase block's name, `str`, `hkl_Is`, `xo_Is` and `d_Is` alike, with the datasets it sits in: the names `to_instrument` takes as `phase=` |
 | `TopasModel.radius_unread` | each `Radius(…)` call not read as one radius, as its values: two different ones, since which is `Rs` has not been measured, or one that does not resolve (`None`) |
 | `TopasModel.background_terms`, `TopasModel.background_refined` | how many coefficients the `bkg` list states, and whether any is refined (`@`) rather than held (`!`). Both `None` when the file states no `bkg` |
 | `TopasModel.skipped_blocks` | `str` blocks that stated no name, or neither a `space_group` nor a `mag_space_group`, with the cell, scale and `weight_percent` each did carry. Recorded whether or not a diagnostics list was passed |

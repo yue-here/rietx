@@ -296,14 +296,20 @@ In the reference's formula the tanθ Lorentzian term is X and the 1/cosθ one is
 
 The secondary radius is the `Rs` keyword, or a `Radius(r)` call.
 It is the radius the reference divides a specimen displacement by, so it becomes `geometry.goniometer_radius_mm`.
+`radius_mm=` states the radius instead of reading it.
+
+A file with several datasets can state a profile and a radius for each, and an instrument describes one pattern.
+`dataset=` reads one dataset's, counting the file's `xdd` blocks from 0.
+`phase=` reads the call of that phase, or the dataset-level call of the dataset it sits in.
 
 `to_instrument` refuses, naming the file:
 
+- a `phase=` that names no phase of the file, or a `dataset=` that the file doesn't open;
 - an input with no call, a call that does not have twelve arguments (TOPAS 6 itself stops on a ten-argument one), or a value that is not a finite number;
-- calls in several phases stating different values, unless `phase=` names the one to read, and a phase's own call that disagrees with a dataset-level one;
+- calls stating different values, naming what tells them apart: datasets (`dataset=` chooses), phases (`phase=` chooses), or a phase's own call against a dataset-level one;
 - a negative W (value 3 plus value 4) or X, which this package's profile bounds at zero. What TOPAS does with a negative width has not been measured;
 - a Lorentzian width X/cosθ + Y·tanθ that turns negative below 2θ = 180°;
-- two different secondary radii, a radius that is not positive, or a `Radius(a, b)` with two different values, whose argument order has not been measured.
+- unless `radius_mm=` is passed: two different secondary radii, a radius that is not positive, or a `Radius(a, b)` with two different values, whose argument order has not been measured.
 
 ## Time-of-flight instrument files
 

@@ -18,7 +18,7 @@ this; everything in `rx.` is `import rietx as rx`.*
 - `rx.read_gsas_tof_iparm(path: str | Path, *, diagnostics: list[Diagnostic] | None = None) -> dict[int, Instrument]` — Read a GSAS-I TOF instrument-parameter file: `{bank number: Instrument}`.
 - `rx.read_gsas2_instprm(path: str | Path, *, bank: int | None = None, diagnostics: list[Diagnostic] | None = None) -> Instrument` — Read a GSAS-II `.instprm` file as a **frozen** `Instrument`.
 - `rx.write_gsas2_instprm(instrument: Instrument, path: str | Path, *, diagnostics: list[Diagnostic] | None = None)` — Write `instrument` to `path` as a GSAS-II `.instprm`.
-- `rietx.io.projects.topas.to_instrument(model: TopasModel, instrument, *, phase: str | None = None)` — The `Instrument` a `.inp`'s TCHZ profile and radius state (WP-1455).
+- `rietx.io.projects.topas.to_instrument(model: TopasModel, instrument, *, phase: str | None = None, dataset: int | None = None, radius_mm: float | None = None)` — The `Instrument` a `.inp`'s TCHZ profile and radius state (WP-1455).
 
 ## Other programs' projects
 

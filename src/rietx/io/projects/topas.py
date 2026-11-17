@@ -570,6 +570,18 @@ class TopasModel:
     #: values, which :func:`to_instrument` then refuses rather than picks, or
     #: one that is not a radius.
     secondary_radii: list = field(default_factory=list)
+    #: The dataset each of ``secondary_radii`` is stated in, in the same
+    #: order: the index of the ``xdd``-family block it sits in, as
+    #: :attr:`TopasPhase.dataset`, and ``None`` above every one, where it
+    #: applies to them all. Two datasets may state two radii, and
+    #: :func:`to_instrument`'s ``dataset=`` reads one dataset's.
+    secondary_radius_datasets: list = field(default_factory=list)
+    #: Every phase block's name — ``str``, ``hkl_Is``, ``xo_Is``, ``d_Is``,
+    #: named as :attr:`TopasTCHZ.phase` names them — with the datasets it
+    #: sits in, as :attr:`TopasPhase.dataset`. Unlike ``phases`` it holds the
+    #: Pawley and Le Bail blocks too: the names :func:`to_instrument`'s
+    #: ``phase=`` accepts.
+    phase_datasets: dict = field(default_factory=dict)
     #: The ``Radius(…)`` calls not read as one radius, each as its argument
     #: values (``None`` for one that did not resolve): a call with two
     #: different values, or with an argument this reader could not evaluate.
@@ -2844,6 +2856,32 @@ def _slot_value(raw: str, symbols: dict[str, float]) -> float | None:
     return _resolve(raw, symbols)
 
 
+def _dataset_at(openers: list, offset: int) -> int | None:
+    """The dataset a card at ``offset`` belongs to: the index of the last
+    ``xdd``-family opener before it, ``None`` above every one
+    (:attr:`TopasPhase.dataset`)."""
+    n = sum(1 for o in openers
+            if o["kw"] in _DATASET_OPENERS and o.start() < offset)
+    return n - 1 if n else None
+
+
+#: The block openers that start a **phase**, whose name ``phase=`` takes.
+_PHASE_OPENERS = ("str", "STR", "hkl_Is", "xo_Is", "d_Is")
+
+
+def _phase_datasets(active: str, openers: list) -> dict[str, tuple]:
+    """Every phase block's name (:func:`_enclosing_phase`) with the datasets
+    it sits in (``TopasModel.phase_datasets``)."""
+    out: dict[str, list] = {}
+    for opener in openers:
+        if opener["kw"] in _PHASE_OPENERS:
+            name = _enclosing_phase(active, openers, opener.start())
+            at = out.setdefault(name, [])
+            if (ds := _dataset_at(openers, opener.start())) not in at:
+                at.append(ds)
+    return {name: tuple(ds) for name, ds in out.items()}
+
+
 def _tchz_calls(unquoted: str, active: str, symbols: dict[str, float],
                 openers: list) -> list[TopasTCHZ]:
     """Every ``TCHZ_Peak_Type(…)`` call, read into a :class:`TopasTCHZ`."""
@@ -2860,19 +2898,18 @@ def _tchz_calls(unquoted: str, active: str, symbols: dict[str, float],
                 named = re.sub(r"[@!,\s`]", "", name) or None
                 vary.append(_flag(name, "`" if "`" in raw else None,
                                   named=named))
-        dataset = sum(1 for o in openers
-                      if o["kw"] in _DATASET_OPENERS and o.start() < m.start())
         calls.append(TopasTCHZ(
             args=tuple(args), values=tuple(values), vary=tuple(vary),
             phase=_enclosing_phase(active, openers, m.start()),
-            dataset=dataset - 1 if dataset else None))
+            dataset=_dataset_at(openers, m.start())))
     return calls
 
 
-def _secondary_radii(unquoted: str, symbols: dict[str, float]
-                     ) -> tuple[list[float], list[tuple]]:
-    """The secondary radii the file states (``TopasModel.secondary_radii``)
-    and the ``Radius`` calls not read as one radius (``radius_unread``).
+def _secondary_radii(unquoted: str, symbols: dict[str, float], openers: list
+                     ) -> tuple[list[float], list[tuple], list]:
+    """The secondary radii the file states (``TopasModel.secondary_radii``),
+    the ``Radius`` calls not read as one radius (``radius_unread``), and the
+    dataset each radius is stated in (``secondary_radius_datasets``).
 
     ``Rs`` is a statement only where it opens one: where the text before it
     ends a statement rather than continuing an expression, so the ``Rs`` of
@@ -2883,6 +2920,7 @@ def _secondary_radii(unquoted: str, symbols: dict[str, float]
     """
     radii: list[float] = []
     unread: list[tuple] = []
+    datasets: list = []
     for m in re.finditer(r"\bRs\b(?=\s)", unquoted):
         before = unquoted[:m.start()].rstrip()
         if before and before[-1] in "+-*/^=(,<>&|":
@@ -2890,14 +2928,16 @@ def _secondary_radii(unquoted: str, symbols: dict[str, float]
         read = _read_tail(unquoted[m.end():], symbols)
         if read is not None and read.value is not None:
             radii.append(read.value)
+            datasets.append(_dataset_at(openers, m.start()))
     for m in re.finditer(r"\bRadius\s*\(", unquoted):
         args = _call_args(unquoted, m.end() - 1) or []
         values = tuple(_slot_value(a, symbols) for a in args)
         if len(values) in (1, 2) and None not in values and len(set(values)) == 1:
             radii.append(values[0])
+            datasets.append(_dataset_at(openers, m.start()))
         else:
             unread.append(values)
-    return radii, unread
+    return radii, unread, datasets
 
 
 def _emission_lines(active: str, masked: str,
@@ -3359,7 +3399,8 @@ def read_topas_inp(path: str | Path, *,
     # a file may state it as `Rs`, through `Radius(…)`, or both: one value
     # however often stated is the radius, two are withheld for `to_instrument`
     # to refuse rather than pick.
-    model.secondary_radii, model.radius_unread = _secondary_radii(_unq, symbols)
+    (model.secondary_radii, model.radius_unread,
+     model.secondary_radius_datasets) = _secondary_radii(_unq, symbols, openers)
     if (len(set(model.secondary_radii)) == 1 and not model.radius_unread
             and 0.0 < model.secondary_radii[0] < math.inf):
         model.goniometer_radius_mm = model.secondary_radii[0]
@@ -3841,6 +3882,7 @@ def read_topas_inp(path: str | Path, *,
     # The TCHZ profile's slots, read for `to_instrument` and judged there
     # (WP-1455): a structure import never fails on a profile it does not use.
     model.tchz = _tchz_calls(_unquoted(active), active, symbols, openers)
+    model.phase_datasets = _phase_datasets(active, openers)
     # Set before the site-count guard's refusal has a chance to fire, so that on
     # every path where a model exists at all it carries its own coverage.
     # A `"<name> magnetic part"` str of `mag_only` sites is the one form of
@@ -4832,7 +4874,8 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
 
 
 def to_instrument(model: TopasModel, instrument, *,
-                  phase: str | None = None):
+                  phase: str | None = None, dataset: int | None = None,
+                  radius_mm: float | None = None):
     """The ``Instrument`` a ``.inp``'s TCHZ profile and radius state (WP-1455).
 
     Returns a copy of ``instrument`` whose ``profile`` U, V, W, X, Y are the
@@ -4854,21 +4897,32 @@ def to_instrument(model: TopasModel, instrument, *,
     (:data:`TCHZ_SLOT_TERMS`).
 
     ``phase`` names the phase whose call to take, where calls in several
-    phases state different values; a call at dataset or top level applies to
-    every phase. Refused, each naming the file:
+    phases state different values; a call at dataset level applies to every
+    phase of its dataset, and one above every dataset to all of them.
+    ``dataset`` (0 for the file's first ``xdd``-family block) reads one
+    dataset's calls and radius, where the file's datasets state different
+    ones: an instrument describes one pattern. A ``phase`` reads its own
+    datasets' calls and radii only. ``radius_mm`` states the secondary radius
+    instead of reading it, for a file whose radius this reader refuses or one
+    whose radius is not the one wanted. Refused, each naming the file:
 
+    - a ``phase`` that names no phase block of the file, or a ``dataset`` the
+      file does not open;
     - no call, a call without twelve arguments, or a slot that does not
       resolve to a number;
-    - calls stating different values and no ``phase`` to choose one;
+    - calls stating different values, naming what tells them apart: datasets
+      (``dataset=``), phases (``phase=``), or a phase's own call against a
+      dataset-level one;
     - a negative W (= v3 + v4) or X, which ``TCHZ_BOUNDS`` holds at or
       above zero — what TOPAS does with a negative Gaussian variance is not
       measured, and a width this package cannot hold is not a shape;
     - a Lorentzian FWHM X/cosθ + Y·tanθ that goes negative below 2θ = 180°;
     - a value that is not finite;
-    - two different secondary radii (an ``Rs`` and a ``Radius`` disagreeing),
-      a radius that is not positive, or a ``Radius(…)`` call not read as one
-      radius (``TopasModel.radius_unread``: two different values, whose
-      order no run has measured, or one that does not resolve).
+    - with no ``radius_mm``: two different secondary radii (an ``Rs`` and a
+      ``Radius`` disagreeing, or two datasets' radii), a radius that is not
+      positive, or a ``Radius(…)`` call not read as one radius
+      (``TopasModel.radius_unread``: two different values, whose order no run
+      has measured, or one that does not resolve).
 
     A W from 0 up to the Γ_G² clamp (``caglioti._MIN_GAMMA_G2``) is raised to
     it, as the schema raises a stored one. A value outside ``instrument``'s own
@@ -4879,11 +4933,51 @@ def to_instrument(model: TopasModel, instrument, *,
     from ...schemas.instrument import ProfileTCHZ
 
     where = model.path or "<model>"
-    calls = [c for c in model.tchz if phase is None or c.phase in ("", phase)]
+
+    def datasets_named(found) -> str:
+        return ", ".join(str(d) for d in sorted(found))
+
+    # Which datasets are read: every one, the one named, or the chosen
+    # phase's. A card above every dataset (``None``) applies to all of them.
+    scope: set | None = None
+    if dataset is not None:
+        if not 0 <= dataset < model.n_datasets:
+            raise ValueError(
+                f"{where}: dataset={dataset!r}, and the file opens "
+                + (f"{model.n_datasets} dataset(s), numbered 0 to "
+                   f"{model.n_datasets - 1}" if model.n_datasets
+                   else "no xdd-family block, so there is no dataset to choose"))
+        scope = {dataset}
+    if phase is not None:
+        named = {**dict.fromkeys(p.name for p in model.phases),
+                 **dict.fromkeys(c.phase for c in model.tchz if c.phase),
+                 **model.phase_datasets}
+        if phase not in named:
+            raise ValueError(
+                f"{where}: phase={phase!r} names no phase of the file (its "
+                f"phases: {', '.join(repr(n) for n in named) or 'none'})")
+        held = set(model.phase_datasets.get(phase, ()))
+        held |= {p.dataset for p in model.phases if p.name == phase}
+        held |= {c.dataset for c in model.tchz if c.phase == phase}
+        held.discard(None)
+        if held:
+            if scope is not None and not scope & held:
+                raise ValueError(
+                    f"{where}: phase {phase!r} sits in dataset(s) "
+                    f"{datasets_named(held)}, not in dataset {dataset}")
+            scope = held if scope is None else scope & held
+
+    def in_scope(ds) -> bool:
+        return scope is None or ds is None or ds in scope
+
+    calls = [c for c in model.tchz
+             if (phase is None or c.phase in ("", phase)) and in_scope(c.dataset)]
     if not calls:
+        chosen = [f"for phase {phase!r}" if phase is not None else "",
+                  f"in dataset {dataset}" if dataset is not None else ""]
         raise ValueError(
             f"{where}: states no TCHZ_Peak_Type(…) call"
-            + (f" for phase {phase!r}" if phase is not None and model.tchz else "")
+            + "".join(f" {c}" for c in chosen if c and model.tchz)
             + ", so there is no TCHZ profile to read")
     for call in calls:
         if len(call.args) != 12:
@@ -4900,15 +4994,28 @@ def to_instrument(model: TopasModel, instrument, *,
                 f"{call.args[2 * slot - 1]!r} does not resolve to a finite number")
     distinct = {c.values for c in calls}
     if len(distinct) > 1:
-        owners = sorted({c.phase or (f"dataset {c.dataset}, dataset level"
-                                     if c.dataset is not None else "top level")
+        owners = sorted({(f"phase {c.phase!r}" if c.phase else "dataset level")
+                         + (f" of dataset {c.dataset}" if c.dataset is not None
+                            else "")
                          for c in calls})
-        advice = ("Pass phase= to choose the one to read" if phase is None else
-                  f"the call in phase {phase!r} and a dataset-level call disagree, "
-                  f"and which one TOPAS applies to it is not measured here")
+        # Advice from what tells the calls apart: datasets first, since an
+        # instrument describes one pattern; then phases within one dataset.
+        spread = {c.dataset for c in calls if c.dataset is not None}
+        per_dataset = {frozenset(c.values for c in calls if c.dataset in (d, None))
+                       for d in spread}
+        if len(per_dataset) > 1:
+            advice = (f"They sit in datasets {datasets_named(spread)}, and an "
+                      f"instrument describes one pattern: pass dataset= to read "
+                      f"one dataset's")
+        elif phase is None:
+            advice = "Pass phase= to choose the phase whose call to read"
+        else:
+            advice = (f"The call in phase {phase!r} and a dataset-level call "
+                      f"disagree, and which one TOPAS applies to it is not "
+                      f"measured here")
         raise ValueError(
             f"{where}: {len(calls)} TCHZ_Peak_Type calls state {len(distinct)} "
-            f"different profiles (in {', '.join(owners)}), and an instrument has "
+            f"different profiles ({'; '.join(owners)}), and an instrument has "
             f"one. {advice}")
     values = calls[0].values
     widths = tchz_widths(values)
@@ -4929,23 +5036,8 @@ def to_instrument(model: TopasModel, instrument, *,
             f"{where}: TCHZ_Peak_Type{tuple(values)} gives X = {widths['x']:g} and "
             f"Y = {widths['y']:g}, whose Lorentzian FWHM X/cosθ + Y·tanθ is "
             f"negative above 2θ = {edge:.3f}°, and a negative width is not a shape")
-    if model.radius_unread:
-        raise ValueError(
-            f"{where}: states Radius{tuple(model.radius_unread[0])}, which this "
-            f"reader does not read as one secondary radius: two different values, "
-            f"whose order no TOPAS run has measured, or one that does not "
-            f"resolve. Set instrument.geometry.goniometer_radius_mm yourself")
-    radii = set(model.secondary_radii)
-    if len(radii) > 1:
-        raise ValueError(
-            f"{where}: states the secondary radius two ways "
-            f"({', '.join(f'{r:g}' for r in sorted(radii))} mm). Set "
-            f"instrument.geometry.goniometer_radius_mm yourself")
-    if radii and not 0.0 < next(iter(radii)) < math.inf:
-        raise ValueError(
-            f"{where}: states a secondary radius of {next(iter(radii)):g} mm, "
-            f"which is not a radius")
 
+    radius = _the_radius(model, where, radius_mm, in_scope, datasets_named)
     out = instrument.model_copy(deep=True)
     if not isinstance(out.profile, ProfileTCHZ):
         raise ValueError(
@@ -4965,9 +5057,49 @@ def to_instrument(model: TopasModel, instrument, *,
             param.max = value + abs(value) + 1.0
         param.value = value
         param.vary = False
-    if model.goniometer_radius_mm is not None:
-        out.geometry.goniometer_radius_mm = model.goniometer_radius_mm
+    if radius is not None:
+        out.geometry.goniometer_radius_mm = radius
     return out
+
+
+def _the_radius(model: TopasModel, where: str, radius_mm, in_scope,
+                datasets_named) -> float | None:
+    """The secondary radius :func:`to_instrument` sets: ``radius_mm`` where
+    the caller states one, else the one radius the datasets read state, else
+    ``None`` (the caller's instrument keeps its own). Each refusal names the
+    keyword that gets past it."""
+    way_out = "Pass radius_mm= to state the radius yourself"
+    if radius_mm is not None:
+        if not 0.0 < float(radius_mm) < math.inf:
+            raise ValueError(f"{where}: radius_mm={radius_mm!r} is not a radius")
+        return float(radius_mm)
+    if model.radius_unread:
+        raise ValueError(
+            f"{where}: states Radius{tuple(model.radius_unread[0])}, which this "
+            f"reader does not read as one secondary radius: two different values, "
+            f"whose order no TOPAS run has measured, or one that does not "
+            f"resolve. {way_out}")
+    stated = [(r, d) for r, d in zip(model.secondary_radii,
+                                     model.secondary_radius_datasets, strict=True)
+              if in_scope(d)]
+    radii = {r for r, _ in stated}
+    if len(radii) > 1:
+        spread = {d for _, d in stated if d is not None}
+        per_dataset = {d: {r for r, e in stated if e in (d, None)} for d in spread}
+        across = len(spread) > 1 and all(len(v) == 1 for v in per_dataset.values())
+        raise ValueError(
+            f"{where}: states "
+            + (f"a different secondary radius in datasets {datasets_named(spread)}"
+               if across else "the secondary radius two ways")
+            + f" ({', '.join(f'{r:g}' for r in sorted(radii))} mm), and an "
+            f"instrument has one. "
+            + ("Pass dataset= to read one dataset's, or radius_mm= to state "
+               "the radius yourself" if across else way_out))
+    if radii and not 0.0 < next(iter(radii)) < math.inf:
+        raise ValueError(
+            f"{where}: states a secondary radius of {next(iter(radii)):g} mm, "
+            f"which is not a radius. {way_out}")
+    return next(iter(radii)) if radii else None
 
 
 def _reserved_phase_terms(model: TopasModel, ip: int, terms, reported=None) -> dict:
