@@ -45,11 +45,12 @@ defines about it.  ILL's D1B writes three (all 26 tracked ``XYDATA`` files
 under ``tests/data/d1b_co3o4_quench/``, three of them planted copies; WP-1952).
 The third is a round number on every one (300, 100, 120, 1.5), and the first
 lies within 6.5 K of it on every run that held a sample: the shape of a set
-point and a sample sensor, though no document either side holds says so.  The one exception is the empty
-cryostat at 120 K, whose first value reads 330, with no sample there to
-measure.  So the first stays the temperature, and the others are not
-surfaced: a reader surfaces only a coordinate the format itself names
-(``io/CLAUDE.md`` § Metadata).  The multipliers are **applied** as the manual defines them
+point and a sample sensor, though no document either side holds says so.
+The one exception is the empty cryostat at 120 K, whose first value reads
+330, with no sample there to measure.  So the first stays the temperature,
+and the others are not surfaced: a reader surfaces only a coordinate the
+format itself names (``io/CLAUDE.md`` § Metadata).  The multipliers are
+**applied** as the manual defines them
 — x times ``fac_x``, y and σ times ``fac_y`` — and a factor other than 1 says
 so (``XYDATA_INTER_APPLIED``, at ``info``), since every number the pattern
 holds is then not the number the file wrote.  A file with no σ column gets the

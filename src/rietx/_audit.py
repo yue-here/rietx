@@ -1120,15 +1120,18 @@ ROWS: tuple[Row, ...] = (
                   "count, how many are below 0 and the 2θ runs in the message. No count "
                   "takes such a value, and the Poisson fallback √max(y, 1) gives it "
                   "σ = 1, so a pattern normalised below one count is fitted unweighted. A "
-                  "zero is not counted: one count at a zero count is the floor's purpose "
+                  "zero is not counted: on raw counts one count at a zero count is the "
+                  "floor's purpose "
                   "(TOPAS 1/Max(Yobs, 1), Technical Reference section 6.2). A column "
                   "proportional to counts and never below 1 is weighted right up to a "
                   "factor that moves χ² and no parameter or esd, so it is silent. "
                   "Proposed in WP-2002 B5.2, agreed by the maintainer on PR #1050; "
-                  "silent on all 59 tracked files read with no σ (2026-11-17), and "
-                  "not raised again where the reader said PATTERN_INTENSITY_SCALED"),
+                  "silent on 58 of the 59 tracked files read with no σ (2026-11-17); the "
+                  "59th, the synthetic bruker_raw4_scrambled.raw, also says "
+                  "PATTERN_INTENSITY_SCALED, which gives no count at the floor"),
         response="warning",
-        responds=("quote χ² and esds knowing the weights are assumed, and supply σ "
+        responds=("quote χ² and esds knowing the weights are assumed, and the "
+                  "parameters too where most points sit at the floor; supply σ "
                   "carried from the raw counts where the intensities were scaled or had a "
                   "background subtracted")),
     Row("PATTERN_INTENSITY_SCALED", "code"),

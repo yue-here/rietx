@@ -3605,7 +3605,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "PATTERN_INTENSITY_NOT_COUNTS": HelpEntry(
         title="Intensities no count can take, weighted as counts",
         description=(
-            "The file gives no esds, so each point is weighted by the Poisson σ = "
+            "The pattern carries no usable esds, so each point is weighted by the Poisson σ = "
             "√max(y, 1), which holds for raw counts. Some intensities lie between 0 and "
             "1, or below 0, and no count does, so the column is not raw counts. The "
             "fallback gives each such point σ = 1. On a pattern scaled below one count "

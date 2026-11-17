@@ -1164,8 +1164,31 @@ def test_counts_or_a_sigma_column_say_nothing(tmp_path):
     assert "PATTERN_INTENSITY_NOT_COUNTS" not in {d.code for d in found}
 
 
-@pytest.mark.parametrize("fixture,_reader", REAL_FIXTURES)
+#: The real fixtures whose counts are counts.  ``bruker_raw4_scrambled.raw``
+#: holds scrambled values, a third of them negative, and is tested below.
+_COUNTS_FIXTURES = [f for f in REAL_FIXTURES
+                    if f[0] != "bruker_raw4_scrambled.raw"]
+
+
+@pytest.mark.parametrize("fixture,_reader", _COUNTS_FIXTURES)
 def test_no_real_fixture_reads_as_not_counts(fixture, _reader):
     found = []
     rx.read_pattern(DATA / fixture, diagnostics=found)
     assert "PATTERN_INTENSITY_NOT_COUNTS" not in {d.code for d in found}
+
+
+def test_it_fires_beside_an_unsettled_scale_and_on_a_shared_list(tmp_path):
+    """The scrambled v4 ``.raw`` says its scale is unsettled; that code gives no
+    count of the points held at the floor, so this one fires beside it.  A
+    second read into the same list reports its own file."""
+    from tests.test_readers import write_xy
+
+    found = []
+    rx.read_pattern(DATA / "bruker_raw4_scrambled.raw", diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_INTENSITY_SCALED",
+                                       "PATTERN_INTENSITY_NOT_COUNTS"]
+    assert "below 0" in found[1].message
+    rx.read_pattern(write_xy(tmp_path / "norm.xy", _NF_TT,
+                             [v / 1000.0 for v in _NF_Y]), diagnostics=found)
+    assert [d.code for d in found[2:]] == ["PATTERN_INTENSITY_NOT_COUNTS"]
+    assert found[2].message.startswith("norm.xy:")

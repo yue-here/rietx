@@ -1041,7 +1041,6 @@ def _sigma_nonpositive_silent() -> list:
                          nonpositive_sigma="poisson"))
 
 
-
 def _not_counts_xy(y: list[float]) -> list:
     """Twelve points of an ``.xy`` with no σ column whose intensities are ``y``, read."""
     from rietx.io.readers import read_pattern
@@ -1065,6 +1064,7 @@ def _not_counts_silent() -> list:
     never drops below one: the floor binds on no value that is not a count."""
     return (_not_counts_xy([0.0 if i == 4 else 500.0 + i % 7 for i in range(12)])
             + _not_counts_xy([1.37 * (500.0 + i % 7) for i in range(12)]))
+
 
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(

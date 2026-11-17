@@ -139,7 +139,7 @@ A deviation that makes the measurement ambiguous is refused.
 | the same σ on every point | keeps it, [`PATTERN_SIGMA_CONSTANT`](diagnostics-files.md#pattern_sigma_constant) |
 | a σ of zero or below on some points | keeps the values and leaves the points out of the fit, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
 | a σ column with no positive entry | does not read the column, so the Poisson σ applies, [`PATTERN_SIGMA_NONPOSITIVE`](diagnostics-files.md#pattern_sigma_nonpositive) |
-| no σ, and an intensity between 0 and 1 or below 0 | weights it at the Poisson floor σ = 1, [`PATTERN_INTENSITY_NOT_COUNTS`](diagnostics-files.md#pattern_intensity_not_counts) |
+| no usable σ, and an intensity between 0 and 1 or below 0 | weights it at the Poisson floor σ = 1, [`PATTERN_INTENSITY_NOT_COUNTS`](diagnostics-files.md#pattern_intensity_not_counts) |
 | dead detector channels | keeps them, [`PATTERN_DEAD_CHANNELS`](diagnostics-files.md#pattern_dead_channels) |
 
 A constant σ makes the fit unweighted.
