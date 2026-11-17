@@ -106,9 +106,14 @@ all 0 of 43 reflections outside the cone) and matters under TRF
       (R̄ the group average from the operators). Every class but -1 carries
       flat directions in that map. Proof, map and per-class counts:
       `examples/probe_stephens_sos.py --classes`.*
-- [ ] Prototype on brucite outside the package: five starts 1e-14 apart under
+- [x] Prototype on brucite outside the package: five starts 1e-14 apart under
       LM with no cone inequality. Compare χ²_red and its spread with WP-1938's
-      7.7177-7.7202 and with TRF's 7.636 outside the cone.
+      7.7177-7.7202 and with TRF's 7.636 outside the cone. *Done 2026-11-17
+      (`examples/probe_stephens_sos.py --forms …`). Those two references have
+      moved: on today's main LM gives 7.888124-7.894550 (spread 8.1e-4) and
+      TRF 7.803376-7.926666 (1.6e-2). No sum-of-squares form comes near the
+      1e-9 bar: 1.8e-4 for the general form and 2.8e-2 for a four-parameter
+      -3m1 form. Numbers in the 2026-11-17 handover entry.*
 - [ ] Decide from the prototype: adopt it, or close 🛑 with the numbers.
 - [ ] If adopted: the parameter rows and their seed, S_HKL reported with
       full-covariance esds, the manual's Part 2 equation with its `*Source:*`
