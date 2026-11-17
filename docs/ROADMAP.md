@@ -571,8 +571,8 @@ scope creep. Each item names what fenced it.
 - **Physics.** Fundamental Parameters as a differentiable convolution stack
   (Cheary-Coelho 1992) — **with** the peaks buffer, never before
   ([1122](wp/1122-compiled-peaks-buffer.md) measured shape reuse below break-even
-  without one); neutron **TOF** (CW landed in 1134; issue #193; the energy-dependent
-  resonant absorption at S(Q), #113) — **built through rather than deferred**: the
+  without one); neutron **TOF** (CW landed in 1134; issue #193; the energy-dependent resonant absorption at S(Q) is #193's rung T-4, from #113;
+  raw TOF reduction (per-pixel NeXus, vanadium, empty can, grouping) is out of scope, not fenced: ruled 2026-11-16 on #1446, and [2146](wp/2146-the-facility-iparm-files-read-with-their-repairs-recorded.md) carries the how-to and the refusal) — **built through rather than deferred**: the
   fork's branch is visible (`tof-cleanroom-20260923`); **decided 2026-09-24: held until magnetic
   closes**, then cut T-1, T-2/T-3, T-5; **amended 2026-10-08: T-1 (axis, readers) cut as
   [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**, closed 2026-10-23 with T-2's inheritance in its Context; the rest still waiting, with #442 (a bank's CW

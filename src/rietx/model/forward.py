@@ -4374,6 +4374,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     phases: list[CompiledPhase] = []
     restraint_items: list = []
+    restraint_findings: list = []
     for ip, phase in enumerate(structure.phases):
         cell = phase.cell.lengths_angles()
         # The phase's own operation list when it carries one: a child cell
@@ -4610,7 +4611,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # intensities and never compute the coordinates a bond would need.  The
         # PBC image is frozen for the stage here, at the compile-time cell/coords.
         if mode == "rietveld" and phase.restraints:
-            restraint_items.extend(resolve_phase_restraints(phase, ip, sites, cell))
+            restraint_items.extend(resolve_phase_restraints(
+                phase, ip, sites, cell, restraint_findings))
         phases.append(cp)
 
     # background compilation — always linear: paths + design rows (+ penalty)
@@ -4721,7 +4723,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     "PeakComponent.")
 
     pawley = _build_pawley_block(phases) if mode == "pawley" else None
-    restraints = CompiledRestraints(restraint_items) if restraint_items else None
+    restraints = (CompiledRestraints(restraint_items, restraint_findings)
+                  if restraint_items else None)
 
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,

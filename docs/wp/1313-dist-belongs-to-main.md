@@ -161,6 +161,12 @@ The shipping PR carries `Closes #159`.
 
 ## Handover log
 
+- **2026-11-17** — Settled by Claude 2026-11-17 under this WP's own Depends line: the WP is
+  runnable now. Only the branch-protection toggles are Yue's, and they come last, after the
+  workflow lands inert with its by-hand instruction (task 4). The alternative was to hold
+  the WP until Yue flips them. Recorded from Part C item 12 of the 2026-11-17 decisions
+  batch (Ghostshift runner, no code changed).
+
 - **2026-09-01** — created, from issue #159 (2026-09-01 triage; the ruling
   that deferred it is quoted in Context). Settled: the design as ruled;
   first open item is the write-path mechanism onto protected main, which

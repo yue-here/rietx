@@ -1,6 +1,7 @@
 Abramowitz
 [aA]bsorber
 [aA]bsorbers
+[aA]cridine
 [aA]ctinide
 [aA]dditively
 ADP
