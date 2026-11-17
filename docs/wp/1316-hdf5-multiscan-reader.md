@@ -68,6 +68,15 @@ counts-vs-synthetic check) go in `tests/data/README.md` without the files.
 
 ### Inherited
 
+- **2026-11-17, from the issue triage round (issue #1446).** Decided
+  2026-11-16 by the maintainer: raw time-of-flight reduction (per-pixel event
+  or histogram NeXus, vanadium, empty can, grouping) is out of scope. WP-2146
+  carries the named refusal of a raw `.nxs` and the "focus with Mantid" how-to.
+  When this reader lands, a raw spallation run must still be refused by that
+  message. Recognising one needs the NeXus structure (an `NXevent_data` group,
+  or per-pixel detector data without a focused `NXdata`), which only h5py can
+  read, so the distinction lives here once h5py is present.
+
 - **2026-10-13, from the issue triage (#135): the reporter's answer on the
   extra's name is `hdf5`.** Posted 2026-10-12: the extra names the dependency
   (h5py), not the application definition, and the reader also takes
