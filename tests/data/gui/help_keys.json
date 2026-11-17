@@ -119,6 +119,8 @@
   "diagnostics:GSAS_IPARM_LEGACY_LAYOUT",
   "diagnostics:GSAS_IPARM_PROFILE_DECLINED",
   "diagnostics:GSAS_IPARM_PROFILE_READ",
+  "diagnostics:GSAS_IPARM_SET_NUMBER_ASSUMED",
+  "diagnostics:GSAS_IPARM_TRAILING_ZEROS_READ",
   "diagnostics:GSAS_PRM_FIELD_DROPPED",
   "diagnostics:GSAS_PRM_FIELD_NOT_WRITTEN",
   "diagnostics:GSAS_PRM_GEOMETRY_ASSUMED",
