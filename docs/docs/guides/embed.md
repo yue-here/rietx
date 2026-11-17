@@ -11,6 +11,7 @@ In a desktop application the working directory may be the user's home or a direc
 Settle it once, when the application starts, before the first fit.
 
 To record nothing, set `RIETX_TELEMETRY=0` in the environment, or call `rietx.runs.set_enabled(False)`.
+The in-browser notebooks on the rietx site do this before rietx is imported, because nothing can read a run written inside a browser tab.
 
 To keep the runs somewhere of your choosing, name a directory once for the whole process:
 
