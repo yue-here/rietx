@@ -136,8 +136,9 @@ it needs its row.
       second record was added (handover entry says why).
 - [x] The help entries (`help.py` 3101, 3220, 5202) and
       `reference/peaks.md:431` say the same as the new messages.
-- [ ] Rebuild tutorial 03b, whose saved output prints both codes, and read
-      the new text in it.
+- [x] Rebuild tutorial 03b, whose saved output prints both codes, and read
+      the new text in it. Tutorial 03 too, whose saved output prints
+      `INDEX_SYSTEMS_NOT_COVERED`; its markdown names neither code.
 - [ ] Quote old and new text in the PR body for the maintainer.
 - [ ] Skill: none expected. `diagnostics-indexing.md`'s `INDEX_PANEL_REDUCED`
       row does not repeat the systems claim. Revisit if the dropped-systems
