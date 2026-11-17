@@ -89,7 +89,7 @@ reads.
 
 - [ ] Reproduce on a pattern the tree reads (synthetic riding-H body if #1006 has not merged).
 - [x] The released arm frees the heavy-atom members and keeps each hydrogen on its riding rule; measure ΔBIC on the issue's case.
-- [ ] Tests: the stretched body fires, the deposited body does not
+- [x] Tests: the stretched body fires, the deposited body does not
 - [ ] Skill: the `RIGID_BODY_MISFIT` reference row, if its reading changes
 
 ## Acceptance
