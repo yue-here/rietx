@@ -188,7 +188,10 @@ maintainer's read. Rwp is reported and is no part of any bar.
   2.30 to 2.43 with them fixed at pattern 0's values. Neither is rerun here.
 - **A real ramp with a known answer** (rules 1 and 2). On the CuCr2O4 ramp, every route the
   documentation recommends closes the b and c axes between 111 and 135 K. The ramp is
-  development data, so this row can fail a route and cannot prove one. A second real series
+  development data, so this row can fail a route and cannot prove one. Measured at the
+  open (WP-2081's log, 2026-11-16): the default chain and a joint fit with a common zero
+  shift both close between 111 and 123 K, and a joint fit with one common profile and no
+  sample width closes between 123 and 134 K. A second real series
   that nobody who changes the package has run is named before rule 2 is built, with its
   independent measurement.
 - **No series action or code rests on a tuned threshold over a fit metric** (rules 5 and

@@ -555,12 +555,53 @@ flag reprints the saved numbers without fitting.
   row approved 2026-11-03, recorded as unanimous, and `fit:refit` is still unaudited.
   WP-2080's trigger no longer waits on anything, and is ruled to a field.
 
-  *In progress.* A joint fit on the CuCr2O4 ramp is being measured by a subagent
-  (`2081-batch/measure_joint_ramp.py`, `joint_ramp.json`). Its numbers are not in this
-  entry.
+  *Measured: a joint fit on the real ramp* (`2081-batch/measure_joint_ramp.py`, output
+  `joint_ramp.json`, `--report` reprints it; run by an Opus subagent, the saved numbers
+  re-read by this session; macOS arm64, worktree venv `[dev]`, Python 3.12.10, rietx
+  1.12.0.dev0, compiled tier on). All 17 CuCr2O4 patterns in one `refine_multi`, each
+  started from the `lab_sample_refine` chain's model for that pattern, Biso held at the
+  chain's values. Wall times are from a machine under uncontrolled load.
+
+  | arm | common to all patterns | per pattern | wall, evaluations | b − c closes between | \|b − c\| at 6.8 K (Å), paper 0.00746 | common zero (°) | mean axis error at 6.8 K vs the paper (ppm) |
+  |---|---|---|---|---|---|---|---|
+  | chain, default (WP table above) | nothing | zero, profile, cell, scale, background | — | 111 and 123 K | 0.00554(113) | −0.00095(65) per pattern | −7 |
+  | chain, `lab_sample_refine`, `.prm` | nothing; zero fixed at 0 | cell, scale, background, sample widths | 414 s | 111 and 123 K | 0.00562(90) | 0, fixed | +67 |
+  | A | zero; profile fixed at the `.prm` | the same | 584 s, 143 | 111 and 123 K | 0.00563(86) | −0.00073(11) | +10 |
+  | B | zero and U, V, W, X, Y declared | the same | 528 s, 227 | 111 and 123 K | 0.00562(89) | −0.00073(11) | +10 |
+  | C0 | zero and U, V, W, X, Y | cell, scale, background; every sample width 0 | 428 s, 277 | 123 and 134 K | 0.00801(41) | −0.00073(11) | +21 |
+
+  Five readings.
+
+  - A common zero shift works on real data. It is fixed about 6× tighter than a
+    per-pattern zero, the closure does not move, and the +67 ppm of the held-at-0 route
+    falls to +10 ppm. The split itself reads the same 25 % under the paper in A and B, so
+    the method did not cause that.
+  - A joint fit of 17 synchrotron patterns costs about what the chain costs here, 7 to 10
+    minutes.
+  - Arm B's declaration was narrowed by the package. `multi._hold_width_twins_multi` holds
+    U, X and Y from the stage where a per-pattern sample width of the same angular shape is
+    free. `StageResult.width_twins_held` records it; no diagnostic code does, and a held term
+    is absent from `result.parameters`. Only zero, V and W were common and free at the end.
+  - W is not determined in arm B. A second start with the profile moved 30 % ends at the
+    same χ² (274072.45 against 274072.74), the same cells and zero to 1e-9, and W at 6.5e-6
+    where the first ended on its floor of 1e-8, traded against every pattern's `gauss_size`.
+    Both report an esd for W near 1e-12, and `COVARIANCE_DIRECTION_DISCARDED` names W. A
+    small esd on a value two starts disagree on by 6.5e-6 looks like a defect against the
+    rule that an unmeasured direction has no esd. Not investigated.
+  - Arm C0 holds no width at one pattern's value: one profile is refined for all patterns
+    and no sample width is free. It closes between 123 and 134 K, which brackets the
+    paper's 130 K, and reads the split 7 % over the paper where every other route reads 25 %
+    under. Its common Y is 0.0508(37) against 0.0072(34) with the chain's sample widths
+    held (arm C in the JSON), so the one profile takes up the specimen's own broadening. This is one specimen on development data, so it shows only that "a held width
+    invents a transition" (the cautious routes above) is a statement about a width taken
+    from a single pattern.
+
+  Not run: Biso free; an arm that pins one pattern's sample widths so U, X and Y could be
+  common beside free widths; a second start for C0. The esd of b − c ignores their
+  correlation, as the table above does.
 
   *Next:* Yue's read of the milestone record's title, scope and draft acceptance rows;
-  the open decisions listed there, the default first; the joint-fit measurement's result.
+  the open decisions listed there; W's esd in the joint fit, as its own investigation.
 
 - **2026-11-04** — rewritten around Yue's account (a ghostshift runner, one session). No
   package code changed, and no question is ruled. Yue said in chat on 2026-11-03 how an
