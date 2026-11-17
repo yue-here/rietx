@@ -52,7 +52,7 @@ prototype at 1440 × 900:
 
 | Piece | WP | What it builds |
 |---|---|---|
-| R1 | [WP-2215](../wp/2215-the-frame.md), in flight | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
+| R1 | [WP-2215](../wp/2215-the-frame.md), merged 2026-11-11 (#1534) | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
 | R2 | [WP-2216](../wp/2216-the-refinement-window.md), in flight | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
 | R3 | [WP-2218](../wp/2218-hand-fitting-and-the-other-graphs.md), in flight | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
 | R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
