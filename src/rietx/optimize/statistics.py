@@ -737,6 +737,13 @@ def background_absorption(jac: np.ndarray, free_paths: list[str],
     — those rows are what makes a stiff background unable to imitate a peak,
     and dropping them overstates the risk by ~5× (measured: R² 0.46 → 0.08 at
     λ = 10⁴).
+
+    **A held curve is outside the block, so this cannot see it** (#1569).
+    The block is the background's *free* columns, and the fixed curve of a
+    ``BackgroundFixedPlusChebyshev`` has none, so whatever its shape took
+    from the reflections was taken before this screen looks (measured: a
+    held SNIP curve that put a synthetic LaB₆'s La Biso 8.8 esd high scored
+    0.011 here).
     """
     # Background-landing extra components join the block.  The statistic asks
     # what the *whole declared background* can imitate, and an explicit broad
