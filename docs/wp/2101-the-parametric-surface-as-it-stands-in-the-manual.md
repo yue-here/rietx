@@ -87,8 +87,11 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   keyword table, then compare a stated value such as a cell or an Rwp with the input's
   own. Include how to expand `#list` and `#define` by hand and
   where `topas.log` holds the expansion.
-- [ ] Skill: decide whether porting is a task shape of its own (a `references/` file behind
+- [x] Skill: decide whether porting is a task shape of its own (a `references/` file behind
   a situation row) or a row in the foreign-inputs line, under the skill's placement rule.
+  *Done 2026-11-17:* a sentence in `api-io.md`'s projects paragraph (authored in
+  `docs/skill/make_api_index.py`), keyed by `TopasInpError` and `read_project_model`,
+  which the agent already holds when porting starts. No new shape file.
 - [ ] `switching/gsas2.md`: the same for GSAS-II's sequential refinement and its
   parametric fit afterwards. Read that program's docs before writing.
 - [x] `reference/parametric.md`: one table of the target kinds accepted. *Done
