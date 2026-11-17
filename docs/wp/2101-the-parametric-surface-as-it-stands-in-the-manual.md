@@ -77,7 +77,9 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   Durham inputs, each with its rietx spelling, its WP or a named non-goal, and each
   input's free-parameter and channel counts. The milestone's agent row is judged against
   it.
-- [ ] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
+- [x] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
+  *Done 2026-11-17* as § Porting an input that does not read, five steps, under
+  § Moving a file across.
   Try `read_project_model`. A parametric input usually raises `TopasInpError` naming the
   first construct it cannot read, and `parametric_05.inp` and ZrP₂O₇'s input both do, so
   there is no list to work from. A simple input returns a model and a

@@ -258,6 +258,32 @@ A construct the reader cannot carry without misrepresenting the file is refused 
 A rigid body, `occ_merge`, a stacking-fault phase and a time-of-flight dataset are refused, because the numbers read back fine and the model would be wrong.
 [Names in other programs](../reference/foreign-names.md) maps each rietx parameter to its TOPAS name and gives the unit conversions.
 
+### Porting an input that does not read
+
+A parametric input usually does not read.
+`read_project_model` raises `rietx.io.projects.topas.TopasInpError`, a `ValueError`, naming the first construct it cannot place.
+In the Durham TOPAS tutorials, both parametric inputs of the WO₃ ramp stop at their `for xdds` loop.
+The ZrP₂O₇ ramp's input stops at a site whose coordinates are written as macro calls, `B1(!xAl1,0.0000,0.0000)`.
+The error names one construct and stops there, so it does not list what else the file uses.
+
+These steps port such an input:
+
+1. Call `rx.read_project_model(path, diagnostics=[])`.
+   If it returns, the `TOPAS_FEATURES_NOT_IMPORTED` diagnostics and `model.coverage` list what the import left out.
+   The ZrMo₂O₈ ramp's input reads this way, as the first of its 68 runs, and `TOPAS_FIRST_RUN_READ` says so.
+2. If it raises, port from the input's text.
+   Expand the preprocessor first, since `#list`, `#define`, `#ifdef`, `macro` and `for xdds` are text substitution.
+   TOPAS writes the input with every macro expanded to `TOPAS.LOG` when it runs, so read that file where TOPAS is at hand.
+   By hand, each `#list` row is one pattern and one row of the `rx.CoordinateTable`.
+   A `#define` decides which `#ifdef` branch is live, and a macro call is its body with the arguments substituted.
+   `for xdds { ... }` is its body once per `xdd`.
+3. Translate each line with the table in [A parametric equation is a formula](#a-parametric-equation-is-a-formula) and with [Names in other programs](../reference/foreign-names.md).
+   A construct in the list under that table has no rietx spelling yet.
+4. Call `MultiHistogramRefinement.preview_equations` before fitting.
+   It evaluates every formula at its starting values, so compare its cells with the ones the input states.
+5. Fit, and compare a refined value the input states, such as a cell edge, with rietx's in units of its esd.
+   Compare Rwp only loosely, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
+
 ### Writing an `.inp`
 
 `write_topas_inp` writes a file TOPAS runs as it stands.
