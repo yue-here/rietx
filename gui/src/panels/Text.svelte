@@ -72,10 +72,27 @@
     sync = reduce(sync, event);
   }
 
+  /** Read the rendering.  A kept buffer waiting in `restoring` goes back over
+   *  it instead (the "restored" event), and only once a read has succeeded:
+   *  a failed read leaves it waiting, so the copy keeps it and the next read
+   *  restores it.  Two reads in flight restore it once. */
   async function load(force = false) {
+    const kept = restoring;
     try {
       const payload = await api.textdoc();
-      dispatch({ kind: "rendered", text: payload.text, revision: payload.revision, force });
+      if (kept && restoring !== kept) return;   // restored already, or the project was left
+      if (kept && !force) {
+        dispatch({ kind: "restored", text: payload.text, revision: payload.revision,
+                   buffer: kept.buffer, kept: kept.revision });
+        restoring = null;
+        if (sync.phase === "dirty" && !sync.stale && !busy) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(check, DEBOUNCE_MS);
+        }
+      } else {
+        dispatch({ kind: "rendered", text: payload.text, revision: payload.revision, force });
+        if (force) restoring = null;
+      }
       loaded = true;
     } catch (error) {
       if (error instanceof ApiError && error.empty) return; // no project yet
@@ -85,8 +102,8 @@
 
   /** The buffer for the recovery copy (WP-2213): as typed, comments
    *  included, with the revision it descends from; `null` while it matches
-   *  the rendering.  A restore still fetching answers with what it restores,
-   *  so the copy is not rewritten without it meanwhile. */
+   *  the rendering.  A restore not yet read back answers with what it
+   *  restores, so the copy is not rewritten without it meanwhile. */
   let restoring = $state.raw<TextDraft | null>(null);
   export function draft(): TextDraft | null {
     if (restoring) return restoring;
@@ -99,21 +116,7 @@
    *  (`lib/sync.ts`, the "restored" event). */
   export async function restoreDraft(kept: TextDraft) {
     restoring = kept;
-    try {
-      const payload = await api.textdoc();
-      if (restoring !== kept) return;   // the project was left meanwhile
-      dispatch({ kind: "restored", text: payload.text, revision: payload.revision,
-                 buffer: kept.buffer, kept: kept.revision });
-      loaded = true;
-      if (sync.phase === "dirty" && !sync.stale && !busy) {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(check, DEBOUNCE_MS);
-      }
-    } catch (error) {
-      if (!(error instanceof ApiError && error.empty)) bootError = (error as Error).message;
-    } finally {
-      if (restoring === kept) restoring = null;
-    }
+    await load();
   }
 
   /** The open project changed: drop this buffer, which is the project left

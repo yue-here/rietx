@@ -444,6 +444,11 @@
   export function forget() {
     revert();
     atomRow = { ...NO_ATOM };
+    // the model left behind too: `draft()` measures a restored form against
+    // `structure`, and the next project's edits are not diffs against this one
+    structure = null;
+    instrument = null;
+    rows = [];
     symbolDraft = null;
     symPreview = null;
     symError = "";

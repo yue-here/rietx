@@ -90,12 +90,16 @@ export function readDraft(value: unknown): Draft | null {
   // a Text arm restores a buffer into an editor, so only the shape written
   const text = t && typeof t.buffer === "string" && typeof t.revision === "string"
     ? { buffer: t.buffer, revision: t.revision } : null;
+  // a Model arm restores four maps into the forms, so each must be one
+  const m = arm(d.model) as Record<string, unknown> | null;
+  const model = m && ["edits", "params", "positions", "vary"].every((k) => arm(m[k]))
+    ? m as unknown as ModelDraft : null;
   return combine(typeof d.count === "number" ? d.count : 0, {
     params: arm(d.params) as ParamsDraft | null,
     interactive: arm(d.interactive) as InteractiveDraft | null,
     plan: arm(d.plan) as PlanDraft | null,
     text,
-    model: arm(d.model) as ModelDraft | null,
+    model,
   });
 }
 
