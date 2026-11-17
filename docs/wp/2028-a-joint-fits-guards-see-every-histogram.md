@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @yue-here for the inherited W-esd finding; earlier: tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
