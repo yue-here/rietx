@@ -2276,11 +2276,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.background.diagnostics.SAMPLING_HEIGHT_FRACTION", "constant", value=0.03),
     Row("rietx.background.diagnostics.SAMPLING_PROMINENCE_SIGMA", "constant", value=5.0),
     Row("rietx.background.diagnostics.STEPS_PER_FWHM_MAX", "constant", tier=2, value=10.0,
-        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36 section "
-                  "2 (docstring; not in the local corpus)")),
+        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36-50, "
+                  "doi:10.1107/S0021889898009856, section 2 p. 37: 'at least five steps (but "
+                  "generally not more than ten) across the top' (read 2026-11-17, WP-2017 group "
+                  "S; the code's per-FWHM reading matches)")),
     Row("rietx.background.diagnostics.STEPS_PER_FWHM_MIN", "constant", tier=2, value=5.0,
-        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36 section "
-                  "2 (docstring; not in the local corpus)")),
+        evidence=("McCusker, Von Dreele, Cox, Louer & Scardi (1999) J. Appl. Cryst. 32, 36-50, "
+                  "doi:10.1107/S0021889898009856, section 2 p. 37: 'at least five steps (but "
+                  "generally not more than ten) across the top' (read 2026-11-17, WP-2017 group "
+                  "S; the code's per-FWHM reading matches)")),
     Row("rietx.background.diagnostics._ANODE_MATCH_TOL", "constant", value=0.01),
     Row("rietx.background.diagnostics._DEAD_INTERVAL_DECIMALS", "constant", value=3),
     Row("rietx.background.diagnostics._DEAD_REPAIR_PASSES", "constant", value=6),
@@ -3144,7 +3148,11 @@ ROWS: tuple[Row, ...] = (
                   "inherits restraints._COS_CLAMP with no free factor")),
     Row("rietx.model.geometry.BOND_SLACK_ANG", "constant", tier=2, value=0.4,
         evidence=("CSD bond-perception convention (radii sum + 0.4 A), named in WP-1072; radii are "
-                  "Cordero 2008, checked in the docstring (not checked by me)")),
+                  "Cordero 2008, checked in the docstring (not checked by me); WP-2017 group S, "
+                  "2026-11-17: no source held states the rule (WP-1072 names 'the CSD 0.4 A slack' "
+                  "without one, and the docstring cites it to nobody), nor whether it pairs 0.4 A "
+                  "with CSD's own radii or Cordero's; Cordero et al. (2008) Dalton Trans. (21), "
+                  "2832-2838, doi:10.1039/b801115j, gives the radii only and is not held")),
     Row("rietx.model.geometry.CONTACT_MAX_ANG", "constant", tier=1, value=3.5,
         evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): every contact within "
                   "3.5 A is listed, in an unreduced cell where a fixed one-cell shell drops a "
@@ -3237,7 +3245,12 @@ ROWS: tuple[Row, ...] = (
                   "peaks, tests/test_gsas2_instprm.py")),
     Row("rietx.model.profiles.caglioti.SCHERRER_K", "constant", tier=2, value=0.9,
         evidence=("Scherrer (1918); Langford & Wilson (1978) J. Appl. Cryst. 11, 102 (0.89 sphere "
-                  "FWHM; docstring; not checked)")),
+                  "FWHM; docstring; not checked); WP-2017 group S, 2026-11-17: metadata confirmed "
+                  "(Scherrer, Nachr. Ges. Wiss. Goettingen, Math.-Phys. Kl. 1918, 98-100; Langford "
+                  "& Wilson 11, 102-113, doi:10.1107/S0021889878012844) and K is applied to a FWHM "
+                  "(caglioti.apparent_size), the right family for a FWHM constant; neither source "
+                  "held, so the 0.89 and which size definition it belongs to are unchecked, and "
+                  "0.9 rounds it by 1 %")),
     Row("rietx.model.profiles.caglioti._MIN_GAMMA_G2", "constant", tier=3, value=1e-08,
         evidence=("Gaussian-variance floor (WP-2002, 2026-10-21, tests/test_gaussian_width_floor.py): "
                   "max |dy|/sigma at fixed parameters 0 on SRM 660c, FAP and NAC and 4.8e-9 on cpd-1a; "
