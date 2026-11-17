@@ -649,6 +649,10 @@ class ValueRestraint(Base):
     weight: float = Field(default=1.0, ge=0.0)
 
 
+#: An occupancy path, the only kind a ``LinearRestraint`` records a value of.
+_OCC_PATH = re.compile(r"^phases\.\d+\.atoms\.\d+\.occ$")
+
+
 class LinearRestraint(Base):
     """A soft restraint on a linear sum of parameters, which may span phases (WP-1942).
 
@@ -665,11 +669,13 @@ class LinearRestraint(Base):
     phase's, a ``vars.<name>`` or an instrument parameter.
 
     ``label`` names the row in the report, for a reader; nothing reads it.
-    ``occupancy_phases`` lists the phases whose atom occupancies the
-    coefficients were computed from (:func:`rietx.elemental_ratio_restraint`
-    fills it).  The coefficients are frozen at declaration, so a stage that
-    frees an occupancy of one of these phases fits against a stale row, and
-    reports so (``LINEAR_RESTRAINT_STALE``) rather than staying silent.
+    ``occupancies`` maps each occupancy path the coefficients were computed
+    from to its value then
+    (:func:`rietx.model.restraints.elemental_ratio_restraint` fills it).  The
+    coefficients are frozen at declaration, so a fit whose occupancies have
+    moved from these values (in any stage, or carried in from a previous
+    pattern) was held to a stale row, and reports so
+    (``LINEAR_RESTRAINT_STALE``) rather than staying silent.
     """
 
     terms: list[tuple[str, float]] = Field(min_length=1)
@@ -677,7 +683,7 @@ class LinearRestraint(Base):
     sigma: float = Field(gt=0.0)
     weight: float = Field(default=1.0, ge=0.0)
     label: str | None = None
-    occupancy_phases: list[int] = Field(default_factory=list)
+    occupancies: dict[str, float] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _terms_are_a_row(self) -> "LinearRestraint":
@@ -699,8 +705,10 @@ class LinearRestraint(Base):
             raise ValueError("a linear restraint needs a nonzero coefficient")
         if not math.isfinite(self.target):
             raise ValueError("a linear restraint's target must be finite")
-        if any(p < 0 for p in self.occupancy_phases):
-            raise ValueError("occupancy_phases holds phase indices, which are >= 0")
+        if any(not _OCC_PATH.match(p) for p in self.occupancies):
+            raise ValueError(
+                f"occupancies keys are occupancy paths (phases.i.atoms.j.occ): "
+                f"{sorted(self.occupancies)}")
         return self
 
 
@@ -2011,17 +2019,17 @@ class Structure(Base):
                     raise ValueError(
                         f"linear restraint {k} names {path}, but the structure "
                         f"has {n} phase(s)")
-            for ip in r.occupancy_phases:
-                if ip >= n:
+            for path in r.occupancies:
+                if int(_LINEAR_PHASE_PATH.match(path).group(1)) >= n:
                     raise ValueError(
-                        f"linear restraint {k} names occupancy phase {ip}, but "
-                        f"the structure has {n} phase(s)")
+                        f"linear restraint {k} names {path}, but the structure "
+                        f"has {n} phase(s)")
         return self
 
     def _linear_restraints_name_atoms_it_has(self) -> None:
         """A :class:`LinearRestraint` term on an atom names an atom this structure has."""
         for k, r in enumerate(self.restraints):
-            for path, _ in r.terms:
+            for path in [*(p for p, _ in r.terms), *r.occupancies]:
                 m = _VALUE_ATOM_PATH.match(path)
                 if m is None:
                     continue

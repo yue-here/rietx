@@ -9484,8 +9484,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
     if model.restraints is not None:
-        diagnostics = diagnostics + _linear_stale_diagnostics(
-            structure, set(table.moving_paths))
+        diagnostics = diagnostics + _linear_stale_diagnostics(structure, values)
 
     # Bonding geometry, with esds through the *whole* covariance (WP-1072,
     # McCusker §10) — built here because that covariance is read off the final
@@ -12345,19 +12344,21 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
     return out
 
 
-def _linear_stale_diagnostics(structure: Structure, moving: set[str]) -> list[Diagnostic]:
-    """A ``LinearRestraint`` whose coefficients this stage made stale (WP-1942).
+def _linear_stale_diagnostics(structure: Structure, values: dict) -> list[Diagnostic]:
+    """A ``LinearRestraint`` whose coefficients the fit made stale (WP-1942).
 
     ``elemental_ratio_restraint`` reads each phase's occupancies once and
-    freezes them into the coefficients (``occupancy_phases``), so a stage
-    that moves an occupancy of one of those phases fitted against a row
-    computed for other occupancies.  Nothing is changed; the finding says so,
-    once per row, naming the occupancies that moved.
+    records them with the row (``occupancies``), so a fit whose occupancies
+    now differ from those, whichever stage moved them or whichever pattern
+    of a series carried them in, was held to a row computed for another
+    composition.  Read off the values, never off the stage's free set, which
+    sees only the last stage.  Nothing is changed; the finding says so, once
+    per row, naming each occupancy with its declared and current value.
     """
     out: list[Diagnostic] = []
     for k, r in enumerate(structure.restraints):
-        moved = sorted(p for p in moving for ip in r.occupancy_phases
-                       if p.startswith(f"phases.{ip}.atoms.") and p.endswith(".occ"))
+        moved = sorted(p for p, v in r.occupancies.items()
+                       if p in values and float(values[p]) != v)
         if not moved:
             continue
         name = f"restraints.{k}" + (f" ({r.label})" if r.label else "")
@@ -12365,9 +12366,11 @@ def _linear_stale_diagnostics(structure: Structure, moving: set[str]) -> list[Di
             level="warning", code="LINEAR_RESTRAINT_STALE",
             where=[f"restraints.{k}", *moved],
             message=(f"The linear restraint {name} has coefficients computed from "
-                     f"occupancies this stage refined ({', '.join(moved)}), so the "
-                     f"fit was held to a row for the occupancies it was declared "
-                     f"at."),
+                     f"occupancies that have since moved ("
+                     + ", ".join(f"{p} {r.occupancies[p]:.4g} -> {float(values[p]):.4g}"
+                                 for p in moved)
+                     + "), so the fit was held to a row for the occupancies it was "
+                       "declared at."),
             suggestion=("Rebuild the row with elemental_ratio_restraint from the "
                         "refined occupancies and refit, or hold those occupancies "
                         "in the stages the row is on."),

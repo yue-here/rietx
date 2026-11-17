@@ -102,7 +102,8 @@ def _ratio_row(cells, ratio, sigma):
 def test_the_row_round_trips_through_json():
     row = LinearRestraint(terms=[("phases.0.scale", 1.0), ("phases.1.scale", -2.5)],
                           target=0.1, sigma=0.02, weight=3.0, label="Cu/Ni",
-                          occupancy_phases=[0, 1])
+                          occupancies={"phases.0.atoms.0.occ": 1.0,
+                                       "phases.1.atoms.0.occ": 0.5})
     s = _pair(FLAT, restraints=[row])
     back = Structure.model_validate_json(s.model_dump_json())
     assert back == s and back.restraints == [row]
@@ -154,6 +155,32 @@ def test_a_phase_removed_by_an_edit_takes_its_carried_row_with_it():
     assert [r.terms for r in ref.structure.restraints] == [[("phases.0.scale", 1.0)]]
 
 
+def test_a_trailing_phase_removed_by_an_edit_drops_the_row_that_named_it():
+    """``atom_moves`` gives no key to a phase number past the new list, so the
+    carry reads such a path as gone rather than refusing the edit."""
+    row = LinearRestraint(terms=[("phases.1.scale", 1.0)], sigma=1.0)
+    ref = Refinement(_pair(SEPARATE, restraints=[row]), _instrument(), history=False)
+    edited = ref.structure.model_copy(update={"phases": [ref.structure.phases[0]]})
+    with pytest.warns(UserWarning, match="linear restraint 0"):
+        ref.edit(structure=edited)
+    assert ref.structure.restraints == []
+
+
+def test_deleting_a_row_in_an_edit_that_renumbers_phases_is_refused():
+    """The place rule of a phase's own list (WP-2121): the row behind a deleted
+    one moves up a place, and in the same edit that renumbers its phases its
+    paths could mean either numbering."""
+    third = _fcc("Al", "Al", 4.05, 5e-4)
+    rows = [LinearRestraint(terms=[("phases.0.scale", 1.0)], sigma=1.0),
+            LinearRestraint(terms=[("phases.1.scale", 1.0)], sigma=1.0, label="ni")]
+    s = Structure(phases=[*_pair(SEPARATE).phases, third], restraints=rows)
+    ref = Refinement(s, _instrument(), history=False)
+    edited = ref.structure.model_copy(update={
+        "phases": ref.structure.phases[1:], "restraints": rows[1:]})
+    with pytest.raises(ValueError, match="linear restraint 0 differs"):
+        ref.edit(structure=edited)
+
+
 # ----------------------------------------------------------------------
 # compile, residual, partials, report
 # ----------------------------------------------------------------------
@@ -197,7 +224,8 @@ def test_the_ratio_row_reads_the_ratio_minus_its_target_at_the_declared_scales()
     w, ratio = _truth(SEPARATE)
     s = _pair(SEPARATE)
     row = elemental_ratio_restraint(s, "Cu", "Ni", 1.5, 0.02)
-    assert row.occupancy_phases == [0, 1]
+    assert row.occupancies == {"phases.0.atoms.0.occ": 1.0,
+                               "phases.1.atoms.0.occ": 1.0}
     value = sum(c * s.phases[int(p.split(".")[1])].scale.value for p, c in row.terms)
     assert value == pytest.approx(ratio - 1.5, rel=1e-12)
     assert row.label == "Cu/(Ni) = 1.5"
@@ -207,8 +235,13 @@ def test_the_ratio_row_refuses_what_it_cannot_build():
     s = _pair(SEPARATE)
     with pytest.raises(ValueError, match="both sides"):
         elemental_ratio_restraint(s, "Cu", ["Cu", "Ni"], 1.0, 0.1)
-    with pytest.raises(ValueError, match="no denominator"):
+    with pytest.raises(ValueError, match=r"no phase spanned holds \['Al'\]"):
         elemental_ratio_restraint(s, "Cu", "Al", 1.0, 0.1)
+    # a misspelt or absent numerator would drive the other side's scales to 0
+    with pytest.raises(ValueError, match=r"no phase spanned holds \['Zn'\]"):
+        elemental_ratio_restraint(s, "Zn", "Ni", 1.0, 0.1)
+    # an ion names its element
+    assert elemental_ratio_restraint(s, "Cu2+", "Ni", 1.5, 0.1).terms
 
 
 # ----------------------------------------------------------------------
@@ -274,8 +307,20 @@ def test_freeing_an_occupancy_the_coefficients_read_is_reported(separate_pattern
                         Stage("occ", [*STAGE, "phases.1.atoms.0.occ"]))
     (d,) = [d for d in res.diagnostics if d.code == "LINEAR_RESTRAINT_STALE"]
     assert d.where == ["restraints.0", "phases.1.atoms.0.occ"]
+    assert "phases.1.atoms.0.occ 1 -> " in d.message
     quiet = _fit(SEPARATE, separate_pattern, [_ratio_row(SEPARATE, ratio, 0.02)])
     assert not [d for d in quiet.diagnostics if d.code == "LINEAR_RESTRAINT_STALE"]
+
+
+def test_an_occupancy_an_earlier_stage_moved_is_still_reported(separate_pattern):
+    """The row is compared with the values, not with the last stage's free set:
+    an occupancy refined in stage 1 and held in stage 2 is still stale."""
+    _, ratio = _truth(SEPARATE)
+    ref = Refinement(_pair(SEPARATE, (8e-4, 8e-4), [_ratio_row(SEPARATE, ratio, 0.02)]),
+                     _instrument(), history=False)
+    ref.run_stage(separate_pattern, Stage("occ", [*STAGE, "phases.1.atoms.0.occ"]))
+    res = ref.run_stage(separate_pattern, Stage("scales", STAGE))
+    assert [d.code for d in res.diagnostics].count("LINEAR_RESTRAINT_STALE") == 1
 
 
 def test_a_series_where_the_ratio_decides_each_partition():

@@ -730,11 +730,13 @@ D_0 = \sum_p S_p^{(0)} V_p\, n_{D,p},
 
 {source}`rietx.model.restraints.elemental_ratio_restraint`
 
-where $S_p^{(0)}$ are the scales at declaration. Near its target the row reads
-the ratio's own deviation, so $\sigma$ is a σ on the ratio. Away from the
-declared scales it is a σ of $\sigma D/D_0$ on the ratio. The cell volumes and
-occupancies are frozen into $a_p$, and a stage refining an occupancy they were
-read from reports so.
+where $S_p^{(0)}$ are the scales at declaration. The row equals
+$(D/D_0)(\rho - r)$, with $\rho$ the ratio the scales imply and $D$ the
+denominator at the current scales, so at the declared scales $\sigma$ is a σ on
+the ratio and away from them a σ of $\sigma D_0/D$. The cell volumes and
+occupancies are frozen into $a_p$. A fit whose occupancies have moved from the
+declared ones reports so, and a refined volume moves a coefficient by its own
+relative change.
 
 ## Weighting the restraints
 
