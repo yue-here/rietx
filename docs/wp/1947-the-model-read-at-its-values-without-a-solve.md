@@ -151,18 +151,31 @@ entry of that date.)*
       stage with 0 is refused too, since it has the verb now. `rietx.help`'s
       `max_iter` entry says so. `StageSpec` keeps no bound, so a stored plan
       still loads (a schema change was not needed for the refusal).
-- [ ] Reflections before a fit: `Refinement.reflection_table(data)` (or the
+- [x] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.
-- [ ] Background without mutation: an accessor over
+      **Landed 2026-11-17:** `reflection_table(data, *, mode=None,
+      two_theta_limits=None)`; with no pattern it is the last fit's rows as
+      before, and the refusal now names the pattern form. Rows equal the
+      empty-stage fit's in all three modes
+      (`test_reflections_before_a_fit_are_the_empty_stage_rows`).
+- [x] Background without mutation: an accessor over
       `CompiledModel.background` (`predict(data, component="background")`
       or `Refinement.background(data)`). Test: it equals the scale-zero
       `predict`, and the history and values are unchanged.
+      **Landed 2026-11-17:** `Refinement.background(two_theta=None)`, with
+      `predict`'s two forms; bit-equal to the scale-zero `predict`, the
+      phase-free twin's `predict` and, after a fit in each mode,
+      `result.y_background` (`test_background_without_mutation`). The
+      no-phase refusal now names it.
 - [ ] Manual (`using/refining.md` or `using/exports.md`) and the generated
       skill API index: the three calls, with the phase-free `predict` named
       as the workaround it replaces.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
-      pattern.
+- [x] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
+      pattern. **Landed 2026-11-17:** six tests in
+      `tests/test_refine_synthetic.py` § the model read at its values;
+      `tests/output/evaluate_before_any_fit.png` (looked at: the perturbed
+      start, peaks offset in the difference curve, as expected).
 - [ ] Skill: the `api.md` row "a reflection table without a fit", written
       new for the documented call (WP-1532 dropped it, issue #1381; nothing
       under `docs/skill/rietx/` teaches the `run_stage` spelling). Nothing

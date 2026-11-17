@@ -2442,7 +2442,7 @@ def _refuse_without_phases(structure: Structure, verb: str) -> None:
         "GUI's Peaks panel), then adopt a candidate cell; or build the Le Bail "
         "scaffold directly from a symbol and a cell "
         "(rietx.schemas.structure.lebail_scaffold). To evaluate the background "
-        "as it stands without refining, call ref.predict(pattern).")
+        "as it stands without refining, call ref.background(pattern).")
 
 
 def _snapshot_sinks(*candidates) -> list:
@@ -6268,7 +6268,9 @@ class Refinement:
                 "a plan with no stages refines nothing: every stage is a group "
                 "of parameters to free, so an empty list frees none. To "
                 "evaluate the model as it stands without refining it, call "
-                "ref.predict(pattern) — that needs no prior fit. To run a "
+                "ref.evaluate(pattern) for the result a fit would report, or "
+                "ref.predict(pattern) for the curve alone — neither needs a "
+                "prior fit. To run a "
                 "refinement, name a preset "
                 f"({', '.join(sorted(PLAN_PRESETS))}) or list at least one "
                 "stage.")
@@ -7137,6 +7139,54 @@ class Refinement:
             result.tree_id = tree.header.tree_id
 
     # ------------------------------------------------------------------
+    def evaluate(self, data: PatternData, *, mode: Mode = "rietveld",
+                 two_theta_limits: tuple[float, float] | None = None
+                 ) -> RefinementResult:
+        """The result a fit would report at the current values, without a fit.
+
+        The statistics, ``y_calc``, ``y_background``, the ticks and the
+        diagnostics of the model as it stands, as the
+        :class:`~rietx.schemas.results.RefinementResult` a fit returns, with
+        nothing refined: ``n_free_parameters`` is 0 under Rietveld, no row
+        carries an esd, and every structural and instrument value is the one
+        the models hold (WP-1947, issue #890).
+
+        **It is the empty stage, run where the caller cannot see it.**
+        ``fit(data, plan=RefinementPlan(stages=[Stage("evaluate", [])]))``
+        evaluated without moving anything and nothing documented it; it also
+        wrote history nodes and a run directory, and replaced ``result_``.
+        This runs that same plan on a private working tree carrying this one's
+        declarations (:meth:`_trial`, history-free, ``telemetry=False``), so
+        the answer is the empty-stage fit's by construction, and this
+        refinement's values, history, ``result_`` and compiled model are left
+        as they were.  ``mode`` and ``two_theta_limits`` mean what they mean
+        to :meth:`fit`.
+
+        **Under Le Bail and Pawley the intensities are still extracted**, at
+        the current cell and profile, because they are not computed from a
+        structure: the result is the extraction at the start values, which is
+        what a statistic in those modes is measured against.  Under Pawley the
+        intensity block is therefore free and ``n_free_parameters`` counts it.
+
+        :meth:`predict` is the cheaper call when only the curve is wanted: one
+        compile, no statistics, and no extraction.
+        """
+        require_two_theta(data, "Refinement.evaluate()", instrument=self.instrument)
+        return self._evaluated(data, mode, two_theta_limits).result_
+
+    def _evaluated(self, data: PatternData, mode: Mode,
+                   two_theta_limits: tuple[float, float] | None) -> "Refinement":
+        """A private trial that has run the empty stage on ``data``.
+
+        The one route :meth:`evaluate` and ``reflection_table(data)`` share,
+        so the result and the rows are the same evaluation's.
+        """
+        trial = self._trial(record=False)
+        trial.fit(data, mode=mode, two_theta_limits=two_theta_limits,
+                  plan=RefinementPlan(stages=[Stage("evaluate", [])]),
+                  telemetry=False)
+        return trial
+
     def predict(self, two_theta=None) -> np.ndarray:
         """Evaluate ``y_calc`` at the current parameters, without a fit.
 
@@ -7233,6 +7283,48 @@ class Refinement:
         if mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
+
+    def background(self, two_theta=None) -> np.ndarray:
+        """The background alone at the current parameters, without a fit.
+
+        :meth:`predict`'s twin over
+        :meth:`~rietx.model.forward.CompiledModel.background`, the one
+        authority every background curve in the package reads (the linear
+        block, a measured background, declared background peaks), and with
+        :meth:`predict`'s two forms (WP-1947, issue #894).  With a grid, an
+        array of 2θ values or a :class:`~rietx.PatternData`, it compiles the
+        models as they stand on that grid; with none it is the last fit's
+        answer on that fit's model, which is ``result_.y_background``.
+
+        Nothing is written or replaced.  It replaces two workarounds: setting
+        the phase scales to zero and predicting, which writes ``set_value``
+        nodes and drops ``result_``; and predicting a phase-free twin,
+        ``Refinement(Structure(phases=[]), ref.instrument).predict(data)``,
+        which this equals.
+        """
+        table = ParameterTable(self.structure, self.instrument)
+        if two_theta is None:
+            if self._model is None:
+                raise RuntimeError(
+                    "background() with no grid reads the grid the last fit "
+                    "ran on, and this Refinement has not been fitted. Pass "
+                    "the pattern (or a 2θ array) to evaluate the background "
+                    "as it stands: ref.background(data).")
+            if self._answer is not None:
+                # the answer frozen with the result, as predict() reads it
+                return self._model.background(self._answer["values"])
+            table.pull_moment_frames(self._model)
+            return self._model.background(table.decode(table.x0()))
+        if isinstance(two_theta, PatternData):
+            require_two_theta(two_theta, "Refinement.background()",
+                              instrument=self.instrument)
+            two_theta = two_theta.two_theta
+        tt = np.asarray(two_theta, dtype=np.float64)
+        grid = PatternData(two_theta=tt.tolist(), intensity=[0.0] * len(tt))
+        model = compile_model(self.structure, self.instrument, grid,
+                              mode=self._mode,
+                              moving_paths=set(table.moving_paths))
+        return model.background(table.decode(table.x0()))
 
     def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
@@ -7679,16 +7771,43 @@ class Refinement:
                              stderr_internal=stderr_internal,
                              correlation=correlation, discarded=discarded)
 
-    def reflection_table(self) -> list["ReflectionRow"]:
-        """Every (emission line, reflection) of the last fit as typed rows.
+    def reflection_table(self, data: PatternData | None = None, *,
+                         mode: Mode | None = None,
+                         two_theta_limits: tuple[float, float] | None = None
+                         ) -> list["ReflectionRow"]:
+        """Every (emission line, reflection) as typed rows.
 
         See :func:`rietx.io.exporters.reflection_table`.  In Le Bail/Pawley
         mode the intensities are the extracted/refined ones held on the model.
+
+        With no ``data``, the rows of the last fit.  **With ``data`` no fit is
+        needed** (WP-1947, issue #891): the rows of :meth:`evaluate` on that
+        pattern at the current values, which are the rows an empty-stage fit
+        reports, from the same phase peaks the forward model draws, so a tick
+        list needs no extinction test of its own.  ``mode`` (default
+        ``"rietveld"``) and ``two_theta_limits`` mean what they mean to
+        :meth:`evaluate`, and only with ``data``.  Nothing on this refinement
+        is written or replaced.
         """
         from .io.exporters import reflection_table
 
+        if data is not None:
+            require_two_theta(data, "Refinement.reflection_table()",
+                              instrument=self.instrument)
+            return self._evaluated(data, mode or "rietveld",
+                                   two_theta_limits).reflection_table()
+        if mode is not None or two_theta_limits is not None:
+            raise ValueError(
+                "reflection_table(mode=..., two_theta_limits=...) describe an "
+                "evaluation and need the pattern to evaluate on: "
+                "ref.reflection_table(data, mode=...). With no pattern the "
+                "rows are the last fit's, under its own mode and limits.")
         if self._model is None or self.result_ is None:
-            raise RuntimeError("call fit() first")
+            raise RuntimeError(
+                "reflection_table() with no pattern lists the last fit's "
+                "rows, and this Refinement has not been fitted. Pass the "
+                "pattern to list them at the current values: "
+                "ref.reflection_table(data).")
         # the answer frozen with the result, as in report() (WP-1421)
         answer = self._answer
         return reflection_table(self._model, answer["values"], answer["structure"])
