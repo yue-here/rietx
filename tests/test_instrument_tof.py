@@ -285,6 +285,55 @@ def test_a_default_set_of_a_function_not_evaluated_is_refused(tmp_path, ptyp):
         read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=prcf(1, 1, ptyp, coeffs)))))
 
 
+#: POLARIS bank 5's shape (issue #1447): sig-0 = 0 and a negative sig-2, so
+#: σ²(d) = 29.2187 d² − 1.81041 d⁴ is positive for d < 4.02 Å.
+NEGATIVE_SIG2 = [0.45, 0.055, 0.003, 0.0, 29.2187, -1.81041] + [0.0] * 15
+
+
+def polaris_bank(tmax_ms: float = 20.4, spectrum: bool = True):
+    lines = [icons(1, 7391.35, -2.16, 1.88), bnkpar(1, 1.0, 146.8)]
+    if spectrum:
+        lines += spectrum_records(1, 0, [], tmin=0.8, tmax=tmax_ms)
+    return lines + prcf(1, 1, 3, NEGATIVE_SIG2)
+
+
+def test_a_negative_sig2_reads_where_the_variance_is_positive_over_the_banks_range(
+        tmp_path):
+    """The bank's I ITYP window, 0.8-20.4 ms, is d 0.108-2.762 Å through its
+    calibration, and σ² > 0 there.  The value is read as written, without the
+    schema's floor at zero, and the report says where σ² turns negative."""
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank())), diagnostics=notes)
+    sig2 = got[1].source.profile_tof.sig2
+    assert sig2.value == -1.81041 and not sig2.vary
+    assert sig2.unit == ProfileTOF().sig2.unit
+    (read,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_READ"]
+    assert "range 0.108-2.762 Å and turns negative past d = 4.017 Å" in read.message
+
+
+def test_a_negative_sig2_is_refused_where_the_variance_turns_negative_in_range(
+        tmp_path):
+    """A window to 40 ms reaches d ≈ 5.4 Å, past where σ² crosses zero."""
+    with pytest.raises(ValueError, match=r"sig2 = -1\.81041 makes the variance .* "
+                                         r"inside the bank's own range"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank(tmax_ms=40.0))))
+
+
+def test_a_negative_sig2_is_refused_where_the_bank_states_no_range(tmp_path):
+    """No I ITYP record, no window: the per-coefficient sign test stands."""
+    with pytest.raises(ValueError, match="states no flight-time range"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank(spectrum=False))))
+
+
+def test_a_negative_sig0_or_sig1_is_still_refused_by_its_sign(tmp_path):
+    """Only sig-2's test moved (the handover says why)."""
+    for k in (3, 4):
+        coeffs = list(TYPE3)
+        coeffs[k] = -1.0
+        with pytest.raises(ValueError, match="is a variance coefficient and is negative"):
+            read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=prcf(1, 1, 3, coeffs)))))
+
+
 def test_a_non_default_set_is_reported_and_skipped(tmp_path):
     """The first set is the default regardless of PTYP; the rest are
     not read (here a type-4 alternative, which is also not evaluated)."""

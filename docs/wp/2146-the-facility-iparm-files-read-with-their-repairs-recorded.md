@@ -161,8 +161,20 @@ output, so its wording goes to the maintainer before merge.
       refused.*
 - [ ] (c): read the GSAS manual on a declared NTERMS below the full count.
       Write the finding here, then repair with a record or keep the refusal.
-- [ ] (d): replace the per-coefficient sign test on sig-2 with σ²(d) > 0
+- [x] (d): replace the per-coefficient sign test on sig-2 with σ²(d) > 0
       over the bank's d range. Write the no-range case's choice here.
+      *Done 2026-11-17. The range is the `I ITYP` window mapped through
+      DIFC/DIFA/ZERO; with sig-2 < 0, σ² is concave in d², so its two ends
+      decide. **No range (no `I ITYP` record, or a window that maps to no
+      positive d): the sign test stays**, since inventing a range the file
+      does not state is the guess the reader rule forbids. A passing value
+      reaches `ProfileTOF` as a `Parameter` with `min=-inf`, because the
+      schema's floor at zero would refuse it (`ProfileTOF.sig2`'s
+      validator); the schema default is unchanged.
+      `GSAS_IPARM_PROFILE_READ` gains one sentence naming the range and
+      where σ² crosses zero. sig-0 and sig-1 keep their sign tests. The
+      `.instprm` reader keeps its sign test on all three: it states no
+      range.*
 - [ ] `.gss`: the per-bank Mantid header line into three declared metadata
       keys.
 - [ ] Tests on synthetic fixtures at the two files' column widths: each

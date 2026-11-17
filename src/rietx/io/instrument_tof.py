@@ -61,6 +61,16 @@ bank number ``bb`` in columns 5-6.
   function this package does not evaluate is declined the same way, where a
   numbered set 1 of one is refused (WP-2146's open question).
 
+**The variance, not its coefficients.**  sig-0 and sig-1 are refused when
+negative.  sig-2 is tested on what it is for: σ²(d) = sig-0 + sig-1·d² +
+sig-2·d⁴ must be positive where the bank has data, and need not be outside
+it.  The bank's d range is its ``I ITYP`` window, TMIN-TMAX, mapped through
+ICONS' DIFC, DIFA and ZERO.  A negative sig-2 makes σ² concave in d², so
+its two ends decide.  POLARIS bank 5 (σ² = 29.2187 d² − 1.81041 d⁴, range
+0.108-2.762 Å, zero at 4.017 Å) passes, and the read's report says where σ²
+turns negative.  **A bank with no window keeps the sign test**, because no
+range the file does not state is invented for it.
+
 **Named assumption — PRCF coefficient order.**  The manual lists each
 function's coefficients "respectively" against their GSAS names (function 1,
 p. 144: ``alp-0 alp-1 bet-0 bet-1 sig-0 sig-1 sig-2 s1ec s2ec rstr rsta rsca``;
@@ -162,6 +172,7 @@ Every refusal names the file.
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -543,7 +554,8 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
 
 def _profile(path: Path, bank: int, headers: dict[int, _Record],
              conts: dict[int, dict[int, _Record]], diagnostics,
-             lone: list[_Record] = (), lone_c: dict[int, _Record] | None = None
+             lone: list[_Record] = (), lone_c: dict[int, _Record] | None = None,
+             d_range: tuple[float, float] | None = None
              ) -> ProfileTOF:
     lone_c = lone_c or {}
     if lone or lone_c:
@@ -651,10 +663,13 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                     f"coefficient (GSAS Technical Manual p. 144, 148) that "
                     f"belongs with the microstructure machinery and has no slot "
                     f"on ProfileTOF; refused rather than dropped")
-        for field in ("sig0", "sig1", "sig2"):
+        for field in ("sig0", "sig1"):
             if kwargs.get(field, 0.0) < 0.0:
                 raise rec.fail(f"PRCF set {n}: {field} = {kwargs[field]!r} is a "
                                f"variance coefficient and is negative")
+        sig2_note = ""
+        if kwargs.get("sig2", 0.0) < 0.0:
+            sig2_note = _negative_sig2(rec, n, kwargs, d_range)
         try:
             chosen = ProfileTOF(**kwargs)
         except ValidationError as exc:
@@ -663,10 +678,73 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
               f"Bank {bank}: PRCF set 1, profile function {ptyp} with {ncof} "
               f"coefficients, was read in the order the GSAS Technical Manual "
               f"lists them ({', '.join(names)}). That order is an assumption. "
-              f"CTOF = {ctof!r} was read and not used.",
+              f"CTOF = {ctof!r} was read and not used.{sig2_note}",
               where=[f"bank {bank}", "PRCF1"])
     assert chosen is not None
     return chosen
+
+
+def _d_range(difc: float, difa: float, zero: float, lo_us: float | None,
+             hi_us: float | None) -> tuple[float, float] | None:
+    """The bank's d range in Å, from its ``I ITYP`` flight-time window and its
+    calibration TOF = DIFC·d + DIFA·d² + ZERO (GSAS Technical Manual p. 222),
+    or ``None`` where the file does not give one.
+
+    The root taken is the one that tends to (t − ZERO)/DIFC as DIFA → 0,
+    written as 2(t − Z)/(C + √(C² + 4A(t − Z))) so that a small DIFA loses
+    no digits.  ``None`` where the window is absent, an end maps to no real
+    or no positive d, or the ends do not order.
+    """
+    if lo_us is None or hi_us is None or not difc > 0.0:
+        return None
+    ends = []
+    for t in (lo_us, hi_us):
+        rest = t - zero
+        disc = difc * difc + 4.0 * difa * rest
+        if not rest > 0.0 or disc < 0.0:
+            return None
+        ends.append(2.0 * rest / (difc + disc ** 0.5))
+    return (ends[0], ends[1]) if ends[0] < ends[1] else None
+
+
+def _negative_sig2(rec: _Record, n: int, kwargs: dict, d_range) -> str:
+    """Pass a negative sig-2 where σ²(d) > 0 over the bank's d range, refuse it
+    otherwise (module docstring, PRCF), and return the sentence the read's
+    report adds.
+
+    σ²(d) = sig-0 + sig-1·d² + sig-2·d⁴ is the variance (GSAS Technical Manual
+    p. 144, 148).  With sig-2 < 0 it is concave in d², so its least value on
+    an interval is at an end, and two evaluations decide.  The coefficient is
+    handed over as a :class:`Parameter` without the schema's floor at zero,
+    which describes each coefficient alone; the read value stays fixed.
+    """
+    s0, s1, s2 = (kwargs.get(f, 0.0) for f in ("sig0", "sig1", "sig2"))
+    if d_range is None:
+        raise rec.fail(
+            f"PRCF set {n}: sig2 = {s2!r} is negative, and the bank states no "
+            f"flight-time range (an I ITYP record with TMIN and TMAX) over which "
+            f"the variance sig0 + sig1·d² + sig2·d⁴ could be checked, so the "
+            f"coefficient is refused")
+
+    def var(d):
+        return s0 + s1 * d * d + s2 * d ** 4
+
+    lo, hi = d_range
+    for d in (lo, hi):
+        if not var(d) > 0.0:
+            raise rec.fail(
+                f"PRCF set {n}: sig2 = {s2!r} makes the variance sig0 + sig1·d² "
+                f"+ sig2·d⁴ = {var(d):.6g} µs² at d = {d:.4g} Å, inside the "
+                f"bank's own range {lo:.4g}-{hi:.4g} Å (its I ITYP flight-time "
+                f"window); a variance must be positive where the bank has data")
+    disc = s1 * s1 - 4.0 * s2 * s0
+    edge = ((-s1 - disc ** 0.5) / (2.0 * s2)) ** 0.5
+    default = ProfileTOF.model_fields["sig2"].get_default(call_default_factory=True)
+    kwargs["sig2"] = Parameter(value=s2, vary=False, unit=default.unit,
+                               min=-math.inf)
+    return (f" sig2 = {s2!r} is negative. The variance stays positive over the "
+            f"bank's range {lo:.4g}-{hi:.4g} Å and turns negative past d = "
+            f"{edge:.4g} Å.")
 
 
 def read_gsas_tof_iparm(path: str | Path, *,
@@ -817,7 +895,9 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         if bank["bad_key"] is not None:
             raise bank["bad_key"]
         profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics,
-                           bank["lone"], bank["lone_c"])
+                           bank["lone"], bank["lone_c"],
+                           _d_range(difc, difa, zero, spectrum.tof_min_us,
+                                    spectrum.tof_max_us))
         try:
             source = TOFSource(difc=difc, difa=difa, tzero=zero,
                                two_theta_bank_deg=ttheta, l1_m=l1_m,
