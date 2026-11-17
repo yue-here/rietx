@@ -31,7 +31,8 @@ body — or of a later body of its phase, whose index the removal shifts — can
 mean the same thing in the released arm and is dropped there; the row's
 ``dropped`` lists each.  The arm's own rider ties are declared after that
 drop, so it never reaches them.  The body arm's glob ``torsions.*.twist``
-frees the body's torsions (WP-1808, #823).
+frees the body's torsions (WP-1808, #823), and it frees a Z body's internals
+whose ``vary`` the model sets (WP-1814).
 
 **What riding by tie is.**  The tie is on the coordinate DOFs, which are
 displacements in fractional coordinates, so at a held cell the parent–H
@@ -404,9 +405,15 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
         index = {lab: j for j, lab in enumerate(labels)}
         for b, body in enumerate(phase.rigid_bodies):
             bb = f"phases.{ip}.rigid_bodies.{b}"
+            # a Z body's internals free in the model are the body's own DOFs
+            # too (WP-1814): the body arm refines them, so the comparison is
+            # the flexible body against the released atoms
+            internals = [f"{bb}.zmatrix.{k}.{name}"
+                         for k, line in enumerate(body.zmatrix)
+                         for name, p in line.internals() if p.vary]
             _, res_a, _ = _fit(ref, base.model_copy(deep=True), data,
                                [*free, f"{bb}.origin.dof.*", f"{bb}.rotation.*",
-                                f"{bb}.torsions.*.twist"], max_iter)
+                                f"{bb}.torsions.*.twist", *internals], max_iter)
             if on_arm is not None:
                 on_arm(body.name, "body", res_a)
             # the released arm: same model, this body's heavy atoms freed and

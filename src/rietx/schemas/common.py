@@ -717,6 +717,13 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-1814): ``RigidBody.zmatrix``, a list of ``ZLine`` (an atom
+#: label or ``None`` for a dummy, its reference lines and its ``r``, ``angle``
+#: and ``dihedral`` as refinable ``Parameter``s), and ``RigidBody.zmatrix_origin``
+#: (c₀, the Z-frame point the template is measured from).  Additive and
+#: defaulted to an empty list and the Z-frame origin, the 0.25 → 0.26 rule, so
+#: every stored body loads as the constant template it was; an older build
+#: refuses a body carrying either key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -4222,7 +4222,7 @@ class Refinement:
                    f": placed by rigid bodies {', '.join(map(repr, names))}")
                 + f"; hold {'the' if len(owners) == 1 else 'each'} body's own "
                 "origin, rotation and torsions instead "
-                f"({', '.join(_body_dof_globs(b) for b in owners)})")
+                f"({', '.join(_body_dof_globs(b, table) for b in owners)})")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []
@@ -5108,6 +5108,8 @@ class Refinement:
         # caller's holds and ties and the mode's force-fix have all settled
         # the free set and before anything is written (WP-1805, answer (c))
         table.refuse_partial_turns()
+        # and a free Z-matrix internal the construction cannot carry (WP-1814)
+        table.refuse_free_internals()
         seeded: dict[str, float] = {}
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
@@ -8683,7 +8685,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         if reaches and f"{site}.x" in owned:
             why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
             fix = ("Free the body's own origin, rotation and torsions instead "
-                   f"({_body_dof_globs(owned_bases[f'{site}.x'])}).")
+                   f"({_body_dof_globs(owned_bases[f'{site}.x'], table)}).")
         elif (reaches and not dofs
               and all(e is not None and e.locked for e in coords)):
             why = (f" Every coordinate of {site} is fixed by its site symmetry, "
@@ -12008,11 +12010,14 @@ def _rigid_body_unsupported(table: ParameterTable,
         for bbase, paths in blind.items()]
 
 
-def _body_dof_globs(bbase: str) -> str:
+def _body_dof_globs(bbase: str, table: ParameterTable | None = None) -> str:
     """One body's own DOFs as the globs advice names, for the body at ``bbase``
-    alone rather than every body in every phase (WP-1951's follow-up)."""
+    alone rather than every body in every phase (WP-1951's follow-up); with
+    ``table``, a Z body's internals too (WP-1814)."""
+    zmatrix = (f", {bbase}.zmatrix.*"
+               if table is not None and table.body_has_zmatrix(bbase) else "")
     return (f"{bbase}.origin.dof.*, {bbase}.rotation.*, "
-            f"{bbase}.torsions.*.twist")
+            f"{bbase}.torsions.*.twist{zmatrix}")
 
 
 def _unsupported_body_advice(table: ParameterTable, bbase: str,

@@ -8,6 +8,9 @@ The schema is ``schemas.structure.RigidBody`` and the refinement map is
   moves nothing (the table decodes them back to < 1e-12);
 * :func:`add_body` — a template (a ``Fragment`` from ``fragments.from_zmatrix``,
   or Cartesian points) placed at an origin and orientation as **new** atoms;
+* :func:`zmatrix_body_from_atoms` — a body over placed atoms whose template is
+  a Z-matrix along a declared spanning tree, so its bond lengths, angles and
+  dihedrals refine (WP-1814);
 * :func:`place_body_atoms` — rewrite every body atom from its body, after a
   caller moved a body's origin or orientation by hand;
 * :func:`body_fractional` — where a body puts its atoms, without a table.
@@ -32,7 +35,15 @@ from collections.abc import Sequence
 import numpy as np
 
 from ..schemas.common import Parameter
-from ..schemas.structure import Atom, BodyOrigin, BodyTorsion, Phase, RigidBody
+from ..schemas.structure import (
+    Atom,
+    BodyOrigin,
+    BodyTorsion,
+    Phase,
+    RigidBody,
+    ZLine,
+    zmatrix_template,
+)
 from . import rotation
 
 
@@ -105,16 +116,149 @@ def body_from_atoms(phase: Phase, labels: Sequence[str], name: str, *,
         rotation_vary=rotation_vary)
 
 
+def _internals(a, b, c, d) -> tuple[float, float, float]:
+    """(r, angle, dihedral) that place ``a`` from ``b``, ``c``, ``d`` (Cartesian Å).
+
+    The inverse of ``fragments._place``: with û = (b − c)/|b − c| and p̂ the
+    unit part of d − c perpendicular to û, w = a − b has angle
+    atan2(|w⊥|, −w·û) and dihedral atan2(w⊥·(û × p̂), w⊥·p̂), so placing from
+    them returns ``a`` to rounding whatever the frame.  ``d`` is ``None`` for
+    line 2, which ``zmatrix_points`` places in its reference half-plane.
+    """
+    w = a - b
+    r = float(np.linalg.norm(w))
+    u = (b - c) / np.linalg.norm(b - c)
+    along = float(w @ u)
+    perp = w - along * u
+    angle = float(np.degrees(np.arctan2(np.linalg.norm(perp), -along)))
+    if d is None:
+        return r, angle, 0.0
+    p = d - c
+    p = p - (p @ u) * u
+    p = p / np.linalg.norm(p)
+    dihedral = float(np.degrees(np.arctan2(perp @ np.cross(u, p), perp @ p)))
+    return r, angle, dihedral
+
+
+def zmatrix_body_from_atoms(phase: Phase, labels: Sequence[str], name: str, *,
+                            tree: Sequence[tuple[str, str]],
+                            origin: str | None = None) -> RigidBody:
+    """A Z-matrix body over atoms ``phase`` already holds, placed where they are (WP-1814).
+
+    ``tree`` declares the spanning tree the Z-matrix follows, as bonds (pairs
+    of labels) joining every atom of ``labels`` exactly once: it is never
+    perceived from distances, since which bonds a ring's tree leaves out
+    decides what a refined internal moves (a free tree bond in a ring moves
+    the closure bond too).  The Z-matrix is rooted at ``origin`` (an atom of
+    ``labels``) or at ``labels[0]``, and lists the atoms breadth-first from
+    there, which is the body's atom order: each atom is placed from its tree
+    parent (b), b's parent or an earlier neighbour (c), and the first earlier
+    atom that makes b, c, d non-collinear (d).  Its internals are read off
+    the atoms, every one held (``vary=False``).
+
+    c₀ is the Z-frame centroid with ``origin=None``, and the body's origin
+    the atoms' centroid; with ``origin`` it is that atom, which sits at the
+    Z-matrix's line 0, so no internal moves it.  R₀ is the proper rotation
+    taking Z(ζ₀) − c₀ onto the atoms (Kabsch 1976, *Acta Cryst.* A32, 922).
+    A molecule with a collinear stretch that no earlier atom opens is refused
+    by the Z-matrix (place it from a dummy, by writing the lines by hand).
+    """
+    by_label = {a.label: a for a in phase.atoms}
+    labels = list(dict.fromkeys(labels))
+    missing = [lab for lab in labels if lab not in by_label]
+    if missing:
+        raise ValueError(f"phase {phase.name!r} has no atom(s) {missing}")
+    root = labels[0] if origin is None else origin
+    if root not in labels:
+        raise ValueError(f"zmatrix_body_from_atoms {name!r}: origin {root!r} is not in labels")
+    neigh: dict[str, list[str]] = {lab: [] for lab in labels}
+    for pair in tree:
+        i, j = pair
+        if i not in neigh or j not in neigh or i == j:
+            raise ValueError(f"zmatrix_body_from_atoms {name!r}: tree bond {tuple(pair)} "
+                             "must join two different atoms of labels")
+        neigh[i].append(j)
+        neigh[j].append(i)
+    order, parent = [root], {root: None}
+    for lab in order:
+        for nb in neigh[lab]:
+            if nb not in parent:
+                parent[nb] = lab
+                order.append(nb)
+    if len(tree) != len(labels) - 1 or len(order) != len(labels):
+        raise ValueError(
+            f"zmatrix_body_from_atoms {name!r}: the tree's {len(tree)} bonds must "
+            f"join all {len(labels)} atoms without a cycle (a spanning tree has "
+            f"{len(labels) - 1}); it reaches {len(order)}")
+    m, _ = _frames(phase.cell.lengths_angles())
+    xyz = {lab: m @ np.array([by_label[lab].x.value, by_label[lab].y.value,
+                              by_label[lab].z.value]) for lab in order}
+    line = {lab: i for i, lab in enumerate(order)}
+    from .fragments import COLLINEAR_TOL, _collinear_sine
+
+    zm = []
+    for i, lab in enumerate(order):
+        if i == 0:
+            zm.append(ZLine(atom=lab))
+            continue
+        b = parent[lab]
+        if i == 1:
+            r = float(np.linalg.norm(xyz[lab] - xyz[b]))
+            zm.append(ZLine(atom=lab, b=0, r=Parameter(value=r)))
+            continue
+        earlier = order[:i]
+        c = parent[b] if parent[b] is not None else next(
+            x for x in earlier if x != b)
+        if i == 2:
+            r, angle, _ = _internals(xyz[lab], xyz[b], xyz[c], None)
+            zm.append(ZLine(atom=lab, b=line[b], c=line[c], r=Parameter(value=r),
+                            angle=Parameter(value=angle)))
+            continue
+        pool = [x for x in (parent[c], *neigh[b], *earlier)
+                if x is not None and x in line and line[x] < i and x not in (b, c)]
+        d = next((x for x in pool if _collinear_sine(xyz[b], xyz[c], xyz[x])
+                  >= COLLINEAR_TOL), pool[0])
+        r, angle, dihedral = _internals(xyz[lab], xyz[b], xyz[c], xyz[d])
+        zm.append(ZLine(atom=lab, b=line[b], c=line[c], d=line[d],
+                        r=Parameter(value=r), angle=Parameter(value=angle),
+                        dihedral=Parameter(value=dihedral)))
+    z = np.asarray(zmatrix_template(zm, (0.0, 0.0, 0.0)), dtype=np.float64)
+    x = np.array([xyz[lab] for lab in order])
+    c0 = z.mean(axis=0) if origin is None else z[0]
+    centre = x.mean(axis=0) if origin is None else x[0]
+    # Kabsch: the proper rotation R minimising Σ|R·(zᵢ − c₀) − (xᵢ − x̄)|²
+    h = (z - c0).T @ (x - centre)
+    u, _, vt = np.linalg.svd(h)
+    flip = np.diag([1.0, 1.0, float(np.sign(np.linalg.det(vt.T @ u.T)))])
+    rot = vt.T @ flip @ u.T
+    q = rotation.canonical_quaternion(rotation.quaternion_from_matrix(rot))
+    frac_centre = np.linalg.solve(m, centre)
+    return RigidBody(
+        name=name, atoms=list(order),
+        template=[tuple(float(v) for v in t) for t in z - c0],
+        origin=BodyOrigin(**{c: Parameter(value=float(v))
+                             for c, v in zip("xyz", frac_centre, strict=True)}),
+        orientation=tuple(float(v) for v in np.asarray(q)),
+        zmatrix=zm, zmatrix_origin=tuple(float(v) for v in c0))
+
+
 def add_body(phase: Phase, name: str, labels: Sequence[str],
              species: Sequence[str], template, origin, *,
              orientation=(1.0, 0.0, 0.0, 0.0), biso: float = 1.0,
              occ: float = 1.0, centre: bool = True, rotation_vary: bool = False,
-             origin_vary: bool = False, torsions: Sequence[BodyTorsion] = ()) -> Phase:
+             origin_vary: bool = False, torsions: Sequence[BodyTorsion] = (),
+             zmatrix: Sequence[ZLine] | None = None) -> Phase:
     """A copy of ``phase`` with a body's atoms appended and the body declared.
 
     ``template`` is (n, 3) Cartesian Å, or a ``fragments.Fragment`` (its
     ``xyz``); with ``centre`` it is shifted to its centroid first, so ``origin``
-    (fractional) is where the body's centroid goes.  On a special position the
+    (fractional) is where the body's centroid goes.
+
+    **With ``zmatrix``** (WP-1814; ``template=None``) the template is the
+    Z-matrix's, Z(ζ) − c₀, and its internals refine: each line's ``atom`` is
+    the label in ``labels`` (``None`` for a dummy).  c₀
+    (``RigidBody.zmatrix_origin``) is frozen here: the Z-frame centroid of the
+    atoms with ``centre``, the Z-matrix's own origin (line 0) without.  On a special position the
     centroid is first projected onto the site's fixed space, so the shift
     commutes with the site operations and a template typed to three decimals
     keeps the miss ``RIGID_BODY_INVARIANCE_TOL`` bounds.  ``orientation`` is a unit
@@ -129,13 +273,22 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
     misses.  It then keeps the first listed point of each image set — the
     space group places the others — and warns naming the labels it dropped.
     """
-    pts = np.asarray(getattr(template, "xyz", template), dtype=np.float64)
+    c0 = np.zeros(3)
+    if zmatrix is not None:
+        if template is not None:
+            raise ValueError(f"add_body {name!r}: pass template=None with zmatrix; "
+                             "the Z-matrix is the template")
+        zmatrix = [ZLine.model_validate(z) for z in zmatrix]
+        pts = np.asarray(zmatrix_template(zmatrix, (0.0, 0.0, 0.0)), dtype=np.float64)
+    else:
+        pts = np.asarray(getattr(template, "xyz", template), dtype=np.float64)
     if pts.shape != (len(labels), 3) or len(species) != len(labels):
         raise ValueError(
             f"add_body {name!r}: {len(labels)} labels, {len(species)} species "
             f"and a template of shape {pts.shape} do not agree")
     if centre:
-        pts = pts - _site_fixed_part(phase, origin, pts.mean(axis=0))
+        c0 = _site_fixed_part(phase, origin, pts.mean(axis=0))
+        pts = pts - c0
     q = rotation.canonical_quaternion(np.asarray(orientation, dtype=np.float64)
                                       / np.linalg.norm(orientation))
     body = RigidBody(
@@ -144,7 +297,9 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
         origin=BodyOrigin(**{c: Parameter(value=float(v), vary=origin_vary)
                              for c, v in zip("xyz", origin, strict=True)}),
         orientation=tuple(float(v) for v in np.asarray(q)),
-        rotation_vary=rotation_vary, torsions=list(torsions))
+        rotation_vary=rotation_vary, torsions=list(torsions),
+        zmatrix=list(zmatrix or []),
+        zmatrix_origin=tuple(float(v) for v in c0) if zmatrix else (0.0, 0.0, 0.0))
     frac = body_fractional(body, phase.cell.lengths_angles())
     keep = _site_representatives(phase, name, labels, species, body, frac)
     if len(keep) < len(labels):
@@ -165,8 +320,14 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
         labels = [labels[k] for k in keep]
         species = [species[k] for k in keep]
         frac = frac[keep]
-        body = body.model_copy(update={
-            "atoms": list(labels), "template": [body.template[k] for k in keep]})
+        # a Z-matrix keeps every line: a dropped atom's line becomes a dummy,
+        # placed where the image is and still a reference for later lines
+        lines = [z.model_copy(update={"atom": z.atom if z.atom in labels else None})
+                 for z in body.zmatrix]
+        body = RigidBody.model_validate({
+            **body.model_dump(), "atoms": list(labels),
+            "template": [body.template[k] for k in keep],
+            "zmatrix": [z.model_dump() for z in lines]})
     atoms = list(phase.atoms) + [
         Atom(label=lab, species=sp, x=Parameter(value=float(f[0])),
              y=Parameter(value=float(f[1])), z=Parameter(value=float(f[2])),
@@ -245,11 +406,17 @@ def _site_representatives(phase: Phase, name: str, labels, species, body,
 
 
 def place_body_atoms(phase: Phase) -> Phase:
-    """A copy of ``phase`` with every body atom rewritten from its body."""
+    """A copy of ``phase`` with every body atom rewritten from its body.
+
+    A Z body's template is rewritten from its Z-matrix first (WP-1814), so an
+    internal edited by hand reaches the atoms too.
+    """
     out = phase.model_copy(deep=True)
     cell = out.cell.lengths_angles()
     index = {a.label: a for a in out.atoms}
     for body in out.rigid_bodies:
+        if body.zmatrix:
+            body.template = zmatrix_template(body.zmatrix, body.zmatrix_origin)
         for lab, f in zip(body.atoms, body_fractional(body, cell), strict=True):
             atom = index[lab]
             atom.x.value, atom.y.value, atom.z.value = (float(v) for v in f)

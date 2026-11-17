@@ -2034,6 +2034,7 @@ class MultiHistogramRefinement:
                 # turn free in two directions of three, in any histogram's table
                 for tab in self.mtable.tables:
                     tab.refuse_partial_turns(joint=True)
+                    tab.refuse_free_internals(joint=True)
                 seeded: dict[str, float] = {}
                 if stage.seed:
                     seeded = dict.fromkeys(

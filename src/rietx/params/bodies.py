@@ -173,6 +173,109 @@ def rotation_axes(template: np.ndarray) -> np.ndarray:
     return np.array(axes.T, dtype=np.float64)
 
 
+class ZMatrixMap:
+    """A body's Z-matrix as its block evaluates it: T(ζ) = Z(ζ) − c₀ (WP-1814).
+
+    Placement and its exact tangent are ``fragments.zmatrix_points`` (per Å
+    for r, per degree for an angle or a dihedral); this holds what the block
+    needs besides the values: each line's references, which lines are the
+    body's atoms (``keep``, in ``RigidBody.atoms`` order; the rest are
+    dummies), c₀, and the internal columns in the tangent's order, each as
+    (line, name).  The values themselves are block inputs, so a stage that
+    refines them hands them in on every call.
+    """
+
+    def __init__(self, refs, keep, c0, names, anchor_values):
+        from ..crystallography.fragments import COLLINEAR_TOL, _collinear_sine, zmatrix_points
+        from ..schemas.structure import ZLINE_INTERNALS
+
+        self.refs = [tuple(int(k) for k in r) for r in refs]
+        self.keep = np.asarray(keep, dtype=np.intp)
+        self.c0 = np.asarray(c0, dtype=np.float64).reshape(3)
+        self.names = list(names)
+        #: (line, internal name) per column, the order of ``zmatrix_points``' ζ
+        self.columns = [(i, n) for i in range(len(self.refs))
+                        for n in ZLINE_INTERNALS[:min(i, 3)]]
+        pos = zmatrix_points(self.refs, anchor_values, names=self.names)
+        #: lines placed on the b–c line over a collinear b, c, d (angle 0° or
+        #: 180°): the traced twin takes ``zmatrix_points``' on-line formula
+        #: there, read at the anchor (a stage cannot open such a triple: the
+        #: angle that would is refused, ``ParameterTable.refuse_free_internals``)
+        self.on_line = frozenset(
+            i for i, ref in enumerate(self.refs) if i >= 3
+            and _collinear_sine(pos[ref[0]], pos[ref[1]], pos[ref[2]]) < COLLINEAR_TOL)
+
+    def _values(self, zeta) -> list[tuple]:
+        out, col = [], 0
+        for i in range(len(self.refs)):
+            w = min(i, 3)
+            out.append(tuple(zeta[col:col + w]))
+            col += w
+        return out
+
+    def points(self, zeta, *, tangents: bool = False):
+        """T(ζ) over the atoms (n, 3); with ``tangents`` also ∂T/∂ζ (m, n, 3)."""
+        from ..crystallography.fragments import zmatrix_points
+
+        vals = self._values([float(v) for v in zeta])
+        if not tangents:
+            return zmatrix_points(self.refs, vals, names=self.names)[self.keep] - self.c0
+        pos, tan = zmatrix_points(self.refs, vals, tangents=True, names=self.names)
+        return pos[self.keep] - self.c0, tan[:, self.keep]
+
+    def reach(self) -> list[frozenset[int]]:
+        """Per column, the member atoms (indices into ``keep``) its internal can
+        move: ``fragments.zmatrix_reach`` over the references, dummies dropped."""
+        from ..crystallography.fragments import zmatrix_reach
+
+        member = {int(line): j for j, line in enumerate(self.keep)}
+        lines = zmatrix_reach(self.refs)
+        return [frozenset(member[k] for k in lines[i] if k in member)
+                for i, _ in self.columns]
+
+    def points_traced(self, zeta) -> list:
+        """T(ζ) over the atoms, a list of traced (3,) points: the placement of
+        ``fragments._place`` in ``xp`` ops (the traced twin, M28)."""
+        xp = get_backend()
+        vals = self._values(list(zeta))
+        ex = xp.asarray(np.array([1.0, 0.0, 0.0]), dtype=np.float64)
+        ez = xp.asarray(np.array([0.0, 0.0, 1.0]), dtype=np.float64)
+
+        def unit(v):
+            return v / xp.sqrt(xp.sum(v * v))
+
+        def cross(a, b):
+            return xp.stack([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                             a[0] * b[1] - a[1] * b[0]])
+
+        pos = []
+        for i, ref in enumerate(self.refs):
+            if i == 0:
+                pos.append(ez * 0.0)
+                continue
+            r = vals[i][0]
+            if i == 1:
+                pos.append(ez * r)
+                continue
+            b, c = pos[ref[0]], pos[ref[1]]
+            u = unit(b - c)
+            th = xp.radians(vals[i][1])
+            if i in self.on_line:
+                pos.append(b - u * (r * xp.cos(th)))
+                continue
+            d = c + ex if i == 2 else pos[ref[2]]
+            p = d - c
+            p = unit(p - u * xp.sum(p * u))
+            if i == 2:
+                arm = p
+            else:
+                ph = xp.radians(vals[i][2])
+                arm = p * xp.cos(ph) + cross(u, p) * xp.sin(ph)
+            pos.append(b + (u * (-xp.cos(th)) + arm * xp.sin(th)) * r)
+        c0 = xp.asarray(self.c0, dtype=np.float64)
+        return [pos[int(i)] - c0 for i in self.keep]
+
+
 class RigidBodyBlock(DerivedBlock):
     """x_i = o + M⁻¹·Exp(δω)·R₀·T_i for one body; see the module docstring."""
 
@@ -181,8 +284,10 @@ class RigidBodyBlock(DerivedBlock):
 
     def __init__(self, *, phase_base: str, body_base: str, atom_bases: list[str],
                  template: np.ndarray, q0, torsions=(), angles=(), names=(),
-                 site_axes=None, site_reach: float = 0.0, labels=()):
+                 site_axes=None, site_reach: float = 0.0, labels=(), zmatrix=None):
         self.template = np.asarray(template, dtype=np.float64)
+        #: the Z-matrix (WP-1814): ``None``, or a :class:`ZMatrixMap`
+        self.zmatrix = zmatrix
         #: the template-frame axes the rotation DOFs turn about, (3, k)
         self.body_axes = rotation_axes(self.template)
         #: W, the Cartesian axial directions the origin's site allows, (3, d)
@@ -210,6 +315,7 @@ class RigidBodyBlock(DerivedBlock):
             *(f"{body_base}.origin.{c}" for c in "xyz"),
             *self.rotation_paths(body_base),
             *self.twist_paths(body_base),
+            *self.zmatrix_paths(body_base),
         )
         self.outputs = tuple(f"{a}.{c}" for a in atom_bases for c in "xyz")
         self.frame_inputs = self.inputs[:self.N_CELL]
@@ -247,6 +353,16 @@ class RigidBodyBlock(DerivedBlock):
 
     def twist_paths(self, body_base: str) -> tuple[str, ...]:
         return tuple(f"{body_base}.torsions.{t}.twist" for t in range(len(self.torsions)))
+
+    def zmatrix_paths(self, body_base: str) -> tuple[str, ...]:
+        """The Z-matrix internals' paths, in the tangent's column order (WP-1814)."""
+        if self.zmatrix is None:
+            return ()
+        return tuple(f"{body_base}.zmatrix.{i}.{name}" for i, name in self.zmatrix.columns)
+
+    @property
+    def _n_twist(self) -> int:
+        return len(self.torsions)
 
     @property
     def n_rot(self) -> int:
@@ -330,16 +446,33 @@ class RigidBodyBlock(DerivedBlock):
     # -- the template after its torsions (WP-1808) ------------------------
     def _angles(self, x: np.ndarray) -> np.ndarray:
         """φ₀ + δφ (degrees), the torsions' angles at inputs ``x``."""
-        return self.phi0 + np.asarray(x, dtype=np.float64)[9 + self.n_rot:]
+        k = 9 + self.n_rot
+        return self.phi0 + np.asarray(x, dtype=np.float64)[k:k + self._n_twist]
+
+    def _zeta(self, x) -> list:
+        """The Z-matrix internals at inputs ``x`` (the inputs after the twists)."""
+        return list(x)[9 + self.n_rot + self._n_twist:]
+
+    def _template(self, x: np.ndarray) -> np.ndarray:
+        """T(ζ) = Z(ζ) − c₀, the template before the torsions (WP-1814), numpy."""
+        if self.zmatrix is None:
+            return self.template
+        return self.zmatrix.points(self._zeta(np.asarray(x, dtype=np.float64)))
 
     def body_points(self, x: np.ndarray) -> np.ndarray:
         """The template in the body frame, before the pose (n, 3), numpy."""
+        template = self._template(x)
         if not self.torsions:
-            return self.template
-        return apply_torsions(self.template, self.torsions, self._angles(x))
+            return template
+        return apply_torsions(template, self.torsions, self._angles(x))
 
     def body_tangents(self, x: np.ndarray) -> np.ndarray:
-        """∂(body points)/∂(twist, per degree), (n_torsion, n, 3).
+        """∂(body points)/∂(twist, per degree; then each internal), (k + m, n, 3).
+
+        With a Z-matrix (WP-1814) the m internals' columns follow the twists':
+        seeded with ∂T/∂ζ (``fragments.zmatrix_points``, per Å and per degree)
+        and carried through the torsions by the same loop, so a torsion whose
+        axis an internal moves turns that internal's motion with it.
 
         Forward-mode tangent propagation through the torsions in order: each
         carries every tangent through its own rotation, including the motion of
@@ -355,8 +488,13 @@ class RigidBodyBlock(DerivedBlock):
         tangent is the same per degree of twist as per degree of angle.
         """
         k = len(self.torsions)
-        pts = np.array(self.template, dtype=np.float64)
-        tan = np.zeros((k, len(pts), 3), dtype=np.float64)
+        if self.zmatrix is None:
+            pts = np.array(self.template, dtype=np.float64)
+            tan = np.zeros((k, len(pts), 3), dtype=np.float64)
+        else:
+            pts, ztan = self.zmatrix.points(
+                self._zeta(np.asarray(x, dtype=np.float64)), tangents=True)
+            tan = np.concatenate([np.zeros((k, len(pts), 3)), ztan])
         for j, ((ia, ib, moves), ang) in enumerate(
                 zip(self.torsions, self._angles(x), strict=True)):
             a, b = pts[ia].copy(), pts[ib].copy()
@@ -367,7 +505,7 @@ class RigidBodyBlock(DerivedBlock):
             c, s = np.cos(phi), np.sin(phi)
             d = pts[moves] - a                                   # (m, 3)
             ud = d @ u                                           # (m,)
-            for t in range(k):
+            for t in range(len(tan)):
                 da, db = tan[t, ia].copy(), tan[t, ib].copy()
                 du = (db - da - u * ((db - da) @ u)) / length
                 dd = tan[t, moves] - da
@@ -383,8 +521,12 @@ class RigidBodyBlock(DerivedBlock):
 
     def body_points_traced(self, x):
         xp = get_backend()
-        pts = [xp.asarray(t) for t in self.template]
-        twists = list(x)[9 + self.n_rot:]
+        if self.zmatrix is None:
+            pts = [xp.asarray(t) for t in self.template]
+        else:
+            pts = self.zmatrix.points_traced(self._zeta(x))
+        k = 9 + self.n_rot
+        twists = list(x)[k:k + self._n_twist]
         for (ia, ib, moves), phi0, dphi in zip(self.torsions, self.phi0, twists,
                                                strict=True):
             a = pts[ia]
@@ -462,13 +604,19 @@ class RigidBodyBlock(DerivedBlock):
         pattern = np.zeros((len(self.outputs), len(self.inputs)), dtype=bool)
         k = 9 + self.n_rot
         pattern[:, :k] = True
-        dep = np.zeros((len(self.torsions), len(self.template)), dtype=bool)
+        n_tw = len(self.torsions)
+        z_reach = [] if self.zmatrix is None else self.zmatrix.reach()
+        dep = np.zeros((n_tw + len(z_reach), len(self.template)), dtype=bool)
+        for c, atoms in enumerate(z_reach):
+            dep[n_tw + c, list(atoms)] = True
         for j, (ia, ib, moves) in enumerate(self.torsions):
             dep[j, moves] = True
-            for t in range(j):
+            # a column that moved the axis turns the moved atoms with it: the
+            # earlier twists, and every internal (seeded before any torsion)
+            for t in (*range(j), *range(n_tw, len(dep))):
                 if dep[t, ia] or dep[t, ib]:
                     dep[t, moves] = True
-        for t in range(len(self.torsions)):
+        for t in range(len(dep)):
             for i in np.flatnonzero(dep[t]):
                 pattern[3 * i:3 * i + 3, k + t] = True
         return pattern
