@@ -33,6 +33,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to choose the next parameter to free](next.md) reads `Refinement.suggest` and measures the move with `compare_freed`.
 - [How to branch a refinement, compare the branches and roll back](branch.md) uses `Refinement.branch`, `RefinementTree.compare` and `Refinement.checkout`.
 - [How to watch or stop a running fit](watch.md) uses `rietx watch`, a cancel token, and the switches that turn recording off.
+- [How to embed rietx in an application](embed.md) chooses where runs go for a whole process, freezes rietx with PyInstaller and sets the kernel threads.
 
 ## Results
 
@@ -79,6 +80,7 @@ Run a plan one stage at a time <stage>
 Choose the next parameter to free <next>
 Branch a refinement, compare the branches and roll back <branch>
 Watch or stop a running fit <watch>
+Embed rietx in an application <embed>
 Find the weight fraction of each phase in a mixture <qpa>
 Quote lattice parameters with their esds <cell>
 Quote a parameter that ended on its bound <interval>

@@ -207,11 +207,13 @@ A fit given `telemetry=` records into the directory it names instead.
 The generated table above gives what each file holds.
 The `.gitignore` holds `*`, so runs stay out of `git status`.
 rietx writes it only into a runs root it chose itself, and leaves a directory named with `telemetry=` alone.
+A directory named for the whole process by `RIETX_RUNS_DIR` or `rietx.runs.set_root` counts as one rietx chose, so it gets the `.gitignore` and the retention below.
 
 Two directories are spelled `.rietx`, and they have nothing to do with each other.
 `$HOME/.rietx` holds the GUI's per-user state: the recent list and the theme.
 `--state-dir` or `RIETX_STATE_DIR` moves it.
-The runs root is relative to the working directory, and no environment variable moves it.
+The runs root is relative to the working directory unless `RIETX_RUNS_DIR` or `rietx.runs.set_root` names one for the whole process ({ref}`guide-embed`).
+`RIETX_STATE_DIR` does not move it.
 A fit run inside somebody else's package leaves `.rietx/` in their working directory, and `RIETX_TELEMETRY=0` is how a process declines.
 
 ### Retention

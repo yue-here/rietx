@@ -274,6 +274,7 @@ Prelog
 PtGeSe
 [pP]x
 [pP]ydantic
+PyInstaller
 [pP]yridine
 [pP]yroelectric
 [pP]ytest
