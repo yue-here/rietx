@@ -62,14 +62,50 @@ vec3 fog(vec3 col, float z) {
 }`;
 
 /** Shading shared by every solid: one key light up and to the left of the
- *  screen, fixed to the camera, so the lit side follows every rotation. */
+ *  screen, fixed to the camera, so the lit side follows every rotation.
+ *  `ao` is the unoccluded share of the ambient light (WP-1538 D3), 1 with
+ *  ambient occlusion off; the key light keeps its own term. */
 const SHADE = `
 ${LIGHT}
-vec3 shade(vec3 base, vec3 n) {
+vec3 shade(vec3 base, vec3 n, float ao) {
   vec3 l = normalize(LIGHT);
   float diffuse = max(dot(n, l), 0.0);
   float spec = pow(max(dot(reflect(-l, n), vec3(0.0, 0.0, 1.0)), 0.0), ${f(LOOK.shininess)});
-  return base * (${f(LOOK.ambient)} + ${f(LOOK.diffuse)} * diffuse) + ${f(LOOK.specular)} * spec;
+  return base * (${f(LOOK.ambient)} * ao + ${f(LOOK.diffuse)} * diffuse) + ${f(LOOK.specular)} * spec;
+}`;
+
+/** Ambient occlusion (WP-1538), `raster.occlusion` in GLSL: the fragment's
+ *  point and normal taken back to the structure's frame about the scene's
+ *  centre, and each direction above its tangent plane weighed by its cosine
+ *  and counted where its depth toward that light, plus the bias, is no nearer
+ *  the light than the map's texel.  A map stores the depth pass's
+ *  `0.5 − z/(2·reach)`, 1 where nothing is; its texel row 0 is the bottom, so
+ *  `t` counts up where Python's row counts down, to the same texel.
+ *  `uShadow` turns the solids' shaders into that depth pass. */
+const OCCLUSION = `
+uniform float uOcclusion; uniform float uShadow; uniform float uReach; uniform float uBias;
+uniform highp sampler2DArray uMaps;
+uniform vec3 uDirs[${LOOK.occlusion_directions}];
+uniform mat3 uR; uniform vec3 uCenter; uniform vec2 uPan;
+float occlusion(vec3 view, vec3 nView) {
+  if (uOcclusion <= 0.0) return 1.0;
+  vec3 rel = transpose(uR) * vec3(view.xy + uPan, view.z);
+  vec3 n = transpose(uR) * nView;
+  int size = textureSize(uMaps, 0).x;
+  float lit = 0.0, total = 0.0;
+  for (int k = 0; k < ${LOOK.occlusion_directions}; k++) {
+    vec3 d = uDirs[k];
+    float w = max(dot(n, d), 0.0);
+    if (w <= 0.0) continue;
+    vec3 u = normalize(cross(abs(d.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0), d));
+    vec3 v = cross(d, u);
+    vec2 st = vec2(dot(u, rel), dot(v, rel)) / (2.0 * uReach) + 0.5;
+    ivec2 t = clamp(ivec2(floor(st * float(size))), ivec2(0), ivec2(size - 1));
+    float occluder = (0.5 - texelFetch(uMaps, ivec3(t, k), 0).r) * 2.0 * uReach;
+    total += w;
+    if (!(dot(d, rel) + uBias < occluder)) lit += w;
+  }
+  return total > 0.0 ? lit / total : 1.0;
 }`;
 
 const ATOM_VS = `#version 300 es
@@ -103,6 +139,7 @@ flat in vec3 vC; flat in mat3 vMinv; flat in vec4 vColor;
 uniform float uDepth;
 ${SHADE}
 ${FOG}
+${OCCLUSION}
 out vec4 frag;
 void main() {
   // the ray (x, y, z) with z free is u = q + s·e in the unit-sphere frame
@@ -110,6 +147,13 @@ void main() {
   vec3 e = vMinv[2];
   float a = dot(e, e), b = dot(q, e), cc = dot(q, q) - 1.0;
   float disc = b * b - a * cc;
+  if (uShadow > 0.5) {
+    // the depth pass: the texel centre's own hit, as raster.id_plane tests it
+    if (disc < 0.0) discard;
+    gl_FragDepth = clamp(0.5 - (vC.z + (-b + sqrt(disc)) / a) / (2.0 * uDepth), 0.0, 1.0);
+    frag = vec4(0.0);
+    return;
+  }
   float w = max(fwidth(disc), 1e-12);
   float coverage = clamp(0.5 + disc / w, 0.0, 1.0);
   if (coverage <= 0.0) discard;
@@ -118,7 +162,7 @@ void main() {
   vec3 n = normalize(transpose(vMinv) * u);
   float z = vC.z + s;
   gl_FragDepth = clamp(0.5 - z / (2.0 * uDepth), 0.0, 1.0);
-  vec3 col = shade(vColor.rgb, n);
+  vec3 col = shade(vColor.rgb, n, occlusion(vec3(vXY, z), n));
   if (vColor.a > 0.5) {
     // the three principal ellipses: T's columns are the principal axes, so a
     // ring is one unit-frame coordinate near zero; the ink is darker on a
@@ -159,6 +203,7 @@ flat in vec3 vA; flat in vec3 vB; flat in vec3 vColor; flat in float vR;
 uniform float uDepth;
 ${SHADE}
 ${FOG}
+${OCCLUSION}
 out vec4 frag;
 void main() {
   // The ray (x, y, z) with z free, against the finite cylinder A-B, open at
@@ -176,6 +221,15 @@ void main() {
   float a = dot(e, e);
   if (a < 1e-9) discard;                     // looking straight down the bond
   float b = dot(q, e), disc = b * b - a * (dot(q, q) - vR * vR);
+  if (uShadow > 0.5) {
+    if (disc < 0.0) discard;
+    float zs = (-b + sqrt(disc)) / a;
+    float at = dot(o, w) + zs * dot(dz, w);
+    if (at < 0.0 || at > len) discard;
+    gl_FragDepth = clamp(0.5 - zs / (2.0 * uDepth), 0.0, 1.0);
+    frag = vec4(0.0);
+    return;
+  }
   float fw = max(fwidth(disc), 1e-12);
   float coverage = clamp(0.5 + disc / fw, 0.0, 1.0);
   if (coverage <= 0.0) discard;
@@ -184,7 +238,7 @@ void main() {
   if (along < 0.0 || along > len) discard;
   vec3 n = normalize((q + z * e) / vR);
   gl_FragDepth = clamp(0.5 - z / (2.0 * uDepth), 0.0, 1.0);
-  frag = vec4(fog(shade(vColor, n), z), coverage);
+  frag = vec4(fog(shade(vColor, n, occlusion(vec3(vXY, z), n)), z), coverage);
 }`;
 
 const LINE_VS = `#version 300 es
@@ -286,6 +340,10 @@ export interface Renderer {
   /** fade each surface toward the background with its depth (WP-1548); off
    *  by default, and an export on a transparent background draws without it */
   setDepthCue(on: boolean): void;
+  /** darken each atom and stick by the ambient light its neighbours keep from
+   *  it (WP-1538); off by default.  The depth maps are built once a scene,
+   *  at the first frame that needs them, so a rotation reuses them */
+  setAmbientOcclusion(on: boolean): void;
   /** draw one frame at the canvas's size, on `background` (0..1 RGB) */
   draw(view: View, background: number[]): void;
   /** render once more, offscreen and larger, to a PNG, with the size it came
@@ -311,6 +369,34 @@ const ATOM_LAYOUT: Array<[string, number]> = [
 ];
 const HALF_LAYOUT: Array<[string, number]> = [["aA", 3], ["aB", 3], ["aColor", 3], ["aRadius", 1]];
 const LINE_LAYOUT: Array<[string, number]> = [["aA", 3], ["aB", 3], ["aColor", 3], ["aWidth", 1]];
+
+/** `n` unit vectors spread evenly over the sphere, `raster.occlusion_directions`:
+ *  the Fibonacci lattice, `z = 1 − (2i + 1)/n` and a turn of the golden angle
+ *  `π(3 − √5)` from one to the next. */
+export function occlusionDirections(n: number = LOOK.occlusion_directions): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i < n; i += 1) {
+    const z = 1 - (2 * i + 1) / n;
+    const r = Math.sqrt(1 - z * z);
+    const phi = i * (Math.PI * (3 - Math.sqrt(5)));
+    out.push([r * Math.cos(phi), r * Math.sin(phi), z]);
+  }
+  return out;
+}
+
+/** The rotation looking back along a light from `d`, rows `u`, `v`, `d`:
+ *  `raster._light_basis`, which the occlusion shader rebuilds per direction. */
+export function lightBasis(d: number[]): number[] {
+  const h = Math.abs(d[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1],
+                                               a[2] * b[0] - a[0] * b[2],
+                                               a[0] * b[1] - a[1] * b[0]];
+  let u = cross(h, d);
+  const norm = Math.hypot(u[0], u[1], u[2]);
+  u = u.map((x) => x / norm);
+  const v = cross(d, u);
+  return [...u, ...v, ...d];
+}
 
 /** A row-major 3×3 as the three columns GLSL's `mat3(c0, c1, c2)` wants. */
 function columns(m: number[]): number[] {
@@ -382,6 +468,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   let scene: Scene | null = null;
   let last: { view: View; background: number[] } | null = null;
   let depthCue = false;
+  let ambientOcclusion = false;
+  /** the occlusion maps and the scene they were built from (WP-1538 D5) */
+  let maps: { texture: WebGLTexture; scene: Scene } | null = null;
+  const directions = occlusionDirections().flat();
+  const MAPS_UNIT = 1;
   let lost = false;
 
   function compile(vs: string, fs: string): Program {
@@ -479,6 +570,70 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     batches = null;
   }
 
+  function releaseMaps() {
+    if (maps) context.deleteTexture(maps.texture);
+    maps = null;
+  }
+
+  /**
+   * The scene's depth maps, one a direction, into a depth texture array: the
+   * atoms' and sticks' own shaders with `uShadow` set, looking back along each
+   * light over the square of side `2·depth` round the scene's centre, as
+   * `raster.occlusion_maps` builds them.  Neither the frame nor the faces cast.
+   * Leaves the framebuffer bound as it found it.
+   */
+  function buildMaps() {
+    if (!scene || !programs || !batches) return;
+    releaseMaps();
+    const size = LOOK.occlusion_map_size, n = LOOK.occlusion_directions;
+    const reach = scene.depth;
+    const texture = context.createTexture()!;
+    context.activeTexture(context.TEXTURE0 + MAPS_UNIT);
+    context.bindTexture(context.TEXTURE_2D_ARRAY, texture);
+    context.texStorage3D(context.TEXTURE_2D_ARRAY, 1, context.DEPTH_COMPONENT32F, size, size, n);
+    for (const p of [context.TEXTURE_MIN_FILTER, context.TEXTURE_MAG_FILTER]) {
+      context.texParameteri(context.TEXTURE_2D_ARRAY, p, context.NEAREST);
+    }
+    // never bound to a unit while it is the target, which WebGL refuses
+    context.bindTexture(context.TEXTURE_2D_ARRAY, null);
+    context.activeTexture(context.TEXTURE0);
+    const bound = context.getParameter(context.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const fb = context.createFramebuffer()!;
+    context.bindFramebuffer(context.FRAMEBUFFER, fb);
+    context.drawBuffers([context.NONE]);
+    context.readBuffer(context.NONE);
+    context.viewport(0, 0, size, size);
+    context.enable(context.DEPTH_TEST);
+    context.depthFunc(context.LESS);
+    context.depthMask(true);
+    context.disable(context.BLEND);
+    context.disable(context.SAMPLE_ALPHA_TO_COVERAGE);
+    context.clearDepth(1);
+    const solids = [[programs.atom, batches.atoms], [programs.half, batches.halves]] as const;
+    for (let k = 0; k < n; k += 1) {
+      context.framebufferTextureLayer(context.FRAMEBUFFER, context.DEPTH_ATTACHMENT, texture, 0, k);
+      context.clear(context.DEPTH_BUFFER_BIT);
+      const basis = lightBasis(directions.slice(3 * k, 3 * k + 3));
+      for (const [p, b] of solids) {
+        context.useProgram(p.program);
+        context.uniformMatrix3fv(p.uniforms.uR, false, columns(basis));
+        context.uniform3fv(p.uniforms.uCenter, scene.center);
+        context.uniform2f(p.uniforms.uPan, 0, 0);
+        context.uniform2f(p.uniforms.uScale, 1 / reach, 1 / reach);
+        context.uniform1f(p.uniforms.uDepth, reach);
+        context.uniform1f(p.uniforms.uPad, 2 * reach / size);
+        context.uniform1f(p.uniforms.uShadow, 1);
+        context.uniform1f(p.uniforms.uOcclusion, 0);
+        context.bindVertexArray(b.vao);
+        context.drawArraysInstanced(context.TRIANGLE_STRIP, 0, 4, b.count);
+      }
+    }
+    context.bindVertexArray(null);
+    context.bindFramebuffer(context.FRAMEBUFFER, bound);
+    context.deleteFramebuffer(fb);
+    maps = { texture, scene };
+  }
+
   function upload() {
     release();
     if (!scene || !programs || !corner) return;
@@ -502,8 +657,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     if (!scene || !programs || !batches) return;
     const span = cue ? fogSpan(scene, view.rotation) : null;
     const fogUniform = span ? [span[0], span[1], LOOK.fog_max] : [0, -1, 0];
+    const occlude = ambientOcclusion;
+    if (occlude && maps?.scene !== scene) buildMaps();
     const s = pixelsPerAngstrom(scene, view, cssWidth, cssHeight);
     const pxScale = width / cssWidth;
+    context.activeTexture(context.TEXTURE0 + MAPS_UNIT);
+    context.bindTexture(context.TEXTURE_2D_ARRAY, occlude && maps ? maps.texture : null);
+    context.activeTexture(context.TEXTURE0);
     context.viewport(0, 0, width, height);
     context.clearColor(background[0], background[1], background[2], 1);
     context.clearDepth(1);
@@ -524,6 +684,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       if (p.uniforms.uPad) context.uniform1f(p.uniforms.uPad, 1.5 / (s * pxScale));
       context.uniform3fv(p.uniforms.uFog, fogUniform);
       context.uniform3fv(p.uniforms.uFogColor, background.slice(0, 3));
+      if (p.uniforms.uShadow) {
+        context.uniform1f(p.uniforms.uShadow, 0);
+        context.uniform1f(p.uniforms.uOcclusion, occlude && maps ? 1 : 0);
+        context.uniform1f(p.uniforms.uReach, scene!.depth);
+        context.uniform1f(p.uniforms.uBias, LOOK.occlusion_bias * 2 * scene!.depth);
+        context.uniform3fv(p.uniforms["uDirs[0]"], directions);
+        context.uniform1i(p.uniforms.uMaps, MAPS_UNIT);
+      }
     };
     common(programs.atom);
     context.bindVertexArray(batches.atoms.vao);
@@ -717,6 +885,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   function onRestored() {
     lost = false;
     batches = null;
+    maps = null;
     init();
     upload();
     if (last) draw(last.view, last.background);
@@ -741,6 +910,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     setDepthCue(on: boolean) {
       depthCue = on;
     },
+    setAmbientOcclusion(on: boolean) {
+      ambientOcclusion = on;
+    },
     draw,
     exportPng,
     dispose() {
@@ -748,6 +920,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       canvas.removeEventListener("webglcontextrestored", onRestored);
       if (!lost) {
         release();
+        releaseMaps();
         if (programs) for (const p of Object.values(programs)) context.deleteProgram(p.program);
         if (corner) for (const b of Object.values(corner)) context.deleteBuffer(b);
       }

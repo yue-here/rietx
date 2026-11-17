@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { faceData, instanceData } from "./gl3d";
+import { faceData, instanceData, lightBasis, occlusionDirections } from "./gl3d";
 import {
   CELL_WIDTH_PX,
   EDGE_WIDTH_PX,
@@ -729,6 +729,7 @@ describe("the Python renderer's scene rules", () => {
              opening: number[];
              axis: Array<{ payload: string; axis: number; rotation: number[] }> };
     fog: Array<{ scene: number; rotation: number[]; span: number[] | null }>;
+    occlusion: { directions: number[][]; bases: number[][] };
   };
 
   // the corpus carries twelve significant figures
@@ -761,6 +762,12 @@ describe("the Python renderer's scene rules", () => {
                  STICK_FLOOR: c.STICK_FLOOR, FLAT_AXIS: c.FLAT_AXIS,
                  CELL_WIDTH_PX: c.CELL_WIDTH_PX, EDGE_WIDTH_PX: c.EDGE_WIDTH_PX,
                  POLY_ALPHA: c.POLY_ALPHA, FILL_COLOR: c.FILL_COLOR });
+  });
+
+  it("lights ambient occlusion from the Python copy's directions (WP-1538)", () => {
+    const dirs = occlusionDirections();
+    close(dirs, corpus.occlusion.directions, "occlusion.directions");
+    close(dirs.map(lightBasis), corpus.occlusion.bases, "occlusion.bases");
   });
 
   it("builds every scene the Python copy builds", () => {

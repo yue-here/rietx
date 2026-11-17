@@ -160,9 +160,14 @@ bound on what sticks add. The multishadow number is the WP's to measure.
   `1538-measure/pairs/`, looked at; D4 stands, the faces casting and
   receiving nothing, since no pair shows a face that would read better
   darkened and a cast face would darken its own centre atom).
-- [ ] The GUI: the depth passes and lookup in `gl3d.ts`, the toggle, and a
+- [x] The GUI: the depth passes and lookup in `gl3d.ts`, the toggle, and a
   parity case with occlusion on. Check that rotation stays smooth on the
-  largest corpus scene, since the maps are built once a scene.
+  largest corpus scene, since the maps are built once a scene (2026-11-17:
+  the solids' own shaders write a `DEPTH_COMPONENT32F` texture array under
+  `uShadow`; parity 1.13 levels, and 11.97 levels of darkening on both sides
+  away from the edges; on garnet, 383 atoms, headless chromium's CPU
+  rasteriser drew a rotation frame in 33-42 ms with it off and on alike, and
+  the maps with their first frame in 77-81 ms).
 - [ ] Docs: the `render_structure` docstring and the GUI guide's structure
   section.
 - [ ] Tests + figure pairs to `tests/output/figure3d/`.

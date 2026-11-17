@@ -226,11 +226,12 @@ def test_the_polyhedra_are_painted_and_give_way_to_their_switch(page, tmp_path):
 PARITY_LEVELS = 2.0
 
 
-@pytest.mark.parametrize("case", ["plain", "depth-cued", "planar-rings"])
+@pytest.mark.parametrize("case", ["plain", "depth-cued", "planar-rings", "occluded"])
 def test_the_python_renderer_draws_the_viewers_picture(request, case):
     """WP-1470: one scene and one view drawn by both renderers, and WP-1548's
     depth cue and filled planar rings drawn by both, ticked in the drawer and
-    asked of ``draw``.  The rings are acridine's, NAC closing none.
+    asked of ``draw``.  The rings are acridine's, NAC closing none.  WP-1538's
+    ambient occlusion too: the GUI's depth maps against ``occlusion_maps``.
 
     The Python side takes the GUI's framing (``gui_frame``: its zoom-1 fit
     and centre) and the canvas's clear colour, and the DOM letters are hidden
@@ -244,12 +245,14 @@ def test_the_python_renderer_draws_the_viewers_picture(request, case):
     from rietx.viz.figure3d.render import _png, gui_frame
 
     depth_cue, planar = case == "depth-cued", case == "planar-rings"
+    occluded = case == "occluded"
     page = request.getfixturevalue("acridine_page" if planar else "page")
     cif, aniso = ("cod_2242872.cif", False) if planar else ("cod_1000236.cif", True)
     page.add_style_tag(content=".viewer .letters { display: none; }")
-    if depth_cue or planar:
+    if depth_cue or planar or occluded:
         page.get_by_role("button", name="drawing").click()
-        page.get_by_label("depth cue" if depth_cue else "fill planar rings").check()
+        page.get_by_label("depth cue" if depth_cue else "fill planar rings" if planar
+                          else "ambient occlusion").check()
         # the drawer opened above the canvas and moved it; close it again
         page.get_by_role("button", name="drawing").click()
     _settle(page)
@@ -277,10 +280,13 @@ def test_the_python_renderer_draws_the_viewers_picture(request, case):
         span = sc.fog_span(scene, sc.opening_view())
         shift = float(rotation[2] @ np.asarray(scene["center"]))
         fog = (span[0] + shift, span[1] + shift, sc.LOOK["fog_max"], ground)
-    ours = raster.draw(scene, rotation, frame, supersample=4, background=ground, fog=fog)
+    maps = raster.occlusion_maps(scene) if occluded else None
+    ours = raster.draw(scene, rotation, frame, supersample=4, background=ground, fog=fog,
+                       occlusion=maps)
     out = Path(__file__).parent / "output" / "figure3d"
     out.mkdir(parents=True, exist_ok=True)
-    tag = {"plain": "", "depth-cued": "_cued", "planar-rings": "_rings"}[case]
+    tag = {"plain": "", "depth-cued": "_cued", "planar-rings": "_rings",
+           "occluded": "_occluded"}[case]
     _png(out / f"parity_python{tag}.png", ours, None)
     theirs = np.concatenate([np.round(shown * 255), np.full(shown.shape[:2] + (1,), 255)],
                             axis=-1).astype(np.uint8)
@@ -299,6 +305,34 @@ def test_the_python_renderer_draws_the_viewers_picture(request, case):
         near = float(np.abs(ours[..., :3] / 255 - shown)[ink].mean() * 255)
         far = float(np.abs(plain[..., :3] / 255 - shown)[ink].mean() * 255)
         assert near < 0.5 * far, (near, far)
+    if occluded:
+        # likewise the occlusion, away from the edges the two antialias
+        # differently (where the plain pictures already differ): where it
+        # moved Python's picture the viewer is nearer the occluded picture,
+        # and darkened as much.  Measured 1.5 against 11.6 levels, and 11.97
+        # levels of darkening on both sides (WP-1538)
+        page.get_by_role("button", name="drawing").click()
+        page.get_by_label("ambient occlusion").uncheck()
+        page.get_by_role("button", name="drawing").click()
+        _settle(page)
+        canvas.scroll_into_view_if_needed()
+        box = canvas.bounding_box()
+        bare_png = page.screenshot(clip={"x": round(box["x"]), "y": round(box["y"]),
+                                         "width": width, "height": height})
+        bare_shown = np.asarray(imread(io.BytesIO(bare_png)), dtype=float)[..., :3]
+        plain = raster.draw(scene, rotation, frame, supersample=4, background=ground)
+        plain = plain[..., :3] / 255
+        moved = np.abs(ours[..., :3] / 255 - plain).sum(axis=2) > 0.06
+        moved &= np.abs(bare_shown - plain).sum(axis=2) <= 0.06
+        assert moved.sum() > 1000
+        near = float(np.abs(ours[..., :3] / 255 - shown)[moved].mean() * 255)
+        far = float(np.abs(plain - shown)[moved].mean() * 255)
+        ours_dark = float((plain - ours[..., :3] / 255)[moved].mean() * 255)
+        theirs_dark = float((bare_shown - shown)[moved].mean() * 255)
+        print(f"parity{tag}: over the occluded pixels {near:.1f} against {far:.1f} levels; "
+              f"darkened {ours_dark:.2f} here, {theirs_dark:.2f} there")
+        assert near < 0.3 * far, (near, far)
+        assert abs(theirs_dark - ours_dark) < 0.1 * ours_dark, (ours_dark, theirs_dark)
     if planar:
         # likewise the rings: where filling them moved Python's picture, the
         # viewer is nearer the filled picture than the bare one
