@@ -667,10 +667,13 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         title="TOF Gaussian variance σ₂²",
         description=(
             "The d⁴ term of the Gaussian variance, σ²(d) = σ₀² + σ₁²·d² + σ₂²·d⁴. It is "
-            "the instrument's share of a variance that grows as d⁴."
+            "the instrument's share of a variance that grows as d⁴. A calibration may "
+            "write it negative, which is legal only while σ²(d) stays positive over the "
+            "bank's d range. The `.iparm` reader checks that at read, and reads such a "
+            "value without the floor at zero."
         ),
         unit="µs²/Å⁴", default="0.0",
-        typical="0-50 µs²/Å⁴",
+        typical="0-50 µs²/Å⁴; a facility file may write a small negative value",
         anchor="reference/instrument.html#time-of-flight-peak-shape",
     ),
     "instrument.source.profile_tof.gam0": HelpEntry(

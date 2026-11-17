@@ -634,8 +634,9 @@ def _mantid_bank_header(between: list[str]) -> dict[str, str]:
     between the previous bank's record and this one, since two would leave
     which bank it describes to a guess; the text is kept as written.
     """
-    found = [m for line in between
-             if (m := _MANTID_BANK_HEADER.match(line.rstrip("\r\n")))]
+    # ``between`` holds the previous bank's whole body; only a comment can match
+    found = [m for line in between if line.startswith("#")
+             and (m := _MANTID_BANK_HEADER.match(line.rstrip("\r\n")))]
     if len(found) != 1:
         return {}
     path_m, tth, difc = found[0].groups()

@@ -325,6 +325,15 @@ def test_a_negative_sig2_is_refused_where_the_bank_states_no_range(tmp_path):
         read_gsas_tof_iparm(write(tmp_path, iparm(polaris_bank(spectrum=False))))
 
 
+def test_a_negative_sig2_is_refused_where_the_window_maps_to_no_d_range(tmp_path):
+    """A window starting below ZERO gives no d range; the refusal says the
+    window does not map, rather than that the bank has none."""
+    lines = [icons(1, 7391.35, -2.16, 900.0), bnkpar(1, 1.0, 146.8)]
+    lines += spectrum_records(1, 0, [], tmin=0.8, tmax=20.4)
+    with pytest.raises(ValueError, match="lie above ZERO"):
+        read_gsas_tof_iparm(write(tmp_path, iparm(lines + prcf(1, 1, 3, NEGATIVE_SIG2))))
+
+
 def test_a_negative_sig0_or_sig1_is_still_refused_by_its_sign(tmp_path):
     """Only sig-2's test moved (the handover says why)."""
     for k in (3, 4):
@@ -418,6 +427,22 @@ def test_a_lone_set_of_a_function_not_evaluated_is_declined_and_the_bank_read(
     assert declined.level == "warning"
     assert "profile function 2" in declined.message
     assert not [n for n in notes if n.code == "GSAS_IPARM_SET_NUMBER_ASSUMED"]
+
+
+def test_a_lone_legacy_type1_block_is_declined_not_sent_to_the_legacy_reader(tmp_path):
+    """An unnumbered 8-coefficient type-1 set is the legacy LANSCE block, which
+    the legacy reader restates only under a numbered key.  Refusing it with
+    the pointer would send the caller to a reader refusing the same file, so
+    both readers decline it and read the bank."""
+    from rietx.io.legacy import read_lansce_iparm
+    lone8 = [line.replace("PRCF1", "PRCF ")
+             for line in prcf(1, 1, 1, TYPE1[:8], ncof=8)]
+    p = write(tmp_path, iparm(bank(1, profile=lone8)))
+    for reader in (read_gsas_tof_iparm, read_lansce_iparm):
+        notes = []
+        assert reader(p, diagnostics=notes)[1].source.profile_tof == ProfileTOF()
+        (declined,) = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+        assert "legacy LANSCE layout" in declined.message
 
 
 def test_an_unnumbered_set_beside_a_numbered_one_is_declined(tmp_path):
@@ -514,6 +539,17 @@ def test_trailing_zeros_past_the_last_field_are_read_and_recorded(tmp_path):
     assert read.where == ["INS  1PRCF1"]
     assert "'0.001000' in columns 26-33, past CTOF (columns 23-32)" in read.message
     assert "read as 0.001" in read.message
+
+
+def test_trailing_zeros_after_a_lowercase_d_exponent_are_read(tmp_path):
+    """The column read accepts ``d`` as the exponent letter, so the overrun
+    test does too."""
+    header = rec("INS  1PRCF1 ", (13, "    3"), (18, "   21"), (26, "1.000d00"))
+    profile = [header] + prcf(1, 1, 3, TYPE3)[1:]
+    notes = []
+    read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=profile))),
+                        diagnostics=notes)
+    assert [n.code for n in notes].count("GSAS_IPARM_TRAILING_ZEROS_READ") == 1
 
 
 @pytest.mark.parametrize("text, col, why", [

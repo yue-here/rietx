@@ -59,7 +59,9 @@ bank number ``bb`` in columns 5-6.
   second unnumbered one, it has two, and it is declined: the bank keeps its
   calibration, as a bank with no set does.  A lone unnumbered set of a
   function this package does not evaluate is declined the same way, where a
-  numbered set 1 of one is refused (WP-2146's open question).
+  numbered set 1 of one is refused (WP-2146's open question).  So is a lone
+  unnumbered 8-coefficient type-1 block: the legacy reader restates that
+  block only under a numbered key, so the legacy pointer would lead nowhere.
 
 **The variance, not its coefficients.**  sig-0 and sig-1 are refused when
 negative.  sig-2 is tested on what it is for: σ²(d) = sig-0 + sig-1·d² +
@@ -344,11 +346,15 @@ class _Record:
         field = self.text[start - 1:last]
         token = self.text[start - 1:end]
         spill = self.text[last:end]
+        if spill.strip("0"):
+            return False
         try:
-            same = float(field.replace("D", "E")) == float(token.replace("D", "E"))
+            # the exponent letters number() accepts, D and d included
+            value = float(field.replace("D", "E").replace("d", "e"))
+            same = value == float(token.replace("D", "E").replace("d", "e"))
         except ValueError:
             return False
-        if spill.strip("0") or not same:
+        if not same:
             return False
         if not self._repaired:
             self._repaired = True
@@ -357,7 +363,7 @@ class _Record:
                   f"({self.text[:12].rstrip()!r}) writes {token!r} in columns "
                   f"{start}-{end}, past {name} (columns {first}-{last}). The "
                   f"columns past {name} hold only zeros, so {name} was read "
-                  f"as {float(field.replace('D', 'E'))!r}, the number in its "
+                  f"as {value!r}, the number in its "
                   f"own columns.",
                   where=[self.text[:12].rstrip()])
         return True
@@ -554,7 +560,8 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
 
 def _profile(path: Path, bank: int, headers: dict[int, _Record],
              conts: dict[int, dict[int, _Record]], diagnostics,
-             lone: list[_Record] = (), lone_c: dict[int, _Record] | None = None,
+             lone: list[_Record] | tuple[_Record, ...] = (),
+             lone_c: dict[int, _Record] | None = None,
              d_range: tuple[float, float] | None = None
              ) -> ProfileTOF:
     lone_c = lone_c or {}
@@ -582,6 +589,19 @@ def _profile(path: Path, bank: int, headers: dict[int, _Record],
                       f"number, declares profile function {ptyp}, "
                       f"{_PRCF_NOT_EVALUATED[ptyp]}, which this package does not "
                       f"evaluate; the profile coefficients are left at zero.",
+                      where=[f"bank {bank}", "PRCF"])
+                return ProfileTOF()
+            if (ptyp, rec.integer(18, 22, "NCOF")) == (1, 8):
+                # the legacy LANSCE block, which read_lansce_iparm restates
+                # only under a numbered PRCF1 key: refusing it here with the
+                # legacy pointer would send the caller to a reader that
+                # refuses the same file, so it is declined as before
+                _note(diagnostics, "warning", "GSAS_IPARM_PROFILE_DECLINED",
+                      f"Bank {bank}: its one PRCF set, written without a set "
+                      f"number, is an 8-coefficient type-1 block, the legacy "
+                      f"LANSCE layout, which is read only as a numbered set 1 "
+                      f"(rietx.io.legacy.read_lansce_iparm); the profile "
+                      f"coefficients are left at zero.",
                       where=[f"bank {bank}", "PRCF"])
                 return ProfileTOF()
             _note(diagnostics, "info", "GSAS_IPARM_SET_NUMBER_ASSUMED",
@@ -722,9 +742,10 @@ def _negative_sig2(rec: _Record, n: int, kwargs: dict, d_range) -> str:
     if d_range is None:
         raise rec.fail(
             f"PRCF set {n}: sig2 = {s2!r} is negative, and the bank states no "
-            f"flight-time range (an I ITYP record with TMIN and TMAX) over which "
-            f"the variance sig0 + sig1·d² + sig2·d⁴ could be checked, so the "
-            f"coefficient is refused")
+            f"flight-time range that maps to a d range (an I ITYP record whose "
+            f"TMIN and TMAX lie above ZERO and give increasing d through DIFC "
+            f"and DIFA) over which the variance sig0 + sig1·d² + sig2·d⁴ could "
+            f"be checked, so the coefficient is refused")
 
     def var(d):
         return s0 + s1 * d * d + s2 * d ** 4
