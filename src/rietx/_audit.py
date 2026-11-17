@@ -1379,7 +1379,6 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
-    Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("the named pattern has no fitted values in the chain the message names: in "
@@ -4419,9 +4418,6 @@ ROWS: tuple[Row, ...] = (
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
                   "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
-    Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
     Row("rietx.solve.cluster._ISOMETRY_RTOL", "constant", tier=1, value=1e-06,
         evidence=("equivalences(): an integer {-1, 0, 1} matrix P is an isometry of "
                   "the cell when |P^T g P - g| <= 1e-6 x max|g|, element by element. "
@@ -5613,7 +5609,6 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
                   "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
                   "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
-    Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
                   "on its own (sequential.py:2277)")),
@@ -6004,8 +5999,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_WIDTH_GROWTH",
-    "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
     "SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion",
     "SIZE_UNUSUALLY_SMALL",
@@ -6474,9 +6467,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
-    "rietx.sequential.WIDTH_GROWTH_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_SIGMA",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -6693,7 +6683,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",

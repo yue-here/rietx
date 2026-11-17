@@ -119,8 +119,8 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
 - **`SEQUENTIAL_WIDTH_GROWTH` is removed** (maintainer, 2026-11-16: "Remove"). The warning
   fired when a phase width reached 3× its first measured value, GoF had doubled and the
   growth exceeded 3 esds, on three unaudited constants. The width trajectory and each
-  pattern's GoF are already in the result, so rule 5 is met without it. The removal is
-  not built yet.
+  pattern's GoF are already in the result, so rule 5 is met without it. Removed in WP-2081
+  on 2026-11-17, with no field added, under `THRESHOLDS_VERSION` 1.15.
 
 ## Open decisions
 
@@ -160,8 +160,8 @@ structural one, WP-2108) are work of their own.
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
-WP-2080, a fixed value surviving a restart (WP-2081 question 4), and the two thresholded
-codes once ruled. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+WP-2080, a fixed value surviving a restart (WP-2081 question 4), and
+`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call. Rule 2's start
 from a series result waits on WP-2103. The default is ruled, so a preset for the typical
 temperature series can be written. The documentation for a user arriving from another program's
 sequential mode is written with rule 1. Each WP's `Priority:` line outranks this paragraph.
