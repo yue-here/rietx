@@ -2297,7 +2297,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(
         title="A declared peak refined to zero intensity",
         description=(
-            "The area of a declared peak finished at zero. A peak reaches the pattern "
+            "The area of a declared peak finished at or below zero, or on its floor of "
+            "zero as the bound test reads it (`FLOOR_HIT`). Under `solver=\"trf\"` the "
+            "stored area can sit a hair above zero. A peak reaches the pattern "
             "only through its area, so at zero area nothing fixes its centre. The centre "
             "and its esd are then not measurements. Either the feature is not in the "
             "specimen or the bounds on the centre do not cover it. Drop the peak or move "
@@ -4179,6 +4181,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measure the instrument on a standard, and hold that profile in this fit."
         ),
     ),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": HelpEntry(
+        title="A restraint measures geometry a rigid body holds fixed",
+        description=(
+            "A bond, angle, torsion or planarity restraint names atoms that all belong to one "
+            "copy of one rigid body, and no torsion the body declares changes the quantity. "
+            "The body places those atoms from its template, so the distance, angle or plane "
+            "is the template's whatever the fit does: the restraint's row is a constant, and "
+            "it restrains nothing. A quantity is either restrained or refined, never both by "
+            "accident, so the compile warns and keeps the row: a refiner may keep one "
+            "restraint set across a with-body and a without-body comparison, where the row "
+            "is the template's penalty. A declared torsion "
+            "changes the quantity when it turns some of the restrained atoms, other than its "
+            "two axis atoms, and not the others; whether the torsion is free in a stage does "
+            "not matter. A restraint across two bodies, between a body atom and a free "
+            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "a torsion that changes it, take the atoms out of the body and restrain them "
+            "as free atoms, or keep the row."
+        ),
+    ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(
         title="Some contacts have no anti-bump row",
         description=(
@@ -4220,7 +4241,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A free rotation or shift of a rigid body has no effect on the pattern. The "
             "usual cause is a turn that moves only zero-occupancy atoms, or a turn about "
             "an axis the template is symmetric under. The value and the esds of the body "
-            "atoms are not measurements. Hold those parameters and refit."
+            "atoms are not measurements. Hold what the suggestion names and refit."
         ),
     ),
     "ROUGHNESS_ABSORPTION": HelpEntry(
@@ -4555,7 +4576,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model holds it fixed, there is nothing to refine. A pattern that names one "
             "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
             "frees nothing at that site. An atom on a fully fixed special position has "
-            "no directions, so its `dof.*` pattern matches no parameter."
+            "no directions, so its `dof.*` pattern matches no parameter. A pattern "
+            "that names one phase's cell, such as `phases.0.cell.*`, gets it too. On "
+            "a phase whose cell is derived from its parent's, it reaches no free "
+            "row, and `phases.0.parent_cell.cell.*` frees the parent's edges."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
