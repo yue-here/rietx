@@ -4,6 +4,8 @@
  * through its own copy of the chart module, `next/rxplot.mjs`. gui/CLAUDE.md:
  * a shared module the new page must change moves into `gui/src/next/` first,
  * so today's page does not move. The swap deletes `lib/pattern.ts`.
+ * WP-2218: a preview draws the last fit in `--plot-last` grey under the preview
+ * in the calculated ink, as the prototype does; the original dashes the last fit.
  *
  * The pattern panel's figure (WP-1461).
  *
@@ -298,16 +300,18 @@ export class PatternChart {
     ctx.restore();
   }
 
-  /** The last fit dashed and the preview solid, in the model's one ink: the
-   *  state rides on the mark, never on a second colour (WP-1210). */
+  /** The last fit in grey and the preview in the model's accent, as the
+   *  prototype draws them (`gui/STYLE.md` § Plots: the last fit turns grey
+   *  only while a preview exists; WP-2218). Each is its legend label's switch. */
   private previewLines(u: any): void {
     const on = this.previewOn;
-    if (!on || this.overlay.hidden.includes("calc")) return;
+    if (!on) return;
+    const hidden = this.overlay.hidden;
     const { ctx } = u, dpr = devicePixelRatio, { min, max } = u.scales.x, log = u.scales.y.distr === 3;
-    const trace = (ys: ArrayLike<number>, width: number, dash: number[]) => {
-      ctx.strokeStyle = this.colors.calc;
+    const trace = (ys: ArrayLike<number>, colour: string, width: number) => {
+      ctx.strokeStyle = colour;
       ctx.lineWidth = width * dpr;
-      ctx.setLineDash(dash.map((d) => d * dpr));
+      ctx.setLineDash([]);
       ctx.beginPath();
       let pen = false;
       for (let q = 0; q < on.tt.length; q++) {
@@ -320,8 +324,8 @@ export class PatternChart {
       ctx.stroke();
     };
     ctx.save();
-    trace(on.last, 1, [4, 3]);
-    trace(on.calc, 1.4, []);
+    if (!hidden.includes("calc")) trace(on.last, this.colors.last, 1.2);
+    if (!hidden.includes("preview")) trace(on.calc, this.colors.calc, 1.4);
     ctx.restore();
   }
 
