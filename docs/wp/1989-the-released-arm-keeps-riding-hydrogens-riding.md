@@ -119,7 +119,7 @@ reads.
   36079.1; this plan ends at 36852.7, so the two ΔBIC are not one number.
   Revert (default `freed` = every member): both stretched tests and the
   deposited fast test fail, on the count first. Fast selection:
-  on the tree before the review fixes and matrix rows, 14697 passed / 432 skipped / 32 xfailed / 1 failed (`test_every_acceptance_test_has_a_matrix_row`, fixed by `d9aee3252`); a rerun on the final tree was in flight at the pause (`fast2.log` in the runner's scratch). The two slow tests, after the review fixes: 2 passed in 85 s. `tests.reader_output`:
+  on the tree before the review fixes and matrix rows, 14697 passed / 432 skipped / 32 xfailed / 1 failed (`test_every_acceptance_test_has_a_matrix_row`, fixed by `d9aee3252`); on the final tree (`cd61e2ed5`), 14708 passed / 432 skipped / 32 xfailed / 0 failed in 573 s, 13 items more than main (3 tests, and 5 matrix checks for each of the 2 new rows); nothing new is skipped. The added fast tests cost 5.1 s, 3.1 s and 0.0 s on that run (8.2 s over `tests/test_body_misfit.py`; local, one run). Vale (`rietx_vale.sh`): 0 errors. The two slow tests, after the review fixes: 2 passed in 85 s. `tests.reader_output`:
   exit 0, unchanged.
 
   *Review:* a read-only Opus reviewer in this worktree (no
