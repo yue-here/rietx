@@ -1,6 +1,6 @@
 # WP-2006 — Readers, crystallography and GUI codes, and the dead surface
 
-Milestone: generality · Status: 🔄 2026-10-24 — part 1 merged from outside (PR #1101, `50bc4555`): the inventory and the reachability walk; the tiers wait on the gate ruling
+Milestone: generality · Status: 🔄 2026-11-17 — part 2's tiers in PR #1636: 218 rows tiered; 36 tier-3 candidates, the FullProf occupancy repair and three writer warnings wait on the maintainer
 Track: The audits
 Depends on: 2001
 Priority: P3 2026-10-19 — 2001 closed, so nothing blocks it; expected mostly tier 1 (records of what was done to a file); the fast one
@@ -46,24 +46,12 @@ promise stages every break).
 
 ### Inherited
 
-- **From WP-2013 (2026-11-03, PR #1369): a reader default the hump ruling left standing.** `HumpComponent.position` is now required of a caller (maintainer, 2026-11-02), because the old 0.0 placed a hump below any measured range. `io/recipe.py`'s background-peak builder still writes `0.0 if pos is None`, silently, so a PowderLine recipe whose `single_peaks` entry has no position gets the placeholder the ruling removed, and a flagged position starts its refinement there. Refusing it or reporting it changes what `read_recipe` returns, so it goes to the maintainer before merge (memory rule on reader output). No recipe with a null position has been seen; whether PowderLine writes one is unchecked.
+Pruned 2026-11-17 (part 2's session; the handover entry says why each other entry went).
 
-- **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed):
-  `VOLUME_RATIO_BOUNDS` (`_audit.py:1038`) fails on inorganic cells.** The formula window
-  misses the true cell for 7 of 9 known cells measured (WP-2030's table). Hofmann's (2002)
-  citation covers organic and metal-organic crystals only, so a tier-2 reading would cover a
-  population the source excludes. [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md)
-  owns the rule. Tier the row with that evidence, or leave it to 2030.
-- **From WP-2002 (2026-10-21, 4th session): tier 2 names seven programs.** `docs/milestones/generality.md` § The rule's tier 2 now reads "by default in an established Rietveld program": GSAS-II, FullProf, TOPAS, RIETAN-FP, BGMN, MAUD and EasyDiffraction, the list rietx-bench runs (the maintainer's instruction). A row resting on a program default names the programs it checked and what each does; a program doing otherwise by default is a dissenter, one without the feature is neither. What each does on peak windows, staging, roughness starts, width limits, dispersion, solver, mode and background seed is in `docs/wp/2002-batch/practice.md`; where each program's manual or source sits is in the maintainer's memory (`foreign-code-sources-on-disk`), and rietx-bench's `tools/` holds BGMN, MAUD, RIETAN-FP and EasyDiffraction's environment beside GSAS-II and FullProf.
-- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: declared names with no writer.** `PhaseMicrostructure.separable` and `.size_strain_collinearity` are `None` on every `RefinementResult.microstructure`; only the report's deep copy writes them (`report/__init__.py:190-212,273-274`). `ProjectFormat.refuses` is set by no registry member, and no member produces `reports_at="read"` (`io/projects/registry.py:107,128-132`; that member was dropped by WP-2013 in PR #1369, 2026-11-03, so only `refuses` is left here). `SuggestedAction.vetoed_by`'s docstring adds "or a guard forbids it", which no code writes (`report/schemas.py:1150`; `layer2.py:1059-1062` sets it from the plan and already-free paths only). Each Reference page states what the code does today (`derived.md`, `foreign-files.md`, `report.md`); the surface walk is where write, retire or document gets decided.
-
-- **From WP-2001 (2026-10-19, PR #1047).** The table is `src/rietx/_audit.py`; this WP's rows are the ones `_audit.WALKED` and `_audit.DEFAULT_SEATS` map to 2006, plus the codes and suggestion rows of its subsystem. Auditing a row means giving it a tier and evidence in place and deleting its line from `UNAUDITED_BASELINE`; `tests/test_audit_table.py` fails until both are done. The walk sees module-level numbers and tuples of numbers only, so a number held in a dict, list or array is audited here by hand, in `crystallography/` and the two `io/` files alike; nobody has looked yet. The GUI keeps its own copy of the correlation guard, `let guard = $state(0.98)` in `gui/src/panels/Plan.svelte` (about line 93), pinned again in `App.test.ts` and `rxt.test.ts`; the python side is now one constant, `rietx.schemas.plan.CORRELATION_GUARD`, and the GUI copy needs the dist rebuilt (`gui/CLAUDE.md`).
-- **From WP-2001's generality judge (2026-10-19).** Five reader decisions sit outside the walk, which keeps the third review's exclusion of reader byte offsets: `io/formats/dif.py` `_MIN_ROWS = 3` (three hkl rows make a peak list, refused); `io/formats/peaklist.py` `_MIN_ROWS = 8`; `io/formats/gsas.py`'s 64 kB sniff bound (a larger `TIME_MAP` table falls to the `xy` reader, refused for the wrong cause); `io/formats/bruker_raw.py`'s `atol=1e-6` drive pick and its counting-time windows, which decide whether σ can be derived; and `io/formats/pdcif.py`, which drops a whole weight column on one zero weight and falls back to Poisson with no diagnostic, while `xy.py` and `chi.py` adopt any positive third column as σ. Audit them by hand, or widen `WALKED` with a reason.
-- **From [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s close (2026-10-20, PR #1070).** `_audit.NOT_WALKED` now declares, with a reason, every top-level entry the walk leaves out, and a test holds it and `WALKED` equal to the package. On the judge's reading, nine more files joined the walk under this WP, their 36 constants at `unaudited` on the baseline: `io/formats/dif.py`, `gsas.py` and `peaklist.py` (the sniff floors and the 64 kB `TIME_MAP` bound in this mailbox's previous bullet), `io/instrument_profile.py` (`_PRM_CUTOFF`, a tail cutoff GSAS-I computes with), `io/projects/fullprof.py`, `registry.py` and `topas_input.py` (`CALC_POINTS_PER_FWHM` sets TOPAS's `convolution_step`; `DEFAULT_RADIUS_MM` claims to cancel and no test says so), `gui/imports.py` (`WAVELENGTH_RTOL` picks the pre-filled instrument: a header 0.71 Å matches no Mo line and is offered as a single-wavelength capillary) and `gui/symmetry.py` (`ORBIT_COLLISION_TOL` and `POSITION_TOL` gate a model edit). **A possible silent repair, read from the code and not run:** `fullprof._OCCUPANCY_RTOL = 5e-3` lets per-site occupancy ratios spread 0.5 % and then writes 1.0 on every site with no diagnostic (`io/projects/fullprof.py` around line 1980), so a site at 0.996 beside full ones is built full, while the constant's comment puts the file's rounding at 2e-5 and says a real partial occupancy is refused.
-
-- **From WP-2002 (2026-10-19, PR #1050).** 2002 tiers `MAGNETIC_ION_ASSUMED` and `LANDE_G_ASSUMED` on both raise sites. Its batch class B15 proposes splitting `crystallography/magnetic/form_factor.py`'s assumed-ion table by element: Ce, Eu, Sm and Yb tier 1 (Sm in question), the other lanthanides tier 2 with a citation, and U, Np and Pu demoted. GSAS-II 5.8.4 maps bare U to U³⁺ where rietx picks U⁴⁺ (`atmdata.py:1706-1709`, checked). Read 2002's ruling before tiering that table.
-
-- 2026-10-26 issue triage: #1058 is the outside contributor's (mustachefeeling) claim on this WP. Part 1 (the walk and the inventory) landed as PR #1101; the tiers wait on the gate ruling after WP-2004, as the status line says. Checked against the tree at c0e32ab29.
+- **From WP-2013 (2026-11-03, PR #1369): a reader default the hump ruling left standing.** `HumpComponent.position` is now required of a caller (maintainer, 2026-11-02), because the old 0.0 placed a hump below any measured range. `io/recipe.py`'s background-peak builder still writes `0.0 if pos is None`, silently, so a PowderLine recipe whose `single_peaks` entry has no position gets the placeholder the ruling removed, and a flagged position starts its refinement there. Refusing it or reporting it changes what `read_recipe` returns, so it goes to the maintainer before merge (memory rule on reader output). No recipe with a null position has been seen; whether PowderLine writes one is unchecked. Still open; on the maintainer's list of 2026-11-16.
+- **From WP-2001 (2026-10-19): numbers inside a dict, list or array.** The constant walk sees module-level numbers and tuples of numbers only, so a number held in a dict, list or array in `crystallography/` and the walked `io/` and `gui/` files is audited by hand. Nobody has looked yet; part 2 did not.
+- **From [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s close, confirmed 2026-11-17: a silent repair in the FullProf reader.** `fullprof._OCCUPANCY_RTOL = 5e-3` lets per-site occupancy ratios spread 0.5 % and then builds 1.0 on every site with no diagnostic (`io/projects/fullprof.py` around lines 2364 and 3635). A probe that scaled one site's Occ by 0.996 built every site full with no record; 0.995 is refused. The constant's comment puts the file's rounding at 2e-5. The same constant gates the magnetic Scale × f² match (around line 2730). A fix adds a record or narrows the bound, and either changes what `read_project` returns, so it goes to the maintainer. The row is a tier-3 candidate in `2006-batch/tiers.md`.
+- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md): declared names with no writer.** `PhaseMicrostructure.separable` and `.size_strain_collinearity` (written only on the report's copy) and `ProjectFormat.refuses` (set by no member). Re-checked 2026-11-17; the write, retire or document choice is in `2006-batch/surface.md` for the maintainer. The third, `SuggestedAction.vetoed_by`'s docstring, was fixed in part 2.
 
 ## Non-goals
 
@@ -77,20 +65,25 @@ promise stages every break).
       27): raise site, `level`, condition, whether it records an act or asserts a
       judgement. `LANDE_G_ASSUMED` and `MAGNETIC_ION_ASSUMED` are raised here and in
       `strategy/magnetic.py`; 2002 tiers them on both sites and this WP reads the row.
-- [ ] The constants of `io/` (~30) and `crystallography/` (66 by AST), entered by 2001's
+- [x] The constants of `io/` (~30) and `crystallography/` (66 by AST), entered by 2001's
       walk: tier each, expected mostly tier 1 (byte offsets, physical limits) with the
-      few thresholds named above.
-- [ ] Tier each; for the few thresholds (`CIF_ANGLE_CORRECT_MAX_DEG`, the attenuator
+      few thresholds named above. (2026-11-17: 120 constant rows; 62 tiered, 22 tier-3
+      candidates and 36 left, `2006-batch/tiers.md`.)
+- [x] Tier each; for the few thresholds (`CIF_ANGLE_CORRECT_MAX_DEG`, the attenuator
       conventions measured per format, the axis refusal), evidence and families.
+      (2026-11-17: 218 of 290 rows tiered, 56 responses given; 36 tier-3 candidates and
+      36 left rows in `2006-batch/tiers.md`.)
 - [x] The reachability walk over `derive_surface()`'s 2 238 entries, as a script in
       `tests/` run by hand (a Haiku-grade task: collate, do not judge), its output a table
       with one row per unreached entry and where it *is* referenced.
-- [ ] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
-      table with a recommendation per row.
+- [x] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
+      table with a recommendation per row. (2026-11-17: `2006-batch/tiers.md` and
+      `2006-batch/surface.md`.)
 - [ ] Approved demotions (expected few); rulings dated into the table.
 - [ ] Tests; the fast count moved by exactly the tests added.
-- [ ] Skill: `references/diagnostics-projects.md` and the io rows of `diagnostics.md`
-      checked against the table; none expected to move.
+- [x] Skill: `references/diagnostics-projects.md` and the io rows of `diagnostics.md`
+      checked against the table; none expected to move. (2026-11-17: no level, message or
+      suggestion changed, so no skill row moves.)
 
 ## Acceptance
 
@@ -106,6 +99,86 @@ promise stages every break).
   derived surface).
 
 ## Handover log
+
+- **2026-11-17** — part 2, the tiers, by a ghostshift runner. PR #1636.
+  Ruled by Yue, 2026-11-16 (decision walk): run 2005-2007 now under the gate as written.
+  Three of every four reader, crystallography and GUI rows in the audit table now carry a
+  tier with its evidence. Almost all of them are tier 1, because a reader's code records a
+  repair the file's format forces, which is what the WP expected. The rest are rietx's own
+  numbers or conventions. They need the maintainer's approval or a test before they can be
+  tiered, and each is written up with what it waits on. Nothing was removed, and no level or
+  message changed, so a reader receives the same text. One inherited suspicion is now a
+  confirmed defect: the FullProf reader builds a 0.4 % vacancy as a full site and says
+  nothing.
+
+  *Done*: 218 of the 290 unaudited rows tiered (98 codes, 56 of them given a response; 58
+  suggestion sites; 62 constants): 190 tier 1, 25 tier 2, 2 caller, 1 invariant. `2006-batch/tiers.md` holds the other 72: 36
+  tier-3 candidates with both grounds and their stakes (14 codes, 22 constants, the magnetic
+  ones marked for Mike) and 36 constants left at `unaudited` with the test that would close
+  each, plus the three reader decisions audited by hand and 59 lanes' notes on tiered rows.
+  `2006-batch/surface.md`: the walk re-run at HEAD (2 504 entries), 29 entries reached by no
+  use, all rigid-body and restraint constructor fields, each recommended kept; the three
+  exports the WP named, kept; the declared names with no writer. `SuggestedAction.vetoed_by`'s
+  two docstrings now say what sets it. `docs/practice.md` gained this session's tier-2
+  program-default rows. Inherited pruned: the `VOLUME_RATIO_BOUNDS` entry went (tiered 2 under
+  the #1121 ruling, 2026-10-24); the seven-programs rule went (it is in `generality.md`); the
+  WP-2001 mechanics went, and its GUI guard note with it (`Plan.svelte`'s 0.98 is an initial
+  value replaced by `GET /api/plan` on load, so the GUI holds no second copy); the five reader
+  decisions went (dif, peaklist and gsas are walked rows, bruker_raw and pdcif are audited in
+  `tiers.md`, and pdcif's zero-weight note was stale: WP-1952 excludes the point and reports
+  it); the B15 entry went (the form-factor rows follow 2002's ruling); the #1058 triage line
+  went (part 1 landed). `PATTERN_DEAD_CHANNELS` is shared with `refine.py` and left to WP-2005.
+  `/code-review high --fix` did not run: the branch's python is table data and two docstrings,
+  and the generality judge read the table.
+  *Measured* (Darwin arm64, `[dev]`, merged with `origin/main`): fast selection 14 685 passed, 433
+  skipped, 32 xfailed, 1 failed in 645 s: `test_silence.py`, because a code row declaring a
+  `warning` response needs a silence pair (a fixture where it fires and one where it stays
+  silent). The 31 warning responses without one were held back, each proposed sentence kept in
+  `tiers.md`'s notes; `test_silence.py` and `test_audit_table.py` then passed (59). No test added. `tests.reader_output` exits 0 (unchanged against the merge-base). `session_usage.py lanes` finds no lanes
+  under this runner's id; three read-only lanes wrote the rows (Opus on crystallography,
+  Sonnet on the pattern readers and the project readers).
+  *Findings, nothing fixed*: (1) `fullprof._OCCUPANCY_RTOL` (5e-3) builds a site at Occ ×0.996
+  beside full ones as full, with no record; ×0.995 is refused (probed); it also gates the
+  magnetic Scale × f² match. (2) `FULLPROF_OCCUPANCY_UNCHECKED` warns on every one-atom phase,
+  including symbols with one setting (F m -3 m probed). (3) `GSAS2_CIF_FIELD_NOT_WRITTEN`,
+  `GSAS2_INSTPRM_FIELD_NOT_WRITTEN` and `GSAS_PRM_FIELD_NOT_WRITTEN` warn on every write, which
+  § Attention is a cost's clause 1 does not admit. (4) `CIF_MAGNETIC_SYMMFORM`,
+  `GSAS2_GPX_PHASE_MAGNETIC` and `RECIPE_FIELD_DROPPED` raise at two levels under one code. (5)
+  `cif.py:98`: a fixed angle within 1e-3° of its value is neither snapped nor reported (≤ 8.3
+  ppm in d). (6) `gui/imports.WAVELENGTH_RTOL` (5e-4) matches Cu but not a header's 0.71 (Mo)
+  or 0.56 (Ag). (7) `bruker_raw.py:346`'s `atol=1e-6` runs with numpy's default `rtol=1e-5`, so
+  the tolerance applied is about 1e-4°. (8) GSAS-II 5.8.4's CW `.prm` importer never reads
+  PRCF12 (in `docs/practice.md`).
+  *Gotchas*: a reader code's `where` is an interval or a column name, never a parameter path,
+  so every reader row with a response declares `scope`. Seven code rows are tiered on the act
+  alone, and each holds only as far as the threshold rows it names, all of them in `tiers.md`.
+  *Generality* (judge, 2026-11-17; 104 of 222 rows read in full, 31 evidence claims checked):
+  tier 2, 23 of 26 hold; caller, both hold; warning sentences, 33 of 37 name a result number;
+  tier-1 sample, 44 of 45 hold; escalation family, none. Weak: `RECIPE_PLAN_STAGED` (PowderLine
+  dissents; author: agreed, now a tier-3 candidate); `GSAS2_INSTPRM_GEOMETRY_ASSUMED` (kind 3,
+  sentence named no number; author: fixed); `CALC_POINTS_PER_FWHM` (the tests do not exercise
+  it; author: agreed, back to unaudited); `K_FLOAT_TOL` and `_SNAP_MESSAGE_SITES` (no invariance
+  or cap test; author: agreed, back to unaudited); the three writer warnings' level (author:
+  agreed, a level change is the maintainer's). Cannot tell: `FULLPROF_ORIGIN_CHOICE`'s manual
+  quote (author: checked in FullProf 8.20's manual, cited in the row). Magnetic rows that settle
+  a reading default: `CIF_MAGNETIC_CENTERING_ASSUMED`, `CIF_MAGNETIC_ION_UNCHARGED` (info, yet
+  its sentence asks for an act), `TOPAS_MOMENT_ION_UNCHARGED`, for Mike.
+  *Settled by Claude* (most important first): code rows tiered on their act with the
+  threshold left separate, under § The rule's "each part tiered on its own" (the alternative
+  held the code row back with its threshold); `RAS_ATTENUATOR_PRESENT` at tier 2 on GSAS-II's
+  default although no `.ras` on disk varies the column, under tier 2's program-default clause
+  (alternative: a tier-3 candidate); two caller rows, under the caller class's two conditions;
+  the judge's weak rows taken back to unaudited rather than argued, under B10 and the
+  invariance rule; `/code-review` skipped, under its prose-only clause read for table data;
+  `vetoed_by` documented rather than written, under WP-1076; `PATTERN_DEAD_CHANNELS` left to
+  WP-2005 to avoid a shared row.
+  *For the maintainer*: approve or demote the 36 tier-3 candidates (`tiers.md`; magnetic ones
+  are Mike's); rule on the FullProf occupancy repair, the one-atom warning and the three
+  writer warnings (each changes what a reader receives); the recipe hump `0.0` (still on the
+  2026-11-16 list); write or retire the declared names in `surface.md`.
+  Next: the maintainer's batch. Then the 31 silence pairs, which give the held warning responses. Then the approved rows dated into the table, and the 36 left
+  constants closed by the tests `tiers.md` names (one small test each), then the numbers
+  inside dicts and lists (still unaudited by hand).
 
 - **2026-10-24** — PR #1101 merged (`50bc4555`, review round 4), by `/pr-review`.
   *Done*: part 1, which removes and rules on nothing.
