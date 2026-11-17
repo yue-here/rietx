@@ -692,7 +692,12 @@ exported without the cue, and the line under the plot says so.
 0.1 Å of one plane as a translucent grey face. Flat is all the fill says:
 coordinates cannot tell an aromatic ring from any other flat one. The viewer
 draws one cell, so a ring that a cell edge cuts stays open; a block drawn by
-`render_structure` closes it. Both start off.
+`render_structure` closes it. `ambient occlusion` darkens each atom and stick
+by the share of ambient light its neighbours keep from it, so crowded parts of
+the structure read as deeper than open ones. It shows most in ball mode, and
+the cell frame and the translucent faces are left as they are. The first frame
+after it is ticked builds 64 depth maps of the structure, and rotating reuses
+them. All three start off.
 
 Two things here will mislead you if nobody says them:
 

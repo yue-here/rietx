@@ -168,12 +168,15 @@ bound on what sticks add. The multishadow number is the WP's to measure.
   away from the edges; on garnet, 383 atoms, headless chromium's CPU
   rasteriser drew a rotation frame in 33-42 ms with it off and on alike, and
   the maps with their first frame in 77-81 ms).
-- [ ] Docs: the `render_structure` docstring and the GUI guide's structure
+- [x] Docs: the `render_structure` docstring and the GUI guide's structure
   section.
-- [ ] Tests + figure pairs to `tests/output/figure3d/`.
-- [ ] Skill: one clause in `api-figure.md` saying the option darkens ball
+- [x] Tests + figure pairs to `tests/output/figure3d/`
+  (`ambient_occlusion_{ball,ellipsoid}.png`, `parity_*_occluded.png`).
+- [x] Skill: one clause in `api-figure.md` saying the option darkens ball
   mode and barely touches ellipsoid mode, tagged with this WP's
-  measurement.
+  measurement (2026-11-17: superseded in part by the measurement, which
+  found ellipsoid mode's atoms losing about half what ball mode's do, the
+  sticks shading them, so the clause says that).
 
 ## Acceptance
 
