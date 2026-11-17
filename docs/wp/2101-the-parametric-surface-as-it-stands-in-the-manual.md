@@ -207,7 +207,14 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   (`formula.md`), because the task named that page and a straight line is where a porter
   writes one first.
 
-  *Gates.* See the PR body for counts on the final tree.
+  *Gates* (on this branch with `origin/main` 2026-11-17 merged in, `[dev]` venv, macOS
+  arm64). `tests/test_manual.py tests/test_manual_api.py tests/test_skill.py
+  tests/test_skill_cli.py tests/test_docs_consistency.py tests/test_examples.py -k "not nac
+  and not srm660c"`: 329 passed. Sphinx `-W`: clean. Vale: no error, and no warning on an
+  added line. Ruff check and the tutorials' format check: clean. `tests.skill_caps`:
+  `series.md` 3 B under its budget. `tests.reader_output`: exit 0, output unchanged. No
+  test was added, and no change could move a measured number, so the full suite did not
+  run.
 
   Next: the maintainer's two rulings above, then task 2 (the inventory of the Durham
   inputs' parametric constructs, with each input's free-parameter and channel counts).
