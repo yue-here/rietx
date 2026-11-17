@@ -1,6 +1,6 @@
 # WP-2146 — The ISIS iparm files read, with each repair recorded
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by ghostshift MacBook-Air-c4aacd
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (2032 soft, closed: the T-1 readers' last follow-ups; 1927 soft, closed: the T-1 cut)
 Priority: P3 2026-11-15 — a reader with a workaround (edit three columns of the file by hand); no TOF fit consumes the profile on main yet, but facility-written HRPD and POLARIS files are what TOF users bring
