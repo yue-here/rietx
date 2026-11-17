@@ -24,6 +24,7 @@
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
   import { canApply, initial, reduce, type Problem, type SyncEvent } from "../lib/sync";
+  import type { TextDraft } from "../lib/recovery";
   // types only — erased at build time, so the boot chunk still has no CodeMirror
   import type { EditorHandle, createEditor } from "../lib/editor";
 
@@ -80,6 +81,49 @@
       if (error instanceof ApiError && error.empty) return; // no project yet
       bootError = (error as Error).message;
     }
+  }
+
+  /** The buffer for the recovery copy (WP-2213): as typed, comments
+   *  included, with the revision it descends from; `null` while it matches
+   *  the rendering.  A restore still fetching answers with what it restores,
+   *  so the copy is not rewritten without it meanwhile. */
+  let restoring = $state.raw<TextDraft | null>(null);
+  export function draft(): TextDraft | null {
+    if (restoring) return restoring;
+    if (!loaded || sync.buffer === sync.base) return null;
+    return { buffer: sync.buffer, revision: sync.revision };
+  }
+
+  /** Put a kept buffer back over a fresh rendering: dirty when that is the
+   *  rendering it was typed against, stale when the project has moved since
+   *  (`lib/sync.ts`, the "restored" event). */
+  export async function restoreDraft(kept: TextDraft) {
+    restoring = kept;
+    try {
+      const payload = await api.textdoc();
+      if (restoring !== kept) return;   // the project was left meanwhile
+      dispatch({ kind: "restored", text: payload.text, revision: payload.revision,
+                 buffer: kept.buffer, kept: kept.revision });
+      loaded = true;
+      if (sync.phase === "dirty" && !sync.stale && !busy) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(check, DEBOUNCE_MS);
+      }
+    } catch (error) {
+      if (!(error instanceof ApiError && error.empty)) bootError = (error as Error).message;
+    } finally {
+      if (restoring === kept) restoring = null;
+    }
+  }
+
+  /** The open project changed: drop this buffer, which is the project left
+   *  behind's (and in its recovery copy), and read the next one afresh. */
+  export function forget() {
+    if (timer) clearTimeout(timer);
+    restoring = null;
+    sync = initial();
+    loaded = false;
+    bootError = "";
   }
 
   function edited(text: string) {

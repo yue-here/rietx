@@ -92,7 +92,7 @@ whatever kind of editor it is. Nothing new to survey.
 
 ## Tasks
 
-- [ ] Text: a `text` arm in `Draft` and `readDraft`, `draft()`/`restoreDraft()` on
+- [x] Text: a `text` arm in `Draft` and `readDraft`, `draft()`/`restoreDraft()` on
   `Text.svelte`, the shell's `$effect` reading it, the restore at the same and at a moved
   revision; vitest beside `lib/recovery.test.ts` and `App.test.ts`'s WP-2209 block
 - [ ] Text: a browser test in `tests/test_gui_recovery_browser.py`: type into the Text panel,

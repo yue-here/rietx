@@ -81,6 +81,7 @@
     type ParamRow,
   } from "../lib/table";
   import { MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
+  import type { ModelDraft } from "../lib/recovery";
   import type { Theme } from "../lib/theme";
   import Splitter from "./Splitter.svelte";
   import Structure3D from "./Structure3D.svelte";
@@ -252,7 +253,8 @@
    *  written from: an export moves no head, and every head move that follows
    *  makes the file a description of something else. */
   let profileSaved = $state("");
-  let draft = $state({ label: "", species: "", x: "0", y: "0", z: "0" });
+  const NO_ATOM = { label: "", species: "", x: "0", y: "0", z: "0" };
+  let atomRow = $state({ ...NO_ATOM });
   /** The 3D view is a **third column of this pane**, not a sixth tab and not a
    *  window of its own: it answers questions about the rows beside it (is that
    *  ADP a balloon? did that coordinate DOF move the atom off its axis?), and a
@@ -407,6 +409,44 @@
     varyEdits = new Map();
     error = "";
     note = "";
+  }
+
+  // -- the recovery copy (WP-2213) ------------------------------------
+  /** The typed fields as they stand, for the recovery copy, or `null` when
+   *  nothing is typed.  The maps themselves rather than the deltas: a restore
+   *  goes back through this form's own state, never by patching the model,
+   *  and the deltas are diffs against a project that may have moved.  Before
+   *  the first load the deltas read zero, so the count falls back to the
+   *  typed fields; the trigger is the typed fields either way, or a restore
+   *  made with this tab unopened would be written over at once. */
+  export function draft(): ModelDraft | null {
+    const typed = edits.size + pedits.size + xyzEdits.size + varyEdits.size;
+    const atom = Object.entries(NO_ATOM).some(([k, v]) => atomRow[k as keyof typeof NO_ATOM] !== v)
+      ? { ...atomRow } : null;
+    const shown = structure ? dirty : typed;
+    if (!shown && !atom) return null;
+    return { count: shown + (atom ? 1 : 0), edits: Object.fromEntries(edits),
+             params: Object.fromEntries(pedits), positions: Object.fromEntries(xyzEdits),
+             vary: Object.fromEntries(varyEdits), atom };
+  }
+
+  export function restoreDraft(kept: ModelDraft) {
+    const map = <T,>(x: Record<string, T> | undefined) => new Map(Object.entries(x ?? {}));
+    edits = map(kept.edits);
+    pedits = map(kept.params);
+    xyzEdits = map(kept.positions);
+    varyEdits = map(kept.vary);
+    if (kept.atom) atomRow = { ...NO_ATOM, ...kept.atom };
+  }
+
+  /** The open project changed: drop every typed field, which belongs to the
+   *  project left behind (and is in its recovery copy). */
+  export function forget() {
+    revert();
+    atomRow = { ...NO_ATOM };
+    symbolDraft = null;
+    symPreview = null;
+    symError = "";
   }
 
   /** Free or hold one row, pending Apply. */
@@ -578,20 +618,20 @@
   }
 
   async function addAtom() {
-    if (!draft.label.trim() || !draft.species.trim()) {
+    if (!atomRow.label.trim() || !atomRow.species.trim()) {
       error = "a new atom needs a label and a species";
       return;
     }
-    const xyz = [draft.x, draft.y, draft.z].map(Number);
+    const xyz = [atomRow.x, atomRow.y, atomRow.z].map(Number);
     if (xyz.some((v) => !Number.isFinite(v))) {
       error = "a new atom's position must be three numbers";
       return;
     }
-    const atom = newAtom(draft.label.trim(), draft.species.trim(), xyz);
+    const atom = newAtom(atomRow.label.trim(), atomRow.species.trim(), xyz);
     await patchStructure(withAtom(structure, phase, atom), `added ${atom.label}`,
       `structure.phases[${phase}].atoms.append(Atom("${atom.label}", `
       + `"${atom.species}", ${xyz.join(", ")}))`);
-    draft = { label: "", species: "", x: "0", y: "0", z: "0" };
+    atomRow = { ...NO_ATOM };
   }
 
   async function removeAtom(index: number) {
@@ -1118,11 +1158,11 @@
         </div>
 
         <div class="add">
-          <input class="mono narrow" placeholder="label" bind:value={draft.label} />
-          <input class="mono narrow" placeholder="species" bind:value={draft.species} />
-          <input class="mono narrow" placeholder="x" bind:value={draft.x} />
-          <input class="mono narrow" placeholder="y" bind:value={draft.y} />
-          <input class="mono narrow" placeholder="z" bind:value={draft.z} />
+          <input class="mono narrow" placeholder="label" bind:value={atomRow.label} />
+          <input class="mono narrow" placeholder="species" bind:value={atomRow.species} />
+          <input class="mono narrow" placeholder="x" bind:value={atomRow.x} />
+          <input class="mono narrow" placeholder="y" bind:value={atomRow.y} />
+          <input class="mono narrow" placeholder="z" bind:value={atomRow.z} />
           <button class="ghost" disabled={busy} onclick={addAtom}>Add atom</button>
         </div>
         <p class="muted">

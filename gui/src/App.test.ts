@@ -6600,3 +6600,164 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
   });
 });
+
+describe("the Text buffer and the Model forms join the recovery copy (WP-2213)", () => {
+  const TYPED = TEXTDOC + "# my note\nlimits 3 60\n";
+  const NO_ARMS = { params: null, interactive: null, plan: null, text: null, model: null };
+  const wait = async (ms = 600) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await flush();
+  };
+  const recoveryPuts = (stub: { calls: Call[] }) =>
+    stub.calls.filter((c) => c.path === "/api/recovery" && c.method === "PUT");
+  const dialog = () => document.querySelector<HTMLElement>(".rc-dialog");
+  const answer = (label: string) =>
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === label)!.click();
+  function routes(kept: unknown, revision = "r1", text = TEXTDOC) {
+    return {
+      "/api/recovery": (call: Call) => ({ body: call.method === "GET" ? kept : {} }),
+      "/api/textdoc": (call: Call) => ({
+        body: call.method === "GET"
+          ? { text, revision, format_version: "1" }
+          : { valid: true, applied: [], delta: {}, revision, would_change: true },
+      }),
+      "/api/params": () => ({ body: MODEL_PARAMS }),
+    };
+  }
+  async function start(extra: Record<string, any>) {
+    const stub = server({ ...boot(), ...extra });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    return stub;
+  }
+  const field = (path: string) =>
+    host.querySelector<HTMLInputElement>(`[data-field="${path}"]`)!;
+  async function typeField(path: string, value: string) {
+    field(path).value = value;
+    field(path).dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+  }
+
+  it("keeps a typed Text buffer, comments included, uncounted", async () => {
+    const stub = await start(routes({ draft: null }));
+    button("Text")!.click();
+    await waitForEditor();
+    await typeInto(TYPED);
+    // past the validation, whose answer is a change of the pane too
+    await settle();
+    await wait();
+    const last = recoveryPuts(stub).at(-1)!.body;
+    expect(last.draft).toEqual({ ...NO_ARMS, count: 0, text: { buffer: TYPED, revision: "r1" } });
+    // the action bar counts none of it: the Text panel keeps its own Apply
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // a buffer read back to the rendering is no edit, and the copy goes
+    host.querySelector<HTMLButtonElement>(".text header button[title^='discard']")!.click();
+    await wait();
+    expect(recoveryPuts(stub).at(-1)!.body.draft).toBeNull();
+  });
+
+  it("restores the buffer dirty over the rendering it was typed against", async () => {
+    const stub = await start(routes({
+      draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
+      saved_utc: null, head: "n0000", head_now: "n0000" }));
+    expect(dialog()?.textContent).toContain(
+      "An edited Text document not applied when the project closed.");
+    answer("Restore");
+    await flush();
+    expect(dialog()).toBeNull();
+    button("Text")!.click();
+    await waitForEditor();
+    expect(editorView().state.doc.toString()).toBe(TYPED);
+    await settle();
+    expect(host.textContent).toContain("ready to apply");
+    // validated against the revision it was typed against, and Apply is live
+    const put = stub.calls.find((c) => c.method === "PUT" && c.path === "/api/textdoc")!;
+    expect(put.body).toEqual({ text: TYPED, base_revision: "r1", validate_only: true });
+    // the server holds exactly this, so nothing is written until it changes
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("restores the buffer stale when the project has moved, with re-read the one exit", async () => {
+    const stub = await start(routes({
+      draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
+      saved_utc: null, head: "n0042", head_now: "n0000" }, "r2", TEXTDOC_MOVED));
+    answer("Restore");
+    await flush();
+    button("Text")!.click();
+    await waitForEditor();
+    await flush();
+    // on screen to copy from, but there is no merge
+    expect(editorView().state.doc.toString()).toBe(TYPED);
+    expect(host.textContent).toContain("stale");
+    expect(host.textContent).toContain("There is no merge");
+    expect(host.querySelector<HTMLButtonElement>(".text header button[title^='apply']")!.disabled)
+      .toBe(true);
+    await settle();
+    expect(stub.calls.some((c) => c.method === "PUT" && c.path === "/api/textdoc")).toBe(false);
+  });
+
+  it("keeps the Model forms' typed fields, and restores them through the form", async () => {
+    const stub = await start(routes({ draft: null }));
+    button("Model")!.click();
+    await flush();
+    await typeField("phases.0.name", "LaB6 batch 2");
+    await wait();
+    const model = recoveryPuts(stub).at(-1)!.body.draft.model;
+    expect(model).toEqual({ count: 1, edits: { "phases.0.name": "LaB6 batch 2" }, params: {},
+                            positions: {}, vary: {}, atom: null });
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    unmount(app);
+    host.innerHTML = "";
+
+    await start(routes({ draft: { count: 0, model }, saved_utc: null,
+                         head: "n0000", head_now: "n0000" }));
+    expect(dialog()?.textContent).toContain(
+      "1 edit in the Model forms not applied when the project closed.");
+    answer("Restore");
+    await flush();
+    button("Model")!.click();
+    await flush();
+    expect(field("phases.0.name").value).toBe("LaB6 batch 2");
+    expect(host.textContent).toContain("1 edit");
+  });
+
+  it("opens another project with neither the Text buffer nor the Model forms carried over", async () => {
+    const other = { ...PROJECT, path: "/tmp/nac.rex",
+                    data: { ...PROJECT.data, filename: "nac.fxye" } };
+    const stub = await start({
+      ...routes({ draft: null }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: other }),
+    });
+    button("Model")!.click();
+    await flush();
+    await typeField("phases.0.name", "LaB6 batch 2");
+    button("Text")!.click();
+    await waitForEditor();
+    await typeInto(TYPED);
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    // the project left behind keeps both, written at once on the way out
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
+    expect(puts[0].draft.text.buffer).toBe(TYPED);
+    expect(puts[0].draft.model.edits).toEqual({ "phases.0.name": "LaB6 batch 2" });
+    // and the next project's panes hold none of it
+    button("Model")!.click();
+    await flush();
+    expect(field("phases.0.name").value).toBe("LaB6");
+    button("Text")!.click();
+    await waitForEditor();
+    await flush();
+    expect(editorView().state.doc.toString()).toBe(TEXTDOC);
+    expect(host.textContent).toContain("in sync");
+  });
+});

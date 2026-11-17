@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { type Draft, RecoveryWriter, combine, offerText, readDraft } from "./recovery";
+import { type Draft, RecoveryWriter, combine, keptParts, offerText, readDraft } from "./recovery";
 
 const PARAMS = { edits: { "phases.0.cell.a": "5.4312" }, vary: {}, hold: {}, limits: {},
                  restraints: {}, positions: {} };
-const DRAFT: Draft = { count: 1, params: PARAMS, interactive: null, plan: null };
+const DRAFT: Draft = { count: 1, params: PARAMS, interactive: null, plan: null, text: null,
+                       model: null };
+const TEXT = { buffer: 'rxt 1\nproject "lab6"\n# my note\n', revision: "r1" };
+const MODEL = { count: 2, edits: { "phases.0.cell.a": "4.2" }, params: {}, positions: {},
+                vary: { "phases.0.cell.a": true }, atom: null };
 
 /** Timers a test fires by hand. */
 function manual() {
@@ -31,8 +35,21 @@ function writer() {
 
 describe("the draft", () => {
   it("is null when no panel holds an edit", () => {
-    expect(combine(0, null, null, null)).toBeNull();
-    expect(combine(1, PARAMS, null, null)).toEqual(DRAFT);
+    expect(combine(0, {})).toBeNull();
+    expect(combine(1, { params: PARAMS })).toEqual(DRAFT);
+  });
+
+  it("keeps the Text buffer and the Model forms as arms of their own (WP-2213)", () => {
+    // neither is counted by the action bar, so either alone is still a copy
+    expect(combine(0, { text: TEXT })).toEqual({ ...DRAFT, count: 0, params: null, text: TEXT });
+    expect(combine(0, { model: MODEL })?.model).toEqual(MODEL);
+    const both = { ...DRAFT, text: TEXT, model: MODEL };
+    expect(readDraft(JSON.parse(JSON.stringify(both)))).toEqual(both);
+    // a copy written before the two arms existed reads with neither
+    expect(readDraft({ count: 1, params: PARAMS, interactive: null, plan: null })).toEqual(DRAFT);
+    // a Text arm restores into an editor, so a malformed one is no arm
+    expect(readDraft({ count: 0, text: { buffer: 3, revision: "r1" } })).toBeNull();
+    expect(readDraft({ count: 1, params: PARAMS, text: { buffer: "x" } })).toEqual(DRAFT);
   });
 
   it("reads back only the shape it writes", () => {
@@ -48,6 +65,18 @@ describe("the draft", () => {
       .toMatch(/^3 edits from .*2026.*, not applied when the project closed\.$/);
     expect(offerText(DRAFT, null)).toBe("1 edit not applied when the project closed.");
     expect(offerText({ ...DRAFT, count: 0 }, "not a date")).toMatch(/^1 edit not applied/);
+  });
+
+  it("names the Model forms and the Text document beside the counted edits", () => {
+    const at = "2026-11-10T09:05:00+00:00";
+    expect(offerText({ ...DRAFT, params: null, count: 0, text: TEXT }, null))
+      .toBe("An edited Text document not applied when the project closed.");
+    expect(offerText({ ...DRAFT, params: null, count: 0, model: MODEL }, null))
+      .toBe("2 edits in the Model forms not applied when the project closed.");
+    expect(offerText({ ...DRAFT, count: 3, text: TEXT, model: { ...MODEL, count: 1 } }, at, "en-GB"))
+      .toMatch(/^3 edits, 1 edit in the Model forms and an edited Text document from .*2026.*, not applied when the project closed\.$/);
+    expect(keptParts({ ...DRAFT, text: TEXT }, "unapplied edit"))
+      .toBe("1 unapplied edit and an edited Text document");
   });
 });
 

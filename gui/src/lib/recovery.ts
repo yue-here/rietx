@@ -7,10 +7,12 @@
  * server keeps one copy per project (`src/rietx/gui/recovery.py`); this module
  * holds the client's half: the draft's shape, and the writer that sends it.
  *
- * The draft holds *proposed* edits only, one arm per panel the action bar
- * counts, and never a value the project stores.  An empty draft is `null`,
- * and writing `null` deletes the copy, which is how an Apply, a Revert or a
- * Discard removes it.
+ * The draft holds *proposed* edits only, one arm per panel, and never a value
+ * the project stores.  Three arms are the panels the action bar counts; the
+ * Text document and the Model forms keep their own Apply and join the copy
+ * uncounted (WP-2213, the maintainer's ruling of 2026-11-10).  An empty draft
+ * is `null`, and writing `null` deletes the copy, which is how an Apply, a
+ * Revert or a Discard removes it.
  */
 
 /** The Parameters panel's six pending maps, as plain objects. */
@@ -34,20 +36,48 @@ export interface PlanDraft {
   guard: number;
 }
 
+/** The Text panel's buffer as typed, comments included, and the revision of
+ *  the rendering it was typed against: restored at another revision it comes
+ *  back stale, since the document has no merge (`lib/sync.ts`). */
+export interface TextDraft {
+  buffer: string;
+  revision: string;
+}
+
+/** The Model panel's typed fields, by the form each belongs to, and the
+ *  new-atom row.  `count` is what the panel itself shows as its edits. */
+export interface ModelDraft {
+  count: number;
+  /** model fields, keyed by the field's path in the model */
+  edits: Record<string, string>;
+  /** raw parameter rows (the ADP patterns) */
+  params: Record<string, string>;
+  /** typed coordinates, keyed by the model path `phases.i.atoms.j.x|y|z` */
+  positions: Record<string, string>;
+  /** refine flags, keyed by parameter path */
+  vary: Record<string, boolean>;
+  atom: { label: string; species: string; x: string; y: string; z: string } | null;
+}
+
 export interface Draft {
   /** what the action bar counted, for the offer's wording */
   count: number;
   params: ParamsDraft | null;
   interactive: InteractiveDraft | null;
   plan: PlanDraft | null;
+  text: TextDraft | null;
+  model: ModelDraft | null;
 }
 
+export type Arms = Partial<Omit<Draft, "count">>;
+
 /** The panels' arms combined, or `null` when none holds an edit. */
-export function combine(count: number, params: ParamsDraft | null,
-                        interactive: InteractiveDraft | null,
-                        plan: PlanDraft | null): Draft | null {
-  if (!params && !interactive && !plan) return null;
-  return { count, params, interactive, plan };
+export function combine(count: number, arms: Arms): Draft | null {
+  const out: Draft = { count, params: arms.params ?? null,
+                       interactive: arms.interactive ?? null, plan: arms.plan ?? null,
+                       text: arms.text ?? null, model: arms.model ?? null };
+  if (!out.params && !out.interactive && !out.plan && !out.text && !out.model) return null;
+  return out;
 }
 
 /** A copy read back, checked for the shape this module writes.  Anything
@@ -56,22 +86,42 @@ export function readDraft(value: unknown): Draft | null {
   if (!value || typeof value !== "object") return null;
   const d = value as Record<string, unknown>;
   const arm = (x: unknown) => (x && typeof x === "object" ? x : null);
-  const out = combine(typeof d.count === "number" ? d.count : 0,
-                      arm(d.params) as ParamsDraft | null,
-                      arm(d.interactive) as InteractiveDraft | null,
-                      arm(d.plan) as PlanDraft | null);
-  return out;
+  const t = arm(d.text) as Record<string, unknown> | null;
+  // a Text arm restores a buffer into an editor, so only the shape written
+  const text = t && typeof t.buffer === "string" && typeof t.revision === "string"
+    ? { buffer: t.buffer, revision: t.revision } : null;
+  return combine(typeof d.count === "number" ? d.count : 0, {
+    params: arm(d.params) as ParamsDraft | null,
+    interactive: arm(d.interactive) as InteractiveDraft | null,
+    plan: arm(d.plan) as PlanDraft | null,
+    text,
+    model: arm(d.model) as ModelDraft | null,
+  });
 }
 
-/** The offer's sentence: how many edits, and when they were kept. */
+const plural = (n: number, noun: string) => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);
+
+/** What a copy holds, in words: the action bar's count (`noun` names it),
+ *  then the Model forms' edits, then the Text document. */
+export function keptParts(draft: Draft, noun = "edit"): string {
+  const counted = draft.params || draft.interactive || draft.plan;
+  const parts: string[] = [];
+  if (counted || (!draft.text && !draft.model)) parts.push(plural(Math.max(1, draft.count), noun));
+  if (draft.model) parts.push(`${plural(Math.max(1, draft.model.count), "edit")} in the Model forms`);
+  if (draft.text) parts.push("an edited Text document");
+  return parts.length > 1
+    ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+}
+
+/** The offer's sentence: what was kept, and when. */
 export function offerText(draft: Draft, savedUtc: string | null | undefined,
                           locale?: string): string {
-  const n = Math.max(1, draft.count);
-  const what = n === 1 ? "1 edit" : `${n} edits`;
+  const what = keptParts(draft);
+  const lead = what.charAt(0).toUpperCase() + what.slice(1);
   const when = savedUtc ? new Date(savedUtc) : null;
-  if (!when || Number.isNaN(when.getTime())) return `${what} not applied when the project closed.`;
+  if (!when || Number.isNaN(when.getTime())) return `${lead} not applied when the project closed.`;
   const stamp = when.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
-  return `${what} from ${stamp}, not applied when the project closed.`;
+  return `${lead} from ${stamp}, not applied when the project closed.`;
 }
 
 type Put = (project: string, head: string | null, draft: Draft | null) => Promise<unknown>;

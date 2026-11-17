@@ -148,4 +148,17 @@ describe("the recovery offer", () => {
     await boot();
     expect(document.body.textContent).not.toMatch(/Unapplied edits/);
   });
+
+  it("offers nothing for a kept Text buffer or Model forms, and leaves that copy alone", async () => {
+    // WP-2213: this page has no panel for either arm; the copy is shared with today's page
+    kept = { draft: { count: 0, text: { buffer: "rxt 1\n# note\n", revision: "r1" },
+                      model: { count: 1, edits: { "phases.0.name": "x" }, params: {},
+                               positions: {}, vary: {}, atom: null } },
+             saved_utc: null, head: "n1", head_now: "n1" };
+    putRecovery.mockClear();
+    await boot();
+    expect(document.body.textContent).not.toMatch(/Unapplied edits/);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(putRecovery).not.toHaveBeenCalled();
+  });
 });

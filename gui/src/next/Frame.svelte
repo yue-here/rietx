@@ -24,7 +24,7 @@
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, type Draft, type InteractiveDraft,
-           type PlanDraft } from "../lib/recovery";
+           type ModelDraft, type PlanDraft, type TextDraft } from "../lib/recovery";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
@@ -153,21 +153,23 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
-  /** The kept copy's Interactive and Plan arms, which today's page wrote and
-   *  this page has no panel for. The copy is one per project and shared by
-   *  both pages, so they ride on every write from here: a Parameters edit on
-   *  this page never drops the other page's unapplied edits. */
-  const NO_CARRY = { interactive: null, plan: null } as const;
-  let carried = $state.raw<{ interactive: InteractiveDraft | null;
-                             plan: PlanDraft | null }>(NO_CARRY);
+  /** The kept copy's Interactive, Plan, Text and Model arms, which today's
+   *  page wrote and this page has no panel for. The copy is one per project
+   *  and shared by both pages, so they ride on every write from here: a
+   *  Parameters edit on this page never drops the other page's unapplied
+   *  edits. The Text and Model arms are not in the action bar's count
+   *  (WP-2213), so they add nothing to `carriedCount`. */
+  const NO_CARRY = { interactive: null, plan: null, text: null, model: null } as const;
+  let carried = $state.raw<{ interactive: InteractiveDraft | null; plan: PlanDraft | null;
+                             text: TextDraft | null; model: ModelDraft | null }>(NO_CARRY);
   const carriedCount = $derived(
     (carried.interactive ? Object.keys(carried.interactive.values ?? {}).length : 0)
     + (carried.plan ? 1 : 0));
   $effect(() => {
     const path = project?.path ?? null;
     const extra = carried;
-    const draft = combine(pendingTouched + carriedCount, paramsPanel?.draft() ?? null,
-                          extra.interactive, extra.plan);
+    const draft = combine(pendingTouched + carriedCount,
+                          { ...extra, params: paramsPanel?.draft() });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -258,8 +260,9 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
-    carried = draft?.interactive || draft?.plan
-      ? { interactive: draft.interactive, plan: draft.plan } : NO_CARRY;
+    carried = draft?.interactive || draft?.plan || draft?.text || draft?.model
+      ? { interactive: draft.interactive, plan: draft.plan, text: draft.text,
+          model: draft.model } : NO_CARRY;
     if (draft?.params) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
