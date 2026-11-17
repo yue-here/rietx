@@ -106,7 +106,10 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [ ] A worked `design` scan over a held scalar, in `examples/`, included into
   `guides/equation.md`, with its missing esd stated.
 - [ ] The refusal message names `.parameters()`.
-- [ ] Skill: the series reference's parametric row, or "none" and why.
+- [x] Skill: the series reference's parametric row, or "none" and why. *Done
+  2026-11-17:* the existing row in `series.md` carries the plan-reach rule, tightened to
+  stay inside the file's budget, and `diagnostics.md`'s `PARAMETRIC_FORM_REJECTED` row
+  carries the held variable, since that code is the name an agent holds there.
 
 ## Acceptance
 
