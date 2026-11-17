@@ -1854,7 +1854,8 @@ also have a 100 K or 300 K scan:
   checks rule out a wrong nominal λ, which would move every line together. The
   Co₃O₄ 300 K patterns of the same experiment index at λ = 2.524 Å with zero near
   0 on Co₃O₄'s room-temperature cell (8.084 Å, Smith & Hobson, *Acta Cryst.* B,
-  1973); at that λ and zero the garnet's cell is 12.378 Å, against YIG's 12.376 Å
+  1973); at that λ the garnet's cell is 12.387 Å with the zero fixed at 0 and
+  12.371 Å with the zero free (−0.06°), against YIG's 12.376 Å
   (Geller & Gilleo, *J. Phys. Chem. Solids*, 1957), and YAG's would need
   λ = 2.45 Å. Independent of λ, with each structure scaled to the whole pattern,
   (220) is about 24 times stronger than YIG's nuclear structure factors give and

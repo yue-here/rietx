@@ -78,7 +78,7 @@ from .base import (
     pattern_data,
     sigma_from_scaled,
 )
-from .rasx import MAX_MEMBER_BYTES, ZIP_MAGIC
+from .rasx import MAX_MEMBER_BYTES, MEMBER_READ_ERRORS, ZIP_MAGIC
 
 #: The XML-Schema-instance namespace, whose ``type`` attribute is what
 #: distinguishes the four kinds of ``RawDataView``.  Held as a namespace rather
@@ -137,7 +137,7 @@ class _Columns:
 def _archive(path: Path) -> zipfile.ZipFile:
     try:
         return zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError) as exc:
         raise ValueError(f"{path.name} begins like a zip archive but is not a "
                          f"readable one ({exc}); a .brml that stops early is "
                          "usually a copy that was interrupted") from None
@@ -157,7 +157,7 @@ def _member(zip_archive: zipfile.ZipFile, name: str, *, path: Path) -> bytes:
         raise ValueError(f"{path.name}: its manifest names {name!r}, which the "
                          "archive does not contain, so the file is internally "
                          "inconsistent") from None
-    except (zipfile.BadZipFile, EOFError) as exc:
+    except MEMBER_READ_ERRORS as exc:
         raise ValueError(f"{path.name}: member {name!r} could not be "
                          f"decompressed ({exc})") from None
     if len(raw) > MAX_MEMBER_BYTES:
@@ -470,13 +470,17 @@ def list_brml_scans(path: str | Path) -> list[ScanInfo]:
 
 
 def looks_brml(p: Path) -> bool:
-    """Zip magic, then both members this reader needs to read anything at all."""
+    """Zip magic, then both members this reader needs to read anything at all.
+
+    An archive ``zipfile`` cannot open is not claimed, as in
+    ``rasx.looks_rasx`` (issue #1593).
+    """
     if not head(p, n=len(ZIP_MAGIC)).raw.startswith(ZIP_MAGIC):
         return False
     try:
         with zipfile.ZipFile(p) as zip_archive:
             names = zip_archive.namelist()
-    except (zipfile.BadZipFile, NotImplementedError, OSError):   # a version past 6.3
+    except (zipfile.BadZipFile, NotImplementedError, OSError):
         return False
     return (any(_MANIFEST.search(n) for n in names)
             and any(_RAW_DATA.search(n) for n in names))

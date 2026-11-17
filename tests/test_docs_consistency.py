@@ -282,6 +282,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-08  docs/ROADMAP.md               618 -> 623  for the gui-overhaul milestone (WP-2123): one table
 #                                                          row, one section of one paragraph; landed 623, no
 #                                                          headroom
+#   2026-11-16  docs/ROADMAP.md               623 -> 628  for the series milestone (WP-2081): one table
+#                                                          row, one section of one paragraph, one Current focus
+#                                                          clause; landed 628, no headroom
 #   2026-10-06  src/rietx/io/CLAUDE.md        501 -> 561  for the time-of-flight readers and axis (issue
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
@@ -290,15 +293,18 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          its per-format row; landed 562
 #   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
 #                                                          case (a name-only refusal) and the table
-#                                                          row's no-fixture sentence; landed LANDED
+#                                                          row's no-fixture sentence; landed 565
 #   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
 #                                                          reader-repair row and one rule for every
 #                                                          reader's pre-drop decisions; landed 571
 #   2026-11-12  src/rietx/io/CLAUDE.md        571 -> 572  for the σ ≤ 0 rule (WP-1952, WP-2002 B5): one
 #                                                          reader-repair row; landed 572
-#   2026-11-16  src/rietx/io/CLAUDE.md        572 -> 573  for the zip of patterns (WP-1315, #134): one
+#   2026-11-16  src/rietx/io/CLAUDE.md        572 -> 575  for the container member-read rule (issue #1593):
+#                                                          the exceptions `zipfile` raises that are not a
+#                                                          ValueError; landed 575, no headroom
+#   2026-11-16  src/rietx/io/CLAUDE.md        575 -> 576  for the zip of patterns (WP-1315, #134): one
 #                                                          per-format row, its staging rule inside it;
-#                                                          landed 573
+#                                                          landed 576
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -622,7 +628,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # its WP-level paragraphs moved to the v1.6 record.  From here the cap is
     # a budget on prose alone, and the per-row bump above ends.  Landed 570,
     # +1 headroom.
-    "docs/ROADMAP.md": 623,
+    "docs/ROADMAP.md": 628,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
@@ -802,7 +808,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 573,
+    "src/rietx/io/CLAUDE.md": 576,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs
@@ -1284,6 +1290,242 @@ def test_current_focus_stays_a_focus_not_a_diary():
         f"Current focus is {n_words} words (cap {CURRENT_FOCUS_WORD_CAP}).  A "
         "shipped milestone's summary belongs in its record, not here."
     )
+
+
+# ----------------------------------------------------------------------
+# Release-note fragments (WP-1941)
+#
+# A change stages its note as docs/releases/unreleased/<id>.<section>.md, and
+# the cut joins the fragments into the next release's staged notes
+# (tests/release_notes.py; docs/RELEASING.md step 2).  These hold the two
+# halves a stranger cannot see from one PR: that a fragment names a heading the
+# staged notes have, and that a join drops nothing.
+# ----------------------------------------------------------------------
+
+from tests import release_notes  # noqa: E402
+
+
+def test_every_release_note_fragment_names_a_section_of_the_staged_notes():
+    head = release_notes.head_path()
+    assert head.is_file(), (
+        f"{head.relative_to(ROOT)} is missing; RELEASING.md step 11 opens the "
+        "next release's staged notes, and every fragment is placed under them")
+    head_text = head.read_text(encoding="utf-8")
+    frags, problems = release_notes.read_fragments()
+    problems += release_notes.check(head_text, frags, str(head.relative_to(ROOT)))
+    assert not problems, "release-note fragments:\n" + "\n".join(problems)
+    # The real join, once per PR that adds a note: it raises on a fragment it
+    # cannot place, so the cut is not the first time a real fragment is joined.
+    release_notes.join(head_text, frags)
+
+
+_HEAD = """\
+# rietx 9.9.0
+
+> Staged.
+
+## Upgrading
+
+Code written against 9.8.0 runs unaltered.
+
+### Code to check
+
+- A loose bullet.
+  Its second line.
+
+- Another.
+
+### Numbers that move
+
+## New
+
+- One.
+- Two.
+
+## Magnetic structures
+"""
+
+
+def _frag(tmp_path, name, text):
+    (tmp_path / name).write_text(text, encoding="utf-8")
+
+
+def test_a_join_places_each_fragment_under_its_heading(tmp_path):
+    _frag(tmp_path, "12.new.md", "- Twelve.\n  Continued.\n")
+    _frag(tmp_path, "3.new.md", "- Three.\n")
+    _frag(tmp_path, "wp1941.new.md", "- A note filed before its PR.\n")
+    _frag(tmp_path, "7.code-to-check.md", "- Seven.\n")
+    _frag(tmp_path, "8.numbers-that-move.md", "- Eight.\n")
+    _frag(tmp_path, "9.magnetic-structures.md", "- Nine.\n")
+    _frag(tmp_path, "README.md", "# Not a fragment\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert not problems and len(frags) == 6
+    joined = release_notes.join(_HEAD, frags)
+    assert joined == """\
+# rietx 9.9.0
+
+> Staged.
+
+## Upgrading
+
+Code written against 9.8.0 runs unaltered.
+
+### Code to check
+
+- A loose bullet.
+  Its second line.
+
+- Another.
+
+- Seven.
+
+### Numbers that move
+
+- Eight.
+
+## New
+
+- One.
+- Two.
+- Three.
+- Twelve.
+  Continued.
+- A note filed before its PR.
+
+## Magnetic structures
+
+- Nine.
+"""
+
+
+def test_a_fragment_naming_no_heading_or_holding_one_is_refused(tmp_path):
+    """A heading, or a fence left open, would move every heading after it."""
+    _frag(tmp_path, "5.fixed.md", "- No such section.\n")
+    _frag(tmp_path, "6.new.md", "## New\n\n- A heading inside.\n")
+    _frag(tmp_path, "7.new.md", "- An open fence.\n\n  ```\n  code\n")
+    _frag(tmp_path, "8.new.md", "- A closed one.\n\n  ```python\n  # a comment\n  ```\n")
+    _frag(tmp_path, "notes.md", "- No section in the name.\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert [p.split(":")[0] for p in problems] == ["6.new.md", "7.new.md", "notes.md"]
+    assert [f.path.name for f in frags] == ["5.fixed.md", "8.new.md"]
+    assert release_notes.check(_HEAD, frags)[0].startswith("5.fixed.md: no heading")
+    with pytest.raises(ValueError, match="5.fixed.md"):
+        release_notes.join(_HEAD, frags)
+
+
+def test_a_fragment_with_a_setext_underline_or_a_rule_is_refused(tmp_path):
+    """`---` or `===` under a line of text makes it a heading the ATX scan does
+    not see, and the join would put a new section inside the one named."""
+    _frag(tmp_path, "1.new.md", "A paragraph\n---\n\n- X.\n")
+    _frag(tmp_path, "2.new.md", "- Y.\n  A title\n  ===\n")
+    _frag(tmp_path, "3.new.md", "- Z.\n\n---\n")
+    _frag(tmp_path, "4.new.md", "- A fenced one is code.\n\n  ```\n  ---\n  ```\n")
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert [p.split(":")[0] for p in problems] == ["1.new.md", "2.new.md", "3.new.md"]
+    assert all("heading" in p for p in problems)
+    assert [f.path.name for f in frags] == ["4.new.md"]
+
+
+def test_a_fragment_for_a_section_the_new_staged_notes_lack_says_how_to_mend_it(tmp_path):
+    """A branch that forked before a cut can merge a note for a section the
+    next staged file does not open; the refusal names the file and the remedy."""
+    _frag(tmp_path, "1700.foreign-files.md", "- A note.\n")
+    frags, _ = release_notes.read_fragments(tmp_path)
+    [problem] = release_notes.check(_HEAD, frags, "docs/releases/9.9.0.md")
+    assert "docs/releases/9.9.0.md" in problem and "'foreign-files'" in problem
+    assert "rebase onto main" in problem
+
+
+def test_one_bullet_notes_in_a_section_that_starts_empty_join_as_a_tight_list(tmp_path):
+    """Every section of a freshly opened staged file is empty, so this is the
+    usual case: separate PRs' notes make one list, not paragraphs."""
+    _frag(tmp_path, "1700.magnetic-structures.md", "- A.\n")
+    _frag(tmp_path, "1701.magnetic-structures.md", "- B.\n  Continued.\n")
+    _frag(tmp_path, "1702.magnetic-structures.md", "- C.\n")
+    _frag(tmp_path, "1703.numbers-that-move.md", "- D.\n")
+    _frag(tmp_path, "1704.numbers-that-move.md", "- E.\n\n- F, loose.\n")
+    _frag(tmp_path, "1705.numbers-that-move.md", "- G.\n")
+    frags, _ = release_notes.read_fragments(tmp_path)
+    joined = release_notes.join(_HEAD, frags)
+    assert joined.endswith("## Magnetic structures\n\n- A.\n- B.\n  Continued.\n- C.\n")
+    # Once a note brings a blank-separated pair, the section is loose from there on.
+    assert "### Numbers that move\n\n- D.\n- E.\n\n- F, loose.\n\n- G.\n\n## New" in joined
+
+
+def _blocks(lines):
+    """A section's text as its blocks: each bullet with its continuation, each paragraph."""
+    blocks, cur = [], []
+    for line in lines:
+        if not line.strip() or release_notes.BULLET.match(line):
+            if cur:
+                blocks.append(" ".join(s.strip() for s in cur))
+            cur = [line] if line.strip() else []
+        else:
+            cur.append(line)
+    if cur:
+        blocks.append(" ".join(s.strip() for s in cur))
+    return blocks
+
+
+def _by_section(text):
+    lines = text.splitlines()
+    marks = release_notes.headings(lines)
+    return {name: sorted(_blocks(lines[i + 1:(marks[k + 1][0] if k + 1 < len(marks)
+                                                  else len(lines))]))
+            for k, (i, _, name) in enumerate(marks)}
+
+
+# A released file never changes, so the round trip always has bullets to split;
+# the live staged file opens with none (RELEASING.md step 11) and may stay so,
+# since notes now go to fragments.
+_ROUND_TRIP_HEADS = {"released-1.11.0": ROOT / "docs" / "releases" / "1.11.0.md", "live": None}
+
+
+@pytest.mark.parametrize("which", list(_ROUND_TRIP_HEADS))
+def test_the_staged_notes_split_into_fragments_join_back_section_for_section(which, tmp_path):
+    """The acceptance: every bullet of a staged-notes file moved into a
+    fragment of its own, joined onto what is left, gives the same sections."""
+    head = _ROUND_TRIP_HEADS[which] or release_notes.head_path()
+    head_text = head.read_text(encoding="utf-8")
+    lines = head_text.splitlines()
+    marks = release_notes.headings(lines)
+    kept, n = lines[:marks[0][0]], 0
+    for k, (start, _, name) in enumerate(marks):
+        end = marks[k + 1][0] if k + 1 < len(marks) else len(lines)
+        kept.append(lines[start])
+        item: list[str] = []
+        for line in lines[start + 1:end] + [""]:
+            if item and (not line.strip() or release_notes.BULLET.match(line)):
+                n += 1
+                _frag(tmp_path, f"{n}.{name}.md", "\n".join(item) + "\n")
+                item = []
+            if release_notes.BULLET.match(line) or (item and line.strip()):
+                item.append(line)
+            elif not item:
+                kept.append(line)
+    if n < 2 and which == "live":
+        pytest.skip(f"{head.relative_to(ROOT)} holds {n} bullet(s); the released file "
+                    "carries the round trip")
+    assert n >= 2, f"{head.relative_to(ROOT)} holds under two bullets; nothing was split"
+    frags, problems = release_notes.read_fragments(tmp_path)
+    assert not problems and len(frags) == n
+    joined = release_notes.join("\n".join(kept) + "\n", frags)
+    assert _by_section(joined) == _by_section(head_text)
+    assert release_notes.sections(joined) == release_notes.sections(head_text)
+
+
+def test_a_freshly_opened_staged_file_skips_the_live_round_trip(tmp_path, monkeypatch):
+    """1.12.0.md as step 11 opened it: headings, no bullets.  The live arm must
+    skip there, not fail, or every PR goes red from the day after a cut."""
+    opened = tmp_path / "9.9.0.md"
+    opened.write_text("# rietx 9.9.0\n\n> Staged.\n\n## Upgrading\n\n### Code to check\n\n"
+                      "## New\n\n## Changed\n", encoding="utf-8")
+    monkeypatch.setattr(release_notes, "head_path", lambda *a, **k: opened)
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    (tmp_path / "frags").mkdir()
+    with pytest.raises(pytest.skip.Exception, match="holds 0 bullet"):
+        test_the_staged_notes_split_into_fragments_join_back_section_for_section(
+            "live", tmp_path / "frags")
 
 
 # ----------------------------------------------------------------------

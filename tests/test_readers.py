@@ -2597,6 +2597,139 @@ def test_a_manifest_naming_a_missing_raw_data_is_refused_by_name(tmp_path):
         rx.read_pattern(p)
 
 
+# ------------------------------------------- zip containers zipfile can't read
+# Issue #1593 item 3: ``zipfile`` raises ``NotImplementedError``,
+# ``RuntimeError`` and ``zlib.error`` for archives and members it cannot read,
+# and none is the ``ValueError``/``OSError`` a reader's refusal must be
+# (``io/CLAUDE.md`` § Refusals).  Each archive below is a valid ``.rasx`` or
+# ``.brml`` rewritten member for member, so the container is the only change.
+def _zip_container(kind: str, path: Path) -> Path:
+    if kind == "rasx":
+        return write_rasx(path, [dict(rows=[(10.0 + 0.02 * i, 5.0 + i)
+                                            for i in range(20)])])
+    return write_brml(path, [dict(rows=[(1, 1, 10.0 + 0.02 * i, 5.0, 500 + i)
+                                        for i in range(20)])])
+
+
+def _rewritten(src: Path, dst: Path, *, compress_type=None, **info) -> Path:
+    import zipfile
+
+    with zipfile.ZipFile(src) as old, zipfile.ZipFile(dst, "w") as new:
+        for member in old.infolist():
+            zinfo = zipfile.ZipInfo(member.filename, member.date_time)
+            zinfo.compress_type = (zipfile.ZIP_STORED if compress_type is None
+                                   else compress_type)
+            for name, value in info.items():
+                setattr(zinfo, name, value)
+            new.writestr(zinfo, old.read(member.filename))
+    return dst
+
+
+def _patched_headers(path: Path, *, local: int, central: int, value: int,
+                     flag: bool = False) -> Path:
+    """Write ``value`` into a two-byte field of every local and central header
+    (OR it in when ``flag``): ``zipfile`` refuses to *write* the values these
+    tests need.  The members are stored text, so no header signature occurs
+    inside one."""
+    raw = bytearray(path.read_bytes())
+    for signature, offset in ((b"PK\x03\x04", local), (b"PK\x01\x02", central)):
+        at = raw.find(signature)
+        while at >= 0:
+            field = int.from_bytes(raw[at + offset:at + offset + 2], "little")
+            field = field | value if flag else value
+            raw[at + offset:at + offset + 2] = field.to_bytes(2, "little")
+            at = raw.find(signature, at + 4)
+    path.write_bytes(bytes(raw))
+    return path
+
+
+def _corrupt_streams(path: Path, *, at: int) -> Path:
+    """Invert byte ``at`` of each member's compressed stream: for deflate the
+    first byte, which then names block type 3 ("invalid block type"); for LZMA
+    the range coder's first byte, which must be zero (after zip's 4-byte LZMA
+    header and the 5 property bytes).  Either is refused before the CRC is
+    ever checked."""
+    import zipfile
+
+    raw = bytearray(path.read_bytes())
+    with zipfile.ZipFile(path) as archive:
+        for member in archive.infolist():
+            offset = member.header_offset
+            start = (offset + 30
+                     + int.from_bytes(raw[offset + 26:offset + 28], "little")
+                     + int.from_bytes(raw[offset + 28:offset + 30], "little"))
+            raw[start + at] ^= 0xFF
+    path.write_bytes(bytes(raw))
+    return path
+
+
+@pytest.mark.parametrize("kind", ["rasx", "brml"])
+def test_a_zip_version_past_6_3_is_not_claimed_by_a_vendor_sniff(tmp_path, kind):
+    """``ZipFile()`` raises ``NotImplementedError`` ("zip file version 6.4") when
+    the central directory's version-needed byte is over 63.  Both sniffs open
+    the archive, and let it escape ``identify_format`` before #1593."""
+    from rietx.io.formats.brml import looks_brml
+    from rietx.io.formats.rasx import looks_rasx
+
+    p = _rewritten(_zip_container(kind, tmp_path / f"good.{kind}"),
+                   tmp_path / f"v64.{kind}", extract_version=64)
+
+    assert looks_rasx(p) is False
+    assert looks_brml(p) is False
+    with pytest.raises(ValueError) as refusal:
+        rx.read_pattern(p)
+    assert p.name in str(refusal.value)
+
+
+@pytest.mark.parametrize("kind", ["rasx", "brml"])
+def test_a_zip_version_past_6_3_is_refused_by_the_reader_called_directly(
+        tmp_path, kind):
+    """``read_rasx`` and ``read_brml`` are exported, so a caller can reach
+    ``_archive`` without the sniff: the ``NotImplementedError`` is converted
+    there too."""
+    from rietx.io.formats.brml import read_brml
+    from rietx.io.formats.rasx import read_rasx
+
+    p = _rewritten(_zip_container(kind, tmp_path / f"good.{kind}"),
+                   tmp_path / f"v64.{kind}", extract_version=64)
+
+    reader = read_rasx if kind == "rasx" else read_brml
+    with pytest.raises(ValueError, match="not a readable one") as refusal:
+        reader(p)
+    assert p.name in str(refusal.value)
+
+
+@pytest.mark.parametrize("kind", ["rasx", "brml"])
+@pytest.mark.parametrize("damage", ["deflate64", "encrypted", "corrupt deflate",
+                                    "corrupt lzma"])
+def test_a_member_zipfile_cannot_read_is_refused_by_name(tmp_path, kind, damage):
+    """The archive opens and the sniff claims it, so the member read is where
+    ``zipfile``'s exception has to become a refusal: ``NotImplementedError``
+    for Deflate64 (method 9, which Windows writes for large archives),
+    ``RuntimeError`` for an encrypted member, ``zlib.error`` and
+    ``lzma.LZMAError`` for a corrupt stream."""
+    import zipfile
+
+    good = _zip_container(kind, tmp_path / f"good.{kind}")
+    p = tmp_path / f"bad.{kind}"
+    if damage == "deflate64":
+        _patched_headers(_rewritten(good, p), local=8, central=10, value=9)
+    elif damage == "encrypted":
+        _patched_headers(_rewritten(good, p), local=6, central=8, value=1,
+                         flag=True)
+    elif damage == "corrupt deflate":
+        _corrupt_streams(_rewritten(good, p, compress_type=zipfile.ZIP_DEFLATED),
+                         at=0)
+    else:
+        _corrupt_streams(_rewritten(good, p, compress_type=zipfile.ZIP_LZMA),
+                         at=9)
+
+    assert identify_format(p).name == kind
+    with pytest.raises(ValueError, match="could not be decompressed") as refusal:
+        rx.read_pattern(p)
+    assert p.name in str(refusal.value)
+
+
 # --------------------------------------------------------------------------- #
 # Bruker/Siemens .raw — the binary DIFFRAC formats
 #
