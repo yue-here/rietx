@@ -566,6 +566,9 @@ position-only list returns the same candidates as on `main`.
   2026-11-15. Still Yue's: replace vs append, and INDEX_WEAK_LINE_RETRY's tier
   (an action at tier 3 needs Yue's dated approval).
 
+  Ruled by Yue 2026-11-17: the new `str(IndexingResult)` and
+  `INDEX_WEAK_LINE_RETRY` accepted (reader output).
+
 - **2026-11-12** — tasks 1, 3 and 4, by a ghostshift runner, in PR #1543. A
   floor on line intensity is not what other indexing programs do by default.
   They search the first twenty or so lines and score with all of them, and the
