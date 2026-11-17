@@ -160,6 +160,8 @@ A fit that turns a torsion inside a rigid body now says that the anti-bump check
 
 *Settled by Claude 2026-11-15 (Yue delegated clear calls):* the RESTRAINT_BODY_CONTACTS_UNCHECKED text as quoted in the PR body, under Yue's 2026-11-13 ruling "both" and the reader-output junk test (it varies per fit and names an action). The #1507 comment stays unposted until Yue approves its rewritten text.
 
+Ruled by Yue 2026-11-17: the `RESTRAINT_BODY_CONTACTS_UNCHECKED` torsion warning accepted (reader output).
+
 - **2026-11-12** — created, from the 2026-11-12 issue triage (issue #1507).
   Checked against the tree at `a86dcf9d4`: the skip and its reason are where
   the issue says, the stale check shares the skip, and a folded chain reaches
