@@ -1,9 +1,8 @@
 # WP-1947 — the model read at its values, without a solve
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-17 — PR #1640; `Refinement.evaluate`, `reflection_table(data)` and `background` read the model at its values without a fit or a write, and a stage refuses `max_iter < 1`; two follow-ups in issue #1652
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-10-11 — an application reads statistics, ticks and the background before a fit through an undocumented empty stage or by mutating its own refinement; each has a workaround
 
 ## Goal
 
@@ -104,11 +103,6 @@ driver (WP-1938 landed): a freeing stage with `max_iter=0` raises scipy's
 still accepted. `cherry_pick` now passes `max_iter` and `lebail_cycles`
 through unchanged, an explicit 0 included (`refine.py:4895`). The
 displacement tick defect is fixed (WP-1908, ✅).
-
-### Inherited
-
-*(Pruned 2026-11-17 on arrival; what each entry became is in the handover
-entry of that date.)*
 
 ## Non-goals
 
@@ -220,6 +214,77 @@ fit reports.
 - Issues #890, #891, #894.
 
 ## Handover log
+
+- **2026-11-17** — closed (ghostshift runner, PR #1640). An application
+  can now ask rietx three things before any fit, each in one documented call
+  that changes nothing: what a fit would report at the values as they stand
+  (`Refinement.evaluate`), which reflections the model draws
+  (`reflection_table(data)`), and the background alone (`background`). The
+  undocumented empty stage still works, but it writes history and a run
+  directory; the new verb runs that same stage on a private copy, so its
+  answer is the empty stage's by construction rather than by a second
+  implementation, Le Bail and Pawley extraction included. A stage asked for
+  zero iterations is refused where it is built, naming the verb, instead of
+  failing mid-fit in scipy's words. Nothing in a fit's numbers moved.
+
+  *Done.* All seven tasks plus the inherited `api_call` slip (see each
+  task's *Landed* note). On arrival the `### Inherited` entries were pruned:
+  #1381's skill row and the `max_iter` lower bound folded into Tasks; of
+  WP-1986's two `lebail_cycles` slips the help text and `cherry_pick` had
+  already been fixed on `main`, and `api_call`'s became a task; WP-1938's
+  `max_iter or 100` replay was already fixed. Context's stale call sites are
+  superseded in part, dated, in place. Review (a read-only subagent in this
+  worktree; `/code-review` is not run by runners) found one bug and three
+  smaller points, all taken: (1) a GUI plan holding `max_iter` 0 was stored
+  and then every plan read answered 500, so `StageSpec.max_iter` gained
+  `ge=1` and the plan route now answers 4xx at `plan.stages.0.max_iter`
+  (probed on the `fap` example); (2) a node recorded before this change from
+  an empty stage with `max_iter=0` now renders a line that raises, and
+  `cherry_pick` of it raises, which is the intended refusal; (3) `evaluate`
+  and `reflection_table(data)` now default to the refinement's own mode, so
+  a Le Bail refinement is read in Le Bail and the two `reflection_table`
+  forms agree; (4) one test comment overclaimed what an assertion could see,
+  reworded. Follow-ups filed as issue #1652: the Plan panel's iteration
+  field has no `min` (needs a dist rebuild), and
+  `docs/docs/reference/exports.md` says `predict()` and `predict(grid)`
+  differ on 36 of 4200 channels where `predict`'s docstring (WP-1421) says
+  they agree bit for bit.
+
+  *Measured* (macOS arm64, `[dev]`, this worktree's venv, unless marked).
+  On the synthetic LaB6 with a non-zero background: `evaluate` equals the
+  empty-stage fit on statistics, `y_calc`, `y_background`, ticks and codes
+  in all three modes (Pawley: 19 intensities free, 2 iterations each in the
+  evaluate and closing stages); 18-45 ms an evaluation against 18-31 ms for
+  the empty-stage fit. `background` is bit-equal to the scale-zero
+  `predict`, the phase-free twin's `predict` and, after a fit in each mode,
+  `y_background`. With recording forced on and an empty working directory,
+  `evaluate` wrote no `.rietx` (the positive arm, a plain fit there, did).
+  Tests added: nine cases in `tests/test_refine_synthetic.py`, one in
+  `tests/test_history.py`; `tests/test_lm_solver.py`'s two `max_iter=0`
+  tests rewritten (the single-fit one now parametrised over 0 and -4), and
+  two expectations each in `test_report_apply.py` and
+  `test_history.py` updated for the partition settings. Workstation runs
+  (Linux, the shared py3.12 venv + PYTHONPATH to the tree): canary
+  `wp1947c` on `e01bf80df`, 213 passed in 40 s; fast `wp1947f` on the
+  main-merged `7b458d0da`, FAST_COUNTS. `python -m tests.reader_output`:
+  exit 0, unchanged against the merge-base. Vale (the CI step): 0 errors.
+  Manual `sphinx -W`: exit 0. Full suite not run: nothing here moves a
+  fitted number.
+
+  *Generality.* No row in `rietx._audit` changed and no threshold, default
+  action or diagnostic was added, so the judge was not dispatched. The
+  `max_iter >= 1` refusal is arithmetic (a budget under one evaluation runs
+  nothing), and `mode=None` reading the refinement's own mode decides
+  nothing for the user. Two module-level copies of `StageSpec`'s partition
+  defaults tripped `test_audit_table` and were inlined instead.
+
+  *Gotchas.* `evaluate` is a whole fit's machinery on a copy, so it is not a
+  per-evaluation objective (WP-1948 inherits that). A stage mutated past its
+  constructor (`plan.stages[0].max_iter = 0`) still reaches the driver's own
+  `max_nfev` refusal; `test_lm_solver.py` keeps that backstop.
+
+  *Next:* none here. WP-1948 (its Priority back to P3) builds the outside
+  optimiser's objective; issue #1652 holds the two follow-ups.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issues #890,
   #891, #894). Checked against the tree at `d80ca5f4`: `max_iter=0` raises
