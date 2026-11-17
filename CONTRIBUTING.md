@@ -195,7 +195,8 @@ regenerates the two copies.
 
 A change a user upgrading needs to hear about (a break, a number that moves,
 a user-facing addition) stages its note in the same pull request, as a new
-file in `docs/releases/unreleased/` named `<PR number>.<section>.md`.
+file in `docs/releases/unreleased/` named `<id>.<section>.md`. The id is the
+pull request's number, or before it exists any name no other note uses.
 [That directory's README](docs/releases/unreleased/README.md) says how to name
 the section and what the file holds. A new file never conflicts with another
 pull request's, which a line appended to the staged notes often did.

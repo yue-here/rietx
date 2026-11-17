@@ -1389,12 +1389,15 @@ Code written against 9.8.0 runs unaltered.
 
 
 def test_a_fragment_naming_no_heading_or_holding_one_is_refused(tmp_path):
+    """A heading, or a fence left open, would move every heading after it."""
     _frag(tmp_path, "5.fixed.md", "- No such section.\n")
     _frag(tmp_path, "6.new.md", "## New\n\n- A heading inside.\n")
+    _frag(tmp_path, "7.new.md", "- An open fence.\n\n  ```\n  code\n")
+    _frag(tmp_path, "8.new.md", "- A closed one.\n\n  ```python\n  # a comment\n  ```\n")
     _frag(tmp_path, "notes.md", "- No section in the name.\n")
     frags, problems = release_notes.read_fragments(tmp_path)
-    assert [p.split(":")[0] for p in problems] == ["6.new.md", "notes.md"]
-    assert [f.path.name for f in frags] == ["5.fixed.md"]
+    assert [p.split(":")[0] for p in problems] == ["6.new.md", "7.new.md", "notes.md"]
+    assert [f.path.name for f in frags] == ["5.fixed.md", "8.new.md"]
     assert release_notes.check(_HEAD, frags)[0].startswith("5.fixed.md: no heading")
     with pytest.raises(ValueError, match="5.fixed.md"):
         release_notes.join(_HEAD, frags)

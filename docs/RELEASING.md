@@ -54,11 +54,12 @@ which is the backlog this rule exists to prevent.
    [1.0.1](releases/1.0.1.md), a patch that changed no source file.
    Start by joining the notes staged as fragments in
    [releases/unreleased/](releases/unreleased/README.md) (WP-1941):
-   `python -m tests.release_notes --write` places each under its heading of
-   the staged file and deletes it, and `--version X.Y.Z` names the file for a
-   patch release. Then edit the result as a reader's document, like any other
-   draft: order, merge, reword, and replace the staging notice with the
-   release's framing.
+   `python -m tests.release_notes --write` places every fragment in the
+   directory under its heading of the staged file, `pyproject.version`'s, and
+   deletes it. A patch release has no staged file, so write one first with
+   the headings its fragments name. Then edit the result as a reader's
+   document, like any other draft: order, merge, reword, and replace the
+   staging notice with the release's framing.
    In the same change, read the names the manual still owes prose for, in
    `tests/api_surface_deferred.txt`. `python -m tests.api_surface` prints the
    count beside its ceiling. Record the count in the release record's ship

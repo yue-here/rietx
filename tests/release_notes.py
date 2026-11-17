@@ -25,7 +25,7 @@ At the cut (``docs/RELEASING.md`` step 2)::
     python -m tests.release_notes --write    # write them, delete the fragments
 
 Each fragment goes at the end of its section's own text, before the next
-heading of any level, in the order of its ``<id>`` (numbers first, by value).
+heading of level 2 or more, in the order of its ``<id>`` (numbers first, by value).
 A section whose bullets sit on consecutive lines gets its fragments the same
 way; any other gets a blank line before each.  The joined file is then edited
 as a reader's document, like any other step-2 draft.
@@ -49,8 +49,10 @@ FRAGMENT_DIR = RELEASES / "unreleased"
 
 FRAGMENT_NAME = re.compile(
     r"^(?P<id>[0-9A-Za-z][0-9A-Za-z_-]*)\.(?P<section>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$")
-HEADING = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*#*\s*$")
-FENCE = re.compile(r"^\s*(```|~~~)")
+# An ATX heading as CommonMark reads one: up to three spaces of indent, and a
+# closing run of #s only after a space, so `## C#` keeps its `#`.
+HEADING = re.compile(r"^ {0,3}(?P<hashes>#{1,6})(?:\s+(?P<text>.*?))?(?:\s+#+)?\s*$")
+FENCE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
 BULLET = re.compile(r"^[-*] ")
 
 # Files in the fragment directory that are not fragments.
@@ -86,17 +88,31 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def headings(lines: list[str]) -> list[tuple[int, int, str]]:
-    """(line index, level, slug) of every heading of level 2 or more, outside code fences."""
-    found, fenced = [], False
+def _scan(lines: list[str]) -> tuple[list[tuple[int, int, str]], bool]:
+    """Every ATX heading outside a code fence as (line index, level, slug), and
+    whether every fence closed.  A fence closes only on its own character, at
+    least as long as its opener."""
+    found, fence = [], ""
     for i, line in enumerate(lines):
-        if FENCE.match(line):
-            fenced = not fenced
+        f = FENCE.match(line)
+        if f and not fence:
+            fence = f["fence"]
             continue
-        m = None if fenced else HEADING.match(line)
-        if m and len(m["hashes"]) >= 2:
-            found.append((i, len(m["hashes"]), slug(m["text"])))
-    return found
+        if f and fence and f["fence"][0] == fence[0] and len(f["fence"]) >= len(fence) \
+                and not line.strip().strip(fence[0]):
+            fence = ""
+            continue
+        m = None if fence else HEADING.match(line)
+        if m:
+            found.append((i, len(m["hashes"]), slug(m["text"] or "")))
+    return found, not fence
+
+
+def headings(lines: list[str]) -> list[tuple[int, int, str]]:
+    """(line index, level, slug) of every heading of level 2 or more, outside code fences.
+
+    The level-1 heading is the file's title and bounds no section."""
+    return [h for h in _scan(lines)[0] if h[1] >= 2]
 
 
 def sections(head_text: str) -> list[str]:
@@ -128,9 +144,13 @@ def read_fragments(directory: Path = FRAGMENT_DIR) -> tuple[list[Fragment], list
         if not text.strip():
             problems.append(f"{path.name}: empty")
             continue
-        if headings(text.splitlines()) or any(
-                HEADING.match(line) for line in text.splitlines() if line.startswith("# ")):
+        found, closed = _scan(text.splitlines())
+        if found:
             problems.append(f"{path.name}: holds a heading; a fragment is the text under one")
+            continue
+        if not closed:
+            problems.append(f"{path.name}: a code fence never closes, which would turn every "
+                            "heading after it into code")
             continue
         frags.append(Fragment(path, m["id"], m["section"], text))
     return frags, problems
@@ -181,7 +201,8 @@ def join(head_text: str, frags: list[Fragment]) -> str:
         if k + 1 < len(marks):
             out.append("")
     text = "\n".join(out).rstrip("\n") + "\n"
-    unplaced = [f.path.name for f in frags if f.text not in text]
+    # Each fragment's text appears at least once more than the head alone holds it.
+    unplaced = [f.path.name for f in frags if text.count(f.text) <= head_text.count(f.text)]
     if unplaced:  # pragma: no cover - a join that drops text is a bug here, not in a fragment
         raise AssertionError(f"fragments left unplaced: {unplaced}")
     return text
@@ -205,7 +226,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     head_text = head.read_text(encoding="utf-8")
     frags, problems = read_fragments()
-    problems += check(head_text, frags)
+    try:
+        problems += check(head_text, frags)
+    except ValueError as err:  # two headings with one slug
+        problems.append(f"{head.relative_to(ROOT)}: {err}")
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1

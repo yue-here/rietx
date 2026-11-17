@@ -72,7 +72,7 @@ be lost. The script makes the staged file itself the configuration. Every
 heading of level 2 or more is a section, named by its slug
 (`### Numbers that move` is `numbers-that-move`), so a new section is one new
 heading and nested sections cost nothing. A fragment's multi-line bullets are
-copied as written. It is 228 lines with its docstring, and adds no dependency. The tool
+copied as written. It is 252 lines with its docstring, and adds no dependency. The tool
 facts are from each tool's own configuration pages, read 2026-11-17.
 
 **Decided 2026-11-17 (task 3): keep the staged file as the head.** On
