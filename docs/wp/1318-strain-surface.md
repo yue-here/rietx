@@ -85,7 +85,7 @@ second one.
 - [x] Tests: surface values pinned against the module's scalar evaluation
       on a corpus case (the brucite/corundum cone-count fixtures exist);
       PNGs to `tests/output/` and looked at. (`tests/test_strain_surface.py`,
-      16 fast; the refined pin rides on the brucite TRF fixture in
+      10 test functions, 18 fast items; the refined pin rides on the brucite TRF fixture in
       `test_acceptance_stephens.py`, slow.)
 
 ## Acceptance
@@ -162,6 +162,17 @@ The shipping PR comments on issue #197 saying its strain half landed —
     point, that the notebook's dark copy keeps the light red for the
     shaded facets, is declined: the dark copy is drawn from the light
     figure by colour mapping, and a shaded facet's colour is no role colour.
+  - *Second review (PR #1620):* the colourbar test keyed on vertices while
+    a facet is red when any vertex is, so the l⁴-only brucite block
+    (s004 = −1e6) drew an all-red surface beside a bar; the scale and the
+    bar now follow the facets drawn in it, and the committed pair is
+    redrawn (bar top 2118 → 2116 ppm). Two tests added: the bar's presence
+    (`fig.axes`), which fails on the old code, and a block 1e-10 below the
+    cone's face, which fails with `STEPHENS_CONE_TOL` forced to 0 (both
+    checked by hand), so 10 test functions, 18 items. The guard floors its scale at
+    1.0 and the figure does not; the docstring says so, and whether to
+    mirror the floor is left to Yue. The release record's refined pin is
+    1e-10, not 1e-12.
   - *Gotchas:* the hull's simplices come in either winding, and matplotlib's
     shading reads the normal, so they are turned outward or the surface draws
     as a checkerboard. Poly3DCollection with `shade=True` needs explicit

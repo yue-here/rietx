@@ -20,6 +20,7 @@ import pytest
 from rietx.crystallography.lattice import d_spacings, reciprocal_metric_tensor
 from rietx.crystallography.spherical_harmonics import sphere_points
 from rietx.crystallography.stephens import (
+    S_NAMES,
     directional_sigma2,
     isotropic_coefficients,
     monomial_matrix,
@@ -231,3 +232,74 @@ def test_a_phase_without_a_drawable_block_is_refused():
         plot_strain_surface(brucite())
     with pytest.raises(ValueError, match="all-zero"):
         plot_strain_surface(brucite(StephensStrain.from_values([0.0] * 15)))
+
+
+def _l4_block(scale: float) -> np.ndarray:
+    """The P-3m1 pure l⁴ pattern at ``scale``, every other pattern zero."""
+    coef = np.zeros(stephens_basis("P -3 m 1").shape[0])
+    coef[_L4_ROW] = scale
+    return coef
+
+
+def test_the_colourbar_follows_the_drawn_facets():
+    """The bar is drawn when some facet is in its scale, and only then.  The
+    l⁴ block driven negative is below zero everywhere but the basal plane: a
+    band of vertices there is inside the tolerance, yet every facet touches a
+    vertex outside it, so the whole surface is red and a bar would be a legend
+    for nothing (review of PR #1620: 22 such vertices, 0 such facets)."""
+    import matplotlib.pyplot as plt
+
+    from rietx.viz import plot_strain_surface
+    from rietx.viz.strain import _surface
+
+    phase = brucite(_strain_from_coef(_l4_block(-1e6), vary=False))
+    surface = _surface(np.array(phase.microstrain.values()),
+                       phase.cell.lengths_angles(), 4000)
+    # the case the check must tell apart: good vertices, no good facet
+    assert (~surface["bad"]).any() and surface["face_bad"].all()
+    fig = plot_strain_surface(phase)
+    assert len(fig.axes) == 1
+    plt.close(fig)
+
+    # the positive arm: a block with facets on the scale gets its bar
+    fig = plot_strain_surface(brucite(_strain_from_coef(_brucite_coef(600.0),
+                                                        vary=False)))
+    assert len(fig.axes) == 2
+    plt.close(fig)
+
+
+def test_rounding_at_the_cone_face_is_not_drawn_as_a_region(monkeypatch):
+    """A block on the cone's face, below zero by a round-off-sized amount: the
+    positive l⁴ pattern, zero on the basal plane, less an in-plane quartic at
+    1e-10 of the largest value, under the guard's 1e-9.  The tolerance keeps it
+    off the red; without it the basal band turns red."""
+    import matplotlib.pyplot as plt
+
+    from rietx.viz import plot_strain_surface
+    from rietx.viz.strain import _surface
+
+    cell = CELLS[1]
+    u = sphere_points(4000)
+    basis = stephens_basis("P -3 m 1").astype(np.float64)
+    in_plane = next(k for k, row in enumerate(basis) if row[S_NAMES.index("s400")])
+    coef = _l4_block(1e6)
+    top = directional_sigma2(basis.T @ coef, cell, u).max()
+    unit = np.zeros_like(coef)
+    unit[in_plane] = 1.0
+    coef[in_plane] = -1e-10 * top / directional_sigma2(basis.T @ unit, cell, u).max()
+    s = basis.T @ coef
+    sigma2 = directional_sigma2(s, cell, u)
+    # the block does dip below zero on the sampled sphere, inside the tolerance
+    assert (sigma2 < 0.0).any()
+    assert sigma2.min() > -1e-9 * np.abs(sigma2).max()
+
+    phase = brucite(_strain_from_coef(coef, vary=False))
+    assert not _surface(s, cell, 4000)["face_bad"].any()
+    fig = plot_strain_surface(phase)
+    assert _bad_faces(fig, "light") == 0
+    assert "σ²(M) < 0" not in _text(fig)
+    plt.close(fig)
+
+    # the positive arm: with no tolerance the same block draws a red band
+    monkeypatch.setattr("rietx.strategy.staged.STEPHENS_CONE_TOL", 0.0)
+    assert _surface(s, cell, 4000)["face_bad"].any()

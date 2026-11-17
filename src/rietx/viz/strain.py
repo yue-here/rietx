@@ -68,7 +68,9 @@ def _surface(s: np.ndarray, cell, n_directions: int) -> dict[str, np.ndarray]:
     ``face_bad`` and ``face_r`` per triangle.  A triangle touching a direction
     below zero is unphysical, so the region is never drawn smaller than it is.
     "Below zero" is the guard's relative tolerance, ``STEPHENS_CONE_TOL`` times
-    the largest magnitude, applied to σ²/M².
+    the largest magnitude, applied to σ²/M².  The guard also floors that
+    magnitude at 1.0 over the reflections and this does not; the two differ only
+    for a block whose largest value is below 1, far below any physical strain.
     """
     from scipy.spatial import ConvexHull
 
@@ -131,7 +133,11 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
                                     surface["face_r"], surface["bad"])
     radius = surface["radius"]
     top = float(radius.max())
-    good_top = float(radius[~bad].max()) if (~bad).any() else top
+    # the colour scale and its bar follow the facets drawn in it, not the
+    # vertices: a facet touching one bad vertex is drawn red, so a band of good
+    # vertices narrower than the sampling leaves no facet on the scale
+    good = ~face_bad
+    good_top = float(face_r[good].max()) if good.any() else top
 
     plt = _pyplot()
     from matplotlib import colormaps
@@ -173,7 +179,7 @@ def plot_strain_surface(structure, diagnostics=None, *, phase: int = 0,
         ax.set_axis_off()
         ax.view_init(elev=elev, azim=azim)
 
-        if (~bad).any():
+        if good.any():
             # a scale nothing is drawn in would be a legend for no facet
             cax = fig.add_axes((0.86, 0.30, 0.03, 0.52))
             bar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), cax=cax)
