@@ -85,7 +85,7 @@ Each GSAS-II control has a rietx argument:
 | the histograms selected for the sequential refinement, in order | `rx.refine_sequential(patterns, structure, instrument, x=temperatures, x_label="T (K)")`, in the order of `patterns` |
 | the refinement flags, the same for every histogram | `plan=`, run whole on the first pattern |
 | Copy results to next histogram? | the default, `carry=["*"]`: each pattern starts from the one before |
-| the same box unticked, each histogram from the project's values | `carry=[]` with `refit="stages"`: each pattern starts from the starting models and walks the whole plan |
+| the same box unticked, each histogram from the project's values | `carry=[]` with `refit="stages"`: each pattern starts from the starting models and walks the whole plan. GSAS-II starts a histogram's phase parameters from its own earlier sequential result when one is stored, and rietx keeps none between runs |
 | Reverse order? | `direction="backward"`. `direction="both"` runs both orders and lists each parameter's gap between them in `SeriesResult.direction_gaps` |
 | the sequential results table | `series.to_table(paths=[...])` and `series.write_csv(path)`; `series.trajectory("phases.0.cell.a")` for one column |
 | a pseudo-variable over the table's columns | a derived path such as `qpa.<phase>` in `to_table`; other expressions have no rietx counterpart with an esd |
