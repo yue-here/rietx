@@ -2239,8 +2239,28 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.cif.CIF_STATED_MULTIPLICITY_SNAP_TOL", "constant", value=0.001),
     Row("rietx.crystallography.cif.DUPLICATE_U_TOLERANCE", "constant", value=0.0002),
     Row("rietx.crystallography.cif.OCCUPANCY_TOLERANCE", "constant", value=0.01),
+    Row("rietx.crystallography.dispersion.CEILING_EV", "constant", tier=3, value=200000.0,
+        evidence=("WP-1925 2026-11-17: where the computed rows above the bundled 70 keV stop. "
+                  "#792 names 130 keV and high-energy powder beamlines run to about 150 keV; "
+                  "the f'' the rows carry is checked against McMaster's photoelectric cross "
+                  "section to 3 % only to 120 keV (tests/test_dispersion.py::"
+                  "test_f_double_prime_above_70_kev_reproduces_mcmaster), and the computed f' "
+                  "against gemmi's where that is regular to 200 keV (test_matches_gemmi_where_"
+                  "its_f_prime_is_regular); above it a lookup is refused, naming "
+                  "Dispersion.overrides and Source.dispersion = None"),
+        grounds=("Ours: a band edge, chosen to cover the beamlines the issue names with "
+                 "margin; nothing physical changes at 200 keV, and past it the refusal names "
+                 "both ways round it. Proposed for the maintainer's dated approval.")),
     Row("rietx.crystallography.dispersion.LINE_DISPERSION_TOL", "constant", value=0.01),
     Row("rietx.crystallography.dispersion.NEAR_EDGE_EV", "constant", value=50.0),
+    Row("rietx.crystallography.dispersion._KK_SAMPLES", "constant", tier=1,
+        value=(100.0, 10000000.0, 1.002),
+        evidence=("numerical grid for the dispersion integral (WP-1925): anchored on 35-55 keV "
+                  "only, it reproduces the bundled f' over 55-70 keV to <= 0.0073 e for every "
+                  "element Z = 3-92 more than 1 keV from an edge (tests/test_dispersion.py::"
+                  "test_the_dispersion_integral_reproduces_the_bundled_f_prime, 8 elements "
+                  "to 0.01 e); edges get a bisected node pair, without which the residual "
+                  "reaches 0.05 e near a K edge (measured 2026-11-17)")),
     Row("rietx.crystallography.fragments.COLLINEAR_TOL", "constant", value=1e-06),
     Row("rietx.crystallography.fragments.INERTIA_RANK_TOL", "constant", value=1e-06),
     Row("rietx.crystallography.fragments._COINCIDENT_A2", "constant", value=1e-20),
