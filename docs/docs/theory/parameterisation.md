@@ -459,27 +459,6 @@ $\delta\varphi \leftarrow 0$. About one axis that composition is addition,
 so the chart moves by a translation and the esd of $\delta\varphi$ is the
 esd of $\varphi$.
 
-A body built from a Z-matrix refines its internal coordinates
-$\boldsymbol\zeta$, each line's bond length, bond angle and dihedral, as TOPAS
-refines its Z-matrix parameters (*TOPAS-Academic V6 Technical Reference*,
-§ 10.22). Its template is the Z-matrix's
-placement less a point $\mathbf{c}_0$ of its frame frozen at declaration,
-before any torsion:
-
-```{math}
-:label: par-zmatrix
-
-\mathbf{T}_i(\boldsymbol\zeta) = \mathbf{Z}_i(\boldsymbol\zeta) - \mathbf{c}_0,
-```
-
-{source}`rietx.crystallography.fragments.zmatrix_points`
-
-with $\partial\mathbf{T}/\partial\boldsymbol\zeta$ propagated forward through
-the placement in closed form, then through the torsions and the pose. An
-internal is an absolute parameter, in Å or degrees; an unbounded dihedral is
-kept in (−180°, 180°] at every commit, so a series compares the dihedral angles in
-`SeriesResult.dihedral_paths` modulo 360°.
-
 A body's *shape* is a hypothesis the data can reject. `Refinement.check_rigid_bodies` releases each body's atoms as free coordinates held near the template by soft restraints, each riding hydrogen tied to its parent, and compares the two fits on the data χ² alone, by Hamilton's R-factor ratio test {cite}`hamilton1965` and by ΔBIC {cite}`schwarz1978`, both at the effective sample size of the serially correlated residual. It warns (`RIGID_BODY_MISFIT`) only when both reject the body, and names the template bonds the released fit moved.
 
 A hydrogen in a body rides with it, at a tabulated length from its parent atom

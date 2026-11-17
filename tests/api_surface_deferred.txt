@@ -39,7 +39,6 @@ RigidBody.riding
 RigidBody.rotation_vary
 RigidBody.template
 RigidBody.torsions
-RigidBody.zmatrix
 RigidBody.zmatrix_origin
 TetherRestraint
 TetherRestraint.atom_i
@@ -49,7 +48,6 @@ TetherRestraint.op_index
 TetherRestraint.sigma
 TetherRestraint.translation
 TetherRestraint.weight
-ZLine
 ZLine.angle
 ZLine.atom
 ZLine.b
