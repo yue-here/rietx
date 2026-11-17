@@ -173,6 +173,13 @@ Documentation = "https://rietx.org/docs/"
 [project.scripts]
 rietx = "rietx.cli:main"
 
+# PyInstaller's documented route for a library to ship its own hook (WP-1950,
+# issue #898): an application freezing rietx gets the data files, the browser
+# pages, the kernel wheel and the version metadata without naming any of them.
+# `src/rietx/__pyinstaller/hook-rietx.py` says what each is for.
+[project.entry-points.pyinstaller40]
+hook-dirs = "rietx.__pyinstaller:get_hook_dirs"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/rietx"]
 # Hatchling takes every non-ignored file under a package directory, so the three

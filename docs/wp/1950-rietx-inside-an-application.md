@@ -107,10 +107,10 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
       `telemetry=` and the working directory in the precedence. Retention
       and its three guards keep working under it (WP-1403), and `rietx
       watch` is told where to look.
-- [ ] A PyInstaller hook shipped in the package through the `pyinstaller40`
+- [x] A PyInstaller hook shipped in the package through the `pyinstaller40`
       entry point: data files, the static page directories, the kernel
       wheel as a hidden import, and the dist-info metadata.
-- [ ] Verify it with a real freeze of a one-fit script in CI or a temporary
+- [x] Verify it with a real freeze of a one-fit script in CI or a temporary
       branch workflow (no docker here): the frozen fit loads the kernels,
       stamps the real version, and writes its run where the root says.
 - [ ] Manual: an "Embedding rietx" section in `using/` covering telemetry
