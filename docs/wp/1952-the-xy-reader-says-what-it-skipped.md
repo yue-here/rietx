@@ -1,6 +1,6 @@
 # WP-1952 — the xy reader says what it skipped
 
-Milestone: unscheduled · Status: 🔄 2026-11-17 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-17 — counts warning and the TEMP decision in PR #1659; the pdCIF naming remains, once PR #1471 merges
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a decimal-comma file reads as a different pattern with no word, and a dropped mid-file row goes unreported; a fine step usually trips the duplicate-2θ refusal, and the reporter keeps their own reader
@@ -172,6 +172,52 @@ same arrays and no new diagnostic.
 - Issue #1448, fixed by PR #1541.
 
 ## Handover log
+
+### 2026-11-17 — the counts warning lands, the TEMP line is decided (PR #1659, ghostshift runner)
+
+A pattern that comes with no usable σ is weighted as if its intensities were counts, √max(y, 1), and until now nothing said when they could not be. An intensity between 0 and 1, or below 0, is no count, and the fallback gives it σ = 1: a pattern normalised below one count was fitted unweighted, in silence. The reader now counts such points and names where they sit, for every format, with no threshold, since one such value is already proof. A column scaled but never below 1 stays silent, because it is weighted right up to one factor, which moves χ² and no parameter or esd. No tracked file fires. Separately, the second (and third) value on an `XYDATA` file's `TEMP` line is settled: the first stays the temperature, and the others are not surfaced.
+
+*Done* (commits `7fc9f070f`, `0833ed45a`, `e9f9c2d7b` on top of the claim `7c5e6671e`, then `origin/main` merged):
+- The counts warning (B5.2): `PATTERN_INTENSITY_NOT_COUNTS`, on `read_pattern`'s hook beside the σ ≤ 0 rule (`readers._not_counts_diagnostics`). It fires when the pattern has no σ after that rule (so also when a column with no positive σ was declined) and holds a finite intensity strictly between 0 and 1 or below 0. A zero is not counted: on raw counts one count at a zero count is the floor's purpose. It fires beside `PATTERN_INTENSITY_SCALED` too, since that code gives no count of the points at the floor (the review's change, below). Audit rows: code tier 1 (arithmetic, no threshold), suggestion tier 1, kind 3. `help.py`, the skill's diagnostics row (three copies), the manual's pattern-files page, a silence pair, and five test functions in `tests/test_readers_robust.py` (one parametrized over the real fixtures). Two existing `.raw` tests now expect the new code beside `PATTERN_INTENSITY_SCALED`: the scrambled v4 fixture (a third of its values negative) and the scaled v2 file (0.25 and -2.0).
+- The second `TEMP` value: decided, no code change. ILL D1B writes three values on every one of the 26 tracked `XYDATA` files (three are planted copies). The third is a round number on each (300, 100, 120, 1.5); the first lies within 6.5 K of it on every run with a sample, and reads 330 on the empty cryostat at 120 K. That is the shape of a set point and a sample sensor, though no document either side holds says so. The first is what the manual names (`tsamp`) and what the reader already took; `io/CLAUDE.md` § Metadata rules that a reader surfaces only a coordinate the format names, so the others stay unread. Recorded in `io/formats/xy.py`'s docstring and the manual, pinned by a test on two D1B files.
+- `### Inherited` is deliberately not pruned, though all three entries are now consumed (B5.2 here; #1064's two parts by PR #1279 and its TEMP question here; #1240 by PR #1241, merged 2026-10-31). Held PR #1471 inserts an entry at the top of that section, and deleting the entries beside it would conflict that PR. The session that takes #1471's entry deletes them.
+
+*Measured*:
+- Census of every tracked file `read_pattern` opens (all formats, `.cif` under `tests/data`, `examples`, `data`): 59 read with no σ (47 `xy`, 12 others), and 58 hold no intensity between 0 and 1 or below 0. The 59th, the synthetic `bruker_raw4_scrambled.raw` (2335 such points, 2320 of them below 0), fires beside its `PATTERN_INTENSITY_SCALED`. The three pdCIF patterns all carry σ.
+- Fast selection (`-m "not slow"`, `-n 4`), `[dev]` venv, arm64 Mac, under ghostshift's serial lock, on the merged tree `227ce207b` (the branch with `origin/main` merged, before this entry): 14 726 passed, 432 skipped, 32 xfailed, 0 failed, in 12:38 wall. An earlier run on `0833ed45a`, before the review's fixes and the merge, gave 14 713 passed; main moved between the two, so they do not subtract. The 12 added test cases (6 functions) cost 0.19 s in all (`tests.added_test_times` on that run's junit).
+- `python -m tests.reader_output`: exit 0, unchanged (it covers one standard fit's printed text, which carries σ). ruff clean. Vale (`rietx_vale.sh`, CI's step): 0 errors at warning level.
+
+*What a reader receives* (for the maintainer, per the 2026-11-01 ruling on reader output): one new warning, `PATTERN_INTENSITY_NOT_COUNTS`, only on a file with no σ that holds such values: "N of M points have an intensity no count can take (k between 0 and 1 and j below 0), at 2θ …, and the fallback gives each of them σ = 1." Its suggestion: "If the intensities were scaled or had a background subtracted, supply σ carried from the raw counts, or quote χ² and esds knowing the weights are assumed." No field, no fit number and no refusal changes.
+
+*Review*: a read-only Opus reviewer inside the worktree (the project's `/code-review` edits the main checkout, so it was not run). No correctness bug. One defect, fixed: the message said "the file gives no σ", false where the hook had declined a column with no positive σ; it now says "no usable σ", in the help and skill rows too. Nits fixed: the zero exemption stated for raw counts only, the TEMP test's "set point" made "a round value", spacing and a reflow. One nit answered rather than coded: on a column scaled above 1 that holds zeros, the zeros are weighted at σ = 1 and nothing fires; the fractional values that reveal such a scale are what fires, and counting zeros would fire on raw counts.
+
+*Generality*: the judge (`.claude/agents/generality-review.md`, run as an Opus agent) ran on `0833ed45a`. Its verdicts, condensed; every finding is kept:
+
+> **`PATTERN_INTENSITY_NOT_COUNTS` (code) — holds.** Kind 1 and tier 1 agree. Weak on two questions: the "non-integer at low counts" half of B5.2 was dropped without a ruling, and a column not proportional to counts and above 1 (an offset background, a slit correction) stays silent with wrong relative weights. `responds` named only χ² and esds, though an all-floor fit moves the parameters too. Every firing case is synthetic; the census was not listed.
+>
+> **`PATTERN_INTENSITY_NOT_COUNTS.suggestion` — holds.** Minor: a negative value can be a masked channel's placeholder, where the remedy is to exclude the point.
+>
+> **The suppression after `PATTERN_INTENSITY_SCALED` — weak, the case against stronger.** That code's skill row says the parameters are largely unaffected, false exactly when the floor binds everywhere, and it gives no floor count; nothing recorded that the new code was withheld.
+>
+> **The `TEMP` decision — holds.** Kind 1 by the format's definition. Partial: the empty can reads 330 K at a 120 K set point with no message, and nothing records that the line held more values. One family (ILL D1B).
+
+Author's answers, in `e9f9c2d7b`:
+- Suppression: removed; both codes fire, and a test pins it with a shared list.
+- `responds`: now names the parameters where most points sit at the floor.
+- The non-integer half: not built, and asked of the maintainer in the PR. Integrality cannot tell a proportional column from an offset one, so it would not catch the judge's case either, and it would fire on 19 tracked patterns that are weighted right up to a constant.
+- Census: listed above under *Measured*.
+- Masked-channel negatives: declined; no reader here writes one with no σ (recalled by the judge, not found in the tree).
+- `TEMP`: the other values stay unrecorded, by `io/CLAUDE.md` § Metadata; the empty can has no sample, so its 330 K describes nothing a series would key on.
+
+*Settled for you* (each could have gone the other way):
+- The rule is "an intensity between 0 and 1 or below 0", not B5.2's "maximum about 1 or less, or non-integer at low values". Grounds: it needs no threshold, and it fires exactly where the fallback is wrong. The alternative, any non-integer value, would fire on 19 tracked patterns that say nothing today (the twelve LLB G41 files and seven TOPAS exports), whose weights are right up to a constant.
+- It lives on `read_pattern`'s hook for every format, not in `xy` alone. Grounds: the fallback is format-agnostic, as the σ ≤ 0 rule and `PATTERN_SIGMA_CONSTANT` are. The alternative was `xy` and `chi` only.
+- It is a warning, not info. Grounds: B5's ruling, "warn during ingestion". The alternative was info for a handful of points.
+- The `TEMP` line's first value stays the temperature (above).
+
+*Decision for the maintainer*: whether to add B5.2's second half, a warning on non-integer values at low counts. Built as "any non-integer value with no σ", it fires on 19 tracked patterns that say nothing today (the twelve LLB G41 files, the seven TOPAS exports), all weighted right up to one constant.
+
+*Next*: the pdCIF naming in this reader's "no numeric data found" refusal, once held PR #1471 merges and brings its `### Inherited` entry (with or after WP-1933's sniff). Then delete the three consumed `### Inherited` entries and close the WP.
 
 ### 2026-11-13 — Yue's rulings recorded, main merged (PR #1541, ghostshift runner)
 
