@@ -161,6 +161,13 @@ output, so its wording goes to the maintainer before merge.
       refused.*
 - [ ] (c): read the GSAS manual on a declared NTERMS below the full count.
       Write the finding here, then repair with a record or keep the refusal.
+      *Blocked 2026-11-17 on the manual: `find_paper.py GSAS larson` finds
+      the Zotero record with no file, and `86-748` finds nothing. The
+      refusal stays as it was. GSAS-II 5.8.4 ignores NCOF and reads the
+      first seven slots by token (`docs/practice.md` § A GSAS-I
+      time-of-flight instrument file's profile set); that is GSAS-II's
+      practice and says nothing about GSAS-I. Next: the PDF from the
+      maintainer, pages 144, 148 and 221-223.*
 - [x] (d): replace the per-coefficient sign test on sig-2 with σ²(d) > 0
       over the bank's d range. Write the no-range case's choice here.
       *Done 2026-11-17. The range is the `I ITYP` window mapped through
@@ -181,13 +188,20 @@ output, so its wording goes to the maintainer before merge.
       between the bank's record and the previous bank's. The DIFC is
       geometric, measured: 2·95.89·sin(84.2835°)/(h/mₙ) = 48236.6 against
       the 48236.8 written.*
-- [ ] Tests on synthetic fixtures at the two files' column widths: each
+- [x] Tests on synthetic fixtures at the two files' column widths: each
       repair with its diagnostic, the refusal it replaces, and a bank whose
-      σ² turns negative inside its range still refused.
-- [ ] `_audit` rows for each new code; the manual page
+      σ² turns negative inside its range still refused. *Landed with each
+      item, in `tests/test_instrument_tof.py` and `tests/test_tof_axis.py`.*
+- [x] `_audit` rows for each new code; the manual page
       `reference/instrument-files.md`; the reader rulebook if a rule moves.
-- [ ] Skill: none expected. The diagnostics carry the guidance (root
+      *Two rows, tier 2 and tier 1, after the iparm rows WP-2006 tiers. The
+      rulebook's strict-layout bullet names the repairs and the sig-2 test
+      (cap 572 → 575, `docs/milestones/process.md` § The caps diary).*
+- [x] Skill: none expected. The diagnostics carry the guidance (root
       CLAUDE.md § skill, the cheapest place). Revisit if an agent needs a row.
+      *Root CLAUDE.md also says "a diagnostic code adds its row", which
+      outranks this WP's expectation, so the two codes have short rows in
+      `references/diagnostics-gsas.md` (+556 bytes, inside its budget).*
 
 ## Acceptance
 

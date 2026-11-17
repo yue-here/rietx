@@ -1018,6 +1018,15 @@ only when called by name.  The operating detail went down a rank: the PRCF
 layout, the bintype table and every refusal's wording are the module
 docstrings'.  560 landed against the 561.
 
+572 -> 575 for the ISIS instrument files (WP-2146, issue #1447): the strict
+reader's "refused by name otherwise" gains its two exceptions, each a repair
+with one reading and a record, and sig-2 is judged by the variance it gives
+over the bank's range instead of its sign.  A session changing the reader
+needs all three, since each one moves what "strict" means.  The `.gss`
+metadata rule went down a rank, into `METADATA_KEYS` and the reader's
+docstring, where the wavelength's "recorded, never used" already covers its
+class.  575 landed against the 575.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`

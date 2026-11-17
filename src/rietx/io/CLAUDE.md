@@ -279,14 +279,6 @@ temperature field, and Rigaku's `CW_Temperature*` axes are the cooling water.
 Reading a specimen coordinate off an axis named for something else is inventing
 a convention, which is the one repair a reader may never make.
 
-**A `.gss` bank's Mantid line is focusing geometry, never the calibration**
-(WP-2146): `# Total flight path …m, tth …deg, DIFC …` before a `BANK` record
-becomes `total_flight_path_m`, `two_theta_bank_deg` and `difc_geometric`, as
-written, only where one such line sits between that bank and the one before.
-Its DIFC follows from L and 2θ (HRPD bank 1: 48236.8); the instrument file's
-`ICONS` DIFC was refined against a standard (48275.36). Nothing reads either
-key to set a `TOFSource`.
-
 ## Per format
 
 | format | claimed by | σ | notes |
@@ -491,7 +483,10 @@ axis over.
 - **Strict to the documented layout, refused by name otherwise**: set 1 the
   default whatever its `PTYP`; `NCOF` exactly 12 / 15 / 21; a default PTYP
   2/4/5 refused, a non-default set declined; a non-zero anisotropic term or
-  ITYP 1/2 fifth `ICOFF` pair refused. A LANSCE-shaped file (8-slot type-1
+  ITYP 1/2 fifth `ICOFF` pair refused. **Two repairs have one reading and are
+  recorded** (WP-2146): a bank's lone unnumbered `PRCF` set is set 1, and
+  zeros past a record's last field that change no digit are read. sig-2 is
+  judged by σ²(d) > 0 over the `I ITYP` window, the sign test where none. A LANSCE-shaped file (8-slot type-1
   `PRCF`) is **refused** here and read only by `legacy/` below. A bank with no
   `PRCF` reads with an all-zero `ProfileTOF`, which says so. `ICONS`' POLA,
   IPOLA, KRATIO pass blank **or zero**, FORTRAN's one reading (F77 §13.5.9).
