@@ -783,3 +783,23 @@ def test_phase_support_and_line_counts_answer_on_a_tof_bank():
     empty = compile_tof_model(st, ins, pattern, tof_limits=(43000.0, 45000.0))
     assert empty.phase_line_counts()[0] == 0
     assert empty.phase_support(v)[0] == 0.0
+
+
+def test_the_compiled_bank_counts_its_sigma_rule_over_its_own_window():
+    """WP-1952's σ ≤ 0 count reaches a bank as it reaches a constant-wavelength
+    model: ``refine`` reads ``model.sigma_rule`` for the result, so a bank
+    without it fails every fit; and the count is over the ``tof_limits``
+    window, so a σ = 0 channel outside it is not counted."""
+    x = grid()
+    sigma = np.ones_like(x)
+    sigma[5] = 0.0          # inside the window below
+    sigma[-5] = 0.0         # outside it
+    pat = PatternData(tof=x.tolist(), intensity=np.ones_like(x).tolist(),
+                      sigma=sigma.tolist())
+    whole = compile_tof_model(silicon(), bank(), pat)
+    assert whole.sigma_rule.n_nonpositive_excluded == 2
+    assert whole.sigma_rule.n_file_sigma == len(x) - 2
+    cut = compile_tof_model(silicon(), bank(), pat,
+                            tof_limits=(float(x[0]), float(x[len(x) // 2])))
+    assert cut.sigma_rule.n_nonpositive_excluded == 1
+    assert len(cut.tof) == len(x) // 2 + 1 - 1

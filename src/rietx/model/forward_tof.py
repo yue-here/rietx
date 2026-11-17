@@ -113,7 +113,7 @@ from ..crystallography.structure_factor import (
 )
 from ..crystallography.symmetry import generate_reflections
 from ..schemas.instrument import HUMP_FIELDS, Instrument
-from ..schemas.pattern import IntensityBasis, PatternData
+from ..schemas.pattern import IntensityBasis, PatternData, SigmaRule
 from ..schemas.structure import Structure
 from .absorption import cylinder_absorption
 from .extinction import sabine_extinction
@@ -401,6 +401,12 @@ class CompiledTOFModel:
     #: same specimen can be inside the Rouse domain at one end of a bank and
     #: outside it at the other.
     mu_r_range: tuple[float, float] | None = None
+
+    #: Which σ rule weighted the fitted channels, counted over this compile's
+    #: own window (``PatternData.sigma_rule``, WP-1952), as on
+    #: ``CompiledModel``: what ``RefinementResult.sigma_rule`` carries.  ``None``
+    #: only on a model built without ``compile_tof_model``.
+    sigma_rule: SigmaRule | None = None
 
     #: ``"gaussian"`` (GSAS TOF profile type 1) or ``"pseudovoigt"`` (type 3).
     #: Compile-time structural, like ``CompiledModel.shape``: taken from
@@ -1206,11 +1212,20 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
 
     mask = pattern.in_range_mask()
     x_all, y_all, s_all = pattern.tof_us(), pattern.y(), pattern.sig()
+    window = None
     if tof_limits is not None:
         lo, hi = tof_limits
-        mask &= (x_all >= lo) & (x_all <= hi)
+        window = (x_all >= lo) & (x_all <= hi)
+        mask &= window
     tof, y_obs, sigma = x_all[mask], y_all[mask], s_all[mask]
-    _require(len(tof) >= 10, "fewer than 10 points remain in the fit range")
+    # the same count, over the same window, ``compile_model`` takes (WP-1952)
+    sigma_rule = pattern.sigma_rule(window)
+    why = ""
+    if sigma_rule.n_nonpositive_excluded:
+        why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+               "because their σ is zero or below (nonpositive_sigma='exclude'), "
+               "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+    _require(len(tof) >= 10, f"fewer than 10 points remain in the fit range{why}")
     tof_min, tof_max = float(tof[0]), float(tof[-1])
 
     # W(T), and only where the *pattern* says one is owed.  Measured on the
@@ -1466,6 +1481,7 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         profile_kind=profile_kind,
         spectrum_itype=spectrum_itype, spectrum_paths=spectrum_paths,
         absorption_terms=absorption_terms, mu_r_range=mu_r_range,
+        sigma_rule=sigma_rule,
         d_range=(d_lo, d_hi), difc_stage=float(src.difc.value),
         restraint_weight_scale=float(restraint_weight_scale),
         lorentz_window_tol=(None if profile_kind == "gaussian"
