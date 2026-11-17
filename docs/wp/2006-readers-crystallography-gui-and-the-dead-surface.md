@@ -77,11 +77,14 @@ promise stages every break).
       27): raise site, `level`, condition, whether it records an act or asserts a
       judgement. `LANDE_G_ASSUMED` and `MAGNETIC_ION_ASSUMED` are raised here and in
       `strategy/magnetic.py`; 2002 tiers them on both sites and this WP reads the row.
-- [ ] The constants of `io/` (~30) and `crystallography/` (66 by AST), entered by 2001's
+- [x] The constants of `io/` (~30) and `crystallography/` (66 by AST), entered by 2001's
       walk: tier each, expected mostly tier 1 (byte offsets, physical limits) with the
-      few thresholds named above.
-- [ ] Tier each; for the few thresholds (`CIF_ANGLE_CORRECT_MAX_DEG`, the attenuator
+      few thresholds named above. (2026-11-17: 120 constant rows; 65 tiered, 22 tier-3
+      candidates and 33 left, `2006-batch/tiers.md`.)
+- [x] Tier each; for the few thresholds (`CIF_ANGLE_CORRECT_MAX_DEG`, the attenuator
       conventions measured per format, the axis refusal), evidence and families.
+      (2026-11-17: 222 of 290 rows tiered, 88 responses given; 35 tier-3 candidates and
+      33 left rows in `2006-batch/tiers.md`.)
 - [x] The reachability walk over `derive_surface()`'s 2 238 entries, as a script in
       `tests/` run by hand (a Haiku-grade task: collate, do not judge), its output a table
       with one row per unreached entry and where it *is* referenced.
