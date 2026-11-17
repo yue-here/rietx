@@ -32,9 +32,11 @@ archive is claimed and its read refused, naming the member.  A member that
 holds several scans of its own (a ``.rasx``, an ``.xrdml``) is refused too:
 ``scan=`` already selects the member, so its second scan could not be reached.
 
-The ASCII reader claims any text that is not binary, so a text member that is
-not a pattern (a log, a parameter file) counts as one, and reading it refuses,
-naming the member.  That is the claim rule as WP-1315 states it.
+The ASCII reader claims any text that is not binary, and ``pdcif`` any ``.cif``
+by its suffix, so a text member that is not a pattern (a log, a parameter file,
+a structure CIF) would count as one.  A member only such a weak claim reaches
+counts only on content evidence: a row of two numbers, or a ``_pd_`` data tag.
+Otherwise it is skipped and never counted (decisions walk, 2026-11-16).
 
 **Reading a member is recursion into the normal dispatch, not a new parser.**
 The member's bytes are read through the container cap, written to a file of
@@ -188,13 +190,37 @@ def _staging() -> Iterator[Path]:
         yield Path(directory)
 
 
+_PDCIF_TAG = re.compile(rb"^\s*_pd_(?:meas|proc|calc)_", re.I | re.M)
+
+
+def _has_profile(fmt: PatternFormat, raw: bytes) -> bool:
+    """Content evidence for a member only a weak claim reaches.
+
+    The ASCII catch-all claims any text, and ``pdcif`` claims any ``.cif`` by
+    its suffix.  Neither is evidence, so such a member counts as a pattern only
+    when it holds a row of two numbers (``xy``, by the reader's own row test)
+    or a ``_pd_meas``/``_pd_proc``/``_pd_calc`` tag (``pdcif``).  A log, a
+    parameter file or a structure CIF is skipped (decisions walk, 2026-11-16).
+    """
+    from .pdcif import PDCIF
+    from .xy import XY, _two_numbers
+
+    if fmt is XY:
+        text = raw.decode("utf-8", errors="replace")
+        return any(_two_numbers(line) for line in text.splitlines())
+    if fmt is PDCIF:
+        return _PDCIF_TAG.search(raw) is not None
+    return True
+
+
 def _claim(staged: Path, raw: bytes) -> PatternFormat | None:
     """The reader that claims a staged member, or ``None``.
 
     The registry's own order, without this format: a zip inside is skipped
     rather than enumerated.  A refusal claiming it, or a plain zip that only a
     loose text sniff would claim (a stored one shows its first member's text to
-    ``gsas``), is no pattern.
+    ``gsas``), is no pattern.  A weak claim (the ASCII catch-all, a ``.cif``
+    suffix) is a pattern only on content evidence (:func:`_has_profile`).
     """
     from . import PATTERN_FORMATS
     from .brml import BRML
@@ -206,6 +232,8 @@ def _claim(staged: Path, raw: bytes) -> PatternFormat | None:
             if fmt.refuses is not None:
                 return None
             if raw.startswith(ZIP_MAGIC) and fmt not in (rasx.RASX, BRML):
+                return None
+            if not _has_profile(fmt, raw):
                 return None
             return fmt
     return None

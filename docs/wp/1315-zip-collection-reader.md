@@ -114,6 +114,13 @@ The shipping PR carries `Closes #134`.
 
 ## Handover log
 
+- **2026-11-17** — decisions-walk item 1 made in #1592: a member claimed only by the ASCII
+  catch-all or by the `.cif` suffix counts as a pattern only on content evidence (a row of
+  two numbers; a `_pd_meas`/`_pd_proc`/`_pd_calc` tag), and is skipped otherwise.
+  `zip_collection._has_profile`; `tests/test_reader_zip.py` gains the log, parameter-file and
+  structure-CIF case and a pdCIF case. Item 2 stands as settled: member 0 is read, with
+  `PATTERN_MULTISCAN_DEFAULTED`.
+
 - **2026-11-16** — closed by a ghostshift runner; PR #1592, follow-ups in #1593.
 
   A plain `.zip` of pattern files now opens with `read_pattern` without being extracted:

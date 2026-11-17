@@ -29,6 +29,11 @@ def xye_text(start: float, n: int = 40) -> str:
                    for i in range(n))
 
 
+#: Numeric rows under a stated d-spacing axis: the ASCII reader recognises it as a
+#: profile (so it counts) and refuses to read it.
+REFUSED_TEXT = "# The X-axis unit is: d-spacing\n" + xye_text(1.0, 10)
+
+
 def fxye_text(n: int = 12) -> str:
     """One GSAS ``FXYE`` bank: 2θ in centidegrees, intensity and esd per row."""
     rows = "".join(f"  {(10.0 + 0.02 * i) * 100:.1f}  {500 + i % 7}  {22 + i % 3}\n"
@@ -215,6 +220,28 @@ def test_a_vendor_container_inside_is_a_pattern(tmp_path):
     assert len(data.intensity) == 50
 
 
+def test_a_text_member_with_no_profile_is_not_a_pattern(tmp_path):
+    """The ASCII catch-all and a ``.cif`` suffix are weak claims: a log, a
+    parameter file and a structure CIF are skipped, never counted
+    (decisions walk, 2026-11-16, item 1)."""
+    structure = "data_s\n_cell_length_a 5.0\n_symmetry_space_group_name_H-M 'P 1'\n"
+    path = write_zip_collection(tmp_path / "mixed.zip",
+                                [("a.log", "run 3 of the beamtime\nall fine\n"),
+                                 ("b.xye", xye_text(10.0)),
+                                 ("c.cif", structure),
+                                 ("d.inp", "wavelength 0.413\n")])
+    assert [s.label for s in list_scans(path)] == ["b.xye"]
+    assert len(rx.read_pattern(path).intensity) == 40
+
+
+def test_a_pdcif_member_with_a_profile_tag_is_a_pattern(tmp_path):
+    cif = ("data_p\n_pd_block_id p\nloop_\n_pd_meas_2theta_scan\n"
+           "_pd_meas_counts_total\n"
+           + "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(20)))
+    path = write_zip_collection(tmp_path / "p.zip", [("a.cif", cif)])
+    assert [s.label for s in list_scans(path)] == ["a.cif"]
+
+
 def test_a_member_past_the_cap_is_skipped(tmp_path, monkeypatch):
     path = write_zip_collection(tmp_path / "big.zip",
                                 [("a.xye", xye_text(10.0, n=400)),
@@ -241,9 +268,9 @@ def test_an_archive_carrying_a_vendor_manifest_is_not_enumerated(tmp_path):
 # ---------------------------------------------------------------- refusals
 def test_a_member_that_cannot_be_read_is_refused_naming_archive_and_member(tmp_path):
     path = write_zip_collection(tmp_path / "bad.zip",
-                                [("notes.txt", "a log, not a pattern\n"),
+                                [("notes.txt", REFUSED_TEXT),
                                  ("z.xye", xye_text(10.0))])
-    # the ASCII reader claims any text, so the log counts and refuses on read
+    # a profile in a unit the reader refuses counts, and refuses on read
     with pytest.raises(ValueError, match="bad.zip holds 2 pattern"):
         rx.read_pattern(path, scan=5)
     with pytest.raises(ValueError) as exc:
@@ -345,7 +372,7 @@ def test_what_the_member_reader_says_names_the_member_and_the_archive(tmp_path):
     rows = "".join(f"{30.0 - 0.02 * i:.2f} {500 + i % 7}\n" for i in range(20))
     path = write_zip_collection(tmp_path / "w.zip",
                                 [("données/scan 1 (A).xy", rows),
-                                 ("notes.txt", "a log, not a pattern\n")])
+                                 ("notes.txt", REFUSED_TEXT)])
     found: list = []
     rx.read_pattern(path, scan=0, diagnostics=found)
     (d,) = [d for d in found if d.code == "PATTERN_SCAN_REVERSED"]
@@ -387,7 +414,7 @@ def test_a_full_staged_path_is_named_once(tmp_path):
     """The xy reader quotes the whole staged path; that path holds the staged
     name too, and it is rewritten once, not twice."""
     path = write_zip_collection(tmp_path / "readme.zip",
-                                [("README.txt", "a log, not a pattern\n"),
+                                [("README.txt", REFUSED_TEXT),
                                  ("a.xy", xye_text(10.0))])
     for call in (lambda: rx.read_pattern(path), lambda: list_scans(path)):
         with pytest.raises(ValueError) as exc:
