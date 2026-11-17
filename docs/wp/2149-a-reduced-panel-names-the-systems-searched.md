@@ -215,6 +215,9 @@ for a search the list cannot support.
 
   Next: Yue's ruling on the wording. Then merge, and close the WP.
 
+  Ruled by Yue 2026-11-17: the reworded `INDEX_PANEL_REDUCED` and
+  `INDEX_SYSTEMS_NOT_COVERED` accepted (reader output).
+
 - **2026-11-17** — created, from the 2026-11-17 issue triage round (no
   issue; the defect came from WP-2041's handover). Checked against the tree at
   `96f721c26`: case 1 reproduced with the tutorial 03b setup; cases 2 and 3
