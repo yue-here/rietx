@@ -1,12 +1,12 @@
 {
  "counts": {
-  "codes_total": 74,
-  "codes_in_refine_py": 69,
+  "codes_total": 75,
+  "codes_in_refine_py": 70,
   "codes_outside_refine_py": 5,
-  "raise_sites": 78,
+  "raise_sites": 81,
   "codes_by_level": {
    "warning": 50,
-   "info": 16,
+   "info": 17,
    "computed: 'warning' if low else 'info'": 1,
    "computed: 'warning' if bound else 'info'": 1,
    "computed: 'warning' if worst >= DISPERSION_NEGLECT_SEVERE else 'info'": 1,
@@ -17,23 +17,23 @@
    "info/warning": 1
   },
   "codes_by_kind": {
-   "the data settle it": 59,
+   "the data settle it": 60,
    "the data can rank it": 4,
    "the data cannot settle it": 11
   },
   "codes_by_audit_tier": {
    "unaudited": 64,
-   "3": 2,
+   "3": 3,
    "1": 8
   },
   "codes_on_unaudited_baseline": 64,
-  "codes_with_a_suggestion_site": 71,
+  "codes_with_a_suggestion_site": 72,
   "codes_no_test_names": 0,
   "named_constants_read": 39,
-  "literals_total": 34,
+  "literals_total": 37,
   "literals_by_role": {
    "arithmetic": 8,
-   "count": 3,
+   "count": 6,
    "listing cap": 3,
    "numerical floor": 3,
    "threshold": 5,
@@ -45,7 +45,7 @@
    "name": "ABSORPTION_ESTIMATE_UNAVAILABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8850",
+     "where": "src/rietx/refine.py:9066",
      "function": "_absorption_diagnostics",
      "level": "warning",
      "guards": [
@@ -96,7 +96,7 @@
    "name": "ABSORPTION_MU_R_OUT_OF_RANGE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8863",
+     "where": "src/rietx/refine.py:9079",
      "function": "_absorption_diagnostics",
      "level": "warning",
      "guards": [
@@ -146,7 +146,7 @@
    "name": "ABSORPTION_PLATE_THICKNESS",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8890",
+     "where": "src/rietx/refine.py:9106",
      "function": "_absorption_diagnostics",
      "level": "info",
      "guards": [
@@ -195,7 +195,7 @@
    "name": "ABSORPTION_THICKNESS_MATTERS",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8878",
+     "where": "src/rietx/refine.py:9094",
      "function": "_absorption_diagnostics",
      "level": "info",
      "guards": [
@@ -245,7 +245,7 @@
    "name": "ADP_NOT_POSITIVE_DEFINITE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7476",
+     "where": "src/rietx/refine.py:7529",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -285,7 +285,7 @@
    "name": "AIR_SCATTER_UNDECLARED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10788",
+     "where": "src/rietx/refine.py:11028",
      "function": "_air_scatter_undeclared_diagnostics",
      "level": "warning",
      "guards": [
@@ -339,7 +339,7 @@
    "name": "BACKGROUND_ABSORPTION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7596",
+     "where": "src/rietx/refine.py:7649",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -432,7 +432,8 @@
    "on_response_baseline": true,
    "tests": {
     "files": [
-     "tests/test_background_auto.py"
+     "tests/test_background_auto.py",
+     "tests/test_manual.py"
     ],
     "test_functions": 2
    },
@@ -445,7 +446,7 @@
    "name": "BISO_NEGATIVE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7561",
+     "where": "src/rietx/refine.py:7614",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -489,7 +490,7 @@
    "name": "BISO_UNUSUALLY_LARGE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7549",
+     "where": "src/rietx/refine.py:7602",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -530,7 +531,7 @@
    "name": "BOUND_HIT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7468",
+     "where": "src/rietx/refine.py:7521",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [
@@ -638,7 +639,7 @@
    "name": "CAPILLARY_OFFSET_UNAVAILABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8835",
+     "where": "src/rietx/refine.py:9051",
      "function": "_capillary_offset_diagnostics",
      "level": "info",
      "guards": [
@@ -680,7 +681,7 @@
    "name": "CELL_DEGENERATE_PROBE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8007",
+     "where": "src/rietx/refine.py:8078",
      "function": "_degenerate_cell_diagnostics",
      "level": "info",
      "guards": [
@@ -717,7 +718,7 @@
    "name": "CELL_RUNAWAY",
    "sites": [
     {
-     "where": "src/rietx/refine.py:2087",
+     "where": "src/rietx/refine.py:2099",
      "function": "_cell_runaway_diagnostic",
      "level": "warning",
      "guards": [
@@ -761,11 +762,12 @@
      "tests/test_lebail_alternation.py",
      "tests/test_multi_histogram.py",
      "tests/test_non_finite_stage.py",
+     "tests/test_parent_cell.py",
      "tests/test_reported_rows_move.py",
      "tests/test_skill_surface.py",
      "tests/test_summary_levels.py"
     ],
-    "test_functions": 24
+    "test_functions": 25
    },
    "condition": "A free cell parameter left the window `CELL_SAFETY_FRACTION` / `CELL_SAFETY_ANGLE_DEG` around its starting value.",
    "kind": 1,
@@ -776,7 +778,7 @@
    "name": "CONSTRAINT_ACTIVE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7937",
+     "where": "src/rietx/refine.py:8008",
      "function": "_constraint_diagnostics",
      "level": "info",
      "guards": [
@@ -805,9 +807,11 @@
      "tests/test_cross_backend.py",
      "tests/test_gaussian_width_floor.py",
      "tests/test_lorentzian_width_floor.py",
-     "tests/test_solver_seam.py"
+     "tests/test_named_variables.py",
+     "tests/test_solver_seam.py",
+     "tests/test_tied_bound_rows.py"
     ],
-    "test_functions": 6
+    "test_functions": 9
    },
    "condition": "In the final stage the LM driver held at least one step against a built-in inequality (the Stephens cone or Γ_G² ≥ 1e-8).",
    "kind": 1,
@@ -818,7 +822,7 @@
    "name": "COVARIANCE_DIRECTION_DISCARDED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7539",
+     "where": "src/rietx/refine.py:7592",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -857,7 +861,7 @@
    "name": "COVARIANCE_UNAVAILABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7977",
+     "where": "src/rietx/refine.py:8048",
      "function": "_covariance_diagnostics",
      "level": "warning",
      "guards": [
@@ -896,7 +900,7 @@
    "name": "DATA_SUPPORT_LOW",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10459",
+     "where": "src/rietx/refine.py:10699",
      "function": "_data_support_diagnostics",
      "level": "computed: 'warning' if low else 'info'",
      "guards": [
@@ -1026,7 +1030,7 @@
    "name": "DISPERSION_NEGLECTED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9843",
+     "where": "src/rietx/refine.py:10083",
      "function": "_dispersion_diagnostics",
      "level": "computed: 'warning' if worst >= DISPERSION_NEGLECT_SEVERE else 'info'",
      "guards": [
@@ -1086,7 +1090,7 @@
    "name": "EXTRA_PEAK_NO_INTENSITY",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10409",
+     "where": "src/rietx/refine.py:10649",
      "function": "_extra_peak_diagnostics",
      "level": "warning",
      "guards": [
@@ -1139,7 +1143,7 @@
    "name": "EXTRA_PEAK_ON_REFLECTION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10423",
+     "where": "src/rietx/refine.py:10663",
      "function": "_extra_peak_diagnostics",
      "level": "warning",
      "guards": [
@@ -1197,7 +1201,7 @@
    "name": "FLAT_DIRECTION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7529",
+     "where": "src/rietx/refine.py:7582",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -1244,7 +1248,7 @@
    "name": "FLOOR_HIT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7461",
+     "where": "src/rietx/refine.py:7514",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [
@@ -1279,15 +1283,17 @@
      "tests/test_diagnostics_summary.py",
      "tests/test_display.py",
      "tests/test_held_phase.py",
+     "tests/test_microstructure.py",
      "tests/test_multi_histogram.py",
      "tests/test_parameter_interval.py",
      "tests/test_planted_series.py",
      "tests/test_result_rows.py",
      "tests/test_suite_alarms.py",
      "tests/test_summary_levels.py",
-     "tests/test_termination_view.py"
+     "tests/test_termination_view.py",
+     "tests/test_tied_bound_rows.py"
     ],
-    "test_functions": 44
+    "test_functions": 51
    },
    "condition": "A scale, width or similar quantity finished on its zero floor and the data push it lower (`staged.bound_findings`).",
    "kind": 1,
@@ -1298,7 +1304,7 @@
    "name": "FROZEN_COMPILE_STALE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9624",
+     "where": "src/rietx/refine.py:9864",
      "function": "_frozen_compile_diagnostics",
      "level": "info",
      "guards": [
@@ -1345,7 +1351,7 @@
    "name": "HARMONIC_ABSENT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10091",
+     "where": "src/rietx/refine.py:10331",
      "function": "_harmonic_diagnostics",
      "level": "info",
      "guards": [
@@ -1397,7 +1403,7 @@
    "name": "HARMONIC_FRACTION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10099",
+     "where": "src/rietx/refine.py:10339",
      "function": "_harmonic_diagnostics",
      "level": "computed: 'warning' if implausible else 'info'",
      "guards": [
@@ -1448,7 +1454,7 @@
    "name": "HARMONIC_HELD",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10083",
+     "where": "src/rietx/refine.py:10323",
      "function": "_harmonic_diagnostics",
      "level": "info",
      "guards": [
@@ -1498,7 +1504,7 @@
    "name": "HIGH_CORRELATION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7448",
+     "where": "src/rietx/refine.py:7501",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -1556,7 +1562,7 @@
    "name": "HOLD_BLOCKED_PLAN",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8205",
+     "where": "src/rietx/refine.py:8276",
      "function": "_hold_diagnostics",
      "level": "info",
      "guards": [
@@ -1599,7 +1605,7 @@
    "name": "HUMP_TOO_NARROW",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7585",
+     "where": "src/rietx/refine.py:7638",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -1642,7 +1648,7 @@
    "name": "LEBAIL_ALTERNATION_STOPPED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9459",
+     "where": "src/rietx/refine.py:9699",
      "function": "_lebail_stop_diagnostic",
      "level": "computed: 'info' if reason == 'converged' else 'warning'",
      "guards": [],
@@ -1679,7 +1685,7 @@
    "name": "LEBAIL_CYCLES_AT_CAP",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10990",
+     "where": "src/rietx/refine.py:11230",
      "function": "_lebail_cap_diagnostics",
      "level": "warning",
      "guards": [
@@ -1720,7 +1726,7 @@
    "name": "LOW_ANGLE_UNMODELLED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10703",
+     "where": "src/rietx/refine.py:10943",
      "function": "_low_angle_diagnostics",
      "level": "warning",
      "guards": [
@@ -1783,7 +1789,7 @@
    "name": "MAGNETIC_WIDTH_MOVED_MOMENT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7851",
+     "where": "src/rietx/refine.py:7919",
      "function": "_moved_moment_diagnostics",
      "level": "warning",
      "guards": [
@@ -1877,7 +1883,7 @@
    "name": "MODEL_FAR_FROM_DATA",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10320",
+     "where": "src/rietx/refine.py:10560",
      "function": "_far_from_data_diagnostics",
      "level": "error",
      "guards": [
@@ -1930,7 +1936,7 @@
    "name": "NEUTRON_RESONANT_ABSORBER",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9921",
+     "where": "src/rietx/refine.py:10161",
      "function": "_resonant_absorber_diagnostics",
      "level": "computed: 'warning' if worst >= RESONANT_ABSORBER_SEVERE_BARN else 'info'",
      "guards": [
@@ -1978,7 +1984,7 @@
    "name": "OCCUPANCY_ABOVE_ONE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11823",
+     "where": "src/rietx/refine.py:12063",
      "function": "_occupancy_flag_diagnostics",
      "level": "info",
      "guards": [
@@ -2019,14 +2025,14 @@
    "name": "ORIGIN_FIXED_ON_POLAR_AXIS",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8150",
+     "where": "src/rietx/refine.py:8221",
      "function": "_centroid_finding",
      "level": "info",
      "guards": [],
      "suggestion": true
     },
     {
-     "where": "src/rietx/refine.py:8082",
+     "where": "src/rietx/refine.py:8153",
      "function": "_origin_diagnostics",
      "level": "info",
      "guards": [
@@ -2072,7 +2078,7 @@
    "name": "ORIGIN_NOT_FIXED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8094",
+     "where": "src/rietx/refine.py:8165",
      "function": "_origin_diagnostics",
      "level": "warning",
      "guards": [
@@ -2116,10 +2122,51 @@
    "kind_reason": "Symmetry fixes it."
   },
   {
+   "name": "PARENT_STRAIN_HELD",
+   "sites": [
+    {
+     "where": "src/rietx/refine.py:8336",
+     "function": "_parent_strain_held_diagnostics",
+     "level": "info",
+     "guards": [
+      "not (declared is None or not declared.strain)",
+      "not (not any((e in freed for e in edges)))",
+      "not (not held)"
+     ],
+     "suggestion": true
+    }
+   ],
+   "levels": [
+    "info"
+   ],
+   "constants_read": {},
+   "explanation": "A stage freed the cell edges of a phase whose cell is stated through its parent (`Phase.parent_cell`) while one of its lattice strains stayed held.",
+   "audit_row": {
+    "tier": "3",
+    "response": "info",
+    "ambiguity": 1
+   },
+   "suggestion_row": {
+    "tier": "3"
+   },
+   "on_unaudited_baseline": false,
+   "on_response_baseline": false,
+   "tests": {
+    "files": [
+     "tests/test_parent_cell.py"
+    ],
+    "test_functions": 3
+   },
+   "condition": "A `Phase.parent_cell` phase had a parent cell edge free in some stage while one of its declared Γ strains was never freed.",
+   "kind": 1,
+   "kind_name": "the data settle it",
+   "kind_reason": "It records a hold the plan's globs produced (the cell glob never frees a strain), which no reading of the data changes."
+  },
+  {
    "name": "PATTERN_DEAD_CHANNELS",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10496",
+     "where": "src/rietx/refine.py:10736",
      "function": "_data_support_diagnostics",
      "level": "warning",
      "guards": [
@@ -2163,7 +2210,7 @@
     "files": [
      "tests/test_data_support.py"
     ],
-    "test_functions": 1
+    "test_functions": 2
    },
    "condition": "With a measured σ, a short run of fitted channels reads far below the local background and its σ shrank with it (`background.diagnostics.dead_channels`).",
    "kind": 1,
@@ -2175,7 +2222,7 @@
    "name": "PATTERN_UNDERSAMPLED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10477",
+     "where": "src/rietx/refine.py:10717",
      "function": "_data_support_diagnostics",
      "level": "warning",
      "guards": [
@@ -2238,7 +2285,7 @@
    "name": "PAWLEY_OFF_DATA_RIDGED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9704",
+     "where": "src/rietx/refine.py:9944",
      "function": "_pawley_off_data_diagnostics",
      "level": "info",
      "guards": [
@@ -2264,9 +2311,10 @@
    "on_response_baseline": true,
    "tests": {
     "files": [
+     "tests/test_parametric_series.py",
      "tests/test_pawley.py"
     ],
-    "test_functions": 2
+    "test_functions": 3
    },
    "condition": "Some Pawley reflections have no emission line centred inside the fitted data, and their intensities are ridged.",
    "kind": 1,
@@ -2277,7 +2325,7 @@
    "name": "PAWLEY_OVERLAP_UNRESOLVED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9674",
+     "where": "src/rietx/refine.py:9914",
      "function": "_pawley_unresolved_diagnostics",
      "level": "info",
      "guards": [
@@ -2311,9 +2359,10 @@
    "tests": {
     "files": [
      "tests/test_held_phase.py",
+     "tests/test_parametric_series.py",
      "tests/test_pawley.py"
     ],
-    "test_functions": 2
+    "test_functions": 3
    },
    "condition": "In an overlap group the largest esd/|I| reaches `PAWLEY_UNRESOLVED_REL`.",
    "kind": 1,
@@ -2324,7 +2373,7 @@
    "name": "PHASE_UNCONSTRAINED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11338",
+     "where": "src/rietx/refine.py:11578",
      "function": "_phase_support_diagnostics",
      "level": "warning",
      "guards": [
@@ -2385,7 +2434,7 @@
    "name": "PLAN_FREES_NO_MOMENT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7765",
+     "where": "src/rietx/refine.py:7833",
      "function": "_held_moment_diagnostics",
      "level": "warning",
      "guards": [
@@ -2427,7 +2476,7 @@
    "name": "QPA_ESD_UNAVAILABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10900",
+     "where": "src/rietx/refine.py:11140",
      "function": "_qpa_esd_unavailable_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2465,7 +2514,7 @@
    "name": "QPA_UNAVAILABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10927",
+     "where": "src/rietx/refine.py:11167",
      "function": "_qpa_unavailable_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2502,7 +2551,7 @@
    "name": "RESOLUTION_NOT_POSITIVE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7572",
+     "where": "src/rietx/refine.py:7625",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2542,7 +2591,7 @@
    "name": "RESOLUTION_UNCONSTRAINED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7518",
+     "where": "src/rietx/refine.py:7571",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2585,7 +2634,7 @@
    "name": "RESTRAINT_PAIRS_STALE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:12008",
+     "where": "src/rietx/refine.py:12248",
      "function": "_restraint_pairs_stale_diagnostics",
      "level": "warning",
      "guards": [
@@ -2632,7 +2681,7 @@
    "name": "RESTRAINT_TENSION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10244",
+     "where": "src/rietx/refine.py:10484",
      "function": "_restraint_tension_diagnostics",
      "level": "warning",
      "guards": [
@@ -2680,7 +2729,7 @@
    "name": "RIGID_BODY_UNSUPPORTED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11703",
+     "where": "src/rietx/refine.py:11943",
      "function": "_rigid_body_unsupported",
      "level": "warning",
      "guards": [],
@@ -2717,7 +2766,7 @@
    "name": "ROUGHNESS_ABSORPTION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7607",
+     "where": "src/rietx/refine.py:7660",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2755,7 +2804,7 @@
    "name": "ROUGHNESS_OUTSIDE_REGIME",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11895",
+     "where": "src/rietx/refine.py:12135",
      "function": "_roughness_regime_diagnostics",
      "level": "warning",
      "guards": [
@@ -2767,7 +2816,7 @@
      "suggestion": true
     },
     {
-     "where": "src/rietx/refine.py:11906",
+     "where": "src/rietx/refine.py:12146",
      "function": "_roughness_regime_diagnostics",
      "level": "info",
      "guards": [
@@ -2820,7 +2869,7 @@
    "name": "ROUGHNESS_UNCONSTRAINED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11926",
+     "where": "src/rietx/refine.py:12166",
      "function": "_roughness_regime_diagnostics",
      "level": "warning",
      "guards": [
@@ -2868,7 +2917,7 @@
    "name": "SCALE_B_INSEPARABLE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11489",
+     "where": "src/rietx/refine.py:11729",
      "function": "_scale_b_ridge_diagnostics",
      "level": "warning",
      "guards": [],
@@ -2913,7 +2962,7 @@
    "name": "SITE_DOFS_RENUMBERED",
    "sites": [
     {
-     "where": "src/rietx/refine.py:2906",
+     "where": "src/rietx/refine.py:2918",
      "function": "_carry_twin_moves",
      "level": "warning",
      "guards": [
@@ -2954,7 +3003,7 @@
    "name": "SIZE_UNUSUALLY_SMALL",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11764",
+     "where": "src/rietx/refine.py:12004",
      "function": "_size_flag_diagnostics",
      "level": "warning",
      "guards": [
@@ -3008,7 +3057,7 @@
    "name": "SPECIES_FALLBACK_NEUTRAL",
    "sites": [
     {
-     "where": "src/rietx/refine.py:9996",
+     "where": "src/rietx/refine.py:10236",
      "function": "_species_fallback_diagnostics",
      "level": "warning",
      "guards": [
@@ -3056,7 +3105,7 @@
    "name": "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7695",
+     "where": "src/rietx/refine.py:7761",
      "function": "_stage_order_diagnostics",
      "level": "warning",
      "guards": [
@@ -3095,7 +3144,7 @@
    "name": "STAGE_MAX_ITER",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10966",
+     "where": "src/rietx/refine.py:11206",
      "function": "_max_iter_diagnostics",
      "level": "warning",
      "guards": [
@@ -3139,7 +3188,7 @@
    "name": "STAGE_NOT_FINITE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:2112",
+     "where": "src/rietx/refine.py:2124",
      "function": "_non_finite_diagnostic",
      "level": "warning",
      "guards": [
@@ -3180,17 +3229,28 @@
    "name": "STAGE_PATH_NOT_FREE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8348",
+     "where": "src/rietx/refine.py:8514",
      "function": "_fixed_literal_diagnostics",
      "level": "warning",
      "guards": [],
      "suggestion": true
     },
     {
-     "where": "src/rietx/refine.py:8469",
+     "where": "src/rietx/refine.py:8656",
      "function": "_site_glob_diagnostics",
      "level": "warning",
-     "guards": [],
+     "guards": [
+      "not (site.endswith('.cell'))"
+     ],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:8627",
+     "function": "_site_glob_diagnostics",
+     "level": "warning",
+     "guards": [
+      "site.endswith('.cell')"
+     ],
      "suggestion": true
     }
    ],
@@ -3213,9 +3273,10 @@
     "files": [
      "tests/silence.py",
      "tests/test_joint_report.py",
-     "tests/test_params_surface.py"
+     "tests/test_params_surface.py",
+     "tests/test_parent_cell.py"
     ],
-    "test_functions": 13
+    "test_functions": 15
    },
    "condition": "A stage asked to refine a path that symmetry or the model fixes, or that follows another.",
    "kind": 1,
@@ -3226,20 +3287,31 @@
    "name": "STAGE_PATH_UNKNOWN",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8591",
+     "where": "src/rietx/refine.py:8807",
      "function": "_unknown_path_diagnostics",
      "level": "warning",
      "guards": [
-      "not (current is not None)"
+      "not (current is not None)",
+      "not ((hit := undeclared_opt_in(path, known, instrument)) is not None)"
      ],
      "suggestion": true
     },
     {
-     "where": "src/rietx/refine.py:8581",
+     "where": "src/rietx/refine.py:8783",
      "function": "_unknown_path_diagnostics",
      "level": "warning",
      "guards": [
       "current is not None"
+     ],
+     "suggestion": true
+    },
+    {
+     "where": "src/rietx/refine.py:8794",
+     "function": "_unknown_path_diagnostics",
+     "level": "warning",
+     "guards": [
+      "not (current is not None)",
+      "(hit := undeclared_opt_in(path, known, instrument)) is not None"
      ],
      "suggestion": true
     }
@@ -3265,7 +3337,7 @@
      "tests/test_multi_histogram.py",
      "tests/test_params_surface.py"
     ],
-    "test_functions": 12
+    "test_functions": 13
    },
    "condition": "A stage named a path no parameter of the model has.",
    "kind": 1,
@@ -3276,7 +3348,7 @@
    "name": "STAGE_SLOW_DESCENT",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11020",
+     "where": "src/rietx/refine.py:11260",
      "function": "_slow_descent_diagnostics",
      "level": "info",
      "guards": [
@@ -3328,7 +3400,7 @@
    "name": "STAGE_WINDOWS_STALE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:8514",
+     "where": "src/rietx/refine.py:8701",
      "function": "_window_loss_diagnostics",
      "level": "warning",
      "guards": [
@@ -3370,7 +3442,7 @@
    "name": "STEPHENS_STRAIN_NOT_POSITIVE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7487",
+     "where": "src/rietx/refine.py:7540",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -3410,7 +3482,7 @@
    "name": "STRAIN_UNUSUALLY_LARGE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:11574",
+     "where": "src/rietx/refine.py:11814",
      "function": "_strain_flag_diagnostics",
      "level": "warning",
      "guards": [
@@ -3457,7 +3529,7 @@
    "name": "TEXTURE_NOT_POSITIVE",
    "sites": [
     {
-     "where": "src/rietx/refine.py:7507",
+     "where": "src/rietx/refine.py:7560",
      "function": "_guard_diagnostics",
      "level": "warning",
      "guards": [],
@@ -3497,7 +3569,7 @@
    "name": "WAVELENGTH_CALIBRATION",
    "sites": [
     {
-     "where": "src/rietx/refine.py:10173",
+     "where": "src/rietx/refine.py:10413",
      "function": "_wavelength_calibration_diagnostics",
      "level": "info",
      "guards": [
@@ -3578,7 +3650,7 @@
    "key": "_absorption_diagnostics|100|100 * residue",
    "function": "src/rietx/refine.py:_absorption_diagnostics",
    "lines": [
-    8882
+    9098
    ],
    "value": 100,
    "in_comparison": false,
@@ -3590,7 +3662,7 @@
    "key": "_absorption_diagnostics|0.7|record.intensity_fraction_of_optimal < 0.7",
    "function": "src/rietx/refine.py:_absorption_diagnostics",
    "lines": [
-    8889
+    9105
    ],
    "value": 0.7,
    "in_comparison": true,
@@ -3602,7 +3674,7 @@
    "key": "_absorption_diagnostics|100|100 * record.intensity_fraction_of_optimal",
    "function": "src/rietx/refine.py:_absorption_diagnostics",
    "lines": [
-    8894
+    9110
    ],
    "value": 100,
    "in_comparison": false,
@@ -3614,7 +3686,7 @@
    "key": "_air_scatter_undeclared_diagnostics|0.001|np.maximum(model.tt, 0.001)",
    "function": "src/rietx/refine.py:_air_scatter_undeclared_diagnostics",
    "lines": [
-    10775
+    11015
    ],
    "value": 0.001,
    "in_comparison": false,
@@ -3626,7 +3698,7 @@
    "key": "_dispersion_diagnostics|2|abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)",
    "function": "src/rietx/refine.py:_dispersion_diagnostics",
    "lines": [
-    9836
+    10076
    ],
    "value": 2,
    "in_comparison": false,
@@ -3638,7 +3710,7 @@
    "key": "_first_reflection_fwhm|2.0|first_tick / 2.0",
    "function": "src/rietx/refine.py:_first_reflection_fwhm",
    "lines": [
-    10612
+    10852
    ],
    "value": 2.0,
    "in_comparison": false,
@@ -3650,7 +3722,7 @@
    "key": "_frozen_compile_diagnostics|100|100 * rel",
    "function": "src/rietx/refine.py:_frozen_compile_diagnostics",
    "lines": [
-    9630
+    9870
    ],
    "value": 100,
    "in_comparison": false,
@@ -3662,7 +3734,7 @@
    "key": "_harmonic_diagnostics|100.0|100.0 * frac",
    "function": "src/rietx/refine.py:_harmonic_diagnostics",
    "lines": [
-    10077
+    10317
    ],
    "value": 100.0,
    "in_comparison": false,
@@ -3674,7 +3746,7 @@
    "key": "_harmonic_diagnostics|100.0|100.0 * esd",
    "function": "src/rietx/refine.py:_harmonic_diagnostics",
    "lines": [
-    10079
+    10319
    ],
    "value": 100.0,
    "in_comparison": false,
@@ -3686,7 +3758,7 @@
    "key": "_hold_diagnostics|5|n > 5",
    "function": "src/rietx/refine.py:_hold_diagnostics",
    "lines": [
-    8211
+    8282
    ],
    "value": 5,
    "in_comparison": true,
@@ -3698,7 +3770,7 @@
    "key": "_intensity_weighted_s2|0.25|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
    "function": "src/rietx/refine.py:_intensity_weighted_s2",
    "lines": [
-    11405
+    11645
    ],
    "value": 0.25,
    "in_comparison": false,
@@ -3710,7 +3782,7 @@
    "key": "_intensity_weighted_s2|2|np.broadcast_to(0.25 / np.asarray(cp.reflections.d, dtype=np.float64) ** 2, inside.shape)",
    "function": "src/rietx/refine.py:_intensity_weighted_s2",
    "lines": [
-    11405
+    11645
    ],
    "value": 2,
    "in_comparison": false,
@@ -3722,7 +3794,7 @@
    "key": "_lebail_stop_diagnostic|100|100 * r",
    "function": "src/rietx/refine.py:_lebail_stop_diagnostic",
    "lines": [
-    9455
+    9695
    ],
    "value": 100,
    "in_comparison": false,
@@ -3734,7 +3806,7 @@
    "key": "_low_angle_diagnostics|2.0|first_tick - 2.0 * fwhm",
    "function": "src/rietx/refine.py:_low_angle_diagnostics",
    "lines": [
-    10672
+    10912
    ],
    "value": 2.0,
    "in_comparison": false,
@@ -3746,7 +3818,7 @@
    "key": "_low_angle_diagnostics|2|np.mean(weighted ** 2)",
    "function": "src/rietx/refine.py:_low_angle_diagnostics",
    "lines": [
-    10682
+    10922
    ],
    "value": 2,
    "in_comparison": false,
@@ -3758,7 +3830,7 @@
    "key": "_low_angle_diagnostics|2.0|np.abs(weighted) >= 2.0",
    "function": "src/rietx/refine.py:_low_angle_diagnostics",
    "lines": [
-    10696
+    10936
    ],
    "value": 2.0,
    "in_comparison": true,
@@ -3767,10 +3839,46 @@
    "reason": "The 2σ channel test placing the suggested lower limit in `LOW_ANGLE_UNMODELLED`'s suggestion, the second literal the WP names; issue #1219 proposes dropping that suggestion. To lift at part 2, or to go with it."
   },
   {
+   "key": "_owner_words|2|len(parts) > 2",
+   "function": "src/rietx/refine.py:_owner_words",
+   "lines": [
+    8401
+   ],
+   "value": 2,
+   "in_comparison": true,
+   "expression": "len(parts) > 2",
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
+  },
+  {
+   "key": "_owner_words|2|len(parts) == 2",
+   "function": "src/rietx/refine.py:_owner_words",
+   "lines": [
+    8403
+   ],
+   "value": 2,
+   "in_comparison": true,
+   "expression": "len(parts) == 2",
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
+  },
+  {
+   "key": "_owner_words|4|len(parts) == 4",
+   "function": "src/rietx/refine.py:_owner_words",
+   "lines": [
+    8405
+   ],
+   "value": 4,
+   "in_comparison": true,
+   "expression": "len(parts) == 4",
+   "role": "count",
+   "reason": "The number of dot-separated parts in an owner path (`hist.h.`, `phases.i`, `phases.i.atoms.j`), used to word a message; it gates no verdict."
+  },
+  {
    "key": "_pawley_unresolved_diagnostics|1e-10|np.maximum(np.abs(inten), 1e-10)",
    "function": "src/rietx/refine.py:_pawley_unresolved_diagnostics",
    "lines": [
-    9665
+    9905
    ],
    "value": 1e-10,
    "in_comparison": false,
@@ -3782,7 +3890,7 @@
    "key": "_phase_support_diagnostics|2|n_phases < 2",
    "function": "src/rietx/refine.py:_phase_support_diagnostics",
    "lines": [
-    11241
+    11481
    ],
    "value": 2,
    "in_comparison": true,
@@ -3794,7 +3902,7 @@
    "key": "_renumber_atoms|4|stacklevel=4",
    "function": "src/rietx/refine.py:_renumber_atoms",
    "lines": [
-    2949
+    2961
    ],
    "value": 4,
    "in_comparison": false,
@@ -3806,7 +3914,7 @@
    "key": "_roughness_regime_diagnostics|0.5|np.radians(0.5 * tt_min)",
    "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
    "lines": [
-    11893
+    12133
    ],
    "value": 0.5,
    "in_comparison": false,
@@ -3818,7 +3926,7 @@
    "key": "_roughness_regime_diagnostics|2|drawn(2 * np.degrees(np.arcsin(min(tau, 1.0))))",
    "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
    "lines": [
-    11902
+    12142
    ],
    "value": 2,
    "in_comparison": false,
@@ -3830,7 +3938,7 @@
    "key": "_roughness_regime_diagnostics|0.5|tau > 0.5 * sin_min",
    "function": "src/rietx/refine.py:_roughness_regime_diagnostics",
    "lines": [
-    11905
+    12145
    ],
    "value": 0.5,
    "in_comparison": true,
@@ -3842,7 +3950,7 @@
    "key": "_scale_b_ridge_diagnostics|3|n > 3",
    "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
    "lines": [
-    11480
+    11720
    ],
    "value": 3,
    "in_comparison": true,
@@ -3854,7 +3962,7 @@
    "key": "_scale_b_ridge_diagnostics|100.0|100.0 * math.expm1(2.0 * s2)",
    "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
    "lines": [
-    11486
+    11726
    ],
    "value": 100.0,
    "in_comparison": false,
@@ -3866,7 +3974,7 @@
    "key": "_scale_b_ridge_diagnostics|2.0|math.expm1(2.0 * s2)",
    "function": "src/rietx/refine.py:_scale_b_ridge_diagnostics",
    "lines": [
-    11486
+    11726
    ],
    "value": 2.0,
    "in_comparison": false,
@@ -3878,7 +3986,7 @@
    "key": "_size_flag_diagnostics|10.0|SIZE_FLAG_SIZE_A / 10.0",
    "function": "src/rietx/refine.py:_size_flag_diagnostics",
    "lines": [
-    11751
+    11991
    ],
    "value": 10.0,
    "in_comparison": false,
@@ -3890,7 +3998,7 @@
    "key": "_size_flag_diagnostics|10.0|size_a / 10.0",
    "function": "src/rietx/refine.py:_size_flag_diagnostics",
    "lines": [
-    11762
+    12002
    ],
    "value": 10.0,
    "in_comparison": false,
@@ -3902,7 +4010,7 @@
    "key": "_wavelength_calibration_diagnostics|1000000.0|1000000.0 * (lam - lam0) / lam0",
    "function": "src/rietx/refine.py:_wavelength_calibration_diagnostics",
    "lines": [
-    10166
+    10406
    ],
    "value": 1000000.0,
    "in_comparison": false,
@@ -3914,7 +4022,7 @@
    "key": "_window_loss_diagnostics|100|100 * sr.window_loss",
    "function": "src/rietx/refine.py:_window_loss_diagnostics",
    "lines": [
-    8517
+    8704
    ],
    "value": 100,
    "in_comparison": false,
@@ -3926,7 +4034,7 @@
    "key": "_window_loss_diagnostics|100|100 * tol",
    "function": "src/rietx/refine.py:_window_loss_diagnostics",
    "lines": [
-    8519
+    8706
    ],
    "value": 100,
    "in_comparison": false,
