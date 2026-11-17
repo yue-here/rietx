@@ -7775,7 +7775,7 @@ class Refinement:
                          mode: Mode | None = None,
                          two_theta_limits: tuple[float, float] | None = None
                          ) -> list["ReflectionRow"]:
-        """Every (emission line, reflection) as typed rows.
+        """Every (emission line, reflection) as typed rows, after a fit or from a pattern.
 
         See :func:`rietx.io.exporters.reflection_table`.  In Le Bail/Pawley
         mode the intensities are the extracted/refined ones held on the model.

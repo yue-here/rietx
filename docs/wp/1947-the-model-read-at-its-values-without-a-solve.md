@@ -168,18 +168,27 @@ entry of that date.)*
       phase-free twin's `predict` and, after a fit in each mode,
       `result.y_background` (`test_background_without_mutation`). The
       no-phase refusal now names it.
-- [ ] Manual (`using/refining.md` or `using/exports.md`) and the generated
+- [x] Manual (`using/refining.md` or `using/exports.md`) and the generated
       skill API index: the three calls, with the phase-free `predict` named
-      as the workaround it replaces.
+      as the workaround it replaces. **Landed 2026-11-17:** the manual tree
+      moved (WP-1986), so `docs/docs/reference/exports.md` § Evaluating the
+      model gains "The result at the current values" and "The background
+      alone", and § The reflection list the pattern form;
+      `reference/history.md` says the stage line now carries the two
+      partition settings. `make_api_index.py` lists the three methods.
 - [x] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
       pattern. **Landed 2026-11-17:** five tests (nine cases) in
       `tests/test_refine_synthetic.py` § the model read at its values;
       `tests/output/evaluate_before_any_fit.png` (looked at: the perturbed
       start, peaks offset in the difference curve, as expected).
-- [ ] Skill: the `api.md` row "a reflection table without a fit", written
+- [x] Skill: the `api.md` row "a reflection table without a fit", written
       new for the documented call (WP-1532 dropped it, issue #1381; nothing
       under `docs/skill/rietx/` teaches the `run_stage` spelling). Nothing
-      else expected.
+      else expected. **Landed 2026-11-17:** generated rows for
+      `Refinement.evaluate`, `.reflection_table` (its first docstring line
+      now says "after a fit or from a pattern") and `.background`, and one
+      sentence in the Refinement section's prose; `api.md` 35 780 → 36 558 B
+      of the 39 000 B ceiling; both committed copies re-synced.
 - [x] `NodeAction.api_call` renders `lebail_cycles` and `lebail_tol` when
       they differ from the `Stage` default (from WP-1986): today a stage run
       with a non-default value renders a call that runs a different stage
