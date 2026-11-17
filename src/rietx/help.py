@@ -4877,7 +4877,9 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The approximate number of solver iterations for this stage. Both solvers "
             "cap function evaluations, so the number is scaled by a measured worst-case "
-            "rejection rate (`NFEV_PER_ITERATION`) before it reaches the solver."
+            "rejection rate (`NFEV_PER_ITERATION`) before it reaches the solver. It "
+            "must be at least 1: to read the model at its values without a fit, call "
+            "`Refinement.evaluate`."
         ),
         default="100",
         typical="20-100",

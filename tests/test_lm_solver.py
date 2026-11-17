@@ -894,16 +894,34 @@ def test_a_budget_under_one_evaluation_is_refused_as_trf_refuses_it():
 
 
 @pytest.mark.parametrize("solver", ["lm", "trf"])
-def test_a_stage_with_max_iter_0_is_refused_on_either_driver(solver):
+@pytest.mark.parametrize("max_iter", [0, -4])
+def test_a_stage_with_max_iter_0_is_refused_on_either_driver(solver, max_iter,
+                                                             tmp_path):
+    """rietx owns the refusal now (WP-1947): the stage is refused where it is
+    built, naming ``max_iter`` and the evaluation verb, so nothing is
+    compiled or recorded on the way.  It reached the driver as ``max_nfev``
+    and was refused there, mid-fit and in scipy's words.  A stored plan says
+    the same thing when ``fit`` converts it, on either driver."""
     import rietx as rx
+    from rietx.schemas.plan import PlanSpec, StageSpec
     from tests.test_refine_synthetic import perturbed_models, synthesize
 
+    with pytest.raises(ValueError, match=r"max_iter=.*ref\.evaluate\(data\)"):
+        rx.Stage("scale", ["phases.*.scale"], max_iter=max_iter)
+    # an empty stage too: a budget under one iteration says nothing about
+    # what is free, and the empty stage's evaluation has its own verb
+    with pytest.raises(ValueError, match="max_iter"):
+        rx.Stage("evaluate", [], max_iter=max_iter)
+
     structure, instrument = perturbed_models()
-    plan = rx.RefinementPlan(stages=[rx.Stage("scale", ["phases.*.scale"],
-                                              max_iter=0)])
-    ref = rx.Refinement(structure, instrument, history=False, solver=solver)
-    with pytest.raises(ValueError, match="max_nfev"):
-        ref.fit(synthesize(), plan=plan)
+    spec = PlanSpec(stages=[StageSpec(name="scale", turn_on=["phases.*.scale"],
+                                      max_iter=max_iter)])
+    ref = rx.Refinement(structure, instrument, history=tmp_path / "h.jsonl",
+                        solver=solver)
+    with pytest.raises(ValueError, match=r"ref\.evaluate\(data\)"):
+        ref.fit(synthesize(), plan=spec, telemetry=False)
+    assert ref.result_ is None
+    assert not (tmp_path / "h.jsonl").exists(), "refused before anything was written"
 
 
 @pytest.mark.parametrize("solver", ["lm", "trf"])
@@ -911,14 +929,15 @@ def test_a_joint_stage_with_max_iter_0_is_refused_on_either_driver(solver):
     """The joint fit reaches ``lm.minimize`` through its own call site, so the
     refusal is checked there too rather than inferred from the single fit."""
     import rietx as rx
+    from rietx.schemas.plan import PlanSpec, StageSpec
     from tests.test_joint_xray_neutron import _flat, _neutron, _xray, corundum
 
-    plan = rx.RefinementPlan(stages=[rx.Stage("scale", ["phases.*.scale"],
-                                              max_iter=0)])
-    with pytest.raises(ValueError, match="max_nfev"):
+    spec = PlanSpec(stages=[StageSpec(name="scale", turn_on=["phases.*.scale"],
+                                      max_iter=0)])
+    with pytest.raises(ValueError, match=r"max_iter=0.*ref\.evaluate\(data\)"):
         rx.refine_multi([_flat(20.0, 80.0), _flat(20.0, 80.0)],
                         rx.Structure(phases=[corundum()]), [_xray(), _neutron()],
-                        plan=plan, solver=solver)
+                        plan=spec, solver=solver)
 
 
 # ----------------------------------------------------------------------
