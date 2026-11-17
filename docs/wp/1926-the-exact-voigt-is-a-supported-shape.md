@@ -1,6 +1,6 @@
 # WP-1926 — the exact Voigt is a supported shape: its cost, its width, its exports and its bound
 
-Milestone: unscheduled · Status: ⬜ 2026-11-16 — the Voigt FWHM landed (#1605); next: the manual's pattern-level bias
+Milestone: unscheduled · Status: 🔄 2026-11-16 — the Voigt FWHM landed (#1605); next: the manual's pattern-level bias
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: — (PR #815 soft: the TOPAS whole-input writer the TOPAS task extends)
 Priority: P3 2026-10-08 — opt-in and correct today; what it lacks is speed, an exact reported width and one writer's statement, and the default stays TCH either way
