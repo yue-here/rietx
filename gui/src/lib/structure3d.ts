@@ -514,8 +514,12 @@ export const FILL_COLOR = "#8c8c8c";
  * `ring_dark` and at `ring_darken` of its colour on the rest, or a violet atom
  * hides its rings.  Depth cueing (WP-1548, off unless asked) fades a surface
  * toward the background linearly in depth, from nothing at `fog_start` of the
- * drawn atoms' depth span to `fog_max` at `fog_end` (`fogSpan`).  The keys are
- * Python's, because Python owns the corpus.
+ * drawn atoms' depth span to `fog_max` at `fog_end` (`fogSpan`).  Ambient
+ * occlusion (WP-1538, off unless asked) lights each atom and stick from
+ * `occlusion_directions` directions through as many depth maps,
+ * `occlusion_map_size` texels a side, with `occlusion_bias` of the map's width
+ * as depth bias (`gl3d.ts`).  The keys are Python's, because Python owns the
+ * corpus.
  */
 export const LOOK = {
   light: [-0.40, 0.55, 0.73],
@@ -532,6 +536,9 @@ export const LOOK = {
   fog_start: 0.5,
   fog_end: 1.0,
   fog_max: 0.7,
+  occlusion_directions: 64,
+  occlusion_map_size: 512,
+  occlusion_bias: 0.01,
 } as const;
 
 /**

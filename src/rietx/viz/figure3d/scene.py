@@ -66,7 +66,11 @@ CELL_INK = "#1f5fa8"
 #: ``fog_start`` of the drawn atoms' depth span, measured from the front, to
 #: ``fog_max`` at ``fog_end`` (:func:`fog_span`).  The start and end are
 #: ChimeraX's defaults for its ramp; ``fog_max`` is below 1 so the back layer
-#: stays legible (``docs/practice.md`` § Depth cueing).
+#: stays legible (``docs/practice.md`` § Depth cueing).  Ambient occlusion
+#: (WP-1538, off unless asked) lights each atom and stick from
+#: ``occlusion_directions`` directions through as many depth maps of
+#: ``occlusion_map_size`` texels a side, ``occlusion_bias`` of the map's width
+#: its depth bias (``raster.occlusion_maps``).
 LOOK: dict[str, Any] = {
     "light": [-0.40, 0.55, 0.73],
     "ambient": 0.45,
@@ -82,6 +86,9 @@ LOOK: dict[str, Any] = {
     "fog_start": 0.5,
     "fog_end": 1.0,
     "fog_max": 0.7,
+    "occlusion_directions": 64,
+    "occlusion_map_size": 512,
+    "occlusion_bias": 0.01,
 }
 
 #: The opening view's eye and up, before ``look_from`` (``openingView``).

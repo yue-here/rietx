@@ -198,6 +198,10 @@ def _corpus(payloads: dict[str, dict] | None = None) -> dict:
         "shown": shown,
         "views": _views(payloads),
         "fog": _fog(scenes),
+        # ambient occlusion's light directions and their map bases (WP-1538)
+        "occlusion": {"directions": raster.occlusion_directions().tolist(),
+                      "bases": [raster._light_basis(d).reshape(-1).tolist()
+                                for d in raster.occlusion_directions()]},
     })
 
 

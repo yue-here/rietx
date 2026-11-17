@@ -752,13 +752,15 @@ def id_plane(pk: dict, frame: Frame) -> IdPlane:
 # ambient occlusion (WP-1538)
 # ----------------------------------------------------------------------
 
-#: Ambient occlusion's constants (WP-1538 D2): how many directions the ambient
-#: light comes from, the side of each direction's depth map in texels, and the
-#: depth bias as a share of the map's width.  The GUI's ``gl3d.ts`` holds the
-#: same three.
-OCCLUSION_DIRECTIONS = 64
-OCCLUSION_MAP_SIZE = 512
-OCCLUSION_BIAS = 0.01
+#: Ambient occlusion's constants (WP-1538 D2), ``scene.LOOK``'s and so the
+#: GUI's: how many directions the ambient light comes from, the side of each
+#: direction's depth map in texels, and the depth bias as a share of the map's
+#: width.  ChimeraX's are 64, 1024 and 0.01 (its ``lighting`` documentation);
+#: 512 texels gave the 1024 map's mean darkening to 0.1 % on the 21 phases
+#: (``docs/wp/1538-measure/results.txt``) at a quarter of its memory.
+OCCLUSION_DIRECTIONS = LOOK["occlusion_directions"]
+OCCLUSION_MAP_SIZE = LOOK["occlusion_map_size"]
+OCCLUSION_BIAS = LOOK["occlusion_bias"]
 
 #: Samples looked up in one go, so a band's (samples × directions) arrays
 #: stay near 50 MB.

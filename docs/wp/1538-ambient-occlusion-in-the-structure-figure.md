@@ -149,10 +149,17 @@ bound on what sticks add. The multishadow number is the WP's to measure.
   and reads the depth back from the ids, so the maps are the same on either
   tier; `raster.occlusion` weighs each direction by its cosine).
 - [ ] The numba kernel, held bit-identical to the numpy path.
-- [ ] `ambient_occlusion=` on `render_structure`, with D5's cache. Measure
-  the cost at 1000 px and 3000 px on the 21 phases. Quote ranges.
-- [ ] Before-and-after pairs on the 21 phases in ball and ellipsoid mode,
-  committed under `docs/wp/1538-measure/`. Decide D4 from them.
+- [x] `ambient_occlusion=` on `render_structure`, with D5's cache. Measure
+  the cost at 1000 px and 3000 px on the 21 phases. Quote ranges (2026-11-17,
+  `1538-measure/results.txt`: the maps 0.06-0.53 s a scene; occluded
+  0.36-2.51 s at 1000 px and 2.39-15.68 s at 3000 px against 0.01-0.15 s and
+  0.05-0.31 s plain on the wheel, the occluded picture being drawn on the
+  numpy path until a kernel draws it).
+- [x] Before-and-after pairs on the 21 phases in ball and ellipsoid mode,
+  committed under `docs/wp/1538-measure/`. Decide D4 from them (2026-11-17:
+  `1538-measure/pairs/`, looked at; D4 stands, the faces casting and
+  receiving nothing, since no pair shows a face that would read better
+  darkened and a cast face would darken its own centre atom).
 - [ ] The GUI: the depth passes and lookup in `gl3d.ts`, the toggle, and a
   parity case with occlusion on. Check that rotation stays smooth on the
   largest corpus scene, since the maps are built once a scene.
