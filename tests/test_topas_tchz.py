@@ -173,13 +173,31 @@ def test_the_secondary_radius_is_read(tmp_path):
             == ref.fitted_instrument.geometry.goniometer_radius_mm)
 
 
-@pytest.mark.parametrize("cards", ["Rs 200\n  Radius(217.5)", "Radius(217.5, 200)"])
-def test_two_secondary_radii_are_refused(tmp_path, cards):
+@pytest.mark.parametrize("cards, match", [
+    ("Rs 200\n  Radius(217.5)", "secondary radius two ways"),
+    ("Radius(217.5, 200)", "not read as one secondary radius"),
+    ("Radius(rr)", "not read as one secondary radius"),
+    ("Rs -5", "not a radius"),
+])
+def test_a_radius_stated_two_ways_or_not_a_radius_is_refused(tmp_path, cards, match):
     ref, _ = case_nacl_xray()
     model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
     assert model.goniometer_radius_mm is None
-    with pytest.raises(ValueError, match="secondary radius two ways"):
+    with pytest.raises(ValueError, match=match):
         topas.to_instrument(model, ref.fitted_instrument)
+
+
+@pytest.mark.parametrize("cards, radii", [
+    ("Rp 217.5 Rs\n    200", [200.0]),                 # a line break is space
+    ("Radius(200.)", [200.0]),
+    ("Radius(2 * 100)", [200.0]),
+    # an equation using Rs, with a term after it, states nothing
+    ("Rs 200\n  th2_offset = -2*Rad*(0.05)*Cos(Th)/Rs -0.002;", [200.0]),
+])
+def test_the_secondary_radius_spellings(tmp_path, cards, radii):
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
+    assert model.secondary_radii == radii
+    assert model.goniometer_radius_mm == radii[0]
 
 
 @pytest.mark.parametrize("call, match", [
@@ -193,6 +211,8 @@ def test_two_secondary_radii_are_refused(tmp_path, cards):
      "!f, 0.001)", "negative above 2θ"),
     ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, 0.0, !e, nope, "
      "!f, 0.001)", "slot 5 value 'nope'"),
+    ("TCHZ_Peak_Type(!a, 1e999, !b, -0.002, !c, 0.003, !d, 0.0, !e, 0.008, "
+     "!f, 0.001)", "slot 1 value '1e999' does not resolve to a finite"),
 ])
 def test_a_profile_this_package_cannot_hold_is_refused(tmp_path, call, match):
     model = _with_call(tmp_path, call)
@@ -254,3 +274,45 @@ def test_each_profile_entry_names_its_topas_and_gsas2_equivalent():
     for name, slot in slots.items():
         index = ["first", "second", "third", "fourth", "fifth", "sixth"].index(slot)
         assert name in topas.TCHZ_SLOT_TERMS[index]
+
+
+def test_a_call_in_a_pawley_phase_is_that_phase_s(tmp_path):
+    """An ``hkl_Is`` phase is a phase too: its call is selectable by its
+    name, and is not a dataset-level call applying to every phase."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    pawley = ('hkl_Is\n  phase_name "LiF"\n  space_group "F m -3 m"\n'
+              '  a 4.03 b 4.03 c 4.03 al 90 be 90 ga 90\n  '
+              + call.replace("0.03", "0.02") + "\n")
+    model = _inp(tmp_path, RUN10 + pawley)
+    assert [c.phase for c in model.tchz] == ["NaCl", "LiF"]
+    assert [c.dataset for c in model.tchz] == [0, 0]
+    ref, _ = case_nacl_xray()
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
+    assert inst.profile.u.value == pytest.approx(0.024)
+
+
+def test_a_phase_call_against_a_dataset_level_one_is_refused(tmp_path):
+    call = TCHZ_LINE.search(RUN10).group(0)
+    text = RUN10.replace("  convolution_step 3\n", "  convolution_step 3\n  "
+                         + call.replace("0.03", "0.02") + "\n")
+    model = _inp(tmp_path, text)
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="the call in phase 'NaCl' and a dataset-level"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NaCl")
+
+
+def test_the_caller_box_opens_no_further_than_the_value(tmp_path):
+    """A caller's own box narrower than the file's value widens to take it;
+    W and X never open past their floors, and the caller's copy is untouched."""
+    model = _with_call(tmp_path, "TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.0, "
+                                 "!d, 0.0, !e, 0.008, !f, 0.0)")
+    ref, _ = case_nacl_xray()
+    base = ref.fitted_instrument.model_copy(deep=True)
+    base.profile.x.value = 0.01
+    base.profile.x.min = 0.002
+    base.profile.w.value = 0.01
+    base.profile.w.min = 0.005
+    inst = topas.to_instrument(model, base)
+    assert inst.profile.x.min == 0.0 and inst.profile.x.value == 0.0
+    assert inst.profile.w.min == inst.profile.w.value > 0.0
+    assert base.profile.x.min == 0.002 and base.profile.x.value == 0.01

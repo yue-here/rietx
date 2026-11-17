@@ -299,11 +299,11 @@ It is the radius the reference divides a specimen displacement by, so it becomes
 
 `to_instrument` refuses, naming the file:
 
-- an input with no call, a call that does not have twelve arguments (TOPAS 6 itself stops on a ten-argument one), or a value that is not a number;
-- calls in several phases stating different values, unless `phase=` names the one to read;
+- an input with no call, a call that does not have twelve arguments (TOPAS 6 itself stops on a ten-argument one), or a value that is not a finite number;
+- calls in several phases stating different values, unless `phase=` names the one to read, and a phase's own call that disagrees with a dataset-level one;
 - a negative W (value 3 plus value 4) or X, which this package's profile bounds at zero. What TOPAS does with a negative width has not been measured;
 - a Lorentzian width X/cosθ + Y·tanθ that turns negative below 2θ = 180°;
-- two different secondary radii, including a `Radius(a, b)` with two different values, whose argument order has not been measured.
+- two different secondary radii, a radius that is not positive, or a `Radius(a, b)` with two different values, whose argument order has not been measured.
 
 ## Time-of-flight instrument files
 

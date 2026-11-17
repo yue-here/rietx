@@ -566,14 +566,18 @@ class TopasModel:
     #: ``th2_offset`` entry, p. 144: ``th2_offset = -2 Rad (c) Cos(Th) / Rs;``),
     #: which is what rietx's ``goniometer_radius_mm`` does too. That field
     #: above is set from this list where it holds one value however often
-    #: stated, and is ``None`` where it holds two, which :func:`to_instrument`
-    #: then refuses rather than picks.
+    #: stated and positive, and is ``None`` otherwise: where it holds two
+    #: values, which :func:`to_instrument` then refuses rather than picks, or
+    #: one that is not a radius.
     secondary_radii: list = field(default_factory=list)
-    #: ``Radius(a, b)`` calls with two different values. The printed signature
-    #: is ``Radius(rp, rs)``, but the TCHZ macro's printed signature turned out
-    #: not to be its argument order (:class:`TopasTCHZ`), and no TOPAS run has
-    #: measured this one, so which value is ``Rs`` is not taken from the order.
-    radius_unordered: list = field(default_factory=list)
+    #: The ``Radius(…)`` calls not read as one radius, each as its argument
+    #: values (``None`` for one that did not resolve): a call with two
+    #: different values, or with an argument this reader could not evaluate.
+    #: The printed signature is ``Radius(rp, rs)``, but the TCHZ macro's
+    #: printed signature turned out not to be its argument order
+    #: (:class:`TopasTCHZ`), and no TOPAS run has measured this one, so which
+    #: value is ``Rs`` is not taken from the order.
+    radius_unread: list = field(default_factory=list)
 
 
 def strip_comments(text: str) -> str:
@@ -2760,9 +2764,13 @@ class TopasTCHZ:
     values: tuple
     #: The refine tri-state of each slot (:func:`_flag`), in slot order.
     vary: tuple
-    #: The ``phase_name`` of the ``str`` the call sits in, ``""`` where it sits
-    #: at dataset or top level and so applies to every phase below it.
+    #: The ``phase_name`` of the phase block the call sits in (``str``,
+    #: ``hkl_Is``, ``xo_Is``, ``d_Is``; ``"<unnamed hkl_Is>"`` where it names
+    #: none), and ``""`` where it sits at dataset or top level and so applies
+    #: to every phase of its dataset.
     phase: str = ""
+    #: Which dataset the call belongs to, as :attr:`TopasPhase.dataset`.
+    dataset: int | None = None
 
 
 #: What rietx's :class:`~rietx.schemas.instrument.ProfileTCHZ` takes from the
@@ -2810,59 +2818,86 @@ def _call_args(text: str, open_paren: int) -> list[str] | None:
 _ARG_NUMBER = re.compile(rf"({_NUM})`?(?:_\S*)?")
 
 
-def _tchz_calls(unquoted: str, symbols: dict[str, float],
-                phase_spans: list[tuple[int, int, str]]) -> list[TopasTCHZ]:
+def _enclosing_phase(active: str, openers: list, offset: int) -> str:
+    """The phase a card at ``offset`` belongs to: the ``phase_name`` of the
+    phase block it sits in (``str``, ``hkl_Is``, ``xo_Is``, ``d_Is``), the
+    opener's keyword where that block names none, and ``""`` where it sits at
+    dataset or top level."""
+    block = None
+    for opener in openers:
+        if opener.start() > offset:
+            break
+        block = opener
+    if block is None or block["kw"] in _DATASET_OPENERS:
+        return ""
+    end = next((o.start() for o in openers if o.start() > block.start()),
+               len(active))
+    name = re.search(r'phase_name\s+"?([^"\n]+)', active[block.end():end])
+    return name.group(1).strip() if name else f"<unnamed {block['kw']}>"
+
+
+def _slot_value(raw: str, symbols: dict[str, float]) -> float | None:
+    """One macro argument's value: a number as written (with TOPAS's
+    write-back annotation), else an equation over the file's symbols."""
+    if n := _ARG_NUMBER.fullmatch(raw):
+        return float(n.group(1))
+    return _resolve(raw, symbols)
+
+
+def _tchz_calls(unquoted: str, active: str, symbols: dict[str, float],
+                openers: list) -> list[TopasTCHZ]:
     """Every ``TCHZ_Peak_Type(…)`` call, read into a :class:`TopasTCHZ`."""
     calls = []
     for m in re.finditer(r"\bTCHZ_Peak_Type\s*\(", unquoted):
         args = _call_args(unquoted, m.end() - 1)
         if args is None:
             continue
-        owner = next((name for start, end, name in phase_spans
-                      if start <= m.start() < end), "")
         values: list = []
         vary: list = []
         if len(args) == 12:
             for name, raw in zip(args[0::2], args[1::2], strict=True):
-                if n := _ARG_NUMBER.fullmatch(raw):
-                    values.append(float(n.group(1)))
-                else:
-                    values.append(_resolve(raw, symbols))
+                values.append(_slot_value(raw, symbols))
                 named = re.sub(r"[@!,\s`]", "", name) or None
                 vary.append(_flag(name, "`" if "`" in raw else None,
                                   named=named))
-        calls.append(TopasTCHZ(args=tuple(args), values=tuple(values),
-                               vary=tuple(vary), phase=owner))
+        dataset = sum(1 for o in openers
+                      if o["kw"] in _DATASET_OPENERS and o.start() < m.start())
+        calls.append(TopasTCHZ(
+            args=tuple(args), values=tuple(values), vary=tuple(vary),
+            phase=_enclosing_phase(active, openers, m.start()),
+            dataset=dataset - 1 if dataset else None))
     return calls
 
 
 def _secondary_radii(unquoted: str, symbols: dict[str, float]
-                     ) -> tuple[list[float], list[tuple[float, float]]]:
+                     ) -> tuple[list[float], list[tuple]]:
     """The secondary radii the file states (``TopasModel.secondary_radii``)
-    and the ``Radius`` calls whose two values differ (``radius_unordered``).
+    and the ``Radius`` calls not read as one radius (``radius_unread``).
 
-    ``Rs`` is read with :func:`_read_tail`, the one grammar, and only where a
-    value follows it: an equation naming ``Rs`` (``… / Rs;``) is a use of the
-    radius, not a statement of it. ``Radius(r)`` states one radius and
-    ``Radius(r, r)`` one radius twice.
+    ``Rs`` is a statement only where it opens one: where the text before it
+    ends a statement rather than continuing an expression, so the ``Rs`` of
+    ``… Cos(Th) / Rs - 0.002;`` is a use of the radius, not a value of it.
+    The value is read with :func:`_read_tail`, the one grammar, across a line
+    break as TOPAS reads it. ``Radius(r)`` states one radius and
+    ``Radius(r, r)`` one radius twice; an argument may be an equation.
     """
     radii: list[float] = []
-    unordered: list[tuple[float, float]] = []
-    for m in re.finditer(r"\bRs\b(?=[ \t]+[^\s;=])", unquoted):
+    unread: list[tuple] = []
+    for m in re.finditer(r"\bRs\b(?=\s)", unquoted):
+        before = unquoted[:m.start()].rstrip()
+        if before and before[-1] in "+-*/^=(,<>&|":
+            continue
         read = _read_tail(unquoted[m.end():], symbols)
         if read is not None and read.value is not None:
             radii.append(read.value)
     for m in re.finditer(r"\bRadius\s*\(", unquoted):
         args = _call_args(unquoted, m.end() - 1) or []
-        numbers = [float(n.group(1)) for a in args
-                   if (n := _ARG_NUMBER.fullmatch(a))]
-        if len(numbers) != len(args) or not numbers:
-            continue
-        if len(set(numbers)) == 1:
-            radii.append(numbers[0])
+        values = tuple(_slot_value(a, symbols) for a in args)
+        if len(values) in (1, 2) and None not in values and len(set(values)) == 1:
+            radii.append(values[0])
         else:
-            unordered.append(tuple(numbers))
-    return radii, unordered
+            unread.append(values)
+    return radii, unread
 
 
 def _emission_lines(active: str, masked: str,
@@ -3324,8 +3359,9 @@ def read_topas_inp(path: str | Path, *,
     # a file may state it as `Rs`, through `Radius(…)`, or both: one value
     # however often stated is the radius, two are withheld for `to_instrument`
     # to refuse rather than pick.
-    model.secondary_radii, model.radius_unordered = _secondary_radii(_unq, symbols)
-    if len(set(model.secondary_radii)) == 1 and not model.radius_unordered:
+    model.secondary_radii, model.radius_unread = _secondary_radii(_unq, symbols)
+    if (len(set(model.secondary_radii)) == 1 and not model.radius_unread
+            and 0.0 < model.secondary_radii[0] < math.inf):
         model.goniometer_radius_mm = model.secondary_radii[0]
     model.geometry = ("debye_scherrer" if _CAPILLARY.search(active)
                       else "bragg_brentano")
@@ -3804,7 +3840,7 @@ def read_topas_inp(path: str | Path, *,
         covered.setdefault(m.group(1), set()).add(owner)
     # The TCHZ profile's slots, read for `to_instrument` and judged there
     # (WP-1455): a structure import never fails on a profile it does not use.
-    model.tchz = _tchz_calls(_unquoted(active), symbols, phase_spans)
+    model.tchz = _tchz_calls(_unquoted(active), active, symbols, openers)
     # Set before the site-count guard's refusal has a chance to fire, so that on
     # every path where a model exists at all it carries its own coverage.
     # A `"<name> magnetic part"` str of `mag_only` sites is the one form of
@@ -4817,7 +4853,7 @@ def to_instrument(model: TopasModel, instrument, *,
     Z/cos²θ = Z·tan²θ + Z exactly, so the fold changes no width at any angle
     (:data:`TCHZ_SLOT_TERMS`).
 
-    ``phase`` names the ``str`` whose call to take, where calls in several
+    ``phase`` names the phase whose call to take, where calls in several
     phases state different values; a call at dataset or top level applies to
     every phase. Refused, each naming the file:
 
@@ -4828,9 +4864,11 @@ def to_instrument(model: TopasModel, instrument, *,
       above zero — what TOPAS does with a negative Gaussian variance is not
       measured, and a width this package cannot hold is not a shape;
     - a Lorentzian FWHM X/cosθ + Y·tanθ that goes negative below 2θ = 180°;
-    - two different secondary radii (an ``Rs`` and a ``Radius`` disagreeing,
-      or a ``Radius(a, b)`` whose two values differ, whose order no run has
-      measured).
+    - a value that is not finite;
+    - two different secondary radii (an ``Rs`` and a ``Radius`` disagreeing),
+      a radius that is not positive, or a ``Radius(…)`` call not read as one
+      radius (``TopasModel.radius_unread``: two different values, whose
+      order no run has measured, or one that does not resolve).
 
     A W from 0 up to the Γ_G² clamp (``caglioti._MIN_GAMMA_G2``) is raised to
     it, as the schema raises a stored one. A value outside ``instrument``'s own
@@ -4853,18 +4891,25 @@ def to_instrument(model: TopasModel, instrument, *,
                 f"{where}: TCHZ_Peak_Type has {len(call.args)} arguments. TOPAS 6 "
                 f"accepts only the twelve-argument form, six (name, value) pairs "
                 f"(measured: a ten-argument call stops the program)")
-        if None in call.values:
-            slot = call.values.index(None) + 1
+        bad = [k for k, v in enumerate(call.values)
+               if v is None or not math.isfinite(v)]
+        if bad:
+            slot = bad[0] + 1
             raise ValueError(
                 f"{where}: TCHZ_Peak_Type's slot {slot} value "
-                f"{call.args[2 * slot - 1]!r} does not resolve to a number")
+                f"{call.args[2 * slot - 1]!r} does not resolve to a finite number")
     distinct = {c.values for c in calls}
     if len(distinct) > 1:
-        owners = sorted({c.phase or "(dataset level)" for c in calls})
+        owners = sorted({c.phase or (f"dataset {c.dataset}, dataset level"
+                                     if c.dataset is not None else "top level")
+                         for c in calls})
+        advice = ("Pass phase= to choose the one to read" if phase is None else
+                  f"the call in phase {phase!r} and a dataset-level call disagree, "
+                  f"and which one TOPAS applies to it is not measured here")
         raise ValueError(
             f"{where}: {len(calls)} TCHZ_Peak_Type calls state {len(distinct)} "
             f"different profiles (in {', '.join(owners)}), and an instrument has "
-            f"one. Pass phase= to choose the one to read")
+            f"one. {advice}")
     values = calls[0].values
     widths = tchz_widths(values)
     if widths["w"] < 0.0 or widths["x"] < 0.0:
@@ -4884,15 +4929,22 @@ def to_instrument(model: TopasModel, instrument, *,
             f"{where}: TCHZ_Peak_Type{tuple(values)} gives X = {widths['x']:g} and "
             f"Y = {widths['y']:g}, whose Lorentzian FWHM X/cosθ + Y·tanθ is "
             f"negative above 2θ = {edge:.3f}°, and a negative width is not a shape")
-    radii = set(model.secondary_radii) | {r for pair in model.radius_unordered
-                                          for r in pair}
-    if model.radius_unordered or len(radii) > 1:
+    if model.radius_unread:
+        raise ValueError(
+            f"{where}: states Radius{tuple(model.radius_unread[0])}, which this "
+            f"reader does not read as one secondary radius: two different values, "
+            f"whose order no TOPAS run has measured, or one that does not "
+            f"resolve. Set instrument.geometry.goniometer_radius_mm yourself")
+    radii = set(model.secondary_radii)
+    if len(radii) > 1:
         raise ValueError(
             f"{where}: states the secondary radius two ways "
-            f"({', '.join(f'{r:g}' for r in sorted(radii))} mm"
-            + (", a Radius(…) call with two different values whose order no "
-               "TOPAS run has measured" if model.radius_unordered else "")
-            + "). Set instrument.geometry.goniometer_radius_mm yourself")
+            f"({', '.join(f'{r:g}' for r in sorted(radii))} mm). Set "
+            f"instrument.geometry.goniometer_radius_mm yourself")
+    if radii and not 0.0 < next(iter(radii)) < math.inf:
+        raise ValueError(
+            f"{where}: states a secondary radius of {next(iter(radii)):g} mm, "
+            f"which is not a radius")
 
     out = instrument.model_copy(deep=True)
     if not isinstance(out.profile, ProfileTCHZ):
@@ -4906,7 +4958,9 @@ def to_instrument(model: TopasModel, instrument, *,
             value = max(value, _MIN_GAMMA_G2)
         param = getattr(out.profile, name)
         if value < param.min:
-            param.min = value - abs(value) - 1.0
+            # W and X sit on their floors at worst (refused below them above),
+            # so the box opens to the value itself and never past a floor
+            param.min = value if name in ("w", "x") else value - abs(value) - 1.0
         if value > param.max:
             param.max = value + abs(value) + 1.0
         param.value = value
