@@ -207,6 +207,32 @@ the declared ratio is wrong by 5σ.
 
 ## Handover log
 
+- **2026-11-17 (later)** — gates run on the final tree, follow-ups filed,
+  PR #1642 marked ready. Current main (13 commits) merged in cleanly first,
+  so the counts below are the merged tree's.
+  - *Measured:* fast suite on the workstation (Linux x86_64, `-n 8 --dist
+    loadgroup -m "not slow"`, after a 4-file canary of 436 passed, 0 failed):
+    3 failed, 14893 passed, 283 skipped, 32 xfailed on cf1ae813b. All three
+    were rows the new code owed: `LINEAR_RESTRAINT_STALE` had no silence
+    pair (`tests/silence.py`) and no joint-fit scope (`multi.DIAGNOSTIC_SCOPES`,
+    absent: a joint fit refuses soft restraints), and the GUI help-key
+    fixture lacked its key; fixed in 8ee692b02, after which those three files
+    pass (5, 129 and 37) and `test_audit_table` 23 ([dev,jax], darwin arm64).
+    `rietx_vale.sh` (the CI Vale step) 0 errors; `tests.reader_output` exit 0
+    (unchanged against the merge-base); `test_docs_consistency` 26 passed;
+    ruff clean.
+  - *Filed:* #1653, the small follow-ups named below (the QPA table export
+    and the series trajectory do not carry `element_counts` or
+    `weight_fraction_covariance`; the GUI list join drops structure-level
+    rows).
+  - *For the maintainer:* the Acceptance asks `RESTRAINT_TENSION` to fire on
+    the flat-partition pair when the ratio is wrong by 5σ; measured, it
+    cannot there (no data pull on the partition), and fires only where the
+    data measure it. The tests pin both halves; whether that is the
+    acceptance wanted is his call. The tier of `LINEAR_RESTRAINT_STALE`
+    (tier 1, arithmetic) is for his read.
+  - *Next:* review of #1642.
+
 - **2026-11-17** — every task built, review fixes in; PR #1642 (draft), its
   fast suite and handover steps still owed. A refinement can now hold a sum of
   parameters across phases near a target as a soft observation, and one call
