@@ -237,7 +237,7 @@ on the writers.
   only when used; tests now pin both lights, a bond half's ends and the
   letters' plane. Its note that a one-object `union` draws a POV-Ray parse
   warning is left, being harmless.
-- **Measured**: FAST_SUITE_ENTRY
+- **Measured**: the new tests, 11 passed (arm64 Mac, `[dev]` venv); lint and Vale clean; `tests.reader_output` exit 0. The fast suite was running when the shift paused (2026-11-17T16:25Z) and is not quoted: the next session runs it, then marks the PR ready.
 - **Gotchas**: `npx gltf-validator` does not run, since the npm package has
   no command-line entry point; it needs a Node script calling
   `validateBytes` (#1667). Homebrew is not on this Mac and pearl has neither
