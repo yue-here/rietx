@@ -1,0 +1,29 @@
+LaB6: 116 atoms, 0 planar rings
+NAC: 185 atoms, 0 planar rings
+fluorapatite: 106 atoms, 0 planar rings
+spinel MgAl2O4: 154 atoms, 0 planar rings
+perovskite SrTiO3: 63 atoms, 0 planar rings
+garnet grossular: 383 atoms, 0 planar rings
+rutile TiO2: 51 atoms, 0 planar rings
+olivine forsterite: 107 atoms, 0 planar rings
+zircon ZrSiO4: 70 atoms, 0 planar rings
+corundum Al2O3: 120 atoms, 0 planar rings
+fluorite CaF2: 78 atoms, 0 planar rings
+wurtzite ZnO: 17 atoms, 0 planar rings
+quartz SiO2: 24 atoms, 0 planar rings
+calcite CaCO3: 132 atoms, 0 planar rings
+gypsum CaSO4.2H2O: 92 atoms, 0 planar rings
+pyrite FeS2: 70 atoms, 0 planar rings
+baryte BaSO4: 64 atoms, 0 planar rings
+andalusite Al2SiO5: 104 atoms, 0 planar rings
+CsCl: 35 atoms, 0 planar rings
+high cristobalite SiO2: 194 atoms, 0 planar rings
+olivine (Mg0.9Fe0.1)2SiO4: 126 atoms, 0 planar rings
+paracetamol: 752 atoms, 16 planar rings
+acridine: 880 atoms, 80 planar rings
+C16H26 (chairs): 796 atoms, 0 planar rings
+cod_1567181: 1144 atoms, 20 planar rings
+cod_7252065: 608 atoms, 24 planar rings
+HKUST-1: 5472 atoms, 256 planar rings
+questions: fog_max, D6, D5 sheets written
+D3, background=None with the cue: refused: depth_cue=True fades toward the background, and background=None has no colour to fade toward; give an opaque background

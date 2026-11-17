@@ -255,7 +255,8 @@ primary extinction, and it is the only extinction a powder has: secondary
 extinction is the attenuation of the beam by other, similarly oriented blocks
 upstream, and in a powder the corresponding effect is multiple scattering
 {cite}`sabine1988b`. Left uncorrected, the
-refinement compensates with a spuriously large Biso and a small scale.
+refinement compensates with a small scale and a small Biso
+{cite}`sabine1988b`, and a strong extinction drives Biso below zero.
 On a fine powder the coefficient trades against the scale and the Biso instead,
 so it is opt-in per phase, and no plan frees it unasked.
 `phase.extinction = 0.0` declares it, and `mccusker_structural` then frees it

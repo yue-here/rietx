@@ -23,9 +23,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rietx import Instrument, Parameter, PatternData, Refinement
+from rietx import Instrument, Parameter, PatternData, Refinement, replay
 from rietx.model.forward import compile_model
-from rietx.model.microstructure import microstructure_table
+from rietx.model.microstructure import floored_paths, microstructure_table
 from rietx.model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
@@ -287,14 +287,62 @@ def test_the_two_independent_columns_are_compared_rather_than_combined():
     assert blocks[0].size_agreement is None
 
 
+def test_a_coefficient_on_its_floor_reads_at_zero_whatever_it_stores():
+    """WP-1914: ``FLOOR_HIT`` is the off state, not a tiny positive width.
+
+    ``solver="trf"`` stops a hair above a floor of zero; on notebook 04's
+    CeO₂ the Gaussian size variance came back 3.4e-24 deg² and read as a
+    4.3e13 Å domain.  Without the floor set that is still what the table
+    says, which is the defect this pins from both sides.
+    """
+    lor = size_coefficient_for_size(300.0, LAM_LONG)
+    values = _phase_values(lor_size=lor, gauss_size=3.4e-24,
+                           gauss_strain=3.8e-11)
+    esds = {"phases.0.lor_size": 0.01 * lor,
+            "phases.0.gauss_size": 4.6e-15, "phases.0.gauss_strain": 1e-6}
+    unread = microstructure_table(_one_phase(), values, wavelength=LAM_LONG,
+                                  esds=esds)
+    assert unread[0].term("gauss_size").value > 1e12
+    assert unread[0].size_agreement > 1e9
+
+    floors = {"phases.0.gauss_size", "phases.0.gauss_strain"}
+    blocks = microstructure_table(_one_phase(), values, wavelength=LAM_LONG,
+                                  esds=esds, floors=floors)
+    for name in ("gauss_size", "gauss_strain"):
+        row = blocks[0].term(name)
+        assert row.unavailable == "at_zero"
+        assert row.value is None and row.esd is None
+        # the stored number is still the stored number
+        assert row.coefficient > 0.0
+    assert blocks[0].term("lor_size").value == pytest.approx(300.0, rel=1e-12)
+    assert blocks[0].size_agreement is None
+    assert blocks[0].strain_agreement is None
+
+
+def test_a_joint_fit_hands_histogram_0_its_own_floor_spelling():
+    """Shared rows are bare and per-histogram rows ``hist.h.…`` (WP-1914)."""
+    from rietx.multi import _hist0_floors
+    from rietx.strategy.staged import GuardFinding
+
+    found = [
+        GuardFinding.at_bound("phases.0.gauss_size", limit=("lower", 0.0)),
+        GuardFinding.at_bound("hist.0.phases.0.gauss_strain",
+                              limit=("lower", 0.0)),
+        GuardFinding.at_bound("hist.1.phases.0.lor_size",
+                              limit=("lower", 0.0)),
+        GuardFinding.at_bound("phases.0.lor_strain", limit=("upper", 0.5)),
+    ]
+    assert _hist0_floors(found) == {"phases.0.gauss_size",
+                                    "phases.0.gauss_strain"}
+
+
 # --- end to end: the block on a real fit, and the caveat on the report ------
 
 OUT = Path(__file__).parent / "output"
 
 
-@pytest.fixture(scope="module")
-def size_and_strain_fit():
-    """One LaB6 pattern with a 400 Å domain and Δd/d = 1e-3, refined."""
+def _lab6_size_and_strain_pattern() -> PatternData:
+    """LaB6 with a 400 Å Lorentzian domain, Δd/d = 1e-3, no Gaussian term."""
     lam = LAM_LONG
     truth = make_lab6()
     truth.phases[0].scale.value = 5e-4
@@ -312,8 +360,14 @@ def size_and_strain_fit():
     table = ParameterTable(truth, ins)
     y = model.evaluate(table.decode(table.x0()))
     y = np.random.default_rng(3).poisson(np.maximum(y, 1.0)).astype(float)
-    pattern = PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+    return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
+
+@pytest.fixture(scope="module")
+def size_and_strain_fit():
+    """One LaB6 pattern with a 400 Å domain and Δd/d = 1e-3, refined."""
+    lam = LAM_LONG
+    pattern = _lab6_size_and_strain_pattern()
     start = make_lab6()
     start.phases[0].scale.value = 5e-4
     ins2 = Instrument.debye_scherrer(wavelength=lam)
@@ -364,6 +418,82 @@ def test_a_converged_fit_reports_a_domain_size_with_an_esd(size_and_strain_fit):
     # the two the plan never freed say so, in the same block
     for name in ("gauss_size", "gauss_strain"):
         assert block.term(name).unavailable == "at_zero"
+
+
+def test_either_driver_reads_a_width_on_its_floor_as_absent():
+    """WP-1914 end to end: the reading follows ``FLOOR_HIT``, not the landing.
+
+    The pattern has no Gaussian broadening, so the two Gaussian widths the
+    stage frees head for their floor.  LM lands such a row on 0.0 and
+    ``solver="trf"`` stops just above it (3.4e-24 deg² on notebook 04, and on
+    this pattern on macOS arm64).  Where either stops is the solver's and
+    moves with platform libm, so the test pins only the decision: a row reads
+    ``at_zero`` exactly where it is stored as zero or ``FLOOR_HIT`` names it,
+    and a replay of the node reads it the same way off the recorded finding.
+    """
+    pattern = _lab6_size_and_strain_pattern()
+    widths = ["phases.*.lor_size", "phases.*.lor_strain",
+              "phases.*.gauss_size", "phases.*.gauss_strain"]
+    plan = RefinementPlan(stages=[
+        Stage(name="scale+bkg",
+              turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*"]),
+        Stage(name="width", turn_on=widths, seed=1e-3),
+    ])
+    for solver in ("lm", "trf"):
+        start = make_lab6()
+        start.phases[0].scale.value = 5e-4
+        ins = Instrument.debye_scherrer(wavelength=LAM_LONG)
+        ins.profile.w.value = 3e-4
+        ins.profile.x.value = 0.0
+        ins.background = BackgroundChebyshev.with_terms(3)
+        ref = Refinement(start, ins, solver=solver)
+        result = ref.fit(pattern, plan=plan)
+        OUT.mkdir(exist_ok=True)
+        result.plot(OUT / f"wp1914_floor_{solver}_fit.png")
+        again = replay(ref.history, ref.history.order[-1], pattern)
+        for res in (result, again):
+            floors = {p for d in res.diagnostics if d.code == "FLOOR_HIT"
+                      for p in d.where}
+            block = res.microstructure[0]
+            for row in block.terms:
+                on_floor = row.path in floors or row.coefficient == 0.0
+                assert (row.unavailable == "at_zero") == on_floor, (solver, row)
+            if block.term("gauss_size").unavailable == "at_zero":
+                assert block.size_agreement is None
+
+
+def test_a_width_tied_to_a_floored_source_is_floored_with_it():
+    """A follower of a floored source carries no ``FLOOR_HIT`` of its own, so
+    it inherits its source's (a tied width held on its own floor is named
+    directly, ``test_tied_bound_rows``).
+
+    ``value = Σ c·source + const`` sits at zero when every source does and
+    the constant is zero, and only then (WP-1914; the review of #1506).
+    """
+    from rietx.params.vector import AffineTie
+
+    class _E:
+        def __init__(self, path, tie=None):
+            self.path, self.tie = path, tie
+
+    class _T:
+        entries = [
+            _E("phases.0.gauss_size"),
+            _E("phases.1.gauss_size",
+               AffineTie.identity("phases.0.gauss_size")),
+            _E("phases.2.gauss_size",
+               AffineTie.identity("phases.1.gauss_size")),
+            _E("phases.3.gauss_size", AffineTie(
+                terms=(("phases.0.gauss_size", 1.0),), const=1e-4)),
+            _E("phases.4.gauss_size", AffineTie(
+                terms=(("phases.0.gauss_size", 1.0),
+                       ("phases.0.lor_size", 1.0)))),
+        ]
+
+    assert floored_paths(_T(), {"phases.0.gauss_size"}) == {
+        "phases.0.gauss_size", "phases.1.gauss_size", "phases.2.gauss_size"}
+    assert floored_paths(_T(), ()) == set()
 
 
 def test_the_report_carries_the_block_and_attaches_the_caveat(size_and_strain_fit):

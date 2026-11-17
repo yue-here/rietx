@@ -25,6 +25,17 @@
   --shadow:0 1px 2px rgba(28,25,23,.06), 0 12px 32px -18px rgba(28,25,23,.25);
   --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* The brand lockup, set on the wordmark's face (WP-2122).  Instrument Sans SemiBold
+     measures x-height .510, stem .1267 and `r` left side bearing .0667 em.  One unit of
+     the mark's 32-unit box is .510/12.5 em.  The Kα2 tip stands 12.5 units above the bar,
+     so it lands on the x-height, and the 3.1-unit bar is the stem's thickness.  The drop
+     lowers a box sitting on the baseline by the 6.5 units under the bar's top, which puts
+     that edge on the baseline.  The gap leaves one x-height of ink from the bar's end to
+     the `r`'s stem, less the box's 1.5-unit margin and the side bearing.  An em here
+     resolves where the token is used, so the lockup scales with the wordmark. */
+  --mark-unit:calc(.51em / 12.5);
+  --mark-drop:calc(6.5 * var(--mark-unit));
+  --mark-gap:calc(.51em - 1.5 * var(--mark-unit) - .0667em);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){

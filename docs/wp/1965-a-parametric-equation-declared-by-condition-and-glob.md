@@ -64,6 +64,21 @@ one declaration per matched path, each with its own coefficients.
 
 ### Inherited
 
+- **2026-11-12, from [1325](1325-parametric-series.md) (closed): `rietx events`
+  could print one line per parametric equation of a joint fit.** 1325 held this
+  in its own § Inherited since 1322 closed without it, and moved it here at its
+  close, because the line reports this WP's subset and detectors. This is
+  @mustachefeeling's point from the PR #977 comments. A joint fit keeps no
+  history (`multi.py`), but it has emitted events since #926, and `rietx events`
+  (`history.aggregate.summarize_events`) shipped in PR #902. The line would
+  carry the subset size, the form verdict, and whether a detector fired inside
+  the subset. Two rules for whoever builds it:
+  - Pair events in file order, never by `(series_index, series_pass)`, since
+    indices recur on reseeds and restarted segments. The aggregator already
+    clears its open stages at each `fit_start` (`aggregate.py:185`).
+  - A segmented chain's summed fit time is not its wall time: 700 s against
+    148 s on one chain, as reported and not re-measured.
+
 - **2026-10-15, from [1325](1325-parametric-series.md), from @mustachefeeling's comments on PR #977: where a subset's boundary goes.** Numbers as
   reported, not re-measured. Since 2026-10-15 the declaration is
   `ParametricEquation` and the resolved one `RefinedParametricEquation`
