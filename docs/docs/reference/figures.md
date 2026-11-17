@@ -139,7 +139,8 @@ Line widths and letters grow with it, as they do in the GUI's export, so a large
 A 17 cm figure at 300 dpi is `size=2008, dpi=300`.
 `supersample=` sets how many samples are taken along each side of a pixel, from 1 to 4, and 2 by default.
 More samples draw smoother edges.
-`path=` writes a PNG and refuses any other suffix.
+`path=` writes the file its suffix names: `.png` the picture, or `.pov` and `.glb` the scene for a ray tracer ([A scene for a ray tracer](#a-scene-for-a-ray-tracer)).
+It refuses any other suffix.
 `pad=` is the share of the frame's width and height left empty on each side, 0.05 by default as in ChimeraX's `view`.
 `pad=0` crops the picture to its ink, keeping only the room a line's half-width, the a, b and c, and any atom labels need.
 YBa₂Cu₃O₇ without its cell, at 1000 px, keeps 35 to 53 px of margin at the default and 3 px at `pad=0`, and fluorapatite with its cell keeps 15 px.
@@ -215,9 +216,41 @@ On an Apple M4 in October 2026, a render of the NAC cell took 35-41 ms at 1000 p
 ### Limits
 
 There is no SVG or PDF output, because a ray-caster has no shapes to write.
-Perspective, shadows and ambient occlusion are not drawn either.
+Perspective, shadows and ambient occlusion are not drawn either; a ray tracer draws the last two from the scene `render_structure` writes for it.
 The function follows the GUI's viewer, and the viewer is still changing, so its look and its keywords are {ref}`provisional <provisional-by-declaration>`.
 For a picture in another program's style, `Structure.to_cif` writes each phase with its anisotropic displacement loop, which VESTA and Jmol both read.
+
+### A scene for a ray tracer
+
+`path="figure.pov"` writes a POV-Ray 3.7 scene and `path="figure.glb"` a glTF 2.0 binary, in place of the PNG.
+Both carry the figure's atoms, sticks, rings, polyhedra, cell, letters, camera and key light, so the file opens framed as the picture is.
+The returned figure is the same `StructureFigure`, and its `path` names the file written.
+`outline=` and `depth_cue=` belong to the PNG's renderer and are refused with either suffix.
+
+```python
+fig = rx.viz.render_structure(structure, mode="ellipsoid", path="nac.pov")
+rx.viz.render_structure(structure, mode="ellipsoid", path="nac.glb")
+```
+
+The POV-Ray scene is drawn at the figure's size, which its second line gives:
+
+```sh
+povray +W1000 +H963 +A nac.pov
+```
+
+Add `+UA` for a transparent background.
+The light, the finish and `RIETX_RADIOSITY`, POV-Ray's global illumination, are `#declare` lines at the top of the file, so turning radiosity on is one edit.
+The atoms are in Cartesian ångström and drawn through `RIETX_VIEW`, the figure's rotation followed by a mirror.
+POV-Ray's frame is left-handed and rietx's is right-handed, and without the mirror the picture would show the other enantiomer of a chiral structure.
+
+Blender reads the `.glb` through File > Import > glTF 2.0.
+The import brings an orthographic camera with the figure's framing, one sun lamp pointed as the figure's light is, and a material for each colour.
+Set the render engine to Cycles, make the imported camera the scene's camera, and set the output size to the figure's pixels.
+One glTF unit is one ångström: glTF's unit is the metre, so the cell arrives a few metres wide, which changes nothing in an orthographic view.
+glTF has no background, so the world colour in Blender is the background.
+
+The PNG shades its sRGB colours directly, as the GUI does, and a ray tracer shades in linear light.
+Each format is given the colours as sRGB, so a line or a letter keeps the PNG's colour exactly and a lit surface's midtones differ.
 
 ## Legend, axis triad and scale bar
 

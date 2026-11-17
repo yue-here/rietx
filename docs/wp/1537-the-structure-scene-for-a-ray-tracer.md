@@ -166,12 +166,13 @@ change.
 - [ ] The GUI: the route, the export menu (PNG, SVG once 1536 lands,
   POV-Ray, glTF), the manual chapter and a browser test that downloads a
   `.glb` and checks its header. Rebuild the dist.
-- [ ] Docs: `docs/manual/using/exports.md` gains a section on ray-tracer
+- [x] Docs: `docs/manual/using/exports.md` gains a section on ray-tracer
   input, with the POV-Ray command and the Blender import steps. The
-  `render_structure` docstring names each suffix.
+  `render_structure` docstring names each suffix. *2026-11-17: that page is
+  now `docs/docs/reference/figures.md`, § A scene for a ray tracer.*
 - [ ] Tests + the render pictures to `tests/output/figure3d/`.
-- [ ] Skill: one clause in `api-figure.md` naming `.pov` and `.glb`, tagged
-  with what was rendered.
+- [x] Skill: one clause in `api-figure.md` naming `.pov` and `.glb`, tagged
+  with what was rendered (from `docs/skill/make_api_index.py`).
 
 ## Acceptance
 

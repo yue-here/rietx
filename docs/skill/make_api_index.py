@@ -234,7 +234,11 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "Drawing a structure",
                 "`rx.viz.render_structure(ref.structure)` draws one phase as the "
                 "GUI's structure viewer draws it, with no browser: an RGBA array "
-                "in `.image`, a PNG when `path=` is given. Look at the picture "
+                "in `.image`, a PNG when `path=` is given, and with "
+                "`path=\"fig.pov\"` or `\"fig.glb\"` the scene for POV-Ray or "
+                "Blender, with the figure's camera and light (Hypothesis: WP-1537, "
+                "checked by projecting the written camera onto the PNG; not yet "
+                "rendered in either program). Look at the picture "
                 "you drew. `view=` takes `\"a\"`, `\"b\"`, `\"c\"`, `[u, v, "
                 "w]`, `{\"hkl\": (h, k, l)}`, `\"auto\"` or a rotation; `.rotation` is the "
                 "view drawn, and passing it back redraws the same picture. "
