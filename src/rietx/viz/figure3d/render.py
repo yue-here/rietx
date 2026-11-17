@@ -724,7 +724,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                      hidden=(), boundary: bool = True, cell: bool = True, polyhedra=None,
                      axis_labels: bool = True, atom_labels: bool = False,
                      outline: bool = False, depth_cue: bool = False,
-                     ambient_occlusion: bool = False, planar_rings=False, faces=(), background="white", pad: float = FIT_PAD,
+                     ambient_occlusion: bool = False,
+                     planar_rings=False, faces=(), background="white", pad: float = FIT_PAD,
                      path=None, dpi: float | None = None) -> StructureFigure:
     """Draw one phase of a structure as the GUI's structure viewer draws it.
 
@@ -786,13 +787,14 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     the way there, as the GUI's toggle does (WP-1548).  It needs an opaque
     ``background``, there being no colour to fade toward over a transparent
     one.  ``ambient_occlusion=True`` darkens each atom and stick by the
-    share of directions from which ambient light cannot reach it, read from
-    64 depth maps of the scene's atoms and sticks (WP-1538): the ambient term
-    scales by the unoccluded share and the key light keeps its own.  Ball
-    mode's atoms lose 3-25 % of their ambient light on the 21 phases WP-1538
-    measured, and ellipsoid mode's about 0.6 of that, the sticks a small
-    ellipsoid meets shading it.  The cell frame and the translucent faces neither cast nor receive
-    it.  Off by default; the GUI's drawing drawer has the same toggle.
+    share of ambient light that cannot reach it, each direction weighed by
+    its cosine with the surface normal, read from 64 depth maps of the
+    scene's atoms and sticks (WP-1538): the ambient term scales by the
+    unoccluded share and the key light keeps its own.  Ball mode's atoms lose
+    3-25 % of their ambient light on the 21 phases WP-1538 measured, and
+    ellipsoid mode's about 0.6 of that, the sticks a small ellipsoid meets
+    shading it.  The cell frame and the translucent faces neither cast nor
+    receive it.  Off by default; the GUI's drawing drawer has the same toggle.
     ``planar_rings=True`` fills each ring of five or six bonded atoms
     lying within ``rings.PLANAR_RING_TOLERANCE`` (0.1 Å) of one plane as a
     translucent face, grey (``scene.FILL_COLOR``) or in the colour given

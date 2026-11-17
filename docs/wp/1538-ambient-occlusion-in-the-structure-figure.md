@@ -7,7 +7,8 @@ Priority: P3 2026-10-02 — a workaround covers it: WP-1537's POV-Ray or Blender
 ## Goal
 
 `render_structure(..., ambient_occlusion=True)` and a GUI toggle darken each
-surface by the share of directions from which ambient light cannot reach it.
+surface by the share of ambient light that cannot reach it, each direction
+weighed by its cosine with the surface normal.
 The darkening comes from 64 directional shadow maps, the method ChimeraX
 uses. It is off by default, and both renderers draw the same picture with it
 on.
@@ -132,7 +133,7 @@ bound on what sticks add. The multishadow number is the WP's to measure.
 ## Tasks
 
 - [x] Ask for Tarini, Cignoni & Montani (2006), and read it before fixing
-  D2's constants (2026-11-17: asked, on the fetch list; it is closed access
+  D2's constants (2026-11-17: requested; it is closed access
   and was not read. D2's constants were measured instead, and reading it
   went to #1647).
 - [x] The depth-map pass and the lookup in the numpy path, with unit tests:
@@ -232,7 +233,8 @@ with the kernel and the paper.
   docstring, the GUI guide, the skill's `api-figure.md` clause (rewritten to the measurement:
   ellipsoid mode about 0.6 of ball mode, not "barely"). Inherited pruned: both 1940 entries had landed
   (the numba twin is gone, `raster.rs` exists), so the numba task became the kernel task and
-  went to #1647 with the paper and the default. Tarini et al. is row 503 of the fetch list.
+  went to #1647 with the paper and the default. The paper is Tarini, M., Cignoni, P. & Montani, C. (2006), *IEEE Trans. Vis.
+  Comput. Graph.* 12(5), 1237-1244, <https://doi.org/10.1109/TVCG.2006.115>, requested.
 - **Measured** (arm64 Mac, `[dev]` venv, wheel loaded; `1538-measure/results.txt`): 1 − A over
   atom pixels of the opening view, mean, ball 3.1-25.1 %, ellipsoid 3.1-24.5 % (0.28-1.07 of
   ball's, median 0.6); sticks 3.3-38.7 %. Map size 256/512/1024 moves the ball mean by

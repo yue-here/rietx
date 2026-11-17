@@ -906,6 +906,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     lost = false;
     batches = null;
     maps = null;
+    mapsFailed = null;
     init();
     upload();
     if (last) draw(last.view, last.background);

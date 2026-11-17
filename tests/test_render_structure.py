@@ -1620,6 +1620,28 @@ def test_a_point_between_two_touching_atoms_is_darker_than_either_far_side():
     assert near.mean() < side.mean() < far.mean()
 
 
+def test_a_stick_casts_occlusion_on_an_atom_above_it():
+    """Bond halves go into the depth maps too (``_depths``' half branch): two
+    balls joined by a stick, and a third ball 0.2 Å above the stick, whose
+    underside the stick darkens and whose top it leaves alone."""
+    n = _sphere_points()
+    ends = [_ball(0, (-2, 0, 0), 0.5), _ball(1, (2, 0, 0), 0.5)]
+    top = _ball(2, (0, 0, 1.0), 0.5)
+    stick = [{"bond": 0, "from": [-2.0, 0.0, 0.0], "to": [0.0, 0.0, 0.0], "radius": 0.3,
+              "color": [0.6, 0.6, 0.6]},
+             {"bond": 0, "from": [2.0, 0.0, 0.0], "to": [0.0, 0.0, 0.0], "radius": 0.3,
+              "color": [0.6, 0.6, 0.6]}]
+    bare = _balls(*ends, top)
+    joined = dict(bare, halves=stick)
+    points = n * 0.5 + [0.0, 0.0, 1.0]
+    without = raster.occlusion(raster.occlusion_maps(bare), points, n)
+    with_stick = raster.occlusion(raster.occlusion_maps(joined), points, n)
+    under, over = n[:, 2] < -0.9, n[:, 2] > 0.9
+    assert without[under].mean() > 0.9
+    assert with_stick[under].mean() < 0.7 * without[under].mean()
+    assert np.allclose(with_stick[over], without[over], atol=0.01)
+
+
 def test_occlusion_scales_the_ambient_term_and_leaves_the_key_light():
     """D3: ``base·(ambient·A + diffuse·d) + specular``; A = 1 is the plain
     shade to the bit and A = 0 removes ambient light alone."""
