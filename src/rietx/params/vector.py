@@ -3789,6 +3789,13 @@ class ParameterTable:
                             for p in paths)))
 
     @property
+    def dihedral_paths(self) -> frozenset[str]:
+        """Every Z-matrix dihedral (degrees, WP-1814): compared across fits
+        modulo 360°, the sibling of :attr:`angle_dof_paths`' 2π."""
+        return frozenset(q for paths in self._zmatrix_paths.values() for q in paths
+                         if q.endswith(".dihedral"))
+
+    @property
     def angle_dof_paths(self) -> frozenset[str]:
         """The moment DOFs that are angles, compared across fits modulo a turn.
 

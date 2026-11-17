@@ -1581,12 +1581,14 @@ class SequentialRefinement:
                                   report_thresholds_version=THRESHOLDS_VERSION))
         relative = _relative_paths(self.structure, self.instrument)
         angles = _angle_paths(self.structure, self.instrument)
+        dihedrals = _dihedral_paths(self.structure, self.instrument)
         # recorded, so a judgement across patterns made outside this run
         # (``SeriesResult.moved_paths``) skips and wraps what the fences do
         series.relative_paths = sorted(relative)
         series.angle_paths = sorted(angles)
+        series.dihedral_paths = sorted(dihedrals)
         # every step, largest first, and no threshold (WP-2003)
-        series.steps = _series_steps(series, relative, angles)
+        series.steps = _series_steps(series, relative, angles, dihedrals)
         # WP-1305 (c): the cold re-measurement, on the caller's k largest.  A
         # cancelled chain gets none — it starts new fits, and a chain that
         # stopped early is not the trajectory the steps were measured on.
@@ -1647,13 +1649,14 @@ class SequentialRefinement:
                                 direction="backward", failures=back_failures,
                                 n_failed=len(back_failures),
                                 relative_paths=sorted(relative),
-                                angle_paths=sorted(angles))
+                                angle_paths=sorted(angles),
+                                dihedral_paths=sorted(dihedrals))
             diagnostics += [_series_pattern_failed_diagnostic(f, pass_name="backward")
                             for f in back_failures]
             back.diagnostics = _moment_diagnostics(back)
             # the reverse chain's own steps, measured as the reported chain's
             # are; never verified, as the reverse chain is itself the check
-            back.steps = _series_steps(back, relative, angles)
+            back.steps = _series_steps(back, relative, angles, dihedrals)
             back.code_counts = _code_counts(back)
             if cancel is not None and bool(cancel):
                 diagnostics.append(
@@ -1668,7 +1671,7 @@ class SequentialRefinement:
                     f"{in_flight}"))
             else:
                 series.direction_gaps, coverage = _direction_gaps(
-                    series, back, relative, angles)
+                    series, back, relative, angles, dihedrals)
                 diagnostics += coverage
                 # the onset in *each direction of the chain*, compared: the one
                 # reading a single pass cannot produce (WP-1329)
@@ -2204,6 +2207,7 @@ class SequentialRefinement:
             return series_paths[k].get(path)
 
         angles = _angle_paths(self.structure, self.instrument)
+        dihedrals = _dihedral_paths(self.structure, self.instrument)
         for s in steps:
             if cancel is not None and bool(cancel):
                 return
@@ -2228,6 +2232,8 @@ class SequentialRefinement:
             if path in angles:
                 # measured as the chain's step was measured (#604)
                 cold_step = float(_angle_difference(cold_step))
+            elif path in dihedrals:
+                cold_step = float(_angle_difference(cold_step, 360.0))
             s.cold_ratio = cold_step / s.step
 
     def _refuse_a_reused_history(self, names: Sequence[str]) -> None:
@@ -2762,20 +2768,34 @@ def _angle_paths(structure: Structure, instrument: Instrument) -> frozenset[str]
     return ParameterTable(structure, instrument).angle_dof_paths
 
 
-def _angle_difference(delta: np.ndarray) -> np.ndarray:
-    """A difference of two angles, in radians, moved by whole turns into (−π, π].
+def _dihedral_paths(structure: Structure, instrument: Instrument) -> frozenset[str]:
+    """The Z-matrix dihedrals (:attr:`ParameterTable.dihedral_paths`, WP-1814).
 
-    Issue #604: a moment along −a refined to φ = 3.13 in one pattern and
-    −3.14 in the next, and both fences read the 2π between the two numbers as
-    a jump in the specimen.  The direction moved by 0.01 rad.
+    The sibling of :func:`_angle_paths` in degrees: wrapped into (−180, 180]
+    at every commit, so a chain crossing ±180° steps by a turn in value while
+    the dihedral barely moves, and its differences are taken modulo 360°.
+    """
+    return ParameterTable(structure, instrument).dihedral_paths
+
+
+def _angle_difference(delta: np.ndarray, turn: float = 2.0 * np.pi) -> np.ndarray:
+    """A difference of two angles moved by whole turns into (−turn/2, turn/2].
+
+    In radians by default (a moment's angles); ``turn=360.0`` for degrees (a
+    Z-matrix dihedral, WP-1814).  Issue #604: a moment along −a refined to
+    φ = 3.13 in one pattern and −3.14 in the next, and both fences read the
+    2π between the two numbers as a jump in the specimen.  The direction
+    moved by 0.01 rad.
     """
     d = np.asarray(delta, dtype=np.float64)
-    return np.pi - np.mod(np.pi - d, 2.0 * np.pi)
+    half = turn / 2.0
+    return half - np.mod(half - d, turn)
 
 
 def _series_steps(series: SeriesResult,
                   relative: frozenset[str] = frozenset(),
-                  angles: frozenset[str] = frozenset()) -> list[SeriesStep]:
+                  angles: frozenset[str] = frozenset(),
+                  dihedrals: frozenset[str] = frozenset()) -> list[SeriesStep]:
     """Every refined path's step between consecutive patterns, largest first.
 
     The one writer of ``SeriesResult.steps`` (WP-2003), and the arithmetic of
@@ -2838,6 +2858,8 @@ def _series_steps(series: SeriesResult,
         signed = np.diff(value)
         if path in angles:
             signed = _angle_difference(signed)
+        elif path in dihedrals:
+            signed = _angle_difference(signed, 360.0)
         floor = _noise_floor(value[kept]) if kept.any() else 0.0
         # consecutive *entries* only: a pattern the path is absent from (a
         # held cell) is not in the trajectory at all, and the two points
@@ -3282,7 +3304,8 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
 def _direction_gaps(forward: SeriesResult,
                     backward: SeriesResult,
                     relative: frozenset[str] = frozenset(),
-                    angles: frozenset[str] = frozenset()
+                    angles: frozenset[str] = frozenset(),
+                    dihedrals: frozenset[str] = frozenset()
                     ) -> tuple[list[DirectionGap], list[Diagnostic]]:
     """Every path's gap between the forward and backward chains, largest first.
 
@@ -3320,7 +3343,7 @@ def _direction_gaps(forward: SeriesResult,
     neighbours, so a coordinate DOF's value has opposite signs in the two by
     construction (WP-1333).  The coordinate rows are compared instead.
     ``angles`` paths are compared modulo a turn (:func:`_angle_difference`,
-    #604).
+    #604), and ``dihedrals`` modulo 360° (WP-1814).
 
     The second return is ``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` at ``info``
     (:func:`_path_check_coverage`): the patterns one chain has no entry for,
@@ -3363,7 +3386,9 @@ def _direction_gaps(forward: SeriesResult,
         vb, sb = vb_all[bj], sb_all[bj]
         comparable = np.isfinite(sf) & np.isfinite(sb)
         combined = np.sqrt(np.nan_to_num(sf) ** 2 + np.nan_to_num(sb) ** 2)
-        signed = _angle_difference(vf - vb) if path in angles else vf - vb
+        signed = (_angle_difference(vf - vb) if path in angles
+                  else _angle_difference(vf - vb, 360.0) if path in dihedrals
+                  else vf - vb)
         floor = _noise_floor(vf, vb)
         if measured and not np.any(comparable & (combined > 0.0)) \
                 and np.any(np.abs(signed) > floor):
