@@ -182,6 +182,11 @@ The first PR's three questions, answered on 2026-11-11.
     gui/CLAUDE.md clause is rewritten to say so. This went to Yue as a consent line, and Yue
     did not object.
 
+- **The look at the `ruled-*` pictures, Yue 2026-11-17:** "observed but not model in the
+  excluded regions looks good". This confirms the settled call above. In a shaded region the
+  observed points stay drawn as faint crosses, and the model is not drawn there. It is
+  acceptance row 10's look for R2, so #1538 merges.
+
 ## Questions
 
 Filled in by the session that builds each PR.
