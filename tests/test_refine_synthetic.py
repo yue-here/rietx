@@ -221,3 +221,159 @@ def test_a_zero_stage_plan_is_refused_before_it_costs_anything(synthetic_pattern
         ref.fit(synthetic_pattern, plan=RefinementPlan(stages=[]))
     assert ref.result_ is None
     assert not (tmp_path / "h.jsonl").exists(), "refused before anything was written"
+
+
+# ------------------------------------- the model read at its values (WP-1947)
+_EMPTY_STAGE = "evaluate"
+
+
+def _with_background():
+    """The perturbed models over a non-zero background, so that a background
+    curve which came back as zeros could not pass for one that was read."""
+    structure, ins = perturbed_models()
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in (35.0, -4.0, 1.0)])
+    return structure, ins
+
+
+def _empty_stage_fit(data, mode):
+    """The spelling the three calls replace: one stage that frees nothing."""
+    from rietx import RefinementPlan, Stage
+
+    ref = Refinement(*_with_background())
+    result = ref.fit(data, mode=mode, telemetry=False,
+                     plan=RefinementPlan(stages=[Stage(_EMPTY_STAGE, [])]))
+    return ref, result
+
+
+def _state(ref):
+    """What a call that reads the model must leave as it found it."""
+    return ([(p.path, p.value, p.vary) for p in ref.parameters()],
+            None if ref.history is None else len(ref.history),
+            ref.result_, ref._model)
+
+
+@pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
+def test_evaluate_is_the_empty_stage_and_changes_nothing(synthetic_pattern, mode,
+                                                         tmp_path, monkeypatch):
+    """#890: the statistics at the start values are one documented call.
+
+    The answer is the empty-stage fit's, field for field on what a caller
+    reads, and under Le Bail and Pawley the extraction at the start values
+    still runs.  The refinement it was called on gains no history node, no run
+    directory and no ``result_``: recording is switched on for the test and
+    the working directory is empty, so a run directory would be seen.
+    """
+    from rietx import runs
+    from rietx._about import STATE_DIR_NAME
+
+    ref = Refinement(*_with_background(), history=tmp_path / "h.jsonl")
+    before = _state(ref)
+    monkeypatch.chdir(tmp_path)
+    was = runs.set_enabled(True)
+    try:
+        result = ref.evaluate(synthetic_pattern, mode=mode)
+    finally:
+        runs.set_enabled(was)
+    assert _state(ref) == before
+    assert not (tmp_path / "h.jsonl").exists(), "an evaluation is not a fit"
+    assert not (tmp_path / STATE_DIR_NAME).exists(), "and records no run"
+
+    _, fitted = _empty_stage_fit(synthetic_pattern, mode)
+    assert result.status == fitted.status == "converged"
+    assert result.mode == mode
+    assert result.statistics == fitted.statistics
+    assert result.y_calc == fitted.y_calc
+    assert result.y_background == fitted.y_background
+    assert result.ticks == fitted.ticks
+    assert [d.code for d in result.diagnostics] == [d.code for d in fitted.diagnostics]
+    assert [s.n_iterations for s in result.stages] == \
+        [s.n_iterations for s in fitted.stages]
+    # nothing refined: no row carries an esd, and under Rietveld nothing is free
+    assert all(p.esd is None for p in result.parameters)
+    if mode == "rietveld":
+        assert result.statistics.n_free_parameters == 0
+        assert all(s.n_iterations == 0 for s in result.stages)
+
+    if mode == "rietveld":
+        _draw_evaluation(result, synthetic_pattern)
+
+
+def _draw_evaluation(result, data):
+    """obs/calc/diff of the evaluated pattern, to look at (WP-1947)."""
+    from pathlib import Path
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    result.plot(out / "evaluate_before_any_fit.png")
+
+
+def test_evaluate_after_a_fit_leaves_its_answer_alone(synthetic_pattern):
+    """On a fitted refinement the evaluation is at the fitted values and the
+    fit's own result, model and history stay the caller's."""
+    ref = Refinement(*_with_background())
+    fitted = ref.fit(synthetic_pattern, plan="profile_only", telemetry=False)
+    before = _state(ref)
+    result = ref.evaluate(synthetic_pattern)
+    assert _state(ref) == before
+    assert ref.result_ is fitted
+    assert result is not fitted
+    assert result.y_calc == pytest.approx(fitted.y_calc, rel=1e-12, abs=1e-9)
+
+
+@pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
+def test_reflections_before_a_fit_are_the_empty_stage_rows(synthetic_pattern, mode):
+    """#891: the rows before a fit equal the rows of an empty-stage fit, so a
+    tick list needs no second extinction test, and nothing is written."""
+    ref = Refinement(*_with_background())
+    before = _state(ref)
+    rows = ref.reflection_table(synthetic_pattern, mode=mode)
+    assert _state(ref) == before
+
+    fitted_ref, _ = _empty_stage_fit(synthetic_pattern, mode)
+    assert rows == fitted_ref.reflection_table()
+    assert rows and {(r.h, r.k, r.l) for r in rows} >= {(1, 0, 0), (1, 1, 0)}
+
+
+def test_reflections_without_a_pattern_still_need_a_fit(synthetic_pattern):
+    ref = Refinement(*_with_background())
+    with pytest.raises(RuntimeError, match=r"ref\.reflection_table\(data\)"):
+        ref.reflection_table()
+    # the evaluation's keywords describe an evaluation, so they need its pattern
+    with pytest.raises(ValueError, match="need the pattern"):
+        ref.reflection_table(mode="lebail")
+
+
+def test_background_without_mutation(synthetic_pattern):
+    """#894: the background alone is one call that touches nothing.
+
+    It equals the two workarounds it replaces: the scale-zero ``predict``
+    (which writes two ``set_value`` nodes) and a phase-free twin's
+    ``predict``.  After a fit, the no-grid form is ``result.y_background``.
+    """
+    from rietx import Structure
+
+    ref = Refinement(*_with_background())
+    before = _state(ref)
+    background = ref.background(synthetic_pattern)
+    assert _state(ref) == before
+    assert background.max() > 0.0
+    assert np.array_equal(background,
+                          ref.background(np.asarray(synthetic_pattern.two_theta)))
+
+    workaround = Refinement(*_with_background())
+    workaround.set_values({"phases.0.scale": 0.0})
+    assert np.array_equal(background, workaround.predict(synthetic_pattern))
+    phase_free = Refinement(Structure(phases=[]), ref.instrument)
+    assert np.array_equal(background, phase_free.predict(synthetic_pattern))
+
+    # after a fit, in every mode, the no-grid form is the result's curve and
+    # the grid form compiles the same background
+    for mode in ("rietveld", "lebail", "pawley"):
+        fitted_ref, fitted = _empty_stage_fit(synthetic_pattern, mode)
+        assert np.array_equal(fitted_ref.background(),
+                              np.asarray(fitted.y_background))
+        assert np.array_equal(fitted_ref.background(synthetic_pattern), background)
+
+    with pytest.raises(RuntimeError, match=r"ref\.background\(data\)"):
+        ref.background()
