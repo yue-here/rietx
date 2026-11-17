@@ -113,19 +113,53 @@ the chain, and its answer on what "held" means should govern here. Read it first
 
 ## Tasks
 
-- [ ] Survey which verbs an expert reaches for, from the two Durham inputs and the
+- [x] Survey which verbs an expert reaches for, from the two Durham inputs and the
   TOPAS and GSAS-II sequential docs. Write the keep and decline list here, each decline
-  with its reason.
-- [ ] `hold`/`unhold`, reported through `blocked_by_hold` as a single fit is.
-- [ ] `tie`/`tie_equal`/`untie` across histograms, or a refusal naming `sharing=`. A
+  with its reason. (§ The survey below.)
+- [x] `hold`/`unhold`, reported through `blocked_by_hold` as a single fit is.
+- [x] `tie`/`tie_equal`/`untie` across histograms, or a refusal naming `sharing=`. A
   source atom in each pattern works, as WO₃'s protocol needs.
-- [ ] `add_variable` on a joint fit, or a refusal naming `variables=`.
-- [ ] `set_values` by canonical path.
-- [ ] A restart: refit from the last answer, per-pattern values and coefficients both,
+- [x] `add_variable` on a joint fit, or a refusal naming `variables=`.
+- [x] `set_values` by canonical path.
+- [x] A restart: refit from the last answer, per-pattern values and coefficients both,
   in process and from a saved result. The bar: a converged fit restarted stops in one
   stage and moves nothing by more than 0.01 esd.
-- [ ] Manual: `reference/joint.md`, and the partition in `tests/api_surface.py`.
-- [ ] Skill: the series reference's joint row.
+- [x] Manual: `reference/joint.md`, and the partition in `tests/api_surface.py`.
+- [x] Skill: the series reference's joint row.
+
+### The survey (2026-11-17)
+
+Sources: `docs/practice.md` (GSAS-II's sequential run, its Hold constraint, "Copy flags",
+`Copy2Next`, checked in source there), this WP's Context on TOPAS (`prm` flags edited and
+rerun from stored values, `load_save_locals`), and the WO₃ protocol of
+`docs/wp/1964-measure/wo3_formula.py`. No web source was read in this session.
+
+**Kept**, each built on `MultiHistogramRefinement`:
+
+- `hold`/`unhold`: GSAS-II's Hold constraint ("will not be varied, even if vary flag is
+  set") and the calibrate-then-hold practice the 2026-11-03 ruling names.
+- `tie`/`tie_equal`/`untie`, linear and `expression=`: GSAS-II's equivalences and TOPAS's
+  `prm` equations; WO₃'s one B per pattern tied across the sites.
+- `add_variable`: TOPAS's `prm`, which a tie names.
+- `set_values`: editing a stored value before a rerun, as an expert edits an `.inp`.
+- `refit` (the restart): TOPAS's rerun from stored values (`load_save_locals`) and
+  GSAS-II's start from an earlier run's results.
+
+**Declined**, each with its reason:
+
+- `set_vary`: a plan replaces the vary flags (WP-1208), so a joint fit frees through its
+  plan's globs and keeps a row fixed through `hold` (#1205's ruling stays for this verb).
+- `run_stage`: `refit` is the cheaper shape for the restart task (one stage at the
+  answer's window fraction) and a plan stage covers the rest (Non-goals).
+- A history (`checkout`, nodes): a Non-goal; `parameters()` carries `held` and `user`
+  ties, and the stages carry `blocked_by_hold`, in its place.
+- `profile_interval`: the Goal names it, but no task does, and a joint profile refits the
+  whole stack per point. Filed as a follow-up issue.
+- `remove_variable`: a variable lives in every pattern's table, which cannot drop a row
+  without a rebuild; no task asks for it. The same limit makes `untie` refuse a formula
+  tie (the follow-up issue covers both).
+- GSAS-II's "Copy flags" across histograms: a bare glob already reaches every pattern's
+  row, so it is the default spelling here.
 
 ## Acceptance
 
