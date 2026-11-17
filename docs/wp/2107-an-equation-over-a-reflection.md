@@ -1,6 +1,6 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-17 — claimed by a ghostshift runner (MacBook-Air-c4aacd)
 Depends on: 1964 (the grammar, evaluated on arrays)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
