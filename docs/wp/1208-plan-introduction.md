@@ -79,6 +79,35 @@ npm --prefix gui test && npm --prefix gui run check
 - McCusker et al. (1999) §3, the turn-on order the presets encode.
 - WP-1123 (cumulative staging), WP-1058 (stage reports).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The plan as a ladder** (WP-1208, `GET /api/plan/resolve`,
+`panels/Plan.svelte`) is the stage list saying what it will *do*: per stage the
+paths its globs reach, the ones it frees on top of the last, the held ones
+carrying the row's own `held_because`, and the running free count. Four rules.
+**The resolution is the real verb** — `ParameterTable.set_vary` on the table
+`fit` builds, so the tied/locked skip, the free-cell wavelength rule and the
+intensity mode's force-fix are the shipped ones; `lib/fnmatch.ts` stays the
+*parameter table's* bulk-edit preview and matches nothing here. **A plan
+replaces the vary flags, it does not continue them**: `fit` starts from
+`_prepare_table(restore=False)`, which holds everything, so a hand-freed row no
+stage names is dropped by a staged Refine and kept by `Run this stage` (measured
+both ways) — `set_aside` is that difference named. **A stage's Rwp is its history node's**, never a
+`fit(stage_reports=True)` trajectory: bit-identical, both read off the model the
+stage compiled and the θ it landed on, and the trajectory costs 7.7× the fit to
+rebuild, so the run verb is untouched — the **last** run's node is matched to a
+rung by position **and** by that stage's name and `turn_on`, anything else
+leaving the number absent rather than a neighbour's or an older run's. An **edited plan keeps the facts of the
+stages above its first change only** (WP-2127, `lib/plan.ts:resolvedPrefix`),
+and is **one pending edit in the shell's action bar**, never a Save of its own. Beside them, the advanced boxes loop over `lib/rxt.ts`'s stage
+words — pinned to `StageSpec` from python with the two properties a box needs —
+so a new schema field reaches this form as well as the `.rxt` document.
+
 ## Handover log
 
 ### 2026-08-27 — closed: the plan now says what it will do

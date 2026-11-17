@@ -76,6 +76,59 @@ npm --prefix gui test
 - WP-0505's measured findings (`refit="single"`, carry hypothesis refuted,
   path-dependence check) — summarised in CLAUDE.md's series paragraph.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **series panel** (WP-1016, `src/rietx/gui/series.py`,
+`panels/Series.svelte`, `lib/series.ts`) is the ninth tab and the only one whose
+subject is a *method* rather than a model: N separate refinements chained by a
+warm start, so **a smooth curve is exactly what a poisoned chain produces** and
+the presentation is built around that. Five rules. **A series lives beside the
+project, not inside it** — staged uploads, in-memory trees, a session-scoped
+answer, `ProjectDoc.patterns` still length 1 — and its protocol (mode, plan,
+limits, exclusions) is *quoted* from `project.json` rather than offered, because
+one protocol over N specimens is what makes their trajectories comparable. That
+is not a shortcut: an upload token dies with the session, so a persisted series
+needs a document, which is WP-1003's to decide. **The order is the series**, so
+every edit is a whole-list `PUT` and every file is read *there* (WP-1014's
+two-phase property at N files) — with a member already described not re-read,
+since a staged upload is immutable and re-reading forty patterns per keystroke
+proves nothing. **The walks' disagreement is the record's number, read and never
+recomputed** (WP-2003, C5): `SeriesResult.direction_gaps` holds every gap in
+esds, unthresholded, and `series.trajectories` serves each path's largest, so no
+path is called path-dependent. **The list opens in the series' own order, and a
+gap ranking is the reader's choice** (ruled by the maintainer 2026-11-04): with no
+fence, a clean ramp's gaps are noise, and ranked by them the panel opened on
+`instrument.background.c1` with `phases.0.cell.a` sixth (`lib/series.ts`'s
+`rankTrajectories`); the largest gap stays one click away on the gap line. And **a per-pattern tree is read-only here** —
+one tree per pattern, pinned by `data_fingerprint`, so a node cannot be checked
+out into this project; what makes the chain navigable is the root node's
+`series_warm_start_node` note. Two shared authorities came out of it rather than second copies: `curve_arrays`, in
+`viz.packed` since the file `write_html` writes became a third drawer (so no two pictures draw
+residuals under two σ policies), and `session.tree_payload`.
+
+Its **five keys on every event** are the thing to know outside the panel:
+`SequentialRefinement.fit` takes `events=`/`cancel=` (since this WP — WP-1008's
+charter said it already did), and `_SeriesStream` stamps
+`series_index`/`series_label`/`series_n`/`series_pass`/`series_cold` onto
+existing kinds, so `EVENT_SCHEMA_VERSION` does not move and "pattern k of N"
+reaches the run record through the *existing* `stage`/`stage_index`/`n_stages`.
+The console pays for that: five fields on every `eval` pushed the cost off the
+right edge, so `lib/stream.ts` folds them into one `[T300 1/3 ↩]` prefix.
+Measured browser facts: the plot is the chart module's canvas since WP-1461, in
+a host that clips it, and its `ResizeObserver` refits it 539 → 1480 px when the
+column takes the window, so no canvas overhangs a control (WP-1015's trap was
+plotly's); a *rotated* y-axis title shares the fixed left margin with the tick
+labels, so `phases.0.cell.a` clipped to `aes.0.cell.a` and the axis takes the
+**leaf** (the heading above carries the path); and the staged table's floor is
+per column — core 308 px, detail 231 — reflowed by `lib/resize.ts:seriesCompact`
+beside `modelStacks`, because the reorder buttons are the last column and the
+panel's main verb.
+
 ## Handover log
 
 - **2026-08-05 — closed ✅.** Branch `wp1016-series-panel`, eleven commits.

@@ -77,8 +77,9 @@ Miller index, a multiplicity.
 
 Theory names quantities by their physics. The unit, default and typical range
 of a named parameter (what `phases.0.cell.a` or `instrument.profile.w` holds) is
-in [the parameter reference](../reference/parameters.md), which is generated
-from the package itself.
+in [the parameter map](../reference/parameters.md) or
+[the instrument parameter map](../reference/parameters-instrument.md), which are
+generated from the package itself.
 
 ```{toctree}
 :hidden:

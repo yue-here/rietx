@@ -13,7 +13,9 @@ Three rules, all of them borrowed rather than invented:
 * **A quantity that cannot be measured is absent, not zero** (WP-1072).  A
   coefficient at its off state, a source with no wavelength and a column that
   measured nothing are three different absences and each names itself in
-  ``MicrostructureTerm.unavailable``.
+  ``MicrostructureTerm.unavailable``.  "At its off state" is the stored zero
+  *or* the bound test's ``FLOOR_HIT`` (WP-1914), so the driver that solved the
+  fit cannot change the reading.
 * **The propagation is exact and single-parameter.**  Each reading is a
   function of one coefficient — ``L = (180/π)·K·λ/x`` and
   ``Δd/d = (π/360)·y`` — so J·Cov·Jᵀ is one variance and there is no
@@ -34,6 +36,7 @@ bound — which is Scherrer's usual caveat, not a new one.
 from __future__ import annotations
 
 import math
+from collections.abc import Collection, Iterable
 
 from ..schemas.results import MicrostructureTerm, PhaseMicrostructure
 from ..schemas.structure import Structure
@@ -56,8 +59,19 @@ _TERMS = {
 
 def _reading(kind: str, coefficient: float, variance: bool,
              sigma: float | None, wavelength: float | None,
-             k: float) -> tuple[float | None, float | None, str | None]:
+             k: float, *, on_floor: bool = False
+             ) -> tuple[float | None, float | None, str | None]:
     """(value, esd, unavailable) for one coefficient.
+
+    ``on_floor`` is the bound test's verdict that this coefficient's floor of
+    zero carried load (``FLOOR_HIT``), and it reads as ``at_zero`` whatever
+    the stored number is.  The default LM driver lands such a row exactly on
+    0.0, so the two tests agree there.  ``solver="trf"`` keeps its iterates
+    strictly inside the box and stops a hair above it: 3.4e-24 deg² on
+    notebook 04's ``gauss_size``, which Scherrer turns into 4.3e13 Å with an
+    esd twenty orders larger (WP-1914).  The floor is that test's, read off
+    :func:`~rietx.strategy.staged.bound_findings`, never a proximity of this
+    module's own.
 
     ``coefficient`` is the stored number — a FWHM coefficient, or its square
     for the Gaussian pair.  The relative esd is where the two shapes differ and
@@ -67,7 +81,7 @@ def _reading(kind: str, coefficient: float, variance: bool,
     that FWHM, so the *relative* esd is the same either way and the sign never
     matters — an esd is a magnitude.
     """
-    if not coefficient > 0.0:
+    if on_floor or not coefficient > 0.0:
         return None, None, "at_zero"
     if kind == "size":
         if wavelength is None or not wavelength > 0.0:
@@ -84,9 +98,35 @@ def _reading(kind: str, coefficient: float, variance: bool,
     return value, value * relative, None
 
 
+def floored_paths(table, named: Iterable[str]) -> set[str]:
+    """The paths ``FLOOR_HIT`` named, and every entry that follows them to zero.
+
+    A free column carries a bound finding, and so does a tied width the LM
+    step held on its own floor (WP-1325, ``staged.tied_bound_findings``).  A
+    width tied to a floored source, or driven by a floored ``vars.X``, is
+    never named itself.  It sits at zero exactly when its tie has no constant
+    and every source is floored: ``value = Σ c·source + 0``.  Transitive, as a tie chain is, and the
+    closure :func:`~rietx.refine._cell_runaway_withheld` builds for an esd
+    one rank over.  ``table`` is any object with
+    :class:`~rietx.params.vector.ParameterTable`'s ``entries``.
+    """
+    floored = set(named)
+    grew = bool(floored)
+    while grew:
+        grew = False
+        for e in table.entries:
+            if (e.tie is not None and e.path not in floored
+                    and e.tie.const == 0.0 and e.tie.terms
+                    and all(src in floored for src, _ in e.tie.terms)):
+                floored.add(e.path)
+                grew = True
+    return floored
+
+
 def microstructure_table(structure: Structure, values: dict[str, float], *,
                          wavelength: float | None,
                          esds: dict[str, float] | None = None,
+                         floors: Collection[str] = (),
                          k: float = SCHERRER_K) -> list[PhaseMicrostructure]:
     """One :class:`PhaseMicrostructure` per phase, in phase order.
 
@@ -101,6 +141,16 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
     :func:`~rietx.optimize.least_squares._longest_line_wavelength` and this
     module must not have a second opinion.  ``None`` is a source that declares
     none: the strains still read, the sizes do not.
+
+    ``floors`` holds the paths whose ``FLOOR_HIT`` finding fired in the
+    answer-producing stage, closed over ties by :func:`floored_paths` and
+    spelled as ``values`` spells them.  Each reads as ``at_zero``.  It is the
+    third projection of that one bound test, beside the diagnostic and
+    ``RefinedParameter.at_bound`` (WP-1076's rule).  ``FLOOR_HIT`` is a lower
+    limit of zero, or one under the 1e-8 Γ_G² clamp
+    (``staged._at_zero_floor``), so a caller's floor that small reads as no
+    broadening too.  Empty is "no test was recorded", and a coefficient then
+    reads at zero only where it is stored as zero.
 
     Never raises on a phase whose coefficients are all at zero — the common
     case, since none of them is freed by default — it returns four terms each
@@ -124,7 +174,8 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
             if coefficient is None:
                 continue
             value, esd, why = _reading(kind, float(coefficient), variance,
-                                       esds.get(path), wavelength, k)
+                                       esds.get(path), wavelength, k,
+                                       on_floor=path in floors)
             terms.append(MicrostructureTerm(
                 path=path, kind=kind, coefficient=float(coefficient),
                 value=value, esd=esd, unavailable=why))

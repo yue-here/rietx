@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-17 — part 2: 44 of 75 codes tiered; 31 wait on the maintainer's batch (`2005-batch/batch.md`), PR #1638
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
@@ -26,6 +26,14 @@ second review: `< 0.7` in the flat-plate thickness test (`ABSORPTION_PLATE_THICK
 2001's tripwire, which walks module-level constants, so this WP lifts each that gates a
 verdict into a named constant with its value in the table, or records why it is tier 1 (a
 count, a dimension, a physical limit).
+
+*Superseded in part, 2026-11-09 (part 1, at `5ae35232c`):* `refine.py` is 12 241 lines and
+raises 69 codes, so with the five below the WP covers 74. Of 34 numeric literals in the
+raising functions and the same-file functions they call, 5 are thresholds, 4 of them in
+`refine.py`: the two above (now ~lines 8889 and 10696), the two-FWHM edge of the low-angle
+region (~10672) and the half of sin θ_min that sets `ROUGHNESS_OUTSIDE_REGIME`'s info band
+(~11905). The other 29 are units, arithmetic, counts, listing caps and numerical floors.
+`2005-batch/README.md` has the counts and what the walk cannot see.
 
 **Five codes no seam names come here too**, since each is raised beside a fit rather than
 in a reader or a report: `BACKGROUND_ORDER_AT_CAP` (`background/select.py`),
@@ -110,13 +118,21 @@ its tier.
 
 ## Tasks
 
-- [ ] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
+- [x] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
       explanation's claim, the kind of ambiguity its verdict has (DESIGN.md § Rules, 1),
-      and how many tests touch it.
+      and how many tests touch it. 74 codes on 2026-11-09: `2005-batch/inventory.json`.
 - [ ] The inline literals: each lifted to a named constant (table row with value) or
-      recorded tier 1 with the reason.
-- [ ] Tier each code per part, with evidence and families.
-- [ ] The batch to the maintainer; rulings dated into the table.
+      recorded tier 1 with the reason. The 29 tier-1 literals are recorded with their
+      reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
+      their tiers, since a new constant enters the table tiered. The fifth threshold
+      refuses a Chebyshev scan in `background/select.py` and gates no code, so it stays.
+      *2026-11-17:* 32 tier-1 literals now (three new counts in `_owner_words`). Each of
+      the 4 thresholds waits on its code's ruling in `2005-batch/batch.md`, since a code
+      that goes takes its literal with it.
+- [ ] Tier each code per part, with evidence and families. *2026-11-17:* 44 of 75 tiered
+      (33 this session); the other 31 need a ruling (`2005-batch/batch.md`).
+- [ ] The batch to the maintainer; rulings dated into the table. *2026-11-17:* written,
+      `2005-batch/batch.md`; no ruling yet.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
       code replaced by an `info` record with no threshold that states the number (the
       record § Demotion); the explanation's observation sentence updated where the verdict
@@ -141,6 +157,126 @@ its tier.
 - `docs/milestones/generality.md`; WP-1985; WP-1076 (a declared name is a claim).
 
 ## Handover log
+
+- **2026-11-17** — part 2, the tiers, in PR #1638 (ghostshift runner, unattended).
+  Ruled by Yue, 2026-11-16 (decision walk): run 2005-2007 now under the gate as written.
+  44 of this WP's 75 codes now carry a tier in the audit table, 33 of them from this session.
+  Each of the 33 reports an act or a fact: a declared correction that could not run, a
+  negative variance, a zero column, a sum of scales at zero, a value on a limit. The other 31
+  need the maintainer, and `2005-batch/batch.md` sorts them by the gate's two questions. Asked
+  first whether the package should make the call at all, 12 of the 75 fail (16 %): a named,
+  competent refiner would quote the number anyway, so the warning should go and the number
+  stay. Nothing a reader receives has changed yet, and no code was demoted, lifted or split.
+  *Done*: 30 code rows at tier 1, 2 at tier 2 (`ABSORPTION_MU_R_OUT_OF_RANGE`,
+  `BRINDLEY_OUTSIDE_REGIME`), 1 caller (`HOLD_BLOCKED_PLAN`, matching its action row); 23
+  suggestion rows; responses for eight `info` codes. `batch.md` holds classes A (12 fail Q1),
+  B (9 pass Q1, threshold to approve or measure), C (4 with a threshold between two levels),
+  D (2 magnetic, for Mike) and E (4 whose tier waits on a convention or another row), plus
+  questions A-F. The inventory is re-collated (75 codes; the new `PARENT_STRAIN_HELD` and
+  three `_owner_words` counts added to `judgements.json`). WP-2004's `### Inherited` names
+  the two of its rows that hold a code of this WP.
+  *Settled by Claude, 2026-11-17*, most important first:
+  1. A code stating a tiered threshold's outcome takes tier 1 for its own part, the threshold
+     keeping its row (`BOUND_HIT`, `FLOOR_HIT`, `BACKGROUND_ORDER_AT_CAP`). Grounds: the
+     `STAGE_SLOW_DESCENT` row, and the thresholds' approved rows say they report through these
+     codes. Alternative: inherit the threshold's tier 3. The general rule is Question E.
+  2. Warning responses withdrawn. Grounds: `tests/test_silence.py` needs a silence pair for
+     each, and the reader-output ruling may reach them (Question F). Alternative: build 23
+     pairs here.
+  3. `RESOLUTION_NOT_POSITIVE` keeps no response. Grounds: the reader-output rule; it would
+     change the standard fit's line from "warning under every purpose" to "microstructure,
+     calibration".
+  4. `ABSORPTION_ESTIMATE_UNAVAILABLE` and `MICROABSORPTION_SKIPPED` at tier 1, not caller.
+     Grounds: the record's caller test (the package decides to skip), and the caller tier is
+     no catchall (ruled 2026-10-21). Alternative: caller, since both inputs are opt-in.
+  5. `HOLD_BLOCKED_PLAN` at caller. Grounds: `StageResult.blocked_by_hold`'s caller row; the
+     package's one `hold()` call sits under an opt-in flag (`strategy/magnetic.py:1369`).
+  *Measured* (darwin arm64, `.venv` `[dev]`, Python 3.12): fast selection (`-m "not slow"`, `-n auto` through the Mac suite lock): 14 681 passed, 433 skipped, 32 xfailed, 4 errors in 642 s. The 4 errors are `tests/test_gui_dist.py`'s wheel build failing a DNS lookup of pypi.org for hatchling, a network fault; the same four passed on this session's first run (14 684 passed, 1 failed: the silence-pair test, since fixed). The branch adds no test, and 14 685 tests ran both times.
+  `tests.reader_output`: unchanged (exit 0). `tests.audit_delta`: exit 0. CI's lint steps as
+  CI runs them: ruff clean, `ruff format --check examples/tutorials` clean, Vale 0 errors.
+  *Review*: `/code-review` was not run. The diff's only code is table data, and a ghostshift
+  runner cannot point the command at its worktree. The generality judge read every row
+  instead. Its findings were all taken, in commit `984c6c56b`: six rows went back to the
+  batch (class E, and `DATA_SUPPORT_LOW` and `LEBAIL_ALTERNATION_STOPPED` to class C),
+  `WAVELENGTH_CALIBRATION`'s sentence stopped asking for an act, `PAWLEY_OFF_DATA_RIDGED` lost
+  its response, `STAGE_MAX_ITER.suggestion` went back to unaudited, and `HOLD_BLOCKED_PLAN`
+  names the magnetic call. Its report also found the silence-pair gap, which the first fast
+  run confirmed (1 failed, `test_every_code_declared_a_warning_has_a_silence_pair`).
+  *Generality* (the judge's verdicts in short; the report is in the session):
+  `BOUND_HIT`, `FLOOR_HIT`, `BACKGROUND_ORDER_AT_CAP` hold; `MODEL_FAR_FROM_DATA` and
+  `PHASE_UNCONSTRAINED` fail as tier 1 (the `CELL_RUNAWAY` shape applies; author: agreed,
+  reverted to the batch); `PAWLEY_OFF_DATA_RIDGED`, `LEBAIL_ALTERNATION_STOPPED`,
+  `SPECIES_FALLBACK_NEUTRAL`, `WAVELENGTH_CALIBRATION`, `PATTERN_UNDERSAMPLED` and
+  `STAGE_MAX_ITER.suggestion` weak (each fixed or reverted as above); the two tier-2 citations
+  and `DATA_SUPPORT_LOW` hold, the last conditionally; the other tier-1 rows and suggestions
+  hold. The silence-pair finding "fails on the test, by reading" (author: the responses were
+  withdrawn).
+  *Not done, on purpose*: `### Inherited` is not pruned, since PR #1480 (WP-2075) still adds
+  an entry there. No demotion, split or lift: each changes what a reader receives or waits on
+  its code's ruling. `generality.md` is untouched (another branch records the ruling).
+  *Gotchas*: a warning or error response needs a silence pair in `tests/silence.py`. A
+  response also moves `summary()` for every fit that raises the code, which one probe fit
+  cannot show. `rows.py` and `rows2.py` in the runner's scratch dir generated the rows; they
+  are not in the tree.
+  Next: the maintainer answers questions A-F in `2005-batch/batch.md`, and Mike class D. Then,
+  in order: land the approved demotions with their help sentences and release notes; split
+  the class-C codes; lift any surviving inline literal with a bit-identity check; give the 23
+  warnings their responses with a silence pair each, if Question F allows.
+
+- **2026-11-09** — part 1, the inventory, in PR #1486 (ghostshift runner, unattended).
+  WP-2005 now has a measured inventory of what it audits, built from the tree by a script
+  rather than counted by hand. It covers 74 codes, not 61. It also shows that the "about 30"
+  inline literals were mostly units and arithmetic: only four literals in `refine.py` gate a
+  verdict or its suggestion. So lifting literals into named constants is a four-row job, and
+  the WP's weight is in tiering 64 unaudited codes. The inventory's first reading puts 59 of
+  the 74 verdicts in the kind the data settle (an act recorded, a fact of the arithmetic, a
+  published range), 4 in the kind the data can rank, and 11 in the kind the data cannot settle.
+  Those 15 are where demotions would come from. Nothing was tiered, lifted or demoted.
+  *Question for the maintainer*: the milestone puts a gate after 2004 (generality.md § The
+  order: the maintainer decides on 2002–2004's counts whether 2005 to 2007 run). WP-2004 is
+  still ⬜, so this session stopped at part 1, as WP-2006's part 1 did. Should part 2 (the tiers,
+  the four lifts, the batch) wait for that gate, or go ahead now?
+  *Done*: `docs/wp/2005-batch/` after `2006-batch/`. `collate_inventory.py` derives raise sites,
+  levels, guarding conditions, the named constants each raising function and its same-file helpers read
+  (with tier and value), the explanation's first sentence, the code's audit rows and the tests naming it.
+  `judgements.json` holds the hand-written part: condition and kind of ambiguity per code,
+  role per literal. The script refuses a code or literal with no judgement, a judgement for one
+  that is gone, and a text cut short. The Context's 2026-10-18 counts are superseded in place,
+  dated. Task 1 is ticked. On task 2, the 29 tier-1 literals are recorded with reasons; the 4
+  thresholds are left, since a new constant in `refine.py` enters the table tiered
+  (`tests/audit_delta.py`).
+  *Measured* (at `5ae35232c`, darwin arm64, `.venv` `[dev]`, Python 3.12): 69 codes in
+  `refine.py` (12 241 lines) plus the WP's five, at 78 raise sites; 64 codes `unaudited`, 8 tier
+  1, 2 tier 3. 39 named constants read by a raising function or a helper it calls: 21 unaudited, 10
+  tier 3, 4 tier 2, 3 tier 1, 1 invariant. Literals: 12 unit, 8 arithmetic, 3 count, 3 listing cap, 3 numerical floor, 5
+  threshold. The four gating ones are `0.7` (`ABSORPTION_PLATE_THICKNESS`, ~8889), the 2σ
+  channel test (`LOW_ANGLE_UNMODELLED`'s suggestion, ~10696), the two-FWHM low-angle edge
+  (~10672) and the half of sin θ_min (`ROUGHNESS_OUTSIDE_REGIME`'s info band, ~11905). The fifth
+  refuses a Chebyshev scan in `background/select.py`. Fast selection
+  (`-m "not slow"`, `-n 2` through the Mac test gate, pearl not answering): 14 341 passed,
+  415 skipped, 32 xfailed in 992 s, on `48acd5cd0`; the branch adds no test, and the review's
+  fixes after it touched only `docs/wp/` (`tests/test_docs_consistency.py` 25 passed after them).
+  *Review*: an Opus subagent reviewed the branch diff in place of `/code-review`, which cannot be
+  pointed at a worktree from a ghostshift runner. It reproduced `inventory.json` byte for byte
+  and re-derived every count. Its five should-fix findings were all taken (commit `cf2fa9d6e`):
+  the walk now lists early-exit guards, resolves re-exported and attribute-read constants, reads
+  helpers' constants and counts tests reaching a code through a same-file helper; one count in
+  the README was wrong (ten, not four); `ABSORPTION_PLATE_THICKNESS` moved to kind 1 beside
+  `ABSORPTION_THICKNESS_MATTERS`. Of its nits, five condition texts were corrected and the
+  README's limits gained three; none was declined.
+  *Not done, on purpose*: the WP's `### Inherited` was not pruned (wp-start step 5), because
+  PR #1480 (WP-2075) adds an entry there and a prune would conflict with it. No tier, no
+  `_audit` row, no `src/` change. No generality judge: the branch adds no row and no heuristic.
+  *Gotchas*: guard codes take their thresholds from `strategy/staged.py` and `schemas/plan.py`,
+  and `PATTERN_DEAD_CHANNELS` from `background/diagnostics.py`. The inventory's `note` names
+  them, but `constants_read` sees only names read in the raising function's own file, one call
+  deep. The kinds
+  are this session's reading for part 2 to check, not rulings. Ten, every code already tiered, copy
+  the ambiguity their audit row carries.
+  Next: the maintainer's answer to the gate question. If part 2 goes ahead: tier each code per
+  part (statistic, threshold, action) with families, starting with the 15 kind-2 and kind-3
+  codes and the B13 constants they read. Then lift the four thresholds with their rows, pinned
+  bit-identical before and after, and send the batch.
 
 - **2026-10-18** — created, from the milestone's opening session, split out of 2002 on the
   second review's finding that one WP over 9 587 lines of actions *and* codes is too big

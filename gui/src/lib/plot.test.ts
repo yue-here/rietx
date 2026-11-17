@@ -71,9 +71,9 @@ describe("the curve colours (WP-1029 q)", () => {
     expect(colors.diff).toBe("#abc");
     // the un-set ones fall back to the light values — a page with no
     // stylesheet still draws the shipped plot
-    expect(colors.calc).toBe("#c23b22");
-    expect(colors.bkg).toBe("#6b7280");
-    expect(colors.zero).toBe("#88888888");
+    expect(colors.calc).toBe("#c65d0a");
+    expect(colors.bkg).toBe("#b5793a");
+    expect(colors.zero).toBe("#cfcfcf");
   });
 
   it("reads the mask wash and its edge from properties too (WP-1033)", () => {
@@ -83,7 +83,7 @@ describe("the curve colours (WP-1029 q)", () => {
     const colors = curveColors((name) => set[name] ?? "");
     expect(colors.mask).toBe("#00000022");
     expect(colors.edge).toBe("#9a9a94");
-    expect(curveColors(() => "").mask).toBe("#1b1b1b14");
+    expect(curveColors(() => "").mask).toBe("#1c191714");
   });
 
   it("reads the peak layer's two, which are not `--accent` and `--bad` (WP-1210)", () => {
@@ -91,17 +91,17 @@ describe("the curve colours (WP-1029 q)", () => {
     // `tests/test_gui_palette.py`, over `app.css` itself and through the one
     // OKLab distance this package has — a port here would be a second answer.
     const set: Record<string, string> = {
-      "--plot-peak": "#8c257e", "--plot-peakfit": "#c158b0",
-      "--accent": "#1f5fa8", "--bad": "#c23b22",
+      "--plot-peak": "#0072b2", "--plot-peakfit": "#6f83e6",
+      "--accent": "#c65d0a", "--bad": "#b4271f",
     };
     const colors = curveColors((name) => set[name] ?? "");
-    expect(colors.peak).toBe("#8c257e");
-    expect(colors.peakfit).toBe("#c158b0");
+    expect(colors.peak).toBe("#0072b2");
+    expect(colors.peakfit).toBe("#6f83e6");
     expect(colors.peak).not.toBe(set["--accent"]);
     expect(colors.peakfit).not.toBe(set["--bad"]);
     // a page with no stylesheet still draws the layer in its own colours
-    expect(curveColors(() => "").peak).toBe("#8c257e");
-    expect(curveColors(() => "").peakfit).toBe("#c158b0");
+    expect(curveColors(() => "").peak).toBe("#0072b2");
+    expect(curveColors(() => "").peakfit).toBe("#6f83e6");
   });
 
   it("reads the phase palette, whose fallbacks are the values (WP-1438)", () => {

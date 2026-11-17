@@ -65,6 +65,15 @@ Lab data with unmodelled profile detail lands near 2 to 3.
 It is Bérar and Lelann's homogeneous correction, one scalar for every parameter ([Esds and the Bérar-Lelann inflation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation)).
 Treat it as a measure of how correlated the residual is, and not as a calibrated per-parameter uncertainty.
 
+### Which esd weighted the fit
+
+Every statistic above weights a point by 1/σ², and a fit does not show where each σ came from.
+`RefinementResult.sigma_rule` records it, as a `SigmaRule` counted over the fitted points.
+`SigmaRule.n_file_sigma` points were weighted by the file's own esd, and `SigmaRule.n_poisson_sigma` by the Poisson σ = √max(y, 1).
+The two add up to `Statistics.n_points`.
+`SigmaRule.n_nonpositive_excluded` counts the points inside the fitted range that left the fit because the file gave them an esd of zero or below ([Intensities and esds](pattern-files.md#intensities-and-esds)).
+A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leaves the top-level field `None`.
+
 ### Limits of the agreement statistics
 
 The statistics measure agreement, and agreement is not correctness.

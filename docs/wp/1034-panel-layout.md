@@ -266,6 +266,45 @@ the thing this package refuses everywhere else.
   `fitColumns`.
 - `gui/CLAUDE.md` — the always-mounted rule and the `responsive: true` trap.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**One column, nine panels** (WP-1034, `App.svelte`, `Model.svelte`,
+`lib/resize.ts`) is where the panels live: Model and Text stopped being modes
+over the window and became tabs beside the plot, and the full-window surface
+they had is now **the column expanding, tab strip and all** — one hatch for
+every panel instead of two, with the header's `Split | Full` the only control
+for it (session-local: a layout is a view choice, not a setting). Five rules,
+each a measurement in the WP. **A panel's minimum width is measured, not
+chosen** — the atom table's `min-content` lives in `MODEL_MIN` (`lib/resize.ts`), the `.rxt`
+document's *editable* columns end at 546 px with the gutter and its trailing
+comments at 756, against a sidebar that clamps at 340–560 and drags to 72 %: so
+WP-1013's "a narrow sidebar undoes the alignment" is true at the floor and false
+at the ceiling. **A column that must not lose gets a flex *basis*, not a share**
+— equal `flex: 1 1 0` gave the structure column 306 px of a 1000 px pane while
+the columns needing less had plenty, and a basis is not a maximum, so a drag
+still overrides it. **Overflow is wrap, never truncation, and it applies to the
+header too**: no tab label is shortened, the buttons do not grow (a lone wrapped
+tab stretched into a banner), and the header wraps because at 860 px it had
+pushed `Cancel` and `⌘K` past the window's edge — a wrapping row breaks on its
+items' *bases*, so anything meant to ellipsise instead needs `flex-basis: 0`.
+**A statistic outlives the thing it describes**: an edit discards the curves
+server-side, but the run frame keeps its Rwp, so the header printed a fit's Rwp
+beside a plot saying there was none — the frame is the source only while a run
+is in flight. That class of bug is invisible until two panels share a screen,
+which is the argument for tabs restated as a defect. And **opening another
+project replaces the session's** with no prompt and no dialog: settings persist
+on the verb and the log is on disk, so there is nothing unsaved, and a run in
+flight is already refused by `project_open`'s 409. **There is no read-only way
+to open one** — every verb writes into the directory and `Project.open` appends
+a head annotation before any verb runs — so looking without changing means a
+copy: `rietx gui --scratch` (byte-for-byte, temp dir), `--state-dir` to put the
+recent list somewhere else, and `*.rex/` in `.gitignore` (WP-1204).
+
 ## Handover log
 
 - **2026-08-05** — **closed.** Every task landed, in two commits on

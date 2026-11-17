@@ -10,7 +10,7 @@ A restraint adds an observation and keeps every parameter; [How to restrain a bo
 ## Make parameters equal
 
 Pass `tie_equal` the parameters' names, such as `phases.0.atoms.4.biso`.
-A `*` in a name matches any run of characters, dots included, and [Parameter map](../reference/parameters.md) lists every name.
+A `*` in a name matches any run of characters, dots included, and [Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 The first match in table order becomes the source, and the call returns the others, which now follow it.
 
 ```python
