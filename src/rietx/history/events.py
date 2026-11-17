@@ -149,7 +149,9 @@ Each *accepted* ``eval`` then reaches the callback with one more top-level
 key, ``preview``, holding ``two_theta`` (the fitted grid, a read-only view),
 ``y_calc`` (an ndarray on that grid, recovered from the residual the solver
 already measured as ``y_obs − r·σ``) and ``values`` (every *moving* path's
-physical value, the tied coordinates and cell included, absolute).  It is a
+physical value, the tied coordinates and cell included, absolute; a magnetic
+fit's moment components are not among them, being refreshed only when a stage
+commits, issue #1626).  It is a
 key of the dict the callback receives and of nothing written: the stream's
 own file, a run recorder chained onto it and a ``progress=`` writer write the
 line they wrote without it, byte for byte, so the version does not move.

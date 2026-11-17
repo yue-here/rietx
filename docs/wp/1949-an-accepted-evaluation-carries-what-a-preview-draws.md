@@ -195,6 +195,16 @@ today's.
 
 ## Handover log
 
+- **2026-11-17** — review fix-ups on PR #1623. Task 4's "on accepted
+  events it equals `y_obs − r/sqrt_w`" is now a test:
+  `test_a_previewed_curve_is_its_own_events_residual` checks every
+  preview against its own event's residual on a toy model, on both
+  drivers. It fails when LM hands `on_trial` the incumbent residual, and
+  when the preview lags one accepted evaluation, where the `predict()` bar
+  still passes (checked once each). The manual, skill 9d.11 and the events
+  docstring now say a magnetic fit's moment components are not in
+  `values` (#1626). The 8e-6 bar's margin (7.45e-6 with an excluded
+  region) is noted in the test as a property of `predict()`.
 - **2026-11-16** — built, in PR #1623 (ghostshift runner). A program
   watching a fit can now draw the current curve, the atom positions and the
   cell from the event stream alone. It asks once, with
@@ -219,7 +229,7 @@ today's.
     in 1130 s (`[dev]`-equivalent venv, Linux x86_64, `-n 4`, at
     `91cf502c1`, beside another job). The 7 added tests (9 cases) cost
     2.4 s together on that run;
-  - canary (`gs1949c`, touched files + audit_table + help +
+  - canary (touched files + audit_table + help +
     docs_consistency + lm_solver, `-n 4`): 234 passed, 1 skipped in 38 s,
     436 MB;
   - `python -m tests.reader_output`: exit 0;

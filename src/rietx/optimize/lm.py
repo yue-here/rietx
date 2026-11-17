@@ -506,9 +506,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     actually measured (WP-1113), with ``cost = ½·rᵀr`` at the trial, the λ
     that produced the step, the norm of the *taken* step, after the box
     clamp, and the residual itself, which a preview reads ``y_calc`` off
-    (WP-1949; the driver's own array, not to be written into).  A trial the linear model discards unevaluated (no descent
-    promised, or a promise under the fp64 floor) never reaches the residual
-    and never fires it.
+    (WP-1949; the driver's own array, not to be written into).  A trial the
+    linear model discards unevaluated (no descent promised, or a promise
+    under the fp64 floor) never reaches the residual and never fires it.
 
     ``normal_equations(J, r)`` returns ``(A, b) = (JᵀJ, −Jᵀr)`` in place of
     :func:`_normal_equations`.  It may return A as a ``scipy.sparse`` matrix,

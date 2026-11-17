@@ -147,7 +147,12 @@ def test_a_preview_rides_accepted_evals_to_the_callback_alone(
     ``y_calc`` is read off the residual the driver measured (``y_obs − r·σ``),
     so on the last accepted evaluation — the answer — it is the fitted curve.
     ``predict()`` evaluates a compile *at* the answer, whose windows differ
-    from the stage's (its docstring), which is the 8e-6.
+    from the stage's (its docstring), which is the 8e-6.  The bar has little
+    headroom: 4.38e-6 on this fixture, and 7.45e-6 (93 % of it) with an
+    excluded region or ``two_theta_limits`` 5° in from each end (review of
+    #1623).  That gap is ``predict()``'s, never the preview's, so a fixture
+    change tripping it says nothing about the preview; the exact check of
+    ``y_calc`` against the event's own residual is the toy test below.
     """
     structure, ins = perturbed_models()
     seen: list[dict] = []
@@ -212,6 +217,103 @@ def test_a_preview_in_the_extraction_modes(synthetic_pattern, mode):
         y = ref.predict()
         gap = np.max(np.abs(last["y_calc"] - y)) / np.max(np.abs(y))
         assert gap <= 8e-6, gap
+
+
+class _ToyModel:
+    """What :func:`_preview_builder` and ``rows.block`` read off a compiled
+    model: a grid, the data and σ, and one penalty block of two rows after
+    the data block, so a slice of the wrong rows changes the length."""
+
+    def __init__(self):
+        self.tt = np.linspace(10.0, 20.0, 41)
+        self.sigma = np.linspace(0.5, 1.5, self.tt.size)
+        self.y_obs = self._curve(np.array([3.0, 14.0, 0.8]))
+        self.bkg_penalty = np.zeros((2, 1))
+        self.pawley = self.restraints = self.origin = None
+
+    def _curve(self, theta):
+        amp, centre, width = theta
+        return amp * np.exp(-((self.tt - centre) / width) ** 2) + 1.0
+
+    def residual(self, theta):
+        theta = np.asarray(theta, dtype=np.float64)
+        data = (self.y_obs - self._curve(theta)) / self.sigma
+        return np.concatenate([data, 0.1 * (theta[:2] - [3.0, 14.0])])
+
+
+class _ToyTable:
+    """The table half: θ is the physical vector, and ``x`` moves with ``a``
+    as a tie would, so the moving set is the free set plus one."""
+
+    free_paths = ["a", "c", "w"]
+    moving_paths = ["a", "c", "w", "x"]
+
+    def decode(self, theta):
+        a, c, w = (float(v) for v in theta)
+        return {"a": a, "c": c, "w": w, "x": 2.0 * a}
+
+    def free_values(self, theta):
+        return [float(v) for v in theta]
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_previewed_curve_is_its_own_events_residual(solver):
+    """Every preview's ``y_calc`` is ``y_obs − σ·r(θ)`` at *its own* event's
+    θ, on a toy residual whose output moves with θ (review of #1623).
+
+    The ``predict()`` bar in the test above reads only the last accepted
+    preview, where the curve has converged, so a preview built from the
+    previous accepted residual passes it; here each accepted evaluation
+    moves the curve, and a lagged ``r`` fails on the first step.  θ is read
+    off the event's ``data["values"]``, which ``_free_values`` writes, never
+    off the preview it checks.
+    """
+    from scipy.optimize import least_squares
+
+    from rietx.optimize import least_squares as ls
+    from rietx.optimize import lm
+
+    model, table = _ToyModel(), _ToyTable()
+    seen: list[dict] = []
+    stream = EventStream(callback=seen.append, preview=True)
+    preview = ls._preview_builder(model, table)
+    tracker = ls._StepTracker()
+    x0 = np.array([1.5, 13.0, 1.4])
+    lo, hi = np.full(3, -np.inf), np.full(3, np.inf)
+    jac = lambda th: _fd_jacobian(model.residual, th)  # noqa: E731
+    if solver == "lm":
+        ls._lm_outcome(model.residual, jac, x0, lo, hi, max_nfev=50,
+                       ftol=lm.FTOL, inequalities=None, events=stream,
+                       stage="toy", track=tracker, table=table,
+                       preview=preview)
+    else:
+        least_squares(ls._tracked(model.residual, tracker, stream, "toy",
+                                  table, preview=preview),
+                      x0, jac=jac, method="trf", max_nfev=50)
+
+    previewed = [e for e in seen if "preview" in e]
+    curves = [e["preview"]["y_calc"] for e in previewed]
+    # the toy moves: the early accepted curves differ by far more than the
+    # bar below, so a preview one accepted evaluation behind would show
+    assert len(previewed) >= 3
+    assert all(np.max(np.abs(b - a)) > 1e-3 for a, b in zip(curves[:3], curves[1:3]))
+    for e in previewed:
+        theta = np.array(e["data"]["values"])
+        r = model.residual(theta)
+        expected = model.y_obs - r[:model.tt.size] * model.sigma
+        np.testing.assert_allclose(e["preview"]["y_calc"], expected,
+                                   rtol=0, atol=1e-12)
+        assert e["preview"]["values"] == table.decode(theta)
+
+
+def _fd_jacobian(residual, theta, h=1e-7):
+    r0 = residual(theta)
+    cols = []
+    for i in range(theta.size):
+        step = np.array(theta, dtype=np.float64)
+        step[i] += h
+        cols.append((residual(step) - r0) / h)
+    return np.stack(cols, axis=1)
 
 
 def _draw_preview(preview: dict, pattern, path: Path) -> None:

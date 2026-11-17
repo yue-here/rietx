@@ -102,6 +102,7 @@ To draw the curve and the atoms while the fit runs, pass `events=rietx.history.E
 Each accepted `eval` then reaches `draw` with a `preview` key beside `data`.
 `preview["two_theta"]` and `preview["y_calc"]` are arrays on the grid the stage fits.
 `preview["values"]` holds every parameter that can move in the stage, by its path, with the atom coordinates and lattice parameters as absolute values.
+On a magnetic fit the moment components are not among them, because they are refreshed only when a stage commits (issue #1626).
 So `draw` needs no second refinement and no `predict()` call, which compiles a model on every frame.
 In a Le Bail fit, `y_calc` uses the intensities extracted before the stage's solve, so it moves when the stage ends and they are extracted again.
 

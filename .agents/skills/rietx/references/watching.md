@@ -187,8 +187,9 @@ result, 0.0411 and 0.0613.)*
 re-predicting.** `EventStream(callback=cb, preview=True)`, passed as `events=`,
 hands `cb` each accepted `eval` with a `preview` key beside `data`:
 `two_theta`, `y_calc` (ndarrays on the stage's fitted grid) and `values`, every
-moving path's absolute value, tied coordinates and cell included. No file
-receives it, so the run's logs are unchanged. Copy what you keep. A joint fit
+moving path's absolute value, tied coordinates and cell included. A magnetic
+fit's moment components are not in `values`: they are refreshed only at a
+stage's commit (#1626). No file receives it, so the run's logs are unchanged. Copy what you keep. A joint fit
 refuses it with a `ValueError`. In Le Bail mode the curve uses the intensities
 frozen for the solve, so it steps when a stage ends.
 
