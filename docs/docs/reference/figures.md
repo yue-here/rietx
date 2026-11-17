@@ -239,9 +239,9 @@ povray +W1000 +H963 +A nac.pov
 ```
 
 Add `+UA` for a transparent background.
-The light, the finish and `RIETX_RADIOSITY`, POV-Ray's global illumination, are `#declare` lines at the top of the file, so turning radiosity on is one edit.
+The light, the finish and `RIETX_RADIOSITY`, POV-Ray's global illumination, are `#declare` lines at the top of the file, so turning global illumination on is one edit.
 The atoms are in Cartesian ångström and drawn through `RIETX_VIEW`, the figure's rotation followed by a mirror.
-POV-Ray's frame is left-handed and rietx's is right-handed, and without the mirror the picture would show the other enantiomer of a chiral structure.
+POV-Ray's frame is left-handed and rietx's is right-handed, and without the mirror the picture would show the mirror image of a chiral structure.
 
 Blender reads the `.glb` through File > Import > glTF 2.0.
 The import brings an orthographic camera with the figure's framing, one sun lamp pointed as the figure's light is, and a material for each colour.
@@ -250,7 +250,7 @@ One glTF unit is one ångström: glTF's unit is the metre, so the cell arrives a
 glTF has no background, so the world colour in Blender is the background.
 
 The PNG shades its sRGB colours directly, as the GUI does, and a ray tracer shades in linear light.
-Each format is given the colours as sRGB, so a line or a letter keeps the PNG's colour exactly and a lit surface's midtones differ.
+Each format is given the colours as sRGB, so a line or a letter keeps the PNG's colour exactly and the shading of a lit surface differs.
 
 ## Legend, axis triad and scale bar
 
