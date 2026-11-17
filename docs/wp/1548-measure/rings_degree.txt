@@ -1,0 +1,25 @@
+21 CIFs; cap 4 drawn bonds, sizes (5, 6), tolerance 0.1 A
+
+src/rietx/data/examples/cod_1000236.cif: 2x2x2 block, 1064 atoms, max degree 8, on a planar ring 0; planar rings 0 uncapped in 0.07 s, 0 capped in 0.01 s
+src/rietx/data/examples/fluorapatite.cif: 2x2x2 block, 576 atoms, max degree 7, on a planar ring 0; planar rings 0 uncapped in 0.05 s, 0 capped in 0.01 s
+tests/data/cif_dictionaries/templ_attr.cif: unreadable (ValueError)
+tests/data/cif_dictionaries/templ_enum.cif: unreadable (ValueError)
+tests/data/cod_1000055.cif: 2x2x2 block, 315 atoms, max degree 24, on a planar ring 0; planar rings 0 uncapped in 1.90 s, 0 capped in 0.00 s
+tests/data/cod_1000236.cif: 2x2x2 block, 1064 atoms, max degree 8, on a planar ring 0; planar rings 0 uncapped in 0.06 s, 0 capped in 0.01 s
+tests/data/cod_1550439.cif: 2x2x2 block, 796 atoms, max degree 4, on a planar ring 0; planar rings 0 uncapped in 0.01 s, 0 capped in 0.01 s
+tests/data/cod_1567181.cif: 2x2x2 block, 1144 atoms, max degree 4, on a planar ring 3; planar rings 20 uncapped in 0.01 s, 20 capped in 0.01 s
+tests/data/cod_1577467.cif: 2x2x2 block, 224 atoms, max degree 2, on a planar ring 0; planar rings 0 uncapped in 0.00 s, 0 capped in 0.00 s
+tests/data/cod_2104364.cif: 2x2x2 block, 752 atoms, max degree 4, on a planar ring 3; planar rings 16 uncapped in 0.01 s, 16 capped in 0.01 s
+tests/data/cod_2242872.cif: 2x2x2 block, 880 atoms, max degree 3, on a planar ring 3; planar rings 80 uncapped in 0.01 s, 80 capped in 0.01 s
+tests/data/cod_4002052.cif: 2x2x2 block, 5472 atoms, max degree 4, on a planar ring 3; planar rings 256 uncapped in 0.11 s, 256 capped in 0.06 s
+tests/data/cod_4003235.cif: 2x2x2 block, 2517 atoms, max degree 6, on a planar ring 0; planar rings 0 uncapped in 0.01 s, 0 capped in 0.01 s
+tests/data/cod_7252065.cif: 2x2x2 block, 608 atoms, max degree 3, on a planar ring 3; planar rings 24 uncapped in 0.00 s, 24 capped in 0.00 s
+tests/data/cod_9003308.cif: 2x2x2 block, 275 atoms, max degree 6, on a planar ring 0; planar rings 0 uncapped in 0.02 s, 0 capped in 0.00 s
+tests/data/cod_9007744.cif: 2x2x2 block, 397 atoms, max degree 12, on a planar ring 0; planar rings 0 uncapped in 0.07 s, 0 capped in 0.00 s
+tests/data/fluorapatite.cif: 2x2x2 block, 576 atoms, max degree 7, on a planar ring 0; planar rings 0 uncapped in 0.03 s, 0 capped in 0.00 s
+tests/data/gsas2_bt1_lamno3.cif: 2x2x2 block, 384 atoms, max degree 8, on a planar ring 0; planar rings 0 uncapped in 0.05 s, 0 capped in 0.00 s
+tests/data/nist_srm660c_100a.cif: unreadable (ValueError)
+tests/data/seqrefine_cucr2o4/CuCr2O4.cif: 2x2x2 block, 798 atoms, max degree 6, on a planar ring 0; planar rings 0 uncapped in 0.06 s, 0 capped in 0.01 s
+tests/data/seqrefine_cucr2o4/CuO.cif: 2x2x2 block, 148 atoms, max degree 4, on a planar ring 0; planar rings 0 uncapped in 0.00 s, 0 capped in 0.01 s
+
+largest degree of a planar-ring atom on disk: 3

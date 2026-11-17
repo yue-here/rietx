@@ -162,14 +162,20 @@ def test_a_declared_halo_on_a_forbidden_position_does_not_refute_the_class(
     """The bug: the declared hump was held at the lattice-group fit's values,
     which the (200) Le Bail line had biased, and ``F d - -`` was refuted at
     (200) on every seed.  Freed per class, like the background it joins, the
-    hump takes the halo back and the right class is returned."""
+    hump takes the halo back and the right class leads, unrefuted.  Since
+    WP-2076 it leads ``F 41 - -`` by less than the margin, as on synthetic Si
+    (``test_extinction_gate``), so the screen abstains rather than answers; a
+    class excluding the specimen's group is never returned."""
     tt, y = bragg
     data = _data(tt, y["sync"] + _gauss(tt, TT200, 1.0, 1e-3 * TOP), seed)
     screen = _screen(data, hump=(round(TT200 + 0.3, 1), 50.0, 1.5))
+    said = [(c.symbol, round(c.delta_bic, 1), c.refuted_reason)
+            for c in screen.candidates]
+    top = screen.candidates[0]
+    assert top.symbol == "F d - -" and not top.refuted, said
+    assert "F d -3 m:2" in top.space_groups
     best = screen.best_or_none()
-    assert best is not None and best.symbol == "F d - -", [
-        (c.symbol, c.refuted_reason) for c in screen.candidates]
-    assert "F d -3 m:2" in best.space_groups
+    assert best is None or best is top, said
 
 
 def test_a_real_violation_under_a_declared_halo_still_refutes(bragg):

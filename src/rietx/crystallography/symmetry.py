@@ -173,7 +173,7 @@ def restate_in_hexagonal_axes(phase, fmt: str):
 
     def held(parameter, value):
         return parameter.model_copy(update={
-            "value": float(value), "vary": False, "expr": None,
+            "value": float(value), "vary": False,
             "stderr": None})
 
     new_cell = cell.model_copy(update={

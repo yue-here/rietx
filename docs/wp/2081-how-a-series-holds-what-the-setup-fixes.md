@@ -1,7 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: unscheduled · Status: ⬜
-Track: A long run is not one fit
+Milestone: series · Status: ⬜
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
@@ -324,6 +323,63 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1556 § 5): a held setup value's error
+  moves every later cell together, and the series has no row for it.** The reporter ran a
+  synthetic LaB₆ ramp, 7 patterns × 150 noise replicates, and held zero and profile from
+  pattern 1 on at pattern 0's fitted values, the calibrate-then-hold practice this WP
+  starts from. Free on every pattern, the cell's pull std is 0.79-0.93 and neighbouring
+  patterns' errors correlate at −0.09 to 0.04. Held, the pull std is 2.30-2.43 and the
+  correlation 0.85-0.90. So each pattern's cell esd is about 2.4× too small, and a series
+  mean's esd about 5.5× too small (rms error 0.88 ppm against a naive esd of the mean of
+  0.16 ppm). The cause is the held calibration's own error, shared by every pattern.
+  Not rerun here. *Checked against the tree at `98d7ba8e3`:* `SeriesResult` carries no
+  row for a held parameter, and `HOLD_BLOCKED_PLAN` is info only. The reporter's
+  candidate: a per-pattern score statistic for each held parameter, as a row with no
+  threshold, and asks whether that sits inside the maintainer's 2026-11-03 "field, not
+  code" ruling. That question is for this WP's discussion. The rest of the issue (a χ²
+  pair per chain, now in WP-1453; equivalence mapping; the combined-esd step; unmeasured
+  points) is placed elsewhere or held for the maintainer.
+
+- **2026-11-06, from the issue triage (issue #1439): the free set can change
+  from frame to frame on its own, through the absent-phase hold.** A design
+  proposal from the recurring contributor, from a private multiphase in-situ
+  series fitted by their own driver, not by `refine_sequential`. They refitted
+  the series with two instrument parameters held and compared the two fits of
+  each frame by ΔBIC. In a few percent of frames the two fits refined different
+  parameters beyond the declared holds: a minor phase's cell, strain and size.
+  The cause was the absent-phase hold (WP-1301; a phase whose scale is under 3σ
+  of its counting-noise esd has its structural paths held for the stage,
+  `phase_support_sigma`). A minor phase near 3σ fell either side depending on
+  the rest of the fit. So the two fits were not nested, and along a chain the
+  gate can switch a phase's cell on and off and put steps in its trajectory.
+  *Checked against the tree at `a84379aac`:* `sequential._collapse` passes
+  `phase_support_sigma` into the collapsed warm plan (the WP-2002 B1 comment
+  there), so the hold decides afresh on every warm refit. Each entry records
+  what its last stage held (`sequential.py` reads `result.stages[-1].held`).
+  The effect has **not** been measured in `rietx.sequential`; the reporter
+  offers a synthetic reproduction. The proposal: the cold first frame resolves
+  the free set, gates included; every warm refit frees exactly that set; the
+  support test still runs per frame and a disagreement is recorded, not acted
+  on, as WP-2003 records steps; `SeriesResult` records the set once. A
+  companion check compares two `SeriesResult`s of the same frames, one a
+  declared restriction of the other, and reports per frame (a) free sets that
+  differ beyond the declared holds and (b) a larger model ending at a higher χ²
+  than the restricted one, which cannot happen at a true minimum. The reporter
+  says (b) found every local minimum they met (a magnetic moment stuck at zero
+  from a fixed start). **Where it lands here:** it is question 1 one rank down.
+  "What a series frees after the first frame" covers frees decided by a gate
+  as well as by the plan, and options b and c above fix the set by a caller's
+  statement, where #1439 fixes it by frame 0's own gates. **It pulls against
+  WP-1420**, whose goal is that a phase held in one frame gets back in when a
+  later frame supports it. A set fixed at frame 0 keeps a late-appearing
+  phase's structure held for the whole series, its scale alone free. Decide the
+  two together. **Prior art, corrected:** the issue says GSAS-II stops when the
+  vary list changes between histograms. GSAS-II 5.8.4 prints the variables
+  added and removed and carries on (`GSASIIstrMain.py:1038-1058`, the stop is
+  commented out; `docs/practice.md` § Sequential refinement already says so).
+  The issue's wider point stands: no program surveyed switches refine flags per
+  pattern on a significance test.
+
 ## Open questions for the discussion
 
 None is ruled. Rwp is inadmissible as evidence for any default here (Rule 4). Admissible
@@ -470,6 +526,82 @@ flag reprints the saved numbers without fitting.
   `tests/data/README.md`.
 
 ## Handover log
+
+- **2026-11-16** — the discussion began, and the series milestone opened (one chat
+  session with Yue; no package code changed).
+
+  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five were
+  accepted at once and rule 2 after a second explanation, in a changed form. They are recorded with Yue's words
+  in [`docs/milestones/series.md`](../milestones/series.md) § The rules, which is now
+  their authority. Yue ruled that series is its own milestone, separate from parametric,
+  and this WP moved to it. Yue ruled WP-2080 to option A, the ratio as a field with no
+  automatic retry (that file's handover log), and approved the comment posted on PR #1473.
+
+  *What the rules settle here.* Questions 2 and 3 fall to rules 1 and 2, question 4 to
+  rule 6, question 5 to rule 4, questions 7 and 9 to rule 5 and question 11 to rules 1 and
+  2. Question 1, the default on later patterns, is still open and is the first open
+  decision in the milestone record. No question in § Open questions is edited: this entry
+  and the milestone record say where each stands.
+
+  *Two more rulings, later the same day.* Question 1 is ruled: the default stays as it is
+  (option a), in Yue's words "keep today's default". `SEQUENTIAL_WIDTH_GROWTH` is to be
+  removed ("Remove"). Both are in the milestone record § Ruled after the open, with the
+  options put. Neither is built. Rule 2 is ruled too: the series call and the joint call stay two
+  calls ("Yes, two calls"), the series call taking per-pattern and fixed parameters only.
+  All six rules are now accepted.
+
+  *Stale lines above, not yet corrected.* Context says PR #1310 is open and mergeable; it
+  has merged. Context says `SequentialRefinement.fit:plan` is unaudited; it has a tier-3
+  row approved 2026-11-03, recorded as unanimous, and `fit:refit` is still unaudited.
+  WP-2080's trigger no longer waits on anything, and is ruled to a field.
+
+  *Measured: a joint fit on the real ramp* (`2081-batch/measure_joint_ramp.py`, output
+  `joint_ramp.json`, `--report` reprints it; run by an Opus subagent, the saved numbers
+  re-read by this session; macOS arm64, worktree venv `[dev]`, Python 3.12.10, rietx
+  1.12.0.dev0, compiled tier on). All 17 CuCr2O4 patterns in one `refine_multi`, each
+  started from the `lab_sample_refine` chain's model for that pattern, Biso held at the
+  chain's values. Wall times are from a machine under uncontrolled load.
+
+  | arm | common to all patterns | per pattern | wall, evaluations | b − c closes between | \|b − c\| at 6.8 K (Å), paper 0.00746 | common zero (°) | mean axis error at 6.8 K vs the paper (ppm) |
+  |---|---|---|---|---|---|---|---|
+  | chain, default (WP table above) | nothing | zero, profile, cell, scale, background | — | 111 and 123 K | 0.00554(113) | −0.00095(65) per pattern | −7 |
+  | chain, `lab_sample_refine`, `.prm` | nothing; zero fixed at 0 | cell, scale, background, sample widths | 414 s | 111 and 123 K | 0.00562(90) | 0, fixed | +67 |
+  | A | zero; profile fixed at the `.prm` | the same | 584 s, 143 | 111 and 123 K | 0.00563(86) | −0.00073(11) | +10 |
+  | B | zero and U, V, W, X, Y declared | the same | 528 s, 227 | 111 and 123 K | 0.00562(89) | −0.00073(11) | +10 |
+  | C0 | zero and U, V, W, X, Y | cell, scale, background; every sample width 0 | 428 s, 277 | 123 and 134 K | 0.00801(41) | −0.00073(11) | +21 |
+
+  Five readings.
+
+  - A common zero shift works on real data. It is fixed about 6× tighter than a
+    per-pattern zero, the closure does not move, and the +67 ppm of the held-at-0 route
+    falls to +10 ppm. The split itself reads the same 25 % under the paper in A and B, so
+    the method did not cause that.
+  - A joint fit of 17 synchrotron patterns costs about what the chain costs here, 7 to 10
+    minutes.
+  - Arm B's declaration was narrowed by the package. `multi._hold_width_twins_multi` holds
+    U, X and Y from the stage where a per-pattern sample width of the same angular shape is
+    free. `StageResult.width_twins_held` records it; no diagnostic code does, and a held term
+    is absent from `result.parameters`. Only zero, V and W were common and free at the end.
+  - W is not determined in arm B. A second start with the profile moved 30 % ends at the
+    same χ² (274072.45 against 274072.74), the same cells and zero to 1e-9, and W at 6.5e-6
+    where the first ended on its floor of 1e-8, traded against every pattern's `gauss_size`.
+    Both report an esd for W near 1e-12, and `COVARIANCE_DIRECTION_DISCARDED` names W. A
+    small esd on a value two starts disagree on by 6.5e-6 looks like a defect against the
+    rule that an unmeasured direction has no esd. Not investigated.
+  - Arm C0 holds no width at one pattern's value: one profile is refined for all patterns
+    and no sample width is free. It closes between 123 and 134 K, which brackets the
+    paper's 130 K, and reads the split 7 % over the paper where every other route reads 25 %
+    under. Its common Y is 0.0508(37) against 0.0072(34) with the chain's sample widths
+    held (arm C in the JSON), so the one profile takes up the specimen's own broadening. This is one specimen on development data, so it shows only that "a held width
+    invents a transition" (the cautious routes above) is a statement about a width taken
+    from a single pattern.
+
+  Not run: Biso free; an arm that pins one pattern's sample widths so U, X and Y could be
+  common beside free widths; a second start for C0. The esd of b − c ignores their
+  correlation, as the table above does.
+
+  *Next:* Yue's read of the milestone record's title, scope and draft acceptance rows;
+  the open decisions listed there; W's esd in the joint fit, as its own investigation.
 
 - **2026-11-04** — rewritten around Yue's account (a ghostshift runner, one session). No
   package code changed, and no question is ruled. Yue said in chat on 2026-11-03 how an

@@ -154,6 +154,38 @@ Report in the handover (don't gate): first-load JS size, boot-to-interactive.
 - DESIGN.md §Outputs, human-GUI paragraph + its 2026-07-29 amendment (stack
   decision).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **frontend** (WP-1010) is a Svelte 5 + Vite + TS workspace in `gui/` whose
+build output is **committed** under `src/rietx/gui/static`, so installing the
+wheel never needs node — and `tests/test_gui_dist.py` is what keeps that honest:
+the dist's digest is recomputed in the ordinary (node-free) suite, nothing may
+gitignore the dist (the repo-wide `*.html` rule matched its `index.html` once),
+the built files must be *in* the wheel, and no built file may name a remote host.
+The digest itself lives once, in `gui/scripts/build_info.py`, called by both the
+build and the test; `build-info.json` deliberately carries no timestamp, because
+`git diff --exit-code src/rietx/gui/static` has to mean "stale", not "rebuilt".
+**Which points a payload carries is the server's** (`viz.compare.decimation_index`, past
+`CURVES_CEILING` in the curves routes); the chart module paints
+each pixel column's extremes of them (WP-1461 D5), what is drawn and never what the
+readout reads. No GUI page loads plotly (WP-1462); uPlot and svgcanvas are vendored, into
+`src/rietx/viz/static` by `scripts/vendor.py`, the build's first step: bump the pin, build.
+**The chart module, uPlot and svgcanvas are chunks off the boot path**, fetched on the first
+draw and the first SVG export, so a panel imports them dynamically or by type alone:
+`test_gui_dist.py` fails on one inlined into `app.js`, which one static `import {download}`
+did without anything else going red (WP-1461).
+`npm run build` needs `python3`, `vitest` needs
+`resolve.conditions: ["browser"]` or `mount()` comes from svelte's server build,
+`@sveltejs/vite-plugin-svelte` must be v7 for Vite 8, and the toolchain needs
+**node ≥ 20.12** — rolldown imports `styleText` from `node:util`, an older node
+fails at *import* naming neither node nor a version, and `npm ci` under it
+leaves a `node_modules` the newer one cannot use (WP-1442).
+
 ## Handover log
 
 - **2026-07-30 (later) — the `*.html` trap had a second half, open for six WPs

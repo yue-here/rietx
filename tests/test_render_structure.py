@@ -16,6 +16,7 @@ import functools
 import json
 import re
 import struct
+import warnings
 import zlib
 from pathlib import Path
 
@@ -27,7 +28,7 @@ from rietx.gui import structure3d as s3
 from rietx.model import compiled
 from rietx.schemas.structure import AnisoU, Atom, Cell, Phase, Structure
 from rietx.viz import component, keep, recolour, render_structure, select
-from rietx.viz.figure3d import glyphs, raster, render, views
+from rietx.viz.figure3d import cut, glyphs, raster, render, views
 from rietx.viz.figure3d import report as rp
 from rietx.viz.figure3d import scene as sc
 from rietx.viz.figure3d.render import _png
@@ -117,6 +118,14 @@ def _cases(payloads: dict[str, dict]) -> tuple[list, list]:
         # bonds the case is the atoms again
         if geo["bonds"]:
             options.append({"mode": "ellipsoid", "stick": 0.5})
+        # filled faces (WP-1548): one in the default grey and one in a colour
+        # given, then the first species hidden, which takes away any fill with
+        # an atom of it
+        fills = [{"kind": "face", "vertices": [0, 1, 2], "faces": [[0, 1, 2]], "color": None},
+                 {"kind": "ring", "vertices": [1, 2, 3, 4], "faces": [[0, 1, 2], [0, 2, 3]],
+                  "color": "#3a7d44"}]
+        options += [{"mode": "ball", "fills": fills},
+                    {"mode": "ball", "hidden": species[:1], "fills": fills}]
         # rutile draws every polyhedron by default, and a repeated case is
         # 40 kB that tests nothing new
         options = [o for k, o in enumerate(options) if o not in options[:k]]
@@ -126,7 +135,7 @@ def _cases(payloads: dict[str, dict]) -> tuple[list, list]:
                 show_boundary=opt.get("showBoundary", True),
                 exaggeration=opt.get("exaggeration", 1.0),
                 polyhedra=opt.get("polyhedra", ()), cell=opt.get("cell", sc.CELL_INK),
-                stick=opt.get("stick", 1.0))
+                stick=opt.get("stick", 1.0), fills=opt.get("fills", ()))
             scenes.append({"payload": name, "options": opt, "scene": scene})
         toggles = [{"on": True}, {"on": False},
                    {"on": True, "hidden": species[:1]},
@@ -140,6 +149,20 @@ def _cases(payloads: dict[str, dict]) -> tuple[list, list]:
                 geo, t["on"], t.get("formulas"), t.get("hidden", ()),
                 t.get("showBoundary", True))})
     return scenes, shown
+
+
+def _fog(scenes: list[dict]) -> list[dict]:
+    """``fog_span`` over the first scene of each payload, seen two ways: the
+    opening view, and down the first lattice vector (WP-1548)."""
+    cases, seen = [], set()
+    for k, case in enumerate(scenes):
+        if case["payload"] in seen:
+            continue
+        seen.add(case["payload"])
+        for rotation in (sc.opening_view(), sc.look_from((1, 0, 0), (0, 0, 1))):
+            cases.append({"scene": k, "rotation": rotation,
+                          "span": sc.fog_span(case["scene"], rotation)})
+    return cases
 
 
 def _views(payloads: dict[str, dict]) -> dict:
@@ -168,11 +191,13 @@ def _corpus(payloads: dict[str, dict] | None = None) -> dict:
             "STICK_OF_SEMI_AXIS": sc.STICK_OF_SEMI_AXIS, "STICK_FLOOR": sc.STICK_FLOOR,
             "FLAT_AXIS": sc.FLAT_AXIS, "CELL_WIDTH_PX": sc.CELL_WIDTH_PX,
             "EDGE_WIDTH_PX": sc.EDGE_WIDTH_PX, "POLY_ALPHA": sc.POLY_ALPHA,
+            "FILL_COLOR": sc.FILL_COLOR,
         },
         "payloads": payloads,
         "scenes": scenes,
         "shown": shown,
         "views": _views(payloads),
+        "fog": _fog(scenes),
     })
 
 
@@ -316,12 +341,15 @@ def _general_ellipsoid() -> dict:
 @pytest.mark.parametrize("kw", [
     {"mode": "ball", "polyhedra": True, "atom_labels": True},
     {"mode": "ellipsoid", "background": None, "outline": True},
-])
+    {"mode": "ball", "polyhedra": True, "atom_labels": True, "outline": True,
+     "depth_cue": True},
+], ids=["ball", "ellipsoid", "cued"])
 def test_the_two_paths_draw_the_same_bits_in_any_banding(nac, kw, monkeypatch):
     """The wheel's kernel and its numpy oracle call no library function, so
     the bar between them is the bit (D1).  A band boundary moves nothing on
     either path: the outline reads across one through its halo.  The numpy
-    half runs without the wheel too."""
+    half runs without the wheel too.  A depth-cued picture is the wheel's
+    ``render_rows_cued`` on the compiled side (WP-1548)."""
     images = {}
     was = compiled.set_enabled(False)
     try:
@@ -612,6 +640,159 @@ def test_the_options_reach_the_picture(nac):
 # ----------------------------------------------------------------------
 # letters (D8)
 # ----------------------------------------------------------------------
+
+def _near_and_far() -> tuple[dict, list[np.ndarray]]:
+    """One ball twice, 6 Å apart along the line of sight and 3 Å apart
+    across it, seen down z: the near copy and the far copy of one atom."""
+    geo = _one_atom(_general_ellipsoid())
+    atom = geo["atoms"][0]
+    pos = np.asarray(atom["pos"], dtype=float)
+    shifted = (pos + [3.0, 0.0, -6.0]).tolist()
+    geo["atoms"] = [atom, dict(atom, pos=shifted)]
+    scene = sc.build_scene(geo, "ball")
+    return scene, [pos, np.asarray(shifted)]
+
+
+@pytest.mark.parametrize("path", [True, False], ids=["compiled", "numpy"])
+def test_fog_blends_each_copy_of_an_atom_by_its_own_depth(path, monkeypatch):
+    """WP-1548 D1: f rises linearly from 0 at z_start to f_max at z_end, and
+    a sample becomes mix(colour, fog colour, f).  A ball's centre sample is
+    its front, at z = centre + radius, so each copy's expected pixel follows
+    from the unfogged picture and its own depth, to the rounding of two
+    8-bit images.  The compiled row draws with the wheel's
+    ``render_rows_cued`` wherever the wheel loaded, never the numpy band."""
+    monkeypatch.setattr(compiled, "_ENABLED", path)
+    numpy_bands = []
+    band = raster._band_numpy
+
+    def counted(*a, **kw):
+        numpy_bands.append(a[:2])
+        band(*a, **kw)
+
+    monkeypatch.setattr(raster, "_band_numpy", counted)
+    scene, centres = _near_and_far()
+    R = np.eye(3)
+    frame = render.gui_frame(scene, R, 240, 240, 240)
+    radius = scene["atoms"][0]["shape"][0]
+    fronts = [c[2] + radius for c in centres]
+    fog_colour = np.array([0.2, 0.4, 0.9])
+    fog = (fronts[0] + 0.5, fronts[1] - 0.5, 0.8, fog_colour)
+    bare = raster.draw(scene, R, frame, supersample=1)
+    cued = raster.draw(scene, R, frame, supersample=1, fog=fog)
+    assert bool(numpy_bands) == (not (path and compiled.available()))
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    _png(OUTPUT / "fog_near_far_off.png", bare, None)
+    _png(OUTPUT / "fog_near_far_on.png", cued, None)
+    seen = []
+    for c, front in zip(centres, fronts):
+        px = int((c[0] - frame.x0) * frame.ppa)
+        py = int((frame.y0 - c[1]) * frame.ppa)
+        f = 0.8 * min(max((fog[0] - front) / (fog[0] - fog[1]), 0.0), 1.0)
+        want = (1 - f) * bare[py, px, :3] / 255 + f * fog_colour
+        assert np.abs(cued[py, px, :3] / 255 - want).max() <= 1.5 / 255, (f, cued[py, px])
+        seen.append(f)
+    # the near copy is barely fogged and the far one nearly to f_max
+    assert seen[0] < 0.1 < 0.7 < seen[1]
+
+
+def test_fog_ending_in_front_of_its_start_is_refused():
+    scene, _ = _near_and_far()
+    frame = render.gui_frame(scene, np.eye(3), 40, 40, 40)
+    with pytest.raises(ValueError, match="not in front of"):
+        raster.draw(scene, np.eye(3), frame, fog=(0.0, 1.0, 0.5, (1.0, 1.0, 1.0)))
+
+
+@pytest.fixture(scope="module")
+def paracetamol_block():
+    """Paracetamol in a 2×2×2 block: the one-cell drawing closes no benzene
+    ring a cell edge cuts (WP-1548)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return s3.build(structure_from_cif(str(DATA / "cod_2104364.cif")),
+                        extent=((0, 2), (0, 2), (0, 2)), max_atoms=5000)
+
+
+def test_planar_rings_fill_paracetamols_benzene_and_replay(paracetamol_block):
+    """WP-1548 D2: ``planar_rings=True`` adds one grey face entry a ring and
+    changes only the picture; a colour for ``True`` takes the colour, and the
+    recipe draws the same bits again."""
+    from rietx.viz.figure3d import rings
+
+    plain = render_structure(paracetamol_block, size=240)
+    filled = render_structure(paracetamol_block, size=240, planar_rings=True)
+    green = render_structure(paracetamol_block, size=240, planar_rings="#3a7d44")
+    _save(filled, "planar_rings_paracetamol")
+    assert not np.array_equal(plain.image, filled.image)
+    assert not np.array_equal(filled.image, green.image)
+    assert filled.palette == plain.palette and filled.polyhedron_palette == {}
+    assert np.array_equal(render_structure(paracetamol_block, **green.recipe).image, green.image)
+    scene = sc.build_scene(paracetamol_block, fills=rings.ring_fills(paracetamol_block))
+    drawn = [f for f in scene["faces"] if f["kind"] == "ring"]
+    assert len(drawn) == len(rings.planar_rings(paracetamol_block)) > 0
+    assert all(f["color"] == sc.rgb(sc.FILL_COLOR) for f in drawn)
+
+
+def test_a_fill_with_a_hidden_atom_is_not_drawn(paracetamol_block):
+    from rietx.viz.figure3d import rings
+
+    fills = rings.ring_fills(paracetamol_block)
+    scene = sc.build_scene(paracetamol_block, hidden=["C"], fills=fills)
+    assert not [f for f in scene["faces"] if f["kind"] != "polyhedron"]
+
+
+def test_named_faces_draw_a_mask_and_replay(nac):
+    """WP-1548 D4: a mask from ``cut`` fills its atoms, in the colour given
+    with it, and the recipe's JSON-plain copy draws the same bits."""
+    geometry = s3.build(nac)
+    layer = cut.plane(geometry, (0, 0, 1), 0.0)            # planar: a polygon
+    cluster = cut.sphere(geometry, (0.5, 0.5, 0.5), 3.0)   # off any plane: a hull
+    plain = render_structure(geometry, size=240, polyhedra=False)
+    faced = render_structure(geometry, size=240, polyhedra=False,
+                             faces=[layer, (cluster, "#3a7d44")])
+    _save(faced, "named_faces_nac")
+    assert not np.array_equal(plain.image, faced.image)
+    # polyhedra off hides the atoms only a polyhedron draws: said, never silent
+    assert any(w.startswith("faces[0]:") for w in faced.report.warnings)
+    again = json.loads(json.dumps(faced.recipe))
+    assert np.array_equal(render_structure(geometry, **again).image, faced.image)
+
+
+def test_a_face_the_hiding_leaves_on_one_line_is_said_never_raised():
+    """WP-1548 D4: three Ca on one line and a P off it make a face, and
+    hiding P leaves a line, which is a warning like too few atoms, never the
+    raise a set the caller named on a line gets."""
+    import itertools
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        geometry = s3.build(structure_from_cif(str(DATA / "fluorapatite.cif")))
+    pos = np.array([a["pos"] for a in geometry["atoms"]], dtype=np.float64)
+    element = [geometry["sites"][a["site"]]["element"] for a in geometry["atoms"]]
+    ca = [k for k, e in enumerate(element) if e == "Ca"]
+    line = next(t for t in itertools.combinations(ca, 3)
+                if np.linalg.norm(np.cross(pos[t[1]] - pos[t[0]], pos[t[2]] - pos[t[0]]))
+                < 1e-6 * np.linalg.norm(pos[t[1]] - pos[t[0]])
+                * np.linalg.norm(pos[t[2]] - pos[t[0]]))
+    mask = np.zeros(len(pos), dtype=bool)
+    mask[[*line, element.index("P")]] = True
+    fig = render_structure(geometry, size=120, hidden=["P"], polyhedra=False, faces=[mask])
+    assert fig.report.warnings == [
+        "faces[0]: 1 of its 4 atoms are not drawn, leaving them on one line, "
+        "so it is not drawn"]
+    with pytest.raises(ValueError, match="one line"):
+        render_structure(geometry, size=120, faces=[mask & (np.array(element) == "Ca")])
+
+
+@pytest.mark.parametrize("kw, says", [
+    ({"faces": np.zeros(3, dtype=bool)}, "faces=\\[mask\\]"),
+    ({"planar_rings": 1}, "planar_rings"),
+    ({"planar_rings": "teal"}, "colour"),
+    ({"faces": [np.zeros(3, dtype=bool)]}, r"faces\[0\]"),
+], ids=["bare-mask", "not-bool", "bad-colour", "bad-mask"])
+def test_fill_arguments_are_refused_by_name(nac, kw, says):
+    with pytest.raises(ValueError, match=says):
+        render_structure(nac, size=60, **kw)
+
 
 def test_the_font_ships_with_its_acknowledgement():
     from importlib import resources

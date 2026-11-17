@@ -8,7 +8,7 @@ The table walks both models, gives every `Parameter` it finds a name, and record
 {eq}`par-affine` is the mapping, p<sub>phys</sub> = C·p<sub>free</sub> + d.
 The table is rebuilt from the models at every stage boundary, so a row is never stale against the objects it came from.
 
-[Parameter map](parameters.md) lists every name with its unit, default and typical range.
+[Parameter map](parameters.md) and [Instrument parameter map](parameters-instrument.md) list every name with its unit, default and typical range.
 [About parameters](../concepts/parameters.md) groups them by what they belong to.
 
 ## Names
@@ -70,7 +70,7 @@ Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 | `ParameterRow.mode_fixed` | `bool` | fixed by the Le Bail or Pawley mode |
 | `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while this pattern's cell is free |
 | `ParameterRow.origin_axis` | `(int, int, int)` or `None` | the direction along which this row holds a polar group's floating origin |
-| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) entry that describes this row's family |
+| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) or [instrument parameter map](parameters-instrument.md) entry that describes this row's family |
 
 The first eight fields mirror the solver's own row type field for field, and a test holds the two equal.
 The rest are deliberate additions.
@@ -88,7 +88,7 @@ A row cannot be freed for one of five reasons, and the remedy differs.
 | Reason | Means | Lifted by |
 |---|---|---|
 | `locked` | fixed by the structure: a cell angle the space group fixes, a coordinate on a fully fixed special position, the first emission line's weight, a non-primary line's wavelength, `biso` on a site with an anisotropic tensor, an atom a rigid body places, a position correction the geometry does not have | nothing |
-| `tie` | an affine function of other rows, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
+| `tie` | an affine function of other rows, or a formula over named variables, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
 | `mode_fixed` | refinable in principle, but the Le Bail or Pawley mode fixes it: every atom parameter, each phase's scale and a texture coefficient | switching back to `rietveld` |
 | `held` | you declared it does not move, whatever a plan frees; a coordinate held to fix a polar group's origin reads `held` too, and `ParameterRow.origin_axis` names the direction | `Refinement.unhold` |
 | `ParameterRow.needs_held_cell` | a wavelength, while this pattern's cell is free, since d = λ/(2 sin θ) fixes only their product | holding the cell; the one reason another parameter decides |
@@ -128,15 +128,16 @@ A Le Bail phase must carry a dummy atom to exist at all, and that atom's `biso` 
 
 ## Ties
 
-`TieSpec` is the stored form of value = Σ c·source + k.
+`TieSpec` is the stored form of value = Σ c·source + k, or of a formula.
 
 | Field | Holds |
 |---|---|
-| `TieSpec.terms` | the (path, coefficient) pairs |
-| `TieSpec.const` | the additive constant k |
+| `TieSpec.terms` | the (path, coefficient) pairs; empty for a formula |
+| `TieSpec.const` | the additive constant k; 0 for a formula |
 | `TieSpec.user` | `True` for a tie you declared, `False` for one the symmetry created |
-| `TieSpec.sources` | the paths this value follows, which are the ones to edit instead |
-| `TieSpec.describe` | the right-hand side as text, such as `1·phases.0.cell.a` |
+| `TieSpec.expression` | the formula's text, for a tie declared with `Refinement.tie(path, expression=...)`; `None` for every linear tie |
+| `TieSpec.sources` | the paths this value follows, which are the ones to edit instead; for a formula, the variables it reads |
+| `TieSpec.describe` | the right-hand side as text, such as `1·phases.0.cell.a`, or the formula as written |
 
 A symmetry tie and a tie you declared hold a row the same way, and `held_because` reads the same for both.
 `TieSpec.user` tells them apart.
@@ -359,6 +360,8 @@ A literal path to a row you held raises `ValueError`, saying to `Refinement.unho
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
 A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
+A path of an opt-in correction the model does not declare names the declaration instead.
+For extinction on a phase that declares none, it names `phase.extinction = 0.0`.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
 A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
 
@@ -378,7 +381,7 @@ It raises `ValueError` on four refusals, each with its own remedy.
 
 | Refusal | Message | Remedy |
 |---|---|---|
-| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each | correct the name |
+| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each, or the declaration an opt-in correction needs | correct the name, or declare the correction |
 | locked | `... is structurally fixed (symmetry, or a representation that owns this channel) and cannot be set` | none; the structure owns the value |
 | tied | `... follows 'phases.0.cell.a' as an affine tie; set that instead` | set the source |
 | out of bounds | `... lies outside its bounds [0.0, inf]` | a value inside them, since the bounded solver cannot start outside |

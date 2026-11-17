@@ -159,6 +159,38 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1552): the Le Bail partition clips each
+  channel's net count at zero, and that biases the intensities up and the background
+  down. Decide it or retire it with this move.** `lebail_update` hands the reflections
+  `max(y_obs − background − extra, 0)` per channel, and `structure_intensity_partition`
+  does the same so that the two nets agree. Below the background, Poisson noise is set
+  to zero while noise above it is kept. *Checked against the tree at `98d7ba8e3`:* both
+  clips are there (`model/forward.py:3313` and `:3473`). The clip dates from the first
+  Le Bail code, before the 2026-08-14 rename, and no record gives a reason for it.
+  `docs/practice.md` § Ranking extinction symbols records that GSAS-II clamps the same
+  way (`GSASIImpsubs.py:177`). The reporter measured, not rerun here: on a synthetic
+  LaB₆ pattern, χ²_red 1.69 as shipped and 1.09 with the clip removed, against Pawley's
+  1.02. At four passes the gap is 1.054 against 1.020. `report.lebail_gap`'s ratio is
+  0.826 as shipped and 0.990 unclipped, so `LEBAIL_GAP_NOTABLE` (1.5) reads differently
+  once the floor is near 1. On real data the clip is a small part of the Le Bail-Pawley
+  gap: SRM 660c 7.2239 to 7.2236 against Pawley's 6.6459, and 11-BM Si 640c 2.4428 to
+  2.3426 against 2.1929. Removing it moves every pinned Le Bail number (`test_lebail_*`,
+  the Le Bail bar in `test_acceptance_nac`, WP-1542's docstring tables, the
+  `lebail_gap` goldens). It also touches Pawley, whose block is seeded by one Le Bail
+  partition (`refine.py`, `PAWLEY_SEED_CYCLES`). No code changed, settled by Claude
+  under Yue's ruling of 2026-11-05 (a Le Bail change that moves every fit's numbers waits
+  or goes to this WP), as the two WP-1542 entries below were. The reporter offers the
+  one-line fix with its golden updates as a PR.
+
+- **From WP-2104, 2026-11-12: a joint fit refuses Le Bail, and the joint Le Bail arm
+  is retired here.** WP-2104 built the Pawley arm of a joint fit
+  (`refine_multi(mode="pawley")`) and left Le Bail refused with a
+  `NotImplementedError`, under the 2026-11-05 ruling. Le Bail's partition runs
+  between solves, so a joint arm would need a partition loop around the stacked solve.
+  The arm was retired to this WP on 2026-11-13, settled by Claude under Yue's
+  2026-11-05 ruling, and Yue raised no objection. If this WP retires Le Bail from the
+  structure-free sites, the joint refusal is already the end state and needs no work.
+
 - **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
   re-partition. Decide it or retire it with this move.** `_final_compile` carries the
   intensities onto the result's windows without a partition. A one-channel window
@@ -192,8 +224,19 @@ above, which come from lab and synchrotron single-phase patterns
   score must drop only the lines a class is charged for, which is one extra fit per class. WP-2076
   § Findings has the numbers and `~/.cache/ghostshift/rietx/wp-2076/candidate.diff` the patch. That patch
   also counts `n_free_parameters` alone, this WP's Hamilton-count task. A Pawley screen read the same
-  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there. Whether
-  WP-2076 lands this first is the maintainer's question, in its newest handover entry.
+  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there.
+  Answered 2026-11-07 (Yue): WP-2076 lands it first, once the screen times under 30 s on NAC. So
+  WP-2076 takes this WP's Hamilton-count task and its A2 row. Tick them here when WP-2076 merges;
+  if the NAC timing sends it back to Yue, they stay here.
+  2026-11-07, WP-2076's third session: NAC timed at 0.97-1.04 s against 0.92-0.97 s on `main`, so
+  PR #1460 carries both. The shared, reference and class fits are Pawley; the cell-free prefit
+  stays Le Bail at `SCREEN_LEBAIL_CYCLES`, whose `_audit` row now says it governs the prefit alone.
+  2026-11-07, WP-2076's fourth session: the constant is gone, so this WP has nothing to retire.
+  Re-measured on the prefit alone over eleven screens, settling the partition recovers a
+  synthetic cell that three cycles lose and moves FAP's cell up to 1474 ppm, and changes no
+  answer WP-2076's open margin task does not own. The prefit now settles like every Le Bail
+  fit. Moving the prefit itself to Pawley would be a new question, with those eleven screens
+  as its bar.
 
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on

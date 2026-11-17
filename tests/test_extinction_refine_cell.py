@@ -2,8 +2,10 @@
 
 SRM 676a corundum from the IUCr round robin (public, ``tests/data/qarr``), at the
 certified cell and at the cell scaled by 1.0012: the held-cell screen
-(``refine_cell=False``) refutes the true class at the scaled one; the default,
+(``refine_cell=False``) refuted the true class at the scaled one; the default,
 which Le Bail-refines the cell in a cell-free prefit before screening, does not.
+Since WP-2076 the held screen returns the true class there too: the refutation
+came from the Le Bail fits the screen compared, which were not χ² minima.
 """
 
 from __future__ import annotations
@@ -34,16 +36,19 @@ def inputs():
             CORUNDUM_CELL)
 
 
-def test_a_cell_off_by_a_tenth_of_a_percent_refutes_the_true_class_only_when_held(inputs):
+def test_a_cell_off_by_a_tenth_of_a_percent_returns_the_true_class_held_or_refined(
+        inputs):
+    """#726's held arm refuted ``R - c -`` here under the Le Bail screen.  Under
+    the nested Pawley screen (WP-2076) the held cell returns it at every factor
+    scanned from ×0.995 to ×1.002, so both arms now answer alike."""
     data, instrument, limits, candidate, certified = inputs
 
     held = determine_extinction_symbol(data, candidate, instrument,
                                        two_theta_limits=limits,
                                        refine_cell=False)
     best = held.best_or_none()
-    assert best is None or "R -3 c:H" not in best.space_groups, (
-        "the held cell no longer refutes the true class at this offset: the "
-        "behaviour #726 describes has changed")
+    assert best is not None and best.symbol == "R - c -", [
+        (c.symbol, round(c.delta_bic, 1), c.refuted_reason) for c in held.candidates]
     assert held.cell == pytest.approx(candidate.cell)
     assert held.prefit_rwp is None
 
@@ -62,7 +67,7 @@ def test_a_cell_off_by_a_tenth_of_a_percent_refutes_the_true_class_only_when_hel
 
 @pytest.mark.parametrize("factor", [0.9992, 1.0004, 1.0008, 1.002, 1.005, 1.01])
 def test_the_prefit_basin_holds_either_side_of_wp_1910s_acceptance_case(inputs, factor):
-    """WP-1910's case is x1.0008 (``R - - -`` today under a held cell); the
+    """WP-1910's case is x1.0008 (``R - - -`` under a held cell before WP-2076); the
     prefit has no ``window_slack_deg``, so the margin either side is measured
     rather than assumed: the true class returns across -0.08 % to +1 %."""
     from tests.test_extinction_symbol import CORUNDUM_CELL, _candidate

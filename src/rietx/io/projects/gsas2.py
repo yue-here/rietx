@@ -134,9 +134,9 @@ G2VarObj = _standin("G2VarObj")
 
 #: A GSAS-II expression object, as stored by the sequential single-peak fit.  It
 #: carries the expression as **text**; the compiled form is ``None`` on disk, so
-#: reading one compiles nothing.  rietx refuses a parameter expression at
-#: construction (``Parameter.expr``), so this has no landing site by design and
-#: is reported rather than carried.
+#: reading one compiles nothing.  rietx's formulas are joint-fit equations
+#: (``ParametricEquation(basis="expression")``, WP-1964) with no single-fit
+#: landing site yet (WP-2118), so this is reported rather than carried.
 ExpressionObj = _standin("ExpressionObj")
 
 

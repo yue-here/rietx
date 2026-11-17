@@ -1,10 +1,9 @@
 # WP-1132 — a neutron µR, from the table this package already ships
 
-Milestone: unscheduled · Status: 🔄 2026-10-01 — claimed by @mustachefeeling; items 1–6 (PR #541) and #543's Brindley µ (PR #576) landed
+Milestone: unscheduled · Status: ✅ 2026-11-08 — items 1–6 (PR #541) and #543's Brindley µ (PR #576) landed; a validation against a measured µR, the capabilities field and a resonance-aware refusal are issue #1467
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: the CW neutron source (PR #108, open) — `NeutronSource` and
 `crystallography/neutron.py` are both prerequisites and both land there
-Priority: P2 2026-09-30 — was P3: issue #543 is a silent wrong weight fraction on a neutron fit that sets `particle_radius_um`, a path few fits run (one rung, not P1)
 
 ## Goal
 
@@ -100,29 +99,6 @@ from the Sears table, and the X-ray control in
 that test exists precisely so a future change here cannot quietly turn X-ray
 estimation off.
 
-### Inherited
-
-- **2026-09-30, from the issue triage (issue #543): Brindley microabsorption
-  reads the X-ray attenuation table on a neutron fit.** `qpa.py:537`
-  (`_apply_microabsorption`) calls `linear_attenuation(...)` whatever
-  `instrument.source.kind` is. *Reproduced at `e3e6486a`* with the reporter's
-  NaCl + W neutron snippet: `mu_cm` is the X-ray 578.6 and 1.029e4 cm⁻¹ to
-  every printed digit, `weight_fraction_corrected` moves NaCl from 0.887 to
-  0.002, and the only warning blames the particle-size regime
-  (`BRINDLEY_OUTSIDE_REGIME`). The neutron µ is about 1.5-2 cm⁻¹. The fix sits
-  on this WP's seam (PR #541's `LINEAR_ATTENUATION_BY_SOURCE`, refusing where
-  no table exists). **PR #541 merged 2026-09-30**, and `_apply_microabsorption`
-  still calls the X-ray `linear_attenuation` (`qpa.py:568`), so the follow-up PR
-  is now unblocked. **Decided 2026-09-30 (maintainer's comment on #543):** a
-  separate PR after #541 lands, with its own test built from the
-  reproduction, not a fold into #541. Until then a neutron user leaves
-  `particle_radius_um` unset. A silent wrong number in a shipped path on a
-  source kind few users run, so the Priority line above moved to P2.
-- **2026-09-23, from the issue triage (issue #117).** Issue #117 is this
-  WP's issue. Its reporter filed it on 2026-08-24 as "WP-1132, owner is
-  taking this one". Until today this file did not cite it, so the backlog
-  read #117 as owned only by 1134, which is ✅. It closes when this WP ships.
-
 ## Deliberately not in scope
 
 - **Energy-dependent σ_abs near a resonance.** Item 4 *refuses* there; making
@@ -134,6 +110,38 @@ estimation off.
   (`model/absorption.py`), and that is unchanged by the radiation.
 
 ## Handover log
+
+- **2026-11-08** — closed (ghostshift runner, PR #1469; no code changed). What this WP set
+  out to give is shipped: a neutron capillary or flat plate with a declared size now gets an
+  absorption correction estimated from the Sears table, a source with no table is refused
+  rather than given the X-ray number, and the Brindley correction reads the neutron µ. What
+  it never had was a measurement to check the estimate against, and none can come from a
+  fit, so that, the capabilities field and a narrower resonance refusal move to issue
+  #1467 rather than holding the WP open.
+
+  *Checked before closing.* The six checklist items are PR #541 (`fd8026a3`) and the
+  `### Inherited` #543 entry is PR #576 (`03870fec`), both ancestors of `main` at
+  `63d7c120a`; #117 closed with #541. The 2026-10-01 entry's *Next*, the nuclide-mass rule
+  beside ZM = Σ occ·m·A in Part 2, landed in `aa3c611c5` and now reads at
+  `docs/docs/theory/corrections.md:439`. The contributor's fork-local `pr/tof-*` branches
+  (`pr/tof-t2t3-20261102`, `pr/tof-t2t3-20261106`, `pr/tof-t5-20261106`,
+  `pr/tof-t6-20261106`, and one worktree detached at `f4be484d6`) carry 12 to 32 unlanded
+  commits each, all the TOF track's T-2 to T-6. One of them (`c0fc9c9d4`)
+  adds a TOF µ(λ) over the same Sears table, but TOF is this WP's *Deliberately not in
+  scope*, and none carries a `WP-1132:` commit.
+
+  *Left, in issue #1467.* (1) Item 5 stays a hand check at an assumed R = 3.0 mm
+  (µR = 0.135045 on HB-2A), since the tree holds no measured neutron µR. (2)
+  `capabilities().radiations` does not read `qpa.LINEAR_ATTENUATION_BY_SOURCE`, so a
+  client cannot tell before a fit whether µR will be estimated. (3) Item 4 refuses every
+  `RESONANT_ABSORBERS` species at every λ until resonance energies are cited, which
+  overlaps #113. The `### Inherited` section was consumed (#543, #117) and is deleted
+  with the Priority line.
+
+  *Not run:* the code review (a prose-only branch), the fast suite (no code or test
+  changed), the generality judge (no heuristic added).
+
+  *Next:* none here. Issue #1467 is the maintainer's to schedule.
 
 - **2026-10-01** — A neutron fit that sets `particle_radius_um` now takes its
   Brindley correction from the neutron attenuation, so #543's silent wrong

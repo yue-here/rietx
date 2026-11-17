@@ -18,6 +18,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to use a measured blank as the background](blank.md) holds an empty-container scan under the pattern with `BackgroundFixedPlusChebyshev`.
 - [How to add a hump to the background](hump.md) declares a broad Gaussian for amorphous or container scattering.
 - [How to fit a peak from the sample holder](holder.md) declares a sharp line no phase explains with a `PeakComponent`.
+- [How to fit a sample holder's lines from its cell](holder_cell.md) ties each declared line's centre to the holder's lattice parameter and height with a formula.
 
 ## Constraints and plans
 
@@ -49,6 +50,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to fit a temperature series](series.md) chains one refinement per pattern with `refine_sequential` and reads a trajectory.
 - [How to check a series for path dependence](path.md) runs the chain both ways and refits a flagged step from cold.
 - [How to refine a cell edge as a function of temperature](equation.md) refines an equation's coefficients against every pattern at once.
+- [How to refine cell edges as Einstein functions of temperature](formula.md) writes each edge as a formula, with one θ shared by both.
 
 ## Magnetic structures
 
@@ -68,6 +70,7 @@ Calibrate an instrument on a standard and reuse it <calibrate>
 Use a measured blank as the background <blank>
 Add a hump to the background <hump>
 Fit a peak from the sample holder <holder>
+Fit a sample holder's lines from its cell <holder_cell>
 Keep a parameter fixed whatever the plan frees <hold>
 Tie parameters together <tie>
 Restrain a bond length or an angle <restrain>
@@ -84,6 +87,7 @@ Open a GSAS, TOPAS or FullProf refinement and write one back <foreign>
 Fit a temperature series <series>
 Check a series for path dependence <path>
 Refine a cell edge as a function of temperature <equation>
+Refine cell edges as Einstein functions of temperature <formula>
 Fit an X-ray and a neutron pattern together <joint>
 Refine a magnetic moment on a known magnetic structure <magnetic>
 Refit the nuclear model with the moment present <moment>

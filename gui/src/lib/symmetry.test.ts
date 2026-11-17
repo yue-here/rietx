@@ -6,6 +6,7 @@ import {
   shortPath,
   siteLines,
   symbolChanged,
+  symbolTokens,
   symmetryLine,
   wyckoffLabel,
   type PhaseSymmetry,
@@ -150,5 +151,22 @@ describe("shortPath", () => {
     expect(shortPath("phases.0.atoms.1.dof.0")).toBe("atoms.1.dof.0");
     expect(shortPath("instrument.profile.w")).toBe("profile.w");
     expect(shortPath("phases.12.cell.c")).toBe("cell.c");
+  });
+});
+
+describe("symbolTokens", () => {
+  it("typesets a screw axis, a glide and a bar", () => {
+    expect(symbolTokens("P 21/c").tokens).toEqual([
+      { kind: "letter", text: "P" }, { kind: "screw", text: "2", sub: "1" },
+      { kind: "slash", text: "/" }, { kind: "letter", text: "c" }]);
+    const r = symbolTokens("R -3 c:H");
+    expect(r.tokens.map((t) => t.kind)).toEqual(["letter", "bar", "letter"]);
+    expect(r.ext).toBe("H");
+    expect(symbolTokens("P 63/m m c").tokens.map((t) => t.text).join(""))
+      .toBe("P6/mmc");
+  });
+
+  it("returns nothing for an empty symbol", () => {
+    expect(symbolTokens("")).toEqual({ tokens: [], ext: "" });
   });
 });

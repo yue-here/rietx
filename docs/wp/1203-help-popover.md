@@ -142,6 +142,37 @@ panel.
 - WP-1032: `title=` as the only help mechanism and the no-mute-fields rule
   this WP retargets.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+Two rules for anything a person reads here (v1.2, WP-1201/1202/1203):
+**GUI prose is written under `/yue-docs-style`** (help entries, wizard lines,
+empty states, error text), and **what a name *means* is an entry in
+`rietx.help` reached through `<Help>`; `title=` is what is left over.** The
+popover is WP-1203 (`Help.svelte`, `lib/help.ts`, one instance in `App`), with
+six rules. A key is **`arm:name`**: the arms' vocabularies overlap, so a
+bare key would resolve by declaration order; each is crossed against
+`tests/data/gui/help_keys.json`. A field inventory **derives** its key from the
+field's own name where the arm is keyed by the same vocabulary (`controls.ts`,
+`wizard.ts`) and carries it as **data** where it is not (`lib/model.ts`). `<Help
+text=…>` is for a sentence the **server** wrote (`held_because`, a refutation, a
+maturity message), which no corpus can hold because it is about one row rather
+than one name. What may still be a `title=` is a **value the layout truncated**,
+or a verb phrase on a `<button>`, never authored prose — `lib/help.test.ts`
+holds that to an exact per-file count failing both ways, so the debt stays
+countable and its list cannot outlive it. And a term is a `<span
+role="button">` because it wraps running text: sound only while it stays
+focusable, answers Enter and Space, and is **hittable** — a flex item's
+automatic minimum is its content size, which left `.path` at zero width in a
+340 px sidebar (v1.2's record has the numbers). It is **named by its
+children, never by an `aria-label`**, which renames the `<label>` or `<th>`
+enclosing it; `aria-haspopup="dialog"` carries the role hint instead, and the
+popover **takes focus**, a `role="dialog"` nobody is in announcing nothing.
+
 ## Handover log
 
 ### 2026-08-26 — one place to ask what a name means, and a countable list of where you still cannot

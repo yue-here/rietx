@@ -173,6 +173,34 @@ that caveat until 1421 lands.
   fires on none. Checked against the tree at d87c8cc91: task 8 is still
   unticked; PR #1205 (task 7) is open and leaves task 8 to #1124.
 
+- **2026-11-17, from WP-2081's joint-fit measurement on the CuCr2O4 ramp: a
+  width term the data does not determine reports an esd near 1e-12, and a
+  declared-common term the fit holds is named by no code.** Two findings from
+  one run (`docs/wp/2081-batch/measure_joint_ramp.py`, arms `B` and `B2` in
+  `joint_ramp.json`; the table and readings are in WP-2081's handover log,
+  2026-11-16). Seventeen patterns in one `refine_multi`, zero shift and U, V,
+  W, X, Y declared common through `SharingMap(shared=...)`, sample widths free
+  per pattern. *First, a possible defect, not investigated.* Two starts that
+  differ only in the profile's starting values end at the same χ² (274072.45
+  against 274072.74) and the same cells to 1e-9 Å, with `instrument.profile.w`
+  at 1e-8 (its floor) in one and 6.5e-6 in the other, traded against every
+  pattern's `gauss_size`. Both results give W an esd near 1e-12 (7.3e-12 and
+  3.7e-12), and `COVARIANCE_DIRECTION_DISCARDED` names W in both. The root
+  CLAUDE.md invariant says a direction the data does not move has no esd
+  rather than a small one (WP-1110 item 14; WP-1929 for a row on its bound).
+  To establish: whether the number is a defect, which step produces it, and
+  whether a single fit does the same. *Second, the hold with no name.*
+  `_hold_width_twins_multi` held U, X and Y from the stage where a
+  per-pattern sample width of the same angular shape was free.
+  `StageResult.width_twins_held` records it, no diagnostic code does, and a
+  held term is absent from `result.parameters`, so the caller's declaration
+  was narrowed where only a reader of that field would see it. This is the
+  Goal's "a hold made in some patterns says so" for a common term. Under the
+  series milestone's rule 5 (`docs/milestones/series.md`) the report is a
+  field with no code; whether the field is findable enough is the question.
+  *Not checked against the tree beyond the run:* neither finding was
+  reproduced small, and no code was read past the function's name.
+
 ## Non-goals
 
 - The joint fit's compile at the answer (the #272 sibling): WP-1421.

@@ -23,6 +23,66 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 
 ### Inherited
 
+- **2026-11-12, from the issue triage (issue #1508): the manual owes a line
+  on rings in a Z-matrix body.** A Z-matrix is a spanning tree, so a bond
+  that closes a ring is no line of it and no internal controls it.
+  Refining a tree bond of the ring moves the closing bond and the ring
+  angles, and the refined value depends on which tree the user declared.
+  *Checked against the tree at `a86dcf9d4`* with `from_zmatrix` on a regular
+  six-ring declared as the chain 0-1-2-3-4-5 (bonds 1.39 Å, angles 120°,
+  dihedrals 0°): raising bond 0-1 to 1.43 Å moves the closing bond 5-0 to
+  1.37044 Å (−0.0196) and the angle 1-0-5 to 118.552° (−1.45°), and leaves
+  the other four tree bonds at 1.39. The issue's numbers reproduce. The
+  reporter's proposed line, for the Z-matrix part of the Part 1 chapter:
+  "A ring in a Z-matrix body is described by a spanning tree. The bonds
+  that close the ring are not internals. Refining a tree bond of the ring
+  also moves the closing bond and the ring angles. If the closing bond must
+  stay near a value, restrain that atom pair." **It is untrue until
+  WP-1814's Z-matrix bodies land**: on `a86dcf9d4` no internal refines, and
+  PR #1510 (WP-1814 chunk C1, open) gives a Z-matrix body no structural
+  restraint refusal, which is what makes the restraint advice hold. So the
+  line lands with or after WP-1814's Z-matrix chunk, and WP-1814's
+  acceptance test records the tree it used (the reporter's plan on the
+  issue).
+
+- **2026-11-06, from the issue triage (issue #1417): the manual owes a
+  paragraph on where a body's origin goes. Ruled by Yue, 2026-11-07: docs
+  only.** A body's origin is the point it turns about.
+  `body_from_atoms(phase, labels, name, *, origin=None)` puts it at the atoms'
+  unit-weight centroid, and `origin` may also be an atom label or a fractional
+  point (`crystallography/bodies.py`); `add_body(..., centre=True)` centres the
+  template the same way. Moving the origin by d is an exact
+  reparameterisation of the pose (t′ = t − [d]×ω, ω′ = ω). So χ², every atom
+  and every atom esd are unchanged. Only the origin's own esds and its
+  correlations with the rotation move. *Checked against the tree at
+  `a84379aac`:* both functions and both defaults are as the issue says.
+  The reporter fitted one body with its origin at seven points on three
+  patterns (rietx `ba3719f06`; not reproduced here). Distance of each origin
+  from the decorrelating point P_opt, and the largest origin–rotation
+  correlation:
+
+  | origin | acridine IX, measured (COD 2242872) | acridine, synthetic neutron | Br-acridine, synthetic X-ray |
+  |---|---|---|---|
+  | unit centroid (default) | 0.50 Å, 0.25 | 0.23 Å, 0.20 | 3.8 Å, 0.59 |
+  | Z² (X-ray) or b² (neutron) weighted centroid | 0.49 Å, 0.24 | 0.16 Å, 0.08 | 0.2 Å, 0.24 |
+
+  Across the arms χ² agreed to 0.002, atoms to 2.4e-6 Å and atom esds to 5e-5
+  relative; no convergence effect was seen. **The ruling.** The paragraph says
+  the default is fine for light atoms, and that when a heavy atom dominates
+  and the origin's esd will be quoted, the caller passes its Z²- (X-ray) or
+  b²- (neutron) weighted centroid to the existing `origin=`, with the few
+  lines that compute it. Declined until a user quotes a rigid body's origin
+  esd, or a badly placed origin is measured to slow convergence: a reported
+  P_opt, an `origin_weights=` argument, and a label-list `origin=`. Grounds:
+  the origin is a parameterisation choice that moves no atom, esd or χ²;
+  `origin=` already takes the weighted or subset centroid as a point; GSAS-II
+  5.8.4 places a residue body's origin on a reference atom or the unit
+  centroid and reports nothing about it (`GSASIIconstrGUI.py:3728-3753`,
+  checked), TOPAS and FullProf not checked. Quote no number in the manual
+  before reproducing one row of the table (acridine IX is WP-1806's fixture).
+  The ruling folded here a separate WP the triage branch had filed for the
+  three-part proposal, before any of it merged.
+
 - **2026-10-23, from [1810](1810-hydrogens-riding-on-a-body.md) (closed): the
   riding hydrogens have no user-facing call yet.** `RigidBody.riding` and
   `crystallography/riding.py` landed in PR #955, and a CIF write carries
@@ -56,6 +116,10 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 - [ ] Textdoc: a body block and its round trip
 - [ ] Skill: the generated per-shape reference and its routing row
 - [ ] Manual: Part 1 chapter, Part 2 frame section
+- [ ] Manual: the origin paragraph in the Part 1 chapter (issue #1417, Ruled by
+      Yue 2026-11-07; Inherited)
+- [ ] Manual: the ring line for Z-matrix bodies (issue #1508; Inherited),
+      once WP-1814's Z-matrix bodies land
 - [ ] GUI: a body shown in the parameter and structure panels
 
 ## Acceptance

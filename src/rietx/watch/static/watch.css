@@ -17,7 +17,7 @@
 body { margin:0; font-family: ui-monospace, Menlo, monospace; font-size:12px;
        background:var(--bg); color:var(--fg); display:flex; flex-direction:column;
        height:100vh; overflow:hidden; }
-a { color:var(--accent); text-decoration:none; }
+a { color:var(--accent-ink); text-decoration:none; }
 a:hover { text-decoration:underline; }
 #bar { background:var(--panel); border-bottom:1px solid var(--line);
        padding:0 12px; display:flex; gap:12px; align-items:center; flex:0 0 auto;
@@ -42,14 +42,13 @@ a:hover { text-decoration:underline; }
                 line-height:1.5; }
 #theme button:hover { color:var(--fg);
                 background:color-mix(in srgb, var(--accent) 12%, var(--panel)); }
-/* `--panel` and not white: on the dark theme the accent is a light blue and
-   white on it measures 2.22:1, under WCAG AA for text of any size. The panel
-   colour is near-black there and white on light, so one token is the right
-   ink in both — 6.44:1 and 7.51:1. The GUI's `.segmented button.on` had the
-   literal and inherited the same defect; it was fixed with this (WP-1438). */
-#theme button[aria-pressed="true"] { background:var(--accent);
+/* Filled in the accent's text role and inked in `--panel`, as the GUI's
+   primary is (WP-2200): `--panel` on the orange accent is 4.22:1 on the light
+   theme, under WCAG AA, and on `--accent-ink` 5.84:1. Never white (WP-1438):
+   the dark fill is a light orange, and `--panel` is near-black there. */
+#theme button[aria-pressed="true"] { background:var(--accent-ink);
                                      color:var(--panel); }
-#theme button[aria-pressed="true"]:hover { background:var(--accent); }
+#theme button[aria-pressed="true"]:hover { background:var(--accent-ink); }
 #toggle-run { flex:0 0 auto; font-size:11px; padding:1px 8px;
               color:var(--muted); }
 #toggle-run:hover { color:var(--fg); }
@@ -218,7 +217,7 @@ tr.run.selected { background:color-mix(in srgb, var(--accent) 16%, transparent);
 .running   { background:color-mix(in srgb, var(--ok) 18%, transparent);
              color:var(--ok); }
 .done      { background:color-mix(in srgb, var(--accent) 18%, transparent);
-             color:var(--accent); }
+             color:var(--accent-ink); }
 .failed    { background:color-mix(in srgb, var(--bad) 18%, transparent);
              color:var(--bad); }
 .cancelled { background:color-mix(in srgb, var(--warn) 18%, transparent);
@@ -348,7 +347,7 @@ iframe#plot { background:var(--panel); }
 .k { color:var(--warn); }
 .ev { color:var(--muted); }
 code { background:color-mix(in srgb, var(--fg) 7%, transparent); padding:1px 5px;
-       border-radius:3px; color:var(--accent); }
+       border-radius:3px; color:var(--accent-ink); }
 #stop { border-color:color-mix(in srgb, var(--bad) 45%, transparent);
         color:var(--bad); }
 #stop:hover { background:color-mix(in srgb, var(--bad) 18%, var(--panel)); }
