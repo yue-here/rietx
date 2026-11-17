@@ -504,6 +504,7 @@
   "result_fields:SeriesResult.backward",
   "result_fields:SeriesResult.code_counts",
   "result_fields:SeriesResult.diagnostics",
+  "result_fields:SeriesResult.dihedral_paths",
   "result_fields:SeriesResult.direction",
   "result_fields:SeriesResult.direction_gaps",
   "result_fields:SeriesResult.entries",

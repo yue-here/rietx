@@ -185,7 +185,6 @@ TOPAS refines every `z_matrix` parameter of a rigid body.
 In rietx a body built from a Z-matrix does too: `RigidBody.zmatrix` lists one `ZLine` per atom, and each line's `r` (Å), `angle` and `dihedral` (degrees) is a parameter with an esd.
 Build one with `rietx.crystallography.bodies.add_body` and its `zmatrix` keyword, or over atoms already placed with `rietx.crystallography.bodies.zmatrix_body_from_atoms`, whose spanning tree you declare.
 The template is measured from a point frozen when the body is declared, so a stretched bond moves only the atoms it reaches.
-In a ring, a free tree bond also moves the bond that closes the ring.
 A dihedral is kept in (−180°, 180°], and a series compares the ones in `SeriesResult.dihedral_paths` modulo 360°.
 
 ### The peak shape is the instrument plus the sample
