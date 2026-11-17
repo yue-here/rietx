@@ -1,6 +1,6 @@
 # WP-2213 — the Text buffer and the Model forms join the recovery copy
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-17 — built, PR #1633 waits on the maintainer's wording (questions 1-4 in the handover log)
+Milestone: gui-overhaul · Status: 🔄 2026-11-17 — built, wording ruled 2026-11-17 and applied; PR #1633 is ready to merge
 Depends on: 2209 (the recovery copy); #1523 (its pull request)
 Priority: P2 2026-11-13 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; WP-2209's store, which it lands on, is on main since #1523 and WP-2209 is closed
 
@@ -99,7 +99,7 @@ whatever kind of editor it is. Nothing new to survey.
   close the tab, reopen, Restore, the buffer is back and dirty; by real keys and clicks
 - [x] Model: a `model` arm over the pieces above, each restored through its form's state;
   vitest and one browser case
-- [ ] The offer's wording for the new arms (open question 1), shown to the maintainer
+- [x] The offer's wording for the new arms (open question 1), shown to the maintainer; ruled 2026-11-17, option B
 - [x] Manual: `reference/gui-guide.md` § Edits not yet applied drops the sentence saying the
   Model forms and the Text document are not kept
 - [x] Dist rebuilt; every `tests/*_browser.py` run locally, since CI has no playwright
@@ -122,7 +122,26 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-### 2026-11-17 — the Text buffer and the Model forms join the recovery copy; PR #1633 waits on the maintainer
+### 2026-11-17 (later) — the maintainer ruled the offer's wording; PR #1633 is ready to merge
+
+*Yue ruled 2026-11-17: option B.* The offer names each part by where it lives, in one sentence, date first. One function, `keptParts` in `lib/recovery.ts`, is the authority for the words. `offerText`, `restoredText` and `movedText` read it, and `Recovery.svelte` (shared by today's page and `/next`) and both consoles call them.
+
+- Dialog, all three parts: "Not applied when the project closed on Nov 17, 2026, 12:44 AM: 1 edit waiting at Apply, 1 edit in the Model forms, and the Text document."
+- Plurals read "2 edits waiting at Apply" and "3 edits in the Model forms". Only the parts present are named. One part alone reads "...: 1 edit waiting at Apply." Two parts join with "and" and no comma. Three take a serial comma.
+- "Edits waiting at Apply" is the action bar's count (Parameters, Interactive sliders, the plan). It replaces the old leading "N edits", so the WP-2209 sentence changed too.
+- Console line after Restore: "# Restored: 1 edit waiting at Apply, 1 edit in the Model forms, and the Text document."
+- The date keeps the format the code already used (`toLocaleString`, medium date and short time). With no readable date the sentence is "Not applied when the project closed: ...". The ruling did not cover that case.
+- Moved project: "The project has been refined or edited since. Restored values will replace the current ones." stays when a values arm is present (action bar or Model forms). A Text arm adds "The Text document comes back marked out of date. Copy what you need from it, then re-read." A Text arm alone shows the first sentence and the Text sentence.
+- Question 2 stays as built: a Text buffer typed before the project changed is still offered and restored stale.
+- Question 3 stays as built: the `/next` dialog names the Text and Model parts although `/next` has no tab for either, so the person knows what Discard drops.
+
+*Settled by Claude under Yue's "go" on the consent lines:* questions 2 and 3 as built, and the out-of-date line for a Text arm.
+
+*Settled by Claude, on grounds of the ruling's own "one function as the authority":* `/next`'s console line after Restore now reads `restoredText(draft)` too, so it names the Text and Model parts it carries unseen, as its dialog does. The alternative was to name only the Parameters edits it restores there. The ruling covers the console line only in the mirror form, and the line goes when `/next` gets those tabs.
+
+*Done.* `lib/recovery.ts` (`keptParts`, `offerText`, new `restoredText` and `movedText`), `panels/Recovery.svelte`, `App.svelte`, `next/Frame.svelte`, the manual's § Edits not yet applied, vitest (`recovery.test.ts` has one case per part-count shape, singular and plural, and the moved-project and Text-arm line; `App.test.ts` and `next/Window.test.ts` quote the new strings), the browser cases, the four screenshots retaken (whole window 1440x900 with the dialog boxed, crop beside; the shown copy has all three parts and a moved project), dist rebuilt. Main (#1538) merged in; the two dist files conflicted and were rebuilt, not merged by hand.
+
+### 2026-11-17 — the Text buffer and the Model forms join the recovery copy; PR #1633 waits on the maintainer (first entry)
 
 Typed edits in the Text document and in the Model panel's forms are now kept the way the action bar's edits are. They survive a closed project, a closed tab and a stopped server. Reopening the project offers them in the same dialog. The Text document comes back as typed, with the person's own comments, which an Apply would drop. A buffer typed before the project changed comes back marked stale, so it stays on screen to copy from, and the person re-reads and types the edit again. Building this found a sibling defect: opening another project carried both panes' typed edits into it. That is fixed. The offer's wording is a proposal for the maintainer (question 1 below).
 
