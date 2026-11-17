@@ -23,6 +23,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
+    from .report.body_misfit import ReleasedArm
     from .schemas.fraction import FractionProfile
     from .schemas.interval import ParameterInterval
     from .schemas.results import QuantitativePhaseAnalysis
@@ -6875,6 +6876,25 @@ class Refinement:
                           instrument=self.instrument)
         return rigid_body_misfit(self, data, **kw)
 
+    def released_arm(self, body: str, *, phase: int | None = None,
+                     freed: Sequence[str] | None = None,
+                     bond_sigma: float = 0.02, angle_sigma: float = 2.0) -> ReleasedArm:
+        """The released arm :meth:`check_rigid_bodies` compares ``body`` with.
+
+        Built from this refinement's current structure (fit first for the
+        arm the check builds): the body removed, its non-riding members freed
+        and held near the template by bond and angle restraints, each riding
+        H tied to its parent.  ``freed`` names the members to free instead.
+        Returns a :class:`~rietx.report.body_misfit.ReleasedArm`; fit it as a
+        ``Refinement`` over its ``structure``, with its ``ties`` declared
+        through :meth:`tie` and its ``free`` globs in a stage.  The rules:
+        :func:`rietx.report.body_misfit.released_arm`.
+        """
+        from .report.body_misfit import released_arm
+
+        return released_arm(self.structure, body, phase=phase, freed=freed,
+                            bond_sigma=bond_sigma, angle_sigma=angle_sigma)
+
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | PlanSpec | str | None = None,
                report: FitReport | None = None,
@@ -8574,7 +8594,9 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     ``dof`` rows, which the suggestion names.  One family is asked two ways:
     the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
     request copying that pair for one isotropic atom has its ``adp.*`` answered
-    by the ``biso`` it freed, and stays silent.
+    by the ``biso`` it freed, and stays silent.  A parent-cell phase's cell is
+    the other such family: a stage naming ``phases.<i>.cell.*`` beside a glob
+    that frees ``phases.<i>.parent_cell.cell.*`` has its cell, and stays silent.
 
     A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
     per glob naming its stages.  ``where`` is the glob, as
@@ -8601,6 +8623,14 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                     for e in rows)):
                 # ``biso`` and ``adp.*`` are one displacement asked two ways:
                 # the shipped stages name both, so either answers it
+                continue
+            if site.endswith(".cell") and any(
+                    e.path.startswith(f"{site.removesuffix('.cell')}.parent_cell.cell.")
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in entries):
+                # a parent-cell phase's cell asked both ways: the parent's
+                # edges the stage frees are the cell the child's glob meant
                 continue
             names = asked.setdefault(glob, [])
             if stage.name not in names:

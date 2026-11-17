@@ -1,7 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: unscheduled · Status: ⬜
-Track: A long run is not one fit
+Milestone: series · Status: ⬜
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
@@ -527,6 +526,82 @@ flag reprints the saved numbers without fitting.
   `tests/data/README.md`.
 
 ## Handover log
+
+- **2026-11-16** — the discussion began, and the series milestone opened (one chat
+  session with Yue; no package code changed).
+
+  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five were
+  accepted at once and rule 2 after a second explanation, in a changed form. They are recorded with Yue's words
+  in [`docs/milestones/series.md`](../milestones/series.md) § The rules, which is now
+  their authority. Yue ruled that series is its own milestone, separate from parametric,
+  and this WP moved to it. Yue ruled WP-2080 to option A, the ratio as a field with no
+  automatic retry (that file's handover log), and approved the comment posted on PR #1473.
+
+  *What the rules settle here.* Questions 2 and 3 fall to rules 1 and 2, question 4 to
+  rule 6, question 5 to rule 4, questions 7 and 9 to rule 5 and question 11 to rules 1 and
+  2. Question 1, the default on later patterns, is still open and is the first open
+  decision in the milestone record. No question in § Open questions is edited: this entry
+  and the milestone record say where each stands.
+
+  *Two more rulings, later the same day.* Question 1 is ruled: the default stays as it is
+  (option a), in Yue's words "keep today's default". `SEQUENTIAL_WIDTH_GROWTH` is to be
+  removed ("Remove"). Both are in the milestone record § Ruled after the open, with the
+  options put. Neither is built. Rule 2 is ruled too: the series call and the joint call stay two
+  calls ("Yes, two calls"), the series call taking per-pattern and fixed parameters only.
+  All six rules are now accepted.
+
+  *Stale lines above, not yet corrected.* Context says PR #1310 is open and mergeable; it
+  has merged. Context says `SequentialRefinement.fit:plan` is unaudited; it has a tier-3
+  row approved 2026-11-03, recorded as unanimous, and `fit:refit` is still unaudited.
+  WP-2080's trigger no longer waits on anything, and is ruled to a field.
+
+  *Measured: a joint fit on the real ramp* (`2081-batch/measure_joint_ramp.py`, output
+  `joint_ramp.json`, `--report` reprints it; run by an Opus subagent, the saved numbers
+  re-read by this session; macOS arm64, worktree venv `[dev]`, Python 3.12.10, rietx
+  1.12.0.dev0, compiled tier on). All 17 CuCr2O4 patterns in one `refine_multi`, each
+  started from the `lab_sample_refine` chain's model for that pattern, Biso held at the
+  chain's values. Wall times are from a machine under uncontrolled load.
+
+  | arm | common to all patterns | per pattern | wall, evaluations | b − c closes between | \|b − c\| at 6.8 K (Å), paper 0.00746 | common zero (°) | mean axis error at 6.8 K vs the paper (ppm) |
+  |---|---|---|---|---|---|---|---|
+  | chain, default (WP table above) | nothing | zero, profile, cell, scale, background | — | 111 and 123 K | 0.00554(113) | −0.00095(65) per pattern | −7 |
+  | chain, `lab_sample_refine`, `.prm` | nothing; zero fixed at 0 | cell, scale, background, sample widths | 414 s | 111 and 123 K | 0.00562(90) | 0, fixed | +67 |
+  | A | zero; profile fixed at the `.prm` | the same | 584 s, 143 | 111 and 123 K | 0.00563(86) | −0.00073(11) | +10 |
+  | B | zero and U, V, W, X, Y declared | the same | 528 s, 227 | 111 and 123 K | 0.00562(89) | −0.00073(11) | +10 |
+  | C0 | zero and U, V, W, X, Y | cell, scale, background; every sample width 0 | 428 s, 277 | 123 and 134 K | 0.00801(41) | −0.00073(11) | +21 |
+
+  Five readings.
+
+  - A common zero shift works on real data. It is fixed about 6× tighter than a
+    per-pattern zero, the closure does not move, and the +67 ppm of the held-at-0 route
+    falls to +10 ppm. The split itself reads the same 25 % under the paper in A and B, so
+    the method did not cause that.
+  - A joint fit of 17 synchrotron patterns costs about what the chain costs here, 7 to 10
+    minutes.
+  - Arm B's declaration was narrowed by the package. `multi._hold_width_twins_multi` holds
+    U, X and Y from the stage where a per-pattern sample width of the same angular shape is
+    free. `StageResult.width_twins_held` records it; no diagnostic code does, and a held term
+    is absent from `result.parameters`. Only zero, V and W were common and free at the end.
+  - W is not determined in arm B. A second start with the profile moved 30 % ends at the
+    same χ² (274072.45 against 274072.74), the same cells and zero to 1e-9, and W at 6.5e-6
+    where the first ended on its floor of 1e-8, traded against every pattern's `gauss_size`.
+    Both report an esd for W near 1e-12, and `COVARIANCE_DIRECTION_DISCARDED` names W. A
+    small esd on a value two starts disagree on by 6.5e-6 looks like a defect against the
+    rule that an unmeasured direction has no esd. Not investigated.
+  - Arm C0 holds no width at one pattern's value: one profile is refined for all patterns
+    and no sample width is free. It closes between 123 and 134 K, which brackets the
+    paper's 130 K, and reads the split 7 % over the paper where every other route reads 25 %
+    under. Its common Y is 0.0508(37) against 0.0072(34) with the chain's sample widths
+    held (arm C in the JSON), so the one profile takes up the specimen's own broadening. This is one specimen on development data, so it shows only that "a held width
+    invents a transition" (the cautious routes above) is a statement about a width taken
+    from a single pattern.
+
+  Not run: Biso free; an arm that pins one pattern's sample widths so U, X and Y could be
+  common beside free widths; a second start for C0. The esd of b − c ignores their
+  correlation, as the table above does.
+
+  *Next:* Yue's read of the milestone record's title, scope and draft acceptance rows;
+  the open decisions listed there; W's esd in the joint fit, as its own investigation.
 
 - **2026-11-04** — rewritten around Yue's account (a ghostshift runner, one session). No
   package code changed, and no question is ruled. Yue said in chat on 2026-11-03 how an
