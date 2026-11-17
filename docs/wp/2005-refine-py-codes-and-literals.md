@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: 🔄 2026-11-09 — part 1 (the inventory, no tiers) in PR #1486; part 2 waits on the maintainer's answer on the gate after 2004
+Milestone: generality · Status: 🔄 2026-11-17 — part 2 (the tiers) claimed by a ghostshift runner; part 1 merged in PR #1486
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
