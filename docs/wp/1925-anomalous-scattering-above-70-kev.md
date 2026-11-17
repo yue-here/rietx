@@ -114,16 +114,25 @@ short of 130 keV, so it is a partial answer.
       keV, where that table stops. Rejected: xraylib's f′ (`fi.dat`) is from
       EPDL97 (LLNL), which states no licence; McMaster's f″ alone stops at
       120 keV and carries no f′.
-- [ ] If a table is added: bundle it with an ATTRIBUTION.md entry and a header
+- [x] If a table is added: bundle it with an ATTRIBUTION.md entry and a header
       stating its status (the wheel rule in root CLAUDE.md § Licensing), extend
       the band, keep the 3-70 keV rows bit-identical, and keep the edge guard.
-- [ ] Either way: `_dispersion_diagnostics` says "off, and not sizeable at
+      No table is added (task 2); the band is extended at runtime, the bundled
+      rows are served as read (`test_the_bundled_rows_are_served_as_read`), the
+      edge guard holds above 70 keV, and ATTRIBUTION.md's Cromer-Liberman entry
+      says what is computed and from what.
+- [x] Either way: `_dispersion_diagnostics` says "off, and not sizeable at
       this wavelength" for an element outside the table, instead of skipping
       it. If declining, the `ValueError` also names `Source.dispersion = None`,
       so the person who hits it at 130 keV is not sent to the source.
-- [ ] Tests (unit/property; the 70 keV boundary both sides; an edge inside the
+      Done: an element it cannot size is named in `DISPERSION_NEGLECTED`
+      (info, "cannot size it for …"); the out-of-band `ValueError` (now above
+      200 keV, or above 70 keV for Np-Cf) names `Dispersion.overrides` and
+      `Source.dispersion = None`.
+- [x] Tests (unit/property; the 70 keV boundary both sides; an edge inside the
       new range is refused) + obs/calc/diff PNGs to `tests/output/` if a
-      fixture is fitted.
+      fixture is fitted. In `tests/test_dispersion.py` § above the bundled
+      70 keV; no fixture is fitted, so no PNGs.
 - [ ] Skill: the routing or reference row an agent driving rietx needs from
       this WP, or "none" and why (1532 owns the workaround wording).
 
