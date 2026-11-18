@@ -3106,8 +3106,9 @@ ROWS: tuple[Row, ...] = (
                   "applies to every positive ratio below it; the error is transient, since the next "
                   "stage recompiles, and the answers of the floors 0.02 and 0.05 differ by 0.229, "
                   "0.516 and 0.380 plain esd on LaB6, FAP and cpd-1a without the closing stage and "
-                  "by 0.007, 0.002 and 0.138 behind it (tests/test_staged_start_invariance.py; "
-                  "cpd-1a's corundum c a strict xfail; WP-2002, 2026-10-21); since WP-2012 held "
+                  "by 0.007, 0.002 and 0.138 behind it, cpd-1a's 0.138 being 0.010 since the "
+                  "width twin hold (tests/test_staged_start_invariance.py; WP-2002, "
+                  "2026-10-21); since WP-2012 held "
                   "H/L, SRM 660c reads 0.582 plain esd on u behind it, a strict xfail: the 0.05 "
                   "floor's closing stage starts past the (333)/(511) Ka2 row of the Gamma_G^2 cone "
                   "and drops it, so the two arms stop on two rows of the cone; the floor only moves "
@@ -3117,11 +3118,13 @@ ROWS: tuple[Row, ...] = (
                   "(WP-2084, 2026-11-16)"),
         grounds=("A numerical setting whose domain test fails over part of the domain it claims; "
                  "tier 3 under B10 option 2 (ruled 2026-10-19).  The seventh round's Q2 (ruled "
-                 "2026-10-21) left it alone if it passed behind the closing stage; it passes on "
-                 "LaB6 and FAP and misses on cpd-1a, so it stays here; the eighth round (ruled "
-                 "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
-                 "floor of its own."),
-        approved="2026-10-22"),
+                 "2026-10-21) left it alone if it passed behind the closing stage; today it "
+                 "passes on FAP and cpd-1a (0.010) and misses on LaB6 (SRM 660c, 0.582 plain "
+                 "esd from the cone face), one family, so it stays here; the eighth round "
+                 "(ruled 2026-10-22) keeps it at tier 3 for WP-2017's second pass over a "
+                 "refine-from-zero floor of its own.  Grounds re-worded to these facts and the "
+                 "approval re-dated, tier kept (maintainer, 2026-11-17)."),
+        approved="2026-11-17"),
     Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
         evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
                   "share of the point is defined; ten orders under one count, and the partition's "
@@ -3912,7 +3915,11 @@ ROWS: tuple[Row, ...] = (
                   "stayed rank-deficient, sqrt(eps) left none (docstring)")),
     Row("rietx.optimize.lm._ON_FACE", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: tolerance covering the last-bit disagreement of two association"
-                  " orders; the value of strategy.staged.STEPHENS_CONE_TOL (docstring)")),
+                  " orders; the value of strategy.staged.STEPHENS_CONE_TOL (docstring); it also "
+                  "decides a row: at a slack of 1e-8 a stage's start keeps or drops the "
+                  "(333)/(511) Ka2 row of the SRM 660c Gamma_G^2 cone, and the two answers "
+                  "differ by 0.58 plain esd on u (WP-2084, 2026-11-16); evidence only, any "
+                  "retier is WP-2017's")),
     Row("rietx.optimize.lm._POLISH_FEASIBLE", "constant", tier=3, value=1e-10,
         evidence=("WP-1938 D8: 1000 random synthetic problems, the polish passed on all 898 that "
                   "crossed a row, worst row -7e-13; synthetic only; second pass owed (refits of "
