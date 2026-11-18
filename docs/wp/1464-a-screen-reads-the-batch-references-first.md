@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
 Track: A long run is not one fit
-Depends on: — (PR #385 soft: once it lands, a runaway cell stops raising in a screen)
+Depends on: — (PR #385, merged 2026-09-25: a runaway cell no longer raises in a screen)
 Priority: P3 2026-09-25 — the references exist and a reader who finds them is covered; one session waited 78 idle minutes on a screen they describe
 
 ## Goal
@@ -16,46 +16,28 @@ pinned.
 
 ### Inherited
 
-- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): a job of many
-  fits is many run directories, and nothing summarises them as one job.** This
-  comes from a 2026-09-25 transcript review of an agent session on `in-situ
-  series 1`. Asked to report its own metrics, the agent counted fits by hand
-  while 887 run directories sat in `.rietx/runs` (843 `done`, 44 `failed`), each
-  with its `meta.json`, `status.json` and log. It put its first screen at
-  "about 15 min", where the transcript's timeline says 89. `rietx events` (PR
-  #902) reads one log or one run directory. `runs.discover` lists the runs
-  under a root, `runs.read_run` reads each, and `label=`
-  ([1431](1431-a-caller-names-its-run.md)) can give a job's runs one name.
-  Still open: decide whether a job's count, failures, wall and slowest run
-  are a second mode of `rietx events` or another verb, and name the answer in
-  `batch-operating.md` either way.
-- **2026-10-11, from the issue triage (#898 (b)): a second user hit lesson
-  2, and asks for `OMP_NUM_THREADS` too.** An application runs rietx beside
-  other parallel work and sets `RIETX_COMPILED_THREADS=1`, because the
-  default oversubscribes. It asks that `NUMBA_NUM_THREADS` or
-  `OMP_NUM_THREADS` be read as well, for users who do not know rietx's
-  variable. Checked at `d80ca5f4`: `model.compiled.n_threads()`
-  (`compiled.py:195-208`) reads only `RIETX_COMPILED_THREADS` (an int ≥ 1,
-  anything else silently ignored), else `min(8, os.cpu_count())`. The pool
-  is a Python `ThreadPoolExecutor` over GIL-releasing Rust kernels, so
-  neither OpenMP nor numba ever controlled it. numba left with WP-1940, so
-  that half of the ask is moot. Whether `OMP_NUM_THREADS` is read as a
-  fallback is a small decision to take with task 1's default-in-a-pool
-  question (numexpr reads `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS`).
-  `os.cpu_count()` ignores CPU affinity and cgroup limits (inferred). The
-  variable is in no manual page either, and WP-1950's embedding section
-  will name it.
+Pruned 2026-11-18 at `origin/main` `37bda00b`. Two entries were folded into
+Context and Tasks, and one was rewritten for the tree as it stands.
 
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): a body sentence is paid for by a cut.** The
-  body's budget is the specification's 5 000 tokens, 17 000 B, and it is at
-  30 509 B, so a change may not grow it (`tests/skill_caps.py`). Guidance
-  for one kind of fit goes in a reference row keyed by a name the agent
-  holds, which the body's grep sentence reaches (CONTRIBUTING.md § The
-  agent skill). The placement round saw Haiku and Sonnet open no reference
-  file in 12 cells, so a rule every fit needs stays in the body.
-  Measured there too: under the grep sentence Opus reached 17 of 18 fired
-  codes' rows against 4 under routing rows
-  (`tests/eval_skill_placement/PROTOCOL.md`).
+- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): a job of many
+  fits is many run directories, and nothing summarises them as one job.**
+  Still true on 2026-11-18: `rietx events` (`cli._events`) reads one
+  `events.jsonl` or one run directory. A 2026-09-25 transcript review of an
+  agent session on `in-situ series 1` found the agent counting fits by hand
+  while 887 run directories sat in `.rietx/runs` (843 `done`, 44 `failed`). It
+  put its first screen at "about 15 min", where the transcript's timeline says
+  89. `runs.discover` lists the runs under a root, `runs.read_run` reads each,
+  and `label=` ([1431](1431-a-caller-names-its-run.md)) can give a job's runs
+  one name. Whether a job's count, failures, wall and slowest run are a second
+  mode of `rietx events` or another verb is a new CLI surface. It is not one of
+  this WP's tasks, and the 2026-11-18 session left it open.
+- **Superseded in part 2026-11-18: the body's budget.** The 2026-09-28 entry
+  from [1338](1338-the-skills-own-gates.md) put `SKILL.md`'s body at 30 509 B
+  against a 17 000 B budget. On `37bda00b` it is 16 989 B, so a rewritten
+  routing row may grow it by 11 B before a body cut pays for it.
+- Folded: the 2026-10-11 issue-triage entry (#898 (b), `OMP_NUM_THREADS`) is
+  now part of task 1. Checked 2026-11-18: `model.compiled.n_threads()`
+  (`compiled.py:231-247`) still reads only `RIETX_COMPILED_THREADS`.
 
 ## Context
 
@@ -82,8 +64,9 @@ a job past its budget as a diagnosis. That row's factor for independent jobs
 is still tagged a hypothesis. This screen is a measured point for it: the one
 job at 84× the median was a cell runaway.
 
-**Why the references were missed.** `SKILL.md`'s two §9c routing rows are keyed
-by topic: "§9c, deciding: ranking, differencing, auditing, identifiability" and
+**Why the references were missed.** `SKILL.md`'s two §9c routing rows were keyed
+by topic (superseded in part 2026-11-18: they have since merged into one row,
+"§9c a batch: deciding; operating", still keyed by topic): "§9c, deciding: ranking, differencing, auditing, identifiability" and
 "§9c, operating: budget, cost, timing, the log, inventory, fault tolerance".
 `batch.md` opens "Load it when a batch's fits are in hand". The rule for a
 routing row is to key it by the situation (root CLAUDE.md, the skill). This
@@ -109,8 +92,10 @@ than the smallest metric difference between candidates.
 
 **Lesson 2: threads in a process pool, not yet measured.** The compiled tier
 takes `model.compiled.n_threads()` threads per process, min(8, cores) unless
-`RIETX_COMPILED_THREADS` is set (`_about.py`). The skill names that variable
-nowhere. A 10-worker pool can therefore run up to 80 kernel threads, plus BLAS.
+`RIETX_COMPILED_THREADS` is set (`_about.py`). The skill named that variable
+nowhere (superseded in part 2026-11-18: `batch-operating.md` 9c.33, from
+WP-1325, now advises `RIETX_COMPILED_THREADS=1` per process and tags the
+one-thread pool a hypothesis that no batch has measured). A 10-worker pool can therefore run up to 80 kernel threads, plus BLAS.
 The agent saw a load of about 25 on 10 cores and pinned only the BLAS
 variables. Its later screens took 0.7 to 2.7 min, but those also changed the
 cell bounds, so they do not isolate the threads. Measure on a quiet machine
@@ -150,6 +135,8 @@ stands with or without #385.
       pinned in both, repeated. Quote walls as ranges. If the gap is large,
       decide whether a pool worker should default to one thread (prior art:
       joblib's loky backend limits its workers' inner threads; read how).
+      Decide with it whether `n_threads()` falls back to `OMP_NUM_THREADS`
+      (numexpr reads `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS`).
 - [ ] Re-key the two §9c routing rows by situation, and make `batch.md`'s
       "Load it when" name a screen before its fits. No new body line: a
       rewritten row costs no cap.
