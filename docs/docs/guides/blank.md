@@ -87,6 +87,7 @@ Store the curve as c*·D.
 D is the other program's curve in its own units.
 c* converts those units to counts at phase scale 1.
 To find c*, compute the ideal pattern in the other program too, and compare it with `Refinement.predict` at phase scale 1 over the whole fitted range.
+`predict` returns the whole model, so make that comparison before the curve is stored, with every background coefficient at zero.
 Then tie the curve's scale to the phase scale:
 
 ```python
@@ -117,10 +118,15 @@ One fit reaches the least-squares minimum in S, with the curve's dependence on S
 A loop of refits that rebuilds the curve from each new scale stops elsewhere, because it holds the curve fixed while it refits S.
 In two synthetic cases the loop's scale differed from the fit's by 0.09 % and 0.5 %.
 
-The curve is fixed on the 2θ axis, and the zero shift moves only the Bragg peaks.
+In a series, a tie is not carried from one pattern to the next.
+Declare it in the `constrain=` hook, which runs before each pattern's fit.
+
+The curve is fixed on the 2θ axis.
+Every peak-position correction moves only the Bragg peaks: the zero shift, and on a flat plate the specimen displacement and transparency too.
 With a zero shift of 0.05° and curve features 0.15° wide, the phase scale came out 0.16 % low and GoF rose from 1.02 to 1.04.
 With features 2.5° wide the bias was 0.009 %.
-If the pattern has a zero shift Z, store the curve at `two_theta + Z` and fit again.
+If the fit finds a peak shift Δ(2θ), the sum of those corrections at each angle, store the curve at `two_theta + Δ(two_theta)` and fit again.
+For a zero shift alone, Δ is the constant Z.
 
 ## Know the limits
 

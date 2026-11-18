@@ -123,9 +123,9 @@ def _loop_fixed_point(data, bragg, curve, cheb) -> float:
     for _ in range(200):
         solution, *_ = np.linalg.lstsq(design, (y - s * curve) * w, rcond=None)
         if abs(solution[0] - s) < 1e-14 * s:
-            break
+            return s
         s = float(solution[0])
-    return s
+    raise AssertionError(f"the outer loop did not reach its fixed point in 200 passes (S = {s})")
 
 
 def _tied_fit(data: PatternData):

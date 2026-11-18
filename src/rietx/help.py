@@ -763,7 +763,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "a DIFFaX stacking-fault term or a Debye sum, scales with that phase. Store "
             "it as c*·D, with c* converting the program's units to counts at phase "
             "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
-            "stored curve does not follow the zero shift."
+            "stored curve does not follow the zero shift or any other peak-position "
+            "correction."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
