@@ -3151,7 +3151,7 @@ class GuiSession:
         try:
             return background.answer(self._need_project(), hold)
         except background.UnknownHold as exc:
-            raise GuiError(str(exc), where=list(hold or [])) from exc
+            raise GuiError(str(exc), where=exc.missing) from exc
 
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.

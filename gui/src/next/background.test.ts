@@ -27,6 +27,9 @@ describe("the rebuilt Background graph's controls (WP-2218)", () => {
     expect(k[0]).toBe(15);
     expect(k[23]).toBeCloseTo(130, 12);
     expect(knots(10, 11)).toEqual([10, 11]);
+    // a half rounds to even, as Python's round does: round(2.5) = 2
+    expect(knots(10, 22.5)).toHaveLength(3);
+    expect(knots(10, 27.5)).toHaveLength(5);
   });
 
   it("switches type to a fresh background of the other kind", () => {

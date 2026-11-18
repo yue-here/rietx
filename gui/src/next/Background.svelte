@@ -49,7 +49,7 @@
     type Multiplier,
   } from "../lib/background";
   import { curveColors } from "../lib/plot";
-  import { LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, lambdaStop, pendingBackgroundHolds,
+  import { DEFAULT_TERMS, LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, lambdaStop, pendingBackgroundHolds,
            switchKind, withTerms } from "./background";
 
   let {
@@ -128,8 +128,12 @@
     return want !== undefined ? want : serverHeld;
   }
 
-  /** Type, Terms and Stiffness: one instrument edit, committed at once. */
-  async function editInstrument(build: (instrument: any) => any, label: string, echo: string) {
+  /** Type, Terms and Stiffness: one instrument edit, committed at once.
+   *  `gone` names the background paths the edit removes or redefines: a
+   *  pending hold or release on one is dropped once the edit lands, or the
+   *  band and Apply would both be refused on a path the table no longer has. */
+  async function editInstrument(build: (instrument: any) => any, label: string, echo: string,
+                                gone: (path: string) => boolean = () => false) {
     if (pending) return;
     pending = true;
     try {
@@ -137,6 +141,10 @@
       await api.patchInstrument(build(instrument), label);
       say(echo);
       error = "";
+      // held === serverHeld deletes the pending entry, whichever way it pointed
+      for (const path of [...holds.keys()]) {
+        if (path.startsWith("instrument.background.") && gone(path)) onhold(path, false, false);
+      }
       onmoved();
     } catch (exc) {
       error = (exc as Error).message;
@@ -152,7 +160,8 @@
       `background: ${next}`,
       next === "pspline"
         ? `instrument.background = BackgroundPSpline.for_range(${tt[0].toFixed(2)}, ${tt[tt.length - 1].toFixed(2)})`
-        : "instrument.background = BackgroundChebyshev.with_terms(6)");
+        : `instrument.background = BackgroundChebyshev.with_terms(${DEFAULT_TERMS})`,
+      () => true);
   }
 
   /** The Terms slider's value while it is dragged; committed on release. */
@@ -163,13 +172,15 @@
     termsDrag = null;
     if (n === terms.length) return;
     void editInstrument((ins) => withTerms(ins, n), `background: ${n} terms`,
-      `instrument.background = BackgroundChebyshev.with_terms(${n})`);
+      `instrument.background = BackgroundChebyshev.with_terms(${n})`,
+      (path) => termIndex(path) >= n);
   }
 
   let stopDrag = $state<number | null>(null);
   const lambda = $derived(header?.lambda_smooth ?? 1);
   const stop = $derived(stopDrag ?? lambdaStop(lambda));
   const lambdaShown = $derived(stopDrag !== null ? LAMBDA_STOPS[stopDrag] : lambda);
+  const intensityUnits = $derived(header?.lambda_units === "intensity");
 
   function commitStop(k: number) {
     stopDrag = null;
@@ -182,7 +193,8 @@
   const titleTip = $derived(
     (previewing ? `Background preview: the band once ${pendingHolds.length} pending hold`
       + `${pendingHolds.length === 1 ? "" : "s"} apply` : "Background at the current values")
-    + (error || loadError ? `. Band refused: ${error || loadError}` : ""));
+    + (error ? `. Edit refused: ${error}` : "")
+    + (loadError ? `. Band refused: ${loadError}` : ""));
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let width = $state(0);
@@ -284,7 +296,8 @@
     <!-- the whole line as its tooltip, since the title is what gives way (B1) -->
     <div class="gtitle" title={titleTip}>
       {#if previewing}<b class="pv">Background preview</b>{:else}<b>Background at the current values</b>{/if}
-      {#if error || loadError}<span class="bad">Band refused</span>
+      {#if loadError}<span class="bad">Band refused</span>
+      {:else if error}<span class="bad">Edit refused</span>
       {:else if busy}<span>waiting for the run</span>{/if}
     </div>
     <div class="gctl">
@@ -336,7 +349,7 @@
               {@const k = termIndex(term.path)}
               {@const on = isHeld(term.path, term.held)}
               <button class="term" aria-pressed={on} aria-label={`Hold term ${k}`}
-                disabled={!holdable(term) || busy}
+                disabled={!holdable(term) || busy || pending}
                 title={holdable(term) ? `${on ? "Release" : "Hold"} term ${k}` : term.held_because}
                 onclick={() => onhold(term.path, !on, term.held)}>{k}</button>
             {/each}
@@ -345,11 +358,15 @@
       {:else if kind === "pspline"}
         <div class="bgctl">
           <span class="lab">Stiffness</span>
+          <!-- the stops are dimensionless: on a λ kept in intensity units
+               (`BackgroundPSpline.lambda_units`) one would move the
+               stiffness by orders of magnitude, so the slider is shown, not offered -->
           <input type="range" min="0" max={LAMBDA_STOPS.length - 1} step="1" aria-label="Stiffness"
-            value={stop} disabled={busy || pending}
+            value={stop} disabled={busy || pending || intensityUnits}
+            title={intensityUnits ? "λ is in intensity units here, and the stops are dimensionless" : undefined}
             oninput={(e) => (stopDrag = Number((e.currentTarget as HTMLInputElement).value))}
             onchange={(e) => commitStop(Number((e.currentTarget as HTMLInputElement).value))} />
-          <span class="num">λ {lambdaShown}</span>
+          <span class="num">λ {lambdaShown}{#if intensityUnits} intensity⁻²{/if}</span>
         </div>
       {/if}
     </div>

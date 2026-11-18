@@ -112,6 +112,20 @@ describe("the Background graph (rows 63-68)", () => {
     expect(document.querySelector<HTMLInputElement>('input[aria-label="Terms"]')!.value).toBe("3");
   });
 
+  it("offers no dimensionless stiffness stop on a λ in intensity units", async () => {
+    const saved = answer.header;
+    answer.header = { ...saved, kind: "pspline", lambda_smooth: 1e-6, lambda_units: "intensity" } as any;
+    try {
+      app = mount(Background, { target: document.body, props: { head: "n1" } });
+      await settle(() => !!document.querySelector('input[aria-label="Stiffness"]'));
+      const slider = document.querySelector<HTMLInputElement>('input[aria-label="Stiffness"]')!;
+      expect(slider.disabled).toBe(true);
+      expect(slider.closest(".bgctl")!.textContent).toContain("intensity⁻²");
+    } finally {
+      answer.header = saved;
+    }
+  });
+
   it("names the current values at rest, and waits for a run", async () => {
     app = mount(Background, { target: document.body, props: { head: "n1" } });
     await settle(() => document.querySelectorAll(".chips .term").length === 3);

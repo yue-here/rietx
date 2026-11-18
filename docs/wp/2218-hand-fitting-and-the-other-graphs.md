@@ -210,6 +210,12 @@ Filled in by the session that builds each PR.
 7. **The second PR: what the Peaks and Background graphs draw that the prototype lacks.**
    - "Band refused" on the Background title line, with the server's words in its tooltip,
      when the band cannot be computed.
+   - "Edit refused" on the Background title line when a Type, Terms or Stiffness edit is
+     refused, with the server's words in its tooltip. It is a field of its own beside the
+     band's refusal (gui/CLAUDE.md, WP-1014). The words follow "Preview refused" (§ Rulings 3).
+   - Stiffness is drawn but disabled on a P-spline whose λ is in intensity units, with its
+     unit beside the value. The slider's stops are dimensionless, so a stop would move such a
+     spline's stiffness by orders of magnitude.
    - "waiting for the run" on the Background title line while a refinement runs.
    - The empty state "No fitted peaks to frame yet." on the Peaks graph before a fit.
 

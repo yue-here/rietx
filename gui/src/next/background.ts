@@ -51,9 +51,16 @@ export function withTerms(instrument: any, n: number): any {
   return next;
 }
 
+/** Python's `round`: a half goes to the even neighbour, where `Math.round`
+ *  takes it up, so a span of 12.5° would get one knot more than Python's. */
+function roundHalfEven(x: number): number {
+  const r = Math.round(x);
+  return r - x === 0.5 && r % 2 !== 0 ? r - 1 : r;
+}
+
 /** Uniform knots over [lo, hi], as `BackgroundPSpline.for_range` places them. */
 export function knots(lo: number, hi: number, step = KNOT_STEP_DEG): number[] {
-  const n = Math.max(Math.round((hi - lo) / step) + 1, 2);
+  const n = Math.max(roundHalfEven((hi - lo) / step) + 1, 2);
   return Array.from({ length: n }, (_, i) => lo + ((hi - lo) * i) / (n - 1));
 }
 

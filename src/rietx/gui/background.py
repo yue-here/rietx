@@ -81,6 +81,10 @@ _CACHE_LOCK = threading.Lock()
 class UnknownHold(ValueError):
     """A pending hold names a path the working table does not have."""
 
+    def __init__(self, missing: list[str]):
+        super().__init__(f"no parameter to hold: {', '.join(missing)}")
+        self.missing = missing
+
 
 def _free_table(project):
     """The working table with the intensity mode's force-fixed columns dropped."""
@@ -178,7 +182,8 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
 def answer(project, hold: list[str] | None = None) -> Packed:
     """The packed answer to ``GET /api/background``; the module docstring has it."""
     holds = tuple(sorted(set(hold or ())))
-    key = (preview._key(project), holds)
+    state = preview._key(project)
+    key = (state, holds)
     with _CACHE_LOCK:
         hit = _CACHE.get(project)
         if hit is not None and hit[0] == key:
@@ -190,7 +195,7 @@ def answer(project, hold: list[str] | None = None) -> Packed:
         if holds:
             missing = sorted(set(holds) - set(table.set_held(list(holds), True)))
             if missing:
-                raise UnknownHold(f"no parameter to hold: {', '.join(missing)}")
+                raise UnknownHold(missing)
         esd, facts = band_esd(model, table)
         values = table.decode(table.x0())
         y_bkg = np.asarray(model.background(values), dtype=np.float64)
@@ -199,7 +204,7 @@ def answer(project, hold: list[str] | None = None) -> Packed:
               "y_background": y_bkg}
     if esd is not None:
         arrays["band_esd"] = esd
-    header = {"head": key[0][0], "pending_holds": list(holds),
+    header = {"head": state[0], "pending_holds": list(holds),
               **_kind(project.refinement.instrument),
               "terms": _terms(project), **facts}
     packed = Packed(header, arrays)

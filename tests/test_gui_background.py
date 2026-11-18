@@ -230,5 +230,7 @@ def test_a_pending_hold_is_held_for_that_answer_alone(tmp_path_factory, tmp_path
     applied = session.background()
     np.testing.assert_allclose(pending.arrays["band_esd"], applied.arrays["band_esd"], rtol=1e-12)
     with pytest.raises(GuiError, match="instrument.background.c99") as excinfo:
-        session.background(["instrument.background.c99"])
+        session.background(["instrument.background.c3", "instrument.background.c99"])
     assert excinfo.value.status == 400
+    # the refusal points at the path that is missing, never at every one sent
+    assert excinfo.value.where == ["instrument.background.c99"]
