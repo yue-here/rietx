@@ -161,6 +161,61 @@ is the first evidence that the weaker version of it fails.
 Round 1.1's four cells are E-RAMP only; the four E-ZRM reel cells are
 outstanding, so this is a finding at N = 4 on synthetic data, not a rate.
 
+### Task 3, the proposed round (2026-11-18; registered, not run)
+
+**Two of the task's three inputs are gone.** 1130's panel never shipped (Gap C
+above). 1130's trigger fit no longer carries the error: re-run on the tree in
+1130's own session, its background lands at 0.90–1.22 of TOPAS's under nine
+protocol variants, against the 0.50–0.71 the session measured
+(`1130-background-reference.md`, lines 435–457). So the round below uses
+three bundled fits with one planted error each, and the montage as it is.
+
+**Fits.** Each is a synthetic pattern from a bundled CIF with one error planted
+in the model the agent is handed, and no diagnostic naming it.
+
+- F1, a missing minor phase: a second phase at 5 wt % in the data, absent from
+  the model. The montage's overview marks its peaks as unmatched.
+- F2, a wrong zero shift held fixed: 0.03° off, every other parameter refined.
+  The worst-region zooms show a derivative-shaped residual.
+- F3, a background held at half its true level between the peaks. The montage
+  has no reference for it, so the image is predicted **not** to help here.
+
+**Conditions**, enforced in the workspace and never in the prompt.
+`numbers`: the venv has no matplotlib, so `plot_for_vlm` raises on import.
+`montage`: the montage PNG is in the workspace and the prompt names its path.
+Both get the result as JSON, the script that made it, and the skill.
+
+**Prompt**, identical in both: "This refinement is wrong in one way. What is
+wrong, and what would you change?"
+
+**Read-outs, fixed before any run.**
+
+- R1: the planted error named, scored by a rubric of accepted phrasings per
+  fit, written before the first run.
+- R2: tool calls before the final answer.
+- R3: input plus output tokens, and cost.
+
+**Decision rule.** The image earns its claim if the `montage` arm wins R1 on
+F1 or F2 at equal or fewer R2 calls. If it wins on neither, the skill's
+hypothesis clause is deleted and `Diagnostic.view`'s `see:` line is
+reconsidered. A win on F3 would contradict the 2026-08-23 measurement, and is
+reported as that, not as support.
+
+**Cost** (extrapolated from `tests/eval_skill_placement` round 1.0, $0.30–0.47
+a run for haiku and sonnet and $1.26–2.07 for opus, on a task that read a
+printed fit; this one runs code, so take one to three times that):
+
+| option | runs | estimate | settles |
+|---|---:|---:|---|
+| A: sonnet, N = 2 | 12 | $6–18 | whether the effect exists on one model |
+| B: sonnet and opus, N = 2 | 24 | $25–90 | whether it holds across models |
+| C: three models, N = 3 | 54 | $60–200 | a rate per model, to N = 3 |
+
+The repo-side work (fits, shim, scorer, `runner.py` from
+`tests/eval_skill_placement/`) costs no money and is the next session's first
+item once an option is picked. Launch with `--setting-sources project,local`
+(Inherited, 1338).
+
 ## Non-goals
 
 - **Not embedding an image in a diagnostic.** The pointer is a name; the
@@ -205,6 +260,9 @@ outstanding, so this is a finding at N = 4 on synthetic data, not a rate.
       bundled fits with a planted error each. Pre-register the read-out. The
       result may be that the image buys nothing; that is a result to record
       and act on by removing the pointer's claim, not to soften.
+      *2026-11-18*: the round is registered in § Task 3, the proposed round,
+      which replaces 1130's panel and trigger fit. Its spend waits on the
+      maintainer's pick from that section's menu.
 - [ ] Tests (the vocabulary meta-test; the field's JSON round trip; the eval's
       shim) + the montage PNGs the eval used to `tests/output/`.
 
