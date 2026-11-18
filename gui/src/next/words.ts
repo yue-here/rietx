@@ -9,7 +9,7 @@
  *  its numbers with these same words, so the two never disagree. A phase's
  *  ticks are labelled with the phase's name, which is not in this table. */
 export const CURVE_WORDS: Record<string, string> = {
-  obs: "Observed", calc: "Last fit", bkg: "Background",
+  obs: "Observed", calc: "Last fit", preview: "Preview", bkg: "Background",
   diff: "Difference",
 };
 
