@@ -1196,6 +1196,26 @@ def _candidate_sites(rec: _OriginPhase, f: tuple[int, int, int]) -> set[str]:
     return {d.rsplit(".dof.", 1)[0] for d in rec.candidates[f]}
 
 
+def _refuse_fixed_but_free(bases: list[str]) -> None:
+    """Refuse every site that asks for a free coordinate it cannot have.
+
+    One site keeps the sentence it always had, byte for byte.  Several are
+    named together, in walk order, so one ``vary=False`` pass fixes them all.
+    """
+    if not bases:
+        return
+    fix = ("set vary=False (Refinement.fix_special_positions() does it for "
+           "every such site)")
+    if len(bases) == 1:
+        raise ValueError(
+            f"{bases[0]} sits on a fully fixed special position; its site "
+            f"symmetry allows no positional freedom — {fix}")
+    named = ", ".join(bases[:-1]) + f" and {bases[-1]}"
+    raise ValueError(
+        f"{named} sit on fully fixed special positions; their site symmetry "
+        f"allows no positional freedom — {fix}")
+
+
 class ParameterTable:
     """The tree-to-flat-θ machinery behind a fit — internal, not the agent surface.
 
@@ -1363,6 +1383,11 @@ class ParameterTable:
         self._units[path] = p.unit
 
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
+        #: every site base on a fully fixed special position that asked for a
+        #: free coordinate, gathered over the whole walk and refused once
+        #: after it (WP-1913, #728 item 4): a refusal naming only the first
+        #: had a caller fix one site per attempt
+        self._fixed_but_free: list[str] = []
         for ip, phase in enumerate(structure.phases):
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
             base = f"phases.{ip}"
@@ -1433,6 +1458,7 @@ class ParameterTable:
                 self._collect_body(base, sg, phase, b, body)
             if phase.floating_origin is not None:
                 self._declare_origin(ip, sg, phase)
+        _refuse_fixed_but_free(self._fixed_but_free)
 
         self._add_instrument_row(instrument, "instrument.zero_shift",
                                  instrument.zero_shift)
@@ -1698,7 +1724,8 @@ class ParameterTable:
         allowed direction (``crystallography.wyckoff``) — and x, y, z become
         affine rows x = x₀ + Σₖ Bₖ·θₖ anchored at the compile-time position.
         Fully fixed special positions contribute none (their coordinates are
-        locked); ``vary=True`` on any coordinate of such a site is an error.
+        locked); ``vary=True`` on any coordinate of such a site is an error,
+        recorded here and raised by :meth:`_collect` once every site is seen.
         A vary request on a constrained-but-free site frees *all* of the
         site's DOFs — per-axis intent does not map onto rows such as [1,1,0].
         DOFs are unbounded displacements; bounds declared on x/y/z do not
@@ -1708,11 +1735,7 @@ class ParameterTable:
         basis = coordinate_basis(stabilizer_rotations(sg, xyz))
         want_vary = any(getattr(atom, c).vary for c in ("x", "y", "z"))
         if len(basis) == 0 and want_vary:
-            raise ValueError(
-                f"{base} sits on a fully fixed special position; its site "
-                "symmetry allows no positional freedom — set vary=False "
-                "(Refinement.fix_special_positions() does it for every such "
-                "site)")
+            self._fixed_but_free.append(base)
         dof_paths = [f"{base}.dof.{k}" for k in range(len(basis))]
         for c_idx, c in enumerate(("x", "y", "z")):
             p: Parameter = getattr(atom, c)
