@@ -55,6 +55,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-17 | P2 | [parametric](#parametric) |
+| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | 2026-11-17 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-13 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
@@ -80,7 +81,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | [gui-overhaul](#gui-overhaul) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | [gui-overhaul](#gui-overhaul) |
-| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -515,7 +515,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | ✅ 2026-11-13 | — | [2133](2133-the-file-menu.md) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
+| [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | 🔄 2026-11-17 | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | ✅ 2026-11-17 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-13 | P2 | [2215](2215-the-frame.md) |
