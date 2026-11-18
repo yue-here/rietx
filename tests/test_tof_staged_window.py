@@ -224,6 +224,19 @@ def test_a_fit_records_which_stages_were_coarse(staged_pair):
     assert [st.lorentz_window_tol for st in flat.stages] == [1e-4] * 6
 
 
+def test_a_banks_closing_stage_records_no_window_fraction(staged_pair):
+    """The compiler a bank runs never reads ``window_area_tol`` (its windows
+    are sized per side by ``TOF_WINDOW_AREA_TOL``), so the closing stage's
+    0.1 % is a figure nothing ran at: the stage and its node record ``None``,
+    as a declared stage's do, and not a number that reads as a measured
+    setting (1548-d, Claude's settlement of 2026-11-17)."""
+    staged, _, ref = staged_pair
+    assert [st.window_area_tol for st in staged.stages] == [None] * 6
+    tree = ref.history
+    nodes = [n for n in tree.lineage(tree.head) if n.action.kind == "stage"][-6:]
+    assert [n.action.window_area_tol for n in nodes] == [None] * 6
+
+
 def test_a_coarse_node_records_its_input_and_a_cherry_pick_compiles_it(staged_pair):
     """``NodeAction.lorentz_window_tol`` is the input the schedule handed each
     stage, ``None`` at the answer tolerance, so ``api_call`` names it on a

@@ -620,6 +620,18 @@ def _is_tof(model) -> bool:
     return getattr(model, "axis", "two_theta") == "tof"
 
 
+def _recorded_stage_window_tol(model, tol: float | None) -> float | None:
+    """What a stage's ``window_area_tol`` record says it ran at.
+
+    A time-of-flight bank's compiler never reads the constant-wavelength
+    window fraction (its windows are sized per side by
+    ``forward_tof.TOF_WINDOW_AREA_TOL``), so ``None``, the "no fraction"
+    state of the model's own ``window_area_tol``: the closing stage's 0.1 %
+    would be a number nothing ran at.  A 2θ stage records what it ran at.
+    """
+    return None if _is_tof(model) else tol
+
+
 def _compile_for(structure: Structure, instrument: Instrument,
                  data: PatternData, *, mode: Mode = "rietveld",
                  limits: tuple[float, float] | None = None,
@@ -6428,7 +6440,8 @@ class Refinement:
                 n_constraint_truncations=outcome.n_constraint_truncations,
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
-                ftol=ftol, window_area_tol=window_tol,
+                ftol=ftol,
+                window_area_tol=_recorded_stage_window_tol(model, window_tol),
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -6472,7 +6485,7 @@ class Refinement:
                     # (Stage.ftol is None for every stage taking the plan's
                     # schedule), because a cherry-pick re-runs what happened
                     ftol=ftol, window_slack_deg=stage.window_slack_deg,
-                    window_area_tol=window_tol,
+                    window_area_tol=_recorded_stage_window_tol(model, window_tol),
                     # and the plan's two settings, for the same reason
                     # (WP-2002, B1)
                     phase_support_sigma=phase_support_sigma,
@@ -6775,7 +6788,8 @@ class Refinement:
                 n_constraint_truncations=outcome.n_constraint_truncations,
                 n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 n_lapack_fallbacks=outcome.n_lapack_fallbacks,
-                ftol=stage.ftol, window_area_tol=window_area_tol,
+                ftol=stage.ftol,
+                window_area_tol=_recorded_stage_window_tol(model, window_area_tol),
                 held=hold.held, released=hold.released,
                 held_reach=hold.reach,
                 scale_b_held=hold.scale_b_held,
@@ -6826,7 +6840,8 @@ class Refinement:
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
-                    window_area_tol=window_area_tol,
+                    window_area_tol=_recorded_stage_window_tol(
+                        model, window_area_tol),
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=correlation_guard,
                     lorentz_window_tol=(stage.lorentz_window_tol

@@ -1229,7 +1229,9 @@ class StageResult(Base):
     #: ``forward.recorded_window_tol(this)`` to ``compile_model`` to reproduce
     #: them, ``compile_model``'s own default being the closing stage's
     #: fraction: the 2 % and 0.1 % windows of one answer differ by up to 0.6 %
-    #: in χ².
+    #: in χ².  ``None`` on a time-of-flight bank's stages whatever the plan's
+    #: closing fraction: its windows are sized by ``lorentz_window_tol`` below,
+    #: and no run read this one.
     window_area_tol: float | None = None
     #: the per-side area fraction of each peak's **Lorentzian component** this
     #: stage's frozen windows were sized to leave outside on a time-of-flight

@@ -6049,7 +6049,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`None` means `model.forward.WINDOW_AREA_TOL`, which every declared stage "
             "takes, and the closing stage runs at the plan's `closing_window_tol`. "
             "`model.forward.recorded_window_tol` turns this into what `compile_model` "
-            "needs to reproduce the result's curves."
+            "needs to reproduce the result's curves. A time-of-flight bank's stages "
+            "all record `None`: its windows are sized by `lorentz_window_tol`."
         ),
     ),
     "StageResult.lorentz_window_tol": HelpEntry(
