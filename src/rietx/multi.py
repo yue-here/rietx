@@ -10,9 +10,12 @@ resolution.  See :mod:`rietx.params.multi` for the parameter-sharing map and
 :func:`rietx.optimize.least_squares.run_multi_least_squares` for the stacked
 solve.
 
-Rietveld mode only: Le Bail / Pawley intensities are per-pattern empirical
-extractions, not shared quantities, so a multi-histogram fit of them is just
-independent single fits — not the joint-residual point of this module.
+Rietveld and Pawley modes (WP-2104).  A Pawley joint fit keeps one intensity
+block per histogram, each pattern's own, and couples the patterns only through
+what they share: a cell, an instrument parameter, a parametric equation's
+coefficients.  With nothing shared it would be N single Pawley fits, and it is
+refused saying so.  Le Bail is not built here: its alternation partitions
+between solves, and the joint solve has no seam for it yet.
 """
 
 from __future__ import annotations
@@ -44,6 +47,8 @@ from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
+    _joint_aux_counts,
+    _joint_aux_paths,
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
@@ -88,6 +93,7 @@ from .refine import (
     _air_scatter_undeclared_diagnostics,
     _axis_in_crystal_axes,
     _capillary_offset_diagnostics,
+    _carry_lebail,
     _cell_runaway_diagnostic,
     _cell_runaway_withheld,
     _column_separation,
@@ -120,6 +126,9 @@ from .refine import (
     _origin_diagnostics,
     _parameter_row,
     _parent_strain_held_diagnostics,
+    _pawley_off_data_diagnostics,
+    _pawley_seed_cycles,
+    _pawley_unresolved_diagnostics,
     _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
@@ -151,6 +160,8 @@ from .refine import (
     _width_census_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
+    mode_fixed_column,
+    mode_fixed_path,
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
@@ -318,7 +329,7 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
     "_lebail_cap_diagnostics": (
-        (ABSENT,), "a joint fit is Rietveld-only, so it runs no partition"),
+        (ABSENT,), "a joint fit refuses lebail, so it runs no partition"),
     "_slow_descent_diagnostics": (
         (FIT,), "the slow-descent rule reads the one joint solve's cost"),
     "_frozen_compile_diagnostics": (
@@ -359,11 +370,11 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "row and STAGE_FREED_NOTHING on one where it matched none, "
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
-    # -- deliberately not computed ---------------------------------------------
     "_parent_strain_held_diagnostics": (
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
+    # -- deliberately not computed ---------------------------------------------
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
                    "naming one site that frees nothing (WP-1951), and wiring it "
@@ -375,12 +386,18 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                    "leaves to _origin_diagnostics, so it would report "
                    "nothing"),
     "_pawley_unresolved_diagnostics": (
-        (ABSENT,), "a joint fit is Rietveld-only (fit refuses pawley)"),
+        (HISTOGRAM,), "each histogram keeps its own Pawley intensity block "
+                      "and overlap groups (WP-2104)"),
     "_pawley_off_data_diagnostics": (
-        (ABSENT,), "a joint fit is Rietveld-only (fit refuses pawley)"),
+        (HISTOGRAM,), "a reflection is off one histogram's fitted range, and "
+                      "the ridge is that histogram's restraint (WP-2104)"),
     "_restraint_tension_diagnostics": (
         (ABSENT,), "soft restraints are refused in a joint fit "
                    "(run_multi_least_squares), so there is no tension to report"),
+    "_body_contacts_unchecked_diagnostics": (
+        (ABSENT,), "soft restraints are refused in a joint fit "
+                   "(run_multi_least_squares), so there is no anti-bump list "
+                   "whose skip inside a body could matter (WP-2144)"),
     "_restraint_pairs_stale_diagnostics": (
         (ABSENT,), "soft restraints are refused in a joint fit "
                    "(run_multi_least_squares), so there is no anti-bump list "
@@ -1562,7 +1579,7 @@ class MultiHistogramRefinement:
     def fitted_instruments(self) -> list[Instrument]:
         return self.mtable.instruments
 
-    def parameters(self) -> list[ParameterRow]:
+    def parameters(self, mode: str | None = None) -> list[ParameterRow]:
         """Every parameter of the joint fit as data, held rows included (WP-2028).
 
         The counterpart of :meth:`Refinement.parameters
@@ -1590,12 +1607,15 @@ class MultiHistogramRefinement:
 
         Each row is read off its own histogram's table, by the single fit's
         rules: ``esd`` from the most recent fit's ``result_.parameters`` under
-        the same path; ``mode_fixed`` for ``"rietveld"``, the only mode a
-        joint fit runs; ``needs_held_cell`` from that histogram's own cell and
-        wavelength.  Read-only: ``set_vary`` and ``set_values`` on the joint
-        fit are not built (#1205's ruling), and the plan's globs are how a
-        joint fit frees a row.
+        the same path; ``mode_fixed`` for ``mode``, else the last fit's mode,
+        else ``"rietveld"`` (WP-2104: a Pawley joint fit force-fixes every
+        ``.atoms.`` path and each scale); ``needs_held_cell`` from that
+        histogram's own cell and wavelength.  Read-only: ``set_vary`` and
+        ``set_values`` on the joint fit are not built (#1205's ruling), and the
+        plan's globs are how a joint fit frees a row.
         """
+        if mode is None:
+            mode = self.result_.mode if self.result_ is not None else "rietveld"
         mt = self.mtable
         esd = ({p.path: p.stderr for p in self.result_.parameters}
                if self.result_ is not None else {})
@@ -1636,7 +1656,7 @@ class MultiHistogramRefinement:
                     const=float(e.tie.const)))
                 lo, hi = window.get(e.path, (e.lo, e.hi))
                 rows.append(_parameter_row(
-                    e, tie=tie, esd=esd.get(path), mode="rietveld",
+                    e, tie=tie, esd=esd.get(path), mode=mode,
                     blocked=blocked, reach=reach, owned=owned, origin=origin,
                     path=path, lo=lo, hi=hi))
         return rows
@@ -1695,11 +1715,7 @@ class MultiHistogramRefinement:
                                          strict=True)):
             require_two_theta(d, f"MultiHistogramRefinement.fit(), histogram "
                                  f"{i} of {n}", instrument=ins)
-        if mode != "rietveld":
-            raise NotImplementedError(
-                "multi-histogram refinement is Rietveld-only; Le Bail / "
-                "Pawley intensities are per-pattern extractions, not shared, so a "
-                "joint fit of them is just independent single-pattern fits")
+        _refuse_joint_mode(self.mtable, mode)
         # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
         # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
         plan = resolve_plan(plan, mode)
@@ -2005,6 +2021,19 @@ class MultiHistogramRefinement:
                 if fixed:
                     gone = set(fixed)
                     freed = [p for p in freed if p not in gone]
+                if mode != "rietveld":
+                    # the single runner's drop (``_run_stage``): what an
+                    # intensity model force-fixes leaves θ, by what each
+                    # column moves in every histogram, before any seed writes
+                    dead = _joint_mode_fixed(self.mtable, mode)
+                    if dead:
+                        self.mtable.set_vary(dead, False)
+                        gone = set(dead)
+                        freed = [p for p in freed if p not in gone]
+                # the single runner's refusal (``_run_stage``, WP-1805): a body
+                # turn free in two directions of three, in any histogram's table
+                for tab in self.mtable.tables:
+                    tab.refuse_partial_turns(joint=True)
                 seeded: dict[str, float] = {}
                 if stage.seed:
                     seeded = dict.fromkeys(
@@ -2014,8 +2043,9 @@ class MultiHistogramRefinement:
                 # moment frames follow the cell this stage starts from, and the
                 # compile reads the DOFs in the table's frames, not its own
                 self.mtable.reframe_moments()
+                previous = models
                 models = [
-                    compile_model(s, ins, d, mode="rietveld", two_theta_limits=lim,
+                    compile_model(s, ins, d, mode=mode, two_theta_limits=lim,
                                   moving_paths=set(tab.moving_paths),
                                   window_area_tol=recorded_window_tol(window_tol),
                                   orbit_split=split)
@@ -2023,6 +2053,10 @@ class MultiHistogramRefinement:
                         self.mtable.structures, self.mtable.instruments, data, limits,
                         self.mtable.tables, orbit_splits, strict=True)]
                 self.mtable.push_moment_frames(models)
+                if mode == "pawley":
+                    _seed_joint_pawley(models, previous, self.mtable, stage)
+                pawley_start = ([None if m.pawley is None else m.pawley_x0()
+                                 for m in models] if mode == "pawley" else None)
                 stage_ftol = {} if ftol is None else {"ftol": ftol}
                 # A phase the data cannot see is flat here too (WP-1301), and
                 # each entry is judged where it lives (``_unseen``, WP-1325): a
@@ -2188,8 +2222,13 @@ class MultiHistogramRefinement:
                         **stage_ftol)
                     if second.non_finite is not None:
                         # the single runner's rule (WP-2048): every value back
-                        # where the stage found it, with nothing committed
+                        # where the stage found it, with nothing committed,
+                        # a Pawley block's intensities with them
                         _restore_stage_start(self.mtable, start_values)
+                        if pawley_start is not None:
+                            for m, x in zip(models, pawley_start, strict=True):
+                                if x is not None:
+                                    m.set_pawley_intensities(x)
                         second = dataclasses.replace(
                             second, theta=self.mtable.x0(),
                             cost_final=outcome.cost_initial)
@@ -2310,8 +2349,12 @@ class MultiHistogramRefinement:
         models, recompiled = self._final_compiles(models, outcome, data, limits,
                                                   window_tol)
         opening_diags = [*opening_diags, *recompiled]
+        # an intensity model reads the screen alone (``_joint_answer_significance``
+        # returns it unmeasured), so the result does not call it decided, the
+        # single fit's rule (``StageResult.significance``)
         return (models, outcome, stage_results, cell_runaway_diags,
-                answer_runaway, opening_diags, answer_significance)
+                answer_runaway, opening_diags,
+                answer_significance if mode == "rietveld" else None)
 
     def _final_compiles(self, models, outcome, data, limits, window_tol):
         """One compile per histogram at the values the result returns.
@@ -2326,7 +2369,13 @@ class MultiHistogramRefinement:
         WP-1309) and the origin rows (WP-1912) stay the solve's, exactly as
         there.  ``FROZEN_COMPILE_STALE`` tests each histogram's own χ² and
         reports the worst, naming it.
+
+        A Pawley fit returns its models as the solve left them, the single
+        fit's rule (``Refinement._final_compile``): the intensity blocks and
+        their esds belong to the solve, and a compile does not carry them.
         """
+        if any(m.mode == "pawley" for m in models):
+            return models, []
         values = [t.decode(th) for t, th in zip(
             self.mtable.tables, self.mtable.split(outcome.theta), strict=True)]
         # each at the solve's orbit split, as the single runner's (WP-2052)
@@ -2393,8 +2442,53 @@ class MultiHistogramRefinement:
         n_data = [len(m.tt) for m in models]
         data_off = np.concatenate([[0], np.cumsum(n_data)]).astype(int)
 
+        # each histogram's physical esds, then the one bound test ------------------
+        # Both run before the per-histogram loop.  The declared-peak
+        # diagnostics inside it read the test's FLOOR_HIT half (WP-2141), and
+        # the test's tied half reads these esds.
+        # (zip rather than a second ``for h in range(n)``: the meta-tests in
+        # tests/test_multi_diagnostics.py find the per-histogram loop by it)
+        # The slices are kept for the loop: with a correlation matrix each is
+        # a dense copy, taken once per histogram.
+        per_stderr, per_corr, per_esds = [], [], []
+        for h_table, h_theta, cm in zip(mt.tables, thetas,
+                                        map(mt.col_map, range(n))):
+            s_h = stderr[cm] if stderr is not None else None
+            corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
+            per_stderr.append(s_h)
+            per_corr.append(corr_h)
+            per_esds.append(h_table.stderr_physical(h_theta, s_h, corr_h)
+                            if s_h is not None else {})
+        # one bound test, three consumers: the rows' at_bound flag, the
+        # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
+        # declared-peak diagnostics (WP-2141)
+        at_bounds = bound_findings(
+            mt.bounds(), mt.free_paths, outcome.theta,
+            cos=outcome.residual_cosine, esd=outcome.stderr_internal,
+            active=_exact_active_bounds(outcome))
+        # a tied value the LM step held on its own limit, per histogram, a
+        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
+        pressed = pressed_tied_paths(outcome.truncated_by)
+        if pressed and per_esds:
+            seen_shared: set[str] = set()
+            for h, table in enumerate(mt.tables):
+                for f in tied_bound_findings(table, pressed, per_esds[h],
+                                             scope=f"hist.{h}."):
+                    base = f.paths[0].removeprefix(f"hist.{h}.")
+                    e = table.entries[table._paths[base]]
+                    if _row_shared(mt, e):
+                        if base in seen_shared:
+                            continue
+                        seen_shared.add(base)
+                        f = dataclasses.replace(f, paths=(base,), message=base)
+                    at_bounds.append(f)
+
         # per-histogram slices ---------------------------------------------------
-        per_values, per_ycalc, per_ybkg, per_esds = [], [], [], []
+        per_values, per_ycalc, per_ybkg = [], [], []
+        # each histogram's FLOOR_HIT paths in its own spelling, closed over
+        # its ties: read by the declared-peak diagnostics in the loop and
+        # histogram 0's by the microstructure block after it
+        per_floors: list[set[str]] = []
         histograms: list[HistogramResult] = []
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
@@ -2411,23 +2505,25 @@ class MultiHistogramRefinement:
             per_ybkg.append(y_bkg)
 
             cm = mt.col_map(h)
-            s_h = stderr[cm] if stderr is not None else None
-            corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
-            esd_h = (table.stderr_physical(thetas[h], s_h, corr_h)
-                     if s_h is not None else {})
-            per_esds.append(esd_h)
+            s_h, corr_h, esd_h = per_stderr[h], per_corr[h], per_esds[h]
 
-            n_free_h = mt.n_shared + len(mt.per_hist_paths[h])
+            # a Pawley block's intensities are this histogram's free
+            # parameters too, as the single fit counts them (``_pawley_n``)
+            n_free_h = (mt.n_shared + len(mt.per_hist_paths[h])
+                        + (0 if model.pawley is None else model.pawley.n))
             stats = compute_statistics(model.y_obs, y_calc, model.sigma,
                                        n_free=n_free_h, y_background=y_bkg)
             # the single fit's builder, blind-scale rule and finding included
-            # (WP-1463); rows are addressed as this surface spells them
-            qpa, qpa_diags = _quantify_phases(
+            # (WP-1463); rows are addressed as this surface spells them.
+            # Rietveld only, as there (``refine._build_result``): a Pawley
+            # fit force-fixes every scale, so a fraction would be the start's
+            qpa, qpa_diags = (_quantify_phases(
                 table, thetas[h], s_h, corr_h, struct, values, model,
                 unmeasured=joint_unmeasured[h],
                 held=(_held_scale_phases(stage_results[-1], h)
                       if stage_results else None),
                 where_of=lambda p, h=h: mt._canonical(h, p))
+                if model.mode == "rietveld" else (None, []))
 
             diags: list[Diagnostic] = []
             j0, j1 = data_off[h], data_off[h] + n_data[h]
@@ -2464,6 +2560,11 @@ class MultiHistogramRefinement:
                     diags.extend(_guard_diagnostics(
                         GuardReport(roughness_correlations=rough)))
             diags.extend(qpa_diags)
+            if model.mode == "pawley":
+                # this histogram's intensity block, its overlap groups and its
+                # ridge (WP-2104): the single fit's two findings, per pattern
+                diags.extend(_pawley_unresolved_diagnostics(model, struct))
+                diags.extend(_pawley_off_data_diagnostics(model, struct))
             # specimen absorption, per histogram — each may sit at its own
             # wavelength and geometry, hence its own µR/µt.  Only the failure
             # modes are surfaced here; the applied value lives on
@@ -2536,7 +2637,9 @@ class MultiHistogramRefinement:
             # the single path's own builder (WP-2028 task 7), so a magnetic
             # phase draws its "(magnetic)" row here too (#278)
             ticks, tick_hkl, tick_support = _tick_rows(model, struct, values)
-            diags.extend(_extra_peak_diagnostics(model, values, ticks, table))
+            per_floors.append(floored_paths(table, _hist_floors(at_bounds, h)))
+            diags.extend(_extra_peak_diagnostics(
+                model, values, ticks, table, floors=per_floors[h]))
             diags.extend(_far_from_data_diagnostics(model, y_calc, y_bkg, stats))
             # the measurement's half only: support=None withholds the ratio,
             # which has no joint definition (DIAGNOSTIC_SCOPES says why)
@@ -2559,6 +2662,7 @@ class MultiHistogramRefinement:
                 # the partition is of *this* pattern's counts, so a joint fit
                 # has one structure R per histogram, not a pooled one
                 phase_agreement=_phase_agreement(model, values, struct),
+                sigma_rule=model.sigma_rule,
                 diagnostics=diags))
 
         # pooled combined statistics (reported, never quoted alone) --------------
@@ -2566,35 +2670,13 @@ class MultiHistogramRefinement:
             np.concatenate([m.y_obs for m in models]),
             np.concatenate(per_ycalc),
             np.concatenate([m.sigma for m in models]),
-            n_free=len(mt.free_paths),
+            n_free=len(mt.free_paths) + sum(_joint_aux_counts(models)),
             y_background=np.concatenate(per_ybkg))
         # the joint solve's convergence figure, copied and never derived
         # (WP-1341; ``_final_shift_over_esd_multi`` says why it is defined)
         combined.max_shift_over_esd = outcome.max_shift_over_esd
 
-        # one bound test, two consumers: the rows' at_bound flag and the
-        # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929)
-        at_bounds = bound_findings(
-            mt.bounds(), mt.free_paths, outcome.theta,
-            cos=outcome.residual_cosine, esd=outcome.stderr_internal,
-            active=_exact_active_bounds(outcome))
-        # a tied value the LM step held on its own limit, per histogram, a
-        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
-        pressed = pressed_tied_paths(outcome.truncated_by)
-        if pressed and per_esds:
-            seen_shared: set[str] = set()
-            for h, table in enumerate(mt.tables):
-                for f in tied_bound_findings(table, pressed, per_esds[h],
-                                             scope=f"hist.{h}."):
-                    base = f.paths[0].removeprefix(f"hist.{h}.")
-                    e = table.entries[table._paths[base]]
-                    if _row_shared(mt, e):
-                        if base in seen_shared:
-                            continue
-                        seen_shared.add(base)
-                        f = dataclasses.replace(f, paths=(base,), message=base)
-                    at_bounds.append(f)
-        # Histogram 0's physical esds, built once in the loop above and read by
+        # Histogram 0's physical esds, built once above the loop and read by
         # two consumers (WP-1131): the shared rows of ``_parameters``, and the
         # microstructure block, which reads histogram 0 because its value scale
         # is exactly 1.0.  With a correlation matrix this is a dense n x n, so
@@ -2719,7 +2801,7 @@ class MultiHistogramRefinement:
             notes={"n_histograms": str(n), "histogram_weights": weight_note})
 
         return RefinementResult(
-            status=outcome.status, mode="rietveld",
+            status=outcome.status, mode=models[0].mode,
             parameters=parameters, statistics=combined,
             stages=stage_results, diagnostics=diagnostics, provenance=provenance,
             # top-level arrays mirror histogram 0 so .plot() and existing
@@ -2743,7 +2825,7 @@ class MultiHistogramRefinement:
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
                 esds=esd_hist0,
-                floors=floored_paths(mt.tables[0], _hist0_floors(at_bounds))),
+                floors=per_floors[0]),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
@@ -2944,23 +3026,102 @@ class MultiHistogramRefinement:
         return _guard_diagnostics(report) + _size_sharing_diagnostics(mt)
 
 
+def _refuse_joint_mode(mtable, mode: str) -> None:
+    """The modes a joint fit runs, and the one Pawley fit it refuses (WP-2104).
+
+    A Pawley joint fit is one solve only when a column couples its patterns:
+    a shared row an intensity model leaves free (a cell, an instrument
+    parameter), or a parametric equation's coefficients.  Each histogram's
+    intensities are its own, so with nothing else shared the stacked residual
+    is N independent problems, solved slower and reported as one.  Le Bail
+    is refused outright: its partition runs between solves, which the joint
+    path has no seam for (the 2026-11-05 ruling makes Pawley the structure-free
+    direction, so that seam waits).
+    """
+    if mode == "rietveld":
+        return
+    if mode == "lebail":
+        raise NotImplementedError(
+            "a joint fit runs in mode='rietveld' or mode='pawley'. Le Bail's "
+            "partition alternates with the solve, and the joint path has no "
+            "seam for it. mode='pawley' refines the same per-reflection "
+            "intensities inside the solve and can share a cell across patterns")
+    if mode != "pawley":
+        raise ValueError(f"unknown mode {mode!r}; a joint fit runs 'rietveld' "
+                         f"or 'pawley'")
+    dead = sorted({r.target for r in (*mtable.parametric, *mtable.expressions)
+                   if mode_fixed_path(r.target, mode)})
+    if dead:
+        raise ValueError(
+            f"mode={mode!r} force-fixes {', '.join(dead)}: an intensity model "
+            "has no |F|² and no phase scale to fit, so an equation on it would "
+            "refine nothing. Declare the equation in a Rietveld joint fit")
+    if mtable.parametric or mtable.expressions:
+        return
+    for table in mtable.tables:
+        for e in table.entries:
+            if (e.tie is None and not e.locked and row_shared(mtable.sharing, e)
+                    and not mode_fixed_path(e.path, mode)):
+                return
+    raise NotImplementedError(
+        "a joint Pawley fit with nothing shared across its patterns is "
+        f"{mtable.n_histograms} single Pawley fits: each histogram's intensities "
+        "are its own, and so is every other free parameter here. Fit each "
+        "pattern with Refinement.fit(mode='pawley'), or share a parameter "
+        "(SharingMap(shared=...)) or declare a parametric equation")
+
+
+def _joint_mode_fixed(mtable, mode: str) -> list[str]:
+    """The free joint columns ``mode`` force-fixes (``refine.mode_fixed_column``).
+
+    Read off what each column moves in every histogram that carries it
+    (:func:`_joint_column_reach`), unscoped, so a per-histogram scale
+    (``hist.1.phases.0.scale``) is the phase scale it is, and a coefficient
+    driving each pattern's ``biso`` is as dead as the ``biso`` itself.
+    """
+    reach = _joint_column_reach(mtable)
+    return [c for c in mtable.free_paths
+            if mode_fixed_column([_unscoped(q) for q in reach.get(c, [c])], mode)]
+
+
+def _seed_joint_pawley(models, previous, mtable, stage) -> None:
+    """Each histogram's Pawley block at a stage's start: the single runner's.
+
+    Carried by (hkl, m) from the previous stage's compile of the same
+    histogram, or, on the first stage, seeded by a short Le Bail partition
+    (``_pawley_seed_cycles``); then the equal-split and ridge rows are built,
+    scaled to those intensities and constant through the solve
+    (``Refinement._run_stage``).
+    """
+    for h, model in enumerate(models):
+        if previous is not None and previous[h].mode == model.mode:
+            _carry_lebail(previous[h], model)
+        else:
+            table = mtable.tables[h]
+            model.lebail_update(table.decode(table.x0()),
+                                n_cycles=_pawley_seed_cycles(stage))
+        model.build_pawley_restraint()
+
+
 def _row_shared(mtable, entry) -> bool:
     """Whether a table entry is one column of the joint fit
     (:func:`~rietx.params.multi.row_shared`, read with ``mtable``'s map)."""
     return row_shared(mtable.sharing, entry)
 
 
-def _hist0_floors(at_bounds) -> set[str]:
-    """Histogram 0's paths whose ``FLOOR_HIT`` fired, as its values spell them.
+def _hist_floors(at_bounds, h: int) -> set[str]:
+    """Histogram ``h``'s paths whose ``FLOOR_HIT`` fired, as its values spell them.
 
     The joint findings name a shared row bare and a per-histogram row
-    ``hist.h.…`` (``_parameters`` keys on the same spelling), and the
-    microstructure block reads histogram 0's own dict, so a shared floor
-    passes through and a ``hist.0.`` one loses its prefix (WP-1914).
+    ``hist.h.…`` (``_parameters`` keys on the same spelling).  The
+    microstructure block (WP-1914) and the declared-peak diagnostics
+    (WP-2141) read one histogram's own dict, so a shared floor passes through
+    and that histogram's ``hist.h.`` one loses its prefix.
     """
+    own = f"hist.{h}."
     return {_unscoped(p) for f in at_bounds if f.code == "FLOOR_HIT"
             for p in f.paths
-            if p.startswith("hist.0.") or not p.startswith("hist.")}
+            if p.startswith(own) or not p.startswith("hist.")}
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
@@ -3433,7 +3594,11 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
         return None, None
     residual, jacobian, n_data = _multi_closures(models, mtable, weights=weights,
                                                  layout="blocked")
-    x = mtable.x0()
+    # at the answer: ``mtable.x0()`` is the cache the last stage started from
+    # (``_joint_theta``).  A Pawley block is free on both sides of the test,
+    # so its columns and names ride after the table's (WP-2104)
+    x = np.concatenate([_joint_theta(mtable), *[m.pawley_x0() for m in models
+                                                if m.pawley is not None]])
     index = {p: i for i, p in enumerate(mtable.free_paths)}
     hold = sorted({index[p] for f in at_bounds for p in f.paths if p in index})
     variables = {p for r in mtable.expressions for p in r.paths}
@@ -3454,7 +3619,8 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
         reach = table.entry_reach()
         usable.append(all(set(reach.get(p, ())) <= written for p in variables))
     return form_tests(mtable.parametric, jacobian(x), residual(x), n_data,
-                      mtable.free_paths, unseen, hold, expressions=mtable.expressions,
+                      mtable.free_paths + _joint_aux_paths(models), unseen, hold,
+                      expressions=mtable.expressions,
                       values=values, usable=usable, scope=mtable._canonical)
 
 
@@ -3683,6 +3849,7 @@ def _joint_origin_findings(stage_results, mtable) -> list[Diagnostic]:
 def refine_multi(data: list[PatternData], structure: Structure | list[Structure],
                  instruments: list[Instrument], *,
                  plan: RefinementPlan | PlanSpec | str = "mccusker_default",
+                 mode: str = "rietveld",
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
@@ -3697,12 +3864,14 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     :class:`MultiHistogramRefinement`; ``structure`` (one, or one per
     pattern), ``coordinates`` and ``parametric`` are its constructor's
     (WP-1325), as is ``variables``, the named quantities a
-    ``basis="expression"`` equation refines (WP-1964), and ``events``,
-    ``cancel``, ``telemetry``, ``label`` and ``progress`` its ``fit``'s."""
+    ``basis="expression"`` equation refines (WP-1964), and ``mode``,
+    ``events``, ``cancel``, ``telemetry``, ``label`` and ``progress`` its
+    ``fit``'s."""
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
                                    variables=variables,
                                    backend=backend, solver=solver)
-    return ref.fit(data, plan=plan, two_theta_limits=two_theta_limits, weights=weights,
+    return ref.fit(data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
+                   weights=weights,
                    events=events, cancel=cancel, telemetry=telemetry, label=label,
                    progress=progress)

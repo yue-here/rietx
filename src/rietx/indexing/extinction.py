@@ -419,10 +419,18 @@ def content_exclusion(sg: gemmi.SpaceGroup, z: int,
 
 def _atoms_per_cell(n: float, z: int):
     """``n`` atoms per formula unit times ``z``, as an exact ``Fraction``: the
-    decimal as written, so 0.7 × 10 is 7 and not 7.000000000000001."""
+    decimal as written, so 0.7 × 10 is 7 and not 7.000000000000001.
+
+    The screen passes the parser's exact count
+    (:func:`~rietx.crystallography.atomic_volume._exact_formula_counts`), which
+    is taken as it stands.  A float, from a caller's own ``counts``, is read
+    as the decimal it prints, which is the decimal as written for a count
+    typed as a literal and not for one that came out of float arithmetic:
+    ``(Mg0.7Fe0.3)2SiO4``'s float Fe is 0.6000000000000001 (#1271's review).
+    """
     from fractions import Fraction
 
-    return Fraction(str(n)) * int(z)
+    return (n if isinstance(n, Fraction) else Fraction(str(n))) * int(z)
 
 
 def uncounted_elements(z: int, counts: dict[str, float]) -> dict[str, float]:
@@ -1389,14 +1397,14 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     screen.n_classes = len(classes)
 
     # the declared Z, settled on the cell the classes are screened at
-    from ..crystallography.atomic_volume import formula_counts
+    from ..crystallography.atomic_volume import _exact_formula_counts
     from ..crystallography.lattice import cell_volume
 
     screen.z, screen.z_from_density = declared_z(
         prior, float(cell_volume(*candidate.cell)))
     if screen.z_from_density is not None and prior.z is None:
         screen.z_candidates = density_zs(screen.z_from_density)
-    counts = (formula_counts(prior.formula)
+    counts = (_exact_formula_counts(prior.formula)
               if prior is not None and prior.formula else None)
 
     # 3a — what each class forbids, and which of those the data can test.  No

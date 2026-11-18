@@ -193,9 +193,11 @@ class Stage:
     #: path globs this stage **fixes** after it frees ``turn_on`` (WP-2208,
     #: ruled 2026-11-09), so ``turn_on=["phases.*"]`` with
     #: ``turn_off=["phases.*.atoms.*.biso"]`` frees a phase but its
-    #: displacements.  GSAS-II's scripted ``clear``, applied after its ``set``
-    #: in the same order (``docs/practice.md`` § A stage that fixes a
-    #: parameter).  The flags carry, so a fix lasts until a later stage's
+    #: displacements.  Fixing after freeing is the only order in which a
+    #: narrow fix inside a broad free does anything.  GSAS-II's scripted
+    #: ``set`` and ``clear`` run in the same order (read in its source; its
+    #: docs do not state the order; ``docs/practice.md`` § A stage that
+    #: fixes a parameter).  The flags carry, so a fix lasts until a later stage's
     #: ``turn_on`` frees the path again, and the closing stage re-solves that
     #: end state (:func:`fixed_at_end`).  Fixing a held, locked or force-fixed
     #: row changes nothing: a fix only ever sets ``vary`` to False.  Last of

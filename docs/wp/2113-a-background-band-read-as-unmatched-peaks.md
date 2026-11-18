@@ -46,6 +46,21 @@ Layer 0, which every report reads.
 acceptance lists, and a two-phase list where the unmatched lines are real), with the known impurity as
 the reference. It answers by kind 3: report the number with its meaning.
 
+### Inherited
+
+- **2026-11-15, from WP-2041 (PR #1570): a third family, a strong line's tail past the fit's
+  profile window.** Tutorial 03's synthetic aragonite (one phase, true Lorentzian X = 0.05),
+  cut to 10-45° 2θ and indexed with the notebook's `spec`, ranks the true cell first and reports
+  `unmatched_observed` 1, `INDEX_IMPURITY_LINES` "strongest region near 25.540°". That is the
+  low-angle tail of the 26.22° line, the pattern's strongest. The Pawley validation's calculated
+  curve is 211 counts (its background) from 25.42° to 25.60° and jumps to 268 at 25.62°, so the
+  line's profile starts there. The truth over 25.42-25.60° is 251-282 counts, so 40-70 counts of
+  tail stay in the residual, and a noise high at 25.54° (307 observed, 269 true) reaches Δ/σ 5.5.
+  Over the full 10-80° range the same pattern reports 0 unmatched. Measured on `978bf43c1`, arm64
+  venv `[dev]`, macOS; probe in WP-2041's handover entry. The tutorial now quotes this warning
+  and says the region is the tail, so a fix here changes notebook 03's output: rebuild it with
+  `examples/tutorials/build.py` and reread the paragraph after "The row also raises".
+
 ## Non-goals
 
 - The ranking, which this count does not enter.
