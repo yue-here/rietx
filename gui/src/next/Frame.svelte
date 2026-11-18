@@ -766,6 +766,7 @@
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
+            anodes={capabilities?.anodes ?? []}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }}
             onholds={(h) => (pendingHolds = h)} />
         </div>

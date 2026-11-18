@@ -1492,3 +1492,76 @@ def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, 
     finally:
         httpd.shutdown()
     assert not failures, "\n".join(failures)
+
+
+def _open_instrument(page) -> None:
+    page.get_by_role("button", name="Instrument actions", exact=True).click()
+    page.get_by_role("menuitem", name="Source and geometry…", exact=True).click()
+    page.wait_for_selector('[role="dialog"] [data-field="geometry.axial_sl"]')
+    _frames(page)
+
+
+def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 133-136. The Instrument band's ⋯ opens the Instrument
+    dialog over the window, which moves nothing. S/L typed equal to H/L shows
+    the warning beside the pair. Apply sends the wavelength in the model and
+    S/L through the table, then closes. Cancel writes nothing. Loading a
+    profile replaces the instrument at once. A project of its own, since
+    Apply writes."""
+    httpd, client = _serve(tmp_path_factory, "next-instrument")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, saved = client.post("/api/export/instrument_profile", {})
+        assert status == 200, saved
+        page = _open_window(browser, url)
+        page.locator("section.model .tabs button", has_text="Parameters").first.click()
+        page.wait_for_selector("tr[data-atom]")
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+        _open_instrument(page)
+        failures = [f"open: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert page.locator('[role="dialog"] h2').inner_text() == "Instrument"
+
+        dialog = page.locator('[role="dialog"]')
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.02")
+        dialog.locator('[data-field="geometry.axial_hl"]').fill("0.02")
+        _frames(page)
+        assert "S/L = H/L = 0.02" in dialog.locator(".warn").inner_text()
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.015")
+        dialog.locator('[data-field="source.lines.0.wavelength"]').fill("0.4140")
+        _frames(page)
+        assert dialog.locator(".warn").count() == 0
+        head = client.get("/api/project")[1]["head"]
+        dialog.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.414
+        assert ins["geometry"]["axial_sl"]["value"] == 0.015
+        assert ins["geometry"]["axial_hl"]["value"] == 0.02
+        assert client.get("/api/project")[1]["head"] != head
+
+        # an anode choice, then Cancel: nothing is written
+        head = client.get("/api/project")[1]["head"]
+        _open_instrument(page)
+        dialog.locator("select").first.select_option("MoKa1")
+        _frames(page)
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value().startswith("0.709")
+        dialog.get_by_role("button", name="Cancel", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        assert client.get("/api/project")[1]["head"] == head
+
+        # a saved profile replaces the instrument at once, one node
+        _open_instrument(page)
+        dialog.locator('input[type="file"]').set_input_files(saved["path"])
+        page.wait_for_function(
+            "document.querySelector('[role=dialog] .reason')?.textContent.startsWith('Loaded')")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.4139
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value() == "0.4139"
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        failures += [f"closed: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)

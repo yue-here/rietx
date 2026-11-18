@@ -92,7 +92,7 @@ How each screen reads in the prototype, restated:
   the title (acceptance row 6) and a browser pass with a real drag (row 9). The first PR.
 - [x] The Peaks and Background graphs (rows 59-68). The second PR.
 - [x] The Structure graph (rows 69-82), from #1519's source. The third PR.
-- [ ] The Instrument dialog (rows 133-136) and File › Export › Instrument profile…. The fourth
+- [x] The Instrument dialog (rows 133-136) and File › Export › Instrument profile…. The fourth
   PR.
 - [ ] Screenshots at 1440 × 900, light and dark, under `docs/wp/2218-screenshots/`, for each
   PR's screens. The last PR waits on the maintainer's look.

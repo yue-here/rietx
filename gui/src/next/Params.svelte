@@ -35,7 +35,8 @@
    * Each acts at once, one history node through today's verb (interaction
    * rules 11 and 12), and waits while edits are pending, since a deleted atom
    * renumbers the paths a pending edit names. The filter row's ⋯ holds the
-   * bulk Free and Fix.
+   * bulk Free and Fix. The Instrument band's ⋯ holds Source and geometry…,
+   * which opens the Instrument dialog (WP-2218, rows 133-136).
    *
    * The layout rule (2026-11-07): no click moves the layout unless it asks
    * to. So the editor and its popover float (`position: fixed`), a pending
@@ -55,6 +56,8 @@
   import { asGlob, editState, heldGlyph, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
   import Ask, { type AskField } from "./Ask.svelte";
+  import Instrument from "./Instrument.svelte";
+  import type { Anode } from "./instrument";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import SpaceGroup from "./SpaceGroup.svelte";
   import { shortTitle, unitText } from "./words";
@@ -63,6 +66,7 @@
     head = null,
     busy = false,
     corpus = null,
+    anodes = [],
     say = (_line: string) => {},
     onpending = (_touched: number, _invalid: string) => {},
     onholds = (_holds: ReadonlyMap<string, boolean>) => {},
@@ -71,6 +75,8 @@
     head?: string | null;
     busy?: boolean;
     corpus?: HelpCorpus | null;
+    /** `GET /api/capabilities`'s anodes, for the Instrument dialog */
+    anodes?: readonly Anode[];
     say?: (line: string) => void;
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
@@ -422,9 +428,11 @@
 
   // ---------------------------------------------------------------- menus
 
-  /** The menu open: the filter row's, a phase band's, or an atom row's. */
+  /** The menu open: the filter row's, a phase band's, the Instrument band's,
+   *  or an atom row's. */
   type Open =
     | { kind: "filter"; at: MenuAt; anchor: HTMLElement }
+    | { kind: "instrument"; at: MenuAt; anchor: HTMLElement }
     | { kind: "phase"; phase: number; at: MenuAt; anchor: HTMLElement }
     | { kind: "atom"; phase: number; atom: number; at: MenuAt; anchor: HTMLElement | null };
   let menu = $state<Open | null>(null);
@@ -432,6 +440,7 @@
   let ask = $state<{ at: { x: number; y: number }; label: string; fields: AskField[];
                      submit: string; send: (v: Record<string, string>) => Promise<string> } | null>(null);
   let sgFor = $state<number | null>(null);
+  let instrumentOpen = $state(false);
   let cifInput: HTMLInputElement | undefined = $state();
 
   /** Why a structural edit waits, or "" when it can go. */
@@ -481,6 +490,9 @@
         { id: "fix", label: bulkLabel("Fix", bulk.toFix), disabled: busy || !bulk.toFix, title: why },
       ];
     }
+    if (m.kind === "instrument") {
+      return [{ id: "instrument", label: "Source and geometry…", ...gate }];
+    }
     if (m.kind === "phase") {
       return [
         { id: "rename", label: "Rename…", ...gate },
@@ -510,6 +522,10 @@
     if (m.kind === "filter") {
       if (id === "free") void bulkVary(true);
       else if (id === "fix") void bulkVary(false);
+      return;
+    }
+    if (m.kind === "instrument") {
+      if (id === "instrument") instrumentOpen = true;
       return;
     }
     const r = m.anchor?.getBoundingClientRect();
@@ -1291,6 +1307,11 @@
               title="Rename, change the space group, add an atom"
               onclick={(e) => toggleMenu({ kind: "phase", phase: phaseOf(section),
                 at: below(e.currentTarget, true), anchor: e.currentTarget })}>{@render dots()}</button>
+          {:else if section.kind === "instrument"}
+            <button class="ib" aria-label="Instrument actions" aria-haspopup="menu"
+              aria-expanded={menu?.kind === "instrument"} title="Source and geometry"
+              onclick={(e) => toggleMenu({ kind: "instrument", at: below(e.currentTarget, true),
+                anchor: e.currentTarget })}>{@render dots()}</button>
           {:else}
             <!-- the ⋯'s slot, kept so every band's count sits in one column -->
             <span class="ibslot" aria-hidden="true"></span>
@@ -1309,8 +1330,14 @@
 </section>
 
 {#if menu}
-  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase" : "Atom"}
+  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase"
+    : menu.kind === "instrument" ? "Instrument" : "Atom"}
     anchor={menu.anchor} items={menuItems} onchoose={chooseMenu} onclose={() => (menu = null)} />
+{/if}
+
+{#if instrumentOpen}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed}
+    onclose={() => (instrumentOpen = false)} />
 {/if}
 
 {#if ask}

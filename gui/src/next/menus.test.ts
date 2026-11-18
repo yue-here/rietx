@@ -47,6 +47,13 @@ vi.mock("../api", () => ({
     symmetry: async () => ({ letters: [] }),
     patchStructure: (s: unknown, label?: string) => patchStructure(s, label),
     aniso: (p: string, on: boolean) => aniso(p, on),
+    instrument: async () => ({ instrument: {
+      source: { kind: "xray_cw", polarization: { value: 0.5, vary: false },
+                lines: [{ wavelength: { value: 1.5405, vary: false }, weight: { value: 1, vary: false } }] },
+      geometry: { kind: "debye_scherrer", mu_r: null, capillary_radius_mm: null, packing_fraction: 0.6,
+                  sample_displacement: { value: 0, vary: false },
+                  axial_sl: { value: 0, vary: false }, axial_hl: { value: 0, vary: false } },
+      zero_shift: { value: 0, vary: false } } }),
   },
 }));
 
@@ -169,8 +176,19 @@ describe("the Parameters panel's menus", () => {
     named("fluorapatite actions")!.click();
     flushSync();
     expect(menuLabels()).toEqual(["Rename…", "Change space group…", "Add atom…", "Replace from CIF…"]);
-    // only a phase band carries one
-    expect(document.querySelectorAll(".band button.ib").length).toBe(1);
+    // a phase band and the Instrument band carry one each
+    expect(document.querySelectorAll(".band button.ib").length).toBe(2);
+  });
+
+  it("opens the Instrument dialog from the Instrument band's ⋯ (WP-2218)", async () => {
+    await open();
+    named("Instrument actions")!.click();
+    flushSync();
+    expect(menuLabels()).toEqual(["Source and geometry…"]);
+    named("Source and geometry…")!.click();
+    await settle();
+    expect(document.querySelector("[role=dialog] h2")!.textContent).toBe("Instrument");
+    expect(document.querySelector("[data-field='geometry.axial_sl']")).not.toBeNull();
   });
 
   it("renames a phase through one whole-model edit", async () => {
