@@ -1,8 +1,7 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-13 — #1535, #1536 and #1537 merged; the polish PR open (#1538), the 2026-11-13 rulings applied
+Milestone: gui-overhaul · Status: ✅ 2026-11-18 — #1535, #1536 and #1537 merged on 2026-11-11 and the polish, #1538, on 2026-11-17; the refinement window is served at `/next`, and R3 (WP-2218) builds on it
 Depends on: 2215 (the frame)
-Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
 ## Goal
 
@@ -213,6 +212,25 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
+- **2026-11-18** — closed by the session that opened R3 (WP-2218), on a `main` that
+  includes #1658. #1537 merged on 2026-11-11 and the polish PR, #1538, on 2026-11-17, after
+  Yue looked at the `ruled-*` pictures (§ Rulings, the last entry). That look is the
+  acceptance's review of the screens beside the prototype's. Every task is ticked and every
+  question is answered. The rebuilt GUI's refinement window is on `main` at `/next`: the
+  Pattern graph, the Parameters tab with its phase and atom menus, the action bar with one
+  Apply, and the recovery offer. It goes out with v1.12.
+
+  *Changed by this close.* Status ✅, the `Priority:` line removed, the narrative moved to
+  `docs/milestones/v1.12.md`, and the R2 row of `docs/milestones/gui-overhaul.md` § The
+  rebuild marked merged. This WP had no `### Inherited` section, and no other WP's
+  priority waited on it.
+
+  *Leftovers, and where each went.* Today's page keeps its own tick band, gridlines, Mult
+  column and "masked" toggle until the swap retires it; that is the swap's piece. R3
+  (WP-2218) takes the Interactive tab and the preview on the Pattern graph. Docs only; no
+  test moved.
+
+  Next: none in this WP.
 - **2026-11-13** — a ghostshift runner applied Yue's 2026-11-13 rulings to the polish PR,
   #1538, after merging `origin/main` into it.
   - *Done*: `gui/src/next/Params.svelte` drops the Mult column. `gui/src/next/Pattern.svelte`

@@ -21,11 +21,14 @@
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
+  import Interactive from "./Interactive.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
-  import { RecoveryWriter, combine, readDraft, restoredText, type Draft, type InteractiveDraft,
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
            type ModelDraft, type PlanDraft, type TextDraft } from "../lib/recovery";
+  import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "../lib/interactive";
   import { isShortcutTarget, type Command } from "../lib/palette";
+  import { peakWindows, widestFwhm } from "../lib/peakwin";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
@@ -73,6 +76,34 @@
   let pendingInvalid = $state("");
   let paramsPanel = $state<any>(null);
   let refining = false;
+  /** The Interactive tab's pending slider values and the preview they drew
+   *  (WP-2128, mounted here by WP-2218). The action bar counts both panels'
+   *  edits as one set, as today's page does. */
+  let interactivePanel = $state<any>(null);
+  let sliderTouched = $state(0);
+  let previewAnswer = $state.raw<PreviewAnswer | null>(null);
+  let previewError = $state("");
+  const touched = $derived(pendingTouched + sliderTouched);
+  /** The curves the Pattern graph last fetched: the sliders' ranges are
+   *  measured from its widest peak and its highest angle. */
+  let baseCurves = $state.raw<any>(null);
+  const rangeContext = $derived.by((): RangeContext => {
+    const tt = baseCurves?.arrays?.two_theta;
+    const fwhm = baseCurves ? widestFwhm(peakWindows(baseCurves)) : 0;
+    return { fwhm: fwhm > 0 ? fwhm : FALLBACK_FWHM_DEG,
+             thetaMaxDeg: tt?.length ? tt[tt.length - 1] / 2 : 45 };
+  });
+  /** One name per phase, in order, read off the tick rows: a magnetic
+   *  phase's row and the declared peaks' row are not phases (today's
+   *  `App.svelte:phaseNames`). */
+  const phaseNames = $derived.by(() => {
+    const out: string[] = [];
+    for (const key of Object.keys(baseCurves?.header?.ticks ?? {})) {
+      if (key === "(extra)" || (out.length && key === `${out[out.length - 1]} (magnetic)`)) continue;
+      out.push(key);
+    }
+    return out;
+  });
 
   let showGraphs = $state(true);
   let showModel = $state(true);
@@ -153,23 +184,22 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
-  /** The kept copy's Interactive, Plan, Text and Model arms, which today's
-   *  page wrote and this page has no panel for. The copy is one per project
-   *  and shared by both pages, so they ride on every write from here: a
-   *  Parameters edit on this page never drops the other page's unapplied
-   *  edits. The Text and Model arms are not in the action bar's count
-   *  (WP-2213), so they add nothing to `carriedCount`. */
-  const NO_CARRY = { interactive: null, plan: null, text: null, model: null } as const;
-  let carried = $state.raw<{ interactive: InteractiveDraft | null; plan: PlanDraft | null;
-                             text: TextDraft | null; model: ModelDraft | null }>(NO_CARRY);
-  const carriedCount = $derived(
-    (carried.interactive ? Object.keys(carried.interactive.values ?? {}).length : 0)
-    + (carried.plan ? 1 : 0));
+  /** The kept copy's Plan, Text and Model arms, which today's page wrote and
+   *  this page has no panel for. The copy is one per project and shared by
+   *  both pages, so they ride on every write from here: an edit on this page
+   *  never drops the other page's unapplied edits. The Interactive arm is this
+   *  page's own (WP-2218). The Text and Model arms are not in the action bar's
+   *  count (WP-2213), so they add nothing to `carriedCount`. */
+  const NO_CARRY = { plan: null, text: null, model: null } as const;
+  let carried = $state.raw<{ plan: PlanDraft | null; text: TextDraft | null;
+                             model: ModelDraft | null }>(NO_CARRY);
+  const carriedCount = $derived(carried.plan ? 1 : 0);
   $effect(() => {
     const path = project?.path ?? null;
     const extra = carried;
-    const draft = combine(pendingTouched + carriedCount,
-                          { ...extra, params: paramsPanel?.draft() });
+    const draft = combine(touched + carriedCount,
+                          { ...extra, params: paramsPanel?.draft(),
+                            interactive: interactivePanel?.draft() });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -245,6 +275,7 @@
     offer = null;
     carried = NO_CARRY;
     paramsPanel?.revert();
+    interactivePanel?.revert();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -260,10 +291,9 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
-    carried = draft?.interactive || draft?.plan || draft?.text || draft?.model
-      ? { interactive: draft.interactive, plan: draft.plan, text: draft.text,
-          model: draft.model } : NO_CARRY;
-    if (draft?.params) {
+    carried = draft?.plan || draft?.text || draft?.model
+      ? { plan: draft.plan, text: draft.text, model: draft.model } : NO_CARRY;
+    if (draft?.params || draft?.interactive) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
       return;
@@ -277,8 +307,9 @@
     if (!o) return;
     offer = null;
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
+    if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
     recoveryWriter.arm(o.path, o.draft);
-    modelTab = "params";
+    modelTab = o.draft.params ? "params" : "interactive";
     say(restoredText(o.draft));
   }
 
@@ -371,11 +402,20 @@
       showModel = true;
       return false;
     }
+    // the slider values second, so a slider wins a path both panels touched;
+    // each panel's apply is its own node, as on today's page
+    const slid = !!(await interactivePanel?.apply());
+    if (!slid) {
+      modelTab = "interactive";
+      showModel = true;
+      return false;
+    }
     return true;
   }
 
   function revertPending() {
     paramsPanel?.revert();
+    interactivePanel?.revert();
   }
 
   /** The action bar's primary: apply the pending edits, then refine. `cycle`
@@ -384,7 +424,7 @@
     if (refining || busy || noPhases || pendingInvalid || !project) return;
     refining = true;
     try {
-      if (pendingTouched && !(await applyPending())) return;
+      if (touched && !(await applyPending())) return;
       if (mode === "plan") {
         run = await api.run({ kind: "fit" });
         say("ref.fit(data, plan=…)");
@@ -490,13 +530,13 @@
       key: `${mod}J`, disabled: !project, run: toggleBottom },
     { id: "stop", label: "Stop the run", echo: "token.cancel()", key: `${mod}.`,
       disabled: !busy, run: stop },
-    { id: "refine", label: pendingTouched ? "Apply the edits and refine" : "Refine",
+    { id: "refine", label: touched ? "Apply the edits and refine" : "Refine",
       echo: "ref.fit(data, plan=…)", key: `${mod}Enter`,
       disabled: !project || busy || noPhases || !!pendingInvalid, run: () => refine() },
     { id: "apply", label: "Apply the edits", echo: "ref.set_values(…)",
-      disabled: !pendingTouched || busy || !!pendingInvalid, run: () => applyPending() },
+      disabled: !touched || busy || !!pendingInvalid, run: () => applyPending() },
     { id: "revert", label: "Revert the edits", echo: "",
-      disabled: !pendingTouched, run: revertPending },
+      disabled: !touched, run: revertPending },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -666,7 +706,8 @@
           {#if graphTab === "pattern"}
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
-              projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi} />
+              projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
+              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -706,11 +747,18 @@
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
+        <!-- mounted while hidden too: its slider values are pending edits -->
+        <div class="pane" class:gone={!!unbuilt || modelTab !== "interactive"}>
+          <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
+            context={rangeContext} {phaseNames}
+            onpending={(n) => (sliderTouched = n)}
+            onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
+        </div>
         {#if !unbuilt}
-          {#if modelTab !== "params"}
+          {#if modelTab !== "params" && modelTab !== "interactive"}
             <div class="pane"><p class="unbuilt">Not built yet.</p></div>
           {/if}
-          <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
+          <ActionBar bind:mode={refineMode} {touched} invalid={pendingInvalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
         {/if}
