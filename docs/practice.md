@@ -1301,6 +1301,39 @@ file" (FullProf), "include file" and "macro" (TOPAS), "template" (RIETAN-FP, and
 for its `.pcr`), "device file" (BGMN) and "refinement preset" (Profex). No program uses one
 word for a set spanning instrument, limits and refinement order.
 
+## A curve computed by another program
+
+Surveyed 2026-11-18 for WP-1512, on how a tabulated curve on 2θ enters a fit: a stacking-fault
+diffuse term from DIFFaX, a Debye sum, an amorphous reference. The questions were where the
+curve lands, what scales it, and whether it follows the specimen's position corrections.
+
+- GSAS-II 5.8.4, checked (source). A "fixed background file" is another histogram in the same
+  project (`Background[1]['background PWDR']`, a name, a multiplier and a refine flag). It is
+  read channel for channel over the same index range, with no interpolation and no position
+  correction (`GSASIIstrIO.py:579-592`). It is added to the background with one refinable
+  multiplier, `BF mult` (`GSASIIpwd.py:1144-1145`, derivative `:2149-2150`). A stacking-fault
+  model is a phase of its own, type `faulted`, simulated through DIFFaX (`StackSim`,
+  `CalcStackingPWDR`, `GSASIIpwd.py:4859, 5155`). Whether a faulted phase enters the least
+  squares was not checked.
+- FullProf, checked (manual; the copy read states no version). `Nba = 1` reads the background
+  from `FILE.bac`, either on a fixed step or as (2θ, intensity) pairs. It is applied as
+  Background(2θ) = b₁·Backg[(1 + b₃)·2θ + b₄] + b₂, eq. 3.6, so the curve has its own scale b₁,
+  offset b₂, stretch b₃ and shift b₄, each refinable. It lands in the background.
+- TOPAS, checked (manual; Technical Reference version 5, not the version 9 named above).
+  `user_y NAME file` loads a tabulated shape, §7.10. It enters any equation that is a function of
+  X, usually as `fit_obj = NAME`, and `fo_transform_X` maps the pattern's X onto the curve's
+  own axis, so a shift or stretch is an equation the user writes. The amplitude is likewise an
+  equation, so it can be a phase's scale times a constant. Where it lands is a flag on the
+  `fit_obj`: `fit_obj_phase` (§13.1). Example Quant-7.inp uses a `user_y` as a phase, linked to
+  a `dummy_str` for its weight fraction (§7.9.5-7.9.6).
+
+So two of the three put a file curve in the background with one multiplier, and the third lets
+the user say where it lands. Only GSAS-II applies no position correction, and its curve is a
+measured histogram on the same instrument, which already carries that instrument's zero offset.
+FullProf and TOPAS both let the curve move along the axis, by a refinable shift or by an
+equation. No program among the three ties the amplitude to a phase scale by default. TOPAS
+lets the user write that tie as an equation.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
