@@ -695,13 +695,13 @@
             {#each levels as key (key)}<option value={key}>{pctText(Number(key))}</option>{/each}
           </select>
         </label>
-        <label class="row" title="A drawing scale, not a probability">Size
+        <label class="row">Size
           <input type="range" min="1" max="4" step="0.25" value={exaggeration}
             oninput={(e) => (exaggeration = Number((e.currentTarget as HTMLInputElement).value))} />
           <span class="num">×{exaggeration.toFixed(2)}</span>
         </label>
       {/if}
-      <label class="row" title="A bond is drawn at d ≤ tol·(rᵢ+rⱼ) on covalent radii">Bonds up to
+      <label class="row">Bonds up to
         <input type="range" min="0.9" max="1.4" step="0.05" value={tolerance}
           oninput={(e) => (toleranceShown = Number((e.currentTarget as HTMLInputElement).value))}
           onchange={(e) => (tolerance = Number((e.currentTarget as HTMLInputElement).value))} />
