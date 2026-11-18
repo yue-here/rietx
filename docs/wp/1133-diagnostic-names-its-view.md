@@ -1,11 +1,10 @@
 # WP-1133 — A diagnostic names the view that shows it
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — tasks 1-2 landed (PR #1676); task 3's spend waits on the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-18 — PR #1676; three codes name their montage panel, the skill carries the channel rule, and the maintainer declined task 3's eval round
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (WP-1130 closed 🛑 2026-09-04; it did **not** deliver the panel,
-and this WP inherits it along with the argument that licenses it — see
-### Inherited)
-Priority: P3 2026-09-23 — a diagnostic that is right and says less than it could
+and this WP took over the argument that licenses it — see
+§ What 1130 and 1307 left)
 
 ## Goal
 
@@ -65,40 +64,13 @@ agent to guess.
 and every guard `Diagnostic` (`schemas/common.py`) carries `where` and
 `value`; neither says which rendered view makes the finding legible.
 `viz.plot_for_vlm` is the montage. 1130 was to add a background panel to it
-and closed without one (Inherited, Gap C).
+and closed without one (§ What 1130 and 1307 left).
 `tests/eval_report_agent/` and `tests/eval_agent_surface/PROTOCOL.md` hold the
 eval discipline: register the read-out before running, enforce the condition
 in a shim rather than the prompt, real subagents with model and effort as
 variables, and no pooling across rounds.
 
-### Inherited
-
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): a real-agent round here launches with
-  `--setting-sources project,local`.** `~/.claude/skills/rietx` is a
-  symlink to the maintainer's checkout, and a user-level skill shadows a
-  workspace one of the same name, so without the flag every cell reads the
-  checkout's body and a `bare` cell is not bare. Check which body each
-  cell was handed off its transcript (`tests/eval_skill_placement/
-  runner.condition_held`).
-
-From **WP-1406** (2026-09-15), which documented the track this WP was waiting on:
-
-- **There is a rendered view to name now, and it is live rather than a file.**
-  `rietx watch` serves every run a fit records, drawing the obs/calc/difference
-  plot from `snapshot.json` and redrawing it in place per stage. So a finding
-  that wants to say "look at this" has a second answer beside a written page: a
-  URL into a run that is still being written. Its chapter is
-  `docs/manual/using/cli.md` § `rietx watch`, and what a run holds is
-  `using/refining.md` § Watching a run.
-- **The view is per stage, which changes the round-trip question this WP
-  measures.** The old `fit.html` was one page at the end of a run. A watcher
-  view exists while the fit is still going, so "an image pays for itself on a
-  question an agent cannot name in advance" can now be asked about a *mid-run*
-  image, which is a different and probably stronger case. Worth deciding
-  deliberately rather than inheriting the end-of-run framing.
-- **No naming mechanism was added.** `Diagnostic` still has no field pointing at
-  a view, and WP-1406 deliberately added none. This WP is still the one that
-  decides whether a finding names its view and how.
+### What 1130 and 1307 left
 
 From **WP-1130** § Gap C, 2026-09-04. **This WP's dependency changed shape
 rather than being discharged.** 1130's line above — "the background panel with
@@ -126,7 +98,6 @@ the Δ/σ panel and the worst-region zooms, and nothing else. A background level
 still has no view, because a uniform factor of two in level leaves a smooth
 monotone decay with no visual signature (§ What the 2026-08-23 session
 measured).
-
 
 From **WP-1307** (round 1.1, E-RAMP complete 2026-08-29, four cells): **making
 the plotting library present did not make the package's plotting surface the
@@ -161,7 +132,10 @@ is the first evidence that the weaker version of it fails.
 Round 1.1's four cells are E-RAMP only; the four E-ZRM reel cells are
 outstanding, so this is a finding at N = 4 on synthetic data, not a rate.
 
-### Task 3, the proposed round (2026-11-18; registered, not run)
+### Task 3, the proposed round (2026-11-18; registered, declined, not run)
+
+*Declined 2026-11-18 by the maintainer, who bought none of the options below.*
+The registration stays as the protocol a later round would start from.
 
 **Two of the task's three inputs are gone.** 1130's panel never shipped (Gap C
 above). 1130's trigger fit no longer carries the error: re-run on the tree in
@@ -212,9 +186,11 @@ printed fit; this one runs code, so take one to three times that):
 | C: three models, N = 3 | 54 | $60–200 | a rate per model, to N = 3 |
 
 The repo-side work (fits, shim, scorer, `runner.py` from
-`tests/eval_skill_placement/`) costs no money and is the next session's first
-item once an option is picked. Launch with `--setting-sources project,local`
-(Inherited, 1338).
+`tests/eval_skill_placement/`) costs no money. A round launches with
+`--setting-sources project,local` (WP-1338, 2026-09-28):
+`~/.claude/skills/rietx` is a symlink to the maintainer's checkout, and a
+user-level skill shadows a workspace one of the same name. Without the flag
+every cell reads the checkout's body, so a `bare` cell is not bare.
 
 ## Non-goals
 
@@ -262,10 +238,16 @@ item once an option is picked. Launch with `--setting-sources project,local`
       result may be that the image buys nothing; that is a result to record
       and act on by removing the pointer's claim, not to soften.
       *2026-11-18*: the round is registered in § Task 3, the proposed round,
-      which replaces 1130's panel and trigger fit. Its spend waits on the
-      maintainer's pick from that section's menu.
-- [ ] Tests (the vocabulary meta-test; the field's JSON round trip; the eval's
-      shim) + the montage PNGs the eval used to `tests/output/`.
+      which replaces 1130's panel and trigger fit.
+      *Declined 2026-11-18 by the maintainer's ruling*: no spend option is
+      taken and the round is not run. The skill's withheld clause stays out.
+- [x] Tests (the vocabulary meta-test; the field's JSON round trip;
+      ~~the eval's shim~~) + ~~the montage PNGs the eval used to
+      `tests/output/`~~.
+      *The vocabulary meta-test landed 2026-11-18.* No JSON round trip is owed,
+      because nothing is stored: the test asserts `view` is absent from the
+      dump. The eval shim and its PNGs are not owed, because task 3 was
+      declined.
 
 ## Acceptance
 
@@ -288,6 +270,13 @@ measurement is recorded with its pre-registered read-out and a decision.
 ## Handover log
 
 - **2026-11-18** — A diagnostic can now say which picture shows its finding, and the skill says when a picture is worth drawing at all. Three codes point at a panel of the montage `plot_for_vlm` draws: a model far from the data at the overview, and the two low-angle background codes at the Δ/σ panel. Every other code reads `None`, which now says no view was checked for it. The claim that a picture pays for itself on a question an agent cannot name is still unmeasured. Its round is registered with a costed menu and waits on the maintainer's pick, since two of the task's three inputs are gone. Session by a ghostshift runner, PR #1676.
+
+  *2026-11-18 (later): maintainer's rulings.* Yue ruled in conversation, and the WP closes ✅ on them.
+  - **Task 3's eval round: none is bought.** No spend option is taken. The skill's withheld clause ("draw the montage for a question you cannot name") stays out of the skill. Task 3 is declined by this ruling, so task 4's eval shim is not owed. Grounds Yue was given: two earlier negative measurements, WP-1130 Finding 8 and WP-1307 round 1.1 (zero `plot_for_vlm` calls in four cells).
+  - **Approved:** the notebook `see:` line and the public property `Diagnostic.view`. This is the reader-output approval the 2026-11-01 ruling asks for.
+  - **Settled by Claude; Yue may reverse either.** `str(diagnostic)` carries no `see:` line, under the 2026-11-01 ruling and WP-1985's rule that per-code text is never stored. The alternative was to print it in `str`. The JSON dump omits `view`, because it is a property, under the same WP-1985 rule. The alternative was a stored field.
+
+  The three questions in *Next* below are answered by these rulings. On close, the `### Inherited` mailbox was emptied. Its WP-1130 Gap C and WP-1307 entries are the evidence behind the design, so they became § What 1130 and 1307 left. The WP-1338 launch flag moved into § Task 3, the proposed round, where a later round would need it. The WP-1406 entries left. Their last item (no naming mechanism yet) is what task 1 delivered. Their mid-run `rietx watch` view is not in the vocabulary, which names montage panels only, and with task 3 declined no round asks the mid-run question.
 
   *Done.* Task 1: `Diagnostic.view`, a property reading `rietx.help.DIAGNOSTIC_VIEW_OF` by code (vocabulary `rietx.help.DIAGNOSTIC_VIEWS`, two names, each the `gid` of its montage panel). `tests/test_diagnostic_views.py` holds vocabulary, codes and panels equal both ways and renders the montage on a fit firing each mapped code, borrowed from that code's own test file. The notebook fold prints `see:`; `str(diagnostic)` is untouched. Manual `reference/result.md` § Diagnostics; release note `docs/releases/unreleased/1676.new.md`. Task 2: the channel rule in `references/diagnostics.md`'s preamble: numbers for a question you can name, a picture judged only against a reference in its frame. The draw-for-an-unnamed-question clause is withheld until task 3 measures it. Task 3: registered in § Task 3, the proposed round; not run. Task 4: the vocabulary meta-test is in; no JSON round trip is owed because nothing is stored (the test asserts `view` is absent from the dump); the eval shim waits on task 3.
   *Inherited pruned.* WP-1985's note was applied in task 1 and the 2026-09-24 note (AGENT_PROTOCOL.md became the skill) in task 2, so both left. Gap C gains a dated note: 1130's panel is not coming.
