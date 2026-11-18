@@ -260,7 +260,6 @@
                   </option>
                 {/each}
               </select>
-              <span class="u"></span>
             </label>
           {/if}
           {#each source as f (f.path)}{@render field(f)}{/each}
@@ -277,7 +276,6 @@
                 <option value={kind}>{PRESET_TITLES[kind]}</option>
               {/each}
             </select>
-            <span class="u"></span>
           </label>
           {#each geometry as f (f.path)}{@render field(f)}{/each}
           {#if advanced.length}
@@ -299,13 +297,19 @@
           </div>
         </div>
       {/if}
+      <!-- under the fields, as New project's form puts it: it replaces them all -->
+      <div class="nrow last">
+        <span class="nl"></span>
+        <div class="nbody">
+          <label class="file" class:off={busy || sending || !!delta?.touched}>
+            <input type="file" accept=".json" disabled={busy || sending || !!delta?.touched}
+              onchange={loadProfile} />
+            <span>Load an instrument profile…</span>
+          </label>
+        </div>
+      </div>
     {/if}
     <div class="foot">
-      <label class="file" class:off={busy || sending || !model || !!delta?.touched}>
-        <input type="file" accept=".json" disabled={busy || sending || !model || !!delta?.touched}
-          onchange={loadProfile} />
-        <span>Load an instrument profile…</span>
-      </label>
       <span class="reason" class:bad={!!refusal} role="status">{refusal || why || loaded}</span>
       <button type="button" class="ghost" onclick={onclose}>Cancel</button>
       <button type="submit" disabled={!delta?.touched || !!why || sending}>Apply</button>
@@ -328,7 +332,7 @@
   }
 
   .dlg {
-    width: min(560px, 100%);
+    width: min(660px, 100%);
     padding: 16px 20px 12px;
     background: var(--panel);
     border: 1px solid var(--line);
@@ -355,8 +359,15 @@
     border-top: 1px solid var(--line);
   }
 
-  .nl {
-    font-weight: 500;
+  /* the button under the fields belongs to them, so no rule above it */
+  .nrow.last {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .nl,
+  .fld > span {
+    color: var(--muted);
   }
 
   .nbody {
@@ -366,16 +377,26 @@
     min-width: 0;
   }
 
-  /* a dialog field: label, box, unit; the label column fits the longest */
+  /* a dialog field: label, box, unit. The label column fits the longest
+     label; every number box has one width, wide enough for any value it
+     holds, and a choice runs to the row's end */
   .fld {
     display: grid;
-    grid-template-columns: 7em minmax(0, 1fr) 2.5em;
+    grid-template-columns: 7em 14ch minmax(0, 1fr);
     align-items: center;
     gap: 8px;
   }
 
+  .fld select {
+    grid-column: 2 / 4;
+  }
+
   .fld.wide select {
-    grid-column: 1 / 3;
+    grid-column: 1 / 4;
+  }
+
+  .nrow.last .file {
+    align-self: flex-start;
   }
 
   .fld input,

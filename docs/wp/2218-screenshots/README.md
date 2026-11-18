@@ -44,6 +44,18 @@ The third PR's pictures, the Structure graph, on the fluorapatite example after 
 - `structure-preview-*.png`: Lattice parameter a dragged 0.3 of its track in the Interactive
   tab. The title reads "Preview, not refined".
 
+The fourth PR's pictures, the Instrument dialog, on the fluorapatite example after one fit:
+
+- `instrument-menu-*.png`: the Instrument band's ⋯ in the Parameters tab, opened by a click.
+  It holds one entry, Source and geometry….
+- `instrument-dialog-*.png`: that entry's dialog at rest. The anode is named from the
+  project's wavelengths, quoted to four places. The number boxes share one width, with each
+  unit after its box.
+- `instrument-edited-*.png`: S/L typed equal to H/L and the geometry switched to a
+  capillary. The warning stands under the pair. The capillary's fields replace the flat
+  plate's, and the edited boxes take the accent tint. Esc then closed the dialog and nothing
+  was written.
+
 Taken 2026-11-18 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every drag and click was made
 by a real pointer move or click.

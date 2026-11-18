@@ -94,7 +94,7 @@ How each screen reads in the prototype, restated:
 - [x] The Structure graph (rows 69-82), from #1519's source. The third PR.
 - [x] The Instrument dialog (rows 133-136) and File › Export › Instrument profile…. The fourth
   PR.
-- [ ] Screenshots at 1440 × 900, light and dark, under `docs/wp/2218-screenshots/`, for each
+- [x] Screenshots at 1440 × 900, light and dark, under `docs/wp/2218-screenshots/`, for each
   PR's screens. The last PR waits on the maintainer's look.
 
 ## Acceptance
@@ -254,6 +254,49 @@ Filled in by the session that builds each PR.
      3's words).
    - One-line empty states: no WebGL2, loading, a load error, and the server's sentence for a
      project with no phase (row 82).
+10. **The fourth PR: how the Instrument dialog differs from New project's instrument form.**
+    The prototype draws no Instrument dialog. Row 134 says the dialog is drawn "on the form
+    New project already draws", so `/next` follows the prototype's New project form: a
+    label column, bordered boxes with the unit after each, the selects running to the end
+    of the row, "Load an instrument profile…" under the fields, and a reason, Cancel and one
+    filled button in the foot. Where it differs, each difference rests on a written rule or
+    on the job:
+    - It edits the open project's instrument, field by field, where New project builds a new
+      one from a preset. A preset would reset every refined profile value. So the dialog
+      shows the project's own wavelengths, the Kα2/Kα1 weight ("w2") and the polarization,
+      where New project shows an anode alone.
+    - The anode is a choice above the wavelengths, named from them to a part in 10⁴, so the
+      fluorapatite example's 1.5405 and 1.5443 Å read as Cu Kα1/Kα2. It offers only the
+      anodes with as many lines as the source has, since adding or removing Kα2 changes what
+      the parameter table holds. Wavelengths that match no anode read "Other".
+    - The geometry choice has no label of its own, because the row is named Geometry.
+    - Rows: Source, Geometry and Axial divergence. S/L and H/L sit in the dialog because
+      row 136 puts the warning beside the pair. They are also in the Parameters tab's Axial
+      divergence group (row 135). Zero, displacement, transparency and U to Y stay in
+      Parameters alone (row 135).
+    - Numbers are in the mono face (`gui/STYLE.md` § Type). Field labels are sentence case.
+    - Apply is the dialog's filled button. A dialog is a form of its own, as New project and
+      Settings are, so its edits do not join the action bar's pending set. Apply sends the
+      model fields in one whole-model edit, then the table's values in one `set_values`.
+    - "Load an instrument profile…" replaces the instrument at once, one history node, and
+      the dialog stays open showing what it loaded, with "Loaded <file>" in the foot.
+    - File › Export › Instrument profile (JSON)… was already in the shared File menu, and its
+      toast reads "Exported instrument_profile.json". The prototype's toast is the same
+      shape. The File menu is today's shared panel until the swap, so neither its label nor
+      its toast moved.
+11. **The fourth PR: what the Instrument dialog draws that the prototype lacks.**
+    - The Instrument band's ⋯ in the Parameters tab, holding one entry, "Source and
+      geometry…" (row 134). The entry takes the name of the Parameters tab's own "Source and
+      geometry" group.
+    - The FCJ warning under S/L and H/L when they are equal (row 136), in the warning colour,
+      in today's words from `lib/model.ts:axialWarning`.
+    - A refusal stays in the foot in the verb's own words, with the typed text kept.
+12. **Where does the peak-shape choice go?** Today's Model tab offers the profile's shape,
+    TCHZ pseudo-Voigt or a true Voigt, under Advanced. It is a model choice, never a refined
+    value, so neither the Parameters tab nor rows 133-136 place it, and the prototype draws
+    none. When the swap deletes the Model tab the choice has no home. Claude leans to the
+    Instrument dialog's Axial divergence row, renamed Peak shape, under Advanced. This places
+    a control on the main surface, so it waits for Yue.
 
 ## Handover log
 
