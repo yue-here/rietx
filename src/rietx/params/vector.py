@@ -1355,6 +1355,7 @@ class ParameterTable:
         #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
         self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
         self._collect(structure, instrument)
+        _refuse_fixed_but_free(self._fixed_but_free)
         self._rebuild()
         if self._origin:
             self._fix_origin()
@@ -1384,8 +1385,8 @@ class ParameterTable:
 
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
         #: every site base on a fully fixed special position that asked for a
-        #: free coordinate, gathered over the whole walk and refused once
-        #: after it (WP-1913, #728 item 4): a refusal naming only the first
+        #: free coordinate, gathered over the whole walk and refused by
+        #: ``__init__`` once it ends (WP-1913, #728 item 4): a refusal naming only the first
         #: had a caller fix one site per attempt
         self._fixed_but_free: list[str] = []
         for ip, phase in enumerate(structure.phases):
@@ -1458,7 +1459,6 @@ class ParameterTable:
                 self._collect_body(base, sg, phase, b, body)
             if phase.floating_origin is not None:
                 self._declare_origin(ip, sg, phase)
-        _refuse_fixed_but_free(self._fixed_but_free)
 
         self._add_instrument_row(instrument, "instrument.zero_shift",
                                  instrument.zero_shift)
@@ -1725,7 +1725,7 @@ class ParameterTable:
         affine rows x = x₀ + Σₖ Bₖ·θₖ anchored at the compile-time position.
         Fully fixed special positions contribute none (their coordinates are
         locked); ``vary=True`` on any coordinate of such a site is an error,
-        recorded here and raised by :meth:`_collect` once every site is seen.
+        recorded here and raised once every site is seen.
         A vary request on a constrained-but-free site frees *all* of the
         site's DOFs — per-axis intent does not map onto rows such as [1,1,0].
         DOFs are unbounded displacements; bounds declared on x/y/z do not
