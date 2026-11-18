@@ -21,12 +21,12 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
-  import { applyFields, axialWarning, editableValue, fieldParam, fieldText,
+  import { GEOMETRIES, applyFields, axialWarning, editableValue, fieldParam, fieldText,
            splitEdits, type InstrumentField } from "../lib/model";
   import type { ParamRow } from "../lib/table";
   import { PRESET_TITLES, anodeLabel } from "../lib/wizard";
   import { anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows, draftOf,
-           withAnode, type Anode } from "./instrument";
+           geometryRefusal, withAnode, type Anode } from "./instrument";
 
   let {
     rows,
@@ -57,12 +57,14 @@
   let refusal = $state("");
   let loaded = $state("");
   let sending = $state(false);
-  let first: HTMLElement | undefined = $state();
+  let dlg: HTMLElement | undefined = $state();
+  let focused = false;
 
   const owned = $derived(dialogRows(rows));
   const byPath = $derived(new Map(owned.map((r) => [r.path, r])));
   const draft = $derived(draftOf(model, edits));
   const fields = $derived(draft ? dialogFields(draft) : []);
+  const fieldAt = $derived(new Map(fields.map((f) => [f.path, f])));
   const delta = $derived(model ? splitEdits(model, fields, edits, owned, "instrument") : null);
   const warning = $derived(draft ? axialWarning(draft) : "");
   const lines = $derived<any[]>(draft?.source?.lines ?? []);
@@ -78,7 +80,8 @@
 
   /** why Apply cannot go, or "" */
   const why = $derived(busy ? "A run is in flight"
-    : delta?.invalid.length ? `${label(delta.invalid[0].path)}: ${delta.invalid[0].why}` : "");
+    : delta?.invalid.length ? `${label(delta.invalid[0].path)}: ${delta.invalid[0].why}`
+    : delta?.touched ? geometryRefusal(draft) : "");
 
   async function load() {
     try {
@@ -92,8 +95,13 @@
 
   void load();
 
+  // focus the first control once, when the fields first draw: a reload after
+  // Apply or a loaded profile leaves focus where the person put it
   $effect(() => {
-    if (model) first?.focus({ preventScroll: true });
+    if (!model || !dlg || focused) return;
+    focused = true;
+    dlg.querySelector<HTMLElement>("select, input:not([disabled]), button")
+      ?.focus({ preventScroll: true });
   });
 
   /** A field's label in sentence case. The form's labels are lower case
@@ -104,12 +112,12 @@
   }
 
   function label(path: string): string {
-    const f = fields.find((x) => x.path === path);
+    const f = fieldAt.get(path);
     return f ? named(f.label) : path;
   }
 
   function shown(path: string): string {
-    const f = fields.find((x) => x.path === path);
+    const f = fieldAt.get(path);
     return f && model ? fieldText(model, f, byPath, "instrument") : "";
   }
 
@@ -162,6 +170,12 @@
                                   "instrument edited");
         say("ref.edit(instrument=…)");
         moved = true;
+        // what landed is no longer an edit: kept, it would compare unequal to
+        // the reloaded rendering and send the same model again
+        const rest = new Map(edits);
+        for (const f of d.fields) rest.delete(f.path);
+        rest.delete("geometry.kind");
+        edits = rest;
       }
       const values = Object.entries(d.values);
       if (values.length) {
@@ -208,7 +222,8 @@
     if (event.key !== "Escape") return;
     event.stopPropagation();
     event.preventDefault();
-    onclose();
+    // a verb in flight keeps the dialog open, so its refusal has somewhere to land
+    if (!sending) onclose();
   }
 
   function submit(event: SubmitEvent) {
@@ -236,8 +251,9 @@
 {/snippet}
 
 <div class="scrim" role="presentation"
-  onpointerdown={(e) => e.target === e.currentTarget && !delta?.touched && onclose()}>
-  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="instrument-title">
+  onpointerdown={(e) => e.target === e.currentTarget && !delta?.touched && !sending && onclose()}>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="instrument-title"
+    bind:this={dlg}>
   <form onsubmit={submit}>
     <h2 id="instrument-title">Instrument</h2>
     {#if loadError}
@@ -245,13 +261,14 @@
     {:else if !model}
       <p class="muted">Loading…</p>
     {:else}
+      {#if (xray && choices.length) || source.length}
       <div class="nrow">
         <span class="nl">Source</span>
         <div class="nbody">
           {#if xray && choices.length}
             <label class="fld">
               <span>Anode</span>
-              <select bind:this={first} value={anode}
+              <select value={anode}
                 onchange={(e) => chooseAnode((e.currentTarget as HTMLSelectElement).value)}>
                 {#if !anode}<option value="" disabled>Other</option>{/if}
                 {#each choices as a (a.name)}
@@ -265,6 +282,7 @@
           {#each source as f (f.path)}{@render field(f)}{/each}
         </div>
       </div>
+      {/if}
       <div class="nrow">
         <span class="nl">Geometry</span>
         <div class="nbody">
@@ -272,8 +290,8 @@
           <label class="fld wide">
             <select aria-label="Geometry" class:edited={edits.has("geometry.kind")} value={draft.geometry.kind}
               onchange={(e) => type("geometry.kind", (e.currentTarget as HTMLSelectElement).value)}>
-              {#each Object.keys(PRESET_TITLES) as kind (kind)}
-                <option value={kind}>{PRESET_TITLES[kind]}</option>
+              {#each GEOMETRIES as kind (kind)}
+                <option value={kind}>{PRESET_TITLES[kind] ?? kind}</option>
               {/each}
             </select>
           </label>
@@ -311,7 +329,7 @@
     {/if}
     <div class="foot">
       <span class="reason" class:bad={!!refusal} role="status">{refusal || why || loaded}</span>
-      <button type="button" class="ghost" onclick={onclose}>Cancel</button>
+      <button type="button" class="ghost" disabled={sending} onclick={onclose}>Cancel</button>
       <button type="submit" disabled={!delta?.touched || !!why || sending}>Apply</button>
     </div>
   </form>

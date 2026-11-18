@@ -23,12 +23,20 @@ export interface Anode {
 const REFINED = new Set(["zero_shift", "geometry.sample_displacement",
                          "geometry.sample_transparency"]);
 
+/** A constant-wavelength neutron source's one wavelength. The instrument
+ *  form walks emission lines, and a neutron source has none. */
+const NEUTRON_WAVELENGTH: InstrumentField = {
+  path: "source.wavelength", label: "λ", kind: "number", unit: "Å", group: "source",
+};
+
 /** The fields the dialog draws for this instrument: every source and
  *  geometry field the model holds, less the refined ones, and the axial pair.
- *  A neutron source has no emission lines and no polarization, so its fields
- *  are absent. */
+ *  A neutron source has no emission lines and no polarization, so those
+ *  fields are absent. A constant-wavelength one draws its wavelength instead. */
 export function dialogFields(model: any): InstrumentField[] {
-  return instrumentFields(model).filter((f) =>
+  const fields = instrumentFields(model);
+  if (model?.source?.kind === "neutron_cw") fields.unshift(NEUTRON_WAVELENGTH);
+  return fields.filter((f) =>
     (f.group !== "profile" || f.path.startsWith("geometry.axial_"))
     && !REFINED.has(f.path) && at(model, f.path) !== undefined);
 }
@@ -40,9 +48,10 @@ const ONLY_ON: Record<string, string[]> = {
   flat_plate: ["mu_t", "thickness_mm"],
 };
 
-/** Clear, in place, the geometry fields the model's own geometry refuses, so a
- *  geometry switch sends a model the schema accepts. A valid model is left as
- *  it is. */
+/** Clear, in place, the drawn geometry fields the model's own geometry
+ *  refuses, so a geometry switch does not fail on a field the dialog has just
+ *  taken away. A valid model is left as it is. `geometryRefusal` names what
+ *  else a switch can trip. */
 export function clearForGeometry(model: any): any {
   const geometry = model?.geometry;
   if (!geometry) return model;
@@ -50,6 +59,40 @@ export function clearForGeometry(model: any): any {
     : ONLY_ON.debye_scherrer;
   for (const name of refused) if (geometry[name] != null) geometry[name] = null;
   return model;
+}
+
+/** Whether a capillary offset is in use. The schema refuses one on any
+ *  other geometry, and one without a goniometer radius. */
+function offsetInUse(offset: any): boolean {
+  return !!offset && (Number(offset.value) !== 0 || !!offset.vary);
+}
+
+/**
+ * Why the schema would refuse this geometry, in the dialog's words, or "".
+ * These are the schema's other geometry validators, the ones a switch trips
+ * on a value the dialog must not invent or does not draw: Bragg-Brentano's
+ * radius, a surface-roughness block, and the capillary offsets. Clearing them
+ * would discard what the project set, so the dialog says what stands in the way.
+ */
+export function geometryRefusal(model: any): string {
+  const g = model?.geometry;
+  if (!g) return "";
+  if (g.kind === "bragg_brentano" && !g.goniometer_radius_mm) {
+    return "Radius: Bragg-Brentano needs the goniometer radius";
+  }
+  if (g.surface_roughness != null && g.kind !== "bragg_brentano") {
+    return "This project's surface roughness applies only to Bragg-Brentano";
+  }
+  const offsets = ["capillary_offset_along_beam", "capillary_offset_across_beam"]
+    .filter((name) => offsetInUse(g[name]));
+  if (offsets.length && g.kind !== "debye_scherrer") {
+    return "The capillary offsets apply only to a capillary. "
+      + "Set them to zero and fixed in the Parameters tab first";
+  }
+  if (offsets.length && !g.goniometer_radius_mm) {
+    return "The capillary offsets need the goniometer radius";
+  }
+  return "";
 }
 
 /**

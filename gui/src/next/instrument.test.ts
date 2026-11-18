@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows, draftOf,
-         withAnode } from "./instrument";
+         geometryRefusal, withAnode } from "./instrument";
 
 const p = (value: number, vary = false) => ({ value, vary });
 
@@ -41,8 +41,34 @@ describe("the Instrument dialog's rules (WP-2218, rows 133-136)", () => {
   it("draws no field the model lacks: a neutron source has no lines and no polarization", () => {
     const neutron = { ...lab(), source: { kind: "neutron_cw", wavelength: p(1.6) } };
     const paths = dialogFields(neutron).map((f) => f.path);
-    expect(paths.filter((x) => x.startsWith("source."))).toEqual([]);
+    // its one wavelength instead, which the instrument form does not walk
+    expect(paths.filter((x) => x.startsWith("source."))).toEqual(["source.wavelength"]);
     expect(paths).toContain("geometry.axial_sl");
+    const tof = { ...lab(), source: { kind: "neutron_tof", difc: p(1000) } };
+    expect(dialogFields(tof).map((f) => f.path).filter((x) => x.startsWith("source."))).toEqual([]);
+  });
+
+  it("names what else a geometry switch trips, rather than discarding it", () => {
+    expect(geometryRefusal(lab())).toBe("");
+    const capillary = lab();
+    capillary.geometry.kind = "debye_scherrer";
+    capillary.geometry.goniometer_radius_mm = null as any;
+    expect(geometryRefusal(capillary)).toBe("");
+    expect(geometryRefusal({ ...capillary, geometry: { ...capillary.geometry,
+      kind: "bragg_brentano" } })).toMatch(/goniometer radius/);
+    const rough = { ...lab().geometry, surface_roughness: { kind: "suortti" } };
+    expect(geometryRefusal({ geometry: rough })).toBe("");
+    expect(geometryRefusal({ geometry: { ...rough, kind: "flat_plate_transmission" } }))
+      .toMatch(/surface roughness/);
+    // an offset at zero and fixed is off, so it does not stand in the way
+    const offset = { ...capillary.geometry, goniometer_radius_mm: 250,
+                     capillary_offset_along_beam: p(0), capillary_offset_across_beam: p(0, true) };
+    expect(geometryRefusal({ geometry: offset })).toBe("");
+    expect(geometryRefusal({ geometry: { ...offset, kind: "bragg_brentano" } }))
+      .toMatch(/capillary offsets apply only to a capillary/);
+    expect(geometryRefusal({ geometry: { ...offset, goniometer_radius_mm: null } }))
+      .toMatch(/need the goniometer radius/);
+    expect(geometryRefusal({ geometry: { ...offset, capillary_offset_across_beam: p(0) } })).toBe("");
   });
 
   it("follows a geometry switch and clears the fields the new geometry refuses", () => {
