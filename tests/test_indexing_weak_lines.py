@@ -331,10 +331,8 @@ def test_the_floor_keeps_neither_the_ordering_lines_nor_the_trace():
     assert len(kept.usable()) == 11
 
 
-def _decision_row(trace: float, engines, fires: bool, fast: bool = False):
-    marks = [pytest.mark.xdist_group("weak-lines-d")]
-    if not fast:
-        marks.append(pytest.mark.slow)
+def _decision_row(trace: float, engines, fires: bool):
+    marks = [pytest.mark.xdist_group("weak-lines-d"), pytest.mark.slow]
     name = "all" if engines is None else "+".join(engines)
     return pytest.param(trace, engines, fires, marks=marks,
                         id=f"{trace:g}-{name}")
@@ -344,12 +342,13 @@ def _decision_row(trace: float, engines, fires: bool, fast: bool = False):
 #: table): at 0.5 % the inlier retry finds the supercell and the weak-line
 #: retry never runs; at 2 % the full list ends with no cell two engines agree
 #: on (none at all), and the retry runs and is adopted, under all three
-#: engines and under each alone.  The fast row is the fixture's default, 2 %
-#: under all three engines (under 10 s here); WP-2147's searches took 5-36 s,
-#: so the other four rows are ``slow``
+#: engines and under each alone.  Every row is ``slow``, as (a) as picked is:
+#: the 2 % all-engine search took 8.5 s on a quiet machine and 17.7 s inside
+#: the fast suite here, and a CI leg runs 3-4× slower.  The census of what
+#: the floor keeps is this case's fast test
 DECISION_ROWS = [
     _decision_row(0.005, None, fires=False),
-    _decision_row(0.02, None, fires=True, fast=True),
+    _decision_row(0.02, None, fires=True),
     _decision_row(0.02, ("dichotomy",), fires=True),
     _decision_row(0.02, ("svd",), fires=True),
     _decision_row(0.02, ("trial_error",), fires=True),

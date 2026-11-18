@@ -225,10 +225,12 @@ in this file, and a test row that reproduces the decision.
   `tests/test_indexing_weak_lines.py`: the census of what the floor keeps,
   the new builder in the determinism test, and five decision rows (0.5 %
   under all engines does not retry; 2 % under all engines and under each
-  alone retries and adopts). Three are fast and four `slow`. The table is
+  alone retries and adopts). Two are fast and five `slow`. The table is
   § Measured. `/code-review high --fix` removed an unused constant, added
   the new builder to the determinism test, fixed a stale comment and gave
-  the fast row its reason. It also flagged three things left as they are:
+  the fast row its reason. That row was then marked `slow` like the rest,
+  since it took 17.7 s inside the fast suite against 8.5 s alone, the
+  reason (a) as picked is `slow`. It also flagged three things left as they are:
   the new builder repeats (a)'s and (b)'s recipe rather than sharing it
   (sharing would risk moving (b)'s pinned pattern); the census hardcodes
   antisite 0.1, the builder's default; and tasks 1 and 3 read differently
