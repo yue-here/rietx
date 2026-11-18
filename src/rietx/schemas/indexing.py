@@ -238,7 +238,7 @@ from .structure import Cell
 #: search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
 #: that found agreement, a declared ``n_unindexed`` and a position-only list
 #: rank exactly as before.
-#: Also 1.12 (WP-2113, #1382): the whole-pattern validation sizes a Chebyshev
+#: 1.13 (WP-2113, #1382): the whole-pattern validation sizes a Chebyshev
 #: background from the data (``auto_background(kind="chebyshev")`` over the
 #: fitted range, never fewer terms than declared), so a candidate's
 #: ``lebail.rwp``, ``gof`` and ``unmatched_observed`` move wherever the
@@ -247,7 +247,7 @@ from .structure import Cell
 #: records the order.  No search, rank or grade reads ``rwp``, ``gof`` or
 #: ``unmatched_observed``; the grade reads ``status``, and without a peak list
 #: the fitted-background ``predicted_but_absent``, both of which can move.
-INDEXING_THRESHOLDS_VERSION = "1.12"
+INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.
