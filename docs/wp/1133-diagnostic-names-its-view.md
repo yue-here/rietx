@@ -64,7 +64,8 @@ agent to guess.
 `GuardFinding` (`strategy/staged.py`) carries `code`/`paths`/`value`/`message`
 and every guard `Diagnostic` (`schemas/common.py`) carries `where` and
 `value`; neither says which rendered view makes the finding legible.
-`viz.plot_for_vlm` is the montage, and 1130 adds the background panel to it.
+`viz.plot_for_vlm` is the montage. 1130 was to add a background panel to it
+and closed without one (Inherited, Gap C).
 `tests/eval_report_agent/` and `tests/eval_agent_surface/PROTOCOL.md` hold the
 eval discipline: register the read-out before running, enforce the condition
 in a shim rather than the prompt, real subagents with model and effort as
@@ -72,12 +73,6 @@ variables, and no pooling across rounds.
 
 ### Inherited
 
-- **2026-10-16, from WP-1985 (closed).** `Diagnostic` gained no field: `message` is the
-  observation, `suggestion` the action, and `Diagnostic.explanation` is a property that
-  looks the code up in `rietx.help.DIAGNOSTIC_HELP` (never stored). `Diagnostic.__str__`
-  is the one text form and `_display.diagnostics_html` the notebook fold, so a view
-  pointer added here renders in those two places. A new field still needs its writer
-  named, and a default that reads as an answer is the trap root CLAUDE.md names.
 - **2026-09-28, from [1338](1338-the-skills-own-gates.md): a real-agent round here launches with
   `--setting-sources project,local`.** `~/.claude/skills/rietx` is a
   symlink to the maintainer's checkout, and a user-level skill shadows a
@@ -85,15 +80,6 @@ variables, and no pooling across rounds.
   checkout's body and a `bare` cell is not bare. Check which body each
   cell was handed off its transcript (`tests/eval_skill_placement/
   runner.condition_held`).
-
-- **2026-09-24, from a review of the open WPs: task 2's target file is
-  gone.** `docs/AGENT_PROTOCOL.md` became the agent skill in v1.3 (WPs 1304
-  and 1308; v1.3 record, § Acceptance), and its last pointer was deleted in
-  v1.4.0 (`29c0ea49`). The channel rule goes in the skill now. Root
-  CLAUDE.md § skill decides where: the body if it holds for every fit, a
-  `references/` file otherwise, with `references/judging.md` the likely one.
-  A body row is paid for by a cut. The rule and its evidence stand as
-  written.
 
 From **WP-1406** (2026-09-15), which documented the track this WP was waiting on:
 
@@ -132,6 +118,14 @@ reader compares and a guard thresholds. That is an argument about what a *view*
 is for, and it is now the strongest single reason this WP exists. 1130's panel
 is still coming and is still the first view worth pointing at; its reference is
 a labelled band, not a curve.
+
+*Superseded in part, 2026-11-18.* The panel is not coming. 1130 closed 🛑 on
+2026-09-04 and no open WP carries the panel (`grep -l "background panel"
+docs/wp/` finds only 1130 and this file). So the montage holds the overview,
+the Δ/σ panel and the worst-region zooms, and nothing else. A background level
+still has no view, because a uniform factor of two in level leaves a smooth
+monotone decay with no visual signature (§ What the 2026-08-23 session
+measured).
 
 
 From **WP-1307** (round 1.1, E-RAMP complete 2026-08-29, four cells): **making
@@ -177,12 +171,22 @@ outstanding, so this is a finding at N = 4 on synthetic data, not a rate.
 
 ## Tasks
 
-- [ ] **The view pointer.** A field on `Diagnostic` (and the `GuardFinding`
+- [x] **The view pointer.** A field on `Diagnostic` (and the `GuardFinding`
       constructor feeding it) naming the rendered view that shows the finding —
       a member of a closed vocabulary drawn from what `plot_for_vlm` can render,
       so a name with no renderer fails a meta-test (the root CLAUDE.md's
       declared-name rule). `None` where no view helps, which is most findings,
       and honest. Manual Part 1 gains the field or the partition fails.
+      *Landed 2026-11-18 as a lookup, not a stored field*: `Diagnostic.view`
+      reads `rietx.help.DIAGNOSTIC_VIEW_OF` by code, as `explanation` reads
+      `DIAGNOSTIC_HELP` (WP-1985: a per-code text is never stored). So no
+      `GuardFinding` constructor changes and the JSON form is unchanged.
+      The vocabulary is `rietx.help.DIAGNOSTIC_VIEWS`: `plot_for_vlm.overview`
+      and `plot_for_vlm.residual`, each the matplotlib `gid` of its panel.
+      Three codes name one, each checked on a rendered fit that fires it.
+      The notebook fold prints a `see:` line; `str(diagnostic)` does not
+      (WP-1985: the text form leaves out what is the same for every finding).
+      Manual: `reference/result.md` § Diagnostics.
 - [ ] **The channel rule in `AGENT_PROTOCOL.md`.** Numbers for a question you
       can name (~15× cheaper), an image for one you cannot, and never an image
       without a reference in the frame. One row, the measurements above as its

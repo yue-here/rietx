@@ -479,7 +479,7 @@ NOTEBOOK_WIDTH = 88
 
 #: The labels of the lines under a headline that the notebook form wraps.
 #: ``at:`` and ``on:`` name paths and a candidate, and stay on one line.
-_PROSE_LABELS = ("  help: ", "  means: ")
+_PROSE_LABELS = ("  help: ", "  means: ", "  see: ")
 
 
 def diagnostic_lines(d, indent: str = "", *, on: str | None = None,
@@ -489,9 +489,10 @@ def diagnostic_lines(d, indent: str = "", *, on: str | None = None,
     The text form is ``str(d)``, with ``on:`` under the headline when ``on``
     names what the finding is about, such as one indexing candidate.  The
     notebook form adds the code's explanation as ``means:`` after ``help:``,
-    and wraps the headline, ``help:`` and ``means:`` at :data:`NOTEBOOK_WIDTH`,
-    each continuation under the text after its label.  The text form leaves
-    the explanation out, because it is the same for every finding (WP-1985).
+    then the view that shows the finding as ``see:`` where the code has one
+    (WP-1133), and wraps the prose at :data:`NOTEBOOK_WIDTH`, each
+    continuation under the text after its label.  The text form leaves both
+    out, because each is the same for every finding (WP-1985).
     """
     head, *rest = str(d).splitlines()
     if on is not None:
@@ -502,6 +503,9 @@ def diagnostic_lines(d, indent: str = "", *, on: str | None = None,
         # ``help:`` is the last thing ``str(d)`` prints, so the end is after it
         # even when a suggestion runs over several lines
         rest.append(f"  means: {d.explanation}")
+    if d.view is not None:
+        from .help import DIAGNOSTIC_VIEWS
+        rest.append(f"  see: {DIAGNOSTIC_VIEWS[d.view]}")
     width = NOTEBOOK_WIDTH - len(indent)
     lines = _wrapped(head, f"{d.level}[{d.code}]: ", width)
     for line in rest:

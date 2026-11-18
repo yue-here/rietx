@@ -58,6 +58,8 @@ __all__ = [
     "HelpEntry",
     "PARAMETER_HELP",
     "DIAGNOSTIC_HELP",
+    "DIAGNOSTIC_VIEWS",
+    "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
     "READER_OPTION_HELP",
@@ -4853,6 +4855,38 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "multiplying."
         ),
     ),
+}
+
+
+#: The rendered views a diagnostic can name (WP-1133), each as
+#: ``function.panel``, with the words a reader is shown.  Each view has a
+#: reference inside its frame: the eye judges a misfit only against something
+#: drawn beside it (WP-1130 § Finding 8).  ``plot_for_vlm`` gives each panel's
+#: axes its name as the matplotlib ``gid``, and
+#: ``tests/test_diagnostic_views.py`` renders the montage and fails on a name
+#: no panel carries, or on a name no code uses.
+DIAGNOSTIC_VIEWS: dict[str, str] = {
+    "plot_for_vlm.overview": (
+        "the top panel of rietx.viz.plot_for_vlm, observed and calculated "
+        "intensity over the whole pattern"
+    ),
+    "plot_for_vlm.residual": (
+        "the Δ/σ panel of rietx.viz.plot_for_vlm, the misfit in noise units "
+        "against a ±3σ band"
+    ),
+}
+
+#: The view that shows a code's finding, read by ``Diagnostic.view``.  It is
+#: the same for every finding with the code, so it is looked up and never
+#: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
+#: fit firing it was rendered and the finding read off that panel; the fits are
+#: in ``tests/test_diagnostic_views.py``.  A code not listed has no view that
+#: helps, which is most of them.  A background level is one: an error of a
+#: factor of two leaves a smooth decay with no visual signature (WP-1130).
+DIAGNOSTIC_VIEW_OF: dict[str, str] = {
+    "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
+    "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",
+    "MODEL_FAR_FROM_DATA": "plot_for_vlm.overview",
 }
 
 
