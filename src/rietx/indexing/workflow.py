@@ -512,6 +512,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     state, and the same one an unreached candidate was always in.
     """
     require_two_theta(data, "validate_by_lebail()", instrument=instrument)
+    not_screened = False
     from ..optimize.cancel import RefinementCancelled
     from ..refine import Refinement
     from ..report.layer0 import build_layer0
@@ -522,7 +523,12 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     ins = instrument
     if peaks is not None:
         ins, _seeded = seed_widths(ins, peaks)
-        if screen is None:
+        if screen is None and not peaks.usable():
+            # no usable line: nothing is testable, so a screen would count
+            # "0 absent" for every cell and the fitted-background detector
+            # reads every line absent.  Neither is a measurement (#1612)
+            not_screened = True
+        elif screen is None:
             from .screen import PatternScreen, screen_for
 
             if pattern_screen is None or not pattern_screen.has_pattern:
@@ -570,7 +576,13 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
 
     rows = [r for r in ref.reflection_table() if r.line == 0]
     extra: dict = {}
-    if screen is not None and screen.absent is not None:
+    if not_screened:
+        # the honest empty state is None, never a count (WP-1076): the four
+        # counts stay None, absent_source names the detector that was
+        # asked, and consensus.caveats_for reads that pair as capping
+        extra = dict(absent_source="line_screen")
+        absent_tt = []
+    elif screen is not None and screen.absent is not None:
         absent_tt = screen.absent_two_theta
         extra = dict(
             predicted_but_absent_uncancellable=screen.n_absent_uncancellable,

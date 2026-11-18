@@ -864,10 +864,10 @@ def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
     no σ column, so the Poisson fallback puts every point under the noise.  A
     direct ``validate_by_lebail`` reached the screen with it and raised.
 
-    The zeros it now returns are vacuous: no predicted line is testable on such
-    a list, so the true cell and the 8-fold supercell cP 2a0 both read
-    converged with 0 absences.  Those counts are not evidence about the cell
-    (whether the validation should decline instead is open on #1612)."""
+    Such a list leaves no predicted line testable, so validate_by_lebail
+    declines (maintainer's request, #1612): the four absence counts are
+    None and caveats_for caps the state, so the true cell and the
+    8-fold supercell cP 2a0 no longer read alike as "converged, 0 absent"."""
     from rietx.indexing.screen import PatternScreen, screen_candidate
     from rietx.indexing.workflow import validate_by_lebail
 
@@ -891,5 +891,13 @@ def test_a_list_with_no_usable_line_reads_zero_width_rather_than_raising(si):
         assert not screen_candidate(pattern, cell, system, centring).testable.any()
         v = validate_by_lebail(_candidate(system, centring, cell), norm, ins, peaks=peaks)
         assert v.status == "converged" and v.absent_source == "line_screen"
-        assert v.predicted_but_absent_uncancellable == 0
-        assert v.predicted_but_absent_uncancellable_in_window == 0
+        assert v.predicted_but_absent_uncancellable is None
+        assert v.predicted_but_absent_uncancellable_in_window is None
+        assert v.n_lines_screened is None and v.n_lines_screened_in_window is None
+        assert v.predicted_but_absent_density_in_window is None
+        cand = _candidate(system, centring, cell)
+        cand.lebail = v
+        caveats = caveats_for(cand, engines_run=[], panel_disagrees=False,
+                              validated=True, search_complete={},
+                              shift_allowance_assumed=False)
+        assert "not_validated" in caveats
