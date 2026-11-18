@@ -4010,7 +4010,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "minimum where the fit stopped: the scale of a weak phase trades against "
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
-            "that takes the broad hump, or longer counting can narrow the range."
+            "that takes the broad hump, or longer counting can narrow the range. "
+            "If the pinned refit found a lower χ² than the fit, the fit did not "
+            "reach the lowest basin and this is not a range of the fraction: read "
+            "the lower fit first as an unmodelled background or broad feature, and "
+            "quote the range only from an admissible fit."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(

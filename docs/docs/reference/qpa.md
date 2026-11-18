@@ -28,6 +28,7 @@ for row in result.qpa.phases:
 | `QuantitativePhaseAnalysis.unmeasured_held` | the part of that list a stage held while a reflection is in range at the answer |
 | `QuantitativePhaseAnalysis.microabsorption` | the `MicroabsorptionCorrection` record, when the correction ran |
 | `QuantitativePhaseAnalysis.microabsorption_skipped` | why it did not run, when a phase asked for it |
+| `QuantitativePhaseAnalysis.esd_basis` | where the esds came from when `Refinement.qpa` was given a covariance, and `None` otherwise |
 
 `PhaseQuantity` is one phase's row.
 
@@ -49,6 +50,17 @@ for row in result.qpa.phases:
 | `PhaseQuantity.weight_fraction_corrected` | the fraction after that correction |
 
 The last five fields are `None` unless the microabsorption correction ran.
+| `PhaseQuantity.support_sigma` | how many esds from zero the phase's scale is, the number `PHASE_UNCONSTRAINED` decides on |
+| `PhaseQuantity.conditional_on` | the phase's paths the answer held at a handed-in value or left on a bound |
+
+`PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` say what the fraction rests on, so a reader of `result.qpa` alone sees them (WP-2073).
+`PhaseQuantity.support_sigma` is written for every phase of a Rietveld fit, whether or not [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) fired, and is that finding's own number rather than a second test.
+`PhaseQuantity.conditional_on` lists the phase's paths that the answer stage held (`StageResult.held`) and the phase's paths at a [`BOUND_HIT`](diagnostics-refinement.md#bound_hit).
+A width on its zero floor ([`FLOOR_HIT`](diagnostics-refinement.md#floor_hit)) is not listed, because zero width is the correction off.
+An empty list means that nothing was held and nothing sat on a bound.
+Neither field decides anything: no threshold applies, and the fraction is quoted either way.
+The QPA table carries a `#` caveat naming each such phase, its paths and its support.
+Both fields are `None` on a row from `Refinement.qpa`, which measures neither.
 
 `PhaseQuantity.cell_mass` and `PhaseQuantity.cell_volume` are the unambiguous quantities.
 `PhaseQuantity.z` and `PhaseQuantity.molar_mass` split the cell mass into an integer count and a formula-unit mass, and fall back to `z = 1` with `molar_mass` equal to `cell_mass` when the composition does not reduce to integers under refined occupancies.
@@ -156,7 +168,7 @@ When `FractionProfile.fit_admissible` is `False`, a pinned refit found χ² lowe
 Every profile of a fit with an esd carries a [`QPA_FRACTION_RANGE`](diagnostics-refinement.md#qpa_fraction_range) info record.
 It names the range and the widths that produced it, and its value is `FractionProfile.excess`, the farthest admissible fraction's distance from the fit's in the esd's 95 % half-widths.
 Below 1, the profile confirms the esd: the controls reached at most 0.79.
-Well above 1, the fraction is not determined by this pattern, whatever its esd says, so quote the range rather than the point: the synthetic trace below reached about 99.
+Well above 1, the fraction is not determined by this pattern, whatever its esd says, so quote the range rather than the point, once the fit is admissible (when `FractionProfile.fit_admissible` is `False` the suggestion first names an unmodelled background or broad feature as the reading, because a range computed on a fit that did not reach the lowest basin is not a range of the fraction): the synthetic trace below reached about 99.
 Before 1.10 the record was the warning `QPA_FRACTION_UNDETERMINED`, which fired only past an excess of 2, a number chosen rather than measured.
 The basins separate only on information the fit does not have: a width held at a value the specimen justifies, a background that can take the hump itself, or more counts on the phase's strongest lines.
 
@@ -189,27 +201,34 @@ These counts come from one synthetic family, LaB₆ with one cubic minor phase u
 
 ## Fractions at given values
 
-A weight fraction at values you supply, rather than at a fit's answer, needs a stage that frees nothing.
-`Refinement.set_values` writes the values and leaves `Refinement.result_` at `None`, because no fit has run at them.
-It refuses a tied path, such as a cubic `cell.b` that follows `cell.a`, so `values` names untied paths only: set the source of a tie, and the tie follows.
-`Refinement.fit` with a plan of one empty stage then evaluates the model where it stands and reports `RefinementResult.qpa` there.
+`Refinement.qpa(data)` gives the weight fractions at the values the refinement holds, with no fit (WP-2073).
+It reads `Refinement.structure` as it stands, whether a fit, `Refinement.set_values` or your own typing put the values there, and it compiles `data` to find which phases have a reflection in range.
+`Refinement.result_` and the history are untouched, and the answer is a `QuantitativePhaseAnalysis`.
+`Refinement.set_values` refuses a tied path, such as a cubic `cell.b` that follows `cell.a`, so `values` names untied paths only: set the source of a tie, and the tie follows.
 
-<!-- api-doc: no-exec — needs a pattern and a fitted model; tests/test_qpa.py runs this route on issue #1213's real weak case -->
+<!-- api-doc: no-exec — needs a pattern and a refinement; tests/test_qpa.py runs this call on issue #1213's real weak case -->
 ```python
 ref = rx.Refinement(structure, instrument)
 ref.set_values(values)
-result = ref.fit(data, plan=rx.RefinementPlan(stages=[rx.Stage("evaluate", [])]))
-print(result.statistics.n_free_parameters)       # 0
-print(result.qpa.phases[1].weight_fraction)      # the fit's fraction at these values, bit for bit
-print(result.qpa.phases[1].weight_fraction_stderr)  # None
+qpa = ref.qpa(data)
+print(qpa.phases[1].weight_fraction)         # the fit's fraction at these values, bit for bit
+print(qpa.phases[1].weight_fraction_stderr)  # None: no covariance was given
 ```
 
-With nothing free there is no covariance, so every esd on the answer is `None`, `PhaseQuantity.weight_fraction_stderr` included.
-An esd on a fraction comes from the covariance of the scales a fit refined.
+With no covariance every esd is `None`.
+An esd on a fraction comes from the covariance of the scales a fit refined, and nothing here refined one.
+Pass `scale_cov` to propagate one: the covariance of the scales of the phases that have a reflection in range, in phase order, square.
+The esds are then propagated through the whole of it, correlations included.
+Take it from the full covariance of a fit, which marginalises the background and every other parameter.
+A block from a solve that held them drops the scales' correlations with them, and an esd then moves by ×0.71 to ×1.15, in both directions.
+`QuantitativePhaseAnalysis.esd_basis` says so whenever `scale_cov` was given, and the QPA table repeats it.
 
-Two traps.
+`PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on` stay `None` on these rows: they are measurements of a fit's answer stage.
+
+A plan of one empty stage gives the same fractions inside a full `RefinementResult`, with statistics and diagnostics, when you want those.
+`Refinement.fit` with `rx.RefinementPlan(stages=[rx.Stage("evaluate", [])])` evaluates the model where it stands, with 0 free parameters, and its esds are `None` for the same reason.
 `Refinement.run_stage` with an empty stage does not do this on a refinement that has already fitted: it continues the previous fit's free set, so the values you set are refitted away.
-And `Refinement` copies the `Structure` it is given, so the values live on `Refinement.structure`, while your own `Structure` still holds what you built it with.
+`Refinement` copies the `Structure` it is given, so the values live on `Refinement.structure`, while your own `Structure` still holds what you built it with.
 
 ## Scope
 

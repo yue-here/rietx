@@ -132,6 +132,7 @@ from .refine import (
     _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
+    _phase_conditions,
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
@@ -2517,12 +2518,23 @@ class MultiHistogramRefinement:
             # (WP-1463); rows are addressed as this surface spells them.
             # Rietveld only, as there (``refine._build_result``): a Pawley
             # fit force-fixes every scale, so a fraction would be the start's
+            # what each fraction rests on in this histogram (WP-2073): the
+            # support the hold was decided on, read as the single fit does, and
+            # the answer stage's holds and the bound test's paths, scoped to h
+            h_support = (significance[h] if significance is not None
+                         else model.phase_support(values))
             qpa, qpa_diags = (_quantify_phases(
                 table, thetas[h], s_h, corr_h, struct, values, model,
                 unmeasured=joint_unmeasured[h],
                 held=(_held_scale_phases(stage_results[-1], h)
                       if stage_results else None),
-                where_of=lambda p, h=h: mt._canonical(h, p))
+                where_of=lambda p, h=h: mt._canonical(h, p),
+                support_sigma=[float(z) for z in h_support],
+                conditional_on=_phase_conditions(
+                    stage_results, [q for f in at_bounds if f.code == "BOUND_HIT"
+                                    for q in f.paths],
+                    len(struct.phases), hist=h,
+                    where_of=lambda p, h=h: mt._canonical(h, p)))
                 if model.mode == "rietveld" else (None, []))
 
             diags: list[Diagnostic] = []

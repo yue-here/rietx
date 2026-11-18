@@ -901,7 +901,7 @@ def test_a_strain_the_answer_held_is_reported_held_at_not_refined_to():
     assert flag.where == ["phases.1.lor_strain"]
     assert "held lor_strain at" in flag.message
     assert "refined" not in flag.message
-    assert "handed" in flag.message
+    assert "did not refine it" not in flag.message   # the second sentence is cut
     assert "BOUND_HIT" not in flag.suggestion
     assert "StageResult.held" in flag.suggestion
     assert flag.value == 10.0
@@ -999,6 +999,169 @@ def test_an_empty_run_stage_on_a_fitted_object_refits_its_free_set():
     r = ref.run_stage(data, Stage("evaluate", []), telemetry=False)
     assert r.statistics.n_free_parameters > 0
     assert ref.structure.phases[1].scale.value == pytest.approx(fitted, rel=1e-3)
+
+
+# ----------------------------------------------------------------------
+# What a fraction rests on (WP-2073, accepted by the maintainer 2026-11-17)
+# ----------------------------------------------------------------------
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_the_unseen_phases_row_carries_its_support_and_what_it_is_conditional_on():
+    """The unseen case: ``support_sigma`` is the number ``PHASE_UNCONSTRAINED``
+    decided on (pinned equal, as ``at_bound`` is pinned to the bound test) and
+    ``conditional_on`` is the phase's paths the answer stage held."""
+    _, _, result = _i1213_fit("unseen")
+    row = result.qpa.phases[1]
+    (finding,) = _on_minor(result, "PHASE_UNCONSTRAINED")
+    assert row.support_sigma == finding.value < 3
+    held = [p for p in result.stages[-1].held if p.startswith("phases.1.")]
+    assert "phases.1.lor_strain" in row.conditional_on
+    assert row.conditional_on == sorted(held)
+    assert result.qpa.phases[0].conditional_on == []        # LaB6: measured
+    assert result.qpa.phases[0].support_sigma > 3
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_a_bound_is_a_condition_and_a_floor_is_not():
+    """The absorbed case's strain refined onto the bound it was given
+    (``BOUND_HIT``), so the fraction is conditional on it, and the row's list is
+    the finding's path.  The real cases' widths sit on a zero floor, the
+    correction off (``FLOOR_HIT``), which no fraction rests on."""
+    _, _, absorbed = _i1213_fit("absorbed")
+    bound = [p for d in absorbed.diagnostics if d.code == "BOUND_HIT"
+             for p in d.where if p.startswith("phases.1.")]
+    assert bound and absorbed.qpa.phases[1].conditional_on == sorted(bound)
+    for name in ("real nano", "real weak"):
+        _, _, real = _i1213_fit(name)
+        assert any(d.code == "FLOOR_HIT" for d in real.diagnostics)
+        assert real.qpa.phases[1].conditional_on == []
+        assert real.qpa.phases[1].support_sigma > 3
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_the_qpa_table_carries_a_caveat_for_the_unseen_phase_and_none_for_real_weak():
+    from rietx.io.exporters import qpa_table_csv
+
+    _, _, unseen = _i1213_fit("unseen")
+    caveats = [ln for ln in qpa_table_csv(unseen.qpa).splitlines()
+               if ln.startswith("# Fractions conditional on")]
+    assert len(caveats) == 1
+    assert "CaF2 (" in caveats[0] and "phases.1.lor_strain" in caveats[0]
+    assert "LaB6" not in caveats[0]
+    _, _, weak = _i1213_fit("real weak")
+    assert "conditional on" not in qpa_table_csv(weak.qpa)
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_a_qpa_trajectory_keeps_a_phase_unconstrained_point_and_marks_it():
+    """Ruled 2026-11-17: the point's scale was measured and only its structure
+    held, so it stays on the curve and says so (a number in a field, no
+    threshold)."""
+    from rietx.sequential import SequentialRefinement
+
+    for name, marked in (("unseen", True), ("real weak", False)):
+        data, s, ins = _i1213_case(name)
+        series = SequentialRefinement(s, ins).fit([data], plan=_i1213_plan())
+        traj = series.qpa_trajectory("CaF2")
+        assert traj.positions == [0]                         # kept
+        assert traj.unconstrained == [marked]
+        row = series.entries[0].qpa.phases[1]
+        assert traj.support_sigma == [row.support_sigma]
+        assert traj.conditional_on == [row.conditional_on]
+        assert ("PHASE_UNCONSTRAINED on this phase" in str(traj)) is marked
+
+
+def _profile(fit_admissible):
+    from rietx.schemas.fraction import FractionProfile, FractionProfilePoint
+
+    pts = [FractionProfilePoint(axis="phases.1.lor_size", value=v, fwhm=v,
+                                admissible=True, weight_fraction=w)
+           for v, w in ((0.0, 0.02), (0.1, 0.20))]
+    return FractionProfile(
+        phase="CaF2", phase_index=1, axes=["phases.1.lor_size"],
+        weight_fraction=0.02, weight_fraction_stderr=0.004, chi2_fit=110.0,
+        chi2_best=100.0 if not fit_admissible else 110.0, delta_chi2_cut=4.0,
+        fit_admissible=fit_admissible, points=pts, range_low=0.02,
+        range_high=0.20, excess=22.0)
+
+
+def test_the_range_suggestion_names_the_unmodelled_background_first_when_the_fit_is_not_admissible():
+    """Ruled 2026-11-17: a range computed on an inadmissible fit is not a range
+    of the fraction, so the suggestion says what to read it as before it says to
+    quote the range."""
+    from rietx.strategy.fraction_profile import fraction_diagnostics
+
+    (ok,) = fraction_diagnostics(_profile(True))
+    assert ok.suggestion.startswith("Quote the range")
+    (bad,) = fraction_diagnostics(_profile(False))
+    assert "did not reach the lowest basin" in bad.message
+    assert bad.suggestion.index("unmodelled") < bad.suggestion.index("quote the range")
+    assert not bad.suggestion.startswith("Quote the range")
+
+
+def test_phase_conditions_reads_the_answer_stage_the_bound_test_and_the_histogram():
+    """The one writer of ``conditional_on``: the last stage's holds (through
+    ``held_reach``), the bound paths, never a phase's own scale, a scoped path
+    for its histogram only, a bare one for every histogram."""
+    from rietx.refine import _phase_conditions
+    from rietx.schemas.results import StageResult
+
+    early = StageResult(name="a", status="converged", n_iterations=1,
+                        cost_initial=1.0, cost_final=1.0,
+                        held=["phases.1.cell.a"])
+    last = StageResult(name="b", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0,
+                       held=["phases.1.lor_strain", "phases.1.scale", "vars.A",
+                             "hist.1.phases.0.lor_size"],
+                       held_reach={"vars.A": ["phases.0.cell.a"]})
+    got = _phase_conditions([early, last], ["phases.0.atoms.0.biso"], 2)
+    assert got == [["phases.0.atoms.0.biso", "vars.A"], ["phases.1.lor_strain"]]
+    h0 = _phase_conditions([last], [], 2, hist=0)
+    h1 = _phase_conditions([last], [], 2, hist=1, where_of=lambda p: f"H.{p}")
+    assert "H.phases.0.lor_size" in h1[0] and "phases.0.lor_size" not in h0[0]
+    assert _phase_conditions(None, [], 2) == [[], []]
+
+
+def _two_phase_qpa_case():
+    data, s, ins = _i1213_case("real weak")
+    ref = Refinement(s, ins)
+    return data, ref
+
+
+def test_refinement_qpa_forms_fractions_at_the_held_values_with_no_fit():
+    from rietx.optimize.qpa import weight_fractions
+
+    data, ref = _two_phase_qpa_case()
+    q = ref.qpa(data)
+    assert ref.result_ is None                       # nothing was fitted
+    assert [r.weight_fraction_stderr for r in q.phases] == [None, None]
+    assert [r.support_sigma for r in q.phases] == [None, None]
+    assert [r.conditional_on for r in q.phases] == [None, None]
+    assert q.esd_basis is None
+    assert abs(sum(r.weight_fraction for r in q.phases) - 1.0) < 1e-12
+    # a caller's covariance is propagated through whole, and the record says
+    # where the esds came from
+    cov = np.array([[4e-10, 1e-10], [1e-10, 9e-12]])
+    qc = ref.qpa(data, scale_cov=cov)
+    _, sigma, indep = weight_fractions([r.zmv for r in q.phases],
+                                       [r.scale for r in q.phases], cov)
+    assert [r.weight_fraction_stderr for r in qc.phases] == list(sigma)
+    assert not np.allclose(sigma, indep)             # the correlation counts
+    assert [r.weight_fraction for r in qc.phases] == [r.weight_fraction for r in q.phases]
+    assert "drops the scales' correlations" in qc.esd_basis
+    from rietx.io.exporters import qpa_table_csv
+    assert "# weight_fraction_esd: propagated through the scale covariance" in qpa_table_csv(qc)
+    with pytest.raises(ValueError, match="2 x 2"):
+        ref.qpa(data, scale_cov=np.eye(3))
+
+
+@pytest.mark.xdist_group("qpa-issue-1213")
+def test_refinement_qpa_reproduces_the_fits_fraction_bit_for_bit():
+    """The acceptance: QPA at the fit's own values is the fit's W, and the
+    covariance block the fit used gives the fit's esd."""
+    data, ref, fitted = _i1213_fit("real weak")
+    q = ref.qpa(data)
+    assert q.phases[1].weight_fraction == fitted.qpa.phases[1].weight_fraction
+    assert q.phases[0].weight_fraction == fitted.qpa.phases[0].weight_fraction
 
 
 @pytest.mark.slow

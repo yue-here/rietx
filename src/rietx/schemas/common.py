@@ -717,6 +717,14 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-2073, the maintainer's acceptance of 2026-11-17):
+#: ``PhaseQuantity.support_sigma`` and ``PhaseQuantity.conditional_on``, what a
+#: fraction rests on, ``QuantitativePhaseAnalysis.esd_basis`` (where an esd came
+#: from when ``Refinement.qpa`` was handed a covariance), and
+#: ``QPATrajectory.support_sigma`` /
+#: ``.conditional_on`` / ``.unconstrained`` per point.  Additive and defaulted
+#: (``None``, empty), the 0.25 → 0.26 rule: every stored result opens with
+#: the fields unmeasured; an older build refuses a document carrying them.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

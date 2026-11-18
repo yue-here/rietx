@@ -6844,6 +6844,67 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
+    def qpa(self, data: PatternData, *, scale_cov=None) -> QuantitativePhaseAnalysis | None:
+        """Weight fractions at the parameter values this object holds, with no fit.
+
+        The route for "QPA at my values" (WP-2073, named by the maintainer
+        2026-11-17): after :meth:`set_values`, or on a structure typed in, the
+        fractions are ``S·ZMV`` normalised over the phases with a reflection in
+        ``data``'s range, the same builder a fit calls
+        (:func:`~rietx.optimize.qpa.compute_qpa`).  Nothing is refined and
+        ``result_`` and the history are untouched.  Rietveld scales only: a
+        Le Bail or Pawley model has none.
+
+        **Esds are absent unless the caller supplies them.**  ``scale_cov`` is
+        the physical covariance of the scales of the phases that have a line in
+        range, in phase order (``len(measured)`` square), and the esds are
+        propagated through the whole of it, correlations included (WP-1072).  A
+        fit's own ``result.qpa`` takes that block from the full covariance,
+        which marginalises the background and every other parameter; a block
+        from a solve that held them drops the scales' correlations with them,
+        and an esd moves by ×0.71 to ×1.15 in both directions.  The record
+        says so in :attr:`~rietx.schemas.results.QuantitativePhaseAnalysis.esd_basis`
+        whenever ``scale_cov`` was given.  Without it every esd is ``None``:
+        no covariance was supplied, so none was measured.
+
+        ``support_sigma`` and ``conditional_on`` stay ``None`` on every row:
+        they are measurements of a fit's answer stage and nothing here made one.
+        Returns ``None`` where the scales cannot form fractions, as
+        :func:`~rietx.optimize.qpa.compute_qpa` does.
+        """
+        require_two_theta(data, "Refinement.qpa()", instrument=self.instrument)
+        if self._mode != "rietveld":
+            raise RuntimeError(
+                f"qpa() forms weight fractions from Rietveld scales, and this "
+                f"object's mode is {self._mode!r}.")
+        table = ParameterTable(self.structure, self.instrument)
+        model = compile_model(self.structure, self.instrument, data,
+                              mode="rietveld", moving_paths=set(table.moving_paths))
+        values = table.decode(table.x0())
+        unmeasured = sorted(_lineless_phases(model))
+        n_measured = len(self.structure.phases) - len(unmeasured)
+        cov = None
+        if scale_cov is not None:
+            cov = np.asarray(scale_cov, dtype=np.float64)
+            if cov.shape != (n_measured, n_measured):
+                raise ValueError(
+                    f"scale_cov must be the {n_measured} x {n_measured} "
+                    f"covariance of the scales of the phases with a reflection "
+                    f"in range, in phase order (phases {unmeasured or 'none'} "
+                    f"have none), and has shape {cov.shape}.")
+        multiplicities = [[len(op[0]) for op in cp.sites.ops] for cp in model.phases]
+        wavelength = model.line_wavelengths[0] if model.line_wavelengths else None
+        qpa = compute_qpa(self.structure, values, cov, multiplicities,
+                          wavelength=wavelength, source_kind=model.source_kind,
+                          unmeasured=unmeasured)
+        if qpa is not None and cov is not None:
+            qpa.esd_basis = (
+                "propagated through the scale covariance the caller supplied. A "
+                "block taken with the background and every other parameter held "
+                "drops the scales' correlations with them, which moves an esd by "
+                "x0.71 to x1.15 in both directions (WP-1072).")
+        return qpa
+
     def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
@@ -9461,13 +9522,36 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # reuses the same Cov_free as stderr_physical → consistent conditioning).
     qpa = None
     unmeasured_now: set[int] | None = None
+    # The significance each phase's hold was decided on (WP-1523), read here
+    # because the QPA rows quote it (``PhaseQuantity.support_sigma``) and
+    # ``PHASE_UNCONSTRAINED`` below reads the same vector: a Rietveld fit hands
+    # in the answer stage's own, any other caller gets the screen at these
+    # values.
+    decided = significance is not None
+    if significance is None:
+        significance = model.phase_support(values)
     if mode == "rietveld":
         held_now = (_held_scale_phases(stage_results[-1]) if stage_results
                     else set(held_scales or ()))
         unmeasured_now = _unmeasured_phases(model, stage_results, held=held_now)
+        # what each fraction rests on, off the records the diagnostics read: the
+        # BOUND_HIT paths of the one bound test (the recorded findings where no
+        # guard ran, as ``floors`` falls back), and the answer stage's holds.  A
+        # FLOOR_HIT is not one: a width on its zero floor is the correction off,
+        # which no fraction is conditional on.  No guard and no stage record is
+        # no measurement, so ``None``.
+        conditions = (_phase_conditions(
+            stage_results,
+            {p for f in guard.at_bounds if f.code == "BOUND_HIT" for p in f.paths}
+            if guard is not None else
+            {p for d in diagnostics if d.code == "BOUND_HIT" for p in d.where},
+            len(structure.phases))
+            if guard is not None or stage_results else None)
         qpa, qpa_diagnostics = _quantify_phases(
             table, theta, stderr_internal, correlation, structure, values, model,
-            unmeasured=unmeasured_now, held=held_now)
+            unmeasured=unmeasured_now, held=held_now,
+            support_sigma=[float(z) for z in significance],
+            conditional_on=conditions)
         diagnostics = diagnostics + qpa_diagnostics
 
     # Soft-restraint summary (bond/angle/value deviations).  Rietveld-only, so
@@ -9587,9 +9671,6 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # screen at these values, an upper bound on the scale's significance.
     # Read against the plan's threshold, the hold's own, or the default
     # where the plan switched the hold off (``_reported_support_sigma``).
-    decided = significance is not None
-    if significance is None:
-        significance = model.phase_support(values)
     support_sigma = _reported_support_sigma(phase_support_sigma)
     diagnostics = diagnostics + _phase_support_diagnostics(
         significance, model.phase_line_counts(),
@@ -11101,6 +11182,7 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                      where_of: Callable[[str], str] | None = None,
                      unmeasured: set[int] | None = None,
                      held: set[int] | None = None,
+                     support_sigma=None, conditional_on=None,
                      ) -> tuple[QuantitativePhaseAnalysis | None, list[Diagnostic]]:
     """Weight fractions from the refined scales, and the findings they carry.
 
@@ -11137,7 +11219,9 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     caller's answer to which (:func:`_unmeasured_phases`, read off what the
     last stage held); ``None`` recounts the lines at this model.  ``held`` is
     the part of it a stage held, which the record names apart from the phases
-    with no line at the answer (``unmeasured_held``).
+    with no line at the answer (``unmeasured_held``).  ``support_sigma`` and
+    ``conditional_on`` are what each row rests on (WP-2073), measured by the
+    caller from the answer's own records (:func:`_phase_conditions`).
     """
     lineless = _lineless_phases(model)
     unmeasured = sorted(lineless if unmeasured is None else unmeasured)
@@ -11163,7 +11247,8 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     wavelength = model.line_wavelengths[0] if model.line_wavelengths else None
     qpa = compute_qpa(structure, values, scale_cov, multiplicities,
                       wavelength=wavelength, source_kind=model.source_kind,
-                      unmeasured=unmeasured, held=held_only)
+                      unmeasured=unmeasured, held=held_only,
+                      support_sigma=support_sigma, conditional_on=conditional_on)
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
     diagnostics = microabsorption_diagnostics(qpa, structure)
@@ -11394,6 +11479,59 @@ def _held_by_phase(stage_results: list[StageResult], n_phases: int
                     paths[ip].add(path)
                     stages[ip][sr.name] = None
     return paths, [list(s) for s in stages]
+
+
+def _phase_conditions(stage_results: list[StageResult] | None,
+                      bound: Iterable[str], n_phases: int, *,
+                      hist: int | None = None,
+                      where_of: Callable[[str], str] | None = None,
+                      ) -> list[list[str]]:
+    """Per phase, the paths its fraction is conditional on at the answer
+    (``PhaseQuantity.conditional_on``, WP-2073).
+
+    Two facts, both already on the records: the columns the **answer stage**
+    held (``StageResult.held``, read like :func:`_held_by_phase` through
+    ``held_reach``, so a ``vars.X`` driving a phase's cell lands on that
+    phase), and the paths at a bound (``bound``: the one bound test's ``BOUND_HIT``
+    paths; a ``FLOOR_HIT`` is a width on its zero floor, the correction off,
+    and no fraction rests on that).  A phase's own ``scale`` is left
+    out: a held scale leaves no fraction.  Only the last stage's hold: an
+    earlier stage's held path was refined by the stages after it, and
+    :func:`_held_by_phase`'s run-wide account is ``PHASE_UNCONSTRAINED``'s.
+
+    ``hist`` is the histogram a joint fit's record is read for (a scoped
+    ``hist.h.…`` path counts for ``h`` only, a bare one for every histogram),
+    and ``where_of`` the row spelling a client holds, as in
+    :func:`_quantify_phases`.
+    """
+    out: list[set[str]] = [set() for _ in range(n_phases)]
+
+    def add(column: str, names: Iterable[str]) -> None:
+        for name in names:
+            if name.startswith("hist."):
+                h, _, name = name[len("hist."):].partition(".")
+                if hist is None or not h.isdigit() or int(h) != hist:
+                    continue
+            if _SCALE_PATH.match(name):
+                continue
+            parts = name.split(".")
+            try:
+                ip = int(parts[parts.index("phases") + 1])
+            except (IndexError, ValueError):
+                continue
+            if 0 <= ip < n_phases:
+                bare = column
+                if bare.startswith("hist."):
+                    bare = bare[len("hist."):].partition(".")[2]
+                out[ip].add(where_of(bare) if where_of else bare)
+
+    if stage_results:
+        sr = stage_results[-1]
+        for path in sr.held:
+            add(path, (path, *sr.held_reach.get(path, ())))
+    for path in bound:
+        add(path, (path,))
+    return [sorted(s) for s in out]
 
 
 def _instrument_held(stage_results: list[StageResult]
@@ -11881,8 +12019,7 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
                          + (f"held {term} at" if held else f"refined {term} to")
                          + f" a strain broadening of {width:.4g} deg (FWHM "
                          f"coefficient of tanθ), {width / STRAIN_FLAG_WIDTH:.0f}× "
-                         f"the flag threshold of {STRAIN_FLAG_WIDTH}."
-                         + (_HELD_FLAG_CLAUSE if held else "")),
+                         f"the flag threshold of {STRAIN_FLAG_WIDTH}."),
                 suggestion=(_HELD_FLAG_SUGGESTION if held else
                             "Check whether BOUND_HIT fired on the same path. "
                             "If the specimen really is this defective, the "
@@ -11891,15 +12028,12 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
     return out
 
 
-#: The clause :func:`_strain_flag_diagnostics` and :func:`_size_flag_diagnostics`
-#: add when the flagged path did not move in the answer (WP-2073): the number is
-#: the one the answer stage started from — a seed, a user's value, an earlier
-#: stage's value, or where a collapsed phase was restored to — and the answer
-#: did not measure it.  The suggestion covers the three ways a path is still:
-#: a stage hold (``StageResult.held``), a user hold
-#: (``StageResult.blocked_by_hold``), or no stage freed it.
-_HELD_FLAG_CLAUSE = (" The answer stage did not refine it, so this is the "
-                     "value that stage was handed.")
+#: The suggestion the two width flags carry when the flagged path did not move
+#: in the answer (WP-2073).  The message says "held at" once and no more (the
+#: maintainer cut a second sentence that repeated it, 2026-11-17); the
+#: suggestion covers the three ways a path is still: a stage hold
+#: (``StageResult.held``), a user hold (``StageResult.blocked_by_hold``), or no
+#: stage freed it.
 _HELD_FLAG_SUGGESTION = ("If StageResult.held names the path, PHASE_UNCONSTRAINED "
                          "says why the stage held it; otherwise your hold or the "
                          "plan kept it, and the value is yours. This flag changes "
@@ -12132,8 +12266,7 @@ def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
                          f"flag threshold of {floor_nm:.0f} nm. Below about "
                          f"2 nm a crystallite is a few unit cells, and "
                          f"broadened Bragg peaks may not describe its pattern "
-                         f"(the Debye scattering equation does)."
-                         + (_HELD_FLAG_CLAUSE if held else "")),
+                         f"(the Debye scattering equation does)."),
                 suggestion=(_HELD_FLAG_SUGGESTION if held else
                             "Check whether BOUND_HIT fired on the same path. "
                             "If the specimen really is this small, the value "
