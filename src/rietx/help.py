@@ -759,11 +759,16 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "polynomial on top cannot correct this, because it is additive and the "
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
-            "expected report."
+            "expected report. A curve another program computed for one phase, such as "
+            "a DIFFaX stacking-fault term or a Debye sum, scales with that phase. Store "
+            "it as c*·D, with c* converting the program's units to counts at phase "
+            "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
+            "stored curve does not follow the zero shift."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank",
+                "of 1 for a measured blank; the phase scale, tied, for a "
+                "computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
