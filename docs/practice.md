@@ -1327,6 +1327,25 @@ file" (FullProf), "include file" and "macro" (TOPAS), "template" (RIETAN-FP, and
 for its `.pcr`), "device file" (BGMN) and "refinement preset" (Profex). No program uses one
 word for a set spanning instrument, limits and refinement order.
 
+## Inner threads in a process pool
+
+Surveyed 2026-11-18 for WP-1464 (whether a rietx process inside a pool of fits should
+default its kernel pool to one thread). This is Python practice for nested parallelism,
+since none of the seven programs runs its own process pool.
+
+| Library | What a worker process gets | Override |
+|---|---|---|
+| rietx | `model.compiled.n_threads()`: `RIETX_COMPILED_THREADS`, else `min(8, os.cpu_count())`; read once, when the kernel pool is built (`compiled.py:231-247`, checked (source)) | the variable |
+| joblib, loky backend | each worker's environment sets `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS` and others to `cpu_count() // n_jobs` (`doc/user_guide/parallel.rst`, "Avoiding over-subscription of CPU resources", checked (manual) at `main` 2026-11-18) | the same variables, set by the user |
+| numexpr | `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS` (recall, not re-checked) | either variable |
+
+Measured for WP-1464 (ran): on a 10-core arm64 Mac at load 9-84 from other work, a screen of
+26 cold fits on 10 worker processes ran 1.9-2.8× slower with `RIETX_COMPILED_THREADS=1` than
+with the default, in four interleaved pairs, and 104 fits ran 2.0× slower in two. BLAS was
+pinned to one thread in both. So rietx keeps its default in a pool and does not read
+`OMP_NUM_THREADS`: under loky, or under the BLAS pinning `batch-operating.md` 9c.31 advises,
+that variable is 1, the setting measured slower.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
