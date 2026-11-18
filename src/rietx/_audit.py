@@ -2720,7 +2720,7 @@ ROWS: tuple[Row, ...] = (
                  "(WP-1955 task 6 owes both).  A literal of its own, not AXIAL_SIZING_FLOOR's "
                  "row, following the 2026-11-03 ruling on NOMINAL_AXIAL_APERTURE: a retune of "
                  "the floor by WP-2017 cannot move a start."),
-        ),
+        approved="2026-11-17"),
     Row("rietx.model.forward.AXIAL_HL_START", "constant", tier=3, value=0.01,
         evidence=("where a stage starts H/L when it frees one sitting on zero (WP-1955), half "
                   "of S/L's so that a pair lifted together does not sit on the S/L = H/L line, "
@@ -2731,7 +2731,7 @@ ROWS: tuple[Row, ...] = (
                   "value takes the other ratio's number (forward.axial_lift_start)"),
         grounds=("A starting value, tier 3 on the same grounds as AXIAL_SL_START: synthetic "
                  "evidence only, task 6 owes a real family and a synchrotron one."),
-        ),
+        approved="2026-11-17"),
     Row("rietx.model.forward.AXIAL_NODE_STEP", "constant", tier=3, value=3e-06,
         evidence=("the step of the second-order forward difference giving a node's derivative "
                   "with respect to an aperture, from a scan against jax's exact column (WP-1955): "
@@ -2742,7 +2742,7 @@ ROWS: tuple[Row, ...] = (
         grounds=("A numerical setting scanned on the apertures the suite carries; tier 3 until "
                  "task 6 has tested apertures 0.001 to 0.005 and the xi cap, as the review of "
                  "#1372 asks (the same stance as FD_STEP's row)."),
-        ),
+        approved="2026-11-17"),
     Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
         evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
                   "share of the point is defined; ten orders under one count, and the partition's "
