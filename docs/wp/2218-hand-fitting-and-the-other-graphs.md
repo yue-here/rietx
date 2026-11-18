@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — every row built: #1680, #1683 and the Instrument dialog's PR; waits on Yue's look at § Questions 5-12
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — every row built: #1680, #1683 and #1684; waits on Yue's look at § Questions 5-12
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
@@ -306,7 +306,7 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
-- **2026-11-18** — the fourth PR of R3, PR #NNNN: the Instrument dialog at `/next`.
+- **2026-11-18** — the fourth PR of R3, PR #1684: the Instrument dialog at `/next`.
 
   A person on the rebuilt page can now change the project's source and geometry without the
   old Model tab. The Instrument band's ⋯ in the Parameters tab opens an Instrument dialog drawn
