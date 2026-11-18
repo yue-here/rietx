@@ -479,7 +479,8 @@ class Identifiability(Base):
     paths included, and :meth:`RefinementResult.for_histogram` hands one
     histogram's view its own rows, unscoped.  The joint path runs neither
     the declared-peak screen nor the parameter-space screens, so
-    ``extra_peak_absorption`` and the three tables below it stay empty there,
+    ``extra_peak_absorption`` and the three tables below it stay empty there
+    (``correlation`` is the exception: the joint solve's matrix, WP-1990),
     a declared and freed peak included: not measured, the same reading as
     ``None``.
     """
@@ -503,8 +504,8 @@ class Identifiability(Base):
     exchangeability: list[ExchangeRow] = Field(default_factory=list)
     #: The whole matrix ``top_correlations`` is cut from (WP-1990).  ``None``
     #: where it was not measured: fewer than two free parameters, no
-    #: correlation formed, or a joint multi-histogram fit, whose
-    #: parameter-space screens do not run (see above).  Export it with
+    #: correlation formed.  A joint multi-histogram fit carries the joint
+    #: solve's matrix, over the joint free paths.  Export it with
     #: :func:`rietx.io.exporters.write_correlation_table`.
     correlation: CorrelationMatrix | None = None
 
@@ -1728,11 +1729,12 @@ def _cap_one_code(diagnostics: list[Diagnostic], code: str, omitted_code: str,
         message=f"{len(omitted)} more {noun}(s) below the "
                 f"{HIGH_CORRELATION_MAX} shown here, weaker than all of them.",
         # every name here is a declared field (WP-1990's test resolves them),
-        # and the joint fit's gap is said rather than left to read as a None
+        # (a joint fit carries the matrix but not the top list, so it is named
+        # as the single fit's extra)
         suggestion="Read every pair's correlation in "
-                   "result.identifiability.correlation, the full matrix, or "
-                   "the worst few in result.identifiability.top_correlations; "
-                   "a joint multi-histogram fit carries neither yet.",
+                   "result.identifiability.correlation, the full matrix; a "
+                   "single fit's worst few are also in "
+                   "result.identifiability.top_correlations.",
     )]
     return out
 

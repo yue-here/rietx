@@ -2332,8 +2332,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The data cannot tell some combinations of parameters apart, and the list "
             "shows only the strongest of these flat directions. This entry counts the "
             "weaker ones left out. Nothing was dropped from the fit. The identifiability "
-            "record on the result holds the full set, except after a joint fit of several "
-            "patterns."
+            "record on the result holds the full set."
         ),
     ),
     "FLOOR_HIT": HelpEntry(
@@ -2937,7 +2936,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "values are less reliable. The list shows only the strongest pairs, to stay "
             "readable. This entry counts the weaker pairs left out. The fit used all of "
             "them. The identifiability record on the result holds the full correlation "
-            "matrix, except after a joint fit of several patterns."
+            "matrix."
         ),
     ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(

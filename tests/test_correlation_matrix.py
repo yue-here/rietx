@@ -4,8 +4,8 @@ Unit tests for the packing first; then one real fit, shared by the tests that
 need it, which is the LaB6 pattern of ``test_high_correlation_dedup.py`` under
 the default plan (about a second).  It holds the three claims the field makes:
 it is the matrix the solver handed the guard, the pairs quoted elsewhere are
-its entries bit for bit, and it survives a JSON round trip.  The joint-fit
-``None`` is asserted in ``test_joint_report.py``, on the fit that file already
+its entries bit for bit, and it survives a JSON round trip.  The joint fit's
+matrix is asserted in ``test_joint_report.py``, on the fit that file already
 pays for.
 """
 

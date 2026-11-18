@@ -179,6 +179,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import PlanSpec, check_phase_support_sigma
 from .schemas.results import (
+    CorrelationMatrix,
     HistogramResult,
     Identifiability,
     RefinedParameter,
@@ -1812,9 +1813,9 @@ class MultiHistogramRefinement:
         report's own, from this histogram's 2θ range.
 
         The background section reads this histogram's own absorption screen.
-        The identifiability section has no correlation, soft-mode or
-        exchangeability table, because the joint path does not run those
-        screens.
+        The identifiability section carries the joint correlation matrix
+        (WP-1990) and has no soft-mode or exchangeability table, because the
+        joint path does not run those screens.
 
         The report reads the result's curves and models, which come from a
         compile at the answer (:meth:`_final_compiles`, WP-1421), as a single
@@ -2431,6 +2432,13 @@ class MultiHistogramRefinement:
         thetas = mt.split(outcome.theta)
         stderr = outcome.stderr_internal
         corr = outcome.correlation
+        # the joint solve's whole correlation matrix, the one ``_top_diagnostics``
+        # thresholds (WP-1990, ruled on #1475); ``None`` where it was not formed
+        free_joint = list(mt.free_paths)
+        joint_correlation = (
+            CorrelationMatrix.from_square(free_joint, corr)
+            if corr is not None and len(free_joint) > 1
+            and np.shape(corr) == (len(free_joint),) * 2 else None)
         n_data = [len(m.tt) for m in models]
         data_off = np.concatenate([[0], np.cumsum(n_data)]).astype(int)
 
@@ -2800,8 +2808,10 @@ class MultiHistogramRefinement:
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
-            identifiability=(Identifiability(background_absorption=absorption_table)
-                             if absorption_table else None),
+            identifiability=(Identifiability(background_absorption=absorption_table,
+                                             correlation=joint_correlation)
+                             if absorption_table or joint_correlation is not None
+                             else None),
             # the declared coefficients in user units at the reference, read
             # off histogram 0's slice of the joint covariance (a coefficient
             # is shared, so its marginal is the joint one), and each equation with
