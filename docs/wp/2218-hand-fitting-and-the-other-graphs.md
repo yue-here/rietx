@@ -257,6 +257,38 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
+- **2026-11-18** — the review the third PR skipped, on PR #1683.
+
+  `/code-review high` ran on this PR's own commits (`origin/wp2218-peaks-background...`)
+  and found eight. Seven are fixed, one commit each, and nothing visual moved: § Questions
+  5, 8 and 9 and the dark last-fit colour are untouched.
+
+  - *Fixed*: a failure counts as a refused preview only when its request carried values.
+    Before, a failing working-state request under a pending slider re-queued itself in a
+    loop, and a 409 that raced a run's start left "Preview refused" up for the whole run
+    (two findings, one commit, and a vitest case for the loop). A selected or focused atom
+    is found by its site and fractional position, so a cell preview keeps the ring and the
+    bar. The context menu and Esc now ask whether the atom is drawn. A phase-scale,
+    broadening, extinction or texture drag is no longer a Structure preview. The filter
+    lists the families that cannot move an atom, so a new family still previews.
+    `GuiSession.structure3d`'s docstring no longer calls the body path "not idle-gated".
+    A disabled polyhedra key entry carries no authored `title=`, since the server's note
+    on the title line already says why it is not drawn. The browser case counts colours
+    through numpy, because `Image.get_flattened_data` needs a recent Pillow.
+  - *Declined*: `preview.structure_at` is not given a table-only base. The finding said
+    it compiles a model only to read the table. But the base is cached per head, and the
+    Interactive tab's `/api/preview` builds that same base on the same drag first. The
+    instrument copy stays because `apply_to_models` writes both models.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.0, Python
+    3.12): fast suite 14948 passed, 424 skipped and 32 xfailed in 8:45, through the
+    shift's serial lock. Ruff clean. Vitest 833 of 833, one more than the PR's 832.
+    svelte-check 0 errors in 456 files. Every non-browser `tests/test_gui_*.py` plus
+    `test_structure3d.py`: 468 passed, 1 skipped. Browser files by glob
+    (`test_structure3d*_browser.py`, `test_gui*_browser.py`), serially: 58 passed.
+  - *Gotchas*: a fresh worktree venv has no playwright, and every browser file then skips.
+    The suite drives the cached chromium by path. It ran here under playwright 1.65.0, the
+    version the other worktrees carry.
+
 - **2026-11-18** — the third PR of R3, PR #1683: the Structure graph at `/next`.
 
   A person on the rebuilt page can now open the Structure graph and turn the fitted structure
