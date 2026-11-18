@@ -67,6 +67,29 @@ that it did not.
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1555): evidence on whether an X-ray
+  geometry's plan frees axial asymmetry; the decision is held for the maintainer.** The
+  reporter proposes that the skill's worked default (§10, `mccusker_structural`) add a
+  last stage freeing FCJ S/L and H/L, tied equal and started at 0.02, on X-ray data,
+  Bragg-Brentano and capillary. Today only `lab_bragg_brentano` frees it, and the skill
+  reserves that plan for a fit where something outside pins zero or displacement. The
+  issue's comment asks whether the capillary plan should free it by default. Measured
+  by the reporter at `a23d06e14`, not rerun here, χ²_red without and with the stage:
+  SRM 660c LaB₆ 7.540 → 4.052 (and `RESOLUTION_NOT_POSITIVE` appears, the Caglioti
+  width going negative once FCJ is free), SRM 1976a 5.430 → 4.139, FAP 2.798 → 2.551,
+  11-BM Si 640c 1.532 → 1.336, NAC + CaF₂ 9.402 → 7.884; a synthetic null and HB-2A
+  neutron data do not move, and the neutron axial term sits on its floor. The cell
+  moves on both 11-BM kits: Si 640c 5.430877 → 5.431093 Å (+40 ppm, 5-29× the FCJ fit's
+  esd), NAC +46 ppm. Two rules bear on it. Root CLAUDE.md forbids an Rwp comparison as a
+  new default's evidence, and the χ² table is that kind; the cell shift is not, but
+  nobody has said which cell is nearer a certificate independent of the 11-BM
+  wavelength calibration. And this WP's ruling B7 keeps a *calibrated* instrument's
+  axial terms fixed in the geometry-picked plan. McCusker et al. (1999), *J. Appl.
+  Cryst.* 32, 36-50, p. 41, calls an axial-divergence asymmetry function essential.
+  *Checked against the tree at `98d7ba8e3`:* `mccusker_structural` frees no axial
+  path. `lab_bragg_brentano` frees `axial_sl`, and so does `lab_calibrate`, which the
+  issue does not mention; neither frees `axial_hl`.
+
 - **2026-11-05, from the issue triage (issue #1409): ten leftovers from PR #1405.** The issue
   holds each in full, by number. Most describe the PR's head, so they were read, not run.
   Checked at `541f0daf7`:

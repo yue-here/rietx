@@ -142,6 +142,60 @@ must not survive is a key, and a key is what the colon matches.
 
 - WP-1029 (the residual and scale knobs the strip reads).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The hover readout** (WP-1213, `lib/plot.ts:readout`, `panels/Plot.svelte`).
+The tooltip covered the data, and plotly offered no positioning for the unified
+box beyond `hoverlabel.align` — so the box was **deleted rather than moved**,
+and a strip of the plot's control rows says what the box said plus the three
+things it could not — the candidate's `hkl`, which emission line that line is,
+and d. **A new fact about a mark goes in the strip**: the chart takes neither
+of the boxes uPlot offers (a legend, a point per series), and `App.test.ts`
+holds every pane to that. Under plotly a label on one trace drew a second box
+of plotly's own beside it (WP-1438).
+So **one reflection has one spelling on all three browser surfaces** —
+`peaks.ts:formatHkl` here, `watch-core.mjs:hklLabel` in the wheel — held equal
+by `plot.test.ts`, since neither can import the other.
+**The strip's shape follows the payload, the tab and the curve toggles — never
+the pointer**: one row per *drawn* curve, so `data only` empties it to the
+points, while everything that varies under one pointer sweep keeps its slot and
+empties it, the resting state included, and the values are sized in `ch` so the
+wrap points hold. A strip that grew a field on hover would resize the canvas
+above it once per entry — WP-1212's jitter arriving through the repair for it
+(measured on NAC: plot 776 px, strip 23 px, unchanged over ten positions).
+**A masked channel is in no result, so the readout reads two arms** — nearest
+over fitted ∪ excluded (WP-1033), and a masked one has no model to quote, which
+is also how the strip says the pointer is inside a region without a field that
+changes width to say it. **The pointer's 2θ is the cursor's pixel through the chart's
+own x**, never a point some trace matched: the ticks ride on reflection
+positions and the markers on peak positions; the line under the pointer is
+`nearestPeak` at the **coarse** 10-px radius the non-destructive
+verbs aim with (`PICK_RADIUS_PX`, WP-1027's fine `grabToleranceDeg` is the
+*move* gesture's, because a drag edits), so the ring, the lit table row and the
+strip name one peak rather than `hoverdistance` naming another. **A curve is
+read at the nearest drawn channel and a nearby thing is hit-tested against the
+pointer**, which are two positions on purpose: a channel is not the pointer, and under
+plotly's decimated window it was up to ~0.03° away at a survey view — wider than
+the tolerance — so the pointer sat on three picked lines in a row while the row
+read `—`. **The pointer's line is chrome, so it is solid and takes `--fg`**: dotted in
+`--muted` is `maskShapes`' excluded-region edge exactly, and the pointer drew a
+line indistinguishable from a protocol boundary (uPlot's own is dashed
+`#607d8b`, and `rxplot.panes` sets `.u-cursor-x` inline for every chart on every page, since a
+page stylesheet that forgot the rule left `rietx compare` dashed) — a mark carrying no quantity
+needs no `--plot-*` token (WP-1210), it needs the one ink no plot colour is
+near. **Prose takes `−`, numbers take `-`**, which this app followed unwritten
+until a typographic minus in the tick offsets sat beside `formatValue`'s
+`toPrecision` output in one row; `formatHkl` shows where the line is, an index
+standing in for an overbar rather than a measurement. And a curves payload is
+**`$state.raw`** — a plain `$state` proxies it, so `held` and the payload a
+draw was handed are two identities for one object (svelte says so in dev; it
+was true before this WP surfaced it).
+
 ## Handover log
 
 - **2026-08-27** — The plot's tooltip is gone. Everything it said now sits in a

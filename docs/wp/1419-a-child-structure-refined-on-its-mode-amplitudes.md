@@ -1,6 +1,6 @@
 # WP-1419 — a child structure refined on its mode amplitudes
 
-Milestone: magnetic · Status: 🔄 2026-10-30 — C1's mode basis (PR #950) and C2's `distortion_candidates` (PR #996) landed from outside, on C0a #842 and C0b #889, with #1002's `primary` fix (PR #1022); task 2 is next; chunk 4's first half (`RefinementResult.distortion_totals`) merged from outside as PR #1238 (`4a93e858`); `distortion_candidates` states a centred parent's children instead of raising, from outside as PR #1275 (`c1bc1975`, #1247); #996's follow-ups (refusals beside the answer) merged as PR #1135 (`f2ca3bc9`); C3a's mode-amplitude block merged as PR #1107 (`e016f187`), the derived cell and the candidate route (3b) remain
+Milestone: magnetic · Status: 🔄 2026-10-30 — C1's mode basis (PR #950) and C2's `distortion_candidates` (PR #996) landed from outside, on C0a #842 and C0b #889, with #1002's `primary` fix (PR #1022); task 2 is next; chunk 4's first half (`RefinementResult.distortion_totals`) merged from outside as PR #1238 (`4a93e858`); `distortion_candidates` states a centred parent's children instead of raising, from outside as PR #1275 (`c1bc1975`, #1247); #996's follow-ups (refusals beside the answer) merged as PR #1135 (`f2ca3bc9`); C3a's mode-amplitude block merged as PR #1107 (`e016f187`); C2's derived cell (`Phase.parent_cell`) merged from outside as PR #1108 through #1528 (`8764de9e`), 2026-11-10; the candidate route (3b) remains
 Depends on: 1418 (the mode vectors: irreps, projection, isotropy subgroups);
 1327 soft (the operator-list phase both would share)
 Priority: P3 2026-09-23 — waits on 1418's mode vectors; P2 when they land
@@ -636,7 +636,7 @@ the reporter's fork.
 - [ ] `DISTORTION_MODE_UNSUPPORTED` and `CHILD_GROUP_UNNAMED` as
       `GuardFinding`s with `help.py` entries; their skill rows in
       `references/diagnostics.md` § 7 per #287's ruling.
-- [ ] The metric subspace: `MetricConstraints` as the fallback, esds
+- [x] The metric subspace: `MetricConstraints` as the fallback, esds
       propagated, the span test on all 39 children and the ten settings
       bit-identical.
 - [ ] The analytic column with declared reach, if the affine route is
@@ -676,6 +676,21 @@ every shipped fixture are bit-identical.
   `operator-list-basis`, as a reference implementation only.
 
 ## Handover log
+
+- **2026-11-10** (`/pr-review`) — C2 merged from outside as PR #1108, landed through #1528 (`8764de9e`) after seven review rounds. `main` had moved 218 commits past the PR's last sync, and its fork branch could not be pushed from the session, so #1528 carried #1108's 45 commits unchanged plus three on top, and GitHub marks #1108 merged. A child phase now states its cell as `Phase.parent_cell`: the parent's group, the (P, p) transform, the parent's cell and one amplitude per Γ strain the child's group allows. The child's metric is G′ = Pᵀ(G + 2LEL)P, built by a second `DerivedBlock` kind (`params/parent_cell.py`), and the child's six cell entries are locked outputs. `phases.*.cell.*` frees the parent's edges and never a strain, and `PARENT_STRAIN_HELD` (tier 3, approved 2026-10-27) reports the held strain on every such stage. `magnetic_supercell` builds the 5 of 36 displacive LaMnO₃ Pnma children, and P4/mmm 63.466, that it refused before. Schema `Also in 0.61`. This ticks the metric-subspace task in the derived-cell form (2026-10-11's chunk 2, replacing #293's `MetricConstraints`). The span test covers 242 children and 11 settings, and the 95 children that build both ways predict bit-identically.
+  - **The three commits on top.** `4de9bd62` merges main. Main's WP-2087 had already split the parameter map, so #1108's own `parameters-tof` page was dropped and its strain row kept in the Cell group. Both `STAGE_PATH_*` suggestion counts are now 3. `9694589b` puts `phases.*.parent_cell.strain.*` in `test_help.NOT_OPT_IN`, for WP-2087's opt-in test, which landed after the PR's last sync. `da3a2d30` trims `theory/estimation` back under the 50 000-character cap: the PR's `{cite}` in `peak-positions` renumbers Sphinx's global citation ids. That gotcha is general: a citation added early in the Theory tab can push any page sitting near the cap over it.
+  - **Not done, by design.** 3b (the derived cell on the candidate route, and a seed rule that covers strains). Whether `phases.*.cell.*` should free a strain once that seed rule exists is decided in 3b. Theory text beyond G′ is chunk 4's.
+  - **Owed to this WP, from the review.** Round 2 item 3: `Refinement.edit()` and a hand-edited `.rex` cannot move the parent's cell alone, because the drift check refuses an edit it cannot attribute to one side. Round 6: a stage naming both `phases.0.cell.*` and `phases.0.parent_cell.cell.*` still warns `STAGE_PATH_NOT_FREE`. The joint-fit arm of the cell-glob report comes with WP-2028. Foreign writers drop `parent_cell` silently, and should refuse it as `refuse_distortion_modes` does. Round 7: `STAGE_PATH_NOT_FREE`'s three coverage lists (`help.py`, `reference/parameter-table.md`, the skill's `references/surprises.md`) omit the cell arm. `_parent_strain_held_diagnostics` sits under `DIAGNOSTIC_SCOPES`' "deliberately not computed" heading in `multi.py`. No test runs `PARENT_STRAIN_HELD` on a joint fit. Round 1's non-blocking notes: no measured strain stands behind a refined one yet, so WP-2010's referent line applies (not yet validated). `gui/symmetry.py`'s `held_causes` names the child group's ties, not the derivation. The null-strain bound of 1e-4 is only 5.6× above a value a solver change already moved.
+  - **What ran.** CI's fast matrix was green on `da3a2d30`. On the merged tree (Linux x86-64, Python 3.12, `[dev,jax]`):
+    - ruff: clean.
+    - `-m slow` over `test_parent_cell`, `test_magnetic_supercell` and `test_cross_backend`: 14 passed, 5 skipped, 2 xfailed.
+    - `test_manual`, `test_manual_api` and `test_gui_manual`: 92 passed.
+    - `sphinx -W`: clean.
+    - `audit_delta`: 6 added, 0 at `unaudited`.
+    - `reader_output`: unchanged.
+    - GUI vitest: 717 passed. `svelte-check`: 0 errors.
+
+    The local fast suite at `-n auto` lost workers to the container's memory cgroup, so CI's matrix is the fast-tier evidence. Round 7's whole `-m slow` run on `d408a6ec` merged with main `26322798` gave 946 passed, 1 failed (#1424, which fails on main too).
 
 - **2026-11-01 (2nd session)** (`/pr-review`) — chunk 4, first half, merged from outside as PR #1238 (`4a93e858`). `RefinementResult.distortion_totals` holds one `DistortionTotal` per irrep block of a phase on mode amplitudes. Each carries A_τ with its esd and label, T², `driving`, the sign convention and the largest displacement. It is `None` on a joint fit. The per-block tests verb refuses a `detectability_probe` unless it is finite and positive. Three audit rows came with it, all tier 1 and held by the generality judge: `EVEN_EXPONENT`, `LINEAR_EXPONENT` and the `DistortionBlockTests.restarts` action. The branch was synced with main once before merge (the schema-history note, `c3f78eba`). No task is ticked by it. Open, owed to this file: PR #1108 (C2, a child's cell through its parent's) has round 2 resolved and waits on a rebase. Its `TECHNIQUE_FIELDS["rx.Phase"]` entry collides with #1238's. #1108's item 3 is a follow-up for this WP and is owed here when #1108 merges. What ran: the PR was replayed in a stack with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green. `main` now equals that tree.
 

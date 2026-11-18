@@ -51,6 +51,24 @@ DEFAULT_PORT = 8731
 #: the package never needs node.  Until then the placeholder page below explains
 #: itself and the API is fully usable without it.
 STATIC_DIR = Path(__file__).parent / "static"
+#: The paths that serve the rebuilt GUI's page (WP-2215); ``rietx gui --new``
+#: opens the first. Both pages talk to the same routes, so a project open in
+#: one is the project in the other.
+NEXT_PAGES = ("/next", "/next/")
+
+
+def _page_file(path: str) -> Path | None:
+    """The built page a request path names, or ``None`` when it names none.
+
+    ``/`` is today's GUI; :data:`NEXT_PAGES` the rebuilt one (WP-2214,
+    WP-2215), a second page of the same build over the same session, until it
+    replaces ``index.html``.
+    """
+    if path in ("/", "/index.html"):
+        return STATIC_DIR / "index.html"
+    if path in NEXT_PAGES:
+        return STATIC_DIR / "next.html"
+    return None
 
 _ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]", "::1"})
 
@@ -214,7 +232,14 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/project"): lambda s, q, b: s.project_doc(),
     ("POST", "/api/project"): lambda s, q, b: s.project_patch(b),
     ("POST", "/api/project/save"): lambda s, q, b: s.project_save(),
+    # the File menu (WP-2133): each acts on the project's folder
+    ("POST", "/api/project/copy"): lambda s, q, b: s.project_copy(b),
+    ("POST", "/api/project/rename"): lambda s, q, b: s.project_rename(b),
+    ("POST", "/api/project/move"): lambda s, q, b: s.project_move(b),
+    ("POST", "/api/project/close"): lambda s, q, b: s.project_close(),
     ("GET", "/api/recent"): lambda s, q, b: {"recent": s.recent()},
+    ("POST", "/api/recent/remove"): lambda s, q, b: s.recent_remove(b),
+    ("POST", "/api/recent/clear"): lambda s, q, b: s.recent_clear(),
     # the "Open…" browser's own listing (WP-1205): read-only, confined to the
     # home directory and the process's cwd — see GuiSession.fs
     ("GET", "/api/fs"): lambda s, q, b: s.fs((q.get("path") or [None])[0]),
@@ -227,6 +252,10 @@ ROUTES: dict[tuple[str, str], Any] = {
     # *person's* rather than a project's (WP-1044)
     ("GET", "/api/settings"): lambda s, q, b: s.settings(),
     ("POST", "/api/settings"): lambda s, q, b: s.settings_patch(b),
+    # the open project's recovery copy of unapplied edits (WP-2209), in the
+    # state directory beside the settings and, like them, not behind the 409
+    ("GET", "/api/recovery"): lambda s, q, b: s.recovery(),
+    ("PUT", "/api/recovery"): lambda s, q, b: s.recovery_put(b),
 
     ("GET", "/api/params"): lambda s, q, b: s.params(),
     ("PATCH", "/api/params"): lambda s, q, b: s.params_patch(b),
@@ -265,6 +294,10 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/result"): lambda s, q, b: s.result(),
     # every channel once, as float64 arrays rather than JSON (WP-1461, D4)
     ("GET", "/api/result/curves"): lambda s, q, b: s.result_curves(),
+    # the curves at values nobody has applied, writing nothing (WP-2125)
+    ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
+    # the background curve and its band from the fit's covariance (WP-2129)
+    ("GET", "/api/background"): lambda s, q, b: s.background(),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 
@@ -509,10 +542,10 @@ def _handler(session: GuiSession, holder: dict):
 
         # -- static --------------------------------------------------
         def _static(self, path: str) -> None:
-            index = STATIC_DIR / "index.html"
-            if path in ("/", "/index.html"):
-                if index.is_file():
-                    self._send(index.read_bytes(), "text/html; charset=utf-8")
+            page = _page_file(path)
+            if page is not None:
+                if page.is_file():
+                    self._send(page.read_bytes(), "text/html; charset=utf-8")
                 else:
                     self._send(_PLACEHOLDER.encode("utf-8"),
                                "text/html; charset=utf-8")
@@ -613,7 +646,8 @@ def build_server(session: GuiSession, *, port: int = DEFAULT_PORT):
 
 def serve(session: GuiSession, *, port: int = DEFAULT_PORT,
           open_browser: bool = True, machine: bool = False,
-          block: bool = True, scratch_of: str | Path | None = None):
+          block: bool = True, scratch_of: str | Path | None = None,
+          new: bool = False):
     """Serve ``session``; returns the server when ``block=False`` (tests).
 
     ``scratch_of`` is the project a :func:`scratch_copy` was made *from*, when
@@ -621,10 +655,14 @@ def serve(session: GuiSession, *, port: int = DEFAULT_PORT,
     already the boot line's ``project``, and the source is the fact a path
     cannot carry — that whatever happens in here, the directory the person
     named on the command line is not written to.
+
+    ``new`` points the browser and the banner at the rebuilt page, ``/next``
+    (WP-2215); the server serves both pages either way.
     """
     httpd = build_server(session, port=port)
     actual = httpd.server_address[1]
-    url = f"http://127.0.0.1:{actual}/"
+    route = NEXT_PAGES[0] if new else "/"
+    url = f"http://127.0.0.1:{actual}{route}"
     if machine:
         # one line, first, so a supervising process (Tauri) can read the port
         # without parsing prose
@@ -643,7 +681,7 @@ def serve(session: GuiSession, *, port: int = DEFAULT_PORT,
         if scratch_of is not None:
             print(f"  scratch copy — {scratch_of} is not written to",
                   flush=True)
-        if not (STATIC_DIR / "index.html").is_file():
+        if not _page_file(route).is_file():
             print("  frontend: not built — run `npm --prefix gui run build`; "
                   "the HTTP API is live either way", flush=True)
         print("  Ctrl-C to stop", flush=True)
@@ -712,6 +750,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="open a throwaway copy of the project; the "
                              "directory named on the command line is never "
                              "written to")
+    parser.add_argument("--new", action="store_true",
+                        help="open the rebuilt GUI, served at /next beside "
+                             "today's page until it replaces it")
     parser.add_argument("--state-dir", default=None, metavar="PATH",
                         help="where the recent list and the theme are kept "
                              f"(default: ${STATE_DIR_ENV}, else "
@@ -738,15 +779,19 @@ def main(argv: list[str] | None = None) -> int:
         try:
             project = Project.open(source, backend=args.backend,
                                    solver=args.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             # the refusal messages name seven different remedies; printing the
             # one that applies is the whole value of them
             print(f"rietx gui: {exc}")
             return 2
     session = GuiSession(project, backend=args.backend, solver=args.solver,
                          state_dir=args.state_dir)
+    if project is None:
+        # no project named: return to the last one, as VS Code and JetBrains
+        # do, and start on the start screen when there is none (WP-2131)
+        session.reopen_last()
     serve(session, port=args.port, open_browser=args.open_browser,
-          machine=args.machine, scratch_of=scratch_of)
+          machine=args.machine, scratch_of=scratch_of, new=args.new)
     return 0
 
 

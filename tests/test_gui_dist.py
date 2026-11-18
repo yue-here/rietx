@@ -97,8 +97,15 @@ def test_the_page_references_no_external_asset():
     html = (DIST / "index.html").read_text(encoding="utf-8")
     # every built script, not just the entry: WP-1013 added chunks, and a
     # vendored library is exactly where a CDN fallback or a sourcemap URL hides
-    built = [("index.html", html)] + [(p.name, p.read_text(encoding="utf-8"))
+    built = [("index.html", html),
+             # the rebuild's page (WP-2215) is held to the same guarantee
+             ("next.html", (DIST / "next.html").read_text(encoding="utf-8"))]
+    built += [(p.name, p.read_text(encoding="utf-8"))
                                       for p in sorted((DIST / "assets").glob("*.js"))]
+    # and every stylesheet, since an @font-face is where a font service's URL
+    # would sit (STYLE § Type: every font is served by the app itself)
+    built += [(p.name, p.read_text(encoding="utf-8"))
+              for p in sorted((DIST / "assets").glob("*.css"))]
     for name, text in built:
         remote = re.findall(r"""["'(]((?:https?:)?//[^"')\s]+)""", text)
         # An XML namespace is an *identifier*, not an address: CodeMirror passes
@@ -110,6 +117,29 @@ def test_the_page_references_no_external_asset():
         assert not remote, f"{name} references remote assets: {remote[:3]}"
     assert not [name for name, text in built if "/plotly.js" in text]
     assert 'src="/assets/app.js"' in html
+
+
+def test_the_rebuilds_fonts_are_the_manuals_and_only_the_rebuild_loads_them():
+    """The fonts `/next` sets are files in the dist, with their licences (WP-2215).
+
+    Instrument Sans and IBM Plex Mono are the manual's own files (WP-2021),
+    byte for byte, so two copies cannot drift. Only the second build pass
+    copies them and only its stylesheet declares them, so today's page loads
+    none of them.
+    """
+    manual = ROOT / "docs" / "docs" / "_static" / "fonts"
+    fonts = DIST / "fonts"
+    names = sorted(p.name for p in fonts.iterdir())
+    shared = [p.name for p in sorted(manual.iterdir()) if p.suffix in (".woff2", ".txt")]
+    assert shared and set(shared) <= set(names)
+    for name in shared:
+        assert (fonts / name).read_bytes() == (manual / name).read_bytes(), name
+    for family in ("InstrumentSans", "IBMPlexMono", "IBMPlexSans"):
+        assert f"OFL-{family}.txt" in names, family
+    css = (DIST / "assets" / "next.css").read_text(encoding="utf-8")
+    declared = set(re.findall(r"""url\(["']?/fonts/([^"')]+)""", css))
+    assert declared == {n for n in names if n.endswith(".woff2")}
+    assert "@font-face" not in (DIST / "assets" / "app.css").read_text(encoding="utf-8")
 
 
 def test_codemirror_is_split_out_and_off_the_boot_path():
@@ -180,7 +210,7 @@ def test_the_sources_the_digest_covers_are_the_ones_that_matter(build_info):
     covered = {build_info.relative(p, GUI_DIR)
                for p in build_info.source_files(GUI_DIR)}
     assert {"vite.config.ts", "tsconfig.json", "package.json",
-            "package-lock.json", "index.html",
+            "package-lock.json", "index.html", "next.html",
             "scripts/build_info.py", "scripts/vendor.py"} <= covered
     assert any(name.endswith(".svelte") for name in covered)
     assert any(name.endswith(".test.ts") for name in covered)
@@ -223,8 +253,8 @@ def test_nothing_gitignores_the_dist():
     """
     import subprocess
 
-    files = [DIST / "index.html", DIST / "build-info.json",
-             DIST / "assets" / "app.css", *sorted((DIST / "assets").glob("*.js"))]
+    files = [DIST / "index.html", DIST / "next.html", DIST / "build-info.json",
+             DIST / "assets" / "app.css", DIST / "assets" / "next.css", *sorted((DIST / "assets").glob("*.js"))]
     # --no-index because check-ignore consults the index first, and answers for
     # a *tracked* file without asking the ignore rules at all: every file here
     # is committed, so without it this test was green while asking nothing
@@ -251,6 +281,7 @@ def test_nothing_gitignores_the_dist():
 #: the entry point go missing — so they are enumerated.
 BUILD_INPUTS = (
     "index.html",          # vite's entry module; the one that broke
+    "next.html",           # the rebuild's page, a second entry (WP-2215)
     "vite.config.ts",
     "svelte.config.js",
     "tsconfig.json",
@@ -327,11 +358,14 @@ def test_the_dist_is_in_the_wheel(wheel_names):
     """
     inside = wheel_names
     wanted = ["rietx/gui/static/index.html", "rietx/gui/static/assets/app.css",
+              "rietx/gui/static/next.html", "rietx/gui/static/assets/next.css",
               "rietx/gui/static/build-info.json"]
     # every chunk, so a new one cannot ship as a 404 at the moment the pane that
     # needs it is opened
     wanted += [f"rietx/gui/static/assets/{p.name}"
                for p in sorted((DIST / "assets").glob("*.js"))]
+    # the rebuild's fonts, each with its licence beside it as the OFL requires
+    wanted += [f"rietx/gui/static/fonts/{p.name}" for p in sorted((DIST / "fonts").iterdir())]
     # the agent skill rides the same build (WP-1003, retargeted from the single
     # AGENT_PROTOCOL.md by WP-1304): force-included as package data so a
     # pip-only agent with no network has its own copy offline, and so

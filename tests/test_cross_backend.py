@@ -31,9 +31,9 @@ rows), ``toy_pawley`` (aux intensity block + overlap-restraint rows),
 ``toy_rich`` (aniso ADPs + March-Dollase + *nonzero* extinction + displacement/
 transparency), and the real-data ``srm660c`` / ``nac`` (marked ``slow``).
 Multi-histogram (stacked ``run_multi_least_squares`` layout) and the
-stage-boundary recompiles get their own tests below.  Le Bail and Pawley are
-single-histogram only — WP-0308 shipped multi-histogram as Rietveld-only,
-because per-pattern intensity extractions are not a shared quantity.
+stage-boundary recompiles get their own tests below, the stacked layout in
+Rietveld and in Pawley mode (WP-2104: each histogram's intensity block rides
+after the table's columns).  Le Bail is single-histogram only.
 
 **Every compile declares its windows** (WP-2002), as ``test_backend_shim``'s
 do.  ``compile_model``'s default is the closing stage's ``CLOSING_WINDOW_TOL``,
@@ -581,12 +581,13 @@ def _state_capillary_offsets():
 def _state_extra_components():
     """An additive background peak, all three parameters free.
 
-    A new derivative path with no row of its own: the peak is a term *added* to
-    the pattern rather than a factor inside the peak chain, so no analytic
-    branch claims it and the numpy reference column is the whole-model FD.  That
-    is exactly why it needs a matrix row — an FD column is only "exact because
-    it decodes through C like the residual" if the traced backends agree that it
-    is, and nothing else here evaluates a parameter the numpy path declines.
+    The peak is a term *added* to the pattern rather than a factor inside the
+    peak chain, so its columns are their own branch: the closed form of
+    ``background.models.hump_partials``, read off the hump alone (WP-2116).
+    Until WP-2116 the numpy reference here was the whole-model FD.  Every
+    column of this state is now exact, which ``NO_FD_CONFIGS`` asserts, and
+    the fd, jax and torch rows are the independent opinions on the closed
+    form.
 
     Freed **beside** the background coefficients on purpose: the peak and the
     low-order Chebyshev terms both raise the same region of the curve, so this
@@ -635,6 +636,84 @@ def _state_extra_components():
                   "instrument.extra_components.0.position",
                   "instrument.extra_components.0.height",
                   "instrument.extra_components.0.fwhm"])
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+
+def _state_extra_components_tied():
+    """Two humps whose columns reach past one field (WP-2116).
+
+    The hump's columns are a closed form read off the hump alone, gated on the
+    column's whole reach.  So this row holds the three shapes the gate has to
+    tell apart, each against the fd, jax and torch opinions:
+
+    * a hump width tied to the other hump's, at 1.5 and a constant, so one
+      column sums two humps' partials at two coefficients;
+    * a named variable driving both positions, so the column is named by what
+      it reaches rather than by a hump path;
+    * one hump's height driving the zero shift and a P-spline coefficient,
+      a reach outside every component, which must keep the whole-model FD
+      column and still write that coefficient's penalty rows;
+    * a third hump's height set by an expression of a variable, so its
+      coefficient is a derived row's and moves with θ.
+    """
+    from rietx.schemas.instrument import (
+        HUMP_FWHM_MIN,
+        BackgroundPSpline,
+        HumpComponent,
+    )
+    from tests.test_coordinates import make_rutile
+
+    structure = make_rutile()
+    structure.phases[0].scale.value = 8.0e-3
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.source.dispersion = None    # declined, not inherited
+    ins.profile.w.value = 8e-3
+    ins.background = BackgroundPSpline.for_range(15.0, 90.0, knot_step_deg=8.0)
+    for k, coef in enumerate(ins.background.coefficients):
+        coef.value = 20.0 + 0.5 * k
+    ins.extra_components = [
+        HumpComponent(label=f"hump{k}",
+                      position=Parameter(value=pos, unit="deg"),
+                      height=Parameter(value=height, min=0.0, unit="counts"),
+                      fwhm=Parameter(value=fwhm, min=HUMP_FWHM_MIN, unit="deg"))
+        for k, (pos, height, fwhm) in enumerate(((34.0, 120.0, 9.0),
+                                                (54.0, 80.0, 14.0),
+                                                (74.0, 60.0, 10.0)))]
+
+    grid = np.arange(15.0, 90.0, 0.02)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim = compile_model(structure, ins, empty, mode="rietveld",
+                        window_area_tol=WINDOW_AREA_TOL)
+    sim_table = ParameterTable(structure, ins)
+    y = sim.evaluate(sim_table.decode(sim_table.x0()))
+    pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
+
+    h0, h1 = "instrument.extra_components.0", "instrument.extra_components.1"
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    table.add_parameter(f"{VAR_PREFIX}P", 34.0, vary=True)
+    table.set_tie(f"{h0}.position", AffineTie.identity(f"{VAR_PREFIX}P"))
+    table.set_tie(f"{h1}.position",
+                  AffineTie(terms=((f"{VAR_PREFIX}P", 1.0),), const=20.0))
+    table.set_tie(f"{h1}.fwhm",
+                  AffineTie(terms=((f"{h0}.fwhm", 1.5),), const=0.5))
+    table.set_tie("instrument.zero_shift",
+                  AffineTie(terms=((f"{h1}.height", 1e-4),), const=-0.008))
+    table.set_tie("instrument.background.c2",
+                  AffineTie(terms=((f"{h1}.height", 0.05),), const=17.0))
+    table.refresh_ties()
+    table.add_parameter(f"{VAR_PREFIX}W", 60.0 ** 0.5, vary=True, lo=0.0)
+    table.add_expression("instrument.extra_components.2.height", "W^2",
+                         variables={"W": f"{VAR_PREFIX}W"})
+    for path in ("phases.0.scale", "instrument.background.c0",
+                 f"{h0}.height", f"{h0}.fwhm", f"{h1}.height"):
+        assert table.set_vary([path], True), path
+    table.apply_to_models(structure, ins)
     model = compile_model(structure, ins, pattern, mode="rietveld",
                           moving_paths=set(table.moving_paths),
                           window_area_tol=WINDOW_AREA_TOL)
@@ -1066,6 +1145,39 @@ def _state_bodies_site():
     return model, table, {}
 
 
+def _state_parent_cell():
+    """A child's cell derived from its parent's and a Γ strain (WP-1419).
+
+    The new derivative path: the parent's edges and the strain reach the
+    child's six cell rows through ``ParentCellBlock``, a derived block, so
+    numpy takes ``_peak_chain_column`` through ``decode`` and the traced
+    backends differentiate ``evaluate_traced``.  The Cm child of the shipped
+    Pnma LaMnO₃ in 2a, a+b, c, whose one shear moves α′ and β′; the strain sits
+    off zero, where the pattern's dependence on it is not stationary.
+    """
+    import rietx as rx
+    from rietx.schemas.structure import Structure
+    from tests.test_parent_cell import _child
+
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase.model_copy(deep=True)
+    _, ins, _ = _lab_state()
+    ref = rx.Refinement(Structure(phases=[phase]), ins.model_copy(deep=True))
+    ref.set_values({"phases.0.parent_cell.strain.0": 0.003})
+    structure = ref.structure
+    tt = np.arange(10.0, 30.0, 0.02)
+    rng = np.random.default_rng(1419)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*",
+                 "phases.0.scale"):
+        assert table.set_vary([glob], True), glob
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 def _state_bodies_site_fixed():
     """A rigid body on a site that fixes every direction (WP-1807): k = 0.
 
@@ -1298,6 +1410,7 @@ CONFIGS = {"families": _state_families,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
+           "parent_cell": _state_parent_cell,
            "bodies_site_fixed": _state_bodies_site_fixed,
            "families_voigt": _state_families_voigt,
            "axial_one_zero": _state_axial_one_zero,
@@ -1312,6 +1425,7 @@ CONFIGS = {"families": _state_families,
            "toy_torsion": _state_toy_torsion,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
+           "extra_components_tied": _state_extra_components_tied,
            "extra_peak": _state_extra_peak,
            "magnetic": _state_magnetic,
            "magnetic_width": _state_magnetic_width,
@@ -1334,8 +1448,8 @@ CONFIGS = {"families": _state_families,
 #: config to one worker means its state and its six method Jacobians are built
 #: once (jax pays a 1-4 s jit compile per state), while the nine configs still
 #: spread across nine workers.  No matrix row is cut.
-def _config(name: str, *marks):
-    return pytest.param(name, marks=[*marks, pytest.mark.xdist_group(f"xb-{name}")])
+def _config(name: str, *marks, group: str | None = None):
+    return pytest.param(name, marks=[*marks, pytest.mark.xdist_group(group or f"xb-{name}")])
 
 
 CONFIG_PARAMS = [
@@ -1354,6 +1468,7 @@ CONFIG_PARAMS = [
     _config("toy_torsion"),
     _config("capillary_offsets"),
     _config("extra_components"),
+    _config("extra_components_tied"),
     _config("extra_peak"),
     _config("magnetic"),
     _config("magnetic_width"),
@@ -1365,6 +1480,10 @@ CONFIG_PARAMS = [
     _config("stephens_over_lor_strain"),
     _config("distortion_modes"),
     _config("bodies_site"),
+    # the state imports test_parent_cell's LaMnO₃ child, whose candidate search
+    # is cached per process: sharing that module's group pays it once
+    # (tests/CLAUDE.md § Shared fixtures)
+    _config("parent_cell", group="parent-cell"),
     _config("bodies_site_fixed"),
     _config("toy_lebail"),
     _config("toy_pawley"),
@@ -1809,11 +1928,19 @@ MULTI_GLOBS = ["phases.*.scale", "instrument.background.*", "phases.*.cell.*",
 
 _MULTI_CACHE: dict[str, tuple] = {}
 
+#: the joint modes, each its own state: Pawley's free set is the Rietveld one
+#: less the scales it force-fixes, and its θ carries each histogram's
+#: intensity block after the table's columns (WP-2104)
+MULTI_MODES = ("rietveld", "pawley")
 
-def _multi_state():
+
+def _multi_state(mode: str = "rietveld"):
     """Two LaB6 patterns of one crystal at two wavelengths (the WP-0308 state),
-    compiled per histogram and wired through a ``MultiParameterTable``."""
-    if "state" not in _MULTI_CACHE:
+    compiled per histogram and wired through a ``MultiParameterTable``:
+    ``(models, mtable, theta, labels)``."""
+    key = f"state:{mode}"
+    if key not in _MULTI_CACHE:
+        from rietx.optimize.least_squares import _joint_aux_paths
         from rietx.params.multi import MultiParameterTable
         from tests.test_multi_histogram import perturbed_inputs, synthesize
 
@@ -1824,36 +1951,46 @@ def _multi_state():
         structure, instruments = perturbed_inputs()
         mtable = MultiParameterTable(structure, instruments)
         mtable.set_vary(["*"], False)
-        assert mtable.set_vary(MULTI_GLOBS, True)
+        globs = (MULTI_GLOBS if mode == "rietveld"
+                 else [g for g in MULTI_GLOBS if not g.endswith(".scale")])
+        assert mtable.set_vary(globs, True)
         mtable.apply_to_models()
-        models = [compile_model(s, ins, d, mode="rietveld",
+        models = [compile_model(s, ins, d, mode=mode,
                                 moving_paths=set(t.moving_paths),
                                 window_area_tol=WINDOW_AREA_TOL)
                   for s, ins, d, t in zip(mtable.structures, mtable.instruments,
                                           data, mtable.tables, strict=True)]
-        _MULTI_CACHE["state"] = (models, mtable)
-    return _MULTI_CACHE["state"]
+        theta = mtable.x0()
+        if mode == "pawley":
+            # the joint runner's seed (``multi._seed_joint_pawley``)
+            for m, t in zip(models, mtable.tables, strict=True):
+                m.lebail_update(t.decode(t.x0()),
+                                n_cycles=_pawley_seed_cycles(Stage("seed", [])))
+                m.build_pawley_restraint()
+            theta = np.concatenate([theta, *[m.pawley_x0() for m in models]])
+        labels = list(mtable.free_paths) + _joint_aux_paths(models)
+        _MULTI_CACHE[key] = (models, mtable, theta, labels)
+    return _MULTI_CACHE[key]
 
 
-def _multi_jacobian(backend: str):
-    key = f"jac:{backend}"
+def _multi_jacobian(backend: str, mode: str = "rietveld"):
+    key = f"jac:{backend}:{mode}"
     if key not in _MULTI_CACHE:
-        models, mtable = _multi_state()
+        models, mtable, _theta, _labels = _multi_state(mode)
         _MULTI_CACHE[key] = _multi_closures(models, mtable, backend=backend)[1]
     return _MULTI_CACHE[key]
 
 
+@pytest.mark.parametrize("mode", MULTI_MODES)
 @pytest.mark.parametrize("method", list(METHODS))
-def test_multi_histogram_stacked_jacobian_matches_analytic(method):
+def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
     """The same matrix over the stacked ``run_multi_least_squares`` layout.
 
-    Rietveld only, and that is not an omission: WP-0308 shipped multi-histogram
-    without Le Bail/Pawley because per-pattern intensity extractions are not a
-    shared quantity, and ``multi.py`` raises ``NotImplementedError`` for them.
+    Rietveld and Pawley (WP-2104).  Le Bail is not a joint mode:
+    ``multi.py`` refuses it, its partition having no seam in the joint solve.
     """
-    models, mtable = _multi_state()
-    theta = mtable.x0()
-    J_ref = _multi_jacobian("numpy")(theta)
+    models, mtable, theta, labels = _multi_state(mode)
+    J_ref = _multi_jacobian("numpy", mode)(theta)
     _build, rel_max, cos_min = METHODS[method]
 
     if method == "fd":
@@ -1870,22 +2007,22 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method):
         backend = method.split("+")[0]
         if backend != "numpy":
             pytest.importorskip(backend)
-        jac = _multi_jacobian(backend)
+        jac = _multi_jacobian(backend, mode)
         if method.endswith("+fp32"):
             with precision_policy(FP32_JACOBIAN):
                 J_test = jac(theta)
         else:
             J_test = jac(theta)
 
-    _assert_columns(J_ref, J_test, list(mtable.free_paths),
+    _assert_columns(J_ref, J_test, labels,
                     rel_max=rel_max, cos_min=cos_min,
-                    what=f"multi/{method} ")
+                    what=f"multi/{mode}/{method} ")
 
 
 def test_multi_histogram_stacked_layout():
     """The layout the agreement above is measured on: one shared column fed by
     *every* histogram's rows, per-histogram columns confined to their own."""
-    models, mtable = _multi_state()
+    models, mtable, _theta, _labels = _multi_state()
     J = _multi_jacobian("numpy")(mtable.x0())
     n_data = [len(m.tt) for m in models]
     blocks = [slice(0, n_data[0]), slice(n_data[0], n_data[0] + n_data[1])]
@@ -2157,6 +2294,11 @@ FD_COLUMN_BAR = 1e-3
 #: stopping point, (JᵀJ)⁻¹·Eᵀr, in esd, and the esd ratio
 FD_ANSWER_ESD_BAR = 0.01
 FD_ESD_RATIO_BAR = 0.01
+#: configs whose every column is exact, so no column takes a finite difference.
+#: ``extra_components`` joined when the hump's columns became the closed form
+#: (WP-2116): its other columns are a phase scale and background coefficients.
+#: Listed rather than skipped, so a column that falls back to FD here fails.
+NO_FD_CONFIGS = frozenset({"extra_components"})
 
 
 def _fd_taken(model, table, theta, monkeypatch):
@@ -2213,9 +2355,10 @@ def test_every_fd_column_meets_a_converged_oracle(config, monkeypatch):
 
     Measured on 2026-10-21 (macOS arm64, ``[dev]``): every column but two
     within 2.0e-5 of the oracle, most within 1.3e-6 (the cell).  The two are
-    the whole-model fallback on ``extra_peak``'s background-peak centre,
-    2.3e-4 (the oracle agrees with itself to 2.4e-10), and the SRM 660c
-    state's extinction, 2.5e-4 against an oracle good to 2.6e-4.
+    ``extra_peak``'s background-peak centre, 2.3e-4 (the oracle agrees with
+    itself to 2.4e-10), and the SRM 660c state's extinction, 2.5e-4 against an
+    oracle good to 2.6e-4.  The centre was then the whole-model fallback.
+    Since WP-2116 it differences the peak curve alone, at the same step.
 
     Made to fail on 2026-10-21: ``FD_STEP`` patched to 1e-4 failed 13 of the
     23 configs, ``extra_peak`` among them.
@@ -2223,6 +2366,10 @@ def test_every_fd_column_meets_a_converged_oracle(config, monkeypatch):
     model, table = _state(config)
     theta = _theta(model, table)
     jac, fd = _fd_taken(model, table, theta, monkeypatch)
+    if config in NO_FD_CONFIGS:
+        labels = _labels(model, table)
+        assert not fd, f"{config}: {[labels[c] for c in fd]} take a finite difference"
+        return
     assert fd, f"{config}: no column takes a finite difference"
     ref, ref_2h = _richardson(config, model, table, theta)
     bound, own, label = _column_errors(jac, ref, ref_2h, fd, _labels(model, table))

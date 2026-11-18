@@ -1,8 +1,11 @@
 # 9c. Many fits as one job: deciding an answer across fits
 
-Load it when a batch's fits are in hand and the task is to decide what they
-show together — ranking candidate models, differencing two populations,
-auditing an aggregate, or judging whether an answer is trustworthy at all.
+Load it before you launch a screen of candidate models, a candidates ×
+patterns grid or a pool of separate fits, because 9c.1, 9c.2 and 9c.35 decide
+how the fits are set up. Load it again when the fits are in hand and the task
+is to decide what they show together: ranking candidate models, differencing
+two populations, auditing an aggregate, or judging whether an answer is
+trustworthy at all.
 One refinement is a unit of a larger job here: candidate models screened
 against one pattern, or many patterns fitted independently rather than
 chained (§9b is the chain, whose fits share an order and a path).
@@ -85,7 +88,8 @@ candidates, sort such a fit into "not testable on this pattern", never into
 the rejects — and never let the batch walk it: before the hold existed, one
 absent phase cost 27 % of a 35-minute session, and its chain, reproduced on 13
 sub-onset patterns, took 6.7 s with cell bounds and was killed unfinished at
-13 minutes without them. *(Measured: WP-1301, and WP-1307's baseline ramp run
+13 minutes without them. A candidate the data sees only through a walked cell
+is the other half, and 9c.35 has it. *(Measured: WP-1301, and WP-1307's baseline ramp run
 — the flat direction's share of wall.)*
 
 **9c.3 Rank candidates only on fits of the same channels, the same excluded
@@ -349,3 +353,26 @@ only between stages that fit the same range and mode, and read a stage whose
 stage whose `termination` is `slow_descent` stopped while still falling
 slowly (`STAGE_SLOW_DESCENT`). *(Hypothesis: the fields are new in WP-1334,
 and no batch has used them yet.)*
+
+**9c.35 Read each candidate's cell against its template before ranking it:
+a candidate that lowers Rwp from a walked cell, or from one resting on its
+bound, is not identified.** 9c.2 is the candidate the data cannot see. This is
+the other half: a candidate the data sees only through a moved cell. The moved
+cell lets it take a present phase's peaks. On the CPD round-robin zincite pattern, absent
+fluorite with its cell free shrank that cell by 10.8 %, under `CELL_RUNAWAY`'s
+15 %, so no code named it. It lowered Rwp from 10.60 % to 10.23 % and took
+14 ± 12 wt %. Bounded at ±1 %, the cell sat on its bound (`BOUND_HIT`), Rwp
+fell to 10.07 % and fluorite took 66 ± 24 wt %, so a bound alone does not end
+the imitation. In one in-situ screen of 204 cold fits, an absent candidate's
+cell more than doubled along one axis in the first Le Bail stage and kept a
+nonzero scale to the end. In the same session a minority candidate lowered χ²
+while its cell left its template, and the chain's two directions disagreed on
+that cell by 18σ. The protocol that agent ended with raised no
+`SEQUENTIAL_PATH_DEPENDENT`: each candidate's cell bounded near its template,
+and each candidate tested as a fit with its cell held at the template against
+a fit without it. *(Measured: WP-1464, 12 CPD round-robin candidate pairs
+fitted free and at ±1 %, and in-situ series 1's second agent session with this
+WP's replay of its 204 jobs. Hypothesis: the bound's width. That session used
+±1 % and then ±0.3 % for candidates whose cells differ by little, and a bound
+tighter than the smallest metric difference between candidates is the general
+form, undecided.)*

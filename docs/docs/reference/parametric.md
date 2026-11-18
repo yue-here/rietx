@@ -1,6 +1,6 @@
 # Parametric refinement
 
-This page gives how a parameter is declared as an equation of each pattern's coordinates and refined across every pattern at once: the coordinate table and the declaration, the reference and scale, what is refused before a fit, the coefficients a fit reports, the test of the declared form, and the equation evaluated at any coordinate.
+This page gives how a parameter is declared as an equation of each pattern's coordinates and refined across every pattern at once: the coordinate table and the declaration, the targets it accepts, the reference and scale, what is refused before a fit, the coefficients a fit reports, the test of the declared form, and the equation evaluated at any coordinate.
 
 A chain measures a parameter once per pattern ([Sequential refinement](series.md)), and a joint fit shares it as one number ([Joint refinement](joint.md)).
 Between the two is a parameter that differs from pattern to pattern by an equation you can write down: a cell edge linear in temperature down a ramp, or a cell edge that follows the composition across a combinatorial library.
@@ -149,6 +149,71 @@ surface = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="polyn
 assert library.n_patterns == 8
 assert surface.n_coefficients == 5
 assert surface.coordinates_used() == ["x", "y"]
+```
+
+## Targets
+
+A target is any parameter that moves on its own in every pattern of the subset.
+These kinds are accepted:
+
+| Kind | Target, for example | Note |
+|---|---|---|
+| a lattice parameter | `phases.0.cell.a`, `phases.0.cell.beta` | only one the space group leaves free; a cubic `b` follows `a` |
+| a phase scale | `phases.0.scale` | |
+| an atomic coordinate | `phases.0.atoms.1.dof.0` | the site-symmetry degree of freedom, never `x`, `y` or `z` ([Site-symmetry degrees of freedom](../theory/parameterisation.md#site-symmetry-degrees-of-freedom)) |
+| a displacement parameter | `phases.0.atoms.0.biso` | |
+| an occupancy | `phases.0.atoms.1.occ` | |
+| a size or strain term | `phases.0.lor_size`, `phases.0.gauss_strain` | a size term only over patterns at one wavelength |
+| the zero shift | `instrument.zero_shift` | |
+| the specimen displacement | `instrument.geometry.sample_displacement` | not on a capillary, whose geometry locks it |
+| axial divergence | `instrument.geometry.axial_sl` | |
+| a peak-width term | `instrument.profile.w`, `instrument.profile.y` | |
+| a background coefficient | `instrument.background.c1` | |
+| a wavelength | `instrument.source.lines.0.wavelength` | it moves every peak as the cell does, so free one of the two |
+
+A path the model ties to another, or one it locks, is refused ([Refusals](#refusals)).
+So is a formula's variable, which is not a target.
+
+A plan frees an equation's coefficients only where one of its stages reaches the target.
+`mccusker_default` reaches the scales, the background, the zero shift, the cell and the peak widths.
+`mccusker_structural` adds the coordinates and B.
+An equation on any other kind needs a `PlanSpec` stage naming its target.
+Otherwise its coefficients stay at their starting values, and the result has no row for them.
+
+```python
+import rietx as rx
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0),
+                   y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0)),
+           rx.Atom(label="B", species="B", x=rx.Parameter(value=0.1975),
+                   y=rx.Parameter(value=0.5), z=rx.Parameter(value=0.5))],
+)])
+coordinates = rx.CoordinateTable(columns={"T": [300.0, 450.0, 600.0, 750.0, 900.0]})
+
+
+def accepted(target):
+    instruments = [rx.Instrument.bragg_brentano(radiation="CuKa") for _ in range(5)]
+    for instrument in instruments:
+        instrument.background = rx.BackgroundChebyshev.with_terms(3)
+    line = rx.ParametricEquation(name="p", target=target, basis="polynomial", terms=[[], ["T"]])
+    try:
+        rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates, parametric=[line])
+    except ValueError:
+        return False
+    return True
+
+
+assert all(accepted(path) for path in [
+    "phases.0.cell.a", "phases.0.scale", "phases.0.atoms.1.dof.0", "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.occ", "phases.0.lor_size", "phases.0.gauss_strain",
+    "instrument.zero_shift", "instrument.geometry.sample_displacement",
+    "instrument.geometry.axial_sl", "instrument.profile.w", "instrument.profile.y",
+    "instrument.background.c1", "instrument.source.lines.0.wavelength"])
+assert not any(accepted(path) for path in [
+    "phases.0.cell.b", "phases.0.cell.alpha", "phases.0.atoms.1.x", "phases.0.atoms.0.x",
+    "instrument.source.lines.0.weight"])
 ```
 
 ## Formula equations
@@ -314,12 +379,18 @@ The rest need the patterns:
 | a coordinate degree of freedom whose atom the starting structures place differently | start every pattern with the atom in one place |
 | two declarations with one name, a coefficient path that already exists, or two declarations on one target with overlapping subsets | a name each, and disjoint `patterns` per target |
 | a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per histogram of one model |
+| starting structures that differ in a field that is not a parameter, such as a texture axis, a declared extinction or Stephens block, the restraints or a rigid body's orientation | the same field in every structure wherever it shapes a shared parameter, or that part made per-histogram; parameter values, bounds and vary flags, the phase's `name` and `particle_radius_um` may always differ |
 | starting structures that disagree on a shared path | one value, a per-histogram override, or a declaration on that path |
 | a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 
 The coefficients are unbounded, unless the basis is `"constant"`, whose one coefficient carries the target's own bounds.
-A sum of terms has no box that holds every pattern's target, so a target can leave its own range on some pattern.
-That is read after the fit ([Range and visibility warnings](#range-and-visibility-warnings)).
+A sum of terms has no box that holds every pattern's target.
+The default LM driver holds each pattern's target inside its own `min` and `max` at every step instead, as one linear constraint per pattern.
+A target the answer leaves on a bound is named in the `CONSTRAINT_ACTIVE` finding, as `parametric equation '<name>' (<target> bounds)`.
+Each pattern whose target sits on its bound also gets a `FLOOR_HIT` or `BOUND_HIT` warning, with `where` naming that pattern's `hist.<h>.` path, as a free parameter on its bound does.
+TRF takes no such constraint, and neither does an `"expression"` equation, which is not linear in its variables.
+There a target can leave its range.
+The fit then finishes and carries `PARAMETRIC_OUT_OF_RANGE`, below.
 
 ## Fitting a declaration
 
@@ -336,6 +407,20 @@ What the target drives follows it, such as a cubic cell's `b` and `c`.
 Each of those rows names the declaration in `RefinedParameter.equations`, and so does each coefficient's `vars.` row.
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
 A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names the coefficient.
+
+A cell series is often fitted before a structure is known.
+`mode="pawley"` refines the same declaration with each pattern's reflection intensities its own ([Modes](joint.md#modes)):
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+result = rx.refine_multi(patterns, lab6, instruments, mode="pawley",
+                         coordinates=coordinates, parametric=[expansion])
+```
+
+`"mccusker_default"` becomes `pawley_default` in that mode, as for a single fit.
+An equation on a parameter Pawley cannot refine, such as a `biso` or a scale, is refused before the fit.
+Over twelve seeds of a ten-pattern synthetic LaB6 ramp, the mean of (value − truth)/esd was 0.20 for the intercept and 0.13 for the slope.
+Its spread was 0.65 and 1.01, so neither coefficient's esd understates its scatter.
 
 ### Large libraries
 
@@ -404,6 +489,8 @@ print(series.summary(deliverable="series", parametric=result))
 
 [`PARAMETRIC_OUT_OF_RANGE`](diagnostics-series.md#parametric_out_of_range) is a warning on `RefinementResult.diagnostics`, one per declaration, when the fitted coefficients put the target outside its own `min` or `max` on some pattern.
 `where` names each such pattern's `hist.<h>.` path, and `value` counts them.
+It fires under TRF and for an `"expression"` equation, since the default LM driver holds a linear equation's target inside its range.
+The result's rows keep the equation's value, and that pattern's model holds the bound the value crossed.
 Do not quote the target there as a measurement.
 Narrow the subset to where the equation holds, lower the polynomial's order, or declare a design basis that stays inside the range.
 
