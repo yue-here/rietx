@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the Peaks and Background graphs up as #1680 and the Structure graph as #1683; the Instrument PR to follow
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — every row built: #1680, #1683 and the Instrument dialog's PR; waits on Yue's look at § Questions 5-12
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
@@ -291,6 +291,12 @@ Filled in by the session that builds each PR.
     - The FCJ warning under S/L and H/L when they are equal (row 136), in the warning colour,
       in today's words from `lib/model.ts:axialWarning`.
     - A refusal stays in the foot in the verb's own words, with the typed text kept.
+    - A geometry switch that the schema would refuse names the reason in the foot, and
+      Apply waits. Three cases: Bragg-Brentano with no goniometer radius, a
+      surface-roughness block off Bragg-Brentano, and capillary offsets in use off a
+      capillary. Added by the review.
+    - A constant-wavelength neutron source draws its one wavelength, λ, in the Source row.
+      A source with no field to draw has no Source row. Added by the review.
 12. **Where does the peak-shape choice go?** Today's Model tab offers the profile's shape,
     TCHZ pseudo-Voigt or a true Voigt, under Advanced. It is a model choice, never a refined
     value, so neither the Parameters tab nor rows 133-136 place it, and the prototype draws
@@ -299,6 +305,54 @@ Filled in by the session that builds each PR.
     a control on the main surface, so it waits for Yue.
 
 ## Handover log
+
+- **2026-11-18** — the fourth PR of R3, PR #NNNN: the Instrument dialog at `/next`.
+
+  A person on the rebuilt page can now change the project's source and geometry without the
+  old Model tab. The Instrument band's ⋯ in the Parameters tab opens an Instrument dialog drawn
+  as New project's instrument form. It names the anode from the project's wavelengths. It
+  offers the wavelengths, the Kα2 weight, the polarization, the geometry and its specimen
+  fields, and the axial pair with the FCJ warning beside it. Apply writes them in one
+  whole-model edit and one `set_values`. A saved profile loads from the same dialog. Every row
+  of the checklist is now ticked. The WP closes once Yue has looked at § Questions 5-12.
+
+  - *Done*: `gui/src/next/Instrument.svelte` and `next/instrument.ts` (which fields the
+    dialog draws, the geometry switch, the anode match, and why a wavelength travels in the
+    model: every line past the first is force-fixed, so `set_values` refuses it).
+    `next/Params.svelte` gives the Instrument band a ⋯ holding "Source and geometry…";
+    `Frame.svelte` passes the capabilities' anodes. Tests: vitest `next/instrument.test.ts`
+    (8), three cases in `next/menus.test.ts`, browser case
+    `test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing`. Pictures, light and
+    dark, in `docs/wp/2218-screenshots/` (`instrument-*.png`). § Questions 10-12 record the
+    differences from the prototype's New project form and one placement for Yue: where the
+    peak-shape choice goes once the Model tab is gone. File › Export › Instrument profile…
+    was already in the shared File menu and did not move.
+  - *Review*: `/code-review high` on this PR's own commits found eight; seven are fixed in
+    one commit. A geometry switch the schema would refuse for a value the dialog does not
+    draw (Bragg-Brentano's radius, surface roughness, capillary offsets) now names the reason
+    in the foot, and Apply waits. Escape, Cancel and the scrim do not close the dialog while
+    a verb is in flight. After a partial apply the landed edits leave the pending set, so a
+    second Apply makes no duplicate node. A neutron constant-wavelength source draws its λ,
+    and an empty Source row is not drawn. Focus is placed once. The geometry choice lists
+    `lib/model.ts:GEOMETRIES`. *Declined*: Escape closing the dialog with typed edits. New
+    project and Settings close on Escape as well; the scrim's guard is against a stray
+    click. The Help popover the finding named has no opener at `/next`, so Escape takes
+    nothing from it.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.0, Python 3.12):
+    fast suite 14949 passed, 424 skipped and 32 xfailed in 9:21, through the shift's serial
+    lock: one more than the third PR, the browser case. Ruff clean. Vitest 844 of 844 in 45
+    files. svelte-check 0 errors in 459 files. GUI python files (`test_gui_server`, `_dist`,
+    `_manual`, `_style_guide`, `_palette`, `_file_menu`): 268 passed. Every browser file by
+    glob (`tests/*_browser.py`), serially: 171 passed, before the review's fixes; the
+    dialog's three browser cases again after them, 4 passed. Vale 0 errors, no warning on a
+    line of this PR. `python -m tests.reader_output`: exit 0, unchanged.
+  - *Gotchas*: svelte delegates `oninput`, so a vitest that types into a field dispatches a
+    bubbling `input` event, or the handler never runs. A `<form>` cannot carry
+    `role="dialog"`, so the dialog is a `div` around the form. The fluorapatite example
+    quotes 1.5405 and 1.5443 Å, which miss Cu Kα at 1e-5, so the anode match is a part in
+    10⁴.
+
+  Next: Yue's look at § Questions 5-12 and the pictures. Then the WP closes.
 
 - **2026-11-18** — the review the third PR skipped, on PR #1683.
 
