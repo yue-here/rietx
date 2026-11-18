@@ -29,11 +29,11 @@ Past the slack a pair is still listed, as a contact, out to `GeometryTable.conta
 The guidelines ask for both kinds: "interatomic distances (both bonding and nonbonding) should be reasonable" {cite}`mccusker1999`.
 The slack and the search radius are conventions rather than physical constants, and the table records the values it used.
 
-Four limits write a note.
+Four limits write a note at fit close.
 Each atom keeps its 24 nearest contacts, and a note counts the contacts the cap dropped.
 Each atom keeps 36 torsions about the bonds it starts, and a note counts the torsions that cap dropped.
 A chain with a straight bond angle has no torsion, and a note counts those chains.
-A phase with more than 200 asymmetric-unit atoms is not searched, and a note names it.
+At fit close a phase with more than 200 asymmetric-unit atoms is not searched, and a note names it; `rietx.geometry_table` lifts that cap.
 
 A row's value is `GeometryDistance.distance` in ångströms, or `GeometryAngle.angle` in degrees.
 Each row names its atoms twice.

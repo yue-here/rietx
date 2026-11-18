@@ -120,7 +120,8 @@ MAX_CONTACTS_PER_ATOM = 24
 #: Phases with more asymmetric-unit atoms than this are skipped, and said in
 #: ``GeometryTable.notes`` to be skipped.  The search is O(n²·m·shell³) and
 #: runs at fit close, where a minute spent on a table is a minute stolen from
-#: the refinement.
+#: the refinement.  Only that table honours it: the explicit
+#: :func:`geometry_table` call is asked for, and does not (WP-1513).
 MAX_ASYM_ATOMS = 200
 
 #: Torsions kept per asymmetric-unit atom B (the central bond's first atom),
@@ -672,11 +673,13 @@ def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
                      covariance)
 
 
-def _assemble(sites_of, values: dict, phases, table, covariance):
+def _assemble(sites_of, values: dict, phases, table, covariance, *,
+              capped: bool = True):
     """The table over ``values`` (a decoded dict: cell and x/y/z per atom).
 
     ``covariance(ip, n_atoms)`` is :func:`_covariance`'s answer for phase
-    ``ip``, or ``None``; ``table`` is read only where it is not ``None``.
+    ``ip``, or ``None``; ``table`` is read only where it is not ``None``.  ``capped`` False lifts
+    :data:`MAX_ASYM_ATOMS` (the explicit census call, which was asked for).
     """
     from ..schemas.results import GeometryAngle, GeometryDistance, GeometryTable
 
@@ -686,7 +689,7 @@ def _assemble(sites_of, values: dict, phases, table, covariance):
     torsions: list = []
     for ip, sites in enumerate(sites_of):
         phase = phases[ip]
-        if sites.n_asym > MAX_ASYM_ATOMS:
+        if capped and sites.n_asym > MAX_ASYM_ATOMS:
             notes.append(f"{phase.name}: {sites.n_asym} asymmetric-unit atoms "
                          f"exceeds the {MAX_ASYM_ATOMS}-atom search limit; no "
                          "geometry listed for this phase")
@@ -754,8 +757,10 @@ def geometry_table(structure, coordinates=None):
     The limits are the table's, and each writes a note where it bounds the
     answer: contacts are listed out to :data:`CONTACT_MAX_ANG` and capped at
     :data:`MAX_CONTACTS_PER_ATOM` nearest per atom, torsions at
-    :data:`MAX_TORSIONS_PER_ATOM`, and a phase of more than
-    :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is not searched at all.
+    :data:`MAX_TORSIONS_PER_ATOM`.  A phase of more than
+    :data:`MAX_ASYM_ATOMS` asymmetric-unit atoms is searched all the same,
+    since this call is asked for (the fit-close table skips it): the search is
+    about O(n²), a few seconds for a few hundred atoms.
     Occupancy is read once, by the twin merge below; after it every site is
     present, and each pair, at any distance, is a bond or a contact by the
     covalent radii alone.
@@ -817,7 +822,8 @@ def geometry_table(structure, coordinates=None):
                 values[f"phases.{ip}.atoms.{j}.{c}"] = float(getattr(atom, c).value)
     sites_of = [PhaseSites(ops=phase_orbit_split(p),
                            species=[a.species for a in p.atoms]) for p in phases]
-    table = _assemble(sites_of, values, phases, None, lambda ip, n_atoms: None)
+    table = _assemble(sites_of, values, phases, None, lambda ip, n_atoms: None,
+                      capped=False)
     if table is not None and merged:
         table = table.model_copy(update={"notes": [d.message for d in merged]
                                          + list(table.notes)})

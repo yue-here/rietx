@@ -583,6 +583,22 @@ def test_a_phase_too_large_to_search_says_so(monkeypatch):
     assert g.notes and "search limit" in g.notes[0]
 
 
+def test_the_explicit_census_runs_past_the_asym_cap_and_fit_close_does_not(monkeypatch):
+    """``MAX_ASYM_ATOMS`` guards the table at fit close, a cost the caller did
+    not ask for; ``rx.geometry_table`` is asked for, so it searches the phase
+    (WP-1513, settled on #1608).  The cap is dropped to 1 so corundum is past it.
+    """
+    structure = Structure(phases=[corundum_phase()])
+    uncapped = rx.geometry_table(structure)
+    monkeypatch.setattr(geom, "MAX_ASYM_ATOMS", 1)
+    census = rx.geometry_table(structure)
+    assert census == uncapped
+    assert census.distances and census.angles
+    assert not any("search limit" in n for n in census.notes)
+    closed, *_ = _table_for(corundum_phase())      # the fit-close path
+    assert closed.distances == [] and "search limit" in closed.notes[0]
+
+
 def test_a_bond_past_the_contact_radius_is_found():
     """``CONTACT_MAX_ANG`` bounds contacts, never bonds.  CsCl's Cs–Cl at
     a√3/2 = 3.571 Å is inside the radii's 2.44 + 1.02 + 0.4 = 3.86 Å and past
