@@ -158,8 +158,9 @@ every image. A port meets the refusal and takes the exit knowingly.
   derives its own subspace and the Non-goals line on 2061 below is stale on that point. The two WPs
   share one basis: 2061 owns the named, declared size block (guard, report rows, exporters),
   and an invariant harmonic inside a user's equation is this WP's. 2061's AS-2 (a size term on
-  a declared family of hkl) overlaps this WP's family widths; which WP owns that is open, as
-  2061's handover question 4.
+  a declared family of hkl) overlaps this WP's family widths. 2026-11-17: settled by Claude (not
+  ruled by Yue, who may reverse it) that AS-2 folds into this WP, so the family width is built here
+  and 2061 does not build it (2061's handover, question 4).
 
 ## Non-goals
 

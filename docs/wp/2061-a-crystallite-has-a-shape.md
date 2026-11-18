@@ -1,6 +1,6 @@
 # WP-2061 — a crystallite has a shape: hkl-dependent size broadening on the analytical profile
 
-Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling; waiting on the maintainer's schema-shape and expansion answers (#1582)
+Milestone: unscheduled · Status: 🔄 2026-11-16 — claimed by @mustachefeeling; questions 1-4 answered 2026-11-17 (#1582), AS-1's wiring next
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (WP-1343 soft, for the magnetic task only)
 Priority: P3 2026-10-26 — a feature no open milestone was opened for, with one named user asking; no wrong number today, only a misfit the isotropic model cannot absorb
@@ -57,10 +57,10 @@ So the seam does not need FPA. FPA would change how a size convolves, not which 
 
 ## Tasks
 
-- [ ] Decide the schema shape with the maintainer: `Phase.size_harmonics` beside `Phase.microstrain`, or one microstructure block holding both (issue #1065, question 2).
-- [ ] Laue-class size harmonics (AS-1): the subspace derived per Laue class (Popa 1998), Lorentzian, Scherrer 1/cosθ law; isotropic seed and the `lor_size` lock; uniaxial as the documented two-coefficient case; the non-negativity guard (or LM inequality) and its `_audit` row; `SIZE_LAMBDA_POWER` rows. (Reuse `texture_basis`; the lock per question 3; see Context, 2026-11-16.)
+- [x] Decide the schema shape with the maintainer: `Phase.size_harmonics` beside `Phase.microstrain`, outside any microstructure block. Accepted by Yue 2026-11-17 (#1582); see the handover log.
+- [ ] Laue-class size harmonics (AS-1): the subspace derived per Laue class (Popa 1998), Lorentzian, Scherrer 1/cosθ law; isotropic seed (no `lor_size` lock: the block starts at l = 2, 2026-11-17); uniaxial as the documented two-coefficient case; the non-negativity guard (or LM inequality) and its `_audit` row; `SIZE_LAMBDA_POWER` rows. (Reuse `texture_basis`; the series expands the Lorentzian size width; see Context, 2026-11-16, and the 2026-11-17 handover entry.)
 - [ ] The harmonics' derivatives: FD first, the analytic branch with its declared reach, a `test_cross_backend.py` config, the traced twin.
-- [ ] Selective family size (AS-2): a declared integer rule on hkl, or "the magnetic reflections of k", each with its own Lorentzian size; refused by name when it selects no reflection or every one.
+- [ ] ~~Selective family size (AS-2)~~ folded into WP-2107 (2026-11-17, settled by Claude, reversible by Yue); not built here. Original wording: a declared integer rule on hkl, or "the magnetic reflections of k", each with its own Lorentzian size; refused by name when it selects no reflection or every one.
 - [ ] Anisotropic magnetic width (AS-3): the harmonics and families on the magnetic part, after WP-1343 closes.
 - [ ] Reporting: `model/microstructure.py` gives a size per direction with esds; `help.py` entries; `capabilities()` flag; the Theory tab's equations with *Source* lines; a `rietx compare` row.
 - [ ] Tests (unit/property; acceptance if this WP carries it) + obs/calc/diff PNGs to `tests/output/`: isotropic limit equals `lor_size` to 1e-12; equal widths across every symmetry-equivalent hkl per Laue class; a planted platelet recovered; GSAS-II's uniaxial model as oracle; the isotropic synthetic comes back isotropic within its esds; a family term equal to `lor_size` bit-identical to the isotropic fit; a planted anti-phase broadening on one family recovered; ceria as the isotropic control.
@@ -89,6 +89,13 @@ The isotropic limits are bit-identical to `lor_size` fits, a planted platelet an
 
 ## Handover log
 
+- **2026-11-17** — The maintainer's decisions walk (2026-11-16) answered the four questions of the 2026-11-16 entry, in a comment on #1582. Yue accepted question 1; he did not rule on 2-4, which Claude settled under named grounds, and he may reverse any of them.
+  (1) **Schema shape: accepted by Yue.** `Phase.size_harmonics` sits beside `Phase.microstrain`, outside any microstructure block. Each opt-in correction is its own field by rietx convention, and a block would migrate every stored `microstrain` path for no reader's gain.
+  (2) **What the series expands: the Lorentzian size width** (settled by Claude, rietx convention). It is linear in the coefficients, as `lor_size`, Stephens' Λ(hkl), `SIZE_LAMBDA_POWER` and the LM linear inequality all assume. Practice is split (recalled, not checked): FullProf expands the width, GSAS-II follows Popa (1998) and expands the size. Alternative: the apparent size, which makes the width nonlinear in the coefficients. *Consequence not answered by the comment:* the GSAS-II uniaxial oracle is not met at order 2 under either choice (2026-11-16 entry), so the acceptance line still needs a separate closed-form uniaxial model, a higher order with a stated tolerance, or a fit-level comparison within the esds. That choice stays open until AS-1's wiring reaches the oracle test.
+  (3) **The isotropic term: start at l = 2** (settled by Claude, precedent). `lor_size` is the l = 0 term and nothing is locked, as `texture_basis` does, which gives the isotropic limit bit-identically. Stephens' lock of `lor_strain` cost a bug class (WP-1467). Alternative: the Stephens lock pattern.
+  (4) **AS-2 folds into WP-2107** (settled by Claude, under the WP-filing rule and Yue's 2026-11-04 parametric ruling: machinery over named forms). AS-2's task is struck above, and WP-2107's `### Inherited` entry records it. Alternative: a third field in this WP.
+  *Done:* this entry, the first task ticked, AS-1 and AS-2 task lines brought in line. No code, so no suite run.
+  *Next:* AS-1's wiring, in the 2026-11-16 order: the field, the table rows (`params/vector.py`; rebase first, WP-2148 was changing it), the forward Lorentzian sum, then the guard with its `_audit` row.
 - **2026-11-16** — Claimed by a ghostshift runner in PR #1582. Nothing is built, because every remaining task waits on the maintainer's answers below. The main finding: the per-Laue-class harmonic subspace that AS-1 planned to derive already exists. WP-1960 built it for texture, with its frame, its backend-routed evaluation and a positivity precedent. So AS-1 is now mostly wiring, and the wiring needs a stored field whose shape is the maintainer's call. The magnetic task (AS-3) was skipped: it waits on WP-1343, whose magnetic design is the user's to rule.
   *Done:* the claim (Status line, index). Context gained a dated *superseded in part* note (WP-1960's `texture_basis` and its positivity machinery, probed: one `c2_0` term at order 2 in every uniaxial class, cubic classes empty below order 4). Both `### Inherited` entries still held and were folded into Context ("The schema question", "WP-2107"), so the section is gone.
   *Questions for the maintainer* (the first is this WP's first task; none is decided here):
