@@ -1722,7 +1722,10 @@ class MultiHistogramRefinement:
         _refuse_joint_mode(self.mtable, mode)
         # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
         # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
-        plan = resolve_plan(plan, mode)
+        # the geometry the histograms share; none where they differ, which
+        # claims nothing and swaps nothing (WP-2015)
+        kinds = {ins.geometry.kind for ins in self.mtable.instruments}
+        plan = resolve_plan(plan, mode, kinds.pop() if len(kinds) == 1 else None)
         if not plan.stages:
             # refused before an event is emitted or a run recorded, as
             # ``Refinement.fit`` refuses it (WP-1110 item 6)
@@ -1839,7 +1842,9 @@ class MultiHistogramRefinement:
             raise IndexError(f"histogram {histogram} of a {n}-histogram fit")
         if plan is not None:
             # read as the fit that made the result read it (WP-2102)
-            plan = resolve_plan(plan, self.result_.mode)
+            kinds = {m.geometry_kind for m in self._models}
+            plan = resolve_plan(plan, self.result_.mode,
+                                kinds.pop() if len(kinds) == 1 else None)
         answer = self._answer[histogram]
         return build_report(
             self.result_.for_histogram(histogram),
