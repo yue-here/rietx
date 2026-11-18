@@ -195,6 +195,13 @@ def test_an_unfitted_refinement_is_refused():
 
 
 # ---------------------------------------------------------------- real data
+# The distance a difference peak may sit from the atom the model lacks, as a
+# fraction of d_min.  Measured on NAC's three removals (0.008-0.122), not tuned
+# to pass; on the noiseless pattern minus F3 the partial model's phases alone
+# leave 0.125 Å, a floor of the map and not of the refit.  Tier 3.
+D_MIN_FRACTION = 0.25
+
+
 @pytest.fixture(scope="module")
 def nac_fits():
     """The NAC protocol, refitted complete and without each of three atoms.
@@ -245,7 +252,10 @@ def test_nac_minus_one_atom_shows_it_as_the_top_difference_peak(nac_fits, remove
     The top ΔF peak lies nearer the removed site than to any atom the full
     structure has, above 3σ of its map, and higher (e/Å³) than anything the
     complete model's map holds.  Measured distances to the site are in
-    WP-1901's handover: the 0.10 Å bar holds for Al1 alone here.
+    WP-1901's handover.  The distance bar is a fraction of ``d_min``, the
+    resolution of a map: ``D_MIN_FRACTION`` (a quarter, tier 3: ours, read off
+    three removals on one dataset, the measured fractions are 0.008, 0.122
+    and 0.113 at d_min 0.976 Å).  A fixed 0.10 Å held for Al1 alone.
     """
     structure, maps = nac_fits
     m = maps[removed]
@@ -260,5 +270,5 @@ def test_nac_minus_one_atom_shows_it_as_the_top_difference_peak(nac_fits, remove
     assert nearest[1] == removed
     assert top.significance > 3.0
     assert top.height > maps[None].difference.peaks[0].height
-    if removed == "Al1":
-        assert nearest[0] < 0.10
+    assert nearest[0] < D_MIN_FRACTION * m.d_min, (
+        f"{removed}: {nearest[0]:.3f} Å = {nearest[0] / m.d_min:.3f} d_min")
