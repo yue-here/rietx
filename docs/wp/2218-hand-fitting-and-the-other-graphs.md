@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the first PR (the Interactive tab and the preview on the Pattern graph) open for review; three PRs to follow
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the second PR (the Peaks and Background graphs) in progress; two PRs to follow
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
