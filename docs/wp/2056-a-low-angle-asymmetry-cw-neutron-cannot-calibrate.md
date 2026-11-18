@@ -89,7 +89,7 @@ either's code; nothing is ported.
       **Reproduced 2026-11-09** on `00cd6db80` (macOS arm64, `[dev]`, numpy path). The
       fixture's protocol on the 1.5 K pattern alone (nuclear fit, then the
       `SOLVE_STAGE_PATHS` plan with the fixture's ties): Rwp 0.1171 nuclear, 0.0611 with
-      the moment, |m| = 3.875(121) μ_B. Per-line centroid shift (the residual regressed
+      the moment, |m| = 3.875(121) μ_B. Per-line position shift (the best-fit rigid shift of the drawn profile; the residual regressed
       on each seen line's ∂P/∂2θ and its own profile, counting-noise esd; negative = observed
       lower): −51.3(2.2)
       mdeg at 9.38° (1 0 1)/(1 0 0), −20.8(8.0) at 17.99°, −6.2(5.7) at 18.27°, all three
@@ -102,14 +102,14 @@ either's code; nothing is ported.
       LaMnO₃ is in the tree (`tests/data/gsas2_bt1_lamno3_50K.gsas`, the WP-1327
       acceptance protocol, apertures from the instrument file, S/L 0.040, H/L 0.030):
       (0 1 0) at 11.53° is the only line below the first nuclear one at 22.32°, and sits
-      +19.6(1.8) mdeg (the drawn line too low, as #1089's "centroid 24 mdeg low"), the
+      +19.6(1.8) mdeg (the drawn line too low, the sign of #1089's "centroid 24 mdeg low"; a centroid difference is a different quantity and depends on its window), the
       nuclear line +9.2(2.7). Not re-run: #1089's tied-ratio refinement.
 - [x] Point 2: the diagnostic, with its audit row and `help.py` entry.
       `LOW_ANGLE_ASYMMETRY_UNCALIBRATED` (info), `report.magnetic.low_angle_asymmetry_findings`,
       called in the result build beside `magnetic_width_findings`. Fires on geometry alone: a
       seen magnetic-only line below the lowest seen line that is not (WP-1343's
       `MAGNETIC_WIDTH_PURITY` cut; "seen" is the line's own t ≥ `MIN_COEF_SIGNIFICANCE`). Says
-      each such line's centroid shift, the first other line's, and what a one-term cot 2θ
+      each such line's position shift, the first other line's, and what a one-term cot 2θ
       shape through the magnetic lines predicts there; no threshold on any number, so no new
       tunable constant (one numerical step, `_SHIFT_STEP_FWHM`, tier 1). Rows: the code tier 1
       / ambiguity 3 / info, its suggestion tier 2 (asymmetry from a standard's calibration, the
@@ -134,7 +134,7 @@ either's code; nothing is ported.
 
 ## Acceptance
 
-On the Ba₂FeSbSe₅ 1.5 K fixture the report names the low-angle centroid shift with its
+On the Ba₂FeSbSe₅ 1.5 K fixture the report names the low-angle position shift with its
 size and says the asymmetry is not determinable from this sample. If point 1 lands, the
 term at P = 0 is bit-identical to today, and the cross-backend matrix covers its columns.
 

@@ -1140,7 +1140,7 @@ def _solve_shifts(tt: np.ndarray, r: np.ndarray, sigma: np.ndarray,
 
 
 def _line_shifts(model, values, r: np.ndarray, sigma: np.ndarray):
-    """Every seen line of every phase, with its centroid shift.
+    """Every seen line of every phase, with its position shift.
 
     Rows ``(phase, position, fwhm, magnetic fraction, shift, esd, hkl)``,
     sorted by position, shift and esd in degrees; negative means the observed
@@ -1210,11 +1210,16 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     below the lowest seen nuclear-only line of any phase (a fraction at or
     below it: WP-1343's control side), or with no nuclear-only line seen at
     all.  A half-magnetic line neither fires it nor silences it.  **What it says is arithmetic**:
-    each such line's centroid shift with its counting-noise esd
+    each such line's position shift with its counting-noise esd
     (:func:`_line_shifts`), the shift at the first line that could check it,
     and what a cot 2θ shape through the magnetic-only lines predicts there
     (:func:`_cot_through`), so a reader sees whether that line follows them.
-    No threshold is applied to any of the numbers.  ``y_calc`` is the drawn
+    No threshold is applied to any of the numbers.  A **position shift** is
+    the best-fit rigid shift of the drawn profile (the 1/σ² regression of
+    :func:`_solve_shifts`, with the line's own profile as a nuisance
+    column), not the centroid of obs − calc: on an asymmetric line the two
+    differ, and a centroid also depends on the window it is taken over.
+    ``y_calc`` is the drawn
     pattern where the caller already holds it.
     """
     out: list[Diagnostic] = []
@@ -1257,8 +1262,9 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
         f"{len(low)} magnetic-only line{' of ' if one else 's of '}{owner} "
         f"{'does' if one else 'do'}, so the axial asymmetry is not "
         f"determinable from this sample's nuclear lines where it is largest. "
-        f"{'Its centroid sits' if one else 'Their centroids sit'} "
-        f"{shown}{more} from the drawn {'position' if one else 'positions'} "
+        f"The best-fit rigid {'position shift' if one else 'position shifts'} "
+        f"of the drawn {'profile' if one else 'profiles'} "
+        f"{'is' if one else 'are'} {shown}{more} "
         f"(negative: observed at lower angle).")
     if anchor is not None:
         message += (
@@ -1276,16 +1282,32 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     state = ("held at 0" if sl == 0.0 and hl == 0.0
              else f"S/L {sl:.4g}, H/L {hl:.4g}")
     message += f" The axial apertures are {state}."
+    # the name says what the geometry denies, not what the reader did: with
+    # the apertures held at 0 nothing was set, so the first sentence applies;
+    # with them nonzero something was set (the finding cannot tell from
+    # where), so the advice is to check it on the lowest line
+    if sl == 0.0 and hl == 0.0:
+        suggestion = (
+            "Take the axial asymmetry from a standard measured on this "
+            "instrument at this wavelength, in the same container and fill. "
+            "Whatever the source, a standard, an instrument file or a value "
+            "refined on these magnetic lines, compare the lowest line's "
+            "drawn and observed shape under it before quoting the moment.")
+    else:
+        suggestion = (
+            "The axial apertures are nonzero, so an asymmetry is already "
+            "drawn; this finding cannot tell whether it came from a standard "
+            "or an instrument file or was refined on these magnetic lines. "
+            "Only a standard measured on this instrument at this wavelength, "
+            "in the same container and fill, checks it. Compare the lowest "
+            "line's drawn and observed shape under it before quoting the "
+            "moment, and quote the shift above as a systematic on the "
+            "moment if it stays.")
     out.append(Diagnostic(
         level="info", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
         where=["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"],
         value=float(low[0][4]),
         message=message,
-        suggestion=(
-            "Take the axial asymmetry from a standard measured on this "
-            "instrument at this wavelength, in the same container and fill. "
-            "Whatever the source, a standard, an instrument file or a value "
-            "refined on these magnetic lines, compare the lowest line's "
-            "drawn and observed shape under it before quoting the moment."),
+        suggestion=suggestion,
     ))
     return out

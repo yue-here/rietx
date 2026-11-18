@@ -3,7 +3,7 @@
 Issue #1090's point 2.  On a constant-wavelength neutron pattern whose lowest
 seen lines are all magnetic-only, no nuclear line in the sample checks the
 axial asymmetry where it is largest.  The finding reports each such line's
-centroid shift and decides nothing.
+position shift and decides nothing.
 
 The arms, on the synthetic CrSBr k = (0, 0, 1/2) pattern of
 ``tests/_synthetic_crsbr.py`` (λ 2.449 Å; the magnetic (0 0 1) of the a,b,2c
@@ -32,6 +32,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
+import rietx.report.magnetic as M
 from rietx.report.magnetic import _line_shifts
 from rietx.strategy.staged import PLAN_PRESETS
 from tests import _synthetic_crsbr as G
@@ -53,8 +54,10 @@ def _truth(asymmetry: float) -> rx.PatternData:
                           sigma=np.sqrt(np.maximum(counts, 1.0)).tolist())
 
 
-def _fit(data, limits=None):
-    ref = rx.Refinement(G.start_structure(), G.instrument())
+def _fit(data, limits=None, aperture=0.0):
+    ins = G.instrument()
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = aperture
+    ref = rx.Refinement(G.start_structure(), ins)
     G.apply_ties(ref)
     plan = rx.RefinementPlan(stages=[PLAN_PRESETS["magnetic_width"]().stages[0]])
     res = ref.fit(data, plan=plan, two_theta_limits=limits)
@@ -82,6 +85,7 @@ def _draw(res, stem):
 @pytest.fixture(scope="module")
 def arms():
     out = {"positive": _fit(_truth(ASYMMETRY)), "null": _fit(_truth(0.0))}
+    out["set"] = _fit(_truth(ASYMMETRY), aperture=ASYMMETRY)
     out["above"] = _fit(_truth(ASYMMETRY), limits=(12.0, 130.0))
     nuc = rx.Refinement(rx.Structure(phases=[G.nuclear_phase()]), G.instrument())
     out["paramagnetic"] = (nuc, nuc.fit(G.pattern("paramagnetic"), plan=rx.RefinementPlan(
@@ -107,6 +111,61 @@ def test_an_asymmetry_the_model_lacks_shows_as_a_negative_shift_at_the_magnetic_
     assert "(0 0 1) " in d.message and "1 magnetic-only line of phase 0 does" in d.message
     assert "not determinable from this sample's nuclear lines" in d.message
     assert "held at 0" in d.message and "predicts" in d.message
+
+
+def test_the_message_names_a_position_shift_and_not_a_centroid(arms):
+    """Yue's review of #1493: the number is the best-fit rigid shift of the drawn
+    profile, which on an asymmetric line is not the obs - calc centroid."""
+    (d,) = _findings(arms["positive"][1])
+    assert "position shift" in d.message
+    assert "centroid" not in d.message.lower()
+
+
+def test_the_suggestion_follows_whether_an_asymmetry_is_already_drawn(arms):
+    """Held at 0, nothing was set and the first advice is to take it from a
+    standard; with the apertures set the finding cannot know where they came
+    from, so it must not call them uncalibrated or tell the reader to take
+    them from a standard as if none were.  Fails on the one-text suggestion."""
+    (held,) = _findings(arms["positive"][1])
+    (given,) = _findings(arms["set"][1])
+    assert "held at 0" in held.message
+    assert held.suggestion.startswith("Take the axial asymmetry from a standard")
+    assert "S/L 0.03, H/L 0.03" in given.message
+    assert not given.suggestion.startswith("Take the axial asymmetry")
+    assert "already drawn" in given.suggestion
+    # the numbers are the same finding's: with the asymmetry set, the lowest
+    # line sits within three esds of the drawn one
+    assert abs(given.value) < 3.0 * _lowest(arms["set"][0])[3]
+
+
+def _derivative_error(arms, step):
+    """Largest relative gap between the position derivative at ``step`` and at a
+    10x smaller one, over every line of the fit with the axial apertures live."""
+    ref, _ = arms["set"]
+    model, values = ref._model, ref._answer["values"]
+    sigma = np.asarray(model.sigma, dtype=float)
+    old = M._SHIFT_STEP_FWHM
+    try:
+        M._SHIFT_STEP_FWHM = step / 10.0
+        fine = M._phase_lines(model, values, 0, sigma)
+        M._SHIFT_STEP_FWHM = step
+        coarse = M._phase_lines(model, values, 0, sigma)
+    finally:
+        M._SHIFT_STEP_FWHM = old
+    assert len(fine) == len(coarse) > 10
+    return max(float(np.max(np.abs(a["dy"] - b["dy"])) / np.max(np.abs(b["dy"])))
+               for a, b in zip(coarse, fine))
+
+
+def test_the_derivative_step_is_converged_to_a_millionth_with_the_asymmetry_live(arms):
+    """Yue's review of #1493: ``_SHIFT_STEP_FWHM`` earns tier 1 by a stated bar.
+    With S/L = H/L = 0.03 (the Finger-Cox-Jephcoat tail live) the column at the
+    shipped 1e-4 differs from the one at 1e-5 by less than 1e-6 of its peak on
+    every line (measured about 6e-8).  The positive arm: a step of 1e-3 misses the
+    same bar (about 2e-6), so the test can fail."""
+    assert ASYMMETRY > 0.0
+    assert _derivative_error(arms, M._SHIFT_STEP_FWHM) < 1e-6
+    assert _derivative_error(arms, 1e-3) > 1e-6
 
 
 def test_with_no_asymmetry_anywhere_the_geometry_still_fires_and_the_shift_is_noise(arms):
