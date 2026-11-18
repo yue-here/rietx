@@ -1354,7 +1354,7 @@ ROWS: tuple[Row, ...] = (
                   "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
                   "torsions of a generic seven-atom body with a chained torsion, the rule "
                   "reports the 45 that stay put when every torsion twists and the pose and "
-                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
+                  "cell move, and no other (tests/test_restraint_body_warning.py). Read off the declaration, never "
                   "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
                   "as on the axis, so an error lands on accepting. Action: a warning "
                   "that keeps the row, because a competent refiner who would act otherwise "
