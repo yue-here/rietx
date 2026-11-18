@@ -49,9 +49,9 @@ from rietx.crystallography.satellites import (
     satellite_d_spacings,
 )
 from rietx.crystallography.symmetry import get_spacegroup
+from rietx.indexing import kvector
 from rietx.indexing.ambiguity import chance_rate
 from rietx.indexing.engines import Budget
-from rietx.indexing import kvector
 from rietx.indexing.kvector import (
     KGridPositions,
     KGridScores,
