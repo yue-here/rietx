@@ -130,7 +130,7 @@ stands with or without #385.
 
 ## Tasks
 
-- [ ] Measure lesson 2 on a quiet machine: one screen-shaped job set under a
+- [x] Measure lesson 2 on a quiet machine: one screen-shaped job set under a
       10-worker pool, with `RIETX_COMPILED_THREADS` unset and set to 1, BLAS
       pinned in both, repeated. Quote walls as ranges. If the gap is large,
       decide whether a pool worker should default to one thread (prior art:
@@ -143,7 +143,7 @@ stands with or without #385.
 - [ ] `batch.md`: the imitation row beside §9c.2, tagged
       `(Measured: in-situ series 1, second session)` for the evidence and
       `(Hypothesis: …)` for the width rule.
-- [ ] `batch-operating.md`: the threads row with lesson 2's numbers. And
+- [x] `batch-operating.md`: the threads row with lesson 2's numbers. And
       §9c.5 gains this screen as a measured point (one job at 84× the median,
       a cell runaway) and "time the failed jobs too", from the `nan` median
       above.
