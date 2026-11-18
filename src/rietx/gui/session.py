@@ -1701,8 +1701,9 @@ class GuiSession:
         symmetry search may live that ``/api/structure`` refused (that route
         refetches on every head move; this one is opened deliberately).
 
-        Not idle-gated: it reads the model, like ``/api/structure``, and a fit in
-        flight does not move the values the working state holds.
+        Without a ``body`` it is not idle-gated: it reads the model, like
+        ``/api/structure``, and a fit in flight does not move the values the
+        working state holds. With one it is, as said above.
         """
         from . import structure3d as geometry
 
