@@ -72,31 +72,21 @@ an alias" by design. So the cheap fix is a pointer that names `stderr` for
 `esd` (the near-miss table in `rietx._nearmiss`); an alias or a rename is a
 schema change across every result reader.
 
-### Inherited
+**The reporter's picks** (#728, posted 2026-10-12 08:29Z, folded from
+`### Inherited` 2026-11-18). Item 4: refuse at construction, and name every
+atom on a fully fixed special position, not only the first. Item 3: a
+one-call mixed-site helper that derives the occupancy, Biso and coordinate
+ties, with an info finding where the data cannot separate the pair; they
+named `Phase.mix_sites`, but ties live on `Refinement` (WP-1070). Item 5: the
+pointer names `stderr`, with no alias.
 
-- **2026-10-11, from the issue triage (#728): the issue's unnumbered fifth
-  ask has no owner.** `Refinement.suggest` reports an FCJ axial term seeded
-  at 0 as "without leverage", since its derivative vanishes there. The
-  showcase agent seeded it at 0.02 by hand. The ask is that `suggest` name
-  the seed such a term needs (`"axial_hl: seed 0.02"`), as `Stage.strain_seed`
-  is documented for Stephens. The 2026-10-05 thread answer filed "3, 4, 5"
-  here and counted `.esd` as 5, so this ask fell between the numbers. PR #754
-  listed it as "a table to agree on". Checked against the tree at 7d9be3cb:
-  `strategy/suggest.py:65-67` holds probe seeds for softplus, roughness and
-  Stephens only, and the summary at `:235` prints the "without leverage"
-  count with no seed named. No WP mentions it. Take it here as a task, or
-  give it its own WP.
-- **2026-10-13, from the issue triage (#728 items 3-5): the reporter's
-  picks.** Posted 2026-10-12 08:29Z. Item 4: refuse at construction, and name
-  every atom on a fully fixed special position, not only the first. Item 3: a
-  one-call mixed-site helper that derives the occupancy, Biso and coordinate
-  ties, with an info finding where the data cannot separate the pair; they
-  named `Phase.mix_sites`, but ties live on `Refinement` (WP-1070), so the
-  verb is likely a `Refinement` one. Item 5: the pointer names `stderr`, with
-  no alias. Checked against the tree at c3d0367: NaCl with both x free still
-  constructs, `parameters()` raises naming only `phases.0.atoms.0` and not
-  Cl, and `.esd`'s message lists the fields without naming `stderr`. The
-  issue's unnumbered seed ask had no answer in the thread.
+**The seed ask** (#728's unnumbered fifth ask, folded 2026-11-18).
+`Refinement.suggest` reports an FCJ axial term seeded at 0 as "without
+leverage", since its derivative vanishes there; the showcase agent seeded it
+at 0.02 by hand. `strategy/suggest.py` holds probe seeds for softplus,
+roughness and Stephens only. The 2026-11-16 decisions walk put a probe seed
+for the axial term on Yue's consent list, taking the plan's own seed constant
+once PR #1372 (WP-1955's aperture lift) settles it.
 
 ## Non-goals
 
@@ -111,10 +101,16 @@ schema change across every result reader.
 - [ ] Decide with the maintainer which of the three are wanted, and for
       part 4 whether `fix_special_positions()` ships beside the earlier refusal.
       *Part 4 decided 2026-10-06: `fix_special_positions()` ships, beside the
-      refusal (draft PR #754). Parts 3 and 5 are not decided.*
+      refusal (draft PR #754). Part 5 settled by Claude 2026-11-16 (a
+      pointer, no alias). Part 3's name and part 4's construction half wait
+      on the maintainer (the 2026-11-18 entry).*
 - [ ] Part 4: `Refinement.__init__` builds the table as `edit` does and
       refuses there, naming every fully fixed atom with a free coordinate;
       the GUI, `.rxt` and project open paths checked for a second builder.
+      *Half landed 2026-11-18: the table's refusal names every site, a rigid
+      body's origin included, and `fix_special_positions()` clears origins.
+      Moving the refusal into `__init__` waits on the maintainer: it leaves
+      no `Refinement` to call `fix_special_positions()` on.*
 - [ ] Part 3: the mixed-site verb over `tie`/`tie_equal`, refusing two atoms
       that do not share an orbit (the lifted `orbit_collisions`), and usable
       through a series' `constrain=`; then the measurement deciding whether
@@ -125,6 +121,8 @@ schema change across every result reader.
 - [ ] `help.py` and Manual Part 1 for every new public name (the api-surface
       partition fails until each is documented).
 - [ ] Tests (unit; no acceptance dataset needed).
+- [ ] The seed ask: `suggest` probes the FCJ axial term at the plan's seed
+      constant, after PR #1372 merges (the 2026-11-16 consent item).
 - [ ] Skill: `SKILL.md:193` teaches the by-hand ties. Replace that sentence
       with the verb at no net growth, since the body is over its budget
       (`tests/skill_caps.py`).
