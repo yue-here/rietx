@@ -137,17 +137,17 @@ stands with or without #385.
       joblib's loky backend limits its workers' inner threads; read how).
       Decide with it whether `n_threads()` falls back to `OMP_NUM_THREADS`
       (numexpr reads `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS`).
-- [ ] Re-key the two §9c routing rows by situation, and make `batch.md`'s
+- [x] Re-key the two §9c routing rows by situation, and make `batch.md`'s
       "Load it when" name a screen before its fits. No new body line: a
       rewritten row costs no cap.
-- [ ] `batch.md`: the imitation row beside §9c.2, tagged
+- [x] `batch.md`: the imitation row beside §9c.2, tagged
       `(Measured: in-situ series 1, second session)` for the evidence and
       `(Hypothesis: …)` for the width rule.
 - [x] `batch-operating.md`: the threads row with lesson 2's numbers. And
       §9c.5 gains this screen as a measured point (one job at 84× the median,
       a cell runaway) and "time the failed jobs too", from the `nan` median
       above.
-- [ ] Re-sync the committed copies (`rietx skill --install . --copy`).
+- [x] Re-sync the committed copies (`rietx skill --install . --copy`).
 
 ## Acceptance
 
