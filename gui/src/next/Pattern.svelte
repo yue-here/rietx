@@ -46,6 +46,7 @@
     residual, shows, toggleCurve,
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
+  import type { PreviewAnswer } from "../lib/interactive";
   import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
@@ -66,6 +67,9 @@
     projectPath = null,
     ui = null,
     onui = () => {},
+    preview = null,
+    previewError = "",
+    oncurves = () => {},
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -91,6 +95,12 @@
     ui?: Record<string, unknown> | null;
     /** persist an axis choice in the project's `ui` keys */
     onui?: (patch: Record<string, unknown>) => void;
+    /** the Interactive tab's preview, drawn over the last fit at its scale (WP-2128) */
+    preview?: PreviewAnswer | null;
+    /** the preview route's refusal, in its own words */
+    previewError?: string;
+    /** the curves each fetch drew, which the sliders' ranges are measured from */
+    oncurves?: (curves: Curves | null) => void;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -159,7 +169,6 @@
   /** What the chart and the readout leave out: `hidden`, plus the excluded
    *  points while the observed ones are hidden. */
   const drawn = $derived(hidden.includes("obs") ? [...hidden, "masked"] : hidden);
-  const dataOnly = $derived(isDataOnly(toggles, hidden));
   const stats = $derived(result?.statistics ?? null);
   const immature = $derived(Boolean(result?.maturity?.immature));
 
@@ -167,6 +176,18 @@
   const title = $derived.by(() =>
     loadError ? "The pattern could not be drawn"
     : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
+
+  /** Whether the graph draws a preview: values nobody has applied (WP-2128). */
+  const previewing = $derived(!!preview && !!held && !loadError);
+  /** Data only also hides the preview, which has no toggle in `toggles`. */
+  const dataOnly = $derived(isDataOnly(toggles, hidden)
+    && (!previewing || hidden.includes("preview")));
+  const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
+  /** The whole title line as its tooltip, since the title is what gives way
+   *  (B1); a refused preview's reason is said there, in the route's words. */
+  const titleTip = $derived(previewing ? "Preview, not refined"
+    : previewError ? `${title}. Preview refused: ${previewError}`
+    : (held as Window | null)?.stale ? `${title}, fitted over other channels` : title);
 
   // -- the chart ---------------------------------------------------------
 
@@ -189,6 +210,9 @@
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
+      // no curves: the sliders' ranges and phase names must not stay the
+      // previous pattern's
+      oncurves(null);
       empty = exc instanceof ApiError && exc.empty;
       loadError = empty ? "" : (exc as Error).message;
       return;
@@ -225,10 +249,13 @@
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
+      const p = untrack(() => preview);
+      if (p) chart.setPreview(p.curves);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
     }
+    oncurves(c);
     relayout();
   }
 
@@ -336,6 +363,21 @@
     untrack(() => chart?.fig.setMode(mode));
   });
 
+  // The preview is a repaint over the payload in hand, never a refetch
+  // (WP-2128). Each one drawn leaves an `rx-preview-redraw` User Timing entry
+  // from the moment its values were set to the frame after it painted: the
+  // drag-to-redraw latency the browser test reads, as on today's page.
+  $effect(() => {
+    const p = preview;
+    untrack(() => {
+      if (!chart) return;
+      chart.setPreview(p?.curves ?? null);
+      if (!p) performance.clearMeasures?.("rx-preview-redraw");
+      else requestAnimationFrame(() => requestAnimationFrame(() =>
+        performance.measure("rx-preview-redraw", { start: p.sentAt })));
+    });
+  });
+
   // -- the readout, handed to the frame's status bar ----------------------
 
   $effect(() => {
@@ -358,7 +400,8 @@
       beforeDataOnly = null;
     } else {
       beforeDataOnly = hidden;
-      hidden = dataOnlyHidden(toggles);
+      // the preview has no toggle of its own but is no data either
+      hidden = [...dataOnlyHidden(toggles), "preview"];
     }
   }
 
@@ -688,7 +731,7 @@
    *  the difference at its pane's middle, one tick row per phase. */
   const legend = $derived.by(() => {
     if (!geom) return [];
-    const out: { id: string; label: string; top: number; absent?: string }[] = [];
+    const out: { id: string; label: string; top: number; absent?: string; reserved?: boolean }[] = [];
     let main = geom.main.top, tick = 0;
     const phases = toggles.filter((t) => t.id.startsWith("ticks:")).length;
     for (const t of toggles) {
@@ -702,6 +745,12 @@
       } else {
         out.push({ id: t.id, label, top: main, absent: t.absent });
         main += LEGEND_ROW;
+        // the preview's slot under the last fit, kept while no preview is
+        // drawn, so one appearing moves no label (the prototype's legend)
+        if (t.id === "calc") {
+          out.push({ id: "preview", label: CURVE_WORDS.preview, top: main, reserved: !previewing });
+          main += LEGEND_ROW;
+        }
       }
     }
     return out;
@@ -715,7 +764,8 @@
       const i = phases.findIndex((t) => t.id === id);
       return phases.length > 1 ? c.phase[i % c.phase.length] : c.obs;
     }
-    return ({ obs: c.obs, calc: c.calc, bkg: c.bkg, diff: c.diff } as any)[id]
+    return ({ obs: c.obs, calc: previewing ? c.last : c.calc, preview: c.calc, bkg: c.bkg,
+              diff: c.diff } as any)[id]
       ?? "currentColor";
   }
 </script>
@@ -725,14 +775,23 @@
 <div class="pattern">
   <div class="ghead">
     <!-- the whole line as its tooltip, since the title is what gives way (B1) -->
-    <div class="gtitle" title={held?.stale ? `${title}, fitted over other channels` : title}>
+    <div class="gtitle" title={titleTip}>
+      {#if previewing}
+        <!-- a preview never reads as a changed fit (`gui/STYLE.md` § Layout):
+             its Rwp is said beside the last fit's, as the prototype's is -->
+        <b class="pv">Preview, not refined</b>
+        <span class="stat">Rwp <span class="num">{pct(preview?.curves?.header?.rwp)}</span>{#if stats?.rwp != null},
+          last fit <span class="num">{pct(stats.rwp)}</span>{/if}</span>
+      {:else}
       {#if title}<b>{title}</b>{/if}
+      {#if previewError}<span class="bad">Preview refused</span>{/if}
       {#if held && !held.raw && stats}
         <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : `${(stats.rwp * 100).toFixed(2)} %`}</span></span>
         <span class="stat">GoF <span class="num">{stats.gof?.toFixed(2)}</span></span>
       {/if}
       {#if held && !held.raw && immature}<span class="bad">Not a fit yet</span>{/if}
       {#if held?.stale}<span>fitted over other channels</span>{/if}
+      {/if}
     </div>
     <div class="gctl">
       <button class="ghost" disabled={!zoomed} onclick={showAll}
@@ -800,8 +859,9 @@
       {/if}
       <div class="gutter" aria-label="Curves">
         {#each legend as l (l.id)}
-          <button class="gut" style:top="{l.top}px" aria-pressed={shows(hidden, l.id)}
-            disabled={!!l.absent} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
+          <button class="gut" class:reserved={!!l.reserved} style:top="{l.top}px"
+            aria-pressed={shows(hidden, l.id)} aria-hidden={l.reserved ? "true" : undefined}
+            disabled={!!l.absent || !!l.reserved} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
             onclick={() => toggle(l.id)}>
             <svg class="sw" viewBox="0 0 16 12" aria-hidden="true" style:color={swatchColor(l.id)}>
               {#if l.id === "obs"}
@@ -910,6 +970,10 @@
 
   .gtitle .bad {
     color: var(--bad);
+  }
+
+  .gtitle b.pv {
+    color: var(--accent-ink);
   }
 
   .gctl {
@@ -1089,6 +1153,11 @@
   .gut:disabled {
     color: var(--muted);
     cursor: default;
+  }
+
+  /* the Preview label's slot while no preview is drawn: laid out, unseen */
+  .gut.reserved {
+    visibility: hidden;
   }
 
   .sw {

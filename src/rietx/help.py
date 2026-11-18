@@ -3104,8 +3104,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Some figures of merit are undefined",
         description=(
             "The peak list has fewer usable lines than the classical figures of merit "
-            "are defined on, so some are left out of the ranking. The search still runs "
-            "over the crystal systems the line count supports. Every candidate is ranked "
+            "are defined on, so some are left out of the ranking. The message names the "
+            "crystal systems with enough lines to determine a cell. A search narrows the "
+            "requested systems to those, unless that would leave none. Every candidate is "
+            "ranked "
             "on the same remaining figures, so the order stays meaningful. Confidence is "
             "capped, and a longer peak list restores the full panel."
         ),
@@ -3224,8 +3226,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The search covered only some crystal systems. A failure to find a cell "
             "means only that none was found in those systems. It says nothing about the "
-            "specimen, and it is no evidence of a mixture. Search the missing systems "
-            "before you draw a conclusion."
+            "specimen, and it is no evidence of a mixture. Where the list has enough lines "
+            "to determine a cell in a missing system, search it before you draw a "
+            "conclusion. Where it has too few, the message says so, and more lines are "
+            "the remedy. Where the list supports no search at all, nothing was searched, "
+            "and INDEX_DATA_INSUFFICIENT says why."
         ),
     ),
     "INDEX_VALIDATION_FAILED": HelpEntry(
@@ -3245,6 +3250,23 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first is an artefact of the search and describes no lattice. The second is "
             "a cell larger than the lines can justify. Narrow the maximum volume, or "
             "measure more lines."
+        ),
+    ),
+    "INDEX_WEAK_LINE_RETRY": HelpEntry(
+        title="The search was run again without the weak lines",
+        description=(
+            "The full peak list, inlier retry included, gave no lattice that two "
+            "engines agree on. The lines under 5 % of the strongest were set aside and "
+            "the search ran again on the rest. This is the second attempt of the 2004 "
+            "indexing round robin (Bergmann et al.). If that search found agreement, "
+            "the candidates are its own, ranked and scored on the kept lines only. "
+            "Otherwise they are the full list's. A trace second phase, or a peak the "
+            "picker split, adds weak lines the host's cell cannot index. Check the "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
+            "`n_unindexed` forbids both retries."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -5245,7 +5267,9 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
     "systems": HelpEntry(
         title="Crystal systems to search",
         description=(
-            "Which crystal systems the search covers. They run in decreasing symmetry, "
+            "Which crystal systems the search covers. Below 20 usable lines, a requested "
+            "system with fewer than 5 lines per metric degree of freedom is dropped, "
+            "unless no requested system is left. They run in decreasing symmetry, "
             "so a cubic answer arrives in seconds and a triclinic one in minutes. "
             "Restricting the systems says nothing about the specimen. The result lists "
             "the systems it searched and makes no claim about the others."
