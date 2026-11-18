@@ -165,27 +165,43 @@ stretch; TOPAS lets the user write the shift, the amplitude and where the curve 
 
 - [x] Audit every reader of `extra_components` and list them here, before
       writing the member. (§ Findings, 2026-11-18.)
-- [ ] Decide the four design questions above, in this file.
-- [ ] The member: schema, `SCHEMA_VERSION` bump, evaluator in `xp` ops,
+- [x] Decide the four design questions above, in this file. **Option A**, Yue's ruling of
+      2026-11-18: no new component. The curve, stored as c*·D, goes in
+      `BackgroundFixedPlusChebyshev`'s fixed curve, and
+      `ref.tie("instrument.background.scale", "phases.0.scale")` holds its amplitude to the phase
+      scale. Yue chose A "for now, as the easiest". What would flip it to C (the member, with the
+      curve following the zero shift): a second case needing a blank and a simulated curve
+      together, or a sharp curve on a pattern with a large zero shift. So the four questions
+      close as follows. Aggregate: the background, since the curve is in the background slot.
+      Zero shift: the curve does not follow it (0.16 % on S at 0.05° with 0.15°-wide features,
+      § Findings), and the manual says so. σ: `fixed_sigma`, already there. Screening: no change
+      (handover 2026-11-18, settled point 3).
+- [x] ~~The member: schema, `SCHEMA_VERSION` bump, evaluator in `xp` ops,
       refinable fields through the one registration helper, cross-backend
-      `CONFIGS` row, manual equation with its `*Source:*` line, `help.py`.
-- [ ] A test pinning the lock: a synthetic Bragg-plus-diffuse pattern where
-      one fit with the tie reaches the outer loop's fixed point to 1e-6, and
-      `instrument.background.*` does not reach the member.
-- [ ] Skill: a reference row saying a simulated curve goes here, with the
-      tie, and never in the background slot.
+      `CONFIGS` row, manual equation with its `*Source:*` line, `help.py`.~~
+      **Declined** under option A: no member is built, so none of its rows is owed, and
+      `gui/src/lib/history.ts` needs no new print format either.
+- [x] A test pinning the lock, restated (handover 2026-11-18, settled point 1): a synthetic
+      Bragg-plus-diffuse pattern where one fit with the tie reaches the **joint** least-squares
+      minimum to 1e-6, and a preset glob over `instrument.background.*` leaves the tied scale
+      alone. `tests/test_simulated_curve_tie.py`.
+- [x] Skill: a reference row saying a simulated curve goes in the fixed slot, with the tie.
+      Under option A the row points at the slot instead of away from it. Plus the
+      `help.py` entry for `instrument.background.scale` and a section of the manual's blank
+      guide.
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_cross_backend.py tests/test_extra_components*.py -n auto --dist loadgroup
+.venv/bin/python -m pytest tests/test_simulated_curve_tie.py tests/test_manual_api.py tests/test_help.py tests/test_skill.py -n auto --dist loadgroup
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
 ```
 
-The lock test above passes. `solution case 1`'s final joint fit, rebuilt
-on the member, reaches its recorded fit quality in one call (ratio in the
-handover).
+The lock test above passes. Restated under option A: the cross-backend and
+extra-component rows the member would have needed are gone with the member, and
+`solution case 1`'s rebuild on the member is replaced by the synthetic joint-minimum
+test, since no member exists to rebuild it on.
 
 ## References
 
