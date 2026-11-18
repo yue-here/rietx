@@ -3217,30 +3217,23 @@ class Refinement:
         call that makes it fittable: it clears the flag on exactly those
         coordinates, records one ``edit_model`` node, and returns their paths,
         sorted.  A rigid body's origin is a site too, so a fixed one is cleared
-        the same way.  Sites with any free direction are untouched, and a
-        structure with nothing to fix returns ``[]`` and records nothing.
+        the same way.  An atom a body places or a distortion mode moves is its
+        owner's, refused by its own sentence and left alone here.  Sites with
+        any free direction are untouched, and a structure with nothing to fix
+        returns ``[]`` and records nothing.
         Opt-in: construction and ``fit()`` still refuse, as before.
         """
-        from .crystallography.symmetry import resolve_group
-        from .crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+        from .params.vector import fixed_sites_asking_to_vary
 
         structure = self.structure.model_copy(deep=True)
         cleared: list[str] = []
-        for ip, phase in enumerate(structure.phases):
-            sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            sites = [(f"phases.{ip}.atoms.{ia}", atom)
-                     for ia, atom in enumerate(phase.atoms)]
-            sites += [(f"phases.{ip}.rigid_bodies.{ib}.origin", body.origin)
-                      for ib, body in enumerate(phase.rigid_bodies)]
-            for base, site in sites:
-                xyz = [site.x.value, site.y.value, site.z.value]
-                if len(coordinate_basis(stabilizer_rotations(sg, xyz))) > 0:
-                    continue
-                for axis in ("x", "y", "z"):
-                    param = getattr(site, axis)
-                    if param.vary:
-                        param.vary = False
-                        cleared.append(f"{base}.{axis}")
+        # the table's own list, so the verb clears exactly what it refuses
+        for base, site in fixed_sites_asking_to_vary(structure):
+            for axis in ("x", "y", "z"):
+                param = getattr(site, axis)
+                if param.vary:
+                    param.vary = False
+                    cleared.append(f"{base}.{axis}")
         if cleared:
             self.edit(structure=structure, label="fix_special_positions")
         return sorted(cleared)

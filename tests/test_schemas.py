@@ -894,6 +894,25 @@ def test_an_esd_asked_for_under_its_other_spelling_names_the_field():
     assert near_misses("ESD", ["path", "stderr"]) == ["stderr"]
 
 
+def test_each_synonym_is_spelled_both_ways_by_some_schema_field():
+    """``_nearmiss.SYNONYMS`` claims each pair is two real spellings; a pair
+    naming a word no field uses would point a caller at a name that does not
+    exist, and nothing else would fail."""
+    from rietx._nearmiss import SYNONYMS
+    from rietx.schemas.common import Base
+
+    def subclasses(cls):
+        for sub in cls.__subclasses__():
+            yield sub
+            yield from subclasses(sub)
+
+    words = {word for cls in subclasses(Base) for field in cls.model_fields
+             for word in field.split("_")}
+    for word, other in SYNONYMS.items():
+        assert SYNONYMS[other] == word, "a pair is mapped both ways"
+        assert word in words, f"no schema field spells {word!r}"
+
+
 def test_every_public_schema_class_is_a_top_level_export():
     """WP-1302: no `Source`/`EmissionLine`/`BackgroundChebyshev`-shaped gap.
 
