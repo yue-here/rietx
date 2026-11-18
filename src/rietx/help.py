@@ -4880,9 +4880,10 @@ DIAGNOSTIC_VIEWS: dict[str, str] = {
 #: the same for every finding with the code, so it is looked up and never
 #: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
 #: fit firing it was rendered and the finding read off that panel; the fits are
-#: in ``tests/test_diagnostic_views.py``.  A code not listed has no view that
-#: helps, which is most of them.  A background level is one: an error of a
-#: factor of two leaves a smooth decay with no visual signature (WP-1130).
+#: in ``tests/test_diagnostic_views.py``.  A code not listed reads ``None``,
+#: which says no view was checked for it, not that none would help.  The one
+#: finding known to have no view is a background level: a uniform factor of
+#: two leaves a smooth decay with no visual signature (WP-1130).
 DIAGNOSTIC_VIEW_OF: dict[str, str] = {
     "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
     "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",

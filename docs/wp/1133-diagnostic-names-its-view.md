@@ -252,8 +252,9 @@ item once an option is picked. Launch with `--setting-sources project,local`
       agent. `judging.md` was the guess and is closed to growth: 34 575 B
       against a 34 600 B budget (`tests/skill_caps.py`). The body is over its
       budget too, so a row there would be paid for by a cut. The
-      image-for-an-unnamed-question clause is tagged `(Hypothesis: …)` until
-      task 3 measures it.
+      image-for-an-unnamed-question clause is withheld until task 3 measures
+      it: the generality judge rated it strong against, since its only
+      evidence (WP-1130 Finding 8, WP-1307) points the other way.
 - [ ] **Measure the round-trip case.** Give an agent a fit and "what is wrong
       with it", with and without the montage (1130's panel in it), and count
       calls to answer as well as tokens — on 1130's trigger fit and on two

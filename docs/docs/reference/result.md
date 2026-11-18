@@ -323,7 +323,7 @@ Each entry is a `Diagnostic`:
 | `Diagnostic.where` | the parameter paths involved |
 | `Diagnostic.value` | the headline number where the code has one, such as a correlation's ρ or an absorption's block R²; `None` means no single number, not zero |
 | `Diagnostic.explanation` | what the code means and why it fires |
-| `Diagnostic.view` | the rendered view that shows the finding, such as `"plot_for_vlm.residual"`; `None` where no view helps, which is most codes |
+| `Diagnostic.view` | the rendered view that shows the finding, such as `"plot_for_vlm.residual"`; `None` where no view has been checked for the code, which is most codes |
 
 `Diagnostic.explanation` is the same for every finding with that code, so it is looked up in `rietx.help.DIAGNOSTIC_HELP` when read.
 It is `None` for a code this version does not describe.

@@ -11,7 +11,6 @@ Every code below is a structured `Diagnostic` on `result.diagnostics` with a
 
 `d.view` names the panel of `rx.viz.plot_for_vlm(result, path=...)` that shows the finding. It is `None` for most codes.
 **Answer a question you can name with numbers.** A per-region table carrying a background misfit cost about 123 tokens; the figure showing it cost about 1830 (Measured: WP-1130, a 1373×1000 PNG).
-Draw the montage for a question you cannot name, such as "what is wrong with this fit" (Hypothesis: WP-1133 has not measured it).
 **Judge a picture only against a reference drawn in its frame.** With only the fit drawn, the eye compares against its prior. Of five fitted backgrounds, the one read as suspect was the closest to TOPAS's (Measured: WP-1130).
 
 One namespace note, because two vocabularies share the same UPPER_SNAKE shape:
