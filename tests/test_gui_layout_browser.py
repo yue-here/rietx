@@ -1393,10 +1393,14 @@ def _colours(page, selector: str) -> int:
     be read back, so the picture is what is measured (browser-driving note)."""
     import io
 
+    import numpy as np
     from PIL import Image
 
     png = page.locator(selector).screenshot()
-    return len(set(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)).get_flattened_data()))
+    # through numpy, which reads every Pillow; Pillow's own pixel list is
+    # `get_flattened_data` only on a recent release
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)))
+    return len(np.unique(pixels.reshape(-1, 3), axis=0))
 
 
 def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, tmp_path_factory):
