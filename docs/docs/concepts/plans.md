@@ -35,7 +35,7 @@ Each preset is a constructor on `RefinementPlan`, and `Refinement.fit` also take
 
 `fit` runs `mccusker_default` unless you pass another.
 The name follows the geometry the instrument states.
-On a `bragg_brentano` instrument it frees the specimen displacement in the stage that frees the zero shift, because on a flat plate the displacement is the largest peak-position error and a zero shift fitted in its place moves the cell.
+On a `bragg_brentano` instrument it frees the specimen displacement in place of the zero shift, and the zero stays at the instrument's stated value. On a flat plate the displacement is the largest peak-position error, and the two correlate almost exactly when both are free, so the plan never frees both.
 It frees nothing else of `lab_bragg_brentano`: the Kα2 ratio and the axial-divergence ratios stay where you set them, which on a calibrated instrument is its calibration.
 On a capillary, a transmission plate or an unstated geometry it frees nothing geometry-specific.
 A plan you build yourself, or a preset you call as `RefinementPlan.mccusker_default()`, runs as written.

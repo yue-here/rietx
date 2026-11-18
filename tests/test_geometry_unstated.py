@@ -31,6 +31,7 @@ from tests.test_fitreport_layers import _truth
 
 _OUT = pathlib.Path(__file__).parent / "output"
 _DISPLACEMENT = "instrument.geometry.sample_displacement"
+_ZERO = "instrument.zero_shift"
 
 
 def _hand_built() -> Instrument:
@@ -89,13 +90,14 @@ def _turn_on(plan) -> set[str]:
 
 
 @pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
-def test_bragg_brentano_frees_the_displacement_with_the_zero(mode):
+def test_bragg_brentano_frees_the_displacement_and_holds_the_zero(mode):
     """The default name under every mode it runs as, the Le Bail and Pawley
-    substitutions included (issue #1233's two structure-free presets)."""
+    substitutions included (issue #1233's two structure-free presets).  Yue's
+    ruling of 2026-11-16: the displacement in place of the zero, never both."""
     plan = resolve_plan("mccusker_default", mode, "bragg_brentano")
-    stage = next(s for s in plan.stages if "instrument.zero_shift" in s.turn_on)
-    assert _DISPLACEMENT in stage.turn_on
-    assert stage.name == "zero_disp"
+    stage = next(s for s in plan.stages if _DISPLACEMENT in s.turn_on)
+    assert stage.name == "displacement"
+    assert _ZERO not in _turn_on(plan)
     # the ruling's fence: a calibrated instrument's Kα2 ratio and axial terms
     # stay where the caller put them, so this is not lab_bragg_brentano
     globs = _turn_on(plan)
@@ -111,6 +113,7 @@ def test_every_other_geometry_runs_the_name_as_it_stands(geometry, mode):
     plain = resolve_plan("mccusker_default", mode)
     assert resolve_plan("mccusker_default", mode, geometry) == plain
     assert _DISPLACEMENT not in _turn_on(plain)
+    assert _ZERO in _turn_on(plain)
 
 
 @pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
@@ -154,7 +157,8 @@ def test_a_bragg_brentano_fit_frees_the_displacement_and_lists_what_it_assumed(l
     structure, ins, data = lab
     result = _fit(structure, ins.model_copy(deep=True), data, "bb")
     assert any(_DISPLACEMENT in s.freed for s in result.stages
-               if s.name == "zero_disp")
+               if s.name == "displacement")
+    assert not any(_ZERO in s.freed for s in result.stages)
     assert "GEOMETRY_UNSTATED" not in _codes(result)
     # the lab preset's Kα2 ratio, held by this plan, is the package's 0.5;
     # the polarisation is the monochromator's and so is not listed

@@ -69,9 +69,9 @@ This script stops a fit from its own event stream when the first stage ends, so 
 ```text
 started scale_bkg
 ended scale_bkg converged
-started zero_disp
-ended zero_disp cancelled
-abandoned: zero_disp
+started displacement
+ended displacement cancelled
+abandoned: displacement
 completed: ['scale_bkg']
 working state at node n0001
 ```

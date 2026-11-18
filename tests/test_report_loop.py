@@ -365,7 +365,7 @@ def test_e1_zero_shift_baseline(truth):
     whole profile block on a state where those were already at truth.
 
     The preset is passed as an object: by name, a Bragg-Brentano instrument
-    also frees the displacement beside the zero (WP-2015), and this baseline
+    frees the displacement in place of the zero (WP-2015), and this baseline
     is about the preset's own ``zero`` stage."""
     structure, ins, data = truth
     start = ins.model_copy(deep=True)
@@ -419,7 +419,7 @@ def test_e2_sample_displacement_baseline(truth):
     parameters.  Rwp alone cannot distinguish them; the parameter values do.
 
     Since WP-2015 the *name* ``"mccusker_default"`` on a Bragg-Brentano
-    instrument frees the displacement with the zero, which closes this miss;
+    instrument frees the displacement in place of the zero, which closes this miss;
     the preset object, which runs as given, is what is measured here.
     """
     structure, ins, data = truth

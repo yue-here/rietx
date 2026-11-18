@@ -18,13 +18,13 @@ This runs three stages by hand on the GSAS-II tutorial fluorapatite pattern that
 
 <!-- output of examples/guides/stage.py -->
 ```text
-scale_bkg  converged  Rwp 0.6050
-cell       converged  Rwp 0.4918
-profile    converged  Rwp 0.0957
+scale_bkg    converged  Rwp 0.6050
+cell         converged  Rwp 0.4920
+profile      converged  Rwp 0.0976
 ```
 
 Each call returns a full `RefinementResult` for the stage it ran, with the statistics, the parameters and their esds, and the diagnostics.
-Parameters freed in an earlier call stay free, so the `profile` stage refines the scale, background, zero shift, specimen displacement and lattice parameters too.
+Parameters freed in an earlier call stay free, so the `profile` stage refines the scale, background, specimen displacement and lattice parameters too.
 
 `run_stage` takes `two_theta_limits`, `mode`, `events`, `cancel` and `label` as `fit` does.
 It also takes its own `correlation_guard`, the correlation above which the fit reports a pair of parameters (0.98 by default), and its own `phase_support_sigma`, the number of esds a phase's scale must sit from zero for the stage to treat the phase as seen (3 by default, `None` for no significance hold; a phase with no line in range is still held), because no plan supplies them.
@@ -49,24 +49,24 @@ To see where the preset pulls ahead, ask it for a report at each stage:
 
 <!-- output of examples/guides/stage.py -->
 ```text
-scale_bkg  Rwp 0.6050
-zero_disp  Rwp 0.4920
-cell       Rwp 0.4918
-profile_w  Rwp 0.1930
-profile    Rwp 0.0975
-closing    Rwp 0.0931
+scale_bkg    Rwp 0.6050
+displacement Rwp 0.4938
+cell         Rwp 0.4921
+profile_w    Rwp 0.1935
+profile      Rwp 0.0994
+closing      Rwp 0.0951
 ```
 
-The instrument is Bragg-Brentano, so the preset frees the specimen displacement with the zero shift, in a stage named `zero_disp` ([Plans](../concepts/plans.md)).
-The preset's `profile` stage reaches Rwp 0.0975.
-The preset then runs its closing stage, which refines the same parameters with wider peak windows and ends at 0.0931 ([The closing stage](../reference/refinement.md#the-closing-stage)).
+The instrument is Bragg-Brentano, so the preset frees the specimen displacement in place of the zero shift, in a stage named `displacement` ([Plans](../concepts/plans.md)).
+The preset's `profile` stage reaches Rwp 0.0994.
+The preset then runs its closing stage, which refines the same parameters with wider peak windows and ends at 0.0951 ([The closing stage](../reference/refinement.md#the-closing-stage)).
 `run_stage` runs no closing stage, so by default it runs at the closing stage's wider windows.
-The hand-run `profile` stage therefore refines the same parameters at the same windows as the closing stage, and ends at 0.0957.
+The hand-run `profile` stage therefore refines the same parameters at the same windows as the closing stage, and ends at 0.0976.
 The difference comes from where each stage fixed its peak windows.
 A stage fixes them at the values it starts from.
 The hand-run stage fixed them at the default widths, and its result carries `FROZEN_COMPILE_STALE`.
 The closing stage fixed them at the widths the preset's `profile` stage had fitted.
-One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0931.
+One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0951.
 The full script is `examples/guides/stage.py`.
 
 ## Read a report at every stage

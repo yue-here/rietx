@@ -422,7 +422,7 @@ def _ftol_sentence(ftol: float | None) -> str:
 def plan_ladder() -> str:
     """The body of `reference/plans.md`: a summary table, then one ladder per preset."""
     from rietx.strategy.staged import (
-        _GEOMETRY_ADDITIONS,
+        _GEOMETRY_SWAPS,
         _MODE_SUBSTITUTES,
         PLAN_INFO,
         PLAN_PRESETS,
@@ -439,10 +439,11 @@ def plan_ladder() -> str:
     out.append("")
     for (name, mode), twin in _MODE_SUBSTITUTES.items():
         out.append(f"Under `{mode}`, `{name}` runs as `{twin}`.")
-    for (name, kind), globs in _GEOMETRY_ADDITIONS.items():
-        freed = ", ".join(f"`{g}`" for g in globs)
-        out.append(f"On a `{kind}` geometry, `{name}` also frees {freed} in the "
-                   "stage that frees the zero, under every mode.")
+    for (name, kind), (freed, held) in _GEOMETRY_SWAPS.items():
+        out.append(f"On a `{kind}` geometry, `{name}` frees "
+                   f"{', '.join(f'`{g}`' for g in freed)} in place of "
+                   f"{', '.join(f'`{g}`' for g in held)} in the stage that "
+                   "frees the zero, under every mode.")
     ftols = {plan.intermediate_ftol for plan in plans.values()}
     shared = len(ftols) == 1
     if shared:

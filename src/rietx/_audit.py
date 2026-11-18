@@ -811,7 +811,7 @@ ROWS: tuple[Row, ...] = (
                   "capillary offset or absorption is applied or freed, and on a Bragg-Brentano "
                   "pattern a displacement fitted as a zero leaves a tan-theta remainder the "
                   "cell absorbs (measured, WP-2015: NIST SRM 660c's cell 70 ppm above its reference "
-                  "with the displacement held, 20 ppm below with it freed; issue #1233). TOPAS applies "
+                  "with the displacement held, 12 ppm below with it freed in place of the zero; issue #1233). TOPAS applies "
                   "no geometry correction unless a macro names it (Technical Reference v9 "
                   "§ 1.3); GSAS-II 5.8.4 always picks a geometry (GSASIIfiles.py:509-519)"),
         grounds=("The geometry is a fact about the caller's instrument, outside the pattern; "
@@ -5016,18 +5016,23 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.Refinement.fit:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
                   "program ships a default plan; it frees the zero, and on bragg_brentano the "
-                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015), leaving the Ka2 "
-                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families): NIST "
-                  "SRM 660c's cell +70 -> -20 ppm from its reference in Rietveld and Le Bail, the "
-                  "displacement -0.073(14) mm against NIST's -0.079; IUCr CPD corundum unmoved in "
-                  "Rietveld (c/a +32 ppm) and further in Le Bail (c/a -87 -> -90 ppm, axes -311 -> "
-                  "-510 ppm), the zero and displacement trading; GSAS-II LabData fluorapatite (a "
-                  "third, cross-code) a -6 -> -386 ppm from GSAS's held-displacement fit, with "
-                  "FLAT_DIRECTION raised. Dissent: MAUD's wizard frees the "
-                  "zero and not the displacement (docs/practice.md)"),
+                  "specimen displacement in its place, never both (staged._GEOMETRY_SWAPS, WP-2015; "
+                  "Yue's ruling of 2026-11-16 on the first version, which freed both), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families, "
+                  "cell against reference, zero only -> displacement in its place): NIST SRM 660c "
+                  "a +70 -> -12 ppm (3.2 ppm esd), displacement -0.066 mm against NIST's -0.079; "
+                  "IUCr CPD corundum a -329 -> -130 and c -297 -> -105 ppm, c/a +32 -> +26 ppm "
+                  "(Le Bail c/a -73 -> -82 ppm); GSAS-II LabData fluorapatite (cross-code) a "
+                  "-6 -> +96 ppm and c -9 -> +94 ppm from GSAS's fit, 0.8 -> 12.8 esd, so that "
+                  "family lands further than the zero-only plan and is Yue's call. Freeing both "
+                  "raised HIGH_CORRELATION on all three (cell esd 2.7x to 13x) and FLAT_DIRECTION on "
+                  "fluorapatite. Literature: GSAS-II 5.8.4 (displacement, never with the zero), "
+                  "Cline et al. 2015 §6, Rowles 2021 §3.4.1, McCusker et al. 1999 §5. Dissent: MAUD's "
+                  "wizard frees the zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
                  "geometry-specific on an unstated, capillary or transmission geometry, and on a "
-                 "stated bragg_brentano frees its displacement (B7, ruled 2026-10-19)."),
+                 "stated bragg_brentano frees its displacement and holds the zero (Yue, 2026-11-16, "
+                 "after B7 of 2026-10-19; the fluorapatite family is open with him)."),
         approved="2026-10-19"),
     Row("rietx.refine.Refinement.fit:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
@@ -5108,18 +5113,23 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.refine:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
                   "program ships a default plan; it frees the zero, and on bragg_brentano the "
-                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015), leaving the Ka2 "
-                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families): NIST "
-                  "SRM 660c's cell +70 -> -20 ppm from its reference in Rietveld and Le Bail, the "
-                  "displacement -0.073(14) mm against NIST's -0.079; IUCr CPD corundum unmoved in "
-                  "Rietveld (c/a +32 ppm) and further in Le Bail (c/a -87 -> -90 ppm, axes -311 -> "
-                  "-510 ppm), the zero and displacement trading; GSAS-II LabData fluorapatite (a "
-                  "third, cross-code) a -6 -> -386 ppm from GSAS's held-displacement fit, with "
-                  "FLAT_DIRECTION raised. Dissent: MAUD's wizard frees the "
-                  "zero and not the displacement (docs/practice.md)"),
+                  "specimen displacement in its place, never both (staged._GEOMETRY_SWAPS, WP-2015; "
+                  "Yue's ruling of 2026-11-16 on the first version, which freed both), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, three Bragg-Brentano families, "
+                  "cell against reference, zero only -> displacement in its place): NIST SRM 660c "
+                  "a +70 -> -12 ppm (3.2 ppm esd), displacement -0.066 mm against NIST's -0.079; "
+                  "IUCr CPD corundum a -329 -> -130 and c -297 -> -105 ppm, c/a +32 -> +26 ppm "
+                  "(Le Bail c/a -73 -> -82 ppm); GSAS-II LabData fluorapatite (cross-code) a "
+                  "-6 -> +96 ppm and c -9 -> +94 ppm from GSAS's fit, 0.8 -> 12.8 esd, so that "
+                  "family lands further than the zero-only plan and is Yue's call. Freeing both "
+                  "raised HIGH_CORRELATION on all three (cell esd 2.7x to 13x) and FLAT_DIRECTION on "
+                  "fluorapatite. Literature: GSAS-II 5.8.4 (displacement, never with the zero), "
+                  "Cline et al. 2015 §6, Rowles 2021 §3.4.1, McCusker et al. 1999 §5. Dissent: MAUD's "
+                  "wizard frees the zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
                  "geometry-specific on an unstated, capillary or transmission geometry, and on a "
-                 "stated bragg_brentano frees its displacement (B7, ruled 2026-10-19)."),
+                 "stated bragg_brentano frees its displacement and holds the zero (Yue, 2026-11-16, "
+                 "after B7 of 2026-10-19; the fluorapatite family is open with him)."),
         approved="2026-10-19"),
     Row("rietx.refine.refine:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "

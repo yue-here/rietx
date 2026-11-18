@@ -20,13 +20,12 @@ ref = rx.Refinement(structure, instrument)
 
 stages = [
     rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
-    rx.Stage("cell", ["instrument.zero_shift", "instrument.geometry.sample_displacement",
-                      "phases.*.cell.*"]),
+    rx.Stage("cell", ["instrument.geometry.sample_displacement", "phases.*.cell.*"]),
     rx.Stage("profile", ["instrument.profile.*"]),
 ]
 for stage in stages:
     result = ref.run_stage(data, stage, two_theta_limits=(15, 130))
-    print(f"{stage.name:<10} {result.status}  Rwp {result.statistics.rwp:.4f}")
+    print(f"{stage.name:<12} {result.status}  Rwp {result.statistics.rwp:.4f}")
 # guide: end
 
 # guide: reports start
@@ -35,21 +34,21 @@ plan_ref = rx.Refinement(structure, instrument)
 plan_ref.fit(data, plan="mccusker_default", two_theta_limits=(15, 130), stage_reports=True)
 
 for report in plan_ref.stage_reports_:
-    print(f"{report.stage:<10} Rwp {report.rwp:.4f}")
+    print(f"{report.stage:<12} Rwp {report.rwp:.4f}")
 # guide: reports end
 
 assert [s.name for s in result.stages] == ["profile"]
 assert [r.stage for r in plan_ref.stage_reports_] == [
-    "scale_bkg", "zero_disp", "cell", "profile_w", "profile", "closing"]
+    "scale_bkg", "displacement", "cell", "profile_w", "profile", "closing"]
 # The page quotes each Rwp, and compares the two ends: the hand-run plan frees
 # all five widths in one stage, the preset frees `w` first.  It compares the
 # hand-run `profile` stage with the preset's closing stage, because both free
 # the same parameters at the closing windows, `run_stage`'s default.  The gap
 # is where each stage fixed its windows: the hand-run result is stale, and a
 # stage freeing nothing new, started from its answer, ends where the preset does.
-assert f"{result.statistics.rwp:.4f}" == "0.0957"
+assert f"{result.statistics.rwp:.4f}" == "0.0976"
 assert [f"{r.rwp:.4f}" for r in plan_ref.stage_reports_] == [
-    "0.6050", "0.4920", "0.4918", "0.1930", "0.0975", "0.0931"]
+    "0.6050", "0.4938", "0.4921", "0.1935", "0.0994", "0.0951"]
 closing = plan_ref.result_.stages[-1]
 assert closing.name == "closing"
 assert result.stages[-1].window_area_tol == closing.window_area_tol == 1e-3
@@ -57,4 +56,4 @@ assert sorted(p.path for p in result.parameters) == sorted(
     p.path for p in plan_ref.result_.parameters)
 assert "FROZEN_COMPILE_STALE" in {d.code for d in result.diagnostics}
 again = ref.branch().run_stage(data, rx.Stage("again", []), two_theta_limits=(15, 130))
-assert f"{again.statistics.rwp:.4f}" == f"{plan_ref.stage_reports_[-1].rwp:.4f}" == "0.0931"
+assert f"{again.statistics.rwp:.4f}" == f"{plan_ref.stage_reports_[-1].rwp:.4f}" == "0.0951"

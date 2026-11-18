@@ -49,7 +49,7 @@ def _fit_default(core, **kw):
     a protocol-level limits key where the core carries one (W1).
 
     The preset runs as an object, the path these rows were registered on: by
-    name, a Bragg-Brentano instrument also frees the displacement beside the
+    name, a Bragg-Brentano instrument frees the displacement in place of the
     zero (WP-2015), which is the plant N1, C1 and E8p hold."""
     structure, ins, data = _models(core)
     if "two_theta_limits" in core:
