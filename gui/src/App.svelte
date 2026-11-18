@@ -41,7 +41,7 @@
   import Start from "./panels/Start.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
   import Recovery from "./panels/Recovery.svelte";
-  import { RecoveryWriter, combine, readDraft, type Draft } from "./lib/recovery";
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -160,15 +160,17 @@
    *  it every change: the panels' `draft()` read their pending maps, so a
    *  retyped value is a change even where the count stays the same.  A
    *  switch of project disarms it first, so the panels' emptied maps never
-   *  overwrite the copy of the project just left. */
+   *  overwrite the copy of the project just left.  The Text buffer and the
+   *  Model forms join the copy uncounted, keeping their own Apply (WP-2213). */
   const recoveryWriter = new RecoveryWriter(
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
   $effect(() => {
     const path = project?.path ?? null;
-    const draft = combine(pendingTotal, paramsPanel?.draft() ?? null,
-                          interactivePanel?.draft() ?? null, planPanel?.draft() ?? null);
+    const draft = combine(pendingTotal, {
+      params: paramsPanel?.draft(), interactive: interactivePanel?.draft(),
+      plan: planPanel?.draft(), text: textPanel?.draft(), model: modelPanel?.draft() });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -217,6 +219,7 @@
   let interactivePanel = $state<any>(null);
   let planPanel = $state<any>(null);
   let modelPanel = $state<any>(null);
+  let textPanel = $state<any>(null);
   let seriesPanel = $state<any>(null);
   /** a 2θ window the report panel asked the plot to show, or null for all of it */
   let zoom = $state<[number, number] | null>(null);
@@ -409,6 +412,8 @@
     offer = null;
     paramsPanel?.revert();
     interactivePanel?.revert();
+    modelPanel?.forget();
+    textPanel?.forget();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -440,9 +445,11 @@
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
     if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
     if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
+    if (o.draft.model) modelPanel?.restoreDraft(o.draft.model);
+    if (o.draft.text) void textPanel?.restoreDraft(o.draft.text);
     // the server holds exactly this, so it is not written again until it changes
     recoveryWriter.arm(o.path, o.draft);
-    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+    say(restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -1579,7 +1586,7 @@
           {/key}
         </div>
         <div class="panel" class:hidden={!textTab}>
-          <Text {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
+          <Text bind:this={textPanel} {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
         </div>
         <div class="panel" class:hidden={tab !== "peaks"}>
           <Peaks peaks={peaksData} {indexAnswer} {extinction} {run} {busy} {say}
