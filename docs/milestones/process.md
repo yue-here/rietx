@@ -1018,6 +1018,12 @@ only when called by name.  The operating detail went down a rank: the PRCF
 layout, the bintype table and every refusal's wording are the module
 docstrings'.  560 landed against the 561.
 
+572 -> 575 for issue #1593 (PR #1602, 2026-11-16): the container rule's
+member read can fail five ways, only one of them a `ValueError`, and a reader
+that catches one of five is the next format's template.  The three lines name
+`rasx.MEMBER_READ_ERRORS` and the exceptions it converts; the measurement is
+in the issue and the tests.  575 landed, no headroom.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`
