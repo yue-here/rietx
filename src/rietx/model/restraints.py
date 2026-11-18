@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import functools
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -41,6 +41,7 @@ from ..backend import get_backend
 from ..crystallography.lattice import direct_metric_tensor
 from ..optimize import lapack
 from ..params.derived import cartesian_frame
+from ..schemas.common import Diagnostic
 from ..schemas.structure import (
     AngleRestraint,
     AntiBumpRestraint,
@@ -64,6 +65,12 @@ _COS_CLAMP = 1.0 - 1e-9
 #: a minimum-image candidate closer than this (Å²) is treated as a coincident
 #: self-image and skipped (matters only for same-atom M–M restraints).
 _COINCIDENT_D2 = 1e-6
+#: two frozen images are one copy when their rotations are equal and their
+#: translations (op translation plus lattice shift, fractional) agree to this:
+#: both are exact small rationals and integers, so any tolerance far below
+#: the smallest nonzero op translation and far above roundoff decides the
+#: same inputs (``RESTRAINT_ON_FIXED_BODY_GEOMETRY``).
+_SAME_IMAGE_TOL = 1e-9
 #: a planarity set is refused when its two smallest scatter eigenvalues lie
 #: within this fraction of the largest: no direction is uniquely the
 #: flattest, so no normal is defined.  The points lie on a line (or
@@ -174,6 +181,10 @@ class CompiledRestraints:
     """
 
     items: list
+    #: compile-time findings about the restraints (``Diagnostic``), which the
+    #: result build carries to ``diagnostics``:
+    #: ``RESTRAINT_ON_FIXED_BODY_GEOMETRY``
+    findings: list = field(default_factory=list)
 
     @property
     def n_rows(self) -> int:
@@ -183,16 +194,22 @@ class CompiledRestraints:
 # ----------------------------------------------------------------------
 # compile-time resolution (minimum-image freeze)
 # ----------------------------------------------------------------------
-def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
+def resolve_phase_restraints(phase, ip: int, sites, cell,
+                             findings: list | None = None) -> list:
     """Freeze the PBC image of every restraint of ``phase`` at its coordinates.
 
     ``sites`` is the phase's :class:`PhaseSites` (frozen orbit-op subsets);
     ``cell`` its compile-time (a, b, c, α, β, γ).  Returns the ordered list of
-    compiled restraint objects (empty if the phase declares none).
+    compiled restraint objects (empty if the phase declares none).  A
+    restraint on geometry a rigid body holds fixed is kept as a row and its
+    ``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` warning appended to ``findings``.
     """
+    if findings is None:
+        findings = []
     g = _metric_g(cell)
     out: list = []
-    for r in phase.restraints:
+    eye, zero = np.eye(3), np.zeros(3)
+    for k, r in enumerate(phase.restraints):
         if isinstance(r, (BondRestraint, TetherRestraint, AntiBumpRestraint)):
             x_i = _atom_xyz(phase, r.atom_i)
             x_j = _atom_xyz(phase, r.atom_j)
@@ -204,6 +221,9 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
                 target, side = r.min_distance, "min"
             else:
                 target, side = r.target, None
+                findings.extend(_fixed_body_findings(
+                    phase, k, "bond", [r.atom_i, r.atom_j],
+                    [(eye, zero), (rot, tr + n)]))
             out.append(_Bond(ip, r.atom_i, r.atom_j, rot, tr, n,
                              target, r.sigma, r.weight, side))
         elif isinstance(r, AngleRestraint):
@@ -214,16 +234,91 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
                                         r.op_index_i, r.translation_i, g)
             rk, tk, nk = _resolve_image(sites, r.atom_k, x_j, x_k,
                                         r.op_index_k, r.translation_k, g)
+            findings.extend(_fixed_body_findings(
+                phase, k, "angle", [r.atom_i, r.atom_j, r.atom_k],
+                [(ri, ti + ni), (eye, zero), (rk, tk + nk)]))
             out.append(_Angle(ip, r.atom_i, r.atom_j, r.atom_k,
                              ri, ti, ni, rk, tk, nk,
                              r.target_deg, r.sigma, r.weight))
-        elif isinstance(r, PlanarityRestraint):
-            out.append(_resolve_plane(phase, ip, sites, cell, g, r))
-        elif isinstance(r, TorsionRestraint):
-            out.append(_resolve_torsion(phase, ip, sites, cell, g, r))
+        elif isinstance(r, (PlanarityRestraint, TorsionRestraint)):
+            plane = isinstance(r, PlanarityRestraint)
+            item = (_resolve_plane if plane else _resolve_torsion)(
+                phase, ip, sites, cell, g, r)
+            findings.extend(_fixed_body_findings(
+                phase, k, "planarity" if plane else "torsion", item.atoms,
+                [(rot, t + n) for rot, t, n in zip(item.R, item.t, item.n,
+                                                   strict=True)]))
+            out.append(item)
         else:  # ValueRestraint
             out.append(_Value(r.path, r.target, r.sigma, r.weight, ip))
     return out
+
+
+def _fixed_body_findings(phase, k: int, kind: str, atoms: list,
+                         images: list) -> list:
+    """``RESTRAINT_ON_FIXED_BODY_GEOMETRY``: restrained or refined, never both.
+
+    Restraint ``k`` of ``phase`` (a bond, angle, torsion or planarity
+    restraint, entry m being atom ``atoms[m]`` at the frozen image
+    ``images[m]`` = (R, t + n)) is reported, as a one-element list holding a
+    warning (an empty list when it is not), when its quantity is one its rigid
+    body holds fixed, so its row is a constant that no parameter moves.  The
+    row is kept: a competent refiner may want it as the template's penalty
+    (the maintainer's ruling, 2026-11-13).  The test:
+
+    * every entry is an atom of one body, all at one image (one copy of the
+      body: an isometry of the template, which keeps every distance, angle,
+      torsion and plane distance); and
+    * no **declared** torsion of the body changes it.  A torsion turns its
+      ``moves`` rigidly about the line through its two axis atoms, which it
+      leaves in place, so it keeps the quantity unless the restraint's atoms
+      other than those two lie partly in ``moves`` and partly outside.
+      Torsions apply in order, each an isometry of whatever it leaves
+      together, so a chain of them keeps what each keeps.
+
+    The rule reads the declaration, never ``vary``: a stage that holds a
+    torsion keeps the restraint as a constant row, as rietx keeps any row of
+    a held parameter, which is also the scope: the structural reading, on
+    bodies with no Z-matrix.  Only the two axis atoms count as on the axis, not an
+    atom that happens to sit on the line, so any error lands on accepting a
+    restraint.  The body's pose (origin, rotation) and the cell move a copy
+    as a whole and change none of these quantities (the template is in Å).
+    A Tether or anti-bump row is one-sided and is not checked.
+    """
+    if not phase.rigid_bodies:
+        return []
+    r0, s0 = images[0]
+    for rot, shift in images[1:]:
+        if not (np.array_equal(rot, r0)
+                and np.allclose(shift, s0, rtol=0.0, atol=_SAME_IMAGE_TOL)):
+            return []
+    labels = [phase.atoms[j].label for j in atoms]
+    named = set(labels)
+    body = next((b for b in phase.rigid_bodies if named <= set(b.atoms)), None)
+    if body is None:
+        return []
+    for t in body.torsions:
+        off_axis = named - set(t.axis)
+        turned = off_axis & set(t.moves)
+        if turned and turned != off_axis:
+            return []
+    unique = list(dict.fromkeys(labels))
+    torsions = (f"none of its {len(body.torsions)} declared torsions turns some "
+                "of them and not the others" if body.torsions
+                else "it declares no torsion")
+    return [Diagnostic(
+        level="warning", code="RESTRAINT_ON_FIXED_BODY_GEOMETRY",
+        where=[f"{phase.name} {lab}" for lab in unique],
+        message=(f"The {kind} restraint {k} of phase {phase.name!r} on "
+                 f"{', '.join(labels)} measures geometry rigid body "
+                 f"{body.name!r} holds fixed: every atom is in one copy of the "
+                 f"body and {torsions}, so no parameter moves the row. The row "
+                 f"is kept."),
+        suggestion=("Drop the restraint, declare a torsion of the body that "
+                    "changes it, take the atoms out of the body and restrain "
+                    "them as free atoms, or keep the row as the template's "
+                    "penalty."),
+    )]
 
 
 def _resolve_plane(phase, ip, sites, cell, g, r) -> _Plane:

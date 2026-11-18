@@ -12,7 +12,7 @@
    * ruling of 2026-11-10).  Every key is held here, so no shortcut acts
    * behind the question (the shell's Escape cancels a fit).
    */
-  import { offerText, type Draft } from "../lib/recovery";
+  import { movedText, offerText, type Draft } from "../lib/recovery";
 
   let {
     draft,
@@ -65,7 +65,7 @@
   <div class="rc-dialog" bind:this={dialog} role="dialog" aria-modal="true" aria-labelledby="rc-title">
     <h2 id="rc-title">Unapplied edits</h2>
     <p>{offerText(draft, savedUtc)}</p>
-    {#if moved}<p class="muted">The project has been refined or edited since. Restored values will replace the current ones.</p>{/if}
+    {#if moved}<p class="muted">{movedText(draft)}</p>{/if}
     <footer>
       <button type="button" class="ghost" onclick={ondiscard}>Discard</button>
       <!-- svelte-ignore a11y_autofocus -->
