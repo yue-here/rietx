@@ -89,6 +89,14 @@ on demand only (a function a caller or agent runs), or the bulge alone always on
   off-region χ²_red and Durbin-Watson and `worst_absorption`, and no per-region
   field; `report/background.py` builds one off-region mask over the whole range.
   No other open WP owns a residual row.
+  **Accepted by Yue, 2026-11-17:** the coherent-residual scan, the bulge and the
+  replica table are built as on-demand functions with no always-printed rows
+  (#1215, #1216, #1218, and #1568 by this fold), since on all four real patterns
+  the scan is never quiet and the replica count is never zero, WP-2037 made
+  quiet the default, and her 2026-11-03 reversal ruled out summary lines
+  restating what a reader inspects. Their tier-3 constants come back as rows
+  later. This settles the "always on, on demand, or the bulge alone" decision
+  above for the per-region rows too.
 
 ## Non-goals
 
