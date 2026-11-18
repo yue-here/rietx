@@ -701,8 +701,16 @@ flag reprints the saved numbers without fitting.
 
   *Author's answer on the skill line:* reworded as the judge proposed, so the line now names both readings and says GoF rises with the counts. *On the missing entry:* the judge read the diff before this entry was written.
 
-  *Next:* Yue reads the milestone record's title, scope and draft acceptance rows. Then
-  rule 1's declaration on the series call, which the milestone's order puts next. The
+  *Ruled by Yue, in chat, later the same day.* The milestone record is out of draft. This
+  session read the title, § Scope and § Acceptance and proposed four corrections, all to
+  § Acceptance. Yue approved them ("Make them"). (1) The rule-3 row's bar is the measured
+  spread between two independent fits of a pattern, not 0.01 esd, and the direction gap no
+  longer stands in for it. (2) The rule-4 row's "name a second real series" task moved to
+  § The order. (3) The threshold row asks for each code's owner's ruling, since the one left
+  is magnetic. (4) A new row tests rule 2's refusal of a common or equation declaration in
+  the series call.
+
+  *Next:* rule 1's declaration on the series call, which the milestone's order puts next. The
   remaining thresholded series code, `SEQUENTIAL_MOMENT_ONSET`, waits on the magnetic
   path's owner.
 
