@@ -24,8 +24,8 @@
   import Interactive from "./Interactive.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
-  import { RecoveryWriter, combine, readDraft, type Draft,
-           type PlanDraft } from "../lib/recovery";
+  import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
+           type ModelDraft, type PlanDraft, type TextDraft } from "../lib/recovery";
   import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "../lib/interactive";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import { peakWindows, widestFwhm } from "../lib/peakwin";
@@ -184,16 +184,22 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
-  /** The kept copy's Plan arm, which today's page writes and this page has no
-   *  panel for yet. The copy is one per project and shared by both pages, so
-   *  it rides on every write from here: an edit on this page never drops the
-   *  other page's unapplied plan. */
-  let carried = $state.raw<PlanDraft | null>(null);
+  /** The kept copy's Plan, Text and Model arms, which today's page wrote and
+   *  this page has no panel for. The copy is one per project and shared by
+   *  both pages, so they ride on every write from here: an edit on this page
+   *  never drops the other page's unapplied edits. The Interactive arm is this
+   *  page's own (WP-2218). The Text and Model arms are not in the action bar's
+   *  count (WP-2213), so they add nothing to `carriedCount`. */
+  const NO_CARRY = { plan: null, text: null, model: null } as const;
+  let carried = $state.raw<{ plan: PlanDraft | null; text: TextDraft | null;
+                             model: ModelDraft | null }>(NO_CARRY);
+  const carriedCount = $derived(carried.plan ? 1 : 0);
   $effect(() => {
     const path = project?.path ?? null;
-    const plan = carried;
-    const draft = combine(touched + (plan ? 1 : 0), paramsPanel?.draft() ?? null,
-                          interactivePanel?.draft() ?? null, plan);
+    const extra = carried;
+    const draft = combine(touched + carriedCount,
+                          { ...extra, params: paramsPanel?.draft(),
+                            interactive: interactivePanel?.draft() });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -267,7 +273,7 @@
     await recoveryWriter.flush();
     recoveryWriter.disarm();
     offer = null;
-    carried = null;
+    carried = NO_CARRY;
     paramsPanel?.revert();
     interactivePanel?.revert();
   }
@@ -285,7 +291,8 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
-    carried = draft?.plan ?? null;
+    carried = draft?.plan || draft?.text || draft?.model
+      ? { plan: draft.plan, text: draft.text, model: draft.model } : NO_CARRY;
     if (draft?.params || draft?.interactive) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
@@ -303,7 +310,7 @@
     if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
     recoveryWriter.arm(o.path, o.draft);
     modelTab = o.draft.params ? "params" : "interactive";
-    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+    say(restoredText(o.draft));
   }
 
   async function discardKept() {
@@ -321,7 +328,7 @@
       return;
     }
     if (project?.path === o.path) {
-      carried = null;
+      carried = NO_CARRY;
       recoveryWriter.arm(o.path, null);
     }
   }
