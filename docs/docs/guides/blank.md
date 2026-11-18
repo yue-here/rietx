@@ -80,13 +80,16 @@ held scale 1.0
 ## Hold a curve another program computed
 
 The same slot holds a curve computed by another program for one phase.
-Examples are a stacking-fault diffuse term from DIFFaX (the faulted pattern minus the ideal one) or a Debye sum.
+An example is a stacking-fault diffuse term from DIFFaX, the faulted pattern minus the ideal one.
 Such a curve scales with its phase, so its scale is tied to the phase scale instead of refined.
+A curve whose amount is independent of the phase, such as an amorphous fraction, keeps a free scale.
 
 Store the curve as c*·D.
 D is the other program's curve in its own units.
 c* converts those units to counts at phase scale 1.
-To find c*, compute the ideal pattern in the other program too, and compare it with `Refinement.predict` at phase scale 1 over the whole fitted range.
+To find c*, compute the ideal pattern in the other program too.
+Then take the least-squares ratio of `Refinement.predict` at phase scale 1 to that pattern, over the whole fitted range.
+Check that the ratio is flat across 2θ: the two programs may treat Lorentz-polarisation or absorption differently.
 `predict` returns the whole model, so make that comparison before the curve is stored, with every background coefficient at zero.
 Then tie the curve's scale to the phase scale:
 
@@ -122,7 +125,7 @@ In a series, a tie is not carried from one pattern to the next.
 Declare it in the `constrain=` hook, which runs before each pattern's fit.
 
 The curve is fixed on the 2θ axis.
-Every peak-position correction moves only the Bragg peaks: the zero shift, and on a flat plate the specimen displacement and transparency too.
+Every peak-position correction moves only the Bragg peaks: the zero shift, the specimen displacement and transparency on a flat plate, and the offsets on a capillary.
 With a zero shift of 0.05° and curve features 0.15° wide, the phase scale came out 0.16 % low and GoF rose from 1.02 to 1.04.
 With features 2.5° wide the bias was 0.009 %.
 If the fit finds a peak shift Δ(2θ), the sum of those corrections at each angle, store the curve at `two_theta + Δ(two_theta)` and fit again.

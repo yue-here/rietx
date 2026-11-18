@@ -760,7 +760,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
             "expected report. A curve another program computed for one phase, such as "
-            "a DIFFaX stacking-fault term or a Debye sum, scales with that phase. Store "
+            "a DIFFaX faulted-minus-ideal term, scales with that phase. Store "
             "it as c*·D, with c* converting the program's units to counts at phase "
             "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
             "stored curve does not follow the zero shift or any other peak-position "

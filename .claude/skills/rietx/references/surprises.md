@@ -499,7 +499,7 @@ came back as 0.838 on 1 term and 0.648 on 6, Rwp falling throughout. Judge the
 scale by **its own esd**, never by Rwp: the blank's esds enter the weight as
 σ² + s²·σ_f², so two fits declaring different scales are not scored on one
 statistic. (Measured: WP-1309.) Presets free `…background.*`, scale included,
-so `hold` it to keep 1.0 (Measured: WP-1986). A curve another program computed
+so `hold` it to keep 1.0 (Measured: WP-1986). A DIFFaX faulted-minus-ideal curve
 for phase 0 goes here as c*·D, with
 `tie("instrument.background.scale", "phases.0.scale")` (Measured: WP-1512).
 
