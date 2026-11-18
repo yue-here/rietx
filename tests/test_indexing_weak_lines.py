@@ -171,10 +171,11 @@ def _row(key: str, floor: float):
 # ----------------------------------------------------------------------------
 # the builders
 # ----------------------------------------------------------------------------
-@pytest.mark.parametrize("key", sorted(BUILDERS))
+@pytest.mark.parametrize("key", [*sorted(BUILDERS), "b+trace"])
 def test_a_builder_draws_the_same_list_every_time(key):
     """Fixed seeds: a second build picks the same lines at the same heights."""
-    one, two = BUILDERS[key](), BUILDERS[key]()
+    build = W.weak_superlattice_with_trace if key == "b+trace" else BUILDERS[key]
+    one, two = build(), build()
     assert np.array_equal(one.peaks.two_theta(), two.peaks.two_theta())
     assert np.array_equal(one.peaks.intensity(), two.peaks.intensity())
 
@@ -343,7 +344,9 @@ def _decision_row(trace: float, engines, fires: bool, fast: bool = False):
 #: table): at 0.5 % the inlier retry finds the supercell and the weak-line
 #: retry never runs; at 2 % the full list ends with no cell two engines agree
 #: on (none at all), and the retry runs and is adopted, under all three
-#: engines and under each alone
+#: engines and under each alone.  The fast row is the fixture's default, 2 %
+#: under all three engines (under 10 s here); WP-2147's searches took 5-36 s,
+#: so the other four rows are ``slow``
 DECISION_ROWS = [
     _decision_row(0.005, None, fires=False),
     _decision_row(0.02, None, fires=True, fast=True),

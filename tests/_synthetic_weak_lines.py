@@ -37,7 +37,7 @@ import rietx as rx
 from rietx.indexing.engines import weak_line_floor
 from rietx.schemas.indexing import PeakList
 
-#: the synchrotron wavelength of WP-1969's Si reproducer, used for all three
+#: the synchrotron wavelength of WP-1969's Si reproducer, used by every builder
 LAM = 0.825739
 
 
@@ -273,10 +273,6 @@ def _ordering_lines(cif: str, two_theta_range) -> np.ndarray:
     # h, k, l all odd ⇔ h² + k² + l² ≡ 3 (mod 8)
     return all_lines[(np.abs(hkl2 - np.round(hkl2)) < 1e-3)
                      & (np.round(hkl2).astype(int) % 8 == 3)]
-
-
-#: the cubic perovskite subcell (P, a_p = a/2): what the supercell is lost to
-SUBCELL = (A_DP / 2.0,) * 3 + (90.0,) * 3
 
 
 def weak_superlattice_with_trace(trace: float = 0.02, antisite: float = 0.1,

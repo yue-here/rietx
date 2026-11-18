@@ -167,18 +167,27 @@ retry here either.
 
 - [x] The fixture: (b) plus a planted trace phase, with the smallest trace
       fraction at which the full list finds no agreement after the inlier
-      retry. Seeded, no data file.
+      retry. Seeded, no data file. *Done 2026-11-18:* the smallest such
+      fraction is 0.6 %, with a gap at 0.7 % (§ Measured). The builder's
+      default is 2 %, inside the band where every trace tried fires, so a
+      test row does not sit on the edge.
 - [x] Measure under `preset="full"` with each engine and all three together:
       whether the retry fires, whether it finds agreement, and where the
       supercell and the subcell rank in the answer a user reads.
-- [ ] Write the result here and in WP-2078's successor's `### Inherited`.
+- [x] Write the result here and in WP-2078's successor's `### Inherited`.
       If the supercell is lost, brief the maintainer on replace-versus-append
-      with these rows.
+      with these rows. *Done 2026-11-18:* the result is § Measured. WP-2078
+      has no successor: no WP file but this one cites the retry (`grep -rln`
+      over `docs/wp/`), so the result lives here alone. The supercell is not
+      lost, because the full list never held it; the two questions still go
+      to the maintainer, with this WP's PR.
 - [x] Tests: the fixture as a row pinning the decision the code makes (fires
       or not, adopts or not), never the landing rank (root CLAUDE.md: what a
       decline leaves free finds the peaks at a rate).
-- [ ] Skill: none expected. If the retry's guidance changes, the row in
-      `references/abstention.md` changes with it.
+- [x] Skill: none expected. If the retry's guidance changes, the row in
+      `references/abstention.md` changes with it. *Done 2026-11-18:* no
+      change. The row already tells the reader that a set-aside line may be a
+      supercell's ordering line.
 
 ## Acceptance
 
