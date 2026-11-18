@@ -173,8 +173,8 @@ What an operator must know, all measured:
 - **A one-direction distortion started at its parent's cell is a bet on a
   sign.**  At the group–subgroup identity point every subgroup line sits
   under a parent line; a fit started there can leave it on the wrong side,
-  and both chain directions can agree on it, silencing
-  `SEQUENTIAL_PATH_DEPENDENT`.  Multi-start it: fit one pattern where the
+  and both chain directions can agree on it, showing no gap in
+  `SeriesResult.direction_gaps`.  Multi-start it: fit one pattern where the
   subgroup is present from each side, keep the lower Rwp, chain from it.
   *(Measured: issue #267's fcc→bct construction only, untested beyond it;
   counts in the manual's series guide.)*

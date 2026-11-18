@@ -139,7 +139,7 @@ The series is synthetic: a Cu parent, and its `I 4/m m m` subgroup present from 
 A single fit of a pattern with the subgroup present, started at the identity point, ended on the wrong side in 42 of 42 fits.
 With the distortion's sign reversed in the data, it ended on the wrong side in 42 of 42 again, so the data pulled the fit away from the truth rather than leaving the choice to chance.
 The chain ended on the wrong side in 17 of 21 forward chains and 21 of 21 backward ones.
-In 17 of the 21 series both directions agreed on the wrong side, so [`SEQUENTIAL_PATH_DEPENDENT`](../reference/diagnostics-series.md#sequential_path_dependent) named nothing on the subgroup's cell.
+In 17 of the 21 series both directions agreed on the wrong side, so `SeriesResult.direction_gaps` showed no gap on the subgroup's cell.
 The subgroup was not held in any pattern where it was present, so the hold played no part in the failure.
 
 Choose the side by fitting, not by chaining:
