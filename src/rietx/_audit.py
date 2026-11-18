@@ -4077,16 +4077,30 @@ ROWS: tuple[Row, ...] = (
                   "model, one source under the generality rule) and read on SRM 1976a and 11-BM "
                   "LaB6 660a; untested beyond them. No program's default reports a level past "
                   "a cut, so none is a precedent"),
-        grounds=("Proposed tier 3, a reporting width of ours with no null to calibrate it; "
-                 "awaiting the maintainer's dated approval (WP-2075's PR).")),
+        grounds=("A reporting width of ours, with no null to calibrate it: the level, far "
+                 "level and slopes beside each cut are read over 1 degree, the width rides on "
+                 "the record (fit_range.cut_window_deg), and it gates nothing and moves no "
+                 "refined value, so no action is on trial. Read on the issue's synthetic "
+                 "perovskite families (each fact checked against the same fit without the "
+                 "planted rise), SRM 1976a and 11-BM LaB6 660a. Where it fails: on a broad "
+                 "pattern (neutron, nanocrystalline) 1 degree is only 1-3 FWHM, so one "
+                 "reflection's flank can set the level and slope read beside the cut."),
+        approved="2026-11-17"),
     Row("rietx.report.fit_range.STRADDLE_FWHM", "constant", tier=3, value=3.0,
         evidence=("reporting window (WP-2075, #1219): a reflection centred within this many "
                   "of its own FWHM of a cut is listed with the share of its profile past it; "
                   "gates nothing. At 3 FWHM a pseudo-Voigt's share past the cut is under 6 % "
                   "for a pure Lorentzian (arithmetic); the issue's families and the two public "
                   "patterns as for CUT_WINDOW_DEG; untested beyond them"),
-        grounds=("Proposed tier 3, a reporting width of ours; awaiting the maintainer's dated "
-                 "approval (WP-2075's PR).")),
+        grounds=("A reporting distance of ours: a reflection centred within 3 of its own FWHM "
+                 "of a cut is listed with the share of its profile past the cut, the distance "
+                 "rides on the record (fit_range.straddle_fwhm), and it gates nothing. "
+                 "Arithmetic bounds what it leaves out: at 3 FWHM a pure Lorentzian puts 5.3 % "
+                 "of its area past the cut and any Gaussian share less, so an unlisted "
+                 "reflection has at most that share outside. Read on the issue's synthetic "
+                 "families, SRM 1976a and 11-BM LaB6 660a. Where it fails: a reflection past "
+                 "the model's generation margin is not listed (#1481), and "
+                 "reflections_searched is approximate.")),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
