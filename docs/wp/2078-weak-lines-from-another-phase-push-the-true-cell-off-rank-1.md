@@ -1,6 +1,6 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: ✅ 2026-11-13 — the weak-line retry built under the 2026-11-13 ruling; the reader-text change waits on the maintainer in its PR
+Milestone: unscheduled · Status: ✅ 2026-11-13 — the weak-line retry built under the 2026-11-13 ruling; the reader-text change accepted 2026-11-17, in PR #1567
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
 
@@ -430,7 +430,7 @@ position-only list returns the same candidates as on `main`.
 
 ## Handover log
 
-- **2026-11-13** — tasks 5-9, by a ghostshift runner, closing the WP. When
+- **2026-11-13** — tasks 5-9, by a ghostshift runner, in PR #1567, closing the WP. When
   a search ends with no cell two engines agree on, rietx now searches once
   more on the lines at or above 5 % of the strongest, as the 2004 indexing
   round robin did for its second attempt. On the trace-oxide fixture the true
