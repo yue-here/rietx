@@ -9641,7 +9641,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # case a batch caller hits: a status of "converged" that is true of the
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
-                   + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
+                   + _far_from_data_diagnostics(model, y_calc, y_bkg, stats,
+                                              values, set(table.free_paths))
                    + _max_iter_diagnostics(stage_results)
                    + _lebail_cap_diagnostics(stage_results)
                    + _slow_descent_diagnostics(stage_results))
@@ -10561,29 +10562,51 @@ def _plane_tension(plane: list, structure: Structure) -> tuple | None:
             f"its plane: {shown}.")
 
 
-#: Rwp above which a fit is reported as a **model/data mismatch** rather than
-#: a converged refinement.  Not a quality bar — an honestly bad Rietveld fit
-#: lands at 0.2-0.5 — and its placement is fixed at both ends by measurement
-#: rather than taste (WP-1028 §(c)):
-#:
-#: * **Rwp = 1 is exactly "no better than y_calc ≡ 0"**, since Σw·Δ² = Σw·y_obs²
-#:   there.  That is not the ceiling of the broken cases, it is their
-#:   *attractor*: with the cell 3 % off, every reflection sits outside its
-#:   frozen evaluation window, the only escape the solver has is to drive the
-#:   scale to zero, and it converges — ``status="converged"`` — at Rwp
-#:   0.99999.  A bar at 1.0 would miss the commonest failure by 1e-5.
-#: * The failures that do exceed it exceed it enormously: 72.25 on a Le Bail
-#:   fit from the source paper's own starting cells, 2.6e3 on a three-phase
-#:   one.
-#:
-#: So 0.8 sits in a gap three orders of magnitude wide at the top and ~0.3
-#: wide at the bottom, and catches the zero-scale attractor that is the whole
-#: point.
-MODEL_FAR_FROM_DATA_RWP = 0.8
+#: ``MODEL_FAR_FROM_DATA``'s test is Hamilton's (1965) R-factor ratio test of the
+#: fit against a **background-only** fit of the same data, at this level
+#: (Hamilton 1965, Acta Cryst. 18, 502).  It replaced the bar ``Rwp > 0.8``
+#: (WP-2017 group K, ruled by Yue 2026-11-17).  Between 0.001 and 0.05 at most
+#: 2 of the 260 probe rows change verdict, so the level is not tuned.
+MODEL_FAR_FROM_DATA_ALPHA = 0.05
+
+
+def _background_only_chi2(model: CompiledModel, values: dict | None,
+                          y_bkg) -> tuple[float, int]:
+    """χ² (Σ((y_obs − fit)/σ)², unreduced) of the best fit of the data by the
+    **background alone** — the declared linear background refitted from
+    scratch, the P-spline penalty rows and the fixed/peak parts kept — and
+    the number of coefficients that fit spent.  Linear least squares: the
+    background is linear in its coefficients (``CompiledModel.bkg_design``)."""
+    import numpy as np
+
+    y_obs = np.asarray(model.y_obs, dtype=np.float64)
+    sig = np.asarray(model.sigma, dtype=np.float64)
+    design = np.asarray(model.bkg_design, dtype=np.float64)
+    n_bkg = design.shape[0]
+    extra = np.zeros_like(y_obs)
+    if values is not None and n_bkg:
+        coeffs = np.array([float(values[p]) for p in model.bkg_paths])
+        extra = np.asarray(y_bkg, dtype=np.float64) - coeffs @ design
+    elif model.fixed_background is not None:
+        extra = np.asarray(model.fixed_background, dtype=np.float64)
+    target = (y_obs - extra) / sig
+    if n_bkg == 0:
+        return float(target @ target), 0
+    a = design.T / sig[:, None]
+    if model.bkg_penalty is not None:
+        pen = np.asarray(model.bkg_penalty, dtype=np.float64)
+        sol = np.linalg.lstsq(np.vstack([a, pen]),
+                              np.concatenate([target, np.zeros(pen.shape[0])]),
+                              rcond=None)[0]
+    else:
+        sol = np.linalg.lstsq(a, target, rcond=None)[0]
+    r = target - a @ sol
+    return float(r @ r), n_bkg
 
 
 def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
-                               stats) -> list[Diagnostic]:
+                               stats, values: dict | None = None,
+                               free_paths=None) -> list[Diagnostic]:
     """``MODEL_FAR_FROM_DATA``: the answer is not a refinement of this model.
 
     The defect this exists for is a *silent* one — the refinement does not
@@ -10593,6 +10616,31 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
     ``reindex_or_recheck_cell`` since v0.2, but at that Rwp nobody builds a
     report.
 
+    **The test** (WP-2017 group K, Yue 2026-11-17): the error fires when the
+    model's χ² is no better than a background-only fit's, by Hamilton's (1965,
+    Acta Cryst. 18, 502) R-factor ratio test at α =
+    :data:`MODEL_FAR_FROM_DATA_ALPHA`, via
+    :func:`rietx.report.layer2.hamilton_justified`.  The restricted model is
+    the declared background refitted alone; the added parameters are the
+    free ones beyond it.  The old bar ``Rwp > 0.8`` is gone, not kept beside
+    it: it missed a full collapse on unthinned FAP (scale to zero at Rwp
+    0.693, reported usable) and flagged 15 of 96 correct fits at 0.05-0.2
+    counts a channel, where this test flags none; between α = 0.001 and 0.05
+    at most 2 of 260 probe rows change verdict.
+
+    **An exception to DESIGN Rule 4** ("An Rwp comparison is never its
+    evidence"), ruled by Yue on 2026-11-17 and recorded here, where it acts,
+    not in the rule: the comparison is a *significance test against the nested
+    background-only model*, never a ranking of alternatives by Rwp.  Toby
+    (2006, *Powder Diffraction* 21, 67) notes that a background-only fit "can
+    give relatively small χ² or Rwp values", which is why Rwp alone cannot
+    say.
+
+    **One known gap.**  A *partial capture* — the scale at 0.3-16 % of the
+    true value, Rwp about 0.85 — reads usable under this test, because its
+    model does carry Bragg intensity.  Its Rwp is already printed for the
+    reader.
+
     The **cause is measured, not asserted**: the diagnostic reports what share
     of the observed above-background intensity the model actually put
     somewhere, because the signature of the frozen-window failure is that the
@@ -10600,10 +10648,27 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
     evaluated outside the window it was compiled with, so it contributes
     nothing anywhere.  A model that is merely *wrong* still has peaks.
     """
-    if stats.rwp <= MODEL_FAR_FROM_DATA_RWP:
-        return []
     import numpy as np
 
+    from rietx.report.layer2 import hamilton_justified
+
+    sig = np.asarray(model.sigma, dtype=np.float64)
+    resid = (np.asarray(model.y_obs, dtype=np.float64)
+             - np.asarray(y_calc, dtype=np.float64)) / sig
+    chi2_full = float(resid @ resid)
+    if chi2_full <= 0.0:       # an exact fit is the opposite of a collapse
+        return []
+    chi2_bkg, n_bkg = _background_only_chi2(model, values, y_bkg)
+    n = int(len(resid))
+    n_free = int(stats.n_free_parameters)
+    if free_paths is not None:
+        n_bkg_free = sum(1 for p in model.bkg_paths if p in free_paths)
+    else:
+        n_bkg_free = n_bkg
+    n_added = max(n_free - n_bkg_free, 1)
+    if hamilton_justified(chi2_bkg, chi2_full, n, n_bkg, n_added,
+                          alpha=MODEL_FAR_FROM_DATA_ALPHA):
+        return []
     bragg_calc = float(np.sum(np.asarray(y_calc) - np.asarray(y_bkg)))
     obs_excess = float(np.sum(np.asarray(model.y_obs) - np.asarray(y_bkg)))
     share = ""
@@ -10612,7 +10677,9 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
                  f"the observed above-background intensity.")
     return [Diagnostic(
         level="error", code="MODEL_FAR_FROM_DATA",
-        message=f"Rwp = {stats.rwp:.1%}.{share}",
+        message=(f"Rwp = {stats.rwp:.1%}; the fit is no better than the "
+                 f"background alone (Hamilton, α = "
+                 f"{MODEL_FAR_FROM_DATA_ALPHA:g}).{share}"),
         where=[],
         suggestion="Do not read the status, the parameter values or their "
                    "esds. Check the cell (it must lie within about 1 % of "

@@ -571,7 +571,9 @@ class SolveCost:
         converge, and one the package calls unusable
         (:attr:`~rietx.schemas.results.RefinementResult.usable`, WP-1902): an
         error-level diagnostic, which today is only ``MODEL_FAR_FROM_DATA``
-        at Rwp above :data:`rietx.refine.MODEL_FAR_FROM_DATA_RWP` (0.8).  An
+        when the fit is no better than a background-only fit (Hamilton's R-factor
+        ratio test at :data:`rietx.refine.MODEL_FAR_FROM_DATA_ALPHA`, which
+        replaced the bar Rwp > 0.8, WP-2017 group K).  An
         error-level code added later refuses here with no edit.  That bar is
         the package's measured
         line between a bad fit and no fit of this model (WP-1028 §(c): Rwp = 1

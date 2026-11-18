@@ -446,7 +446,7 @@ A flat plate, `kind="bragg_brentano"` or `kind="flat_plate_transmission"`:
 A transmission plate has no displacement or transparency model: only `Instrument.zero_shift` moves its peaks.
 No position correction carries a default bound, and the transparency and the axial ratios keep their floor of 0.
 Before 1.10, `Instrument.zero_shift` was held to ±0.5°, a displacement and each capillary offset to ±1 mm, and the transparency to 0.05.
-Where a scan cannot separate a position error from the cell, the fit reports [`FLAT_DIRECTION`](diagnostics-refinement.md#flat_direction) and the cell's esd grows to show it, with or without a bound.
+Where a scan cannot separate a position error from the cell, the fit reports [`FLAT_DIRECTION`](diagnostics-refinement.md#flat_direction), with or without a bound. The esd does not reliably grow to show it: freeing the zero shift beside displacement walked the cell 3.6-6.6 esd on three of six flat-plate fits (WP-2017 group I), and `FLAT_DIRECTION` fired on five of the six.
 On 11-BM NAC over 2-24° 2θ with the zero shift and both capillary offsets free, 1.9.0's bounded fit put the cell 1097 ppm from its reference with an esd of 2610 ppm.
 The unbounded fit lets the offsets slide to +4.86 and +2.12 mm, puts the cell 5111 ppm away, and reports an esd of 2544 ppm.
 Both fits reported the same two `FLAT_DIRECTION` findings.

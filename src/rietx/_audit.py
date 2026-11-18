@@ -2181,11 +2181,15 @@ ROWS: tuple[Row, ...] = (
                   " data "
                   "(docs/wp/2017-batch/group_f_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
-                 "auto_background (B12's ruling); kept as a pick rather than an abstention "
-                 "near the trigger (ruled 2026-10-20) because no near-trigger choice moved a "
-                 "refined value past 0.8 esd on the seven patterns measured, and the score and "
-                 "its trigger travel beside the pick on BackgroundChoice."),
-        approved="2026-10-20"),
+                 "auto_background (B12's ruling); the pick is kept, not an abstention (Yue, "
+                 "decision 9, 2026-11-16), and its ground is the real hump: Si SRM 640c in a "
+                 "Kapton capillary scores 0.099, and against a fit with the measured "
+                 "empty-capillary background 3 deg knots land within 0.43 esd on lambda, zero and "
+                 "Biso while 8 deg knots move Biso 3.0 esd and lor_size 4.0 esd. OWED: a second "
+                 "real hump pattern whose score sits near 0.05; no pattern near the switch has "
+                 "been measured. The score and its trigger travel beside the pick on "
+                 "BackgroundChoice."),
+        approved="2026-11-17"),
     Row("rietx.background.auto._KNOT_STEP_HUMPY_DEG", "constant", tier=3, value=3.0,
         evidence=("WP-1454: 3° knots on IUCr CPD sample 2 (qarr) held Rwp and Biso flat from λ "
                   "0.1 to 100; a v0.2 choice; no failure stated; "
@@ -3864,16 +3868,20 @@ ROWS: tuple[Row, ...] = (
         evidence=("WP-1938 D8: 1000 random synthetic problems, the polish passed on all 898 that "
                   "crossed a row, worst row -7e-13; synthetic only; second pass owed (refits of "
                   "three families on either side)"),
-        grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
-                 "three families on either side give one answer (B10, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+        grounds=("Closed at tier 3 under the rare-feature clause and the 2026-11-05 ruling "
+                 "(Yue accepted, 2026-11-17): the polish is reached by Stephens strain, a named "
+                 "rare feature, and ordinary fits barely reach it, so no further family is "
+                 "owed; supersedes the 2026-10-19 wording that waited on refits of three families."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm._POLISH_STATIONARY", "constant", tier=3, value=1e-08,
         evidence=("WP-1938 D8: the same 1000 problems, worst stationarity residual 4e-10, eight "
                   "decades inside; synthetic only; second pass owed (refits of three families on "
                   "either side)"),
-        grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
-                 "three families on either side give one answer (B10, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+        grounds=("Closed at tier 3 under the rare-feature clause and the 2026-11-05 ruling "
+                 "(Yue accepted, 2026-11-17): the polish is reached by Stephens strain, a named "
+                 "rare feature, and ordinary fits barely reach it, so no further family is "
+                 "owed; supersedes the 2026-10-19 wording that waited on refits of three families."),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm._PREDICTED_FLOOR", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: rounding bound of a sum of N squares, N*eps/2 ~ 1e-12 at N ~ "
                   "9e3 (Higham 2002 §3.1; docstring: S is a sum of ~1e4 squares, resolution "
@@ -4147,9 +4155,12 @@ ROWS: tuple[Row, ...] = (
                   "13.649 %; 22.561 to 33.879 %), and FAP still gained 1.3 % at its last pass "
                   "(10.108 to 8.710 % over five), so the constant was reached on none of three "
                   "families"),
-        grounds=("Stops an opt-in alternation once a pass no longer lowers Rwp; kept at the "
-                 "measured value, one family (B11, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+        grounds=("Stops an opt-in alternation once a pass no longer lowers Rwp; kept at tier 3 "
+                 "under the 2026-11-05 ruling (Yue accepted, 2026-11-17), WP-1323's LaB6+cBN "
+                 "case being the one it was set on. The stated failing case of the neighbouring "
+                 "lebail_tol is cpd-1a: its Le Bail fit moves 0.76-0.82 esd either side, and "
+                 "Pawley is the direction (WP-2062). No new Le Bail family is owed."),
+        approved="2026-11-17"),
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
@@ -4166,15 +4177,24 @@ ROWS: tuple[Row, ...] = (
                  "solver a longer seed costs index validation, a default path, and moves nothing; "
                  "the TRF failing case goes to WP-2062, which owns Pawley's bugs."),
         approved="2026-10-19"),
-    Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
-        evidence=("WP-1028 (c): the zero-scale attractor converges at Rwp 0.99999, honest bad fits "
-                  "sit at 0.2-0.5, the failures above it at 72.25 and 2.6e3 (docstring); gates "
-                  "MODEL_FAR_FROM_DATA (error), hence RefinementResult.usable, read by "
-                  "solve/cost.py:477; family count not recorded, second pass owed"),
-        grounds=("A fit whose calculated pattern has collapsed towards zero is no answer to any "
-                 "refiner; 0.8 sits in a gap 0.3 wide below and three orders wide above (B12, "
-                 "ruled 2026-10-19)."),
-        approved="2026-10-19"),
+    Row("rietx.refine.MODEL_FAR_FROM_DATA_ALPHA", "constant", tier=3, value=0.05,
+        evidence=("WP-2017 group K, probe of 2026-11-16 (corundum, FAP, SRM 660c, NAC, "
+                  "Poisson-thinned, three seeds each): the old bar Rwp > 0.8 missed a full "
+                  "collapse on unthinned FAP (scale to zero at Rwp 0.693, reported usable) and "
+                  "flagged 15 of 96 correct fits at 0.05-0.2 counts a channel; Hamilton's "
+                  "R-factor ratio test against a background-only fit flags none of those at "
+                  "alpha = 0.05 and catches every full collapse; between alpha = 0.001 and "
+                  "0.05 at most 2 of 260 probe rows change verdict"),
+        grounds=("Hamilton (1965, Acta Cryst. 18, 502) at the conventional 0.05, the level not "
+                 "tuned. An EXCEPTION TO DESIGN Rule 4 (\"an Rwp comparison is never its "
+                 "evidence\"), ruled by Yue on 2026-11-17 and recorded here, where it acts: the "
+                 "comparison is a significance test against the nested background-only model "
+                 "(Toby 2006, Powder Diffraction 21, 67: a background-only fit \"can give "
+                 "relatively small chi2 or Rwp values\"), never a ranking of alternatives by "
+                 "Rwp. Known gap: a partial capture (scale at 0.3-16 % of the true value, Rwp "
+                 "about 0.85) reads usable, because its model does carry Bragg intensity; its "
+                 "Rwp is already printed. Replaces the 2026-10-19 approval of the Rwp > 0.8 bar."),
+        approved="2026-11-17"),
     Row("rietx.refine.MOMENT_PROBE_ANGLE_RAD", "constant", tier=3, value=0.1,
         evidence=("WP-1327, WP-1929: on Cr2WO6 4 K (HB-2A) a 1e-6 step reads 5e-7 of the modulus "
                   "response at a determined direction, the 0.1 rad turn ~1e0; both signs tried "
@@ -4257,12 +4277,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.schemas.EXCHANGEABLE_MIN_R2", "constant", value=0.9),
     Row("rietx.report.schemas.EXCHANGE_PARTNER_MIN_SIGNIFICANCE", "constant", value=5.0),
     Row("rietx.report.schemas.IMPURITY_SHIFT_CAP", "constant", value=0.3),
-    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", value=5,
-        evidence=("unaudited, for the maintainer's tier. WP-2017 group Q (2026-11-16, Linux "
+    Row("rietx.report.schemas.LEBAIL_GAP_CYCLES", "constant", tier=1, value=5,
+        evidence=("numerical setting (B10; the lead's settlement of Q27, 2026-11-17): the "
+                  "cycles of the Le Bail partition the gap read runs, 0.07 of the ratio at most "
+                  "(FAP, 5 cycles against 20); WP-2004 enters the row. WP-2017 group Q (2026-11-16, Linux "
                   "x86_64): the gap read at 2, 5 and 20 cycles from one converged Rietveld state "
                   "(n_cycles echoed back) is 0.977, 0.978, 0.978 on LaB6+cBN, 0.536, 0.549, 0.626 "
                   "on cpd-1a and 0.764, 0.980, 1.052 on FAP, so the partition sits at its fixed "
-                  "point by 5 cycles on one family of three; on FAP and cpd-1a more cycles raise "
+                  "point by 5 cycles on one family of three, not claimed for the others; on FAP and cpd-1a more cycles raise "
                   "the ratio (5 cycles under-reads FAP's by 0.07); every arm is a correct model "
                   "and none comes near LEBAIL_GAP_NOTABLE (1.5), so no arm here could change that "
                   "verdict")),
@@ -4974,8 +4996,11 @@ ROWS: tuple[Row, ...] = (
                   "case this half exists for "
                   "(docs/wp/2017-batch/group_e_summary.md)"),
         grounds=("Reports only, through BOUND_HIT, FLOOR_HIT and at_bound; with f kept on the esd "
-                 "(B4) the margins stand as measured (B16, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "(B4) the margins stand as measured (B16, ruled 2026-10-19). Domain: ftol <= "
+                 "1e-6 (Yue accepted, 2026-11-17): every default stage runs at 1e-6 or 1e-9 and "
+                 "the measured margin at the shipped tolerances is 625x; the stated failing case "
+                 "is ftol 1e-3, where three of five free-optimum controls read 18-33x over."),
+        approved="2026-11-17"),
     Row("rietx.strategy.staged.BOUND_HIT_ESD_FRAC", "constant", tier=3, value=0.01,
         evidence=("WP-1434: 32 binding cases on FAP and Si SRM 640c, ftol 1e-9 to 1e-3: largest "
                   "binding gap 7.7e-4 esd, early stop 2.36 esd (make_lab6 synthetic), margins 13x "
@@ -6861,7 +6886,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.report.schemas.EXCHANGEABLE_MIN_R2",
     "rietx.report.schemas.EXCHANGE_PARTNER_MIN_SIGNIFICANCE",
     "rietx.report.schemas.IMPURITY_SHIFT_CAP",
-    "rietx.report.schemas.LEBAIL_GAP_CYCLES",
     "rietx.report.schemas.LEBAIL_GAP_NOTABLE",
     "rietx.report.schemas.MAGNETIC_WIDTH_MIN_REFLECTIONS",
     "rietx.report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA",

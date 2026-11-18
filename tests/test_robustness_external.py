@@ -644,15 +644,47 @@ def test_a_fit_nowhere_near_the_data_is_reported_however_the_solver_exited(
     assert "2θ range" in far[0].suggestion
 
 
-def test_the_bar_sits_below_the_zero_scale_attractor_not_above_it():
-    # Rwp = 1 is exactly "no better than y_calc = 0", and driving the scale to
-    # zero is the escape a windowed-out model converges to — measured 0.99999
-    # on the reproduction above, so a threshold at 1.0 misses it by 1e-5
-    from rietx.refine import MODEL_FAR_FROM_DATA_RWP
+def test_the_test_is_the_nested_background_only_ratio_not_an_rwp_bar():
+    # WP-2017 group K (Yue, 2026-11-17): Rwp > 0.8 is gone.  The zero-scale
+    # attractor (Rwp 0.99999) and a collapse at Rwp 0.693 are both "no better
+    # than the background alone"; a correct sparse fit at Rwp 0.8+ is not.
+    import importlib
 
-    assert MODEL_FAR_FROM_DATA_RWP < 0.99999
-    # and still far above an honestly bad Rietveld fit (0.2-0.5 measured)
-    assert MODEL_FAR_FROM_DATA_RWP > 0.5
+    rf = importlib.import_module("rietx.refine")   # ``rietx.refine`` the name is the function
+    assert not hasattr(rf, "MODEL_FAR_FROM_DATA_RWP")
+    assert rf.MODEL_FAR_FROM_DATA_ALPHA == 0.05
+
+
+def test_a_collapse_below_rwp_08_is_caught_and_a_high_rwp_good_fit_is_not(tmp_path):
+    import numpy as np
+
+    from rietx.refine import _far_from_data_diagnostics
+    from rietx import Refinement
+    from rietx.strategy.staged import Stage
+
+    start, ins, pattern = _nacl_pattern(tmp_path)
+    ref = Refinement(start, ins)
+    result = ref.run_stage(pattern, Stage(name="scale", turn_on=["phases.*.scale"],
+                                          max_iter=20))
+    assert "MODEL_FAR_FROM_DATA" not in {d.code for d in result.diagnostics}
+
+    class _S:           # the fields the test reads
+        rwp = 0.693
+        n_free_parameters = 3
+
+    from types import SimpleNamespace
+    y = np.asarray(result.y_obs, dtype=float)
+    sig = np.asarray(result.sigma, dtype=float)
+    model = SimpleNamespace(y_obs=y, sigma=sig, bkg_paths=("c0",),
+                            bkg_design=np.ones((1, len(y))),
+                            bkg_penalty=None, fixed_background=None)
+    flat = np.full_like(y, np.average(y, weights=1 / sig**2))
+    # a "collapsed" calc: just the (best constant) background, Rwp well under 0.8
+    out = _far_from_data_diagnostics(model, flat, flat, _S)
+    assert [d.code for d in out] == ["MODEL_FAR_FROM_DATA"]
+    # and the real fit's own answer is not flagged
+    assert not _far_from_data_diagnostics(
+        model, y, flat, SimpleNamespace(rwp=0.9, n_free_parameters=3))
 
 
 def test_a_fit_on_the_data_reports_neither_robustness_diagnostic(tmp_path):
