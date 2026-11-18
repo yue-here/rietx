@@ -506,7 +506,8 @@ CLAIMS: tuple[Claim, ...] = (
         "held zero shift, the sample displacement and the Ka2 ratio",
         reference="NIST's cell recomputed for this dataset's 20.85 C block, "
                   "4.156780 A, under an explicitly interim +-2e-4 A band; the "
-                  "certificate's own +-8e-6 at 22.5 C is NOT claimed and the "
+                  "certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT "
+                  "claimed and the "
                   "residual is a characterised cotTheta/sin2Theta aberration "
                   "(divergence, tube tails, monochromator passband) fenced to "
                   "the v2 FPA work",
@@ -2940,8 +2941,10 @@ CLAIMS: tuple[Claim, ...] = (
         reference="the planted (deposited) coordinates; four esds over 42 "
                   "components is a 0.3 % union false-alarm rate under "
                   "Gaussian errors",
-        measured="worst |delta|/esd 0.64 over 42 components (bar 4); "
-                 "Rwp 0.0282, GoF 0.995",
+        measured="worst |delta|/esd 0.64 over 42 components at seed 1806 "
+                 "(bar 4); 0.64 to 2.27 over seeds 1806 and 1 to 7, median "
+                 "1.5, so the margin is about 1.8x; Rwp 0.0282, GoF 0.995 at "
+                 "seed 1806",
     ),
     Claim(
         "test_acceptance_acridine_ix", "test_a_regular_hexagon_template_fails_the_known_answer_bound",
@@ -3093,8 +3096,9 @@ GAPS: tuple[tuple[str, str], ...] = (
      "ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below "
      "~15 deg with real low-angle reflections."),
     ("The SRM 660c certificate band is not reached and is not claimed.",
-     "Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The "
-     "residual is a characterised cotTheta/sin2Theta aberration — equatorial "
+     "Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute "
+     "4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, "
+     "19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial "
      "divergence, tube tails, monochromator passband — which is the "
      "fundamental-parameters territory fenced to v2, not a tuning gap."),
     ("GoF does not reach 1 on lab data and should not be expected to.",

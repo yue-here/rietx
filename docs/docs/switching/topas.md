@@ -97,7 +97,10 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `min` and `max` on a `prm` | `rx.Parameter(min=..., max=...)` |
 | `for xdds { ... }`, with `existing_prm i += 1;` and `#T_val(i)` | a python loop over the files, with each file's `T` at the same row of the coordinate table |
 | `#define`, `#ifdef` and `macro` | no equivalent: write out what they expand to, or a python function that builds the repeated part |
-| a phase's parameter under one name in every `xdd`, such as its `TCHZ_Peak_Type` terms | nothing: every pattern shares a phase's parameters unless `SharingMap.per_histogram` names them |
+| `fn cell_fT(a0, grad, theta, te) = a0 + grad/(Exp(theta/te) - 1);` | no equivalent: write the body into each formula with the arguments substituted, or build the text with a python function |
+| a phase's parameter under one name in every `xdd`, such as its `Strain_L` term or a coordinate | nothing: every pattern shares a phase's parameters unless `SharingMap.per_histogram` names them |
+| `TCHZ_Peak_Type` on a phase | the phase's `gauss_strain` for the Gaussian tan²θ term U, `gauss_size` for the Gaussian 1/cos²θ term Z, `lor_strain` for the Lorentzian tanθ term X and `lor_size` for the Lorentzian 1/cosθ term Y. A phase's own V and W have no spelling, because rietx's V and W belong to the instrument. |
+| `local height` and `th2_offset = -2 57.2957795 (height) Cos(Th) / Rs;` | `instrument.geometry.sample_displacement`, in mm with the same sign, one per pattern. This is TOPAS's `Specimen_Displacement` written out, and the instrument's `goniometer_radius_mm` takes the place of `Rs`. |
 | `local` on a phase's parameter, such as each temperature's `beq` | `rx.SharingMap(per_histogram=["phases.0.atoms.0.biso"])` |
 | `local` on a scale, a `bkg` term, `th2_offset` or a specimen height | nothing: each phase scale, and every parameter under `instrument.`, is one per pattern already |
 | an instrument term under one name in every `xdd` | `rx.SharingMap(shared=["instrument.zero_shift"])` |
@@ -109,6 +112,7 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `range 3` of a multi-range RAW file | `rx.read_pattern(path, scan=2)`, since `scan` counts from 0 |
 | `Get(r_wp)`, `Out(Get(a), ...)` and `MVW(...)` | `result.histograms[h].statistics`, the rows of `result.parameters` (a per-pattern row is `hist.<h>.<path>`), and `result.histograms[h].qpa` |
 | `val_on_continue = Val*Rand(0.99, 1.01);` | no equivalent: rietx refines once from its starting values, so a python loop over starting values repeats the fit |
+| `load_save_locals` or `use_stored_values`, which start each value from the last run's | no equivalent: a joint fit starts from the values its models carry |
 
 A formula is evaluated in radians, and `pi` is the constant.
 `MultiHistogramRefinement.preview_equations` evaluates every formula at its starting values before any fit.
@@ -163,7 +167,7 @@ Four things a TOPAS input does have no rietx spelling yet:
 
 - A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
 - A restraint or a `penalty` in a joint fit, which refuses soft restraints.
-- An equation over a reflection or a point: `th2_offset` written in `Xo`, or a width, position or intensity written in `Th` or `D_spacing`. An overall B is the exception, through the formulas above.
+- An equation over a reflection or a point: `th2_offset` written in `Xo`, a phase's own TCHZ V and W, or a width, position or intensity written in `Th` or `D_spacing`. An overall B and a height written in `Cos(Th)` are the exceptions, through the rows above.
 - `fit_obj`, a term added to the calculated pattern.
 
 ### Coordinates are refined along the symmetry directions
@@ -192,6 +196,8 @@ The `lab_calibrate` and `lab_sample_refine` plans do the two halves.
 TOPAS's `CS_L` and `Strain_L` macros state a size and a strain.
 rietx reads neither from a file, and says so when it meets one.
 `gauss_size`, `lor_size`, `gauss_strain` and `lor_strain` are the terms to set by hand.
+TOPAS's `Strain_L(e)` adds a Lorentzian FWHM e·tanθ, so `lor_strain` is e.
+Its `Strain_G(e)` adds a Gaussian FWHM e·tanθ, and rietx states the Gaussian FWHM², so `gauss_strain` is e².
 
 ### The scale is not TOPAS's scale
 
@@ -257,6 +263,34 @@ TOPAS_FEATURES_NOT_IMPORTED | refined.inp: this import is partial. The file stat
 A construct the reader cannot carry without misrepresenting the file is refused by name.
 A rigid body, `occ_merge`, a stacking-fault phase and a time-of-flight dataset are refused, because the numbers read back fine and the model would be wrong.
 [Names in other programs](../reference/foreign-names.md) maps each rietx parameter to its TOPAS name and gives the unit conversions.
+
+### Porting an input that does not read
+
+A parametric input usually does not read.
+`read_project_model` raises `rietx.io.projects.topas.TopasInpError`, a `ValueError`, naming the first construct it cannot place.
+In the Durham TOPAS tutorials, both parametric inputs of the WO₃ ramp stop at their `for xdds` loop.
+The ZrP₂O₇ ramp's input stops at a site whose coordinates are written as macro calls, `B1(!xAl1,0.0000,0.0000)`.
+The error names one construct and stops there, so it does not list what else the file uses.
+
+These steps port such an input:
+
+1. Call `rx.read_project_model(path, diagnostics=[])`.
+   If it returns, the `TOPAS_FEATURES_NOT_IMPORTED` diagnostics and `model.coverage` list what the import left out.
+   The ZrMo₂O₈ ramp's input reads this way, as the first of its 68 runs, and `TOPAS_FIRST_RUN_READ` says so.
+2. If it raises, port from the input's text.
+   Expand the macros and the loops first.
+   `#list`, `#define`, `#ifdef` and `macro` act on the text, and `for xdds` repeats its body.
+   TOPAS writes the input with every macro expanded to `TOPAS.LOG` when it runs, so read that file where TOPAS is at hand.
+   By hand, each `#list` row is one pattern and one row of the `rx.CoordinateTable`.
+   A `#define` decides which `#ifdef` branch is live, and a macro call is its body with the arguments substituted.
+   `for xdds { ... }` is its body once per `xdd`.
+3. Translate each line with the table in [A parametric equation is a formula](#a-parametric-equation-is-a-formula) and with [Names in other programs](../reference/foreign-names.md).
+   A construct in the list under that table has no rietx spelling yet.
+4. Call `MultiHistogramRefinement.preview_equations` before fitting.
+   It evaluates every formula at its starting values, so compare its cells with the ones the input states.
+5. Fit, and compare a refined value the input states, such as a lattice parameter, with rietx's in ppm, with both esds beside it.
+   Two programs can differ by more than either esd.
+   Rwp is a weaker check, because the two programs' peak shapes differ ([The peak shape is the instrument plus the sample](#the-peak-shape-is-the-instrument-plus-the-sample)).
 
 ### Writing an `.inp`
 
