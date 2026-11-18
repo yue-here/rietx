@@ -1,6 +1,6 @@
 # WP-1913 — what the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd`
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner); parts 4 (refusal at construction) and 5 (`.esd` pointer) in hand, part 3 waits on the verb's name
+Milestone: unscheduled · Status: 🔄 2026-11-18 — part 4's every-site refusal and part 5 landed (PR #1675); part 4's construction half and part 3's verb name wait on the maintainer
 Track: Data and metadata in, a structure out
 Depends on: —
 Priority: P3 2026-10-05 — a workaround covers each: the by-hand ties are documented, the refusal names its fix, and `.esd` gets a field-list pointer
@@ -149,6 +149,80 @@ set it replaces, to the same numbers. `.esd` on a `RefinedParameter` names
   tiny column is live).
 
 ## Handover log
+
+- **2026-11-18** — a caller whose model asks for free coordinates on several
+  fully fixed special positions now hears about all of them in one refusal,
+  so the benchmark agent's retry loop (fix one site, rebuild, meet the next)
+  is no longer needed. `RefinedParameter(...).esd` now says "did you mean
+  'stderr'?". A rigid body's origin on a fixed site was a gap: the table
+  refused it while `fix_special_positions()` returned `[]`, and now the verb
+  clears it. Two halves wait on the maintainer: whether `rx.Refinement(...)`
+  itself refuses (below), and part 3's verb name (the 2026-11-16 brief Y2).
+  PR #1675 (ghostshift runner).
+  *Done.* Part 5: `_nearmiss.SYNONYMS` maps `esd` ↔ `stderr`, one dot- or
+  underscore-delimited word at a time, so every near-miss surface (schema
+  attributes, plan fields, paths) points both ways, `weight_fraction_esd`
+  included; a meta-test holds each word to a real schema field spelling.
+  `difflib` alone scored the pair at 0.22, under its 0.6 cutoff. Settled by
+  Claude under `schemas/common.py`'s "a pointer, not an alias" and the
+  Non-goals' fence on a rename (the 2026-11-16 walk, item 91, which the
+  reporter also picked); the alternative was leaving the field list as it was.
+  Part 4's message half: `params.vector.fixed_sites_asking_to_vary` walks the
+  structure as `_collect` routes it (an atom a body places or a mode moves is
+  its owner's; every other atom and every body origin is checked against its
+  stabiliser). `ParameterTable.__init__` refuses every site it returns before
+  the walk, in walk order, and one site keeps its sentence byte for byte.
+  `fix_special_positions()` reads the same list, so it clears exactly what the
+  table refuses, body origins included. The refusal sits in `__init__`, clear
+  of `_collect_cell`, which WP-2150 edits next. Inherited pruned: both entries
+  folded into Context (the reporter's picks; the seed ask), and the seed ask
+  became a task.
+  *Measured.* `ParameterTable` build against `Refinement` construction, min of
+  5, macOS arm64, `[dev]`, on 14 test CIFs: the table costs 1.2-6.9 ms where
+  construction costs 0.5-2.3 ms, and one magnetic file (cod_4002052) 576 ms
+  against 0.9 ms. Fast selection on this branch merged with main `8996cc5cf`, macOS arm64,
+  `[dev]`: 14777 passed, 433 skipped, 32 xfailed, 0 failed; the 5 added tests
+  cost 0.21 s together. `tests.reader_output` exit 0.
+  *Review* (`/code-review high`, run without `--fix` because its test runs
+  would bypass the shift's one-suite lock; fixes applied by hand). Taken: the
+  gathered refusal had run after the walk, so every other table refusal
+  outranked it, and the verb kept its own copy of the walk (the copy that had
+  missed body origins); both now read one walk, which refuses first. Taken: a
+  meta-test for `SYNONYMS`. Declined: walk-order return from the verb (its
+  docstring and test promise sorted paths); a cap on a long list of sites
+  (the caller needs every name, and the verb fixes them in one call).
+  Declined as another track's: `gui/session.py`'s `_edit_on` marks only the
+  first path a refusal names, so the GUI highlights one of several sites. It
+  highlighted one before as well, so nothing regressed; the GUI track owns it.
+  *Not generalised, deliberately:* the refusals of `vary=True` on an atom a
+  rigid body places or a distortion mode moves still stop at the first atom.
+  Each names a different owner and remedy, no bulk verb clears them, and the
+  benchmark report was the special-position one.
+  *Decision for the maintainer: should `rx.Refinement(...)` itself refuse a
+  free coordinate on a fully fixed special position?* Today construction
+  succeeds and the first `parameters()` or `fit()` refuses. That is what PR
+  #754 shipped, and the 2026-10-06 ruling on #754 approved it ("as this draft
+  does"). This WP's task and the reporter's 2026-10-12 pick ask for the
+  refusal at construction. The two conflict: a construction refusal leaves no
+  `Refinement` to call `fix_special_positions()` on, so the verb you asked for
+  would serve only a structure edited in place after construction. With every
+  site now named, the agent's loop is one call: `ref.fix_special_positions()`
+  before the fit. Options: (a) leave construction as it is (recommended, a
+  lean; nothing to build); (b) refuse at construction and accept that
+  `fix_special_positions()` mostly goes unused, at one extra table build per
+  construction (above); (c) refuse at construction and add a structure-level
+  fixer, a new public name. The crux is whether refusing one call earlier is
+  worth the verb's reach. (a) wins there, since the refusal already comes
+  before any fit work. Evidence that callers keep building a `Refinement` they
+  never list or fit would flip it.
+  *Not done.* Part 4's construction half (above). Part 3, which waits on its
+  name. The seed ask, which waits on PR #1372. The skill sentence, which is
+  part 3's.
+  *Next:* the maintainer's answers on the construction refusal and on part
+  3's name. Then part 3 (lift `gui/symmetry.orbit_collisions` into the core,
+  the verb over `tie`/`tie_equal`, the `constrain=` route, the measurement
+  for `OCC_PAIR_ILL_CONDITIONED`) and the skill sentence; the seed ask after
+  #1372 merges.
 
 - **2026-10-08** — a caller whose model marks a fixed special position as
   refinable can now clear every such flag in one call instead of meeting the
