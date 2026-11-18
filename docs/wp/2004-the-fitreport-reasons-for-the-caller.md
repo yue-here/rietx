@@ -66,6 +66,12 @@ open under the same track; neither tiers a gate.
 
 ### Inherited
 
+- **2026-11-17, from WP-2005 (part 2, PR #1638): two of this WP's rows hold a `refine.py`
+  code's tier.** `DATA_SUPPORT_LOW` fires on `optimize.statistics.OBS_PER_PARAMETER_MIN` and
+  `_PREFERRED`, which quote McCusker et al. (1999) § 9 verbatim and are unaudited here. WP-2005
+  proposes tier 2 for the code once those two rows are tiered (`docs/wp/2005-batch/batch.md`,
+  class C). `MAGNETIC_WIDTH_MOVED_MOMENT` fires on `report.schemas.MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA`
+  (class D, Mike's to rule).
 - **2026-11-05, from the issue triage (issue #1411, item 9): three codes hang on the 3σ cut.**
   When this WP rules `MOMENT_SUPPORT_SIGMA`, the codes `SEQUENTIAL_MOMENT_ONSET`,
   `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` and `MOMENT_UNSUPPORTED` reopen with it.

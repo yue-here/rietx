@@ -1744,7 +1744,7 @@ WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotro
 
 **Referenced to:** the planted (deposited) coordinates; four esds over 42 components is a 0.3 % union false-alarm rate under Gaussian errors
 
-**Measured:** worst |delta|/esd 0.64 over 42 components (bar 4); Rwp 0.0282, GoF 0.995
+**Measured:** worst |delta|/esd 0.64 over 42 components at seed 1806 (bar 4); 0.64 to 2.27 over seeds 1806 and 1 to 7, median 1.5, so the margin is about 1.8x; Rwp 0.0282, GoF 0.995 at seed 1806
 
 #### `test_a_regular_hexagon_template_fails_the_known_answer_bound`
 
