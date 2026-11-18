@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from rietx._display import diagnostic_lines
+from rietx._display import diagnostic_lines, short_lines
 from rietx.help import DIAGNOSTIC_HELP, DIAGNOSTIC_VIEW_OF, DIAGNOSTIC_VIEWS
 from rietx.schemas.common import Diagnostic
 
@@ -51,7 +51,7 @@ def test_every_view_a_code_names_is_in_the_vocabulary():
 
 
 def test_every_view_in_the_vocabulary_is_named_by_a_code():
-    assert set(DIAGNOSTIC_VIEWS) == set(DIAGNOSTIC_VIEW_OF.values())
+    assert set(DIAGNOSTIC_VIEWS) <= set(DIAGNOSTIC_VIEW_OF.values())
 
 
 def test_every_code_with_a_view_is_a_code_the_package_raises():
@@ -102,3 +102,13 @@ def test_the_notebook_form_names_the_view_and_the_text_form_does_not():
     assert "  see: the top panel of rietx.viz.plot_for_vlm" in notebook
     plain = Diagnostic(level="info", code="HIGH_CORRELATION", message="m")
     assert "see:" not in "\n".join(diagnostic_lines(plain, notebook=True))
+
+
+def test_a_row_printed_short_names_the_view_in_the_notebook_form():
+    """A warning prints short when no deliverable is given, so the short form
+    carries ``see:`` too, or two of the three codes would never show it."""
+    d = Diagnostic(level="warning", code="LOW_ANGLE_UNMODELLED", message="m")
+    short = "LOW_ANGLE_UNMODELLED: warning under every purpose"
+    assert short_lines(d, short) == [short]
+    notebook = "\n".join(short_lines(d, short, notebook=True))
+    assert "  see: the Δ/σ panel of rietx.viz.plot_for_vlm" in notebook

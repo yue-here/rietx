@@ -2,9 +2,10 @@
 
 Text is the authority, because an agent reads stdout and a person reads a
 notebook cell, and the two must not disagree.  The notebook form is the text
-form in one ``<pre>`` (WP-2039), with two additions: a result's refined
-parameters as a table, and each diagnostic's explanation as ``means:`` under
-its ``help:`` line (:func:`diagnostic_lines`).  It is one block because
+form in one ``<pre>`` (WP-2039), with three additions: a result's refined
+parameters as a table, each diagnostic's explanation as ``means:`` under its
+``help:`` line (:func:`diagnostic_lines`), and the view that shows the finding
+as ``see:`` where its code has one (WP-1133).  It is one block because
 GitHub's sanitiser strips ``<details>``, and GitHub and JupyterLab both draw a
 bare ``<table>`` in the body font with its cells right-aligned.  An object
 whose notebook form would add nothing has no ``_repr_html_``, so a notebook
@@ -503,15 +504,22 @@ def diagnostic_lines(d, indent: str = "", *, on: str | None = None,
         # ``help:`` is the last thing ``str(d)`` prints, so the end is after it
         # even when a suggestion runs over several lines
         rest.append(f"  means: {d.explanation}")
-    if d.view is not None:
-        from .help import DIAGNOSTIC_VIEWS
-        rest.append(f"  see: {DIAGNOSTIC_VIEWS[d.view]}")
+    rest += _view_lines(d)
     width = NOTEBOOK_WIDTH - len(indent)
     lines = _wrapped(head, f"{d.level}[{d.code}]: ", width)
     for line in rest:
         label = next((p for p in _PROSE_LABELS if line.startswith(p)), None)
         lines += [line] if label is None else _wrapped(line, label, width)
     return [indent + line for line in lines]
+
+
+def _view_lines(d) -> list[str]:
+    """The ``see:`` line naming the view that shows ``d``'s finding, or none
+    where its code has no view (WP-1133).  Unwrapped: each caller wraps it."""
+    if d.view is None:
+        return []
+    from .help import DIAGNOSTIC_VIEWS
+    return [f"  see: {DIAGNOSTIC_VIEWS[d.view]}"]
 
 
 def _wrapped(line: str, label: str, width: int) -> list[str]:
@@ -528,8 +536,9 @@ def short_lines(d, short: str, indent: str = "", *, notebook: bool = False) -> l
     """A diagnostic a view prints on one line (WP-2037), ``short`` being that
     line.  The notebook form wraps it at :data:`NOTEBOOK_WIDTH` and puts the
     code's explanation under it as ``means:``, so a row printed short in a
-    notebook still says what it means (WP-2039's decision 1).  The text form
-    is the line alone, which is what keeps ``print`` quiet."""
+    notebook still says what it means (WP-2039's decision 1), then ``see:``
+    where the code has a view (WP-1133), since a warning prints short unless a
+    deliverable is given.  The text form is the line alone, which is what keeps ``print`` quiet."""
     if not notebook:
         return [indent + short]
     import textwrap
@@ -538,6 +547,8 @@ def short_lines(d, short: str, indent: str = "", *, notebook: bool = False) -> l
                           break_on_hyphens=False) or [short]
     if d.explanation:
         lines += _wrapped(f"  means: {d.explanation}", "  means: ", width)
+    for line in _view_lines(d):
+        lines += _wrapped(line, "  see: ", width)
     return [indent + line for line in lines]
 
 
