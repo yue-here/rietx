@@ -29,7 +29,8 @@ applied against the whole plan. Two properties make it safe to rely on:
   produce a rung.
 - **It costs ≈2.5–2.8× the fit's wall clock** (1.06 s → 2.70 s on 59.5k
   channels of real 11-BM data; 0.30 s → 0.82 s on the 4200-channel synthetic
-  LaB₆ fixture, re-measured 2026-08-19) and single-digit kB of payload: on
+  LaB₆ fixture, re-measured 2026-08-19, before WP-1335's cut: the series reference has the
+  later 4.7–5.7× on the NAC fixture over seven rungs) and single-digit kB of payload: on
   that LaB₆ fixture, 0.6–0.8 kB a rung, 3.5 kB for the whole five-rung
   trajectory, ~3 % of the 111 kB report it ships beside. Quote that share
   with its fixture — the report's size is dominated by its geometry table
