@@ -146,3 +146,7 @@ Filled in by the session that builds each PR.
    difference curve. Keep it, or ask for a lighter one?
 
 ## Handover log
+
+- **2026-11-17** — filed by the session that opened R3, after the maintainer's "go" on
+  2026-11-17. R3 splits into four PRs by screen, each a whole screen for review; the first
+  builds the Interactive tab and the preview on the Pattern graph.
