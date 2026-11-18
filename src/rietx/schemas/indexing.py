@@ -238,7 +238,7 @@ from .structure import Cell
 #: search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
 #: that found agreement, a declared ``n_unindexed`` and a position-only list
 #: rank exactly as before.
-#: Also 1.12 (WP-2120): ``PeakFlag`` gains ``tail_shoulder`` and
+#: 1.13 (WP-2120): ``PeakFlag`` gains ``tail_shoulder`` and
 #: ``PEAK_UNUSABLE_FLAGS`` gains it too.  It is a component carrying both
 #: ``axial_tail`` and ``position_at_bound``: a weak shoulder on a much stronger
 #: group-mate's axial-tail side, which the fit pushed to its position bound.  On
@@ -249,7 +249,7 @@ from .structure import Cell
 #: false-discovery screen, which reads usable components only.  A component that
 #: was a ``duplicate_line`` copy can now be ``tail_shoulder`` instead, unusable
 #: either way.  Neither flag alone moves, and no threshold here moved.
-INDEXING_THRESHOLDS_VERSION = "1.12"
+INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.

@@ -304,7 +304,7 @@ WP records why such a component stays usable.
   *Done:* tasks 1-5 (`8ccdda1cf`, `7524ce19e`, `6d906c4f4`, `aaa61b53e`, `c10c1ac97`). The flag
   is raised in `_flags_for` only on fits `fit_group` judged (`width_at_bound` not `None`), so
   `fit_peaks` and the peak editor never raise it on named positions, like `width_capped`. It
-  is in `PEAK_UNUSABLE_FLAGS`, and `INDEXING_THRESHOLDS_VERSION` stays at 1.12, with a history line (one bump per release cycle). Also updated: the help
+  is in `PEAK_UNUSABLE_FLAGS`, and `INDEXING_THRESHOLDS_VERSION` is 1.13, the cycle after the 1.12.0 release, with a history line (one bump per release cycle). Also updated: the help
   entries, the `PEAK_AXIAL_TAIL` message (it counts the excluded ones), the manual's flag table,
   the skill row, the GUI vocabulary and dist, a release note, and `tests/test_peak_tail_shoulder.py`
   (4 rows, one `slow`).
