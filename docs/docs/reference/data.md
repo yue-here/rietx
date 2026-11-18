@@ -230,7 +230,7 @@ assert len(plan.run_stages()) == 4
 assert plan.stage_lorentz_window_tols() == [1e-2, 1e-2, None, None]
 ```
 
-`RefinementPlan.stage_lorentz_window_tols` is parallel to `RefinementPlan.run_stages` and applies the rule `RefinementPlan.stage_ftols` applies ([Stage tolerances](refinement.md#stage-tolerances)).
+`RefinementPlan.stage_lorentz_window_tols` is parallel to `RefinementPlan.run_stages` and applies the rule `RefinementPlan.stage_ftols` applies ([Stage tolerances](stage-tolerances.md)).
 `Stage.lorentz_window_tol` overrides the schedule for one stage.
 The last declared stage and the closing stage take `None`, the one 1e-4 rule for every component, because they produce the answer.
 The closing stage never takes a coarse value from the stage before it.
