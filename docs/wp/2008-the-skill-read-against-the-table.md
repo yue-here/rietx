@@ -162,13 +162,19 @@ and goes through the harness.
   against the tree at bc77a934e with the issue's own harness, synthetic arm
   only: La Biso 0.4749(163) held against 0.3789(158) co-refined,
   `worst_absorption` 0.0111; the real patterns were not re-run, and a larger
-  `w` was not tried against Biso. The issue leaves three changes to the maintainer: the rule's evidence
-  names a structural check (Biso against truth) beside background/truth, and
-  says meanwhile that the held SNIP biases Biso up at 3 FWHM; the abstention
-  row stops naming the held SNIP as the fallback until then; optionally, one
+  `w` was not tried against Biso. The issue proposed three changes: the rule's
+  evidence names a structural check (Biso against truth) beside
+  background/truth, and says meanwhile that the held SNIP biases Biso up at 3
+  FWHM; the abstention row stops naming the held SNIP as the fallback; one
   docstring sentence that `worst_absorption` does not see a held curve.
-  WP-2017's row Q (the held SNIP not re-measured on PbSO₄ and #726) is the
-  measurement twin. Until a ruling or this sweep moves it, the rule stays.
+  **Ruled by Yue, 2026-11-16 (decisions walk, decision 1):** withdraw the
+  "under a broad hump, hold SNIP" recipe everywhere now (`judging.md:75`,
+  `SKILL.md:87`, the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row of
+  `abstention.md`); the recipe becomes a co-refined background; add the
+  docstring sentence that the absorption screen cannot see a held curve. The
+  three changes are therefore ruled; PR #1630 (merged 2026-11-17) carries
+  them out. WP-2017's row Q (the held SNIP not re-measured on PbSO₄ and #726)
+  stays the measurement twin.
 
 ## Non-goals
 
