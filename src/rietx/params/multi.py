@@ -615,7 +615,9 @@ class MultiParameterTable:
 
         A matched path that is tied, locked or held follows something else or
         nothing that any stage moves, so no equation can drive it: it is
-        skipped and recorded in :attr:`glob_expansions`.  A path refused for
+        skipped.  Only a skip the caller could not foresee (the floating
+        origin's hold) is recorded in :attr:`glob_expansions`; a symmetry tie
+        or lock is silent.  A path refused for
         any other reason (a rigid body's increment, a moment DOF) is one the
         caller may have meant to drive, so the glob is refused, as a bare
         target on it would be.
@@ -646,20 +648,16 @@ class MultiParameterTable:
                     f"matches {path}, which {why}. Narrow the glob to leave it out")
 
             members, record = expand_glob(equation, list(owner), skip_reason)
-            driven = {m.target for m in members}
-            for k, (path, why) in enumerate(record.skipped):
-                e = owner[path][1]
-                if e.tie is not None:
-                    sources = [src for src, _ in e.tie.terms]
-                    record.skipped[k] = (path, (
-                        f"is tied to {', '.join(sources)}, which this glob drives"
-                        if set(sources) <= driven else
-                        f"is tied to {', '.join(sources)}; declare an equation on "
-                        f"{', '.join(sources)} to drive it"))
-                elif e.locked:
-                    record.skipped[k] = (path, "is locked by symmetry or by the model")
-                elif e.held:
-                    record.skipped[k] = (path, "is held (Phase.floating_origin fixes it)")
+            # Only a skip the caller could not foresee is kept on the record
+            # (the maintainer's ruling on #1619, 2026-11-17): a symmetry tie or
+            # lock is not news to whoever wrote the glob, and a cubic
+            # ``phases.0.cell.*`` would say the same five lines on every fit.
+            # The joint table has no tie or hold verb and its mode is not known
+            # here, so the one skip left is the floating origin's hold, which
+            # the package puts on a path the caller did not name.
+            record.skipped = [
+                (path, "is held (Phase.floating_origin fixes it)")
+                for path, _ in record.skipped if owner[path][1].held]
             out.extend(members)
             self.glob_expansions.append(record)
         return out

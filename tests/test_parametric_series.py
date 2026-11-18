@@ -447,16 +447,10 @@ def test_a_glob_target_expands_per_path_and_reports_what_it_skips():
                 f"vars.{name}_0", f"vars.{name}_1"]
     (record, plain) = mt.glob_expansions
     assert record.members == ["cell_a"] and plain.skipped == []
-    assert [p for p, _ in record.skipped] == [f"phases.0.cell.{k}" for k in
-                                              ("b", "c", "alpha", "beta", "gamma")]
-    assert "is tied" in record.skipped[0][1] and "locked" in record.skipped[2][1]
-    (finding,) = _parametric_glob_diagnostics(mt)
-    assert finding.code == "PARAMETRIC_GLOB_SKIPPED" and finding.level == "info"
-    assert finding.value == 5.0 and finding.where == [p for p, _ in record.skipped]
-    assert "'cell' on phases.0.cell.* drives 1 path (cell_a)" in finding.message
-    assert ("phases.0.cell.b, phases.0.cell.c are tied to phases.0.cell.a, which this "
-            "glob drives; phases.0.cell.alpha, phases.0.cell.beta, phases.0.cell.gamma "
-            "are locked") in finding.message
+    # the five symmetry skips (two ties, three locked angles) are no news to
+    # whoever wrote a cell glob, so none is recorded or reported (#1619 review)
+    assert record.skipped == []
+    assert _parametric_glob_diagnostics(mt) == []
     # the resolved declarations are bare, and refit to the same wiring
     assert [e.target for e in mt.declared] == [r.target for r in mt.parametric]
     again = MultiParameterTable(s, _lab6_instruments(3), coordinates=coords,
@@ -464,6 +458,27 @@ def test_a_glob_target_expands_per_path_and_reports_what_it_skips():
     assert again.glob_expansions == []
     assert [(r.name, r.target, r.equation.reference) for r in again.parametric] == [
         (r.name, r.target, r.equation.reference) for r in mt.parametric]
+
+
+def test_a_glob_reports_the_origin_hold_it_skips_and_nothing_the_symmetry_fixes():
+    """The one skip the caller could not foresee is the floating origin's hold,
+    which the package puts on a path the glob did not name: reported.  What the
+    space group ties or locks stays silent (the maintainer's ruling on #1619)."""
+    from tests.test_floating_origin import _zno
+
+    phase = _zno()
+    phase.floating_origin = "hold"
+    s = rx.Structure(phases=[phase])
+    glob = _equation(name="d", target="phases.0.atoms.*.dof.*", basis="constant",
+                     terms=None)
+    mt = MultiParameterTable(s, [rx.Instrument.bragg_brentano(radiation="CuKa")] * 2,
+                             parametric=[glob])
+    (record,) = mt.glob_expansions
+    assert record.skipped and all("floating_origin" in why for _, why in record.skipped)
+    (finding,) = _parametric_glob_diagnostics(mt)
+    assert finding.code == "PARAMETRIC_GLOB_SKIPPED"
+    assert finding.where == [p for p, _ in record.skipped]
+    assert finding.value == float(len(record.skipped))
 
 
 @pytest.mark.parametrize("equation, fragment", [

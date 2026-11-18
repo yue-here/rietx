@@ -3581,14 +3581,15 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
 
 def _parametric_glob_diagnostics(mtable) -> list[Diagnostic]:
     """``PARAMETRIC_GLOB_SKIPPED`` — a glob target's matched paths that no
-    equation can drive (WP-1965).
+    equation can drive and the caller could not foresee (WP-1965).
 
     A glob target expands at resolution into one declaration per matched path
     (``params.parametric.expand_glob``), skipping each path a bare target on it
-    would be refused for: tied, locked or held.  The skip is the package's own
-    act on the caller's glob, so it is said out loud, never silent (root
-    CLAUDE.md § A hold).  One info per declaration with any skipped path;
-    ``where`` names each, ``value`` counts them.
+    would be refused for: tied, locked or held.  Only the skip the caller could
+    not foresee stays on the record, the floating origin's hold; a symmetry tie
+    or lock is silent (the maintainer's ruling on #1619, 2026-11-17), so a cubic
+    ``phases.0.cell.*`` does not print one line on every fit.  One info per
+    declaration with any such path; ``where`` names each, ``value`` counts them.
     """
     out: list[Diagnostic] = []
     for record in mtable.glob_expansions:

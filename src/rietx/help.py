@@ -3634,12 +3634,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Equation glob skipped paths",
         description=(
             "A parametric equation whose target is a glob was expanded into one "
-            "equation per matched path, each with its own coefficients. Some paths "
-            "the glob matched cannot carry an equation, because they are tied to "
-            "another parameter, locked by symmetry or held, so they were skipped. A "
-            "tied path follows its source, and the message says whether the glob "
-            "drives that source. Nothing needs doing unless a skipped path was meant "
-            "to be driven: then declare the equation on the path it is tied to."
+            "equation per matched path, each with its own coefficients. A path the "
+            "glob matched was held for the floating origin, which no stage frees, so "
+            "it was skipped and left out of the equation. Paths the space group "
+            "ties or locks are skipped without a message, since the symmetry that "
+            "fixes them is no news to whoever wrote the glob. Nothing needs doing "
+            "unless the skipped path was meant to be driven: then declare it on its "
+            "own."
         ),
     ),
     "PARAMETRIC_OUT_OF_RANGE": HelpEntry(

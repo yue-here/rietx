@@ -1138,8 +1138,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic of the tie map: a path the table ties to another, locks or holds "
                   "has no column of its own, so a second tie onto it cannot be wired and a bare "
                   "target on it is refused (params.multi._target_refusal); fires exactly when a "
-                  "glob target matched such a path, naming each with why and, for a tied one, "
-                  "whether the glob drives its source; any other refusal of a matched path (a "
+                  "glob target matched a path held for the floating origin, the one skip the "
+                  "caller could not foresee, naming each with why; a path the space group ties "
+                  "or locks is skipped silently, since a cubic cell glob would print the same "
+                  "line on every fit (maintainer's ruling on #1619, 2026-11-17); any other refusal of a matched path (a "
                   "rigid body's increment, a moment DOF) refuses the glob instead, since the "
                   "caller may have meant to drive it "
                   "(test_a_glob_target_expands_per_path_and_reports_what_it_skips)"),
@@ -1147,8 +1149,8 @@ ROWS: tuple[Row, ...] = (
                  "would give b, tied to a, or a locked angle a second function; the dissenting "
                  "case, a glob matching nothing drivable, is refused, never expanded to nothing."),
         response="info",
-        responds=("note which matched paths were skipped and why; declare the equation on a "
-                  "tied path's source if that path was meant to be driven")),
+        responds=("note which matched path was held for the floating origin; drive it on its own "
+                  "if it was meant to be driven")),
     Row("PARAMETRIC_TARGET_UNSEEN", "code"),
     Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
         evidence=("info; fires when a stage frees a Phase.parent_cell phase's cell edges while a "
