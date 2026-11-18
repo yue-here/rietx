@@ -431,7 +431,8 @@ All ten sets of a published indexing benchmark {cite}`bergmann2004` arrive as ba
 
 Whether a list can be searched and whether its candidates can be scored are separate questions.
 Below 20 usable lines the classical figures are not computed: de Wolff's M₂₀ is defined on twenty lines {eq}`idx-m20`, and $F_N$ is scored at twenty as this package's own choice, since Smith and Snyder define it for any N and recommend thirty {eq}`idx-fn`.
-The search still runs, over the supported systems only, and ranks on the reduced panel.
+The search still runs, over the requested systems the list supports, and ranks on the reduced panel.
+Where none of the requested systems is supported, it runs over the request as given.
 `DataQualityReport.fom_undefined` names each missing figure with its reason, [`INDEX_PANEL_REDUCED`](diagnostics-indexing.md#index_panel_reduced) says so, and the candidates' confidence is capped below `high` ([The confidence gate](indexing.md#the-confidence-gate)).
 
 `DataQualityReport.volume_envelope` is Smith's (1977) estimate of the cell volume from the d-spacing of the N-th line {eq}`idx-volume`, with N the smaller of `envelope_n` and the usable count.

@@ -188,7 +188,7 @@ A_SRM676A, C_SRM676A = 4.759355, 12.99231     # k = 2, 22.5 °C (certificate)
 #: NIST SRM 660c LaB6, the *absolute* lab anchor: the cell the certification CIF
 #: recomputes for this data block's own temperature (20.85 °C), which is the
 #: value ``test_acceptance_srm660c`` refines against.  The certificate's
-#: 4.156826(8) Å applies at 22.5 °C and is not the number to compare with here.
+#: 4.15683(8) Å (k = 2) applies at 22.5 °C and is not the number to compare with here.
 A_SRM660C = 4.156780
 #: The specimen displacement NIST's own analysis of this pattern recorded, and
 #: the goniometer radius of the divergent-beam diffractometer it was measured on.
