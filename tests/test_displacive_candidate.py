@@ -266,6 +266,45 @@ def test_a_refused_or_unverified_candidate_is_refused_by_name():
         D.displacive_statement(other, candidate=cand)
 
 
+def test_a_parent_whose_cell_moved_since_the_candidate_was_built_is_refused():
+    """Yue's review of #1533, item 1: the old cell was taken silently.
+
+    NaTaO₃'s cubic parent with its edge scaled by 1.01 passes the atoms check
+    (the same sites, species and fractional positions) but is not the parent
+    the candidate was built on; the statement used to return the old parent's
+    edge.  Positive arm: the unmoved parent states, and a shift of the order of
+    round-off (1e-9) is not a move.
+    """
+    parent, cand, _, _ = _natao3_route()
+    D.displacive_statement(parent, candidate=cand)
+    nudged = natao3_parent(parent.cell.a.value * (1.0 + 1e-9))
+    D.displacive_statement(nudged, candidate=cand)
+    moved = natao3_parent(parent.cell.a.value * 1.01)
+    with pytest.raises(ValueError, match=r"another parent cell.*rerun distortion_candidates"):
+        D.displacive_statement(moved, candidate=cand)
+
+
+def test_a_tied_edge_written_a_hair_off_its_source_still_states():
+    """Yue's review of #1533, item 2: a call that worked in 1.11.0 must not start to refuse.
+
+    The P4/mbm child's ``b`` tied to ``a`` is discarded by the parameter table,
+    so a ``b`` a·(1 + 1e-5) away states as the exact tie does: the same derived
+    cell and the same strain.  Positive arm: a real difference between the
+    edges (a different cell, 1e-2) is the tie's to impose too, since the table
+    reads ``a`` for both; a ``gamma`` the group fixes at 90° is imposed alike.
+    """
+    cell = natao3_child().cell
+    exact = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T).phase
+    for rel in (1e-9, 1e-7, 1e-5, 1e-2):
+        skewed = natao3_child(cell=cell.model_copy(update={
+            "b": cell.b.model_copy(update={"value": cell.a.value * (1.0 + rel)}),
+            "gamma": cell.gamma.model_copy(update={"value": 90.0 + 10.0 * rel})}))
+        got = D.displacive_statement(natao3_parent(), skewed, NATAO3_T).phase
+        assert got.parent_cell == exact.parent_cell, rel
+        assert [got.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")] == \
+            [exact.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")], rel
+
+
 # --------------------------------------------------------------------------
 # B2: the derived cell on every statement
 # --------------------------------------------------------------------------
@@ -295,8 +334,20 @@ def test_a_stated_child_keeps_its_own_cell_as_the_parents_plus_held_strain():
     skewed = natao3_child(0.0).model_copy(update={"cell": rx.Cell(
         a=P_(value=5.5503), b=P_(value=5.56), c=P_(value=3.9335), alpha=P_(value=90.0),
         beta=P_(value=90.0), gamma=P_(value=90.0))})
+    # the group's own ties are imposed on a child stated by symbol (the table
+    # discards the stored b), so this states as the exact tie does
+    # (Yue's review of #1533, item 2) ...
+    exact = D.displacive_statement(natao3_parent(), natao3_child(0.0), NATAO3_T).phase
+    got = D.displacive_statement(natao3_parent(), skewed, NATAO3_T).phase
+    assert got.parent_cell == exact.parent_cell
+    # ... but a child stated by an operator list has no symbol to tie from, so
+    # a cell its operations forbid is still refused
+    import gemmi
+
+    ops = [op.triplet() for op in gemmi.SpaceGroup("P 4/m b m").operations()]
+    listed = skewed.model_copy(update={"symmetry_operations": ops})
     with pytest.raises(ValueError, match="does not have the symmetry its group states"):
-        D.displacive_statement(natao3_parent(), skewed, NATAO3_T)
+        D.displacive_statement(natao3_parent(), listed, NATAO3_T)
 
 
 def test_a_parent_stated_by_its_operations_leaves_the_child_its_own_cell():
@@ -587,7 +638,8 @@ def test_every_stated_candidate_passes_row_d_on_three_sweep_rows():
 def test_every_stated_candidate_passes_row_d_over_the_sweep():
     """All fifteen settings × two sites, and the cubic perovskite at Γ, X, M and R.
 
-    Measured 2026-11-02 (about 50 s): 270 candidates, 41 refused by the
+    Measured 2026-11-02 and 2026-11-17 (50-70 s on macOS arm64; whether another
+    session ran beside it was not recorded): 270 candidates, 41 refused by the
     probe, 229 statements, 2421 modes; no statement failed its row-D check.
     """
     rows = list(_sweep_rows()) + [(perovskite(3.9), k) for k in (

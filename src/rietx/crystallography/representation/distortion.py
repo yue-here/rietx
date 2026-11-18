@@ -1190,6 +1190,29 @@ def _generic_seed(n: int) -> list[np.ndarray]:
     return out
 
 
+def _tied_cell(phase):
+    """``phase``'s cell with its group's own ties and fixed angles imposed (WP-1419).
+
+    The parameter table discards a tied edge's stored value and a fixed
+    angle's, so a stated cell is read the way the table reads it: ``b`` of a
+    tetragonal group is ``a`` whatever ``b`` was written as.  A phase stated by
+    an operator list has no symbol to take the constraints from and keeps its
+    cell as written.  Returns an object whose ``a`` … ``gamma`` are floats.
+    """
+    from types import SimpleNamespace
+
+    from ..symmetry import cell_constraints
+
+    names = ("a", "b", "c", "alpha", "beta", "gamma")
+    values = {n: _value(getattr(phase.cell, n)) for n in names}
+    if phase.symmetry_operations is None:
+        cons = cell_constraints(_group(phase))
+        for name, src in cons.ties.items():
+            values[name] = values[src]
+        values.update({n: float(v) for n, v in cons.fixed_angles.items()})
+    return SimpleNamespace(**values)
+
+
 def _from_candidate(parent, candidate, reference: str):
     """A ``DistortionCandidate``'s child, (P, p), basis and driving component, checked.
 
@@ -1199,7 +1222,10 @@ def _from_candidate(parent, candidate, reference: str):
     child, and one whose isotropy group failed verification is not a child of
     its direction; both are refused, naming why.  The basis is the
     candidate's own, built in the ``"average"`` reference, and it must have
-    been built from this parent.
+    been built from this parent: the same atoms and the same cell (the
+    parent's metric carried through P is the candidate child's, to
+    ``_RANK_TOL``, relative), so a parent whose cell has moved since
+    ``distortion_candidates`` ran is refused rather than stated on the old one.
     """
     name = getattr(candidate, "label", repr(candidate))
     refusal = getattr(candidate, "refusal", None)
@@ -1225,6 +1251,15 @@ def _from_candidate(parent, candidate, reference: str):
         raise ValueError(
             f"candidate {name}'s basis was not built from this parent ({parent.name!r}): "
             "its atoms are not this parent's images in the child cell")
+    carried = big.T @ _cell_metric(_tied_cell(parent)) @ big
+    stated = _cell_metric(candidate.child.cell)
+    drift = float(np.max(np.abs(carried - stated))) / float(np.max(np.abs(stated)))
+    if drift > _RANK_TOL:
+        raise ValueError(
+            f"candidate {name} was built on another parent cell than {parent.name!r}'s: "
+            f"the parent's metric carried through the candidate's transform differs from "
+            f"the candidate child's by {drift:.3g} (relative), so the child's cell is not "
+            "this parent's; rerun distortion_candidates on this parent")
     driving = candidate.driving
     index = next(i for i, c in enumerate(basis.components) if c is driving)
     return candidate.child, (big, small), basis, ref, index
@@ -1242,11 +1277,18 @@ def _parent_cell_of(parent, child, big, small):
     (a candidate's child, a ``magnetic_supercell`` child) has every strain at
     exactly zero; a strained child keeps its own cell, now as strains.  The
     child cell returned is the derived one, which the parameter table then
-    reproduces to the bit.  ``None`` for a parent stated by an operator list,
+    reproduces to the bit.  The child's cell is read with its own group's ties
+    and fixed angles imposed, as the parameter table reads it, so a tied edge
+    written a hair off its source states as it did before this derivation
+    (the table discards the stored value).  Campbell, Stokes, Tanner & Hatch
+    (2006), *J. Appl. Cryst.* 39, 607, for the Γ strain as the part of a
+    child's metric the parent's group does not fix.  ``None`` for a parent stated by an operator list,
     which ``ParentCell`` cannot name: that child keeps its own cell.
     """
     if parent.symmetry_operations is not None:
         return None, None
+    from types import SimpleNamespace
+
     from ...schemas.common import Parameter
     from ...schemas.structure import Cell, ParentCell
     from .. import metric
@@ -1256,8 +1298,11 @@ def _parent_cell_of(parent, child, big, small):
     names = ("a", "b", "c", "alpha", "beta", "gamma")
     parent_sg = get_spacegroup(parent.space_group)
     cons = cell_constraints(parent_sg)
+    # the child's cell as its table reads it: its own group's ties and fixed
+    # angles imposed (a tied edge's stored value is discarded there too)
+    tied = _tied_cell(child)
     values = dict(zip(names, metric.cell_from_metric(
-        _parent_metric(parent, child, big, "average")), strict=True))
+        _parent_metric(parent, SimpleNamespace(cell=tied), big, "average")), strict=True))
     for name, src in cons.ties.items():
         values[name] = values[src]
     values.update({n: float(v) for n, v in cons.fixed_angles.items()})
@@ -1269,7 +1314,7 @@ def _parent_cell_of(parent, child, big, small):
     inv = np.linalg.inv(big)
     g_parent = np.asarray(direct_metric_tensor(*(values[n] for n in names)), dtype=np.float64)
     lengths = np.sqrt(np.diag(g_parent))
-    strain = (inv.T @ _cell_metric(child.cell) @ inv - g_parent) / (2.0 * np.outer(lengths, lengths))
+    strain = (inv.T @ _cell_metric(tied) @ inv - g_parent) / (2.0 * np.outer(lengths, lengths))
     frame = np.linalg.inv(metric._normalised_frame(cons.fixed_angles))
     amps = np.array([metric._inner(frame, strain, e) for e in basis])
     left = strain - (np.tensordot(amps, basis, axes=1) if len(basis) else 0.0)
@@ -1359,7 +1404,7 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
     holds every strain at exactly zero and a strained stated child keeps its
     own cell, now as held strains; ``phases.*.cell.*`` frees the parent's
     edges, and a strain is freed only by naming it
-    (``phases.*.parent_cell.strain.*``).  At a parent sitting exactly at its
+    (``phases.*.parent_cell.strain.*``).  At a child sitting exactly at its
     parent (every amplitude outside the identity irrep zero, every strain
     zero) a strain has an exactly zero gradient too, since its subspace is the
     kernel of the parent's average; the seeded amplitudes lift that, and the
