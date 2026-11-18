@@ -1246,3 +1246,17 @@ class Diagnostic(Base):
 
         entry = explain(self.code)
         return None if entry is None else entry.description
+
+    @property
+    def view(self) -> str | None:
+        """The rendered view that shows this finding, from
+        :data:`rietx.help.DIAGNOSTIC_VIEW_OF` (WP-1133).
+
+        A name in :data:`rietx.help.DIAGNOSTIC_VIEWS`, such as
+        ``"plot_for_vlm.residual"``.  ``None`` where no view has been checked
+        for the code, which is most codes.  The pointer is a name and never an image, so the caller
+        decides whether to draw it.
+        """
+        from ..help import DIAGNOSTIC_VIEW_OF
+
+        return DIAGNOSTIC_VIEW_OF.get(self.code)

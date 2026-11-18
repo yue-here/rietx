@@ -570,7 +570,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 |---|---|---|---|---|
 | [1131](1131-sample-broadening-is-a-specimen-property.md) | Sample broadening is a specimen property, not an angular coefficient | ✅ 2026-09-02 | — | — |
 | [1132](1132-neutron-specimen-absorption.md) | A neutron µR, from the table this package already ships | ✅ 2026-11-08 | — | — |
-| [1133](1133-diagnostic-names-its-view.md) | A diagnostic names the view that shows it | ⬜ | P3 | — |
+| [1133](1133-diagnostic-names-its-view.md) | A diagnostic names the view that shows it | ✅ 2026-11-18 | — | — |
 | [1312](1312-neutron-followthrough.md) | CW neutron follow-through: the seed, the resonant flag, the joint fit | ✅ 2026-10-02 | — | — |
 | [1927](1927-tof-t1-the-axis-and-its-readers.md) | TOF T-1: the time-of-flight axis and its readers | ✅ 2026-10-23 | — | — |
 | [2032](2032-the-tof-readers-t1-follow-ups.md) | The TOF readers' T-1 follow-ups: a time map read as data, and names with no writer | ✅ 2026-10-23 | — | — ([1927](1927-tof-t1-the-axis-and-its-readers.md) soft) |
