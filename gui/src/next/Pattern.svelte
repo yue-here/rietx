@@ -169,7 +169,6 @@
   /** What the chart and the readout leave out: `hidden`, plus the excluded
    *  points while the observed ones are hidden. */
   const drawn = $derived(hidden.includes("obs") ? [...hidden, "masked"] : hidden);
-  const dataOnly = $derived(isDataOnly(toggles, hidden));
   const stats = $derived(result?.statistics ?? null);
   const immature = $derived(Boolean(result?.maturity?.immature));
 
@@ -180,6 +179,9 @@
 
   /** Whether the graph draws a preview: values nobody has applied (WP-2128). */
   const previewing = $derived(!!preview && !!held && !loadError);
+  /** Data only also hides the preview, which has no toggle in `toggles`. */
+  const dataOnly = $derived(isDataOnly(toggles, hidden)
+    && (!previewing || hidden.includes("preview")));
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   /** The whole title line as its tooltip, since the title is what gives way
    *  (B1); a refused preview's reason is said there, in the route's words. */
@@ -208,6 +210,9 @@
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
+      // no curves: the sliders' ranges and phase names must not stay the
+      // previous pattern's
+      oncurves(null);
       empty = exc instanceof ApiError && exc.empty;
       loadError = empty ? "" : (exc as Error).message;
       return;
@@ -395,7 +400,8 @@
       beforeDataOnly = null;
     } else {
       beforeDataOnly = hidden;
-      hidden = dataOnlyHidden(toggles);
+      // the preview has no toggle of its own but is no data either
+      hidden = [...dataOnlyHidden(toggles), "preview"];
     }
   }
 

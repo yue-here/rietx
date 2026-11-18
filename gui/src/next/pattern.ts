@@ -128,7 +128,8 @@ export class PatternChart {
       // wears the peak layer's ink (WP-1210), as its row in the strip does
       // while a preview is drawn over a fit the model's own series keeps its
       // place in the y range and paints nothing: the layer draws the last fit
-      // dashed and the preview solid, so the scale stays the last fit's
+      // in `--plot-last` and the preview in the calculated ink, so the scale
+      // stays the last fit's
       colors: () => ({ ...this.colors, masked: this.colors.edge,
                        calc: this.previewOn ? "rgba(0, 0, 0, 0)" : this.colors.calc,
                        diff: this.curves.header.fit ? this.colors.diff : this.colors.peakfit }),

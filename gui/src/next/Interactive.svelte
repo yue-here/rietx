@@ -83,6 +83,8 @@
   let sliders = $state<Slider[]>([]);
   let edits = $state(new Map<string, number>());
   let error = $state("");
+  /** the rows' load error, apart from a verb's refusal (gui/CLAUDE.md, WP-1014) */
+  let loadError = $state("");
   /** the slider whose range pop-up is open, and where it is anchored */
   let popFor = $state<string | null>(null);
   let popAt = $state<{ left: number; top: number } | null>(null);
@@ -105,10 +107,10 @@
   async function load() {
     try {
       rows = normalize((await api.params()).parameters);
-      error = "";
+      loadError = "";
     } catch (exc) {
       rows = [];
-      error = exc instanceof ApiError && exc.empty ? "" : (exc as Error).message;
+      loadError = exc instanceof ApiError && exc.empty ? "" : (exc as Error).message;
     }
   }
 
@@ -119,11 +121,20 @@
     load();
   });
 
+  // keyed by value: the shell builds a new context and name list on every
+  // curves fetch, and an unchanged one must not rebuild the sliders or send
+  // the preview again
+  const contextKey = $derived(`${context.fwhm} ${context.thetaMaxDeg}`);
+  const namesKey = $derived(phaseNames.join("\n"));
+
   // the sliders follow the rows and the curves the ranges are measured on; a
   // range the person set is kept (`prior`)
   $effect(() => {
-    const r = rows, ctx = context, names = phaseNames, c = corpus;
+    const r = rows, c = corpus;
+    void contextKey;
+    void namesKey;
     untrack(() => {
+      const ctx = context, names = phaseNames;
       const prior = new Map(sliders.map((s) => [s.path, s]));
       sliders = buildSliders(r, c, ctx, names, prior);
       const next = new Map(edits);
@@ -185,7 +196,10 @@
 
   function dragged(s: Slider, event: Event) {
     const f = Number((event.currentTarget as HTMLInputElement).value) / STEPS;
-    set(s, Math.abs(f - posFrac(s, s.ref)) < SNAP ? s.ref : valueAt(s, f));
+    // only a mark on the track snaps: `posFrac` clamps a last fit outside a
+    // set range to an end, where snapping would jump past that end
+    const onTrack = s.ref >= s.lo && s.ref <= s.hi && (s.track !== "log" || s.ref > 0);
+    set(s, onTrack && Math.abs(f - posFrac(s, s.ref)) < SNAP ? s.ref : valueAt(s, f));
   }
 
   function startTyping(s: Slider) {
@@ -329,8 +343,9 @@
 {/snippet}
 
 <div class="interactive" style:--dec={`${decimals + 1}ch`}>
+  {#if loadError}<p class="bad err">{loadError}</p>{/if}
   {#if error}<p class="bad err">{error}</p>{/if}
-  {#if !sliders.length && !error}
+  {#if !sliders.length && !loadError}
     <p class="muted empty">No value here can be moved by hand.</p>
   {/if}
   {#each groups as group (group.title)}
