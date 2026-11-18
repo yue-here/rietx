@@ -33,7 +33,7 @@ import rietx as rx
 from rietx import Instrument, PatternData, Refinement
 from rietx.model import geometry as geom
 from rietx.model.forward import compile_model
-from rietx.model.geometry import geometry_table, symmetry_operations
+from rietx.model.geometry import fit_geometry_table, symmetry_operations
 from rietx.model.restraints import _metric_g
 from rietx.params.vector import ParameterTable
 from rietx.schemas.structure import BondRestraint, Structure
@@ -62,7 +62,7 @@ def _table_for(phase, *, vary: list[str] | None = None):
         table.set_vary(["*"], False)
         table.set_vary(vary, True)
     theta = table.x0()
-    return geometry_table(model, table, theta, structure), structure, table, theta
+    return fit_geometry_table(model, table, theta, structure), structure, table, theta
 
 
 def _distances(g, a: str, b: str) -> list[float]:
@@ -157,7 +157,7 @@ def test_orbit_counting_confirms_every_neighbour_was_found(builder):
     structure = Structure(phases=[phase])
     model = compile_model(structure, LAB, _blank(), mode="rietveld")
     table = ParameterTable(structure, LAB)
-    g = geometry_table(model, table, table.x0(), structure)
+    g = fit_geometry_table(model, table, table.x0(), structure)
     mult = [len(ops[0]) for ops in model.phases[0].sites.ops]
 
     counts: dict[tuple[int, int, float], int] = {}
@@ -255,7 +255,7 @@ def test_esd_matches_a_monte_carlo_through_decode():
     (4× the wall clock) measured 1.9 %.
     """
     model, structure, table, theta, sd, corr = _rutile_with_covariance()
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=sd, correlation=corr)
     rows = [d for d in g.distances if d.atom_index_1 == 0][:4]
     assert rows and all(d.stderr is not None for d in rows)
@@ -291,7 +291,7 @@ def test_a_stage_restraint_scale_never_reaches_the_geometry_esds():
     """
     def table_of(**kw):
         model, structure, table, theta, sd, corr = _rutile_with_covariance(**kw)
-        return model, geometry_table(model, table, theta, structure,
+        return model, fit_geometry_table(model, table, theta, structure,
                                      stderr_internal=sd, correlation=corr)
 
     _, plain = table_of()
@@ -342,7 +342,7 @@ def _distance_at(values: dict[str, float], row) -> float:
 def test_full_covariance_and_diagonal_only_disagree():
     """§10's point, measured: ignoring the correlations changes the answer."""
     model, structure, table, theta, sd, corr = _rutile_with_covariance()
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=sd, correlation=corr)
     ratios = [d.stderr / d.stderr_diagonal for d in g.distances
               if d.stderr and d.stderr_diagonal]
@@ -350,7 +350,7 @@ def test_full_covariance_and_diagonal_only_disagree():
     assert max(abs(r - 1.0) for r in ratios) > 0.05
 
     # and with an identity correlation the two constructions coincide exactly
-    g0 = geometry_table(model, table, theta, structure, stderr_internal=sd,
+    g0 = fit_geometry_table(model, table, theta, structure, stderr_internal=sd,
                         correlation=np.eye(3))
     for d in g0.distances:
         if d.stderr:
@@ -367,7 +367,7 @@ def test_symmetry_equivalent_bonds_agree_in_length_and_in_esd():
     work both fell into with a passing degrees-of-freedom count.
     """
     model, structure, table, theta, sd, corr = _rutile_with_covariance()
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=sd, correlation=corr)
     groups: dict[tuple, list] = {}
     for d in g.distances:
@@ -393,7 +393,7 @@ def test_a_symmetry_fixed_angle_carries_no_esd():
     information, so both report ``None``.
     """
     model, structure, table, theta, sd, corr = _rutile_with_covariance()
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=sd, correlation=corr)
     fixed = [a for a in g.angles
              if min(abs(a.angle - 90.0), abs(a.angle - 180.0)) < 1e-6]
@@ -427,7 +427,7 @@ def test_a_fully_fixed_row_reports_none_not_zero():
     table.set_vary(["phases.0.scale"], True)
     model = compile_model(structure, LAB, _blank(), mode="rietveld")
     theta = table.x0()
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=np.array([1e-4]),
                        correlation=np.eye(1))
     assert g.distances
@@ -459,7 +459,7 @@ def test_a_multi_phase_fit_keeps_the_phases_apart():
     rng = np.random.default_rng(3)
     a = rng.normal(size=(len(free), len(free)))
     corr = np.corrcoef(a @ a.T)
-    g = geometry_table(model, table, theta, structure,
+    g = fit_geometry_table(model, table, theta, structure,
                        stderr_internal=sd, correlation=corr)
 
     seen = {d.phase_index for d in g.distances}
@@ -479,7 +479,7 @@ def test_no_geometry_outside_rietveld(mode):
     structure = Structure(phases=[corundum_phase()])
     model = compile_model(structure, LAB, _blank(), mode=mode)
     table = ParameterTable(structure, LAB)
-    assert geometry_table(model, table, table.x0(), structure) is None
+    assert fit_geometry_table(model, table, table.x0(), structure) is None
 
 
 def test_the_contact_cap_is_recorded_not_silent(monkeypatch):
@@ -711,7 +711,7 @@ def test_the_census_finds_an_image_across_the_cell_boundary(x, defect_finds_it):
     """
     phase = _phase_in("P -1", (5.0, 5.2, 5.4, 88.0, 92.0, 91.0),
                       [("O1", "O", x, 0.5, 0.5)])
-    near = [d for d in rx.geometry_census(phase).distances if d.distance < 1.0]
+    near = [d for d in rx.geometry_table(phase).distances if d.distance < 1.0]
     assert len(near) == 1 and (near[0].atom_1, near[0].atom_2) == ("O1", "O1")
     assert 0.49 < near[0].distance < 0.53
     assert (_shifted_before_wrapped(phase, 0) < 1.0) is defect_finds_it
@@ -723,14 +723,14 @@ def test_the_census_reads_bare_coordinates_across_the_boundary():
     phase = _p1_phase((10.0, 6.0, 7.0, 90.0, 90.0, 90.0),
                       [("A", "Si", 0.2, 0.3, 0.4), ("B", "O", 0.6, 0.3, 0.4)])
     structure = Structure(phases=[phase])
-    moved = rx.geometry_census(structure, coordinates=[[0.97, 0.3, 0.4],
+    moved = rx.geometry_table(structure, coordinates=[[0.97, 0.3, 0.4],
                                                        [0.02, 0.3, 0.4]])
     pair = [d.distance for d in moved.distances if (d.atom_1, d.atom_2) == ("A", "B")]
     assert min(pair) == pytest.approx(0.5, abs=1e-9)
-    stored = rx.geometry_census(structure)
+    stored = rx.geometry_table(structure)
     assert not [d for d in stored.distances if d.distance < 3.0]
     # one entry per phase is the same answer, and the structure is untouched
-    again = rx.geometry_census(structure, coordinates=[np.array([[0.97, 0.3, 0.4],
+    again = rx.geometry_table(structure, coordinates=[np.array([[0.97, 0.3, 0.4],
                                                                  [0.02, 0.3, 0.4]])])
     assert again == moved
     assert structure.phases[0].atoms[0].x.value == 0.2
@@ -743,17 +743,17 @@ def test_the_census_reads_coordinates_a_loop_never_wrapped():
     phase = _phase_in("P -1", (5.0, 5.2, 5.4, 88.0, 92.0, 91.0),
                       [("O1", "O", 0.3, 0.5, 0.5)])
     for x in (3.95, -6.05):
-        g = rx.geometry_census(phase, coordinates=[[x, 0.5, 0.5]])
+        g = rx.geometry_table(phase, coordinates=[[x, 0.5, 0.5]])
         near = [d.distance for d in g.distances if d.distance < 1.0]
         assert len(near) == 1 and 0.49 < near[0] < 0.53, x
 
 
 @pytest.mark.parametrize("builder", [corundum_phase, zincite_phase, fluorite_phase])
 def test_the_census_is_the_unfitted_refinement_geometry(builder):
-    """``geometry_census`` and ``Refinement.geometry()`` with no live fit are
+    """``geometry_table`` and ``Refinement.geometry()`` with no live fit are
     one table, row for row: the census shares the search and the assembly."""
     structure = Structure(phases=[builder()])
-    census = rx.geometry_census(structure)
+    census = rx.geometry_table(structure)
     assert census == Refinement(structure, LAB, history=False).geometry()
     assert census.distances and census.angles
 
@@ -766,7 +766,7 @@ def test_the_census_does_to_the_model_what_a_fit_does_first():
                       [("Zn", "Zn", 0.333, 0.667, 0.0),
                        ("O", "O", 0.333, 0.667, 0.3819)])
     structure = Structure(phases=[phase])
-    census = rx.geometry_census(structure)
+    census = rx.geometry_table(structure)
     unfitted = Refinement(structure, LAB, history=False).geometry()
     assert census.distances == unfitted.distances
     assert census.angles == unfitted.angles
@@ -792,12 +792,12 @@ def test_the_census_keeps_a_split_site_and_lists_its_halves_as_bonded():
     is moved, and the two halves, 0.0036 Å apart, are listed as a bond, as
     ``Refinement.geometry()`` lists them.
     """
-    merged = rx.geometry_census(_near_mirror(1.0))
+    merged = rx.geometry_table(_near_mirror(1.0))
     assert not [d for d in merged.distances if d.distance < 1.0]
     assert any("moved onto the special position" in n for n in merged.notes)
 
     phase = _near_mirror(0.5)
-    kept = rx.geometry_census(phase)
+    kept = rx.geometry_table(phase)
     assert any("nothing was moved" in n for n in kept.notes)
     near = [d for d in kept.distances if d.distance < 1.0]
     assert [(d.atom_1, d.atom_2, d.bonded) for d in near] == [("O1", "O1", True)]
@@ -812,7 +812,7 @@ def test_the_census_moves_a_trial_atom_onto_its_special_position(y):
     trial atom 3·10⁻⁴ off the mirror, in any cell, is measured on it, with one
     note, and does not list its own image as a bond."""
     phase = _near_mirror(1.0, y=0.25)
-    g = rx.geometry_census(phase, coordinates=[[0.2, y, 0.3]])
+    g = rx.geometry_table(phase, coordinates=[[0.2, y, 0.3]])
     assert sum("moved onto the special position" in n for n in g.notes) == 1
     assert not [d for d in g.distances if d.distance < 1.0]
     assert phase.atoms[0].y.value == 0.25
@@ -831,7 +831,7 @@ def test_a_census_off_a_special_position_has_the_whole_orbit():
     xyz = np.array([[a.x.value, a.y.value, a.z.value]
                     for a in structure.phases[0].atoms])
     xyz[0] += (0.01, 0.02, 0.03)
-    g = rx.geometry_census(structure, coordinates=xyz)
+    g = rx.geometry_table(structure, coordinates=xyz)
     mult = [len(r) for r, _t in phase_orbit_split(_placed(structure.phases[0], xyz))]
     assert mult[0] == 16
     counts: dict[tuple[int, int, float], int] = {}
@@ -847,22 +847,22 @@ def test_a_census_off_a_special_position_has_the_whole_orbit():
 def test_the_census_refuses_coordinates_it_cannot_place():
     structure = Structure(phases=[corundum_phase()])
     with pytest.raises(ValueError, match="need"):
-        rx.geometry_census(structure, coordinates=np.zeros((1, 3)))
+        rx.geometry_table(structure, coordinates=np.zeros((1, 3)))
     with pytest.raises(ValueError, match="one row per atom"):
-        rx.geometry_census(structure, coordinates=[None, None])
+        rx.geometry_table(structure, coordinates=[None, None])
     with pytest.raises(ValueError, match="one per phase"):
-        rx.geometry_census(Structure(phases=[corundum_phase(), fluorite_phase()]),
+        rx.geometry_table(Structure(phases=[corundum_phase(), fluorite_phase()]),
                            coordinates=[None])
     with pytest.raises(ValueError, match="not finite"):
-        rx.geometry_census(structure, coordinates=np.full((2, 3), np.nan))
-    assert rx.geometry_census(Structure(phases=[])) is None
+        rx.geometry_table(structure, coordinates=np.full((2, 3), np.nan))
+    assert rx.geometry_table(Structure(phases=[])) is None
     # a symmetry-fixed angle the cell disagrees with, refused as a fit refuses it
     skewed = _phase_in("P m m m", (5.0, 6.0, 7.0, 90.0, 93.2, 90.0),
                        [("O1", "O", 0.1, 0.2, 0.3)])
     with pytest.raises(ValueError, match="fixes beta at 90.0° by symmetry"):
-        rx.geometry_census(skewed)
+        rx.geometry_table(skewed)
     with pytest.raises(ValueError, match="fixes beta at 90.0° by symmetry"):
         Refinement(Structure(phases=[skewed]), LAB, history=False).geometry()
     # a Refinement handed in by mistake is named, not passed on to pydantic
     with pytest.raises(TypeError, match=r"not Refinement .*\.structure"):
-        rx.geometry_census(Refinement(structure, LAB, history=False))
+        rx.geometry_table(Refinement(structure, LAB, history=False))

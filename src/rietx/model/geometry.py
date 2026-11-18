@@ -636,7 +636,7 @@ def _torsion_row(ip: int, labels, item: _Torsion, codes, values, sigma):
         symmetry_4=codes[3])
 
 
-def geometry_table(model, table, theta: np.ndarray, structure, *,
+def fit_geometry_table(model, table, theta: np.ndarray, structure, *,
                    stderr_internal=None, correlation=None):
     """The converged model's distances, angles and torsions, or ``None``.
 
@@ -658,7 +658,7 @@ def geometry_table(model, table, theta: np.ndarray, structure, *,
 
 def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
                         stderr_internal=None, correlation=None):
-    """:func:`geometry_table` over each phase's frozen orbit subsets.
+    """:func:`fit_geometry_table` over each phase's frozen orbit subsets.
 
     ``sites_of[ip]`` is phase ``ip``'s :class:`~rietx.crystallography.
     structure_factor.PhaseSites`; a compiled model's when there is one, and
@@ -732,10 +732,10 @@ def _assemble(sites_of, values: dict, phases, table, covariance):
 # ----------------------------------------------------------------------
 # the census without a fit (WP-1513)
 # ----------------------------------------------------------------------
-def geometry_census(structure, coordinates=None):
+def geometry_table(structure, coordinates=None):
     """The bonds, contacts, angles and torsions of a structure, with no fit.
 
-    The table a Rietveld fit closes with (:func:`geometry_table`), built by the
+    The table a Rietveld fit closes with (:func:`fit_geometry_table`), built by the
     same search and the same assembly, for any coordinates: a ``Structure`` or
     a single ``Phase`` as stored, or with its fractional coordinates replaced
     by ``coordinates`` — an (n_atoms, 3) array for a one-phase structure, or
@@ -791,7 +791,7 @@ def geometry_census(structure, coordinates=None):
     if not isinstance(structure, Structure | Phase):
         hint = (" (a Refinement: pass its .structure)"
                 if hasattr(structure, "structure") else "")
-        raise TypeError(f"geometry_census takes a Structure or a Phase, not "
+        raise TypeError(f"geometry_table takes a Structure or a Phase, not "
                         f"{type(structure).__name__}{hint}")
     phases = list(structure.phases) if isinstance(structure, Structure) else [structure]
     if not phases:
@@ -965,7 +965,7 @@ def request_table(request, sites_of, table, theta: np.ndarray, structure, *,
     second atom from its first, an angle's two arms from the vertex, a
     torsion's B, C and D each from the atom before it.  The first atom of a
     distance or a torsion and an angle's vertex sit where they are stored
-    unless coded.  esds are :func:`geometry_table`'s, through the same
+    unless coded.  esds are :func:`fit_geometry_table`'s, through the same
     partials and the same floor, so a requested row the table also lists
     carries the same numbers.  A torsion whose chain has a straight bond
     angle has none, and is named in ``notes`` rather than listed.

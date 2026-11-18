@@ -109,7 +109,7 @@ The covariance it needs comes from the final Jacobian, and the Jacobian is not s
 
 ### Without a fit
 
-`rietx.geometry_census` returns the same table for a `Structure` or a single `Phase`, with no refinement, pattern or instrument.
+`rietx.geometry_table` returns the same table for a `Structure` or a single `Phase`, with no refinement, pattern or instrument.
 Its search and its assembly are the fit's, so it equals `Refinement.geometry()` before a fit, row for row, and every esd is `None`.
 `coordinates=` replaces the stored fractional coordinates: an array of shape (atoms, 3) for a one-phase structure, or one entry per phase, `None` keeping that phase's own.
 The coordinates follow the order of `Phase.atoms`, and the structure itself is not changed.
@@ -121,10 +121,10 @@ import rietx as rx
 from rietx.examples import examples_dir
 
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
-table = rx.geometry_census(structure)
+table = rx.geometry_table(structure)
 xyz = [[a.x.value, a.y.value, a.z.value] for a in structure.phases[0].atoms]
 xyz[0][2] += 0.01
-moved = rx.geometry_census(structure, coordinates=xyz)
+moved = rx.geometry_table(structure, coordinates=xyz)
 ```
 
 The limits are the table's, and each writes a note where it applies.

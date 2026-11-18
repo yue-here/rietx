@@ -143,10 +143,10 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "carries no `cell` key by design: `best_or_none()` is the only way to "
         "one cell, and it returns `None` more often than not (§6). "
         "`RefinedParameter.at_bound` is three-valued — test `is True`. "
-        "`rx.geometry_census` is `result.geometry`'s table for any "
+        "`rx.geometry_table` is `result.geometry`'s table for any "
         "coordinates, with no fit.",
         ("rx.RefinementResult", "rx.StageResult", "rx.Statistics",
-         "rx.RefinedParameter", "rx.Diagnostic", "rx.geometry_census",
+         "rx.RefinedParameter", "rx.Diagnostic", "rx.geometry_table",
          "rx.SeriesResult",
          "rx.SeriesResult.trajectory", "rx.SeriesResult.to_table",
          "rx.SeriesResult.write_csv", "rx.SeriesResult.summary",
