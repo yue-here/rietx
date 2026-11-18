@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the second PR (the Peaks and Background graphs) up as #1680; Structure and Instrument PRs to follow
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the Peaks and Background graphs up as #1680 and the Structure graph as #1683; the Instrument PR to follow
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
@@ -256,6 +256,42 @@ Filled in by the session that builds each PR.
      project with no phase (row 82).
 
 ## Handover log
+
+- **2026-11-18** — the third PR of R3, PR #1683: the Structure graph at `/next`.
+
+  A person on the rebuilt page can now open the Structure graph and turn the fitted structure
+  by hand. Look down a, b or c, Balls or Ellipsoids and the colour key's switches change the
+  picture and move nothing else. A click on an atom rings it and opens a bar with Show
+  coordination. The status bar names what is under the pointer. Dragging Lattice parameter a
+  in the Interactive tab redraws the cell as "Preview, not refined", writing nothing until
+  Apply. § Questions 8-9 list each difference from the prototype for Yue's look. The
+  Instrument dialog (rows 133-136) is not started and is the fourth PR.
+
+  - *Done*: `gui/src/next/Structure.svelte`, written from `panels/Structure3D.svelte` with
+    #1519's fetch key and empty state, and `next/structure.ts` (the hover readout and the
+    values that can move an atom). `Frame.svelte` mounts it and passes the Interactive tab's
+    unapplied values (`onvalues`). Server: `POST /api/structure3d` takes the body
+    `POST /api/preview` takes and draws a copy at those values (`preview.structure_at`),
+    idle-only; the manual's `gui-power.md` row says so. Tests: pytest
+    `test_the_structure_graph_draws_unapplied_values_and_writes_nothing`, vitest
+    `next/Structure.test.ts` (7), browser case
+    `test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing`. Pictures, light and
+    dark, in `docs/wp/2218-screenshots/` (`structure-*.png`).
+  - *Review*: `/code-review high --fix` was not run. The session reached its context cap
+    after the gates, so the review falls to the PR's reviewer or the next session.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): fast suite 14948 passed, 424 skipped and 32 xfailed in 8:55, through the shift's serial lock; this branch adds two python tests (the server case and the browser case).
+    Vitest 832 of 832; svelte-check 0 errors in 456 files. GUI python files
+    (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_preview`): 286
+    passed. Browser files by glob: layout + gui 43 passed; peaks, recovery, structure3d and rxplot 56 passed. The compare, html and watch browser files were not run, since nothing here reaches their pages. Vale 0 errors. `python -m tests.reader_output`: exit 0, unchanged.
+  - *Gotchas*: in `GuiSession.structure3d` the element-list loop names its variable
+    `values`, so a parameter of that name was silently overwritten; the new one is `body`.
+    A menu opened where a popover sits fell under it, so opening the view menu closes the
+    popover (found by a real click). `lib/help.test.ts` counts authored `title=` per file,
+    `next/` included.
+
+  Next: Yue's look at § Questions 5-9 and the pictures. Then the fourth PR, the Instrument
+  dialog (rows 133-136) and File › Export › Instrument profile…, which also lists the
+  structure image in File › Export once the File menu moves into `next/`.
 
 - **2026-11-18** — the second PR of R3, PR #1680: the Peaks and Background graphs at `/next`.
 
