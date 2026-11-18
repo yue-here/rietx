@@ -56,7 +56,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-17 | P2 | [parametric](#parametric) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 2026-11-13 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | 2026-11-17 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
@@ -520,7 +519,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
 | [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | ✅ 2026-11-17 | — | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
-| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | 🔄 2026-11-13 | P2 | [2215](2215-the-frame.md) |
+| [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | ✅ 2026-11-18 | — | [2215](2215-the-frame.md) |
 | [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | 🔄 2026-11-17 | P2 | [2216](2216-the-refinement-window.md) |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
