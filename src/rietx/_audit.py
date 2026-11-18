@@ -3000,6 +3000,7 @@ ROWS: tuple[Row, ...] = (
                 "across the centring loop, so a unit capped in its first centring never "
                 "searches the later ones (C for monoclinic; C, I and F for orthorhombic), "
                 "and a centred truth cannot be among its candidates.",
+        approved="2026-11-17",
         value=4000000),
     Row("rietx.indexing.trial_error.SOLVE_CHUNK", "constant", value=200000),
     Row("rietx.indexing.workflow.ABSENT_SIGMA", "constant", value=3.0),
