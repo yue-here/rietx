@@ -872,6 +872,28 @@ def test_a_wrong_stage_or_plan_field_gets_the_closest_match():
         plan.stagess
 
 
+def test_an_esd_asked_for_under_its_other_spelling_names_the_field():
+    """WP-1913 (#728 item 5): the package spells an esd two ways.
+
+    ``RefinedParameter`` calls it ``stderr`` and ``ParameterRow`` calls it
+    ``esd``.  ``difflib`` alone scores the pair at 0.22, so ``.esd`` listed the
+    fields without naming the one meant.  The answer is a pointer: the
+    attribute still raises, so no reader gains a second name for one field.
+    """
+    from rietx._nearmiss import near_misses
+
+    row = rx.RefinedParameter(path="phases.0.cell.a", value=4.15, stderr=1e-5,
+                              vary=True)
+    with pytest.raises(AttributeError, match=r"no attribute 'esd'; did you mean 'stderr'\?"):
+        row.esd
+    # both directions, one word of a longer name, and case folded
+    assert near_misses("stderr", ["path", "value", "esd"]) == ["esd"]
+    assert near_misses("weight_fraction_esd",
+                       ["weight_fraction", "weight_fraction_stderr"])[0] == (
+        "weight_fraction_stderr")
+    assert near_misses("ESD", ["path", "stderr"]) == ["stderr"]
+
+
 def test_every_public_schema_class_is_a_top_level_export():
     """WP-1302: no `Source`/`EmissionLine`/`BackgroundChebyshev`-shaped gap.
 

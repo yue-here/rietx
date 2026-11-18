@@ -119,8 +119,9 @@ schema change across every result reader.
       that do not share an orbit (the lifted `orbit_collisions`), and usable
       through a series' `constrain=`; then the measurement deciding whether
       `OCC_PAIR_ILL_CONDITIONED` is needed at all.
-- [ ] Part 5: `esd` → `stderr` in the attribute pointer, with a test that
-      the message names the field.
+- [x] Part 5: `esd` → `stderr` in the attribute pointer, with a test that
+      the message names the field. *Both ways, through `_nearmiss.SYNONYMS`,
+      so every schema hint and path hint shares it (2026-11-18).*
 - [ ] `help.py` and Manual Part 1 for every new public name (the api-surface
       partition fails until each is documented).
 - [ ] Tests (unit; no acceptance dataset needed).
