@@ -2297,7 +2297,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(
         title="A declared peak refined to zero intensity",
         description=(
-            "The area of a declared peak finished at zero. A peak reaches the pattern "
+            "The area of a declared peak finished at or below zero, or on its floor of "
+            "zero as the bound test reads it (`FLOOR_HIT`). Under `solver=\"trf\"` the "
+            "stored area can sit a hair above zero. A peak reaches the pattern "
             "only through its area, so at zero area nothing fixes its centre. The centre "
             "and its esd are then not measurements. Either the feature is not in the "
             "specimen or the bounds on the centre do not cover it. Drop the peak or move "
@@ -3102,8 +3104,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Some figures of merit are undefined",
         description=(
             "The peak list has fewer usable lines than the classical figures of merit "
-            "are defined on, so some are left out of the ranking. The search still runs "
-            "over the crystal systems the line count supports. Every candidate is ranked "
+            "are defined on, so some are left out of the ranking. The message names the "
+            "crystal systems with enough lines to determine a cell. A search narrows the "
+            "requested systems to those, unless that would leave none. Every candidate is "
+            "ranked "
             "on the same remaining figures, so the order stays meaningful. Confidence is "
             "capped, and a longer peak list restores the full panel."
         ),
@@ -3222,8 +3226,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The search covered only some crystal systems. A failure to find a cell "
             "means only that none was found in those systems. It says nothing about the "
-            "specimen, and it is no evidence of a mixture. Search the missing systems "
-            "before you draw a conclusion."
+            "specimen, and it is no evidence of a mixture. Where the list has enough lines "
+            "to determine a cell in a missing system, search it before you draw a "
+            "conclusion. Where it has too few, the message says so, and more lines are "
+            "the remedy. Where the list supports no search at all, nothing was searched, "
+            "and INDEX_DATA_INSUFFICIENT says why."
         ),
     ),
     "INDEX_VALIDATION_FAILED": HelpEntry(
@@ -3243,6 +3250,23 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first is an artefact of the search and describes no lattice. The second is "
             "a cell larger than the lines can justify. Narrow the maximum volume, or "
             "measure more lines."
+        ),
+    ),
+    "INDEX_WEAK_LINE_RETRY": HelpEntry(
+        title="The search was run again without the weak lines",
+        description=(
+            "The full peak list, inlier retry included, gave no lattice that two "
+            "engines agree on. The lines under 5 % of the strongest were set aside and "
+            "the search ran again on the rest. This is the second attempt of the 2004 "
+            "indexing round robin (Bergmann et al.). If that search found agreement, "
+            "the candidates are its own, ranked and scored on the kept lines only. "
+            "Otherwise they are the full list's. A trace second phase, or a peak the "
+            "picker split, adds weak lines the host's cell cannot index. Check the "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
+            "`n_unindexed` forbids both retries."
         ),
     ),
     "K_SEARCH_PARTNER": HelpEntry(
@@ -3648,6 +3672,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "weight and the fit is unweighted. The reader kept the values, because a "
             "uniform error is legal. Goodness of fit and χ² mean something only if every "
             "point has that error. A placeholder in the error field is the usual cause."
+        ),
+    ),
+    "PATTERN_SIGMA_NONPOSITIVE": HelpEntry(
+        title="Points with an error estimate of zero or below",
+        description=(
+            "The file's error column gives some points an esd of zero or a negative "
+            "one. Zero claims an exact intensity and a negative esd has no meaning, so "
+            "neither gives a weight. These points are left out of the fit, and the "
+            "file's numbers are kept as written. The message counts them, says how "
+            "many record an intensity of zero and gives their 2θ; the code's value is "
+            "the count. A column with no positive esd at "
+            "all is not read, and the Poisson σ = √max(y, 1) is used instead. Where "
+            "the points are channels that counted zero, and the writer computed "
+            "σ = √0, read the file with `nonpositive_sigma='poisson'` to keep them at "
+            "σ = √max(y, 1), one count at a zero count. "
+            "`RefinementResult.sigma_rule` counts what the fit weighted by each rule."
         ),
     ),
     "PATTERN_TOTAL_SCATTERING": HelpEntry(
@@ -4172,6 +4212,44 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measure the instrument on a standard, and hold that profile in this fit."
         ),
     ),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": HelpEntry(
+        title="A torsion turned, and the body's own contacts are not checked",
+        description=(
+            "A rigid body's torsion turned during the run, and the anti-bump checks do not "
+            "search the pairs inside one copy of that body. The builder, "
+            "`anti_bump_restraints`, skips those pairs by default, and the end-of-run contact "
+            "check always skips them, because a rigid body keeps its template distances. "
+            "A torsion breaks that: it turns part of the molecule about a bond, and two atoms "
+            "on either side of the bond can come together. Only a row you wrote for that pair "
+            "restrains it, and nothing reports it. The message says how many rows the list "
+            "holds inside the body. Read the distances between the body's "
+            "own atoms in `result.geometry.distances`, bonds included: a folded pair can be "
+            "short enough to be listed as a bond. Where a torsion brought two of its atoms closer than "
+            "you allow, add an anti-bump row for that pair, with a minimum you state for it, or "
+            "restrain or hold the torsion. Keep such a row off the two end atoms of a torsion: "
+            "they sit 2.5 to 3.9 Å apart in real molecules, and a floor there pushes the "
+            "torsion towards anti."
+        ),
+    ),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": HelpEntry(
+        title="A restraint measures geometry a rigid body holds fixed",
+        description=(
+            "A bond, angle, torsion or planarity restraint names atoms that all belong to one "
+            "copy of one rigid body, and no torsion the body declares changes the quantity. "
+            "The body places those atoms from its template, so the distance, angle or plane "
+            "is the template's whatever the fit does: the restraint's row is a constant, and "
+            "it restrains nothing. A quantity is either restrained or refined, never both by "
+            "accident, so the compile warns and keeps the row: a refiner may keep one "
+            "restraint set across a with-body and a without-body comparison, where the row "
+            "is the template's penalty. A declared torsion "
+            "changes the quantity when it turns some of the restrained atoms, other than its "
+            "two axis atoms, and not the others; whether the torsion is free in a stage does "
+            "not matter. A restraint across two bodies, between a body atom and a free "
+            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "a torsion that changes it, take the atoms out of the body and restrain them "
+            "as free atoms, or keep the row."
+        ),
+    ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(
         title="Some contacts have no anti-bump row",
         description=(
@@ -4213,7 +4291,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A free rotation or shift of a rigid body has no effect on the pattern. The "
             "usual cause is a turn that moves only zero-occupancy atoms, or a turn about "
             "an axis the template is symmetric under. The value and the esds of the body "
-            "atoms are not measurements. Hold those parameters and refit."
+            "atoms are not measurements. Hold what the suggestion names and refit."
         ),
     ),
     "ROUGHNESS_ABSORPTION": HelpEntry(
@@ -4548,7 +4626,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model holds it fixed, there is nothing to refine. A pattern that names one "
             "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
             "frees nothing at that site. An atom on a fully fixed special position has "
-            "no directions, so its `dof.*` pattern matches no parameter."
+            "no directions, so its `dof.*` pattern matches no parameter. A pattern "
+            "that names one phase's cell, such as `phases.0.cell.*`, gets it too. On "
+            "a phase whose cell is derived from its parent's, it reaches no free "
+            "row, and `phases.0.parent_cell.cell.*` frees the parent's edges."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
@@ -5015,6 +5096,21 @@ READER_OPTION_HELP: dict[str, HelpEntry] = {
         ),
         typical="`_meas` for measured data in a pdCIF",
     ),
+    "nonpositive_sigma": HelpEntry(
+        title="Zero or negative esds",
+        description=(
+            "What a point whose esd in the file is zero or negative becomes. Such an "
+            "esd gives no weight. `exclude` leaves the point out of the fit and "
+            "reports it as `PATTERN_SIGMA_NONPOSITIVE`. `poisson` weights it by "
+            "σ = √max(y, 1), which is one count at a zero count: use it for a file "
+            "that wrote σ = √0 for a channel that counted nothing. The file's numbers "
+            "are kept either way, and `RefinementResult.sigma_rule` counts the points "
+            "each rule weighted. Taken by the formats whose σ is a column of the file: "
+            "plain columns, GSAS, pdCIF and `.chi`."
+        ),
+        default="exclude",
+        typical="`exclude`; `poisson` for raw counts with zeros written as σ = 0",
+    ),
     "scan": HelpEntry(
         title="Scan index",
         description=(
@@ -5185,7 +5281,9 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
     "systems": HelpEntry(
         title="Crystal systems to search",
         description=(
-            "Which crystal systems the search covers. They run in decreasing symmetry, "
+            "Which crystal systems the search covers. Below 20 usable lines, a requested "
+            "system with fewer than 5 lines per metric degree of freedom is dropped, "
+            "unless no requested system is left. They run in decreasing symmetry, "
             "so a cubic answer arrives in seconds and a triclinic one in minutes. "
             "Restricting the systems says nothing about the specimen. The result lists "
             "the systems it searched and makes no claim about the others."
@@ -5788,6 +5886,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "How many of the declared extra components land in the background. This is "
             "the background flexibility the caller granted, which a reader comparing "
             "two Rwp values needs to see. `0` means none; `None` means nothing counted."
+        ),
+    ),
+    "RefinementResult.sigma_rule": HelpEntry(
+        title="Which σ weighted the fit",
+        description=(
+            "How many fitted points the file's own esd weighted (`n_file_sigma`), how "
+            "many the Poisson σ = √max(y, 1) weighted (`n_poisson_sigma`), and how "
+            "many points inside the fitted range left the fit because their esd was "
+            "zero or negative (`n_nonpositive_excluded`). The first two add up to the "
+            "fit's point count. `None` means nothing counted: a joint fit, which "
+            "counts per histogram, or a result recorded before the field existed."
         ),
     ),
     "RefinementResult.histograms": HelpEntry(

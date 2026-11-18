@@ -191,6 +191,14 @@ and have no free factor to measure, so this file's old list named them without c
   the refit measures that scatter. The CPD QPA plan frees exact pairs (X with `lor_size`, Y with
   `lor_strain`, zero with displacement), so read those rows as one sum.
 
+### Inherited
+
+- **From WP-2020 (2026-11-15).** WP-2020's design brief, which waits on the maintainer, leans
+  towards extending the instrument profile file and the plan presets, because no setting in
+  the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting
+  is one of the two observations that would flip that pick to a new scenario-set file. Name
+  any such demotion in WP-2020's handover log when it lands.
+
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.

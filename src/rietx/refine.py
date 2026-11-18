@@ -11,7 +11,7 @@ import subprocess
 import time
 import tomllib
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -23,6 +23,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
+    from .report.body_misfit import ReleasedArm
     from .schemas.fraction import FractionProfile
     from .schemas.interval import ParameterInterval
     from .schemas.results import QuantitativePhaseAnalysis
@@ -4210,15 +4211,20 @@ class Refinement:
         # since holding half of what it names would be a silent partial hold
         owned = table.body_rows()
         if blocked := [p for p in hits if p in owned]:
-            names = sorted({owned[p] for p in blocked})
+            # every body the sweep reached, in the order it reached them, so
+            # the name and the globs are the same bodies' (a glob over several
+            # bodies' atoms names each one's DOFs, not only the first's)
+            bases = table.body_row_bases()
+            owners = list(dict.fromkeys(bases[p] for p in blocked))
+            names = list(dict.fromkeys(owned[p] for p in blocked))
             raise ValueError(
                 f"cannot hold {blocked[0]!r}"
                 + (f" and {len(blocked) - 1} more" if len(blocked) > 1 else "")
-                + f": placed by rigid body {names[0]!r}; hold the body's own "
+                + (f": placed by rigid body {names[0]!r}" if len(names) == 1 else
+                   f": placed by rigid bodies {', '.join(map(repr, names))}")
+                + f"; hold {'the' if len(owners) == 1 else 'each'} body's own "
                 "origin, rotation and torsions instead "
-                "(phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*, "
-                "phases.*.rigid_bodies.*.torsions.*.twist)")
+                f"({', '.join(_body_dof_globs(b) for b in owners)})")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []
@@ -5099,6 +5105,11 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
+        # a body's turn free in two directions of three has no exact re-chart
+        # at the commit, so it is refused here, where the stage's globs, the
+        # caller's holds and ties and the mode's force-fix have all settled
+        # the free set and before anything is written (WP-1805, answer (c))
+        table.refuse_partial_turns()
         seeded: dict[str, float] = {}
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
@@ -6059,6 +6070,8 @@ class Refinement:
                 # after the write-back: the search reads the answer's coordinates
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
                     self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
+                    self.structure, stale_since))
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -6619,6 +6632,8 @@ class Refinement:
             if mode == "rietveld":
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
                     self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
+                    self.structure, stale_since))
 
             stage_result = StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -6874,6 +6889,25 @@ class Refinement:
         require_two_theta(data, "Refinement.check_rigid_bodies()",
                           instrument=self.instrument)
         return rigid_body_misfit(self, data, **kw)
+
+    def released_arm(self, body: str, *, phase: int | None = None,
+                     freed: Sequence[str] | None = None,
+                     bond_sigma: float = 0.02, angle_sigma: float = 2.0) -> ReleasedArm:
+        """The released arm :meth:`check_rigid_bodies` compares ``body`` with.
+
+        Built from this refinement's current structure (fit first for the
+        arm the check builds): the body removed, its non-riding members freed
+        and held near the template by bond and angle restraints, each riding
+        H tied to its parent.  ``freed`` names the members to free instead.
+        Returns a :class:`~rietx.report.body_misfit.ReleasedArm`; fit it as a
+        ``Refinement`` over its ``structure``, with its ``ties`` declared
+        through :meth:`tie` and its ``free`` globs in a stage.  The rules:
+        :func:`rietx.report.body_misfit.released_arm`.
+        """
+        from .report.body_misfit import released_arm
+
+        return released_arm(self.structure, body, phase=phase, freed=freed,
+                            bond_sigma=bond_sigma, angle_sigma=angle_sigma)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | PlanSpec | str | None = None,
@@ -8574,7 +8608,9 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     ``dof`` rows, which the suggestion names.  One family is asked two ways:
     the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
     request copying that pair for one isotropic atom has its ``adp.*`` answered
-    by the ``biso`` it freed, and stays silent.
+    by the ``biso`` it freed, and stays silent.  A parent-cell phase's cell is
+    the other such family: a stage naming ``phases.<i>.cell.*`` beside a glob
+    that frees ``phases.<i>.parent_cell.cell.*`` has its cell, and stays silent.
 
     A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
     per glob naming its stages.  ``where`` is the glob, as
@@ -8602,11 +8638,20 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                 # ``biso`` and ``adp.*`` are one displacement asked two ways:
                 # the shipped stages name both, so either answers it
                 continue
+            if site.endswith(".cell") and any(
+                    e.path.startswith(f"{site.removesuffix('.cell')}.parent_cell.cell.")
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in entries):
+                # a parent-cell phase's cell asked both ways: the parent's
+                # edges the stage frees are the cell the child's glob meant
+                continue
             names = asked.setdefault(glob, [])
             if stage.name not in names:
                 names.append(stage.name)
     by_path = {e.path: e for e in entries}
     owned = table.body_rows()
+    owned_bases = table.body_row_bases()
     out = []
     for glob, names in asked.items():
         which = subject or _stage_list(names)
@@ -8640,9 +8685,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         if reaches and f"{site}.x" in owned:
             why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
             fix = ("Free the body's own origin, rotation and torsions instead "
-                   "(phases.*.rigid_bodies.*.origin.dof.*, "
-                   "phases.*.rigid_bodies.*.rotation.*, "
-                   "phases.*.rigid_bodies.*.torsions.*.twist).")
+                   f"({_body_dof_globs(owned_bases[f'{site}.x'])}).")
         elif (reaches and not dofs
               and all(e is not None and e.locked for e in coords)):
             why = (f" Every coordinate of {site} is fixed by its site symmetry, "
@@ -9363,7 +9406,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
     tested = set(table.free_paths) | on_bound if guard is not None else set()
     # the FLOOR_HIT half of the same findings, read by the microstructure
-    # block below (WP-1914).  With no guard (``replay``) the recorded
+    # block (WP-1914) and the declared-peak diagnostics (WP-2141) below.
+    # With no guard (``replay``) the recorded
     # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
     # them below, so the table cannot contradict a warning the result carries.
     # A tied width the LM step held on its own floor is named here directly
@@ -9437,6 +9481,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if restraints_report is not None:
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
+    if model.restraints is not None:
+        # compile-time findings about the declared rows (WP-1814 C1)
+        diagnostics = diagnostics + model.restraints.findings
 
     # Bonding geometry, with esds through the *whole* covariance (WP-1072,
     # McCusker §10) — built here because that covariance is read off the final
@@ -9617,9 +9664,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
     # reflection" is asked against the same predicted positions Layer 0 uses,
-    # and the two must not disagree about where the model puts a line.
+    # and the two must not disagree about where the model puts a line.  "On
+    # its floor" is the bound test's ``floors`` above, never a distance of its
+    # own (WP-2141).
     diagnostics = diagnostics + _extra_peak_diagnostics(
-        model, values, ticks, table)
+        model, values, ticks, table, floors=floors)
 
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
@@ -9670,6 +9719,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         n_extra_components=(len(model.component_paths)
                             + len(model.peak_components)),
         n_background_components=len(model.component_paths),
+        sigma_rule=model.sigma_rule,
     )
 
 
@@ -10569,7 +10619,8 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
 
 
 def _extra_peak_diagnostics(model: CompiledModel, values: dict,
-                            ticks: dict, table) -> list[Diagnostic]:
+                            ticks: dict, table, *,
+                            floors: Collection[str]) -> list[Diagnostic]:
     """The two things a declared sharp peak is owed (WP-1103).
 
     Both **report and gate nothing.**  Declaring a peak the phases cannot
@@ -10592,18 +10643,26 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
     item 13, one rank down, and the position it reports is a walk rather than a
     measurement.  Said in the vocabulary the peak list already chose for this
     fact (``no_intensity`` in ``PEAK_UNUSABLE_FLAGS``) rather than in a second
-    one, and tested with ``BOUND_HIT_RTOL``, the distance of the
-    refinement's own bound test where no solve stands behind it
-    (``staged.bound_findings``, which reads the driver's exact active set or
-    a conjunction where it has a solve, WP-1434 and WP-1929) rather than a
-    second constant.
+    one.
+
+    "On its zero bound" is the package's one bound test, read rather than
+    restated (WP-2141).  ``floors`` holds the paths whose ``FLOOR_HIT`` fired
+    in the answer-producing stage, closed over ties by
+    :func:`~rietx.model.microstructure.floored_paths`.  That finding comes
+    from ``staged.bound_findings``, which reads the driver's exact active set
+    or a conjunction of distance and residual angle (WP-1434, WP-1929).  The
+    default LM driver lands a floored area on 0.0.  ``solver="trf"`` keeps its
+    iterates strictly inside the box, so a stopping point a hair above zero
+    still reads as no intensity when the bound test says the floor carried
+    load.  An area at or below zero reads so too, which covers a stated lower
+    bound below zero.  A positive lower bound is ``BOUND_HIT``, never this
+    code: an area held there still puts counts in the pattern.
 
     This is the honest evidence for "the peak was not needed", and it is not an
     Rwp comparison — which the package forbids as a correction's evidence for
     the reason ``docs/milestones/v0.5.md`` records.
     """
     from .report.layer0 import LAYER0_MATCH_TOL_DEG
-    from .strategy.staged import BOUND_HIT_RTOL
 
     out: list[Diagnostic] = []
     if not model.peak_components:
@@ -10633,18 +10692,11 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
             # refinement to report on nor a degeneracy to warn about.
             continue
 
-        entry = (table.entries[table._paths[area_path]]
-                 if area_path in table._paths else None)
-        lo = entry.lo if entry is not None else 0.0
-        # ``BOUND_HIT_RTOL`` is scipy's own test and ``bound_findings``'
-        # fallback, imported rather than restated so the two cannot drift
-        # apart on what counts as *at* a limit.  The ``<= 0`` clause beside
-        # it covers an area whose stated lower bound is below zero, which is
-        # off at its identity without being "at" that bound.
-        at_zero = (area <= 0.0
-                   or (np.isfinite(lo)
-                       and abs(area - lo) <= BOUND_HIT_RTOL * max(1.0, abs(lo))))
-        if at_zero:
+        # ``FLOOR_HIT`` is the bound test's verdict and never a distance of
+        # this function's own (WP-2141).  The ``<= 0`` clause beside it
+        # covers an area whose stated lower bound is below zero, which is off
+        # at its identity without being "at" that bound.
+        if area <= 0.0 or area_path in floors:
             out.append(Diagnostic(
                 level="warning", code="EXTRA_PEAK_NO_INTENSITY",
                 message=(
@@ -11932,19 +11984,54 @@ def _rigid_body_unsupported(table: ParameterTable,
     carries no esd either, which the rows already say; this says which DOF
     did it.  A body a stage *held* (an absent phase, WP-1301) is
     ``PHASE_UNCONSTRAINED``'s, never this.
+
+    The suggestion never steers into ``RIGID_BODY_PARTIAL_TURN`` (WP-1805):
+    where holding just the blind DOFs would leave two free turn directions of
+    three, it names the body's whole rotation to hold with them, asking
+    :meth:`~rietx.params.vector.ParameterTable.free_turn_directions` what the
+    hold would leave.
     """
     owner = table.body_dofs()
+    # keyed by the body's base path, phases.<i>.rigid_bodies.<k>: a body's
+    # name is unique in its phase, not across phases
+    bases = table.body_dof_bases()
     free = set(table.free_paths)
     blind: dict[str, list[str]] = {}
+    names: dict[str, str] = {}
     for row in params:
         if row.path in owner and row.path in free and row.stderr is None:
-            blind.setdefault(owner[row.path], []).append(row.path)
+            names[bases[row.path]] = owner[row.path]
+            blind.setdefault(bases[row.path], []).append(row.path)
     return [Diagnostic(
         level="warning", code="RIGID_BODY_UNSUPPORTED", where=paths,
-        message=(f"Rigid body {name!r}: {len(paths)} free degree(s) of freedom "
-                 f"measured nothing ({', '.join(paths)})."),
-        suggestion="Hold them (Refinement.hold) and refit.")
-        for name, paths in blind.items()]
+        message=(f"Rigid body {names[bbase]!r}: {len(paths)} free degree(s) of "
+                 f"freedom measured nothing ({', '.join(paths)})."),
+        suggestion=_unsupported_body_advice(table, bbase, paths))
+        for bbase, paths in blind.items()]
+
+
+def _body_dof_globs(bbase: str) -> str:
+    """One body's own DOFs as the globs advice names, for the body at ``bbase``
+    alone rather than every body in every phase (WP-1951's follow-up)."""
+    return (f"{bbase}.origin.dof.*, {bbase}.rotation.*, "
+            f"{bbase}.torsions.*.twist")
+
+
+def _unsupported_body_advice(table: ParameterTable, bbase: str,
+                             paths: list[str]) -> str:
+    """``RIGID_BODY_UNSUPPORTED``'s suggestion: hold what a stage will accept.
+
+    Holding the blind DOFs alone, unless that leaves the body's turn free in
+    some of its directions but neither one nor all, the shape a stage refuses
+    (``ParameterTable.refuse_partial_turns``); then the whole turn with them.
+    """
+    _, free, k = table.free_turn_directions(without=paths)[bbase]
+    if free in (0, 1, k):
+        return "Hold them (Refinement.hold) and refit."
+    return (f"Hold them and the body's whole turn ({bbase}.rotation.*) with "
+            f"Refinement.hold, and refit: holding them alone would leave {free} "
+            f"free turn directions of {k}, which a stage refuses "
+            "(RIGID_BODY_PARTIAL_TURN).")
 
 
 def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
@@ -12257,6 +12344,75 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
                        "coordinates (or with a wider margin) and refit; or, if "
                        "the contact is real, lower that species pair's minimum "
                        "distance"))
+    return out
+
+
+def _body_contacts_unchecked_diagnostics(structure: Structure,
+                                          since: list) -> list[Diagnostic]:
+    """``RESTRAINT_BODY_CONTACTS_UNCHECKED`` — a torsion turned inside a body
+    whose own contacts the anti-bump checks do not search (WP-2144, #1507).
+
+    The anti-bump builder skips two atoms of one rigid body in the body's own
+    copy by default, and :func:`_restraint_pairs_stale_diagnostics` skips
+    them always, so a torsion that folds the molecule onto itself is
+    restrained only by a row the caller wrote for that pair, and is never
+    named.  One warning per body with a torsion whose ``angle`` moved during
+    the run, in a phase with an anti-bump row; the message counts the rows
+    the list holds inside the body
+    (:func:`rietx.model.restraints.body_own_rows`).  ``since`` is each phase
+    as the run started (:func:`_anti_bump_start_phases`), so a phase without
+    an anti-bump row is never searched, and a torsion that did not move
+    cannot have folded anything the caller did not start from.
+    """
+    from .model.restraints import body_own_rows
+    from .params.bodies import wrap_degrees
+
+    out: list[Diagnostic] = []
+    for phase, start in zip(structure.phases, since, strict=True):
+        if start is None:
+            continue
+        # wrapped on both sides: write-back stores every torsion's angle
+        # wrapped, held or not, so a declared −180 comes back 180 unturned
+        before = {b.name: {t.name: wrap_degrees(t.angle) for t in b.torsions}
+                  for b in start.rigid_bodies}
+        turned_in: dict[str, list] = {}
+        for body in phase.rigid_bodies:
+            was = before.get(body.name, {})
+            moved = [(t.name, was[t.name], t.angle) for t in body.torsions
+                     if t.name in was and wrap_degrees(t.angle) != was[t.name]]
+            if moved:
+                turned_in[body.name] = moved
+        # the row count reads every row's image, so it runs only where a
+        # torsion turned
+        if not turned_in:
+            continue
+        for name, rows in body_own_rows(phase).items():
+            if name not in turned_in:
+                continue
+            body = next(b for b in phase.rigid_bodies if b.name == name)
+            moved = turned_in[name]
+            turned = ", ".join(f"{t} {a:.1f}° → {b:.1f}°" for t, a, b in moved)
+            held = ("the anti-bump list has no row between two atoms of one "
+                    "copy of the body" if rows == 0 else
+                    f"the anti-bump list holds {rows} row(s) inside one copy "
+                    "of the body and the end-of-run search skips its other "
+                    "pairs")
+            out.append(Diagnostic(
+                level="warning", code="RESTRAINT_BODY_CONTACTS_UNCHECKED",
+                where=[f"{phase.name} {label}" for label in body.atoms],
+                value=float(len(moved)),
+                message=(f"phase {phase.name!r}, rigid body {name!r}: "
+                         f"{len(moved)} torsion(s) turned during the run "
+                         f"({turned}), and {held}, so contacts inside the "
+                         "molecule are not checked."),
+                suggestion=("read the distances between the body's own atoms "
+                            "in result.geometry.distances, bonds included (a "
+                            "folded pair can be short enough to be listed as a "
+                            "bond); where a torsion brought "
+                            "two of its atoms closer than you allow, add an "
+                            "AntiBumpRestraint row for that pair with its own "
+                            "minimum, or restrain or hold the torsion; a floor "
+                            "on a torsion's own two ends pushes it towards anti")))
     return out
 
 

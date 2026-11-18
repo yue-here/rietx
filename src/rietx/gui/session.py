@@ -524,6 +524,20 @@ class GuiSession:
             # it is a summary rather than a second authority — the phases live
             # in the history like every other model fact.
             "n_phases": len(p.refinement.structure.phases),
+            # What the readers repaired or assumed on the read this session
+            # holds (WP-1522): the pattern reader's (a reversed scan, dropped
+            # rows, a scaled intensity) and the history reader's (a declared
+            # range restored or left off, an earlier tree skipped).  A repair
+            # that changes how the next fit moves must be readable where that
+            # fit is started, and these are its only carrier: `Project` keeps
+            # them in memory, never in project.json.  On the document rather
+            # than on the open route's answer alone, so a reload's
+            # `GET /api/project` still says it; in the readers' order, as
+            # `Diagnostic` dumps, the order to show them being the panel's.
+            "data_diagnostics": [d.model_dump(mode="json")
+                                 for d in p.data_diagnostics],
+            "history_diagnostics": [d.model_dump(mode="json")
+                                    for d in p.history_diagnostics],
         }
 
     def project_patch(self, body: dict) -> dict:
@@ -1696,7 +1710,7 @@ class GuiSession:
                 raise GuiError(str(exc), where=[what]) from None
         structure = self._need_project().refinement.structure
         try:
-            return geometry.build(
+            built = geometry.build(
                 structure, int(phase), probability=float(probability),
                 bond_tolerance=(geometry.BOND_TOLERANCE if bond_tolerance is None
                                 else float(bond_tolerance)), disorder=disorder,
@@ -1706,6 +1720,13 @@ class GuiSession:
                            where=["phase"]) from None
         except ValueError as exc:
             raise GuiError(str(exc), where=["probability"]) from None
+        # the planar rings ride with the drawing they were found on, for the
+        # drawer's "fill planar rings" (WP-1548); a ring is the server's to find
+        # as a polyhedron is, and the walk is bounded (rings.MAX_RING_DEGREE)
+        from ..viz.figure3d import rings
+
+        built["rings"] = rings.ring_fills(built)
+        return built
 
     def instrument(self) -> dict:
         return {"instrument": self._need_project().refinement.instrument.model_dump(
