@@ -2512,7 +2512,8 @@ ROWS: tuple[Row, ...] = (
                   "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
                   "params.bodies._SNAP_REACH, the snap's reach per fractional coordinate, "
                   "from which RigidBodyBlock._axis_tilt_bound derives the linear-body axis "
-                  "test's tilt bound in radians (tier 1); that test compared the tilt with "
+                  "test's tilt bound in radians (a derived value, whose tier follows this "
+                  "row's once given); that test compared the tilt with "
                   "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
                   "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
@@ -3812,7 +3813,10 @@ ROWS: tuple[Row, ...] = (
                   "n.u = sum s_i h_i / sum s_i^2 exactly (h_i the point's offset from the "
                   "site's plane or line), so the tilt's sine is at most the reach x "
                   "sum |s_i| / sum s_i^2. It replaces the comparison of that sine with "
-                  "SITE_TOL itself (#1226). Tested: a CO2-like body (C-O 1.16 A) on the "
+                  "SITE_TOL itself (#1226). Its tier follows SITE_TOL's: the value is SITE_TOL "
+                  "x (1 + _SITE_TOL_SLACK), both still unaudited, and the derivation has no "
+                  "free factor, so it takes whatever tier SITE_TOL is given "
+                  "(docs/milestones/generality.md, The rule). Tested: a CO2-like body (C-O 1.16 A) on the "
                   "P n m a mirror with an O typed up to SITE_TOL/2 off it builds at b = 6 and "
                   "20 A, as one along the P 1 2 1 2-fold does, both refused on main; a body "
                   "exempt from the overlap refusal builds at 0.99 x the bound and is refused "
