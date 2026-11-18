@@ -338,7 +338,9 @@ A joint run writes no `snapshot.json`, so `rietx watch` lists it and follows its
 The live view draws one pattern, and a joint fit has several.
 
 `MultiHistogramRefinement.fit` takes no `stage_reports=`.
-A report at each stage would be one report per pattern per stage, and a report build's cost is set by the pattern and its phases rather than by the fit, from a fraction of a second on 11-BM NAC to seconds on a 49 000-point pattern, so the trajectory would multiply a single fit's report cost by the number of patterns.
+A report at each stage would be one report per pattern per stage, so the trajectory would multiply a single fit's report cost by the number of patterns.
+The cost of one report is not set by the point count.
+What remains of it after WP-1335 is the Stephens strain arm's Gauss-Newton solves and the March-Dollase grid, and both run again at every stage.
 Until that changes, a joint fit's stage trajectory is its event log, with each pattern's Rwp on every `stage_end`.
 
 ## Report per pattern
