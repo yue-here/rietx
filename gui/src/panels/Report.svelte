@@ -243,7 +243,7 @@ mispositioned or absent phase, not an impurity">
                 {row.action.two_theta_range[0].toFixed(2)}°</button>
             {/if}
             {#if arm?.can_apply}
-              <button disabled={busy}
+              <button class="ghost" disabled={busy}
                 title={arm.api_call ?? ""}
                 onclick={() => apply(row.action.kind, row.action.parameter_paths)}>
                 Apply</button>

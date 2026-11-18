@@ -25,35 +25,56 @@ AxisKind = Literal["two_theta", "tof"]
 AXIS_UNITS: dict[str, str] = {"two_theta": "degrees", "tof": "microseconds (µs)"}
 
 
-#: The floor :func:`_floor_sigma` raises a zero or negative esd to, as a
-#: fraction of the column's median positive esd (#650).  Such a channel then
-#: weighs about a million times its neighbours; WP-1952 replaces it with a
-#: dropped channel and a reader warning (WP-2002, B5).
-SIGMA_FLOOR_RELATIVE = 1e-3
 #: The count under which the Poisson fallback stops falling: σ = √max(y, 1),
 #: so a channel that counted zero is weighted as one count, as TOPAS weights
 #: a file without esds, 1/Max(Yobs, 1) (Technical Reference § 6.2).
 POISSON_FLOOR_COUNTS = 1.0
 
+#: What a channel whose stated σ is zero or negative becomes (WP-1952, WP-2002
+#: B5).  ``"exclude"``: it takes no weight, leaving the fit as an excluded
+#: channel does, the rule GSAS-II's fxye reader applies to σ ≤ 0.  ``"poisson"``:
+#: it is weighted by the Poisson fallback √max(y, 1), one count at a zero count,
+#: for a file that wrote σ = √0 for a channel that counted nothing.
+NonPositiveSigma = Literal["exclude", "poisson"]
 
-def _floor_sigma(s: np.ndarray) -> np.ndarray:
-    """``s`` with zero and negative esds raised to a floor, so no channel takes
-    an infinite weight.
 
-    The floor is a thousandth of the column's median positive esd, and nothing
-    else. It used to be ``max(1e-3, …)`` as well — an absolute number in
-    whatever units the intensity happened to be in, which never binds on counts
-    (median esd ≥ 1) and silently raised every esd of a normalised pattern,
-    whose esds sit near 1e-3 and below, to 1e-3 (#650). A column with no
-    positive entry has no scale to be relative to, and keeps 1.0.
+def _poisson_where_nonpositive(s: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """``s``, with every entry that is not positive replaced by √max(y, 1).
+
+    An esd of zero claims an exact intensity and a negative one has no meaning,
+    so neither is a weight.  Under ``nonpositive_sigma="exclude"`` these
+    channels leave the fit (:meth:`PatternData.in_range_mask`) and the value
+    here is a placeholder no residual reads; it keeps every whole-pattern
+    consumer finite.  Under ``"poisson"`` it is the weight.  It replaced a floor
+    at a thousandth of the column's median esd, which gave such a channel about
+    a million times its neighbours' weight (#650, #897).
 
     One rule for :meth:`PatternData.sig` and
     :meth:`~rietx.schemas.results.RefinementResult.sig`, so the two cannot
     drift apart.
     """
-    floor = (float(np.median(s[s > 0])) * SIGMA_FLOOR_RELATIVE if np.any(s > 0)
-             else 1.0)
-    return np.maximum(s, floor)
+    return np.where(s > 0, s, np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS)))
+
+
+class SigmaRule(Base):
+    """Which σ rule weighted the channels a fit took, and on how many (WP-1952).
+
+    WP-2002's B14 asked for it: by the time a result exists, a file's esd and a
+    Poisson estimate are the same array of floats, so the rule that produced
+    each has to be recorded where it fired.  ``n_file_sigma + n_poisson_sigma``
+    is the fit's channel count.  Built by :meth:`PatternData.sigma_rule`, the
+    authority on both the rule and the mask.
+    """
+
+    #: fitted channels weighted by the file's own σ
+    n_file_sigma: int
+    #: fitted channels weighted by the Poisson fallback √max(y, 1): every one
+    #: when the pattern carries no σ, else the σ ≤ 0 channels a caller kept
+    #: with ``nonpositive_sigma="poisson"``
+    n_poisson_sigma: int
+    #: channels inside the fitted range whose σ is zero or negative and which
+    #: left the fit under ``nonpositive_sigma="exclude"``
+    n_nonpositive_excluded: int
 
 
 class PatternData(Base):
@@ -89,6 +110,10 @@ class PatternData(Base):
     tof: list[float] | None = None
     intensity: list[float]
     sigma: list[float] | None = None
+    #: What a channel whose ``sigma`` is zero or negative becomes:
+    #: :data:`NonPositiveSigma`.  The values stay the file's; this field says
+    #: how they are weighted.  The ``nonpositive_sigma`` reader option sets it.
+    nonpositive_sigma: NonPositiveSigma = "exclude"
     excluded_regions: list[tuple[float, float]] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
 
@@ -184,19 +209,46 @@ class PatternData(Base):
         return np.asarray(self.intensity, dtype=np.float64)
 
     def sig(self) -> np.ndarray:
-        """Per-point σ, applying the Poisson fallback where needed."""
-        if self.sigma is not None:
-            return _floor_sigma(np.asarray(self.sigma, dtype=np.float64))
+        """Per-point σ, applying the Poisson fallback where needed.
+
+        A stated σ that is zero or negative comes back as √max(y, 1)
+        (:func:`_poisson_where_nonpositive`): the weight under
+        ``nonpositive_sigma="poisson"``, a placeholder the fit never reads under
+        ``"exclude"``.
+        """
         y = self.y()
+        if self.sigma is not None:
+            return _poisson_where_nonpositive(
+                np.asarray(self.sigma, dtype=np.float64), y)
         return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
+    def nonpositive_sigma_mask(self) -> np.ndarray:
+        """True per channel whose stated σ is zero or negative; all False when
+        the pattern carries no σ.
+
+        Written as "not positive", the test :func:`_poisson_where_nonpositive`
+        replaces by, so a channel :meth:`sig` does not weight by the file's σ
+        is never counted as the file's in :meth:`sigma_rule`."""
+        if self.sigma is None:
+            return np.zeros(len(self.intensity), dtype=bool)
+        return ~(np.asarray(self.sigma, dtype=np.float64) > 0)
+
     def in_range_mask(self) -> np.ndarray:
-        """True for points kept in the fit (excluded_regions removed).
+        """True for points kept in the fit: excluded_regions removed, and under
+        ``nonpositive_sigma="exclude"`` every channel whose σ is zero or
+        negative (WP-1952), since such a σ states no weight.
 
         On the axis as measured: an excluded region is a span of *channels*, so
         it is quoted in whatever the abscissa is — degrees on a CW pattern,
         microseconds on a TOF one.
         """
+        mask = self._region_mask()
+        if self.nonpositive_sigma == "exclude":
+            mask &= ~self.nonpositive_sigma_mask()
+        return mask
+
+    def _region_mask(self) -> np.ndarray:
+        """``in_range_mask`` before the σ rule: the excluded regions alone."""
         from .project import check_interval
 
         x = self.x()
@@ -206,6 +258,30 @@ class PatternData(Base):
             check_interval("an excluded region", lo, hi)
             mask &= ~((x >= lo) & (x <= hi))
         return mask
+
+    def sigma_rule(self, within: np.ndarray | None = None) -> SigmaRule:
+        """Which σ rule weights the channels a fit takes, counted
+        (:class:`SigmaRule`).
+
+        ``within`` is the fit's own window over the channels (a
+        ``two_theta_limits`` cut), ``None`` for the whole pattern.  It is
+        intersected with the excluded regions here, so the counts are the
+        fit's: ``compile_model`` asks this with the same window it cuts by.
+        """
+        regions = self._region_mask()
+        if within is not None:
+            regions &= np.asarray(within, dtype=bool)
+        nonpos = self.nonpositive_sigma_mask() & regions
+        n_in = int(regions.sum())
+        n_nonpos = int(nonpos.sum())
+        if self.sigma is None:
+            return SigmaRule(n_file_sigma=0, n_poisson_sigma=n_in,
+                             n_nonpositive_excluded=0)
+        if self.nonpositive_sigma == "poisson":
+            return SigmaRule(n_file_sigma=n_in - n_nonpos,
+                             n_poisson_sigma=n_nonpos, n_nonpositive_excluded=0)
+        return SigmaRule(n_file_sigma=n_in - n_nonpos, n_poisson_sigma=0,
+                         n_nonpositive_excluded=n_nonpos)
 
     def __str__(self) -> str:
         """The range and step on one line, then what was measured beside it
@@ -247,6 +323,7 @@ class PatternData(Base):
             tof=kept if self.axis == "tof" else None,
             intensity=self.y()[keep].tolist(),
             sigma=None if self.sigma is None else np.asarray(self.sigma)[keep].tolist(),
+            nonpositive_sigma=self.nonpositive_sigma,
             excluded_regions=self.excluded_regions,
             metadata=self.metadata,
         )

@@ -154,16 +154,28 @@ class Cell(Base):
     Crystal-system constraints (e.g. cubic ``a=b=c``, α=β=γ=90°) are enforced
     by the parameter-vector compiler from the space group, not stored here.
 
-    The six parameters carry no physical bounds of their own (``min=-inf,
-    max=inf`` by default, like every other bare ``Parameter`` field) — the
-    cell-window / tie-window machinery in :mod:`rietx.params.vector`
-    (``cell_window``, ``freeze_cell_windows``, ``_tie_windows``) reads an
-    infinite stored bound as *no claim made* and this is deliberately left
-    that way (issue #283's own discussion; a schema default here is a design
-    decision for that machinery, not a local fix).  A degenerate cell reached
-    by an unbounded search is refused by
+    The six parameters carry no default box (``min=-inf, max=inf``, like
+    every other bare ``Parameter`` field), on purpose (issue #283, WP-1528).
+    A finite stored bound is the *caller's claim*:
+    :func:`~rietx.params.vector.cell_window` keeps it and skips its own
+    runaway window on that side, and
+    :meth:`~rietx.params.vector.ParameterTable.bounds` is ordered so that
+    nothing makes a side finite ahead of it.  A box here would therefore act
+    on every free cell and switch off the runaway window on its side.  It would
+    also show in ``ParameterRow`` and the ``.rxt`` document as a claim the user
+    never made.  Under ``solver="trf"`` there is a third ground: scipy scales
+    its trust region by the distance to the bounds, so a box changes the step
+    even when it is never reached (windowing every phase took the IUCr
+    ``cpd-1c`` refit from 82 iterations to its 400 budget, and its corundum
+    fraction from 6.30 to 9.04 wt %; those figures are TRF measurements).  The
+    default ``solver="lm"`` reads a box only when a step reaches it.  The limit lives in the solver instead: a
+    window frozen at each stage's start for phases the data cannot see
+    (``freeze_cell_windows``), and the post-solve
+    :func:`~rietx.refine.reset_cell_runaway`, which puts a runaway phase's
+    cell back at the stage's start (``CELL_RUNAWAY``).  A
+    degenerate cell reached by the unbounded search is refused by
     :func:`~rietx.crystallography.lattice.d_spacings` and neutralised by the
-    solver's own guard instead (``CELL_DEGENERATE_PROBE``).
+    solver's own guard (``CELL_DEGENERATE_PROBE``).
     """
 
     a: Parameter
@@ -1239,6 +1251,37 @@ class DistortionModes(Base):
         return self
 
 
+class ParentCell(Base):
+    """A child's cell stated as its parent's cell carried through (P, p), plus strain.
+
+    WP-1419 (#286, #293, #746): a child phase (a superstructure in the cell
+    ``transform`` makes of its parent's) whose ``parent_cell`` is set does not
+    refine its own six cell parameters.  It refines the **parent's** cell,
+    under the parent group's own constraints, and the Γ lattice strains its
+    own group allows and the parent's does not; the child's a, b, c, α, β, γ
+    are derived from them, G′ = Pᵀ·(G_parent + 2·L·E·L)·P
+    (``crystallography.metric``), and locked.  This is how a child cell whose
+    axes are not conventional for its own point group (a C-centred type in a
+    primitive doubled cell, so no tie or fixed angle states its metric) gets a
+    cell at all, and it is the convention of mode-amplitude refinement: the
+    parent's cell refined, the child's derived, a strain freed only where the
+    data show one.
+
+    ``space_group`` is the parent's symbol, ``transform`` the parent → child
+    (P, p) in ``transform_BNS_Pp_abc`` form (``"a,2b,b+c;0,0,0"``: the child's
+    axes as combinations of the parent's).  ``strain`` holds one dimensionless
+    amplitude per strain the child's group allows, in the order
+    ``crystallography.metric.strain_basis`` gives them; the parameter table
+    refuses a list of the wrong length and says how long it must be.  Built by
+    ``magnetic_supercell`` with every strain at zero and held.
+    """
+
+    space_group: str
+    transform: str
+    cell: Cell
+    strain: list[Parameter] = Field(default_factory=list)
+
+
 class Phase(_InheritsDeclaredDefaults):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
@@ -1478,6 +1521,11 @@ class Phase(_InheritsDeclaredDefaults):
                     f"phase {self.name!r}: atom {atom.label!r} is placed by a rigid "
                     "body and moved by a distortion mode; one writer per coordinate")
         return self
+    # The cell as the parent's carried through (P, p) plus the Γ strains this
+    # phase's group allows (WP-1419; :class:`ParentCell`).  ``None`` (the
+    # default) is exactly off: the cell refines as its own six parameters under
+    # ``cell_constraints``, as every earlier version built it.
+    parent_cell: ParentCell | None = None
 
     @model_validator(mode="after")
     def _bodies_name_their_atoms(self) -> "Phase":

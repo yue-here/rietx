@@ -11,7 +11,7 @@ import subprocess
 import time
 import tomllib
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -23,6 +23,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
+    from .report.body_misfit import ReleasedArm
     from .schemas.fraction import FractionProfile
     from .schemas.interval import ParameterInterval
     from .schemas.results import QuantitativePhaseAnalysis
@@ -61,7 +62,7 @@ from .crystallography.twins import (
     restraints_dropped_message,
     site_of,
 )
-from .help import help_key_for
+from .help import help_key_for, undeclared_opt_in
 from .history.events import _attach_progress, as_event_stream
 from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
@@ -83,7 +84,7 @@ from .model.forward import (
     window_loss,
 )
 from .model.geometry import cell_volumes, geometry_table
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
 from .model.profiles.caglioti import (
     SCHERRER_K,
@@ -467,6 +468,9 @@ class _StageHold:
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
     unknown_paths: list[str] = dataclasses.field(default_factory=list)
+    #: ``StageResult.fixed`` (WP-2208), riding here for the same reason: the
+    #: paths the stage's ``turn_off`` fixed, decided before the solve
+    fixed: list[str] = dataclasses.field(default_factory=list)
     #: ``StageResult.seeded`` (WP-1930), riding here for the same reason:
     #: decided before the solve, and unrecoverable after it, when the seeded
     #: row has moved.  ``Stage.seed``'s rows and ``Stage.strain_seed``'s.
@@ -1968,10 +1972,14 @@ def _cell_runaway_withheld(table: ParameterTable,
     """The paths whose esd a result withholds, given the paths one stage's
     ``CELL_RUNAWAY`` finding names (its ``where``).
 
-    Every cell path named, and every entry tied to one of them, transitively:
-    a tie inherits its source's blindness (root CLAUDE.md, the covariance
-    clause), so a cubic ``b``/``c`` following a withheld ``a`` cannot report
-    the esd ``a`` lost.  A ``vars.X`` driver the finding names is not a cell
+    Every cell path named, and every entry tied to one of them or written by a
+    derived block reading one, transitively: a tie inherits its source's
+    blindness (root CLAUDE.md, the covariance clause), so a cubic ``b``/``c``
+    following a withheld ``a`` cannot report the esd ``a`` lost.  A derived
+    entry is the same case without the tie: a ``Phase.parent_cell`` child's
+    six cell entries are computed from the parent's, and are the cell the
+    pattern uses, so they lose the esd the parent edge lost (WP-1419, review
+    of #1108).  A ``vars.X`` driver the finding names is not a cell
     and keeps its esd; the cells it drives are named themselves.  Which
     stage's finding is the caller's to decide (:func:`_build_result`).
     """
@@ -1984,6 +1992,11 @@ def _cell_runaway_withheld(table: ParameterTable,
                     and any(src in withheld for src, _ in e.tie.terms)):
                 withheld.add(e.path)
                 grew = True
+        for block in table.derived:
+            if (any(src in withheld for src in block.inputs)
+                    and not withheld.issuperset(block.outputs)):
+                withheld.update(block.outputs)
+                grew = True
     return withheld
 
 
@@ -1995,7 +2008,7 @@ def _cell_runaway_withheld(table: ParameterTable,
 _ANGLE_CELL_NAMES = ("alpha", "beta", "gamma")
 
 #: a cell path's phase index, bare or scoped ``hist.h.`` by a joint fit
-_CELL_PHASE = re.compile(r"phases\.(\d+)\.cell\.")
+_CELL_PHASE = re.compile(r"phases\.(\d+)\.(?:parent_cell\.)?cell\.")
 
 
 def _cell_runaway_diagnostic(
@@ -3198,31 +3211,29 @@ class Refinement:
         A ``vary=True`` coordinate on an atom whose site symmetry allows no
         positional freedom (``F d -3 m`` 8a, ``P n m a`` inversion centres, …) is
         refused when the parameter table is first built, at the first
-        :meth:`parameters` or :meth:`fit`, and the refusal names only the first
-        such atom.  After a step that frees "every coordinate" of a structure
-        holding special and general sites together, this is the one call that
-        makes it fittable: it clears the flag on exactly those coordinates,
-        records one ``edit_model`` node, and returns their paths, sorted.  Atoms
-        with any free direction are untouched, and a structure with nothing to
-        fix returns ``[]`` and records nothing.  Opt-in: construction and
-        ``fit()`` still refuse, as before.
+        :meth:`parameters` or :meth:`fit`, and the refusal names every such
+        site (WP-1913).  After a step that frees "every coordinate" of a
+        structure holding special and general sites together, this is the one
+        call that makes it fittable: it clears the flag on exactly those
+        coordinates, records one ``edit_model`` node, and returns their paths,
+        sorted.  A rigid body's origin is a site too, so a fixed one is cleared
+        the same way.  An atom a body places or a distortion mode moves is its
+        owner's, refused by its own sentence and left alone here.  Sites with
+        any free direction are untouched, and a structure with nothing to fix
+        returns ``[]`` and records nothing.
+        Opt-in: construction and ``fit()`` still refuse, as before.
         """
-        from .crystallography.symmetry import resolve_group
-        from .crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+        from .params.vector import fixed_sites_asking_to_vary
 
         structure = self.structure.model_copy(deep=True)
         cleared: list[str] = []
-        for ip, phase in enumerate(structure.phases):
-            sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            for ia, atom in enumerate(phase.atoms):
-                xyz = [atom.x.value, atom.y.value, atom.z.value]
-                if len(coordinate_basis(stabilizer_rotations(sg, xyz))) > 0:
-                    continue
-                for axis in ("x", "y", "z"):
-                    param = getattr(atom, axis)
-                    if param.vary:
-                        param.vary = False
-                        cleared.append(f"phases.{ip}.atoms.{ia}.{axis}")
+        # the table's own list, so the verb clears exactly what it refuses
+        for base, site in fixed_sites_asking_to_vary(structure):
+            for axis in ("x", "y", "z"):
+                param = getattr(site, axis)
+                if param.vary:
+                    param.vary = False
+                    cleared.append(f"{base}.{axis}")
         if cleared:
             self.edit(structure=structure, label="fix_special_positions")
         return sorted(cleared)
@@ -3439,7 +3450,7 @@ class Refinement:
         known = {e.path for e in table.entries}
         if unknown := [g for g in dict.fromkeys(globs)
                        if is_literal_path(g) and g not in known]:
-            raise _unknown_paths_error(unknown, known)
+            raise _unknown_paths_error(unknown, known, self.instrument)
 
     def _set_vary_findings(self, table: ParameterTable, globs: list[str],
                            vary: bool) -> list[str]:
@@ -3452,7 +3463,7 @@ class Refinement:
         verb = "freed" if vary else "fixed"
         out = []
         for path in table.unknown_paths(globs):
-            hint = _path_hint(path, known)
+            hint = _path_hint(path, known, self.instrument)
             out.append(f"set_vary {verb} nothing for {path!r}, which names no "
                        "parameter of this model."
                        + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
@@ -3486,12 +3497,38 @@ class Refinement:
         recorded only once the history tree exists.
         """
         table = self._working_table()
+        by_path = self._refuse_value_edits(table, values)
+        for path, value in values.items():
+            by_path[path].value = float(value)
+        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
+        self._write_back(table)
+        # a value set next to its own image is the twin case #1007 describes
+        self._merge_twins()
+        # the fitted curve and statistics described the *old* values
+        self._invalidate_fit()
+        if self.history is None:
+            return
+        node = self.history.add(
+            parents=[self._head_id] if self._head_id else [],
+            action=NodeAction(kind="set_value", values=dict(values)),
+            state=self.snapshot())
+        self._head_id = node.id
+
+    def _refuse_value_edits(self, table: ParameterTable,
+                            values: dict[str, float]) -> dict:
+        """``table``'s entries by path, once every edit in ``values`` is legal.
+
+        :meth:`set_values`' refusals, one check so that a caller previewing
+        values without applying them (the GUI's ``POST /api/preview``,
+        WP-2125) refuses exactly what applying them would, in the same
+        sentences.  Raises ``ValueError`` on the first refusal.
+        """
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
             raise ValueError(f"unknown parameter path(s): {sorted(unknown)}" + "".join(
                 f"; for {p!r}, {h}" for p in sorted(unknown)
-                if (h := _path_hint(p, by_path))))
+                if (h := _path_hint(p, by_path, self.instrument))))
         for path, value in values.items():
             e = by_path[path]
             user = (self._ties.get(path) if path in self._applied_ties else None)
@@ -3513,21 +3550,7 @@ class Refinement:
             if not (e.lo <= float(value) <= e.hi):
                 raise ValueError(
                     f"{path}={value} lies outside its bounds [{e.lo}, {e.hi}]")
-        for path, value in values.items():
-            by_path[path].value = float(value)
-        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
-        self._write_back(table)
-        # a value set next to its own image is the twin case #1007 describes
-        self._merge_twins()
-        # the fitted curve and statistics described the *old* values
-        self._invalidate_fit()
-        if self.history is None:
-            return
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_value", values=dict(values)),
-            state=self.snapshot())
-        self._head_id = node.id
+        return by_path
 
     # ------------------------------------------------------------------
     # user constraints (WP-1070)
@@ -3730,7 +3753,7 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         entry = by_path.get(path)
         if entry is None:
-            raise _unknown_path_error(path, by_path)
+            raise _unknown_path_error(path, by_path, self.instrument)
         user = (self._ties.get(path) if path in self._applied_ties else None)
         if user is not None and entry.locked:
             # a formula's block writes this row: its own target, or a row
@@ -4108,7 +4131,7 @@ class Refinement:
                 continue
             entry = known.get(glob)
             if entry is None:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             if entry.tie is not None:
                 raise ValueError(
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
@@ -4177,7 +4200,7 @@ class Refinement:
         for glob in globs:
             if not is_literal_path(glob) or glob in known:
                 continue
-            raise _unknown_path_error(glob, known)
+            raise _unknown_path_error(glob, known, self.instrument)
         hits = sorted(p for p in known
                       if any(fnmatch.fnmatchcase(p, g) for g in globs))
         # a body owns its atoms' coordinates as symmetry owns a special
@@ -4186,15 +4209,20 @@ class Refinement:
         # since holding half of what it names would be a silent partial hold
         owned = table.body_rows()
         if blocked := [p for p in hits if p in owned]:
-            names = sorted({owned[p] for p in blocked})
+            # every body the sweep reached, in the order it reached them, so
+            # the name and the globs are the same bodies' (a glob over several
+            # bodies' atoms names each one's DOFs, not only the first's)
+            bases = table.body_row_bases()
+            owners = list(dict.fromkeys(bases[p] for p in blocked))
+            names = list(dict.fromkeys(owned[p] for p in blocked))
             raise ValueError(
                 f"cannot hold {blocked[0]!r}"
                 + (f" and {len(blocked) - 1} more" if len(blocked) > 1 else "")
-                + f": placed by rigid body {names[0]!r}; hold the body's own "
+                + (f": placed by rigid body {names[0]!r}" if len(names) == 1 else
+                   f": placed by rigid bodies {', '.join(map(repr, names))}")
+                + f"; hold {'the' if len(owners) == 1 else 'each'} body's own "
                 "origin, rotation and torsions instead "
-                "(phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*, "
-                "phases.*.rigid_bodies.*.torsions.*.twist)")
+                f"({', '.join(_body_dof_globs(b) for b in owners)})")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []
@@ -4323,7 +4351,7 @@ class Refinement:
             glob = literals[0]
             known = [e.path for e in table.entries]
             if glob not in known:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             raise ValueError(f"{glob!r} is not held by this refinement")
         if not hits and not origin_hits:
             return []
@@ -4872,6 +4900,7 @@ class Refinement:
         # carries the frozen 100 and 3 for a node written before the fields
         stage = Stage(node.action.name or "cherry-pick",
                       list(node.action.turn_on),
+                      turn_off=list(node.action.turn_off),
                       max_iter=node.action.max_iter,
                       lebail_cycles=node.action.lebail_cycles,
                       lebail_tol=node.action.lebail_tol,
@@ -5019,10 +5048,13 @@ class Refinement:
         # that are held *on this model* and cannot disagree with what
         # ``set_vary`` just did.  A stage that frees nothing held records an
         # empty list, which is every stage of every fit that declares no hold.
+        # A path the same stage fixes is left out (WP-2208): the stage did not
+        # want it free, so the hold refused nothing it asked for.
         blocked_by_hold = sorted(
             e.path for e in table.entries
             if e.held and e.tie is None and not e.locked
-            and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on))
+            and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+            and not any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_off))
         # What the stage asked for by name and the model does not have
         # (WP-1414).  A literal, or a pattern under a retired spelling: any
         # other pattern matching nothing is how the shipped plans reach
@@ -5031,7 +5063,9 @@ class Refinement:
         # and a retired name is a rename the plan missed.  Recorded, never
         # raised — one plan runs a whole series, and a path one pattern's
         # model lacks must not end the chain.
-        unknown_paths = table.unknown_paths(stage.turn_on)
+        # A fix's literal is read the same way (WP-2208): a mistyped path in
+        # either list is the same mistake.
+        unknown_paths = table.unknown_paths([*stage.turn_on, *stage.turn_off])
         # what the previous stage's answer held, which the support hold reads
         # as tried and flat (WP-2049, ``_unsupported_phase_paths``)
         tried = list(self._held)
@@ -5041,6 +5075,19 @@ class Refinement:
             # need not name its cell again for it to keep refining
             table.set_vary(self._held, True)
             self._held = []
+        # The stage's fixes, after its frees and after the lift above, so a
+        # lifted support hold cannot free again what the stage fixes (WP-2208).
+        # ``freed`` then describes the set this stage leaves free, and
+        # ``fixed`` names only what the fix took out of the free set: a row
+        # already fixed, or held, matches ``set_vary`` but was not fixed here.
+        fixed: list[str] = []
+        if stage.turn_off:
+            was_free = set(table.free_paths)
+            fixed = [p for p in table.set_vary(stage.turn_off, False)
+                     if p in was_free]
+        if fixed:
+            gone = set(fixed)
+            freed = [p for p in freed if p not in gone]
         if mode in ("lebail", "pawley"):
             # never refine what ``mode_fixed_path`` force-fixes against the
             # intensity model (structure, the phase scale, texture, a magnetic
@@ -5056,6 +5103,11 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
+        # a body's turn free in two directions of three has no exact re-chart
+        # at the commit, so it is refused here, where the stage's globs, the
+        # caller's holds and ties and the mode's force-fix have all settled
+        # the free set and before anything is written (WP-1805, answer (c))
+        table.refuse_partial_turns()
         seeded: dict[str, float] = {}
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
@@ -5589,7 +5641,7 @@ class Refinement:
             scale_b_held=dict(scale_b_held),
             width_twins_held=width_twins_held,
             blocked_by_hold=blocked_by_hold, unknown_paths=unknown_paths,
-            seeded=seeded,
+            fixed=list(fixed), seeded=seeded,
             cell_runaway=list(cell_runaway),
             cell_reset=list(cell_reset), collapsed=list(collapsed),
             cell_runaway_unresolved=[(d, list(e)) for d, e in cell_runaway_unresolved],
@@ -6004,14 +6056,19 @@ class Refinement:
                 [(sr.name, sr.n_degenerate_cell_probes) for sr in stage_results]))
             diagnostics.extend(_hold_diagnostics(stage_results,
                                                  table.origin_holds))
+            diagnostics.extend(_parent_strain_held_diagnostics(
+                stage_results, table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
-                stage_results, [e.path for e in table.entries]))
+                stage_results, [e.path for e in table.entries], self.instrument,
+                fixes=_fix_only_globs(plan.stages)))
             diagnostics.extend(_window_loss_diagnostics(stage_results))
             if mode == "rietveld":
                 # after the write-back: the search reads the answer's coordinates
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
+                    self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
                     self.structure, stale_since))
 
             self.result_ = _build_result(
@@ -6155,7 +6212,9 @@ class Refinement:
         model = outcome = guard = None
         # the declared stages and the closing one, with the schedule of each
         # (WP-2002, the sixth round's Q1 and Q2): the plan is the one authority
-        stages = plan.run_stages()
+        # the table's paths, which the closing stage of a plan that fixes
+        # replays its fixes over (WP-2208, ``staged.fixed_at_end``)
+        stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
         window_tols = plan.stage_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
@@ -6262,7 +6321,7 @@ class Refinement:
                 moment_flat_axes=hold.moment_flat_axes,
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
-                unknown_paths=hold.unknown_paths,
+                unknown_paths=hold.unknown_paths, fixed=hold.fixed,
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
@@ -6287,6 +6346,7 @@ class Refinement:
                 self._record_free_paths(table)
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
+                    turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
                     lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
@@ -6570,6 +6630,8 @@ class Refinement:
             if mode == "rietveld":
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
                     self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
+                    self.structure, stale_since))
 
             stage_result = StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -6586,7 +6648,7 @@ class Refinement:
                 moment_flat_axes=hold.moment_flat_axes,
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
-                unknown_paths=hold.unknown_paths, unreached_histograms={},
+                unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
@@ -6599,10 +6661,13 @@ class Refinement:
             # before the node, so the node carries what the result carries
             diagnostics.extend(_hold_diagnostics([stage_result],
                                                  table.origin_holds))
+            diagnostics.extend(_parent_strain_held_diagnostics(
+                [stage_result], table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
-                [stage_result], [e.path for e in table.entries]))
+                [stage_result], [e.path for e in table.entries], self.instrument,
+                fixes=_fix_only_globs([stage])))
             diagnostics.extend(_window_loss_diagnostics([stage_result]))
 
             # before the node is recorded, which is where `_run_plan` writes it
@@ -6618,6 +6683,7 @@ class Refinement:
             if tree is not None:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
+                    turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
                     lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
@@ -6821,6 +6887,25 @@ class Refinement:
         require_two_theta(data, "Refinement.check_rigid_bodies()",
                           instrument=self.instrument)
         return rigid_body_misfit(self, data, **kw)
+
+    def released_arm(self, body: str, *, phase: int | None = None,
+                     freed: Sequence[str] | None = None,
+                     bond_sigma: float = 0.02, angle_sigma: float = 2.0) -> ReleasedArm:
+        """The released arm :meth:`check_rigid_bodies` compares ``body`` with.
+
+        Built from this refinement's current structure (fit first for the
+        arm the check builds): the body removed, its non-riding members freed
+        and held near the template by bond and angle restraints, each riding
+        H tied to its parent.  ``freed`` names the members to free instead.
+        Returns a :class:`~rietx.report.body_misfit.ReleasedArm`; fit it as a
+        ``Refinement`` over its ``structure``, with its ``ties`` declared
+        through :meth:`tie` and its ``free`` globs in a stage.  The rules:
+        :func:`rietx.report.body_misfit.released_arm`.
+        """
+        from .report.body_misfit import released_arm
+
+        return released_arm(self.structure, body, phase=phase, freed=freed,
+                            bond_sigma=bond_sigma, angle_sigma=angle_sigma)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | PlanSpec | str | None = None,
@@ -7622,6 +7707,19 @@ _MAGNETIC_WIDTH_PATH = re.compile(
     r"^phases\.(\d+)\.magnetic_lor_(?:size|strain)$")
 
 
+def _left_free(freed: list[str], stage: Stage) -> list[str]:
+    """``freed`` without the paths ``stage``'s own ``turn_off`` fixes after it.
+
+    ``_run_stage``'s order (WP-2208), for the plan checks that read
+    ``would_free`` before a stage runs: a path the stage frees and fixes
+    again is not one it refines.
+    """
+    if not stage.turn_off:
+        return freed
+    return [p for p in freed
+            if not any(fnmatch.fnmatchcase(p, g) for g in stage.turn_off)]
+
+
 def _stage_order_diagnostics(plan, table,
                              mode: Mode) -> list[Diagnostic]:
     """``STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`` — the ordering rule, checked
@@ -7679,7 +7777,7 @@ def _stage_order_diagnostics(plan, table,
         # ``_run_stage`` drops with, so this cannot report a stage the mode
         # empties.  A hold the data decides later (``_hold_unsupported_phases``,
         # the flat-moment hold) is not seen here.
-        freed = table.would_free(stage.turn_on)
+        freed = _left_free(table.would_free(stage.turn_on), stage)
         if mode in ("lebail", "pawley"):
             reach = table.column_reach()
             freed = [p for p in freed
@@ -7749,8 +7847,10 @@ def _held_moment_diagnostics(plan, table, structure: Structure,
                 bases.append(base)
     if not sites:
         return []
-    freed = table.would_free(
-        [g for stage in plan.run_stages() for g in stage.turn_on])
+    # what some stage leaves free, its own fixes taken out (WP-2208): a moment
+    # a stage frees and fixes again never moves
+    freed = [p for stage in plan.run_stages()
+             for p in _left_free(table.would_free(stage.turn_on), stage)]
     moving = {p.split(".")[1] for p in freed if _MOMENT_DOF.match(p)}
     start = table.decode(table.x0())
     out: list[Diagnostic] = []
@@ -7921,16 +8021,19 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
         return []
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
-    # ``instrument.profile``
+    # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
+    # Lorentzian``).  A joint fit prefixes a histogram's block with
+    # ``hist.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
+    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
-    if any(label.endswith(".microstrain") for label in by):
+    if any(label.endswith(".microstrain") for label in bare):
         suggestion += (" The STEPHENS_STRAIN_NOT_POSITIVE protocol row "
                        "applies to the strain cone, although that guard stays "
                        "silent while the default LM driver holds the cone.")
-    if any(label.startswith("instrument.profile") for label in by):
+    if any(label.startswith("instrument.profile (") for label in bare):
         suggestion += (" At some reflection the data asked for no Gaussian "
                        "width (the Γ_G² floor, 1e-8 deg²), so U, V, W and the "
                        "phase's Gaussian size and strain describe that floor.")
@@ -8214,6 +8317,72 @@ def _hold_diagnostics(stage_results: list[StageResult],
     )]
 
 
+#: a joint fit's histogram scope, stripped to compare a path with the model's
+_HIST_SCOPE = re.compile(r"^hist\.\d+\.")
+
+
+def _parent_strain_held_diagnostics(stage_results: list[StageResult],
+                                    free: Iterable[str],
+                                    structure: Structure) -> list[Diagnostic]:
+    """``PARENT_STRAIN_HELD`` — a parent cell's edges refined with a Γ strain held.
+
+    ``phases.*.cell.*`` reaches the parent's cell edges of a
+    ``Phase.parent_cell`` phase and never a strain (WP-1419): while the
+    child's atoms and moments keep the parent's symmetry a strain at zero is a
+    stationary point, and a distortion gives it only a small gradient there
+    (measured 2e-3 of the peak at a 0.01 coordinate; 8e-14 on the parent's
+    positions), so a plan written for an ordinary phase
+    should refine the cell the way a user expects.  A competent refiner can
+    still want the strain freed, so the hold is said aloud, as a hold is
+    (:func:`_hold_diagnostics`, DESIGN.md § Rules, 1): one finding per phase
+    whose edges were free in some stage while one of its strains was not,
+    naming the held strain paths and the verbs that free them.  ``info``: the
+    run did what its plan said.
+
+    ``free`` is the answer's free paths and the stages' ``freed`` lists add
+    what an earlier stage freed, so an edge freed and later held is still
+    counted; a joint fit's ``hist.h.`` scope is stripped.
+    """
+    def bare(path: str) -> str:
+        return _HIST_SCOPE.sub("", path)
+
+    freed = {bare(p) for p in free}
+    for sr in stage_results:
+        freed.update(bare(p) for p in sr.freed)
+    out: list[Diagnostic] = []
+    for ip, phase in enumerate(structure.phases):
+        declared = phase.parent_cell
+        if declared is None or not declared.strain:
+            continue
+        edges = [f"phases.{ip}.parent_cell.cell.{n}"
+                 for n in ("a", "b", "c", "alpha", "beta", "gamma")]
+        if not any(e in freed for e in edges):
+            continue
+        held = [f"phases.{ip}.parent_cell.strain.{j}"
+                for j in range(len(declared.strain))
+                if f"phases.{ip}.parent_cell.strain.{j}" not in freed]
+        if not held:
+            continue
+        n = len(held)
+        values = [declared.strain[int(p.rsplit(".", 1)[1])].value for p in held]
+        out.append(Diagnostic(
+            level="info", code="PARENT_STRAIN_HELD",
+            message=(f"phase {ip}'s parent cell was refined with {n} Γ strain"
+                     f"{'' if n == 1 else 's'} held at "
+                     f"{', '.join(repr(v) for v in values)}: {', '.join(held)}.  "
+                     f"The cell glob never frees a strain, so the child's cell "
+                     f"is the parent's carried through the transform with no "
+                     f"shear beyond the held value."),
+            where=held, value=float(n),
+            suggestion=("To test for a strain, seed it off zero with set_values "
+                        "(zero is a stationary point while the atoms keep the "
+                        "parent's symmetry, and a distortion gives it only a "
+                        "small gradient there), then free "
+                        "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
+        ))
+    return out
+
+
 #: an atom's coordinate, which a site-symmetry table drives through
 #: ``….dof.k`` rather than freeing directly
 _COORDINATE_PATH = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.[xyz]$")
@@ -8225,7 +8394,7 @@ def _stage_list(names: list[str]) -> str:
             f"stages {', '.join(repr(s) for s in names)}")
 
 
-def _path_hint(path: str, known) -> str:
+def _path_hint(path: str, known, instrument=None) -> str:
     """The spelling a caller most likely meant by an unknown ``path``, or ``""``.
 
     ``STAGE_PATH_UNKNOWN``'s two answers, for the verbs that take a path
@@ -8234,30 +8403,59 @@ def _path_hint(path: str, known) -> str:
     the nearest real path (:mod:`rietx._nearmiss`).  Before this the verbs
     answered ``instrument.zero`` with the bare refusal, and ``set_vary`` with
     nothing at all.
+
+    A third answer comes between them (WP-2087): a path of an opt-in
+    correction its owner does not declare names the declaration
+    (:func:`rietx.help.undeclared_opt_in`).  The nearest real path answered
+    ``phases.0.extinction`` with ``phases.0.lor_strain``.  ``instrument``
+    lets a correction one geometry takes (roughness) answer too; without it
+    that correction gets the nearest path, never a declaration that raises.
     """
     current = retired_spelling(path)
     if current is not None:
         return f"it is a spelling retired after v1.2, now spelled {current!r}."
+    if (hit := undeclared_opt_in(path, known, instrument)) is not None:
+        row, owner = hit
+        # "a parameter of", never "exists once declared": an indexed family
+        # (a texture term, a Stephens or ADP DOF) need not hold this index
+        return (f"it is a parameter of {row.name}, which {_owner_words(owner)} "
+                f"does not declare. Declare it with {row.declaration}.")
     return did_you_mean(path, known, n=1)
 
 
-def _unknown_path_error(path: str, known) -> ValueError:
+def _owner_words(owner: str) -> str:
+    """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0".
+
+    A joint fit's ``hist.1.`` scope reads as "of histogram 1" after it.
+    """
+    parts = owner.split(".")
+    tail = ""
+    if parts[0] == "hist" and len(parts) > 2:
+        tail, parts = f" of histogram {parts[1]}", parts[2:]
+    if parts[0] == "phases" and len(parts) == 2:
+        return f"phase {parts[1]}{tail}"
+    if parts[0] == "phases" and len(parts) == 4 and parts[2] == "atoms":
+        return f"atom {parts[3]} of phase {parts[1]}{tail}"
+    return f"the {parts[-1]}{tail}"
+
+
+def _unknown_path_error(path: str, known, instrument=None) -> ValueError:
     """``unknown parameter path: 'p'``, with :func:`_path_hint` when it has one."""
-    hint = _path_hint(path, known)
+    hint = _path_hint(path, known, instrument)
     return ValueError(f"unknown parameter path: {path!r}"
                       + (f"; {hint}" if hint else ""))
 
 
-def _unknown_paths_error(paths: list[str], known) -> ValueError:
+def _unknown_paths_error(paths: list[str], known, instrument=None) -> ValueError:
     """:func:`_unknown_path_error` for one path; for several, every one named.
 
     ``set_vary`` takes a list, and naming each typo saves a rerun per typo.
     """
     if len(paths) == 1:
-        return _unknown_path_error(paths[0], known)
+        return _unknown_path_error(paths[0], known, instrument)
     return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
                       + "".join(f"; for {p!r}, {h.rstrip('.')}" for p in paths
-                                if (h := _path_hint(p, known))))
+                                if (h := _path_hint(p, known, instrument))))
 
 
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
@@ -8354,7 +8552,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
 
 
 #: the fixed leading segments of a glob that names one site
-_SITE_GLOB = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.")
+_SITE_GLOB = re.compile(r"^(phases\.\d+\.(?:atoms\.\d+|cell))\.")
 
 
 def _frees_for_request(entry, turn_on, user_ties) -> bool:
@@ -8390,7 +8588,10 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     was already reported by :func:`_fixed_literal_diagnostics`.
 
     **Only a glob whose fixed leading segments name one existing site**
-    (``phases.<i>.atoms.<j>.``).  WP-1414 kept every other pattern that matches
+    (``phases.<i>.atoms.<j>.``) **or one existing phase's cell**
+    (``phases.<i>.cell.``, #1108: a parent-cell phase's cell glob reaches only
+    derived rows, and ``phases.0.cell.al*`` on a cubic phase only
+    symmetry-fixed ones, while the literal was already reported).  WP-1414 kept every other pattern that matches
     nothing silent, because the shipped plans free families some models lack
     (``phases.*.microstrain.dof.*``), and no preset names a concrete index.
     A glob with a concrete site is the caller's claim about that site, so it
@@ -8405,7 +8606,9 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     ``dof`` rows, which the suggestion names.  One family is asked two ways:
     the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
     request copying that pair for one isotropic atom has its ``adp.*`` answered
-    by the ``biso`` it freed, and stays silent.
+    by the ``biso`` it freed, and stays silent.  A parent-cell phase's cell is
+    the other such family: a stage naming ``phases.<i>.cell.*`` beside a glob
+    that frees ``phases.<i>.parent_cell.cell.*`` has its cell, and stays silent.
 
     A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
     per glob naming its stages.  ``where`` is the glob, as
@@ -8433,16 +8636,43 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                 # ``biso`` and ``adp.*`` are one displacement asked two ways:
                 # the shipped stages name both, so either answers it
                 continue
+            if site.endswith(".cell") and any(
+                    e.path.startswith(f"{site.removesuffix('.cell')}.parent_cell.cell.")
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in entries):
+                # a parent-cell phase's cell asked both ways: the parent's
+                # edges the stage frees are the cell the child's glob meant
+                continue
             names = asked.setdefault(glob, [])
             if stage.name not in names:
                 names.append(stage.name)
     by_path = {e.path: e for e in entries}
     owned = table.body_rows()
+    owned_bases = table.body_row_bases()
     out = []
     for glob, names in asked.items():
         which = subject or _stage_list(names)
         site = _SITE_GLOB.match(glob).group(1)
         matched = [e.path for e in entries if fnmatch.fnmatchcase(e.path, glob)]
+        if site.endswith(".cell"):
+            ip = int(site.split(".")[1])
+            what = (f"matches only rows the model fixes or ties "
+                    f"({', '.join(matched)})" if matched
+                    else "matches no parameter")
+            parent = any(e.path.startswith(f"phases.{ip}.parent_cell.cell.")
+                         for e in entries)
+            why = (f" Phase {ip}'s cell is stated through its parent, so its "
+                   "own cell rows are derived and never free." if parent else "")
+            fix = (f"Free phases.{ip}.parent_cell.cell.* (the parent's edges) "
+                   "instead." if parent else
+                   "Read held_because for these rows in ref.parameters().")
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_NOT_FREE",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {glob}, "
+                         f"which {what}, so nothing was freed for it.{why}"),
+                where=[glob], suggestion=fix))
+            continue
         dofs = [e.path for e in entries if e.path.startswith(f"{site}.dof.")]
         coords = [by_path.get(f"{site}.{axis}") for axis in "xyz"]
         reaches = any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
@@ -8453,9 +8683,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         if reaches and f"{site}.x" in owned:
             why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
             fix = ("Free the body's own origin, rotation and torsions instead "
-                   "(phases.*.rigid_bodies.*.origin.dof.*, "
-                   "phases.*.rigid_bodies.*.rotation.*, "
-                   "phases.*.rigid_bodies.*.torsions.*.twist).")
+                   f"({_body_dof_globs(owned_bases[f'{site}.x'])}).")
         elif (reaches and not dofs
               and all(e is not None and e.locked for e in coords)):
             why = (f" Every coordinate of {site} is fixed by its site symmetry, "
@@ -8528,8 +8756,15 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
     return out
 
 
+def _fix_only_globs(stages) -> set[str]:
+    """The ``turn_off`` globs no stage's ``turn_on`` also names (WP-2208)."""
+    frees = {g for s in stages for g in s.turn_on}
+    return {g for s in stages for g in s.turn_off} - frees
+
+
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str]) -> list[Diagnostic]:
+                              known: list[str], instrument=None,
+                              fixes=frozenset()) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -8564,10 +8799,17 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     the nearest real path (:mod:`rietx._nearmiss`, the ``__getattr__`` helper)
     rides in the message.  One suggestion rather than three, since on dot
     paths the second and third are usually siblings of the first: for the
-    issue's typo they were ``lines.0.weight`` and ``profile.w``.
+    issue's typo they were ``lines.0.weight`` and ``profile.w``.  A literal
+    of an opt-in correction its owner does not declare names the declaration
+    instead (:func:`rietx.help.undeclared_opt_in`, WP-2087), and its
+    suggestion says to declare it.
 
     The suggestion names ``ref.parameters()`` for seeing every path, which a
     joint fit has too (WP-2028), spelling its rows as ``known`` does.
+
+    ``fixes`` holds the plan's ``turn_off`` globs (WP-2208): a path asked for
+    there alone was meant to be fixed, so the message says nothing was fixed,
+    since whatever the plan freed under that name still refines.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -8576,22 +8818,37 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     out = []
     for path, stages in by_path.items():
         which = _stage_list(stages)
+        done = "fixed" if path in fixes else "freed"
         current = retired_spelling(path)
         if current is not None:
             out.append(Diagnostic(
                 level="warning", code="STAGE_PATH_UNKNOWN",
                 message=(f"{which[:1].upper()}{which[1:]} asked for {path}, a "
-                         "spelling retired after v1.2, so nothing was freed "
+                         f"spelling retired after v1.2, so nothing was {done} "
                          f"for it. The current spelling is {current!r}."),
                 where=[path],
                 suggestion=f"Write {current!r} in the plan.",
+            ))
+            continue
+        if (hit := undeclared_opt_in(path, known, instrument)) is not None:
+            row, owner = hit
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_UNKNOWN",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
+                         f"names no parameter of this model, so nothing was {done} "
+                         f"for it. It is a parameter of {row.name}, which "
+                         f"{_owner_words(owner)} does not declare."),
+                where=[path],
+                suggestion=(f"Declare it with {row.declaration}, or write a glob "
+                            "if the stage should reach it only on models that "
+                            "declare it."),
             ))
             continue
         hint = did_you_mean(path, known, n=1)
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_UNKNOWN",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
-                     "names no parameter of this model, so nothing was freed "
+                     f"names no parameter of this model, so nothing was {done} "
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],
@@ -8978,7 +9235,7 @@ def _extra_peak_tick_support(model: CompiledModel,
 
 
 def _tick_rows(model: CompiledModel, structure: Structure,
-               values: dict[str, float]
+               values: dict[str, float], *, support: bool = True
                ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
                           dict[str, list[float]]]:
     """Every tick row of one histogram: positions, Miller indices and
@@ -8989,6 +9246,11 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     task 7), so a joint fit draws the rows a single fit draws: a magnetic
     phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
     peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+
+    ``support=False`` skips the support, which evaluates every reflection's
+    window and cost 11 ms of the GUI preview's 20 on the fluorapatite
+    example (WP-2125). Its rows then carry NaN, and the positions and indices
+    are unchanged.
     """
     # Tick positions cover **every** emission line, not just the primary one.
     # The calculated pattern really does have a peak at each Kα2 position, and
@@ -9023,7 +9285,8 @@ def _tick_rows(model: CompiledModel, structure: Structure,
         # (H, m), not H: a satellite is labelled by its order (WP-1326)
         pos, hkl = model.reflection_positions(ip, values)
         n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
+        sup = (_reflection_tick_support(model, ip, values, n_lines) if support
+               else np.full(len(pos), np.nan))
         keep = np.isfinite(pos)
         if cp.magnetic is not None:
             # issue #278: a magnetic phase's reflections are drawn as their
@@ -9082,7 +9345,9 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     extra_ticks = model.extra_peak_tick_positions(values)
     if extra_ticks:
         ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+        tick_support[EXTRA_TICK_KEY] = (
+            _extra_peak_tick_support(model, values) if support
+            else [math.nan] * len(extra_ticks))
     return ticks, tick_hkl, tick_support
 
 
@@ -9133,9 +9398,22 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # tested, so a tied row — in `parameters`, absent from the free vector —
     # reports None, and so does every row when no guard ran at all
     # (`replay`).  A free row on a floor of 0 is tested like any other bound
-    # (WP-1938), and reads True under either code (WP-1929).
-    tested = set(table.free_paths) if guard is not None else set()
+    # (WP-1938), and reads True under either code (WP-1929).  A tied row the
+    # LM step held on its own limit is a finding too (WP-1325,
+    # ``staged.tied_bound_findings``), so it reads True rather than None.
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
+    tested = set(table.free_paths) | on_bound if guard is not None else set()
+    # the FLOOR_HIT half of the same findings, read by the microstructure
+    # block (WP-1914) and the declared-peak diagnostics (WP-2141) below.
+    # With no guard (``replay``) the recorded
+    # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
+    # them below, so the table cannot contradict a warning the result carries.
+    # A tied width the LM step held on its own floor is named here directly
+    # (WP-1325), and ``floored_paths`` adds the ones tied to a floored source
+    floors = floored_paths(table, (
+        {p for f in guard.at_bounds if f.code == "FLOOR_HIT" for p in f.paths}
+        if guard is not None else
+        {p for d in diagnostics if d.code == "FLOOR_HIT" for p in d.where}))
     # A CELL_RUNAWAY finding's own message says the named cell's value is
     # "not a measurement", so its esd is withheld while the row stays (it is
     # still a free column; WP-1301's hold is what drops a row).  Keyed on the
@@ -9201,6 +9479,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if restraints_report is not None:
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
+    if model.restraints is not None:
+        # compile-time findings about the declared rows (WP-1814 C1)
+        diagnostics = diagnostics + model.restraints.findings
 
     # Bonding geometry, with esds through the *whole* covariance (WP-1072,
     # McCusker §10) — built here because that covariance is read off the final
@@ -9228,10 +9509,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # the three cannot attribute one coefficient to different wavelengths.
     # ``stderr_phys`` rather than a second ``stderr_physical`` call: with a
     # correlation matrix that build is a dense n x n, which a Pawley table
-    # makes large, and the two calls would return the same dict.
+    # makes large, and the two calls would return the same dict.  ``floors``
+    # is the FLOOR_HIT half of the bound findings ``at_bound`` projects
+    # above, so a width solve="trf" stopped a hair above zero reads absent
+    # exactly where LM's lands on it (WP-1914).
     microstructure = microstructure_table(
         structure, values, wavelength=_longest_line_wavelength(model),
-        esds=stderr_phys)
+        esds=stderr_phys, floors=floors)
 
     # WP-1343: whether the magnetic peaks are broader than the profile drew
     # them, read off the converged residual's *shape* rather than from any
@@ -9378,9 +9662,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
     # reflection" is asked against the same predicted positions Layer 0 uses,
-    # and the two must not disagree about where the model puts a line.
+    # and the two must not disagree about where the model puts a line.  "On
+    # its floor" is the bound test's ``floors`` above, never a distance of its
+    # own (WP-2141).
     diagnostics = diagnostics + _extra_peak_diagnostics(
-        model, values, ticks, table)
+        model, values, ticks, table, floors=floors)
 
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
@@ -9431,6 +9717,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         n_extra_components=(len(model.component_paths)
                             + len(model.peak_components)),
         n_background_components=len(model.component_paths),
+        sigma_rule=model.sigma_rule,
     )
 
 
@@ -10330,7 +10617,8 @@ def _far_from_data_diagnostics(model: CompiledModel, y_calc, y_bkg,
 
 
 def _extra_peak_diagnostics(model: CompiledModel, values: dict,
-                            ticks: dict, table) -> list[Diagnostic]:
+                            ticks: dict, table, *,
+                            floors: Collection[str]) -> list[Diagnostic]:
     """The two things a declared sharp peak is owed (WP-1103).
 
     Both **report and gate nothing.**  Declaring a peak the phases cannot
@@ -10353,18 +10641,26 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
     item 13, one rank down, and the position it reports is a walk rather than a
     measurement.  Said in the vocabulary the peak list already chose for this
     fact (``no_intensity`` in ``PEAK_UNUSABLE_FLAGS``) rather than in a second
-    one, and tested with ``BOUND_HIT_RTOL``, the distance of the
-    refinement's own bound test where no solve stands behind it
-    (``staged.bound_findings``, which reads the driver's exact active set or
-    a conjunction where it has a solve, WP-1434 and WP-1929) rather than a
-    second constant.
+    one.
+
+    "On its zero bound" is the package's one bound test, read rather than
+    restated (WP-2141).  ``floors`` holds the paths whose ``FLOOR_HIT`` fired
+    in the answer-producing stage, closed over ties by
+    :func:`~rietx.model.microstructure.floored_paths`.  That finding comes
+    from ``staged.bound_findings``, which reads the driver's exact active set
+    or a conjunction of distance and residual angle (WP-1434, WP-1929).  The
+    default LM driver lands a floored area on 0.0.  ``solver="trf"`` keeps its
+    iterates strictly inside the box, so a stopping point a hair above zero
+    still reads as no intensity when the bound test says the floor carried
+    load.  An area at or below zero reads so too, which covers a stated lower
+    bound below zero.  A positive lower bound is ``BOUND_HIT``, never this
+    code: an area held there still puts counts in the pattern.
 
     This is the honest evidence for "the peak was not needed", and it is not an
     Rwp comparison — which the package forbids as a correction's evidence for
     the reason ``docs/milestones/v0.5.md`` records.
     """
     from .report.layer0 import LAYER0_MATCH_TOL_DEG
-    from .strategy.staged import BOUND_HIT_RTOL
 
     out: list[Diagnostic] = []
     if not model.peak_components:
@@ -10394,18 +10690,11 @@ def _extra_peak_diagnostics(model: CompiledModel, values: dict,
             # refinement to report on nor a degeneracy to warn about.
             continue
 
-        entry = (table.entries[table._paths[area_path]]
-                 if area_path in table._paths else None)
-        lo = entry.lo if entry is not None else 0.0
-        # ``BOUND_HIT_RTOL`` is scipy's own test and ``bound_findings``'
-        # fallback, imported rather than restated so the two cannot drift
-        # apart on what counts as *at* a limit.  The ``<= 0`` clause beside
-        # it covers an area whose stated lower bound is below zero, which is
-        # off at its identity without being "at" that bound.
-        at_zero = (area <= 0.0
-                   or (np.isfinite(lo)
-                       and abs(area - lo) <= BOUND_HIT_RTOL * max(1.0, abs(lo))))
-        if at_zero:
+        # ``FLOOR_HIT`` is the bound test's verdict and never a distance of
+        # this function's own (WP-2141).  The ``<= 0`` clause beside it
+        # covers an area whose stated lower bound is below zero, which is off
+        # at its identity without being "at" that bound.
+        if area <= 0.0 or area_path in floors:
             out.append(Diagnostic(
                 level="warning", code="EXTRA_PEAK_NO_INTENSITY",
                 message=(
@@ -11693,19 +11982,54 @@ def _rigid_body_unsupported(table: ParameterTable,
     carries no esd either, which the rows already say; this says which DOF
     did it.  A body a stage *held* (an absent phase, WP-1301) is
     ``PHASE_UNCONSTRAINED``'s, never this.
+
+    The suggestion never steers into ``RIGID_BODY_PARTIAL_TURN`` (WP-1805):
+    where holding just the blind DOFs would leave two free turn directions of
+    three, it names the body's whole rotation to hold with them, asking
+    :meth:`~rietx.params.vector.ParameterTable.free_turn_directions` what the
+    hold would leave.
     """
     owner = table.body_dofs()
+    # keyed by the body's base path, phases.<i>.rigid_bodies.<k>: a body's
+    # name is unique in its phase, not across phases
+    bases = table.body_dof_bases()
     free = set(table.free_paths)
     blind: dict[str, list[str]] = {}
+    names: dict[str, str] = {}
     for row in params:
         if row.path in owner and row.path in free and row.stderr is None:
-            blind.setdefault(owner[row.path], []).append(row.path)
+            names[bases[row.path]] = owner[row.path]
+            blind.setdefault(bases[row.path], []).append(row.path)
     return [Diagnostic(
         level="warning", code="RIGID_BODY_UNSUPPORTED", where=paths,
-        message=(f"Rigid body {name!r}: {len(paths)} free degree(s) of freedom "
-                 f"measured nothing ({', '.join(paths)})."),
-        suggestion="Hold them (Refinement.hold) and refit.")
-        for name, paths in blind.items()]
+        message=(f"Rigid body {names[bbase]!r}: {len(paths)} free degree(s) of "
+                 f"freedom measured nothing ({', '.join(paths)})."),
+        suggestion=_unsupported_body_advice(table, bbase, paths))
+        for bbase, paths in blind.items()]
+
+
+def _body_dof_globs(bbase: str) -> str:
+    """One body's own DOFs as the globs advice names, for the body at ``bbase``
+    alone rather than every body in every phase (WP-1951's follow-up)."""
+    return (f"{bbase}.origin.dof.*, {bbase}.rotation.*, "
+            f"{bbase}.torsions.*.twist")
+
+
+def _unsupported_body_advice(table: ParameterTable, bbase: str,
+                             paths: list[str]) -> str:
+    """``RIGID_BODY_UNSUPPORTED``'s suggestion: hold what a stage will accept.
+
+    Holding the blind DOFs alone, unless that leaves the body's turn free in
+    some of its directions but neither one nor all, the shape a stage refuses
+    (``ParameterTable.refuse_partial_turns``); then the whole turn with them.
+    """
+    _, free, k = table.free_turn_directions(without=paths)[bbase]
+    if free in (0, 1, k):
+        return "Hold them (Refinement.hold) and refit."
+    return (f"Hold them and the body's whole turn ({bbase}.rotation.*) with "
+            f"Refinement.hold, and refit: holding them alone would leave {free} "
+            f"free turn directions of {k}, which a stage refuses "
+            "(RIGID_BODY_PARTIAL_TURN).")
 
 
 def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],
@@ -12018,6 +12342,75 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
                        "coordinates (or with a wider margin) and refit; or, if "
                        "the contact is real, lower that species pair's minimum "
                        "distance"))
+    return out
+
+
+def _body_contacts_unchecked_diagnostics(structure: Structure,
+                                          since: list) -> list[Diagnostic]:
+    """``RESTRAINT_BODY_CONTACTS_UNCHECKED`` — a torsion turned inside a body
+    whose own contacts the anti-bump checks do not search (WP-2144, #1507).
+
+    The anti-bump builder skips two atoms of one rigid body in the body's own
+    copy by default, and :func:`_restraint_pairs_stale_diagnostics` skips
+    them always, so a torsion that folds the molecule onto itself is
+    restrained only by a row the caller wrote for that pair, and is never
+    named.  One warning per body with a torsion whose ``angle`` moved during
+    the run, in a phase with an anti-bump row; the message counts the rows
+    the list holds inside the body
+    (:func:`rietx.model.restraints.body_own_rows`).  ``since`` is each phase
+    as the run started (:func:`_anti_bump_start_phases`), so a phase without
+    an anti-bump row is never searched, and a torsion that did not move
+    cannot have folded anything the caller did not start from.
+    """
+    from .model.restraints import body_own_rows
+    from .params.bodies import wrap_degrees
+
+    out: list[Diagnostic] = []
+    for phase, start in zip(structure.phases, since, strict=True):
+        if start is None:
+            continue
+        # wrapped on both sides: write-back stores every torsion's angle
+        # wrapped, held or not, so a declared −180 comes back 180 unturned
+        before = {b.name: {t.name: wrap_degrees(t.angle) for t in b.torsions}
+                  for b in start.rigid_bodies}
+        turned_in: dict[str, list] = {}
+        for body in phase.rigid_bodies:
+            was = before.get(body.name, {})
+            moved = [(t.name, was[t.name], t.angle) for t in body.torsions
+                     if t.name in was and wrap_degrees(t.angle) != was[t.name]]
+            if moved:
+                turned_in[body.name] = moved
+        # the row count reads every row's image, so it runs only where a
+        # torsion turned
+        if not turned_in:
+            continue
+        for name, rows in body_own_rows(phase).items():
+            if name not in turned_in:
+                continue
+            body = next(b for b in phase.rigid_bodies if b.name == name)
+            moved = turned_in[name]
+            turned = ", ".join(f"{t} {a:.1f}° → {b:.1f}°" for t, a, b in moved)
+            held = ("the anti-bump list has no row between two atoms of one "
+                    "copy of the body" if rows == 0 else
+                    f"the anti-bump list holds {rows} row(s) inside one copy "
+                    "of the body and the end-of-run search skips its other "
+                    "pairs")
+            out.append(Diagnostic(
+                level="warning", code="RESTRAINT_BODY_CONTACTS_UNCHECKED",
+                where=[f"{phase.name} {label}" for label in body.atoms],
+                value=float(len(moved)),
+                message=(f"phase {phase.name!r}, rigid body {name!r}: "
+                         f"{len(moved)} torsion(s) turned during the run "
+                         f"({turned}), and {held}, so contacts inside the "
+                         "molecule are not checked."),
+                suggestion=("read the distances between the body's own atoms "
+                            "in result.geometry.distances, bonds included (a "
+                            "folded pair can be short enough to be listed as a "
+                            "bond); where a torsion brought "
+                            "two of its atoms closer than you allow, add an "
+                            "AntiBumpRestraint row for that pair with its own "
+                            "minimum, or restrain or hold the torsion; a floor "
+                            "on a torsion's own two ends pushes it towards anti")))
     return out
 
 

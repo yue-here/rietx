@@ -24,6 +24,7 @@
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
   import { canApply, initial, reduce, type Problem, type SyncEvent } from "../lib/sync";
+  import type { TextDraft } from "../lib/recovery";
   // types only — erased at build time, so the boot chunk still has no CodeMirror
   import type { EditorHandle, createEditor } from "../lib/editor";
 
@@ -71,15 +72,61 @@
     sync = reduce(sync, event);
   }
 
+  /** Read the rendering.  A kept buffer waiting in `restoring` goes back over
+   *  it instead (the "restored" event), and only once a read has succeeded:
+   *  a failed read leaves it waiting, so the copy keeps it and the next read
+   *  restores it.  Two reads in flight restore it once. */
   async function load(force = false) {
+    const kept = restoring;
     try {
       const payload = await api.textdoc();
-      dispatch({ kind: "rendered", text: payload.text, revision: payload.revision, force });
+      if (kept && restoring !== kept) return;   // restored already, or the project was left
+      if (kept && !force) {
+        dispatch({ kind: "restored", text: payload.text, revision: payload.revision,
+                   buffer: kept.buffer, kept: kept.revision });
+        restoring = null;
+        if (sync.phase === "dirty" && !sync.stale && !busy) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(check, DEBOUNCE_MS);
+        }
+      } else {
+        dispatch({ kind: "rendered", text: payload.text, revision: payload.revision, force });
+        if (force) restoring = null;
+      }
       loaded = true;
     } catch (error) {
       if (error instanceof ApiError && error.empty) return; // no project yet
       bootError = (error as Error).message;
     }
+  }
+
+  /** The buffer for the recovery copy (WP-2213): as typed, comments
+   *  included, with the revision it descends from; `null` while it matches
+   *  the rendering.  A restore not yet read back answers with what it
+   *  restores, so the copy is not rewritten without it meanwhile. */
+  let restoring = $state.raw<TextDraft | null>(null);
+  export function draft(): TextDraft | null {
+    if (restoring) return restoring;
+    if (!loaded || sync.buffer === sync.base) return null;
+    return { buffer: sync.buffer, revision: sync.revision };
+  }
+
+  /** Put a kept buffer back over a fresh rendering: dirty when that is the
+   *  rendering it was typed against, stale when the project has moved since
+   *  (`lib/sync.ts`, the "restored" event). */
+  export async function restoreDraft(kept: TextDraft) {
+    restoring = kept;
+    await load();
+  }
+
+  /** The open project changed: drop this buffer, which is the project left
+   *  behind's (and in its recovery copy), and read the next one afresh. */
+  export function forget() {
+    if (timer) clearTimeout(timer);
+    restoring = null;
+    sync = initial();
+    loaded = false;
+    bootError = "";
   }
 
   function edited(text: string) {
@@ -220,12 +267,12 @@
     <span class="muted mono">.rxt</span>
     <span class="pill mono" data-phase={sync.stale ? "stale" : sync.phase}>{status}</span>
     <span class="spacer"></span>
-    <button onclick={apply} disabled={!applyable} title="apply the whole document as one delta">
+    <button class="ghost" onclick={apply} disabled={!applyable} title="apply the whole document as one delta">
       Apply <kbd>⌘⏎</kbd>
     </button>
     <!-- one button, not a Revert *and* a Re-read: both discard the buffer and
          re-render from state, which is also the only exit a stale pane has -->
-    <button class:ghost={!sync.stale} onclick={() => load(true)}
+    <button class="ghost" onclick={() => load(true)}
       title="discard this buffer and re-read the project">Re-read</button>
   </header>
 

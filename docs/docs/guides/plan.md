@@ -72,7 +72,7 @@ assert len(plan.stages) == 4
 The second argument of `Stage`, `turn_on`, is a list of parameter names such as `phases.0.cell.a`.
 A `*` in a name matches any run of characters, dots included, so `phases.*.atoms.*.biso` matches every atom's Biso in every phase.
 Names take no square brackets, because the matching reads `[0]` as a set of characters and not as an index.
-[Parameter map](../reference/parameters.md) lists every name.
+[Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 
 A stage never frees a parameter the space group fixes or ties, or one you hold with `Refinement.hold`, whatever its names match.
 The other `Stage` arguments have defaults.
@@ -83,6 +83,30 @@ The ones most often set are:
 - `seed`, a starting value for each freed parameter that sits exactly on a lower limit of 0 or above, so the fit can move it off the limit (0.0, which seeds nothing).
 
 `help(rx.Stage)` lists the rest.
+
+## Fix parameters in a stage
+
+`Stage.turn_off` lists parameter names the stage fixes after it frees its `turn_on`, and `StageSpec.turn_off` is the same list in a stored plan.
+A fixed parameter stays fixed in the stages after it, until a later stage frees it again.
+The closing stage that follows the declared ones keeps it fixed too.
+This plan refines the structure while the profile stays where an earlier Pawley or Le Bail fit left it, although its stage frees every instrument parameter:
+
+```python
+import rietx as rx
+
+plan = rx.RefinementPlan(stages=[
+    rx.Stage("background", ["instrument.background.*", "phases.*.scale"]),
+    rx.Stage("structure", ["instrument.*", "phases.*.cell.*", "phases.*.atoms.*.biso"],
+             turn_off=["instrument.profile.*"]),
+])
+assert plan.stages[1].turn_off == ["instrument.profile.*"]
+```
+
+`StageResult.fixed` lists the parameters each stage fixed.
+Which parameters the closing stage fixes depends on the names the model has, so `RefinementPlan.run_stages` and `RefinementPlan.closing_stage` take them as `paths`, and the closing stage's `turn_off` then lists names, not patterns.
+`rietx.strategy.staged.fixed_at_end` computes that list.
+In the `.rxt` text document the list is a `fix` clause after the stage's frees.
+To keep a parameter fixed in every plan you run, hold it with `Refinement.hold` instead ([How to keep a parameter fixed whatever the plan frees](hold.md)).
 
 ## Where to put the new stage
 

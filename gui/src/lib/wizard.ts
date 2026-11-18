@@ -1,42 +1,36 @@
-/** The import wizard's logic: three previews, one create (WP-1014).
+/** The New project dialog's logic: previews first, one create (WP-1014, WP-2131).
  *
- * The flow is two-phase by construction — pattern, structure and instrument are
- * *previewed* first and only tokens are committed — so what is left here is the
- * bookkeeping between the steps and the one judgement the client is allowed to
- * make: whether the project can be created yet, and if not, which step is
- * missing. `blocked()` returns that sentence; nothing here decides anything the
- * server would decide differently.
+ * The flow is two-phase by construction: the pattern, each phase and an
+ * instrument profile are *previewed* first and only tokens are committed. What
+ * is left here is the bookkeeping between the rows and the one judgement the
+ * client is allowed to make: whether the project can be created yet, and if not,
+ * what is missing. `blocked()` returns that sentence; nothing here decides
+ * anything the server would decide differently.
  *
- * The instrument step sends a **decision**, not a model: a geometry and (for a
- * lab instrument) an anode name. The package owns the physics that follows — the
+ * The round-9 design (the maintainer, 2026-11-08) is one dialog of four rows:
+ * Pattern, Phases, Instrument, Project. Mode and plan are not asked: a typed
+ * cell has no atoms, so a project holding one is created in Le Bail mode, every
+ * other project in Rietveld mode, and the plan is the default (`modeFor`).
+ *
+ * The instrument row sends a **decision**, not a model: a geometry and (for a
+ * lab instrument) an anode name. The package owns the physics that follows: the
  * emission wavelengths come from its NIST-scale table (WP-0507), the doublet from
- * the anode, the polarization constant from the monochromator angle. A form that
- * posted a whole `Instrument` would be a second copy of all three, kept in
- * TypeScript, and the wavelengths are the exact quantity a ~100 ppm cell error
- * hides in.
+ * the anode, the polarization constant from the monochromator angle. With
+ * nothing better known the decision is Bragg-Brentano with a Cu Kα1/Kα2 anode,
+ * and the row says it was assumed (`InstrumentSource`).
  *
- * Step 2 takes two answers (WP-1206): a CIF, or a space-group symbol and a cell.
- * The second is the same Le Bail scaffold the indexing panel's Adopt button
- * lands, and it is built server-side — which cell parameters a *setting* leaves
- * free is crystallography, so the form asks `GET /api/spacegroup` and draws the
- * boxes it names. Typing one the symmetry determines is therefore not something
- * the form can do, which is the coordinate-DOF rule (WP-1014) one parameter
- * family over: unrepresentable rather than refused.
+ * Which cell parameters a typed symbol leaves free is crystallography, so the
+ * form asks `GET /api/spacegroup` and draws the boxes it names (WP-1206).
  *
  * `PRESET_FIELDS` is held to the constructors' own signatures across the language
  * boundary by `tests/data/gui/instrument_presets.json`, the same device the glob
  * corpus uses: written from `gui.imports.INSTRUMENT_PRESETS` by pytest, replayed
  * by `wizard.test.ts`. A field this form offers that the constructor does not
  * take is a control whose only outcome is a 400.
+ *
  */
 
 export type PresetFieldKind = "number" | "optnumber" | "anode";
-
-/**
- * The three answers step 2 takes: a file with atoms in it, a lattice, or
- * nothing at all — a pattern whose phase is not known yet (WP-1207).
- */
-export type StructureSource = "cif" | "cell" | "none";
 
 export interface PresetField {
   name: string;
@@ -99,114 +93,59 @@ export const PRESET_TITLES: Record<string, string> = {
   flat_plate_transmission: "Flat plate, transmission",
 };
 
+/** One phase of a new project: a staged CIF, or a typed symbol and cell. */
+export type NewPhase =
+  | { kind: "cif"; preview: any; aniso: boolean }
+  | { kind: "cell"; symbol: string; facts: any; cell: Record<string, number> };
+
+/** The Space group and cell form while it is open, before Add. */
+export interface CellDraft {
+  symbol: string;
+  /** `GET /api/spacegroup`'s answer for the symbol, or null before it resolves */
+  facts: any | null;
+  /** what the symbol could not be resolved as, or "" */
+  error: string;
+  /** the free cell parameters as typed, keyed by name */
+  cell: Record<string, string>;
+}
+
+/**
+ * Where the instrument row's decision came from, which its tag says.
+ *
+ * `assumed` is the round-9 fallback: Bragg-Brentano with a Cu Kα1/Kα2 anode,
+ * marked so, because a wrong anode shifts every refined cell and an unmarked
+ * default reads as something the file said. `header` is what the pattern
+ * file's own header named (`imports.suggest_instrument`), and `user` anything
+ * a person changed in the form. A saved profile names its own file.
+ */
+export type InstrumentSource = "assumed" | "header" | "user";
+
 export interface WizardState {
   /** `POST /api/upload/pattern`'s answer, or null before a file is chosen */
   pattern: any | null;
-  /** the reader keywords this format offers, by name — `block`, `scan`, … */
+  /** the reader keywords this format offers, by name: `block`, `scan`, … */
   readerOptions: Record<string, string>;
-  /** which of the two structure routes step 2 is on (WP-1206) */
-  structureFrom: StructureSource;
-  /** `POST /api/upload/cif`'s answer */
-  structure: any | null;
-  aniso: boolean;
-  /** the typed symbol, and `GET /api/spacegroup`'s answer for it */
-  symbol: string;
-  cellFacts: any | null;
-  /** what the symbol could not be resolved as, or "" */
-  cellError: string;
-  /** the free cell parameters as typed, keyed by name */
-  cell: Record<string, string>;
+  phases: NewPhase[];
+  cellDraft: CellDraft | null;
   /** an uploaded instrument profile takes precedence over the preset form */
   instrument: any | null;
   preset: string;
   values: Record<string, string>;
-  path: string;
-  mode: string;
-  plan: string;
+  source: InstrumentSource;
+  /** the project's name without `.rex`, and the folder it is made in */
+  name: string;
+  where: string;
+  /** whether a person typed each, so a later pattern no longer moves it */
+  nameSet: boolean;
+  whereSet: boolean;
 }
 
 export function emptyWizard(): WizardState {
-  return seedPreset({ pattern: null, readerOptions: {}, structureFrom: "cif",
-                      structure: null, aniso: false, symbol: "", cellFacts: null,
-                      cellError: "", cell: {},
+  return seedPreset({ pattern: null, readerOptions: {}, phases: [], cellDraft: null,
                       instrument: null, preset: "bragg_brentano", values: {},
-                      path: "", mode: "rietveld", plan: "mccusker_default" },
+                      source: "assumed", name: "", where: "", nameSet: false,
+                      whereSet: false },
                     "bragg_brentano");
-}
-
-/**
- * Switch step 2 between a CIF and a typed cell, taking the mode with it.
- *
- * A typed cell carries no atoms, so `rietveld` is not a mode it can be created
- * in — the server refuses it rather than overriding a mode somebody chose, and
- * the form's job is to make that refusal unreachable. Switching back restores
- * `rietveld`, because a CIF's whole point is that it has atoms.
- *
- * `"none"` moves the mode nowhere, and that is not an omission. With no phase
- * there is nothing for a mode to govern: the run is refused whatever it says,
- * and the route out — adopting an indexed candidate — sets the mode itself.
- *
- * Neither side is cleared. A staged CIF and a typed cell are independent
- * answers to the same step, and `createBody` reads only the one in force, so
- * flipping to compare them costs nothing.
- */
-export function useStructureFrom(state: WizardState,
-                                 source: StructureSource): WizardState {
-  if (source === "none") return { ...state, structureFrom: source };
-  const mode = source === "cell"
-    ? (state.mode === "rietveld" ? "lebail" : state.mode)
-    : (state.mode === "lebail" ? "rietveld" : state.mode);
-  return { ...state, structureFrom: source, mode };
-}
-
-/**
- * The cell parameters the form draws, in the server's own order.
- *
- * Read off `GET /api/spacegroup`'s `free_cell`, never derived here: which
- * parameters a *setting* leaves free is crystallography (three settings
- * disagree with the crystal system alone), and a copy of that rule in
- * TypeScript is the second authority the wavelength table is not allowed to
- * have either. Before a symbol resolves there is nothing to draw.
- */
-export function freeCellFields(state: WizardState): string[] {
-  const free = state.cellFacts?.free_cell;
-  return Array.isArray(free) ? free.map(String) : [];
-}
-
-/**
- * Has the typed-cell step been answered?
- *
- * A resolved symbol is not an answer: it is what tells the form *which* boxes
- * to draw, and until they carry numbers there is no cell. The step marked itself
- * done on the symbol alone until a browser showed the green rule beside two
- * empty boxes (WP-1206).
- */
-export function typedCellReady(state: WizardState): boolean {
-  const free = freeCellFields(state);
-  return free.length > 0 && free.every((name) => !!(state.cell[name] ?? "").trim());
-}
-
-/** The `structure` argument for a typed cell: the symbol and the free numbers. */
-export function typedCellArgument(state: WizardState): Record<string, unknown> {
-  const cell: Record<string, number> = {};
-  for (const name of freeCellFields(state)) {
-    cell[name] = Number((state.cell[name] ?? "").trim());
-  }
-  return { space_group: state.symbol.trim(), cell };
-}
-
-/**
- * The `structure` argument, whichever of the three routes step 2 is on.
- *
- * `null` for the pattern-only route, which the server reads as an answer rather
- * than as a missing key — it requires `structure` to be *present* and refuses a
- * body that leaves it out (WP-1207).
- */
-export function structureArgument(state: WizardState): Record<string, unknown> | null {
-  if (state.structureFrom === "none") return null;
-  return state.structureFrom === "cell"
-    ? typedCellArgument(state)
-    : { upload: state.structure?.upload, aniso: state.aniso };
 }
 
 /**
@@ -286,15 +225,129 @@ export function instrumentArgument(state: WizardState): Record<string, unknown> 
     : presetSpec(state);
 }
 
-/** The `POST /api/project/new` body — tokens, not paths. */
+/**
+ * Take a staged pattern, and the defaults it brings.
+ *
+ * The name and the folder follow the file until a person types either, from
+ * the preview's `suggested_project`: a browser upload carries a file's name
+ * and never its folder, so the place is the server's suggestion rather than
+ * the pattern's own folder the round-9 design names. The instrument hint
+ * seeds the form only while it is still the assumed fallback, so a person's
+ * choice is never overwritten by a second file.
+ */
+export function absorbPattern(state: WizardState, preview: any,
+                              fresh = true): WizardState {
+  let next: WizardState = { ...state, pattern: preview,
+    readerOptions: { ...(preview?.reader_options ?? {}) } };
+  const suggested = String(preview?.suggested_project ?? "");
+  const cut = lastSeparator(suggested);
+  if (!next.nameSet) {
+    next.name = (cut >= 0 ? suggested.slice(cut + 1) : suggested).replace(/\.rex$/, "");
+  }
+  if (!next.whereSet && cut > 0) next.where = suggested.slice(0, cut);
+  if (fresh && next.source !== "user" && !next.instrument) {
+    // A header-seeded form belongs to the file that seeded it: a replacement
+    // pattern re-seeds it from its own header, or falls back to the assumed
+    // default, so the tag never names a header this file does not have.
+    const base = seedPreset({ ...next, values: {} }, "bragg_brentano");
+    const hinted = preview?.instrument_hint
+      ? applyInstrumentHint(base, preview.instrument_hint) : base;
+    if (hinted !== base) next = { ...hinted, source: "header" };
+    else if (next.source === "header") next = { ...base, source: "assumed" };
+  }
+  return next;
+}
+
+/** The last path separator in a server path, `/` or a Windows `\`; -1 if none. */
+export function lastSeparator(path: string): number {
+  return Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+}
+
+/** The cell parameters the open cell form draws, in the server's own order. */
+export function freeCellFields(draft: CellDraft | null): string[] {
+  const free = draft?.facts?.free_cell;
+  return Array.isArray(free) ? free.map(String) : [];
+}
+
+/** Why the open cell form cannot be added yet, or "". */
+export function cellBlocked(draft: CellDraft | null): string {
+  if (!draft) return "";
+  const symbol = draft.symbol.trim();
+  if (!symbol) return "Type a space-group symbol.";
+  if (draft.error) return draft.error;
+  // the boxes drawn are the last resolved symbol's: an edited symbol not yet
+  // looked up would send its free parameters under the new one
+  if (draft.facts && String(draft.facts.space_group ?? "").trim() !== symbol) {
+    return `Looking up ${symbol}…`;
+  }
+  const free = freeCellFields(draft);
+  if (!free.length) return "Type a space-group symbol.";
+  for (const name of free) {
+    const text = (draft.cell[name] ?? "").trim();
+    if (!text) return `${symbol} needs ${free.join(", ")}.`;
+    if (!Number.isFinite(Number(text))) return `${name} is not a number.`;
+    if (Number(text) <= 0) return `${name} must be greater than zero.`;
+  }
+  return "";
+}
+
+/** Add the open cell form as a phase, if it is complete. */
+export function addTypedCell(state: WizardState): WizardState {
+  const draft = state.cellDraft;
+  if (!draft || cellBlocked(draft)) return state;
+  const cell: Record<string, number> = {};
+  for (const name of freeCellFields(draft)) cell[name] = Number(draft.cell[name].trim());
+  return { ...state, cellDraft: null, phases: [...state.phases,
+    { kind: "cell", symbol: draft.symbol.trim(), facts: draft.facts, cell }] };
+}
+
+/**
+ * Le Bail when a phase is a typed cell, else Rietveld.
+ *
+ * A typed cell carries no atoms, so `rietveld` is not a mode it can be created
+ * in: the server refuses it (WP-1206), and the dialog makes the refusal
+ * unreachable. With a CIF beside it the project is still Le Bail, the only
+ * mode in which both are legal. With no phase the mode governs nothing, and
+ * adopting an indexed cell sets it.
+ */
+export function modeFor(state: WizardState): string {
+  return state.phases.some((p) => p.kind === "cell") ? "lebail" : "rietveld";
+}
+
+function phaseArgument(phase: NewPhase): Record<string, unknown> {
+  return phase.kind === "cell"
+    ? { space_group: phase.symbol, cell: phase.cell }
+    : { upload: phase.preview?.upload, aniso: phase.aniso };
+}
+
+/**
+ * The `structure` argument: `null` with no phase, one form, or a list.
+ *
+ * `null` is the pattern-only project, which the server reads as an answer
+ * rather than as a missing key (WP-1207). Several phases go as a list of the
+ * single forms (WP-2131).
+ */
+export function structureArgument(state: WizardState): unknown {
+  if (!state.phases.length) return null;
+  const forms = state.phases.map(phaseArgument);
+  return forms.length === 1 ? forms[0] : forms;
+}
+
+/** Where the project is made: the folder, the name, `.rex`. */
+export function projectPath(state: WizardState): string {
+  const where = state.where.trim().replace(/[/\\]+$/, "");
+  const name = state.name.trim().replace(/\.rex$/, "");
+  return `${where}/${name}.rex`;
+}
+
+/** The `POST /api/project/new` body: tokens, never staged paths, and no plan. */
 export function createBody(state: WizardState): Record<string, unknown> {
   const body: Record<string, unknown> = {
-    path: state.path.trim(),
+    path: projectPath(state),
     pattern: { upload: state.pattern?.upload },
     structure: structureArgument(state),
     instrument: instrumentArgument(state),
-    mode: state.mode,
-    plan: state.plan,
+    mode: modeFor(state),
   };
   const options = Object.fromEntries(
     Object.entries(state.readerOptions).filter(([, v]) => v !== ""));
@@ -302,52 +355,73 @@ export function createBody(state: WizardState): Record<string, unknown> {
   return body;
 }
 
-/** Why this cannot be created yet, or "" — one sentence, naming the step. */
+/** Why this cannot be created yet, or "": one sentence, naming the row. */
 export function blocked(state: WizardState): string {
   if (!state.pattern) return "Choose a pattern file.";
-  if (state.structureFrom === "none") {
-    // nothing to answer: a pattern-only project's phase is what indexing finds
-  } else if (state.structureFrom === "cell") {
-    if (!state.symbol.trim()) return "Type a space-group symbol.";
-    if (state.cellError) return state.cellError;
-    const free = freeCellFields(state);
-    if (!free.length) return "Type a space-group symbol.";
-    for (const name of free) {
-      const text = (state.cell[name] ?? "").trim();
-      if (!text) return `${state.symbol.trim()} needs ${free.join(", ")}.`;
-      if (!Number.isFinite(Number(text))) return `${name} is not a number.`;
-      if (Number(text) <= 0) return `${name} must be greater than zero.`;
-    }
-  } else if (!state.structure) {
-    return "Choose a CIF for the starting structure.";
-  }
+  if (state.cellDraft) return "Add the typed cell, or cancel it.";
   if (!state.instrument) {
     for (const field of PRESET_FIELDS[state.preset] ?? []) {
-      const missing = field.kind === "number"
-        && !(state.values[field.name] ?? "").trim();
-      if (missing) return `The ${PRESET_TITLES[state.preset]} preset needs ${field.label}.`;
       const text = (state.values[field.name] ?? "").trim();
+      if (field.kind === "number" && !text) {
+        return `${SHORT_TITLES[state.preset]} needs a ${field.label}.`;
+      }
       if (text && field.kind !== "anode" && !Number.isFinite(Number(text))) {
         return `${field.label} is not a number.`;
       }
     }
   }
-  if (!state.path.trim()) return "Name the project directory.";
-  if (!state.path.trim().endsWith(".rex")) {
-    return "A project directory's name ends in .rex.";
-  }
+  if (!state.name.trim()) return "Name the project.";
+  if (/[/\\]/.test(state.name.trim())) return "A project name has no slash in it.";
+  if (!state.where.trim()) return "Choose where the project goes.";
   return "";
 }
 
-/** A one-line summary of a staged pattern, for the step header. */
-export function patternSummary(preview: any): string {
-  if (!preview) return "";
-  const [lo, hi] = preview.two_theta_range ?? [0, 0];
-  return `${preview.format.title} · ${preview.n_points} points · `
-    + `${lo}–${hi}°2θ · σ ${preview.has_sigma ? "from the file" : "Poisson fallback"}`;
+/** The geometries as the instrument row's summary names them. */
+export const SHORT_TITLES: Record<string, string> = {
+  debye_scherrer: "Debye-Scherrer",
+  bragg_brentano: "Bragg-Brentano",
+  flat_plate_transmission: "Transmission",
+};
+
+/** An anode name as a line list: `CuKa` is Cu Kα1/Kα2, `CuKa1` is Cu Kα1. */
+export function anodeLabel(name: string): string {
+  const m = /^([A-Z][a-z]?)Ka(1?)$/.exec(name);
+  return m ? `${m[1]} Kα1${m[2] ? "" : "/Kα2"}` : name;
 }
 
-/** …and of a staged CIF. */
+/** The instrument row's one line: the geometry and the source's lines. */
+export function instrumentSummary(state: WizardState): string {
+  if (state.instrument) {
+    const s = state.instrument.summary ?? {};
+    const lam = (s.wavelengths ?? []).map((w: number) => w.toFixed(5)).join(", ");
+    return `${s.geometry ?? "saved profile"}${lam ? ` · λ ${lam} Å` : ""}`;
+  }
+  const geometry = SHORT_TITLES[state.preset] ?? state.preset;
+  if (state.preset === "debye_scherrer") {
+    const lam = (state.values.wavelength ?? "").trim();
+    return `${geometry} · ${lam ? `λ ${lam} Å` : "no wavelength yet"}`;
+  }
+  return `${geometry} · ${anodeLabel(state.values.radiation ?? "")}`;
+}
+
+/** The tag beside that line, saying where the decision came from. */
+export function sourceTag(state: WizardState): string {
+  if (state.instrument) return `from ${state.instrument.filename}`;
+  return state.source === "assumed" ? "assumed"
+    : state.source === "header" ? "from the file's header" : "";
+}
+
+/** A staged pattern in rietx's words: reader, points, range and step, esds. */
+export function patternSummary(preview: any): string {
+  if (!preview) return "";
+  const [lo, hi] = (preview.two_theta_range ?? [0, 0]).map(Number);
+  const step = preview.step ? `, step ${Number(Number(preview.step).toPrecision(4))}°` : "";
+  return `${preview.format.title} · ${preview.n_points} points · `
+    + `2θ ${lo.toFixed(2)}–${hi.toFixed(2)}°${step} · `
+    + `esd ${preview.has_sigma ? "from the file" : "from counts"}`;
+}
+
+/** A staged CIF's first phase on one line: name, symbol, cell edges, atoms. */
 export function structureSummary(preview: any): string {
   if (!preview) return "";
   const phase = preview.phases?.[0];
@@ -355,4 +429,36 @@ export function structureSummary(preview: any): string {
   const cell = phase.cell.slice(0, 3).map((v: number) => v.toFixed(4)).join(" ");
   return `${phase.name} · ${phase.space_group} · ${cell} Å · `
     + `${phase.n_atoms} atoms (${phase.species.join(", ")})`;
+}
+
+/**
+ * Whether the instrument form shows a field before Advanced is opened.
+ *
+ * The round-9 form asks for the geometry, the source and the goniometer
+ * radius. Every other preset argument has a constructor default that suits
+ * most specimens, so it waits under Advanced (settled by Claude, reversible:
+ * the alternative is the whole preset form at once).
+ */
+export function basicField(field: PresetField): boolean {
+  return field.kind !== "optnumber" || field.name === "goniometer_radius_mm";
+}
+
+/**
+ * A preview curve as one SVG path, with intensity drawn on a square-root axis.
+ *
+ * The square root is the round-9 design's: on a linear axis a pattern's weak
+ * lines vanish beside its strongest one at a 34 px height.
+ */
+export function sparkline(curve: any, width = 260, height = 34): string {
+  const xs: number[] = curve?.two_theta ?? [];
+  const ys: number[] = (curve?.intensity ?? []).map((y: number) => Math.sqrt(Math.max(y, 0)));
+  if (xs.length < 2) return "";
+  const x0 = xs[0], x1 = xs[xs.length - 1];
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  const span = hi - lo || 1;
+  return xs.map((x, i) => {
+    const px = ((x - x0) / (x1 - x0 || 1)) * width;
+    const py = height - ((ys[i] - lo) / span) * height;
+    return `${i ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`;
+  }).join(" ");
 }

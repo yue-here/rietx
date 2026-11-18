@@ -706,6 +706,20 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
 #: every stored tie opens as the linear tie it was.  An older build refuses a
 #: document carrying the key.
+#: Also in 0.61 (WP-1419, C2): ``Phase.parent_cell``, a ``ParentCell`` (the
+#: parent's ``space_group``, the parent → child ``transform``, the parent's
+#: ``cell`` and one ``strain`` amplitude per Γ strain the child's group
+#: allows), which makes the child's six cell parameters derived and locked.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
+#: document loads and refines as before; an older build refuses a phase
+#: carrying it.
+#: Also in 0.61 (WP-1952, WP-2002 B5 and B14): ``PatternData.nonpositive_sigma``
+#: (``"exclude"`` or ``"poisson"``, default ``"exclude"``), what a σ ≤ 0
+#: becomes, and ``RefinementResult.sigma_rule`` / ``HistogramResult.sigma_rule``,
+#: a ``SigmaRule`` of three counts.  Additive and defaulted, the 0.25 → 0.26
+#: rule; an older build refuses a document carrying either key.  The default
+#: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
+#: its neighbours and now leaves the fit.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
@@ -1235,3 +1249,17 @@ class Diagnostic(Base):
 
         entry = explain(self.code)
         return None if entry is None else entry.description
+
+    @property
+    def view(self) -> str | None:
+        """The rendered view that shows this finding, from
+        :data:`rietx.help.DIAGNOSTIC_VIEW_OF` (WP-1133).
+
+        A name in :data:`rietx.help.DIAGNOSTIC_VIEWS`, such as
+        ``"plot_for_vlm.residual"``.  ``None`` where no view has been checked
+        for the code, which is most codes.  The pointer is a name and never an image, so the caller
+        decides whether to draw it.
+        """
+        from ..help import DIAGNOSTIC_VIEW_OF
+
+        return DIAGNOSTIC_VIEW_OF.get(self.code)

@@ -849,6 +849,26 @@ def _stale_structure(*, drift: bool):
     return Structure(phases=[ph]), [start]
 
 
+def _body_unchecked_fires() -> list:
+    """A chain body whose two torsions folded N1 onto O6 (1.50 A under a
+    3.0 A minimum) while the anti-bump list held no row inside the body."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    return _body_contacts_unchecked_diagnostics(*_chain_run(-120.0, -120.0))
+
+
+def _body_unchecked_silent() -> list:
+    """The same chain with its torsions where they started, and the folded
+    chain in a phase the run did not search (no anti-bump row at its start)."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    folded, _ = _chain_run(-120.0, -120.0)
+    return (_body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0))
+            + _body_contacts_unchecked_diagnostics(folded, [None]))
+
+
 def _stale_fires() -> list:
     """A contact that was outside r0 at the start and came inside it with no
     row restraining it."""
@@ -983,6 +1003,80 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+# ------------------------------------------------------------ the restraint compile
+
+
+def _restraint_compile(*restraints) -> list:
+    """``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` from ``resolve_phase_restraints``
+    on the bodies of ``tests/test_restraint_body_refusal.py``, one restraint
+    at a time: the warning arrives with the compiled restraints."""
+    from rietx.crystallography.structure_factor import compile_phase_sites
+    from rietx.model.restraints import resolve_phase_restraints
+    from tests.test_restraint_body_refusal import _phase
+
+    found: list = []
+    for r in restraints:
+        phase = _phase([r])
+        resolve_phase_restraints(phase, 0, compile_phase_sites(phase),
+                                 phase.cell.lengths_angles(), found)
+    return found
+
+
+def _fixed_body_fires() -> list:
+    """A bond inside a body with no torsion, and one no declared torsion splits."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("T0"), atom_j=_index("T1"), target=1.2, sigma=0.01),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=1.5, sigma=0.01))
+
+
+def _fixed_body_silent() -> list:
+    """A bond a torsion splits, one to a free atom, one across two bodies and
+    one between two copies of the body."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K3"), target=3.0, sigma=0.01),
+        BondRestraint(atom_i=_index("Li"), atom_j=_index("K0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("T0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=8.0, sigma=0.1,
+                      op_index=0, translation=(1, 0, 0)))
+
+
+def _sigma_xye(sigma: list[float], **options) -> list:
+    """Twelve points of an ``.xye`` whose σ column is ``sigma``, read."""
+    from rietx.io.readers import read_pattern
+    from tests.test_readers import write_xy
+
+    tt = [10.0 + 0.02 * i for i in range(12)]
+    y = [500.0 + i % 7 for i in range(12)]
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_xy(pathlib.Path(tmp) / "s.xye", tt, y, sigma)
+        read_pattern(path, diagnostics=found, **options)
+    return found
+
+
+_SIGMA_OK = [22.0 + i % 3 for i in range(12)]
+
+
+def _sigma_nonpositive_fires() -> list:
+    """One σ = 0 and one σ = −1 in an otherwise measured column."""
+    return _sigma_xye([0.0 if i == 5 else (-1.0 if i == 7 else v)
+                       for i, v in enumerate(_SIGMA_OK)])
+
+
+def _sigma_nonpositive_silent() -> list:
+    """Every σ positive; and the same σ ≤ 0 points read with the option that
+    keeps them, which the caller asked for by name."""
+    return (_sigma_xye(_SIGMA_OK)
+            + _sigma_xye([0.0 if i == 5 else v for i, v in enumerate(_SIGMA_OK)],
+                         nonpositive_sigma="poisson"))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -1016,6 +1110,9 @@ SILENCE: dict[str, Pair] = {
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
+    "PATTERN_SIGMA_NONPOSITIVE": Pair(
+        _sigma_nonpositive_fires, _sigma_nonpositive_silent,
+        "tests/test_readers_robust.py"),
     "PATTERN_TOTAL_SCATTERING": Pair(
         _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
@@ -1027,6 +1124,8 @@ SILENCE: dict[str, Pair] = {
         "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": Pair(
+        _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_refusal.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
         _resolution_fires, _resolution_silent,
         "strategy.staged.check_resolution_supported (no test pinned it before)"),
@@ -1043,6 +1142,8 @@ SILENCE: dict[str, Pair] = {
         _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": Pair(
+        _body_unchecked_fires, _body_unchecked_silent, "tests/test_one_sided_restraints.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
     "SITE_MULTIPLICITY_KEPT": Pair(

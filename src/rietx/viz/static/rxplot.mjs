@@ -826,6 +826,28 @@ function tickRows(u, ticks, colors, skip) {
   });
 }
 
+/**
+ * `draw` with the context clipped to the plot area of the pane it is handed.
+ * uPlot clips its own series to that area and leaves a hook's strokes alone,
+ * so a layer drawn in a hook ran into the axis gutters at any zoom that cut
+ * it: the peak fit's dashes crossed the y axis (WP-2200). Every hook a
+ * pattern pane runs goes through here.
+ */
+function clipped(draw) {
+  return (u) => {
+    const { ctx } = u, { left, top, width, height } = u.bbox;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
+    try {
+      draw(u);
+    } finally {
+      ctx.restore();
+    }
+  };
+}
+
 /** A line across the plot area at y = 0, when zero is in view. */
 function zeroLine(u, color) {
   const y = Math.round(u.valToPos(0, "y", true)) + 0.5, { top, height, left, width } = u.bbox;
@@ -905,7 +927,8 @@ const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc"
  *   and "ticks:<phase>".
  * - `labels`: `{ y, resid }`, the two y axis titles, as functions.
  * - `layers`: per pane key ("main", "ticks", "resid"), `{ under, over }` lists
- *   of `(u) => void`, run before the grid and after the series.
+ *   of `(u) => void`, run before the grid and after the series, each clipped
+ *   to its pane's plot area (`clipped`).
  * - `rawResidual()`: the residual pane's values over the pattern's channels
  *   when the payload carries no fit, or null for none. The GUI draws its peak
  *   groups' own residual there.
@@ -975,8 +998,9 @@ export function pattern(uPlot, host, curves, spec) {
 
   function hooks(key, own = {}) {
     const layer = spec.layers?.[key] ?? {};
-    return { drawClear: [...(layer.under ?? [])], drawAxes: own.drawAxes ?? [],
-             draw: [...(own.draw ?? []), ...(layer.over ?? [])] };
+    const all = (fns) => fns.map(clipped);
+    return { drawClear: all(layer.under ?? []), drawAxes: all(own.drawAxes ?? []),
+             draw: all([...(own.draw ?? []), ...(layer.over ?? [])]) };
   }
 
   state.c = prepare(curves);

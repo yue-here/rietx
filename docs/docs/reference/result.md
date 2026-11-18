@@ -65,6 +65,15 @@ Lab data with unmodelled profile detail lands near 2 to 3.
 It is Bérar and Lelann's homogeneous correction, one scalar for every parameter ([Esds and the Bérar-Lelann inflation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation)).
 Treat it as a measure of how correlated the residual is, and not as a calibrated per-parameter uncertainty.
 
+### Which esd weighted the fit
+
+Every statistic above weights a point by 1/σ², and a fit does not show where each σ came from.
+`RefinementResult.sigma_rule` records it, as a `SigmaRule` counted over the fitted points.
+`SigmaRule.n_file_sigma` points were weighted by the file's own esd, and `SigmaRule.n_poisson_sigma` by the Poisson σ = √max(y, 1).
+The two add up to `Statistics.n_points`.
+`SigmaRule.n_nonpositive_excluded` counts the points inside the fitted range that left the fit because the file gave them an esd of zero or below ([Intensities and esds](pattern-files.md#intensities-and-esds)).
+A joint fit records one per histogram, on `HistogramResult.sigma_rule`, and leaves the top-level field `None`.
+
 ### Limits of the agreement statistics
 
 The statistics measure agreement, and agreement is not correctness.
@@ -314,9 +323,14 @@ Each entry is a `Diagnostic`:
 | `Diagnostic.where` | the parameter paths involved |
 | `Diagnostic.value` | the headline number where the code has one, such as a correlation's ρ or an absorption's block R²; `None` means no single number, not zero |
 | `Diagnostic.explanation` | what the code means and why it fires |
+| `Diagnostic.view` | the rendered view that shows the finding, such as `"plot_for_vlm.residual"`; `None` where no view has been checked for the code, which is most codes |
 
 `Diagnostic.explanation` is the same for every finding with that code, so it is looked up in `rietx.help.DIAGNOSTIC_HELP` when read.
 It is `None` for a code this version does not describe.
+`Diagnostic.view` is also looked up by code, in `rietx.help.DIAGNOSTIC_VIEW_OF`.
+Each name it returns is a panel of `rietx.viz.plot_for_vlm`, and `rietx.help.DIAGNOSTIC_VIEWS` says what that panel draws.
+The view is a name and never an image, so you decide whether to draw it.
+A code names a view only where a fit firing it was drawn and the finding could be read off that panel.
 [Diagnostic codes](diagnostics.md) lists every code.
 
 The codes are an open vocabulary on purpose, so a new correction ships with the diagnostic that states what it changed.
@@ -536,6 +550,7 @@ It never calls `Refinement.summary`, which builds a report.
 A notebook asks for the text each time a cell displays the refinement.
 In a notebook, a `RefinementResult`, an `IndexingResult` and a `PeakList` add to their text.
 Under each diagnostic's `help:` line, a `means:` line gives its `Diagnostic.explanation`.
+Where the code has a view, a `see:` line under it names the panel that shows the finding.
 A result then lists `RefinementResult.parameters` in columns headed `path`, `value` and `at_bound`.
 An `equations` column follows when a parametric equation set a row.
 The display is one block of fixed-width text, so its columns stay aligned in GitHub's notebook viewer as well as in JupyterLab.

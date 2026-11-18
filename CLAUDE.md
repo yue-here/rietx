@@ -345,9 +345,9 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   whose esd it could not honestly give. Conversions stay in `caglioti.py`; the answer is
   a **coherent domain size**, never `particle_radius_um`, quoted as an order of magnitude
   with its K and beside its separability verdict.
-- **Weights**: the file's esd column when present (readers), Poisson √max(y,1) only as fallback.
-  Never subtract an estimated background — hold it additively (`BackgroundFixedPlusChebyshev`) or
-  co-refine it under a smoothness penalty (`BackgroundPSpline`).
+- **Weights**: the file's esd column when present (readers), Poisson √max(y,1) only as fallback; a
+  σ ≤ 0 is no weight and leaves the fit, never a floor (WP-1952). Never subtract an estimated
+  background — hold it additively (`BackgroundFixedPlusChebyshev`) or co-refine it under a smoothness penalty (`BackgroundPSpline`).
 - **The observation count is reflections, not points — and it gates nothing** (WP-1071).
   `n_points` is the algorithm's N; McCusker §9's warning is that refining against it outruns the
   data in silence (22 003 points against 132 reflections on 11-BM NAC). `optimize.statistics` is
@@ -685,9 +685,9 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   the calculated curve" for itself, on two different darks. The values cannot live in
   `gui/src`, which is a build input the wheel does not ship, so the module owns them, the two
   Python servers render a `/tokens.css` route, `gui/src/tokens.css` is **generated and
-  committed** and a test holds it equal to the emitter. A page's extra roles — a hover, a
-  focus ring, a state pill — are `color-mix` over the nine chrome tokens, never a token of
-  their own: one the GUI never reads is a declared name with no writer. The **theme** has one
+  committed** and a test holds it equal to the emitter. A page's extra roles — a focus
+  ring, a state pill — are `color-mix` over the chrome tokens; a token is added only where a
+  register reads it and no mix gives it (WP-2200). The **theme** has one
   home and every page that shows it may set it (`state_dir/settings.json`, through
   `theme.theme_choice`/`set_theme_choice`; WP-1438 widened 1429's GUI-only writer, which left
   the choice unreachable for a fit driven from a script and watched in a browser). A change

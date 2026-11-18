@@ -87,6 +87,15 @@ the chain, and its answer on what "held" means should govern here. Read it first
   `_install_parametric` does for a `ParametricEquation`. WP-2118 left `multi.py` and
   `params/multi.py` untouched.
 
+- **From WP-2101 (2026-11-15): WO₃'s one B per pattern spells without the tie.** A
+  formula equation on each site's `biso`, `"<site's B> + b"`, with `vars.b` named in
+  `SharingMap.per_histogram`, gives one refined B per pattern on every site today
+  (`switching/topas.md`'s overall-B block). On a seven-pattern synthetic LaB₆ ramp six
+  patterns returned b within 0.04 Å² of the truth 0, esd 0.10 Å², and the seventh failed
+  the same way with or without the formula (a probe-plan local minimum). So the mirrored
+  WO₃ run may not need this WP's tie. Decide whether it moves out of this WP, and say
+  which spelling the milestone row should judge.
+
 ## Non-goals
 
 - A history DAG for a joint fit.
