@@ -168,13 +168,13 @@ retry here either.
 - [x] The fixture: (b) plus a planted trace phase, with the smallest trace
       fraction at which the full list finds no agreement after the inlier
       retry. Seeded, no data file.
-- [ ] Measure under `preset="full"` with each engine and all three together:
+- [x] Measure under `preset="full"` with each engine and all three together:
       whether the retry fires, whether it finds agreement, and where the
       supercell and the subcell rank in the answer a user reads.
 - [ ] Write the result here and in WP-2078's successor's `### Inherited`.
       If the supercell is lost, brief the maintainer on replace-versus-append
       with these rows.
-- [ ] Tests: the fixture as a row pinning the decision the code makes (fires
+- [x] Tests: the fixture as a row pinning the decision the code makes (fires
       or not, adopts or not), never the landing rank (root CLAUDE.md: what a
       decline leaves free finds the peaks at a rate).
 - [ ] Skill: none expected. If the retry's guidance changes, the row in

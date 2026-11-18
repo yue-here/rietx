@@ -61,6 +61,15 @@ fixture                        weak lines  picked  0.5%  1 %   2 %
   owns about half of each list.  The positive arm (no lines planted, 16 Si
   lines) ranks Si first.
 
+**(b) with a trace phase** (WP-2147) is searched as picked under
+``preset="full"``, and its rows pin the decision alone: whether the weak-line
+retry runs and whether its answer is adopted.  At a 0.5 % trace the inlier
+retry finds the supercell and the retry never runs; at 2 % the full list ends
+with no candidate, the retry searches the eleven subcell lines the 5 % floor
+keeps, and its answer is adopted under all three engines and under each
+alone.  Where the supercell lands among the subcells (3rd or 4th) is WP-2147's
+table, not a pin.
+
 A row records ``main`` and is meant to flip: the WP that changes a rank
 changes the table and the row together.  An acceptance row that fails on
 ``main`` is ``xfail(strict=True)`` naming its WP, so a fix turns it into a
@@ -276,3 +285,88 @@ def test_a_superlattice_keeps_its_supercell_first():
     _finished(res)
     assert rank == 1
     assert "INDEX_WEAK_LINE_RETRY" not in {d.code for d in res.diagnostics}
+
+
+# ----------------------------------------------------------------------------
+# WP-2147: (b) with a trace phase, so the retry fires on a superlattice
+# ----------------------------------------------------------------------------
+@lru_cache(maxsize=None)
+def _trace_fixture(trace: float) -> W.WeakLineFixture:
+    return W.weak_superlattice_with_trace(trace=trace)
+
+
+@lru_cache(maxsize=None)
+def _trace_search(trace: float, engines: tuple[str, ...] | None):
+    """(b)+trace as a user's call searches it: as picked, the retry left to
+    decide, the system declared and the search uncut (``preset="full"``)."""
+    fx = _trace_fixture(trace)
+    return index_pattern(fx.peaks, spec=SearchSpec(systems=("cubic",)),
+                         preset="full", engines=engines)
+
+
+def _retry(res):
+    return [d for d in res.diagnostics if d.code == "INDEX_WEAK_LINE_RETRY"]
+
+
+@pytest.mark.xdist_group("weak-lines-d")
+def test_the_floor_keeps_neither_the_ordering_lines_nor_the_trace():
+    """(b)+trace at its default 2 %: the picker keeps all twelve ordering lines
+    and 58 of the oxide's, and the retry's 5 % floor keeps none of either, so
+    the retry searches the eleven subcell lines alone."""
+    fx = _trace_fixture(0.02)
+    oxide = W._lines(W.MOO3_CIF, fx.two_theta_range)
+    host = W._lines(W._double_perovskite(0.1), fx.two_theta_range)
+
+    def n_oxide_only(two_theta):
+        return int(sum(np.min(np.abs(oxide - t)) < MATCH_DEG
+                       and np.min(np.abs(host - t)) >= MATCH_DEG
+                       for t in two_theta))
+
+    kept = weak_line_floor(fx.peaks)
+    assert _n_weak(fx, fx.peaks.two_theta()) == 12
+    assert n_oxide_only(fx.peaks.two_theta()) == 58
+    assert _n_weak(fx, kept.two_theta()) == 0
+    assert n_oxide_only(kept.two_theta()) == 0
+    assert len(kept.usable()) == 11
+
+
+def _decision_row(trace: float, engines, fires: bool, fast: bool = False):
+    marks = [pytest.mark.xdist_group("weak-lines-d")]
+    if not fast:
+        marks.append(pytest.mark.slow)
+    name = "all" if engines is None else "+".join(engines)
+    return pytest.param(trace, engines, fires, marks=marks,
+                        id=f"{trace:g}-{name}")
+
+
+#: the decision ``main`` makes on (b)+trace, measured on 05ea63571 (WP-2147's
+#: table): at 0.5 % the inlier retry finds the supercell and the weak-line
+#: retry never runs; at 2 % the full list ends with no cell two engines agree
+#: on (none at all), and the retry runs and is adopted, under all three
+#: engines and under each alone
+DECISION_ROWS = [
+    _decision_row(0.005, None, fires=False),
+    _decision_row(0.02, None, fires=True, fast=True),
+    _decision_row(0.02, ("dichotomy",), fires=True),
+    _decision_row(0.02, ("svd",), fires=True),
+    _decision_row(0.02, ("trial_error",), fires=True),
+]
+
+
+@pytest.mark.parametrize("trace, engines, fires", DECISION_ROWS)
+def test_a_superlattice_with_a_trace_decides_the_retry(trace, engines, fires):
+    """Whether the weak-line retry runs on (b)+trace, and whether its answer
+    is adopted.  The row pins the decision, never where the supercell lands:
+    a retry that runs searches the subcell lines alone, and where the truth
+    ranks among the subcells is WP-2147's table, not a pin."""
+    fx = _trace_fixture(trace)
+    res = _trace_search(trace, engines)
+    _finished(res)
+    retry = _retry(res)
+    if not fires:
+        assert not retry
+        assert res.n_usable_lines == len(fx.peaks.usable())
+        return
+    assert len(retry) == 1
+    assert "the candidates are that search's" in retry[0].message
+    assert res.n_usable_lines == len(weak_line_floor(fx.peaks).usable())
