@@ -1,9 +1,8 @@
 # WP-2147 — The weak-line retry on a superlattice that also carries a trace phase
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-18 — measured: the retry never loses the supercell, which the full list had already lost; replace vs append and the tier stay the maintainer's, in PR #1679
 Track: What fires, and what stays silent
 Depends on: 2078 (PR #1567 builds the retry this WP measures, and was not merged on 2026-11-15)
-Priority: P3 2026-11-15 — a measurement that decides two open maintainer questions on WP-2078's retry (replace or append, and the code's tier); down a rung from P2 because nothing can start until PR #1567 merges
 
 ## Goal
 
@@ -111,7 +110,9 @@ measured by making the floor set nothing aside):
 | 2 % | yes | yes | 4 | 2 | I 3.943 | —, 0 |
 | 4 % | yes | yes | 3 | 2 | I 3.943 | —, 0 |
 
-Every candidate in every row grades `low`. Seeds 1-4 at 2 % make the same
+Every run abstains (`INDEX_ABSTAINED`; no pattern is given, so nothing is
+validated). The four leading candidates grade `low` in every row but the
+trace-free one, whose truth grades `medium`. Seeds 1-4 at 2 % make the same
 decision (fires, adopted; truth 3rd or 4th, subcell 2nd). Searches took
 5-36 s each.
 
@@ -150,10 +151,8 @@ truth and move no rank above it.
 595 s, `INDEX_SEARCH_INCOMPLETE`): the inlier retry finds two engines
 agreeing on an orthorhombic P 6.991 Å cell, so the weak-line retry does not
 run. The truth is absent, and so is the subcell. The quick preset's 120 s
-ceiling would cut this search, so the default call does not reach the
-retry here either.
-
-### Inherited
+ceiling would cut this search, and a cut search skips the retry (WP-2078,
+judge point (d)), so the default call does not reach it here either.
 
 ## Non-goals
 
@@ -206,6 +205,79 @@ in this file, and a test row that reproduces the decision.
 - WP-2078 and PR #1567; issue #1291.
 
 ## Handover log
+
+- **2026-11-18** — all five tasks, by a ghostshift runner, in PR #1679,
+  closing the WP. The weak-line retry does not lose a superlattice's true
+  cell when a trace phase is present, because in every run where the retry
+  fires the full line list had already lost it. The retry brings the true
+  supercell back, but at 3rd or 4th. Above it sit the perovskite subcell and
+  a still smaller cell, because the 5 % floor removes the subcell's own weak
+  lines as well as the ordering lines. The leading candidates grade `low`
+  and the run abstains, so no reader is handed a wrong cell as an answer.
+  These runs gave the indexer the peak list alone; a run given the pattern
+  adds a whole-profile check, which was not measured. Keeping
+  the full list's candidates after the retry's would add 0 to 4 wrong cells
+  below the truth and change no rank above it. This is development data on
+  one synthetic family.
+
+  *Done.* `weak_superlattice_with_trace` in `tests/_synthetic_weak_lines.py`
+  (fixture (b) plus α-MoO₃, default trace 2 %). Seven tests in
+  `tests/test_indexing_weak_lines.py`: the census of what the floor keeps,
+  the new builder in the determinism test, and five decision rows (0.5 %
+  under all engines does not retry; 2 % under all engines and under each
+  alone retries and adopts). Three are fast and four `slow`. The table is
+  § Measured. `/code-review high --fix` removed an unused constant, added
+  the new builder to the determinism test, fixed a stale comment and gave
+  the fast row its reason. It also flagged three things left as they are:
+  the new builder repeats (a)'s and (b)'s recipe rather than sharing it
+  (sharing would risk moving (b)'s pinned pattern); the census hardcodes
+  antisite 0.1, the builder's default; and tasks 1 and 3 read differently
+  from what was built, now answered in their tick notes.
+
+  *Measured.* § Measured holds the tables. Gates on the merged tree, `[dev]`
+  venv, macOS arm64: see the PR body for the fast-suite and acceptance
+  counts.
+
+  *Gotchas.* An adopted retry replaces the full list's diagnostics too, so
+  `INDEX_INLIER_RETRY` is absent from an adopted run's codes although the
+  inlier retry ran. The undeclared-systems search at 2 % took 595 s under
+  `preset="full"`. A single engine counts as "no agreement" only when it
+  returns nothing, so dichotomy alone at 1 % returns one wrong cell and
+  never retries.
+
+  *Settled by the runner* (each could have gone the other way):
+  1. The trace phase is (a)'s α-MoO₃, not SrMoO₄. Grounds: the WP says to
+     build the trace the way (a) builds it, and MoO₃ is a published refined
+     structure already in the file. Alternative: SrMoO₄, the impurity most
+     often reported in Sr₂FeMoO₆, whose coordinates the file does not carry.
+  2. The builder's default trace is 2 %, not the 0.6 % threshold. Grounds:
+     every trace tried from 0.8 % to 4 % fires, and seeds 1-4 at 2 % make the
+     same decision, while 0.7 % does not fire. Alternative: 0.6 %, which
+     puts the pinned row next to a gap.
+  3. The searches declare the cubic system. Grounds: the existing rows'
+     protocol, and the undeclared search takes 595 s. Alternative: undeclared,
+     measured once and reported.
+  4. The WP closes ✅ with the two questions still open. Grounds: the WP's
+     Context says it supplies evidence and decides neither, and WP-2078 has
+     no successor to carry them. Alternative: leave it 🔄 until the
+     maintainer rules.
+
+  *For the maintainer* (both stay yours, on WP-2078's rulings file of
+  2026-11-15). Replace versus append: the measurement does not separate
+  them for the true cell, since the full list never holds it when the retry
+  fires. Appending adds a record of what the first search found, which
+  matches the inlier retry's "adds, never removes" convention, at the cost
+  of 0 to 4 extra wrong `low` rows. The runner leans to keeping replace,
+  since nothing measured favours appending. A fixture whose full list holds
+  the truth from one engine only while the retry adopts a wrong cell would
+  flip that. The tier of `INDEX_WEAK_LINE_RETRY`: nothing here bears on its
+  grounds, a published practice (Bergmann et al. 2004), so the measurement
+  gives no reason to move it from tier 2. On this family the retry's
+  leading cells grade `low` and the run abstains, so the rule against a
+  confident wrong answer holds, on peak lists without the pattern.
+
+  Next: none in this WP. The maintainer rules on the two questions from the
+  PR. A change to the retry that follows goes into a new WP.
 
 - **2026-11-15** — created, from the 2026-11-15 issue triage, as the
   follow-up the 2026-11-15 rulings file asks for (WP-2078, PR #1567). No issue
