@@ -3,7 +3,7 @@
 ``rietx.gui.series.TRACE_VOCABULARY`` is the one statement of what the trace
 draws.  These tests hold the three places that quote it to it: :func:`trace`,
 which reads each row's source off a :class:`SeriesResult` and nothing else; the
-library, which must still write every code the table names; and the GUI guide,
+library, which must still write every code the table names; and the GUI quickstart,
 whose table must list the same rows, both ways.  The panel draws what the route
 serves, and ``gui/src/lib/series.test.ts`` covers that half.
 """
@@ -25,7 +25,7 @@ from rietx.schemas.sequential import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
-GUIDE = REPO / "docs" / "docs" / "reference" / "gui-guide.md"
+GUIDE = REPO / "docs" / "docs" / "start" / "gui-quickstart.md"
 SEQUENTIAL = REPO / "src" / "rietx" / "sequential.py"
 
 CODES = [row["key"] for row in TRACE_VOCABULARY if row["key"].isupper()]
@@ -152,7 +152,7 @@ def test_the_vocabulary_names_codes_the_library_writes_and_explains():
 
 
 def _guide_rows() -> dict[str, str]:
-    """The GUI guide's trace table, as key → label."""
+    """The GUI quickstart's trace table, as key → label."""
     text = GUIDE.read_text(encoding="utf-8")
     start = text.index("### The trace")
     end = text.find("\n## ", start)
@@ -167,7 +167,7 @@ def _guide_rows() -> dict[str, str]:
 def test_the_guide_lists_the_vocabulary_both_ways():
     rows = _guide_rows()
     assert set(rows) == {row["key"] for row in TRACE_VOCABULARY}, (
-        "the GUI guide's trace table and rietx.gui.series.TRACE_VOCABULARY "
+        "the GUI quickstart's trace table and rietx.gui.series.TRACE_VOCABULARY "
         "disagree")
     for row in TRACE_VOCABULARY:
         assert rows[row["key"]] == row["label"], row["key"]
