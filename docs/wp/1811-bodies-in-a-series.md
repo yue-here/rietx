@@ -19,6 +19,34 @@ quaternion and origin, never by its increment. This is chunk R11 of issue #561, 
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1558): the carry is built, and the
+  orientation never reaches the result.** *Checked against the tree at `98d7ba8e3`:*
+  `_carry_into` (`sequential.py:786`) passes each body's quaternion, origin and torsions
+  to `ParameterTable.displace_anchored_dofs` (`params/vector.py:3678`, the call at
+  `sequential.py:838`). The increment-carry failure is pinned by
+  `test_the_series_carry_sets_the_increment_by_log_not_by_subtraction`
+  (`tests/test_rigid_body.py:515`). So the first task and the third acceptance line
+  are done in substance; whoever starts this WP ticks them with what did it. The
+  reporter measured, not rerun here: three-pattern C₆Br ramps at 3° and 15° steps read
+  the planted turns within 0.07°, and every direction gap is 0.0. What is missing:
+  - No quaternion reaches `SeriesResult`. `rotation.k` is an increment a commit
+    zeroes, so it reads 0.0 on every pattern, and `steps` and `direction_gaps` skip it
+    as a relative path. A torsion's twist is the same. So the acceptance line "the
+    trajectory is the quaternion" fails today.
+  - The stored quaternion is canonical, w ≥ 0 (`crystallography/rotation.py:17`). On a
+    ramp across w = 0 the whole vector changes sign between neighbours (dot −0.9997), so
+    a plotted z component jumps by 1.6 for a 3° turn.
+  - `SequentialRefinement.fitted_structures` (`sequential.py:2338`) holds the first chain
+    only, as a list over the patterns that have an entry, so a pattern that raised
+    shifts every later index.
+  The reporter offers a rewrite of this WP's goal, tasks and acceptance around the
+  result surface: a continuous quaternion and the turn from the first accepted pattern
+  with a propagated esd, per body and per chain, and orientations compared modulo ±q and
+  the body's point group. It also asks three design questions (a typed field or
+  absolute rows; which covariance gives the turn's esd; whether `fitted_structures`
+  changes what its callers read). Each is a scope or reader-output call, held for the
+  maintainer on 2026-11-15, so this WP's goal is unchanged until that answer.
+
 - **2026-11-05, from the issue triage (issue #1390, item 1):** `_displace_body_rotations` writes
   into held rotation entries too, so a body with one free turn direction starts its stage with a
   nonzero held increment, and the esd re-charted at the first commit is approximate. WP-2114 owns
@@ -45,5 +73,12 @@ quaternion and origin, never by its increment. This is chunk R11 of issue #561, 
 - Issue #561; PR #596; WP-1333.
 
 ## Handover log
+
+- **2026-11-17** — Ruled by Yue 2026-11-17: the result surface #1558 asks for is built. Its
+  design follows the written rules, and the field's shape (a typed field or absolute rows)
+  is settled at PR review. This lifts the 2026-11-15 hold under `### Inherited`. Recorded
+  from Part B item 44 of the 2026-11-17 decisions batch (Ghostshift runner, no code
+  changed). Next: take the reporter's rewrite of the goal, tasks and acceptance into this
+  file, then build.
 
 - **2026-10-06** — created by WP-1803's re-cut, from #596's proposal.

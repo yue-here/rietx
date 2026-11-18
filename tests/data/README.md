@@ -131,15 +131,15 @@ Reference values used in acceptance tests:
   temperature/calibration — the acceptance test therefore checks internal
   consistency (Le Bail vs Rietveld) and agreement with the 11-BM wavelength
   calibration rather than a certificate-grade absolute value.
-- LaB6 SRM 660c certified lattice parameter: a = 4.156826(8) Å **at 22.5 °C**
-  (expanded uncertainty, k = 2; NIST certificate,
-  tsapps.nist.gov/srmext/certificates/660c.pdf).  The `…_100a` data block was
-  measured at 20.85 °C and its CIF records NIST's own recomputed cell for
-  exactly this dataset, **a = 4.156780 Å** — the value the acceptance test
-  compares against (consistent with the certificate via the Sirota et al. 1998
-  thermal expansion used by NIST).  The certificate/CIF wavelength scale is
-  λ(Cu Kα1) = 1.5405929 Å (Hölzer et al. 1997), which is what
-  `Instrument.bragg_brentano(radiation="CuKa")` ships.
+- LaB6 SRM 660c certified lattice parameter: a = 4.156826 ± 0.00008 Å
+  **at 22.5 °C** (0.415 682 6 nm ± 0.000 008 nm, expanded uncertainty, k = 2,
+  19 ppm; NIST certificate, tsapps.nist.gov/srmext/certificates/660c.pdf).
+  The `…_100a` data block was measured at 20.85 °C and its CIF records NIST's
+  own recomputed cell for exactly this dataset, **a = 4.156780 Å** — the
+  value the acceptance test compares against (consistent with the certificate
+  via the Sirota et al. 1998 thermal expansion used by NIST).  The
+  certificate/CIF wavelength scale is λ(Cu Kα1) = 1.5405929 Å (Hölzer et al.
+  1997), which is what `Instrument.bragg_brentano(radiation="CuKa")` ships.
 - SRM 660c auxiliary references: CIF-recorded specimen displacement
   −0.07877 mm (the v0.2 fit recovers −0.0801 mm with zero fixed);
   Hölzer integrated Kα2/Kα1 intensity ratio ≈ 0.52 (fit: 0.513).
@@ -793,7 +793,7 @@ of the *specimen* rather than a convenience:
   be measured against its own certificate first (WP-1023).
 * **The cell is certified in the same file the pattern is in**, at this data
   block's own temperature (4.156780 Å at 20.85 °C — not the certificate's
-  4.156826(8) Å at 22.5 °C, which is the wrong comparison here).
+  4.156826 ± 0.00008 Å (k = 2) at 22.5 °C, which is the wrong comparison here).
 
 Its 2θ range, 20.3-150.9° in 24 stitched regions, is also what makes it
 demanding: axial divergence reverses the sign of its tail at 90°, and both signs
@@ -1839,7 +1839,8 @@ also have a 100 K or 300 K scan:
   checks rule out a wrong nominal λ, which would move every line together. The
   Co₃O₄ 300 K patterns of the same experiment index at λ = 2.524 Å with zero near
   0 on Co₃O₄'s room-temperature cell (8.084 Å, Smith & Hobson, *Acta Cryst.* B,
-  1973); at that λ and zero the garnet's cell is 12.378 Å, against YIG's 12.376 Å
+  1973); at that λ the garnet's cell is 12.387 Å with the zero fixed at 0 and
+  12.371 Å with the zero free (−0.06°), against YIG's 12.376 Å
   (Geller & Gilleo, *J. Phys. Chem. Solids*, 1957), and YAG's would need
   λ = 2.45 Å. Independent of λ, with each structure scaled to the whole pattern,
   (220) is about 24 times stronger than YIG's nuclear structure factors give and

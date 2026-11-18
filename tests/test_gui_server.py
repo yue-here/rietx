@@ -626,6 +626,56 @@ def test_open_surfaces_the_binding_message_it_refused_on(blank, tmp_path,
     assert "sha256" in payload["error"]["message"]
 
 
+def test_open_says_what_the_readers_repaired(blank, tmp_path, pattern_file):
+    """WP-1522: both readers' repairs reach the route, as `Diagnostic` dumps.
+
+    A scan written high angle first is put in order by the pattern reader; a
+    log aged to schema 0.16 has a phase scale's declared floor restored and an
+    occupancy stored below its floor left unbounded.  Each changes how the
+    next fit moves, and `Project` keeps them in memory only, so the document
+    is the one place a person can learn of them before running.
+    """
+    from tests.test_project import _BARE, _age_log, _bare_occ
+
+    _, client = blank
+    clean = tmp_path / "clean.rex"
+    _project(clean, pattern_file)
+    status, doc = client.post("/api/project/open", {"path": str(clean)})
+    assert status == 200
+    assert (doc["data_diagnostics"], doc["history_diagnostics"]) == ([], [])
+
+    lines = pattern_file.read_text(encoding="utf-8").splitlines()
+    down = tmp_path / "down.xye"
+    down.write_text("\n".join(reversed(lines)) + "\n", encoding="utf-8")
+    root = tmp_path / "old.rex"
+    project = _project(root, down)
+
+    def edit(state):
+        state["structure"]["phases"][0]["scale"].update(_BARE)
+        _bare_occ(-2.0)(state)
+
+    _age_log(project, "0.16", edit)
+
+    status, doc = client.post("/api/project/open", {"path": str(root)})
+    assert status == 200
+    [scan] = doc["data_diagnostics"]
+    assert scan["code"] == "PATTERN_SCAN_REVERSED" and "down.xye" in scan["message"]
+    by_code = {d["code"]: d for d in doc["history_diagnostics"]}
+    assert set(by_code) == {"DECLARED_RANGE_RESTORED", "DECLARED_RANGE_NOT_RESTORED"}
+    restored = by_code["DECLARED_RANGE_RESTORED"]
+    left = by_code["DECLARED_RANGE_NOT_RESTORED"]
+    assert (restored["level"], restored["where"]) == ("warning", ["phases.0.scale"])
+    assert (left["level"], left["where"], left["value"]) == (
+        "warning", ["phases.0.atoms.1.occ"], -2.0)
+    assert "-2.0 in n0000" in left["message"]
+
+    # the session's own read, so a reload's GET says the same, item for item
+    status, again = client.get("/api/project")
+    assert status == 200
+    assert again["data_diagnostics"] == doc["data_diagnostics"]
+    assert again["history_diagnostics"] == doc["history_diagnostics"]
+
+
 # ----------------------------------------------------------------------
 # uploads and the import flow (WP-1014)
 # ----------------------------------------------------------------------

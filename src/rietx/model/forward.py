@@ -424,10 +424,41 @@ REFLECTION_MARGIN_DEG = 0.5
 #: always the refined one.
 MAGNETIC_SIZING_FLOOR = 0.1
 
-#: Distinct keys :meth:`CompiledModel._memo` holds per slot.  Two, because a
-#: Jacobian column alternates between the expansion point and one perturbed
-#: state; see that method for the measurement and for why this is capped.
+#: Recent keys :meth:`CompiledModel._memo` holds per slot, *beside* the pinned
+#: expansion point (:class:`_MemoSlot`).  The pin is what a Jacobian's
+#: alternation needs; this list is only the residual's trail between
+#: Jacobians, and that method carries the measurement sizing it.
 _MEMO_DEPTH = 2
+
+#: Set while :meth:`CompiledModel.derivative_bases` builds the expansion
+#: point's peaks, so :meth:`CompiledModel._memo` pins what it hands back there
+#: (WP-1945).  Private and scoped by :func:`_pinning_expansion_point`.
+_MEMO_PIN: ContextVar[bool] = ContextVar("_MEMO_PIN", default=False)
+
+
+@contextmanager
+def _pinning_expansion_point():
+    """Every memo lookup inside the block pins its entry (WP-1945)."""
+    token = _MEMO_PIN.set(True)
+    try:
+        yield
+    finally:
+        _MEMO_PIN.reset(token)
+
+
+class _MemoSlot:
+    """One memo slot: the pinned expansion point and the recent keys.
+
+    ``pin`` is the ``(key, value)`` the last :meth:`derivative_bases` asked
+    for, and no run of other keys evicts it; ``recent`` is a most-recent-first
+    list of at most :data:`_MEMO_DEPTH` other entries.
+    """
+
+    __slots__ = ("pin", "recent")
+
+    def __init__(self) -> None:
+        self.pin: tuple | None = None
+        self.recent: list[tuple] = []
 
 
 def _freeze(value) -> None:
@@ -923,7 +954,7 @@ class CompiledPhase:
     # profile width leaves both the cell block and |F|² alone.  ``None`` keeps
     # the hot loop exactly as it was; numpy path only, for the reason the FCJ
     # memo is numpy-only.
-    scalar_cache: dict[str, tuple] | None = None
+    scalar_cache: dict[str, _MemoSlot] | None = None
     # WP-1326.  ``satellites`` is the second ReflectionSet, frozen at stage
     # compile beside the nuclear one, kept whole so a caller can ask what was
     # generated and from which k; ``reflections`` above is the **merge** of the
@@ -1619,47 +1650,71 @@ class CompiledModel:
         this repository.  Freezing the arrays costs nothing per call and turns
         the corruption into a ``ValueError`` naming the write.
 
-        **Two keys deep, because a Jacobian alternates between exactly two**
-        (WP-1121).  A column perturbs one parameter and leaves the rest at the
-        expansion point, so a run of columns that do not touch this block all
-        want the *same* base key — and one cell column between two of them is
-        enough to evict it from a one-deep slot, which then rebuilds a block
-        the perturbation could not have changed.  Measured on the trigger cold
-        fit: 63.6 % of column-seam lookups hit at depth 1 against 72.9 % with
-        an unbounded cache, the gap worth 0.29 s of 8.8 s, and |F|² alone —
-        145 µs a build — carrying 0.17 s of it.
+        **The expansion point is pinned, because no depth holds it** (WP-1945,
+        correcting WP-1121).  A column perturbs one parameter and leaves the
+        rest at the expansion point, so a run of columns that do not touch
+        this block all want the *same* base key.  WP-1121 read that as an
+        alternation of two arms and kept two keys, least recently used first.
+        But a phase with two cell columns pushes the base out of two slots, so
+        the next column of that phase rebuilt every block at a state the memo
+        had already built: 129 of trigger's 172 ``lor_size`` columns rebuilt
+        the cell block and |F|², and none does pinned.  A deeper list only
+        moves the edge, since trigger's monoclinic phase has four cell
+        columns.  So
+        :meth:`derivative_bases`, which builds the peaks every column is
+        differenced against, runs its ``phase_peaks`` calls under
+        :func:`_pinning_expansion_point`, and the entry each lookup there
+        returns becomes the slot's ``pin``: replaced by the next expansion
+        point, never by a column.  An entry already on the recent trail moves
+        to the pin unbuilt, which is the accepted step's case (residual at the
+        trial point, then the Jacobian there).
 
-        Depth is capped rather than unbounded because the keys are decoded θ:
-        an unbounded map grows one entry per distinct parameter vector and a
-        fit visits thousands, so it is a leak wearing a cache's clothes.  Two
-        is what the *access pattern* asks for, not a tuning constant — the
-        alternation has two arms, and **depth 8 was measured to build exactly
-        the same 35 596 blocks as depth 2** on the trigger fit, to the call.
-        What the remaining 8 pp of the unbounded figure would take is a key
-        last seen in an *earlier Jacobian*, thousands of lookups ago; no cache
-        that is not a leak reaches it, and reading that gap as headroom is the
-        mistake this note exists to stop.
+        **The two-key measurement that sized the old depth could not have
+        come out any other way.**  The lookup then compared ``held[0]`` and
+        ``held[1]`` and nothing else, whatever ``_MEMO_DEPTH`` was, so depth
+        8 held six keys no lookup ever returned and built exactly the blocks
+        depth 2 built.  For the same reason the gap between depth 1 and an
+        unbounded cache was not keys from an *earlier Jacobian*: it was mostly
+        this one's evicted expansion point.  The lookup now scans every entry.
+
+        What remains is ``recent``, the trail of other keys, capped because
+        the keys are decoded θ: an unbounded map grows one entry per distinct
+        parameter vector and a fit visits thousands, so it is a leak wearing a
+        cache's clothes.  With the pin in place the trail's depth barely
+        matters, measured over nac, cpd-1a, cpd-2 and trigger by WP-1945's
+        replay probe (its handover names the script and holds the tables):
+        9732, 9724 and 9631 block builds on trigger at depth 1, 2 and 8,
+        against 11 428 for the shipped two-key memo.  It stays at 2.  Every count, Rwp and
+        refined value was bit-identical at all three depths, as a memo hit
+        must be.
         """
         cache = cp.scalar_cache
         if cache is None or get_backend().name != "numpy":
             return build()
         key = key_fn()
         held = cache.get(slot)
-        if held is not None:
-            if held[0][0] == key:
-                return held[0][1]
-            if len(held) > 1 and held[1][0] == key:
-                # promote, so an alternation keeps hitting rather than
-                # evicting the arm it is about to want again
-                held[0], held[1] = held[1], held[0]
-                return held[0][1]
+        if held is None:
+            held = cache[slot] = _MemoSlot()
+        pinning = _MEMO_PIN.get()
+        if held.pin is not None and held.pin[0] == key:
+            return held.pin[1]
+        recent = held.recent
+        for i, entry in enumerate(recent):
+            if entry[0] == key:
+                del recent[i]
+                if pinning:
+                    held.pin = entry
+                else:
+                    # most recent first, so the trail evicts its oldest key
+                    recent.insert(0, entry)
+                return entry[1]
         value = build()
         _freeze(value)
-        if held is None:
-            cache[slot] = [(key, value)]
+        if pinning:
+            held.pin = (key, value)
         else:
-            held.insert(0, (key, value))
-            del held[_MEMO_DEPTH:]
+            recent.insert(0, (key, value))
+            del recent[_MEMO_DEPTH:]
         return value
 
     def _atom_key(self, ip: int, values: dict[str, float]) -> tuple:
@@ -3242,9 +3297,13 @@ class CompiledModel:
             if cp.batch_mag is not None:
                 jobs.append((ip, cp, 1, cp.batch_mag))
         for ip, cp, component, lay in jobs:
-            peaks = self.phase_peaks(
-                ip, values, None if intensities is None else intensities[ip],
-                component=component)
+            # the expansion point every peak-chain column of this Jacobian
+            # differences against: pinned, so no run of columns evicts it
+            # (``_memo``, WP-1945)
+            with _pinning_expansion_point():
+                peaks = self.phase_peaks(
+                    ip, values, None if intensities is None else intensities[ip],
+                    component=component)
             if component:
                 peaks_mag[ip] = peaks
             else:
@@ -4491,6 +4550,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     phases: list[CompiledPhase] = []
     restraint_items: list = []
+    restraint_findings: list = []
     for ip, phase in enumerate(structure.phases):
         cell = phase.cell.lengths_angles()
         # The phase's own operation list when it carries one: a child cell
@@ -4727,7 +4787,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # intensities and never compute the coordinates a bond would need.  The
         # PBC image is frozen for the stage here, at the compile-time cell/coords.
         if mode == "rietveld" and phase.restraints:
-            restraint_items.extend(resolve_phase_restraints(phase, ip, sites, cell))
+            restraint_items.extend(resolve_phase_restraints(
+                phase, ip, sites, cell, restraint_findings))
         phases.append(cp)
 
     # background compilation — always linear: paths + design rows (+ penalty)
@@ -4838,7 +4899,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     "PeakComponent.")
 
     pawley = _build_pawley_block(phases) if mode == "pawley" else None
-    restraints = CompiledRestraints(restraint_items) if restraint_items else None
+    restraints = (CompiledRestraints(restraint_items, restraint_findings)
+                  if restraint_items else None)
 
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
