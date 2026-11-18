@@ -294,9 +294,6 @@ The gap is a real thing, such as a phase not yet in the model or a stage that di
 
 `SeriesResult.qpa_trajectory` gives a phase's weight fraction as a percentage, as a `QPATrajectory`.
 Its `QPATrajectory.path`, `QPATrajectory.x`, `QPATrajectory.x_label`, `QPATrajectory.value`, `QPATrajectory.stderr`, `QPATrajectory.labels` and `QPATrajectory.positions` read as a `Trajectory`'s.
-`QPATrajectory.support_sigma`, `QPATrajectory.conditional_on` and `QPATrajectory.unconstrained` say, per point, what that pattern's fraction rests on (WP-2073): the phase's `PhaseQuantity.support_sigma` and `PhaseQuantity.conditional_on`, and whether the pattern carried `PHASE_UNCONSTRAINED` on the phase.
-A point whose pattern held the phase's structure is kept and marked, not dropped: its scale was still measured, and only its structure was held.
-No threshold decides the mark.
 `QPATrajectory.unmeasured` lists, per point, the phases that pattern quoted no fraction for, and `QPATrajectory.basis_changes` says whether the points are fractions of different sets of phases, as when a reflection crosses the range edge part-way through the series (WP-1958).
 `SeriesResult.agreement_trajectory` gives a phase's structure agreement index, with `metric="r_bragg"` (the default) or `"r_f"`.
 `SeriesResult.agreement_phases` lists the phases that carry one.
