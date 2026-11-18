@@ -32,6 +32,18 @@ The second PR's pictures, the Peaks and Background graphs:
 - `background-hold-*.png`: the band at ×5 with terms 4 and 5 held by their chips. The title
   reads "Background preview" and the action bar counts two pending edits.
 
+The third PR's pictures, the Structure graph, on the fluorapatite example after one fit:
+
+- `structure-rest-*.png`: the graph at the current values, balls, with the colour key under
+  the title line. The CaO₅ and CaO₆F polyhedra start off, so their entries are struck through.
+- `structure-ellipsoids-*.png`: Ellipsoids, looking down c. The title states the probability.
+- `structure-selected-*.png`: an atom clicked after a drag. The ring and its bar name it, and
+  the status bar names what is under the pointer.
+- `structure-coordination-*.png`: Show coordination on that atom.
+- `structure-drawing-*.png`: the view menu's Drawing… popover.
+- `structure-preview-*.png`: Lattice parameter a dragged 0.3 of its track in the Interactive
+  tab. The title reads "Preview, not refined".
+
 Taken 2026-11-18 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every drag and click was made
 by a real pointer move or click.

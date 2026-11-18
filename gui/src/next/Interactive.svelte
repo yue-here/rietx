@@ -65,6 +65,7 @@
     say = () => {},
     onpending = () => {},
     onpreview = () => {},
+    onvalues = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
@@ -77,6 +78,8 @@
     onpending?: (n: number) => void;
     /** the preview to draw, or null when nothing is pending; `error` is a refusal */
     onpreview?: (answer: PreviewAnswer | null, error: string) => void;
+    /** the unapplied slider values, or null: the Structure graph draws them */
+    onvalues?: (values: Record<string, number> | null) => void;
   } = $props();
 
   let rows = $state<ParamRow[]>([]);
@@ -149,6 +152,7 @@
 
   $effect(() => {
     onpending(edits.size);
+    onvalues(edits.size ? Object.fromEntries(edits) : null);
   });
 
   // the chart module is a chunk off the boot path (gui/CLAUDE.md), so its

@@ -91,7 +91,7 @@ How each screen reads in the prototype, restated:
   edits counted in the action bar and carried by the recovery offer. A vitest mount case for
   the title (acceptance row 6) and a browser pass with a real drag (row 9). The first PR.
 - [x] The Peaks and Background graphs (rows 59-68). The second PR.
-- [ ] The Structure graph (rows 69-82), from #1519's source. The third PR.
+- [x] The Structure graph (rows 69-82), from #1519's source. The third PR.
 - [ ] The Instrument dialog (rows 133-136) and File › Export › Instrument profile…. The fourth
   PR.
 - [ ] Screenshots at 1440 × 900, light and dark, under `docs/wp/2218-screenshots/`, for each
@@ -218,6 +218,42 @@ Filled in by the session that builds each PR.
      spline's stiffness by orders of magnitude.
    - "waiting for the run" on the Background title line while a refinement runs.
    - The empty state "No fitted peaks to frame yet." on the Peaks graph before a fit.
+8. **The third PR: what the Structure graph draws differently from the prototype, each by a
+   written rule.**
+   - The draw mode is a segmented Balls | Ellipsoids, and polyhedra are entries in the colour
+     key. The prototype's segmented choice is Atoms | Polyhedra. Inventory rows 70 and 77
+     place them so, and ellipsoids are the reason the viewer exists (WP-1015).
+   - The colour key sits on a row of its own under the title line. The prototype puts it on
+     the title line. At the default split the graph is 655 px wide, and the title, Look
+     down, the draw mode and the view menu take most of it, so the key would push the
+     controls off the line (`gui/STYLE.md` § Layout: no control wraps while the title can
+     still shrink).
+   - The title reads "Structure at the current values" at rest, where the prototype reads
+     "Last fit". An applied edit moves the drawing without a fit, so "Last fit" would be
+     wrong; the Background graph reads the same way (§ Questions 6).
+   - Only a slider value that can move an atom makes a preview. An instrument value moves
+     the pattern and leaves the drawing as it is, so the title stays at the current values.
+   - The cell frame takes the accent and the a, b, c letters its text role, as today's viewer
+     does (`gui/STYLE.md` § Plots). The prototype draws a muted frame and serif letters.
+   - The selected atom's bar sits at the top centre of the canvas, since an atom has no
+     on-screen extent to sit above as a plot region does (interaction rule 7).
+9. **The third PR: what the Structure graph draws that the prototype lacks.** Each comes from
+   an inventory row.
+   - A phase menu on the title line with two or more phases (row 71).
+   - A click selects an atom: a ring in the text ink and a bar holding "Show coordination"
+     and ×. Esc closes it, and double-click resets the view (row 73).
+   - The status bar names the atom, bond or polyhedron under the pointer (row 74).
+   - A ⋯ view menu holding Reset view, Drawing…, Save image… and Copy image, and the same
+     image entries on the canvas's context menu (rows 79 and 80). Save image… asks one
+     question, a transparent background. File › Export does not list the image yet: the File
+     menu is today's shared panel until the swap.
+   - While ellipsoids show, the title says "Ellipsoids at 50 %" and any exaggeration
+     beside it, "drawn ×1.50" (row 81, WP-1029). The old caption and "space group · V" are
+     gone.
+   - "Preview refused" on the title line, with the server's words in its tooltip (§ Rulings
+     3's words).
+   - One-line empty states: no WebGL2, loading, a load error, and the server's sentence for a
+     project with no phase (row 82).
 
 ## Handover log
 

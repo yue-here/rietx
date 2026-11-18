@@ -24,6 +24,7 @@
   import Interactive from "./Interactive.svelte";
   import Background from "./Background.svelte";
   import Peaks from "./Peaks.svelte";
+  import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -83,6 +84,8 @@
    *  edits as one set, as today's page does. */
   let interactivePanel = $state<any>(null);
   let sliderTouched = $state(0);
+  /** The slider values not yet applied, which the Structure graph draws. */
+  let sliderValues = $state.raw<Record<string, number> | null>(null);
   let previewAnswer = $state.raw<PreviewAnswer | null>(null);
   let previewError = $state("");
   /** The Parameters panel's pending holds, shared with the Background
@@ -723,6 +726,9 @@
             <Background {head} {busy} {theme} {say} protocol={protocolKey} holds={pendingHolds}
               onhold={(path, held, serverHeld) => paramsPanel?.setHold(path, held, serverHeld)}
               onmoved={structureMoved} />
+          {:else if graphTab === "structure"}
+            <Structure {head} {busy} {theme} {say} values={sliderValues}
+              projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -768,6 +774,7 @@
           <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
+            onvalues={(v) => (sliderValues = v)}
             onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
         {#if !unbuilt}

@@ -1386,3 +1386,105 @@ def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_
     finally:
         httpd.shutdown()
     assert not failures, "\n".join(failures)
+
+
+def _colours(page, selector: str) -> int:
+    """Distinct colours in a screenshot of one element: a WebGL canvas cannot
+    be read back, so the picture is what is measured (browser-driving note)."""
+    import io
+
+    from PIL import Image
+
+    png = page.locator(selector).screenshot()
+    return len(set(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)).get_flattened_data()))
+
+
+def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 69-82. The Structure graph draws the working model and says
+    so; Look down, the draw mode and a colour-key switch move no place; a drag
+    turns the picture; a click on an atom opens its selection bar; and a
+    Lattice parameter a slider drawn in the Interactive tab redraws it as
+    "Preview, not refined" without writing, until Revert. Every press is real."""
+    httpd, client = _serve(tmp_path_factory, "next-structure")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        failures = []
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Structure", exact=True).click()
+        page.wait_for_selector(".structgraph .key .entry")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        page.wait_for_timeout(300)
+        _frames(page, 4)
+        rest = _colours(page, ".structgraph canvas")
+        assert rest > 20, rest
+        landmarks = NEXT_GRAPHS + [".key", ".key .entry", ".structgraph .view"]
+        before = page.evaluate(SNAP, landmarks)
+        for axis in ("a", "b", "c"):
+            page.locator(".structgraph .gctl button.axis", has_text=axis).click()
+            _frames(page, 2)
+        failures += [f"Look down: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Ellipsoids").click()
+        _frames(page, 3)
+        assert "Ellipsoids at 50 %" in page.locator(".gtitle").inner_text()
+        failures += [f"Ellipsoids: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry = page.locator(".structgraph .key .entry").first
+        entry.click()
+        _frames(page, 2)
+        assert entry.get_attribute("aria-pressed") == "false"
+        failures += [f"key switch: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry.click()
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Balls").click()
+        _frames(page, 3)
+
+        # a real drag turns the picture
+        shot = page.locator(".structgraph canvas").screenshot()
+        box = page.locator(".structgraph canvas").bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(cx, cy)
+        page.mouse.down()
+        for k in range(1, 11):
+            page.mouse.move(cx + 8 * k, cy + 4 * k)
+            _frames(page, 1)
+        page.mouse.up()
+        _frames(page, 3)
+        assert page.locator(".structgraph canvas").screenshot() != shot
+
+        # a click on an atom selects it: hunt for one by hovering, as a person would
+        hit = None
+        for dx in range(-150, 151, 10):
+            for dy in range(-100, 101, 10):
+                page.mouse.move(cx + dx, cy + dy)
+                text = page.locator(".statusbar .right").inner_text()
+                if "(" in text and "Å" not in text:
+                    hit = (cx + dx, cy + dy)
+                    break
+            if hit:
+                break
+        assert hit, "no atom under any hovered point"
+        page.mouse.click(*hit)
+        page.wait_for_selector(".structgraph .selbar")
+        assert "Show coordination" in page.locator(".structgraph .selbar").inner_text()
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".structgraph .selbar", state="detached")
+
+        # a structural slider value is drawn as a preview, and writes nothing
+        head = client.get("/api/project")[1]["head"]
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        row = page.locator("section.model .slider",
+                           has=page.locator("button.pname", has_text="Lattice parameter a")).first
+        track = row.locator('input[type="range"]')
+        track.scroll_into_view_if_needed()
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        assert client.get("/api/project")[1]["head"] == head
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
