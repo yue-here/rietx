@@ -33,6 +33,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1941](1941-a-release-note-is-a-file-per-change.md) | A release note is a file per change | 2026-11-17 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | 2026-11-16 | P3 | [Unscheduled](#unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement) |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | 2026-11-13 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -874,7 +875,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1926](1926-the-exact-voigt-is-a-supported-shape.md) | The exact Voigt is a supported shape: its cost, its width, its exports and its bound | ⬜ | P3 | — (#815 soft) |
 | [1939](1939-an-ahead-of-time-kernel-spike.md) | An ahead-of-time kernel spike: Rust, C or Cython against numba | ✅ 2026-10-10 | — | — |
 | [1940](1940-the-kernel-tier-in-a-wheel.md) | The kernel tier in a wheel: Rust kernels, threaded on work, with a vector exponential | ✅ 2026-10-11 | — | [1939](1939-an-ahead-of-time-kernel-spike.md) |
-| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | ⬜ | P3 | — ([1938](1938-every-parameter-refined-in-its-own-units.md) soft) |
+| [1945](1945-the-peak-chain-columns-built-in-one-pass-per-phase.md) | The peak-chain columns of a Jacobian built in one pass per phase | 🔄 2026-11-16 | P3 | — ([1938](1938-every-parameter-refined-in-its-own-units.md) soft) |
 | [1948](1948-a-public-objective-for-an-outside-optimiser.md) | A public objective for an outside optimiser | ⬜ | P4 | [1947](1947-the-model-read-at-its-values-without-a-solve.md), [1938](1938-every-parameter-refined-in-its-own-units.md) |
 | [1950](1950-rietx-inside-an-application.md) | Rietx inside an application | ⬜ | P3 | — |
 | [1960](1960-spherical-harmonics-texture.md) | Spherical-harmonics texture: preferred orientation with no single axis | ✅ 2026-10-15 | — | — |
