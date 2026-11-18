@@ -235,7 +235,8 @@ export const api = {
    *  The arguments are drawing thresholds, not settings, which is why they ride
    *  on the query string and are never persisted. */
   structure3d: (phase = 0, bondTolerance?: number, disorder?: "all" | "major",
-                centres?: string[] | null, ligands?: string[] | null) => {
+                centres?: string[] | null, ligands?: string[] | null,
+                values?: Record<string, number> | null) => {
     const query = new URLSearchParams({ phase: String(phase) });
     if (bondTolerance !== undefined) {
       query.set("bond_tolerance", String(bondTolerance));
@@ -244,7 +245,10 @@ export const api = {
     // present and empty asks for none, so only null leaves the chemistry's
     if (centres != null) query.set("centres", centres.join(","));
     if (ligands != null) query.set("ligands", ligands.join(","));
-    return call("GET", `/api/structure3d?${query}`);
+    // unapplied values ride in a POST body, as `POST /api/preview` takes them
+    // (WP-2218): the Structure graph's preview, which writes nothing
+    return values ? call("POST", `/api/structure3d?${query}`, { values })
+      : call("GET", `/api/structure3d?${query}`);
   },
   instrument: () => call("GET", "/api/instrument"),
   /** A whole validated model, not a field patch — adding a phase or an ADP block

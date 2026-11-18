@@ -258,6 +258,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/structure/symmetry` | the Wyckoff letter per atom, which costs a search per atom |
 | `POST /api/structure/symmetry/preview` · `POST /api/structure/symmetry` | what a space-group change would invalidate; the change |
 | `GET /api/structure3d` | the model as the geometry the 3D view draws |
+| `POST /api/structure3d` | the same geometry at values sent in the body and never applied, as `POST /api/preview` takes them; writes nothing |
 | `GET /api/instrument` · `PATCH /api/instrument` | the instrument, and edits to it |
 | `GET /api/textdoc` · `PUT /api/textdoc` | render the `.rxt` document; apply one |
 

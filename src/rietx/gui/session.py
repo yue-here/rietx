@@ -1682,8 +1682,15 @@ class GuiSession:
     def structure3d(self, phase: int = 0, *, probability: float = 0.5,
                     bond_tolerance: float | None = None, disorder: str = "all",
                     centres: list[str] | None = None,
-                    ligands: list[str] | None = None) -> dict:
+                    ligands: list[str] | None = None,
+                    body: dict | None = None) -> dict:
         """The current model as drawable geometry (WP-1015).
+
+        ``body`` is that of ``POST /api/structure3d``: the same ``values`` map
+        ``POST /api/preview`` takes, so the Structure graph draws a person's
+        unapplied slider values as the Pattern graph does (WP-2218). Writing
+        nothing, and idle-only like that preview, since it reads the compiled
+        table the preview keeps.
 
         A route beside ``/api/structure`` rather than an arm of it, on WP-1008's
         test for a new one: it returns what the model does **not** already say —
@@ -1708,7 +1715,13 @@ class GuiSession:
                     geometry.element_list(values, what)
             except ValueError as exc:
                 raise GuiError(str(exc), where=[what]) from None
-        structure = self._need_project().refinement.structure
+        if body is not None:
+            from . import preview
+
+            self._require_idle()
+            structure = preview.structure_at(self._need_project(), body)
+        else:
+            structure = self._need_project().refinement.structure
         try:
             built = geometry.build(
                 structure, int(phase), probability=float(probability),
