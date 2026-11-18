@@ -666,8 +666,7 @@
           <button class="entry" aria-pressed={entry.available && polyOn(entry.formula, entry.byDefault)}
             disabled={!entry.available || !polyhedraIn[mode]}
             onclick={() => togglePolyhedra(entry.formula, entry.byDefault)}
-            title={entry.available ? `Show or hide the ${entry.formula} polyhedra`
-              : `The ${entry.formula} polyhedra reach past the atoms drawn`}>
+            title={entry.available ? `Show or hide the ${entry.formula} polyhedra` : undefined}>
             <i class="poly" style:background={entry.color}></i>{entry.formula}</button>
         {/each}
       {/if}
