@@ -129,5 +129,10 @@ describe("the helpers", () => {
     expect(structureValues({ "instrument.zero_shift": 0.1, "phases.0.cell.a": 4 }))
       .toEqual({ "phases.0.cell.a": 4 });
     expect(structureValues(null)).toBeNull();
+    expect(structureValues({ "phases.0.scale": 2, "phases.1.lor_size": 0.1,
+                             "phases.0.texture.dof.0": 1 })).toBeNull();
+    expect(structureValues({ "phases.0.atoms.1.biso": 0.5, "vars.t": 1,
+                             "phases.0.rigid_bodies.0.rot": 3 }))
+      .toEqual({ "phases.0.atoms.1.biso": 0.5, "vars.t": 1, "phases.0.rigid_bodies.0.rot": 3 });
   });
 });

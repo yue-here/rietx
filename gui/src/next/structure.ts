@@ -22,15 +22,22 @@ export function structureReadout(text: string): StatusReadout | null {
 }
 
 /**
+ * The families that move the pattern and never an atom: the instrument, and a
+ * phase's scale, peak broadening, extinction and texture (`rietx.help`'s
+ * families). The list names what cannot move the drawing, so a family added
+ * later is drawn as a preview until it joins here.
+ */
+const PATTERN_ONLY = /^(instrument\.|phases\.\d+\.(scale|gauss_size|gauss_strain|lor_size|lor_strain|magnetic_lor_size|magnetic_lor_strain|microstrain|extinction|preferred_orientation|texture)(\.|$))/;
+
+/**
  * The unapplied slider values that can move the drawing, or `null` when none
- * can. An instrument value moves the pattern and never the structure, so a
- * zero-shift drag leaves the graph at the current values rather than calling
- * an unchanged drawing a preview.
+ * can. A zero-shift or phase-scale drag leaves the graph at the current values
+ * rather than calling an unchanged drawing a preview.
  */
 export function structureValues(
   values: Record<string, number> | null | undefined,
 ): Record<string, number> | null {
   if (!values) return null;
-  const kept = Object.entries(values).filter(([path]) => !path.startsWith("instrument."));
+  const kept = Object.entries(values).filter(([path]) => !PATTERN_ONLY.test(path));
   return kept.length ? Object.fromEntries(kept) : null;
 }
