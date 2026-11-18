@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-17 — the first PR (the Interactive tab and the preview on the Pattern graph) open
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the first PR (the Interactive tab and the preview on the Pattern graph) open for review; three PRs to follow
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
@@ -86,7 +86,7 @@ How each screen reads in the prototype, restated:
 ## Tasks
 
 - [x] File the WP; the milestone's R3 row names it.
-- [ ] The Interactive tab at `/next` (rows 98-103) and the preview on the Pattern graph (row
+- [x] The Interactive tab at `/next` (rows 98-103) and the preview on the Pattern graph (row
   57): the title line's three states, the reserved Preview slot, the last fit in grey, slider
   edits counted in the action bar and carried by the recovery offer. A vitest mount case for
   the title (acceptance row 6) and a browser pass with a real drag (row 9). The first PR.
@@ -143,9 +143,55 @@ Filled in by the session that builds each PR.
    `interactive-preview-zoom-crop-dark.png` the grey line sits close to the orange preview
    and reads faintly against the plot's ground. The prototype's dark grey is darker still. A
    lighter grey would need to clear the palette's floor against the observed crosses and the
-   difference curve. Keep it, or ask for a lighter one?
+   difference curve. It is also olive brown (`#776849`) more than grey, so beside the
+   background curve it can read as part of that family. Keep it, or ask for a lighter grey?
 
 ## Handover log
+
+- **2026-11-18** — the first PR of R3: hand fitting works at `/next`.
+
+  A person on the rebuilt page can now drag a slider in the Interactive tab and watch the
+  Pattern graph redraw. The title line says "Preview, not refined" with both Rwp values, the
+  last fit turns grey under the preview, and the legend's Preview slot fills. Nothing is
+  refined until Apply, and an unapplied slider edit comes back through the recovery offer as a
+  Parameters edit does. Today's page did not move: its bundle changed only by one unused
+  colour read. Four visual questions wait on Yue (§ Questions 1-4), the dark last-fit grey
+  being the one most worth a look.
+
+  - *Done*: `gui/src/next/Interactive.svelte` is a copy of today's panel, drawn to the
+    prototype (tinted group bands, value box, reserved ↺ slot, 0.5 % snap, the range pop-up
+    with its last fit in the slider's format and Scale above its choice). `Frame.svelte`
+    mounts it, counts slider edits in the action bar and carries them in the recovery copy.
+    `Pattern.svelte` and `pattern.ts` draw the preview, its title states and the reserved
+    legend slot. New token `--plot-last` (`viz/theme.py`, `tokens.css`, `lib/plot.ts`), held
+    by `tests/test_gui_palette.py`. Vitest `next/Preview.test.ts` (four title and hand-off
+    cases); browser case `test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing`.
+    Pictures in `docs/wp/2218-screenshots/`, listed in its README.
+  - *Review*: `/code-review high` found ten. Six fixed in one commit: a failed curves fetch
+    now clears the frame's curves; the snap holds only while the last fit is on the track;
+    Show only the data hides the preview; the rows' load error has its own field; the sliders
+    rebuild only on a change in value, so no second preview is sent; a stale comment. Four
+    declined: two are visual questions for Yue (§ Questions 3 and 4); sharing `rangeContext`
+    with `App.svelte` would edit today's page, which the swap deletes; the group heading's
+    size and the buttons' padding follow the prototype, and `lib/style.test.ts` does not scan
+    `next/`, as WP-2215's leftover on issue #1656 already records.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12, load
+    average 67-85 from other sessions): fast suite 14910 passed, 424 skipped, 32 xfailed and
+    23 errors in 49 min. The 23 errors are one fixture: the manual's sphinx build hit its
+    300 s runaway guard under the load. `tests/test_manual.py` and `tests/test_help.py` rerun
+    alone: 102 passed. Every `tests/test_gui_*.py` and `tests/*_browser.py` serially: 507
+    passed. Vitest 799 of 799; svelte-check 0 errors. The new browser case drew 24 preview
+    redraws at 33-131 ms each, and took 56 s alone. No junit run: a second 49-minute suite
+    under this load would time nothing usefully, so the cost line is that single timing.
+    `python -m tests.reader_output`: unchanged.
+  - *Gotchas*: `src/lib/structure3d.test.ts`'s scene-corpus case timed out once at 5 s in a
+    full vitest run under load and passes alone; unrelated to this diff. A `{@const}` must sit
+    directly under its `{#if}`.
+
+  Next: the second PR, the Peaks and Background graphs (rows 59-68). Move
+  `panels/PeakWindows.svelte` and `panels/Background.svelte` into `gui/src/next/` first, then
+  draw each to the prototype (§ Context). Yue's answers to § Questions may land on this PR
+  first.
 
 - **2026-11-17** — filed by the session that opened R3, after the maintainer's "go" on
   2026-11-17. R3 splits into four PRs by screen, each a whole screen for review; the first
