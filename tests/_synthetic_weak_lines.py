@@ -1,6 +1,6 @@
 """Synthetic patterns whose weak lines decide the indexing answer (WP-2078 task 2).
 
-Three builders, each drawn by the package's own forward model
+Four builders, each drawn by the package's own forward model
 (``Refinement.predict``) with Poisson counting noise from a fixed seed, so a
 test rebuilds the same pattern every run and no data file is read:
 
@@ -10,6 +10,9 @@ test rebuilds the same pattern every run and no data file is read:
 * :func:`weak_superlattice` (b): a host whose weak lines are its own, the
   ordering reflections of a superlattice.  The supercell is the truth, and the
   subcell is what a search loses it to.
+* :func:`weak_superlattice_with_trace` (WP-2147): (b) with (a)'s trace phase,
+  so the superlattice's ordering lines and a foreign phase's lines sit under
+  one floor together.
 * :func:`planted_silicon` (c): WP-1969's synthetic Si (issue #933) with twelve
   Gaussian lines planted at 1-5 % of the strongest.
 
@@ -257,11 +260,47 @@ def weak_superlattice(antisite: float = 0.1, seed: int = 5,
     cif = _double_perovskite(antisite)
     y = _profile(cif, ins, tt)
     data = _counts(y / y.max() * 1.3e6, tt, 7700.0, seed)
+    return _pick("weak_superlattice", data, ins, two_theta_range,
+                 (A_DP,) * 3 + (90.0,) * 3, "F",
+                 _ordering_lines(cif, two_theta_range))
+
+
+def _ordering_lines(cif: str, two_theta_range) -> np.ndarray:
+    """2θ of the double perovskite's ordering lines in ``two_theta_range``."""
     all_lines = _lines(cif, two_theta_range)
     d = LAM / (2.0 * np.sin(np.radians(all_lines / 2.0)))
     hkl2 = (A_DP / d) ** 2
     # h, k, l all odd ⇔ h² + k² + l² ≡ 3 (mod 8)
-    weak = all_lines[(np.abs(hkl2 - np.round(hkl2)) < 1e-3)
+    return all_lines[(np.abs(hkl2 - np.round(hkl2)) < 1e-3)
                      & (np.round(hkl2).astype(int) % 8 == 3)]
-    return _pick("weak_superlattice", data, ins, two_theta_range,
-                 (A_DP,) * 3 + (90.0,) * 3, "F", weak)
+
+
+#: the cubic perovskite subcell (P, a_p = a/2): what the supercell is lost to
+SUBCELL = (A_DP / 2.0,) * 3 + (90.0,) * 3
+
+
+def weak_superlattice_with_trace(trace: float = 0.02, antisite: float = 0.1,
+                                 seed: int = 5,
+                                 two_theta_range: tuple[float, float] = SUB_RANGE,
+                                 ) -> WeakLineFixture:
+    """(b) with an α-MoO₃ trace whose strongest line is ``trace`` × the host's (WP-2147).
+
+    The double perovskite of :func:`weak_superlattice` and the oxide of
+    :func:`weak_second_phase`, summed the way (a) sums them: each phase is
+    normalised to its own strongest line, so ``trace`` is the ratio of the two
+    phases' strongest peak heights.  MoO₃ is a reactant of the usual
+    solid-state route to Sr₂FeMoO₆, so an unreacted trace is the plausible
+    impurity.  ``weak_two_theta`` holds the host's ordering lines, as in (b);
+    the oxide's positions are ``_lines(MOO3_CIF, ...)``.  Counts, background
+    and seed as (b).
+    """
+    ins = _instrument()
+    tt = _grid(*two_theta_range)
+    cif = _double_perovskite(antisite)
+    host = _profile(cif, ins, tt)
+    imp = _profile(MOO3_CIF, ins, tt)
+    y = (host / host.max() + trace * imp / imp.max()) * 1.3e6
+    data = _counts(y, tt, 7700.0, seed)
+    return _pick("weak_superlattice_with_trace", data, ins, two_theta_range,
+                 (A_DP,) * 3 + (90.0,) * 3, "F",
+                 _ordering_lines(cif, two_theta_range))

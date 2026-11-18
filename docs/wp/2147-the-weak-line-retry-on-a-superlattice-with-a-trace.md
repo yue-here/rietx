@@ -68,6 +68,91 @@ supplies evidence for both and decides neither.
 **Tier.** No rule is added. The measurement is development data on one
 synthetic family; say so where it is quoted.
 
+### Measured 2026-11-18
+
+Development data on one synthetic family, measured on `05ea63571`
+(`[dev]` venv, macOS arm64), from a `git archive` snapshot, one run at a
+time. The fixture is `weak_superlattice_with_trace` in
+`tests/_synthetic_weak_lines.py`: (b) at antisite 0.1, seed 5, plus α-MoO₃
+summed the way (a) sums it, `trace` being the ratio of the two phases'
+strongest peak heights. MoO₃ is a reactant of the usual solid-state route to
+Sr₂FeMoO₆, so an unreacted trace is the plausible impurity. Every run is
+`index_pattern(peaks, spec=SearchSpec(systems=("cubic",)), preset="full")`
+on the list as picked. "Truth" is the supercell F 7.886 Å; "subcell" is the
+primitive perovskite cell P 3.943 Å. A rank is read by `rank_of_lattice`;
+"—" means absent.
+
+**The picked list.** The picker keeps all twelve ordering lines at every
+trace. The oxide adds 25 lines at 0.5 %, 39 at 1 %, 58 at 2 % and 77 at 4 %.
+The retry's 5 % floor keeps 11 or 12 lines at every trace up to 4 %, all of
+them subcell lines: no ordering line and no oxide line survives it.
+
+**When the retry first fires.** At 0.5 % the inlier retry finds the
+supercell with all three engines, the weak-line retry does not run, and the
+truth ranks first. At 0.6 % the full list ends with no agreement and the
+retry fires. The threshold is not monotone: at 0.7 % dichotomy and
+trial_error agree on a wrong P 13.659 Å cell after the inlier retry, so the
+retry does not run and the truth is absent. From 0.8 % to 4 % it fires on
+every trace tried. The fixture's default is 2 %, inside that band.
+
+**All three engines** (truth / subcell rank in the answer a user reads; the
+"retry off" column is the full list's own answer, inlier retry included,
+measured by making the floor set nothing aside):
+
+| trace | retry fires | adopted | truth | subcell | rank 1 | retry off: truth, candidates |
+|---|---|---|---|---|---|---|
+| 0 | no | — | 1 | — | F 7.886 (truth) | (same run) |
+| 0.5 % | no | — | 1 | — | F 7.886 (truth) | 1, 12 |
+| 0.6 % | yes | yes | 4 | 2 | I 3.943 | —, 4 (dichotomy only) |
+| 0.7 % | no | — | — | — | P 13.659 | (same run) |
+| 0.8 % | yes | yes | 4 | 2 | I 3.943 | —, 2 (dichotomy only) |
+| 0.9 % | yes | yes | 4 | 2 | I 3.943 | not run |
+| 1 % | yes | yes | 4 | 2 | I 3.943 | —, 1 (dichotomy only) |
+| 2 % | yes | yes | 4 | 2 | I 3.943 | —, 0 |
+| 4 % | yes | yes | 3 | 2 | I 3.943 | —, 0 |
+
+Every candidate in every row grades `low`. Seeds 1-4 at 2 % make the same
+decision (fires, adopted; truth 3rd or 4th, subcell 2nd). Searches took
+5-36 s each.
+
+**Each engine alone** (a single engine "agrees" only by returning nothing,
+`workflow._no_agreement`, so the retry fires only on an empty first answer):
+
+| engine | trace | retry fires | adopted | truth | subcell |
+|---|---|---|---|---|---|
+| dichotomy | 0 | no | — | 1 | — |
+| dichotomy | 1 % | no | — | — | — |
+| dichotomy | 2 % | yes | yes | 4 | 2 |
+| svd | 0 | no | — | 1 | — |
+| svd | 1 % | yes | yes | 4 | 2 |
+| svd | 2 % | yes | yes | 4 | 2 |
+| trial_error | 0 | no | — | 1 | — |
+| trial_error | 1 % | yes | yes | 4 | 2 |
+| trial_error | 2 % | yes | yes | 4 | 2 |
+
+At 1 % dichotomy alone returns one wrong cell (P 19.317 Å), so the retry
+does not run and the truth is absent.
+
+**What this says about the two open questions.** The retry does not lose
+the supercell, because the full list never held it: wherever the retry
+fires, the full list's answer lacks the truth (0 to 4 single-engine cells at
+13-22 Å). The retry moves the truth from absent to 3rd or 4th. What it puts
+above the truth is the perovskite subcell (2nd) and, first, I 3.943 Å, a
+lattice of half the subcell's volume. The floor also removes the subcell's
+own weak lines: at 2 % it keeps the subcell's even lines (h² + k² + l² = 2,
+4, ..., 22, bar 16) and one odd one, (111) at 5.7 % of the strongest. The
+I cell indexes ten of those eleven lines and predicts about half as many
+lines as the subcell, and the panel ranks it first. Appending the full
+list's candidates after the retry's would add 0 to 4 wrong cells below the
+truth and move no rank above it.
+
+**Undeclared systems** (all three engines, `preset="full"`, 2 %, one run,
+595 s, `INDEX_SEARCH_INCOMPLETE`): the inlier retry finds two engines
+agreeing on an orthorhombic P 6.991 Å cell, so the weak-line retry does not
+run. The truth is absent, and so is the subcell. The quick preset's 120 s
+ceiling would cut this search, so the default call does not reach the
+retry here either.
+
 ### Inherited
 
 ## Non-goals
@@ -80,7 +165,7 @@ synthetic family; say so where it is quoted.
 
 ## Tasks
 
-- [ ] The fixture: (b) plus a planted trace phase, with the smallest trace
+- [x] The fixture: (b) plus a planted trace phase, with the smallest trace
       fraction at which the full list finds no agreement after the inlier
       retry. Seeded, no data file.
 - [ ] Measure under `preset="full"` with each engine and all three together:
