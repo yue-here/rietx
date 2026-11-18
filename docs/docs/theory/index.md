@@ -13,6 +13,7 @@ Every displayed equation carries a source line naming that symbol, and the build
 - [Background](background.md) gives the background models and the bias a flexible one causes.
 - [Estimation](estimation.md) states what the fit minimises and how each esd is computed.
 - [Parameterisation and constraints](parameterisation.md) builds the parameter vector and ties its entries.
+- [A parameter as a function of each pattern's coordinates](parametric.md) holds one parameter of a joint fit to a declared function of where each pattern sits.
 - [Representation analysis](representation-analysis.md) derives the magnetic structures a propagation vector allows.
 - [Superspace groups](superspace.md) describes a crystal modulated along one direction.
 - [Maximal subgroups and Wyckoff splittings](subgroups.md) builds every maximal subgroup of a space group, and how its Wyckoff positions split, from its operations.
@@ -95,6 +96,7 @@ microstructure
 background
 estimation
 parameterisation
+parametric
 representation-analysis
 superspace
 subgroups

@@ -52,9 +52,9 @@ prototype at 1440 × 900:
 
 | Piece | WP | What it builds |
 |---|---|---|
-| R1 | [WP-2215](../wp/2215-the-frame.md), in flight | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
-| R2 | [WP-2216](../wp/2216-the-refinement-window.md), in flight | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
-| R3 | — | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
+| R1 | [WP-2215](../wp/2215-the-frame.md), merged 2026-11-11 (#1534) | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
+| R2 | [WP-2216](../wp/2216-the-refinement-window.md), merged 2026-11-11 (#1537), polish 2026-11-17 (#1538) | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
+| R3 | [WP-2218](../wp/2218-hand-fitting-and-the-other-graphs.md), in flight | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
 | R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
 | R6 | — | the peaks-and-indexing workflow in four steps |
@@ -97,7 +97,7 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 | Settings dialog | theme, density and number format | 2026-11-07 | R1 for the theme; density and number format with the first piece that draws what they change |
 | Bottom panel and status bar | Console (the Python the window runs) and History, toggled from the status bar along the window's foot | 2026-11-07 | R1 and R5; PR #1521 (WP-2206, WP-2207) closes as a source |
 | Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | [WP-2208](../wp/2208-a-plan-stage-that-fixes.md), PR #1520, merged 2026-11-11; R4 draws it |
-| Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (the Text buffer and Model forms join the copy) shrinks, since R4 makes a Text edit a pending edit |
+| Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (PR #1633) adds the Text buffer and the Model forms to the copy for today's page; R4 reuses its `text` arm and `lib/sync.ts`'s `restored` event, and the Model arm goes with today's Model panel at the swap |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit judgement beside Refine while the graphs are hidden ("try B") | 2026-11-09 | R2; PR #1518 (WP-2210) closes as a source |
 | The graph window | curves switched from a legend, a view menu, the fitted range and excluded regions as plot objects | 2026-11-10 | R2; the branch `wp2213-the-graph-window` is a source, and its WP number is retired because PR #1523 files WP-2213 |
 
