@@ -1,6 +1,6 @@
 # WP-1945 — the peak-chain columns of a Jacobian built in one pass per phase
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — task 1 in PR #1603 (memo pins the expansion point); tasks 2-9 open
 Track: Candidates — named on a use case, not yet on a measurement
 Depends on: 1938 soft (it rewrites `decode` and the FD step that tasks 3-5 batch; task 1 needs nothing)
 Priority: P3 2026-10-11 — cost only, no user at the wall: 1.27× on trigger and 1.33× on cpd-1a with every column bit-identical, and task 1 is a bit-neutral 3 % on its own; 1938 landed (#883), so tasks 3-5 can start
@@ -211,7 +211,7 @@ first.
 
 ## Tasks
 
-- [ ] The memo looks up every entry it holds, and the expansion point stops
+- [x] The memo looks up every entry it holds, and the expansion point stops
       being evictable by a run of columns: a pinned entry, or a depth with the
       measurement that sizes it. Correct `_memo`'s docstring (the depth-8
       claim, and the "earlier Jacobian" reading of the gap to an unbounded
@@ -270,6 +270,107 @@ main's own range.
   physical units.
 
 ## Handover log
+
+### 2026-11-16 — task 1: the memo pins the expansion point (PR #1603)
+
+The scalar memo now keeps the point a Jacobian expands around, so a run of
+columns can no longer push it out. The lookup also checks every key it holds,
+not just the newest two. Nothing a fit returns moved, to the bit, on the four
+bench cases. The memo builds 15-18 % fewer blocks on cpd-1a, cpd-2 and
+trigger. On trigger, the 129 `lor_size` columns that rebuilt the cell block
+and |F|² at the expansion point now rebuild none of it. This is a cost-only
+change: the fit's wall clock stayed inside its run-to-run range, and no
+speedup is claimed. Task 1 ran in its own PR, as the filing session asked.
+Tasks 2-9 are untouched.
+
+*Done.* Three changes in `model/forward.py`:
+
+- **A pin per slot.** Each memo slot is a `_MemoSlot`: a `pin` plus a
+  `recent` trail, still capped at `_MEMO_DEPTH = 2`.
+- **`derivative_bases` sets the pin.** It runs its `phase_peaks` calls under
+  `_pinning_expansion_point()`, a private `ContextVar` scope. The entry each
+  lookup returns there becomes the pin. Only the next expansion point replaces
+  it. If that entry is already on the trail, which is the case for an accepted
+  step, it moves to the pin without a rebuild.
+- **The lookup scans the whole trail,** most recent first.
+
+The `_memo` docstring is rewritten: the depth-8 claim is gone, and the
+"earlier Jacobian" reading of the gap to an unbounded cache is corrected. Four
+tests in `tests/test_scalar_memo.py` replace "a third state evicts":
+
+- two cell columns cannot evict the expansion point (its builders are
+  counted, and positions are checked by object identity);
+- the next expansion point takes the pin;
+- the lookup finds the fourth key of four;
+- the trail is bounded.
+
+Positive arm: with `_pinning_expansion_point` swapped for a `nullcontext`,
+the two pin tests fail. A read-only review subagent found no bug. Its one code
+nit, an unused `_MemoSlot.__len__`, is removed (baa7d8e9f). It noted that
+`test_the_memo_is_allocated_and_actually_used` depends on running first in
+its module. That predates this change, it is safe under loadgroup today, and
+I left it.
+
+*Measured.* The replay script is
+[replay.py](1945-prototype/replay.py), committed with the review fix-ups on
+2026-11-16. Rerun then on nac, it reproduced this branch's record field for
+field (1752 builds). The logs are in the runner's scratch, not the repo. The
+replay used `examples/bench_refinement.py`'s setups for nac,
+cpd-1a, cpd-2 and trigger, with counters wrapped around `_make_residual` and
+`_make_jacobian`. Main bc77a934e and this branch were run on the worktree's
+`[dev]` venv, darwin/arm64, python 3.12, in place.
+
+- **Bit-identity:** Rwp, status, residual and Jacobian evaluation counts,
+  each stage's `n_iterations` and every refined value (as `float.hex`) are
+  identical between main and the branch, at a trail depth of 1, 2 and 8.
+  The counts are 53/48, 188/172, 284/258 and 90/82.
+- **Block builds:**
+
+  | case | main | branch |
+  |---|---|---|
+  | nac | 1818 | 1752 |
+  | cpd-1a | 12042 | 10082 |
+  | cpd-2 | 28040 | 23117 |
+  | trigger | 11428 | 9724 |
+
+  On trigger, depth 1, 2 and 8 build 9732, 9724 and 9631 blocks, so the
+  trail stays at 2.
+- **`colprobe.py` on trigger,** two runs per arm: `lor_size` columns
+  rebuilding the cell block go from 129 of 172 to 0, and `zero_shift` width
+  rebuilds from 183 to 0. Block-build seconds inside the columns:
+
+  | case | main | branch |
+  |---|---|---|
+  | trigger | 0.386 s | 0.306-0.334 s |
+  | cpd-1a | 0.197-0.223 s | 0.158-0.168 s |
+
+- **Gates:**
+  - ruff is clean;
+  - `tests/test_scalar_memo.py` has 12 tests, 3 net new (4 written, 1
+    of them replacing an old test);
+  - workstation canary (`-n 4`, Linux x86_64, venv `rietx-py312`, tree 7ce7646cc):
+    276 passed, 117 skipped, 4 xfailed;
+  - workstation fast suite (`-m "not slow" -n 8 --dist loadgroup`, tree baa7d8e9f;
+    origin/main had not moved, so this is the merged tree): 14853 passed, 280 skipped, 32 xfailed, 0 failed in 374 s (6.0 GB, 714 % on 8 cores). Main bc77a934e reads 14850 passed / 280 skipped / 32 xfailed in the other runs logged on that tree today, so passed+skipped moved by +3, exactly the net new tests. The four new tests cost 0.01 s together (`tests.added_test_times` on this run's junit);
+  - `tests.reader_output` exits 0, unchanged.
+- **Generality:** not triggered. `_audit.py` is untouched, and `_MEMO_DEPTH`'s
+  row keeps its value and its tier ("invariant", since a hit is bit-equal).
+  A pin adds no heuristic.
+
+*Gotchas.*
+
+- `1945-prototype/missprobe.py` reads a slot as a list and no longer runs
+  against the new `_MemoSlot`.
+- `colprobe.py` and `batchprobe.py` do not read slots directly. `colprobe.py`
+  ran for the numbers above.
+- Task 9 deletes the directory.
+
+*Next.* Task 2, the A/B harness as `examples/bench_batched_columns.py`.
+Before it, re-measure § Context's shares on main. Since 1938 the evaluation
+counts are far lower: trigger's cold fit builds 82 Jacobians here, against
+183 at filing. This task also removed the
+expansion-point rebuilds that part of the prototype's 2.36× was recovering.
+Then take tasks 3-8 in order.
 
 ### 2026-10-11 — filed from a sizing session
 

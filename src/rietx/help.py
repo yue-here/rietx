@@ -3252,6 +3252,23 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measure more lines."
         ),
     ),
+    "INDEX_WEAK_LINE_RETRY": HelpEntry(
+        title="The search was run again without the weak lines",
+        description=(
+            "The full peak list, inlier retry included, gave no lattice that two "
+            "engines agree on. The lines under 5 % of the strongest were set aside and "
+            "the search ran again on the rest. This is the second attempt of the 2004 "
+            "indexing round robin (Bergmann et al.). If that search found agreement, "
+            "the candidates are its own, ranked and scored on the kept lines only. "
+            "Otherwise they are the full list's. A trace second phase, or a peak the "
+            "picker split, adds weak lines the host's cell cannot index. Check the "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
+            "`n_unindexed` forbids both retries."
+        ),
+    ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
         title="Two propagation vectors fit equally well",
         description=(
@@ -4179,6 +4196,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "converged to is an artefact of the fit and not a measurement of the "
             "instrument. Do not quote the widths, or any size or strain read from them. "
             "Measure the instrument on a standard, and hold that profile in this fit."
+        ),
+    ),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": HelpEntry(
+        title="A torsion turned, and the body's own contacts are not checked",
+        description=(
+            "A rigid body's torsion turned during the run, and the anti-bump checks do not "
+            "search the pairs inside one copy of that body. The builder, "
+            "`anti_bump_restraints`, skips those pairs by default, and the end-of-run contact "
+            "check always skips them, because a rigid body keeps its template distances. "
+            "A torsion breaks that: it turns part of the molecule about a bond, and two atoms "
+            "on either side of the bond can come together. Only a row you wrote for that pair "
+            "restrains it, and nothing reports it. The message says how many rows the list "
+            "holds inside the body. Read the distances between the body's "
+            "own atoms in `result.geometry.distances`, bonds included: a folded pair can be "
+            "short enough to be listed as a bond. Where a torsion brought two of its atoms closer than "
+            "you allow, add an anti-bump row for that pair, with a minimum you state for it, or "
+            "restrain or hold the torsion. Keep such a row off the two end atoms of a torsion: "
+            "they sit 2.5 to 3.9 Å apart in real molecules, and a floor there pushes the "
+            "torsion towards anti."
         ),
     ),
     "RESTRAINT_ON_FIXED_BODY_GEOMETRY": HelpEntry(
