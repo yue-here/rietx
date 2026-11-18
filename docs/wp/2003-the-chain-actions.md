@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-04 — C8's onset split and C11's invariant arms landed (draft PR #1410, handover paused); owed on #1411: the hold code's tier, C2's rung fields, C10 q1, the X14 rows
+Milestone: generality · Status: 🔄 2026-11-18 — C8's onset split and C11's invariant arms landed (PR #1410, ready for review); owed on #1411: items 1, 8 and 10 as ruled 2026-11-12, C2's rung fields, C10 q1, the X14 rows
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -334,27 +334,134 @@ summary).
 
 ## Handover log
 
-### 2026-11-04 (seventh session) — C8's onset split and C11's invariant arms landed, handover paused
+### 2026-11-18 — PR #1410 finished: main merged, measured on pearl, put up for review
 
-The onset of a magnetic series is now two codes at fixed levels: `SEQUENTIAL_MOMENT_ONSET`
-states the bracket at `info`, and `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` gives every reason not to
-quote it at `warning`. The hold message names every floored pattern. `fit:x`, `fit:x_label` and
-`fit:labels` are `invariant`, with their arms. A ghostshift runner paused this session on the
-usage window before the handover finished, so this entry is short.
+The handover the seventh session paused is finished. The code did not change: main was merged in,
+the fast selection ran on pearl, the seventh session's entry below is now complete, and the PR left
+draft. While the PR waited, Michael ruled three of #1411's items (1, 8 and 10, under #1075). The
+rulings change what comes next, not this PR, and the seventh session's *Next* says how.
 
-*Done.* Draft PR #1410; issue #1411 holds what is owed. Commits `3315d5f`, `4cb3c5c` (C8),
-`11fdabd` (C11), `cd68970` (code review: four of seven findings fixed), `34efa05` (generality
-judge: wording, `fit:x` evidence, `labels` both ways). The judge's verdicts and the full draft
-entry are in the runner's scratch (`~/.cache/ghostshift/rietx-src/wp-2003/entry.md`).
+*Done.* `0464197` merges origin/main `e252435f9` into the branch, with no conflicts and no
+budget breaks. The seventh-session entry is expanded from the runner's draft, its commits named by
+their current SHAs (the branch was rebased twice since). Status line and index row updated.
 
-*Measured* (darwin arm64, worktree venv `[dev]`): magnetic series with its slow rows, the preset
-and audit-table files, 93 passed before the review fixes; touched files green after. The
-fast selection was started on `34efa05` and had not finished at the pause. Pearl was unreachable.
+*Measured.* In the seventh session's *Measured*: the fast selection on pearl, and the Mac gates.
 
-*Next*, in order: read the fast suite's count; finish `/wp-handover` (this entry expanded from
-the scratch draft, steps 10-11); `gh pr ready` on #1410. Questions for the maintainer: is the
-split's added row welcome; tier 1 against the batch's tier 3 for the unresolved code; the hold
-code's tier.
+*Next.* The seventh session's *Next*, all on #1411.
+
+### 2026-11-04 (seventh session) — C8's onset split and C11's invariant arms landed
+
+A magnetic series used to report its onset under one code whose level the package chose at
+run time: `info` when the bracket could be quoted, `warning` when it could not. Those are now two
+codes, each at one fixed level. One states the bracket and is always `info`. The other gives every
+reason not to quote it, at `warning`: the ordered side stopped early, the verdicts switch more than
+once, or the two walk directions disagree or one gave no verdict. A caller filtering on level now
+sees exactly the rows that ask it to hold a number back. The floor message names every floored
+pattern instead of four. Three series defaults (the axis, its name and the pattern names) are
+shown to change no fitted value, so they leave the unaudited list. What is not done: the hold
+code's tier, C2's rung fields, C10 q1's hand rows and the X14 rows, now on issue #1411.
+
+*Done.* A ghostshift runner, alone, no lanes (`lanes: keep C8 ~25`, `lanes: keep C11 ~8`).
+PR #1410. The SHAs are the branch's after its rebases, as of 2026-11-18.
+- **C8** (`b6df1f8`, `60bc575`). `SEQUENTIAL_MOMENT_ONSET` raises only at `info`, tier 1,
+  ambiguity 3. The new `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` raises only at `warning`, tier 1,
+  ambiguity 1, with seven suggestion sites. The `direction="both"` fold (`_with_onset_agreement`,
+  with `_fold_onset`) never changes a level. Agreement goes into the bracket row. Anything else
+  goes into the unresolved row, which the fold writes when the forward pass gave none. The
+  unresolved row's `value` is `None`: a backward-only bracket's midpoint used to ride on the row
+  and is now in the message and on `series.backward`'s own bracket row. `SEQUENTIAL_MOMENT_HOLD`
+  names every pattern on `SeriesEntry.floored` (X7; pinned by
+  `test_the_hold_names_every_floored_pattern_off_the_record`). Help, the skill's magnetic rows
+  (three copies), the series reference page and the release note follow.
+- **C11** (`15cd735`, `5cad857`). `fit:x`, `fit:x_label` and `fit:labels` are `invariant`. `x`
+  and `x_label` join `test_a_series_observed_is_the_series_unobserved`, each checked to have
+  reached the result. `labels` has `test_a_series_named_is_the_series_unnamed`, comparing the
+  chain blind to the names under `direction="forward"` and `"both"`, its direction gaps included.
+  `fit:direction` and `fit:verify_steps` were re-read, as C11 asked: both stay `caller`.
+- **Code review** (`/code-review high --fix origin/main..HEAD`): seven findings, four fixed
+  (`924759c`).
+  - Fixed: a forward-only bracket whose supported side stopped early still told the reader to
+    run `direction='both'`. It now points at the unresolved row.
+  - Fixed: the skill row's "compare the two chains" advice is scoped to the two-chain reasons.
+  - Fixed: the no-op `if agrees: pass` branch is gone.
+  - Fixed: one `_bracket_text` helper replaces four inline copies of the bracket sentence.
+  - Skipped: the hold message's two no-verdict lists still cut at four while the floored list
+    does not, and the floored list has no cap on a long series. Both went to the issue (item 10,
+    now ruled: see below).
+  - Skipped at first, then fixed after the judge: `labels`' arm ran only the forward direction
+    (`5cad857`).
+- **After the pause**, on the branch: `0a4786c` adds a silence pair for
+  `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED`; `4f47685`, `fc35801`, `e1b7fc5` and `c163376` trim the
+  series page and its skill copies back under their caps after main's merges; `a6862a6` moves
+  the release note to `docs/releases/unreleased/1410.code-to-check.md`.
+
+*Measured.*
+- Fast selection on pearl (Linux x86_64, venv `rietx-py312`, Python 3.12.14; wsrun job
+  `o2003f`, `-m "not slow" -n 8 --dist loadgroup`) on the merged tree `0464197` (origin/main
+  `e252435f9`): `14957 passed, 280 skipped, 32 xfailed` in 568 s, 0 failed; 6.6 GB peak,
+  730 % CPU on 8 cores. Collected with `--collect-only -m "not slow"`, on pearl and on the Mac
+  alike, main `e252435f9` has 15 253 fast tests and the branch 15 259 (the junit's 15 269 adds
+  ten module-level skips). The six added are the five the runner
+  expected (the hold test, the `x` and `x_label` arms, `labels` both ways) and the silence row for
+  `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` (`0a4786c`). None removed.
+- Added tests' times on pearl: `tests.added_test_times` on the junit gives 4.16 s over the two
+  new test functions (`labels` forward 0.83 s and both 3.33 s; the hold test 0.00 s). It does not
+  see new cases of an existing function: read off the junit, the `x` and `x_label` arms take
+  0.70 s and 0.97 s and the silence row 0.00 s, so the six together take 5.8 s.
+- Gates on the merged tree (darwin arm64, `.venv-test` `[dev]` with `PYTHONPATH` to the tree,
+  Python 3.12.13): the touched test files with `test_silence`, `test_docs_consistency`,
+  `test_skill*` and `test_audit_table`, 412 passed. `tests.audit_delta` exit 0: five names leave
+  `UNAUDITED_BASELINE` (the onset code, its suggestion, `fit:x`, `fit:x_label`, `fit:labels`).
+  `tests.reader_output` exit 0, unchanged against `e252435f9`: its corpus holds no magnetic
+  series, so it cannot see this change. Vale (`rietx_vale.sh`) 0 errors; ruff clean.
+- On 2026-11-04 (darwin arm64, worktree venv `[dev]`, Python 3.12.13), before the review fixes:
+  `tests/test_magnetic_series.py` with its slow rows, 93 passed together with the magnetic preset
+  and audit-table files.
+- The full suite did not run: the branch changes diagnostic codes and levels and moves no fitted
+  value (tests/CLAUDE.md § Running, rung 3).
+
+*Generality.* The judge (`.claude/agents/generality-review.md`, run on Opus) gave these verdicts:
+- `SEQUENTIAL_MOMENT_ONSET` holds, tier 1, ambiguity 3. It reports a midpoint and half-gap and
+  decides nothing. It would change if WP-2004 demotes `MOMENT_SUPPORT_SIGMA`.
+- `SEQUENTIAL_MOMENT_ONSET.suggestion` holds. Its wording slip ("the pattern spacing" where the ±
+  is half of it) is fixed in `5cad857`.
+- `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` is **weak**. Tier 1 holds for the code's own logic: no
+  free factor, the `MOMENT_UNSUPPORTED` precedent, and the batch gave the bracket tier 1 on the
+  same verdicts. Ambiguity 1 does not hold for two of the four reasons. A chain that gave no
+  verdict leaves the forward bracket unchecked, not contradicted, which is the ruled
+  `SEQUENTIAL_PATH_CHECK_INCOMPLETE` shape at `info`. Verdicts that flicker across 3σ near T_N
+  could be quoted as a wider onset. Both went to the issue (item 8, now ruled). The row's reasons
+  2 and 3 exist only through the 3σ cut; WP-2004's Inherited carries that (issue item 9).
+- `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED.suggestion` holds.
+- `fit:x` is **weak**: the onset is read along `x`, so codes follow a non-monotone axis.
+  *Author's answer:* that is by design, and the row's evidence now says so (`5cad857`).
+- `fit:x_label` and `fit:labels` hold. `labels`' pairing under `both` is now in its arm.
+- The hold message's uncut list holds on the batch ruling. Weak on consistency: its other two
+  lists still cut at four (issue item 10, now ruled).
+
+*In flight.* Nothing uncommitted.
+
+*Gotchas.* The worktree-isolation hook refuses a Bash command that sets a variable or chains a
+`git` call with other verbs. Use plain relative paths, one `git` verb per call.
+
+*Ruled since* (on #1411, 2026-11-12, by Michael, whose magnetic codes these are under #1075):
+- Item 1: `SEQUENTIAL_MOMENT_HOLD` is tier 1, `warning`, and fires only on an unsupported
+  pattern. Its row is still `unaudited` here.
+- Item 8: "a chain gave no verdict" becomes its own code at `info`, tier `caller`. Disagreement
+  and flickering verdicts stay in `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED`, `warning`, tier 1.
+- Item 10: all three hold lists cap at four labels, with "and N more" and a pointer to the
+  record. That re-caps the floored list this PR uncut.
+
+None of the three is in this PR. Still open for the maintainer: the split adds a row on a
+magnetic series where there was one (the `warning` beside the `info` bracket). Does it belong?
+
+*Next*, in order (all on issue #1411):
+1. Land items 1, 8 and 10 as ruled: the hold row's tier 1, the no-verdict `info` code, the three
+   capped lists.
+2. C2's rung fields and the ranking criterion; `relative_paths` and `angle_paths` as tier-1 rows.
+3. C10 q1's hand rows, then the X14 rows.
+4. The flat-pair defect (the sixth session's 4b).
+5. Goldens, the skill-row list for WP-2008, the agent run.
 
 - **2026-11-04** — The sixth session past midnight. CI on Linux x86-64 py3.11 failed the flat
   X-ray plus neutron pin added in `d8f0da7` (background constant 2931.21 against 1.0, twice), so
