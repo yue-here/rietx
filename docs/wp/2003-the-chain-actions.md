@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-18 — C8's onset split and C11's invariant arms landed (PR #1410, ready for review); owed on #1411: items 1, 8 and 10 as ruled 2026-11-12, C2's rung fields, C10 q1, the X14 rows
+Milestone: generality · Status: 🔄 2026-11-18 — C8's onset split and C11's invariant arms landed (PR #1410, ready for review); #1411's items 1, 8 and 10 built in as ruled 2026-11-12; owed on #1411: C2's rung fields, C10 q1, the X14 rows
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -299,7 +299,9 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       tier 1 argued against the batch's tier 3, for the maintainer to rule);
       `SEQUENTIAL_MOMENT_HOLD` names every floored pattern. C11: `fit:x`, `fit:x_label`
       and `fit:labels` `invariant`, their arms in `test_answer_invariant_defaults.py`
-      (`labels` compared blind to the names). Owed: `SEQUENTIAL_MOMENT_HOLD`'s tier (C8 q1, approval owed), the tiers
+      (`labels` compared blind to the names). Built in 2026-11-18 as ruled on #1411 (items 1, 8,
+      10): `SEQUENTIAL_MOMENT_HOLD` tier 1 on unsupported patterns only,
+      `SEQUENTIAL_MOMENT_ONSET_UNCHECKED` at `info`, four labels a list. Owed: the tiers
       of `SeriesEntry.rungs_tried`/`.rungs_raised` and `fit:refit` (C2), C10 q1's hand
       rows, and the rows waiting on X14.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first
@@ -333,6 +335,38 @@ summary).
 - Root CLAUDE.md § Series.
 
 ## Handover log
+
+### 2026-11-18 — #1411's items 1, 8 and 10 built into PR #1410, as ruled
+
+Michael's 2026-11-12 rulings on #1411 (under #1075) are now in this PR, so it lands the final
+design rather than one a follow-up would reverse. The hold fires only where a pattern's moment
+is unsupported. A chain that gave no verdict is a new `info` code rather than a warning, and the
+forward rows keep their level and advice. The hold's three lists name four labels and count the
+rest. Nothing in the Tasks list is ticked by it.
+
+*Done.* `8c6d35c` merges origin/main `3dce54eae`. `5f47c39` builds the three rulings:
+- Item 1: `SEQUENTIAL_MOMENT_HOLD` tier 1, `warning`, firing on unsupported patterns only. Its
+  row names the floor's approved tier-3 row and `MOMENT_SUPPORT_SIGMA`'s cut (it reopens with
+  WP-2004). `test_patterns_with_no_verdict_alone_never_fire_the_hold`; the preset's series test
+  now pins no hold on a plan that frees no moment.
+- Item 8: `SEQUENTIAL_MOMENT_ONSET_UNCHECKED`, `info`, tier `caller`, `direction="both"` only.
+  The name keeps the onset family's prefix and says what the reader holds, a reading nobody
+  checked, beside `_UNRESOLVED`. The bracket gains "was not cross-checked" and keeps its advice.
+  Switching verdicts now give the switches' envelope.
+  `test_a_check_that_could_not_run_leaves_the_forward_rows_as_they_were`,
+  `test_verdicts_that_switch_back_and_forth_give_the_switches_envelope`.
+- Item 10: `_some_labels` caps each list at four, "and N more", and the record that names each.
+  No shared cap helper existed (the series' codes slice by hand), so this is the first. It
+  replaces X7's uncapped list and its test.
+
+*Measured.* Fast selection on pearl (Linux x86_64, venv `rietx-py312`, Python 3.12.14;
+wsrun job `r2003f`, `-n 8 --dist loadgroup`) on `5f47c39`: `14967 passed, 280 skipped,
+32 xfailed` in 453 s, 0 failed. Main `3dce54eae` collects 15 253 fast tests and the branch
+15 269. Gates on the Mac (darwin arm64, `[dev]`, Python 3.12.13): 554 passed;
+`tests.audit_delta` and `tests.reader_output` exit 0. Positive controls: every new test fails against `8c6d35c`'s code, and
+each ruling reverted alone fails only its own tests.
+
+*Next.* The seventh session's *Next*, from item 2.
 
 ### 2026-11-18 — PR #1410 finished: main merged, measured on pearl, put up for review
 
@@ -452,12 +486,12 @@ PR #1410. The SHAs are the branch's after its rebases, as of 2026-11-18.
 - Item 10: all three hold lists cap at four labels, with "and N more" and a pointer to the
   record. That re-caps the floored list this PR uncut.
 
-None of the three is in this PR. Still open for the maintainer: the split adds a row on a
-magnetic series where there was one (the `warning` beside the `info` bracket). Does it belong?
+All three were built into this PR on 2026-11-18 (that day's second entry). Still open for the
+maintainer: the split adds a row on a magnetic series where there was one (the `warning` beside
+the `info` bracket). Does it belong?
 
 *Next*, in order (all on issue #1411):
-1. Land items 1, 8 and 10 as ruled: the hold row's tier 1, the no-verdict `info` code, the three
-   capped lists.
+1. Items 1, 8 and 10: done 2026-11-18, in this PR.
 2. C2's rung fields and the ranking criterion; `relative_paths` and `angle_paths` as tier-1 rows.
 3. C10 q1's hand rows, then the X14 rows.
 4. The flat-pair defect (the sixth session's 4b).
