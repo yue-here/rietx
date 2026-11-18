@@ -1,6 +1,6 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the second PR (the Peaks and Background graphs) in progress; two PRs to follow
+Milestone: gui-overhaul · Status: 🔄 2026-11-18 — the second PR (the Peaks and Background graphs) up as #1680; Structure and Instrument PRs to follow
 Depends on: 2216 (the refinement window)
 Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
@@ -220,6 +220,59 @@ Filled in by the session that builds each PR.
    - The empty state "No fitted peaks to frame yet." on the Peaks graph before a fit.
 
 ## Handover log
+
+- **2026-11-18** — the second PR of R3, PR #1680: the Peaks and Background graphs at `/next`.
+
+  A person on the rebuilt page can now open the Peaks graph and see three windows of the last
+  fit, each with its residual strip. A slider preview draws in each window beside the last
+  fit, which stays solid. The Background graph draws the background and its esd band over the
+  data. Its term chips hold a term until Apply, and the band is redrawn at once for what Apply
+  would give. Yue's dark last-fit colour ruling could not be carried. No cool blue-grey passes
+  the palette tests, so `#776849` stays and § Questions 5 brings four measured options back.
+  A bug from the first PR is fixed: the Pattern graph drew empty when it came back from
+  another graph tab under a preview.
+
+  - *Done*: `gui/src/next/Peaks.svelte`, `Background.svelte` and `background.ts`, written
+    for `/next` rather than moved, since today's panels stay until the swap. `Frame.svelte`
+    mounts both. `Params.svelte` shares its pending holds with the Background chips
+    (`setHold`, `onholds`). The shared title-line styles moved to `next.css`.
+    `lib/peakwin.ts` gained the peak-shape helpers. Server: `GET /api/background?hold=`
+    holds the named paths for that answer alone and refuses an unknown one with a 400
+    naming it (`background.UnknownHold`); the manual's `gui-power.md` row says so. Tests:
+    vitest `next/Graphs.test.ts` (6) and `next/background.test.ts` (5), a peak-shape case in
+    `lib/peakwin.test.ts`; pytest `test_a_pending_hold_is_held_for_that_answer_alone`; the
+    browser case `test_the_rebuilt_peaks_and_background_graphs_move_nothing`. That case also
+    makes the Pattern-Peaks-Pattern trip under a preview, and it failed on the old dist:
+    the main pane painted 447 pixels against 6396 at rest. § Rulings 1-4 recorded;
+    § Questions 5-7 added. Pictures re-shot at a 0.3 drag, and the new graphs added, light
+    and dark, in `docs/wp/2218-screenshots/`.
+  - *Review*: `/code-review high --fix` found ten; seven fixed, three declined. Fixed: a Type
+    switch or a Terms cut drops pending holds on the paths it removes, and the chips wait
+    while such an edit is in flight; P-spline knots round a half to even, as `for_range`
+    does; the hold refusal names only the missing paths; the header reads the head from a
+    named key; an edit refusal reads "Edit refused" in its own field (gui/CLAUDE.md,
+    WP-1014); Stiffness is disabled on a λ kept in intensity units. Declined: the console
+    echo `with_terms(n)` after a Terms edit, since the same line is in `panels/Model.svelte`,
+    which the swap deletes; a glob hold the band leaves out, since Params never produces one
+    over background paths; the net curve computed twice in Peaks, since sharing
+    `netModel` would edit a file today's page uses.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12):
+    fast suite 14946 passed, 424 skipped and 32 xfailed in 17 min, through the shift's
+    serial lock at load average 40-75 from other sessions; this branch adds two python tests
+    (5.54 s for the browser case, 0.35 s for the server case, local junit). Vitest 825 of
+    825; svelte-check 0 errors in 453 files. GUI python files
+    (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_background`): 265
+    passed before the review fixes; `_background` and `_dist` 27 with the graphs browser case
+    after them. Browser files by glob: layout + gui 42 passed, peaks + recovery 7,
+    structure3d + rxplot 49. Vale 0 errors. `python -m tests.reader_output`: exit 0,
+    unchanged.
+  - *Gotchas*: a chart built while a preview is up takes it without keeping a view
+    (`setPreview(p, false)`); keeping one drew an empty plot. No generality review: the
+    branch adds no package heuristic and leaves `_audit.py` alone.
+
+  Next: Yue's look at § Questions 5-7 and the pictures. Then the third PR, the Structure
+  graph (rows 69-82) from #1519's source, then the Instrument dialog (rows 133-136). The
+  screenshots row closes with the last PR.
 
 - **2026-11-18** — the first PR of R3: hand fitting works at `/next`.
 
