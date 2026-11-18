@@ -1357,6 +1357,30 @@ def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_
         page.locator(".actions button", has_text="Revert").click()
         page.wait_for_function(
             "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+
+        # A preview up while the Pattern graph is built again draws, at the
+        # last fit's view: a graph tab's trip once left it empty.
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_selector("section.graphs .gutter .gut")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        rest = page.evaluate(PAINTED)
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        track = page.locator('section.model .interactive input[type="range"]').first
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        back = page.evaluate(PAINTED)
+        # the main pane's canvas carries the curves: at least half its paint at rest
+        assert len(back) == len(rest) and back[0] > rest[0] / 2, (rest, back)
+        page.locator(".actions button", has_text="Revert").click()
         assert not page.errors, page.errors
         page.close()
     finally:

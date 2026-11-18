@@ -249,8 +249,10 @@
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
+      // a chart built under a preview (the graph tab came back to Pattern)
+      // has no view yet to keep: keeping one drew an empty plot (WP-2218)
       const p = untrack(() => preview);
-      if (p) chart.setPreview(p.curves);
+      if (p) chart.setPreview(p.curves, false);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
