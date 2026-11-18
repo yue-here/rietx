@@ -48,6 +48,15 @@ fit converges it describes the curvature there and nothing more.
 
 The answer is cached per working state on ``gui.preview``'s key, so a hold, a
 vary change or a λ edit, each of which moves the head, recomputes it.
+
+``hold`` names paths a person has held and not yet applied (WP-2218): the
+rebuilt page's Background graph draws the band the next fit would have while
+a "Hold at last fit" chip is pending, as ``/api/preview`` draws the curves at
+pending values. Each is held on this call's table alone, which is what the hold
+verb would do to the working table (``ParameterTable.set_held``), so the band
+is the one the applied hold gives. A pending *release* needs no arm: a
+released parameter comes back fixed (``Refinement.unhold``), so its band is the
+held one. A path the table does not have is refused, never ignored.
 """
 
 from __future__ import annotations
@@ -67,6 +76,10 @@ from . import preview
 #: one answer per open ``Project``, keyed on ``preview._key``
 _CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 _CACHE_LOCK = threading.Lock()
+
+
+class UnknownHold(ValueError):
+    """A pending hold names a path the working table does not have."""
 
 
 def _free_table(project):
@@ -162,9 +175,10 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
     return factor * np.sqrt(np.maximum(var, 0.0)), facts
 
 
-def answer(project) -> Packed:
+def answer(project, hold: list[str] | None = None) -> Packed:
     """The packed answer to ``GET /api/background``; the module docstring has it."""
-    key = preview._key(project)
+    holds = tuple(sorted(set(hold or ())))
+    key = (preview._key(project), holds)
     with _CACHE_LOCK:
         hit = _CACHE.get(project)
         if hit is not None and hit[0] == key:
@@ -173,6 +187,10 @@ def answer(project) -> Packed:
     with base.lock:
         model = base.model
         table = _free_table(project)
+        if holds:
+            missing = sorted(set(holds) - set(table.set_held(list(holds), True)))
+            if missing:
+                raise UnknownHold(f"no parameter to hold: {', '.join(missing)}")
         esd, facts = band_esd(model, table)
         values = table.decode(table.x0())
         y_bkg = np.asarray(model.background(values), dtype=np.float64)
@@ -181,7 +199,8 @@ def answer(project) -> Packed:
               "y_background": y_bkg}
     if esd is not None:
         arrays["band_esd"] = esd
-    header = {"head": key[0], **_kind(project.refinement.instrument),
+    header = {"head": key[0][0], "pending_holds": list(holds),
+              **_kind(project.refinement.instrument),
               "terms": _terms(project), **facts}
     packed = Packed(header, arrays)
     with _CACHE_LOCK:

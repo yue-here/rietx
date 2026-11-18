@@ -22,6 +22,8 @@
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
+  import Background from "./Background.svelte";
+  import Peaks from "./Peaks.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
@@ -83,6 +85,9 @@
   let sliderTouched = $state(0);
   let previewAnswer = $state.raw<PreviewAnswer | null>(null);
   let previewError = $state("");
+  /** The Parameters panel's pending holds, shared with the Background
+   *  graph's term chips (WP-2218): one pending set for both. */
+  let pendingHolds = $state.raw<ReadonlyMap<string, boolean>>(new Map());
   const touched = $derived(pendingTouched + sliderTouched);
   /** The curves the Pattern graph last fetched: the sliders' ranges are
    *  measured from its widest peak and its highest angle. */
@@ -142,6 +147,9 @@
     limits: (project?.doc?.two_theta_limits ?? null) as [number, number] | null,
     regions: (project?.doc?.excluded_regions ?? []) as [number, number][],
   });
+  /** What changes the background's channels and free set without moving the
+   *  head: the mode, the fit range and the excluded regions (WP-2129). */
+  const protocolKey = $derived(JSON.stringify([project?.doc?.mode ?? null, protocol.limits, protocol.regions]));
   const extent = $derived((project?.data?.two_theta_range ?? null) as [number, number] | null);
   const wavelengths = $derived((project?.data?.wavelengths ?? null) as number[] | null);
   const theme = $derived(resolveTheme(themeChoice, systemDark));
@@ -708,6 +716,13 @@
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
               preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+          {:else if graphTab === "peaks"}
+            <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
+              rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
+          {:else if graphTab === "background"}
+            <Background {head} {busy} {theme} {say} protocol={protocolKey} holds={pendingHolds}
+              onhold={(path, held, serverHeld) => paramsPanel?.setHold(path, held, serverHeld)}
+              onmoved={structureMoved} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -745,7 +760,8 @@
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
-            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }}
+            onholds={(h) => (pendingHolds = h)} />
         </div>
         <!-- mounted while hidden too: its slider values are pending edits -->
         <div class="pane" class:gone={!!unbuilt || modelTab !== "interactive"}>

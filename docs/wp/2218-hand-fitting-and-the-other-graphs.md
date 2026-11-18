@@ -90,7 +90,7 @@ How each screen reads in the prototype, restated:
   57): the title line's three states, the reserved Preview slot, the last fit in grey, slider
   edits counted in the action bar and carried by the recovery offer. A vitest mount case for
   the title (acceptance row 6) and a browser pass with a real drag (row 9). The first PR.
-- [ ] The Peaks and Background graphs (rows 59-68). The second PR.
+- [x] The Peaks and Background graphs (rows 59-68). The second PR.
 - [ ] The Structure graph (rows 69-82), from #1519's source. The third PR.
 - [ ] The Instrument dialog (rows 133-136) and File › Export › Instrument profile…. The fourth
   PR.
@@ -112,6 +112,24 @@ the prototype's (WP-2214 § How the maintainer reviews).
 ## Rulings
 
 Filled in as the maintainer answers § Questions.
+
+1. **The last fit under a preview stays a solid line.** Yue, 2026-11-18: "not dashed, otherwise
+   you choose". This answers § Questions 3. `/next` keeps STYLE.md's solid line in its own
+   ink, on the Pattern graph and in each Peaks window.
+2. **The dark last-fit colour: a cool blue-grey was asked for, and no such colour passes the
+   palette tests.** Settled by Claude under Yue's 2026-11-18 ruling, then reopened by
+   measurement. The ruling asked for a blue-grey matching light mode's hue (`#849499`), on
+   condition that it pass `tests/test_gui_palette.py`. A search of the dark sRGB gamut found
+   none. Every candidate near that hue with low chroma lands within 0.13 OKLab of another
+   plot colour: `#5d6c71` sits 0.069 from the peak-fit curve, and `#7f8f94` sits 0.023 from
+   the difference curve. The only passing colours near the hue are a saturated cyan
+   (`#5ccbeb`, chroma 0.11 or more). The lowest-chroma passing colours are olive, which is
+   what `#776849` already is. So `#776849` stays, and the choice returns to Yue as § Questions
+   5.
+3. **The refusal words stay.** "Preview refused" and "No value here can be moved by hand."
+   are kept as written. Settled by Claude; this answers § Questions 2.
+4. **Review pictures drag 0.3 of the slider track**, so the compared curves separate. Yue,
+   2026-11-18. The Interactive pictures in `docs/wp/2218-screenshots/` are re-shot that way.
 
 ## Questions
 
@@ -145,6 +163,55 @@ Filled in by the session that builds each PR.
    lighter grey would need to clear the palette's floor against the observed crosses and the
    difference curve. It is also olive brown (`#776849`) more than grey, so beside the
    background curve it can read as part of that family. Keep it, or ask for a lighter grey?
+   *Answered by § Rulings 2, which could not be carried; see Question 5.*
+5. **The dark last-fit colour, again.** Yue asked for a cool blue-grey (§ Rulings 2), and no
+   blue-grey clears the plot palette's tests. The test holds every plot colour at least 0.13
+   apart in OKLab, a perceptual colour distance, and at least 3:1 in contrast on the page.
+   Four options, each measured with `structure3d._oklab_distance`:
+   - (a) Keep `#776849`, the olive grey shipped by the first PR. It passes every test. In
+     `interactive-preview-zoom-dark.png` it reads faintly and sits near the background
+     curve's family.
+   - (b) `#5ccbeb`, a light cyan. It passes every test: 0.136 from the observed crosses and
+     0.065 from phase 2's colour against a floor of 0.063. It reads clearly, but it is a
+     saturated colour, where the light theme's is a grey.
+   - (c) `#5d6c71`, the blue-grey asked for, at 3.23:1 contrast. It misses one pair: 0.069
+     from the peak-fit curve. Taking it means naming that pair in the test's `NAMED_PAIRS`.
+     The two curves never share a graph today. The peak fit draws only while the peak list
+     is being edited (gui/CLAUDE.md, WP-1210), and `/next` does not draw it yet. The last fit
+     draws only under a preview.
+   - (d) `#7f8f94`, a lighter blue-grey. It sits 0.023 from the difference curve, which it
+     always shares a graph with. Dropped as unreadable beside it.
+   Claude leans to (c), since the named pair never draws together. This is a visual choice,
+   so it waits for Yue's look.
+6. **The second PR: what the Peaks and Background graphs draw differently from the
+   prototype, each by a written rule.**
+   - The background curve and its band are drawn in `--plot-bkg`, the background curve's own
+     ink. The prototype uses the accent. gui/CLAUDE.md (WP-1210) gives each plot mark its
+     own `--plot-*` token and keeps chrome colours off the plot.
+   - Neither graph draws gridlines. `gui/STYLE.md` § Plots draws none.
+   - The window arrows ‹ and › are borderless icon buttons, by `gui/STYLE.md`'s icon-button
+     rule.
+   - Type offers Chebyshev and P-spline only. rietx has no "Points" background kind.
+   - A Type switch commits at once and starts the new background at zero coefficients. It is
+     a whole-model edit (gui/CLAUDE.md, WP-1014), so it cannot wait in the pending set.
+     Terms and Stiffness commit at once for the same reason.
+   - The term chips are pending holds that share the Parameters panel's pending set, and
+     Apply commits them (`gui/STYLE.md`: an edit is pending until Apply). The band is
+     fetched with those holds, through the new `?hold=` argument on `GET /api/background`,
+     so it shows what Apply would give.
+   - The title reads "Background preview" only while a background hold is pending, and
+     "Background at the current values" otherwise. The prototype's "Background of the last
+     fit" would be wrong after a value edit, since the band is computed at the current
+     values.
+   - Peak shape alone draws the model minus its background. Neighbouring reflections inside
+     a window therefore still show.
+   - The residual strip keeps the last fit's scale, so a large preview residual is clipped
+     at the strip's edge.
+7. **The second PR: what the Peaks and Background graphs draw that the prototype lacks.**
+   - "Band refused" on the Background title line, with the server's words in its tooltip,
+     when the band cannot be computed.
+   - "waiting for the run" on the Background title line while a refinement runs.
+   - The empty state "No fitted peaks to frame yet." on the Peaks graph before a fit.
 
 ## Handover log
 

@@ -49,3 +49,20 @@ describe("the single-peak windows (WP-2128)", () => {
     expect(hi).toBeCloseTo(110, 12);
   });
 });
+
+describe("peak shape alone (WP-2218)", () => {
+  it("draws the model over its background and frames it from zero", async () => {
+    const { netCurve, shapeRange } = await import("./peakwin");
+    const c = curves([12], [100]);
+    const net = netCurve(c.arrays.y_calc, c.arrays.y_background);
+    expect(net[200]).toBeCloseTo(100, 9);
+    expect(net[0]).toBeCloseTo(0, 9);
+    const [lo, hi] = shapeRange(c.arrays.two_theta, net, 11.5, 12.5);
+    expect(lo).toBe(0);
+    expect(hi).toBeCloseTo(110, 9);
+    // a window with no peak still has a range to draw on
+    expect(shapeRange(c.arrays.two_theta, net, 40, 41)[1]).toBeGreaterThan(0);
+    // no background: the model itself
+    expect(netCurve([1, 2], undefined)).toEqual(Float64Array.from([1, 2]));
+  });
+});

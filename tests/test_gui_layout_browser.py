@@ -1278,3 +1278,87 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
           f"{min(redraws):.0f}-{max(redraws):.0f} ms")
     assert not failures, "\n".join(failures)
+
+
+#: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
+#: line, the windows, the plot and the block under it.
+NEXT_GRAPHS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", "section.graphs figure", "section.graphs canvas",
+    "section.graphs .plot", ".bgctls", ".bgctl > *", ".chips .term",
+    ".actions", ".actions .go > *",
+]
+
+#: How many pixels of each 2D canvas in the graphs column carry paint.
+PAINTED = """() => [...document.querySelectorAll("section.graphs canvas")].map((c) => {
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+  return n;
+})"""
+
+
+def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 59-68. The Peaks graph frames three painted windows of the
+    last fit, and its Show choice repaints them in place. On the Background
+    graph a term chip is a pending hold: the action bar counts it, the title
+    says "Background preview", the head stays where it was, and the band is
+    refetched for it. Neither the chip nor "Band drawn" moves a place, and
+    Revert brings the title back. Every press is a real click. A project of its
+    own, since the call that frees the background terms is written."""
+    httpd, client = _serve(tmp_path_factory, "next-graphs")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+        failures = []
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
+        _frames(page, 4)
+        windows = page.locator("section.graphs figure").count()
+        assert 1 <= windows <= 3, windows
+        painted = page.evaluate(PAINTED)
+        assert len(painted) == windows and min(painted) > 0, painted
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        page.locator('[aria-label="Show"] button', has_text="Peak shape alone").click()
+        _frames(page, 4)
+        assert page.locator('[aria-label="Show"] button[aria-pressed="true"]').text_content() \
+            == "Peak shape alone"
+        failures += [f"Peak shape alone: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert min(page.evaluate(PAINTED)) > 0
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector(".chips .term:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+        page.wait_for_selector('[aria-label="Band drawn"] button:not([disabled])')
+        _frames(page, 4)
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        head = client.get("/api/project")[1]["head"]
+        page.get_by_role("button", name="Hold term 1", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b.pv')?.textContent === 'Background preview'")
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        _frames(page, 4)
+        assert page.get_by_role("button", name="Hold term 1", exact=True).get_attribute(
+            "aria-pressed") == "true"
+        # pending, so nothing is written
+        assert client.get("/api/project")[1]["head"] == head
+        failures += [f"hold chip: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        page.locator('[aria-label="Band drawn"] button', has_text="×5").click()
+        _frames(page)
+        failures += [f"Band drawn ×5: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert page.evaluate(PAINTED)[0] > 0
+
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)

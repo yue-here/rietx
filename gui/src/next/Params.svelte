@@ -65,6 +65,7 @@
     corpus = null,
     say = (_line: string) => {},
     onpending = (_touched: number, _invalid: string) => {},
+    onholds = (_holds: ReadonlyMap<string, boolean>) => {},
     onmoved = () => {},
   }: {
     head?: string | null;
@@ -74,6 +75,9 @@
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
+    /** the pending holds and releases, path or glob → held, reported so the
+     *  Background graph's term chips share them (WP-2218) */
+    onholds?: (holds: ReadonlyMap<string, boolean>) => void;
     /** a structural edit landed: the head moved under the shell */
     onmoved?: () => void;
   } = $props();
@@ -236,6 +240,10 @@
     onpending(touched, first ? `${first.path.split(".").pop()}: ${first.why}` : "");
   });
 
+  $effect(() => {
+    onholds(holdEdits);
+  });
+
   async function load() {
     loading = true;
     try {
@@ -393,6 +401,16 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+  }
+
+  /** A hold or release on one path from another panel: the Background graph's
+   *  "Hold at last fit" chips (WP-2218). One pending set, so the action bar
+   *  counts it once, Apply sends it once, and the recovery copy carries it. */
+  export function setHold(path: string, held: boolean, serverHeld: boolean) {
+    const next = new Map(holdEdits);
+    if (held === serverHeld) next.delete(path);
+    else next.set(path, held);
+    holdEdits = next;
   }
 
   export function focusFilter() {

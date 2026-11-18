@@ -277,7 +277,9 @@ export const api = {
   curves: () => arrays("/api/result/curves"),
   /** The background curve, the observed pattern and the curve's esd at each
    *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
-  background: () => arrays("/api/background"),
+  background: (hold: readonly string[] = []) => arrays(hold.length
+    // WP-2218: paths held for this answer alone, a person's pending holds
+    ? `/api/background?hold=${encodeURIComponent(hold.join(","))}` : "/api/background"),
   /** The curves at values nobody has applied, writing nothing (WP-2125): the
    *  fitted channels, the model, its background, each phase, the three
    *  residuals and the ticks, with the Rwp there. */

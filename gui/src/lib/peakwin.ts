@@ -124,3 +124,25 @@ export function windowRange(xs: ArrayLike<number>, obs: ArrayLike<number>,
   const base = Math.min(0, bottom);
   return [base, top + (top - base) * 0.1 || 1];
 }
+
+/**
+ * The peaks alone: the model over its background, channel by channel, for the
+ * Peaks graph's "Peak shape alone" (WP-2218). The prototype drew one
+ * reflection's profile; no route sends one, so this is every reflection in
+ * the window, which is the same curve wherever the window's peak stands alone.
+ */
+export function netCurve(calc: ArrayLike<number>, bkg: ArrayLike<number> | undefined): Float64Array {
+  const out = new Float64Array(calc.length);
+  for (let i = 0; i < calc.length; i++) out[i] = calc[i] - (bkg ? bkg[i] : 0);
+  return out;
+}
+
+/** The y range of a window drawn as peak shape alone: from zero to the last
+ *  fit's highest net point inside it, with a tenth of headroom. The preview is
+ *  never read, so the comparison keeps the last fit's scale (ruled 2026-11-07). */
+export function shapeRange(xs: ArrayLike<number>, net: ArrayLike<number>,
+                           lo: number, hi: number): [number, number] {
+  let top = 0;
+  for (let i = 0; i < xs.length; i++) if (xs[i] >= lo && xs[i] <= hi && net[i] > top) top = net[i];
+  return [0, top > 0 ? top * 1.1 : 1];
+}

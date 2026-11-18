@@ -210,3 +210,25 @@ def test_one_round_trip_through_the_real_server(fap, tmp_path):
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_a_pending_hold_is_held_for_that_answer_alone(tmp_path_factory, tmp_path):
+    """The rebuilt page's chips (WP-2218): the band a pending hold would give,
+    the hold verb's own band to the digit, and nothing written."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    head = project.refinement._head_id
+    free = session.background()
+    pending = session.background(["instrument.background.c3"])
+    assert project.refinement._head_id == head
+    assert pending.header["pending_holds"] == ["instrument.background.c3"]
+    assert pending.header["head"] == free.header["head"]
+    assert pending.header["n_background_free"] == free.header["n_background_free"] - 1
+    # the committed state is what the terms report: the hold is pending
+    assert not next(t for t in pending.header["terms"] if t["path"].endswith("c3"))["held"]
+    project.refinement.hold("instrument.background.c3")
+    applied = session.background()
+    np.testing.assert_allclose(pending.arrays["band_esd"], applied.arrays["band_esd"], rtol=1e-12)
+    with pytest.raises(GuiError, match="instrument.background.c99") as excinfo:
+        session.background(["instrument.background.c99"])
+    assert excinfo.value.status == 400

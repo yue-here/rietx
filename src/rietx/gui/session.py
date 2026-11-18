@@ -3140,14 +3140,18 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
-    def background(self) -> Packed:
+    def background(self, hold: list[str] | None = None) -> Packed:
         """The background curve and the band it may move in, writing nothing
         (WP-2129). Idle-only, like every verb that compiles;
-        :mod:`rietx.gui.background` has the band's derivation."""
+        :mod:`rietx.gui.background` has the band's derivation. ``hold`` names
+        paths held for this answer alone, a person's pending holds (WP-2218)."""
         from . import background
 
         self._require_idle()
-        return background.answer(self._need_project())
+        try:
+            return background.answer(self._need_project(), hold)
+        except background.UnknownHold as exc:
+            raise GuiError(str(exc), where=list(hold or [])) from exc
 
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
