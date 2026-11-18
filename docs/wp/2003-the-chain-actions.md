@@ -336,6 +336,21 @@ summary).
 
 ## Handover log
 
+### 2026-11-18 — #1411 item 8 amended: no advice asks for the run that just ran
+
+Michael amended item 8 on 2026-11-18 (option b): under `direction="both"`, a quotable forward
+bracket whose backward chain gave no verdict kept the advice "Run the series with
+direction='both'", which an agent reading that row first would follow and repeat a
+deterministic run. That bracket's advice now names `SEQUENTIAL_MOMENT_ONSET_UNCHECKED` and says
+to quote the bracket as the forward pass's alone (`_SEE_UNCHECKED`). The same advice sat on the
+backward chain's own bracket row (`series.backward.diagnostics`), written as if that chain stood
+alone; once the comparison runs it points at the forward rows (`_SEE_FORWARD_ROWS`,
+`_as_reverse_chain`). An unquotable bracket's advice and an interleaved verdict's are unchanged.
+`test_no_advice_under_direction_both_asks_for_direction_both` holds the invariant over six
+chain pairs and fails on `6f8b5799c` in five (the sixth, an unquotable bracket, never asked).
+A cancelled backward chain is untouched: `SEQUENTIAL_PATH_CHECK_NOT_RUN` asks for a run to
+completion, which has not happened. Nothing in the Tasks list is ticked by it.
+
 ### 2026-11-18 — #1411's items 1, 8 and 10 built into PR #1410, as ruled
 
 Michael's 2026-11-12 rulings on #1411 (under #1075) are now in this PR, so it lands the final

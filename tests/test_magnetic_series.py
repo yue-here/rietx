@@ -38,6 +38,7 @@ block below turns on:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -746,6 +747,12 @@ def test_both_directions_agree_on_the_onset_and_the_row_says_so():
     # the reverse pass carries its own reading, not the forward one's
     assert any(d.code == "SEQUENTIAL_MOMENT_ONSET"
                for d in series.backward.diagnostics)
+    # and no row of either chain asks for the run that produced it (#1411
+    # item 8, amended 2026-11-18): the reverse chain's bracket, written as if
+    # that chain stood alone, used to say "run direction='both'"
+    for d in (*series.diagnostics, *series.backward.diagnostics):
+        assert not _ASKS_FOR_BOTH.search(d.suggestion or ""), (
+            d.code, d.suggestion)
 
 
 # Verdict columns for the two-chain comparison, on the ramp's own axis.  The
@@ -764,6 +771,7 @@ def _verdicts(flags) -> SeriesResult:
 
 
 _BRACKET = "SEQUENTIAL_MOMENT_ONSET"
+_ASKS_FOR_BOTH = re.compile(r"""direction\s*=\s*['"]both['"]""")
 _UNRESOLVED = "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED"
 _UNCHECKED = "SEQUENTIAL_MOMENT_ONSET_UNCHECKED"
 
@@ -983,14 +991,22 @@ def test_a_check_that_could_not_run_leaves_the_forward_rows_as_they_were(forward
     leave the reader worse off than not asking for it.  Against a backward
     chain that gave no verdict, every forward row keeps its level and its
     advice; the bracket only gains that it was not cross-checked, and the
-    reason is one ``info`` row of its own."""
+    reason is one ``info`` row of its own.  Amended 2026-11-18: a quotable
+    bracket's advice was to run ``direction='both'``, which had just run, so
+    that one advice points at the ``…_UNCHECKED`` row instead."""
     series = forward()
     alone = _onset_rows(_moment_diagnostics(series))
     rows = _fold(series, _quiet(None))
     assert set(rows) == set(alone) | {_UNCHECKED}
     for code, row in alone.items():
         assert rows[code].level == row.level, code
-        assert rows[code].suggestion == row.suggestion, code
+        if _ASKS_FOR_BOTH.search(row.suggestion):
+            assert code == _BRACKET and _UNRESOLVED not in alone
+            assert rows[code].suggestion.startswith(f"Read the {_UNCHECKED} row")
+            assert "quote this bracket as the forward pass's alone" in (
+                rows[code].suggestion)
+        else:
+            assert rows[code].suggestion == row.suggestion, code
     if _BRACKET in alone:
         assert rows[_BRACKET].message == (
             f"{alone[_BRACKET].message} The backward chain gave no verdict, so "
@@ -999,6 +1015,33 @@ def test_a_check_that_could_not_run_leaves_the_forward_rows_as_they_were(forward
         assert rows[_UNRESOLVED].message == alone[_UNRESOLVED].message
     assert "backward chain gave no verdict on any pattern" in (
         rows[_UNCHECKED].message)
+
+
+@pytest.mark.parametrize("forward, back", [
+    (lambda: _verdicts(_BRACKETED), lambda: _quiet(None)),
+    (lambda: _quiet(None), lambda: _verdicts(_BRACKETED)),
+    (lambda: _verdicts(_BRACKETED), lambda: _verdicts(_BRACKETED)),
+    (lambda: _verdicts(_BRACKETED), lambda: _verdicts(_RISES)),
+    (lambda: _verdicts(_EVERYWHERE), lambda: _verdicts(_BRACKETED)),
+    (lambda: _early(_BRACKETED), lambda: _quiet(None)),
+], ids=["no-verdict-backward", "no-verdict-forward", "agreeing",
+        "disagreeing", "carried", "no-verdict-unquotable"])
+def test_no_advice_under_direction_both_asks_for_direction_both(forward, back):
+    """The invariant behind #1411 item 8 as amended 2026-11-18: advice never
+    asks for an action the caller has already taken.  An agent reads the
+    bracket row first, and "run the series with direction='both'" there sends
+    it to repeat a deterministic run at the cost of a whole series, to get the
+    same rows back.  Every row the comparison returns is checked, whatever
+    the two chains found, the backward chain's own rows included."""
+    from rietx.sequential import _as_reverse_chain
+
+    forward, back = forward(), back()
+    rows = [*_fold_rows(forward, back),
+            *_as_reverse_chain(_moment_diagnostics(back))]
+    assert rows
+    for d in rows:
+        assert not _ASKS_FOR_BOTH.search(d.suggestion or ""), (
+            d.code, d.suggestion)
 
 
 def test_verdicts_that_switch_back_and_forth_give_the_switches_envelope():

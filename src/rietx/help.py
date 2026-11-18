@@ -4375,9 +4375,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "You asked for both directions, and one chain gave no verdict on any "
             "pattern for this site, so the other chain's onset reading was not checked "
-            "against it. Nothing disagrees: the other chain's rows keep their level and "
-            "advice. Read the status and magnetic row of the silent chain's entries to "
-            "find out why it gave no verdict."
+            "against it. Nothing disagrees: the other chain's rows keep their level, and "
+            "its bracket points here rather than asking for the run you made. Quote that "
+            "bracket as one pass's alone, and read the status and magnetic row of the "
+            "silent chain's entries to find out why it gave no verdict."
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(

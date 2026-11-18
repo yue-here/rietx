@@ -68,7 +68,8 @@ hidden:
     chain smooths straight through the transition.  Always ``info``: it
     states the bracket, and the reasons not to quote it are the next code's.
     Under ``direction="both"`` it carries the other chain's bracket when the
-    two agree.
+    two agree, and once the comparison has run no row of either chain asks
+    for it again.
 ``SEQUENTIAL_MOMENT_ONSET_UNRESOLVED``
     every reason the onset is not quotable, at ``warning`` (WP-2003 C8 split
     it off the bracket, which used to raise at a level computed between the
@@ -1737,6 +1738,7 @@ class SequentialRefinement:
                 # the onset in *each direction of the chain*, compared: the one
                 # reading a single pass cannot produce (WP-1329)
                 diagnostics = _with_onset_agreement(diagnostics, series, back)
+                back.diagnostics = _as_reverse_chain(back.diagnostics)
             self.backward_ = back
             # …and on the result, so `refine_sequential` — the one-shot API the
             # manual recommends — hands back the trajectory its
@@ -3283,6 +3285,14 @@ _RUN_BOTH = ("Run the series with direction='both' to check this onset "
 _NO_VERDICT = ("Read the status and magnetic row of the entries in the chain "
                "that gave no verdict.")
 
+_SEE_UNCHECKED = ("Read the SEQUENTIAL_MOMENT_ONSET_UNCHECKED row on this "
+                  "site: the reverse chain ran and gave no verdict. Until its "
+                  "entries say why, quote this bracket as the forward pass's "
+                  "alone.")
+
+_SEE_FORWARD_ROWS = ("Read the forward series' onset rows on this site, "
+                     "which compare this bracket with the forward chain's.")
+
 _NOT_CROSS_CHECKED = ("The backward chain gave no verdict, so this bracket "
                       "was not cross-checked against it.")
 
@@ -3291,6 +3301,18 @@ _COMPARE_CHAINS = (
     "(series.magnetic_trajectory() against "
     "series.backward.magnetic_trajectory()). Look for the pattern that one "
     "chain supports and the other holds.")
+
+
+def _as_reverse_chain(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
+    """The backward chain's own onset rows, once the comparison ran.
+
+    Written by :func:`_moment_diagnostics` as if the chain stood alone, its
+    bracket would ask for ``direction="both"``, the run it is half of, so
+    that advice points at the forward rows the comparison was folded into
+    (#1411 item 8, amended 2026-11-18).  Any other advice stands.
+    """
+    return [d.model_copy(update={"suggestion": _SEE_FORWARD_ROWS})
+            if d.suggestion == _RUN_BOTH else d for d in diagnostics]
 
 
 def _supported_kind(onset) -> tuple[bool, bool]:
@@ -3333,8 +3355,11 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
     switch"), which never asked for the comparison.  A chain that gave no
     verdict on any pattern is ``SEQUENTIAL_MOMENT_ONSET_UNCHECKED`` at
     ``info``, with no cause attached: nothing was compared, so nothing was
-    found carried or floored, and the forward rows keep their own level and
-    advice (#1411 item 8).
+    found carried or floored, and the forward rows keep their own level
+    (#1411 item 8).  Their advice stands too, bar a quotable bracket's to run
+    ``direction="both"``: the run happened, so that bracket points at the
+    ``…_UNCHECKED`` row and says to quote it as one pass's alone (amended
+    2026-11-18).
     """
     by_site = {}
     for site in back.magnetic_sites():
@@ -3355,11 +3380,15 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
         if _no_verdict(other):
             # A check that could not run leaves the reader no worse off than
             # not asking for it (#1411 item 8): the forward rows keep their
-            # own level and advice, the bracket gains that it went unchecked,
-            # and the reason is an ``info`` row of its own.
+            # own level, the bracket gains that it went unchecked, and the
+            # reason is an ``info`` row of its own.  Advice never asks for
+            # the run that just ran (amended 2026-11-18), so a quotable
+            # bracket's "run direction='both'" points at that row instead.
             if bracket is not None:
-                out_site.append(bracket.model_copy(update={
-                    "message": f"{bracket.message} {_NOT_CROSS_CHECKED}"}))
+                update = {"message": f"{bracket.message} {_NOT_CROSS_CHECKED}"}
+                if bracket.suggestion == _RUN_BOTH:
+                    update["suggestion"] = _SEE_UNCHECKED
+                out_site.append(bracket.model_copy(update=update))
             if unresolved is not None:
                 out_site.append(unresolved)
             name = by_site[site].atom or site

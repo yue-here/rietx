@@ -5772,8 +5772,12 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the check that compares the bracket with the reverse "
                   "chain (direction='both'), or the unresolved row when the bracket's "
                   "supported side stopped early; folded, it names the unresolved row or says "
-                  "to quote the bracket with its spacing (sequential._moment_diagnostics, "
-                  "_with_onset_agreement)")),
+                  "to quote the bracket with its spacing, and against a chain that gave no "
+                  "verdict it names the unchecked row and says to quote the bracket as one "
+                  "pass's; the reverse chain's own bracket names the forward rows, so no "
+                  "advice asks for the run that just ran (sequential._moment_diagnostics, "
+                  "_with_onset_agreement, _as_reverse_chain; #1411 item 8, amended "
+                  "2026-11-18)")),
     Row("SEQUENTIAL_MOMENT_ONSET_UNCHECKED.suggestion", "suggestion", tier="caller",
         ambiguity=1, value=3,
         evidence=("opt-in, as its code: read the status and magnetic row of the entries in "
