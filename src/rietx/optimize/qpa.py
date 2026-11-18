@@ -671,7 +671,7 @@ def _formula_unit_withheld_reason(phases: list[tuple[str, ZMV]]) -> str:
     """Why ``mole_fraction_formula_unit`` is withheld, naming each phase.
 
     The text :attr:`QuantitativePhaseAnalysis.formula_unit_withheld` stores
-    and ``QPA_FORMULA_UNIT_WITHHELD`` quotes (WP-1340).
+    (WP-1340).
     """
     named = []
     for name, zmv in phases:
@@ -691,35 +691,6 @@ def _formula_unit_withheld_reason(phases: list[tuple[str, ZMV]]) -> str:
     return ("Mole fractions are given per unit cell only: the formula unit is "
             "not established for " + "; ".join(named)
             + ". A per-formula-unit column would mix two bases.")
-
-
-def formula_unit_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
-    """``QPA_FORMULA_UNIT_WITHHELD``: the per-formula-unit mole fraction is
-    withheld for every phase, and this names the phase that withheld it.
-
-    Info, not warning: nothing reported is wrong, a column is absent and
-    ``mole_fraction`` (per unit cell) stands.  The reader it protects is the
-    one who would otherwise divide ``weight_fraction`` by the reported
-    ``molar_mass`` and get a column that sums to 1 on two bases at once
-    (WP-1340: +30.8 points on a 50/50 wt % LaFeO3 + La0.6Sr0.4FeO3 mixture).
-    """
-    if qpa.formula_unit_withheld is None:
-        return []
-    names = [r.name for r in qpa.phases if r.z_source == "unresolved"
-             and r.weight_fraction is not None and r.cell_mass > 0.0]
-    return [Diagnostic(
-        level="info", code="QPA_FORMULA_UNIT_WITHHELD",
-        where=names,
-        message=qpa.formula_unit_withheld,
-        suggestion=(
-            "mole_fraction counts unit cells: it is the mol % of formula units "
-            "only where every phase's cell holds the same number of them. "
-            "Never divide weight_fraction by molar_mass. For a per-formula-unit "
-            "fraction, "
-            "declare the formula units per cell on "
-            + ("the phase" if len(names) == 1 else "each phase")
-            + " (Phase.formula_units) and refit."),
-    )]
 
 
 def _phase_mu_xray(zmv: ZMV, wavelength: float) -> float:

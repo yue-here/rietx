@@ -863,28 +863,22 @@ def test_the_two_bases_differ_by_z_where_both_are_established():
                                n / n.sum(), rtol=1e-12)
 
 
-def test_the_withheld_column_names_its_phase_in_an_info_diagnostic():
-    from rietx.optimize.qpa import formula_unit_diagnostics
-
+def test_the_withheld_column_names_its_phase_in_the_field_and_no_diagnostic():
     structure, values, compute_qpa = _ferrite_pair()
-    (diag,) = formula_unit_diagnostics(compute_qpa(structure, values))
-    assert (diag.level, diag.code) == ("info", "QPA_FORMULA_UNIT_WITHHELD")
-    assert diag.where == ["La0.6Sr0.4FeO3"]
-    assert "Phase.formula_units" in diag.suggestion
+    qpa = compute_qpa(structure, values)
+    assert "La0.6Sr0.4FeO3" in qpa.formula_unit_withheld
+    assert "Phase.formula_units" not in qpa.formula_unit_withheld
     structure, values, compute_qpa = _ferrite_pair(declared_z=4)
-    assert formula_unit_diagnostics(compute_qpa(structure, values)) == []
+    assert compute_qpa(structure, values).formula_unit_withheld is None
 
 
 def test_one_phase_seen_is_one_on_either_basis_and_withholds_nothing():
-    from rietx.optimize.qpa import formula_unit_diagnostics
-
     structure, values, compute_qpa = _ferrite_pair()
     lone = compute_qpa(structure, values, unmeasured=[0])
     assert lone.phases[0].mole_fraction is None
     assert lone.phases[1].mole_fraction == 1.0
     assert lone.phases[1].mole_fraction_formula_unit == 1.0
     assert lone.formula_unit_withheld is None
-    assert formula_unit_diagnostics(lone) == []
     # an unmeasured unresolved phase is out of the sum, so it withholds nothing
     other = compute_qpa(structure, values, unmeasured=[1])
     assert other.phases[0].mole_fraction_formula_unit == 1.0
@@ -948,7 +942,7 @@ def test_the_per_formula_unit_esd_carries_z_where_the_zs_differ():
 def test_an_empty_phase_has_no_mole_fraction_and_withholds_nothing():
     """Every site empty: W = 0 for any scale, but the cell count S·V rides a
     scale the data cannot move, so it is absent, not zero."""
-    from rietx.optimize.qpa import compute_qpa, formula_unit_diagnostics
+    from rietx.optimize.qpa import compute_qpa
 
     structure = Structure(phases=[
         _perovskite("LaFeO3", [("La", 1.0)]),
@@ -965,7 +959,6 @@ def test_an_empty_phase_has_no_mole_fraction_and_withholds_nothing():
     assert (empty.mole_fraction, empty.mole_fraction_formula_unit) == (None, None)
     assert (pure.mole_fraction, pure.mole_fraction_formula_unit) == (1.0, 1.0)
     assert qpa.formula_unit_withheld is None
-    assert formula_unit_diagnostics(qpa) == []
     # beside a massive unresolved phase it still withholds nothing of its own
     both = compute_qpa(structure, values)
     assert both.formula_unit_withheld is not None
@@ -1002,7 +995,7 @@ def test_a_solid_solution_whose_counts_happen_to_reduce_withholds_too(x_sr, cell
     whole cell, of La2Sr2Fe4O12 half of it, and neither is ABO3.  Shipping
     either gives 79.1/20.9 or 64.1/35.9 for a true 48.6/51.4 or 47.2/52.8
     (review of PR #1598, F1).  Declaring Z = 4 gives the true figures."""
-    from rietx.optimize.qpa import compute_qpa, formula_unit_diagnostics
+    from rietx.optimize.qpa import compute_qpa
 
     name = f"La{1 - x_sr:g}Sr{x_sr:g}FeO3"
     pure = _perovskite("LaFeO3", [("La", 1.0)])
@@ -1022,8 +1015,6 @@ def test_a_solid_solution_whose_counts_happen_to_reduce_withholds_too(x_sr, cell
     assert all(r.mole_fraction_formula_unit is None for r in qpa.phases)
     assert name in qpa.formula_unit_withheld
     assert "LaFeO3," not in qpa.formula_unit_withheld
-    (diag,) = formula_unit_diagnostics(qpa)
-    assert (diag.code, diag.where) == ("QPA_FORMULA_UNIT_WITHHELD", [name])
     # per unit cell the two Z = 4 cells already give the true ABO3 mol %
     assert tuple(round(100 * r.mole_fraction, 1) for r in qpa.phases) == x_fu
     doped.formula_units = 4

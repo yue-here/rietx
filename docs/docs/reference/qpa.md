@@ -101,7 +101,7 @@ Dividing `weight_fraction` by that `molar_mass` puts one phase per cell and the 
 On a 50/50 wt % mixture of LaFeO<sub>3</sub> and La<sub>0.6</sub>Sr<sub>0.4</sub>FeO<sub>3</sub>, both perovskites with Z = 4, the true composition is 47.8/52.2 mol %, and that route gives 78.5/21.5.
 So the per-formula-unit column is reported only when every measured phase's formula unit is known, and is otherwise `None` on every row: one phase on the other basis spoils the comparison for all of them.
 A phase with a mixed or partly occupied site withholds it, whatever its counts per cell.
-`QuantitativePhaseAnalysis.formula_unit_withheld` and the info diagnostic [`QPA_FORMULA_UNIT_WITHHELD`](diagnostics-refinement.md#qpa_formula_unit_withheld) name the phase and its counts or occupancies.
+`QuantitativePhaseAnalysis.formula_unit_withheld` names the phase and its counts or occupancies.
 `PhaseQuantity.mole_fraction` still stands, and for that pair, both cells holding four formula units, it is the 47.8/52.2 itself.
 It counts unit cells, so it equals the mol % of formula units only where every phase's cell holds the same number of them; where the cells differ, declare the formula units.
 

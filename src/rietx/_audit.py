@@ -1243,24 +1243,6 @@ ROWS: tuple[Row, ...] = (
                   "with no measurable esd (statistics.normal_covariance drops its column) "
                   "leaves every fraction's esd unmeasured; fires exactly then (CLAUDE.md: "
                   "consumers mark, never clamp)")),
-    Row("QPA_FORMULA_UNIT_WITHHELD", "code", tier=1, ambiguity=1,
-        evidence=("arithmetic: fires exactly when two or more phases have a weight fraction and "
-                  "one of them, with no declared Phase.formula_units, has a mixed or partly "
-                  "occupied site (optimize.qpa.partial_occupancy_sites) or occupancy-weighted "
-                  "cell counts that do not reduce to integers (optimize.qpa.unreduced_counts, "
-                  "_formula_units' existing 2 % test, not retuned); names the phase and its "
-                  "counts or occupancies. Whole counts are not enough: La0.5Sr0.5FeO3 in a "
-                  "Z = 4 cell reduces to z = 2, which is no formula unit (PR #1598 review). "
-                  "Withholds a column, never a number: mole_fraction per unit cell stands "
-                  "(WP-1340: a 50/50 wt % LaFeO3 + La0.6Sr0.4FeO3 mixture reads 47.8/52.2 "
-                  "mol % per formula unit, and 78.5/21.5 by W over the reported molar mass)"),
-        grounds=("Arithmetic: a per-formula-unit column over phases on two bases sums to 1 "
-                 "and is wrong, so the column is absent and the reason is said."),
-        response="info",
-        responds=("quote mole_fraction as a count of unit cells, which is the mol % of "
-                  "formula units only where every phase's cell holds the same number of "
-                  "them, or declare Phase.formula_units on the named phase and refit for a "
-                  "per-formula-unit mol %; never divide weight_fraction by molar_mass")),
     Row("QPA_FRACTION_RANGE", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: an info record on every width profile whose fit carries an esd, "
                   "with no threshold (B12 3(a), ruled 2026-10-19, replacing "
@@ -5578,10 +5560,6 @@ ROWS: tuple[Row, ...] = (
     Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: removing a phase at zero scale restores the others' esds; "
                   "profile_fraction gives one fraction's range; picks neither")),
-    Row("QPA_FORMULA_UNIT_WITHHELD.suggestion", "suggestion", tier=1, ambiguity=1,
-        value=1,
-        evidence=("names the two readings the result already holds (mole_fraction, and "
-                  "Phase.formula_units for the other basis); chooses no number")),
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),

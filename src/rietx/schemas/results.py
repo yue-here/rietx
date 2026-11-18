@@ -607,8 +607,9 @@ class QuantitativePhaseAnalysis(Base):
     ``mole_fraction_formula_unit`` is ``None``, naming the measured phase
     whose formula unit is not established; ``None`` when the column is
     reported (or there was nothing to withhold).  The ``microabsorption_skipped``
-    pattern: the reason travels with the result, and
-    ``QPA_FORMULA_UNIT_WITHHELD`` quotes it.
+    pattern: the reason travels with the result, in the field and
+    in no diagnostic (an info code would fire on every solid solution and tell
+    one fit from another on nothing).
 
     ``unmeasured_phases`` (WP-1958): the phases with no reflection in the
     fitted range.  Each has no fraction, and the others sum to 1 over the
