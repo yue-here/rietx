@@ -1,6 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: series · Status: ⬜
+Milestone: series · Status: 🔄 2026-11-18 — the rulings are being built; the width-growth removal is in review
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
@@ -526,6 +526,185 @@ flag reprints the saved numbers without fitting.
   `tests/data/README.md`.
 
 ## Handover log
+
+- **2026-11-18** — the series no longer warns when a phase width grows (one session; package
+  code changed).
+
+  A series no longer raises a warning when a phase width grows while the fit worsens. Yue
+  ruled it removed on 2026-11-16, because it fired on three thresholds nobody had audited,
+  and the width's trajectory and each pattern's GoF were already on the result. A caller
+  who wants that reading now puts the two side by side, and the skill says so. Nothing a
+  fit computes has moved. The report-thresholds contract moved to 1.15, so a reader
+  counting codes can tell the two versions apart. This entry also stands for the two
+  2026-11-17 commits of the last session (the joint-ramp measurement and the WP-2028
+  fold), which the 2026-11-16 entry below already describes.
+
+  *Done.* Removed `SEQUENTIAL_WIDTH_GROWTH`, its suggestion, `WIDTH_GROWTH_FACTOR`,
+  `WIDTH_GROWTH_GOF_FACTOR`, `WIDTH_GROWTH_SIGMA` and `_WIDTH_SUFFIXES`
+  (`sequential.py`). Removed the "widths grown with a worsening fit" row of
+  `SeriesResult.summary(deliverable="series")`, the help entry and the five audit rows
+  with their `UNAUDITED_BASELINE` and `RESPONSE_BASELINE` lines. Removed eleven tests in
+  `test_sequential.py` and two in `test_termination_view.py`, and narrowed
+  `test_planted_series.EVENT_CODES`. `THRESHOLDS_VERSION` 1.14 → 1.15; its history line
+  also names WP-2003's `SEQUENTIAL_DISCONTINUITY` removal, which no version had recorded
+  (WP-2004 Inherited asked for that line). The skill, the manual's series and result
+  references, `docs/practice.md` and tutorial 05 lose their mentions, and the skill's
+  generated API index quotes 1.15. Added a release-note fragment
+  (`docs/releases/unreleased/wp2081.code-to-check.md`). The milestone record and WP-2004
+  say the removal landed with no field. The ruling supersedes the record field that
+  WP-2003's C7 and issue #1212 had proposed.
+
+  *Started in its own session.* The W esd question (WP-2028 Inherited, 2026-11-17) is
+  being worked in a separate session, PR #1668.
+
+  *Review.* `/code-review high --fix` found two items. Fixed: the release note named
+  only `ImportError`, where attribute access raises `AttributeError`. No change: an old
+  saved result carrying the code loses its help text. WP-2003's removal of
+  `SEQUENTIAL_DISCONTINUITY` set that precedent, and the help tests require every entry
+  to name a live code.
+
+  *Measured* (macOS arm64, worktree venv `[dev]`, Python 3.12.10). The fast selection ran
+  twice under heavy load from another session's 17-pattern ramp (load average 35-63).
+  The first run was killed from outside at 86 % with no failure. The second run ended
+  2 failed, 14701 passed, 433 skipped, 32 xfailed and 23 errors, in about 71 minutes.
+  One failure was real: the skill's API index was stale against 1.15, now regenerated
+  (`test_skill.py` 174 passed). The other failure and all 23 errors were the manual
+  build and the magnetic guide script hitting their 300 s runaway guards. Re-run once
+  the load fell, `test_manual.py`, `test_help.py` and the guide-script test passed
+  (129 passed). The count check is not done: no baseline ran, so passed+skipped cannot
+  be compared. The branch removes 13 tests and adds none, so the junit cost report has
+  nothing to rank. The full selection did not run: removing a diagnostic moves no
+  fitted number. `tests.reader_output` reports no change, but its fixtures hold no
+  series summary, so the removed summary row is a change it cannot see.
+
+  *Generality* (the `generality-review` judge, on the branch diff before this entry and the skill rewording; pasted unedited).
+
+  #### `SEQUENTIAL_WIDTH_GROWTH` (code), deleted
+
+  **holds.** The case against the code is stronger. Its thresholds rest on one real positive chain, and that chain is not on disk. A dissent was already named against it. The case for it is a single synthetic measurement showing that nothing else fires, and the raw numbers that measurement reads are still on the result.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | "The width trajectory and each pattern's GoF are already in the result, so rule 5 is met without it." (`docs/milestones/series.md` § Ruled after the open, lines 119-123). Release note: "read the two side by side" (`docs/releases/unreleased/wp2081.code-to-check.md`) | The deleted code made five choices the caller now makes. (a) The reference is the first width measured above 3 of its own esds, not the first value. (b) A Gaussian variance term is compared on its square root. (c) Quarantined patterns are skipped. (d) Widths tied to one column count as one trajectory. (e) It fires only where the width ratio is ≥3×, the growth exceeds 3 combined esds, and the GoF ratio is ≥2×. Deleted docstrings: `sequential.py` lines 401-446 and 464-500 of the diff. The series summary's "widths grown with a worsening fit" row goes too. | answered |
+  | 2. Which kind of ambiguity? | Row: none given (it was `unaudited`, with no `ambiguity`). WP-2003's draft (the audit of the series' automatic actions) gives `"ambiguity": 3` (`docs/wp/2003-batch/rows.json`:301) | Kind 3 is right. Whether a width grew because the specimen strained or because a phase is missing from the model depends on facts outside the pattern. The deleted docstring says so itself: "the finding reports and never judges". Series rule 5 puts kind 3 in a field with no code. | agrees with the draft; row itself none given |
+  | 3. Case against the code | C7 (class 7 of WP-2003's batch, width growth): "Three tier-3 thresholds decide whether the code exists, on one real family." The dissenter it names is "a refiner whose strain grows for real while GoF rises for a second, independent reason" (`docs/wp/2003-batch/batch.md`:639-648). That batch was settled by Claude and relabelled as evidence on 2026-11-02. | Confirmed, and one more mechanism found. With a fixed fractional misfit, χ² grows with the counts, so GoF grows as √counts. A series whose counts rise (a growing phase, a longer count time, a beam refill) can therefore double GoF under a model whose only fault was already there. The deleted GoF constant's docstring guards only against falling counts ("Rwp tracks Rexp"). Both of its measurements were at constant counts ("on the synthetic, whose counts are constant"). The deleted real-growth null test (`test_a_width_that_grows_for_real_is_not_named`) also used one scale throughout. No program among the seven screens widths along a series: the pre-change `docs/practice.md`:398-399 listed this screen among rietx's own behaviours (checked in this repo). | strong |
+  | 4. Case for the code | Deleted skill row: "No per-pattern code says so until `STRAIN_UNUSUALLY_LARGE` at 1.5° (Measured: a 0.4 %-split second phase, width 3.65×, GoF 3.1×, nothing else fired)". `docs/wp/1465-a-width-that-became-background.md` (WP-1465, which added the code) Finding 1: a one-phase fit's Rwp went 1.56 % → 11.74 % with no warning, and the width's background-projection R² moved only 0.047 → 0.053. | Real, but synthetic only. What a caller pays now is computing the statistic correctly. The deleted `WIDTH_GROWTH_FACTOR` docstring measures the naive version: against each trajectory's first value, width growth alone fires on 11 of 24 trajectories of the CPD chain (the clean quantitative-phase round-robin chain in the acceptance suite). Taking the first measured value fires on none. One CPD first value is 5.85e-5 with an esd of 3e3, so any later value reads as "946×" it. No number moved off a reference was measured: the soaked phase's scale or fraction error against truth is not given. DESIGN.md § Rules, 1 says "every withheld verdict leaves its statistic". Its inputs stay, but the statistic itself (the ratio with its esd, the GoF ratio) is no longer computed. WP-2003's C7 proposed exactly that field. The 2026-11-16 ruling supersedes it, and that ruling is yours. WP-2080's GoF-ratio field is ruled but not built. | moderate; synthetic only |
+  | 5. Tier | none given (row unaudited) | It could only have been tier 3: no program default exists (`docs/practice.md`, checked in this repo). It is not `invariant`, since it changed what a series printed. | consistent with removal |
+  | 6. Dataset families | none given in the row. Deleted docstrings and `rows.json`:302 list them. | 1. The synthetic soak (rietx's own test, LaB6 model with a planted 0.4 %-split phase). The reference is a known truth. Development data. 2. The CPD chain (real), silent. A null only, development data. 3. The 75 suite series that set the GoF clean bound of 1.52. Development data. 4. Issue #451's operando chain (the reporter's laboratory, real): widths 3.4×, not on disk. So there is one real positive family, and it is off disk. It falls short of the three-family ground. | fails the mechanical ground, so removal is consistent |
+  | 7. What says it fired, or that it is gone? | `THRESHOLDS_VERSION` 1.15 history comment (`src/rietx/report/schemas.py`) | After removal nothing fires. The disappearance is recorded by `THRESHOLDS_VERSION` 1.15 (the report-thresholds contract version), which every `SeriesResult.provenance.report_thresholds_version` stamps, and by the release note. | adequate |
+
+  Missing from the author's case: the WP-2081 handover log has no entry for this removal. Its latest entry (2026-11-16) still says "Neither is built".
+
+  What would change the verdict: a real chain on disk where a width grew with GoF, plus a measurement showing that a caller reading `statistics.gof` by hand either misses it or flags a clean chain.
+
+  #### `SEQUENTIAL_WIDTH_GROWTH.suggestion` (suggestion, value 1), deleted
+
+  **holds.** The case against is stronger: the suggestion assumed one of the code's two readings.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | none given beyond the code's removal | The deleted text was "Fit the pattern at the onset with the missing component before reading this width…". The caller now decides whether anything is missing at all. | answered |
+  | 2. Which kind? | Row: none given. `rows.json`:319: ambiguity 3 | Kind 3 is right. | agrees |
+  | 3. Case against | `rows.json`:320: "assumes a missing component, one of the docstring's two readings" | Confirmed by the deleted docstring, which allows that "the width may legitimately grow". | strong |
+  | 4. Case for | none found | none found | — |
+  | 5. Tier | none given | Tier 3 at best. | — |
+  | 6. Dataset families | as for the code | as for the code | — |
+  | 7. Record | the code's | It goes with its code, and no orphan site remains (grep of `src/`). | adequate |
+
+  What would change the verdict: none short of the code returning.
+
+  #### `rietx.sequential.WIDTH_GROWTH_FACTOR` (3.0), deleted
+
+  **holds.** The case against is stronger: the value is "the reporter's", fitted between two soaks, and it has no consumer left.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | milestone: "on three unaudited constants" | The caller picks their own multiple, or none. | answered |
+  | 2. Which kind? | n/a (constant) | It was a threshold on a kind-3 report. | — |
+  | 3. Case against | Deleted docstring: "3 is the reporter's, and it sits between the two soaks measured" (3.4× operando, 3.65× synthetic). "The width ratio does not separate on its own." | Fitted to two positives, one of them off disk. | strong |
+  | 4. Case for | Deleted docstring: against the first measured value it fires on none of CPD's 24 trajectories | That is a null on development data only. | weak |
+  | 5. Tier | none given | Tier 3. No program screens this. | — |
+  | 6. Families | as for the code | One real positive family, off disk. | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: three unrelated real chains where 3× separates a missing-phase soak from real growth.
+
+  #### `rietx.sequential.WIDTH_GROWTH_GOF_FACTOR` (2.0), deleted
+
+  **holds.** The case against is stronger. The value was set for margin on development data at constant counts, and GoF itself moves with counts.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | as for the code | The caller judges whether a GoF rise is "with" the width. | answered |
+  | 2. Which kind? | n/a | It was the threshold on the misfit half. | — |
+  | 3. Case against | Deleted docstring: "The value is set for margin". Clean bound 1.52 over 75 suite series; synthetic soak 3.05. | All of it is development data. A rise in counts raises GoF under a fixed misfit, and none of those measurements varied the counts. | strong |
+  | 4. Case for | Deleted docstring: "This half is also what keeps a width that grows *for real* silent" | True on the constant-count synthetic only. | weak |
+  | 5. Tier | none given | Tier 3. | — |
+  | 6. Families | 75 suite series (development), CPD 1.14, synthetic 3.05 | No real positive family on disk. | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: a real series with varying counts where a 2× GoF ratio still separates the two readings.
+
+  #### `rietx.sequential.WIDTH_GROWTH_SIGMA` (3.0), deleted
+
+  **holds.** The case against is stronger. Its job was to keep the reference meaningful, and with the code gone it has no consumer.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | none given | The caller chooses which pattern counts as the reference. Deleted docstring: CPD's "first `lor_strain` is 5.85e-5 with an esd of 3e3, so any later value is '946×' it". | answered; this is the trap the caller inherits |
+  | 2. Which kind? | n/a | It was a threshold. | — |
+  | 3. Case against | none given | It was rietx's own 3σ, with no source given. | moderate |
+  | 4. Case for | the deleted docstring above | It guarded the ratio. It is not needed without the ratio. | weak |
+  | 5. Tier | none given | Tier 3. | — |
+  | 6. Families | CPD (development) | one | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: the code or a ratio field returning.
+
+  #### `rietx.sequential._WIDTH_SUFFIXES` (no row), deleted
+
+  **holds.** The case against keeping it is stronger: it maps width paths to "variance or width", an arithmetic fact, and its only consumer is gone.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | C7: "`_WIDTH_SUFFIXES` is tier 1, no row" (`docs/wp/2004-…md`, inherited entry; `batch.md`:646) | Whether to compare the square root of `gauss_*`, which are variance coefficients. | answered |
+  | 2. Which kind? | n/a | n/a | — |
+  | 3. Case against | none needed | It has no other consumer in `src/` (grep). | — |
+  | 4. Case for | none found | none found | — |
+  | 5. Tier | tier 1 (WP-2003's batch, settled by Claude) | Correct: the variance-versus-width split is arithmetic. A dict of booleans is outside the constant walk, so having no row is consistent. | holds |
+  | 6. Families | n/a | n/a | — |
+  | 7. Record | n/a | n/a | — |
+
+  What would change the verdict: another consumer of the dict surviving in the tree. None found.
+
+  #### `UNAUDITED_BASELINE` and `RESPONSE_BASELINE` removals
+
+  **holds.** These are removals only: five names leave `UNAUDITED_BASELINE` (the shrink-only list of rows awaiting audit), and the code leaves `RESPONSE_BASELINE` (codes still without a reader response). Their rows are gone, so each list shrinks as designed. No name was added, so no reason is owed.
+
+  What would change the verdict: a name added to either list. There is none.
+
+  #### Skill line, `docs/skill/rietx/references/series.md`:355-359 (and its two synced copies)
+
+  **weak** as wording. It is not a new heuristic the table should see. The case against its verdict is stronger than the case for it.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide? | "Read each entry's `statistics.gof` beside the width's trajectory: a width that grows while GoF rises with it stands in for a missing component, and one that grows at a flat GoF is this rule. No code fires on either." | The package decides nothing here and prints nothing. Skill prose is outside the table's sight by declaration (`_audit.py` docstring: "a heuristic written as skill prose (WP-2008)"). No row of the five kinds could hold it. In substance it is the deleted code's conjunction without thresholds, so it is not new. | not a table item |
+  | 2. Which kind? | none given | The question is kind 3, but the sentence answers it as if kind 1: "stands in for a missing component". The deleted docstring was more careful: "the finding reports and never judges". | wording overstates |
+  | 3. Case against its wording | none given | C7 names the dissent, a real strain growth with GoF rising "for a second, independent reason" (`batch.md`:641). GoF also rises with counts under a fixed misfit. | strong |
+  | 4. Case for | It names a field (`statistics.gof`), which DESIGN.md § Rules, 4's skill-row test asks for. The outside source is issue #451's operando chain (a user's report), beside rietx's synthetic. | It passes the skill-row test. It is the only pointer left to this failure mode now that the code and the summary row are gone. | moderate |
+  | 5. Tier | n/a | n/a | — |
+  | 6. Families | as for the code | One real chain, off disk, plus rietx's synthetic. | thin |
+  | 7. Record | "No code fires on either." | Accurate. | holds |
+
+  What would change the verdict: rewording to "may stand in for a missing component; GoF also rises when counts rise". That would make it a pointer to two readings rather than a verdict.
+
+  *Author's answer on the skill line:* reworded as the judge proposed, so the line now names both readings and says GoF rises with the counts. *On the missing entry:* the judge read the diff before this entry was written.
+
+  *Next:* Yue reads the milestone record's title, scope and draft acceptance rows. Then
+  rule 1's declaration on the series call, which the milestone's order puts next. The
+  remaining thresholded series code, `SEQUENTIAL_MOMENT_ONSET`, waits on the magnetic
+  path's owner.
 
 - **2026-11-16** — the discussion began, and the series milestone opened (one chat
   session with Yue; no package code changed).

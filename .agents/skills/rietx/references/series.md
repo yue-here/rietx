@@ -354,9 +354,10 @@ cryostat ramp, a phase's `lor_strain` rose 0.019° → ~0.11° toward low temper
 reproducibly and in both directions; a chain with that term pinned would have had to absorb
 the same intensity redistribution somewhere else.  What separates that from a width standing
 in for something missing is whether the fit keeps up.  Read each entry's
-`statistics.gof` beside the width's trajectory: a width that grows while GoF rises with it
-stands in for a missing component, and one that grows at a flat GoF is this rule.  No code
-fires on either.
+`statistics.gof` beside the width's trajectory.  A width that grows while GoF rises with it
+may stand in for a missing component, but GoF also rises when the counts rise under a
+misfit that was already there.  One that grows at a flat GoF is this rule.  No code fires
+on either.
 
 The mirror-image mistake is a **numeric floor carried across instruments**.  A microstrain or
 size floor is a hedge against the term collapsing to zero and capturing no broadening at all,
