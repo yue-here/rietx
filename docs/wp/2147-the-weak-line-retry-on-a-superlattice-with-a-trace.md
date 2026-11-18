@@ -236,9 +236,17 @@ in this file, and a test row that reproduces the decision.
   antisite 0.1, the builder's default; and tasks 1 and 3 read differently
   from what was built, now answered in their tick notes.
 
-  *Measured.* § Measured holds the tables. Gates on the merged tree, `[dev]`
-  venv, macOS arm64: see the PR body for the fast-suite and acceptance
-  counts.
+  *Measured.* § Measured holds the tables. Gates on the tree merged with
+  `origin/main` at `fb3ac5a66`, `[dev]` venv, macOS arm64: the fast
+  selection, 14786 passed, 433 skipped, 32 xfailed (12 min, under
+  `serial.py`); `tests/test_acceptance_indexing.py`, 45 passed (on the
+  previous merge, `f24aa034d`); `tests/test_indexing_weak_lines.py` whole,
+  29 passed. The file collects 29 tests against
+  main's 22 (+7), 12 fast against 10 (+2), and adds no skip. Lint: ruff, the
+  reference pages, the tutorial prose and vale all clean (vale 0 errors).
+  `tests.reader_output`: exit 0, unchanged. The full suite did not run: no
+  package code changed, so no measured number can move. The bethanechol
+  benchmark did not run, for the same reason.
 
   *Gotchas.* An adopted retry replaces the full list's diagnostics too, so
   `INDEX_INLIER_RETRY` is absent from an adopted run's codes although the
