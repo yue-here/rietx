@@ -460,7 +460,9 @@ def read_xy(path: str | Path, *, axis: str | None = None,
     arr = np.array([vals for _, parts, vals in rows if len(parts) == arity],
                    dtype=np.float64)
     n_cols = arr.shape[1]
-    sigma = arr[:, 2] if n_cols >= 3 and np.any(arr[:, 2] > 0) else None
+    # a third column with no positive σ reaches read_pattern's hook, which
+    # declines it and says so (WP-1952)
+    sigma = arr[:, 2] if n_cols >= 3 else None
 
     stated_axis, stated, other = _stated_axis(comments)
     if axis is not None:
@@ -503,8 +505,11 @@ def read_xy(path: str | Path, *, axis: str | None = None,
         if sigma is not None:
             sigma = sigma * fac_y
         if diagnostics is not None:
-            diagnostics.append(_inter_applied(p, fac_x, fac_y, axis,
-                                              sigma is not None))
+            # a column with no positive σ is declined on read_pattern's hook,
+            # so it is not a σ the multiplier reached (WP-1952)
+            diagnostics.append(_inter_applied(
+                p, fac_x, fac_y, axis,
+                sigma is not None and bool(np.any(sigma > 0))))
     x, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=XY,
                           axis=axis, diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis, source_file=p.name, format="xy",
@@ -520,10 +525,10 @@ XY = PatternFormat(
           "is 2θ in degrees unless a comment states the x-axis unit: a flight "
           "time (Mantid's 'The X-axis unit is: Time-of-flight') reads it in "
           "microseconds, and any other stated unit is named and refused",
-    sigma="the third column when present and positive, else the Poisson "
+    sigma="the third column when present, else the Poisson "
           "fallback; a FullProf XYDATA heading's INTER fac_y multiplies y and "
           "σ alike",
-    options=("axis",),
+    options=("axis", "nonpositive_sigma"),
     # last, but no longer *total*: a file with a NUL in its first 4 kB is not
     # claimed, so a binary vendor pattern reaches identify_format's refusal —
     # which names the formats this build reads — instead of reaching

@@ -1,8 +1,7 @@
 # WP-2209 — unapplied edits survive a close or a crash
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, and the maintainer's five rulings of 2026-11-10 applied; PR #1523 waits on the merge
+Milestone: gui-overhaul · Status: ✅ 2026-11-13 — merged in PR #1523 on 2026-11-11; unapplied edits are kept in a recovery copy and offered on reopen
 Depends on: 2133
-Priority: P2 2026-11-10 — a piece the gui-overhaul milestone was opened for, ruled 2026-11-09
 
 ## Goal
 
@@ -128,15 +127,6 @@ The maintainer's answers to the five open questions of the first handover entry.
 No rule here reads a pattern. The retention ceiling and floor are storage constants in
 `gui/`, which `_audit.NOT_WALKED` declares out of the generality walk.
 
-### Inherited
-
-- **2026-11-12, from WP-2143: `recovery.move` keys the old copy by the path it is given.**
-  It used to resolve that path again. On Windows a path resolves to the spelling on disk,
-  so after a case-only rename (`sample.rex` → `Sample.rex`) the old name resolved to the
-  new folder, and the copy stayed under a key nothing reads. A caller passes the resolved
-  path taken before the move, as `_relocate` does.
-  `test_a_move_keys_the_old_copy_by_the_path_it_was_given` pins it on every platform.
-
 ## Non-goals
 
 - The Model panel's forms and the Text panel's buffer: they apply through their own buttons.
@@ -182,6 +172,27 @@ The milestone's row 10: the maintainer looks at the offer on screen before the m
 - WP-2133 § The maintainer's rulings of 2026-11-09, item 1.
 
 ## Handover log
+
+- **2026-11-13** — closed by the close-only bookkeeping batch of 2026-11-13 (PR #1563), a
+  repair. PR #1523 merged on 2026-11-11 with every task ticked, and two `WP-2209:` commits of
+  that day never reached this log. The GUI now keeps edits a person has made but not applied
+  in a recovery copy outside the project, and offers them again when the project reopens after
+  a close or a crash. That is shipped on `main` and goes out with v1.12.
+
+  *Changed by this repair.* Status ✅, the `Priority:` line removed, the narrative moved to
+  `docs/milestones/v1.12.md`. The `### Inherited` note from WP-2143 is removed as consumed: it
+  recorded a fix WP-2143 made itself, that `recovery.move` keys the old copy by the path its
+  caller gives (PR #1539), pinned by
+  `test_a_move_keys_the_old_copy_by_the_path_it_was_given`. It asked nothing of this WP.
+
+  Next: none in this WP. WP-2213 joins the Text panel's buffer and the Model panel's forms to
+  the same recovery copy.
+
+- **2026-11-11** — (reconstructed post hoc) from the commits. `249465671` committed the entry
+  headed "2026-11-10 — the maintainer's five rulings applied" just after midnight, so its
+  commit carries this date. `5606c61b4` merged `main` and rebuilt the GUI dist after #1528 and
+  #1530. PR #1523 merged at 02:16 UTC. The commits do not say whether the suite was rerun on the
+  merged tree; CI on #1523 was the gate.
 
 ### 2026-11-10 — the maintainer's five rulings applied; PR #1523 waits on the merge
 

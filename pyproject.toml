@@ -71,7 +71,7 @@ dependencies = [
     # The floor is `model.compiled.KERNEL_FLOOR`.  A new kernel is a minor
     # release, and raises it: 1.4 added the structure-solution engine's three.
     # docs/RELEASING.md § The kernel wheel has the procedure.
-    "rietx-kernels>=1.4,<2",
+    "rietx-kernels>=1.5,<2",
     # Required since WP-1545, an extra (`viz`) before it.  A figure is how most
     # people read a fit, and every tutorial and the landing page draw one, so a
     # base install that could not was the install people were judged by.  The

@@ -161,6 +161,14 @@ READER_OPTIONS: dict[str, ReaderOption] = {
         help="the data block to read, by substring match on its name — a pdCIF "
              "carrying both a _meas and a _calc block is a different pattern "
              "depending on it"),
+    "nonpositive_sigma": ReaderOption(
+        name="nonpositive_sigma", kind="str",
+        help="what a point whose esd is zero or negative becomes: 'exclude' "
+             "(the default) leaves it out of the fit, since such an esd "
+             "states no weight; 'poisson' weights it by σ = √max(y, 1), one "
+             "count at a zero count, for a file that wrote σ = √0 for a "
+             "channel that counted nothing. Taken by the formats whose σ is "
+             "the file's own column"),
     "scan": ReaderOption(
         name="scan", kind="int",
         help="which measurement to read, counting from 0, in a file that holds "
@@ -385,6 +393,24 @@ def finite_rows(x: np.ndarray, y: np.ndarray, sig: np.ndarray | None, *,
     return x[keep], y[keep], None if sig is None else sig[keep]
 
 
+def _point_runs(x: np.ndarray, idx: np.ndarray,
+               unit: str) -> tuple[list[tuple[float, float]], str]:
+    """The runs of consecutive indices in ``idx`` as ``(lo, hi)`` spans of
+    ``x``, and the words naming the first three and counting the rest.
+
+    One builder for every reader report that says where its points sit
+    (``PATTERN_ROWS_DROPPED``, ``PATTERN_SIGMA_NONPOSITIVE``).  ``x`` may still
+    run backwards, so each span is ordered by value."""
+    runs = (np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1)
+            if idx.size else [])
+    spans = [(float(min(x[r[0]], x[r[-1]])), float(max(x[r[0]], x[r[-1]])))
+             for r in runs]
+    shown = ", ".join(f"{lo:g}-{hi:g}{unit}" if lo != hi else f"{lo:g}{unit}"
+                      for lo, hi in spans[:3])
+    more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
+    return spans, shown + more
+
+
 def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
                   sig: np.ndarray | None, bad_x: np.ndarray,
                   bad_y: np.ndarray, bad_s: np.ndarray,
@@ -400,17 +426,10 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
     nan, inf = bool(np.isnan(values).any()), bool(np.isinf(values).any())
     what = ("a NaN or infinite" if nan and inf else
             ("a NaN" if nan else "an infinite"))
-    placed = np.flatnonzero(bad & ~bad_x)
-    runs = (np.split(placed, np.flatnonzero(np.diff(placed) > 1) + 1)
-            if placed.size else [])
-    spans = [(float(min(x[r[0]], x[r[-1]])), float(max(x[r[0]], x[r[-1]])))
-             for r in runs]
-    shown = ", ".join(f"{lo:g}-{hi:g}{unit}" if lo != hi else f"{lo:g}{unit}"
-                      for lo, hi in spans[:3])
-    more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
+    spans, shown = _point_runs(x, np.flatnonzero(bad & ~bad_x), unit)
     # a row with no finite abscissa has no position, so it is only counted
     unplaced = int(bad_x.sum())
-    where_text = (f", at {label} {shown}{more}" if spans else "") + (
+    where_text = (f", at {label} {shown}" if spans else "") + (
         f", and {unplaced} with no finite {label}" if spans and unplaced else "")
     n = int(bad.sum())
     has, was = ("has", "was") if n == 1 else ("have", "were")
