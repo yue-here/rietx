@@ -1,6 +1,6 @@
 # WP-1913 — what the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd`
 
-Milestone: unscheduled · Status: 🔄 2026-10-08 — part 4's opt-in `fix_special_positions()` landed from outside (PR #754); part 4's default and parts 3 and 5 remain
+Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner); parts 4 (refusal at construction) and 5 (`.esd` pointer) in hand, part 3 waits on the verb's name
 Track: Data and metadata in, a structure out
 Depends on: —
 Priority: P3 2026-10-05 — a workaround covers each: the by-hand ties are documented, the refusal names its fix, and `.esd` gets a field-list pointer
