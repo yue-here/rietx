@@ -155,7 +155,7 @@ Filled in by the session that builds each PR.
   last fit turns grey under the preview, and the legend's Preview slot fills. Nothing is
   refined until Apply, and an unapplied slider edit comes back through the recovery offer as a
   Parameters edit does. Today's page did not move: its bundle changed only by one unused
-  colour read. Four visual questions wait on Yue (§ Questions 1-4), the dark last-fit grey
+  colour token. Four visual questions wait on Yue (§ Questions 1-4), the dark last-fit grey
   being the one most worth a look.
 
   - *Done*: `gui/src/next/Interactive.svelte` is a copy of today's panel, drawn to the
