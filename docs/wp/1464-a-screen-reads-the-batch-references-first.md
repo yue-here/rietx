@@ -1,6 +1,6 @@
 # WP-1464 — a screen reads the batch references first
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-18 — tasks 1-5 in PR #1681 (the routing row, 9c.35, 9c.33 measured, 9c.5); task 6, a job-summary verb, is open
 Track: A long run is not one fit
 Depends on: — (PR #385, merged 2026-09-25: a runaway cell no longer raises in a screen)
 Priority: P3 2026-09-25 — the references exist and a reader who finds them is covered; one session waited 78 idle minutes on a screen they describe
@@ -29,8 +29,7 @@ Context and Tasks, and one was rewritten for the tree as it stands.
   89. `runs.discover` lists the runs under a root, `runs.read_run` reads each,
   and `label=` ([1431](1431-a-caller-names-its-run.md)) can give a job's runs
   one name. Whether a job's count, failures, wall and slowest run are a second
-  mode of `rietx events` or another verb is a new CLI surface. It is not one of
-  this WP's tasks, and the 2026-11-18 session left it open.
+  mode of `rietx events` or another verb is a new CLI surface, now task 6.
 - **Superseded in part 2026-11-18: the body's budget.** The 2026-09-28 entry
   from [1338](1338-the-skills-own-gates.md) put `SKILL.md`'s body at 30 509 B
   against a 17 000 B budget. On `37bda00b` it is 16 989 B, so a rewritten
@@ -148,6 +147,10 @@ stands with or without #385.
       a cell runaway) and "time the failed jobs too", from the `nan` median
       above.
 - [x] Re-sync the committed copies (`rietx skill --install . --copy`).
+- [ ] From Inherited (2026-11-18): decide whether a job's count, failures,
+      wall and slowest run are a second mode of `rietx events` or another
+      verb, and name the answer in `batch-operating.md`. A new CLI surface,
+      so the name goes to the maintainer.
 
 ## Acceptance
 
@@ -166,6 +169,78 @@ The routing rows name the situation, and the two new rows carry tags that
 - Issue #374, PR #385 (the runaway).
 
 ## Handover log
+
+### 2026-11-18 — tasks 1-5, PR #1681
+
+An agent about to run a screen of candidate fits is now sent to the batch
+references before it launches. Those references now carry both lessons, and one
+of them turned out the other way round. Pinning rietx's kernel pool to one
+thread per worker, which the skill advised, made a 10-worker screen about twice
+as slow, so the advice is reversed and the package keeps its default. The
+imitation lesson reproduces on public data: on the CPD zincite pattern an
+absent fluorite candidate shrank its cell 10.8 %, too little for any code to
+fire, and took 14 ± 12 wt %. A ±1 % cell bound did not stop it.
+
+*Done.*
+- Task 2: `SKILL.md`'s one §9c row (the two rows had merged since 2026-09-25)
+  now reads "§9c a screen or pool of fits, before launch". It grew the body by
+  11 B to exactly its 17 000 B budget. `batch.md`'s first line now says to load
+  it before a screen and again once the fits are in hand.
+- Task 3: `batch.md` 9c.35, the imitation row. It sits at the file's end,
+  because `test_skill.py` requires row numbers to increase, and 9c.2 now ends
+  with a pointer to it. Its tag opens `Measured: WP-1464` and names in-situ
+  series 1 inside: the corpus gate admits a `Measured` tag only when it opens
+  with `WP-` or the file's declared corpus, and the task's suggested
+  `(Measured: in-situ series 1, …)` fails it.
+- Task 4: 9c.33 reversed (leave `RIETX_COMPILED_THREADS` unset; pin BLAS only)
+  and 9c.5 gains the screen's 84× job and "time the jobs that raise".
+- Task 1's decision, settled by Claude on the measurement and joblib's
+  documented practice: no package change. A pool worker keeps
+  `min(8, cores)` kernel threads, and `n_threads()` does not fall back to
+  `OMP_NUM_THREADS`. loky sets that variable to `cpu_count() // n_jobs` in
+  each worker (1 for a 10-worker pool on 10 cores) and 9c.31's BLAS pinning
+  sets it to 1, so a fallback would select the setting measured slower.
+  Recorded in `docs/practice.md` § Inner threads in a process pool.
+
+*Measured.* All on this machine (arm64 Mac, 10 cores as 4 performance and 6
+efficiency, `[dev]` venv, rietx-kernels compiled tier on), never quiet: other
+sessions' suites held the load at 9-84 throughout. Driver and raw JSON lines
+in `~/.cache/ghostshift/rietx/wp-1464/` (`driver.py`, `screenjobs.py`,
+`series*.jsonl`, `imitation.py`/`.log`).
+- Job set: six patterns (CPD corundum, zincite, fluorite, brucite; GSAS-II
+  fluorapatite; 11-BM NAC) each fitted alone and with each other CPD phase
+  added, every cell free, the compare standards' plans: 26 cold fits, 10
+  spawn workers, BLAS and OpenMP variables at 1 in both arms.
+- Walls, default pool against `RIETX_COMPILED_THREADS=1`, interleaved:
+  23.6/44.0, 27.3/75.9 (a `find /` of mine overlapped the second), 49.6/117.6,
+  47.7/116.5 s. Ratio 1.9-2.4×. Summed job time 1.17× in the one pair at load
+  9-13, 1.5-1.6× in the rest. 104 fits (the set ×4): 145.9/297.2 and
+  99.8/200.8 s, 2.0× both. Every fit ran the same iterations to the same Rwp
+  in both arms.
+- Splits: every job's kernel calls split across the pool, 187-4464 times a
+  fit, so the pool does work here.
+- Most of the wall gap is the slowest job (fluorite + corundum, 19.6-40.1 s
+  against 40.2-107.2 s), which the default pool spreads over the cores the
+  finished workers leave idle.
+- Imitation (CPD patterns, 12 pairs, free and at ±1 %): absent candidates
+  were held or sat at 0 wt % on 10 of 12 with the cell free. zincite + fluorite: cell −10.8 %,
+  Rwp 10.60 → 10.23 %, 14 ± 12 wt %; at ±1 %: on its bound, 10.07 %,
+  66 ± 24 wt %. fluorite + corundum: Rwp 17.64 → 16.01 %, 89 ± 40 wt %,
+  `CELL_RUNAWAY` fired; at ±1 %: 16.00 %, 89 ± 75 wt %.
+- Acceptance: `tests/test_skill.py tests/test_skill_cli.py
+  tests/test_docs_consistency.py` 222 passed (same venv and machine). ruff
+  clean. Vale: 0 errors, 272 warnings, none on a line of this branch (it
+  touches no `docs/docs` page). `python -m tests.reader_output` exit 0.
+
+*Not done.* Task 6 (the job-summary verb) is a new CLI surface and stays open.
+No code changed, so neither the fast nor the full suite ran locally; CI runs
+the fast one. `/code-review` skipped: the branch is prose only.
+
+*Gotchas.* The machine was never quiet, so the ratios are measured under
+contention. The one pair at load 9-13 bounds the quiet-machine gap only
+loosely (1.17× summed, 1.86× wall); 9c.33's tag keeps that as a hypothesis.
+
+Next: task 6, after the maintainer names the surface. Then close.
 
 - **2026-09-25** — created by a transcript review of a second agent session on
   `in-situ series 1`. The screen's numbers are from that session's timeline and
