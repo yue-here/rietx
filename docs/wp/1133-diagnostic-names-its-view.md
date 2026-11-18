@@ -187,10 +187,18 @@ outstanding, so this is a finding at N = 4 on synthetic data, not a rate.
       The notebook fold prints a `see:` line; `str(diagnostic)` does not
       (WP-1985: the text form leaves out what is the same for every finding).
       Manual: `reference/result.md` § Diagnostics.
-- [ ] **The channel rule in `AGENT_PROTOCOL.md`.** Numbers for a question you
+- [x] **The channel rule in the skill** (`AGENT_PROTOCOL.md` became the skill
+      in v1.3). Numbers for a question you
       can name (~15× cheaper), an image for one you cannot, and never an image
       without a reference in the frame. One row, the measurements above as its
       evidence.
+      *Landed 2026-11-18 in `references/diagnostics.md`'s preamble*, beside the
+      `d.explanation` line, since `d.view` is how the pointer reaches an
+      agent. `judging.md` was the guess and is closed to growth: 34 575 B
+      against a 34 600 B budget (`tests/skill_caps.py`). The body is over its
+      budget too, so a row there would be paid for by a cut. The
+      image-for-an-unnamed-question clause is tagged `(Hypothesis: …)` until
+      task 3 measures it.
 - [ ] **Measure the round-trip case.** Give an agent a fit and "what is wrong
       with it", with and without the montage (1130's panel in it), and count
       calls to answer as well as tokens — on 1130's trigger fit and on two
