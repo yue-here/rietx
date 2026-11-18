@@ -49,7 +49,7 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 
 - [ ] `ZLine`/`PointLine` on `RigidBody`, the frozen c₀, and the dot-paths.
 - [x] The tangent-propagation Jacobian; the six placement partials checked against complex step.
-- [ ] The restrain-or-refine refusals and the torsion-reach refusal.
+- [x] The restrain-or-refine refusals and the torsion-reach refusal.
 - [ ] Tests: placement partials vs complex step < 1e-12; the map's Jacobian vs FD < 1e-9; a freed C–C on acridine IX (COD 2242872) within its published esd
 - [ ] Skill: the routing row for refining a Z-matrix body
 
@@ -67,6 +67,26 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 - Issue #759.
 
 ## Handover log
+
+### 2026-11-18 — a restraint on a Z-matrix body is not reported
+
+C1 (#1510) merged with the maintainer's ruling, a warning that keeps the
+row, so this chunk now meets it: `_fixed_body_findings` returns nothing for a
+body with a Z-matrix, whose lines' lengths, angles and dihedrals can change
+any quantity a restraint over its atoms measures (the design review's M20,
+"Z bodies: no structural refusal"). The third task is complete with it.
+
+- *Done*: the guard in `model.restraints._fixed_body_findings`; its
+  docstring, the `help.py` entry, the audit row's evidence and the skill's
+  diagnostics row say so; one line in the release-note fragment. C1's tests
+  renamed from refuse to warn (the maintainer's #1510 round 2, follow-up 2):
+  `tests/test_restraint_body_warning.py`, `_warned`,
+  `test_the_rule_warns_on_exactly_what_the_body_holds_fixed`.
+- *Measured*: a bond (line 1's r) and an angle (line 2's angle) restraint on
+  #759's branched fragment as a Z body raise nothing; the same restraints on
+  the same template with the Z-matrix dropped warn. With the guard removed
+  both cases fail.
+- *Next*: unchanged, the acceptance chunk (T7, T8) and the routing row.
 
 ### 2026-11-17 — Z-matrix bodies refine
 

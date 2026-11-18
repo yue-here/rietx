@@ -4287,7 +4287,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "changes the quantity when it turns some of the restrained atoms, other than its "
             "two axis atoms, and not the others; whether the torsion is free in a stage does "
             "not matter. A restraint across two bodies, between a body atom and a free "
-            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "atom, or between two copies of a body is not reported, nor one on a body built "
+            "from a Z-matrix, whose bond lengths, bond angles and dihedral angles can change it. "
+            "Drop the restraint, declare "
             "a torsion that changes it, take the atoms out of the body and restrain them "
             "as free atoms, or keep the row."
         ),
