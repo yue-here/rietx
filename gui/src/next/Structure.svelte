@@ -65,6 +65,13 @@
   import type { StatusReadout } from "./readout";
   import { structureReadout, structureValues } from "./structure";
 
+  /** An atom by its site and fractional position. */
+  type AtomId = { site: number; frac: number[] };
+  /** How far a remembered atom may have moved, in fractional coordinates, and
+   *  still be the one drawn. A coordinate dragged further loses the selection,
+   *  and the ring then goes. */
+  const NEAR = 0.05;
+
   let {
     head = null,
     projectPath = null,
@@ -117,11 +124,12 @@
   let disorder = $state<Disorder>("all");
   let centres = $state<string[] | null>(null);
   let ligands = $state<string[] | null>(null);
-  /** One atom's environment (WP-1468), by its site and position, which a
-   *  refetch keeps while an index may move. */
-  let focus = $state<{ site: number; pos: number[] } | null>(null);
+  /** One atom's environment (WP-1468), by its site and fractional position.
+   *  A refetch keeps that identity while an index may move, and a preview of
+   *  the cell keeps it while every Cartesian position moves. */
+  let focus = $state<AtomId | null>(null);
   /** The selected atom, by the same identity. */
-  let selected = $state<{ site: number; pos: number[] } | null>(null);
+  let selected = $state<AtomId | null>(null);
   let level = $state("0.5");
   let hidden = $state(new Set<string>());
   let showBoundary = $state(true);
@@ -138,14 +146,28 @@
   const painted = $derived(geo && theme === "dark" ? onDarkGround(geo) : geo);
   const entries = $derived(painted ? legend(painted) : []);
   const levels = $derived(geo ? Object.keys(geo.probability_levels) : []);
-  const shown = $derived(!geo ? [] : focus !== null ? focusedPolyhedra(geo, focus)
+  const focusIndex = $derived(geo ? find(geo, focus) : -1);
+  const shown = $derived(!geo ? [] : focus !== null
+    ? (focusIndex < 0 ? [] : focusedPolyhedra(geo, geo.atoms[focusIndex]))
     : shownPolyhedra(geo, polyhedraIn[mode], polyFormulas, hidden, showBoundary));
   const polyEntries = $derived(painted ? polyhedraLegend(painted) : []);
-  const selIndex = $derived(!geo || !selected ? -1 : geo.atoms.findIndex(
-    (a) => a.site === selected!.site && a.pos.every((v, k) => Math.abs(v - selected!.pos[k]) < 1e-6)));
+  const selIndex = $derived(geo ? find(geo, selected) : -1);
   const selName = $derived(geo && selIndex >= 0 ? siteName(geo, geo.atoms[selIndex].site) : "");
-  const focusedHere = $derived(!!focus && !!selected && focus.site === selected.site
-    && focus.pos.every((v, k) => Math.abs(v - selected!.pos[k]) < 1e-6));
+  const focusedHere = $derived(focusIndex >= 0 && focusIndex === selIndex);
+
+  /** The drawn atom an identity names, or -1: the image of its site nearest
+   *  in fractional coordinates, within `NEAR`. Nearest, because a coordinate
+   *  preview moves the position itself. */
+  function find(g: Geometry, id: AtomId | null): number {
+    if (!id) return -1;
+    let best = -1, nearest = NEAR;
+    g.atoms.forEach((a, i) => {
+      if (a.site !== id.site) return;
+      const d = Math.max(...a.frac.map((v, k) => Math.abs(v - id.frac[k])));
+      if (d < nearest) { nearest = d; best = i; }
+    });
+    return best;
+  }
 
   function siteName(g: Geometry, site: number): string {
     const s = g.sites[site];
@@ -378,18 +400,18 @@
     }
   }
 
-  /** The atom under the pointer, by its site and position, or null. */
-  function atomAt(event: MouseEvent): { site: number; pos: number[] } | null {
+  /** The atom under the pointer, by its site and fractional position, or null. */
+  function atomAt(event: MouseEvent): AtomId | null {
     if (!scene || !canvas || !geo) return null;
     const box = canvas.getBoundingClientRect();
     const hit = pickAtom(scene, view, canvas.clientWidth, canvas.clientHeight,
                          event.clientX - box.left, event.clientY - box.top);
     if (!hit) return null;
-    const { site, pos } = geo.atoms[scene.atoms[hit.atom].index];
-    return { site, pos };
+    const { site, frac } = geo.atoms[scene.atoms[hit.atom].index];
+    return { site, frac };
   }
 
-  function select(atom: { site: number; pos: number[] } | null) {
+  function select(atom: AtomId | null) {
     selected = atom;
   }
 
@@ -400,7 +422,7 @@
       clearChemistry();
       return;
     }
-    focus = { ...selected };
+    focus = { site: selected.site, frac: [...selected.frac] };
     centres = [geo.sites[selected.site].element];
     ligands = elements(geo);
   }
@@ -541,7 +563,7 @@
   ]);
 
   const ctxItems = $derived<MenuEntry[]>([
-    ...(selected ? [{ id: "coord", label: focusedHere ? "Show every atom" : "Show coordination" },
+    ...(selIndex >= 0 ? [{ id: "coord", label: focusedHere ? "Show every atom" : "Show coordination" },
                     "-" as const] : []),
     { id: "save", label: "Save image…", disabled: !geo || unsupported },
     { id: "copy", label: "Copy image", disabled: !geo || unsupported },
@@ -572,7 +594,7 @@
   function keydown(event: KeyboardEvent) {
     if (event.key !== "Escape") return;
     if (pop) pop = null;
-    else if (selected) selected = null;
+    else if (selIndex >= 0) selected = null;
   }
 
   const pctText = (p: number) => `${(p * 100).toFixed(0)} %`;
