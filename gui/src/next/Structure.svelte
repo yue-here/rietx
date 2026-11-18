@@ -153,18 +153,26 @@
   }
 
   // -- fetching ---------------------------------------------------------------
+  /** The values of the request in flight. The queue sends one at a time, so a
+   *  failure is this request's, and only one that carried values is a refused
+   *  preview. */
+  let sent: Record<string, number> = {};
   /** One request in flight, the newest waiting: a slider drag asks on every
    *  move, and the drawing follows the last values it can (the Pattern graph's
    *  queue, `lib/interactive.ts`). An empty map is the working state. */
   const queue = new PreviewQueue<Geometry>(
-    (vals) => api.structure3d(phase, tolerance, disorder, centres, ligands,
-                              Object.keys(vals).length ? vals : null),
+    (vals) => {
+      sent = vals;
+      return api.structure3d(phase, tolerance, disorder, centres, ligands,
+                             Object.keys(vals).length ? vals : null);
+    },
     (payload, vals) => {
       geo = at(payload, level);
       error = absent = "";
       previewShown = Object.keys(vals).length > 0;
-      // a refusal stands while the values that were refused do
-      if (previewShown || !untrack(() => moving)) previewError = "";
+      // a refusal stands while the values that were refused do; a run asks for
+      // no preview, so it ends one (a 409 that raced the run's start)
+      if (previewShown || !untrack(() => moving) || untrack(() => busy)) previewError = "";
       ready = true;
     },
     (exc) => {
@@ -174,9 +182,10 @@
         error = previewError = "";
         previewShown = false;
         absent = exc.empty ? "" : exc.message;
-      } else if (untrack(() => moving)) {
+      } else if (Object.keys(sent).length) {
         // a refused preview keeps the drawing it had, or draws the working
-        // state when it had none, and says so on the title
+        // state when it had none, and says so on the title; that request
+        // carries no values, so its own failure is a load error and never loops
         previewError = (exc as Error).message;
         if (!geo) queue.push({});
       } else {

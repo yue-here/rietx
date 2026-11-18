@@ -17,12 +17,14 @@ const RUTILE = JSON.parse(readFileSync(resolve(process.cwd(), "../tests/data/gui
 
 const calls: Array<{ values: Record<string, number> | null | undefined }> = [];
 let refuse: Error | null = null;
+let broken: Error | null = null;
 vi.mock("../api", async (original) => ({
   ...(await original<typeof import("../api")>()),
   api: {
     structure3d: (_phase: number, _tol?: number, _dis?: string, _c?: unknown, _l?: unknown,
                   values?: Record<string, number> | null) => {
       calls.push({ values });
+      if (broken) return Promise.reject(broken);
       if (values && refuse) return Promise.reject(refuse);
       return Promise.resolve(structuredClone(RUTILE));
     },
@@ -47,6 +49,7 @@ afterEach(() => {
   app = null;
   calls.length = 0;
   refuse = null;
+  broken = null;
   document.body.innerHTML = "";
 });
 
@@ -78,6 +81,15 @@ describe("the Structure graph", () => {
     show({ values: { "phases.0.cell.a": -1 } });
     await settle(() => titleText().includes("Preview refused"));
     expect(document.querySelector(".gtitle")!.getAttribute("title")).toContain("below its minimum");
+  });
+
+  it("asks once for the working state when it fails under a refused preview", async () => {
+    broken = new Error("the server failed");
+    show({ values: { "phases.0.cell.a": 4.6 } });
+    await settle(() => document.querySelector(".empty")?.textContent === "the server failed");
+    await new Promise((done) => setTimeout(done, 100));
+    // the refused preview, then one working-state request, and no loop
+    expect(calls.map((c) => c.values)).toEqual([{ "phases.0.cell.a": 4.6 }, null]);
   });
 
   it("states the ellipsoids' probability in the title while they show", async () => {
