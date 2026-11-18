@@ -28,7 +28,7 @@ matrix — no pydantic objects are touched per iteration.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
@@ -123,6 +123,17 @@ DISTORTION_DRIFT_TOL = 1e-9
 #: the vectors are averages of permutation-times-rotation matrices, so a true
 #: zero sits at 1e-15 and a vector the site forbids is O(1) off.
 DISTORTION_SITE_TOL = 1e-8
+
+
+def _matrix_rank(a: np.ndarray) -> int:
+    """``np.linalg.matrix_rank`` at its default tolerance, through
+    :func:`~rietx.optimize.lapack.svd`, so the decomposition takes the
+    second driver where the first does not converge (that module's rule for
+    every decomposition on the fit path)."""
+    if not a.size:
+        return 0
+    s = lapack.svd(a, compute_uv=False)
+    return int(np.count_nonzero(s > s.max() * max(a.shape) * np.finfo(np.float64).eps))
 
 
 def _is_wavelength(path: str) -> bool:
@@ -1263,6 +1274,17 @@ class ParameterTable:
         self.derived: list[DerivedBlock] = []
         #: (body base path, body name, its block), in collection order
         #: (WP-1805): the write-back and the rigidity check walk this
+        #: A body's rotation DOFs are the **anchored-rotation** kind (WP-1805),
+        #: read off its block (``block.rotation_paths(bbase)``), which holds
+        #: the anchor and the axes they turn about: the kind belongs to the
+        #: group of rows, so a per-row field or a second map would restate
+        #: what the block already knows (the maintainer's answer (a),
+        #: 2026-10-08).  An increment δω = E·θ composed into the body's R₀
+        #: and zeroed at every :meth:`commit`, so its value is a step within
+        #: one stage and never a position; never read off a path's name, for
+        #: ``_anchored_dofs``' reason, and never *in* ``_anchored_dofs``,
+        #: whose subtraction rule is wrong for a rotation by O(δω²)
+        #: (WP-1803's record), so nothing rebases one.
         self._bodies: list[tuple[str, str, DerivedBlock]] = []
         #: the cell blocks of ``Phase.parent_cell`` phases (WP-1419), declared
         #: before every body block, which reads a phase's cell
@@ -1271,15 +1293,6 @@ class ParameterTable:
         #: positive definite, however it is combined (WP-1419); applied in
         #: :meth:`bounds` to a **free** strain, never stored on the entry
         self._strain_domain: dict[str, float] = {}
-        #: body base path → its rotation DOF paths: the **anchored-rotation**
-        #: kind (WP-1805).  An increment δω = E·θ composed into the body's
-        #: R₀ and zeroed at every :meth:`commit`, so its value is a step
-        #: within one stage and never a position.  Built where the anchor is
-        #: (:meth:`_collect_body`), never read off a path's name, for
-        #: ``_anchored_dofs``' reason; and never *in* ``_anchored_dofs``,
-        #: whose subtraction rule is wrong for a rotation by O(δω²)
-        #: (WP-1803's record), so nothing rebases one.
-        self._anchored_rotations: dict[str, tuple[str, ...]] = {}
         #: body base path → its torsions' twist increments (WP-1808): the
         #: same anchored-rotation kind about one named axis each, composed
         #: into the torsion's ``angle`` and zeroed at every :meth:`commit`
@@ -1401,13 +1414,14 @@ class ParameterTable:
                 self._add(f"{base}.magnetic_lor_strain",
                           phase.magnetic_lor_strain, force_fixed=off)
             self._collect_microstrain(base, sg, phase)
-            owner = {label: body.name for body in phase.rigid_bodies
+            owner = {label: (body.name, f"{base}.rigid_bodies.{b}")
+                     for b, body in enumerate(phase.rigid_bodies)
                      for label in body.atoms}
             moved = self._collect_distortion_modes(base, phase)
             for j, atom in enumerate(phase.atoms):
                 if atom.label in owner:
                     self._collect_body_atom_coords(f"{base}.atoms.{j}", atom,
-                                                   owner[atom.label])
+                                                   *owner[atom.label])
                 elif j in moved:
                     self._collect_mode_atom_coords(f"{base}.atoms.{j}", sg, phase, j)
                 else:
@@ -1917,7 +1931,8 @@ class ParameterTable:
             candidates=candidates, labels=labels, coords=coords,
             mode=phase.floating_origin, sites=site_info)
 
-    def _collect_body_atom_coords(self, base: str, atom, body: str) -> None:
+    def _collect_body_atom_coords(self, base: str, atom, body: str,
+                                  bbase: str) -> None:
         """A body atom's x, y, z: locked rows its body's block writes (WP-1805).
 
         No displacement DOF, no affine row: the coordinates are outputs of a
@@ -1929,9 +1944,9 @@ class ParameterTable:
         if any(getattr(atom, c).vary for c in ("x", "y", "z")):
             raise ValueError(
                 f"{base} ({atom.label!r}) is placed by rigid body {body!r}; its "
-                "coordinates are the body's — refine the body's origin and "
-                "rotation (phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*) and set vary=False here")
+                "coordinates are the body's — refine the body's origin, "
+                f"rotation and torsions ({bbase}.origin.dof.*, {bbase}.rotation.*, "
+                f"{bbase}.torsions.*.twist) and set vary=False here")
         for c in ("x", "y", "z"):
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
@@ -1946,7 +1961,7 @@ class ParameterTable:
         DOFs as E has columns (``params.bodies``): the template's inertia rank
         at a general origin, and on a special position the axial directions
         the origin's site symmetry fixes (WP-1807: 0, 1 or 3).  It is never in
-        ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).  The block
+        ``_anchored_dofs`` (:attr:`_bodies` says why).  The block
         is declared after collection, through :meth:`add_derived`.
 
         Refused at build, each naming the body and the atom
@@ -1998,12 +2013,10 @@ class ParameterTable:
         # the anchored-rotation kind: identity entries (radians) that a commit
         # composes into R₀ and zeroes, boxed so |δω| stays below the 2π where
         # the exponential map's Jacobian degenerates (WP-1803's handover)
-        paths = block.rotation_paths(bbase)
-        for path in paths:
+        for path in block.rotation_paths(bbase):
             self.entries.append(Entry(
                 path=path, value=0.0, vary=body.rotation_vary,
                 lo=-RIGID_BODY_ROTATION_BOUND, hi=RIGID_BODY_ROTATION_BOUND))
-        self._anchored_rotations[bbase] = paths
         # named-bond torsions (WP-1808): the same kind about one axis each, in
         # degrees and unboxed — a turn about a fixed axis has no singular
         # chart to keep away from, and the commit wraps the record
@@ -2215,18 +2228,32 @@ class ParameterTable:
         """Every derived row a rigid body writes → that body's name (WP-1805)."""
         return {q: name for _, name, block in self._bodies for q in block.outputs}
 
+    def body_row_bases(self) -> dict[str, str]:
+        """Every derived row a rigid body writes → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: advice naming the owning body's own
+        DOFs, where :meth:`body_rows`' name is unique only in its phase."""
+        return {q: bbase for bbase, _, block in self._bodies for q in block.outputs}
+
     def body_dofs(self) -> dict[str, str]:
         """Every rigid body's own DOF → that body's name (WP-1805).
 
         Its origin's displacement DOFs, its rotation DOFs and its torsions'
         twists, read off the data :meth:`_collect_body` built.
         """
-        out: dict[str, str] = {}
-        for bbase, name, _ in self._bodies:
-            out.update(dict.fromkeys(self._anchored_rotations[bbase], name))
-            out.update(dict.fromkeys(self._anchored_torsions[bbase], name))
-            out.update(dict.fromkeys(self._body_origin_dofs[bbase], name))
-        return out
+        return {p: name for p, _, name in self._body_dof_owners()}
+
+    def body_dof_bases(self) -> dict[str, str]:
+        """Every rigid body's own DOF → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: :meth:`body_dofs` keyed where a
+        body's name is unique only in its phase, read off the same data."""
+        return {p: bbase for p, bbase, _ in self._body_dof_owners()}
+
+    def _body_dof_owners(self) -> Iterator[tuple[str, str, str]]:
+        """(DOF path, body base path, body name) for every body's own DOF."""
+        for bbase, name, block in self._bodies:
+            for p in (*block.rotation_paths(bbase), *self._anchored_torsions[bbase],
+                      *self._body_origin_dofs[bbase]):
+                yield p, bbase, name
 
     def body_bond_errors(self) -> dict[str, float]:
         """Per body, the largest |d_ij − d_ij(template)| over its atoms (Å).
@@ -3158,10 +3185,11 @@ class ParameterTable:
     def _body_increment_kind(self, path: str) -> str | None:
         """``"rotation"``/``"torsion"``/``"origin"`` for a body increment, else ``None``.
 
-        Read off :attr:`_anchored_rotations` and :attr:`_body_origin_dofs`,
-        the data built where each increment is anchored, never off the name.
+        Read off each body's block, :attr:`_anchored_torsions` and
+        :attr:`_body_origin_dofs`, the data built where each increment is
+        anchored, never off the name.
         """
-        if any(path in paths for paths in self._anchored_rotations.values()):
+        if any(path in block.rotation_paths(bbase) for bbase, _, block in self._bodies):
             return "rotation"
         if any(path in paths for paths in self._anchored_torsions.values()):
             return "torsion"
@@ -3651,10 +3679,12 @@ class ParameterTable:
         fits compares nothing.  The quaternion record and the body atoms' rows
         are what carry the answer.  A torsion's twist is the same kind about
         one axis (WP-1808), its record the torsion's ``angle``.  Read off
-        :attr:`_anchored_rotations` and :attr:`_anchored_torsions`.
+        each body's block and :attr:`_anchored_torsions`.
         """
-        return frozenset(p for kind in (self._anchored_rotations, self._anchored_torsions)
-                         for paths in kind.values() for p in paths)
+        return frozenset((*(p for bbase, _, block in self._bodies
+                            for p in block.rotation_paths(bbase)),
+                          *(p for paths in self._anchored_torsions.values()
+                            for p in paths)))
 
     @property
     def angle_dof_paths(self) -> frozenset[str]:
@@ -3784,7 +3814,7 @@ class ParameterTable:
         moved: list[str] = []
         for bbase, name, block in self._bodies:
             target = orientations.get(bbase)
-            paths = self._anchored_rotations[bbase]
+            paths = block.rotation_paths(bbase)
             if target is None or not (any(named(p) for p in paths)
                                       or any(named(q) for q in block.outputs)):
                 continue
@@ -4564,7 +4594,7 @@ class ParameterTable:
         charts: dict[str, np.ndarray] = {}
         self._precommit_anchor = {}
         for bbase, _, block in self._bodies:
-            paths = self._anchored_rotations[bbase]
+            paths = block.rotation_paths(bbase)
             anchor = (block.q0, block.r0, block.axes)
             chart = block.commit_rotation([values[q] for q in paths])
             if chart is None:
@@ -4638,26 +4668,100 @@ class ParameterTable:
 
         The moment signs on the diagonal and each composed body's block on
         its rotation columns (disjoint sets).  A rotation entry's free column
-        is its value or an affine image of another's; the block is carried
-        through C's rows as pinv(A)·chart·A, A the rows of the body's rotation
-        entries over the columns that reach them.  That is exact when each
-        rotation entry is its own free column; a body with some rotation DOFs
-        held or tied gets the projection, because composing then changes which
-        orientations the held components leave reachable, and no matrix maps
-        one family onto the other.
+        is its value or an affine image of another's, so with A the rows of
+        the body's rotation entries over the columns that reach them, δω = A·θ
+        and the block is A⁻¹·chart·A.  Exact in the three shapes a stage
+        allows (:meth:`refuse_partial_turns`): no free direction, nothing to
+        carry; every direction free, A square and invertible; one, a turn
+        about one fixed axis a, where composing is addition — J_l(t·a)·a = a,
+        so the chart is the identity on that column and the block is left so.
+
+        Two free directions of three are refused at stage start rather than
+        approximated: two turns compose into the third, so no matrix maps the
+        old family onto the new one (the maintainer's answer (c) on #801,
+        replacing a pinv(A)·chart·A projection the 2026-10-08 probe measured
+        no closer to a fresh solve than no re-chart at all).  A caller driving
+        the table by hand into that shape gets no re-chart for the body.
         """
         n = len(self._free_idx)
         out = np.diag(np.ones(n) if signs is None else np.asarray(signs, dtype=np.float64))
-        C = self._C.toarray()
-        for bbase, chart in charts.items():
-            rows = [self._paths[q] for q in self._anchored_rotations[bbase]]
-            a = C[rows]
-            cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
-            if not len(cols):
+        for bbase, _, block in self._bodies:
+            if (chart := charts.get(bbase)) is None:
                 continue
+            a = self._C[[self._paths[q] for q in block.rotation_paths(bbase)]].toarray()
+            cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
             a = a[:, cols]
-            out[np.ix_(cols, cols)] = lapack.pinv(a) @ chart @ a
+            if len(cols) == len(a) and _matrix_rank(a) == len(cols):
+                out[np.ix_(cols, cols)] = np.linalg.solve(a, chart @ a)
         return out
+
+    def free_turn_directions(self, without: Iterable[str] = ()
+                             ) -> dict[str, tuple[str, int, int]]:
+        """Each body's free turn directions: base path → (name, free, of).
+
+        ``free`` is the rank of the body's rotation rows of C over the free
+        columns, so it counts what holds and ties leave: three rotation DOFs
+        tied to one free column are one direction, a turn about one fixed
+        axis.  ``of`` is the block's k, the directions the body has.  A free
+        path in ``without`` is counted as held, so advice can ask what a hold
+        would leave before recommending it (``RIGID_BODY_UNSUPPORTED``).
+        """
+        drop = set(without)
+        keep = [c for c, p in enumerate(self.free_paths) if p not in drop]
+        out: dict[str, tuple[str, int, int]] = {}
+        for bbase, name, block in self._bodies:
+            rows = [self._paths[q] for q in block.rotation_paths(bbase)]
+            a = self._C[rows][:, keep].toarray() if rows and keep else np.zeros((0, 0))
+            out[bbase] = (name, _matrix_rank(a), len(rows))
+        return out
+
+    def refuse_partial_turns(self, *, joint: bool = False) -> None:
+        """``RIGID_BODY_PARTIAL_TURN``: a body's turn is free in some directions only.
+
+        Raised at stage start (``Refinement._run_stage`` and the joint runner),
+        once the stage's globs, the caller's holds and ties and the mode's
+        force-fix have settled the free set, so a hold, a tie and a plan glob
+        reach it alike.  A body's free turn directions
+        (:meth:`free_turn_directions`) must number 0, 1 or all of them:
+        a commit composes R₀ ← Exp(δω)·R₀, and two turns of a three-direction
+        body compose into the third, so the next stage's two directions are
+        not this one's and :meth:`_chart_matrix` has no exact re-chart to give
+        (the maintainer's answer (c) on #801).  A linear body has two
+        directions, and one of them free is a turn about a fixed axis.
+
+        ``joint`` words the remedies for ``MultiHistogramRefinement``, which
+        has no hold or tie verb, so the stage's globs are the only lever.
+        """
+        turns = self.free_turn_directions()
+        for bbase, _, block in self._bodies:
+            name, free, k = turns[bbase]
+            if free in (0, 1, k):
+                continue
+            state, pinned = [], False
+            for q in block.rotation_paths(bbase):
+                e = self.entries[self._paths[q]]
+                pinned |= e.tie is not None or e.held
+                state.append(f"{q.rsplit('.', 1)[1]} "
+                             + ("tied" if e.tie is not None
+                                else "free" if e.vary else "held"))
+            glob = f"{bbase}.rotation.*"
+            if joint:
+                remedy = (f"Free all {k} ({glob}) or none of them in the stage's "
+                          "turn_on: a joint fit has no hold or tie verb")
+            else:
+                remedy = (f"Free all {k} ({glob}), hold all {k} "
+                          f"(Refinement.hold({glob!r})), or tie the turn to one axis "
+                          f"(Refinement.tie_equal({glob!r}), or Refinement.tie with "
+                          "scales for another axis)")
+                if pinned:
+                    remedy += ("; a held or tied DOF first needs Refinement.unhold "
+                               "or Refinement.untie")
+            raise ValueError(
+                f"RIGID_BODY_PARTIAL_TURN: rigid body {name!r} has {free} free turn "
+                f"directions of its {k} ({bbase}.rotation: {', '.join(state)}). "
+                "A commit composes the turn into the body's orientation, and two "
+                "turns compose into the third, so the stage cannot keep the "
+                f"directions it was given. {remedy}")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.
@@ -4673,7 +4777,7 @@ class ParameterTable:
         for bbase, _, block in self._bodies:
             restored = False
             if (bbase in self._precommit_anchor
-                    and wanted & set(self._anchored_rotations[bbase])):
+                    and wanted & set(block.rotation_paths(bbase))):
                 block.restore_anchor(*self._precommit_anchor.pop(bbase))
                 restored = True
             # a torsion's twist is the same kind (WP-1808): each one restored
@@ -5022,7 +5126,7 @@ class ParameterTable:
         # pose Exp(δω)·R₀ not yet composed, written as the pose it describes
         for bbase, _, block in self._bodies:
             ip, b = (int(t) for t in bbase.split(".")[1::2][:2])
-            q = block.orientation([values[p] for p in self._anchored_rotations[bbase]])
+            q = block.orientation([values[p] for p in block.rotation_paths(bbase)])
             structure.phases[ip].rigid_bodies[b].orientation = tuple(
                 float(v) for v in np.asarray(q))
             # its torsions' records the same way (WP-1808): φ₀ + δφ, which is

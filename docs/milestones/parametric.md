@@ -34,6 +34,12 @@ test.
 The practice behind the design is `docs/practice.md` § A parameter set by an equation
 the user writes, surveyed across fields on 2026-11-03.
 
+How a series declares its parameters, and when a series becomes a joint fit, is the
+[series](series.md) milestone's question (opened 2026-11-16, kept separate from this one
+by the maintainer's ruling of that day). Its rule 1 names the four kinds of parameter a
+series can declare, and two of them, a common value and an equation, are this milestone's
+machinery.
+
 | WP | What it adds |
 |---|---|
 | [2101](../wp/2101-the-parametric-surface-as-it-stands-in-the-manual.md) | the surface that exists today, documented for someone arriving from TOPAS or GSAS-II |
@@ -137,6 +143,8 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   cells and a constant height offset between the two have a mean z-score under 0.5 in size.
   The same fit with the second phase treated as a structure misses the truth, and the
   fixture is built so that it does. A height offset is what the holder is there to give.
+  Met on single patterns on 2026-11-15 by declared peaks with formula centres, with no new
+  surface (`tests/test_holder_cell.py`); a joint fit sharing the offset was not tried.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
   ramp the result agrees with the joint fit's coefficients within their combined esds. On a

@@ -1,6 +1,6 @@
 # WP-1986 — Guides and Theory move over, and the old tree retires
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the old tree retired (one manual; its 47 URLs redirect); guide 24 and the README and landing links on `/docs/stable/` landed (PR #1347); open for guide 18, which waits on WP-1910 and WP-2030
+Milestone: unscheduled · Status: 🔄 2026-11-13 — the old tree retired (one manual; its 47 URLs redirect, each known old anchor to the page holding it, PR #1564); guide 24 and the README and landing links on `/docs/stable/` landed (PR #1347); open for guide 18, which waits on WP-1910 and WP-2030
 Track: The repo's own process
 Depends on: 1978 (the new tree); 1985 (the report text the guides show); 1979 (redirect stubs)
 Priority: P2 2026-10-16 — unblocked: WP-1979 built the redirect stubs (PR #1023)
@@ -299,15 +299,6 @@ the tree that day.
 
 ### Inherited
 
-- **2026-11-12, from [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md)
-  (closed): the `using/glossary` redirect loses an instrument entry's anchor.** PR #1505
-  split the parameter map into `reference/parameters` (phases) and
-  `reference/parameters-instrument` (instrument and background), because the single page had
-  reached the manual's page-size cap. `docs/docs_versions.py` still sends `using/glossary` to
-  `reference/parameters`, so an old link to an instrument entry lands on the phase page and
-  its fragment matches nothing there. Found by 2087's code review and left alone there. Not
-  re-measured here. The stub carries the fragment over by script, so a fix could pick the page
-  by fragment.
 - **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed): guide
   18's wait on WP-1510 is now a wait on [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md).**
   The findings guide 18 would document on the shipped fluorapatite pattern are 2030's: the
@@ -357,6 +348,58 @@ the tree that day.
 ```
 
 ## Handover log
+
+### 2026-11-13 (13th session) — a retired page's stub sends each known old anchor to the page that has it (PR #1564)
+
+An old link to a section of a retired page now lands on that section where anyone is known to
+link it. The redirect stubs used to send every fragment to one page per old page. The old
+glossary's thirteen sections went to four pages, so eleven of them lost their place, and
+the note inherited from WP-2087 named only part of that. Seven help links that installed
+releases (v1.2 to v1.9) open, and eleven links in released READMEs (kept on PyPI's release
+pages), also landed at the top of a page that lacked their heading. Each now has a row, and a
+test checks every known old anchor against the built manual. About 280 other old headings
+that nobody is known to link still land at the top of their successor page.
+
+*Done.* `docs/docs_versions.py`: `MOVED_ANCHORS` (old page → {old id: new page and heading}),
+`retired_target(old, fragment)`, and `redirect_page(..., moved)`, whose script looks the
+reader's fragment up before carrying it over. A row sends a help anchor where the current
+release's `rietx.help` sends the same entry, and a README anchor where the current README
+sends the same feature. `assemble` picks the stable tree for a row only when stable's page
+holds the heading too; otherwise dev, as it already did for a missing page.
+`tests/test_manual.py::test_every_known_anchor_of_a_retired_page_lands_on_a_page_holding_it`
+(manual-build group) checks the thirteen glossary sections, 48 released help anchors and 14
+released README anchors, each list read off the old source or the tags and committed, since
+CI's shallow checkout has no tags. Without the rows it reports 20 of the first two sets.
+`tests/test_docs_versions.py` gains three tests; one runs a stub's script in node and was
+made to fail once by disabling the lookup. The inherited 2026-11-12 note is done and
+deleted: its premise of an "instrument-entry anchor" did not hold, since the old glossary
+had one `#parameters` section and no per-entry ids, but the class was larger.
+
+*Measured.* A survey of the old tree's headings (`d881d9029^`, docutils ids off each page's
+Markdown, plus every released help anchor) against this branch's build: 280 old ids on 26 old
+pages land on a page without them. 240 of those are on no page of the new tree, because the
+re-homing rewrote the headings, and 37 sit on exactly one other page. Acceptance
+(`test_manual`, `test_manual_api`, `test_gui_manual`, `test_landing`, `test_docs_versions`;
+`[dev]`, darwin/arm64): 164 passed before the review's additions. On the final tree with `main` merged in (`8f68b1089`), the same five files plus `test_docs_consistency.py`: 191 passed, none skipped. The branch adds eight test cases (one manual-build test, seven in `test_docs_versions.py`, five of them one parametrised stub test). The fast selection did not run here. It waited over ten minutes in the machine's suite queue behind two other runners' suites and was withdrawn, so CI's fast matrix is its gate.
+
+*Review* (`/code-review high --fix`): two findings, both fixed in the second commit. The
+README anchors above were missing from the rows. And the stable/dev choice looked at the page
+alone, so a row naming a heading added on `main` would have landed at the top of stable's
+page. Declined, as the review itself did: `using/model#declared-extra-peaks` keeps the help
+entry's target (`theory/profiles`) where the current README sends that feature to
+`reference/instrument#extra-components`, since both exist and the help link is the more
+numerous; the stub's canonical link still names the default page when the script goes
+elsewhere.
+
+*Generality.* No judge dispatched: the branch leaves `src/rietx/_audit.py` alone and adds
+no heuristic to the package. The fragment table is site tooling, a hand-written map.
+
+*Gotchas.* The two anchor lists in the test are history, so CI cannot re-derive them. A
+release cut after v1.9 links `/docs/<minor>/`, never a stub, so the lists are closed.
+
+Next: (1) guide 18 when WP-1910 and WP-2030 close, as the 12th session's entry says.
+(2) Whether the 240 unlinked old headings deserve rows is open. Nothing is known to link
+them, and each row is a hand judgement of where a rewritten section went.
 
 ### 2026-11-02 (12th session) — guide 24, and the README and landing links name their page (PR #1347)
 

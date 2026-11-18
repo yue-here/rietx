@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from ..theme import TOKENS
-from . import cut, glyphs, raster, views
+from . import cut, glyphs, raster, rings, views
 from . import report as rp
 from . import scene as sc
 from .report import FigureReport
@@ -304,7 +304,8 @@ def _polyhedron_palette(geometry: Mapping, scene: dict) -> dict[str, str]:
     centre's site as :func:`_palette` is.  Read off the faces the scene drew,
     so a polyhedron switched off, hidden or cut is not in it."""
     polys, sites = geometry["polyhedra"], geometry["sites"]
-    drawn = sorted({f["index"] for f in scene["faces"]}, key=lambda i: (polys[i]["site"], i))
+    drawn = sorted({f["index"] for f in scene["faces"] if f["kind"] == "polyhedron"},
+                   key=lambda i: (polys[i]["site"], i))
     return _named((sc.polyhedron_formula(geometry, polys[i]), sites[polys[i]["site"]]["color"])
                   for i in drawn)
 
@@ -722,7 +723,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                      exaggeration: float = 1.0, stick: float = 1.0,
                      hidden=(), boundary: bool = True, cell: bool = True, polyhedra=None,
                      axis_labels: bool = True, atom_labels: bool = False,
-                     outline: bool = False, background="white", pad: float = FIT_PAD,
+                     outline: bool = False, depth_cue: bool = False,
+                     planar_rings=False, faces=(), background="white", pad: float = FIT_PAD,
                      path=None, dpi: float | None = None) -> StructureFigure:
     """Draw one phase of a structure as the GUI's structure viewer draws it.
 
@@ -778,7 +780,23 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     the room a line's half-width, the a, b, c and any atom labels need.  ``background``
     is ``"white"``, ``"black"``, ``"#rrggbb"``, three channels in 0..1, or
     ``None`` for transparent.  ``outline=True`` inks silhouettes, off by
-    default because the GUI draws none.  ``atom_labels=True`` writes each site
+    default because the GUI draws none.  ``depth_cue=True`` fades each surface
+    toward the background with its depth, linearly from half-way back through
+    the drawn atoms to the rearmost, where it is ``scene.LOOK["fog_max"]`` of
+    the way there, as the GUI's toggle does (WP-1548).  It needs an opaque
+    ``background``, there being no colour to fade toward over a transparent
+    one.  ``planar_rings=True`` fills each ring of five or six bonded atoms
+    lying within ``rings.PLANAR_RING_TOLERANCE`` (0.1 Å) of one plane as a
+    translucent face, grey (``scene.FILL_COLOR``) or in the colour given
+    instead of ``True``.  Flat is all it claims: from coordinates the package
+    cannot tell an aromatic ring from any other flat one.  A ring a cell edge
+    cuts closes only in a block (``structure3d.build(extent=...)``), and an
+    atom of more than four drawn bonds joins none (``rings.MAX_RING_DEGREE``).
+    ``faces`` fills sets of atoms you name, each a boolean mask over the
+    geometry's atoms from :mod:`rietx.viz.figure3d.cut` (``select``,
+    ``plane``, ``sphere``, ``component``) or a ``(mask, colour)`` pair: a set
+    within 0.1 Å of a plane is drawn as the convex polygon round it, any
+    other as its convex hull (``rings.face_fill``).  ``atom_labels=True`` writes each site
     label beside its atom, in the first of eight places around it clear of
     atoms, bonds and the labels before it.  The report counts what each label
     still meets.  ``path`` writes a PNG, with ``dpi`` only in its ``pHYs``
@@ -801,6 +819,20 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
             or not 0 <= pad < 0.5):
         raise ValueError(f"pad {pad!r}: the share of each side left empty, from 0 "
                          "(cropped to the ink) up to but not including 0.5")
+    if not isinstance(depth_cue, bool):
+        raise ValueError(f"depth_cue {depth_cue!r}: True or False")
+    if depth_cue and background is None:
+        raise ValueError("depth_cue=True fades toward the background, and "
+                         "background=None has no colour to fade toward; "
+                         "give an opaque background")
+    if not isinstance(planar_rings, (bool, str)):
+        raise ValueError(f"planar_rings {planar_rings!r}: True, False or a colour "
+                         "'#rrggbb'")
+    ring_colour = (cut.site_colour(planar_rings) if isinstance(planar_rings, str)
+                   else None)
+    if isinstance(faces, np.ndarray):
+        raise ValueError("faces: a list of masks, or of (mask, colour) pairs; one mask "
+                         "is faces=[mask]")
     if dpi is not None and not 0 < float(dpi) < 1e6:
         raise ValueError(f"dpi {dpi!r}: a positive resolution, in dots per inch")
     if (isinstance(stick, bool) or not isinstance(stick, (int, float, np.integer, np.floating))
@@ -851,10 +883,44 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     shown = sc.shown_polyhedra(geometry, on, formulas, hidden, boundary)
     # the frame is the payload's ``edges``; the fit reads what the scene
     # draws, so a frame left out stops holding the view open (WP-1533)
-    scene = sc.build_scene(geometry if cell else {**geometry, "edges": []}, mode,
-                           hidden=hidden, show_boundary=boundary,
-                           exaggeration=exaggeration, polyhedra=shown,
-                           cell=tokens["--accent"], stick=float(stick))
+    framed = geometry if cell else {**geometry, "edges": []}
+    drawing = dict(hidden=hidden, show_boundary=boundary, exaggeration=exaggeration,
+                   polyhedra=shown, cell=tokens["--accent"], stick=float(stick))
+    scene = sc.build_scene(framed, mode, **drawing)
+    fills = (rings.ring_fills(geometry, color=ring_colour)
+             if planar_rings is not False else [])
+    fill_warnings = []
+    drawn_atoms = {a["index"] for a in scene["atoms"]}
+    for k, named in enumerate(faces):
+        # a pair is (mask, colour); the recipe's JSON-plain copy is a list
+        paired = (isinstance(named, (tuple, list)) and len(named) == 2
+                  and isinstance(named[1], str))
+        mask, colour = named if paired else (named, None)
+        mask = cut._mask(geometry, mask, f"faces[{k}]")
+        colour = None if colour is None else cut.site_colour(colour)
+        # a face spans the atoms drawn: one a switch hides (a species, the
+        # images, a polyhedron's own vertex) leaves it, and the report says so
+        named_atoms = [int(i) for i in np.flatnonzero(mask)]
+        kept = [i for i in named_atoms if i in drawn_atoms]
+        if len(kept) == len(named_atoms):
+            fills.append(rings.face_fill(geometry, named_atoms, color=colour))
+            continue
+        # the set as named is the caller's and raises whatever is drawn; what
+        # the hiding leaves of it, too few atoms or a line, is said and skipped
+        rings.face_fill(geometry, named_atoms)
+        fill, reason = None, ", leaving too few to fill, so it is not drawn"
+        if len(kept) >= 3:
+            try:
+                fill = rings.face_fill(geometry, kept, color=colour)
+            except ValueError:
+                reason = ", leaving them on one line, so it is not drawn"
+        if fill is not None:
+            fills.append(fill)
+        fill_warnings.append(
+            f"faces[{k}]: {len(named_atoms) - len(kept)} of its {len(named_atoms)} "
+            "atoms are not drawn" + (reason if fill is None else " and are left out of it"))
+    if fills:
+        scene = sc.build_scene(framed, mode, fills=fills, **drawing)
     asked_axis_labels, axis_labels = axis_labels, bool(axis_labels) and bool(cell)
     margin = max([0.5 * line["width"] for line in scene["lines"]] + [0.0])
     if axis_labels:
@@ -878,8 +944,14 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     if outline:
         step = sc.stick_radius(geometry, mode, exaggeration, float(stick))
         ol = (OUTLINE_CSS * frame.px_scale, step, sc.rgb(tokens["--fg"]))
+    fog = None
+    if depth_cue:            # an opaque background, refused above otherwise
+        span = sc.fog_span(scene, [float(v) for v in np.asarray(R).reshape(-1)])
+        if span is not None:
+            shift = float(R[2] @ np.asarray(scene["center"], dtype=np.float64))
+            fog = (span[0] + shift, span[1] + shift, sc.LOOK["fog_max"], bg)
     image = raster.draw(scene, R, frame, supersample=s, background=bg, text=strokes,
-                        outline=ol)
+                        outline=ol, fog=fog)
     atoms = []
     for a in scene["atoms"]:
         c = R @ np.asarray(a["pos"], dtype=np.float64)
@@ -895,7 +967,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         _png(target, image, dpi)
         written = str(target)
     seen = rp.look(probe, R)
-    warnings = []
+    warnings = list(fill_warnings)
     if mode == "ellipsoid":
         drawn_sites = {geometry["atoms"][a["index"]]["site"] for a in scene["atoms"]}
         flat = sorted({geometry["sites"][k]["label"] for k in drawn_sites
@@ -943,6 +1015,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         "max_atoms": max_atoms, "exaggeration": exaggeration, "stick": stick,
         "hidden": hidden_asked, "boundary": boundary, "cell": cell, "polyhedra": polyhedra,
         "axis_labels": asked_axis_labels, "atom_labels": atom_labels, "outline": outline,
+        "depth_cue": depth_cue, "planar_rings": planar_rings,
+        "faces": faces,
         "background": background, "pad": pad, "dpi": dpi}.items()}
     return StructureFigure(image=image, rotation=views.as_list(R),
                            pixels_per_angstrom=frame.ppa, origin=[float(frame.x0), float(frame.y0)],
