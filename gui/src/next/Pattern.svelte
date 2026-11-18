@@ -16,7 +16,10 @@
    *   place each is chosen. The choice is kept per project in
    *   `ProjectDoc.ui` (the maintainer's ruling of 2026-11-11, "Yes, build it");
    * - each legend label sits beside the pane its curve is drawn in and is its
-   *   curve's switch (`gui/STYLE.md` § Plots);
+   *   curve's switch (`gui/STYLE.md` § Plots). The excluded points have no
+   *   label: the shading marks where they are (interaction rule 4), and the
+   *   Observed switch shows and hides them with the rest of the data (the
+   *   maintainer's ruling of 2026-11-13);
    * - the fitted range and each excluded region is an object on the plot
    *   (interaction rules 1, 3, 4, 12): a click on its shading selects it, its
    *   selection bar holds the typed bounds and the channel count, Delete or
@@ -28,7 +31,8 @@
    * - the intensity opens on square root, as the prototype's does, until the
    *   project remembers another choice.
    *
-   * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
+   * The chart is today's `lib/pattern.ts` figure, through its `/next` copy
+   * (`next/pattern.ts`, drawn to the prototype by the polish), drawn without the peak layer,
    * which the peaks-and-indexing workflow brings (R6). The three-effect split
    * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
    */
@@ -42,7 +46,8 @@
     residual, shows, toggleCurve,
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
-  import type { Curves, Overlay, PatternChart } from "../lib/pattern";
+  import type { PreviewAnswer } from "../lib/interactive";
+  import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import { statusReadout, type StatusReadout } from "./readout";
@@ -62,6 +67,9 @@
     projectPath = null,
     ui = null,
     onui = () => {},
+    preview = null,
+    previewError = "",
+    oncurves = () => {},
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -87,6 +95,12 @@
     ui?: Record<string, unknown> | null;
     /** persist an axis choice in the project's `ui` keys */
     onui?: (patch: Record<string, unknown>) => void;
+    /** the Interactive tab's preview, drawn over the last fit at its scale (WP-2128) */
+    preview?: PreviewAnswer | null;
+    /** the preview route's refusal, in its own words */
+    previewError?: string;
+    /** the curves each fetch drew, which the sliders' ranges are measured from */
+    oncurves?: (curves: Curves | null) => void;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -107,7 +121,7 @@
 
   let host: HTMLDivElement | undefined = $state();
   let chart: PatternChart | null = null;
-  let chartModule: typeof import("../lib/pattern") | null = null;
+  let chartModule: typeof import("./pattern") | null = null;
   let curves: Curves | null = null;
   let held: Window | null = $state.raw(null);
   let loadError = $state("");
@@ -147,8 +161,14 @@
   let selection = $state<Selection | null>(null);
   let note = $state("");
 
-  const toggles = $derived(held ? curveToggles(held, residual(kind, held).label) : []);
-  const dataOnly = $derived(isDataOnly(toggles, hidden));
+  // the excluded points are no curve of their own here: their shading marks
+  // them, so the legend lists no "Excluded" (ruled 2026-11-13), and `drawn`
+  // hides them with the observed points
+  const toggles = $derived(held
+    ? curveToggles(held, residual(kind, held).label).filter((t) => t.id !== "masked") : []);
+  /** What the chart and the readout leave out: `hidden`, plus the excluded
+   *  points while the observed ones are hidden. */
+  const drawn = $derived(hidden.includes("obs") ? [...hidden, "masked"] : hidden);
   const stats = $derived(result?.statistics ?? null);
   const immature = $derived(Boolean(result?.maturity?.immature));
 
@@ -157,11 +177,23 @@
     loadError ? "The pattern could not be drawn"
     : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
 
+  /** Whether the graph draws a preview: values nobody has applied (WP-2128). */
+  const previewing = $derived(!!preview && !!held && !loadError);
+  /** Data only also hides the preview, which has no toggle in `toggles`. */
+  const dataOnly = $derived(isDataOnly(toggles, hidden)
+    && (!previewing || hidden.includes("preview")));
+  const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
+  /** The whole title line as its tooltip, since the title is what gives way
+   *  (B1); a refused preview's reason is said there, in the route's words. */
+  const titleTip = $derived(previewing ? "Preview, not refined"
+    : previewError ? `${title}. Preview refused: ${previewError}`
+    : (held as Window | null)?.stale ? `${title}, fitted over other channels` : title);
+
   // -- the chart ---------------------------------------------------------
 
   function overlayNow(): Overlay {
     return { protocol, extent, peaks: null, groups: null, peaksActive: false,
-             candidate: null, hidden, held: untrack(() => held) };
+             candidate: null, hidden: drawn, held: untrack(() => held) };
   }
 
   let fetchSeq = 0;
@@ -170,14 +202,17 @@
   async function drawChart() {
     if (!host) return;
     const seq = ++fetchSeq;
-    let mod: typeof import("../lib/pattern");
+    let mod: typeof import("./pattern");
     let c: Curves;
     try {
-      mod = chartModule ??= await import("../lib/pattern");
+      mod = chartModule ??= await import("./pattern");
       c = await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
       dropChart();
+      // no curves: the sliders' ranges and phase names must not stay the
+      // previous pattern's
+      oncurves(null);
       empty = exc instanceof ApiError && exc.empty;
       loadError = empty ? "" : (exc as Error).message;
       return;
@@ -204,20 +239,23 @@
       // the x title is the chart module's own string, and uPlot reads the
       // live pane's axis at each draw: blank it there. Its strip stays, so
       // nothing under the plot moves, and the x hint sits in it
-      const xAxis = chart.fig.panes.resid?.axes?.[0];
+      const xAxis = chart.fig.panes.ticks?.axes?.[0];
       if (xAxis) {
         xAxis.label = () => (exporting ? "2θ (°)" : "");
-        chart.fig.panes.resid.redraw(false, false);
+        chart.fig.panes.ticks.redraw(false, false);
       }
       applied = untrack(() => ({ kind, scale, theme }));
       chart.fig.onCursor = (hit) => (hoverAt = hit ? hit.x : null);
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
+      const p = untrack(() => preview);
+      if (p) chart.setPreview(p.curves);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
     }
+    oncurves(c);
     relayout();
   }
 
@@ -293,7 +331,7 @@
 
   // a knob applies what moved, and fetches nothing
   $effect(() => {
-    const k = kind, s = scale, h = hidden, t = theme;
+    const k = kind, s = scale, h = drawn, t = theme;
     void protocolKey;
     void extentKey;
     const o = untrack(overlayNow);
@@ -325,11 +363,26 @@
     untrack(() => chart?.fig.setMode(mode));
   });
 
+  // The preview is a repaint over the payload in hand, never a refetch
+  // (WP-2128). Each one drawn leaves an `rx-preview-redraw` User Timing entry
+  // from the moment its values were set to the frame after it painted: the
+  // drag-to-redraw latency the browser test reads, as on today's page.
+  $effect(() => {
+    const p = preview;
+    untrack(() => {
+      if (!chart) return;
+      chart.setPreview(p?.curves ?? null);
+      if (!p) performance.clearMeasures?.("rx-preview-redraw");
+      else requestAnimationFrame(() => requestAnimationFrame(() =>
+        performance.measure("rx-preview-redraw", { start: p.sentAt })));
+    });
+  });
+
   // -- the readout, handed to the frame's status bar ----------------------
 
   $effect(() => {
     const reading = statusReadout(held, hoverAt, {
-      kind, wavelengths, hidden,
+      kind, wavelengths, hidden: drawn,
       chi2Base: untrack(() => chart?.fig.chi2Base() ?? 0),
     });
     untrack(() => onreadout(reading));
@@ -347,7 +400,8 @@
       beforeDataOnly = null;
     } else {
       beforeDataOnly = hidden;
-      hidden = dataOnlyHidden(toggles);
+      // the preview has no toggle of its own but is no data either
+      hidden = [...dataOnlyHidden(toggles), "preview"];
     }
   }
 
@@ -677,7 +731,7 @@
    *  the difference at its pane's middle, one tick row per phase. */
   const legend = $derived.by(() => {
     if (!geom) return [];
-    const out: { id: string; label: string; top: number; absent?: string }[] = [];
+    const out: { id: string; label: string; top: number; absent?: string; reserved?: boolean }[] = [];
     let main = geom.main.top, tick = 0;
     const phases = toggles.filter((t) => t.id.startsWith("ticks:")).length;
     for (const t of toggles) {
@@ -691,6 +745,12 @@
       } else {
         out.push({ id: t.id, label, top: main, absent: t.absent });
         main += LEGEND_ROW;
+        // the preview's slot under the last fit, kept while no preview is
+        // drawn, so one appearing moves no label (the prototype's legend)
+        if (t.id === "calc") {
+          out.push({ id: "preview", label: CURVE_WORDS.preview, top: main, reserved: !previewing });
+          main += LEGEND_ROW;
+        }
       }
     }
     return out;
@@ -704,7 +764,8 @@
       const i = phases.findIndex((t) => t.id === id);
       return phases.length > 1 ? c.phase[i % c.phase.length] : c.obs;
     }
-    return ({ obs: c.obs, masked: c.obs, calc: c.calc, bkg: c.bkg, diff: c.diff } as any)[id]
+    return ({ obs: c.obs, calc: previewing ? c.last : c.calc, preview: c.calc, bkg: c.bkg,
+              diff: c.diff } as any)[id]
       ?? "currentColor";
   }
 </script>
@@ -714,14 +775,23 @@
 <div class="pattern">
   <div class="ghead">
     <!-- the whole line as its tooltip, since the title is what gives way (B1) -->
-    <div class="gtitle" title={held?.stale ? `${title}, fitted over other channels` : title}>
+    <div class="gtitle" title={titleTip}>
+      {#if previewing}
+        <!-- a preview never reads as a changed fit (`gui/STYLE.md` § Layout):
+             its Rwp is said beside the last fit's, as the prototype's is -->
+        <b class="pv">Preview, not refined</b>
+        <span class="stat">Rwp <span class="num">{pct(preview?.curves?.header?.rwp)}</span>{#if stats?.rwp != null},
+          last fit <span class="num">{pct(stats.rwp)}</span>{/if}</span>
+      {:else}
       {#if title}<b>{title}</b>{/if}
+      {#if previewError}<span class="bad">Preview refused</span>{/if}
       {#if held && !held.raw && stats}
         <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : `${(stats.rwp * 100).toFixed(2)} %`}</span></span>
         <span class="stat">GoF <span class="num">{stats.gof?.toFixed(2)}</span></span>
       {/if}
       {#if held && !held.raw && immature}<span class="bad">Not a fit yet</span>{/if}
       {#if held?.stale}<span>fitted over other channels</span>{/if}
+      {/if}
     </div>
     <div class="gctl">
       <button class="ghost" disabled={!zoomed} onclick={showAll}
@@ -775,7 +845,7 @@
           </button>
         {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="hint xhint" style:top="{geom.resid.top + geom.resid.height + X_TICKS}px"
+        <span class="hint xhint" style:top="{geom.ticks.top + geom.ticks.height + X_TICKS}px"
           style:height="{X_STRIP}px" style:right="calc(100% - {plotX.left + plotX.width}px)"
           onpointerenter={(e) => showTip("x", e.currentTarget, false)} onpointerleave={hideTip}
           >{hints.x}</span>
@@ -789,12 +859,13 @@
       {/if}
       <div class="gutter" aria-label="Curves">
         {#each legend as l (l.id)}
-          <button class="gut" style:top="{l.top}px" aria-pressed={shows(hidden, l.id)}
-            disabled={!!l.absent} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
+          <button class="gut" class:reserved={!!l.reserved} style:top="{l.top}px"
+            aria-pressed={shows(hidden, l.id)} aria-hidden={l.reserved ? "true" : undefined}
+            disabled={!!l.absent || !!l.reserved} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
             onclick={() => toggle(l.id)}>
             <svg class="sw" viewBox="0 0 16 12" aria-hidden="true" style:color={swatchColor(l.id)}>
-              {#if l.id === "obs" || l.id === "masked"}
-                <path d="M5 3l6 6M11 3l-6 6" class:faint={l.id === "masked"} />
+              {#if l.id === "obs"}
+                <path d="M5 3l6 6M11 3l-6 6" />
               {:else if l.id.startsWith("ticks:")}
                 <path d="M8 1.5v9" />
               {:else if l.id === "bkg"}
@@ -901,6 +972,10 @@
     color: var(--bad);
   }
 
+  .gtitle b.pv {
+    color: var(--accent-ink);
+  }
+
   .gctl {
     flex: none;
     display: flex;
@@ -927,10 +1002,13 @@
     color: var(--bad);
   }
 
+  /* the plot is a card on the window's ground, as the prototype draws it */
   .plot {
     position: relative;
     flex: 1 1 auto;
     min-height: 300px;
+    border-radius: 6px;
+    background: var(--panel);
   }
 
   .host {
@@ -1077,6 +1155,11 @@
     cursor: default;
   }
 
+  /* the Preview label's slot while no preview is drawn: laid out, unseen */
+  .gut.reserved {
+    visibility: hidden;
+  }
+
   .sw {
     flex: none;
     width: 16px;
@@ -1084,10 +1167,6 @@
     fill: none;
     stroke: currentColor;
     stroke-width: 1.6;
-  }
-
-  .sw .faint {
-    opacity: 0.45;
   }
 
   /* floating layers: the panel ground, a hairline and one shadow */

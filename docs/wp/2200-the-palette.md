@@ -1,8 +1,7 @@
 # WP-2200 — The palette
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, PR #1517; the six colour questions ruled 2026-11-10
+Milestone: gui-overhaul · Status: ✅ 2026-11-17 — merged in PR #1517 on 2026-11-11; the GUI's default theme is the site's palette, light and dark, with the six colour questions ruled
 Depends on: 2142 (the style guide)
-Priority: P2 2026-11-10 — a gui-overhaul piece the maintainer ruled for on 2026-11-06 and 2026-11-09; the peak-mark colour waits on it
 
 ## Goal
 
@@ -142,6 +141,24 @@ tests/test_gui_dist.py` green; `npm --prefix gui test && npm --prefix gui run ch
 the screenshots in the PR; the maintainer's look before merge (milestone row 10).
 
 ## Handover log
+- **2026-11-17** — closed by a ghostshift runner in the close-only batch PR #1658. PR #1517
+  merged on 2026-11-11 with all seven tasks ticked, after the maintainer ruled on the six
+  colour questions on 2026-11-10; the merge was the maintainer's look before merge that the
+  acceptance asks for. The GUI opens in the site's palette, light and dark, and `rietx watch`
+  and `rietx compare` changed with it; a test holds every text colour to its ground and every
+  curve to 3:1. It is on `main` and goes out with v1.12.
+
+  *Changed by this close.* Status ✅, the `Priority:` line removed, the narrative moved to
+  `docs/milestones/v1.12.md`. This WP had no `### Inherited` section, and the milestone's
+  row for the palette already reads merged.
+
+  *Leftovers, and where each went.* Each already has an owner, so nothing new was filed: the
+  watcher's state-pill contrast sits in `docs/milestones/gui-overhaul.md` § Owed to the port;
+  the named themes on the `SCHEMES` seam are that record's "Named themes" row, after the swap;
+  the graph window's clutter is its "The graph window" row, taken by R2 (WP-2216). Docs only;
+  no test moved.
+
+  Next: none in this WP.
 - **2026-11-11** — rulings applied, PR #1517. Main was merged in at c5fe8cf38; the one
   conflict was the milestone's piece table, and both rows stand. Yue's rulings of 2026-11-10
   on the six colour questions are in § Rulings of 2026-11-10. Every value stays as built.

@@ -56,3 +56,35 @@ The menus-and-axes pictures (`r2b-*`), light and dark, the `fap` example after o
   Anisotropic ADPs, then Delete.
 
 Taken 2026-11-11 the same way, by `shots.py` in the runner's scratch directory.
+
+The polish pictures (`polish-*`), light and dark, after Yue's ruling of 2026-11-11 ("Merge,
+then polish"): the same six states as `r2b-*` plus the readout hover, so each pairs with the
+picture taken before the polish. The `fap` example after one staged fit:
+
+- `polish-rest-*.png` pairs with `r2b-rest-*.png`. Parameters has the filter box, the row of
+  links to each band, 44 px bands with a strong rule, 32 px rows, the drawn checkboxes and tinted
+  value boxes. The atom table reads Atom, Species, Wyckoff, Position, Occ, Biso Å², Mult. The
+  plot is a card. The reflection ticks are lenses at the foot, under a 76 px difference pane,
+  and carry the 2θ labels. The intensity labels read 1, 50, 200, 500, 1k, 2k, 5k, 10k, 20k.
+  Observed points are crosses, and no gridlines are drawn. The action bar reads
+  "Staged plan, 6 stages".
+- `polish-phase-menu-*.png`, `polish-atom-menu-*.png`, `polish-intensity-axis-*.png` and
+  `polish-difference-axis-*.png` pair with their `r2b-*` namesakes.
+- `polish-readout-hover-*.png` pairs with `readout-hover-*.png`: zoomed by a drag across the
+  middle tenth of the plot, the pointer resting inside it. The ±3 esd band shows behind the
+  difference.
+
+Taken 2026-11-12 the same way, by `shots.py` in the runner's scratch directory.
+
+The pictures after Yue's rulings of 2026-11-13 (`ruled-*`). The `fap` example with a fitted range
+of 20-120° 2θ and excluded regions at 50-56° and from 130°, after one staged fit:
+
+- `ruled-rest-*.png` pairs with `polish-rest-*.png`. The excluded region and the two stretches
+  outside the fitted range are shaded across all three panes, each edge a dotted line. The
+  legend reads Observed, Last fit and Background, with no Excluded entry. The atom table has
+  no Mult column and fits its 784 px panel.
+- `ruled-observed-hidden-light.png`: the plot after a click on Observed in the legend. The
+  excluded points go with the rest of the data, and the shading stays.
+
+Taken 2026-11-13 the same way, by `shots.py` and `probe_obs.py` in the runner's scratch
+directory.
