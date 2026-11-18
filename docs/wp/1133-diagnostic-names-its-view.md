@@ -1,6 +1,6 @@
 # WP-1133 — A diagnostic names the view that shows it
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: — (WP-1130 closed 🛑 2026-09-04; it did **not** deliver the panel,
 and this WP inherits it along with the argument that licenses it — see
