@@ -222,17 +222,17 @@ def test_each_radiation_says_whether_a_fit_estimates_its_absorption(
 
     by_kind = {r.kind: r for r in caps.radiations}
     for kind, arm in by_kind.items():
-        assert arm.absorption_estimate == (
+        assert arm.absorption_estimable == (
             kind in qpa.LINEAR_ATTENUATION_BY_SOURCE)
-    assert by_kind["xray_cw"].absorption_estimate is True
-    assert by_kind["neutron_cw"].absorption_estimate is True
+    assert by_kind["xray_cw"].absorption_estimable is True
+    assert by_kind["neutron_cw"].absorption_estimable is True
     # a bank spans a range of λ, so one µ per histogram is not defined there
-    assert by_kind["neutron_tof"].absorption_estimate is False
+    assert by_kind["neutron_tof"].absorption_estimable is False
 
     monkeypatch.delitem(qpa.LINEAR_ATTENUATION_BY_SOURCE, "neutron_cw")
     flipped = {r.kind: r for r in capabilities().radiations}
-    assert flipped["neutron_cw"].absorption_estimate is False
-    assert flipped["xray_cw"].absorption_estimate is True
+    assert flipped["neutron_cw"].absorption_estimable is False
+    assert flipped["xray_cw"].absorption_estimable is True
 
 
 def test_the_anode_arm_says_nothing_about_a_neutron_source(caps):

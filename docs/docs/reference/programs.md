@@ -209,7 +209,7 @@ A program that reads only the anodes would conclude that the build handles X-ray
 | `RadiationCapability.polarization_refinable` | whether the polarisation factor can refine |
 | `RadiationCapability.harmonic_contamination` | whether the source accepts declared λ/n monochromator harmonics ([Monochromator harmonics](instrument.md#monochromator-harmonics)) |
 | `RadiationCapability.magnetic_scattering` | whether a pattern from this source carries the magnetic scattering of a phase that declares moments |
-| `RadiationCapability.absorption_estimate` | whether a fit estimates µR or µt from the composition when the geometry declares a radius or thickness and leaves `mu_r` or `mu_t` unset ([Absorption](instrument.md#absorption)); the same table gives the µ of the Brindley microabsorption correction in phase quantification, so `False` also means a QPA with `Phase.particle_radius_um` skips it. `False` means the fit does not estimate µR or µt; an explicit `mu_r` or `mu_t` is still honoured wherever the source can be fitted |
+| `RadiationCapability.absorption_estimable` | whether a fit estimates µR or µt from the composition when the geometry declares a radius or thickness and leaves `mu_r` or `mu_t` unset ([Absorption](instrument.md#absorption)); the same table gives the µ of the Brindley microabsorption correction in phase quantification, so `False` also means a QPA with `Phase.particle_radius_um` skips it. `False` means the fit does not estimate µR or µt; an explicit `mu_r` or `mu_t` is still honoured wherever the source can be fitted |
 
 Each flag is computed from the source class, so it changes by itself when the class gains the feature.
 A listed kind is one the schema accepts, which does not mean every fit runs on it.

@@ -202,7 +202,7 @@ class RadiationCapability(Base):
     #: ``True`` is not a promise for every specimen, since the estimate still
     #: declines for an absorption edge, an untabulated species or a resonant
     #: neutron absorber
-    absorption_estimate: bool
+    absorption_estimable: bool
 
 
 class ReaderCapability(Base):
@@ -521,7 +521,7 @@ def _radiation(cls: type) -> RadiationCapability:
         polarization_refinable="polarization" in cls.model_fields,
         harmonic_contamination=harmonics,
         magnetic_scattering=kind in MAGNETIC_SOURCE_KINDS,
-        absorption_estimate=kind in LINEAR_ATTENUATION_BY_SOURCE,
+        absorption_estimable=kind in LINEAR_ATTENUATION_BY_SOURCE,
     )
 
 
