@@ -1196,6 +1196,65 @@ def _candidate_sites(rec: _OriginPhase, f: tuple[int, int, int]) -> set[str]:
     return {d.rsplit(".dof.", 1)[0] for d in rec.candidates[f]}
 
 
+def _mode_moved_atoms(phase) -> set[int]:
+    """The indices of the atoms some distortion mode of ``phase`` moves."""
+    modes = phase.distortion_modes
+    if modes is None:
+        return set()
+    return {j for j in range(len(phase.atoms))
+            if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+
+
+def fixed_sites_asking_to_vary(structure: Structure) -> list[tuple[str, object]]:
+    """Every site whose coordinates its symmetry fixes, while one asks to vary.
+
+    The one authority for which sites those are, read by the table's refusal
+    and by ``Refinement.fix_special_positions`` (WP-1913), because the verb
+    once walked atoms alone and missed a rigid body's origin.  It routes as
+    :meth:`ParameterTable._collect` does: an atom a rigid body places or a
+    distortion mode moves is checked by that owner's own refusal, and every
+    other atom and every body origin against its stabiliser.  Returns
+    ``(base path, site)`` pairs in walk order, the site being the structure's
+    own ``Atom`` or ``BodyOrigin``.
+    """
+    found: list[tuple[str, object]] = []
+    for ip, phase in enumerate(structure.phases):
+        sg = resolve_group(phase.space_group, phase.symmetry_operations)
+        placed = {label for body in phase.rigid_bodies for label in body.atoms}
+        moved = _mode_moved_atoms(phase)
+        sites = [(f"phases.{ip}.atoms.{j}", atom) for j, atom in enumerate(phase.atoms)
+                 if atom.label not in placed and j not in moved]
+        sites += [(f"phases.{ip}.rigid_bodies.{b}.origin", body.origin)
+                  for b, body in enumerate(phase.rigid_bodies)]
+        for base, site in sites:
+            if not any(getattr(site, c).vary for c in ("x", "y", "z")):
+                continue
+            xyz = np.array([site.x.value, site.y.value, site.z.value])
+            if len(coordinate_basis(stabilizer_rotations(sg, xyz))) == 0:
+                found.append((base, site))
+    return found
+
+
+def _refuse_fixed_but_free(bases: list[str]) -> None:
+    """Refuse every site that asks for a free coordinate it cannot have.
+
+    One site keeps the sentence it always had, byte for byte.  Several are
+    named together, in walk order, so one ``vary=False`` pass fixes them all.
+    """
+    if not bases:
+        return
+    fix = ("set vary=False (Refinement.fix_special_positions() does it for "
+           "every such site)")
+    if len(bases) == 1:
+        raise ValueError(
+            f"{bases[0]} sits on a fully fixed special position; its site "
+            f"symmetry allows no positional freedom — {fix}")
+    named = ", ".join(bases[:-1]) + f" and {bases[-1]}"
+    raise ValueError(
+        f"{named} sit on fully fixed special positions; their site symmetry "
+        f"allows no positional freedom — {fix}")
+
+
 class ParameterTable:
     """The tree-to-flat-θ machinery behind a fit — internal, not the agent surface.
 
@@ -1334,6 +1393,9 @@ class ParameterTable:
         #: :meth:`_collect_distortion_modes`; read by
         #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
         self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
+        # every fixed site at once, before the walk, which would stop at the
+        # first (WP-1913, #728 item 4)
+        _refuse_fixed_but_free([base for base, _ in fixed_sites_asking_to_vary(structure)])
         self._collect(structure, instrument)
         self._rebuild()
         if self._origin:
@@ -1698,7 +1760,9 @@ class ParameterTable:
         allowed direction (``crystallography.wyckoff``) — and x, y, z become
         affine rows x = x₀ + Σₖ Bₖ·θₖ anchored at the compile-time position.
         Fully fixed special positions contribute none (their coordinates are
-        locked); ``vary=True`` on any coordinate of such a site is an error.
+        locked); ``vary=True`` on any coordinate of such a site is an error,
+        which ``__init__`` raises for every such site before the walk
+        (:func:`fixed_sites_asking_to_vary`).
         A vary request on a constrained-but-free site frees *all* of the
         site's DOFs — per-axis intent does not map onto rows such as [1,1,0].
         DOFs are unbounded displacements; bounds declared on x/y/z do not
@@ -1708,11 +1772,7 @@ class ParameterTable:
         basis = coordinate_basis(stabilizer_rotations(sg, xyz))
         want_vary = any(getattr(atom, c).vary for c in ("x", "y", "z"))
         if len(basis) == 0 and want_vary:
-            raise ValueError(
-                f"{base} sits on a fully fixed special position; its site "
-                "symmetry allows no positional freedom — set vary=False "
-                "(Refinement.fix_special_positions() does it for every such "
-                "site)")
+            _refuse_fixed_but_free([base])
         dof_paths = [f"{base}.dof.{k}" for k in range(len(basis))]
         for c_idx, c in enumerate(("x", "y", "z")):
             p: Parameter = getattr(atom, c)
@@ -1750,8 +1810,7 @@ class ParameterTable:
             paths.append(path)
         self._distortion[base] = (tuple(paths),
                                   tuple(mode.parent_invariant for mode in modes.modes))
-        return {j for j in range(len(phase.atoms))
-                if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+        return _mode_moved_atoms(phase)
 
     def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
         """An atom a distortion mode moves: x, y, z derived from the amplitudes.
