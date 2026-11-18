@@ -286,12 +286,12 @@ short python stretches between short numpy and kernel calls, so threads queue
 on the GIL rather than sharing the cores: four threads ran a joint fit's
 per-pattern Jacobians at **0.49×** the speed of one, and holding BLAS and the
 kernel pool to one thread each left that unchanged. One process per fit is the
-parallel unit. Pin BLAS in each process (9c.31). Do not set
+parallel unit. Set the `*_NUM_THREADS` variables in each process (9c.31), and do not set
 `RIETX_COMPILED_THREADS=1`: the kernel pool, `min(8, cores)` threads by
 default, splits only a call large enough to repay it. A screen of 26 cold
 fits on 10 worker processes and 10 cores ran
-**1.9-2.4×** slower with the pool pinned to one thread, in all six interleaved
-pairs, and 104 such fits ran 2.0× slower in both pairs. The screen took six
+**1.9-2.8×** slower with the pool pinned to one thread, in all four interleaved
+pairs, and 104 such fits ran 2.0× slower in both of two pairs. The screen took six
 patterns (four CPD round-robin single-phase patterns, the GSAS-II fluorapatite
 and 11-BM NAC) and fitted each alone and with each other CPD phase added, every
 cell free. Every fit did the same

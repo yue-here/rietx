@@ -37,6 +37,11 @@ Context and Tasks, and one was rewritten for the tree as it stands.
 - Folded: the 2026-10-11 issue-triage entry (#898 (b), `OMP_NUM_THREADS`) is
   now part of task 1. Checked 2026-11-18: `model.compiled.n_threads()`
   (`compiled.py:231-247`) still reads only `RIETX_COMPILED_THREADS`.
+  Still open from that entry: `os.cpu_count()` ignores CPU affinity and
+  cgroup limits (inferred), so a job allowed four cores on a large node starts
+  `min(8, node cores)` kernel threads per process. `os.process_cpu_count()`
+  (Python 3.13+) reads affinity. No run limited that way was measured, and the
+  2026-11-18 session changed nothing here.
 
 ## Context
 
@@ -213,7 +218,7 @@ in `~/.cache/ghostshift/rietx/wp-1464/` (`driver.py`, `screenjobs.py`,
   spawn workers, BLAS and OpenMP variables at 1 in both arms.
 - Walls, default pool against `RIETX_COMPILED_THREADS=1`, interleaved:
   23.6/44.0, 27.3/75.9 (a `find /` of mine overlapped the second), 49.6/117.6,
-  47.7/116.5 s. Ratio 1.9-2.4×. Summed job time 1.17× in the one pair at load
+  47.7/116.5 s. Ratio 1.9-2.8× over four pairs (1.9-2.4× in the three no other job of mine disturbed). Summed job time 1.17× in the one pair at load
   9-13, 1.5-1.6× in the rest. 104 fits (the set ×4): 145.9/297.2 and
   99.8/200.8 s, 2.0× both. Every fit ran the same iterations to the same Rwp
   in both arms.
@@ -232,6 +237,22 @@ in `~/.cache/ghostshift/rietx/wp-1464/` (`driver.py`, `screenjobs.py`,
   clean. Vale: 0 errors, 272 warnings, none on a line of this branch (it
   touches no `docs/docs` page). `python -m tests.reader_output` exit 0.
 
+*Generality* (the `generality-review` judge's verdicts, summarised, with the
+author's answer under each weak one).
+- 9c.33, weak: the row said six pairs at 1.9-2.4×, where `series.jsonl` holds
+  four at 1.9-2.8×, and "Pin BLAS (9c.31)" said more than 9c.31 does. One
+  machine under load; joblib's loky dissents (1 thread at `n_jobs = cores`);
+  without the one degenerate slow job the light-load pair's summed time is
+  1.01×. Author: figures and wording corrected; the quiet-machine gap stays a
+  hypothesis in the tag.
+- 9c.5, holds. 9c.35, holds: two families, both development data, and the
+  bound's width is rightly a hypothesis. Moved cells a refiner accepts
+  (thermal expansion, Vegard) bear on the width, never on the rule.
+- The practice decision, weak: strong for no `OMP_NUM_THREADS` fallback,
+  moderate for the default in general; the prune dropped the `os.cpu_count()`
+  note. Author: restored as open in Inherited.
+- The routing row is a routing key, not a heuristic.
+
 *Not done.* Task 6 (the job-summary verb) is a new CLI surface and stays open.
 No code changed, so neither the fast nor the full suite ran locally; CI runs
 the fast one. `/code-review` skipped: the branch is prose only.
@@ -239,6 +260,9 @@ the fast one. `/code-review` skipped: the branch is prose only.
 *Gotchas.* The machine was never quiet, so the ratios are measured under
 contention. The one pair at load 9-13 bounds the quiet-machine gap only
 loosely (1.17× summed, 1.86× wall); 9c.33's tag keeps that as a hypothesis.
+
+Also forwarded: the thread measurement to WP-1950's Inherited, for its
+embedding section.
 
 Next: task 6, after the maintainer names the surface. Then close.
 

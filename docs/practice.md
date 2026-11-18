@@ -1340,8 +1340,8 @@ since none of the seven programs runs its own process pool.
 | numexpr | `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS` (recall, not re-checked) | either variable |
 
 Measured for WP-1464 (ran): on a 10-core arm64 Mac at load 9-84 from other work, a screen of
-26 cold fits on 10 worker processes ran 1.9-2.4× slower with `RIETX_COMPILED_THREADS=1` than
-with the default, in six interleaved pairs, and 104 fits ran 2.0× slower in two. BLAS was
+26 cold fits on 10 worker processes ran 1.9-2.8× slower with `RIETX_COMPILED_THREADS=1` than
+with the default, in four interleaved pairs, and 104 fits ran 2.0× slower in two. BLAS was
 pinned to one thread in both. So rietx keeps its default in a pool and does not read
 `OMP_NUM_THREADS`: under loky, or under the BLAS pinning `batch-operating.md` 9c.31 advises,
 that variable is 1, the setting measured slower.
