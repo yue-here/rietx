@@ -1,9 +1,8 @@
-# WP-1512 — A simulated diffuse curve is a component, and its amplitude rides on the phase scale
+# WP-1512 — A simulated diffuse curve rides on the phase scale, through the fixed-background slot and a tie
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-18 — option A (Yue): no component; the fixed-background slot plus a tie to the phase scale, documented and pinned at the joint minimum, in PR #1678
 Track: Data and metadata in, a structure out
 Depends on: —
-Priority: P3 2026-09-28 — a workaround covers it (the background slot plus a refit loop), and since 1.5.0 that workaround breaks silently on a preset
 
 ## Goal
 
@@ -210,6 +209,121 @@ test, since no member exists to rebuild it on.
 
 ## Handover log
 
+- **2026-11-18 (2nd session)** (ghostshift runner, PR #1678) — closed as option A.
+
+  A user who brings a stacking-fault curve from DIFFaX now has a documented route, and it needs
+  no new code. The curve goes in the fixed-background slot, multiplied by the factor that puts it
+  in counts at phase scale 1, and one call ties its scale to the phase scale. One fit then lands
+  at the true least-squares answer, which the old loop of refits missed by 0.09 % to 0.5 % of the
+  scale. The route's known cost is that the curve stays put on the 2θ axis while the zero shift
+  and the other position corrections move the Bragg peaks; the manual says so, with the measured
+  bias and a remedy. Yue ruled option A on 2026-11-18, "for now, as the easiest", and plans an
+  in-house stacking-fault code later.
+
+  **The ruling.** Option A: no new component. What would flip it to C (a member whose curve
+  follows the zero shift): a second case needing a blank and a simulated curve together, or a
+  sharp curve on a pattern with a large zero shift. The previous entry's "Settled here" points
+  stand, the restated acceptance first. Yue's plan for an in-house stacking-fault code went to
+  WP-1516's `### Inherited`, beside the note that its `Depends on: 1512` premise changed.
+
+  **Done.**
+  - `tests/test_simulated_curve_tie.py`: synthetic LaB6 with a five-feature diffuse curve stored as
+    c*·D. One tied fit is compared with the joint minimum and the outer loop's fixed point, both
+    solved in closed form from the model's own linear columns (`Refinement.predict`). A second
+    test pins that a glob over `instrument.background.*` frees the Chebyshev terms and leaves the
+    tied scale alone. Plots go to `tests/output/simulated_curve_tie*.png`; looked at, GoF 1.03,
+    the diffuse humps under the five lines fitted.
+  - `src/rietx/help.py`, `instrument.background.scale`: a DIFFaX faulted-minus-ideal curve is stored
+    as c*·D and its scale tied; the stored curve follows no peak-position correction. `typical`
+    names the tied case.
+  - `docs/docs/guides/blank.md` § Hold a curve another program computed: the route as an executed
+    block, c* as a least-squares ratio against `predict` with a flatness check, a separate
+    fraction keeping a free scale, a series re-declaring the tie in `constrain=`, and the position
+    corrections' cost and remedy.
+  - Skill row 8.29 (`references/surprises.md`): one sentence for the faulted-minus-ideal curve. Paid
+    for by cutting two clauses the help entry carries (`HIGH_CORRELATION` against c0 expected; a
+    blank never on the specimen's scale) and the file's "Each one cost a debugging pass."
+    34 588 → 34 596 B against a 34 600 B budget.
+  - Task 3 (the member) declined. The acceptance is restated in this file around the joint
+    minimum.
+
+  **Measured** (darwin/arm64, `[dev]`, this worktree's venv). The tied fit's S sits 5.7e-11 from the
+  joint minimum; the loop's fixed point 8.7e-4 from it, 0.17 of S's esd (1.56e-6 on 3.02e-4). The
+  bar is 1e-6, so 17 000× margin on one side and 870× on the other. The first version of the test
+  used `closing_window_tol=None`, and the gap was then 4e-4: the fit's own model cut peak tails
+  the oracle's fresh compile kept. A default closing stage measures the answer at the windows
+  `predict(grid)` compiles at. Fast suite: 14 789 passed, 432 skipped, 32 xfailed in 9:38 at load average about 21, on `ea62581d5` (darwin/arm64, `[dev]`); the 2 added tests pass, 0.72 s together, so neither joins the tail. The prose and help-text commits after it were covered by rerunning the six files they touch on the final tree, 280 passed..
+
+  **Code review** (`/code-review high --fix`). Applied: the remedy covers every position
+  correction, not the zero shift alone; c* is calibrated with the background at zero; a series
+  re-declares the tie; the loop oracle raises if it does not converge. Declined: restoring the
+  cut clauses of row 8.29 (the help entry carries them and the file is at its budget); moving c*
+  into `tie(..., scale=c*)` (the ruling stores c*·D); the WP-1516 note's "closed" before this
+  status flipped (resolved by this entry).
+
+  **Generality** (generality-review agent, pasted unedited):
+
+  #### 1. Skill row 8.29 (`docs/skill/rietx/references/surprises.md`): a computed curve goes in the fixed-background slot, tied to phase 0's scale
+
+  **holds.** The case for the tie is stronger. It closes a silent break and is pinned by a test. The case against is real only for a curve whose amount is not the phase's own.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | Store the curve as c*·D and call `tie("instrument.background.scale", "phases.0.scale")` (diff, row 8.29). Here D is the other program's curve and c* converts its units to counts at phase scale 1. | The package acts on nothing. The row steers an agent to three choices: the slot (`BackgroundFixedPlusChebyshev`'s fixed curve), a locked amplitude rather than a free multiplier, and a coefficient of 1. | clear |
+  | 2. Kind of ambiguity | none given (no audit row) | The kind depends on what D is. For a faulted-minus-ideal DIFFaX curve (DIFFaX is a stacking-fault simulator) it is kind 1, by arithmetic: the faulted pattern is S·c*·(ideal + D), with S the phase scale. For a curve whose amount is independent of the phase, such as an amorphous reference or a separate disordered fraction, it is kind 3: whether it scales with the phase is a fact outside the pattern. The row says "for phase 0" and does not state that condition. | weak on scope |
+  | 3. Case against | none given | `docs/practice.md` lines 1336-1347 and 1360 say GSAS-II and FullProf put a file curve in the background with **one free multiplier** by default, and no surveyed program ties it to a phase scale. A refiner who treats the curve's amount as unknown frees the multiplier: an amorphous fraction, or a fault probability they do not trust. The WP's Context says a free amplitude is "degenerate with the background and the Bisos". No measurement backs that sentence. | real, narrow |
+  | 4. Case for | Since 1.5.0 every preset frees `instrument.background.scale`, so the amplitude "floats free of the phase scale, and nothing says so" (WP Context). The loop of refits lands off the joint least-squares minimum, 0.50 % in S (§ Findings). | Confirmed by the test file. The tied fit sits 5.7e-11 from the closed-form joint minimum. The loop's point is 8.7e-4 away, 0.17 of S's esd (`tests/test_simulated_curve_tie.py`). The tie costs one call and one fit; the loop took 4-7 refits. | strong |
+  | 5. Tier | none given | The coefficient 1, given c* calibrated at S = 1, is arithmetic (tier 1). Locking rather than freeing the amplitude has no tier-2 support: GSAS-II and FullProf dissent by default (per practice.md, which cites GSAS-II source and the FullProf manual; I did not check the programs). TOPAS lets the user write the tie. The package decides nothing, so the choice stays the caller's. Tests: `test_one_tied_fit_reaches_the_joint_minimum_and_not_the_loops_fixed_point` and `test_a_preset_glob_frees_the_terms_and_not_the_tied_scale`, both in `tests/test_simulated_curve_tie.py`. | tier 1 coefficient, caller's choice |
+  | 6. Dataset families | "(Measured: WP-1512)" | One family: synthetic LaB6 at Cu Kα1, built by the test itself. It is development data. The reference is the known truth plus a closed-form linear solve, so it verifies and validates nothing. The real run that motivated the WP ("solution case 1", an agent run in the private corpus) was not rebuilt (WP § Acceptance). | adequate for a mechanics claim |
+  | 7. Record that it fired | none given | The `tie` field of `ParameterRow` reads `= 1·phases.0.scale`, and `fixed_source` holds the caller's note. | clear |
+
+  Evidence that would change the verdict: an agent routing an amorphous or separate-fraction curve through "for phase 0" and tying an amplitude that should be free.
+
+  One thing outside the named items: the same edit deletes the row's sentence "`HIGH_CORRELATION` against `c0` there is the correct report" (HIGH_CORRELATION is a diagnostic code). The `help.py` entry still tells the reader to expect that code.
+
+  #### 2. `help.py` entry for `instrument.background.scale`
+
+  **holds.** The case for is stronger, as in item 1. The entry also states the frozen-axis limit as a report and stops, which is the right answer for a kind-3 consequence. One example in it is weak.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | A curve another program computed for one phase "scales with that phase". Store it as c*·D and tie this scale with `Refinement.tie`. "The stored curve does not follow the zero shift or any other peak-position correction" (diff, `help.py` ~759). The `typical` field gains "the phase scale, tied, for a computed curve". | Advice only. The axis sentence covers every position correction, capillary offsets included. | clear |
+  | 2. Kind of ambiguity | none given | Same as item 1. "Scales with that phase" is stated as fact. That holds for faulted-minus-ideal. It is contestable for "a Debye sum", which often models a separate nanocrystalline or disordered fraction whose amount is independent of the Bragg phase. | weak clause |
+  | 3. Case against | none given | Same dissent as item 1 (free multiplier by default in GSAS-II and FullProf). The Debye-sum example widens the advice into the cases where that dissent applies. | narrow |
+  | 4. Case for | as item 1 | as item 1 | strong |
+  | 5. Tier | none given | As item 1. The axis sentence is a report (kind 3, report and stop), which is correct. | as item 1 |
+  | 6. Dataset families | none given | As item 1: one synthetic family. | as item 1 |
+  | 7. Record that it fired | none given | `ParameterRow.tie`. No diagnostic says the curve stayed fixed on the axis. | partial |
+
+  Evidence that would change the verdict: a source showing that a Debye-sum curve used beside a Bragg phase is normally that phase's own correction rather than an independent fraction. Failing that, drop or qualify the example.
+
+  #### 3. Manual blank guide, § Hold a curve another program computed (`docs/docs/guides/blank.md`)
+
+  **weak.** The route and the series sentence hold. The c* recipe and the zero-shift remedy rest on no measurement of their own, and the probe scripts behind the quoted biases are missing.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | Find c* by comparing the other program's ideal pattern with `Refinement.predict` at phase scale 1 "over the whole fitted range", with every background coefficient at zero. In a series, re-declare the tie in `constrain=` (the per-pattern hook). If the fit finds a peak shift Δ(2θ), store the curve at `two_theta + Δ(two_theta)` and fit again (diff, blank.md lines 18-19, 50-58). | Three suggestions the caller did not ask for: an estimator for c*, a calibration window, and a remedy for the frozen axis. | clear |
+  | 2. Kind of ambiguity | none given | The remedy is kind 1. Geometry says a curve on the specimen's axis moves with the peaks, and FullProf (shift b₄) and TOPAS (`fo_transform_X`) both offer this (practice.md 1344-1354). The c* recipe is kind 1 only if the ratio between the two programs' ideal patterns is flat in 2θ. Nothing checks that. | partly unstated |
+  | 3. Case against | none given | (a) "Compare" names no estimator: ratio of sums, a least-squares ratio, or one strong line. (b) The two programs' Lorentz-polarisation, monochromator, Debye-Waller and absorption terms can differ, so the ratio can drift with angle. That is my reasoning and is not measured. The guide gives no check for a non-flat ratio. (c) The source run calibrated c* over a narrower window (WP Context). The guide's "whole range" carries no measured difference. (d) The remedy was measured with the shift applied to the curve by hand (§ Findings), not with a fitted Δ followed by a refit. (e) The guide names only the zero shift and the flat-plate corrections. The capillary offsets (`instrument.geometry.capillary_offset_along_beam` and `_across_beam`) also move peaks. The help entry covers them; the guide does not. (f) No function is named that returns Δ(2θ) from fitted values, so the caller writes the formulas and signs. The zero-shift sign the guide implies matches `help.py`'s "added to every calculated 2θ". | substantive |
+  | 4. Case for | The frozen curve costs 0.16 % in S and GoF 1.02 → 1.04 at a 0.05° zero shift with 0.15°-wide features, and 0.009 % at 2.5° (blank.md 55-56; § Findings table). | The numbers match § Findings. From the test, S's esd is about 0.5 %, so 0.16 % is roughly 0.3 esd. The guide does not give that comparison. The remedy costs one extra fit. The series sentence agrees with root CLAUDE.md (WP-1441: ties are re-declared per pattern through `constrain=` and never carried). | moderate |
+  | 5. Tier | none given | Remedy: tier 1 (geometry), with FullProf and TOPAS as practice (from practice.md; not checked by me). c* estimator and window: no source, so rietx's own. No test covers the c* recipe or the remedy. The joint-minimum claim and the glob claim are pinned (item 1). | remedy tier 1; c* none given |
+  | 6. Dataset families | none given | One synthetic family and one noise draw for the zero-shift table. It is development data. Its reference is a fit with the curve shifted by hand, so it is relative and validates nothing. The probe scripts § Findings cites (`~/.cache/ghostshift/rietx/wp-1512/probe/lock_today.py` and `zero_and_glob.py`) are **not on disk**: that directory does not exist. Only `/Users/yue/.cache/ghostshift/rietx/wp-1512/probe1.py` survives, and it reproduces the lock test, not the zero-shift table. | one family, unreproducible table |
+  | 7. Record that it fired | none given | Nothing reports that the curve stayed fixed on the axis. `fixed_source` is free text the caller writes; the example puts c* there. | none |
+
+  Evidence that would change the verdict: the zero-shift probe restored and rerun with a fitted Δ and a refit, a check that the c* ratio is flat across 2θ on one real DIFFaX/rietx pair, and the capillary offsets added to the guide's list.
+
+  The author's answer to item 3's "weak": the scope, c* estimator and capillary clauses were
+  fixed in `83aea6e0c`. The zero-shift table and the remedy stay development data on one
+  synthetic family, as the agent says.
+
+  **Gotchas.** The first session's probes (`probe/lock_today.py`, `probe/zero_and_glob.py`) are
+  gone from the scratch directory, so § Findings' zero-shift table cannot be rerun from disk. Its
+  numbers are quoted as that session measured them. The fast suite ran while two commits of
+  prose and help text landed; the files those touch were rerun after (counts above).
+
+  Next: none in this WP. Reopen as option C on either trigger above. WP-1516 carries the in-house
+  code.
 - **2026-11-18** (ghostshift runner, draft PR #1678) — audit, practice survey and three probes
   landed; no code. **Stopped for a decision of Yue's** before writing the member.
 
