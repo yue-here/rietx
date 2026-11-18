@@ -3285,7 +3285,7 @@ ROWS: tuple[Row, ...] = (
                  "B10's solver-path switches (ruled 2026-10-20)."
                  "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
                  " from every start that reaches it, the failing case and start domain stated in the evidence."),
-        approved="2026-10-20"),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
                   "rate the last 100 evaluations lowered the cost, would lower chi2 over the next 300 by less than "
@@ -3449,7 +3449,7 @@ ROWS: tuple[Row, ...] = (
                  "  WP-2017 group A, hard starts (2026-11-09): one answer at the answer on three families"
                  " either side from every start that reaches it, the failing case and start domain stated in"
                  " the evidence."),
-        approved="2026-10-20"),
+        approved="2026-11-17"),
     Row("rietx.optimize.lm._NULL_CURVATURE", "constant", tier=1, value=1.4901161193847656e-08,
         evidence=("numerical floor: sqrt(eps); at the cut itself three of 1000 random problems "
                   "stayed rank-deficient, sqrt(eps) left none (docstring)")),
