@@ -146,8 +146,9 @@ class ParametricEquation(Base):
       resolved into one declaration per matched path that an equation can
       drive, each with its own coefficients and named ``{name}_{tail}``
       (:func:`~rietx.params.parametric.glob_member_name`); a path it matches
-      that no equation can drive (tied, locked, held) is skipped and reported
-      (``PARAMETRIC_GLOB_SKIPPED``).
+      that no equation can drive (tied, locked, held) is skipped; one the caller
+      could not foresee, the floating origin's hold, is reported
+      (``PARAMETRIC_GLOB_SKIPPED``), a symmetry tie or lock is silent.
     * ``basis`` — ``constant``; ``polynomial``, with ``terms``: each a list of
       coordinate names, a repeat being a power and ``[]`` the intercept
       (``[[], ["T"]]`` is a + b·T, ``[[], ["x"], ["y"], ["x", "y"]]`` a bilinear

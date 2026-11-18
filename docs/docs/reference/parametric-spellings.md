@@ -54,8 +54,8 @@ A declaration `cell` on `phases.0.cell.*` has the member `cell_a` on `phases.0.c
 A member named like another declaration is refused, as two declarations of one name are.
 
 A glob may match paths that no equation can drive: on a cubic phase, `phases.0.cell.*` matches `b` and `c`, which are tied to `a`, and three locked angles.
-Those paths are skipped, and the result says which, and why, in [`PARAMETRIC_GLOB_SKIPPED`](diagnostics-series.md#parametric_glob_skipped), an info.
-For a tied path it says whether the glob drives the path's source.
+Those paths are skipped, silently: the space group fixes them, and the declarations the result carries show which paths moved.
+A skip you could not foresee, a path held for the floating origin, is named in [`PARAMETRIC_GLOB_SKIPPED`](diagnostics-series.md#parametric_glob_skipped), an info.
 A glob that matches nothing, or matches only such paths, is refused.
 So is a glob that matches a path refused for another reason, such as a rigid body's increment or a moment component, since that is a path you may have meant to drive.
 The glob is matched against the model of every pattern of the subset, so a path that only some of them have, such as a background term, is a member, and the patterns without it are refused by name.
