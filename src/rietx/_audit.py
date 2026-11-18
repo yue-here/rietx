@@ -962,10 +962,12 @@ ROWS: tuple[Row, ...] = (
         evidence=("a geometric fact of the cell: fires once per image of k under a near-symmetry "
                   "of the metric (indexing.ambiguity.lattice_point_group at the caller's tol) "
                   "that is no star arm, -k or G - k of k modulo the centred L*; on a "
-                  "pseudo-tetragonal Pnma cell (5.74 x 7.70 x 5.54 A) a k near the x <-> z "
-                  "image of a general k matched every planted satellite at a 0.12 deg radius "
-                  "(issue #795, the K design's 0.01-grid arm); none on a 5.74 x 7.70 x 6.40 A "
-                  "cell at the same tol (tests/test_indexing_kvector.py)"),
+                  "pseudo-tetragonal Pnma cell (5.74 x 7.70 x 5.54 A, tol 0.08) the x <-> z "
+                  "image of k = (15/64, 7/64, 3/8) is listed (deviation 0.0735) and none on a "
+                  "5.74 x 7.70 x 6.40 A cell at the same tol; with ten planted satellites at a "
+                  "0.12 deg radius the exact image matched 2 of 10 (seed 0) and the best grid "
+                  "k within four steps of it 8 of 10, 7 of 10 on seeds 1 and 2 "
+                  "(tests/test_indexing_kvector.py, V6)"),
         grounds=("Arithmetic: W G W^T against G is a statement about the cell alone; the code "
                  "lists the partner as one equivalence row and never says which k is right "
                  "(Mighell & Santoro 1975, one rank over)."),
@@ -2748,15 +2750,23 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.kvector._BLOCK", "constant", tier="invariant", value=2000.0,
         evidence=("answer-invariant layout: the degrees each k's windows are shifted by so one "
                   "searchsorted locates a peak in every k's list; any value past the 2θ axis and "
-                  "_PAD gives the same rows (tests/test_indexing_kvector.py holds every grid row "
-                  "equal to score_kvector's single-k answer)")),
+                  "_PAD gives the same rows to rounding (row 2047 sits about 4.1e6 deg along the axis, "
+                  "so the shift is exact to about 1e-9 deg, not exactly); "
+                  "test_the_layout_constants_do_not_change_the_rows runs _BLOCK 5000 beside "
+                  "2000 and holds every grid row equal, and "
+                  "test_each_grid_row_is_score_kvector_of_its_k holds each to score_kvector's "
+                  "single-k answer)")),
     Row("rietx.indexing.kvector._CHUNK", "constant", tier="invariant", value=2048,
         evidence=("answer-invariant: the rows scored per vectorised block, bounding working "
                   "memory; each row's arithmetic is its own, so the grid rows equal "
-                  "score_kvector's per k whatever the block (tests/test_indexing_kvector.py)")),
+                  "score_kvector's per k whatever the block: "
+                  "test_each_grid_row_is_score_kvector_of_its_k sets the block to 7 so the 1/8 "
+                  "grid's strata cross many block boundaries, and "
+                  "test_the_layout_constants_do_not_change_the_rows sets 31)")),
     Row("rietx.indexing.kvector._PAD", "constant", tier="invariant", value=900.0,
         evidence=("answer-invariant layout: where an unused window slot sits, past any 2θ, so "
-                  "no peak locates it; any value in (180, _BLOCK) gives the same rows")),
+                  "no peak locates it; any value in (180, _BLOCK) gives the same rows "
+                  "(test_the_layout_constants_do_not_change_the_rows runs _PAD 300 beside 900)")),
     Row("rietx.indexing.peakfit._H_POS", "constant", value=1e-05),
     Row("rietx.indexing.peakfit._H_WIDTH", "constant", value=1e-07),
     Row("rietx.indexing.peakfit._SEED_GAUSS_FRACTION", "constant", value=0.8),

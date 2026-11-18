@@ -46,8 +46,11 @@ centring included** (#1071): on F m m m, (1, 0, 0) and (0, 1, 1) are one k, and
 the three X points are three stars.
 
 Clean room: the design follows the literature and our own spikes (issue #795):
-de Wolff (1968) for the chance rate, Mighell & Santoro (1975) for the
-geometrical ambiguity.  No other program's source was read.
+de Wolff, P. M. (1968), *J. Appl. Cryst.* **1**, 108-113, for the chance
+rate; Mighell, A. D. & Santoro, A. (1975), *J. Appl. Cryst.* **8**, 372-374,
+for the geometrical ambiguity; Bradley, C. J. & Cracknell, A. P. (1972), *The
+Mathematical Theory of Symmetry in Solids* (Oxford: Clarendon), for the star
+of k and its little co-group.  No other program's source was read.
 """
 
 from __future__ import annotations
@@ -410,7 +413,10 @@ def kgrid_strata(space_group, *, denominator: int) -> tuple[KStratum, ...]:
 
     **Strata are derived, never tabulated**: a stratum is the set of
     representatives sharing one little co-group P_k = {R : Rᵀk ≡ k mod L*},
-    computed at the representative.  Its order is |P_k| and its number of free
+    computed at the representative.  The star of k and the little co-group are
+    the constructions of Bradley, C. J. & Cracknell, A. P. (1972), *The
+    Mathematical Theory of Symmetry in Solids* (Oxford: Clarendon), the
+    reference :mod:`~rietx.crystallography.representation.irreps` cites for them.  Its order is |P_k| and its number of free
     components the dimension of the subspace P_k fixes.
 
     **Order, a stated listing convention and not a search order**: strata by

@@ -51,6 +51,7 @@ from rietx.crystallography.satellites import (
 from rietx.crystallography.symmetry import get_spacegroup
 from rietx.indexing.ambiguity import chance_rate
 from rietx.indexing.engines import Budget
+from rietx.indexing import kvector
 from rietx.indexing.kvector import (
     KGridPositions,
     KGridScores,
@@ -174,10 +175,12 @@ def test_each_stratum_order_is_the_little_groups_at_every_member(symbol, n):
             lg = little_group(sg, k)
             assert lg.order == st.little_group_order, (st, k)
             assert lg.indices == st.operation_indices, (st, k)
-        # the locus is what P_k fixes: a fixed component never moves
+        # the locus is what P_k fixes: a fixed component never moves along the
+        # stratum, it sits at a zone-centre or zone-boundary value (0, 1/2, 1;
+        # the same whatever n), so a component that ran over the grid fails
         for c, fixed in enumerate(st.fixed_components):
-            if fixed and st.n_points > 1:
-                assert len({k[c] for k in st.kvectors}) <= 2 * n
+            if fixed:
+                assert {k[c] for k in st.kvectors} <= {F(0), F(1, 2), F(1)}, (st.kind, c)
 
 
 def test_dropping_the_centring_fails_the_brute_force_check():
@@ -364,16 +367,36 @@ def test_a_non_equivalent_k_with_the_same_count_scores_differently():
 
 # ================================================ the grid: rows, order, budget
 
-def test_each_grid_row_is_score_kvector_of_its_k():
+def test_each_grid_row_is_score_kvector_of_its_k(monkeypatch):
+    # a block of 7 rows makes every stratum of the 1/8 grid cross several block
+    # boundaries (the largest holds hundreds of points); at 2048 none would
+    monkeypatch.setattr(kvector, "_CHUNK", 7)
     pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
     strata = kgrid_strata("P n m a", denominator=8)
     grid = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND)
+    assert max(st.n_points for st in strata) > 3 * 7
     assert [r.k for r in grid.rows] == [k for st in strata for k in st.kvectors]
     for r in grid.rows[::7]:
         s = score_kvector(pk, PNMA, r.k, radius=RADIUS, band_deg=BAND)
         assert r.score == pytest.approx(s.score, rel=1e-12, abs=1e-12)
         assert r.matched == s.matched and r.n_positions == s.n_positions
         assert canonical_kvector(PNMA.group, r.k) in r.equivalents
+
+
+def test_the_layout_constants_do_not_change_the_rows(monkeypatch):
+    """_BLOCK, _PAD and _CHUNK are layout: other legal values give the same rows."""
+    pk = _planted(PNMA, K_GENERAL, 8, 10, spurious=2)
+    strata = kgrid_strata("P n m a", denominator=8)
+    base = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND)
+    monkeypatch.setattr(kvector, "_BLOCK", 5000.0)    # past the 2θ axis and _PAD
+    monkeypatch.setattr(kvector, "_PAD", 300.0)       # in (180, _BLOCK)
+    monkeypatch.setattr(kvector, "_CHUNK", 31)
+    other = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND)
+    assert [r.k for r in other.rows] == [r.k for r in base.rows]
+    assert [r.matched for r in other.rows] == [r.matched for r in base.rows]
+    assert [r.n_positions for r in other.rows] == [r.n_positions for r in base.rows]
+    np.testing.assert_allclose([r.score for r in other.rows], [r.score for r in base.rows],
+                               rtol=1e-8, atol=1e-8)
 
 
 def test_rows_keep_the_callers_order_whatever_the_peaks():
@@ -531,6 +554,21 @@ def test_the_pseudo_tetragonal_partner_is_listed_with_its_code():
     assert "right" not in text and "correct" not in text and "better" not in text
 
 
+def test_the_partners_exact_image_matches_little_and_a_neighbour_matches_most():
+    """V6's measured numbers: the exact metric image of an on-grid k is not the
+    position match, a grid point near it is (seeds 1 and 2: 7 of 10)."""
+    k = (F(15, 64), F(7, 64), F(24, 64))
+    image, near = (F(24, 64), F(7, 64), F(15, 64)), (F(23, 64), F(7, 64), F(1, 4))
+    for seed, n_near in ((0, 8), (1, 7), (2, 7)):
+        pk = _planted(PNMA, k, 10, seed)
+        got = {name: score_kvector(pk, PNMA, kk, radius=RADIUS, band_deg=BAND)
+               for name, kk in (("k", k), ("image", image), ("near", near))}
+        assert got["k"].n_matched == 10
+        assert got["image"].n_matched == 2
+        assert got["near"].n_matched == n_near
+        assert got["image"].score < got["near"].score < got["k"].score
+
+
 def test_a_clearly_orthorhombic_cell_has_no_partner_and_no_code():
     ortho = KParent("P n m a", (5.74, 7.70, 6.40, 90, 90, 90), LAMBDA, 10.0, 140.0)
     eq = kvector_equivalents(ortho, (F(15, 64), F(7, 64), F(24, 64)), tol=0.08)
@@ -567,6 +605,45 @@ def test_a_planted_line_k_scores_above_its_null(pnma64):
     null = kgrid_null(pk, PNMA, pnma64, radius=RADIUS, band_deg=BAND,
                       exclude=_exclude(PNMA), n_shuffles=100, percentile=99, seed=20261112)
     assert s.score > null.threshold, (s.score, null.threshold)
+
+
+def _no_satellite_peaks(seed, n=4):
+    """n unexplained peaks with no satellites in them: uniform over the 2θ range,
+    off the nuclear match windows (the residue of a good fit)."""
+    rng = np.random.default_rng(seed)
+    nuc = _nuclear(PNMA)
+    out = []
+    while len(out) < n:
+        x = rng.uniform(PNMA.two_theta_min, PNMA.two_theta_max)
+        if np.min(np.abs(nuc - x)) > RADIUS:
+            out.append(x)
+    return np.sort(out)
+
+
+def test_a_list_without_satellites_stays_under_its_own_null():
+    """V4's negative arm, beside the planted-k positive arm above (K1b's
+    ``K_SEARCH_AT_CHANCE`` rests on it): the grid maximum of a peak list that holds no
+    satellite falls under the 99th percentile of its own null, on the 1/16 grid."""
+    pos = kgrid_positions(PNMA, kgrid_strata("P n m a", denominator=16))
+
+    def margin(seed):
+        pk = _no_satellite_peaks(seed)
+        top = max(r.score for r in score_kgrid(pk, PNMA, pos, radius=RADIUS,
+                                               band_deg=BAND).rows)
+        null = kgrid_null(pk, PNMA, pos, radius=RADIUS, band_deg=BAND,
+                          exclude=_exclude(PNMA), n_shuffles=100, percentile=99,
+                          seed=20261112)
+        return top - null.threshold
+
+    assert margin(0) < 0
+    # chance allows about 1 in 100 above; across 20 lists, 3 or more would be a leak
+    assert sum(margin(s) > 0 for s in range(20)) <= 2
+    # the positive arm on the same grid and settings: a planted k does clear it
+    pk = _planted(PNMA, (F(0), F(5, 16), F(0)), 10, 17)
+    top = max(r.score for r in score_kgrid(pk, PNMA, pos, radius=RADIUS, band_deg=BAND).rows)
+    null = kgrid_null(pk, PNMA, pos, radius=RADIUS, band_deg=BAND, exclude=_exclude(PNMA),
+                      n_shuffles=100, percentile=99, seed=20261112)
+    assert top > null.threshold
 
 
 @pytest.mark.slow
