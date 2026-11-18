@@ -1,6 +1,6 @@
 # WP-2147 — The weak-line retry on a superlattice that also carries a trace phase
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 2078 (PR #1567 builds the retry this WP measures, and was not merged on 2026-11-15)
 Priority: P3 2026-11-15 — a measurement that decides two open maintainer questions on WP-2078's retry (replace or append, and the code's tier); down a rung from P2 because nothing can start until PR #1567 merges
