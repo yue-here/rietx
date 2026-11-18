@@ -1780,7 +1780,8 @@ ROWS: tuple[Row, ...] = (
                  ".window_area_tol do: a coarse stage's numbers are never the reported "
                  "ones, and a reader comparing two fits' stage trajectories, or "
                  "cherry-picking a coarse node, must see which stages were coarse.  Its tier "
-                 "is the schedule's (INTERMEDIATE_LORENTZ_WINDOW_TOL).")),
+                 "is the schedule's (INTERMEDIATE_LORENTZ_WINDOW_TOL)."),
+        approved="2026-11-17"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"
@@ -3127,7 +3128,8 @@ ROWS: tuple[Row, ...] = (
                   "inherits TOF_WINDOW_AREA_TOL's tier"),
         grounds=("Derived from TOF_WINDOW_AREA_TOL with no free factor, so it inherits that "
                  "row's tier and grounds (the rule's derivation clause); kept so the two "
-                 "halves of one window state one bar.")),
+                 "halves of one window state one bar."),
+        approved="2026-11-17"),
     Row("rietx.model.forward_tof.TOF_WINDOW_AREA_TOL", "constant", tier=3, value=0.0001,
         evidence=("per-side area fraction a time-of-flight peak's frozen window may leave "
                   "outside; measured 2026-09 on one real bank, SNS NOMAD Si (SRM 640c) bank "
@@ -3148,7 +3150,8 @@ ROWS: tuple[Row, ...] = (
                  "is converged (1e-6 moves it by under a tenth).  Tier 3 under B10 option "
                  "2, as forward.WINDOW_AREA_TOL, until a domain test spans further banks; "
                  "the Lorentzian tail's cost is bought back by a stated schedule "
-                 "(INTERMEDIATE_LORENTZ_WINDOW_TOL), never by a cap on this.")),
+                 "(INTERMEDIATE_LORENTZ_WINDOW_TOL), never by a cap on this."),
+        approved="2026-11-17"),
     Row("rietx.model.forward_tof.WINDOW_MIN_US", "constant", tier=3, value=3.0,
         evidence=("absolute window half-width slack, movement headroom beside "
                   "WINDOW_SLACK_FRAC: windows are frozen per stage while TZERO moves inside "
@@ -3159,7 +3162,8 @@ ROWS: tuple[Row, ...] = (
                   "untested from a real bank's start"),
         grounds=("A numerical setting whose domain test covers less than the domain it "
                  "claims (one synthetic bank, one start); tier 3 under B10 option 2, as "
-                 "forward.WINDOW_MIN_DEG, until that is measured.")),
+                 "forward.WINDOW_MIN_DEG, until that is measured."),
+        approved="2026-11-17"),
     Row("rietx.model.forward_tof.WINDOW_SLACK_FRAC", "constant", tier=3, value=0.002,
         evidence=("window half-width slack as a fraction of the peak's own flight time, "
                   "movement headroom beside WINDOW_MIN_US: a cell or DIFC error is "
@@ -3170,7 +3174,8 @@ ROWS: tuple[Row, ...] = (
                   "untested from a real bank's start"),
         grounds=("A numerical setting whose domain test covers less than the domain it "
                  "claims (one synthetic bank, one start); tier 3 under B10 option 2, as "
-                 "forward.WINDOW_MIN_DEG, until that is measured.")),
+                 "forward.WINDOW_MIN_DEG, until that is measured."),
+        approved="2026-11-17"),
     Row("rietx.model.forward_tof._MIN_RATE", "constant", tier=1, value=1e-12,
         evidence=("arithmetic: the back-to-back pulse has amplitude alpha beta/(alpha + beta) "
                   "and unbounded width as alpha or beta goes to 0, so a bank with a "
@@ -4599,7 +4604,8 @@ ROWS: tuple[Row, ...] = (
                  "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
                  "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
                  "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
-                 "family only.")),
+                 "family only."),
+        approved="2026-11-17"),
     Row("rietx.schemas.plan.PHASE_SUPPORT_SIGMA", "constant", tier=3, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -5077,7 +5083,8 @@ ROWS: tuple[Row, ...] = (
                  "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
                  "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
                  "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
-                 "family only.")),
+                 "family only."),
+        approved="2026-11-17"),
     Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
         evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
@@ -5209,7 +5216,8 @@ ROWS: tuple[Row, ...] = (
                  "all-1e-4 plan for a 1.2-3.6x cheaper fit; only the Lorentzian component is "
                  "loosened, so a Gaussian-branch bank (every real bank the track holds) is "
                  "bit-identical; None is the bit-identical way back.  Measured on one synthetic "
-                 "family only.")),
+                 "family only."),
+        approved="2026-11-17"),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
