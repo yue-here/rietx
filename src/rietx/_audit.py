@@ -1381,7 +1381,18 @@ ROWS: tuple[Row, ...] = (
                   "person's stop, and no default path sets one (searched 2026-10-24). It "
                   "reports the requested act, n of N patterns, and moves no value "
                   "(sequential.py:2153-2167, WP-1016)")),
-    Row("SEQUENTIAL_MOMENT_HOLD", "code"),
+    Row("SEQUENTIAL_MOMENT_HOLD", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote the patterns the message counts as held, not as measured moments, "
+                  "and read each floored successor's modulus as reseeded, not warm-started"),
+        evidence=("arithmetic on the per-pattern MOMENT_UNSUPPORTED verdicts: fires exactly "
+                  "when one or more patterns of a site came back unsupported, and never on "
+                  "patterns that gave no verdict alone (sequential._moment_diagnostics). It "
+                  "names what SeriesEntry.floored records; the floor itself is that row's "
+                  "act, tier 3, approved 2026-11-03, so it is not audited twice here. The "
+                  "cut is MOMENT_SUPPORT_SIGMA's, and this tier reopens with WP-2004's "
+                  "ruling on it. Ruled by the magnetic-path owner under #1075 (#1411 item 1, "
+                  "2026-11-12; tests/test_magnetic_series.py)")),
     Row("SEQUENTIAL_MOMENT_ONSET", "code", tier=1, ambiguity=3,
         response="info",
         responds=("read the bracket as where the per-pattern moment verdicts switch, its ± "
@@ -1399,21 +1410,34 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("quote no onset temperature and no ordered moment at the bracket for the "
-                  "site `where` names; the message says which of the four reasons holds"),
+                  "site `where` names; the message says which of the three reasons holds"),
         evidence=("arithmetic on the verdicts the bracket is read from, with no threshold of "
                   "its own: (1) a supported side of the bracket whose fit did not converge "
                   "(MagneticOnset.bracket_verdicts_final, a solver status), (2) verdicts that "
-                  "switch more than once, so there is no single bracket, and under "
-                  "direction='both' (3) two chains whose brackets do not overlap, order "
-                  "opposite sides or exist on one side only, or (4) a chain that gave no "
-                  "verdict, so nothing was checked (sequential._moment_diagnostics, "
-                  "_with_onset_agreement, _fold_onset). Unanimity: no competent refiner "
-                  "quotes a transition two readings of the same data place differently, or "
-                  "one whose ordered side had not finished refining; none found. The "
-                  "verdicts' threshold is MOMENT_SUPPORT_SIGMA's row (WP-2004). Split off "
-                  "SEQUENTIAL_MOMENT_ONSET (WP-2003 batch C8); the batch proposed tier 3 "
-                  "on MOMENT_SUPPORT_SIGMA, and this row argues tier 1 for the maintainer to "
-                  "rule (tests/test_magnetic_series.py)")),
+                  "switch more than once, so there is no single bracket (the message gives "
+                  "the switches' envelope), and under direction='both' (3) two chains whose "
+                  "brackets do not overlap, order opposite sides or exist on one side only "
+                  "(sequential._moment_diagnostics, _with_onset_agreement, _fold_onset). "
+                  "Unanimity: no competent refiner quotes a transition two readings of the "
+                  "same data place differently, or one whose ordered side had not finished "
+                  "refining; none found. A chain that gave no verdict is "
+                  "SEQUENTIAL_MOMENT_ONSET_UNCHECKED's. Ruled tier 1 by the magnetic-path "
+                  "owner under #1075 (#1411 item 8, 2026-11-12); reason 2 exists only "
+                  "through MOMENT_SUPPORT_SIGMA's cut, so its level reopens with WP-2004's "
+                  "ruling on it (#1411 item 9; tests/test_magnetic_series.py)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNCHECKED", "code", tier="caller", ambiguity=1,
+        response="info",
+        responds=("read the other chain's onset reading on the site `where` names as "
+                  "unchecked by the forward-backward comparison; its own rows stand"),
+        evidence=("opt-in: fires only under direction='both', off by default, which no "
+                  "default path sets (the GUI series panel defaults to 'forward', "
+                  "gui/series.py). It reports that one chain gave no verdict on any "
+                  "pattern, so the requested comparison of the onset could not run, and "
+                  "moves no value and no other row's level: the forward bracket keeps its "
+                  "own advice and gains a note (sequential._with_onset_agreement). The "
+                  "shape SEQUENTIAL_PATH_CHECK_INCOMPLETE was given (C5). Ruled by the "
+                  "magnetic-path owner under #1075 (#1411 item 8, 2026-11-12; "
+                  "tests/test_magnetic_series.py)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE", "code", tier="caller", ambiguity=1,
         response="info",
         responds=("treat the patterns or paths `where` names as unchecked by the "
@@ -5739,19 +5763,28 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_CANCELLED.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: says the one way to extend a trajectory the caller "
                   "stopped, re-running it (sequential.py:2166)")),
-    Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", value=1),
+    Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the record to plot (series.magnetic_trajectory()) and "
+                  "says to quote the held points as held, which is what the code counts; "
+                  "picks no value (sequential._moment_diagnostics). The batch's proposal, "
+                  "beside the code's tier 1 (#1411 item 1)")),
     Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the check that compares the bracket with the reverse "
                   "chain (direction='both'), or the unresolved row when the bracket's "
                   "supported side stopped early; folded, it names the unresolved row or says "
                   "to quote the bracket with its spacing (sequential._moment_diagnostics, "
                   "_with_onset_agreement)")),
+    Row("SEQUENTIAL_MOMENT_ONSET_UNCHECKED.suggestion", "suggestion", tier="caller",
+        ambiguity=1, value=3,
+        evidence=("opt-in, as its code: read the status and magnetic row of the entries in "
+                  "the chain that gave no verdict (sequential._with_onset_agreement), which "
+                  "restates what the requested check left undone")),
     Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED.suggestion", "suggestion", tier=1, ambiguity=1,
-        value=7,
+        value=5,
         evidence=("arithmetic: each names the record to open for the reason given — the "
-                  "moment stage's max_iter, the patterns either side of each switch, the two "
-                  "chains' magnetic rows, or the entries that gave no verdict — and picks "
-                  "no reading (sequential._moment_diagnostics, _with_onset_agreement)")),
+                  "moment stage's max_iter, the patterns either side of each switch, or the "
+                  "two chains' magnetic rows — and picks no reading "
+                  "(sequential._moment_diagnostics, _with_onset_agreement)")),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion", "suggestion", tier="caller", ambiguity=1,
         value=2,
         evidence=("opt-in, as its code: treat the named patterns as unchecked, or read both "
@@ -6158,8 +6191,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "ROUGHNESS_OUTSIDE_REGIME.suggestion",
     "ROUGHNESS_UNCONSTRAINED",
     "ROUGHNESS_UNCONSTRAINED.suggestion",
-    "SEQUENTIAL_MOMENT_HOLD",
-    "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
@@ -6844,7 +6875,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "ROUGHNESS_OUTSIDE_REGIME",
     "ROUGHNESS_UNCONSTRAINED",
     "SCALE_B_INSEPARABLE",
-    "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",

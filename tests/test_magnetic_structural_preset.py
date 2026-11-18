@@ -27,9 +27,10 @@ negative (freed)       a plan naming ``moment.dof*``,      the check fires on a 
                        stage                               stage rather than the plan
 negative (hold)        the moment held by the caller       the check overrides the
                                                            caller's own hold
-series                 ``refine_sequential`` under         ``SEQUENTIAL_MOMENT_HOLD``
-                       ``mccusker_default``                still blames a missing esd
-                                                           rather than the plan
+series                 ``refine_sequential`` under         a pattern stops naming the
+                       ``mccusker_default``                plan, or the series writes a
+                                                           hold for patterns that gave
+                                                           no verdict (#1411 item 1)
 =====================  ==================================  ===============================
 
 **Tolerance: 2 esd**, as ``test_magnetic_width_k_half``: on one noise draw a
@@ -236,7 +237,11 @@ def test_a_moment_the_caller_holds_is_the_callers(data):
 
 # ----------------------------------------------------------------- the series
 
-def test_the_series_hold_names_the_plan_as_the_cause():
+def test_a_series_whose_plan_frees_no_moment_names_the_plan_and_writes_no_hold():
+    """Every pattern's plan frees no moment, so every pattern gives no verdict
+    and says why itself.  Since #1411 item 1 (ruled 2026-11-12) the series
+    writes no ``SEQUENTIAL_MOMENT_HOLD`` for them: a pattern that gives no
+    verdict is no evidence of a held moment."""
     patterns = [_simulate(seed) for seed in (1, 2, 3)]
 
     def tie(_index, ref):
@@ -246,8 +251,6 @@ def test_the_series_hold_names_the_plan_as_the_cause():
         patterns, rx.Structure(phases=[_start()]), _instrument(),
         plan="mccusker_default", constrain=tie, x=[1.0, 2.0, 3.0])
     assert all(_codes(e) for e in series.entries)
-    holds = [d for d in series.diagnostics if d.code == "SEQUENTIAL_MOMENT_HOLD"]
-    assert [d.where for d in holds] == [[p] for p in MODULI]
-    for d in holds:
-        assert "because the plan frees no moment" in d.message
-        assert "has no esd" not in d.message
+    for site in MODULI:
+        assert series.magnetic_trajectory(site).measured == [False] * 3
+    assert not any(d.code == "SEQUENTIAL_MOMENT_HOLD" for d in series.diagnostics)

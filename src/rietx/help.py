@@ -4340,10 +4340,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "In some patterns the refined moment lies within the noise of its own esd. "
             "That reads as a moment the data do not support, and says nothing about a "
-            "small moment. Patterns where the modulus has no esd give no verdict at all. "
-            "When the plan frees no moment, every pattern is one of these and the "
-            "modulus is the start value; `PLAN_FREES_NO_MOMENT` fires on each, and "
-            "the message says so. "
+            "small moment. It fires only where a pattern is unsupported. Patterns where "
+            "the modulus has no esd give no verdict, and the message counts them beside "
+            "the held ones. When the plan frees no moment, `PLAN_FREES_NO_MOMENT` fires "
+            "on each pattern instead. Each list names four patterns at most, and the "
+            "record names every one. "
             "The value shown is the modulus the fit reached. Quote these points as held."
         ),
     ),
@@ -4360,13 +4361,23 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED": HelpEntry(
         title="The magnetic onset cannot be quoted",
         description=(
-            "The series gives no onset to quote for this site. One of four things "
+            "The series gives no onset to quote for this site. One of three things "
             "happened. The supported side of the bracket stopped at its iteration cap, "
             "so its modulus had not finished falling. The verdicts switch back and "
-            "forth, so there is no single bracket. Under `direction=\"both\"`, the "
-            "forward and backward chains disagree, or one of them gave no verdict at "
-            "all. The message says which. Disagreement means one chain's warm start "
-            "carried a moment across the transition that the other did not."
+            "forth, so there is no single bracket; the message gives the range the "
+            "switches span. Under `direction=\"both\"`, the forward and backward chains "
+            "disagree. The message says which. Disagreement means one chain's warm "
+            "start carried a moment across the transition that the other did not."
+        ),
+    ),
+    "SEQUENTIAL_MOMENT_ONSET_UNCHECKED": HelpEntry(
+        title="One chain gave no verdict on the magnetic onset",
+        description=(
+            "You asked for both directions, and one chain gave no verdict on any "
+            "pattern for this site, so the other chain's onset reading was not checked "
+            "against it. Nothing disagrees: the other chain's rows keep their level and "
+            "advice. Read the status and magnetic row of the silent chain's entries to "
+            "find out why it gave no verdict."
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(

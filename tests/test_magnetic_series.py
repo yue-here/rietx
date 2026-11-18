@@ -765,16 +765,19 @@ def _verdicts(flags) -> SeriesResult:
 
 _BRACKET = "SEQUENTIAL_MOMENT_ONSET"
 _UNRESOLVED = "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED"
+_UNCHECKED = "SEQUENTIAL_MOMENT_ONSET_UNCHECKED"
 
 
 def _onset_rows(rows) -> dict[str, Diagnostic]:
-    """The one site's onset rows, by code: at most one of each (WP-2003 C8)."""
+    """The one site's onset rows, by code: at most one of each (WP-2003 C8,
+    #1411 item 8)."""
     out = {}
     for d in rows:
-        if d.code in (_BRACKET, _UNRESOLVED):
+        if d.code in (_BRACKET, _UNRESOLVED, _UNCHECKED):
             assert d.code not in out, f"two {d.code} rows on one site"
             out[d.code] = d
-    for code, level in ((_BRACKET, "info"), (_UNRESOLVED, "warning")):
+    for code, level in ((_BRACKET, "info"), (_UNRESOLVED, "warning"),
+                        (_UNCHECKED, "info")):
         if code in out:
             assert out[code].level == level, (code, out[code].level)
     return out
@@ -937,8 +940,12 @@ def _early(flags) -> SeriesResult:
 
 
 def _fold(forward: SeriesResult, back: SeriesResult) -> dict[str, Diagnostic]:
-    return _onset_rows(_with_onset_agreement(_moment_diagnostics(forward),
-                                             forward, back))
+    return _onset_rows(_fold_rows(forward, back))
+
+
+def _fold_rows(forward: SeriesResult, back: SeriesResult) -> list[Diagnostic]:
+    """Every row the fold returns, unfiltered (the silence pairs read these)."""
+    return _with_onset_agreement(_moment_diagnostics(forward), forward, back)
 
 
 @pytest.mark.parametrize("forward, back, silent", [
@@ -954,15 +961,53 @@ def test_a_chain_that_gave_no_verdict_is_said_to_and_gets_no_cause(
     held) has nothing to disagree with.  The rows used to say the chains
     "disagree on every pattern they both judged", when they judged none in
     common, and blamed a warm start or a floor that nothing checked (review
-    round 3, item 1)."""
+    round 3, item 1).  Since #1411 item 8 it is its own code, at ``info``,
+    and never the warning."""
     rows = _fold(forward(), back())
-    row = rows[_UNRESOLVED]
+    assert _UNRESOLVED not in rows
+    row = rows[_UNCHECKED]
+    assert row.level == "info"
     assert f"{silent} chain gave no verdict on any pattern" in row.message
     for cause in ("warm start", "never climbed", "disagree on every pattern"):
         assert cause not in row.message, cause
-    for row in rows.values():
-        assert "series.backward.magnetic_trajectory()" not in row.suggestion
-        assert "direction='both'" not in row.suggestion
+    assert "series.backward.magnetic_trajectory()" not in row.suggestion
+    assert "direction='both'" not in row.suggestion
+
+
+@pytest.mark.parametrize("forward", [
+    lambda: _verdicts(_BRACKETED), lambda: _early(_BRACKETED),
+    lambda: _verdicts(_INTERLEAVED)], ids=["quotable", "stopped-early",
+                                            "interleaved"])
+def test_a_check_that_could_not_run_leaves_the_forward_rows_as_they_were(forward):
+    """#1411 item 8, ruled 2026-11-12: a check that could not run must not
+    leave the reader worse off than not asking for it.  Against a backward
+    chain that gave no verdict, every forward row keeps its level and its
+    advice; the bracket only gains that it was not cross-checked, and the
+    reason is one ``info`` row of its own."""
+    series = forward()
+    alone = _onset_rows(_moment_diagnostics(series))
+    rows = _fold(series, _quiet(None))
+    assert set(rows) == set(alone) | {_UNCHECKED}
+    for code, row in alone.items():
+        assert rows[code].level == row.level, code
+        assert rows[code].suggestion == row.suggestion, code
+    if _BRACKET in alone:
+        assert rows[_BRACKET].message == (
+            f"{alone[_BRACKET].message} The backward chain gave no verdict, so "
+            f"this bracket was not cross-checked against it.")
+    if _UNRESOLVED in alone:
+        assert rows[_UNRESOLVED].message == alone[_UNRESOLVED].message
+    assert "backward chain gave no verdict on any pattern" in (
+        rows[_UNCHECKED].message)
+
+
+def test_verdicts_that_switch_back_and_forth_give_the_switches_envelope():
+    """#1411 item 8: flickering verdicts stay a reason not to quote, with the
+    envelope the switches span in the message, never quoted as the onset."""
+    row = _onset_rows(_moment_diagnostics(_verdicts(_INTERLEAVED)))[_UNRESOLVED]
+    assert row.value is None
+    assert ("If the series has one onset, it lies inside the envelope the "
+            "switches span, T (K) 15 → 75.") in row.message
 
 
 def test_an_overlap_with_one_unquotable_bracket_names_it_and_asks_for_max_iter():
@@ -1104,22 +1149,66 @@ def test_a_starved_chain_reports_a_supported_moment_above_the_transition_and_is_
     assert set(_onset_rows(fed.diagnostics)) == {_BRACKET}
 
 
-def test_the_hold_names_every_floored_pattern_off_the_record():
-    """``SEQUENTIAL_MOMENT_HOLD`` reads ``SeriesEntry.floored`` and names every
-    pattern on it (WP-2003 C8, X7): the list used to stop at four labels and
-    an ellipsis, leaving the rest to the record it was read from."""
-    series = _hand_built([(10.0 * i, 4.0 if i == 0 else 0.01,
-                           0.05 if i == 0 else 0.4, i == 0) for i in range(8)])
+def _held_after_one(n: int) -> SeriesResult:
+    """``n`` patterns, the first supported and every later one held."""
+    return _hand_built([(10.0 * i, 4.0 if i == 0 else 0.01,
+                         0.05 if i == 0 else 0.4, i == 0) for i in range(n)])
+
+
+@pytest.mark.parametrize("n_floored", [3, 4, 6])
+def test_the_hold_names_four_floored_patterns_and_counts_the_rest(n_floored):
+    """#1411 item 10, ruled 2026-11-12: ``SEQUENTIAL_MOMENT_HOLD``'s floored
+    list names every pattern up to four, and past four names the first four,
+    counts the rest and points at ``SeriesEntry.floored``, which names each.
+    (WP-2003's X7 had named every one; on a long ramp that runs to hundreds.)"""
+    series = _held_after_one(2 + n_floored)
     (site,) = series.magnetic_sites()
-    floored = [f"p{i}" for i in range(2, 8)]          # six successors
+    floored = [f"p{i}" for i in range(2, 2 + n_floored)]
     for entry in series.entries:
         if entry.label in floored:
             entry.floored = [site]
     (hold,) = [d for d in _moment_diagnostics(series)
                if d.code == "SEQUENTIAL_MOMENT_HOLD"]
-    assert f"on {len(floored)} successor pattern(s) ({', '.join(floored)};" in (
+    if n_floored <= 4:
+        listed = ", ".join(floored)
+    else:
+        listed = (f"{', '.join(floored[:4])} and {n_floored - 4} more; "
+                  f"SeriesEntry.floored names each")
+    assert f"on {n_floored} successor pattern(s) ({listed}) instead of" in (
         hold.message)
     assert "…" not in hold.message
+
+
+def test_the_hold_counts_the_patterns_with_no_verdict_past_four():
+    """#1411 item 10: the two no-verdict lists cap the same way, pointing at
+    the trajectory's ``measured``.  Two held, six with no esd."""
+    points = ([(10.0, 4.0, 0.05, True)]
+              + [(20.0 + i, 0.01, 0.4, False) for i in range(2)]
+              + [(30.0 + i, 4.0, None, None) for i in range(6)])
+    (hold,) = [d for d in _moment_diagnostics(_hand_built(points))
+               if d.code == "SEQUENTIAL_MOMENT_HOLD"]
+    assert ("6 more pattern(s) give no verdict at all (p3, p4, p5, p6 and 2 "
+            "more; series.magnetic_trajectory().measured marks each), because "
+            "the modulus has no esd there.") in hold.message
+    assert "…" not in hold.message
+
+
+def test_patterns_with_no_verdict_alone_never_fire_the_hold():
+    """#1411 item 1, ruled 2026-11-12: the hold is tier 1 and fires on an
+    unsupported pattern only.  A pattern that gives no verdict is no evidence
+    of a held moment: every fit diverged, or every other pattern supports the
+    moment, and either way no hold.  One held pattern fires it."""
+    def holds(series):
+        return [d for d in _moment_diagnostics(series)
+                if d.code == "SEQUENTIAL_MOMENT_HOLD"]
+
+    assert holds(_quiet(None)) == []
+    blind = [(10.0, 4.0, 0.05, True), (20.0, 4.0, None, None),
+             (30.0, 4.0, 0.05, True)]
+    assert holds(_hand_built(blind)) == []
+    (hold,) = holds(_hand_built(blind + [(40.0, 0.01, 0.4, False)]))
+    assert hold.level == "warning" and hold.value == 1.0
+    assert "1 more pattern(s) give no verdict at all (p1)" in hold.message
 
 
 def test_an_unsupported_pattern_reseeds_its_successor_to_the_floor():

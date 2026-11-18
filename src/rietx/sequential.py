@@ -46,7 +46,7 @@ verdict (the removed ``SEQUENTIAL_PATH_DEPENDENT``).
 pair's two patterns cold and independently, and writes what the pair
 reproduces as ``SeriesStep.cold_ratio`` (WP-1305's check).
 
-Three more belong to the magnetic arm (WP-1329), and they are fences of exactly
+Four more belong to the magnetic arm (WP-1329), and they are fences of exactly
 the same kind — a series through an ordering transition is a series whose
 answer *changes character* part-way along, and warm-starting is how that gets
 hidden:
@@ -58,7 +58,9 @@ hidden:
     to its floor instead of warm-started from the value before it.  A moment a
     pattern does not support must not become the *starting point* of the next
     pattern, because |F_m|² ∝ m² makes a stale modulus a local minimum the
-    next fit has no gradient to leave.
+    next fit has no gradient to leave.  It fires only where a pattern came
+    back unsupported, never on patterns that gave no verdict alone, and names
+    up to four labels per list, the record naming each (#1411 items 1, 10).
 ``SEQUENTIAL_MOMENT_ONSET``
     where along the axis the moment stops being supported, as a bracket
     between the last released pattern and the first held one — read off the
@@ -71,11 +73,16 @@ hidden:
     every reason the onset is not quotable, at ``warning`` (WP-2003 C8 split
     it off the bracket, which used to raise at a level computed between the
     two): the supported side of the bracket stopped early, the verdicts switch
-    back and forth so there is no single bracket, or under
-    ``direction="both"`` the two chains disagree or one gave no verdict.
-    Disagreement is the signature of a chain that carried a moment across the
-    transition in one direction and not the other, which is the one thing a
-    single chain cannot see.
+    back and forth so there is no single bracket (the message gives the
+    switches' envelope), or under ``direction="both"`` the two chains
+    disagree.  Disagreement is the signature of a chain that carried a moment
+    across the transition in one direction and not the other, which is the
+    one thing a single chain cannot see.
+``SEQUENTIAL_MOMENT_ONSET_UNCHECKED``
+    under ``direction="both"``, a chain that gave no verdict on any pattern,
+    so the other chain's reading went unchecked: ``info``, the shape of
+    ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``, since a check that could not run
+    must leave the reader no worse off than not asking for it (#1411 item 8).
 
 **The fallback is a ladder, and a pattern it cannot rescue is quarantined**
 (WP-1051).  A rejected warm fit escalates one rung at a time — collapsed warm
@@ -3156,7 +3163,11 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
                    if any(d.code == "PLAN_FREES_NO_MOMENT"
                           and (e.pattern_paths or {}).get(site, site) in d.where
                           for d in e.diagnostics)}
-        if n_held or blind:
+        # The hold fires on an unsupported pattern only (#1411 item 1, ruled
+        # 2026-11-12): a pattern that gives no verdict is no evidence of a held
+        # moment, so a series of them alone writes no hold.  A floored
+        # successor needs an unsupported predecessor, so it implies one.
+        if n_held:
             message = (
                 f"{name}: the moment is unsupported on {n_held} of {n} pattern(s) "
                 f"({100.0 * n_held / n:.0f}% of the series), with |m| at or "
@@ -3170,20 +3181,17 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
                 if labels:
                     message += (
                         f" {len(labels)} more pattern(s) give no verdict at "
-                        f"all ({', '.join(labels[:4])}"
-                        f"{' …' if len(labels) > 4 else ''}), {why}.")
+                        f"all ({_some_labels(labels, _MEASURED_MARKS_EACH)}), "
+                        f"{why}.")
             if blind:
                 message += " They are left out of the onset."
             if reseeded:
-                # every one named, read off the kept attempt's record (WP-2003
-                # C8, X7): a list cut at four left the rest to SeriesEntry
                 message += (
                     f" The modulus was reseeded to its floor "
                     f"({MOMENT_FLOOR_MU_B:g} μ_B) on {len(reseeded)} successor "
-                    f"pattern(s) ({', '.join(reseeded)}; each one's "
-                    f"SeriesEntry.floored names it) instead of "
-                    f"warm-starting from a value the pattern before did not "
-                    f"support.")
+                    f"pattern(s) ({_some_labels(reseeded, _FLOORED_NAMES_EACH)}) "
+                    f"instead of warm-starting from a value the pattern before "
+                    f"did not support.")
             out.append(Diagnostic(
                 level="warning", code="SEQUENTIAL_MOMENT_HOLD", where=[site],
                 value=float(n_held), message=message,
@@ -3227,12 +3235,33 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
                         + onset.note.split(". Do not quote it: ")[-1] + "."),
                     suggestion=_RAISE_MAX_ITER))
         elif not onset.monotone:
+            # the switches' envelope (#1411 item 8, ruled 2026-11-12): where
+            # one onset would lie, never quoted as one
+            low, high = onset.boundaries[0][0], onset.boundaries[-1][1]
             out.append(Diagnostic(
                 level="warning", code="SEQUENTIAL_MOMENT_ONSET_UNRESOLVED",
-                where=[site], message=f"{name}: {onset.note}.",
+                where=[site],
+                message=(f"{name}: {onset.note}. If the series has one onset, "
+                         f"it lies inside the envelope the switches span, "
+                         f"{series.x_label} {low:g} → {high:g}."),
                 suggestion=_OPEN_THE_SWITCHES))
     return out
 
+
+def _some_labels(labels: list[str], record: str) -> str:
+    """Pattern labels as a series message lists them (#1411 item 10, ruled
+    2026-11-12): every one up to four, else the first four, "and N more", and
+    the record that names each.  The record names every pattern, so the
+    message does not have to, and a long ramp's list does not run to hundreds.
+    """
+    if len(labels) <= 4:
+        return ", ".join(labels)
+    return f"{', '.join(labels[:4])} and {len(labels) - 4} more; {record}"
+
+
+_FLOORED_NAMES_EACH = "SeriesEntry.floored names each"
+
+_MEASURED_MARKS_EACH = "series.magnetic_trajectory().measured marks each"
 
 _ONSET_FAMILY = ("SEQUENTIAL_MOMENT_ONSET", "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED")
 
@@ -3253,6 +3282,9 @@ _RUN_BOTH = ("Run the series with direction='both' to check this onset "
 
 _NO_VERDICT = ("Read the status and magnetic row of the entries in the chain "
                "that gave no verdict.")
+
+_NOT_CROSS_CHECKED = ("The backward chain gave no verdict, so this bracket "
+                      "was not cross-checked against it.")
 
 _COMPARE_CHAINS = (
     "Compare the two chains' magnetic rows pattern by pattern "
@@ -3299,8 +3331,10 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
     max_iter"), which the comparison does not address, and so does an
     interleaved forward verdict ("open the patterns either side of each
     switch"), which never asked for the comparison.  A chain that gave no
-    verdict on any pattern is said to, with no cause attached: nothing was
-    compared, so nothing was found carried or floored.
+    verdict on any pattern is ``SEQUENTIAL_MOMENT_ONSET_UNCHECKED`` at
+    ``info``, with no cause attached: nothing was compared, so nothing was
+    found carried or floored, and the forward rows keep their own level and
+    advice (#1411 item 8).
     """
     by_site = {}
     for site in back.magnetic_sites():
@@ -3317,8 +3351,28 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
         mine = forward.magnetic_trajectory(site).onset
         bracket = found.get("SEQUENTIAL_MOMENT_ONSET")
         unresolved = found.get("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED")
-        agrees, sentence, advice = _fold_onset(mine, other)
         out_site: list[Diagnostic] = []
+        if _no_verdict(other):
+            # A check that could not run leaves the reader no worse off than
+            # not asking for it (#1411 item 8): the forward rows keep their
+            # own level and advice, the bracket gains that it went unchecked,
+            # and the reason is an ``info`` row of its own.
+            if bracket is not None:
+                out_site.append(bracket.model_copy(update={
+                    "message": f"{bracket.message} {_NOT_CROSS_CHECKED}"}))
+            if unresolved is not None:
+                out_site.append(unresolved)
+            name = by_site[site].atom or site
+            out_site.append(Diagnostic(
+                level="info", code="SEQUENTIAL_MOMENT_ONSET_UNCHECKED",
+                where=[site],
+                message=(f"{name}: the backward chain gave no verdict on any "
+                         f"pattern ({other.note}), so the forward reading has "
+                         f"not been checked against it."),
+                suggestion=_NO_VERDICT))
+            folded[site] = out_site
+            continue
+        agrees, sentence, advice = _fold_onset(mine, other)
         if bracket is not None:
             out_site.append(bracket.model_copy(update=(
                 {"message": f"{bracket.message} {sentence}",
@@ -3376,7 +3430,7 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
                                  if _no_verdict(other) else
                                  (("forward", mine), ("backward", other)))
                 out.append(Diagnostic(
-                    level="warning", code="SEQUENTIAL_MOMENT_ONSET_UNRESOLVED",
+                    level="info", code="SEQUENTIAL_MOMENT_ONSET_UNCHECKED",
                     where=[site],
                     message=(
                         f"{name}: the {silent[0]} chain gave no verdict on any "
@@ -3405,7 +3459,7 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
                  f"has no single onset ({other.note})")
         if _no_verdict(mine):
             out.append(Diagnostic(
-                level="warning", code="SEQUENTIAL_MOMENT_ONSET_UNRESOLVED",
+                level="info", code="SEQUENTIAL_MOMENT_ONSET_UNCHECKED",
                 where=[site],
                 message=(
                     f"{name}: the backward chain {found}, while the forward "
@@ -3437,10 +3491,8 @@ def _fold_onset(mine, other) -> tuple[bool, str, str]:
     unresolved row takes)``.  The forward chain has a row, so it located a
     bracket or an interleaved verdict.
     """
-    if _no_verdict(other):
-        return (False, f"The backward chain gave no verdict on any pattern "
-                       f"({other.note}), so this reading has not been checked "
-                       f"against it.", _NO_VERDICT)
+    # (a backward chain that gave no verdict never reaches here: the fold
+    # writes it as SEQUENTIAL_MOMENT_ONSET_UNCHECKED, #1411 item 8)
     # three ways of lacking an onset, each blaming the chain that lacks it
     if mine.x is None and other.x is None:
         return (False, f"The backward chain located no single onset either "
