@@ -1,6 +1,6 @@
 # WP-1512 — A simulated diffuse curve is a component, and its amplitude rides on the phase scale
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-18 — claimed by @yue-here (ghostshift runner)
 Track: Data and metadata in, a structure out
 Depends on: —
 Priority: P3 2026-09-28 — a workaround covers it (the background slot plus a refit loop), and since 1.5.0 that workaround breaks silently on a preset
