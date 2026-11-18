@@ -690,7 +690,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ✅ 2026-11-13 | — | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
-| [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ⬜ | P3 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
+| [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ✅ 2026-11-18 | — | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | ⬜ | P2 | — |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 🔄 2026-11-17 | P3 | — |
 | [2150](2150-a-tied-cell-value-that-contradicts-its-symmetry.md) | A tied cell value that contradicts its space group is repaired at read or refused | ⬜ | P2 | — |
