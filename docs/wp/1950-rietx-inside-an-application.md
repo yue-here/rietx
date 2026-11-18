@@ -92,6 +92,14 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
   would replace that line, so name the browser as a second caller. The same
   host also empties `fcntl`. WP-1966 made the three lock sites import `flock`
   by name, so a record written there takes the Windows path.
+- **From WP-1464 (2026-11-18): what the manual section says about
+  `RIETX_COMPILED_THREADS`.** Measured on a 10-core arm64 Mac under load from
+  other work: a screen of 26 fits on 10 worker processes ran 1.9-2.4× slower
+  with `RIETX_COMPILED_THREADS=1` than with the default pool, and 104 fits
+  2.0× slower. So the package keeps its default in a pool and does not read
+  `OMP_NUM_THREADS` (`docs/practice.md` § Inner threads in a process pool).
+  The embedding section names the variable as the way to cap rietx beside an
+  application's own parallel work, and does not recommend 1 for speed.
 
 ## Non-goals
 
