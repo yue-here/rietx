@@ -1,6 +1,6 @@
 # WP-2150 — A tied cell value that contradicts its space group is repaired at read or refused
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-19 — PR #1698 in review; reader output waits on the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-18 — a silent wrong answer on a path few fits run: a cell length (or a rhombohedral angle) that its space group ties to another is replaced by that other value with no word, at any size of disagreement (#1669)
@@ -92,21 +92,22 @@ code and constant takes its `rietx._audit` row.
 
 ## Tasks
 
-- [ ] Measure: tied-length deviations of indexing candidates entering `validate_by_lebail`
+- [x] Measure: tied-length deviations of indexing candidates entering `validate_by_lebail`
       on the indexing acceptance set; whether a saved `.rex` state can hold a contradicting
       tied value.
-- [ ] The table: `check_cell_angles` widened (or a sibling beside it) to every tied cell
+- [x] The table: `check_cell_angles` widened (or a sibling beside it) to every tied cell
       entry, refusing beyond a relative length bound and the existing angle tolerance,
       naming the entry, both values and the symbol. `complete_cell`'s docstring updated.
-- [ ] The CIF and magCIF readers: snap a tied entry within the file's printed precision
+- [x] The CIF and magCIF readers: snap a tied entry within the file's printed precision
       onto its source and record it (one code for lengths and tied angles, or two; the
       maintainer rules the text). A larger deviation is left as written and raises.
-- [ ] The project readers (`gsas2`, `gsas`, `topas`, `fullprof`, `recipe`) and, once
+- [x] The project readers (`gsas2`, `gsas`, `topas`, `fullprof`, `recipe`) and, once
       merged, Jana: the same snap or a refusal by name, through one shared helper.
-- [ ] The `.rex` open path, if the measurement says a stored state can contradict.
-- [ ] Tests: the six cases above at both sizes; an indexing candidate still validates.
-- [ ] `_audit` rows, `help.py` for each new code, the manual's reader page.
-- [ ] Skill: a reference row for each new code (root `CLAUDE.md`: a diagnostic code adds
+      (Jana's PR #1627 had not merged; the call is WP-1314's, in its Inherited.)
+- [x] The `.rex` open path, if the measurement says a stored state can contradict.
+- [x] Tests: the six cases above at both sizes; an indexing candidate still validates.
+- [x] `_audit` rows, `help.py` for each new code, the manual's reader page.
+- [x] Skill: a reference row for each new code (root `CLAUDE.md`: a diagnostic code adds
       its row).
 
 ## Acceptance
@@ -129,6 +130,83 @@ indexing acceptance ranking is unchanged.
   (repairs within printed precision).
 
 ## Handover log
+
+- **2026-11-19** — PR #1698. A cell that contradicts its space group's ties
+  no longer builds silently. Under a cubic group b = 5.9 beside a = 5.641
+  used to become 5.641 with no word; the parameter table now refuses it,
+  naming the entry, both values and the symbol. A CIF whose two values agree
+  within the digits it prints is read as cubic and says so. A project file
+  from GSAS-II, GSAS, TOPAS, FullProf or a recipe is refused naming the
+  file. A history saved by an older release opens as its fits read it, with
+  a note. The cost: a script that edits `cell.a.value` alone on a cubic or
+  tetragonal phase now raises, and 14 test sites plus the holder-cell guide
+  had to move b and c with a.
+
+  *Done.* `symmetry.check_cell_ties` beside `check_cell_angles`, called from
+  `ParameterTable._collect_cell`; `SYMMETRY_LENGTH_RTOL` = 1e-5 (≤ 10 ppm in
+  d, under SRM 660c's 48 ppm band), tied angles on the existing
+  `SYMMETRY_ANGLE_TOL_DEG`. `cif._correct_cell_ties` (CIF and magCIF): a
+  tied entry within the two values' printed rounding, or within the table's
+  tolerance, snaps to its source; `CIF_CELL_TIE_CORRECTED` (warning) only
+  when the move passes the entry's own half-digit. `check_phase_cell_ties`
+  is the one helper for the project readers, the recipe reader and
+  `Project.create`, which refuses before it writes the directory.
+  `RefinementTree.load` repairs stored nodes (`HISTORY_CELL_TIE_CORRECTED`,
+  info, one per entry with the node count). GUI: the symmetry preview refuses
+  a contradicting tie; a limits-and-value edit of a source moves its
+  dependents. A phase stating its cell through a parent is checked under the
+  parent's group everywhere (`constrained_cell`). Audit rows, help entries,
+  manual (`reference/structure-files.md`), skill rows, release note.
+
+  *Measured* (`[dev]` venv, macOS arm64). Fast suite with a temporary probe
+  logging every tie check: 25 351 checks, round-off at most 1e-14 relative,
+  real disagreements 1e-4 and up. Indexing acceptance with the probe: 45
+  passed in 1100 s, 276 checks, largest deviation 1.9e-16, ranking
+  unchanged. On main, `Project.create` stored a root node holding b = 5.9
+  under `F m -3 m` (probe on a `git archive` of origin/main), which is why
+  the history repair exists. CIF scans: `tests/data` 16 read, 0 corrected,
+  0 refused; `~/Code/rietx-bench` 80 read (349 unreadable to the reader),
+  0 corrected, 0 refused. FASTCOUNT
+
+  *Review.* `/code-review high --fix` found 8: the six fixed are the parent
+  cell paths (helper, GUI preview, GUI edit, history repair, readers), a
+  release number in a help text, and a per-node group resolve. Declined:
+  (5) raising symmetry in the GUI is now blocked when the cell is merely
+  close to the new group's ties, since making the verb snap b to a is a
+  behaviour change for the maintainer; (7) a GUI edit moves a tied entry's
+  value but not its own limits, low impact.
+
+  *Overlap.* PR #1587 (Mike) edits `structure_from_cif` in `cif.py` too, in
+  the docstring, the symops refusal and an occupancy comment; no line of
+  this branch's hunks touches those.
+
+  *For the maintainer* (PR #1698). (1) Reader output: the table's refusal
+  text and the two codes' messages and suggestion are new reader output.
+  (2) Settled under the WP's Goal ("refused, by the reader or by the
+  table"): the table refuses rather than staying lenient, which breaks the
+  edit-`cell.a`-alone idiom; the alternative was to refuse in readers only.
+  (3) Settled on the `CIF_CELL_ANGLE_CORRECTED` precedent:
+  `CIF_CELL_TIE_CORRECTED` is a warning; the generality judge argues
+  `info`, as `CIF_ADP_SYMMETRY_PROJECTED` is, since nothing the reader can do
+  changes the fit.
+
+  *Generality* (judge's sections, unedited, in PR #1698's body; verdicts
+  here). `CIF_CELL_TIE_CORRECTED`: holds (response level weak).
+  `.suggestion`: holds. `HISTORY_CELL_TIE_CORRECTED`: holds.
+  `SYMMETRY_LENGTH_RTOL`: weak, because the measurement was not yet
+  written down and text project files (TOPAS, FullProf, EXP) do print
+  digits the helper ignores. Answer: the row now carries the measurement and
+  the docstring no longer claims those files print none; a text reader
+  snapping within its digits is not done. The su-free CIF band: holds.
+
+  *Gotchas.* A test that edits one cell entry of a tied group must edit its
+  ties too, or go through `set_values`. The backend-shim goldens were
+  computed on a model with a stale b; that builder now compiles the stale
+  model but builds the table from a consistent copy, so they stay
+  bit-identical.
+
+  Next: the maintainer reads the reader-output section of PR #1698 and rules
+  on (3); WP-1314's Jana reader adds its `check_phase_cell_ties` call.
 
 - **2026-11-18** — created, from the 2026-11-18 issue triage (issue #1669). Checked against
   the tree at 3f5167863: reproduced, a tied length builds from its source at 2 ppm and at
