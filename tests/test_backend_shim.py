@@ -193,6 +193,21 @@ def _state_nac():
     return model, table, {}
 
 
+def _ties_followed(sim_structure: rx.Structure) -> rx.Structure:
+    """``sim_structure`` with b moved to a, for the simulation's table.
+
+    The goldens were captured on simulations compiled with b left at its old
+    value while a moved, and the table then built b from a.  Since WP-2150 the
+    table refuses that cell, so the simulation still compiles the stale model
+    (its frozen windows are part of every golden) and decodes its values from
+    a copy whose b follows a: the same numbers, so every golden stays
+    bit-identical.
+    """
+    consistent = sim_structure.model_copy(deep=True)
+    consistent.phases[0].cell.b.value = consistent.phases[0].cell.a.value
+    return consistent
+
+
 def _toy_base(*, c_near_a: bool = False) -> tuple[rx.Structure, Instrument, PatternData]:
     """Deterministic rutile toy: y_obs from a perturbed copy of the model.
 
@@ -225,7 +240,7 @@ def _toy_base(*, c_near_a: bool = False) -> tuple[rx.Structure, Instrument, Patt
     sim_structure.phases[0].scale.value = 9.2e-3
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
-    sim_table = ParameterTable(sim_structure, instrument)
+    sim_table = ParameterTable(_ties_followed(sim_structure), instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 30.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
     return structure, instrument, pattern
@@ -300,7 +315,7 @@ def _state_toy_rich():
     sim_structure.phases[0].preferred_orientation.r.value = 0.9
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
-    sim_table = ParameterTable(sim_structure, instrument)
+    sim_table = ParameterTable(_ties_followed(sim_structure), instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 20.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
 
@@ -390,7 +405,7 @@ def _state_toy_capillary():
     sim_structure.phases[0].cell.a.value = 4.5987
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
-    sim_table = ParameterTable(sim_structure, instrument)
+    sim_table = ParameterTable(_ties_followed(sim_structure), instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 20.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
 
