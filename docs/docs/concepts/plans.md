@@ -34,11 +34,18 @@ The pattern, the mode and the fitted channels must be the same.
 No value may have been written since, by `set_values`, `edit`, `run_stage` or a checkout to another node.
 Changing what is free with `set_vary`, `hold` or `tie`, or passing another plan, keeps it a re-fit.
 An accepted fit is one with `status="converged"` and no error-level diagnostic.
-A project reopened at a converged fit's answer, and the GUI's second Refine, are re-fits too.
+A project reopened at a converged fit's answer is a re-fit too.
+The GUI's Refine always runs the plan in stages, so its stage ladder shows every stage's Rwp.
 
 If the one stage diverges or carries an error-level diagnostic, rietx discards it.
 The model goes back to where that stage started, the staged plan runs from there, and the result carries `WARM_REFIT_REJECTED`.
-`fit(..., refit="stages")` runs the plan in stages whatever the start.
+| `refit=` | A first fit | A re-fit |
+|---|---|---|
+| `"single"` (default) | the plan, in stages | one stage, `warm_refit`; if it is rejected, the plan in stages from the same start, with `WARM_REFIT_REJECTED` |
+| `"stages"` | the plan, in stages | the plan, in stages |
+
+`Refinement.fit` and `refine` both take `refit=`.
+`refine` builds a new `Refinement`, so it re-fits only when its `history` is a tree whose head is such a fit's answer.
 A plan with a stage that fixes parameters (`Stage.turn_off`) always runs in stages, because one stage cannot replay a fix that a later stage undid.
 A series has made the same choice per pattern since v0.5 ([How to refine a series of patterns](../guides/series.md)).
 
