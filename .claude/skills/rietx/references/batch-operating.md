@@ -303,14 +303,14 @@ Hypothesis: whole fits behave the same on threads, not timed; and on a machine
 the screen has to itself, the summed job time, 1.17× in the one pair run at
 load 9-13, bounds the gap when every worker stays busy.)*
 
-**9c.34 Switch the closing stage off for a screening batch with
-`plan.closing_window_tol = None`, and keep it on for the fits you report.**
-Every plan ends in a closing stage that refines everything again on windows
-dropping 1e-3 of each peak, and it costs **1.2-2.3×** a fit on the four
-acceptance patterns. Off, each answer lands 0.15-0.96 esd from the closing
-one and depends on the start values (0.75 esd apart on cpd-1a from two Biso
-starts, 0.07 with it on). Refit with it on the units a screen keeps and those
-near its cut, which a shift that size can carry across it, and say which
-setting each number came from: `result.stages[-1].name == "closing"`
-when it ran. *(Measured: WP-2002 on SRM 660c LaB6, the GSAS-II
-fluorapatite, CPD cpd-1a and 11-BM NAC, one fit each; no batch has timed it.)*
+**9c.34 A screening batch runs without a closing stage, the default since
+1.13; ask for one on the fits you report, with `plan.closing_window_tol =
+CLOSING_WINDOW_TOL` (1e-3, from `rietx.schemas.plan`).** It refines
+everything again on windows dropping 1e-3 of each peak, at **1.2-1.9×** the
+fit. Without it, answers land 0.16-2.0 esd from the closing one and can
+depend on the start values. Refit with it on the units a screen keeps and
+those near its cut, which a shift that size can carry across it, and say
+which setting each number came from: `result.stages[-1].name == "closing"`
+when it ran. *(Measured: WP-2222 on 11-BM NAC, CPD cpd-1a and cpd-2 and the
+bench's simulated trigger case, one fit each; WP-2002 on SRM 660c LaB6 and the
+GSAS-II fluorapatite; no batch has timed it.)*

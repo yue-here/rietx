@@ -76,6 +76,7 @@ from .model.absorption import (
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
+    WINDOW_AREA_TOL,
     CompiledModel,
     Mode,
     compile_model,
@@ -161,7 +162,6 @@ from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_R
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
-    CLOSING_WINDOW_TOL,
     PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
@@ -6530,12 +6530,14 @@ class Refinement:
         A project's ``run_stage`` passes its stored plan's.
 
         ``window_area_tol`` is the fraction of each peak's area this stage's
-        windows may drop.  ``None`` is ``schemas.plan.CLOSING_WINDOW_TOL``, the
-        fraction an answer is measured at: no closing stage follows a stage run
-        here, so its answer is computed on its own windows (WP-2002, the
-        seventh round's Q1).  Pass ``forward.WINDOW_AREA_TOL`` for the declared
-        stages' faster windows.  :meth:`cherry_pick` passes a recorded node's.
-        The stage's ``window_area_tol`` records the fraction it ran at.
+        windows may drop.  ``None`` is ``forward.WINDOW_AREA_TOL``, the
+        declared stages' 2 %, which a default fit measures its answer at since
+        the closing stage went off by default (WP-2222; until then it was
+        ``schemas.plan.CLOSING_WINDOW_TOL``, WP-2002's seventh round's Q1).
+        Pass ``CLOSING_WINDOW_TOL`` for an answer computed on near-complete
+        tails, at about 1.5-2× the stage's time.  :meth:`cherry_pick` passes a
+        recorded node's.  The stage's ``window_area_tol`` records the fraction
+        it ran at.
         """
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
@@ -6548,7 +6550,7 @@ class Refinement:
                     f"stage's windows may drop, a number strictly between 0 and 1, "
                     f"or None for the default; got {window_area_tol!r}") from None
         else:
-            window_area_tol = CLOSING_WINDOW_TOL
+            window_area_tol = WINDOW_AREA_TOL
         require_two_theta(data, "Refinement.run_stage()",
                           instrument=self.instrument)
         mode = mode or self._mode
@@ -6801,14 +6803,13 @@ class Refinement:
 
         A grid compiles at ``compile_model``'s default windows whatever this
         object has fitted, so a never-fitted twin carrying the same models
-        returns the same array.  That default is the closing stage's
-        ``CLOSING_WINDOW_TOL`` (WP-2002, the seventh round's Q1), the windows a
-        default fit measures its answer on, so a grid redraws a default fit's
-        ``y_calc`` and a synthetic pattern carries the tails a default fit
-        fits.  A plan with ``closing_window_tol=None`` measured its answer at
-        the declared stages' ``forward.WINDOW_AREA_TOL`` instead; redraw it
-        with ``compile_model(..., window_area_tol=recorded_window_tol(
-        result.stages[-1].window_area_tol))``.
+        returns the same array.  That default is ``CLOSING_WINDOW_TOL``
+        (WP-2002, the seventh round's Q1), so a synthetic pattern carries
+        near-complete tails.  A default fit measures its answer at the declared
+        stages' ``forward.WINDOW_AREA_TOL`` since the closing stage went off by
+        default (WP-2222), so a grid differs from its ``y_calc`` by the tails;
+        redraw a fit's own curve with ``compile_model(...,
+        window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))``.
         """
         table = ParameterTable(self.structure, self.instrument)
         if two_theta is None:

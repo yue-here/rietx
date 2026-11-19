@@ -63,10 +63,10 @@ the maintainer's ruling, and TOPAS's 2 % cut as named practice.
 
 ## Tasks
 
-- [ ] Flip the default on `PlanSpec` and `RefinementPlan`; the help text, docstrings and field descriptions say what the default is and what 1e-3 buys
+- [x] Flip the default on `PlanSpec` and `RefinementPlan`; the help text, docstrings and field descriptions say what the default is and what 1e-3 buys. `Refinement.run_stage`'s `window_area_tol=None` and a FitReport action applied in the GUI follow, to the declared stages' 2 %; `compile_model`, `predict` and the FitReport misfit keep evaluating at 1e-3
 - [ ] Tests: those that assumed a closing stage by default declare it, or assert the new default
-- [ ] Audit rows, manual (`reference/refinement.md` speed section), skill rows (`batch-operating.md` 9c.34), staged release notes
-- [ ] Skill: the opt-in row for a final answer, or "none" and why
+- [x] Audit rows, manual (`reference/refinement.md` speed section), skill rows (`batch-operating.md` 9c.34), staged release notes
+- [x] Skill: the opt-in row for a final answer: 9c.34 rewritten as the opt-in, and `series.md`'s runaway row says only an opted-in plan has a closing stage
 
 ## Acceptance
 

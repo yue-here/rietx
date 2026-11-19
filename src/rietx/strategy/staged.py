@@ -27,7 +27,7 @@ from ..schemas.common import Mode
 # need them at class-definition time and this module is the *upper* layer;
 # they are re-exported here, where plan policy is read.
 from ..schemas.plan import (
-    CLOSING_WINDOW_TOL,
+    CLOSING_WINDOW_TOL,  # noqa: F401  re-exported: the opt-in value, no longer a default here
     CORRELATION_GUARD,
     INTERMEDIATE_FTOL,
     PHASE_SUPPORT_SIGMA,
@@ -425,10 +425,11 @@ class RefinementPlan:
     #: the sixth round's Q1 and Q2).  After the declared stages, one more
     #: recompiles at the answer with these windows and solves with every glob
     #: the plan freed (:meth:`closing_stage`); :data:`CLOSING_WINDOW_TOL` says
-    #: what it fixes, what it costs and what other programs do.  ``None``
-    #: runs the declared stages alone, which reproduces every fit before the
-    #: field, bit for bit.
-    closing_window_tol: float | None = CLOSING_WINDOW_TOL
+    #: what it fixes, what it costs and what other programs do.  ``None``, the
+    #: default since WP-2222, runs the declared stages alone, which reproduces
+    #: every fit before the field, bit for bit; :data:`CLOSING_WINDOW_TOL` is
+    #: the opt-in for an answer to publish.
+    closing_window_tol: float | None = None
 
     def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
