@@ -104,8 +104,9 @@ def test_at_bound_names_exactly_the_paths_bound_hit_names():
     """
     data, structure, instrument = _nac()
     ref = rx.Refinement(structure, instrument)
-    a = ref.structure.phases[0].cell.a
-    a.value = 10.2490
+    cell = ref.structure.phases[0].cell
+    a = cell.a
+    a.value = cell.b.value = cell.c.value = 10.2490   # I 21 3 ties b and c to a
     a.min, a.max = 10.2000, 10.2500
     result = ref.fit(data, mode="lebail", two_theta_limits=LIMITS)
 

@@ -143,6 +143,29 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+def _cell_tie_fires() -> list:
+    """A cubic b printed 5.64101 beside a = 5.641: one value within the file's
+    digits, read as a and said (``cif.py``'s ``_correct_cell_ties``)."""
+    from tests.test_cell_ties import CIF, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    return _read_cif(CIF.format(symbol=symbol, **printed))
+
+
+def _cell_tie_silent() -> list:
+    """The same cell printed equal; b printed 5.641 beside a = 5.64101, inside
+    b's own rounding; and b = 5.900, past every band, which the reader leaves
+    for the table to refuse."""
+    from tests.test_cell_ties import CIF, PAST_PRINT, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    equal = dict(printed, b=printed["a"])
+    own = dict(printed, a="5.64101", b="5.641")
+    return (_read_cif(CIF.format(symbol=symbol, **equal))
+            + _read_cif(CIF.format(symbol=symbol, **own))
+            + _read_cif(CIF.format(symbol=PAST_PRINT[0][0], **PAST_PRINT[0][1])))
+
+
 # ---------------------------------------------------- the FullProf project reader
 
 
@@ -1042,6 +1065,8 @@ def _sigma_nonpositive_silent() -> list:
 
 
 SILENCE: dict[str, Pair] = {
+    "CIF_CELL_TIE_CORRECTED": Pair(
+        _cell_tie_fires, _cell_tie_silent, "tests/test_cell_ties.py"),
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
     "CIF_SITE_MULTIPLICITY_DISAGREES": Pair(
