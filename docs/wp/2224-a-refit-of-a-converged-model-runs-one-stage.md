@@ -1,6 +1,6 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; four questions wait on Yue (handover log)
+Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; Yue ruled on the four questions, the reworded text waits on Yue's look
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
 Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
@@ -139,7 +139,11 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
    (`set_values`, `edit`, a checkout to another node). `set_vary`, `hold`, `tie` and a changed
    plan keep it a re-fit. Anything else runs the staged plan. The strict side is the safe side:
    the staged plan reached 46 of 48 cold starts. Loosening it for a model swap that adds a block at
-   its identity value needs the measurement § Measured lacks.
+   its identity value needs the measurement § Measured lacks. Superseded in part 2026-11-19
+   by Yue's ruling: a changed plan or free set keeps it a re-fit only while the plan frees
+   nothing the converged fit's plan left fixed (`Refinement._plan_frees`, the
+   `refit_frees` node note). A released parameter is a cold start, so that fit runs staged.
+   A model swap through `edit` stays staged, ruled on the same ground.
 3. **Fallback.** One rung: a one-stage fit that is `_rejected` is discarded, the models go back
    to where the fit started, and the staged plan runs from there. The test is the series' own
    (`_rejected`, ruled 2026-11-03), and this WP adds no fence beside it: Yue's rulings on
@@ -151,7 +155,8 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
 5. **A project.** The history head is the working state, so a reopened `.rex` whose head is a
    converged fit of its pattern is a re-fit too. With `history=False` the fact is held on the
    `Refinement`. Superseded in part 2026-11-19: the GUI's Refine passes `refit="stages"`
-   until Yue rules on how the stage ladder shows one stage (handover log).
+   until it can show which way a run went. Yue ruled that it must ("there should be visual
+   feedback in the gui"), and WP-2226 carries it to the rebuilt Plan tab.
 
 ## Non-goals
 
@@ -217,6 +222,37 @@ evaluations.
   neighbour pattern in a wrong basin), WP-2222 (the closing stage off).
 
 ## Handover log
+
+- **2026-11-19 (rulings)** — Yue answered the four questions. A re-fit that frees a parameter
+  the converged fit held now runs in stages, because that parameter starts cold; on brucite the
+  March-Dollase case that landed 2.25 esd off in one stage now runs staged by itself and lands
+  on the staged answer exactly (68 evaluations either way). A model swap through `edit` stays
+  staged on the same ground. Yue found the display text unnatural, so it is reworded, and
+  `summary()` now states for every re-fit whether it ran in one stage or in stages, and why.
+  The GUI must show the same thing; that is WP-2226, filed for the rebuilt Plan tab, and today's
+  GUI stays staged meanwhile.
+
+  *Rulings, verbatim.* (1) "yes, default to staged if a new parameter is released, it is a
+  cold start as you say. it should be clear to users whether the run is staged or single."
+  (2) "as for 1, as it's a cold start." (3) "the text feels very AI/unnatural." (4) "there
+  should be visual feedback in the gui".
+
+  *Done.* `Refinement._plan_frees` gives the paths a plan leaves free, asked of
+  `ParameterTable.would_free` with each stage's `turn_off` applied in order. An accepted fit
+  records them beside its key, in memory and as the `refit_frees` node note (a JSON list), and
+  `fit` re-fits only when the new plan's set is a subset. `_refit_how` records which way a
+  re-fit went for the plan line. New text:
+  `plan: one stage (warm_refit), because the model had already converged on this pattern. refit="stages" runs scale_bkg, … in turn.`;
+  `plan: …, po, in stages, because this fit frees phases.0.preferred_orientation.r, which the last fit held.`;
+  `plan: …, in stages, after the one-stage re-fit was discarded.`; and
+  `WARM_REFIT_REJECTED`: `The one-stage re-fit diverged (Rwp 0.4521), so it was discarded and the plan was run in stages from the same start.`
+  (or `ended with MODEL_FAR_FROM_DATA` in place of `diverged`). The audit rows, the help entry,
+  the skill row (its Hypothesis tag is gone, the case it named now runs staged) and
+  `concepts/plans.md` follow. Three tests: a released parameter runs staged and the next fit
+  re-fits; a narrower plan stays one stage; `hold` keeps a re-fit and `unhold` runs staged.
+
+  *Next.* Yue reads the reworded lines above before merge (the reader-output rule). Then
+  WP-2226: Yue's three design questions there come before any building.
 
 - **2026-11-19 (implementation)** — A second `fit` on a model that its last fit of the same
   pattern left converged now runs one stage, `warm_refit`, freeing at once everything the plan
