@@ -6,7 +6,7 @@ general-purpose package. The block 20xx is claimed for it. [`../ROADMAP.md`](../
 § generality carries the short prose, and the WP index lists the rows.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 
@@ -356,6 +356,18 @@ decides then whether 2005 to 2007 run. If the holds and gates mostly pass both, 
 remaining value is the guard and the prose, which 2001 and 2009 deliver. WP-2010 is
 outside the gate: it audits features against Rule 2, whose premise the gate does not test
 and the validation matrix already measures, so it runs whatever the gate decides.
+
+**Ruled by Yue 2026-11-16: 2005 to 2007 run now.** They do not wait for WP-2004's counts.
+The ruling rests on a tally of the gate's two questions over WP-2002 and WP-2003, counted
+by Claude on 2026-11-16 from `main` `85e7b9437`. Its unit is the decision item: one action,
+threshold or default whose outcome a ruling fixed. Question 1 demoted 12 of 53 decided items
+in WP-2002 (23 %) and 18 of 55 in WP-2003 (33 %). Either question changed 25 of 53 (47 %) and
+22 of 55 (40 %). The Q1 demotions fall in two shapes. All six of WP-2002's removals were
+limits on physical quantities. Four of WP-2003's five demoted classes were series thresholds
+whose value decided whether a code fired. The Q2 half of the premise is untested. WP-2002's
+Q2 changes are mostly numerical settings that failed a precision test, and WP-2017's second
+pass has ruled only group A, which kept all seven rows. The ruling answers PR #1591's
+question 1. WP-2005 and WP-2007 are claimed by Mike.
 
 ## Acceptance
 

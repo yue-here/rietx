@@ -87,9 +87,10 @@ row to `docs/practice.md` once checked.
 
 ## Tasks
 
-- [ ] The ruling: whether the diagnostic exists and where it lives (report finding at the
+- [x] The ruling: whether the diagnostic exists and where it lives (report finding at the
   answer, validation on request, or nothing), and whether the opt-in two-model comparison
   is wanted. Record it as `Decided YYYY-MM-DD: …`.
+  Decided 2026-11-17: on demand, with no verdict band (handover log).
 - [ ] Reproduce the reporter's probe as a committed script, with a positive arm (split) and a
   negative arm (single atom), after #1088's fix.
 - [ ] The diagnostic as ruled: predicted Δχ² against the moment-matched alternative at the
@@ -121,6 +122,15 @@ row to `docs/practice.md` once checked.
 - The full list is in issue #1010 and its comment.
 
 ## Handover log
+
+- **2026-11-17** — Ruled by Yue 2026-11-17: the split-site test runs on demand only, with
+  no verdict band. Nothing fires at the answer. The test reports the predicted Δχ² and the
+  2√(U∥ − U⊥) bound, and the caller reads them. Ground: Yue's earlier rule for a diagnostic
+  of this kind, "a field, and the caller decides". Recorded from Part B item 44 of the
+  2026-11-17 decisions batch (Ghostshift runner, no code changed). Task 1 is ticked. Task 3
+  now reads without its verdict word. Two questions were not part of this ruling: the
+  opt-in two-model comparison (task 4), and the stored-format half of keeping a split on
+  the history node (Context). Next: task 2, the reporter's probe as a committed script.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1010). Checked against
   the tree at c0e32ab29: nothing fires between `TWIN_DISTANCE` (0.02 Å) and the 0.20 Å split
