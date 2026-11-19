@@ -122,6 +122,7 @@ def _as_phase():
     structure = FLUORAPATITE.model_copy(deep=True)
     structure.phases.append(ALUMINIUM.model_copy(deep=True).phases[0])
     structure.phases[1].cell.a.value = 4.05
+    structure.phases[1].cell.b.value = structure.phases[1].cell.c.value = structure.phases[1].cell.a.value  # the cell's ties follow a
     return rx.Refinement(structure, _instrument(), history=False)
 
 

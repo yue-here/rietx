@@ -201,6 +201,17 @@ nothing.
 
 ## Handover log
 
+- **2026-11-19** — Ruled by Yue 2026-11-19, in chat, answering a shift's
+  brief on PR #1332 (S0). The enantiomorph mirror is opt-in. S0's
+  `smaller_screw` defaults to `False`, so `standard_setting` keeps a
+  structure's hand unless the caller asks for the mirror. This makes Yue's
+  ruling the call that a Claude agent settled on 2026-11-17 in #1332's
+  review (its item A4). The grounds were reviewed as follows. Parthé & Gelato
+  (1984) invert to the smaller screw. spglib 2.8.0 keeps the hand, re-measured
+  2026-11-19 on the enantiomorph pairs 152/154, 212/213 and 169/170. Nothing
+  else in this WP changes. Next: S1a once #1332 has merged and 1452 has
+  landed.
+
 - **2026-11-03** — Yue reversed the table ruling in chat, accepting the
   contributor's proposal on issue #1330. S1 and S2 build on moyopy's
   `WyckoffPosition.coordinates` after [1452](1452-spglib-to-moyo.md), and

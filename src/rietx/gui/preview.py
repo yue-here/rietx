@@ -306,3 +306,24 @@ def evaluate(project, body: Any) -> Packed:
               "phases": [ph.name for ph in project.refinement.structure.phases],
               "ticks": ticks, "tick_hkl": tick_hkl}
     return Packed(header, arrays)
+
+
+def structure_at(project, body: Any):
+    """A copy of the working structure at values nobody has applied, for the
+    Structure graph's preview (WP-2218), writing nothing.
+
+    The edits go through :func:`_edited`, so the refusal is ``set_values``'
+    own and every tie and derived row follows them as it does for the curves.
+    """
+    edits = _edits(body)
+    base = _base(project)
+    r = project.refinement
+    structure = r.structure.model_copy(deep=True)
+    instrument = r.instrument.model_copy(deep=True)
+    with base.lock:
+        with _edited(project, base, edits):
+            try:
+                base.table.apply_to_models(structure, instrument)
+            except ValueError as exc:
+                raise GuiError(str(exc), where=sorted(edits)) from None
+    return structure
