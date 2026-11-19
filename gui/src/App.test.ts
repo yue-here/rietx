@@ -1157,14 +1157,26 @@ describe("the parameter table", () => {
     });
   });
 
-  it("treats a value typed back as it was drawn as no edit", async () => {
+  it("opens a value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1009's rule: the drawn value is compared, so a click in and out of a
-    // cell cannot truncate a parameter
+    // drawn as 4.1568(2), edited in full, as a spreadsheet cell is
+    numberAt("phases.0.cell.a").click();
+    await flush();
+    const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+    expect(editor.value).toBe("4.15678");
+    // WP-1009's rule against the text the editor opened on: Enter on it, or a
+    // click in and out, cannot truncate a parameter
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(host.textContent).not.toContain("pending edit");
+    // the drawn digits typed in are a different number, so they are an edit
     await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).toContain("1 pending edit");
+    // and the stored value typed back takes the edit away
+    await editValue("phases.0.cell.a", "4.15678");
     expect(host.textContent).not.toContain("pending edit");
   });
 
@@ -6536,6 +6548,49 @@ describe("the Interactive tab (WP-2128)", () => {
     await flush();
     expect(host.querySelector(".gtitle")!.textContent).toContain("Last fit");
     expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
+  });
+
+  it("opens a typed value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
+    // a w with 14 significant figures: a 12-digit box would read back different
+    const W = 0.0011090354888959;
+    const params = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "instrument.profile.w" ? { ...p, value: W } : p) };
+    const stub = server({ ...boot(), ...FITTED, "/api/params": () => ({ body: params }),
+                          "/api/preview": preview });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Interactive")!.click();
+    await flush();
+    const box = () => panel().querySelector<HTMLButtonElement>("button.num")!;
+    const typedInput = () => panel().querySelector<HTMLInputElement>("input.typed")!;
+    const enter = async (text?: string) => {
+      box().click();
+      await flush();
+      if (text !== undefined) {
+        typedInput().value = text;
+        typedInput().dispatchEvent(new Event("input", { bubbles: true }));
+        await flush();
+      }
+      typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flush();
+    };
+
+    box().click();
+    await flush();
+    expect(typedInput().value).toBe("0.0011090354888959");
+    typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/preview")).toBe(false);
+    expect(host.querySelector(".actions .pending")?.textContent ?? "").toBe("");
+
+    // the box reads ×10ⁿ as the range fields do
+    await enter("1.5×10⁻³");
+    expect(stub.calls.filter((c) => c.path === "/api/preview").at(-1)!.body.values)
+      .toEqual({ "instrument.profile.w": 0.0015 });
+    // leave nothing pending, or its recovery copy is written into the next test
+    bar("Revert").click();
+    await flush();
   });
 
   it("frames single peaks in a graph tab of their own", async () => {

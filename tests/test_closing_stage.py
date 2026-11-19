@@ -4,7 +4,8 @@ Every stage freezes its peak windows at the values it starts from, and drops
 ``forward.WINDOW_AREA_TOL`` (2 %) of each peak's area.  So a plan ends with one
 more stage: recompiled at the answer, with windows dropping
 ``RefinementPlan.closing_window_tol`` (1e-3), and solved with every glob the
-plan freed.  ``None`` runs the declared stages alone.  These tests pin the
+plan freed.  ``None``, the default since WP-2222, runs the declared stages
+alone, so every plan here that wants one declares it.  These tests pin the
 plumbing: which stages run, at which tolerances, what the record says, and
 that every surface that reruns a stage reruns it at its windows.  What the
 closing stage buys in accuracy is ``tests/test_window_domain.py``'s.
@@ -42,7 +43,7 @@ def pattern():
 def closed(pattern):
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins)
-    return ref, ref.fit(pattern, plan=_plan())
+    return ref, ref.fit(pattern, plan=_plan(closing_window_tol=CLOSING_WINDOW_TOL))
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +54,7 @@ def unclosed(pattern):
 
 
 def test_a_plan_runs_its_stages_then_one_freeing_every_glob_at_tight_windows():
-    plan = _plan()
+    plan = _plan(closing_window_tol=CLOSING_WINDOW_TOL)
     assert plan.closing_window_tol == CLOSING_WINDOW_TOL == 1e-3
     names = [s.name for s in plan.run_stages()]
     assert names == ["scale_bkg", "cell", CLOSING_STAGE_NAME]
@@ -77,6 +78,9 @@ def test_a_plan_runs_its_stages_then_one_freeing_every_glob_at_tight_windows():
 
 
 def test_none_runs_the_declared_stages_alone():
+    # the default since WP-2222, on both mirrors
+    assert _plan().closing_window_tol is None
+    assert PlanSpec().closing_window_tol is None
     plan = _plan(closing_window_tol=None)
     assert plan.closing_stage() is None
     assert [s.name for s in plan.run_stages()] == ["scale_bkg", "cell"]
@@ -98,7 +102,6 @@ def test_the_setting_round_trips_through_the_mirror_and_the_series_collapse():
     spec = PlanSpec.from_plan(plan)
     assert spec.closing_window_tol == 2e-3
     assert PlanSpec.model_validate_json(spec.model_dump_json()).to_plan() == plan
-    assert PlanSpec().closing_window_tol == CLOSING_WINDOW_TOL
     # a warm series refit is the compressed plan, and keeps its closing stage
     for tol in (2e-3, None):
         assert _collapse(_plan(closing_window_tol=tol)).closing_window_tol == tol
@@ -110,10 +113,11 @@ def test_a_fit_records_the_closing_stage_and_its_windows(closed, unclosed):
     assert [s.ftol for s in result.stages] == [1e-6, None, None]
     nodes = [n for n in ref.history.nodes.values() if n.action.kind == "stage"]
     assert [n.action.window_area_tol for n in nodes] == [None, None, 1e-3]
-    # each line replays what ran: run_stage's own default is the closing
-    # fraction, so the closing node names no window and a declared one its 2 %
-    assert "window_area_tol" not in nodes[-1].action.api_call()
-    assert nodes[0].action.api_call().endswith("window_area_tol=0.02)")
+    # each line replays what ran: run_stage's own default is the declared
+    # stages' 2 % since WP-2222, so a declared node names no window and the
+    # closing node its 1e-3
+    assert "window_area_tol" not in nodes[0].action.api_call()
+    assert nodes[-1].action.api_call().endswith("window_area_tol=0.001)")
     # the trials a report runs on the caller's behalf compare χ² with this
     # fit's, so they inherit its answer windows
     assert ref._plan_settings["window_area_tol"] == 1e-3
@@ -122,8 +126,8 @@ def test_a_fit_records_the_closing_stage_and_its_windows(closed, unclosed):
     assert [s.name for s in result_u.stages] == ["scale_bkg", "cell"]
     assert all(n.action.window_area_tol is None
                for n in ref_u.history.nodes.values() if n.action.kind == "stage")
-    # resolved, since a trial hands it to run_stage, whose None is the closing
-    # fraction: a 2 % fit's trials refit at 2 %
+    # resolved, so a trial handing it to run_stage says what it means: a 2 %
+    # fit's trials refit at 2 %
     assert ref_u._plan_settings["window_area_tol"] == WINDOW_AREA_TOL
     # the closing stage moves the answer, if only a little, on this fixture
     assert result.statistics.chi2 != result_u.statistics.chi2

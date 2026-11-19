@@ -18,6 +18,8 @@ CI.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rietx.gui import GuiSession
@@ -188,7 +190,9 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -1169,7 +1173,9 @@ def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
     _frames(page)
     before = page.evaluate(SNAP, WINDOW_LANDMARKS)
     page.locator(".params .row button.ink").first.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -1282,6 +1288,66 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
           f"{min(redraws):.0f}-{max(redraws):.0f} ms")
     assert not failures, "\n".join(failures)
+
+
+def test_a_clicked_value_opens_on_its_full_value_and_enter_on_it_is_no_edit(browser, gui):
+    """WP-2223, the spreadsheet model: a value drawn as ×10ⁿ opens on its
+    stored value to the last digit, and Enter on that text records nothing,
+    in the Interactive tab's box and in the Parameters panel's editor. A
+    ×10ⁿ value typed into the box is a pending edit at that value."""
+    url, client = gui
+    stored = {r["path"]: r["value"] for r in client.get("/api/params")[1]["parameters"]}
+    page = _open_window(browser, url)
+    pending = page.locator(".actions .pending")
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+    page.wait_for_selector("section.model .interactive .slider")
+    # a nonzero value drawn as ×10ⁿ: a digit from 1 to 9 before the ×
+    shown = re.compile(r"^[^×]*[1-9][^×]*×10")
+    slider = page.locator("section.model .interactive .slider").filter(
+        has=page.locator("button.num", has_text=shown)).first
+    path = slider.locator("button.pname").get_attribute("data-pop")
+    box = slider.locator("button.num")
+    drawn = box.text_content()
+    box.click()
+    typed = page.locator("section.model .interactive input.typed")
+    typed.wait_for()
+    text = typed.input_value()
+    # the full value as typed text: it reads back as the stored double exactly
+    assert "×" not in text and float(text) == stored[path], (path, text, drawn, stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not typed.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+
+    # typed as the range fields read it
+    box.click()
+    typed.wait_for()
+    page.keyboard.type("1.5×10⁻³")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert pending.text_content().strip() == "1 pending", pending.text_content()
+    box.click()
+    typed.wait_for()
+    assert typed.input_value() == "0.0015", typed.input_value()
+    page.keyboard.press("Escape")
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+
+    page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+    cell = page.locator(".params .row button.ink", has_text=shown).first
+    cell.wait_for()
+    path = cell.get_attribute("data-path")
+    cell.click()
+    editor = page.locator("input.editor")
+    editor.wait_for()
+    assert float(editor.input_value()) == stored[path], (path, editor.input_value(), stored[path])
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert not editor.count()
+    assert pending.text_content().strip() == "", pending.text_content()
+    assert not page.errors, page.errors
+    page.close()
 
 
 #: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
