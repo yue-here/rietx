@@ -10,7 +10,7 @@ chat. The six rules carry the maintainer's answer to each, and all six are accep
 § Acceptance are the session's wording and wait for the maintainer's read.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 

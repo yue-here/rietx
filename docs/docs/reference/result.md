@@ -323,9 +323,14 @@ Each entry is a `Diagnostic`:
 | `Diagnostic.where` | the parameter paths involved |
 | `Diagnostic.value` | the headline number where the code has one, such as a correlation's ρ or an absorption's block R²; `None` means no single number, not zero |
 | `Diagnostic.explanation` | what the code means and why it fires |
+| `Diagnostic.view` | the rendered view that shows the finding, such as `"plot_for_vlm.residual"`; `None` where no view has been checked for the code, which is most codes |
 
 `Diagnostic.explanation` is the same for every finding with that code, so it is looked up in `rietx.help.DIAGNOSTIC_HELP` when read.
 It is `None` for a code this version does not describe.
+`Diagnostic.view` is also looked up by code, in `rietx.help.DIAGNOSTIC_VIEW_OF`.
+Each name it returns is a panel of `rietx.viz.plot_for_vlm`, and `rietx.help.DIAGNOSTIC_VIEWS` says what that panel draws.
+The view is a name and never an image, so you decide whether to draw it.
+A code names a view only where a fit firing it was drawn and the finding could be read off that panel.
 [Diagnostic codes](diagnostics.md) lists every code.
 
 The codes are an open vocabulary on purpose, so a new correction ships with the diagnostic that states what it changed.
@@ -545,6 +550,7 @@ It never calls `Refinement.summary`, which builds a report.
 A notebook asks for the text each time a cell displays the refinement.
 In a notebook, a `RefinementResult`, an `IndexingResult` and a `PeakList` add to their text.
 Under each diagnostic's `help:` line, a `means:` line gives its `Diagnostic.explanation`.
+Where the code has a view, a `see:` line under it names the panel that shows the finding.
 A result then lists `RefinementResult.parameters` in columns headed `path`, `value` and `at_bound`.
 An `equations` column follows when a parametric equation set a row.
 The display is one block of fixed-width text, so its columns stay aligned in GitHub's notebook viewer as well as in JupyterLab.
