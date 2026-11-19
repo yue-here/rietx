@@ -239,7 +239,7 @@ from .structure import Cell
 #: that found agreement, a declared ``n_unindexed`` and a position-only list
 #: rank exactly as before.
 #: 1.12 → 1.13 (WP-1910, ruled on #1178, the first change to what this string
-#: stamps since 1.11.0): with ``refine_cell=True`` a screen that names a class
+#: stamps since 1.12.0): with ``refine_cell=True`` a screen that names a class
 #: is checked by a second screen at the prefit's cell, held, from the declared
 #: instrument (an all-zero background seeded first, as the prefit seeds it), and
 #: ``best_or_none()`` abstains when the two name different classes
