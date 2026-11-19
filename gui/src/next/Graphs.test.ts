@@ -33,13 +33,25 @@ const answer = {
   arrays: { two_theta: Float64Array.from([10, 20]), y_obs: Float64Array.from([5, 6]),
             y_background: Float64Array.from([4, 4]), band_esd: Float64Array.from([0.1, 0.1]) },
 };
-vi.mock("../api", async (original) => ({
-  ...(await original<typeof import("../api")>()),
-  api: { background: (hold: string[]) => { background(hold); return Promise.resolve(new ArrayBuffer(0)); } },
-}));
+/** the holds the last band was fetched with: the answer echoes them, as the
+ *  server's `pending_holds` does; a hold on "refused.*" is answered 400 */
+let lastHold: string[] = [];
+vi.mock("../api", async (original) => {
+  const real = await original<typeof import("../api")>();
+  return {
+    ...real,
+    api: { background: (hold: string[]) => {
+      background(hold);
+      lastHold = hold;
+      return hold.some((h) => h.startsWith("refused."))
+        ? Promise.reject(new real.ApiError(400, { error: { message: "no parameter to hold: refused.x" } }))
+        : Promise.resolve(new ArrayBuffer(0));
+    } },
+  };
+});
 vi.mock("./rxplot.mjs", async (original) => ({
   ...(await original<typeof import("./rxplot.mjs")>()),
-  unpack: () => answer,
+  unpack: () => ({ ...answer, header: { ...answer.header, pending_holds: lastHold } }),
 }));
 
 import Background from "./Background.svelte";
@@ -111,7 +123,7 @@ describe("the Background graph (rows 63-68)", () => {
     const holds = new Map([["instrument.background.c1", true], ["phases.0.cell.a", true]]);
     app = mount(Background, { target: document.body, props: { head: "n1", holds, onhold } });
     await settle(() => document.querySelectorAll(".chips .term").length === 3);
-    expect(background).toHaveBeenLastCalledWith(["instrument.background.c1"]);
+    expect(background).toHaveBeenLastCalledWith(["instrument.background.c1", "phases.0.cell.a"]);
     expect(titleText()).toBe("Background preview");
     const chips = [...document.querySelectorAll<HTMLButtonElement>(".chips .term")];
     expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"]);
@@ -121,6 +133,28 @@ describe("the Background graph (rows 63-68)", () => {
     expect([...document.querySelectorAll('[aria-label="Type"] button')].map((b) => b.getAttribute("aria-pressed")))
       .toEqual(["true", "false"]);
     expect(document.querySelector<HTMLInputElement>('input[aria-label="Terms"]')!.value).toBe("3");
+  });
+
+  it("reads a pending glob hold on the chips and fetches the band with it", async () => {
+    const holds = new Map([["instrument.background.*", true]]);
+    app = mount(Background, { target: document.body, props: { head: "n1", holds } });
+    await settle(() => document.querySelectorAll(".chips .term").length === 3);
+    expect(background).toHaveBeenLastCalledWith(["instrument.background.*"]);
+    expect([...document.querySelectorAll(".chips .term")].map((c) => c.getAttribute("aria-pressed")))
+      .toEqual(["true", "true", "true"]);
+    expect(titleText()).toBe("Background preview");
+  });
+
+  it("never calls a band drawn without the holds a preview", async () => {
+    // the band at rest, then a pending hold whose fetch is refused: the band
+    // on screen is still the one without it, and the title says so
+    app = mount(Background, { target: document.body, props: { head: "n1" } });
+    await settle(() => document.querySelectorAll(".chips .term").length === 3);
+    unmount(app);
+    app = mount(Background, { target: document.body,
+                              props: { head: "n1", holds: new Map([["refused.x", true]]) } });
+    await settle(() => titleText().includes("Band refused"));
+    expect(titleText()).toBe("Background at the current values Band refused");
   });
 
   it("offers no dimensionless stiffness stop on a λ in intensity units", async () => {

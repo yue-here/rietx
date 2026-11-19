@@ -401,6 +401,11 @@ Filled in by the session that builds each PR.
     (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_preview`): 288
     passed. Every browser file by glob (`tests/*_browser.py`), serially: 170 passed. CI's
     Vale steps, run as `ci.yml` runs them: 0 errors.
+  - *Later the same day*: merged PR #1680's nine review fixes (its entry lists them). The
+    browser test file kept both branches' new cases, and the dist was rebuilt. Fast suite
+    14955 passed, 424 skipped, 32 xfailed, five more than 14950 (PR #1680's four python cases
+    and its browser case). Vitest 846. svelte-check 0 errors in 456 files. GUI python files
+    302 passed. Browser glob 171 passed. Ruff and CI's Vale steps clean.
   - *Next*: PR #1684 takes the same merge, then § Rulings 6 (the Peak shape row).
 
 - **2026-11-19** — Yue's rulings of 2026-11-19 applied to the second PR, PR #1680.
@@ -431,7 +436,7 @@ Filled in by the session that builds each PR.
   - *Review*: `/code-review high` against the previous head (43eddfb48) returned ten. One was
     on this round's code and is fixed: the Peaks graph rebuilt the preview's net curve per
     window on every frame, six times now. The other nine are on the earlier commits of this
-    PR, mostly the Background graph, and are left for the PR's review: committed holds that
+    PR, mostly the Background graph, and the next bullet fixes them: committed holds that
     survive a Type switch or a Terms cut and land on the new background's coefficients of the
     same name; pending value and vary edits on removed terms that make the next Apply
     refused; the "Background preview" title read from the client's holds rather than the
@@ -439,6 +444,31 @@ Filled in by the session that builds each PR.
     out of the band; the TypeScript port of `for_range` with no corpus replay; the band cache
     keeping one answer; a console echo that does not match the Terms edit; and `.vg` copied
     into three files.
+  - *Review findings fixed* (later on 2026-11-19, on the lead's word under the merge rule):
+    all nine, each behaviour fix with a case made to fail first. A Type switch or a Terms
+    change now also asks the hold and free registers, which `Refinement` keeps by path:
+    `PATCH /api/instrument` takes `unhold` (released before the edit) and `free` (freed
+    after), all or nothing. So a held Chebyshev `c3` no longer holds the P-spline's `c3`, a
+    cut term's hold no longer comes back with it, and terms an extension or a switch adds
+    start free; before, every coefficient past the old count was built fixed. The Parameters
+    panel drops its pending values, flags, holds and limits on the paths such an edit removed
+    or redefined, and on every reload those on paths the working state no longer has,
+    whatever moved the head. The title reads the answer's `pending_holds`; the band takes
+    every pending hold, globs and other parameters' included, resolved as the hold verb
+    resolves them; the cache keeps one answer per set of holds; the P-spline the switch
+    builds is held equal to `BackgroundPSpline.for_range` by a committed corpus
+    (`tests/data/gui/background_cases.json`); the console echoes the Python each edit runs;
+    `.vg` is drawn once, in `next.css`. Tests: `tests/test_gui_background.py` (4), vitest
+    `next/background.test.ts` (5) and `next/Graphs.test.ts` (2), and the browser case
+    `test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit`. Not
+    generalised: a hold already in the register on a path a cut removed before this fix
+    still comes back with that path; `.rxt` and the old Background tab can change the
+    background without releasing its holds (the package keeps a vanished path's hold on
+    purpose, for a checkout); pending positions and restraints are not pruned. Measured:
+    fast suite 14953 passed, 424 skipped, 32 xfailed, five more than 14948 (four
+    python cases and the browser case); vitest 838 of 838, seven more than 831;
+    svelte-check 0 errors in 453 files; GUI python files 271 passed; every browser
+    file by glob, serially, 170 passed; ruff and CI's Vale steps clean.
   - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.0, Python 3.12):
     fast suite 14948 passed, 424 skipped and 32 xfailed in 9:55, through the shift's serial
     lock: two more than this PR's last count, the new palette test in each theme. Vitest 831

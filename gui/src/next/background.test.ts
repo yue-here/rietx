@@ -1,7 +1,15 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TERMS, LAMBDA_STOPS, knots, lambdaStop, pendingBackgroundHolds,
-         switchKind, withTerms } from "./background";
+import { DEFAULT_TERMS, LAMBDA_STOPS, heldWith, kindArms, kindEcho, knots, lambdaStop,
+         pendingHolds, switchKind, termsArms, termsEcho, withTerms } from "./background";
+
+/** `BackgroundPSpline.for_range`'s answers, written by `tests/test_gui_background.py`. */
+const corpus: { cases: Array<{ lo: number; hi: number; breakpoints: number[]; n_coefficients: number;
+                               lambda_smooth: number; lambda_units: string }> } = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../../../tests/data/gui/background_cases.json", import.meta.url)),
+               "utf-8"));
 
 const cheb = (n: number) => ({
   geometry: { kind: "bragg_brentano" },
@@ -51,7 +59,7 @@ describe("the rebuilt Background graph's controls (WP-2218)", () => {
     expect(lambdaStop(0)).toBe(0);
   });
 
-  it("fetches the band with the background's pending holds alone", () => {
+  it("fetches the band with every pending hold, globs and other parameters' too", () => {
     const holds = new Map([
       ["instrument.background.c3", true],
       ["instrument.background.c1", true],
@@ -59,7 +67,53 @@ describe("the rebuilt Background graph's controls (WP-2218)", () => {
       ["phases.0.cell.a", true],
       ["phases.0.atoms.1.dof.*", true],
     ]);
-    expect(pendingBackgroundHolds(holds)).toEqual(
-      ["instrument.background.c1", "instrument.background.c3"]);
+    expect(pendingHolds(holds)).toEqual(["instrument.background.c1", "instrument.background.c3",
+                                         "phases.0.atoms.1.dof.*", "phases.0.cell.a"]);
+  });
+
+  it("reads a chip held through a pending glob, its own entry first", () => {
+    const holds = new Map([["instrument.background.*", true], ["instrument.background.c2", false]]);
+    expect(heldWith("instrument.background.c4", false, holds)).toBe(true);
+    expect(heldWith("instrument.background.c2", true, holds)).toBe(false);
+    expect(heldWith("instrument.background.c4", true, new Map())).toBe(true);
+  });
+
+  it("builds the P-spline for_range builds, case for case", () => {
+    expect(corpus.cases.length).toBeGreaterThan(5);
+    for (const c of corpus.cases) {
+      expect(knots(c.lo, c.hi)).toEqual(c.breakpoints);
+      const bg = switchKind(cheb(6), "pspline", c.lo, c.hi).background;
+      expect(bg.breakpoints).toEqual(c.breakpoints);
+      expect(bg.coefficients).toHaveLength(c.n_coefficients);
+      expect([bg.lambda_smooth, bg.lambda_units]).toEqual([c.lambda_smooth, c.lambda_units]);
+    }
+  });
+
+  it("releases and frees what a Type switch redefines", () => {
+    const arms = kindArms();
+    expect([arms.unhold, arms.free]).toEqual([["instrument.background.*"], ["instrument.background.*"]]);
+    expect(arms.gone("instrument.background.c7")).toBe(true);
+    expect(arms.gone("phases.0.scale")).toBe(false);
+  });
+
+  it("releases the held terms a cut removes and frees the terms an extension adds", () => {
+    const terms = [0, 1, 2, 3, 4, 5].map((k) => ({ path: `instrument.background.c${k}`, held: k === 2 || k === 5 }));
+    const cut = termsArms(terms, 4);
+    expect(cut.unhold).toEqual(["instrument.background.c5"]);
+    expect(cut.free).toEqual([]);
+    expect([cut.gone("instrument.background.c4"), cut.gone("instrument.background.c3")]).toEqual([true, false]);
+    const more = termsArms(terms, 8);
+    expect(more.unhold).toEqual([]);
+    expect(more.free).toEqual(["instrument.background.c6", "instrument.background.c7"]);
+    expect(more.gone("instrument.background.c5")).toBe(false);
+  });
+
+  it("echoes the Python each edit runs, the kept values and the bounds sent", () => {
+    expect(termsEcho(6, 4)).toBe("instrument.background.coefficients = instrument.background.coefficients[:4]");
+    expect(termsEcho(6, 8)).toBe(
+      "instrument.background.coefficients += [Parameter(value=0.0, vary=True) for _ in range(2)]");
+    expect(kindEcho("pspline", 5.0012345678, 130)).toBe(
+      "instrument.background = BackgroundPSpline.for_range(5.0012345678, 130.0)");
+    expect(kindEcho("chebyshev", 5, 130)).toBe(`instrument.background = BackgroundChebyshev.with_terms(${DEFAULT_TERMS})`);
   });
 });

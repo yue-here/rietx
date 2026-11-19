@@ -725,6 +725,7 @@
           {:else if graphTab === "background"}
             <Background {head} {busy} {theme} {say} protocol={protocolKey} holds={pendingHolds}
               onhold={(path, held, serverHeld) => paramsPanel?.setHold(path, held, serverHeld)}
+              ondropped={(gone) => paramsPanel?.dropPending(gone)}
               onmoved={structureMoved} />
           {:else if graphTab === "structure"}
             <Structure {head} {busy} {theme} {say} values={sliderValues}

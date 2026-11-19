@@ -402,13 +402,6 @@
     flex-direction: column;
   }
 
-  .vg {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-  }
-
   /* the counts are the script's (cols, rows), so the grid holds what was picked */
   .wins {
     flex: 1 1 auto;

@@ -254,3 +254,12 @@ button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
   font-size: var(--text-sm);
   color: var(--muted);
 }
+
+/* a control's label and its control, one group: the graphs' title lines
+   and the action bar's Refine choice draw it alike */
+.vg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}

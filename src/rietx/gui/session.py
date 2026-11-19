@@ -1780,12 +1780,49 @@ class GuiSession:
         return {"node_id": node, **self.structure()}
 
     def instrument_patch(self, body: dict) -> dict:
+        """Replace the instrument: one ``edit_model`` node.
+
+        Two optional arms carry the Background graph's Type switch and Terms
+        change (WP-2218 review), because the hold and free registers are
+        declarations about a *path* and an edit keeps them: ``Refinement``
+        reapplies both by name to whatever the new model calls ``c3``.
+        ``unhold`` lists held paths or globs to release before the edit (one
+        ``set_hold`` node), or a Chebyshev ``c3`` held would hold the new
+        P-spline's ``c3``, and a cut ``c5`` the ``c5`` a later extension adds.
+        ``free`` lists paths or globs to free after it (one ``set_vary``
+        node), since a coefficient the old background did not have, or had
+        fixed, is otherwise built fixed whatever its ``vary`` says. All the
+        verbs run on a history-free copy first (:func:`rehearse`), so a refusal
+        from any leaves the holds, the model and the history as they were.
+        """
         self._require_idle()
-        node = self._edit(
-            instrument=_as_instrument(_with_file_optics(
-                _need(body, "instrument"),
-                lambda: self._need_project().data.metadata), self.uploads),
-            label=body.get("label") or "instrument edited")
+        p = self._need_project()
+        unhold = body.get("unhold") or []
+        free = body.get("free") or []
+        for arm, globs in (("unhold", unhold), ("free", free)):
+            if not isinstance(globs, list) or not all(isinstance(g, str) for g in globs):
+                raise GuiError(f"'{arm}' is a list of dot-paths or globs", where=[arm])
+        instrument = _as_instrument(_with_file_optics(
+            _need(body, "instrument"), lambda: p.data.metadata), self.uploads)
+        label = body.get("label") or "instrument edited"
+
+        def apply(ref) -> str | None:
+            arm = "unhold"
+            try:
+                if unhold:
+                    ref.unhold(unhold)
+                node = _edit_on(ref, instrument=instrument, label=label)
+                arm = "free"
+                if free:
+                    ref.set_vary(free, True)
+                    node = ref._head_id
+            except ValueError as exc:
+                raise GuiError(str(exc), where=[arm]) from None
+            return node
+
+        if unhold or free:
+            rehearse(p.refinement, apply)
+        node = apply(p.refinement)
         return {"node_id": node, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
