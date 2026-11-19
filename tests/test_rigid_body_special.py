@@ -40,7 +40,7 @@ from rietx.io.projects.gsas2 import read_gsas2_gpx, to_structure
 from rietx.io.readers import read_pattern
 from rietx.model.forward import compile_model
 from rietx.optimize.qpa import phase_zmv
-from rietx.params.bodies import RigidBodyBlock
+from rietx.params.bodies import RigidBodyBlock, site_reach
 from rietx.params.derived import cartesian_frame
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -288,7 +288,7 @@ def test_the_polar_law_would_take_diacetylene_out_of_its_mirror():
     assert abs(wrong @ u) < 1e-9 and abs(wrong[1]) < 1e-12   # in the mirror plane
     good = RigidBodyBlock(phase_base="p", body_base="b", atom_bases=["a"] * 6,
                           template=block.template, q0=block.q0,
-                          site_axes=wrong.reshape(3, 1))
+                          site_axes=wrong.reshape(3, 1), site_reach=site_reach(m))
     x[9] = math.radians(1.0)
     moved = good.evaluate(x).reshape(-1, 3)
     out = float(np.abs(moved[:, 1] - 0.75).max() * phase.cell.b.value)
@@ -880,6 +880,119 @@ def test_a_linear_body_off_its_site_axis_by_cif_precision_is_accepted():
             assert not ok, exc
             continue
         assert ok and _dofs(table) == (2, 1)
+
+
+# ------------- #1226's finding: the linear axis test's tilt bound is in radians
+CO = 1.16  # Å, the C-O bond of the CO2-like body
+
+
+def _co2(space_group: str, cell, at, group=None) -> Phase:
+    """A CO2-like body, C at ``at`` and each O ``CO`` Å from it, whose typed
+    offsets the caller adds; ``group`` sets every atom's ``disorder_group``,
+    which exempts the body from the overlap refusal."""
+    P = Parameter
+    return Phase(name="co2", space_group=space_group, cell=Cell(**{
+        k: P(value=v) for k, v in zip(("a", "b", "c", "alpha", "beta", "gamma"), cell,
+                                      strict=True)}),
+        atoms=[Atom(label=label, species=label[0], x=P(value=x), y=P(value=y),
+                    z=P(value=z), disorder_group=group)
+               for label, (x, y, z) in zip(("C", "O1", "O2"), at, strict=True)])
+
+
+def _mirror_co2(b: float, dy1: float, dy2: float = 0.0, group=None) -> Phase:
+    """The body in the P n m a mirror y = ¼, along a, O1 and O2 typed ``dy1``
+    and ``dy2`` (fractional) off it."""
+    dx = CO / 8.0
+    return _co2("P n m a", (8.0, b, 7.0, 90.0, 90.0, 90.0),
+                [(0.3, 0.25, 0.3), (0.3 + dx, 0.25 + dy1, 0.3), (0.3 - dx, 0.25 + dy2, 0.3)],
+                group)
+
+
+def _axis_co2(dx: float, dz: float, dx2: float = 0.0, group=None) -> Phase:
+    """The body along the P 1 2 1 2-fold (0, y, 0), O1 typed ``dx``, ``dz``
+    and O2 ``dx2`` (fractional) off it."""
+    dy = CO / 8.0
+    return _co2("P 1 2 1", (7.0, 8.0, 9.0, 90.0, 100.0, 90.0),
+                [(0.0, 0.3, 0.0), (dx, 0.3 + dy, dz), (dx2, 0.3 - dy, 0.0)], group)
+
+
+def _build_co2(phase: Phase) -> ParameterTable:
+    body = body_from_atoms(phase, ["C", "O1", "O2"], "CO2", origin="C", rotation_vary=True)
+    return ParameterTable(_with_body(phase, body), LAB)
+
+
+def _bound(phase: Phase) -> float:
+    """The derived tilt bound, from the arithmetic alone: SITE_TOL × the cell's
+    longest body diagonal (Å) × Σ|s_i| / Σ s_i², with s = (0, ±CO) along the
+    body, so ÷ CO."""
+    from rietx.crystallography.symmetry import SITE_TOL
+
+    m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
+    diag = max(float(np.linalg.norm(m @ np.array(s, dtype=np.float64)))
+               for s in ((1, 1, 1), (1, 1, -1), (1, -1, 1), (-1, 1, 1)))
+    return SITE_TOL * diag / CO
+
+
+@pytest.mark.parametrize("b", [6.0, 20.0])
+def test_a_linear_body_typed_within_the_mirror_snap_builds_at_any_cell_edge(b):
+    """#1226's finding: the axis test compared the sine of a tilt with the
+    fractional SITE_TOL, so on ``main`` this body, whose atoms all pass the site
+    check, was refused at "90°" from an O typed 4e-5 off at b = 6 Å and 2e-5 at
+    b = 20 Å.  Every offset the mirror snaps (up to SITE_TOL/2) builds with its
+    one turn about the normal, the two O on opposite sides included, and the
+    block's bound is the arithmetic's."""
+    from rietx.crystallography.symmetry import SITE_TOL
+
+    h = SITE_TOL / 2.0 * (1.0 - 1e-6)
+    for dy1, dy2 in ((1e-5, 0.0), (2e-5, 0.0), (4e-5, 0.0), (h, 0.0), (h, -h)):
+        table = _build_co2(_mirror_co2(b, dy1, dy2))
+        block = table._bodies[0][2]
+        assert block.body_axes.shape[1] == 2 and _dofs(table) == (2, 1), (dy1, dy2)
+    assert block.axis_tol == pytest.approx(_bound(_mirror_co2(b, 0.0)), rel=1e-6)
+
+
+def test_a_linear_body_typed_off_the_two_fold_builds_along_it():
+    """The parallel case of the same test: the body along the P 1 2 1 2-fold
+    with O1 typed SITE_TOL/2 off it in x and z, which the 2-fold snaps, tilts
+    by 2.2e-4 rad, more than SITE_TOL, and builds with no turn."""
+    from rietx.crystallography.symmetry import SITE_TOL
+
+    h = SITE_TOL / 2.0 * (1.0 - 1e-6)
+    table = _build_co2(_axis_co2(h, h))
+    assert table._bodies[0][2].body_axes.shape[1] == 2 and _dofs(table) == (1, 0)
+
+
+@pytest.mark.parametrize("scale,ok", [(0.99, True), (1.01, False)])
+def test_a_linear_body_tilted_past_the_bound_is_refused_naming_its_atom(scale, ok):
+    """The positive arm.  The tilt's sine is Σ s_i h_i / Σ s_i², so the body
+    turned rigidly about C, its two O CO·tilt Å off the plane or line on
+    opposite sides, tilts by ``tilt``.  With the overlap refusal exempted by
+    a ``disorder_group``, the axis test is what decides: 0.99 × the derived
+    bound builds, 1.01 × is refused, on the mirror and on the 2-fold, naming
+    an O (the two sit equally far off).  Without the exemption the same tilt
+    puts O1 off the mirror next to its own image, refused as an overlap
+    naming O1."""
+    b = 20.0
+    dy = CO * scale * _bound(_mirror_co2(b, 0.0)) / b
+    a = float(np.linalg.norm(np.asarray(cartesian_frame(
+        _axis_co2(0.0, 0.0).cell.lengths_angles()))[:, 0]))
+    dx = CO * scale * _bound(_axis_co2(0.0, 0.0)) / a
+    cases = ((_mirror_co2(b, dy, -dy, group="1"), "perpendicular", (2, 1)),
+             (_axis_co2(dx, 0.0, -dx, group="1"), "the turn axis", (1, 0)))
+    for phase, case, dofs in cases:
+        if ok:
+            table = _build_co2(phase)
+            assert table._bodies[0][2].body_axes.shape[1] == 2 and _dofs(table) == dofs
+            continue
+        with pytest.raises(ValueError, match=(
+                rf"RIGID_BODY_NOT_INVARIANT: rigid body 'CO2': a linear body on this "
+                rf"site .* tilted .*° from {case}, more than the .*° that atoms within the site "
+                rf"tolerance allow, and its atom 'O[12]' lies furthest off")):
+            _build_co2(phase)
+    if not ok:
+        with pytest.raises(ValueError, match=(
+                r"RIGID_BODY_IMAGE_OVERLAP: rigid body 'CO2' has the image of its atom 'O1'")):
+            _build_co2(_mirror_co2(b, dy, -dy))
 
 
 def test_add_body_refuses_a_torsion_naming_an_atom_it_dropped():
