@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows, draftOf,
-         geometryRefusal, withAnode } from "./instrument";
+         geometryRefusal, SHAPE_LABELS, withAnode } from "./instrument";
 
 const p = (value: number, vary = false) => ({ value, vary });
 
@@ -26,14 +26,18 @@ const ANODES = [
 ];
 
 describe("the Instrument dialog's rules (WP-2218, rows 133-136)", () => {
-  it("draws the source, the geometry and the axial pair, and leaves the refined values to Parameters", () => {
+  it("draws the source, the geometry and the peak shape, and leaves the refined values to Parameters", () => {
     const paths = dialogFields(lab()).map((f) => f.path);
     expect(paths).toEqual(expect.arrayContaining([
       "source.lines.0.wavelength", "source.lines.1.wavelength", "source.lines.1.weight",
       "source.polarization", "geometry.kind", "geometry.goniometer_radius_mm", "geometry.mu_t",
-      "geometry.thickness_mm", "geometry.axial_sl", "geometry.axial_hl"]));
+      "geometry.thickness_mm", "geometry.axial_sl", "geometry.axial_hl", "profile.shape"]));
+    // the shape is a model choice, under Advanced, and every choice has a label
+    const shape = dialogFields(lab()).find((f) => f.path === "profile.shape")!;
+    expect(shape.advanced).toBe(true);
+    expect(shape.choices!.map((c) => SHAPE_LABELS[c])).toEqual(["TCHZ pseudo-Voigt", "Voigt"]);
     for (const refined of ["zero_shift", "geometry.sample_displacement",
-                           "geometry.sample_transparency", "profile.u", "profile.shape"]) {
+                           "geometry.sample_transparency", "profile.u"]) {
       expect(paths).not.toContain(refined);
     }
   });

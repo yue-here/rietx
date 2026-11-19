@@ -1,7 +1,9 @@
 <script lang="ts">
   /**
    * The Instrument dialog at `/next` (WP-2218, inventory rows 133-136): the
-   * open project's source and geometry, and the axial pair with its warning.
+   * open project's source and geometry, and a Peak shape row holding the axial
+   * pair with its warning and, under Advanced, the profile's shape (Yue's
+   * ruling of 2026-11-19, WP-2218 § Rulings 6).
    * Opened from the Instrument band's ⋯ menu in the Parameters tab (the
    * maintainer's ruling of 2026-11-11, WP-2214 question 1).
    *
@@ -25,8 +27,8 @@
            splitEdits, type InstrumentField } from "../lib/model";
   import type { ParamRow } from "../lib/table";
   import { PRESET_TITLES, anodeLabel } from "../lib/wizard";
-  import { anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows, draftOf,
-           geometryRefusal, withAnode, type Anode } from "./instrument";
+  import { SHAPE_LABELS, anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows,
+           draftOf, geometryRefusal, withAnode, type Anode } from "./instrument";
 
   let {
     rows,
@@ -76,7 +78,8 @@
   const geometry = $derived(fields.filter((f) => f.group === "geometry" && !f.advanced
     && f.path !== "geometry.kind"));
   const advanced = $derived(fields.filter((f) => f.group === "geometry" && f.advanced));
-  const axial = $derived(fields.filter((f) => f.group === "profile"));
+  const axial = $derived(fields.filter((f) => f.group === "profile" && !f.advanced));
+  const shape = $derived(fields.find((f) => f.path === "profile.shape"));
 
   /** why Apply cannot go, or "" */
   const why = $derived(busy ? "A run is in flight"
@@ -306,12 +309,30 @@
           {/if}
         </div>
       </div>
-      {#if axial.length}
+      {#if axial.length || shape}
         <div class="nrow">
-          <span class="nl">Axial divergence</span>
+          <span class="nl">Peak shape</span>
           <div class="nbody">
             {#each axial as f (f.path)}{@render field(f)}{/each}
             {#if warning}<p class="warn" role="note">{warning}</p>{/if}
+            {#if shape}
+              <!-- a model choice, never a refined value: it applies with the
+                   dialog's Apply, in the whole-model edit -->
+              <details class="more">
+                <summary class="muted">Advanced</summary>
+                <div class="nbody">
+                  <label class="fld">
+                    <span>{named(shape.label)}</span>
+                    <select class:edited={edited(shape)} data-field={shape.path} value={text(shape)}
+                      onchange={(e) => type(shape.path, (e.currentTarget as HTMLSelectElement).value)}>
+                      {#each shape.choices ?? [] as c (c)}
+                        <option value={c}>{SHAPE_LABELS[c] ?? c}</option>
+                      {/each}
+                    </select>
+                  </label>
+                </div>
+              </details>
+            {/if}
           </div>
         </div>
       {/if}

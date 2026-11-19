@@ -1518,8 +1518,9 @@ def _open_instrument(page) -> None:
 def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, tmp_path_factory):
     """WP-2218 rows 133-136. The Instrument band's ⋯ opens the Instrument
     dialog over the window, which moves nothing. S/L typed equal to H/L shows
-    the warning beside the pair. Apply sends the wavelength in the model and
-    S/L through the table, then closes. Cancel writes nothing. Loading a
+    the warning beside the pair. The profile's shape waits under the Peak shape
+    row's Advanced, closed. Apply sends the wavelength and the shape in the
+    model and S/L through the table, then closes. Cancel writes nothing. Loading a
     profile replaces the instrument at once. A project of its own, since
     Apply writes."""
     httpd, client = _serve(tmp_path_factory, "next-instrument")
@@ -1544,6 +1545,16 @@ def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, 
         dialog.locator('[data-field="source.lines.0.wavelength"]').fill("0.4140")
         _frames(page)
         assert dialog.locator(".warn").count() == 0
+        # the shape under the Peak shape row's Advanced, closed until asked
+        row = dialog.locator(".nrow", has=page.locator(".nl", has_text="Peak shape"))
+        shape = row.locator('[data-field="profile.shape"]')
+        assert not shape.is_visible()
+        row.locator("summary", has_text="Advanced").click()
+        _frames(page)
+        assert shape.input_value() == "tchz_pv"
+        assert shape.locator("option").all_inner_texts() == ["TCHZ pseudo-Voigt", "Voigt"]
+        shape.select_option("voigt")
+        _frames(page)
         head = client.get("/api/project")[1]["head"]
         dialog.get_by_role("button", name="Apply", exact=True).click()
         page.wait_for_selector('[role="dialog"]', state="detached")
@@ -1551,6 +1562,7 @@ def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, 
         assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.414
         assert ins["geometry"]["axial_sl"]["value"] == 0.015
         assert ins["geometry"]["axial_hl"]["value"] == 0.02
+        assert ins["profile"]["shape"] == "voigt"
         assert client.get("/api/project")[1]["head"] != head
 
         # an anode choice, then Cancel: nothing is written

@@ -290,10 +290,12 @@ Filled in by the session that builds each PR.
       anodes with as many lines as the source has, since adding or removing Kα2 changes what
       the parameter table holds. Wavelengths that match no anode read "Other".
     - The geometry choice has no label of its own, because the row is named Geometry.
-    - Rows: Source, Geometry and Axial divergence. S/L and H/L sit in the dialog because
+    - Rows: Source, Geometry and Peak shape. S/L and H/L sit in the Peak shape row because
       row 136 puts the warning beside the pair. They are also in the Parameters tab's Axial
-      divergence group (row 135). Zero, displacement, transparency and U to Y stay in
-      Parameters alone (row 135).
+      divergence group (row 135). The profile's shape, TCHZ pseudo-Voigt or Voigt, sits in
+      the same row under an Advanced disclosure, closed by default, and applies with the
+      dialog's Apply in its whole-model edit (§ Rulings 6). Zero, displacement, transparency
+      and U to Y stay in Parameters alone (row 135).
     - Numbers are in the mono face (`gui/STYLE.md` § Type). Field labels are sentence case.
     - Apply is the dialog's filled button. A dialog is a form of its own, as New project and
       Settings are, so its edits do not join the action bar's pending set. Apply sends the
@@ -323,6 +325,8 @@ Filled in by the session that builds each PR.
     none. When the swap deletes the Model tab the choice has no home. Claude leans to the
     Instrument dialog's Axial divergence row, renamed Peak shape, under Advanced. This places
     a control on the main surface, so it waits for Yue.
+    *Answered by § Rulings 6: option (a), the Peak shape row. The shape's two labels are
+    written in `next/instrument.ts`, since `rietx.help` has no entry for either.*
 
 13. **The look's three items (§ Rulings 7): the details Claude chose to build them.** Each is
     a visual value the ruling did not fix, so each waits for Yue's look at

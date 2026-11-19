@@ -6,8 +6,10 @@
  * instrument form's (`lib/model.ts:instrumentFields`), never the New project
  * presets: a preset builds a whole new instrument, and sending one here would
  * reset every refined profile value. The dialog shows the source and geometry
- * groups and the axial pair, since the pair's warning sits beside it (row 136).
- * The other profile values are the Parameters tab's (row 135).
+ * groups, and a Peak shape row: the axial pair, since the pair's warning sits
+ * beside it (row 136), and the profile's shape under Advanced (Yue's ruling of
+ * 2026-11-19, WP-2218 § Rulings 6). The other profile values are the
+ * Parameters tab's (row 135).
  */
 import { at, clone, instrumentFields, validateField, writeField,
          type InstrumentField } from "../lib/model";
@@ -29,15 +31,23 @@ const NEUTRON_WAVELENGTH: InstrumentField = {
   path: "source.wavelength", label: "λ", kind: "number", unit: "Å", group: "source",
 };
 
+/** The profile's shapes, as the Peak shape row names them. `rietx.help` has
+ *  no entry for either, so the words are written here. */
+export const SHAPE_LABELS: Readonly<Record<string, string>> = {
+  tchz_pv: "TCHZ pseudo-Voigt",
+  voigt: "Voigt",
+};
+
 /** The fields the dialog draws for this instrument: every source and
- *  geometry field the model holds, less the refined ones, and the axial pair.
+ *  geometry field the model holds, less the refined ones, the axial pair and
+ *  the profile's shape.
  *  A neutron source has no emission lines and no polarization, so those
  *  fields are absent. A constant-wavelength one draws its wavelength instead. */
 export function dialogFields(model: any): InstrumentField[] {
   const fields = instrumentFields(model);
   if (model?.source?.kind === "neutron_cw") fields.unshift(NEUTRON_WAVELENGTH);
   return fields.filter((f) =>
-    (f.group !== "profile" || f.path.startsWith("geometry.axial_"))
+    (f.group !== "profile" || f.path.startsWith("geometry.axial_") || f.path === "profile.shape")
     && !REFINED.has(f.path) && at(model, f.path) !== undefined);
 }
 
