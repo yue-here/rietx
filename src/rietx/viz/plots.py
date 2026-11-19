@@ -1471,9 +1471,13 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
                  fontsize=10)
     ax.set_ylabel("intensity")
     ax.legend(loc="upper right", fontsize=8, frameon=False)
+    # the panel's name in rietx.help.DIAGNOSTIC_VIEWS, which a diagnostic's
+    # ``view`` points at (WP-1133)
+    ax.set_gid("plot_for_vlm.overview")
 
     # -- panel 2: Δ/σ across the pattern
     ax = fig.add_subplot(gs[1, :])
+    ax.set_gid("plot_for_vlm.residual")
     ax.plot(tt, delta / sigma, "-", lw=0.5, color="#333333")
     ax.axhspan(-3, 3, color="#2a9d2a", alpha=0.15, lw=0)
     ax.set_ylabel(r"$\Delta/\sigma$")

@@ -73,8 +73,21 @@ telling you it is degenerate. On a chain `first_rung_factor` (yours, off by
 default) is a factor times the dearest *converged* first rung, never a fixed
 wall (WP-1127); a job several times the median converged job is a flat
 direction or a degeneracy to read in its trajectory, not a fit to wait for.
-*(Hypothesis: measured on a chain, WP-1127, and the ramp run's 27 %; not for
-independent jobs.)*
+Time the jobs that raise as well, in a `finally`, and count them beside the
+ones that returned. For runs the package recorded, `rietx runs --label
+'screen-1/*'` prints that count by state, the wall from first start to last
+end, and the slowest run against the median of every timed run, failed ones
+included rather than converged ones alone
+(`rietx.runs.job_summary` in Python; 9c.32 names the runs). Run mid-screen,
+it adds the longest a live run has gone against that median, so a runaway
+shows before it ends. One screen of 204 independent cold fits on 10 worker
+processes had a median job of 54 s and a slowest of 4559 s, 84× the median,
+and that job was a cell runaway. 43 jobs raised and carried no time, so the
+agent's summary printed a `nan` median, it never saw the 4559 s job, and it
+reported the 89-minute screen as about 15 minutes. *(Measured: WP-1464, that
+screen's timeline, one point for independent jobs; WP-1127 and the ramp run's
+27 % measured the chain. Hypothesis: the factor for independent jobs, which
+one screen does not set.)*
 
 **9c.6 Cost tracks solver iteration count and almost nothing else, so predict
 a batch from iterations rather than from the model.** Stratified by pattern
@@ -263,7 +276,8 @@ list, and the reader tells the runs apart by start time alone. `label=` is on
 every verb that records a run (`fit`, `run_stage`, `refine`,
 `refine_sequential`, `Project.fit`) and costs one keyword at the call. Pass the
 candidate, the phase, the specimen: the fact that makes this fit the one you
-will want to reopen. It is telemetry, so it changes no number the fit produces
+will want to reopen. Put the job first, `screen-1/zincite`, so
+`rietx runs --label 'screen-1/*'` gathers the job (9c.5). It is telemetry, so it changes no number the fit produces
 and appears in no result. On a chain `label=` names the job while `labels=`
 names the patterns, and the list shows the pattern. *(Hypothesis: the limit it
 removes is measured, WP-1424 having made the rows tell apart by start second
@@ -273,18 +287,28 @@ timestamped one is undecided. What would decide it: a batch operator asked to
 reopen a named candidate from the watcher list, against the same task on a
 timestamped one.)*
 
-**9c.33 Run separate fits side by side in processes, never threads.** A
-fit's per-pattern work is short python stretches between short numpy and
-kernel calls, so threads queue on the GIL rather than sharing the cores: four
-threads ran a joint fit's per-pattern Jacobians at **0.49×** the speed of one,
-and holding BLAS and the kernel pool to one thread each left that unchanged.
-One process per fit is the parallel unit. Give each process
-`RIETX_COMPILED_THREADS=1` beside the `*_NUM_THREADS` variables (9c.31), so N
-processes do not each start a kernel pool sized for the whole machine.
+**9c.33 Run separate fits side by side in processes, never threads, and
+leave each process's kernel pool at its default.** A fit's per-pattern work is
+short python stretches between short numpy and kernel calls, so threads queue
+on the GIL rather than sharing the cores: four threads ran a joint fit's
+per-pattern Jacobians at **0.49×** the speed of one, and holding BLAS and the
+kernel pool to one thread each left that unchanged. One process per fit is the
+parallel unit. Set the `*_NUM_THREADS` variables in each process (9c.31), and do not set
+`RIETX_COMPILED_THREADS=1`: the kernel pool, `min(8, cores)` threads by
+default, splits only a call large enough to repay it. A screen of 26 cold
+fits on 10 worker processes and 10 cores ran
+**1.9-2.8×** slower with the pool pinned to one thread, in all four interleaved
+pairs, and 104 such fits ran 2.0× slower in both of two pairs. The screen took six
+patterns (four CPD round-robin single-phase patterns, the GSAS-II fluorapatite
+and 11-BM NAC) and fitted each alone and with each other CPD phase added, every
+cell free. Every fit did the same
+iterations to the same Rwp either way. Most of the gap is the slowest job, which
+the default pool spreads over the cores the finished workers leave idle.
 *(Measured: WP-1325, the per-pattern closures of a 60-pattern joint fit on 4
-CPUs. Hypothesis: whole fits behave the same on threads, not timed; and the
-one-thread pool per process, the use `RIETX_COMPILED_THREADS`'s docstring names
-for it, which no batch has measured.)*
+CPUs; WP-1464, the screen above on an arm64 Mac at load 9-84 from other work.
+Hypothesis: whole fits behave the same on threads, not timed; and on a machine
+the screen has to itself, the summed job time, 1.17× in the one pair run at
+load 9-13, bounds the gap when every worker stays busy.)*
 
 **9c.34 Switch the closing stage off for a screening batch with
 `plan.closing_window_tol = None`, and keep it on for the fits you report.**

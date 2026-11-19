@@ -436,6 +436,7 @@ A bound stated on the parent's cell carries over to the child's `parent_cell.cel
 Coordinates do not refine as x, y and z.
 The parameter table refines one shift per direction the site symmetry allows, and ties x, y and z to those shifts.
 A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises.
+The refusal names every such site at once, a rigid body's origin among them.
 `Refinement.fix_special_positions` clears `vary` on every such coordinate and returns their names.
 The [parameter map](parameters.md#atoms) gives the names of the shifts.
 

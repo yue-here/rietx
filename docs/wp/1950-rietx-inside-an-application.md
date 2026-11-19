@@ -92,11 +92,28 @@ hook is the `pyinstaller40` entry point: `hook-dirs =
   would replace that line, so name the browser as a second caller. The same
   host also empties `fcntl`. WP-1966 made the three lock sites import `flock`
   by name, so a record written there takes the Windows path.
+- **From WP-1464 (2026-11-18): what the manual section says about
+  `RIETX_COMPILED_THREADS`.** Measured on a 10-core arm64 Mac under load from
+  other work: a screen of 26 fits on 10 worker processes ran 1.9-2.8× slower
+  with `RIETX_COMPILED_THREADS=1` than with the default pool, and 104 fits
+  2.0× slower. So the package keeps its default in a pool and does not read
+  `OMP_NUM_THREADS` (`docs/practice.md` § Inner threads in a process pool).
+  The embedding section names the variable as the way to cap rietx beside an
+  application's own parallel work, and does not recommend 1 for speed.
+- **From WP-1464 (2026-11-19, on closing): the default ignores CPU
+  affinity.** `model.compiled.n_threads()` takes `min(8, os.cpu_count())`,
+  and `os.cpu_count()` counts the node's cores, not those a job is allowed
+  (affinity, cgroup limits; inferred, never measured). A job given four cores
+  on a large node then starts eight kernel threads per process.
+  `os.process_cpu_count()` (Python 3.13+) reads affinity. WP-1464 closed with
+  this open and no run limited that way measured; it is this WP's because an
+  application or a cluster job is where a core limit is set.
 
 ## Non-goals
 
 - Changing the telemetry default (Decided 2026-10-11, above).
-- The kernel thread count (WP-1464, issue #898 (b)).
+- The kernel thread count in a process pool (WP-1464, issue #898 (b),
+  closed 2026-11-19). The affinity question it left open is in Inherited.
 - `platformdirs` as a dependency.
 
 ## Tasks
