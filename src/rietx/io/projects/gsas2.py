@@ -2192,6 +2192,7 @@ def from_structure(structure, *,
         refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
+        refuse_parent_cell,
         refuse_propagation_vector,
         restate_in_hexagonal_axes,
         rhombohedral_restated_diagnostic,
@@ -2215,6 +2216,7 @@ def from_structure(structure, *,
                 "without a warning (measured on GSAS-II 5.6.3)")
         refuse_operation_list(phase, "a GSAS-II phase CIF")
         refuse_distortion_modes(phase, "a GSAS-II phase CIF")
+        refuse_parent_cell(phase, "a GSAS-II phase CIF")
         phase, restated = restate_in_hexagonal_axes(
             phase, "a GSAS-II phase CIF")
         if restated:

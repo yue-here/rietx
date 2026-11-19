@@ -128,7 +128,7 @@ def test_an_edit_survives_a_restarted_server_and_restores(served, browser):
     dialog = page.locator(".rc-dialog")
     dialog.wait_for()
     assert dialog.locator("h2").inner_text() == "Unapplied edits"
-    assert "1 edit from" in dialog.inner_text()
+    assert ": 1 edit waiting at Apply." in dialog.inner_text()
     dialog.get_by_role("button", name="Restore", exact=True).click()
     dialog.wait_for(state="detached")
     assert page.locator(".actions .pending").inner_text() == "1 pending edit"
@@ -191,5 +191,96 @@ def test_escape_keeps_the_copy_and_the_next_open_offers_it(served, browser):
     dialog.wait_for()
     assert dialog.locator("h2").inner_text() == "Unapplied edits"
     assert _kept(state, project)["params"]["edits"] == {PATH: "5.7"}
+    assert page.errors == []
+    page.close()
+
+
+# -- WP-2213: the Text buffer and the Model forms join the copy -----------------
+
+NOTE = "# a note of my own"
+
+
+def _tab(page, label: str) -> None:
+    page.locator("nav.tabs").get_by_role("button", name=label, exact=True).click()
+
+
+def test_a_typed_text_buffer_survives_a_closed_tab_and_restores_dirty(served, browser):
+    """WP-2213. The buffer comes back as typed, comments included, and dirty.
+
+    A comment is the one edit the copy must keep that no Apply could: the
+    rendering drops it (WP-1009)."""
+    serve, state, project = served
+    url = serve()
+    page = _page(browser, url)
+    _tab(page, "Text")
+    content = page.locator(".text .cm-content")
+    content.wait_for()
+    page.wait_for_function(
+        "() => document.querySelector('.text .pill')?.textContent === 'in sync'")
+    content.click()
+    page.keyboard.press("Meta+ArrowDown")
+    page.keyboard.press("Enter")
+    page.keyboard.type(NOTE)
+    assert _until(lambda: (_kept(state, project) or {}).get("text") is not None)
+    kept = _kept(state, project)
+    assert NOTE in kept["text"]["buffer"]
+    # uncounted: the Text panel keeps its own Apply
+    assert kept["count"] == 0
+    assert page.locator(".actions .pending").inner_text() == ""
+    page.close(run_before_unload=True)
+
+    page = _page(browser, url)
+    dialog = page.locator(".rc-dialog")
+    dialog.wait_for()
+    assert ": the Text document." in dialog.inner_text()
+    dialog.get_by_role("button", name="Restore", exact=True).click()
+    dialog.wait_for(state="detached")
+    _tab(page, "Text")
+    content = page.locator(".text .cm-content")
+    content.wait_for()
+    # the editor draws only the lines in view, and the note is the last one
+    content.click()
+    page.keyboard.press("Meta+ArrowDown")
+    page.wait_for_function(
+        f"() => document.querySelector('.text .cm-content')?.textContent.includes({NOTE!r})")
+    # dirty against the rendering it was typed at, never stale; a comment
+    # alone emits no verb, so the validation answers "no changes"
+    pill = page.locator(".text .pill")
+    assert _until(lambda: pill.inner_text() == "no changes")
+    assert page.locator(".text .banner.bad").count() == 0
+    assert "comment line(s) you added" in page.locator(".text").inner_text()
+    assert page.errors == []
+    page.close()
+
+
+def test_a_typed_model_field_survives_a_restarted_server_and_restores(served, browser):
+    """WP-2213. The Model form's typed name comes back through the form itself."""
+    serve, state, project = served
+    page = _page(browser, serve())
+    _tab(page, "Model")
+    name = page.locator('[data-field="phases.0.name"]')
+    name.wait_for()
+    name.click()
+    page.keyboard.press("Meta+A")
+    page.keyboard.type("renamed")
+    assert _until(lambda: (_kept(state, project) or {}).get("model") is not None)
+    assert _kept(state, project)["model"]["edits"] == {"phases.0.name": "renamed"}
+    page.close()
+
+    page = _page(browser, serve())
+    dialog = page.locator(".rc-dialog")
+    dialog.wait_for()
+    assert ": 1 edit in the Model forms." in dialog.inner_text()
+    dialog.get_by_role("button", name="Restore", exact=True).click()
+    dialog.wait_for(state="detached")
+    _tab(page, "Model")
+    name = page.locator('[data-field="phases.0.name"]')
+    name.wait_for()
+    assert name.input_value() == "renamed"
+    assert page.locator(".model header .muted", has_text="1 edit").count() == 1
+
+    # the form's own Revert is a discard: the copy goes with the edit
+    page.locator(".model header").get_by_role("button", name="Revert", exact=True).click()
+    assert _until(lambda: _kept(state, project) is None)
     assert page.errors == []
     page.close()

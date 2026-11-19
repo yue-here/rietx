@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-17 — second slice in review (#1632): porting, the GSAS-II sequential map, coefficient traps; two rulings owed
+Milestone: parametric · Status: 🔄 2026-11-17 — second slice in review (#1632), the Durham inventory stacked on it; two rulings owed
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
@@ -82,10 +82,11 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   written the core table; this slice added the constructs the two Durham inputs use and
   a list of the four with no spelling yet. 1964 is closed, so the list names the
   missing pieces, not WPs.
-- [ ] The inventory, moved from the parked 2105. Every parametric construct in the two
+- [x] The inventory, moved from the parked 2105. Every parametric construct in the two
   Durham inputs, each with its rietx spelling, its WP or a named non-goal, and each
   input's free-parameter and channel counts. The milestone's agent row is judged against
-  it.
+  it. *Done 2026-11-17:* § Inventory below, with four rows added to `switching/topas.md`
+  for the constructs that had none.
 - [x] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
   *Done 2026-11-17* as § Porting an input that does not read, five steps, under
   § Moving a file across.
@@ -140,7 +141,145 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - WP-1325 (the surface), WP-1964 (what comes next), WP-1996 (the Switching tab says
   only what its tests show).
 
+## Inventory
+
+The two Durham inputs the milestone's port rows name, both public downloads registered in
+`tests/local_data.py` and held in the local data root: WO₃'s `parametric_06.inp` (inside
+`parametric_06.zip`, tutorials 9.3 and 9.4) and ZrP₂O₇'s `d8_02999_35_annotate_04.inp`
+(tutorial 9.5). "Row" means a row of the table in `switching/topas.md` § A parametric
+equation is a formula. "List" means the list of constructs with no spelling under that
+table.
+
+### Counts
+
+Free parameters are counted from each input's text by TOPAS's naming rules. A value after
+`@` is one anonymous parameter. A named value without `!` is refined, and a name is one
+parameter wherever it recurs. `local` gives each pattern its own. An `= ...;` is an
+equation and refines nothing. Channels are the points of each `range` inside
+`start_X`..`finish_X`, read with `rx.read_pattern(path, scan=range - 1)`. No point lies on
+either limit, so inclusive and exclusive counts agree. Neither input excludes a region.
+
+| | WO₃ `parametric_06.inp` | ZrP₂O₇ `d8_02999_35_annotate_04.inp` |
+| --- | --- | --- |
+| patterns | 100 (ranges 1-100 of `d9_02592.raw`) | 37 (ranges 1, 26, ..., 871 of `d8_02999.raw`, from the 37 `#define use_t_*` lines) |
+| fitted 2θ | 20-80° | 15-90° (the file ends at 89.99°) |
+| channels | 5844 a pattern, 584 400 in all | 4409 a pattern, 163 133 in all |
+| shared free parameters | 63 | 20 |
+| free parameters a pattern | 11 | 31 |
+| free parameters in all | 1163 | 1167 |
+| check | the input's header states 1163 for 100 data sets and 184 for 11; the count gives 184 for 11 | none in the input. Stinton & Evans (2007), Example 2, count 53 a pattern for independent fits, and 53 less 3 cells, 18 profile terms and 1 asymmetry is 31 |
+
+WO₃'s 63 shared: 34 cell coefficients (9 `zero_*`, 9 `grad_*`, `theta_ma`, and 15 angle
+coefficients), 23 W coordinates (6 in P2₁/n, 12 in P-1, 5 in Pc, where `xW31` is held), and
+6 strains (`Strain_G` and `Strain_L` per phase). Its 11 a pattern: `height`,
+`individual_b`, six `bkg` terms and three phase scales. Every one has a rietx spelling, so
+a port that mirrors the protocol frees 1163.
+
+ZrP₂O₇'s 20 shared: `step_error` and `square`, the two refined coefficients of the 2θ
+curve in `Xo`, and 18 `TCHZ_Peak_Type` terms (six per phase). Its 31 a pattern: 18 `bkg`
+terms, three scales, the ZrP₂O₇ cell, one height, the P coordinate and seven B. A port
+today spells 1159 of the 1167. The 2θ curve's 2 and each phase's own TCHZ V and W (6) wait
+on 2107. The Al₂O₃ coordinates count nothing: the `B1`-`B3` macros drop their `param`
+argument, so the file's `!` on them is inert and the values are fixed either way. Every
+temperature-calibration and cell coefficient carries `!`, so the 1167 frees none of them.
+
+### WO₃ `parametric_06.inp`
+
+| Construct | What it does | rietx | Status |
+| --- | --- | --- | --- |
+| `#list Files T_val Range_val` and `Create_XDDs(#list_n T_val)` | one pattern per row | row `#list` | spelled |
+| `#define param_cell`, `write_out`; `#ifdef refine_some ... #else` | pick the live text | row `#define` | spelled |
+| `for xdds { ... }`, `prm i = 0;`, `existing_prm i += 1;`, `#Files(i)`, `#T_val(i)`, `#Range_val(i)` | the per-pattern body | row `for xdds` | spelled |
+| `range = #Range_val(i);` | the scan inside the RAW file | row `range 3` | spelled |
+| `local !te = #T_val(i);` | each pattern's temperature | the `T` column of the `CoordinateTable` | spelled |
+| `fn cell_fT(...)`, `fn angle_fT(...)` | a user function | row `fn` (added by this slice) | spelled |
+| `prm zero_ma 7.298...`` and the other 33 coefficients | refined shared coefficients | row `prm zero_a` | spelled |
+| `prm !theta_mb = theta_ma;` (eight of them) | one θ for nine edges | row `prm !theta_b = theta_a;` | spelled |
+| `a = cell_fT(zero_ma, grad_ma, theta_ma, te);` (nine edges) | an Einstein edge | row `a = zero_a + ...` | spelled |
+| `be = angle_fT(...)`, and P-1's `al`, `be`, `ga` | a quadratic angle | row `be = b0*(1 + ...)`, on `cell.alpha`, `beta` or `gamma` | spelled |
+| `local height`, `th2_offset = -2 57.2957795 (height) Cos(Th) / Rs;` | a height per pattern | row `local height` (added) | spelled |
+| `local individual_b`, `scale_pks = Exp(-2*individual_b/(2 D_spacing)^2);` with `beq !bval 0` on every site | one B per pattern | row `scale_pks`, with `expression="b"` since every site's B is 0 | spelled |
+| `local bkg0` ... `bkg5`, `bkg = bkg0; = bkg1; ...` | a background per pattern | row `local` on a `bkg` term | spelled |
+| `macro Phase_Common(n, scv) { local sc scv min 1e-10; scale = sc; ... }` | a scale per phase per pattern | rows `#define` and `local` on a scale | spelled |
+| `A1(xW1, ...)` and the other W coordinates, one name in every `xdd` | shared coordinates | row "a phase's parameter under one name" | spelled; their `min`/`max` window on a coordinate is not checked |
+| `A1(!xO3, ...)` and every other O, and `!xW31` | held coordinates on general positions | row `!` on a coordinate | spelled |
+| `Strain_G(strainG_p21n, ...)`, `Strain_L(...)`, per phase | shared strains | `gauss_strain` = e² and `lor_strain` = e, shared by default (§ The peak shape is the instrument plus the sample) | spelled |
+| `val_on_continue = ...`, `vcstrain`, `continue_after_convergence` | restarts from perturbed values | row `val_on_continue` | no equivalent, by design |
+| `load_save_locals` | starts each `local` from the last run | row `load_save_locals` (added) | a restart from a result: 2103 |
+| `Zero_Error(!zero, 0)`, `Simple_Axial_Model(!axial, 5.74444)`, `LP_Factor(!th2_monochromator, 0)`, `CuKa2(0.0001)` | fixed instrument terms | single-fit vocabulary; `Simple_Axial_Model` has no equal, and FCJ (`axial_sl`, `axial_hl`) is the nearest | no parameter, not parametric |
+| `x_calculation_step = Yobs_dx_at(Xo)`, `convolution_step 2`, `extra_X_right 2`, `iters`, `chi2_convergence_criteria` | numerics | nothing to write | not parametric |
+| `Out(...)`, `Out_String`, `Get(r_wp)`, `out ... append`, `Backup_INP`, `system_before_save_OUT`, `#if (Run_Number == 0)`, `xdd_out` | output | row `Get(r_wp)` | output only |
+| `weight_percent`, `Phase_Density_g_on_cm3`, `r_bragg`, `local plpvol = Get(cell_volume);` | reported values | row `Get(r_wp)` | output only |
+
+### ZrP₂O₇ `d8_02999_35_annotate_04.inp`
+
+| Construct | What it does | rietx | Status |
+| --- | --- | --- | --- |
+| `#define use_t_0303 prm !set_t_0303 303 macro r_t_0303 { 1 }` (37 lines) | a flag, a set temperature and a range per pattern | row `#define`, and the `T` column | spelled |
+| `#ifdef use_t_0303 ... #endif` (37 blocks) and `RAW(d8_02999)` | one written-out block per pattern | row `#define` | spelled |
+| `range r_t_0303` | the scan | row `range 3` | spelled |
+| `macro information { ... }` | text shared by every block | row `#define` | spelled |
+| `th2_offset = (Xo-data_middle)^2*(square/1000) + (Xo-data_middle) (step_error/1000) + zero;` | a 2θ curve, two shared coefficients | list, "`th2_offset` written in `Xo`" | 2107 |
+| `prm !T_calibration_b` ... `_d`, `prm !T_calibration_a = 0 - (...);` | a cubic calibration, its constant set by the others | row `prm !calib = ...`, `target=None` | spelled |
+| `prm !delta_t_0303 = ...;`, `prm !t_0303 = set_t_0303 + delta_t_0303;` | each pattern's temperature through the calibration | row `prm !calib`, one equation feeding the cell formulas | spelled |
+| `prm lpa_si_t_0303 = Exp(Ln(a0) + ...);` and `Cubic(=lpa_si_t_0303;)` | Si's three Einstein terms | row `a = zero_a + ...`, written in `T` | spelled |
+| `prm !lpa_al2o3_t_0303 = a_al2o3_offset + a0_al2o3 (1 + ax1_al2o3 (t_0303-273) + ...);`, and `c` | Al₂O₃'s polynomial cell | rows `a0 (1 + ax1 (T - 273))` and `a = ...` | spelled |
+| `scale scale_zrp2o7_t_0303 ...`, `Cubic(lpa_zrp2o7_t_0303 ...)`, `xp1_t_0303`, `bvalue*_t_0303`, one name per block | per-pattern parameters by name | row `local` on a phase's parameter (`per_histogram`) | spelled |
+| `Specimen_Displacement(height_zrp2o7_t_0303, ...)`, and `=height_zrp2o7_t_0303;` in the other two phases | one height per pattern | row `Specimen_Displacement` | spelled |
+| `TCHZ_Peak_Type(pku_zrpo7, ...)`, one name per phase in every block | a phase's six width terms, shared | row `TCHZ_Peak_Type` (added) | U, Z, X, Y spelled; V and W 2107 |
+| `B1(!xAl1, 0.0000, 0.0000)` ... `B3(...)` | fixed Al₂O₃ coordinates | nothing to write | the coordinates are fixed |
+| `bkg @` with 18 values in each block | a background per pattern | row `local` on a `bkg` term | spelled |
+| `MVW(...)`, `Out(...)`, `out "temp.res" append`, `prm !correction_at_30_deg2th = ...;`, `prm !calc_delta_t_0300 = ...;` | reported values | row `Get(r_wp)` | output only |
+| `Simple_Axial_Model(!axial, =ax_overall;)`, `LP_Factor(!th2_monochromator, 27.26)`, `CuKa1(0.001)` | fixed instrument terms | single-fit vocabulary | no parameter, not parametric |
+| `chi2_convergence_criteria`, `iters`, `seed`, `Rietveld_Plot` | numerics and output | nothing to write | not parametric |
+
 ## Handover log
+
+- **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR #1654, stacked on
+  #1632. The milestone's agent-port row now has numbers to judge against. WO₃'s input fits
+  584 400 channels with 1163 free parameters, and ZrP₂O₇'s fits 163 133 with 1167. Every
+  WO₃ parameter has a rietx spelling. Eight of ZrP₂O₇'s wait on 2107: the two
+  coefficients of its 2θ curve in `Xo`, and each phase's own TCHZ V and W.
+
+  *Done.* § Inventory: a counts table and one construct table per input. In
+  `switching/topas.md`, four rows for constructs that had none (`fn`, a phase's
+  `TCHZ_Peak_Type`, a height written in `Cos(Th)`, `load_save_locals`), the list's
+  reflection bullet naming a phase's V and W, and the `Strain_G`/`Strain_L` conversion
+  under § The peak shape. The old row "a phase's parameter under one name ..., such as its
+  `TCHZ_Peak_Type` terms" was wrong: rietx has no per-phase V or W, so its example is now
+  a strain or a coordinate.
+
+  *Measured* (runner's scratch scripts, `[dev]` venv, macOS arm64, not in the repo).
+  Channels from `rx.read_pattern(..., scan=range - 1)`: 5844 a pattern in 20-80° on
+  `d9_02592.raw`, 4409 a pattern in 15-90° on `d8_02999.raw`, with no point on a limit.
+  Free parameters from each input's text by TOPAS's naming rules. The WO₃ count gives 1163
+  for 100 data sets and 184 for 11, the two figures its header states. ZrP₂O₇'s input
+  states none, and its 31 a pattern equals Stinton & Evans's (2007) 53 for an
+  independent fit less the 22 terms the input shares or fixes. The TCHZ and `Strain_G`
+  forms were read from the TOPAS 5 Technical Reference.
+
+  *Gotchas.* The Al₂O₃ `B1`-`B3` macros drop their `param` argument, so those
+  coordinates are fixed whatever the `!` says. WO₃'s input states no `Rs`, so a port
+  sets `goniometer_radius_mm` to TOPAS's default. ZrP₂O₇'s count includes no
+  temperature-calibration coefficient, because the input holds all of them. The
+  milestone's run that frees them is a different protocol.
+
+  *Settled by Claude 2026-11-17:* the inventory lives in this WP file, because the
+  milestone's row names "2101's inventory"; the alternative was a manual page, which would
+  publish a judge's answer key. *Settled by Claude 2026-11-17:* a phase's TCHZ V and W and
+  the `Xo` curve are marked 2107, under the milestone's ZrP₂O₇ row ("join the protocol
+  once 2107 lands"); the alternative was a non-goal. *Settled by Claude 2026-11-17:* the
+  four missing rows went into `switching/topas.md` in this slice, under the milestone's
+  agent row (a line per construct or a named non-goal); the alternative was listing the
+  gaps here for a later slice.
+
+  *Gates* (on this branch, `[dev]` venv, macOS arm64). `tests/test_docs_consistency.py
+  tests/test_manual.py tests/test_manual_api.py`: 110 passed. Sphinx `-W`: clean. CI's lint
+  steps from the top level: ruff check and the tutorials' format check clean; Vale 0 errors,
+  and its one warning on `topas.md` is on line 82, which this slice did not write. No code
+  changed, so no other suite ran.
+
+  Next: the maintainer's two rulings in the entry below, then task 9.
 
 - **2026-11-17** — Second slice, by a ghostshift runner, in PR #1632. A TOPAS user whose
   parametric input does not read now has a five-step route from the reader's error to a

@@ -2,7 +2,7 @@
 
 Milestone: gui-overhaul · Status: ⬜
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
-Priority: P3 2026-11-11 — P2 (a feature the open milestone was opened for), down a rung: it builds on the bottom panel, so nothing starts until the rebuild's R1 lands (re-pointed 2026-11-11 by WP-2214)
+Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
 ## Goal
 
