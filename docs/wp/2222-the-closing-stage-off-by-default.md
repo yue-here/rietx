@@ -52,6 +52,33 @@ Mike's (since 2026-11-04). A saved project stores its selected plan whole
 under 1.10-1.12 keeps `closing_window_tol: 0.001` until its user changes
 it. A project with no saved plan follows the new default.
 
+**Three cases that keep the closing stage, ruled by Yue 2026-11-19.**
+Seven tests stayed red under the new default because the default changed what
+they measure. Yue took all three of the session's leans ("Yes, finish it
+here"):
+
+1. *A Pawley series that carries intensities forward runs the closing
+   stage.* With 2 % windows each pattern misassigns a little intensity and
+   the next pattern starts from it. On the four-pattern chain Rwp read
+   0.0339, 0.0345, 0.0347, 0.0372 carried, 0.0339-0.0345 re-seeded, and
+   about 0.034 throughout with the closing stage: the WP-1459 (#440) drift
+   back. `SequentialRefinement.fit` sets `CLOSING_WINDOW_TOL` on a plan whose
+   value is `None` when `mode="pawley"` and `carry_hkl_intensities` is on;
+   `carry_hkl_intensities=False` is the way out. A single Pawley fit has
+   nothing to compound and stays off. Le Bail carries the same way and was
+   not measured.
+2. *`lab_calibrate` runs the closing stage, and the `branch` and `path`
+   guides ask for it.* At the default a calibration's size and strain land
+   2.9 and 2.4 esd from the simulated truth, and every later fit holds the
+   calibration fixed. The two guides teach comparisons of one objective,
+   which the declared windows blur (Rwp 0.1031 against 0.0988 where the
+   page shows one 0.0947; a 0.02 esd direction gap against 0.005).
+3. *The GUI preview keeps 1e-3 windows and the shift is accepted.* A preview
+   starting from a default fit moves the curve by up to 0.13 % of the
+   strongest peak (26 counts on 20 310, the fluorapatite example) and the
+   preview's Rwp in the third digit. Retuning the preview for 2 % windows is
+   a follow-up WP.
+
 **Tier.** No new rule. A default moves from one named value to another,
 both already audited (`_audit.py`, the `CLOSING_WINDOW_TOL` rows). Ground:
 the maintainer's ruling, and TOPAS's 2 % cut as named practice.
@@ -65,7 +92,8 @@ the maintainer's ruling, and TOPAS's 2 % cut as named practice.
 ## Tasks
 
 - [x] Flip the default on `PlanSpec` and `RefinementPlan`; the help text, docstrings and field descriptions say what the default is and what 1e-3 buys. `Refinement.run_stage`'s `window_area_tol=None` and a FitReport action applied in the GUI follow, to the declared stages' 2 %; `compile_model`, `predict` and the FitReport misfit keep evaluating at 1e-3
-- [ ] Tests: those that assumed a closing stage by default declare it, or assert the new default
+- [x] Tests: those that assumed a closing stage by default declare it, or assert the new default
+- [x] The three rulings of § Context: a carried Pawley series runs the closing stage (`SequentialRefinement.fit`); `lab_calibrate` declares it and the `calibrate`, `branch` and `path` guides ask for it; the GUI preview's shift accepted in its tests, WP-2225 filed to retune it
 - [x] Audit rows, manual (`reference/refinement.md` speed section), skill rows (`batch-operating.md` 9c.34), staged release notes
 - [x] Skill: the opt-in row for a final answer: 9c.34 rewritten as the opt-in, and `series.md`'s runaway row says only an opted-in plan has a closing stage
 

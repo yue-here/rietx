@@ -701,8 +701,15 @@ class RefinementPlan:
         measure the *goniometer*; freeing a mount property against a fixed
         certified cell would let specimen preparation contaminate the
         calibration that every later sample inherits.  ``save_instrument_profile``
-        strips any roughness block for the same reason."""
-        return cls(stages=[
+        strips any roughness block for the same reason.
+
+        **It runs the closing stage** (:data:`CLOSING_WINDOW_TOL`), which
+        other plans leave off since WP-2222.  Every later fit holds this
+        result fixed, so its error reaches all of them.  On the simulated
+        standard of ``examples/guides/calibrate.py``, the declared stages
+        alone put size and strain 2.9 and 2.4 esd from the truth, against
+        under 1 esd with the closing stage (WP-2222, ruled 2026-11-19)."""
+        return cls(closing_window_tol=CLOSING_WINDOW_TOL, stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
                                 "instrument.geometry.sample_displacement"]),

@@ -41,11 +41,16 @@ rx.save_instrument_profile(calibration.instrument, work / "first.json")
 
 from _calibration_pair import ceo2  # noqa: E402
 
+from rietx.schemas.plan import CLOSING_WINDOW_TOL  # noqa: E402
+
 
 def refine_sample(profile, data):
     instrument = rx.load_instrument_profile(profile)
     instrument.background = rx.BackgroundChebyshev.with_terms(4)
-    return rx.Refinement(ceo2(), instrument).fit(data, plan="lab_sample_refine")
+    # A size and strain to quote: end with the closing stage, as lab_calibrate does.
+    plan = rx.RefinementPlan.lab_sample_refine()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    return rx.Refinement(ceo2(), instrument).fit(data, plan=plan)
 
 
 def show(label, result):
