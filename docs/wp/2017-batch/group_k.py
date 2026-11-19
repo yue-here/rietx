@@ -35,7 +35,10 @@ handover, "part B …: registered before any run").  The tools are ``tests/reach
 ``a``.  Its main phase's scale over that correct fit's names what it found: a **full
 collapse** below 1e-3, a **partial capture** between 1e-3 and 0.5 when the cell was not
 reached, otherwise **other**.  The collapse set the edges read is every ``scale0`` fit and
-every displaced full collapse; the correct set is every ``correct`` fit.
+every displaced full collapse; the correct set is every ``correct`` fit.  *Amended after
+the run (2026-11-19):* on NAC's two-phase model that label also took fits whose main phase
+went to zero while CaF₂ kept its own lines, so the edge reads the fits with **every** phase's
+scale under 1e-3, and ``summary`` prints the registered set beside it.
 
 **The edges.**  The largest p over the correct set and the smallest over the collapse set,
 each with its case.  The row's regression test (``tests/test_far_from_data_family.py``)
@@ -257,8 +260,17 @@ def summary() -> None:
         r["p"] = h.p_value(r)
         r["ratio"] = (r["scales"][0] / ref[_key(r)]["scales"][0]
                       if _key(r) in ref and ref[_key(r)]["scales"][0] else None)
+        r["every_phase"] = (r["arm"] == "scale0" or (
+            _key(r) in ref and all(q and s / q < COLLAPSE_RATIO for s, q in
+                                   zip(r["scales"], ref[_key(r)]["scales"]))))
     correct = [r for r in rows if r["arm"] == "correct"]
-    collapse = [r for r in rows if r["label"].startswith("full collapse")]
+    # Read after the run: on a two-phase model the pre-registered label ("the main phase's
+    # scale") also takes fits whose main phase went to zero while another phase kept its
+    # own lines.  Those carry Bragg intensity, so the edge reads the every-phase set and the
+    # pre-registered set is printed beside it.
+    registered = [r for r in rows if r["label"].startswith("full collapse")]
+    collapse = [r for r in registered if r["every_phase"]]
+    kept = [r for r in registered if not r["every_phase"]]
     lines = ["# WP-2017 group K, `MODEL_FAR_FROM_DATA`'s level on a thinned family", "",
              f"Rows: {len(rows)} fits ({len(errors)} raised or timed out), head "
              f"`{meta.get('head', '?')[:9]}`, {meta.get('platform', '?')}, Python "
@@ -280,10 +292,23 @@ def summary() -> None:
               f"{_fmt(hi and hi['p'], '.3e')} ({hi and hi['case']}, Rwp {_fmt(hi and hi['rwp'], '.4f')}, "
               f"F {_fmt(hi and hi['far_from_data'].get('F'))}).",
               f"- Smallest p over the {len(collapse)} full collapses: "
-              f"{_fmt(lo and lo['p'], '.6g')} ({lo and lo['case']}, Rwp {_fmt(lo and lo['rwp'], '.4f')}, "
+              f"{_fmt(lo and lo['p'], '.15g')} ({lo and lo['case']}, Rwp {_fmt(lo and lo['rwp'], '.4f')}, "
               f"F {_fmt(lo and lo['far_from_data'].get('F'))}).",
               f"- Correct fits flagged: {sum(h.flagged(r) for r in correct)}; full collapses "
               f"not flagged: {sum(not h.flagged(r) for r in collapse)}.",
+              f"- Read after the run: the pre-registered label (the main phase's scale under "
+              f"{COLLAPSE_RATIO:g} of the correct fit's) took {len(registered)} fits.  "
+              f"{len(collapse)} of them have every phase's scale there.  The other {len(kept)} "
+              f"({', '.join(sorted({r['family'] for r in kept})) or 'none'}) lost the main "
+              f"phase while another phase kept its scale: {sum(h.flagged(r) for r in kept)} "
+              f"flagged, p {_fmt(min((r['p'] for r in kept), default=None), '.3g')} to "
+              f"{_fmt(max((r['p'] for r in kept), default=None), '.3g')}, scale of the other "
+              f"phase over its correct fit's "
+              f"{_fmt(min((r['scales'][1] / ref[_key(r)]['scales'][1] for r in kept), default=None))}"
+              f" to "
+              f"{_fmt(max((r['scales'][1] / ref[_key(r)]['scales'][1] for r in kept), default=None))}"
+              f".  Over the pre-registered set the smallest p is "
+              f"{_fmt(min((r['p'] for r in registered), default=None), '.3g')}.",
               f"- Spy and code agree (flagged ⇔ p ≥ α) on "
               f"{sum(h.flagged(r) == (r['p'] >= alpha) for r in rows)} of {len(rows)} rows.", ""]
     near = sorted((r for r in correct), key=lambda r: -r["p"])[:5]
@@ -291,7 +316,7 @@ def summary() -> None:
         f"{r['case']} {r['p']:.3e}" for r in near) + ".", ""]
     near = sorted(collapse, key=lambda r: r["p"])[:5]
     lines += ["Five full collapses with the smallest p: " + "; ".join(
-        f"{r['case']} {r['p']:.6g}" for r in near) + ".", ""]
+        f"{r['case']} {r['p']:.15g}" for r in near) + ".", ""]
 
     lines += ["## Correct starts and held collapses, by family and count", "",
               "| family | counts a channel | correct: fits | Rwp | flagged | largest p | "
@@ -316,7 +341,7 @@ def summary() -> None:
                 f"{_fmt(max((r['p'] for r in c), default=None), '.2e')} | "
                 f"{_fmt(min(fs, default=None))} | {len(z)} | {rng(z, 'rwp')} | "
                 f"{sum(h.flagged(r) for r in z)} | "
-                f"{_fmt(min((r['p'] for r in z), default=None), '.6g')} |")
+                f"{_fmt(min((r['p'] for r in z), default=None), '.15g')} |")
     lines.append("")
 
     disp = [r for r in rows if r["arm"] == "displaced"]
@@ -336,12 +361,13 @@ def summary() -> None:
                          f"{lab.count('other')} |")
     lines.append("")
     lines += ["Every displaced fit that did not reach its answer:", "",
-              "| case | class | label | scale / correct | Rwp | usable | flagged | p | errors |",
-              "|---|---|---|---|---|---|---|---|---|"]
+              "| case | class | label | scale / correct | every phase | Rwp | usable | flagged | "
+              "p | errors |", "|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(disp, key=lambda r: r["case"]):
         if r["label"] == "reached":
             continue
         lines.append(f"| {r['case']} | {r['class']} | {r['label']} | {_fmt(r['ratio'])} | "
+                     f"{'yes' if r['every_phase'] else 'no'} | "
                      f"{r['rwp']:.4f} | {r['usable']} | {h.flagged(r)} | {r['p']:.3g} | "
                      f"{', '.join(r['error_codes']) or '—'} |")
     lines.append("")
