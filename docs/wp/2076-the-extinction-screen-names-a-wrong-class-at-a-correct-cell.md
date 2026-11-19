@@ -131,7 +131,7 @@ the screen and stays a v2 fence.
 
 ### Inherited
 
-- **2026-11-19, from the issue triage (issue #1685): the screen's per-class fits are not
+- **2026-11-19, from the issue triage (PR #1697; issue #1685): the screen's per-class fits are not
   checked for status.** #1685 lists `indexing/extinction.py:1520-1528` among four ΔBIC callers
   that never read either fit's `status` and never test that the fuller fit's χ² sits at or below
   the restricted one's. WP-2220 takes the other three (`compare_freed`, `predict_then_verify`,

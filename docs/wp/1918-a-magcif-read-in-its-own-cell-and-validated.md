@@ -140,7 +140,7 @@ transcriptions were deliberately not copied. TOPAS is a black box.
 
 - 2026-10-26 issue triage: #1063 (mustachefeeling, 2026-10-20), three FullProf-mCIF refusals on k = 0 files, independent of I-c. Checked against the tree at c0e32ab29, from `tests/test_magcif.py`'s Cr₂WO₆ fixture: (1) an empty `data_global` block ahead of the structure block, or one holding only `_audit_*` tags, raises "single data block expected, got 2 — this file does not read as a CIF (an empty, truncated or non-CIF file reaches here)" (`crystallography/cif.py:206-209`); (2) `_parent_space_group.name_H-M` without `_alt` raises `MagCifError` naming only the `_alt` tag (`magcif.py:683-690`); `cif_mag.dic` 0.9.9 defines only `name_h-m_alt` (`tests/data/cif_dictionaries/cif_mag.dic:3320`); (3) pre-2016 `_magnetic_atom_site_*`/`_magnetic_cell_*` tags raise "no atom sites found". Two real mCIFs from FullProf's example distribution (held locally, never to be committed) write `_parent_space_group.name_H-M` and both raise (2); with the tag renamed to `_alt`, both read. GSAS-II 5.8.4 falls back to `name_H-M` when `_alt` is absent (`imports/G2phase_CIF.py:242-244`, read 2026-10-26). Proposed: read `name_H-M` where `_alt` is absent, with an info diagnostic naming the non-dictionary tag, and refuse when both are present and disagree; read the one block holding an `_atom_site_` loop when every other block is empty or `_audit_*` only, with an info diagnostic naming the skipped blocks, while two structure blocks stay refused with a message that counts them and names `block=`; refuse the pre-2016 tag set by name. Item (1) edits the same reader lines as WP-1933's C-e (`structure_from_cif(block=)`), whose Inherited already records the wrong-cause message; build them together or land this rule first and let C-e generalise it. Each new code needs its `_audit` row (tier 1: the format's definition) and its `help.py`/skill row.
 
-- **2026-11-19, from the issue triage (issue #1688): a phase whose group gemmi cannot name
+- **2026-11-19, from the issue triage (PR #1697; issue #1688): a phase whose group gemmi cannot name
   raises in `report()` and in the nuclear CIF writer.** I-d sets `parent_cell` where
   `_closest_type` is `None`, so every phase it reads is this kind. On a `magnetic_supercell`
   child (`R-3m [unnamed in 2a,a+b,a+c]`) the fit completes, then `report()` raises at
@@ -148,7 +148,7 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   both through `OperatorGroup.closest_type`. Checked against the tree at 7a4a6cd20. WP-2221
   owns the fix. I-d's acceptance run reaches the same raise until it lands.
 
-- **2026-11-19, from the issue triage (issues #1689, #1691): the 4d ions past M⁺ have no
+- **2026-11-19, from the issue triage (PR #1697; issues #1689, #1691): the 4d ions past M⁺ have no
   form-factor row, and computed rows are offered.** Folded here beside I-e because both add
   rows to one table in `crystallography/magnetic/form_factor.py`, with an `ATTRIBUTION.md` row
   and the table's fingerprint test, and because #1691's first question is I-e's own (which

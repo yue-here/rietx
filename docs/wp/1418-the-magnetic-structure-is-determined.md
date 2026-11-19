@@ -125,7 +125,7 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
-- **2026-11-19, from the issue triage (issue #1692): on co-sited magnetic atoms the support
+- **2026-11-19, from the issue triage (PR #1697; issue #1692): on co-sited magnetic atoms the support
   test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
   call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic
   atoms, the support test reads the combination the powder measures there, Σ occ·f·m, with its
@@ -143,7 +143,7 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   (`strategy/magnetic.py:327`) stand as the issue describes. `moment_supported` is WP-1327's D4
   null test; the change reaches it too.
 
-- **2026-11-19, from the issue triage (issue #1690): `solve_magnetic` abstains on most k ≠ 0
+- **2026-11-19, from the issue triage (PR #1697; issue #1690): `solve_magnetic` abstains on most k ≠ 0
   candidates from a centred parent, because #614's guard refuses every class.**
   `isotropy.magnetic_cell` reduces the primitive basis, and in the reduced cell an operation
   can mix two axes of unequal length, so `MagneticGroup.allowed_moment_basis` raises

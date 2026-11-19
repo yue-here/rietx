@@ -126,7 +126,7 @@ at its bound. Every existing `compare_freed` number is unchanged.
 
 ## Handover log
 
-- **2026-11-19** — created, from the 2026-11-19 issue triage (issues #1685, #1686). A reader of
+- **2026-11-19** — created, from the 2026-11-19 issue triage (PR #1697; issues #1685, #1686). A reader of
   a ΔBIC comparison cannot yet tell when it rests on a fit that never finished, or when it
   charges parameters that carried no information. Checked against the tree at 7a4a6cd20: both
   issues' scripts reproduce digit for digit on macOS arm64; `_freed_comparison` reads no

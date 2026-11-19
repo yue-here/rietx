@@ -91,7 +91,7 @@ present.
 
 ## Handover log
 
-- **2026-11-19** — created, from the 2026-11-19 issue triage (issue #1688). A magnetic child
+- **2026-11-19** — created, from the 2026-11-19 issue triage (PR #1697; issue #1688). A magnetic child
   that rietx itself builds can be fitted and then cannot be reported or written to a CIF.
   Checked against the tree at 7a4a6cd20: the issue's script reproduces, and the nuclear CIF
   writer raises the same error on the same child. No open WP owns it: WP-1326 built the
