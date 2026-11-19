@@ -85,6 +85,16 @@ None.
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+  a commit after this file was last touched, and the entry below records it. Nothing else
+  changed, and the status stays ✅.
+
+- **2026-11-15** (reconstructed post hoc) — `8e7381bd6` made notebook 03b plot its cut
+  pattern. `test_tutorial_executes_clean` refuses a notebook with no plotting cell, because it
+  then checks no figure. The cell that cuts the pattern at 45° 2θ now ends on `short.plot()`,
+  and the peak pick and search move to the next cell. It rode PR #1570, which merged on
+  2026-11-15 as `0eb533fcd`. It changed the tutorial script and its generated notebook only.
+
 ### 2026-11-15 — notebook 03 shows the indexer abstain on a 45° cut
 
 Tutorial 03 now runs a second indexing search on its own pattern cut at 45° 2θ, and that
