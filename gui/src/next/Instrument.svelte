@@ -210,9 +210,11 @@
       say(`ref.edit(instrument=load_instrument_profile("${file.name}"))`);
       edits = new Map();
       refusal = "";
-      loaded = `Loaded ${file.name}`;
       onlanded();
       await load();
+      // only once the fields show what was loaded, so "Loaded" never names a
+      // file over the values it replaced
+      loaded = `Loaded ${file.name}`;
     } catch (exc) {
       refusal = busyWords(exc);
     } finally {
