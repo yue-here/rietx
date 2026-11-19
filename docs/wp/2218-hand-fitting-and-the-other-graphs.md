@@ -316,6 +316,11 @@ Filled in by the session that builds each PR.
     (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_preview`): 288
     passed. Every browser file by glob (`tests/*_browser.py`), serially: 170 passed. CI's
     Vale steps, run as `ci.yml` runs them: 0 errors.
+  - *Later the same day*: merged PR #1680's nine review fixes (its entry lists them). The
+    browser test file kept both branches' new cases, and the dist was rebuilt. Fast suite
+    14955 passed, 424 skipped, 32 xfailed, five more than 14950 (PR #1680's four python cases
+    and its browser case). Vitest 846. svelte-check 0 errors in 456 files. GUI python files
+    302 passed. Browser glob 171 passed. Ruff and CI's Vale steps clean.
   - *Next*: PR #1684 takes the same merge, then § Rulings 6 (the Peak shape row).
 
 - **2026-11-19** — Yue's rulings of 2026-11-19 applied to the second PR, PR #1680.
