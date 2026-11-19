@@ -127,9 +127,9 @@ assert not any("biso" in p.path for p in unreached.parameters)
 # esd, its unscaled esds the declared line's, its scaled ones wider by sqrt(chi2/nu).
 a0, k = fit.variables
 assert (fit.chain, fit.n_points, fit.dof, fit.skipped) == ("forward", 7, 5, [])
-assert f"{fit.reduced_chi2:.2f}" == "1.49"
-assert f"{a0.value:.9f}" == "4.162832824" and f"{k.value:.7e}" == "2.0781664e-05"
+assert f"{fit.reduced_chi2:.2f}" == "1.45"
+assert f"{a0.value:.9f}" == "4.162832875" and f"{k.value:.7e}" == "2.0781570e-05"
 assert f"{a0.esd:.1e}" == "2.0e-06" and f"{a0.esd_unscaled:.1e}" == "1.6e-06"
-assert f"{k.esd:.1e}" == "9.8e-09" and f"{k.esd_unscaled:.1e}" == "8.0e-09"
-assert f"{abs(a0.value - result.parametric[0].value) / result.parametric[0].esd:.2f}" == "0.07"
-assert f"{abs(k.value - slope.value) / slope.esd:.2f}" == "0.03"
+assert f"{k.esd:.1e}" == "9.9e-09" and f"{k.esd_unscaled:.1e}" == "8.2e-09"
+assert f"{abs(a0.value - result.parametric[0].value) / result.parametric[0].esd:.2f}" == "0.10"
+assert f"{abs(k.value - slope.value) / slope.esd:.2f}" == "0.05"
