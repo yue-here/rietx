@@ -1403,7 +1403,7 @@ class LeBailValidation(Base):
     #: is not read as ``unmatched_observed`` lines.  The scan's cap,
     #: ``background.select.CHEBYSHEV_MAX_ORDER``, is returned whenever BIC still
     #: falls there.  ``None`` for a background of another kind, and in a
-    #: record written before schema 0.61
+    #: record written before schema 0.62
     background_terms: int | None = None
 
 

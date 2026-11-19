@@ -101,7 +101,7 @@ the reference. It answers by kind 3: report the number with its meaning.
   *Done.* Route A, ruled by Michael 2026-11-09 (recorded under Context): `_size_validation_background`
   (`select_chebyshev_order` over the fitted range, never below the declared order, any other background kind
   or a failed scan left as declared), called once by `index_pattern` when a candidate will be validated and by
-  `validate_by_lebail` unless `size_background=False`; `LeBailValidation.background_terms` (schema 0.61 note;
+  `validate_by_lebail` unless `size_background=False`; `LeBailValidation.background_terms` (schema 0.62 note;
   thresholds 1.13, 1.12 having shipped in 1.11.0); tier-3 action row on that field with `LeBailValidation` in
   `RECORD_SCHEMAS` and its other 19 fields in `OTHER_RECORD_FIELDS`; manual table row and paragraph in
   `reference/indexing.md`; skill API index regenerated (both copies); release note; indexing CLAUDE.md clause;

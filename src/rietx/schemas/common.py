@@ -717,10 +717,10 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (WP-2113): ``LeBailValidation.background_terms``, the
+#: 0.61 → 0.62 (WP-2113): ``LeBailValidation.background_terms``, the
 #: validation fit's Chebyshev order.  Additive and defaulted to ``None``, the
 #: 0.25 → 0.26 rule; an older build refuses a validation carrying the key.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
