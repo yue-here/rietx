@@ -1,6 +1,6 @@
 # WP-2220 — A nested comparison says which fits it rests on, and which freed columns carried information
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: — (2076 soft: its extinction-screen nesting finding fences that caller out; 2053 soft: the same stationary-point t)
 Priority: P2 2026-11-19 — a ΔBIC of the wrong sign is quoted beside a fit that stopped on its budget, and nothing on the comparison says so; a path few fits run
