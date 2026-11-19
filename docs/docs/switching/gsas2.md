@@ -60,9 +60,9 @@ result = ref.fit(data, plan=plan, two_theta_limits=(15, 130))
 
 ```text
 >>> result.status, round(result.statistics.rwp, 4)
-('converged', 0.0898)
+('converged', 0.0893)
 >>> [(s.name, len(s.freed)) for s in result.stages]
-[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19), ('closing', 34)]
+[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19)]
 ```
 
 The two axial-divergence terms are set by hand, where an `.instprm` would supply `SH/L`.
@@ -71,7 +71,8 @@ This plan frees U, V and W, which the [validation protocol](validation.md#fluora
 A name in `turn_on` is a parameter path, and `*` stands for any text at that place.
 `phases.*.cell.*` is every lattice parameter of every phase.
 Staging is cumulative, so the cell stays free in the profile and atom stages.
-The fit ends with a closing stage, which frees all 34 parameters again with wider peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
+The fit ends with the last stage, `atoms`.
+A plan can add a closing stage that frees all 34 parameters again on tighter peak windows, and this one does not ([The closing stage](../reference/refinement.md#the-closing-stage)).
 [About a fit](../concepts/fit.md#the-plan) describes the stages, and the [plan presets](../reference/plans.md) draw the ones rietx ships.
 
 ### A sequential refinement is a chain
@@ -163,17 +164,17 @@ rx.write_gsas2_instprm(ref.fitted_instrument, "refined.instprm")
 Type:PXC
 Lam1:1.54059
 Lam2:1.54443
-Zero:-0.0365586
+Zero:-0.0365483
 I(L2)/I(L1):0.5
 Polariz.:0.5
-U:-1.57826
-V:2.76475
-W:2.37759
-X:2.68762
-Y:4.11637
+U:-1.57858
+V:2.93235
+W:2.29048
+X:2.74538
+Y:3.9936
 ```
 
-The `.instprm` states U = −1.57826 centidegrees², and rietx's own value is −0.000875173 degrees².
+The `.instprm` states U = −1.57858 centidegrees², and rietx's own value is −0.000875351 degrees².
 `rx.read_gsas2_instprm` reads the file back and converts.
 
 GSAS-II states one axial divergence, `SH/L`, as the sum of the specimen and detector terms.

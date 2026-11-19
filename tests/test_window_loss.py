@@ -125,7 +125,8 @@ def test_a_fit_records_each_stages_loss_and_its_node_carries_it(pattern):
         rx.Stage("cell", ["phases.*.cell.*", "phases.*.scale"], max_iter=40)])
     result = ref.fit(pattern, plan=plan)
     losses = [s.window_loss for s in result.stages]
-    assert len(losses) == 3 and all(x is not None for x in losses)
+    # one per declared stage: no closing stage by default since WP-2222
+    assert len(losses) == 2 and all(x is not None for x in losses)
     assert all(abs(x) < WINDOW_AREA_TOL for x in losses)
     assert "STAGE_WINDOWS_STALE" not in {d.code for d in result.diagnostics}
     nodes = [n for n in ref.history.nodes.values() if n.action.kind == "stage"]

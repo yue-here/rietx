@@ -51,6 +51,7 @@ from rietx.crystallography.symmetry import (
 )
 from rietx.report.schemas import MOMENT_SUPPORT_SIGMA
 from rietx.schemas.common import Parameter
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import (
     MOMENT_FLOOR_MU_B,
     Atom,
@@ -157,7 +158,10 @@ def simulate(phase, instrument, *, background=40.0, seed=20260906,
 NUCLEAR_PLAN = rx.RefinementPlan(stages=[
     rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
     rx.Stage("cell", ["phases.*.scale", "instrument.background.c*",
-                      "phases.*.cell.*"])])
+                      "phases.*.cell.*"])],
+    # declared, not inherited: off by default since WP-2222, and the nuclear
+    # fits every solve here starts from were measured with it
+    closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 def neutron():
@@ -229,6 +233,18 @@ def test_the_published_arrangement_ranks_first_and_the_rivals_are_listed(a_type,
     assert solution.tied == (solution.best.class_index,)
     assert solution.best.moments[0].magnitude == pytest.approx(3.5, abs=0.2)
     assert solution.best.moments[0].supported
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-solve-a-type")
+def test_the_winners_closing_stage_runs_on_the_closing_windows(a_type_solution):
+    """The winner continues with a closing stage at ``CLOSING_WINDOW_TOL``.
+    It names the window, because ``run_stage``'s own default has been the
+    declared stages' 2 % since WP-2222, and there the stage ran on the
+    windows it exists to widen while still being called closing."""
+    last = a_type_solution.best._result.stages[-1]
+    assert last.name == "closing"
+    assert last.window_area_tol == CLOSING_WINDOW_TOL
 
 
 @pytest.mark.slow
@@ -1879,7 +1895,8 @@ def test_a_budget_stop_is_continued_from_where_it_stopped():
     start.cell.c.value += 0.004
     _ref, result = _fit(rx.Structure(phases=[start]), instrument,
                         data, starved)
-    assert [s.name for s in result.stages] == ["all (continued)", "closing"]
+    # the plan declares no closing stage, the default since WP-2222
+    assert [s.name for s in result.stages] == ["all (continued)"]
     freed = {p.path for p in result.parameters if p.vary}
     assert "phases.0.scale" in freed and "phases.0.cell.a" in freed
     # each continuation keeps the last stage's one-iteration budget, so this
