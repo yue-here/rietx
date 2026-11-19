@@ -198,6 +198,34 @@ and have no free factor to measure, so this file's old list named them without c
   the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting
   is one of the two observations that would flip that pick to a new scenario-set file. Name
   any such demotion in WP-2020's handover log when it lands.
+- **For group R, from a side investigation (2026-11-19).** The simulated `trigger` case in
+  `examples/bench_refinement.py` fitted to Rwp 0.01998 on v1.9.0 and reaches 0.0276 on
+  main (closing stage off). The truth model scores 0.0195 against its own pattern, so main
+  stops above the noise floor. The cause is the width twin hold (`1a4f5c52e`). The fit at its
+  parent reaches 0.02036 on main's pattern, and at `1a4f5c52e` 0.02784. The floor removal
+  alone (`879fb1bcc`) gives 0.02035. The data also differ between the two trees, because each
+  simulates with its own forward model (truth curves up to 0.45 % apart). That is not the
+  cause: v1.9.0 fits either pattern to about 0.020, and main fits either to about 0.0275.
+  The mechanism is plan order. `qpa_plan` frees U, V, X and Y in `profile`, before
+  `lines_axial` refines the axial divergence and the Kα2 weight. With the axial term still
+  at 0.02 against a truth of 0.03, the widths absorb the asymmetry: U 0.037 (truth 0.008),
+  X 0.035 (0.02) and Y −0.035 (0). From `sample_broadening` on, the hold freezes U, X and Y
+  at those values. `gauss_strain` and `gauss_size` have a floor of 0, so they cannot take
+  back U's excess. V moves to −0.030 to compensate. Y's deficit is paid by `lor_strain`
+  of 0.023-0.081 on all four phases, whose truth is 0. Weight fractions move by at most
+  0.14 wt % between arms. Cells are 250-330 ppm off truth in every arm, from the zero and
+  displacement walk, which v1.9.0 shares. With `lines_axial` moved ahead of `profile` and
+  the hold on, the fit reaches Rwp 0.02038 with the widths near truth (U 0.0048, X 0.0197,
+  Y 0.0001, `lor_strain` at most 0.0034). Without the hold and without Y's floor, Y walks to
+  −0.167 with `lor_strain` 0.12-0.19, the degeneracy the hold was built to stop. So the hold
+  assumes instrument widths that are already right, which § Instrument and specimen widths
+  in `docs/practice.md` gets from a standard. A plan that estimates them from the sample
+  before its asymmetry terms freezes a biased estimate, and nothing reports it as such.
+  Group R's question gains this family: the hold decides a real outcome here, a reported
+  microstrain where the truth has none. Reproduce with `2017-batch/trigger_twin_hold.py`
+  (four arms, about 10 s, macOS arm64, worktree `[dev]` venv). What to change, if anything
+  (the hold, `qpa_plan`'s order, or the bench notes that still say Rwp lands near 0.02), is
+  the maintainer's call.
 
 ## Non-goals
 
