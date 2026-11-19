@@ -158,7 +158,7 @@ choosing a fix.
 
   *Done.* No code changed in this session. The open task is ticked with the ruling. The
   status is ✅, and the `Priority:` line is gone. The narrative went to
-  `docs/milestones/v1.12.md`. The branch was rebased onto `origin/main` (`541f0daf7`). Issue
+  `docs/milestones/v1.13.md`. The branch was rebased onto `origin/main` (`541f0daf7`). Issue
   #1426 says what the hold does, what the tie would do and why it is more proper. It also
   says what the tie needs: a `Recipe` tie field, a check of the tied column at the FCJ
   corner, and a recipe that flags the term, to measure the two models against GSAS-II.
@@ -230,7 +230,7 @@ choosing a fix.
 
   *Next:* the maintainer rules on hold against tie.
   - **Hold:** mark #1422 ready, tick the open task, close the WP and move its narrative to
-    `docs/milestones/v1.12.md`.
+    `docs/milestones/v1.13.md`.
   - **Tie:** add a tie channel to `Recipe` (or to the plan), apply `tie_equal` to the
     axial pair in `read_recipe`'s plan, and rewrite the note and the four tests.
 
