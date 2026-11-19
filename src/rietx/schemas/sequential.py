@@ -1677,28 +1677,6 @@ class SeriesResult(Base):
                          f"one check that separates a trajectory from the order "
                          f"it was refined in")
 
-        # a width that grew while the fit got worse (WP-1465): the one reading
-        # of a trajectory that says a phase stood in for something missing
-        growth = by_code.get("SEQUENTIAL_WIDTH_GROWTH", [])
-        # a series stamped before thresholds 1.9 never ran the check, and its
-        # zero would read as "checked, none" — the row the ordering artefact
-        # above already refuses to print for a comparison that did not run
-        stamped = (None if self.provenance is None
-                   else self.provenance.report_thresholds_version)
-        try:
-            predates = (stamped is not None and tuple(
-                int(p) for p in stamped.split(".")[:2]) < (1, 9))
-        except ValueError:
-            predates = False
-        if predates and not growth:
-            lines.append(f"    widths grown with a worsening fit: NOT measured "
-                         f"— this series was stamped at thresholds {stamped}, "
-                         f"before SEQUENTIAL_WIDTH_GROWTH existed (1.9)")
-        else:
-            lines.append(f"    widths grown with a worsening fit: {len(growth)}")
-        for d in growth[:5]:
-            lines.append(f"      {d.message}")
-
         # the form itself (WP-1325): a chain measures points, and a line drawn
         # through them afterwards weights each by an esd conditional on its
         # own pattern; a joint parametric fit measures the coefficients
