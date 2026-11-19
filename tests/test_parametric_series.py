@@ -1451,7 +1451,8 @@ def test_an_equation_the_freed_reading_rejects_is_printed_and_warned_as_such():
         "(p = 0.077) for 31 directions"]
     mt = SimpleNamespace(expressions=[], parametric=[SimpleNamespace(name="cubic_a",
                                                      paths=["vars.cubic_a_0",
-                                                            "vars.cubic_a_1"])])
+                                                            "vars.cubic_a_1"])],
+                         free_paths=["vars.cubic_a_0", "vars.cubic_a_1"])
     (d,) = _parametric_form_diagnostics(mt, [t])
     assert d.value == 48.6 and d.where == ["vars.cubic_a_0", "vars.cubic_a_1"]
     assert "with the other equations' targets freed (with them tied it read 42.8" in d.message
@@ -1474,7 +1475,8 @@ def test_equations_the_joint_reading_alone_rejects_are_warned_together_naming_no
     from rietx.schemas.results import _parametric_lines
 
     mt = SimpleNamespace(expressions=[], parametric=[SimpleNamespace(name=n, paths=[f"vars.{n}_0"])
-                                     for n in ("A", "B")])
+                                     for n in ("A", "B")],
+                         free_paths=[f"vars.{n}_0" for n in ("A", "B")])
 
     def equation(name: str, freed_stat: float) -> ParametricFormTest:
         tied, freed = _two_readings(30.0, 0.5, freed_stat, 0.1)
@@ -1522,7 +1524,8 @@ def test_a_verdict_beside_a_rejected_equation_is_marked_provisional():
         "        provisional: 'zrp_a' rejected too, and moved the answer this reading "
         "steps from; read it again after fixing and refitting")
     mt = SimpleNamespace(expressions=[], parametric=[SimpleNamespace(name=n, paths=[f"vars.{n}_0"])
-                                     for n in ("zrp_a", "si_a")])
+                                     for n in ("zrp_a", "si_a")],
+                         free_paths=[f"vars.{n}_0" for n in ("zrp_a", "si_a")])
     a, b = _parametric_form_diagnostics(mt, tests)
     assert "The verdict is provisional: 'si_a' rejected too" in a.message
     assert "The verdict is provisional: 'zrp_a' rejected too" in b.message
@@ -1540,7 +1543,8 @@ def test_an_equation_with_no_direction_beside_the_others_is_named_by_the_joint_w
     from rietx.schemas.parametric import ParametricFormReading, ParametricFormTest
 
     mt = SimpleNamespace(expressions=[], parametric=[SimpleNamespace(name=n, paths=[f"vars.{n}_0"])
-                                     for n in ("A", "B")])
+                                     for n in ("A", "B")],
+                         free_paths=[f"vars.{n}_0" for n in ("A", "B")])
     none = ParametricFormReading(dof=0, statistic=None, cut=None, rejected=None,
                                  p_value=None)
     tied_a, _ = _two_readings(60.0, 0.0006, 30.0, 0.5)

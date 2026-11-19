@@ -363,6 +363,14 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "joint-only (WP-1325): one equation sets its target across its "
                 "subset, so the patterns that cannot see it are told once per "
                 "declaration, naming each"),
+    "_parametric_not_freed_diagnostics": (
+        (FIT,), "joint-only (WP-2101): the plan's stages run once for every "
+                "pattern, so a coefficient no stage freed is told once per "
+                "declaration"),
+    "_variable_not_freed_diagnostics": (
+        (ABSENT,), "a single fit's reading of VARIABLE_NOT_FREED (WP-2101): a "
+                   "joint fit's variables are its equations' coefficients, which "
+                   "_parametric_not_freed_diagnostics names per equation"),
     "_fixed_literal_diagnostics": (
         (FIT,), "a plan read (#803, WP-1341), through _joint_fixed_literals: "
                 "each histogram's table is asked under the joint matching rule, "
