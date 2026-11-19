@@ -308,7 +308,7 @@ gh run list --workflow nightly.yml --branch main --limit 1
   *Done* (ghostshift runner and this close, PR #1425). The moot `Priority:`
   line and the `### Inherited` section went (its notes, on WP-2045's close and on
   the wavelength row, are consumed below); the narrative moved to
-  `docs/milestones/v1.12.md` § How v1.12 is getting here; the index was
+  `docs/milestones/v1.13.md` § How v1.13 is getting here; the index was
   regenerated. Filed #1424 for the Mac rows. Yue held the close on #1425 until
   #1429 landed and a nightly passed (comment of 2026-11-05 22:21Z). #1429
   merged 2026-11-05 22:18Z (`7dec1f490`); run 42225042080 is the first nightly
