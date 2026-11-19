@@ -40,7 +40,6 @@
     PreviewQueue,
     buildSliders,
     defaults,
-    editText,
     fixFormat,
     formatParts,
     maxDecimals,
@@ -55,6 +54,8 @@
     type Slider,
     type Track,
   } from "../lib/interactive";
+  // the box opens as a Parameters cell does: one editor rule (WP-2223)
+  import { editText } from "../lib/numslot";
   import type { InteractiveDraft } from "../lib/recovery";
   import { normalize, type ParamRow } from "../lib/table";
   import { unitText } from "./words";
@@ -97,6 +98,8 @@
   /** the slider whose number is being typed, and the text so far */
   let typing = $state<string | null>(null);
   let typed = $state("");
+  /** the text the box opened on: Enter on it records nothing (WP-2223) */
+  let opened = "";
 
   const decimals = $derived(maxDecimals(sliders));
   const groups = $derived.by(() => {
@@ -212,7 +215,7 @@
 
   function startTyping(s: Slider) {
     typing = s.path;
-    typed = editText(current(s));
+    typed = opened = editText(current(s));
   }
 
   const typedCheck = $derived.by(() => {
@@ -224,6 +227,9 @@
     if (event.key === "Escape") {
       typing = null;
       event.stopPropagation();
+    } else if (event.key === "Enter" && typed.trim() === opened) {
+      // the text as it opened is no edit, whatever the value's digits (WP-2223)
+      typing = null;
     } else if (event.key === "Enter" && typedCheck && "value" in typedCheck) {
       set(s, typedCheck.value);
       typing = null;
@@ -293,6 +299,9 @@
     const [lo, hi] = typedRange(s);
     if (lo === s.lo && hi === s.hi) return;
     replace(s, { lo, hi, custom: true, track: s.track === "log" && !(lo > 0) ? "lin" : s.track });
+    // the fields now show the new ends, so typing the old text back is a change
+    shownLo = rangeLo;
+    shownHi = rangeHi;
   }
 
   function setTrack(s: Slider, track: Track) {
