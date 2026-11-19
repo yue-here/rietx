@@ -1064,6 +1064,11 @@ def _read_phase(key: str, block: dict, lam: float,
 
     atoms = _read_atoms(key, st, par, diags)
     phase = Phase(name=name, space_group=str(sg), cell=cell, atoms=atoms)
+    from ..crystallography.symmetry import check_phase_cell_ties
+    try:
+        check_phase_cell_ties(phase, prefix=None)
+    except ValueError as exc:
+        raise RecipeError(f"payload.phases.{key}.structure.unit_cell: {exc}") from exc
 
     scale_entry = (par.get("scale"))
     _, scale_vary, _, _ = _spec(scale_entry,
