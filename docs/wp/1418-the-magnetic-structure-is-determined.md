@@ -125,6 +125,41 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-19, from the issue triage (issue #1692): on co-sited magnetic atoms the support
+  test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
+  call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic
+  atoms, the support test reads the combination the powder measures there, Σ occ·f·m, with its
+  esd from the fit's covariance, against the same floor and the same `MOMENT_SUPPORT_SIGMA`
+  (3.0). A class whose combination passes is eligible, as a D8 pair is today through
+  `MomentRow.pair_supported`. Each atom's own modulus is still reported, marked as not
+  separately determined. The bar does not change. The ruling reads the degeneracy the way #1576
+  (Q14 (b), exclusion 4) reads it for the ΔBIC charge. Not ruled, proposed for the implementing
+  PR: f taken at Q → 0, so the tested number is Σ occ·m; the pin is the issue's six MAGNDATA
+  labels (0.206, 0.272, 0.673, 0.679, 0.882, 0.885), published class ineligible → eligible.
+  The measurement (published class best by ΔBIC and still ineligible on all six, best per-site
+  m/σ 0.07-2.57) is the reporter's on 90643335c and was not re-run (MAGNDATA files are not in
+  the tree). Checked against the tree at 7a4a6cd20: `moment_supported`
+  (`report/magnetic.py:460`), `MOMENT_SUPPORT_SIGMA` and `MomentRow.pair_supported`
+  (`strategy/magnetic.py:327`) stand as the issue describes. `moment_supported` is WP-1327's D4
+  null test; the change reaches it too.
+
+- **2026-11-19, from the issue triage (issue #1690): `solve_magnetic` abstains on most k ≠ 0
+  candidates from a centred parent, because #614's guard refuses every class.**
+  `isotropy.magnetic_cell` reduces the primitive basis, and in the reduced cell an operation
+  can mix two axes of unequal length, so `MagneticGroup.allowed_moment_basis` raises
+  (`crystallography/magnetic/operators.py:644`, `_refuse_crystal_axis_action`) and
+  `magnetic_supercell` and `_tilted_seed` never state the class. The guard is right (#614's
+  MnF₂ case). The reporter measured 18 of 31 k ≠ 0 labels of a 122-label MAGNDATA sample
+  abstaining this way on 545b79adb; with the guard disabled as a diagnostic, 13 of the 18 solve
+  to the published group. Proposed: state the child in a cell whose axes the group leaves
+  unmixed (the child-cell route, WP-1918 I-c on the read side), or use the fractional moment
+  action `isotropy` already uses. Pin: the 18 labels, refusal → solved. Checked against the
+  tree at 7a4a6cd20 on synthetic parents (no MAGNDATA): at k = (1, 1, 1), `I 4/m m m` gives 4
+  candidates and `magnetic_supercell` refuses all 4 by this guard; `I m -3 m` gives 6 and it
+  refuses 5. The same guard blocks NiO and MnO on `R -3 m:R` at k = (½ ½ ½) (#757); that
+  route's report-side raise is WP-2221 (#1688). Which route is a magnetic-path design call, so
+  Mike's (#1075).
+
 - **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
   chooses between two site assignments by a χ² gap smaller than its own stop scatter, and
   says nothing.** This is M-9's ranking and abstention, so it sits here. Decisions on it
