@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.12.0.dev0"
+  version: "1.13.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -38,10 +38,10 @@ How to drive `rietx` on real data: the order of work, and the checks before you 
 | §8 a result that makes no sense | [surprises](references/surprises.md) |
 | §9 the trajectory, and the history DAG | [history](references/history.md) |
 | §9b a ramp, a sweep or a tray of patterns | [series](references/series.md) |
-| §9c a batch: deciding; operating | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
+| §9c a screen or pool of fits, before launch | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
 | §9d a human watching, or a finished run on disk | [watching](references/watching.md) |
 
-Read signatures from the package, never from memory: `rx.capabilities()`, `rx.help_for(path)`, `inspect.signature(obj)`. A failure raises. Dump an answer with `model_dump(mode="json")`.
+Read signatures from the package, never from memory: `rx.capabilities()`, `rx.help_for(path)`, `inspect.signature(obj)`. Dump an answer with `model_dump(mode="json")`.
 
 ---
 
@@ -65,7 +65,7 @@ Never subtract a background, because that breaks the weights. Hold an estimated 
 
 ## 2. The turn-on order
 
-Free parameters in groups, cumulatively, each group converged before the next (McCusker et al. 1999, *J. Appl. Cryst.* **32**, 36). A preset plan does this; `rx.PLAN_INFO` describes each. Leave a plan's order only when `ref.suggest(data)` (held parameters ranked by predicted Δχ², with no fit) or a diagnostic names a better next group.
+Free parameters in groups, cumulatively, each group converged before the next (McCusker et al. 1999, *J. Appl. Cryst.* **32**, 36). A preset plan does this; `rx.PLAN_INFO` describes each. A second `fit` of a converged model runs one stage (`refit="stages"` walks it). Leave a plan's order only when `ref.suggest(data)` (held parameters by Δχ², no fit) or a diagnostic names a better next group.
 
 | Plan | When |
 |---|---|
@@ -81,9 +81,9 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 2. **Free intensity corrections last** (PO, extinction, roughness), after the structure settles, or they absorb structure.
 3. **Free anisotropic strain inside the sample-broadening stage.** A Stephens block locks `lor_strain`, so later means fifteen coefficients turned on at once.
 
-**Le Bail** (`mode="lebail"`, plan `profile_only`) is for a cell without a trusted structure: an indexing check, intensities for structure solution, a cell independent of any model. With a CIF, run the Rietveld plan directly (judging.md § rules 4-5). Where reflections crowd, check a Le Bail cell against a structural model before you quote it.
+**Le Bail** (`mode="lebail"`, plan `profile_only`) is for a cell without a trusted structure: an indexing check, intensities for structure solution, a cell independent of any model. With a CIF, run the Rietveld plan directly (judging.md § rules 4-5). Where reflections crowd, check a Le Bail cell against a structure.
 
-4. **Set `lebail_passes` (say 8) on a plan object**: `plan = rx.RefinementPlan.profile_only(); plan.lebail_passes = 8`.
+4. **Set `lebail_passes` (say 8)**: `plan = rx.RefinementPlan.profile_only(); plan.lebail_passes = 8`.
 5. **Seed the background before a Le Bail run: `rx.auto_background(data, seed=True).background`.** Unseeded, every coefficient is 0.0 and the pedestal goes to the reflections. Keep it co-refined under a broad hump: a held SNIP curve biases the fit (judging.md).
 
 ---

@@ -37,9 +37,10 @@ assert held == ["phases.0.cell.a", "phases.0.cell.alpha", "phases.0.cell.b",
                 "phases.0.cell.beta", "phases.0.cell.c", "phases.0.cell.gamma"]
 assert ref.fitted_structure.phases[0].cell.a.value == 9.3717
 assert ref.fitted_structure.phases[0].cell.c.value == 6.8859
+# The plan ends at its last declared stage since WP-2222 (closing stage off by
+# default, 2026-11-19), so the hold blocks the `cell` stage alone.
 assert [(s.name, s.blocked_by_hold) for s in result.stages if s.blocked_by_hold] == [
-    ("cell", ["phases.0.cell.a", "phases.0.cell.c"]),
-    ("closing", ["phases.0.cell.a", "phases.0.cell.c"])]
+    ("cell", ["phases.0.cell.a", "phases.0.cell.c"])]
 
 # The same fit without the hold moves the cell: the plan's `cell` stage frees it.
 free = rx.Refinement(rx.Structure.from_cif(examples_dir() / "fluorapatite.cif"), instrument)
@@ -52,6 +53,8 @@ ppm = 1e6 * (a_held - a_free) / a_held
 # 351.9 once the CIF's Ca1 was read on 1/3 (WP-2037, 2026-10-24): a free cell
 # lands at one of several nearby points.  Since lab_bragg_brentano frees S/L
 # alone (WP-2012, 2026-11-03) both macOS paths read 215.6; Linux was not
-# measured, so the line states a floor well under every reading.
+# measured, so the line states a floor well under every reading.  The same fit
+# reads 228.5 on macOS arm64 once the plan runs no closing stage (WP-2222,
+# 2026-11-19): 215.6 -> 228.5.
 print("without the hold: a moves by more than 150 ppm")
 assert 150 <= ppm < 400, ppm

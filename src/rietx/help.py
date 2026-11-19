@@ -58,6 +58,8 @@ __all__ = [
     "HelpEntry",
     "PARAMETER_HELP",
     "DIAGNOSTIC_HELP",
+    "DIAGNOSTIC_VIEWS",
+    "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
     "READER_OPTION_HELP",
@@ -759,11 +761,17 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "polynomial on top cannot correct this, because it is additive and the "
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
-            "expected report."
+            "expected report. A curve another program computed for one phase, such as "
+            "a DIFFaX faulted-minus-ideal term, scales with that phase. Store "
+            "it as c*·D, with c* converting the program's units to counts at phase "
+            "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
+            "stored curve does not follow the zero shift or any other peak-position "
+            "correction."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank",
+                "of 1 for a measured blank; the phase scale, tied, for a "
+                "computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
@@ -1928,6 +1936,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "and c to a on a cubic cell, or beta and gamma to alpha on rhombohedral "
+            "axes. The file stores the two with slightly different values. They "
+            "agree within the digits the file prints, so the reader used the source "
+            "value for both. A refinement builds the tied parameter from its source "
+            "anyway. A larger disagreement is left as written and the refinement "
+            "refuses it. If the difference is real, the symmetry is lower than the "
+            "symbol claims, and the phase needs a space group that leaves the "
+            "parameter free."
+        ),
+    ),
     "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
         title="Data blocks that state nothing were skipped",
         description=(
@@ -2941,6 +2963,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter in a history set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "to a on a tetragonal cell. A history written by an earlier release "
+            "stores the two with different values. Every fit of that model built "
+            "the tied parameter from its source, so loading reads it that way and "
+            "no number the history produced changes. This release refuses "
+            "such a cell, so the stored value could not otherwise be refined."
+        ),
+    ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
         title="Earlier tree in a history file skipped",
         description=(
@@ -3267,6 +3300,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "line of a supercell. A supercell of the leading cell predicts the last kind. "
             "Declaring "
             "`n_unindexed` forbids both retries."
+        ),
+    ),
+    "K_SEARCH_PARTNER": HelpEntry(
+        title="The cell's metric pairs this propagation vector with another",
+        description=(
+            "A near-symmetry of the cell's metric, within the tolerance passed, maps this "
+            "propagation vector onto another one that no symmetry of the space group "
+            "relates to it. The satellites of this vector and of vectors near the other "
+            "one can then agree within a match radius, so the positions alone may not say "
+            "which the peaks belong to. On a pseudo-tetragonal cell the swap of the two "
+            "near-equal axes is the usual case. Score the other vector and its "
+            "neighbourhood, and keep every vector that matches as a hypothesis. A moment or "
+            "modulation model, which reads intensities, or a sharper instrument separates "
+            "them."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -4399,16 +4446,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Fit the pattern on its own to find out why."
         ),
     ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
-        ),
-    ),
     "SERIES_PATTERN_FAILED": HelpEntry(
         title="A pattern could not be fitted",
         description=(
@@ -4858,6 +4895,34 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Respell the site in TOPAS if you want to refine the ion."
         ),
     ),
+    "VARIABLE_NOT_FREED": HelpEntry(
+        title="A variable was never refined",
+        description=(
+            "No stage of the plan freed a variable, so it kept its starting value. In "
+            "a joint fit the variable is a coefficient of a parametric equation. A "
+            "stage that frees the equation's target frees its coefficients. A "
+            "formula's variable declared `vary=False` is freed only by a stage naming "
+            "its `vars.<name>` path. In a single fit a variable that other parameters "
+            "are tied to is freed only by a stage naming its `vars.<name>` path. The "
+            "parameters that follow the variable are set from its start, and the data "
+            "did not measure them. The result has no row for the variable in "
+            "`parameters`. Add a stage that frees it before you quote what it sets. In a "
+            "single fit, hold the variable with `Refinement.hold` to say the start is "
+            "meant, and it is not named."
+        ),
+    ),
+    "WARM_REFIT_REJECTED": HelpEntry(
+        title="A re-fit fell back to the staged plan",
+        description=(
+            "A second `fit` on a model its last fit had converged runs the plan as one "
+            "stage, `warm_refit`, because a converged model needs no staged approach. "
+            "Here that one-stage fit diverged or carried an error-level finding, which "
+            "the message names. It was discarded, the model went back to where it "
+            "started, and the staged plan ran from there. The result is the staged "
+            "plan's answer, so nothing needs redoing. No ordinary fit has been seen to "
+            "fire it. `refit=\"stages\"` skips the one-stage attempt."
+        ),
+    ),
     "WAVELENGTH_CALIBRATION": HelpEntry(
         title="A refined wavelength moved from its declared value",
         description=(
@@ -4894,6 +4959,39 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "multiplying."
         ),
     ),
+}
+
+
+#: The rendered views a diagnostic can name (WP-1133), each as
+#: ``function.panel``, with the words a reader is shown.  Each view has a
+#: reference inside its frame: the eye judges a misfit only against something
+#: drawn beside it (WP-1130 § Finding 8).  ``plot_for_vlm`` gives each panel's
+#: axes its name as the matplotlib ``gid``, and
+#: ``tests/test_diagnostic_views.py`` renders the montage and fails on a name
+#: no panel carries, or on a name no code uses.
+DIAGNOSTIC_VIEWS: dict[str, str] = {
+    "plot_for_vlm.overview": (
+        "the top panel of rietx.viz.plot_for_vlm, observed and calculated "
+        "intensity over the whole pattern"
+    ),
+    "plot_for_vlm.residual": (
+        "the Δ/σ panel of rietx.viz.plot_for_vlm, the misfit in noise units "
+        "against a ±3σ band"
+    ),
+}
+
+#: The view that shows a code's finding, read by ``Diagnostic.view``.  It is
+#: the same for every finding with the code, so it is looked up and never
+#: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
+#: fit firing it was rendered and the finding read off that panel; the fits are
+#: in ``tests/test_diagnostic_views.py``.  A code not listed reads ``None``,
+#: which says no view was checked for it, not that none would help.  The one
+#: finding known to have no view is a background level: a uniform factor of
+#: two leaves a smooth decay with no visual signature (WP-1130).
+DIAGNOSTIC_VIEW_OF: dict[str, str] = {
+    "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
+    "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",
+    "MODEL_FAR_FROM_DATA": "plot_for_vlm.overview",
 }
 
 
