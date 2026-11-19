@@ -58,6 +58,7 @@ from rietx.crystallography.magnetic.operators import (
     moment_magnitude,
 )
 from rietx.schemas.common import Parameter
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import (
     MOMENT_MODEL_FIELDS,
     Atom,
@@ -1673,10 +1674,12 @@ def _fit(truth_phase, start_phase, *, background=20.0, stages=None,
     instrument = rx.Instrument.constant_wavelength_neutron(LAMBDA_CW)
     data = rx.PatternData(two_theta=_grid().tolist(), intensity=y.tolist())
     ref = rx.Refinement(structure, instrument, solver=solver or DEFAULT_SOLVER)
+    # declared, not inherited: off by default since WP-2222.  The truth is
+    # drawn on compile_model's closing windows, so a noise-free fit closes on them.
     result = ref.fit(data, plan=rx.RefinementPlan(stages=stages or [
         rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
         rx.Stage("moment", ["phases.*.atoms.*.moment.dof*"]),
-    ]))
+    ], closing_window_tol=CLOSING_WINDOW_TOL))
     return ref, result
 
 

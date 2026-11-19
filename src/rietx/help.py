@@ -4895,6 +4895,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Respell the site in TOPAS if you want to refine the ion."
         ),
     ),
+    "WARM_REFIT_REJECTED": HelpEntry(
+        title="A re-fit fell back to the staged plan",
+        description=(
+            "A second `fit` on a model its last fit had converged runs the plan as one "
+            "stage, `warm_refit`, because a converged model needs no staged approach. "
+            "Here that one-stage fit diverged or carried an error-level finding, which "
+            "the message names. It was discarded, the model went back to where it "
+            "started, and the staged plan ran from there. The result is the staged "
+            "plan's answer, so nothing needs redoing. No ordinary fit has been seen to "
+            "fire it. `refit=\"stages\"` skips the one-stage attempt."
+        ),
+    ),
     "WAVELENGTH_CALIBRATION": HelpEntry(
         title="A refined wavelength moved from its declared value",
         description=(
