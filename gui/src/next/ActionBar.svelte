@@ -90,10 +90,8 @@
     white-space: nowrap;
   }
 
+  /* the group's shape is next.css's; the bar's label reads secondary */
   .vg {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
     color: var(--muted);
     font-size: var(--text-sm);
   }
