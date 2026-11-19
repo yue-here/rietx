@@ -160,14 +160,14 @@ def _correct_cell_ties(sg, cell: dict[str, float],
         own = float(_printed_half(mine)) if mine is not None else 0.0
         rounding = (own + float(_printed_half(theirs))
                     if mine is not None and theirs is not None else 0.0)
-        table = cell_tie_tolerance(name) * (abs(target) if name in "abc" else 1.0)
+        table = cell_tie_tolerance(name) * (abs(target) if name in ("a", "b", "c") else 1.0)
         delta = value - target
         if abs(delta) > max(rounding, table):
             continue                      # a contradiction: the table refuses it
         out[name] = target
         if abs(delta) <= own or diagnostics is None:
             continue                      # the file's own rounding of the value
-        unit = " Å" if name in "abc" else "°"
+        unit = " Å" if name in ("a", "b", "c") else "°"
         why = ("within the digits the file prints" if abs(delta) <= rounding
                else "inside the tolerance the parameter table holds a tied "
                     "value to")

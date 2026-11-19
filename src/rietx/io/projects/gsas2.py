@@ -1832,7 +1832,7 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
             f"`model.phases`") from exc
     from ...crystallography.symmetry import check_phase_cell_ties
     try:
-        check_phase_cell_ties(structure.phases[0], prefix="phases.0.cell")
+        check_phase_cell_ties(structure.phases[0], prefix="phases.0")
     except ValueError as exc:
         raise Gsas2GpxError(f"{named}: phase {chosen.name!r}: {exc}") from exc
 

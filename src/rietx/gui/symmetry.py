@@ -59,7 +59,7 @@ from ..crystallography.symmetry import (
     OperatorGroup,
     cell_constraints,
     check_cell_angles,
-    check_cell_ties,
+    check_phase_cell_ties,
     expand_positions,
     free_cell_names,
     get_spacegroup,
@@ -651,9 +651,9 @@ def _refusals(candidate: Structure, instrument, phase: int) -> list[dict]:
         group = resolve_group(block.space_group, block.symmetry_operations)
         check_cell_angles(group, {n: getattr(block.cell, n).value
                                   for n in ("alpha", "beta", "gamma")})
-        check_cell_ties(group, {n: getattr(block.cell, n).value
-                                for n in ("a", "b", "c", "alpha", "beta", "gamma")},
-                        prefix=f"phases.{phase}.cell")
+        # the cell the table ties: a parent's, under the parent's group, for a
+        # phase stating its cell through one (constrained_cell)
+        check_phase_cell_ties(block, prefix=f"phases.{phase}")
     except ValueError as exc:
         # the cell itself cannot carry the symbol: no atom probe would add
         # anything, because every one of them would report the same sentence

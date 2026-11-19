@@ -4540,7 +4540,7 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
             from ...crystallography.magnetic.scattering import check_group_is_structure_symmetry
             from ...crystallography.symmetry import check_phase_cell_ties
             check_group_is_structure_symmetry(phases[-1])
-            check_phase_cell_ties(phases[-1], prefix=f"phases.{len(phases) - 1}.cell")
+            check_phase_cell_ties(phases[-1], prefix=f"phases.{len(phases) - 1}")
         except TopasInpError:
             raise
         except Exception as exc:

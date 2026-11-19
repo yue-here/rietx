@@ -174,7 +174,7 @@ class Project:
         # exists, so no project stores a root that no fit could start from
         from .crystallography.symmetry import check_phase_cell_ties
         for ip, phase in enumerate(structure.phases if structure is not None else []):
-            check_phase_cell_ties(phase, prefix=f"phases.{ip}.cell")
+            check_phase_cell_ties(phase, prefix=f"phases.{ip}")
         root.mkdir(parents=True, exist_ok=True)
 
         copied = root / src.name

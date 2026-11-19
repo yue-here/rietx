@@ -1619,7 +1619,7 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
             f"({exc}).  The file's own numbers are on `model.phases`") from exc
     from ...crystallography.symmetry import check_phase_cell_ties
     try:
-        check_phase_cell_ties(structure.phases[0], prefix="phases.0.cell")
+        check_phase_cell_ties(structure.phases[0], prefix="phases.0")
     except ValueError as exc:
         raise GsasExpError(
             f"{model.path or '<model>'}: phase {chosen.number} "

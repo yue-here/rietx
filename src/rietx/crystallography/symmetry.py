@@ -795,6 +795,30 @@ def check_cell_ties(sg: gemmi.SpaceGroup, cell: dict[str, float], *,
             f"symmetry leaves {name} free.")
 
 
+def constrained_cell(phase):
+    """The cell ``ParameterTable`` ties by symmetry on a model ``Phase``.
+
+    Returns ``(path, group, cell)``: ``path`` is the cell's place under the
+    phase, ``"cell"`` for the phase's own and ``"parent_cell.cell"`` for a
+    phase stating its cell through a parent (``Phase.parent_cell``), whose own
+    six entries are derived and locked while the parent's are tied under the
+    parent's group (``ParameterTable._collect_parent_cell``).  ``None`` where
+    the group does not resolve, which the table refuses naming the symbol.
+    """
+    declared = getattr(phase, "parent_cell", None)
+    try:
+        if declared is not None:
+            sg = resolve_group(declared.space_group)
+            path, cell = "parent_cell.cell", declared.cell
+        else:
+            sg = resolve_group(phase.space_group, phase.symmetry_operations)
+            path, cell = "cell", phase.cell
+        cell_constraints(sg)
+    except (RuntimeError, ValueError):
+        return None
+    return path, sg, cell
+
+
 def check_phase_cell_ties(phase, *, prefix: str | None) -> None:
     """:func:`check_cell_ties` on a model ``Phase``, for a project reader.
 
@@ -803,20 +827,20 @@ def check_phase_cell_ties(phase, *, prefix: str | None) -> None:
     project converted from the file can never store a cell the table refuses.
     A project file prints neither the digits nor the su a CIF reader snaps
     within, so nothing is snapped here: within the table's own tolerance the
-    cell builds as it always did, and past it the file is refused.  A phase
-    stating its cell through a parent (``Phase.parent_cell``) is the table's
-    to check, under the parent's group, and so is a group that does not
-    resolve, whose refusal names the symbol.
+    cell builds as it always did, and past it the file is refused.  The cell
+    checked is :func:`constrained_cell`'s, so a phase stating its cell through
+    a parent is checked under the parent's group.  ``prefix`` is the phase's
+    path (``"phases.0"``), and the message names the cell under it; with no
+    prefix it names a parent's cell as ``parent_cell.cell`` and its own not at
+    all.
     """
-    if getattr(phase, "parent_cell", None) is not None:
+    found = constrained_cell(phase)
+    if found is None:
         return
-    try:
-        sg = resolve_group(phase.space_group, phase.symmetry_operations)
-        cell_constraints(sg)
-    except (RuntimeError, ValueError):
-        return
-    check_cell_ties(sg, {name: getattr(phase.cell, name).value
-                         for name in CELL_NAMES}, prefix=prefix)
+    path, sg, cell = found
+    where = f"{prefix}.{path}" if prefix else (None if path == "cell" else path)
+    check_cell_ties(sg, {name: getattr(cell, name).value for name in CELL_NAMES},
+                    prefix=where)
 
 
 #: The cell parameters, in the order every surface in this package writes them.

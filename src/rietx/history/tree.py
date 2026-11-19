@@ -74,37 +74,46 @@ def _tie_stored_cells(pending: Sequence[Any]) -> list[Diagnostic]:
         cell_constraints,
         cell_tie_deviation,
         cell_tie_tolerance,
-        resolve_group,
+        constrained_cell,
     )
 
+    # a history repeats the same few groups in every node, so each is
+    # resolved once (keyed by what the group is read from)
+    groups: dict[tuple, Any] = {}
     found: dict[tuple[int, str], list[tuple[float, float, str, str]]] = {}
     for item in pending:
         if not isinstance(item, HistoryNode):
             continue
         for ip, phase in enumerate(item.state.structure.phases):
-            if phase.parent_cell is not None:
+            declared = phase.parent_cell
+            key = ((declared.space_group,) if declared is not None else
+                   (phase.space_group, tuple(phase.symmetry_operations or ())))
+            if key not in groups:
+                resolved = constrained_cell(phase)
+                groups[key] = (None if resolved is None else
+                               (resolved[0], resolved[1].xhm(),
+                                cell_constraints(resolved[1]).ties))
+            if groups[key] is None:
                 continue
-            try:
-                sg = resolve_group(phase.space_group, phase.symmetry_operations)
-                ties = cell_constraints(sg).ties
-            except (RuntimeError, ValueError):
-                continue
+            path, symbol, ties = groups[key]
+            cell = declared.cell if declared is not None else phase.cell
             for name, source in ties.items():
-                entry, origin = getattr(phase.cell, name), getattr(phase.cell, source)
+                entry, origin = getattr(cell, name), getattr(cell, source)
                 off = cell_tie_deviation(name, entry.value, origin.value)
                 if not off > cell_tie_tolerance(name):
                     continue              # within tolerance, or not a number
-                found.setdefault((ip, name), []).append(
-                    (entry.value, origin.value, sg.xhm(), source))
+                found.setdefault((ip, f"{path}.{name}"), []).append(
+                    (entry.value, origin.value, symbol, source))
                 entry.value = origin.value
     out: list[Diagnostic] = []
-    for (ip, name), group in found.items():
+    for (ip, where), group in found.items():
         value, target, symbol, source = group[0]
-        unit = " Å" if name in "abc" else "°"
+        name = where.rsplit(".", 1)[1]
+        unit = " Å" if name in ("a", "b", "c") else "°"
         stored = f" (stored in {len(group)} nodes)" if len(group) > 1 else ""
         out.append(Diagnostic(
             level="info", code="HISTORY_CELL_TIE_CORRECTED",
-            where=[f"phases.{ip}.cell.{name}"],
+            where=[f"phases.{ip}.{where}"],
             message=(f"this history stores {name} = {value}{unit} and {source} = "
                      f"{target}{unit} under space group {symbol!r}, whose "
                      f"symmetry makes {name} equal to {source}. Every fit of it "

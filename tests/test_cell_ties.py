@@ -311,3 +311,23 @@ def test_a_gui_limit_typed_with_a_value_moves_the_tied_entries():
         ref, {"phases.0.cell.a": [5.0, None]}, {}, {"phases.0.cell.a": 5.7})
     assert structure.phases[0].cell.lengths_angles()[:3] == (5.7, 5.7, 5.7)
     ParameterTable(structure, INSTRUMENT)
+
+
+# --- a phase stating its cell through a parent -----------------------------
+
+
+def test_a_parent_cell_is_checked_under_the_parent_group():
+    """The table ties the parent's cell under the parent's group, so the
+    readers' helper checks that cell and names it by its own path."""
+    from rietx.crystallography.symmetry import check_phase_cell_ties
+    from rietx.schemas.structure import ParentCell
+
+    phase = _structure("F m -3 m", SIX[0][3]).phases[0]
+    parent = rx.Cell(**{n: rx.Parameter(value=v) for n, v in zip(
+        NAMES, (5.641, 5.9, 5.641, 90.0, 90.0, 90.0), strict=True)})
+    phase = phase.model_copy(update={"parent_cell": ParentCell(
+        space_group="F m -3 m", transform="a,b,c;0,0,0", cell=parent)})
+    with pytest.raises(ValueError, match=r"phases\.0\.parent_cell\.cell\.b to a"):
+        check_phase_cell_ties(phase, prefix="phases.0")
+    with pytest.raises(ValueError, match=r"parent_cell\.cell\.b to a"):
+        ParameterTable(rx.Structure(phases=[phase]), INSTRUMENT)

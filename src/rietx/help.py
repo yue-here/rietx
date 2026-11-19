@@ -2970,7 +2970,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "to a on a tetragonal cell. A history written by an earlier release "
             "stores the two with different values. Every fit of that model built "
             "the tied parameter from its source, so loading reads it that way and "
-            "no number the history produced changes. Releases since 1.13 refuse "
+            "no number the history produced changes. This release refuses "
             "such a cell, so the stored value could not otherwise be refined."
         ),
     ),
