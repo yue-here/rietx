@@ -869,6 +869,39 @@ undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jaco
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
 
+## The esd of a parameter on a direction the data does not determine
+
+Read 2026-11-18 for WP-2028 (PR #1668's open question). Several parameters can trade along a
+direction that leaves χ² unchanged. The Gaussian width is one case: Γ_G² = W + size/cos²θ +
+strain·tan²θ, and 1/cos²θ = 1 + tan²θ. Should each such parameter still get a finite esd from
+the directions the data did measure, or none? rietx keeps the finite esd and warns with
+`COVARIANCE_DIRECTION_DISCARDED` (WP-1535). That esd is at least √2 short by construction,
+and WP-2028 measured one 140× short. Which esd a fit gets is itself set by
+rounding. On that width triple the smallest eigenvalue sat at 2.2e-16 to 1.6e-15 of the largest,
+against a cut of 1e-15. A cut direction read ± 3.9e-7 on W, and a kept one ± 5.5 (WP-2028).
+
+| Source | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | A column with a zero diagonal is a "hard" singularity. The parameter is dropped from the refinement and reported as "Parameter(s) dropped" (`GSASIImath.HessianLSQ`, `:264-266`; `GSASIIstrMain.ReportProblems`, `:54-139`). A combination direction is "soft". The Hessian is scaled to unit diagonal and inverted by an SVD that zeroes every singular value under 1e-6 of the largest (`setHcorr`, `GSASIImath.py:131-148`). Every parameter keeps the finite esd that inverse gives. The count of zeroed values and the parameters most involved are reported as "soft (SVD) Hessian singularities" (`setSVDwarn`, `:150-162`) | checked (source) |
+| TOPAS 5 and v9 | `do_errors` gives errors and `C_matrix_normalized` from the A matrix (TOPAS 5 Technical Reference §3.7). v9 takes them from an SVD by default (§5.10); its cut is not stated. `bootstrap_errors` refits resampled data and quotes the spread of the refined values (TOPAS 5 Technical Reference, keyword `bootstrap_errors`; Efron & Tibshirani 1986). Nothing marks an esd as undetermined | checked (manuals) |
+| FullProf | A singular matrix stops the run. The manual advises starting from the scale factors alone and refining separately any pair correlated above about 50 % (FullProf manual, Trouble shooting and p. 14) | checked (manual) |
+| Prince (2004), *Mathematical Techniques in Crystallography and Materials Science*, § Correlation | An exactly singular Hessian "has no inverse". A variance computed while leaving out variables correlated with the one of interest is too small, and "the apparent precision will be illusory". The book's remedy is a constraint that removes the indeterminacy (§ Constraints, p. 127) | checked (text) |
+| Linear-models theory (Searle 1971, *Linear Models*, p. 169; summarised in the SAS/STAT guide, "Finding the Least Squares Estimators") | In a rank-deficient model a parameter that is not estimable has no unique estimate. A generalized inverse gives one solution of infinitely many, and a variance built from it depends on which inverse was taken. Standard errors are quoted for estimable combinations only, which no choice of inverse moves | checked (secondary) |
+| R `lm` | A pivoted QR drops each column that depends on the earlier ones. Its coefficient and standard error print as `NA`, "not defined because of singularities", and the others are conditional on it being zero (R-help, Ripley 2008; `?alias`) | checked (secondary) |
+| SAS PROC GLM | Estimates from a generalized inverse are flagged "B", "not uniquely estimable". A coefficient set to zero by the inverse shows a missing standard error (SAS usage note 22585; SAS/IML blog 2018-11-28) | checked (secondary) |
+| scipy 1.18.1 `curve_fit` | No treatment. On y = (a + b)x + c, the same data from two starts gave a and b esds of 5.0e6 and 9.1e6 (`lm`), or 4.3e4 and 1.5e5 (`trf`), with c's esd near 6.4e-3 in all four fits and no warning (run 2026-11-18) | measured |
+| SHELXL, Jana, MAUD, BGMN, RIETAN-FP | not checked | |
+
+**The practice.** Statistics is settled: a parameter the data cannot estimate has no standard
+error, and software that meets one prints none (R, SAS). Both then quote the other parameters
+conditional on a stated choice: R fixes the later column at zero. The crystallographic textbook
+agrees and asks for a constraint. The two crystallographic programs that report errors through
+a singular matrix (GSAS-II, TOPAS) do what rietx does today. They quote the finite esd of a
+truncated SVD, and GSAS-II adds a warning naming the parameters. GSAS-II drops a parameter only
+when its own column has no gradient. A truncated SVD is an unstated constraint: the minimum-norm
+solution in the units the matrix was scaled to. So its esd is conditional on a choice nobody
+made, and it changes with the scaling.
+
 ## Stephens anisotropic strain: the width's shape and its clamp
 
 Collected 2026-11-02 for WP-1467 from three sources. Stephens' paper was read by the lead. GSAS-II
