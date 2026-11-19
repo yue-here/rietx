@@ -149,6 +149,13 @@ Filled in as the maintainer answers § Questions.
    sliders move the Structure graph. They already do: the third PR, #1683, draws unapplied
    values through `POST /api/structure3d`. A cell value moves the frame, a coordinate moves
    its atom, and an instrument value moves nothing.
+8. **The Peaks second look is approved.** Yue, 2026-11-19: "All the changes look good". This
+   answers § Questions 13 and approves the four values Claude chose there. Each Peaks window
+   is at least 190 px tall with its caption. The overview strip is 36 px of plot in the
+   `--plot-obs` ink. Each window's band is a 22 % `color-mix` of `--accent`. A computed range
+   is rounded outward to the value box's digits. The three PRs reached `main` together:
+   PR #1684 carried PR #1680's and PR #1683's branches, so GitHub marked all three merged at
+   10:36 UTC on 2026-11-19.
 
 ## Questions
 
@@ -346,6 +353,8 @@ Filled in by the session that builds each PR.
       can widen by up to one digit of the box. Caglioti U opens on 0.2772×10⁻³ to
       4.4362×10⁻³. The fields write the box's ×10ⁿ in superscript digits, and also read
       `1.5e-3` and `1.5x10^-3`.
+    *Answered by § Rulings 8: approved as built. Yue's question of the same day, how a
+    ×10ⁿ value looks once clicked, went to WP-2223.*
 
 ## Handover log
 
