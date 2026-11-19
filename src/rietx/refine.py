@@ -6058,6 +6058,7 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
+            diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -8382,6 +8383,57 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
                         "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
         ))
     return out
+
+
+def _variable_not_freed_diagnostics(stage_results: list[StageResult],
+                                    table: ParameterTable) -> list[Diagnostic]:
+    """``VARIABLE_NOT_FREED`` — a variable other parameters follow that no
+    stage of the plan freed (WP-2101, ruled by the maintainer 2026-11-19).
+
+    A plan replaces the vary flags (WP-1208), and in a single fit no stage
+    frees a ``vars.`` row unless its ``turn_on`` names it: a stage reaching a
+    tied parameter skips it, since the freedom sits with the variable.  So a
+    tie onto a variable, linear or a formula (WP-2118), under a preset plan
+    ends the fit with the variable at its start and everything following it
+    set from that start, and nothing said so.  The joint fit's equation-level
+    reading of the same fact is ``multi._parametric_not_freed_diagnostics``.
+
+    One warning per fit naming every such variable, with its start and what
+    follows it (``ParameterTable.entry_reach``, through chains and formula
+    blocks): ``where`` the variables, ``value`` how many.  A variable nothing
+    follows is left out, since holding it changes nothing.  A tied variable
+    has no freedom of its own and is left out too: its sources are the ones
+    named.  "Freed" is every stage's ``freed`` and ``held`` together, as the
+    joint reading counts it.  A report with no action (DESIGN.md Rule 4).
+    """
+    ever = {p for sr in stage_results for p in (*sr.freed, *sr.held)}
+    reach = table.entry_reach()
+    idle = []
+    for e in table.entries:
+        if not is_variable_path(e.path) or e.tie is not None or e.path in ever:
+            continue
+        follow = [q for q in reach.get(e.path, ()) if q != e.path]
+        if follow:
+            idle.append((e, follow))
+    if not idle:
+        return []
+
+    def one(e, follow: list[str]) -> str:
+        shown = ", ".join(follow[:5])
+        more = f" and {len(follow) - 5} more" if len(follow) > 5 else ""
+        return f"{e.path} (start {e.value:.6g}; sets {shown}{more})"
+
+    many = len(idle) > 1
+    return [Diagnostic(
+        level="warning", code="VARIABLE_NOT_FREED",
+        where=[e.path for e, _ in idle], value=float(len(idle)),
+        message=(f"No stage freed {f'{len(idle)} variables' if many else 'a variable'} "
+                 f"that other parameters follow: "
+                 f"{'; '.join(one(e, f) for e, f in idle)}. {'Each' if many else 'It'} "
+                 "kept its starting value, so the parameters that follow it are set "
+                 "from that start and the data did not measure them."),
+        suggestion=("A plan frees a variable only where a stage's turn_on names it, "
+                    "such as a stage turning on vars.*."))]
 
 
 #: an atom's coordinate, which a site-symmetry table drives through
