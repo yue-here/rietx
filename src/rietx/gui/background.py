@@ -46,12 +46,26 @@ term"``), and where such a column is one the data do not constrain, 1/d = 0
 (``"unmeasured"``). The band is linearised at the current values, so before a
 fit converges it describes the curvature there and nothing more.
 
-The answer is cached per working state on ``gui.preview``'s key, so a hold, a
-vary change or a λ edit, each of which moves the head, recomputes it.
+The answers are cached per working state on ``gui.preview``'s key, one per
+set of pending holds, so a hold, a vary change or a λ edit, each of which moves
+the head, recomputes them, and a chip pressed and released costs one band.
+
+``hold`` names paths a person has held and not yet applied (WP-2218): the
+rebuilt page's Background graph draws the band the next fit would have while
+a "Hold at last fit" chip is pending, as ``/api/preview`` draws the curves at
+pending values. Each is held on this call's table alone, which is what the hold
+verb would do to the working table (``ParameterTable.set_held``), so the band
+is the one the applied hold gives. A hold may be a glob, resolved as
+``Refinement.hold`` resolves one, and may name any parameter: a held scale
+moves the background's band through the covariance too. A pending *release*
+needs no arm: a released parameter comes back fixed (``Refinement.unhold``), so
+its band is the held one. A path or glob the table does not have is refused,
+never ignored.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import threading
 import weakref
 from typing import Any
@@ -64,9 +78,18 @@ from ..optimize.statistics import berar_lelann_factor, normal_factors
 from ..viz.packed import Packed
 from . import preview
 
-#: one answer per open ``Project``, keyed on ``preview._key``
+#: per open ``Project``: the working state's key and its answers, one per set of
+#: pending holds, so a release after a press is free (WP-2218)
 _CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 _CACHE_LOCK = threading.Lock()
+
+
+class UnknownHold(ValueError):
+    """A pending hold names a path, or a glob, the working table does not have."""
+
+    def __init__(self, missing: list[str]):
+        super().__init__(f"no parameter to hold: {', '.join(missing)}")
+        self.missing = missing
 
 
 def _free_table(project):
@@ -162,17 +185,24 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
     return factor * np.sqrt(np.maximum(var, 0.0)), facts
 
 
-def answer(project) -> Packed:
+def answer(project, hold: list[str] | None = None) -> Packed:
     """The packed answer to ``GET /api/background``; the module docstring has it."""
-    key = preview._key(project)
+    holds = tuple(sorted(set(hold or ())))
+    state = preview._key(project)
     with _CACHE_LOCK:
         hit = _CACHE.get(project)
-        if hit is not None and hit[0] == key:
-            return hit[1]
+        if hit is not None and hit[0] == state and holds in hit[1]:
+            return hit[1][holds]
     base = preview._base(project)
     with base.lock:
         model = base.model
         table = _free_table(project)
+        if holds:
+            known = [e.path for e in table.entries]
+            hits = {h: [p for p in known if fnmatch.fnmatchcase(p, h)] for h in holds}
+            if missing := [h for h in holds if not hits[h]]:
+                raise UnknownHold(missing)
+            table.set_held(sorted({p for found in hits.values() for p in found}), True)
         esd, facts = band_esd(model, table)
         values = table.decode(table.x0())
         y_bkg = np.asarray(model.background(values), dtype=np.float64)
@@ -181,9 +211,13 @@ def answer(project) -> Packed:
               "y_background": y_bkg}
     if esd is not None:
         arrays["band_esd"] = esd
-    header = {"head": key[0], **_kind(project.refinement.instrument),
+    header = {"head": state[0], "pending_holds": list(holds),
+              **_kind(project.refinement.instrument),
               "terms": _terms(project), **facts}
     packed = Packed(header, arrays)
     with _CACHE_LOCK:
-        _CACHE[project] = (key, packed)
+        hit = _CACHE.get(project)
+        answers = hit[1] if hit is not None and hit[0] == state else {}
+        answers[holds] = packed
+        _CACHE[project] = (state, answers)
     return packed
