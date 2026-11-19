@@ -76,7 +76,8 @@ direction or a degeneracy to read in its trajectory, not a fit to wait for.
 Time the jobs that raise as well, in a `finally`, and count them beside the
 ones that returned. For runs the package recorded, `rietx runs --label
 'screen-1/*'` prints that count by state, the wall from first start to last
-end, and the slowest run against the median, failed runs timed too
+end, and the slowest run against the median of every timed run, failed ones
+included rather than converged ones alone
 (`rietx.runs.job_summary` in Python; 9c.32 names the runs). One screen of 204 independent cold fits on 10 worker
 processes had a median job of 54 s and a slowest of 4559 s, 84× the median,
 and that job was a cell runaway. 43 jobs raised and carried no time, so the
