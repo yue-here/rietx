@@ -1,6 +1,6 @@
 # WP-2219 — A direction the data does not determine has no esd
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 2028 soft (its joint-fit covariance fix, PR #1668)
 Priority: P2 2026-11-19 — a quoted esd too small by up to 140×, and the CIF that carries it says nothing; a path few fits run
