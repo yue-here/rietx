@@ -89,7 +89,7 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 
 | Program | Staging | Held during a fit |
 |---|---|---|
-| rietx | plans of cumulative stages; a stage may also fix (WP-2208); the closing stage re-solves the declared stages' end state | reflection list, windows, FCJ nodes: per stage |
+| rietx | plans of cumulative stages for a first fit; a stage may also fix (WP-2208); the closing stage re-solves the declared stages' end state. A re-fit of a model its last fit converged runs the plan collapsed into one stage, falling back to the stages when that stage is rejected (WP-2224, as a series' warm patterns have since v0.5) | reflection list, windows, FCJ nodes: per stage |
 | RIETAN-FP | `NAUTO = 2`: early cycles refine subsets (background and scale; widths; asymmetry; widths and asymmetry; cell; atoms), then everything together to convergence. `NAUTO = 1`: the user lists the early cycles | windows follow every evaluation; Le Bail intensities per cycle |
 | BGMN | automatic: isotropic models first, anisotropic ones added, then a closing run with everything free restarted from the answer; a weak anisotropic term is switched off | the ray-traced instrument function for the whole fit |
 | MAUD | the refinement wizard: cumulative stages (scales and background; cell, zero, B; size and strain; atoms), no final all-free cycle | windows follow every evaluation; texture, strain, Le Bail intensities and structure factors per iteration |
@@ -100,6 +100,27 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 
 None of the seven tests whether its answer depends on the path or the start, and none of
 their manuals discusses it.
+
+Surveyed 2026-11-19 for WP-2224. The three programs without staging run one solve of whatever
+is free from the current values, so a re-fit in one stage is what their users do.
+
+### When a fit stops
+
+| Program | Stopping rule | Default |
+|---|---|---|
+| rietx | the solver's `ftol` on the relative change in cost; intermediate stages at 1e-6 (`intermediate_ftol`), the last stage at the solver's 1e-9 | checked (source) |
+| GSAS-II 5.8.4 | `min dM/M` 0.001 on the relative change in the minimised function, and `max cyc` 3 cycles a `Refine` call (`GSASIIobj.py:20`; `GSASIImath.HessianLSQ`, `GSASIImath.py:164-432`) | checked (source) |
+| FullProf | every shift under `Eps` times its esd, from `NCY, Eps` on line 9 of the control file; the manual calls `Eps = 0.2` "or lower" reasonable | checked (manual) |
+| TOPAS | the change in χ² under `chi2_convergence_criteria` for three consecutive cycles (Technical Reference v9 § 20.12) | checked (manual); the default value is not stated in the text |
+
+### How far one iteration may move a parameter
+
+TOPAS limits the move of each parameter type in one iteration, to "stabilize refinement"
+(Technical Reference v9 § 2.18 and Table 2-1, read 2026-11-19). A cell length may move between
+0.995·Val − 0.05 and 1.005·Val + 0.05 Å, and a Beq by ±10 Å². Part of its reach from a far start
+rests on these limits. rietx, GSAS-II and FullProf take the damped Gauss-Newton step with no
+limit per type (checked (source) for rietx and GSAS-II, (manual) for FullProf's relaxation
+factors, which scale a shift rather than bound it).
 
 ## A site's multiplicity during a fit
 
