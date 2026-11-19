@@ -150,10 +150,10 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
 
 ## Tasks
 
-- [ ] `refit=` on `Refinement.fit` and `refine`, `_collapse` moved to where both the series and
+- [x] `refit=` on `Refinement.fit` and `refine`, `_collapse` moved to where both the series and
       the single fit import it, the re-fit test of design 2, the fallback of design 3. A plan
       with `turn_off` runs staged.
-- [ ] The record of design 4, and the `_audit` row for the new default action with its tier
+- [x] The record of design 4, and the `_audit` row for the new default action with its tier
       and families (the eight standards above).
 - [ ] Measure a re-fit after a model swap that adds a block at its identity value (a
       preferred-orientation block on brucite, a second phase on NAC), one stage against staged.
