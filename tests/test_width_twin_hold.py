@@ -17,7 +17,7 @@ import pytest
 
 from rietx import Instrument, Refinement
 from rietx.multi import _hold_width_twins_multi
-from rietx.params.multi import MultiParameterTable
+from rietx.params.multi import MultiParameterTable, SharingMap
 from rietx.params.vector import AffineTie, ParameterTable
 from rietx.refine import _hold_width_twins
 from rietx.schemas.structure import StephensStrain, Structure
@@ -122,6 +122,59 @@ def test_a_gaussian_size_holds_u_and_never_w():
     assert held == ["instrument.profile.u"]
     assert twins == {"instrument.profile.u": ["phases.0.gauss_size"]}
     assert "instrument.profile.w" in table.free_paths
+
+
+def test_the_gaussian_triple_holds_w():
+    """W, ``gauss_size`` and ``gauss_strain`` free with U fixed:
+    (δW, δsize, δstrain) = (1, −1, 1) changes no width at any angle, and U is
+    not free to take it, so W is held (WP-2219)."""
+    table = _table(make_lab6(), ["instrument.profile.w", "phases.*.gauss_size",
+                                 "phases.*.gauss_strain"])
+    held, _, twins = _hold_width_twins(table, set())
+    assert held == ["instrument.profile.w"]
+    assert twins == {"instrument.profile.w": ["phases.0.gauss_size",
+                                              "phases.0.gauss_strain"]}
+    assert {"phases.0.gauss_size", "phases.0.gauss_strain"} <= set(table.free_paths)
+
+
+def test_the_triple_with_u_free_holds_u_and_w():
+    """With U free as well the null space is two-dimensional: U pairs with the
+    strain, and the triple survives U's hold, so both instrument terms go."""
+    table = _table(make_lab6(), ["instrument.profile.u", "instrument.profile.w",
+                                 "phases.*.gauss_size", "phases.*.gauss_strain"])
+    held, _, twins = _hold_width_twins(table, set())
+    assert sorted(held) == ["instrument.profile.u", "instrument.profile.w"]
+    assert {"phases.0.gauss_size", "phases.0.gauss_strain"} <= set(table.free_paths)
+
+
+def test_w_with_one_specimen_term_is_not_held():
+    for free in (["instrument.profile.w", "phases.*.gauss_size"],
+                 ["instrument.profile.w", "phases.*.gauss_strain"]):
+        table = _table(make_lab6(), free)
+        assert _hold_width_twins(table, set()) == ([], {}, {})
+
+
+def test_two_wavelengths_separate_the_triple():
+    """``gauss_size`` goes as λ² and ``gauss_strain`` does not (WP-1131), so
+    two histograms at different wavelengths see the size and the strain apart
+    and the triple is not flat in a joint fit: nothing is held."""
+    mt = _joint(["instrument.profile.w", "phases.*.gauss_size",
+                 "phases.*.gauss_strain"])
+    assert _hold_width_twins_multi(mt, [set(), set()]) == ([], {})
+
+
+def test_a_shared_w_beside_each_patterns_widths_is_held():
+    """WP-2028's series shape: one wavelength, W shared, each pattern's own
+    ``gauss_size`` and ``gauss_strain``.  Every pattern carries the triple, and
+    the shared W is the one column that takes it."""
+    instruments = [Instrument.debye_scherrer(wavelength=WAVELENGTH) for _ in range(3)]
+    mt = MultiParameterTable(make_lab6(), instruments, sharing=SharingMap(
+        shared=["instrument.profile.w"], per_histogram=["phases.*.gauss_*"]))
+    mt.set_vary(["instrument.profile.w", "phases.*.gauss_size",
+                 "phases.*.gauss_strain"], True)
+    held, twins = _hold_width_twins_multi(mt, [set(), set(), set()])
+    assert held == ["instrument.profile.w"]
+    assert len(twins["instrument.profile.w"]) == 6
 
 
 def test_a_held_w_pins_the_gaussian_size():
