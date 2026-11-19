@@ -130,6 +130,25 @@ Filled in as the maintainer answers § Questions.
    are kept as written. Settled by Claude; this answers § Questions 2.
 4. **Review pictures drag 0.3 of the slider track**, so the compared curves separate. Yue,
    2026-11-18. The Interactive pictures in `docs/wp/2218-screenshots/` are re-shot that way.
+5. **The dark last fit is the light blue-grey `#7f8f94`.** Yue, 2026-11-19, on § Questions 5:
+   option (d), "since they never intersect". The difference curve sits in its own strip below
+   the pattern, so the last fit never draws beside it. The muted ink draws observed points
+   only inside an excluded region, where no model curve draws (Yue's #1538 ruling). So the
+   two pairs under the palette's 0.13 floor are named in `tests/test_gui_palette.py` at their
+   measured distances: 0.023 from `--plot-diff` (in `NAMED_PAIRS`) and 0.056 from `--muted`
+   (in `LAST_FROM_MUTED`). Naming them keeps each pair from coming closer unnoticed. Every
+   other plot colour is at least 0.131 away, and the contrast on `--panel` is 5.25:1. Light
+   mode is unchanged.
+6. **The peak-shape choice moves into the Instrument dialog.** Yue, 2026-11-19, on § Questions
+   12: option (a). The dialog's Axial divergence row becomes Peak shape, and the profile's
+   shape sits in it under an Advanced disclosure. Built on the fourth PR, #1684.
+7. **The R3 look: "mostly good".** Yue, 2026-11-19. Three things were asked for, built on this
+   PR: the range pop-up's From and To read in the value box's digits; the Peaks graph shows
+   as many windows as fit; and an overview strip of the whole pattern sits at the top of the
+   Peaks graph, shading each shown window's range. Yue also asked whether the Interactive
+   sliders move the Structure graph. They already do: the third PR, #1683, draws unapplied
+   values through `POST /api/structure3d`. A cell value moves the frame, a coordinate moves
+   its atom, and an instrument value moves nothing.
 
 ## Questions
 
@@ -183,6 +202,7 @@ Filled in by the session that builds each PR.
      always shares a graph with. Dropped as unreadable beside it.
    Claude leans to (c), since the named pair never draws together. This is a visual choice,
    so it waits for Yue's look.
+   *Answered by § Rulings 5: (d).*
 6. **The second PR: what the Peaks and Background graphs draw differently from the
    prototype, each by a written rule.**
    - The background curve and its band are drawn in `--plot-bkg`, the background curve's own
@@ -218,6 +238,24 @@ Filled in by the session that builds each PR.
      spline's stiffness by orders of magnitude.
    - "waiting for the run" on the Background title line while a refinement runs.
    - The empty state "No fitted peaks to frame yet." on the Peaks graph before a fit.
+13. **The look's three items (§ Rulings 7): the details Claude chose to build them.** Each is
+    a visual value the ruling did not fix, so each waits for Yue's look at
+    `peaks-rest-*.png`, `peaks-stepped-*.png` and `interactive-rangepop-*.png`.
+    - *Window height.* The ruling asked for 240 px columns and six windows at the default
+      split, two columns of three. Three rows of today's 240 px plots do not fit the graph's
+      height at 1440 × 900. So the windows share the height, each at least 190 px with its
+      caption, about 160 px of plot. At the default split each plot is about 200 px tall. A
+      taller window adds a row. Holding 240 px instead would show four windows.
+    - *Overview height.* 36 px of plot, with 12 px below it before the windows.
+    - *Overview ink.* The observed pattern in the observed points' ink, `--plot-obs`, 1 px.
+      Each pixel column draws the extremes of the points under it, as the Pattern graph does.
+    - *Window bands.* An accent wash, `color-mix` of `--accent` at 22 %, full height. The
+      accent marks a selection on a plot (`gui/STYLE.md` § Colour). `--plot-mask` was not
+      used, because it is the excluded-region wash.
+    - *Range digits.* A computed range is rounded outward to the value box's digits, so it
+      can widen by up to one digit of the box. Caglioti U opens on 0.2772×10⁻³ to
+      4.4362×10⁻³. The fields write the box's ×10ⁿ in superscript digits, and also read
+      `1.5e-3` and `1.5x10^-3`.
 
 ## Handover log
 
