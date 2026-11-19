@@ -476,7 +476,7 @@ The middle one is the classic doubled-cell false positive, so validation is part
 | `LeBailValidation.n_stages` | the stages the fit ran, of the validation plan's four |
 | `LeBailValidation.diagnostics` | findings from the fit; [`INDEX_VALIDATION_FAILED`](diagnostics-indexing.md#index_validation_failed) when it raised |
 | `LeBailValidation.mode` | the decomposition the fit ran: `"pawley"` since 1.11, `"lebail"` on a record written before it |
-| `LeBailValidation.background_terms` | the Chebyshev terms the fit carried, sized from the data since 1.12; `None` for another kind |
+| `LeBailValidation.background_terms` | the Chebyshev terms the fit carried, sized from the data since 1.13; `None` for another kind |
 
 The fit holds the cell: the candidate is the hypothesis under test, and letting it walk would validate a different cell.
 It frees the background, then exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano), then `W`, then `U`, `V`, `X` and `Y` together.
