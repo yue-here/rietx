@@ -430,6 +430,16 @@ position-only list returns the same candidates as on `main`.
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+  two commits after the 2026-11-13 entry, and the entry below records them. Nothing else
+  changed, and the status stays ✅.
+
+- **2026-11-18** (reconstructed post hoc) — two bookkeeping commits rode PR #1567, which
+  merged on 2026-11-18 as `ba6207825`. `501cbe6a3` (2026-11-17) recorded Yue's ruling of that
+  day: the new `str(IndexingResult)` text and `INDEX_WEAK_LINE_RETRY` are accepted as reader
+  output. It also updated the v1.12 record to match. `81d8ef5cb` (2026-11-18) put the ruling
+  into the Status line. Neither touched code or a test.
+
 - **2026-11-13** — tasks 5-9, by a ghostshift runner, in PR #1567, closing the WP. When
   a search ends with no cell two engines agree on, rietx now searches once
   more on the lines at or above 5 % of the strongest, as the 2004 indexing
