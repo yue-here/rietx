@@ -15,6 +15,7 @@ written against `rietx.refine` patches nothing and reports today's behaviour.
 | `eight.py OUT.jsonl` | every standard: first fit, chained staged re-fits until Rwp moves under 1e-7 (at most 6), the same with the hold off, and the shipped default (closing stage on) with one re-fit |
 | `shifts.py OUT.jsonl` | reduces `eight.py`'s rows to the largest shift per kind of parameter, in esds of the earlier fit; `eight_summary.txt` is its output |
 | `swap.py OUT.jsonl STD,STD` | the prototype: a pair whose specimen twins all sit on their floor at a stage's start holds the twins and frees the instrument column; `swap_summary.txt` is its output |
+| `eight_summary_axial_first.txt` | `shifts.py` on `eight.py` re-run 2026-11-19 after `qpa_plan` moved `lines_axial` ahead of `sample_broadening` (WP-2225 § Inherited); merged main, closing stage off by default |
 | `plot_zincite.py` | zincite's shipped first fit against a shipped re-fit, to `tests/output/` |
 
 ```sh
