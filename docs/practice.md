@@ -184,6 +184,24 @@ scratch copies were not kept. The claims they marked inferred are TOPAS's quadra
 combination rule (not stated in the reference), the scope of `force_positive_fwhm`, and
 FullProf's constant-wavelength combination rule with an IRF.
 
+### When one twin reaches its limit, and a re-run
+
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
+specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
+earlier stage put it, and no free parameter in the stage can narrow that part of the width.
+
+| Program | A refined parameter that reaches a limit | A re-run of a converged refinement |
+|---|---|---|
+| rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
+| GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
+| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
+
+In the one program read, the parameter that crossed its limit is the one taken out, and its
+partner keeps refining. No program holds an instrument width because its specimen twin is free
+(the table above), so none meets this case in the form rietx does.
+
 ## Extinction
 
 Surveyed 2026-10-24 for WP-2044, one agent across six programs, with each

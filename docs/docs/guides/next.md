@@ -19,11 +19,11 @@ This runs two stages by hand on the GSAS-II tutorial fluorapatite pattern that s
 <!-- output of examples/guides/next.py -->
 ```text
 noise floor 693 | best: None
-instrument.profile.x, phases.0.lor_size       gain   322280  dBIC   +795  resolved False
-instrument.profile.y, phases.0.lor_strain     gain   189145  dBIC   +333  resolved False
-instrument.profile.w                          gain   156424  dBIC   +264  resolved True
-phases.0.gauss_size, instrument.profile.v     gain   129105  dBIC   +201  resolved False
-instrument.profile.u, phases.0.gauss_strain   gain    39429  dBIC    +45  resolved False
+instrument.profile.x, phases.0.lor_size       gain   320387  dBIC   +784  resolved False
+instrument.profile.y, phases.0.lor_strain     gain   187891  dBIC   +329  resolved False
+instrument.profile.w                          gain   156393  dBIC   +263  resolved True
+phases.0.gauss_size, instrument.profile.v     gain   129080  dBIC   +201  resolved False
+instrument.profile.u, phases.0.gauss_strain   gain    39422  dBIC    +45  resolved False
 ```
 
 Each group's `gain` is the fall in χ² that freeing the group would give, predicted from the derivatives at the current values.
@@ -56,9 +56,9 @@ This frees the instrument widths and asks again:
 
 <!-- output of examples/guides/next.py -->
 ```text
-instrument.source.lines.1.weight    gain  474  dBIC +21.0
-phases.0.atoms.2.occ                gain  218  dBIC  +5.8
-phases.0.atoms.6.occ                gain  201  dBIC  +4.8
+instrument.source.lines.1.weight    gain  478  dBIC +15.7
+phases.0.atoms.2.occ                gain  215  dBIC  +3.3
+phases.0.atoms.6.occ                gain  182  dBIC  +1.7
 ```
 
 The gain says how far a parameter can move χ², and nothing about whether it should move.
@@ -79,17 +79,17 @@ The structure declared extinction at the start, so it is among them: an undeclar
 
 <!-- output of examples/guides/next.py -->
 ```text
-phases.0.atoms.6.biso leads: predicted Δχ² 32.7, ΔBIC -5.0; ΔBIC refuses it — the predicted gain does not pay for 1 parameter(s) at N_eff=1001 (5751 rows over the squared esd inflation) (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage, 1 held back by a bound; noise floor 26.98)
+nothing clears the noise floor — the fit is converged for every separable held parameter (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage, 1 held back by a bound; noise floor 29.96)
 ```
 
-The one Biso left clears the noise floor, and ΔBIC refuses it, so the summary says it leads rather than that it is next.
+Nothing clears the noise floor: the one Biso left falls under it, so the summary says so and `groups` is empty.
 `best_or_none()` returns `None` for the same reason: it names a parameter only when the top group clears the floor, is resolved and has a positive `delta_bic`.
-It reads `delta_bic` on the top group only, and a lower group that ΔBIC admits is yours to weigh from `groups`.
+Where a group does clear the floor, it reads `delta_bic` on the top group only, and a lower group that ΔBIC admits is yours to weigh from `groups`.
 
 The candidate held back by a bound is extinction.
 It sits on its lower bound of 0 and the data push it below 0, so no value it can take moves χ².
 `suggest` scores each candidate by the gain it can reach inside its bounds, so extinction scores 0 and is listed in `bound_limited`.
-Its `gain_unbounded` of 96.1 is the gain it would have if it could go negative.
+Its `gain_unbounded` of 104.5 is the gain it would have if it could go negative.
 
 The four non-separable candidates are the sample widths, which the free instrument widths already cover.
 
@@ -106,12 +106,12 @@ First, the re-solve:
 
 <!-- output of examples/guides/next.py -->
 ```text
-Rwp before 0.0970, after re-solving 0.0945
+Rwp before 0.1022, after re-solving 0.0940
 ```
 
 A stage that frees nothing new still moves the fit here.
 Each stage fixes its peak windows at the values it starts from, and the `profile` stage started from much wider peaks than it ended with.
-Giving that stage wider windows (`Stage.window_slack_deg=1.0`) ends it at Rwp 0.0952 instead.
+Giving that stage wider windows (`Stage.window_slack_deg=1.0`) ends it at Rwp 0.0947 instead.
 
 Then free the Kα2 weight on a branch of the re-solved fit, and compare:
 
@@ -123,8 +123,8 @@ Then free the Kα2 weight on a branch of the re-solved fit, and compare:
 
 <!-- output of examples/guides/next.py -->
 ```text
-instrument.source.lines.1.weight: 0.5 -> 0.465(6), t = -5.8
-dBIC +29.2 at N_eff 1269 (raw N: +156)
+instrument.source.lines.1.weight: 0.5 -> 0.464(6), t = -6.0
+dBIC +31.0 at N_eff 1297 (raw N: +161)
 ```
 
 `t_ratio` is how far the parameter moved from where it was held, in its own esds.
@@ -137,7 +137,7 @@ A line weight can also absorb a peak asymmetry the model lacks, and the two axia
 
 ```{warning}
 Compare against the re-solved branch, never against the fit as the stage left it.
-Freed on a branch of the fit before the re-solve, extinction stayed on its floor at 0 and still scored ΔBIC +46, all of it the re-solve's gain.
+Freed on a branch of the fit before the re-solve, extinction stayed on its floor at 0 and still scored ΔBIC +148, all of it the re-solve's gain.
 On a branch of the re-solved fit it scored −7.
 ```
 
