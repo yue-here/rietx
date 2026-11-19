@@ -85,6 +85,9 @@ each member is read `read(cap + 1)` and refused past `rasx.MAX_MEMBER_BYTES`, an
 `extract()` — which writes files, and historically wrote them outside the
 destination — is never called. A 651 kB `.brml` carries a 4.5 MB member no reader
 here opens, so the file's size says nothing about a member's.
+The member read converts `rasx.MEMBER_READ_ERRORS` (shared with `.brml`): besides
+`BadZipFile`, `zipfile` raises `NotImplementedError`, `RuntimeError`, `zlib.error`
+and `lzma.LZMAError` there, none of them a `ValueError` (issue #1593).
 
 `PatternFormat.refuses` marks a format recognised **in order to be declined** —
 a `.dif` peak list is not a profile. One field rather than a side table, so

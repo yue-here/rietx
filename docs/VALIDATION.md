@@ -289,7 +289,7 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Claims:** the absolute lab cell anchor: a, the Berar-Lelann esd inflation, the held zero shift, the sample displacement and the Ka2 ratio
 
-**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -1745,7 +1745,7 @@ WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotro
 
 **Referenced to:** the planted (deposited) coordinates; four esds over 42 components is a 0.3 % union false-alarm rate under Gaussian errors
 
-**Measured:** worst |delta|/esd 0.64 over 42 components (bar 4); Rwp 0.0282, GoF 0.995
+**Measured:** worst |delta|/esd 0.64 over 42 components at seed 1806 (bar 4); 0.64 to 2.27 over seeds 1806 and 1 to 7, median 1.5, so the margin is about 1.8x; Rwp 0.0282, GoF 0.995 at seed 1806
 
 #### `test_a_regular_hexagon_template_fails_the_known_answer_bound`
 
@@ -1849,7 +1849,7 @@ should know about before trusting a number, each with what would close it.
 
 - **No dataset here can constrain a low-angle intensity correction.** The qarr phases first reflect at 25.6/28.3/31.8 deg and SRM 660c at 21.4, so surface roughness (WP-0502) has a negative acceptance result only: two of three phases collapse to the identity and raise ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below ~15 deg with real low-angle reflections.
 
-- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
+- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute 4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, 19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
 
 - **GoF does not reach 1 on lab data and should not be expected to.** Cline et al. (2015) put the floor for analytical-PSF fits on this instrument class at 1.5-1.9; FPA reaches 1.08.  Measured 1.63 on corundum with Rexp ~ 8.9 %, so Rwp 14.6 % is mostly counting statistics.  A policy demanding GoF -> 1 would be demanding FPA.
 

@@ -652,23 +652,26 @@ def test_a_strained_plane_is_one_tension_finding_naming_its_atoms_out():
     assert bond.where == ["p C5", "p C6"]
 
 
-def test_a_stale_contact_warns_where_a_coordinate_is_quoted():
+@pytest.mark.parametrize("code", ["RESTRAINT_PAIRS_STALE",
+                                  "RESTRAINT_BODY_CONTACTS_UNCHECKED"])
+def test_a_stale_contact_warns_where_a_coordinate_is_quoted(code):
     """``RESTRAINT_PAIRS_STALE``'s ``where`` holds atom labels, so its level
     under a purpose comes from its audit row's ``scope``: a warning for the
     purposes whose numbers depend on atom coordinates, ``info`` for the rest
-    (a contact moves no line position, width or instrument term)."""
+    (a contact moves no line position, width or instrument term).
+    ``RESTRAINT_BODY_CONTACTS_UNCHECKED`` (WP-2144) states the same scope."""
     from fnmatch import fnmatchcase
 
     from rietx import _audit
     from rietx.purposes import PURPOSES
     from rietx.schemas.results import Diagnostic, level_under
 
-    (row,) = [r for r in _audit.ROWS if r.name == "RESTRAINT_PAIRS_STALE"]
+    (row,) = [r for r in _audit.ROWS if r.name == code]
     reads_coordinates = {name for name, p in PURPOSES.items()
                          if p.depends != ("*",)
                          and any(fnmatchcase("phases.0.atoms.0.x", g) for g in p.depends)}
     assert set(row.scope) == reads_coordinates
-    d = Diagnostic(level="warning", code="RESTRAINT_PAIRS_STALE",
+    d = Diagnostic(level="warning", code=code,
                    where=["p Li1", "p O2"], value=1.0, message="m", suggestion="s")
     for name in PURPOSES:
         want = "warning" if name in reads_coordinates | {"series"} else "info"
