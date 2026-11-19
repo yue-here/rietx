@@ -1,9 +1,8 @@
 # WP-1528 — the cell box is declined where the cell is declared
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-03 — `Cell`'s docstring says why the cell carries no default box (PR #1365)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P4 2026-10-06 — was P2 for #719, which PR #736 fixed; the docstring task remains
 
 ## Goal
 
@@ -41,25 +40,6 @@ put no box on `Cell`. Still open, and only if a measurement asks for it: a
 guard neutralises and counts each probe. If it needs anything, it is a finding,
 not a bound.
 
-### Inherited
-
-- **2026-10-05, from the issue triage (issue #719): `clamp_cell_runaway`
-  can itself build a zero-volume cell, and `fit()` then raises
-  `DegenerateCellError`.** It clamps each free cell parameter to its own
-  safety window (`CELL_SAFETY_FRACTION` 0.15, `CELL_SAFETY_ANGLE_DEG` 6.0)
-  without asking whether the six make a cell, and `_run_stage` reads the
-  result in `_answer_significance` → `phase_support` (`refine.py:3513`,
-  `:3560`), outside the guards that wrap the solver. *Checked at `32ef5a6`*
-  with the reporter's snippet (P1 Le Bail of a wrong cell on synthetic
-  silicon, `[dev]`, Linux): `profile_only`'s 4th stage raises (the issue saw
-  it one plan later). The stage starts at det +55.46; TRF returns lengths of
-  −16200 to +1383 Å and angles past ±360°, every one det > 0, so no guard
-  fires; the clamp puts all six on window edges and that corner has det
-  −63.51. `multi.py:714` calls the same clamp. The reporter proposes no fix;
-  restoring the stage's start cell (the WP-1301 collapse-restore precedent)
-  or catching the raise where the answer is read is the maintainer's choice,
-  and either keeps 1528's "a finding, not a bound".
-
 ## Non-goals
 
 - Any new bound, window or clamp.
@@ -68,8 +48,8 @@ not a bound.
 
 ## Tasks
 
-- [ ] `Cell`'s docstring (`schemas/structure.py:136-145`) states the reason above in a few sentences
-- [ ] Skill: none
+- [x] `Cell`'s docstring (`schemas/structure.py:136-145`) states the reason above in a few sentences
+- [x] Skill: none
 
 ## Acceptance
 
@@ -84,6 +64,34 @@ not a bound.
 - Issue #283; WP-1321.
 
 ## Handover log
+
+- **2026-11-03** — `Cell`'s docstring now says, in a few sentences, why
+  the cell's six parameters carry no default box. A finite stored bound is
+  read as the caller's own claim, so a box in the schema would act on every
+  free cell: it switches off the runaway window on its side, and it would show
+  to a reader as a limit nobody set. Under `solver="trf"` it also changes the
+  solver's step even when never reached; the default `lm` reads a box only when
+  a step reaches it (Yue's review, 2026-11-05). The docstring names where the
+  limit lives instead. Issue #283 was already closed; this closes the WP. PR
+  #1365.
+
+  *Done:* the docstring (`src/rietx/schemas/structure.py`, class `Cell`),
+  checked against the tree at `d0c4bded`: `cell_window` keeps a finite side
+  and the cpd-1c numbers are its docstring's; `ParameterTable.bounds` states
+  the ordering rule. *Gotcha:* the Context's `clamp_cell_runaway` no longer
+  exists. WP-2002 (`b9ed0b36`) replaced it with `refine.reset_cell_runaway`,
+  which puts a runaway phase's whole cell back at the stage's start, so the
+  docstring names that. The Context is left as written, as the record of what
+  was decided on 2026-09-30. The `### Inherited` entry (#719) was consumed by
+  PR #736 per the entry below, and was deleted on close.
+
+  *Measured* (`[dev]` venv, macOS arm64): `ruff check src tests examples`
+  clean; `tests/test_docs_consistency.py` 25 passed. No fast or full suite:
+  the change is a docstring. `/code-review` was not run: the only `.py` hunk
+  is a docstring, every name it cites was checked to resolve, and the shift
+  budget was short. No CLAUDE.md edits, no heuristic, no skill row.
+
+  *Next:* nothing for this WP.
 
 - **2026-10-06** — PR #736 (#719) merged from outside as `3b8882b7`.
   Where the clamp would leave a phase's cell with no volume,
