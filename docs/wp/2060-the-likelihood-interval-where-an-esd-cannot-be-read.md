@@ -70,6 +70,14 @@ Repro 2's seeds 3, 4 and 8 give intervals of non-zero width that contain m = 0; 
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
+  a commit after this file was last touched, and the entry below records it. Nothing else
+  changed, the status stays ✅, and nothing on the magnetic path was decided here.
+
+- **2026-11-07** (reconstructed post hoc) — `208b05d28` put the space-group symbol `Pnma` in
+  `MOMENT_ANGLE_STATIONARY`'s help entry (`src/rietx/help.py`) in a code span. It changed one
+  line and no wording. It rode PR #1459, which merged on 2026-11-07 as `795fdf112`.
+
 - **2026-11-07** (2nd session, ghostshift runner, PR #1459) — task 8 built, and the WP closes. A
   moment whose angles the stationary test left out now carries a likelihood interval on its size,
   computed unasked, beside the esd it keeps. Mike's runs put that interval's coverage at 0.93-0.98
