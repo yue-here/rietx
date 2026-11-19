@@ -237,6 +237,18 @@ def test_the_published_arrangement_ranks_first_and_the_rivals_are_listed(a_type,
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("magnetic-solve-a-type")
+def test_the_winners_closing_stage_runs_on_the_closing_windows(a_type_solution):
+    """The winner continues with a closing stage at ``CLOSING_WINDOW_TOL``.
+    It names the window, because ``run_stage``'s own default has been the
+    declared stages' 2 % since WP-2222, and there the stage ran on the
+    windows it exists to widen while still being called closing."""
+    last = a_type_solution.best._result.stages[-1]
+    assert last.name == "closing"
+    assert last.window_area_tol == CLOSING_WINDOW_TOL
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-solve-a-type")
 def test_the_k_step_takes_the_forbidden_lattice_point_route(a_type, a_type_solution):
     """A k = 0 signature is never scored against a candidate propagation vector.
 
