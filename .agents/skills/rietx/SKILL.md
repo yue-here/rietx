@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.12.0.dev0"
+  version: "1.13.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -38,7 +38,7 @@ How to drive `rietx` on real data: the order of work, and the checks before you 
 | §8 a result that makes no sense | [surprises](references/surprises.md) |
 | §9 the trajectory, and the history DAG | [history](references/history.md) |
 | §9b a ramp, a sweep or a tray of patterns | [series](references/series.md) |
-| §9c a batch: deciding; operating | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
+| §9c a screen or pool of fits, before launch | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
 | §9d a human watching, or a finished run on disk | [watching](references/watching.md) |
 
 Read signatures from the package, never from memory: `rx.capabilities()`, `rx.help_for(path)`, `inspect.signature(obj)`. A failure raises. Dump an answer with `model_dump(mode="json")`.

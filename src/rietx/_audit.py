@@ -1465,7 +1465,6 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
-    Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("the named pattern has no fitted values in the chain the message names: in "
@@ -2532,13 +2531,12 @@ ROWS: tuple[Row, ...] = (
                   "rigid-body uses (WP-1807, #1005). (1) params.vector._refuse_body_off_its_"
                   "sites holds the exact invariance miss to _BODY_SITE_MISS_FACTOR x SITE_TOL, "
                   "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
-                  "params.bodies.RigidBodyBlock._increment_basis compares a linear body's "
-                  "unit-vector residuals |n.u| and |u - (n.u)n|, a tilt in radians, with this "
-                  "fractional tolerance, so the two checks agree only for a body long against "
-                  "its cell: a CO2-like body (C-O 1.16 A) in the P n m a mirror passes the site "
-                  "check and is refused at '90 deg' from an O typed 4e-5 off the mirror at "
-                  "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
-                  "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
+                  "params.bodies._SNAP_REACH, the snap's reach per fractional coordinate, "
+                  "from which RigidBodyBlock._axis_tilt_bound derives the linear-body axis "
+                  "test's tilt bound in radians (a derived value, whose tier follows this "
+                  "row's once given); that test compared the tilt with "
+                  "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
+                  "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
@@ -3845,6 +3843,28 @@ ROWS: tuple[Row, ...] = (
                   "column; 1e-6 A is far below any structural distance")),
     Row("rietx.params.bodies._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.bodies._SNAP_REACH", "constant", tier=1, value=0.00010000000010000001,
+        evidence=("arithmetic: site_orbit's snapped position is the mean of images each within "
+                  "SITE_TOL x (1 + _SITE_TOL_SLACK) of the typed site in every fractional "
+                  "coordinate (its step-1 test), so the mean is too, and it lies on the site's "
+                  "element. site_reach makes that a distance: |M d| is convex in d, so over the "
+                  "box it peaks at a corner, this x the cell's longest body diagonal (A). "
+                  "RigidBodyBlock._axis_tilt_bound makes that a tilt: with u the template's "
+                  "principal axis and s_i each point's offset along it from the centroid, "
+                  "n.u = sum s_i h_i / sum s_i^2 exactly (h_i the point's offset from the "
+                  "site's plane or line), so the tilt's sine is at most the reach x "
+                  "sum |s_i| / sum s_i^2. It replaces the comparison of that sine with "
+                  "SITE_TOL itself (#1226). Its tier follows SITE_TOL's: the value is SITE_TOL "
+                  "x (1 + _SITE_TOL_SLACK), both still unaudited, and the derivation has no "
+                  "free factor, so it takes whatever tier SITE_TOL is given "
+                  "(docs/milestones/generality.md, The rule). Tested: a CO2-like body (C-O 1.16 A) on the "
+                  "P n m a mirror with an O typed up to SITE_TOL/2 off it builds at b = 6 and "
+                  "20 A, as one along the P 1 2 1 2-fold does, both refused on main; a body "
+                  "exempt from the overlap refusal builds at 0.99 x the bound and is refused "
+                  "at 1.01 x, naming its atom (tests/test_rigid_body_special.py)"),
+        grounds=("Never refuses a body whose atoms all passed the site check, and a body "
+                 "tilted past it has an atom further from the element than any snap moves a "
+                 "site, so no refiner's choice turns on it")),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
@@ -4540,9 +4560,6 @@ ROWS: tuple[Row, ...] = (
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
                   "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
-    Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
     Row("rietx.solve.cluster._ISOMETRY_RTOL", "constant", tier=1, value=1e-06,
         evidence=("equivalences(): an integer {-1, 0, 1} matrix P is an isometry of "
                   "the cell when |P^T g P - g| <= 1e-6 x max|g|, element by element. "
@@ -5780,7 +5797,6 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
                   "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
                   "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
-    Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
                   "on its own (sequential.py:2277)")),
@@ -6171,8 +6187,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_WIDTH_GROWTH",
-    "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
     "SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion",
     "SIZE_UNUSUALLY_SMALL",
@@ -6641,9 +6655,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
-    "rietx.sequential.WIDTH_GROWTH_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_SIGMA",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -6860,7 +6871,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",

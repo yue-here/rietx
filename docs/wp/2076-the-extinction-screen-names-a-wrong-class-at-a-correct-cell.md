@@ -129,6 +129,19 @@ an `_audit` row, and its tier and dated approval are the maintainer's.
 **Licensing.** Concepts only. Markvardsen et al. (2001) is the Bayesian form of
 the screen and stays a v2 fence.
 
+### Inherited
+
+- **2026-11-19, from the issue triage (PR #1697; issue #1685): the screen's per-class fits are not
+  checked for status.** #1685 lists `indexing/extinction.py:1520-1528` among four ΔBIC callers
+  that never read either fit's `status` and never test that the fuller fit's χ² sits at or below
+  the restricted one's. WP-2220 takes the other three (`compare_freed`, `predict_then_verify`,
+  `rigid_body_misfit`) and fences this one out. The Findings below show why: the class χ² sits
+  below the reference χ² on every certified row, so an ordering flag copied here unchanged would
+  fire on every answer the suite certifies. Whether a class fit that stopped on its budget
+  abstains, and how the ordering test reads once nesting is restored, are this WP's. Checked
+  against the tree at 7a4a6cd20: the screen abstains on the reference's net Rwp, on a class fit
+  that raised, and on a cap or a stop; no class fit's `status` is read.
+
 ## Findings
 
 Measured 2026-11-05 on main at `29b75345a`, `[dev]`, macOS arm64. Scripts, rows and the candidate
