@@ -120,6 +120,13 @@
              net: calc ? netCurve(calc, bkg) : null };
   });
 
+  /** The preview's model over its background, built once per answer rather
+   *  than once per window per frame. */
+  const previewNet = $derived.by(() => {
+    const pv = preview?.curves.arrays;
+    return pv ? netCurve(pv.y_calc, pv.y_background) : null;
+  });
+
   const previewing = $derived(!!preview && windows.length > 0);
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   const titleTip = $derived(previewing ? "Preview, not refined"
@@ -274,7 +281,7 @@
     // maintainer, 2026-11-18); the preview takes the model's ink
     const fitY = data ? calc : lastFit.net;
     if (fitTT && fitY) line(fitTT, fitY, pv ? c.last : c.calc, pv ? 1.2 : 1.3);
-    if (pv) line(pv.two_theta, data ? pv.y_calc : netCurve(pv.y_calc, pv.y_background), c.calc, 1.5);
+    if (pv) line(pv.two_theta, data ? pv.y_calc : previewNet ?? pv.y_calc, c.calc, 1.5);
     ctx.restore();
     if (data) {
       // the residual strip: the preview's when there is one, else the last fit's
