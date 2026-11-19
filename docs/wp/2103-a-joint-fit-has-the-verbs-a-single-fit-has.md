@@ -96,6 +96,15 @@ the chain, and its answer on what "held" means should govern here. Read it first
   WO₃ run may not need this WP's tie. Decide whether it moves out of this WP, and say
   which spelling the milestone row should judge.
 
+- **From WP-2101 (2026-11-19): a joint fit's hold must silence `VARIABLE_NOT_FREED`.**
+  The code names each parametric equation whose coefficients no plan stage freed. In a
+  single fit, a coefficient the caller holds is left out, read off the table with
+  `ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). A joint fit has
+  no hold verb yet, so `multi._parametric_not_freed_diagnostics` names every unfreed
+  coefficient, and its docstring says so. When this WP adds `hold` to a joint fit, that
+  builder leaves out a held coefficient the same way, with a test that fails when the
+  filter is removed.
+
 ## Non-goals
 
 - A history DAG for a joint fit.
