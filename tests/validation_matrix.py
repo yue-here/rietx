@@ -506,7 +506,8 @@ CLAIMS: tuple[Claim, ...] = (
         "held zero shift, the sample displacement and the Ka2 ratio",
         reference="NIST's cell recomputed for this dataset's 20.85 C block, "
                   "4.156780 A, under an explicitly interim +-2e-4 A band; the "
-                  "certificate's own +-8e-6 at 22.5 C is NOT claimed and the "
+                  "certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT "
+                  "claimed and the "
                   "residual is a characterised cotTheta/sin2Theta aberration "
                   "(divergence, tube tails, monochromator passband) fenced to "
                   "the v2 FPA work",
@@ -3095,8 +3096,9 @@ GAPS: tuple[tuple[str, str], ...] = (
      "ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below "
      "~15 deg with real low-angle reflections."),
     ("The SRM 660c certificate band is not reached and is not claimed.",
-     "Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The "
-     "residual is a characterised cotTheta/sin2Theta aberration — equatorial "
+     "Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute "
+     "4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, "
+     "19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial "
      "divergence, tube tails, monochromator passband — which is the "
      "fundamental-parameters territory fenced to v2, not a tuning gap."),
     ("GoF does not reach 1 on lab data and should not be expected to.",

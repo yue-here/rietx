@@ -1,6 +1,6 @@
 # WP-2072 — The Le Bail and Pawley cell, validated against the SRM 660c certificate
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — quotations corrected; Sirota check open (paper not held); test and matrix row wait on WP-2010 (#1266)
 Track: The fit has no reference
 Depends on: 2010 (the feature registry and the `reference_kind` join, PR #1266); 2015 soft (the shipped presets pass the bar only once the declared geometry picks the offset)
 Priority: P3 2026-10-31 — a validation row over a measurement already made; changes no number a user gets, but lifts one feature to "validated on development data"
@@ -27,6 +27,15 @@ a = 0.415 682 6 nm ± 0.000 008 nm at 22.5 °C, expanded uncertainty k = 2, that
 `tests/test_acceptance_srm660c.py` already uses (`A_REFERENCE`). The reporter derived
 the 11 ppm correction from the CIF's own cell and the certificate's (α = 6.7e-6 K⁻¹),
 not from Sirota et al. (1998), which the certificate cites; check it against Sirota.
+*Checked in part, 2026-11-16:* the arithmetic holds. 4.156826 → 4.156780 Å over
+22.5 → 20.85 °C is 11.07 ppm, an α of 6.71e-6 K⁻¹, and 4.156826 × (1 − 6.7e-6 × 1.65)
+= 4.156780 Å. The data block's CIF records `_cell_length_a 4.156780` at
+`_pd_spec_temperature 20.85` (`tests/data/nist_srm660c_100a.cif` lines 65 and 98),
+so the value is NIST's own, as stated. The comparison with Sirota's LaB6 a(T) is
+**not checked**: the paper is not held. The likely match on Crossref is Sirota,
+Novikov, Vinokurov & Paderno, Phys. Solid State 40(11), 1856-1858 (1998),
+doi:10.1134/1.1130671, to be confirmed against the certificate's reference list, which
+our note on the certificate does not transcribe. It is on a contributor's fetch list.
 
 **Measured by the reporter** (main `44de0f62a`; not re-run in triage):
 
@@ -60,6 +69,12 @@ ten times smaller than the certificate's ±0.00008 Å. Sites at `d87c8cc91`:
 `tests/data/README.md` lines 132 and 785; `tests/test_acceptance_srm660c.py` lines 16
 and 27; `tests/test_acceptance_indexing.py` line 191. The correct spelling is
 4.15683(8) Å, or 4.156826 ± 0.00008 Å (k = 2).
+*Superseded in part, 2026-11-16:* at `bc77a934e` the five sites sat at
+`tests/data/README.md` lines 134 and 787, and the census missed three more of the same
+error: `tests/validation_matrix.py` lines 509 and 3096 ("+-8e-6", rendered into
+`docs/VALIDATION.md`) and `docs/docs/switching/validation.md` line 197
+("±8×10<sup>−6</sup> Å"). All eight are corrected. Dated records (WP-1001's log,
+`docs/milestones/v0.2.md` line 30) keep the old wording as history.
 
 **Tier.** A comparison with an independent measurement; no heuristic, no `_audit` row.
 
@@ -71,8 +86,9 @@ and 27; `tests/test_acceptance_indexing.py` line 191. The correct spelling is
 
 ## Tasks
 
-- [ ] Correct the five quotations of the certificate's uncertainty.
+- [x] Correct the five quotations of the certificate's uncertainty (eight, see Context).
 - [ ] Check the temperature correction against Sirota et al. (1998); record the value.
+      Arithmetic and the CIF checked 2026-11-16 (Context); Sirota is not held, so open.
 - [ ] The test: both modes under the NIST protocol within 50 ppm of 4.156780 Å; Pawley
       and Le Bail agree within the esd; the λ × (1 ± 1e-4) positive arm fails the bar
       and the null arm passes. Shares the `srm660c` xdist group. obs/calc/diff PNGs to
@@ -99,9 +115,46 @@ and 27; `tests/test_acceptance_indexing.py` line 191. The correct spelling is
   doi:10.1017/S0885715620000068 (the certification).
 - Cline, J. P. et al. (2015). J. Res. NIST 120, 173, doi:10.6028/jres.120.013 (the
   instrument).
-- Sirota, N. N. et al. (1998), cited by the certificate for LaB6's expansion.
+- Sirota, N. N. et al. (1998), cited by the certificate for LaB6's expansion; likely
+  Phys. Solid State 40(11), 1856-1858, doi:10.1134/1.1130671 (not held, not confirmed).
 
 ## Handover log
+
+- **2026-11-16** — tasks 1 and 2 (a ghostshift runner), PR #1595. The tree now quotes
+  the SRM 660c certificate's uncertainty correctly: ±0.00008 Å (19 ppm, k = 2), where
+  eight places had it ten times smaller. Every sentence built on it still holds: rietx's
+  +24 ppm is outside both the old and the true band, and no test asserts the number.
+  The 22.5 → 20.85 °C correction is arithmetically sound and is NIST's own value in the
+  data block's CIF, but nobody has compared it with Sirota (1998), because we do not
+  hold that paper. Tasks 3 and 4 still wait on WP-2010 (PR #1266).
+  *Done.* Task 1: `tests/data/README.md` (2), `tests/test_acceptance_srm660c.py` (2),
+  `tests/test_acceptance_indexing.py` (1), and three the census missed:
+  `tests/validation_matrix.py` (2, so `docs/VALIDATION.md` regenerated) and
+  `docs/docs/switching/validation.md` (1). Context's site list is marked superseded in
+  part. Task 2: arithmetic and CIF recorded in Context. The task stays unticked.
+  *Checked.* The certificate value is from our paper note on the certificate (p. 1,
+  "0.415 682 6 nm +/- 0.000 008 nm (k = 2)"), read from the PDF's text layer on
+  2026-10-31. No parse of the PDF is held. Sirota (1998) is NOT CHECKED: not held. The
+  Crossref match is doi:10.1134/1.1130671 (Sirota, Novikov, Vinokurov, Paderno, Phys.
+  Solid State 40, 1856). It is unconfirmed as the certificate's reference, and it is on
+  a contributor's fetch list. The DOIs of Black et al. (2020) and Cline et al. (2015)
+  resolve to the titles and authors the References give (Crossref, 2026-11-16).
+  *Measured* (darwin arm64, `[dev]`, Python 3.12): `tests/test_validation_matrix.py`
+  775 passed (dot count); `tests/test_docs_consistency.py` green; ruff clean; the two
+  edited acceptance files collect; Vale 0 errors; `tests.reader_output` exit 0,
+  unchanged. No test added, and no number a test asserts moved, so neither the fast
+  nor the full selection ran locally; CI's matrix is the gate.
+  *Review.* A read-only reviewer found nothing in the diff (units, string joins, the
+  regenerated page, remaining sites). It noted, outside this diff, that the +24 ppm is
+  against the 20.85 °C recompute while the 19 ppm band is the certificate's at 22.5 °C.
+  The comparison is like for like only through the correction task 2 leaves open.
+  *Gotchas.* PR #1266 renders the same matrix reference string into new places in
+  `docs/VALIDATION.md`. Whichever of #1266 and #1595 merges second must regenerate that
+  page (`.venv/bin/python tests/validation_matrix.py`). Nothing was written into WP-2010,
+  to keep clear of #1266. PR #1583 (WP-2084) touches none of these files.
+  *Next:* (1) get Sirota (1998), confirm it against the certificate's reference list,
+  and tick task 2 with LaB6's α near 21.7 °C from the paper. (2) Once #1266 merges,
+  tasks 3 and 4.
 
 - **2026-10-31** — created by the issue triage from #1259. WP-2010 (every feature names
   what verifies and validates it) lists this as a follow-up to file, and PR #1266, which
