@@ -322,6 +322,7 @@ def test_the_specimen_and_the_fit_are_told_once():
     phase.space_group = "R -3 c"  # bare: gemmi picks a setting and says so
     phase.scale.value = 1e-4
     phase.cell.a.value *= 1.004
+    phase.cell.b.value = phase.cell.a.value  # the cell's ties follow a
     starved = RefinementPlan(stages=[Stage(
         "scale", ["phases.*.scale", "phases.*.cell.*"], max_iter=1)])
     joint = rx.refine_multi(data, rx.Structure(phases=[phase]),
