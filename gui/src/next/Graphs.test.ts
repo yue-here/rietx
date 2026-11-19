@@ -77,6 +77,17 @@ describe("the Peaks graph (rows 59-62)", () => {
     expect(show).toEqual(["Data and model", "Peak shape alone"]);
   });
 
+  it("shades each shown window's range on the overview, and a step moves its band", async () => {
+    app = mount(Peaks, { target: document.body, props: { rwp: 0.0928 } });
+    await settle(() => document.querySelectorAll("figure").length > 0);
+    const bands = () => [...document.querySelectorAll<HTMLElement>(".overview .band")].map((b) => b.style.left);
+    const before = bands();
+    expect(before).toHaveLength(document.querySelectorAll("figure").length);
+    (document.querySelector('[aria-label="Previous peak"]:not(:disabled)') as HTMLButtonElement).click();
+    await settle(() => bands().join() !== before.join());
+    expect(bands()).toHaveLength(before.length);
+  });
+
   it("says a preview is not refined, with both Rwp values", async () => {
     const preview = { curves: { header: { rwp: 0.3001 }, arrays: payload.arrays }, sentAt: 0 };
     app = mount(Peaks, { target: document.body, props: { rwp: 0.0928, preview } });

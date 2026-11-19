@@ -1264,6 +1264,10 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     page.wait_for_selector(".rangepop")
     _frames(page)
     failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    # the ends read in the value box's digits, never at full precision (WP-2218)
+    for end in ("Lowest value", "Highest value"):
+        text = page.get_by_label(end, exact=True).input_value()
+        assert len(text) <= 12, f"{end} reads {text!r}"
     page.keyboard.press("Escape")
 
     redraws = page.evaluate(REDRAWS)
@@ -1283,7 +1287,7 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
 #: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
 #: line, the windows, the plot and the block under it.
 NEXT_GRAPHS = NEXT_LANDMARKS + [
-    ".ghead", ".gctl", ".gctl > *", "section.graphs figure", "section.graphs canvas",
+    ".ghead", ".gctl", ".gctl > *", ".overview", "section.graphs figure", "section.graphs canvas",
     "section.graphs .plot", ".bgctls", ".bgctl > *", ".chips .term",
     ".actions", ".actions .go > *",
 ]
@@ -1298,8 +1302,9 @@ PAINTED = """() => [...document.querySelectorAll("section.graphs canvas")].map((
 
 
 def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_factory):
-    """WP-2218 rows 59-68. The Peaks graph frames three painted windows of the
-    last fit, and its Show choice repaints them in place. On the Background
+    """WP-2218 rows 59-68. The Peaks graph fills its grid with painted windows
+    of the last fit under an overview of the pattern that shades each window's
+    range, and its Show choice and a window's › repaint them in place. On the Background
     graph a term chip is a pending hold: the action bar counts it, the title
     says "Background preview", the head stays where it was, and the band is
     refetched for it. Neither the chip nor "Band drawn" moves a place, and
@@ -1319,9 +1324,18 @@ def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_
         page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
         _frames(page, 4)
         windows = page.locator("section.graphs figure").count()
-        assert 1 <= windows <= 3, windows
+        assert windows >= 1, windows
+        assert page.locator(".overview .band").count() == windows
         painted = page.evaluate(PAINTED)
-        assert len(painted) == windows and min(painted) > 0, painted
+        # the overview's canvas, then one per window
+        assert len(painted) == windows + 1 and min(painted) > 0, painted
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        bands = page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)")
+        step = page.locator('section.graphs button[aria-label="Next peak"]:not([disabled])').first
+        step.click()
+        _frames(page, 4)
+        assert page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)") != bands
+        failures += [f"Next peak: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
         before = page.evaluate(SNAP, NEXT_GRAPHS)
         page.locator('[aria-label="Show"] button', has_text="Peak shape alone").click()
         _frames(page, 4)
