@@ -76,6 +76,8 @@ The second half takes the winning class back as a structure that carries its mom
 `MagneticSolution.write_magcifs` writes one magCIF per class, and `Structure.from_cif` reads the winner's file.
 The magCIF does not carry the scale factor, so the script copies it from the blind fit.
 One stage then frees the moment and every nuclear term.
+Each round ends with the closing stage, because the loop compares one round's moment with the next.
+Without it, round 1 stopped at different points on different machines.
 
 ```{literalinclude} ../../../examples/guides/moment.py
 :language: python
@@ -85,8 +87,8 @@ One stage then frees the moment and every nuclear term.
 
 <!-- output of examples/guides/moment.py -->
 ```text
-round 1: |m| = 2.1 μB, Rwp 0.104
-round 2: |m| = 2.1 μB, Rwp 0.104
+round 1: |m| = 2.1 μB, Rwp 0.105
+round 2: |m| = 2.1 μB, Rwp 0.105
 scale moved less than its esd
 ```
 
