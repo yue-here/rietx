@@ -222,7 +222,7 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   times the pattern count. The `### Inherited` section was consumed and
   deleted. Its #245 timings are the issue's own record. Its WP-1341 entry is
   this question, also forwarded to WP-2028's `### Inherited`, whose Non-goals
-  still send the item here. The narrative went to `docs/milestones/v1.12.md`.
+  still send the item here. The narrative went to `docs/milestones/v1.13.md`.
 
   *Measured.* Nothing timed, since nothing that runs changed. `[dev]` venv,
   darwin arm64: the acceptance files with the docs and joint-fit tests
