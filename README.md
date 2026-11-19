@@ -51,7 +51,7 @@ FitReport: 53 misfit regions. The top 15 carry 74% of χ² and the other 38 carr
 Refinement history (every stage is a restorable checkpoint):
 t5544a638  15 nodes  data=11BM_NAC.fxye
  n0000  root                   —
- n0001  stage:bkg              Rwp 3.1772
+ n0001  stage:bkg              Rwp 3.1796
  …
 *n0014  stage:closing          Rwp 0.0930
 ```

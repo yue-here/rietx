@@ -3211,31 +3211,29 @@ class Refinement:
         A ``vary=True`` coordinate on an atom whose site symmetry allows no
         positional freedom (``F d -3 m`` 8a, ``P n m a`` inversion centres, …) is
         refused when the parameter table is first built, at the first
-        :meth:`parameters` or :meth:`fit`, and the refusal names only the first
-        such atom.  After a step that frees "every coordinate" of a structure
-        holding special and general sites together, this is the one call that
-        makes it fittable: it clears the flag on exactly those coordinates,
-        records one ``edit_model`` node, and returns their paths, sorted.  Atoms
-        with any free direction are untouched, and a structure with nothing to
-        fix returns ``[]`` and records nothing.  Opt-in: construction and
-        ``fit()`` still refuse, as before.
+        :meth:`parameters` or :meth:`fit`, and the refusal names every such
+        site (WP-1913).  After a step that frees "every coordinate" of a
+        structure holding special and general sites together, this is the one
+        call that makes it fittable: it clears the flag on exactly those
+        coordinates, records one ``edit_model`` node, and returns their paths,
+        sorted.  A rigid body's origin is a site too, so a fixed one is cleared
+        the same way.  An atom a body places or a distortion mode moves is its
+        owner's, refused by its own sentence and left alone here.  Sites with
+        any free direction are untouched, and a structure with nothing to fix
+        returns ``[]`` and records nothing.
+        Opt-in: construction and ``fit()`` still refuse, as before.
         """
-        from .crystallography.symmetry import resolve_group
-        from .crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+        from .params.vector import fixed_sites_asking_to_vary
 
         structure = self.structure.model_copy(deep=True)
         cleared: list[str] = []
-        for ip, phase in enumerate(structure.phases):
-            sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            for ia, atom in enumerate(phase.atoms):
-                xyz = [atom.x.value, atom.y.value, atom.z.value]
-                if len(coordinate_basis(stabilizer_rotations(sg, xyz))) > 0:
-                    continue
-                for axis in ("x", "y", "z"):
-                    param = getattr(atom, axis)
-                    if param.vary:
-                        param.vary = False
-                        cleared.append(f"phases.{ip}.atoms.{ia}.{axis}")
+        # the table's own list, so the verb clears exactly what it refuses
+        for base, site in fixed_sites_asking_to_vary(structure):
+            for axis in ("x", "y", "z"):
+                param = getattr(site, axis)
+                if param.vary:
+                    param.vary = False
+                    cleared.append(f"{base}.{axis}")
         if cleared:
             self.edit(structure=structure, label="fix_special_positions")
         return sorted(cleared)
@@ -6070,6 +6068,8 @@ class Refinement:
                 # after the write-back: the search reads the answer's coordinates
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
                     self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
+                    self.structure, stale_since))
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -6629,6 +6629,8 @@ class Refinement:
             self._record_free_paths(table)
             if mode == "rietveld":
                 diagnostics.extend(_restraint_pairs_stale_diagnostics(
+                    self.structure, stale_since))
+                diagnostics.extend(_body_contacts_unchecked_diagnostics(
                     self.structure, stale_since))
 
             stage_result = StageResult(
@@ -12340,6 +12342,75 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
                        "coordinates (or with a wider margin) and refit; or, if "
                        "the contact is real, lower that species pair's minimum "
                        "distance"))
+    return out
+
+
+def _body_contacts_unchecked_diagnostics(structure: Structure,
+                                          since: list) -> list[Diagnostic]:
+    """``RESTRAINT_BODY_CONTACTS_UNCHECKED`` — a torsion turned inside a body
+    whose own contacts the anti-bump checks do not search (WP-2144, #1507).
+
+    The anti-bump builder skips two atoms of one rigid body in the body's own
+    copy by default, and :func:`_restraint_pairs_stale_diagnostics` skips
+    them always, so a torsion that folds the molecule onto itself is
+    restrained only by a row the caller wrote for that pair, and is never
+    named.  One warning per body with a torsion whose ``angle`` moved during
+    the run, in a phase with an anti-bump row; the message counts the rows
+    the list holds inside the body
+    (:func:`rietx.model.restraints.body_own_rows`).  ``since`` is each phase
+    as the run started (:func:`_anti_bump_start_phases`), so a phase without
+    an anti-bump row is never searched, and a torsion that did not move
+    cannot have folded anything the caller did not start from.
+    """
+    from .model.restraints import body_own_rows
+    from .params.bodies import wrap_degrees
+
+    out: list[Diagnostic] = []
+    for phase, start in zip(structure.phases, since, strict=True):
+        if start is None:
+            continue
+        # wrapped on both sides: write-back stores every torsion's angle
+        # wrapped, held or not, so a declared −180 comes back 180 unturned
+        before = {b.name: {t.name: wrap_degrees(t.angle) for t in b.torsions}
+                  for b in start.rigid_bodies}
+        turned_in: dict[str, list] = {}
+        for body in phase.rigid_bodies:
+            was = before.get(body.name, {})
+            moved = [(t.name, was[t.name], t.angle) for t in body.torsions
+                     if t.name in was and wrap_degrees(t.angle) != was[t.name]]
+            if moved:
+                turned_in[body.name] = moved
+        # the row count reads every row's image, so it runs only where a
+        # torsion turned
+        if not turned_in:
+            continue
+        for name, rows in body_own_rows(phase).items():
+            if name not in turned_in:
+                continue
+            body = next(b for b in phase.rigid_bodies if b.name == name)
+            moved = turned_in[name]
+            turned = ", ".join(f"{t} {a:.1f}° → {b:.1f}°" for t, a, b in moved)
+            held = ("the anti-bump list has no row between two atoms of one "
+                    "copy of the body" if rows == 0 else
+                    f"the anti-bump list holds {rows} row(s) inside one copy "
+                    "of the body and the end-of-run search skips its other "
+                    "pairs")
+            out.append(Diagnostic(
+                level="warning", code="RESTRAINT_BODY_CONTACTS_UNCHECKED",
+                where=[f"{phase.name} {label}" for label in body.atoms],
+                value=float(len(moved)),
+                message=(f"phase {phase.name!r}, rigid body {name!r}: "
+                         f"{len(moved)} torsion(s) turned during the run "
+                         f"({turned}), and {held}, so contacts inside the "
+                         "molecule are not checked."),
+                suggestion=("read the distances between the body's own atoms "
+                            "in result.geometry.distances, bonds included (a "
+                            "folded pair can be short enough to be listed as a "
+                            "bond); where a torsion brought "
+                            "two of its atoms closer than you allow, add an "
+                            "AntiBumpRestraint row for that pair with its own "
+                            "minimum, or restrain or hold the torsion; a floor "
+                            "on a torsion's own two ends pushes it towards anti")))
     return out
 
 
