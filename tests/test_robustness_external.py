@@ -658,8 +658,8 @@ def test_the_test_is_the_nested_background_only_ratio_not_an_rwp_bar():
 def test_a_collapse_below_rwp_08_is_caught_and_a_high_rwp_good_fit_is_not(tmp_path):
     import numpy as np
 
-    from rietx.refine import _far_from_data_diagnostics
     from rietx import Refinement
+    from rietx.refine import _far_from_data_diagnostics
     from rietx.strategy.staged import Stage
 
     start, ins, pattern = _nacl_pattern(tmp_path)
