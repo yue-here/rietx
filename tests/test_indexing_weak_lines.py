@@ -1,4 +1,4 @@
-"""Weak lines and the indexer's rank of the true cell: WP-2078 task 2's record.
+"""Weak lines and the indexer's rank of the true cell: WP-2078's record.
 
 Three synthetic patterns from ``tests/_synthetic_weak_lines.py``, each picked
 as ``pick_peaks`` picks it and then cut at 0.5, 1 and 2 % of its strongest
@@ -28,19 +28,24 @@ rather than reads a load, and says so, and the first Linux nightly is the first
 read of the slow rows.  The undeclared default's ranks are in WP-2078's PR
 body, with the cut named.
 
-**What the rows say on main** (truth's rank; "—" = absent from the list):
+**What the rows say** (truth's rank; "—" = absent from the list).  The
+"picked" column is the default search, weak-line retry included; the floored
+columns search the floored list as given:
 
 =============================  ==========  ======  ====  ====  ====
 fixture                        weak lines  picked  0.5%  1 %   2 %
 =============================  ==========  ======  ====  ====  ====
-(a) molybdenum + trace MoO₃    foreign     —       1     1     1
+(a) molybdenum + trace MoO₃    foreign     1       1     1     1
 (b) ordered double perovskite  structural  1       1     2     3
 (c) Si + twelve planted lines  foreign     —       —     —     —
 =============================  ==========  ======  ====  ====  ====
 
-* (a) reproduces the failure: molybdenum owns 6 of the 38 picked lines and
-  the oxide 29, the count of 2 refuses the host, and the inlier retry
-  (WP-1969) cannot accept a cell owning a sixth of the list.  Every floor leaves all six
+* (a) reproduced the failure until the weak-line retry: molybdenum owns 6 of
+  the 38 picked lines and the oxide 29, the count of 2 refuses the host, and
+  the inlier retry (WP-1969) cannot accept a cell owning a sixth of the list.
+  With no lattice two engines agree on, the search runs again on the lines at
+  or above 5 % of the strongest (``INDEX_WEAK_LINE_RETRY``) and ranks the
+  truth first; before WP-2078 built it the column read "—".  Every floor leaves all six
   of the host's lines, with two of the oxide's at 0.5 % and none from 1 %, and
   the truth comes first.  At 2 % the list is the host's six lines alone, one
   above the five a cubic search needs, so the row is decided by the floor and
@@ -56,10 +61,20 @@ fixture                        weak lines  picked  0.5%  1 %   2 %
   owns about half of each list.  The positive arm (no lines planted, 16 Si
   lines) ranks Si first.
 
+**(b) with a trace phase** (WP-2147) is searched as picked under
+``preset="full"``, and its rows pin the decision alone: whether the weak-line
+retry runs and whether its answer is adopted.  At a 0.5 % trace the inlier
+retry finds the supercell and the retry never runs; at 2 % the full list ends
+with no candidate, the retry searches the eleven subcell lines the 5 % floor
+keeps, and its answer is adopted under all three engines and under each
+alone.  Where the supercell lands among the subcells (3rd or 4th) is WP-2147's
+table, not a pin.
+
 A row records ``main`` and is meant to flip: the WP that changes a rank
-changes the table and the row together.  The acceptance rows that fail on
-``main`` are ``xfail(strict=True)`` naming WP-2078, so a fix turns them into
-a failure that must be read, never a silent pass.
+changes the table and the row together.  An acceptance row that fails on
+``main`` is ``xfail(strict=True)`` naming its WP, so a fix turns it into a
+failure that must be read, never a silent pass; (a)'s flipped with the
+weak-line retry.
 """
 
 from __future__ import annotations
@@ -70,10 +85,10 @@ import numpy as np
 import pytest
 
 from rietx.indexing import index_pattern
-from rietx.indexing.engines import SearchSpec
+from rietx.indexing.engines import SearchSpec, weak_line_floor
 from rietx.schemas.indexing import PeakList
 from tests import _synthetic_weak_lines as W
-from tests.indexing_gallery import rank_of_lattice
+from tests.indexing_gallery import OUTPUT, rank_of_lattice
 from tests.test_acceptance_indexing import _skip_unless_finished
 
 BUILDERS = {"a": W.weak_second_phase, "b": W.weak_superlattice,
@@ -81,9 +96,10 @@ BUILDERS = {"a": W.weak_second_phase, "b": W.weak_superlattice,
 FLOORS = (0.0, 0.005, 0.01, 0.02)
 
 #: the truth's rank on ``main`` per (fixture, floor), ``None`` = absent;
-#: measured on 892e05fc0 and 1f4be2972 (the module docstring's table)
+#: measured on 892e05fc0 and 1f4be2972 (the module docstring's table); (a) as
+#: picked moved from absent to 1 with the weak-line retry (WP-2078)
 RANK_ON_MAIN = {
-    ("a", 0.0): None, ("a", 0.005): 1, ("a", 0.01): 1, ("a", 0.02): 1,
+    ("a", 0.0): 1, ("a", 0.005): 1, ("a", 0.01): 1, ("a", 0.02): 1,
     ("b", 0.0): 1, ("b", 0.005): 1, ("b", 0.01): 2, ("b", 0.02): 3,
     ("c", 0.0): None, ("c", 0.005): None, ("c", 0.01): None, ("c", 0.02): None,
 }
@@ -118,6 +134,28 @@ def _finished(res) -> None:
     _skip_unless_finished(res)
 
 
+def _draw(key: str, res) -> None:
+    """The ranked ticks and the leading cell's obs/calc/diff fit, to
+    ``tests/output/`` for looking at (not a gallery row: the scoreboard counts
+    real patterns only)."""
+    import matplotlib.pyplot as plt
+
+    from rietx.indexing.workflow import validate_by_lebail
+    from rietx.viz.indexing import plot_indexing
+
+    fx = _fixture(key)
+    kept = weak_line_floor(fx.peaks) if any(
+        d.code == "INDEX_WEAK_LINE_RETRY" for d in res.diagnostics) else fx.peaks
+    pair = (validate_by_lebail(res.candidates[0], fx.data, fx.instrument,
+                               peaks=kept, with_result=True)
+            if res.candidates else None)
+    OUTPUT.mkdir(exist_ok=True)
+    for name, fig in plot_indexing(res, kept, data=fx.data, n=5,
+                                   validation=pair).items():
+        fig.savefig(OUTPUT / f"weak_lines_{key}_{name}.png")
+        plt.close(fig)
+
+
 def _n_weak(fx: W.WeakLineFixture, two_theta) -> int:
     weak = np.asarray(fx.weak_two_theta)
     return int(sum(np.min(np.abs(weak - t)) < MATCH_DEG for t in two_theta))
@@ -133,10 +171,11 @@ def _row(key: str, floor: float):
 # ----------------------------------------------------------------------------
 # the builders
 # ----------------------------------------------------------------------------
-@pytest.mark.parametrize("key", sorted(BUILDERS))
+@pytest.mark.parametrize("key", [*sorted(BUILDERS), "b+trace"])
 def test_a_builder_draws_the_same_list_every_time(key):
     """Fixed seeds: a second build picks the same lines at the same heights."""
-    one, two = BUILDERS[key](), BUILDERS[key]()
+    build = W.weak_superlattice_with_trace if key == "b+trace" else BUILDERS[key]
+    one, two = build(), build()
     assert np.array_equal(one.peaks.two_theta(), two.peaks.two_theta())
     assert np.array_equal(one.peaks.intensity(), two.peaks.intensity())
 
@@ -180,10 +219,12 @@ def test_the_planted_lines_survive_the_floors():
 
 @pytest.mark.xdist_group("weak-lines-a")
 def test_a_floor_removes_nothing_from_a_position_only_list():
-    """``from_positions`` gives every line weight 1, so no floor bites."""
+    """``from_positions`` gives every line weight 1, so no floor bites, the
+    weak-line retry's included: such a list never sets a line aside."""
     fx = _fixture("a")
     flat = PeakList.from_positions(fx.peaks.two_theta(), fx.peaks.wavelength)
     assert len(W.floored(flat, 0.02).usable()) == len(flat.usable())
+    assert len(weak_line_floor(flat).usable()) == len(flat.usable())
 
 
 # ----------------------------------------------------------------------------
@@ -220,18 +261,114 @@ def test_silicon_without_planted_lines_ranks_first():
 # ----------------------------------------------------------------------------
 @pytest.mark.slow
 @pytest.mark.xdist_group("weak-lines-a")
-@pytest.mark.xfail(strict=True, reason=(
-    "WP-2078: on main the count of 2 refuses molybdenum among its oxide's "
-    "lines and the inlier retry cannot accept a cell owning 4 of 36"),
-    raises=AssertionError)
 def test_a_trace_second_phase_leaves_the_truth_first():
+    """The weak-line retry: the full list gives no lattice two engines agree
+    on, the lines under 5 % of the strongest are set aside, and the search on
+    the rest ranks molybdenum first.  The diagnostic names every set-aside
+    line, and the candidates count the kept lines only."""
+    fx = _fixture("a")
     res, rank = _search("a", 0.0)
     _finished(res)
+    _draw("a", res)
     assert rank == 1
+    retry = [d for d in res.diagnostics if d.code == "INDEX_WEAK_LINE_RETRY"]
+    assert len(retry) == 1 and "the candidates are that search's" in retry[0].message
+    n_set_aside = len(fx.peaks.usable()) - len(weak_line_floor(fx.peaks).usable())
+    assert f"its {n_set_aside} line(s)" in retry[0].message
+    assert res.n_usable_lines == len(weak_line_floor(fx.peaks).usable())
 
 
 @pytest.mark.xdist_group("weak-lines-b")
 def test_a_superlattice_keeps_its_supercell_first():
+    """Two engines agree on the supercell from the full list, so the weak-line
+    retry never runs and its twelve ordering lines all score."""
     res, rank = _search("b", 0.0)
     _finished(res)
     assert rank == 1
+    assert "INDEX_WEAK_LINE_RETRY" not in {d.code for d in res.diagnostics}
+
+
+# ----------------------------------------------------------------------------
+# WP-2147: (b) with a trace phase, so the retry fires on a superlattice
+# ----------------------------------------------------------------------------
+@lru_cache(maxsize=None)
+def _trace_fixture(trace: float) -> W.WeakLineFixture:
+    return W.weak_superlattice_with_trace(trace=trace)
+
+
+@lru_cache(maxsize=None)
+def _trace_search(trace: float, engines: tuple[str, ...] | None):
+    """(b)+trace as a user's call searches it: as picked, the retry left to
+    decide, the system declared and the search uncut (``preset="full"``)."""
+    fx = _trace_fixture(trace)
+    return index_pattern(fx.peaks, spec=SearchSpec(systems=("cubic",)),
+                         preset="full", engines=engines)
+
+
+def _retry(res):
+    return [d for d in res.diagnostics if d.code == "INDEX_WEAK_LINE_RETRY"]
+
+
+@pytest.mark.xdist_group("weak-lines-d")
+def test_the_floor_keeps_neither_the_ordering_lines_nor_the_trace():
+    """(b)+trace at its default 2 %: the picker keeps all twelve ordering lines
+    and 58 of the oxide's, and the retry's 5 % floor keeps none of either, so
+    the retry searches the eleven subcell lines alone."""
+    fx = _trace_fixture(0.02)
+    oxide = W._lines(W.MOO3_CIF, fx.two_theta_range)
+    host = W._lines(W._double_perovskite(0.1), fx.two_theta_range)
+
+    def n_oxide_only(two_theta):
+        return int(sum(np.min(np.abs(oxide - t)) < MATCH_DEG
+                       and np.min(np.abs(host - t)) >= MATCH_DEG
+                       for t in two_theta))
+
+    kept = weak_line_floor(fx.peaks)
+    assert _n_weak(fx, fx.peaks.two_theta()) == 12
+    assert n_oxide_only(fx.peaks.two_theta()) == 58
+    assert _n_weak(fx, kept.two_theta()) == 0
+    assert n_oxide_only(kept.two_theta()) == 0
+    assert len(kept.usable()) == 11
+
+
+def _decision_row(trace: float, engines, fires: bool):
+    marks = [pytest.mark.xdist_group("weak-lines-d"), pytest.mark.slow]
+    name = "all" if engines is None else "+".join(engines)
+    return pytest.param(trace, engines, fires, marks=marks,
+                        id=f"{trace:g}-{name}")
+
+
+#: the decision ``main`` makes on (b)+trace, measured on 05ea63571 (WP-2147's
+#: table): at 0.5 % the inlier retry finds the supercell and the weak-line
+#: retry never runs; at 2 % the full list ends with no cell two engines agree
+#: on (none at all), and the retry runs and is adopted, under all three
+#: engines and under each alone.  Every row is ``slow``, as (a) as picked is:
+#: the 2 % all-engine search took 8.5 s on a quiet machine and 17.7 s inside
+#: the fast suite here, and a CI leg runs 3-4× slower.  The census of what
+#: the floor keeps is this case's fast test
+DECISION_ROWS = [
+    _decision_row(0.005, None, fires=False),
+    _decision_row(0.02, None, fires=True),
+    _decision_row(0.02, ("dichotomy",), fires=True),
+    _decision_row(0.02, ("svd",), fires=True),
+    _decision_row(0.02, ("trial_error",), fires=True),
+]
+
+
+@pytest.mark.parametrize("trace, engines, fires", DECISION_ROWS)
+def test_a_superlattice_with_a_trace_decides_the_retry(trace, engines, fires):
+    """Whether the weak-line retry runs on (b)+trace, and whether its answer
+    is adopted.  The row pins the decision, never where the supercell lands:
+    a retry that runs searches the subcell lines alone, and where the truth
+    ranks among the subcells is WP-2147's table, not a pin."""
+    fx = _trace_fixture(trace)
+    res = _trace_search(trace, engines)
+    _finished(res)
+    retry = _retry(res)
+    if not fires:
+        assert not retry
+        assert res.n_usable_lines == len(fx.peaks.usable())
+        return
+    assert len(retry) == 1
+    assert "the candidates are that search's" in retry[0].message
+    assert res.n_usable_lines == len(weak_line_floor(fx.peaks).usable())

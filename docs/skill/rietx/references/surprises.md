@@ -5,7 +5,7 @@ Load it when something the fit did makes no sense. Every entry is a measured res
 *A reference file of the `rietx` skill. The body it belongs to is [`SKILL.md`](../SKILL.md); section numbers are the ones the body cites.*
 
 These are the findings from building the package that change how an agent
-should behave. Each one cost a debugging pass.
+should behave.
 
 **8.1 A correction that provably cannot improve Rwp can still be essential.**
 The capillary absorption factor factors *exactly* into a constant × exp(c·sin²θ)
@@ -481,7 +481,7 @@ a Stephens block frees nothing and is healthy. A path with no `*`, `?` or `[`
 names one parameter, so a missing row (`instrument.source.wavelength` for
 `…lines.0.wavelength`) fires §7 `STAGE_PATH_UNKNOWN` with the nearest real
 path, and `set_vary` raises instead, changing nothing. A glob naming one site
-is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
+or one cell is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
 `STAGE_PATH_NOT_FREE` (WP-1951). **A typo inside a glob (`phases.*.cel.*`)
 still cannot be told from a healthy miss, so read `StageResult.freed` for each
 stage you wrote.** On a joint fit the
@@ -494,14 +494,14 @@ and the fit converged at Rwp 0.115 against 0.066 with the right globs. That is
 **8.29 More background terms make a measured blank's scale worse while Rwp
 improves.** `BackgroundFixedPlusChebyshev.from_pattern(blank)` carries the
 blank's esds. Free `…background.scale` against a **low-order** polynomial,
-because the blank is never on the specimen's scale and enough Chebyshev terms
-describe the curve themselves: a 0.85 truth came back as 0.838 on 1 term and
-0.648 on 6, Rwp falling throughout. `HIGH_CORRELATION` against `c0` there is
-the correct report. Judge the scale by **its own esd**, never by Rwp: the
-blank's esds enter the weight as σ² + s²·σ_f², so two fits declaring different
-scales are not scored on one statistic.
-(Measured: WP-1309.) Presets free `…background.*`, scale included, so `hold`
-it to keep 1.0 (Measured: WP-1986).
+because enough Chebyshev terms describe the curve themselves: a 0.85 truth
+came back as 0.838 on 1 term and 0.648 on 6, Rwp falling throughout. Judge the
+scale by **its own esd**, never by Rwp: the blank's esds enter the weight as
+σ² + s²·σ_f², so two fits declaring different scales are not scored on one
+statistic. (Measured: WP-1309.) Presets free `…background.*`, scale included,
+so `hold` it to keep 1.0 (Measured: WP-1986). A DIFFaX faulted-minus-ideal curve
+for phase 0 goes here as c*·D, with
+`tie("instrument.background.scale", "phases.0.scale")` (Measured: WP-1512).
 
 **8.30 A joint X-ray + neutron fit keys every correction, and each pattern's
 findings, to its own histogram.** f₀ with f′/f″ on the X-ray one; b, a locked
