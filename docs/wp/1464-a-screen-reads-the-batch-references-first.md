@@ -153,6 +153,85 @@ The routing rows name the situation, and the two new rows carry tags that
 
 ## Handover log
 
+### 2026-11-19 — the runs still going, on Yue's ruling (a); PR #1695
+
+`rietx runs` checked while a job runs now says how many of its runs are
+still going and how long the oldest has gone. Before this, a run with no
+end had no line, so the verb run mid-screen could not show the runaway this
+WP opened with. The previous entry left that question for Yue.
+
+*Ruled by Yue, 2026-11-19.* Option (a): show the runs in progress, with a
+line such as `running: 2, longest so far 12 min (40x the median)`. Yue also
+approved, as part of PR #1695, three things the previous entry had settled
+by Claude: the median on the slowest line, the second line naming the
+slowest run's label and directory, and `--label` as a glob.
+
+*Done.*
+- `JobSummary.running` lists the runs `liveness_of` reads as `running`,
+  earliest start first. Each `RunningRun` carries its label, its directory,
+  its recorded start (`started`, Unix seconds) and the liveness evidence.
+  It carries no elapsed time, because a field computed from the clock
+  differs on every call (WP-1427). `--json` therefore prints the same
+  bytes twice for a directory that has not changed.
+- The text view reads the clock. `JobSummary.__str__` calls `_text(now)`
+  with `time.time()`, the one clock read in the view, and its docstring
+  says so. Elapsed is `now` minus the oldest live run's start.
+- Running means live by `liveness_of`, with no second test. A run whose
+  writer died reads `abandoned` and stays off the running line.
+- The line's final wording, after the existing lines, which do not change:
+  `running: N, longest so far T (Rx the median, M)`, then an indented line
+  with that run's own label (where it differs from the job's) and its
+  directory. The median is over the timed runs. With none timed, the line
+  is `running: N, longest so far T`. With no live run recording a start, it
+  is `running: N, no start recorded`.
+- When a finished run is slower than every live one, both blocks print and
+  the live ratio is under 1 (`0.5x`). A ratio under 0.1 prints `<0.1x`.
+- Manual `reference/cli.md` § `rietx runs` gains the real example below and
+  says what the JSON carries. The verb's `--help`, skill 9c.5 (re-synced
+  copies), the release fragment `1695.new.md` and the v1.13 record each
+  gain a sentence.
+
+Real output, from six fits of the synthetic LaB6 pattern: four finished,
+one held at its first stage by a sleeping callback, one killed with
+`kill -9` partway (driver `~/.cache/ghostshift/rietx/wp-1464/live_demo.py`):
+
+```console
+$ rietx runs --label 'screen-2/*'
+screen-2/*: 6 runs, 4 done, 1 running, 1 abandoned
+wall 5.0 s, first start to last end (2 runs recorded no end)
+slowest: 0.3 s, done (1.4x the median, 0.2 s)
+  screen-2/lab6-1, .rietx/runs/20261119-094950-56387
+running: 1, longest so far 26 s (103x the median, 0.2 s)
+  screen-2/lab6-held, .rietx/runs/20261119-094956-56428
+```
+
+*Measured.* `[dev]` venv, arm64 Mac.
+- A job with nothing running prints as before, byte for byte: the text of
+  both demo roots of the previous entry, compared with `cmp` before and
+  after. Its JSON gains `"running": []`.
+- Tests: 4 added in `tests/test_runs.py` (a live run under a held lock, a
+  dead run with a free lock and a stale heartbeat, a live run with no
+  finished run through the pid rung, and nothing running with its JSON).
+  The file: 65 passed, 1 skipped.
+- Fast selection on `4de2cb70a` (the code commit, main merged since the
+  previous entry's count): 14 823 passed, 434 skipped, 32 xfailed,
+  through ghostshift's `serial.py`.
+- `python -m tests.reader_output` exit 0: a fit's printed text is
+  unchanged against the merge-base `d98250f96`.
+
+*Settled by Claude, for the maintainer to reverse.*
+- The running line carries the median's value, `(40x the median, 18 s)`,
+  as the slowest line does, beyond the ruling's example shape. With no
+  slowest line (one timed run) the median would otherwise print nowhere.
+- A second line names the longest-running run's label and directory, as
+  the approved slowest line does. A runaway seen is one to find.
+- A dead run keeps its existing word, `abandoned`, in the counts line, with
+  no extra line such as `stopped responding: 1`. The manual already defines
+  `abandoned` (`guides/watch.md`, `reference/cli.md`), and a second phrase
+  for one state would make two names.
+
+Next: none. The WP stays closed.
+
 ### 2026-11-19 — task 6, `rietx runs`; WP closed, PR #1695
 
 A person or an agent checking an overnight batch can now ask the shell what
