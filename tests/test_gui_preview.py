@@ -337,6 +337,36 @@ def test_a_preview_while_a_run_is_in_flight_is_a_409(fap, tmp_path):
         session._state = "idle"
 
 
+def test_the_structure_graph_draws_unapplied_values_and_writes_nothing(fap, tmp_path):
+    """``POST /api/structure3d`` draws the cell a slider holds (WP-2218), through
+    the preview's own refusal, and leaves the project as it found it."""
+    session = GuiSession(fap, state_dir=tmp_path)
+    r = fap.refinement
+    before = _digest(fap.path)
+    models = (r.structure.model_dump_json(), r.instrument.model_dump_json())
+    a = preview._base(fap).values["phases.0.cell.a"]
+    now = session.structure3d(0)
+    grown = session.structure3d(0, body={"values": {"phases.0.cell.a": a * 1.01}})
+    # hexagonal: b follows a, so the volume grows by 1.01² and c stays
+    assert grown["volume"] == pytest.approx(now["volume"] * 1.01 ** 2, rel=1e-9)
+    assert grown["lattice"][2] == pytest.approx(now["lattice"][2], rel=1e-12)
+    assert session.structure3d(0, body={"values": {}})["volume"] == pytest.approx(
+        now["volume"], rel=1e-12)
+    with pytest.raises(GuiError, match="unknown parameter path"):
+        session.structure3d(0, body={"values": {"phases.0.nope": 1.0}})
+    assert _digest(fap.path) == before
+    assert (r.structure.model_dump_json(), r.instrument.model_dump_json()) == models
+    session._state = "running"
+    try:
+        with pytest.raises(GuiError) as excinfo:
+            session.structure3d(0, body={"values": {}})
+        assert excinfo.value.status == 409
+        # the drawing of the working state stays open mid-run
+        assert session.structure3d(0)["volume"] == pytest.approx(now["volume"])
+    finally:
+        session._state = "idle"
+
+
 # ---------------------------------------------------------------- the wire
 def test_one_round_trip_through_the_real_server(fap, tmp_path):
     session = GuiSession(fap, state_dir=tmp_path)

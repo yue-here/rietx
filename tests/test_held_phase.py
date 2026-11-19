@@ -433,6 +433,7 @@ def _ramp_patterns(temperatures, seed: int = 20260826, grid=None):
     out = []
     for temperature in temperatures:
         truth.phases[0].cell.a.value = _ramp_a(temperature)
+        truth.phases[0].cell.b.value = truth.phases[0].cell.c.value = truth.phases[0].cell.a.value  # the cell's ties follow a
         truth.phases[1].scale.value = 4.0e-4 * _ramp_caf2_weight(temperature)
         y = rx.Refinement(truth, ins).predict(grid)
         counts = rng.poisson(np.maximum(y, 0.0)).astype(float)

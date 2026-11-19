@@ -1879,6 +1879,7 @@ def test_a_budget_stop_is_continued_from_where_it_stopped():
     # and the test would not reach the code it is about (WP-1938).
     start = tetragonal()
     start.cell.a.value += 0.004
+    start.cell.b.value = start.cell.a.value  # the cell's ties follow a
     start.cell.c.value += 0.004
     _ref, result = _fit(rx.Structure(phases=[start]), instrument,
                         data, starved)
