@@ -59,14 +59,13 @@ The probe scripts were not kept. The first task rebuilds the decisive one,
 the Le Bail single fit at pattern 2, as a test.
 
 **How far a window reaches, against TOPAS.** TOPAS cuts each peak at 0.001
-of the strongest line's height (`docs/practice.md` § How far a peak is
-computed). rietx's 2 % of each peak's own area matches that only for a pure
-Lorentzian. For a mixed peak TOPAS's window on its strongest line is wider:
-1.6 against 1.0 FWHM at η = 0, 4.2 against 1.6 at η = 0.1, 11.2 against 9.5
-at η = 0.6. On this ramp TOPAS's window would be ±0.13°, so TOPAS would leave
-the same tail unmodelled; its 0.5° margin (`extra_X_right`) is rietx's.
-
-**Practice.** See § Practice, from the 2026-11-19 survey.
+of its own height (`docs/practice.md` § How far a peak is computed).
+rietx's 2 % of each peak's own area matches that only for a pure Lorentzian.
+For a mixed peak TOPAS's window is wider: 1.6 against 1.0 FWHM at η = 0, 4.2
+against 1.6 at η = 0.1, 11.2 against 9.5 at η = 0.6, before rietx's 0.3°
+slack. On this ramp TOPAS's window would be ±0.13°. TOPAS would therefore
+leave the same tail unmodelled, and its 0.5° margin (`extra_X_right`) is
+rietx's.
 
 **Tier.** To be set by the fix: a window rule for reflections whose window
 does not reach the data is a new default, tier 2 if it follows a program's
@@ -78,7 +77,30 @@ stage for Le Bail or carried Pawley.
 
 ## Practice
 
-(filled from the survey)
+Surveyed 2026-11-19, recorded in `docs/practice.md` § A reflection centred
+past the range end. **No program has a mechanism for this edge.** TOPAS and
+FullProf generate the reflection and give it a free intensity on whatever
+sliver of data its window reaches. GSAS-II and RIETAN-FP do not generate it,
+so its tail goes unmodelled and a neighbour absorbs it, as here. FullProf
+(`Dum = 3`) and RIETAN-FP (`H` in the `.lst`) leave edge reflections out of
+R_Bragg and say so in their output. GSAS-II's Pawley help advises against
+reflections past the limits. The literature read covers each peak's own
+cut-off and nothing about a peak centred outside the data.
+
+So the mechanism is rietx's own, tier 3, and needs the maintainer's
+approval. Candidates, from what rietx already has:
+
+- *A window that reaches the data.* A reflection generated inside the margin
+  but centred outside the range gets a window sized at
+  `CLOSING_WINDOW_TOL`, or at least to the data's end. Its tail is then
+  modelled, as at 0.1 % today. Cost: a few windows per fit. Its Le Bail
+  intensity rests on a sliver of data: at 0.1 % on the ramp, (6 0 2) took
+  2.77e4, ten times the strongest in-range reflection, harmlessly for the
+  cell. Pawley's ridge (WP-1459) already bounds that intensity.
+- *Not generating it* (GSAS-II, RIETAN-FP). This leaves the tail unmodelled,
+  which is the failure measured here. Dropped.
+- *Flagging it* (FullProf, RIETAN-FP). Report only, WP-2075's half. It does
+  not fix the cell.
 
 ## Non-goals
 
