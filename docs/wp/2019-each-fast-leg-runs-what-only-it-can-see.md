@@ -317,7 +317,7 @@ acceptance line is met, so the WP closes.
 
 - **Done** (PR #1354). The last open task, *Read ten runs again*, is read
   and ticked. Status ✅, the `Priority:` line deleted, the narrative in
-  `docs/milestones/v1.12.md` (moved there in review: 1.11.0 is cut). No code changes, and `tests/shard_times.json`
+  `docs/milestones/v1.13.md` (moved there in review: 1.12.0 is cut). No code changes, and `tests/shard_times.json`
   is not touched.
 - **Measured: the wall clock.** The ten successful `ci.yml` push runs on main
   from 41430141218 (892e05fc0, the merge of #1329, 11-02 10:36 UTC), the
