@@ -255,6 +255,28 @@ def test_a_verdict_short_fits_could_flip_is_not_judged():
     assert _judged(False, "max_iter", "converged", True) == (False, None)
 
 
+def test_a_gain_over_a_short_caller_fit_is_not_judged(biso_pair):
+    """``predict_then_verify``: a caller's fit stopped on its budget may gain
+    by continuing, so a pass over it is not judged (WP-2220)."""
+    from rietx.report import predict_then_verify
+
+    ref, _ = biso_pair
+    data = _poisson(_lab6(0.5), 17)
+    short = ref.branch()
+    short.set_values({"phases.0.cell.a": 4.1586})
+    short.run_stage(data, rx.Stage("all", BASE, max_iter=1), telemetry=False)
+    assert short.result_.status == "max_iter"
+    action = rx.SuggestedAction(kind="refine_biso", confidence=0.9,
+                                rationale="test", parameter_paths=[BISO])
+    out = predict_then_verify(short, data, action)
+    assert out.observed_delta_chi2 > 0.01 * short.result_.statistics.chi2
+    assert out.accepted is None
+    assert "not judged" in out.reason and "caller's fit" in out.reason
+    # and on the converged caller the same action is judged, and passes
+    out = predict_then_verify(ref, data, action)
+    assert out.accepted is True and out.reason.endswith("accepted")
+
+
 PEAK = [f"instrument.extra_components.0.{n}" for n in ("area", "center", "fwhm")]
 
 

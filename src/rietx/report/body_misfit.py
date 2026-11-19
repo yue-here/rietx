@@ -89,7 +89,16 @@ MISFIT_BIC = 10.0
 
 @dataclass
 class BodyMisfitRow:
-    """One body's comparison; ``deviations`` are (label, template, released, Δ/σ)."""
+    """One body's comparison; ``deviations`` are (label, template, released, Δ/σ).
+
+    ``status_body`` and ``status_released`` are the two arms' own ``status``,
+    and ``chi2_ordered`` says the released arm's χ² sits at or below the
+    body arm's (the released arm contains every pose the body can take).
+    ``fires`` is ``None`` where an arm short of its optimum could flip the
+    test, "not judged" rather than a pass or a fail (WP-2220): a short
+    released arm understates the gain, so only a firing stands, and a short
+    body arm overstates it, so only a silence stands.
+    """
 
     phase_index: int
     body: str
@@ -102,10 +111,13 @@ class BodyMisfitRow:
     f_statistic: float
     p_value: float
     delta_bic: float
-    fires: bool
+    fires: bool | None
     deviations: list[tuple[str, float, float, float]] = field(default_factory=list)
     #: declarations of the caller's that could not follow into the released arm
     dropped: list[str] = field(default_factory=list)
+    status_body: str = "converged"
+    status_released: str = "converged"
+    chi2_ordered: bool = True
 
 
 @dataclass
@@ -380,7 +392,9 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
     ``bond_sigma`` (Å) and ``angle_sigma`` (deg) are the released arm's
     restraint widths: stiff enough to keep the molecule a molecule, loose enough
     that the data can say which bond it disagrees with.  Returns a row per
-    body and a ``RIGID_BODY_MISFIT`` warning per body that fails.
+    body and a ``RIGID_BODY_MISFIT`` warning per body that fails, and a
+    ``COMPARISON_UNCONVERGED`` warning per body whose two arms did not both
+    reach their optimum (WP-2220).
     """
     require_two_theta(data, "rigid_body_misfit()", instrument=ref.instrument)
     if ref.result_ is None:
@@ -392,7 +406,14 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
 
     from ..optimize.statistics import _chi2_absolute, effective_sample_size
     from ..params.derived import cartesian_frame
-    from .layer2 import _hamilton_f, delta_bic, hamilton_justified
+    from .layer2 import (
+        _chi2_ordered,
+        _comparison_unconverged,
+        _hamilton_f,
+        _judged,
+        delta_bic,
+        hamilton_justified,
+    )
 
     base: Structure = ref.fitted_structure.model_copy(deep=True)
     rows: list[BodyMisfitRow] = []
@@ -414,7 +435,6 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
             # riding H tied to its parent (WP-1989)
             arm = released_arm(base, body.name, phase=ip, bond_sigma=bond_sigma,
                                angle_sigma=angle_sigma)
-            members = [index[lab] for lab in body.atoms]
             ref_b, res_b, dropped = _fit(
                 ref, arm.structure, data, [*free, *arm.free], max_iter,
                 drop=_later_bodies(ip, b), ties=arm.ties)
@@ -433,9 +453,23 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
                 f_stat, dof = test
                 p = float(f_dist.sf(f_stat, added, dof))
             dbic = delta_bic(chi_a, chi_b, n, added, n_effective=n_eff)
-            fires = (hamilton_justified(chi_a, chi_b, n, k_a, added, alpha=alpha,
-                                        n_effective=n_eff)
-                     and dbic > bic_threshold)
+            passes = (hamilton_justified(chi_a, chi_b, n, k_a, added, alpha=alpha,
+                                         n_effective=n_eff)
+                      and dbic > bic_threshold)
+            # the test is between two optima: an arm short of its own can flip
+            # it, in the direction its bias runs (WP-2220)
+            ordered = _chi2_ordered(chi_a, chi_b)
+            fires, _ = _judged(passes, res_a.status, res_b.status, ordered,
+                               names=("rigid-body", "released"))
+            members = [index[lab] for lab in body.atoms]
+            short = _comparison_unconverged(
+                res_a.status, res_b.status, chi_a, chi_b, ordered,
+                where=[f"phases.{ip}.atoms.{j}" for j in members],
+                names=("rigid-body", "released"))
+            if short is not None:
+                diagnostics.append(short.model_copy(update={
+                    "message": f"Rigid body {body.name!r} (phase {ip}): "
+                               + short.message}))
             # where: the released geometry against the template, in σ units,
             # for each restrained bond and angle
             fitted = ref_b.fitted_structure.phases[ip]
@@ -462,7 +496,8 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
                 phase_index=ip, body=body.name, chi2_body=chi_a, chi2_released=chi_b,
                 n_points=n, n_effective=n_eff, n_free_body=k_a, n_added=added,
                 f_statistic=f_stat, p_value=p, delta_bic=dbic, fires=fires,
-                deviations=devs, dropped=dropped)
+                deviations=devs, dropped=dropped, status_body=res_a.status,
+                status_released=res_b.status, chi2_ordered=ordered)
             rows.append(row)
             if fires:
                 worst = "; ".join(

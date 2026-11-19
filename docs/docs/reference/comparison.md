@@ -110,6 +110,10 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedComparison.n_effective` | N/f² | `rietx.optimize.statistics.effective_sample_size` |
 | `FreedComparison.delta_bic` | ΔBIC charged at `n_effective` | positive favours the fuller model |
 | `FreedComparison.delta_bic_raw_n` | the same at the channel count | an upper bound on the evidence, kept so the gap is visible |
+| `FreedComparison.status_restricted`, `FreedComparison.status_full` | each fit's own `status` | a fit not `converged` may not sit at its optimum |
+| `FreedComparison.chi2_ordered` | whether `chi2_full` is at or below `chi2_restricted`, within the solver's relative tolerance `rietx.optimize.lm.FTOL` | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
+| `FreedComparison.n_identified` | the freed parameters with an esd and off their bounds | fewer than `n_added` means some charged columns carried no information; `delta_bic` still charges `n_added` |
+| `FreedComparison.diagnostics` | [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) when either status is not `converged` or the ordering fails | read it before quoting `delta_bic` |
 
 | Field | Is | Reads as |
 |---|---|---|
@@ -118,8 +122,13 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedParameter.value` | the fuller fit's value | |
 | `FreedParameter.esd` | the fuller fit's esd | already inflated by that fit's Bérar-Lelann factor |
 | `FreedParameter.t_ratio` | `(value - held_at) / esd` | how far the parameter moved, in its own esds; `None` where either is |
+| `FreedParameter.at_bound` | the fuller fit's own `RefinedParameter.at_bound` for the row | `True` means a limit carried load, so the t-ratio is no Wald number |
+| `FreedParameter.t_reason` | why `t_ratio` is `None` | `None` wherever `t_ratio` is a number |
 
 There is no verdict field.
+A comparison that rests on a fit short of its optimum is flagged and not refused, because a fit stopped on its budget can still sit at its optimum.
+On the synthetic LaB₆ pattern of `tests/test_compare_freed.py`, freeing La Biso gave ΔBIC +264 when the fuller fit converged.
+Stopped after one iteration from Biso = 4, the same comparison gave −1941, with `status_full` `max_iter`, `chi2_ordered` `False` and `COMPARISON_UNCONVERGED` on `diagnostics`.
 A pair that is not nested raises `ValueError`: a different channel count, different intensities or a different mode, a path the restricted fit frees and the fuller one does not, nothing added, or a free count that moved by other than the added paths.
 A refinement that has not been fitted raises `RuntimeError`.
 
@@ -135,11 +144,14 @@ It accepts the action when the reduced χ² falls by more than `min_improvement`
 | `VerificationOutcome.kind` | the action's kind |
 | `VerificationOutcome.predicted_delta_chi2` | the action's `expected_delta_chi2` |
 | `VerificationOutcome.observed_delta_chi2` | the fall in the reduced χ² the stage achieved |
-| `VerificationOutcome.accepted` | whether that fall passed the `min_improvement` rule, and nothing else |
+| `VerificationOutcome.accepted` | whether that fall passed the `min_improvement` rule; `None` where a fit short of its optimum could flip the rule, so the action was not judged |
 | `VerificationOutcome.reason` | the χ² before and after, as a sentence |
 | `VerificationOutcome.comparison` | the trial's `FreedComparison`; `None` when no trial fit ran, when the action freed nothing new, or when a hold in the stage broke the nesting |
 
 An action with no parameter paths, and a trial whose fit fails, come back rejected with the reason.
+A trial that stopped short of its optimum and fell short of the rule comes back with `accepted` `None`, since more iterations could only lower its χ².
+A gain over your own fit that was itself short comes back `None` too, since the gain may be that fit continuing.
+The reason then says which fit was short.
 On a synthetic LaB₆ fit with the cell 0.0005 Å off, verifying `refine_cell` predicted 16.16 and observed 16.31, with the reason `χ² 16.93 → 0.6239 (+96.31%); accepted`.
 
 ## Where the improvement lives
@@ -219,6 +231,7 @@ In the released refit a riding hydrogen keeps riding: its coordinates are tied t
 Both refits run under the refinement's own 2θ limits, ties, holds, backend and solver.
 It compares them on the data χ² with Hamilton's R-factor ratio test {cite}`hamilton1965` and with ΔBIC {cite}`schwarz1978`, both at the effective observation count.
 It warns ([`RIGID_BODY_MISFIT`](diagnostics-refinement.md#rigid_body_misfit)) only when both prefer the released atoms.
+It adds [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) for a body whose refits did not both reach their optimum.
 It costs two refinements per body and is not part of `fit`.
 
 <!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
@@ -239,7 +252,8 @@ It returns a `rietx.report.body_misfit.BodyMisfitResult`, whose `rows` hold one 
 | `BodyMisfitRow.n_free_body`, `BodyMisfitRow.n_added` | the free parameters of the body refit, and how many the released refit adds |
 | `BodyMisfitRow.f_statistic`, `BodyMisfitRow.p_value` | Hamilton's test |
 | `BodyMisfitRow.delta_bic` | ΔBIC, positive favouring the released atoms |
-| `BodyMisfitRow.fires` | whether both tests prefer the released atoms |
+| `BodyMisfitRow.fires` | whether both tests prefer the released atoms; `None` where a refit short of its optimum could flip the answer |
+| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's χ² is at or below the body refit's |
 | `BodyMisfitRow.deviations` | (label, template value, released value, Δ/σ) for each template bond and angle, largest first |
 | `BodyMisfitRow.dropped` | your ties and holds that could not follow into the released refit |
 

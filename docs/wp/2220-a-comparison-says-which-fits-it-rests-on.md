@@ -98,9 +98,9 @@ public surface.
       and pinned set-equal; a reason string where `t_ratio` is `None`. Pin both seeds of
       #1686's table.
 - [x] `n_identified` beside `n_added`: freed columns that are live and off their bounds.
-- [ ] `predict_then_verify` and `rigid_body_misfit` take the same fields. A trial that stopped
+- [x] `predict_then_verify` and `rigid_body_misfit` take the same fields. A trial that stopped
       on its budget reads as not judged, never as a rejection (#1685 proposal 3).
-- [ ] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
+- [x] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
       `tests/output/`
 - [x] Skill: the `compare_freed` reference row says to read the status and ordering fields
       before quoting a ΔBIC.

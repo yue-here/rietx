@@ -1225,7 +1225,9 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
     Runs on a *branch* of the refinement history when one is available, so a
     rejected action leaves no trace in the working state — the rollback is
     structural, not a manual undo.  ``min_improvement`` is the fractional χ²
-    reduction required to accept.
+    reduction required to accept.  Where a fit short of its optimum could
+    flip that rule, ``accepted`` is ``None`` and ``reason`` names the fit
+    (:func:`_judged`, WP-2220).
     """
     from ..strategy.staged import Stage
 
