@@ -55,7 +55,7 @@ PLOT_TS = ROOT / "gui" / "src" / "lib" / "plot.ts"
 #: `--plot-zero` and `--plot-mask` are deliberately absent: both are chrome (a
 #: zero line, a wash over what is not fitted), and neither carries a quantity.
 #: The pairs that sit under the floor are named below in :data:`NAMED_PAIRS`.
-CURVES = ("--plot-obs", "--plot-calc", "--plot-bkg", "--plot-diff",
+CURVES = ("--plot-obs", "--plot-calc", "--plot-bkg", "--plot-diff", "--plot-last",
           "--plot-peak", "--plot-peakfit", "--plot-candidate")
 
 #: What a *layer's* colour must clear: every other curve, plus the two inks a

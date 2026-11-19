@@ -1230,3 +1230,51 @@ def test_the_structural_menus_and_axis_hints_move_nothing(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not failures, "\n".join(failures)
+
+
+#: The rebuilt Interactive tab's rows (WP-2218).
+NEXT_SLIDERS = ["section.model .interactive .slider", "section.model .interactive .slider .line > *"]
+
+
+def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser, gui):
+    """WP-2218: a real drag on the rebuilt Interactive tab draws a preview the
+    title line names, fills the legend's reserved Preview slot and the action
+    bar's pending slot, and moves no place in the window. The range pop-up
+    floats over it. Revert brings the title back to the last fit."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs button", has_text="Interactive").first.click()
+    page.wait_for_selector("section.model .interactive .slider")
+    _frames(page)
+    marks = WINDOW_LANDMARKS + NEXT_SLIDERS
+    before = page.evaluate(SNAP, marks)
+    failures = []
+
+    track = page.locator('section.model .interactive input[type="range"]').first
+    value = int(track.input_value()) / 1000
+    _drag(page, track, value, min(1.0, value + 0.3))
+    page.wait_for_function(
+        "document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+    _frames(page)
+    failures += [f"drag: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    assert "pending" in page.locator(".actions .pending").text_content()
+    assert page.locator(".gutter .gut", has_text="Preview").is_visible()
+
+    page.locator("section.model .interactive button.pname").first.click()
+    page.wait_for_selector(".rangepop")
+    _frames(page)
+    failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    page.keyboard.press("Escape")
+
+    redraws = page.evaluate(REDRAWS)
+    page.locator(".actions button", has_text="Revert").click()
+    page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
+    assert not page.locator(".gutter .gut", has_text="Preview").is_visible()
+    assert not page.errors, page.errors
+    page.close()
+    assert redraws, "no preview was drawn"
+    # a runaway guard on one redraw, never a timer
+    assert max(redraws) < 5000, redraws
+    print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
+          f"{min(redraws):.0f}-{max(redraws):.0f} ms")
+    assert not failures, "\n".join(failures)
