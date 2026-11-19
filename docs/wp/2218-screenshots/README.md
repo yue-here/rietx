@@ -60,11 +60,15 @@ The fourth PR's pictures, the Instrument dialog, on the fluorapatite example aft
   It holds one entry, Source and geometry….
 - `instrument-dialog-*.png`: that entry's dialog at rest. The anode is named from the
   project's wavelengths, quoted to four places. The number boxes share one width, with each
-  unit after its box.
+  unit after its box. The third row is Peak shape: S/L, H/L and a closed Advanced
+  (§ Rulings 6).
 - `instrument-edited-*.png`: S/L typed equal to H/L and the geometry switched to a
   capillary. The warning stands under the pair. The capillary's fields replace the flat
   plate's, and the edited boxes take the accent tint. Esc then closed the dialog and nothing
   was written.
+- `instrument-advanced-*.png`: the dialog reopened and the Peak shape row's Advanced opened
+  by a click. Shape reads TCHZ pseudo-Voigt; its other choice is Voigt.
+- Every `instrument-*.png` was re-shot on 2026-11-19, after § Rulings 6.
 
 Taken 2026-11-18 and 2026-11-19 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every drag and click was made
