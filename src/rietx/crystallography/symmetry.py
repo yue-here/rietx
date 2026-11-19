@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import functools
 import itertools
+import math
 import re
 from dataclasses import dataclass, field
 
@@ -724,6 +725,100 @@ def check_cell_angles(sg: gemmi.SpaceGroup,
                 f"{name} free.")
 
 
+#: Largest relative disagreement between a cell length its space group ties to
+#: another (b and c to a on a cubic cell) and that other, past which
+#: ``ParameterTable`` refuses the cell (WP-2150).  Chosen by consequence, as
+#: :data:`SYMMETRY_ANGLE_TOL_DEG` was.  The table builds a tied length from its
+#: source and never reads the stored value, so a stored length off by a
+#: relative ε is a cell whose d-spacings move by at most ε from the ones the
+#: caller wrote.  At 1e-5 that is 10 ppm, the size of the angle tolerance's
+#: 8.3 ppm and under SRM 660c's 48 ppm certificate band.  It clears the
+#: round-off an indexing candidate arrives with (measured in WP-2150's handover).
+SYMMETRY_LENGTH_RTOL = 1e-5
+
+_LENGTH_NAMES = ("a", "b", "c")
+
+
+def cell_tie_deviation(name: str, value: float, source: float) -> float:
+    """How far a tied cell parameter sits from its source, in the unit its
+    tolerance is stated in: relative for a length
+    (:data:`SYMMETRY_LENGTH_RTOL`), degrees for an angle
+    (:data:`SYMMETRY_ANGLE_TOL_DEG`)."""
+    if name in _LENGTH_NAMES:
+        return abs(value - source) / abs(source) if source else math.inf
+    return abs(value - source)
+
+
+def cell_tie_tolerance(name: str) -> float:
+    """The tolerance :func:`cell_tie_deviation` is compared against."""
+    return SYMMETRY_LENGTH_RTOL if name in _LENGTH_NAMES else SYMMETRY_ANGLE_TOL_DEG
+
+
+def check_cell_ties(sg: gemmi.SpaceGroup, cell: dict[str, float], *,
+                    prefix: str | None = None) -> None:
+    """Raise if a tied cell parameter disagrees with the one symmetry ties it to.
+
+    ``cell`` maps the six :data:`CELL_NAMES` to their stored values.  A tied
+    length is compared relative to its source, against
+    :data:`SYMMETRY_LENGTH_RTOL`.  A tied angle (β and γ to α on rhombohedral
+    axes) is compared in degrees, against :data:`SYMMETRY_ANGLE_TOL_DEG`.
+    ``prefix`` (``"phases.0.cell"``) names the entry in the message.
+
+    The sibling of :func:`check_cell_angles` and refused for its reason
+    (WP-2150, issue #1669).  The table builds a tied entry from its source and
+    never reads its own stored value, so before this check ``b = 5.9`` under
+    ``F m -3 m`` with ``a = 5.641`` built ``b = 5.641`` and said nothing.  The
+    table has no diagnostics channel to report a repair through, and cannot
+    tell which of the two numbers the caller meant.  A reader can repair a
+    disagreement within the file's printed precision and record it
+    (``CIF_CELL_TIE_CORRECTED``).  A non-finite value is left to the checks
+    that refuse it.
+    """
+    where = f"{prefix}." if prefix else ""
+    for name, source in cell_constraints(sg).ties.items():
+        value, target = float(cell[name]), float(cell[source])
+        if not (math.isfinite(value) and math.isfinite(target)):
+            continue
+        off = cell_tie_deviation(name, value, target)
+        allowed = cell_tie_tolerance(name)
+        if off <= allowed:
+            continue
+        unit = "" if name in _LENGTH_NAMES else "°"
+        size = (f"{off:.3g} relative, {allowed:g} allowed"
+                if name in _LENGTH_NAMES else f"{off:.6g}°, {allowed:g}° allowed")
+        raise ValueError(
+            f"space group {sg.xhm()!r} ties {where}{name} to {source} by "
+            f"symmetry, but the cell stores {name} = {value}{unit} and "
+            f"{source} = {target}{unit}, off by {size}. The table builds "
+            f"{name} from {source}, so the stored {name} would be dropped. "
+            f"Set {name} to {target}{unit}, or use a space group whose "
+            f"symmetry leaves {name} free.")
+
+
+def check_phase_cell_ties(phase, *, prefix: str | None) -> None:
+    """:func:`check_cell_ties` on a model ``Phase``, for a project reader.
+
+    The one call a project reader makes (WP-2150), inside the boundary that
+    turns a refusal into one naming the file.  A reader refuses at read, so a
+    project converted from the file can never store a cell the table refuses.
+    A project file prints neither the digits nor the su a CIF reader snaps
+    within, so nothing is snapped here: within the table's own tolerance the
+    cell builds as it always did, and past it the file is refused.  A phase
+    stating its cell through a parent (``Phase.parent_cell``) is the table's
+    to check, under the parent's group, and so is a group that does not
+    resolve, whose refusal names the symbol.
+    """
+    if getattr(phase, "parent_cell", None) is not None:
+        return
+    try:
+        sg = resolve_group(phase.space_group, phase.symmetry_operations)
+        cell_constraints(sg)
+    except (RuntimeError, ValueError):
+        return
+    check_cell_ties(sg, {name: getattr(phase.cell, name).value
+                         for name in CELL_NAMES}, prefix=prefix)
+
+
 #: The cell parameters, in the order every surface in this package writes them.
 CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
@@ -753,13 +848,13 @@ def complete_cell(sg: gemmi.SpaceGroup,
     violation is **unrepresentable rather than refused**.
 
     A parameter the symmetry determines is refused rather than checked against
-    what symmetry demands, and refused rather than quietly ignored.  Checking
-    would need a tolerance on a *length* — a constant nothing else in this
-    package needs, chosen from nothing — while ignoring is what the old
-    six-number route did: under ``P 4/m m m`` a typed ``b`` was tied away by
-    ``ParameterTable`` and the number the user read back was never the one they
-    entered.  The message names the source instead, so the refusal says what to
-    send.
+    what symmetry demands, and refused rather than quietly ignored.  Ignoring
+    is what the old six-number route did: under ``P 4/m m m`` a typed ``b`` was
+    tied away by ``ParameterTable`` and the number the user read back was never
+    the one they entered.  Checking would accept a typed ``b`` within
+    :data:`SYMMETRY_LENGTH_RTOL` of ``a``, the table's own tolerance since
+    WP-2150, and still store a number the table does not read.  The message
+    names the source instead, so the refusal says what to send.
     """
     cons = cell_constraints(sg)
     free = free_cell_names(sg)

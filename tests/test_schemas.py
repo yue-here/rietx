@@ -685,6 +685,7 @@ def test_one_zero_sigma_on_a_peak_no_longer_holds_the_fit():
 
     start = make_lab6()
     start.phases[0].cell.a.value = 4.1585
+    start.phases[0].cell.b.value = start.phases[0].cell.c.value = start.phases[0].cell.a.value  # the cell's ties follow a
     res = rx.Refinement(start, Instrument.debye_scherrer(wavelength=1.5406),
                         history=False).fit(data)
     out = Path(__file__).parent / "output"

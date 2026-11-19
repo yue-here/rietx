@@ -59,6 +59,7 @@ from ..crystallography.symmetry import (
     OperatorGroup,
     cell_constraints,
     check_cell_angles,
+    check_cell_ties,
     expand_positions,
     free_cell_names,
     get_spacegroup,
@@ -639,7 +640,7 @@ def _refusals(candidate: Structure, instrument, phase: int) -> list[dict]:
     """Every incompatible item, in the package's own words.
 
     A ``ParameterTable`` stops at the **first** refusal, so this probes the phase
-    once (cell angles, the texture block and the Stephens block, which are
+    once (cell angles and ties, the texture block and the Stephens block, which are
     collected before any atom) and then once per atom, each against a real
     table.  The alternative —
     reading the message and neutralising what it names — would be a parser for
@@ -647,10 +648,12 @@ def _refusals(candidate: Structure, instrument, phase: int) -> list[dict]:
     """
     block = candidate.phases[phase]
     try:
-        check_cell_angles(resolve_group(block.space_group,
-                                        block.symmetry_operations),
-                          {n: getattr(block.cell, n).value
-                           for n in ("alpha", "beta", "gamma")})
+        group = resolve_group(block.space_group, block.symmetry_operations)
+        check_cell_angles(group, {n: getattr(block.cell, n).value
+                                  for n in ("alpha", "beta", "gamma")})
+        check_cell_ties(group, {n: getattr(block.cell, n).value
+                                for n in ("a", "b", "c", "alpha", "beta", "gamma")},
+                        prefix=f"phases.{phase}.cell")
     except ValueError as exc:
         # the cell itself cannot carry the symbol: no atom probe would add
         # anything, because every one of them would report the same sentence

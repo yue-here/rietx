@@ -367,6 +367,7 @@ def test_a_checkout_of_a_node_that_declared_nothing_keeps_the_model_flags(patter
     elif edit == "edit":
         new = ref.structure.model_copy(deep=True)
         new.phases[0].cell.a.value += 0.001
+        new.phases[0].cell.b.value = new.phases[0].cell.c.value = new.phases[0].cell.a.value  # the cell's ties follow a
         ref.edit(structure=new)
     elif edit == "add_variable":
         ref.add_variable("tilt", 0.1)

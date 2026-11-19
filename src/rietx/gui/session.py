@@ -3948,6 +3948,32 @@ def _stored_param(tree: dict, path: str) -> dict:
     return node
 
 
+def _follow_cell_ties(tree: dict, path: str, value: float) -> None:
+    """Move every cell entry its space group ties to ``path`` along with it.
+
+    ``set_values`` does this through ``ParameterTable.refresh_ties``.  A value
+    written into the dumped model has no table behind it, and since WP-2150
+    the table refuses a tied entry left behind its source, so b follows a here
+    as it does there.
+    """
+    from ..crystallography.symmetry import cell_constraints, resolve_group
+
+    match = re.fullmatch(r"phases\.(\d+)\.cell\.(\w+)", path)
+    if match is None:
+        return
+    phase = tree["phases"][int(match.group(1))]
+    if phase.get("parent_cell") is not None:
+        return
+    try:
+        sg = resolve_group(phase["space_group"], phase.get("symmetry_operations"))
+        ties = cell_constraints(sg).ties
+    except (RuntimeError, ValueError):
+        return                       # the table's own refusal names the group
+    for name, source in ties.items():
+        if source == match.group(2):
+            phase["cell"][name]["value"] = value
+
+
 def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
                               values: dict) -> tuple[Structure | None,
                                                      Instrument | None]:
@@ -3991,6 +4017,7 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         stored["min"], stored["max"] = lo, hi
         if value is not None:
             stored["value"] = value
+            _follow_cell_ties(tree, path, value)
         touched["instrument" if path.startswith("instrument.") else "structure"] = True
     if restraints:
         from ..schemas.structure import ValueRestraint

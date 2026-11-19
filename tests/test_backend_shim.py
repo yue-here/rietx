@@ -225,7 +225,13 @@ def _toy_base(*, c_near_a: bool = False) -> tuple[rx.Structure, Instrument, Patt
     sim_structure.phases[0].scale.value = 9.2e-3
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
-    sim_table = ParameterTable(sim_structure, instrument)
+    # The goldens were captured on a simulation compiled with b left at its
+    # old value, which the table then built from a.  Since WP-2150 the table
+    # refuses that cell, so the values come from a copy whose b follows a:
+    # the same decoded numbers, so every golden stays bit-identical.
+    consistent = sim_structure.model_copy(deep=True)
+    consistent.phases[0].cell.b.value = consistent.phases[0].cell.a.value
+    sim_table = ParameterTable(consistent, instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 30.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
     return structure, instrument, pattern
@@ -297,6 +303,7 @@ def _state_toy_rich():
                         intensity=np.zeros_like(grid).tolist())
     sim_structure = structure.model_copy(deep=True)
     sim_structure.phases[0].cell.a.value = 4.5987
+    sim_structure.phases[0].cell.b.value = sim_structure.phases[0].cell.a.value  # the cell's ties follow a
     sim_structure.phases[0].preferred_orientation.r.value = 0.9
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
@@ -388,6 +395,7 @@ def _state_toy_capillary():
                         intensity=np.zeros_like(grid).tolist())
     sim_structure = structure.model_copy(deep=True)
     sim_structure.phases[0].cell.a.value = 4.5987
+    sim_structure.phases[0].cell.b.value = sim_structure.phases[0].cell.a.value  # the cell's ties follow a
     sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
                     window_area_tol=WINDOW_AREA_TOL)
     sim_table = ParameterTable(sim_structure, instrument)
