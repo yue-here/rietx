@@ -23,9 +23,11 @@ def swap_hold(table, unseen):
     for c, ks in flats.items():
         if ks and all(x[k] <= lo[k] for k in ks):
             cols += list(ks); SWAPS.append(names[c])
+            for k in ks:                      # the twin is the held half here
+                pairs.setdefault(names[k], []).append(names[c])
         else:
             cols.append(c)
-        pairs[names[c]] = [names[k] for k in ks]
+            pairs[names[c]] = [names[k] for k in ks]
     held = list(dict.fromkeys(names[c] for c in cols))
     reach = RF._reach_beyond_self(table, held)
     table.set_vary(held, False)

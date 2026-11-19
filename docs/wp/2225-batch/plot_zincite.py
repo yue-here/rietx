@@ -1,5 +1,5 @@
 """Zincite: the shipped first fit against a shipped re-fit of it (closing stage on, today's default)."""
-import sys, warnings
+import warnings
 import numpy as np
 warnings.simplefilter("ignore")
 import matplotlib

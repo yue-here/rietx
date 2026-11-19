@@ -4,8 +4,8 @@
 
 Arms run from the first fit's converged models unless named first:*.
 """
-import copy
 import json
+import os
 import sys
 import warnings
 
@@ -15,10 +15,11 @@ from rietx.strategy.staged import RefinementPlan, Stage
 from rietx.viz import compare
 
 warnings.simplefilter("ignore")
-import os, sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import spy
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import spy  # noqa: E402
 if os.environ.get("NOHOLD"):
-    _rf = _s.modules["rietx.refine"]
+    _rf = sys.modules["rietx.refine"]
     _rf._hold_width_twins = lambda table, unseen: ([], {}, {})
 KEY = sys.argv[1]
 ARMS = sys.argv[2].split(",")
@@ -120,15 +121,15 @@ for arm in ARMS:
         rr = Refinement(S1, I1, history=False)
         for k in range(int(arm[6:])):
             res, _ = run(rr, "staged")
-            v = {p.path: p for p in res.parameters}
+            prof = rr.instrument.profile  # held paths are absent from res.parameters
             print(f"  pass {k+2}: rwp={res.statistics.rwp:.6f} chi2={res.statistics.chi2:.6f} "
-                  f"u={v['instrument.profile.u'].value if 'instrument.profile.u' in v else None} "
-                  f"v={v['instrument.profile.v'].value:.6g} x={v.get('instrument.profile.x').value if 'instrument.profile.x' in v else None} "
-                  f"axial={v['instrument.geometry.axial_sl'].value:.6g}")
+                  + " ".join(f"{c}={getattr(prof, c).value:.6g}" for c in "uvwxy")
+                  + f" axial={rr.instrument.geometry.axial_sl.value:.6g}")
         continue
     trace = arm.endswith("!")
     arm = arm.rstrip("!")
     rr = Refinement(S1, I1, history=False)
+    spy.LOG.clear()
     res, tr = run(rr, arm, trace)
     p0 = {p.path: (p.value, p.stderr) for p in r1.parameters}
     shifts = {k: (v.value - p0[k][0]) / p0[k][1] for k, v in
@@ -137,13 +138,18 @@ for arm in ARMS:
     print(f"{arm:28s} rwp={res.statistics.rwp:.6f} chi2={res.statistics.chi2:.6f} "
           f"nfev={sum(s.n_iterations for s in res.stages)} "
           + " ".join(f"{k.split('.')[-1]}={v:+.2f}" for k, v in big))
-    for s, rec in zip(res.stages, spy.LOG[-len(res.stages):]):
+    for s in res.stages:
         print(f"     {s.name:18s} {s.status:9s} nfev={s.n_iterations:4d} "
-              f"c {s.cost_initial:.4f}->{s.cost_final:.4f} {s.termination} | n={rec['n']} box={rec['active_box']} trunc={rec['trunc_by']} blocks={rec['blocks']}")
+              f"c {s.cost_initial:.4f}->{s.cost_final:.4f} {s.termination}")
+    # one record per LM solve, in order; a stage that re-solves logs two
+    for i, rec in enumerate(spy.LOG):
+        print(f"       solve {i}: n={rec['n']} {rec['term']} box={rec['active_box']} "
+              f"trunc={rec['trunc_by']} blocks={rec['blocks']}")
     if tr:
         for t in tr:
             print("       ", t)
     rows.append(summary(arm, res))
-with open(f"{sys.argv[0].rsplit('/', 1)[0]}/arms_{KEY}.jsonl", "a") as fh:
+OUT = os.environ.get("ARMS_OUT", os.path.join(os.getcwd(), f"arms_{KEY}.jsonl"))
+with open(OUT, "a", encoding="utf-8") as fh:
     for r in rows:
         fh.write(json.dumps(r) + "\n")
