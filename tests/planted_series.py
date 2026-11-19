@@ -318,7 +318,8 @@ def signals(result: rx.SeriesResult) -> dict:
     of each :data:`TABLE_PATHS` path (:func:`largest_steps`, read off
     ``SeriesResult.steps``), the reseeded entries
     (``SEQUENTIAL_RESEED``), the quarantined ones (``SEQUENTIAL_UNRECOVERED``),
-    the entries carrying ``PHASE_UNCONSTRAINED``, and every series-level code
+    the entries carrying ``PHASE_UNCONSTRAINED`` or ``MODEL_FAR_FROM_DATA``,
+    and every series-level code
     with its ``where``.
     """
     largest = largest_steps(result)
@@ -334,6 +335,9 @@ def signals(result: rx.SeriesResult) -> dict:
         "phase_unconstrained": [
             e.index for e in result.entries
             if any(d.code == "PHASE_UNCONSTRAINED" for d in e.diagnostics)],
+        "model_far_from_data": [
+            e.index for e in result.entries
+            if any(d.code == "MODEL_FAR_FROM_DATA" for d in e.diagnostics)],
         "codes": sorted({(d.code, ",".join(d.where or []))
                          for d in result.diagnostics}),
     }
@@ -365,7 +369,11 @@ def surfaced(result: rx.SeriesResult, kind: str, index: int) -> str | None:
         the largest step of ``instrument.background.c0`` is between
         ``index - 1`` and ``index``;
     ``bad``
-        the largest step of ``phases.0.scale`` is into or out of it;
+        the frame itself carries ``MODEL_FAR_FROM_DATA`` (WP-2017 group K:
+        its fit is no better than the background alone, by Hamilton's test).
+        Before group K this read the largest step of ``phases.0.scale`` into
+        or out of the frame; the error now quarantines the frame, so the next
+        pattern is seeded past it and no step lands there;
     ``second_phase``
         none.  Its one trace is ``SeriesEntry.rwp_over_median`` rising from
         the onset, a record with no threshold since WP-2003 removed the Rwp
@@ -386,9 +394,9 @@ def surfaced(result: rx.SeriesResult, kind: str, index: int) -> str | None:
             return f"largest step {path} ({index - 1}, {index})"
         return None
     if kind == "bad":
-        pair = largest.get("phases.0.scale")
-        if pair is not None and index in pair:
-            return f"largest step phases.0.scale ({pair[0]}, {pair[1]})"
+        if any(d.code == "MODEL_FAR_FROM_DATA"
+               for d in result.entries[index].diagnostics):
+            return f"MODEL_FAR_FROM_DATA on entry {index}"
         return None
     if kind == "second_phase":
         return None

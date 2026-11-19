@@ -10595,11 +10595,11 @@ def _background_only_chi2(model: CompiledModel, values: dict | None,
     a = design.T / sig[:, None]
     if model.bkg_penalty is not None:
         pen = np.asarray(model.bkg_penalty, dtype=np.float64)
-        sol = np.linalg.lstsq(np.vstack([a, pen]),
-                              np.concatenate([target, np.zeros(pen.shape[0])]),
-                              rcond=None)[0]
+        sol = lapack.lstsq(np.vstack([a, pen]),
+                            np.concatenate([target, np.zeros(pen.shape[0])]),
+                            rcond=None)[0]
     else:
-        sol = np.linalg.lstsq(a, target, rcond=None)[0]
+        sol = lapack.lstsq(a, target, rcond=None)[0]
     r = target - a @ sol
     return float(r @ r), n_bkg
 

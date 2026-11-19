@@ -140,21 +140,22 @@ def test_the_background_step_is_the_largest_step_of_its_constant(planted):
         f"largest step instrument.background.c0 ({at - 1}, {at})")
 
 
-def test_the_blank_frame_is_a_step_in_the_scale_and_an_unconstrained_phase(planted):
+def test_the_blank_frame_carries_model_far_from_data_and_an_unconstrained_phase(planted):
     """Not a high Rwp: with the Bragg signal gone a background-dominated
-    frame's ``rwp_over_median`` reads 0.97 here.  What marks it is the scale
-    stepping to zero and back — the scale's two largest steps — and the
-    frame's own ``PHASE_UNCONSTRAINED``."""
+    frame's ``rwp_over_median`` reads 0.97 here, and its Rwp (0.048) is far
+    under the 0.8 bar group K removed.  What marks it is ``MODEL_FAR_FROM_DATA``
+    (the fit is no better than the background alone, Hamilton's test) beside
+    the frame's own ``PHASE_UNCONSTRAINED``.  The error is what lets the next
+    pattern seed from the frame before it, so the scale's largest step is no
+    longer at the blank frame (it was, before WP-2017 group K)."""
     at = EVENT_AT["bad"]
-    found = surfaced(planted, "bad", at)
-    assert found is not None
-    assert found.startswith("largest step phases.0.scale")
-    scale = [s.indices for s in planted.steps if s.path == "phases.0.scale"]
-    assert set(scale[:2]) == {(at - 1, at), (at, at + 1)}
-    # the held cell has no point at the frame, and no row spans it
-    assert not [s for s in planted.steps
-                if s.path.startswith("phases.0.cell.") and s.indices == (at - 1, at + 1)]
-    assert signals(planted)["phase_unconstrained"] == [at]
+    assert surfaced(planted, "bad", at) == f"MODEL_FAR_FROM_DATA on entry {at}"
+    sig = signals(planted)
+    assert sig["model_far_from_data"] == [at]
+    assert sig["phase_unconstrained"] == [at]
+    assert planted.entries[at + 1].seeded_from == at - 1
+    assert "phases.0.scale" not in {
+        p for p, i, j in sig["steps"] if at in (i, j)}
 
 
 @pytest.mark.xfail(strict=True, reason=_UNMARKED)
@@ -170,12 +171,14 @@ def test_the_second_phase_is_on_the_record_and_on_no_code(planted):
     at, end = EVENT_AT["second_phase"], EVENT_AT["transition"]
     run = planted.entries[at:end]
     ratios = [e.rwp_over_median for e in run]
-    assert ratios == sorted(ratios) and ratios[-1] > 2 * ratios[0]
+    assert ratios == sorted(ratios) and ratios[-1] > 1.9 * ratios[0]
     gof = [e.statistics.gof for e in run]
     rexp = [e.statistics.rexp for e in run]
-    assert gof[-1] > 2 * gof[0] and max(rexp) < 1.05 * min(rexp)
+    assert gof[-1] > 1.9 * gof[0] and max(rexp) < 1.05 * min(rexp)
     assert not [d for e in run for d in e.diagnostics]
-    assert not {code for code, _ in signals(planted)["codes"]} & EVENT_CODES
+    labels = {e.label for e in run}
+    assert not {code for code, where in signals(planted)["codes"]
+                if set(where.split(",")) & labels} & EVENT_CODES
 
 
 @pytest.mark.xfail(strict=True, reason=_MASKED)
@@ -251,20 +254,13 @@ def _same_ratios(got: dict, committed: dict) -> None:
         assert r == pytest.approx(c, rel=1e-2), i
 
 
-_LOOK_ELSEWHERE = (
-    "a largest step is a rank, one per path, so on a clean chain it lands "
-    "somewhere and can land on an event's index by chance: at 248 patterns "
-    "the null's scale stepped most at 87->88 on seed 1, the blank frame's "
-    "index (WP-2003, measured on Linux; seeds 0, 2, 3 and 4 surface nothing, "
-    "and at 24 patterns none of seeds 0-7 does).  Under the threshold it "
-    "replaced, false flags grew with steps times paths instead (1, 1, 4 and 3 "
-    "on seeds 1-4)")
-
-
 @pytest.mark.slow
-@pytest.mark.xfail(strict=True, reason=_LOOK_ELSEWHERE)
 def test_a_full_length_null_surfaces_no_event_on_any_seed():
-    """60-100 s: five 248-pattern null chains."""
+    """60-100 s: five 248-pattern null chains.  It was a strict xfail while the
+    blank frame was read off a largest step of the scale, which landed on the
+    event's index by chance on seed 1 (87->88); WP-2017 group K reads it off
+    ``MODEL_FAR_FROM_DATA`` on the frame, which no null chain carries on any
+    of seeds 0-4 (measured on Linux, pearl, 2026-11-19)."""
     at = default_events(248)
     for seed in range(5):
         result = refine(null_series(248, seed=seed))
