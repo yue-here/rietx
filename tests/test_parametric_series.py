@@ -1120,6 +1120,47 @@ def test_a_blocked_fit_lands_on_the_dense_answer(n):
     assert block.statistics.rwp == pytest.approx(dense.statistics.rwp, rel=1e-9)
 
 
+#: The margin `DENSE_JACOBIAN_MAX_BYTES`'s answer-invariance is held to, in
+#: plain esd: WP-2017 group D's largest shift between the two layouts on a real
+#: joint family (0.00503 on the CuCr2O4 ramp's cell b, 11-BM), which is the same
+#: ramp's own rounding-noise arm (0.00503).  Stated from that measurement, not
+#: tuned on this library, which moves about 1e-5.
+LAYOUT_INVARIANCE_MARGIN_ESD = 0.005
+
+
+@pytest.mark.xdist_group("parametric-series")
+def test_the_dense_jacobian_cut_is_answer_invariant(monkeypatch):
+    """`DENSE_JACOBIAN_MAX_BYTES` is answer-invariant efficiency (Q7, Yue accepted
+    2026-11-17): moved either side of a joint fit's size, the fit takes the
+    other layout and lands on the same answer.  The constant itself is moved,
+    not the `set_layout` seam: at 0 every joint solve is blocked, at the
+    shipped 256 MiB this library's are dense.  Every free row within
+    `LAYOUT_INVARIANCE_MARGIN_ESD` plain esd, the same rows carrying an esd,
+    the same codes, Rwp to 1e-9."""
+    from tests.test_sequential import _start_models
+
+    n = 6
+    patterns, coords, equation = library(n, tt_max=10.0)
+    results, layouts = {}, {}
+    for cut in (blocked.DENSE_JACOBIAN_MAX_BYTES, 0):
+        monkeypatch.setattr(blocked, "DENSE_JACOBIAN_MAX_BYTES", cut)
+        s, ins = _start_models()
+        ref = _Probe(s, [ins] * n, coordinates=coords, parametric=[equation])
+        results[cut] = ref.fit(patterns, plan="mccusker_default")
+        layouts[cut] = ref.outcome_.jacobian_layout
+    dense, block = results.values()
+    assert list(layouts.values()) == ["dense", "blocked"], layouts
+    assert dense.status == block.status == "converged"
+    rows = {p.path: p for p in block.parameters}
+    measured = [p for p in dense.parameters if p.stderr]
+    assert {p.path for p in measured} == {p.path for p in block.parameters if p.stderr}
+    for p in measured:
+        shift = abs(rows[p.path].value - p.value) / p.stderr
+        assert shift <= LAYOUT_INVARIANCE_MARGIN_ESD, (p.path, shift)
+    assert {d.code for d in block.diagnostics} == {d.code for d in dense.diagnostics}
+    assert block.statistics.rwp == pytest.approx(dense.statistics.rwp, rel=1e-9)
+
+
 @pytest.mark.xdist_group("parametric-series")
 def test_a_targets_column_once_serves_every_coefficient(monkeypatch):
     """WP-1964 task 7: a coefficient's column is the target's column times

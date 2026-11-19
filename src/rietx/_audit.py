@@ -3503,25 +3503,25 @@ ROWS: tuple[Row, ...] = (
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."),
         approved="2026-10-20"),
-    Row("rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES", "constant", tier=3, value=268435456,
-        evidence=("switches the dense solve to the blocked one; "
-                  "tests/test_parametric_series.py::test_a_blocked_fit_lands_on_the_dense_answer holds "
-                  "the two within 0.01 esd on one case; WP-2017 group D forced each layout on two real "
-                  "joint families, cpd-1a/-1b/-1c together (qarr) and the CuCr2O4 ramp's seven frames "
-                  "below 130 K (11-BM), and on that synthetic library at 20 patterns: every free row "
+    Row("rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES", "constant", tier="invariant",
+        value=268435456,
+        evidence=("answer-invariant efficiency (Q7, Yue accepted 2026-11-17; generality.md "
+                  "§ Answer-invariant efficiency): it switches the dense joint solve to the "
+                  "blocked one and moves no answer past the stated margin; "
+                  "tests/test_parametric_series.py::test_the_dense_jacobian_cut_is_answer_invariant "
+                  "moves the constant either side of a six-pattern library (0: blocked; 256 MiB: "
+                  "dense) and asserts every free row within 0.005 plain esd, the same rows carrying "
+                  "an esd, the same codes and Rwp to 1e-9; the margin is WP-2017 group D's, which "
+                  "forced each layout on two real joint families, cpd-1a/-1b/-1c together (qarr) "
+                  "and the CuCr2O4 ramp's seven frames below 130 K (11-BM), and on that synthetic "
+                  "library at 20 patterns: every free row "
                   "within 0.0050 plain esd of the dense answer, the noise arm's own 0.0050 on the "
                   "ramp, Rwp equal to 9 digits and the same codes, the same rows carrying an esd, "
                   "esds within 7.0 % on cpd-1's instrument W (noise arm 8.5 %) and 0.068 % on the "
                   "ramp (noise 0.057 %) (docs/wp/2017-batch/group_d_summary.md); both real families "
                   "are development data; the near-cut case blocked.py names, where the layouts can "
-                  "discard different directions, was not produced; their largest dense Jacobian is 110 MiB, "
-                  "so the size rule took dense on all three and only the forced arm reached the "
-                  "blocked path; a third real joint family owed, and none on disk but Nd2Ru2O7, "
-                  "evidence for no audit before the milestone closes"),
-        grounds=("A solver-path switch no refiner has a view on, the seventh beside B10's six; "
-                 "tier 3 until refits of three families on either side give one answer "
-                 "(ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                  "discard different directions, was not produced; no third joint family is owed "
+                  "(Q7), as PAWLEY_SPARSE_DENSITY left the list on 2026-10-28 on the same ground")),
     Row("rietx.optimize.blocked._DENSE_EIGEN_MAX", "constant", tier="invariant", value=64,
         evidence=("dense against Lanczos |lambda|max; it only places the pseudo-inverse cut: across "
                   "the switch (83-84 and 204 columns) |lambda|max agrees to 3.7e-14 relative against a "
