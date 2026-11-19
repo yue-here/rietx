@@ -1,6 +1,6 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: parametric · Status: 🔄 2026-11-17 — the surface waits on the maintainer (PR #1635); nothing built
+Milestone: parametric · Status: 🔄 2026-11-19 — the maintainer ruled option A and the consent list (PR #1635); nothing built; next is the Compile task
 Depends on: 1964 (the grammar, evaluated on arrays)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
@@ -226,6 +226,27 @@ then adds both to its protocol.
 - WP-1964 (the grammar), WP-0503 (Stephens), WP-1102 (the expression clause), WP-2061.
 
 ## Handover log
+
+- **2026-11-19 (the ruling)** — The maintainer ruled on 2026-11-19 on the 2026-11-17
+  decision. **Option A**: a peak equation is a field on the model. No objection was raised
+  to the five consent items, so each stands as written below. Ruled by the maintainer
+  2026-11-19.
+  1. The type is `rx.PeakEquation(target, expression, coefficients)`. The fields are
+     `Phase.peak_equations` and `Instrument.peak_equations`. Each level holds at most one
+     equation per target. Paths use the list index.
+  2. The five targets and their units stand: `lor_fwhm`, `gauss_fwhm`,
+     `gauss_fwhm_squared`, `shift` and `intensity_factor`. The instrument level takes
+     `shift` only.
+  3. The reflection names are `h`, `k`, `l`, `m`, `d`, `theta` and `two_theta`. A
+     coefficient may take none of them, and may not be called `scale`.
+  4. `orbit_mean` and `harmonic` join the grammar, and `GRAMMAR_VERSION` moves 1 → 2.
+  5. In a joint fit a coefficient varies through a `ParametricEquation` whose target is
+     its path.
+
+  The maintainer also confirmed that the 2026-11-05 tie-family ruling on WP-1964 does not
+  cover a peak equation. That ruling governs a formula that makes an existing parameter
+  follow something. A peak equation adds a physical term. Nothing is built. Next: the
+  Compile task, the first that builds anything, on the surface named above.
 
 - **2026-11-17 (a ghostshift runner; PR #1635)** — Nothing is built yet. The first task
   names a field on `Phase` and a top-level type, so it is the maintainer's to rule, and
