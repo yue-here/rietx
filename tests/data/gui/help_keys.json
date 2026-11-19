@@ -259,7 +259,6 @@
   "diagnostics:SEQUENTIAL_PATH_CHECK_NOT_RUN",
   "diagnostics:SEQUENTIAL_RESEED",
   "diagnostics:SEQUENTIAL_UNRECOVERED",
-  "diagnostics:SEQUENTIAL_WIDTH_GROWTH",
   "diagnostics:SERIES_PATTERN_FAILED",
   "diagnostics:SITE_DOFS_RENUMBERED",
   "diagnostics:SITE_MULTIPLICITY_KEPT",

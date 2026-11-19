@@ -58,6 +58,8 @@ __all__ = [
     "HelpEntry",
     "PARAMETER_HELP",
     "DIAGNOSTIC_HELP",
+    "DIAGNOSTIC_VIEWS",
+    "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
     "READER_OPTION_HELP",
@@ -759,11 +761,17 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "polynomial on top cannot correct this, because it is additive and the "
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
-            "expected report."
+            "expected report. A curve another program computed for one phase, such as "
+            "a DIFFaX faulted-minus-ideal term, scales with that phase. Store "
+            "it as c*·D, with c* converting the program's units to counts at phase "
+            "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
+            "stored curve does not follow the zero shift or any other peak-position "
+            "correction."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank",
+                "of 1 for a measured blank; the phase scale, tied, for a "
+                "computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
@@ -4421,16 +4429,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Fit the pattern on its own to find out why."
         ),
     ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
-        ),
-    ),
     "SERIES_PATTERN_FAILED": HelpEntry(
         title="A pattern could not be fitted",
         description=(
@@ -4916,6 +4914,39 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "multiplying."
         ),
     ),
+}
+
+
+#: The rendered views a diagnostic can name (WP-1133), each as
+#: ``function.panel``, with the words a reader is shown.  Each view has a
+#: reference inside its frame: the eye judges a misfit only against something
+#: drawn beside it (WP-1130 § Finding 8).  ``plot_for_vlm`` gives each panel's
+#: axes its name as the matplotlib ``gid``, and
+#: ``tests/test_diagnostic_views.py`` renders the montage and fails on a name
+#: no panel carries, or on a name no code uses.
+DIAGNOSTIC_VIEWS: dict[str, str] = {
+    "plot_for_vlm.overview": (
+        "the top panel of rietx.viz.plot_for_vlm, observed and calculated "
+        "intensity over the whole pattern"
+    ),
+    "plot_for_vlm.residual": (
+        "the Δ/σ panel of rietx.viz.plot_for_vlm, the misfit in noise units "
+        "against a ±3σ band"
+    ),
+}
+
+#: The view that shows a code's finding, read by ``Diagnostic.view``.  It is
+#: the same for every finding with the code, so it is looked up and never
+#: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
+#: fit firing it was rendered and the finding read off that panel; the fits are
+#: in ``tests/test_diagnostic_views.py``.  A code not listed reads ``None``,
+#: which says no view was checked for it, not that none would help.  The one
+#: finding known to have no view is a background level: a uniform factor of
+#: two leaves a smooth decay with no visual signature (WP-1130).
+DIAGNOSTIC_VIEW_OF: dict[str, str] = {
+    "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
+    "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",
+    "MODEL_FAR_FROM_DATA": "plot_for_vlm.overview",
 }
 
 
