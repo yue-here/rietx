@@ -39,7 +39,7 @@ def test_a_propagation_vector_off_gamma_is_named_too():
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("magnetic-solve-two-site")
-def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
+def test_the_two_site_winner_measures_the_sum_and_difference(monkeypatch):
     """The two-site Pnma set of ``test_magnetic_solve``, which carried this
     file's end-to-end naming check until WP-1930 showed both its pairs were
     stopping points.
@@ -49,7 +49,9 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
     the size of each combination unchanged.  The swapped point is a second
     minimum, χ² higher by only 0.66 (2556.51 against 2555.85, macOS arm64).  The flat start lands on it
     under both drivers since the floor seed went (WP-1938 D4), so the sweep
-    reports two minima and the released start that reaches the truth wins.
+    reports two minima, and either assignment may win until the tie row lands
+    (#1424): the test asserts the sum and the difference, which are the same
+    for both.
     Under LM the released starts reach it only because the moduli climb before
     the angles turn (D12): freed together, they stopped at χ² 454 660.
 
@@ -102,11 +104,17 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
     winner = next(t for t in solution.trials if t.class_index == 0)
     assert solution.best is not None and solution.best.class_index == 0
     m1, m2 = winner.moments
-    assert m1.magnitude == pytest.approx(3.5, abs=0.01)
-    assert m2.magnitude == pytest.approx(0.7, abs=0.01)
+    # What the pattern measures is m1 + m2 and m1 - m2 (Mn1 and Mn2 are
+    # related by c/2); the two moduli swapped is a second minimum within the
+    # tie width (#1424), so no site's modulus is asserted alone.  Signed along
+    # a, where both moments lie, so a flipped relative sign (3.5, -0.7) fails.
+    a1, a2 = m1.crystalaxis[0], m2.crystalaxis[0]
+    assert abs(a1 + a2) == pytest.approx(4.20, abs=0.02)
+    assert abs(a1 - a2) == pytest.approx(2.80, abs=0.02)
+    # esds and rho matched by size, not by site
+    assert sorted(r.esd for r in winner.moments) == pytest.approx(
+        [0.00111, 0.00150], rel=0.05)
     assert not any(row.paired_with for row in winner.moments)
-    assert m1.esd == pytest.approx(0.00150, rel=0.05)
-    assert m2.esd == pytest.approx(0.00111, rel=0.05)
     (pair,) = taken[id(winner._result)]
     assert pair.rho == pytest.approx(-0.24, abs=0.02)
     # the record that moved them: the winner's last stage left its four
@@ -115,3 +123,29 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
     (passed,) = [t for t in stage.moment_angle_tests if t.zeroed]
     assert len(passed.paths) == 4 and passed.statistic <= passed.cut
     assert "MOMENT_ANGLE_STATIONARY" in {d.code for d in winner._result.diagnostics}
+
+
+def test_best_start_picks_the_lowest_absolute_chi2_not_the_lowest_rwp():
+    """``_best_start`` ranks starts by absolute weighted chi², the quantity the
+    ranking compares (#1424).  Constructed starts, where the lowest Rwp and the
+    lowest chi² disagree, so a pick by ``rwp``, by reduced chi² or by list order
+    fails."""
+    from types import SimpleNamespace as NS
+
+    from rietx.strategy import magnetic as solve
+
+    def start(label, chi2_red, n_free, rwp):
+        stats = NS(chi2=chi2_red, n_points=1000, n_free_parameters=n_free,
+                   rwp=rwp)
+        return (label, None, NS(statistics=stats))
+
+    # absolute chi²: 1.0*990 = 990, 1.0005*990 = 990.495, 1.002*980 = 981.96;
+    # the truth start has the highest reduced chi² and the highest Rwp, so a
+    # pick by either (or by list order) fails
+    flat = start("flat", 1.0, 10, 0.050)
+    swap = start("swap", 1.0005, 10, 0.040)      # lowest Rwp, higher chi²
+    truth = start("truth", 1.002, 20, 0.060)     # lowest absolute chi²
+    best, n, minima = solve._best_start([flat, swap, truth])
+    assert best[0] == "truth" and n == 3 and minima == 3
+    best, _, _ = solve._best_start([truth, swap, flat])
+    assert best[0] == "truth"
