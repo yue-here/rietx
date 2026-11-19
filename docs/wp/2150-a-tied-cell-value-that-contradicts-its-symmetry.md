@@ -1,9 +1,8 @@
 # WP-2150 — A tied cell value that contradicts its space group is repaired at read or refused
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — PR #1698 in review; reader output waits on the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-19 — merged as #1698; the Jana reader's call is WP-1314's
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-18 — a silent wrong answer on a path few fits run: a cell length (or a rhombohedral angle) that its space group ties to another is replaced by that other value with no word, at any size of disagreement (#1669)
 
 ## Goal
 
@@ -79,8 +78,6 @@ PR for his decision.
 (a file's printed digits). The table's relative bound is chosen by consequence. Each new
 code and constant takes its `rietx._audit` row.
 
-### Inherited
-
 ## Non-goals
 
 - A space group's **fixed** angles: handled by `check_cell_angles` and
@@ -130,6 +127,13 @@ indexing acceptance ranking is unchanged.
   (repairs within printed precision).
 
 ## Handover log
+
+- **2026-11-19 (closed)** — PR #1698 merged as `f44388aef` at 12:03Z, merged by the
+  maintainer on the ruling recorded in the entry below, and issue #1669 closed with it.
+  Every task was already ticked. This close was done by a ghostshift runner in the
+  close-only PR #1719: the Priority line and the empty `### Inherited` section went, and
+  the narrative moved to the v1.13 record. The one follow-up, the Jana reader's call to
+  `check_phase_cell_ties`, already sits in WP-1314's `### Inherited`.
 
 - **2026-11-19** — PR #1698. A cell that contradicts its space group's ties
   no longer builds silently. Under a cubic group b = 5.9 beside a = 5.641
