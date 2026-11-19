@@ -431,8 +431,8 @@ def test_a_held_slope_is_named_and_the_rejection_names_it_first():
                                "such as vars.a1.")
     (rejected,) = [d for d in held.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED"]
     assert rejected.suggestion.startswith(
-        "vars.a1 was not free at the answer, so it kept its starting value. Free it "
-        "and refit before changing the equation. Revise the expression")
+        "vars.a1 was held at the answer. Free it and refit before changing the "
+        "equation. Revise the expression")
     # a fit-wide statement: every pattern's view carries it
     assert "VARIABLE_NOT_FREED" in {d.code for d in held.for_histogram(2).diagnostics}
 

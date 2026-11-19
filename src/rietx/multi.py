@@ -3716,11 +3716,9 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
         check = ""
         if held:
             them = len(held) > 1
-            check = (f"{', '.join(held)} {'were' if them else 'was'} not free at the "
-                     f"answer, so {'they' if them else 'it'} kept "
-                     f"{'their' if them else 'its'} starting "
-                     f"value{'s' if them else ''}. Free {'them' if them else 'it'} and "
-                     "refit before changing the equation. ")
+            check = (f"{', '.join(held)} {'were' if them else 'was'} held at the "
+                     f"answer. Free {'them' if them else 'it'} and refit before "
+                     "changing the equation. ")
         r = t.others_freed if t.others_freed is not None else t.tied
         # the verdict is the freed reading wherever there is one; say what the
         # tied one read when it passed, since a reader comparing refits will

@@ -99,7 +99,7 @@ assert held.parametric[1].value == 0.0
 assert [d.code for d in held.diagnostics if d.code in WATCHED] == [
     "PARAMETRIC_FORM_REJECTED", "VARIABLE_NOT_FREED"]
 rejected = next(d for d in held.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED")
-assert rejected.suggestion.startswith("vars.a1 was not free at the answer")
+assert rejected.suggestion.startswith("vars.a1 was held at the answer")
 # A line on a B that no stage of mccusker_default frees: both coefficients keep
 # their starts, with no esd, while the cell line refines; VARIABLE_NOT_FREED says so.
 b_rows = [c for c in unreached.parametric if c.equation == "b"]
