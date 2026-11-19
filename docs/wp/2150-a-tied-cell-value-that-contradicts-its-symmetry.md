@@ -131,7 +131,7 @@ indexing acceptance ranking is unchanged.
 - **2026-11-19 (closed)** — PR #1698 merged as `f44388aef` at 12:03Z, merged by the
   maintainer on the ruling recorded in the entry below, and issue #1669 closed with it.
   Every task was already ticked. This close was done by a ghostshift runner in the
-  close-only PR #PRNUM: the Priority line and the empty `### Inherited` section went, and
+  close-only PR #1719: the Priority line and the empty `### Inherited` section went, and
   the narrative moved to the v1.13 record. The one follow-up, the Jana reader's call to
   `check_phase_cell_ties`, already sits in WP-1314's `### Inherited`.
 
