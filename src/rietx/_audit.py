@@ -898,7 +898,7 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds="nothing: the held paths stayed where the caller held them",
         evidence=("opt-in: Refinement.hold(), nothing held by default "
-                  "(StageResult.blocked_by_hold's row, caller); the package calls hold only "
+                  "(StageResult.blocked_by_hold records what it refused); the package calls hold only "
                   "at strategy/magnetic.py:1369, under solve_magnetic(tie_to_parent=True), "
                   "default False; refine.py:4184 and sequential.py:1412 are docstrings "
                   "(searched 2026-11-17); reports which turn_on glob met the caller's hold "
@@ -1875,9 +1875,14 @@ ROWS: tuple[Row, ...] = (
                   "fit stopped short, every refiner would refit, and the caller's own fit is "
                   "untouched; tests/test_distortion_totals.py::"
                   "test_a_restricted_fit_below_the_full_one_restarts_the_full_fit")),
-    Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier="caller", ambiguity=1,
-        evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
-                  " plan glob (WP-1435)")),
+    Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: the turn_on paths a stage's glob matched and left fixed, recorded and "
+                  "moving no value. Three writers, each reading the table that did the refusing: "
+                  "the caller's Refinement.hold (WP-1435, opt-in, nothing held by default), the "
+                  "floating-origin coordinate hold (WP-1912, also on the joint runner's "
+                  "MultiParameterTable.blocked_by_hold) and the wavelength the lambda-cell fence "
+                  "declined (WP-2148, refine._run_stage). Three runners build the StageResult: "
+                  "Refinement._run_plan, Refinement.run_stage and the joint _run_plan")),
     Row("rietx.schemas.results.StageResult.seeded", "action", tier=3, ambiguity=1,
         evidence=("the one shipped seed is _ROUGHNESS_STAGE's 0.3, recorded per model. Suortti's "
                   "b: start-invariant from 0.3 and 0 on five lab patterns from three families "
