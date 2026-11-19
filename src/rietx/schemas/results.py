@@ -1366,7 +1366,7 @@ class StageResult(Base):
     #: Disjoint from :attr:`freed` (a blocked path never entered it) and from
     #: :attr:`held`, which is WP-1301's separate thing — a *stage's* reading
     #: of what the data can see, decided per stage and lifted at the next.
-    #: This one is the caller's, and it persists until ``unhold``.
+    #: A caller's hold persists until ``unhold``.
     #:
     #: Empty on every fit where no hold was declared, which is every fit that
     #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.  A path the
@@ -1378,6 +1378,9 @@ class StageResult(Base):
     #: the floating-origin fix holds (WP-1912, ``ORIGIN_FIXED_ON_POLAR_AXIS``),
     #: and a wavelength the λ–cell fence declined because no phase in the
     #: pattern had a held cell (WP-2148, ``WAVELENGTH_NOT_FREED``).
+    #: The field is a record: it names what a glob reached and a hold or the fence
+    #: refused, and moves no value.  Writers: the three runners that build a
+    #: ``StageResult``, from the three sources above.
     blocked_by_hold: list[str] = Field(default_factory=list)
     #: paths this stage's ``turn_off`` fixed after its frees (WP-2208), in
     #: table order: the free paths it took, never a row that was already
