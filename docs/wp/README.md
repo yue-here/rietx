@@ -88,6 +88,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | P2 | — ([1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | P2 | — ([2222](2222-the-closing-stage-off-by-default.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2225](2225-a-held-instrument-width-stops-a-staged-fit-short.md) | A held instrument width stops a staged fit short of its own plan's point | P2 | [2002](2002-the-single-fit-actions.md) ([2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md), [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) soft) | [generality](#generality-the-audits) |
+| [2227](2227-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -701,6 +702,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2219](2219-a-direction-the-data-does-not-determine-has-no-esd.md) | A direction the data does not determine has no esd | ⬜ | P2 | — ([2028](2028-a-joint-fits-guards-see-every-histogram.md) soft) |
 | [2220](2220-a-comparison-says-which-fits-it-rests-on.md) | A nested comparison says which fits it rests on, and which freed columns carried information | ⬜ | P2 | — ([2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md), [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) soft) |
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | ⬜ | P2 | — ([1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) soft) |
+| [2227](2227-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | ⬜ | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

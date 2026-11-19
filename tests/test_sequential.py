@@ -3254,10 +3254,10 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
 
 
 def test_a_carried_pawley_chain_runs_the_closing_stage(monkeypatch):
-    """WP-2222, ruled 2026-11-19: carried Pawley intensities compound the
-    declared stages' 2 % window error, so a chain that carries them runs the
-    closing stage when its plan has none; a chain that re-seeds does not, and
-    a plan's own value is kept."""
+    """WP-2222, ruled 2026-11-19: a chain that carries Pawley intensities runs
+    the closing stage when its plan has none; a chain that re-seeds does not,
+    and a plan's own value is kept.  The drift it answers comes from a
+    reflection centred past the data's end (WP-2227), whose fix replaces it."""
     from rietx.refine import Refinement
     from rietx.schemas.plan import CLOSING_WINDOW_TOL
     from rietx.strategy.staged import PLAN_PRESETS
