@@ -318,17 +318,17 @@ roughly the shift (+1400 ppm).
   new surface showing an engine's cell goes through it too, or one search speaks two.
 - **An assumed precision may never refuse to index** (`from_positions` lists get no
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
-- **This package is not slow at indexing, it is silent** — DICVOL04 reaches 3770 s
-  on hard triclinic patterns and McMaille "hours, if not a night", against our
-  0.7–177 s. Buy responsiveness with ordering and reporting, never by shrinking
-  the box. **`budget_seconds` is per (engine × system)** — probe and validation on
-  top — so the whole-run bound is `total_budget_seconds`, a `Deadline` that *is*
-  the cancel token; `estimate_ceiling` is the pre-run arithmetic,
-  `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
-  and a truncated validation reads `not_validated`, never `validation_failed`
-  (1037). And **a Monte Carlo indexer must refine each proposal; raw random cells
-  do not rank** — WP-1023 ranked corundum's truth 29 053 of 200 001 unrefined,
-  where `search_svd`, iterating to a fixed assignment, returns it alone.
+- **This package is not slow at indexing, it is silent** — DICVOL04 reaches 3770 s on hard
+  triclinic patterns and McMaille "hours, if not a night", against our 0.7–177 s. Buy
+  responsiveness with ordering and reporting, never by shrinking the box. **`budget_seconds`
+  is per (engine × system)** — probe and validation on top — so the whole-run bound is
+  `total_budget_seconds`, a `Deadline` that *is* the cancel token, and **under it a unit
+  runs at most the search's time over the engines** (`unit_share_seconds`, #1374);
+  `estimate_ceiling` is the pre-run arithmetic, `INDEX_BUDGET_EXHAUSTED` names the three
+  states (searched/truncated/not reached), and a truncated validation reads `not_validated`,
+  never `validation_failed` (1037). And **a Monte Carlo indexer must refine each proposal;
+  raw random cells do not rank** — WP-1023 ranked corundum's truth 29 053 of 200 001
+  unrefined, where `search_svd`, iterating to a fixed assignment, returns it alone.
 - **Coelho's N_c/N_o gate bounds the *volume*, it is not a per-trial verdict**
   (WP-1040, `svd.volume_window`): N_c ∝ V, so one probe gives κ and the gate is
   V ∈ [N_o/3κ, 4N_o/κ] — it held the truth on all nine corpus datasets and is most

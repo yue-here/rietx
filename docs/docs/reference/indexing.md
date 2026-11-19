@@ -95,6 +95,8 @@ A declared `SearchSpecSpec.total_budget_seconds` is never overridden, and the re
 
 There are two budgets, and they bound different things.
 `SearchSpecSpec.budget_seconds` bounds one slice, one engine on one crystal system, and `SearchSpecSpec.total_budget_seconds` bounds the whole run.
+Under a ceiling no slice runs longer than the search's time divided by the number of engines, so one engine that does not finish a system leaves the others their time on it.
+The default 30 s slice is below that share of the `quick` ceiling, so a default run is unaffected; to give one engine the whole search, name it in `engines`.
 The slices run system by system: every engine finishes one system before any engine starts the next, cubic first and triclinic last.
 So a binding ceiling cuts trailing systems for every engine alike, and a completed system holds every engine's answer, which the agreement gate needs.
 

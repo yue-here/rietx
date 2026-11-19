@@ -1793,7 +1793,9 @@ class SearchSpecSpec(Base):
         "run: a default three-engine, seven-system call is up to 3x7x30 s of "
         "search before the probe and validation. An engine stopped by it "
         "reports search_complete[system] = false, and a negative result there "
-        "is not evidence. total_budget_seconds is the whole-run bound"))
+        "is not evidence. total_budget_seconds is the whole-run bound, and "
+        "under it no slice runs longer than the search's time divided by "
+        "the number of engines"))
     total_budget_seconds: float | None = Field(None, gt=0.0, description=(
         "wall-clock ceiling for the WHOLE run — search, probe and validation "
         "together. The run still returns a complete IndexingResult over what "
