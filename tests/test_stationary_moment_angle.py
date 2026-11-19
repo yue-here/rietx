@@ -26,6 +26,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import MagneticSymmetry, Moment
 
 MN1, MN2 = "phases.0.atoms.0.moment", "phases.0.atoms.1.moment"
@@ -54,9 +55,12 @@ def _magnetic() -> MagneticSymmetry:
 def _plan() -> rx.RefinementPlan:
     from rietx.strategy.magnetic import SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS
 
+    # declared, not inherited: off by default since WP-2222, and the solve's
+    # own close (strategy.magnetic._close) declares it too
     return rx.RefinementPlan(stages=[
         rx.Stage(name, list(paths))
-        for name, paths in zip(SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, strict=True)])
+        for name, paths in zip(SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, strict=True)],
+        closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 def _fit(tilt: float, *, two: bool = True, start_tilt: float | None = None,
@@ -433,7 +437,8 @@ def test_an_angle_a_named_variable_drives_leaves_the_covariance():
     extra = (("vars.m1",), ("vars.m1", "vars.phi"), ("vars.m1", "vars.phi"))
     result = ref.fit(data, telemetry=False, plan=rx.RefinementPlan(stages=[
         rx.Stage(name, [*paths, *more]) for name, paths, more in zip(
-            SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, extra, strict=True)]))
+            SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, extra, strict=True)],
+        closing_window_tol=CLOSING_WINDOW_TOL))   # declared, as _plan() says
     (only,) = result.stages[-1].moment_angle_tests
     assert only.paths == [f"{MN1}.dof1", f"{MN2}.dof1", "vars.phi"]
     assert only.reached and only.zeroed and abs(only.statistic) < 1.0
