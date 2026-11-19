@@ -1,6 +1,6 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
 Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
