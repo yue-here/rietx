@@ -1,6 +1,6 @@
 # WP-1464 — a screen reads the batch references first
 
-Milestone: unscheduled · Status: 🔄 2026-11-18 — tasks 1-5 in PR #1681 (the routing row, 9c.35, 9c.33 measured, 9c.5); task 6, a job-summary verb, is open
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner): task 6, the `rietx runs` verb; tasks 1-5 merged in PR #1681
 Track: A long run is not one fit
 Depends on: — (PR #385, merged 2026-09-25: a runaway cell no longer raises in a screen)
 Priority: P3 2026-09-25 — the references exist and a reader who finds them is covered; one session waited 78 idle minutes on a screen they describe
