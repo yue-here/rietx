@@ -1398,14 +1398,17 @@ class SequentialRefinement:
         base_plan = resolve_plan(plan, mode, self.instrument.geometry.kind)
         if (mode == "pawley" and self.carry_hkl_intensities
                 and base_plan.closing_window_tol is None):
-            # Carried Pawley intensities compound the declared stages' 2 %
-            # window error down the chain, and the closing stage removes it
-            # (WP-2222, ruled 2026-11-19).  On the four-pattern chain of
-            # tests/test_sequential.py, Rwp per pattern read 0.0339, 0.0345,
-            # 0.0347, 0.0372 carried without it, 0.0339-0.0345 re-seeded,
-            # and about 0.034 throughout with it.  A plan's None cannot be
-            # told from the default, so the way out is
-            # carry_hkl_intensities=False.  Every stage it runs is recorded.
+            # Ruled 2026-11-19 (WP-2222) on a drift along a carried chain:
+            # on the ten-pattern ramp of tests/test_pawley.fap_series, Rwp
+            # rose to 0.0407 at pattern 5 against about 0.034 with the
+            # closing stage, and the cell moved up to 0.77 esd, recovering
+            # by pattern 7.  Its cause is the range end, not the carrying
+            # (WP-2228): (6 0 2), centred 0.4 deg past the data, has a 2 %
+            # window that reaches no channel, so its tail in the data goes
+            # unmodelled.  Cut the data at 72 deg and the carried chain
+            # without the closing stage lands within 0.05 esd.  WP-2228's
+            # fix replaces this rule.  A plan's None cannot be told from the
+            # default, so the way out is carry_hkl_intensities=False.
             base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
