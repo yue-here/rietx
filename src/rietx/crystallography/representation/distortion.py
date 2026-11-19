@@ -1193,19 +1193,24 @@ def _generic_seed(n: int) -> list[np.ndarray]:
 def _tied_cell(phase):
     """``phase``'s cell with its group's own ties and fixed angles imposed (WP-1419).
 
-    The parameter table discards a tied edge's stored value and a fixed
-    angle's, so a stated cell is read the way the table reads it: ``b`` of a
-    tetragonal group is ``a`` whatever ``b`` was written as.  A phase stated by
-    an operator list has no symbol to take the constraints from and keeps its
-    cell as written.  Returns an object whose ``a`` … ``gamma`` are floats.
+    The parameter table discards a tied edge's stored value, so a stated cell
+    is read the way the table reads it: ``b`` of a tetragonal group is ``a``
+    whatever ``b`` was written as.  A fixed angle is not normalised: the table
+    refuses one more than ``SYMMETRY_ANGLE_TOL_DEG`` from its value
+    (``check_cell_angles``, "refused, not normalised"), so this refuses it
+    first and imposes the value only within that tolerance (Yue's review of
+    #1533, round 2, item 1).  A phase stated by an operator list has no symbol
+    to take the constraints from and keeps its cell as written.  Returns an
+    object whose ``a`` … ``gamma`` are floats.
     """
     from types import SimpleNamespace
 
-    from ..symmetry import cell_constraints
+    from ..symmetry import cell_constraints, check_cell_angles
 
     names = ("a", "b", "c", "alpha", "beta", "gamma")
     values = {n: _value(getattr(phase.cell, n)) for n in names}
     if phase.symmetry_operations is None:
+        check_cell_angles(_group(phase), values)
         cons = cell_constraints(_group(phase))
         for name, src in cons.ties.items():
             values[name] = values[src]

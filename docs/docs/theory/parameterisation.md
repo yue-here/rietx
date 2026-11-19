@@ -607,9 +607,9 @@ not mapped to its negative by any parent operation, so its sign is physical and
 not a domain label, and zero is still stationary. With the amplitudes at zero,
 an amplitude whose $\mathbf{k}$ is not Γ also stays stationary under a held non-zero
 strain, because a lost parent translation acts on it by a phase other than 1 and
-leaves the metric alone. The seeded amplitudes lift the strain's stationary point, so no strain
-is seeded, since a held strain moved off zero would bias every fit that keeps
-it held.
+leaves the metric alone. The seeded amplitudes lift the strain's stationary
+point, so no strain is seeded, since a held strain moved off zero would bias
+every fit that keeps it held.
 
 ## Soft restraints
 

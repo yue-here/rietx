@@ -285,24 +285,52 @@ def test_a_parent_whose_cell_moved_since_the_candidate_was_built_is_refused():
 
 
 def test_a_tied_edge_written_a_hair_off_its_source_still_states():
-    """Yue's review of #1533, item 2: a call that worked in 1.11.0 must not start to refuse.
+    """Yue's review of #1533, item 2: a call that worked in 1.12.0 must not start to refuse.
 
     The P4/mbm child's ``b`` tied to ``a`` is discarded by the parameter table,
     so a ``b`` a·(1 + 1e-5) away states as the exact tie does: the same derived
     cell and the same strain.  Positive arm: a real difference between the
     edges (a different cell, 1e-2) is the tie's to impose too, since the table
-    reads ``a`` for both; a ``gamma`` the group fixes at 90° is imposed alike.
+    reads ``a`` for both.  A tied edge is the one half of the table's reading
+    that this statement still takes on trust: #1698 adds ``check_cell_ties``
+    to the table, and whichever PR merges second makes ``_tied_cell`` call it.
     """
     cell = natao3_child().cell
     exact = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T).phase
     for rel in (1e-9, 1e-7, 1e-5, 1e-2):
         skewed = natao3_child(cell=cell.model_copy(update={
-            "b": cell.b.model_copy(update={"value": cell.a.value * (1.0 + rel)}),
-            "gamma": cell.gamma.model_copy(update={"value": 90.0 + 10.0 * rel})}))
+            "b": cell.b.model_copy(update={"value": cell.a.value * (1.0 + rel)})}))
         got = D.displacive_statement(natao3_parent(), skewed, NATAO3_T).phase
         assert got.parent_cell == exact.parent_cell, rel
         assert [got.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")] == \
             [exact.cell.model_dump()[n]["value"] for n in ("a", "b", "c", "gamma")], rel
+
+
+def test_a_symmetry_fixed_angle_is_refused_as_the_parameter_table_refuses_it():
+    """Yue's review of #1533, round 2, item 1: "refused, not normalised".
+
+    ``gamma`` of the P4/mbm child is fixed at 90°.  The table accepts one within
+    ``SYMMETRY_ANGLE_TOL_DEG`` and refuses one beyond it; the statement agrees
+    arm for arm, so a cell the table refuses is not silently rewritten to 90°
+    and refined.  Positive arm: 0.0005° (inside) states, and equals the exact
+    cell's statement.
+    """
+    from rietx.crystallography.symmetry import SYMMETRY_ANGLE_TOL_DEG
+
+    cell = natao3_child().cell
+    exact = D.displacive_statement(natao3_parent(), natao3_child(), NATAO3_T).phase
+    for delta in (0.0005, 0.002, 0.1, 1.0):
+        child = natao3_child(cell=cell.model_copy(update={
+            "gamma": cell.gamma.model_copy(update={"value": 90.0 + delta})}))
+        if delta <= SYMMETRY_ANGLE_TOL_DEG:
+            ParameterTable(Structure(phases=[child]), neutron())
+            got = D.displacive_statement(natao3_parent(), child, NATAO3_T).phase
+            assert got.parent_cell == exact.parent_cell, delta
+        else:
+            with pytest.raises(ValueError, match="fixes gamma"):
+                ParameterTable(Structure(phases=[child]), neutron())
+            with pytest.raises(ValueError, match="fixes gamma"):
+                D.displacive_statement(natao3_parent(), child, NATAO3_T)
 
 
 # --------------------------------------------------------------------------
