@@ -1947,6 +1947,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "and c to a on a cubic cell, or beta and gamma to alpha on rhombohedral "
+            "axes. The file stores the two with slightly different values. They "
+            "agree within the digits the file prints, so the reader used the source "
+            "value for both. A refinement builds the tied parameter from its source "
+            "anyway. A larger disagreement is left as written and the refinement "
+            "refuses it. If the difference is real, the symmetry is lower than the "
+            "symbol claims, and the phase needs a space group that leaves the "
+            "parameter free."
+        ),
+    ),
     "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
         title="Data blocks that state nothing were skipped",
         description=(
@@ -2960,6 +2974,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter in a history set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "to a on a tetragonal cell. A history written by an earlier release "
+            "stores the two with different values. Every fit of that model built "
+            "the tied parameter from its source, so loading reads it that way and "
+            "no number the history produced changes. This release refuses "
+            "such a cell, so the stored value could not otherwise be refined."
+        ),
+    ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
         title="Earlier tree in a history file skipped",
         description=(
@@ -3312,6 +3337,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "line of a supercell. A supercell of the leading cell predicts the last kind. "
             "Declaring "
             "`n_unindexed` forbids both retries."
+        ),
+    ),
+    "K_SEARCH_PARTNER": HelpEntry(
+        title="The cell's metric pairs this propagation vector with another",
+        description=(
+            "A near-symmetry of the cell's metric, within the tolerance passed, maps this "
+            "propagation vector onto another one that no symmetry of the space group "
+            "relates to it. The satellites of this vector and of vectors near the other "
+            "one can then agree within a match radius, so the positions alone may not say "
+            "which the peaks belong to. On a pseudo-tetragonal cell the swap of the two "
+            "near-equal axes is the usual case. Score the other vector and its "
+            "neighbourhood, and keep every vector that matches as a hypothesis. A moment or "
+            "modulation model, which reads intensities, or a sharper instrument separates "
+            "them."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -4442,16 +4481,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measurement, so do not interpolate across it. It seeded no later pattern "
             "and was left out of the series median, so its neighbours are unaffected. "
             "Fit the pattern on its own to find out why."
-        ),
-    ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
         ),
     ),
     "SERIES_PATTERN_FAILED": HelpEntry(
