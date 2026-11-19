@@ -1,4 +1,4 @@
-# WP-2227 — A reflection centred past the range end keeps its tail
+# WP-2228 — A reflection centred past the range end keeps its tail
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
