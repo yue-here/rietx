@@ -91,7 +91,7 @@ public surface.
 
 - [x] `FreedComparison` records both fits' `status` and a χ² ordering flag (full ≤ restricted
       within the solver's ftol). Pin both rows of #1685's table.
-- [ ] A diagnostic on the comparison when either fit is not `converged` or the ordering fails,
+- [x] A diagnostic on the comparison when either fit is not `converged` or the ordering fails,
       with its `_audit` row (tier: named practice for the ordering, since a nested optimum
       cannot rise), `help.py` and skill rows.
 - [x] `FreedParameter.at_bound`, projected from the fuller fit's `RefinedParameter.at_bound`
@@ -102,7 +102,7 @@ public surface.
       on its budget reads as not judged, never as a rejection (#1685 proposal 3).
 - [ ] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
       `tests/output/`
-- [ ] Skill: the `compare_freed` reference row says to read the status and ordering fields
+- [x] Skill: the `compare_freed` reference row says to read the status and ordering fields
       before quoting a ΔBIC.
 
 ## Acceptance

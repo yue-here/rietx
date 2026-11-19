@@ -720,6 +720,19 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
     Row("CIF_SITE_TWINS_MERGED", "code"),
     Row("CIF_SPECIES_NORMALISED", "code"),
+    Row("COMPARISON_UNCONVERGED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
+                  "fit it names on to convergence and compare again"),
+        evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
+                  "status other than 'converged', or the fuller fit's chi2 sits above the "
+                  "restricted one's by more than optimize.lm.FTOL relative (a model that "
+                  "contains another can reproduce it, so at both optima chi2_full <= "
+                  "chi2_restricted; report.layer2._chi2_ordered, on distortion.py's "
+                  "restart precedent); flags and refuses nothing, since a budget stop can "
+                  "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
+                  "converged chi2); raised by compare_freed, predict_then_verify's "
+                  "comparison and rigid_body_misfit (WP-2220)")),
     Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
         response="info",
         responds=("note which width the floor held; the next fit's start decides whether it "
@@ -5641,6 +5654,10 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", value=1),
     Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
     Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
+    Row("COMPARISON_UNCONVERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one remedy for a fit short of its optimum, running "
+                  "it on, and the two ways to start it (more iterations, or the other "
+                  "fit's values)")),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
     Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names three levers, fewer free, held known values, a wider "
