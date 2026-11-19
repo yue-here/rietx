@@ -218,4 +218,10 @@ or the chosen code fires on exactly those four.
   on the four standards whose plan holds a twin, and reaches a quoted value only on zincite (half
   an esd). Filed new because no open WP owns the hold's behaviour at a bound: WP-2017 row R
   measures the hold's tier, and WP-2002, which built it, is closed. *Measured*: § Context.
-  *Next*: task 1, the multi-phase measurement, then the brief.
+  *Done at handover*: forward references into WP-2017's and WP-2224's `### Inherited`; the
+  review (`/code-review high --fix`) found five defects in the probe scripts, all fixed in
+  `8a4c79625` (the `passes` arm printed `None` for held widths, the spy's per-solve records were
+  zipped onto stages, the output path broke outside the repo root, the swap prototype recorded
+  the wrong half as held, an unused import). No summary file changes, since `eight.py`,
+  `shifts.py` and `swap.py`'s printed columns were not affected. Docs only: no test added, no
+  full suite run. *Next*: task 1, the multi-phase measurement, then the brief.
