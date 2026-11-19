@@ -4938,8 +4938,16 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
-        evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
+    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None, no closing stage, since WP-2222 (2026-11-19): TOPAS cuts each peak at "
+                  "0.001 of the strongest line's height, 2 % of a Lorentzian, as the declared "
+                  "stages' WINDOW_AREA_TOL does, and has no closing run (docs/practice.md); "
+                  "measured 2026-11-19 (macOS arm64, [dev], three interleaved rounds) the "
+                  "closing stage cost 1.2-1.3x on 11-BM NAC, 1.7x on CPD cpd-1a and cpd-2 "
+                  "and 1.9x on the bench's simulated trigger case, and moved those answers "
+                  "0.16, 0.92, 2.0 and 1.24 plain esd; a closing stage at 2e-2 equalled none "
+                  "in Rwp on cpd-1a and trigger, so its effect is the tail, not the recompile. "
+                  "The opt-in, CLOSING_WINDOW_TOL: BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
                   "Cryst. 48, 1573, 2); RIETAN-FP's NAUTO = 2 ends with everything refining "
                   "together, its windows moving each evaluation; MAUD's wizard has no final "
@@ -4956,10 +4964,12 @@ ROWS: tuple[Row, ...] = (
                   "declared stages leave fixed (a turn_off whose glob matched last, "
                   "staged.fixed_at_end), which it keeps fixed and records in its "
                   "StageResult.fixed"),
-        grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
-                 "plan ends with a closing stage at tight windows, which removes the 2 % "
-                 "window's error from the answer and most of a staged plan's start dependence; "
-                 "None runs the declared stages alone, bit-identical to before.")),
+        grounds=("The maintainer's ruling of 2026-11-19 (WP-2222), after users complained of "
+                 "fit time: codes such as TOPAS are fast, with accuracy their users consider "
+                 "very sufficient; turn the closing stage off by default. It reverses the "
+                 "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
+                 "at CLOSING_WINDOW_TOL for an answer to publish."),
+        approved="2026-11-19"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
@@ -5141,18 +5151,22 @@ ROWS: tuple[Row, ...] = (
                   "checked"
                   "; seven programs, 2026-10-21 (docs/practice.md): the full range in GSAS-II, FullProf, RIETAN-FP, MAUD and EasyDiffraction, BGMN the instrument function's range, TOPAS's default not stated")),
     Row("rietx.refine.Refinement.run_stage:correlation_guard", "default", value=0.98),
-    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=1, ambiguity=1, value=None,
-        evidence=("None resolves to schemas.plan.CLOSING_WINDOW_TOL, the windows an answer is "
-                  "measured on, and inherits that row's tier and domain test; the stage records "
-                  "the fraction it ran at"),
-        grounds=("No closing stage follows a stage driven by hand (the GUI's Run this stage "
-                 "among them), so its own windows compute its answer; at the declared stages' "
-                 "2 % that answer carried up to 0.97 esd on lab data. A caller wanting the fast "
-                 "stage passes WINDOW_AREA_TOL, and cherry_pick passes a recorded node's "
-                 "through forward.recorded_window_tol. Ruled 2026-10-21 (the seventh round's "
-                 "Q1, evaluation outside a fit at the closing windows, which the brief extended "
-                 "to this seat)."),
-        approved="2026-10-21"),
+    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None resolves to forward.WINDOW_AREA_TOL since WP-2222, the windows a default "
+                  "fit's declared stages measure its answer on: TOPAS's cut, 2 % of a Lorentzian, "
+                  "inside the seven programs' range (docs/practice.md, How far a peak is "
+                  "computed), as PlanSpec:closing_window_tol's row cites; until WP-2222 it "
+                  "resolved to schemas.plan.CLOSING_WINDOW_TOL; nothing follows a stage run by "
+                  "hand, so its answer keeps the declared windows' error (up to 0.97 esd on lab "
+                  "data, WP-2002); the stage records the fraction it ran at"),
+        grounds=("A stage driven by hand (the GUI's Run this stage among them) runs on the "
+                 "windows a default fit's stages run on, so it costs what the same stage in a "
+                 "plan costs: the maintainer's 2026-11-19 ruling that TOPAS-level accuracy is "
+                 "sufficient and the closing stage goes off by default (WP-2222), which "
+                 "supersedes the seventh round's Q1 extension to this seat (2026-10-21); "
+                 "settled by Claude under that ruling, not yet approved for this seat. A "
+                 "caller wanting near-complete tails passes CLOSING_WINDOW_TOL, and "
+                 "cherry_pick passes a recorded node's through forward.recorded_window_tol.")),
     Row("rietx.refine.Refinement.run_stage:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "

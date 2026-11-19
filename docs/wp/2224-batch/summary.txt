@@ -1,0 +1,117 @@
+reached / run, then the median over reaching standards of: time vs staged at the same start, evaluations vs staged, largest gap in esd, cell gap ppm
+
+start own
+  shipped            8/8  time 1.40 (1.23-2.35)  evals 1.10  gap  1.04 (max   2.29) esd  cell   12.3 ppm max
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   0.00) esd  cell    0.0 ppm max
+  single             4/8  time 0.43 (0.41-0.55)  evals 0.25  gap  2.41 (max   9.08) esd  cell   20.9 ppm max   missed: srm660c,corundum,brucite,nac
+  single+2pc         6/8  time 0.65 (0.54-6.35)  evals 0.40  gap  2.38 (max  89.19) esd  cell 5455.4 ppm max   missed: corundum,nac
+  single+close       3/5  time 0.98 (0.79-4.76)  evals 0.35  gap  4.98 (max   8.44) esd  cell   15.6 ppm max   missed: corundum,brucite
+  two                6/8  time 0.61 (0.57-0.85)  evals 0.56  gap  0.13 (max   9.10) esd  cell  140.8 ppm max   missed: srm660c,corundum
+  two+2pc            8/8  time 0.75 (0.54-1.04)  evals 0.63  gap  0.09 (max   8.75) esd  cell  270.6 ppm max
+  staged:1e-4,1e-9   8/8  time 0.92 (0.51-0.98)  evals 0.77  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-6   8/8  time 0.87 (0.50-0.94)  evals 0.76  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-4   8/8  time 0.87 (0.50-0.92)  evals 0.74  gap  0.00 (max   0.06) esd  cell   11.1 ppm max
+  staged:1e-3,1e-3   7/8  time 0.80 (0.46-0.95)  evals 0.62  gap  0.01 (max   0.38) esd  cell   75.7 ppm max   missed: brucite
+
+start warm
+  shipped            8/8  time 1.56 (1.29-2.57)  evals 1.28  gap  1.05 (max   2.29) esd  cell  199.7 ppm max
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.24 (max   1.97) esd  cell  253.4 ppm max
+  single             8/8  time 0.39 (0.34-0.50)  evals 0.25  gap  0.02 (max   0.41) esd  cell   10.8 ppm max
+  single+2pc         8/8  time 0.54 (0.48-0.67)  evals 0.40  gap  0.02 (max   0.41) esd  cell    6.4 ppm max
+  single+close       5/5  time 1.42 (0.79-4.11)  evals 0.47  gap  0.97 (max   1.96) esd  cell   13.7 ppm max
+  two                8/8  time 0.50 (0.42-0.66)  evals 0.38  gap  0.02 (max   0.41) esd  cell   10.5 ppm max
+  two+2pc            8/8  time 0.72 (0.57-0.79)  evals 0.51  gap  0.02 (max   0.41) esd  cell    6.7 ppm max
+  staged:1e-4,1e-9   3/3  time 0.99 (0.97-0.99)  evals 0.95  gap  0.01 (max   0.02) esd  cell    0.0 ppm max
+  staged:1e-4,1e-6   3/3  time 0.95 (0.90-0.99)  evals 0.86  gap  0.01 (max   0.02) esd  cell    0.0 ppm max
+  staged:1e-4,1e-4   3/3  time 0.94 (0.88-0.99)  evals 0.86  gap  0.01 (max   0.02) esd  cell    0.0 ppm max
+  staged:1e-3,1e-3   3/3  time 0.94 (0.89-0.97)  evals 0.86  gap  0.01 (max   0.02) esd  cell    0.0 ppm max
+  single:1e-4        8/8  time 0.35 (0.27-0.45)  evals 0.16  gap  0.02 (max   0.41) esd  cell    5.7 ppm max
+
+start edit
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   1.35) esd  cell   18.3 ppm max
+  single             8/8  time 0.42 (0.30-0.69)  evals 0.31  gap  0.00 (max   0.00) esd  cell    0.2 ppm max
+  single+2pc         8/8  time 0.59 (0.44-0.82)  evals 0.49  gap  0.02 (max   0.05) esd  cell    7.8 ppm max
+  single:1e-4        8/8  time 0.36 (0.27-0.62)  evals 0.18  gap  0.00 (max   0.01) esd  cell    0.9 ppm max
+
+start cell+0.1
+  shipped            8/8  time 1.34 (1.09-2.46)  evals 1.06  gap  1.04 (max   2.29) esd  cell   12.3 ppm max
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   0.00) esd  cell    0.0 ppm max
+  single             3/8  time 0.54 (0.42-0.63)  evals 0.38  gap  0.10 (max   0.16) esd  cell  201.6 ppm max   missed: srm660c,corundum,zincite,fluorite,nac
+  single+2pc         5/8  time 0.74 (0.43-5.92)  evals 0.41  gap  0.02 (max   0.41) esd  cell  235.3 ppm max   missed: corundum,zincite,fluorite
+  single+close       2/5  time 0.85 (0.81-0.89)  evals 0.25  gap  0.51 (max   0.70) esd  cell  171.2 ppm max   missed: corundum,zincite,fluorite
+  two                6/8  time 0.66 (0.59-0.78)  evals 0.61  gap  0.13 (max   9.10) esd  cell  139.4 ppm max   missed: srm660c,corundum
+  two+2pc            8/8  time 0.78 (0.65-2.62)  evals 0.67  gap  0.09 (max   8.75) esd  cell  206.6 ppm max
+  staged:1e-4,1e-9   3/3  time 0.94 (0.84-0.95)  evals 0.84  gap  0.00 (max   0.00) esd  cell    0.0 ppm max
+  staged:1e-4,1e-6   3/3  time 0.90 (0.83-0.90)  evals 0.80  gap  0.00 (max   0.01) esd  cell    0.0 ppm max
+  staged:1e-4,1e-4   3/3  time 0.89 (0.82-1.02)  evals 0.79  gap  0.00 (max   0.01) esd  cell    0.0 ppm max
+  staged:1e-3,1e-3   3/3  time 0.91 (0.61-0.92)  evals 0.70  gap  0.00 (max   0.01) esd  cell    0.0 ppm max
+
+start cell-0.1
+  shipped            8/8  time 1.42 (1.16-2.21)  evals 1.06  gap  1.04 (max   2.29) esd  cell   12.3 ppm max
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   0.00) esd  cell    0.0 ppm max
+  single             4/8  time 0.53 (0.46-0.72)  evals 0.35  gap  2.43 (max   9.10) esd  cell   19.2 ppm max   missed: srm660c,corundum,brucite,nac
+  single+2pc         5/8  time 0.68 (0.59-5.83)  evals 0.49  gap  0.02 (max   8.75) esd  cell   19.9 ppm max   missed: srm660c,corundum,brucite
+  single+close       2/5  time 0.90 (0.84-0.95)  evals 0.31  gap  6.71 (max   8.44) esd  cell   15.6 ppm max   missed: srm660c,corundum,brucite
+  two                6/8  time 0.64 (0.56-1.01)  evals 0.61  gap  0.13 (max   9.10) esd  cell  140.8 ppm max   missed: srm660c,corundum
+  two+2pc            8/8  time 0.76 (0.52-1.05)  evals 0.64  gap  0.09 (max   8.75) esd  cell  270.5 ppm max
+  staged:1e-4,1e-9   8/8  time 0.87 (0.21-0.96)  evals 0.79  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-6   8/8  time 0.84 (0.21-0.90)  evals 0.78  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-4   8/8  time 0.81 (0.20-0.87)  evals 0.77  gap  0.00 (max   0.06) esd  cell   11.1 ppm max
+  staged:1e-3,1e-3   7/8  time 0.76 (0.18-0.83)  evals 0.64  gap  0.01 (max   0.38) esd  cell   75.7 ppm max   missed: brucite
+
+start cell+0.3
+  shipped            8/8  time 1.29 (0.95-2.18)  evals 1.03  gap  1.04 (max   2.29) esd  cell   12.3 ppm max
+  staged             8/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   0.00) esd  cell    0.0 ppm max
+  single             3/8  time 0.50 (0.30-0.54)  evals 0.20  gap  0.21 (max   9.41) esd  cell 1414.9 ppm max   missed: srm660c,corundum,zincite,fluorite,nac
+  single+2pc         4/8  time 0.73 (0.34-1.21)  evals 0.37  gap  0.13 (max  10.41) esd  cell 1467.8 ppm max   missed: srm660c,corundum,zincite,fluorite
+  single+close       1/5  time 1.20 (1.20-1.20)  evals 0.27  gap 10.55 (max  10.55) esd  cell 1471.0 ppm max   missed: srm660c,corundum,zincite,fluorite
+  two                6/8  time 0.75 (0.56-1.10)  evals 0.76  gap  0.13 (max   9.03) esd  cell  137.7 ppm max   missed: srm660c,corundum
+  two+2pc            7/8  time 0.84 (0.48-1.12)  evals 0.83  gap  0.17 (max   8.75) esd  cell  205.1 ppm max   missed: srm660c
+  staged:1e-4,1e-9   8/8  time 0.73 (0.14-0.97)  evals 0.68  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-6   8/8  time 0.71 (0.14-0.91)  evals 0.67  gap  0.00 (max   0.06) esd  cell   11.2 ppm max
+  staged:1e-4,1e-4   8/8  time 0.69 (0.14-0.90)  evals 0.66  gap  0.00 (max   0.06) esd  cell   11.1 ppm max
+  staged:1e-3,1e-3   7/8  time 0.53 (0.08-0.81)  evals 0.27  gap  0.01 (max   0.38) esd  cell   75.7 ppm max   missed: brucite
+
+start wx4
+  shipped            7/8  time 1.50 (1.22-1.99)  evals 1.11  gap  0.97 (max   1.94) esd  cell   23.2 ppm max   missed: fap
+  staged             7/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.04 (max   0.44) esd  cell    8.3 ppm max   missed: fap
+  single             4/8  time 0.51 (0.38-0.66)  evals 0.34  gap  3.03 (max   8.42) esd  cell   20.5 ppm max   missed: corundum,brucite,fap,nac
+  single+2pc         5/8  time 0.66 (0.53-1.31)  evals 0.42  gap  0.03 (max   7.90) esd  cell   20.0 ppm max   missed: corundum,brucite,fap
+  single+close       3/4  time 1.00 (0.92-1.02)  evals 0.48  gap  4.98 (max   7.59) esd  cell   15.6 ppm max   missed: corundum
+  two                6/8  time 0.58 (0.55-0.64)  evals 0.54  gap  3.07 (max   8.42) esd  cell  176.0 ppm max   missed: fap,nac
+  two+2pc            6/8  time 0.74 (0.71-0.84)  evals 0.60  gap  2.45 (max   7.91) esd  cell  213.3 ppm max   missed: fap,nac
+  staged:1e-4,1e-9   2/3  time 0.96 (0.96-0.96)  evals 0.87  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-4,1e-6   2/3  time 0.94 (0.92-0.96)  evals 0.85  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-4,1e-4   2/3  time 0.93 (0.90-0.95)  evals 0.83  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-3,1e-3   2/3  time 0.91 (0.88-0.95)  evals 0.80  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+
+start w/4
+  shipped            7/8  time 1.38 (1.15-1.83)  evals 1.07  gap  0.97 (max   1.96) esd  cell    9.5 ppm max   missed: fap
+  staged             7/8  time 1.00 (1.00-1.00)  evals 1.00  gap  0.00 (max   0.02) esd  cell    2.8 ppm max   missed: fap
+  single             2/8  time 0.37 (0.28-0.46)  evals 0.19  gap  2.51 (max   4.78) esd  cell    3.1 ppm max   missed: srm660c,corundum,zincite,brucite,fap,nac
+  single+2pc         5/8  time 0.59 (0.38-4.93)  evals 0.33  gap  0.02 (max  10.48) esd  cell 2314.7 ppm max   missed: corundum,zincite,fap
+  single+close       2/4  time 0.81 (0.79-0.83)  evals 0.32  gap  2.85 (max   4.98) esd  cell    0.7 ppm max   missed: corundum,zincite
+  two                5/8  time 0.67 (0.58-0.92)  evals 0.59  gap  0.24 (max   9.28) esd  cell  177.5 ppm max   missed: srm660c,corundum,fap
+  two+2pc            7/8  time 0.78 (0.69-1.06)  evals 0.77  gap  0.17 (max   8.96) esd  cell  231.3 ppm max   missed: fap
+  staged:1e-4,1e-9   2/3  time 0.87 (0.80-0.95)  evals 0.70  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-4,1e-6   2/3  time 0.83 (0.79-0.87)  evals 0.69  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-4,1e-4   2/3  time 0.81 (0.77-0.85)  evals 0.68  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+  staged:1e-3,1e-3   2/3  time 0.73 (0.67-0.79)  evals 0.54  gap  0.00 (max   0.00) esd  cell    0.0 ppm max   missed: fap
+
+absolute seconds, own start and warm
+  srm660c         own   shipped=0.42  staged=0.32  single=0.16  single+2pc=0.22  single+close=1.51  two=0.18  two+2pc=0.24  staged:1e-4,1e-9=0.31  staged:1e-4,1e-6=0.29  staged:1e-4,1e-4=0.28  staged:1e-3,1e-3=0.25
+  srm660c         warm  shipped=0.43  staged=0.30  single=0.10  single+2pc=0.15  single+close=1.22  two=0.12  two+2pc=0.17  single:1e-4=0.10
+  corundum        own   shipped=0.99  staged=0.51  single=0.88  single+2pc=23.82  single+close=335.89  two=0.22  two+2pc=0.28  staged:1e-4,1e-9=0.26  staged:1e-4,1e-6=0.26  staged:1e-4,1e-4=0.26  staged:1e-3,1e-3=0.24
+  corundum        warm  shipped=0.54  staged=0.24  single=0.10  single+2pc=0.15  single+close=0.40  two=0.12  two+2pc=0.16  single:1e-4=0.08
+  zincite         own   shipped=0.41  staged=0.27  single=0.12  single+2pc=0.16  single+close=0.27  two=0.16  two+2pc=0.20  staged:1e-4,1e-9=0.24  staged:1e-4,1e-6=0.23  staged:1e-4,1e-4=0.24  staged:1e-3,1e-3=0.20
+  zincite         warm  shipped=0.37  staged=0.22  single=0.08  single+2pc=0.11  single+close=0.21  two=0.09  two+2pc=0.13  single:1e-4=0.06
+  fluorite        own   shipped=0.42  staged=0.31  single=0.13  single+2pc=0.17  single+close=0.25  two=0.18  two+2pc=0.22  staged:1e-4,1e-9=0.28  staged:1e-4,1e-6=0.27  staged:1e-4,1e-4=0.27  staged:1e-3,1e-3=0.25
+  fluorite        warm  shipped=0.38  staged=0.27  single=0.10  single+2pc=0.14  single+close=0.21  two=0.12  two+2pc=0.16  single:1e-4=0.09
+  brucite         own   shipped=0.87  staged=0.59  single=0.37  single+2pc=3.76  single+close=36.21  two=0.39  two+2pc=0.45  staged:1e-4,1e-9=0.47  staged:1e-4,1e-6=0.45  staged:1e-4,1e-4=0.44  staged:1e-3,1e-3=0.25
+  brucite         warm  shipped=0.50  staged=0.25  single=0.09  single+2pc=0.12  single+close=0.36  two=0.16  two+2pc=0.19  single:1e-4=0.07
+  fap             own   shipped=1.29  staged=0.55  single=0.30  single+2pc=0.42  two=0.34  two+2pc=0.43  staged:1e-4,1e-9=0.52  staged:1e-4,1e-6=0.48  staged:1e-4,1e-4=0.48  staged:1e-3,1e-3=0.45
+  fap             warm  shipped=1.21  staged=0.47  single=0.24  single+2pc=0.32  two=0.28  two+2pc=0.37  staged:1e-4,1e-9=0.46  staged:1e-4,1e-6=0.42  staged:1e-4,1e-4=0.42  staged:1e-3,1e-3=0.42  single:1e-4=0.21
+  nac             own   shipped=0.55  staged=0.44  single=2.74  single+2pc=2.88  two=0.37  two+2pc=0.46  staged:1e-4,1e-9=0.43  staged:1e-4,1e-6=0.41  staged:1e-4,1e-4=0.40  staged:1e-3,1e-3=0.42
+  nac             warm  shipped=0.49  staged=0.37  single=0.18  single+2pc=0.23  two=0.24  two+2pc=0.28  staged:1e-4,1e-9=0.37  staged:1e-4,1e-6=0.35  staged:1e-4,1e-4=0.35  staged:1e-3,1e-3=0.35  single:1e-4=0.17
+  lab6_capillary  own   shipped=1.11  staged=0.90  single=0.36  single+2pc=0.49  two=0.54  two+2pc=0.67  staged:1e-4,1e-9=0.84  staged:1e-4,1e-6=0.83  staged:1e-4,1e-4=0.82  staged:1e-3,1e-3=0.80
+  lab6_capillary  warm  shipped=0.87  staged=0.68  single=0.27  single+2pc=0.37  two=0.34  two+2pc=0.54  staged:1e-4,1e-9=0.67  staged:1e-4,1e-6=0.67  staged:1e-4,1e-4=0.67  staged:1e-3,1e-3=0.66  single:1e-4=0.25
