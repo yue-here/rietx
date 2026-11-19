@@ -131,3 +131,17 @@ and the carried Pawley chain within 0.1 esd of its closing-stage answer.
   `Refinement.run_stage:window_area_tol` at tier 2 on TOPAS's cut (the
   `_audit.py` row's `approved`), and the carried-Pawley rule's comment and
   test docstring now name this cause.
+
+  *CI on this WP's PR* failed `test_examples.py[moment]` twice on Linux
+  py3.14, and the same test failed on main locally (macOS arm64, `[dev]`).
+  The moment guide's rounds ran one all-free stage with no closing stage
+  since WP-2222, and round 1 stopped wherever rounding put it: |m| 2.0 at Rwp
+  0.114 on the CI runner, 2.10 at 0.107 with esd 0.052 on the Mac, against
+  the pinned 0.04. Under start nudges of ±1e-14 and ±3e-14, one of four
+  stopped elsewhere (Rwp 0.108). With the closing stage on each round, as
+  the `branch` and `path` guides already have it, all four agree (Rwp 0.105
+  in both rounds) and every assertion passes. The guide now declares it, and
+  the page quotes 0.105. The first CI attempt also failed
+  `test_examples.py[magnetic]` once (`MOMENT_ANGLE_STATIONARY` decided
+  differently on that runner); it passed on the re-run and locally, and is
+  not touched here.
