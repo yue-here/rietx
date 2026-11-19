@@ -20,7 +20,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from ..schemas.common import Base
+from ..schemas.common import Base, Diagnostic
 from ..schemas.results import (
     CorrelationPair,
     GeometryTable,
@@ -286,6 +286,16 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   side.  ``add_impurity_phase`` no longer counts a row on a flank.  A new
 #   type a consumer reads, on 1.11 → 1.12's precedent, and an action a
 #   consumer may count, on 1.12 → 1.13's.
+# 1.15 → 1.16 (WP-2220, issues #1685 and #1686): ``FreedComparison`` says
+#   which fits it rests on and which freed columns carried information.  It
+#   gains both fits' ``status``, ``chi2_ordered`` (the fuller χ² at or below
+#   the restricted one within ``optimize.lm.FTOL``), ``n_identified`` and a
+#   ``diagnostics`` list carrying the new ``COMPARISON_UNCONVERGED``;
+#   ``FreedParameter`` gains ``at_bound`` and ``t_reason``.  A verdict that
+#   rests on a fit short of its optimum in the direction that could flip it is
+#   now ``None``, "not judged": ``VerificationOutcome.accepted`` and
+#   ``BodyMisfitRow.fires`` become ``bool | None``.  No threshold moved, and
+#   no number on a pair of converged, ordered fits changed.
 # 1.14 → 1.15 (WP-2081, the maintainer's ruling of 2026-11-16): 1.9's
 #   ``SEQUENTIAL_WIDTH_GROWTH`` is removed with its three thresholds, so a
 #   series raises no finding about a width that grew.  The width trajectory
@@ -297,7 +307,7 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   ``DISCONTINUITY_FACTOR``, ``DISCONTINUITY_SIGMA`` and
 #   ``MIN_POINTS_FOR_DISCONTINUITY``, which no version recorded; its statistic
 #   is ``SeriesResult.steps``.
-THRESHOLDS_VERSION = "1.15"
+THRESHOLDS_VERSION = "1.16"
 
 #: WP-1343.  How far the moment must move when a magnetic width is released
 #: before the release is called a *measurement of the correlation*, in units
@@ -1266,7 +1276,15 @@ class FreedParameter(Base):
     the fuller fit's, already Bérar-Lelann inflated.  ``held_at`` is ``None``
     where the restricted model has no such entry (a phase the fuller model
     adds), and for a coordinate DOF no coordinate row follows alone.
-    ``t_ratio`` is ``None`` then and wherever the esd is.
+    ``t_ratio`` is ``None`` then and wherever the esd is, and ``t_reason``
+    says which (WP-2220).
+
+    ``at_bound`` is the fuller fit's own
+    :attr:`~rietx.RefinedParameter.at_bound` for the row, copied and never
+    re-tested: ``True`` says a limit carried load at the answer.  A t-ratio
+    on such a row is still computed, but it is no Wald number, since the
+    parameter is not at an interior optimum (issue #1686: a peak centre on
+    its upper bound read t = +8.5 beside an area at 1.6).
     """
 
     path: str
@@ -1274,6 +1292,9 @@ class FreedParameter(Base):
     value: float
     esd: float | None = None
     t_ratio: float | None = None
+    at_bound: bool | None = None
+    #: why ``t_ratio`` is ``None``; ``None`` wherever it is a number
+    t_reason: str | None = None
 
 
 class FreedComparison(Base):
@@ -1292,6 +1313,23 @@ class FreedComparison(Base):
     ΔBIC bless a parameter its own esd puts within 1σ of zero: the issue's
     four fits gave +36 to +211 at t = 0.76-1.89.  **There is deliberately no
     verdict field**, on :class:`RivalComparison`'s precedent.
+
+    **Which fits it rests on** (WP-2220, issue #1685).  ΔBIC is a difference
+    of two optima, so it means something only where both fits reached
+    theirs.  ``status_restricted`` and ``status_full`` are the two results'
+    own ``status``, and ``chi2_ordered`` says the fuller χ² sits at or below
+    the restricted one within :data:`~rietx.optimize.lm.FTOL`.  A nested model
+    at its optimum cannot fit worse than the model it contains, so a
+    ``False`` there proves the fuller fit short of its minimum, whatever its
+    status says.  Either reading short adds ``COMPARISON_UNCONVERGED`` to
+    ``diagnostics``.  Nothing is refused: a fit stopped on its budget can sit
+    on its optimum, and its ΔBIC is then the right one.
+
+    **Which freed columns carried information** (issue #1686).
+    ``n_identified`` counts the freed parameters with an esd that do not sit
+    on a bound.  ``delta_bic`` stays charged at ``n_added``, so a comparison
+    whose fuller fit could not move a freed column pays ln N_eff for it and
+    errs towards the restricted model.
     """
 
     freed: list[FreedParameter]
@@ -1305,6 +1343,13 @@ class FreedComparison(Base):
     n_effective: float
     delta_bic: float
     delta_bic_raw_n: float
+    status_restricted: Literal["converged", "max_iter", "diverged"]
+    status_full: Literal["converged", "max_iter", "diverged"]
+    chi2_ordered: bool
+    #: the freed parameters with an esd and off their bounds
+    n_identified: int
+    #: ``COMPARISON_UNCONVERGED`` where a fit stopped short; empty otherwise
+    diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
 class DistortionBlockTest(Base):
@@ -1489,12 +1534,20 @@ class VerificationOutcome(Base):
     alone.  ``None`` when there was no trial fit, when the action freed
     nothing that was not already free, or when a stage hold made the two fits
     stop being nested.
+
+    **``accepted`` is ``None`` where the trial was not judged** (WP-2220,
+    issue #1685).  A trial that stopped short of its optimum (``status`` not
+    ``"converged"``) and gained too little has not shown the action fails,
+    since more iterations could only lower its χ².  The same holds the other
+    way round: a gain over a caller's fit that was itself short may be that
+    fit continuing.  ``reason`` names which.  Read ``None`` as "run it
+    again", never as a rejection.
     """
 
     kind: ActionKind
     predicted_delta_chi2: float | None
     observed_delta_chi2: float
-    accepted: bool
+    accepted: bool | None
     reason: str
     comparison: FreedComparison | None = None
 

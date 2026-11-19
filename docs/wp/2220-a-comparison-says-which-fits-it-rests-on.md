@@ -89,15 +89,15 @@ public surface.
 
 ## Tasks
 
-- [ ] `FreedComparison` records both fits' `status` and a χ² ordering flag (full ≤ restricted
+- [x] `FreedComparison` records both fits' `status` and a χ² ordering flag (full ≤ restricted
       within the solver's ftol). Pin both rows of #1685's table.
 - [ ] A diagnostic on the comparison when either fit is not `converged` or the ordering fails,
       with its `_audit` row (tier: named practice for the ordering, since a nested optimum
       cannot rise), `help.py` and skill rows.
-- [ ] `FreedParameter.at_bound`, projected from the fuller fit's `RefinedParameter.at_bound`
+- [x] `FreedParameter.at_bound`, projected from the fuller fit's `RefinedParameter.at_bound`
       and pinned set-equal; a reason string where `t_ratio` is `None`. Pin both seeds of
       #1686's table.
-- [ ] `n_identified` beside `n_added`: freed columns that are live and off their bounds.
+- [x] `n_identified` beside `n_added`: freed columns that are live and off their bounds.
 - [ ] `predict_then_verify` and `rigid_body_misfit` take the same fields. A trial that stopped
       on its budget reads as not judged, never as a rejection (#1685 proposal 3).
 - [ ] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
