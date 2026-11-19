@@ -249,8 +249,12 @@ Evidence that would change the verdict: the cell, coordinate and Biso errors aga
 
 Evidence that would change the verdict: SRM 660c and SRM 676a calibrations with and without the closing stage, carried into a sample fit. If the instrument profile, zero and displacement do not move beyond their esds there, the action buys nothing on real data.
 
+  *Reader output.* Yue approved the summary's changed lines on 2026-11-19:
+  the `stage closing` line gone, `max|Δθ|/esd` on the last declared stage,
+  and the constraint note naming that stage.
+
   Next: none on this WP. WP-2226 (the preview) and WP-2224 (one-stage
-  re-fits, after PR 1710 merges) build on it.
+  re-fits, merged in PR 1710) build on it.
 
 - **2026-11-19** — created. No open WP owns the default: WP-2017 measures
   tier-3 thresholds, WP-2047/2051 are closed, and WP-2002 is closed.
