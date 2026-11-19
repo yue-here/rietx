@@ -116,7 +116,7 @@ with one phase declared and one not.
 
 ## Handover log
 
-- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
   a commit after this file was last touched, and the entry below records it. Nothing else
   changed, and the status stays ✅.
 
