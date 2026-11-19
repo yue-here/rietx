@@ -121,11 +121,19 @@ def check_phase_support_sigma(value: Any) -> float | None:
     return float(value)
 
 
-#: The area each peak's window may drop in a plan's closing stage, and what
+#: The area each peak's window may drop in a plan's closing stage when a caller
+#: asks for one (WP-2002, the sixth round's Q1 and Q2, ruled 2026-10-21).
 #: :attr:`PlanSpec.closing_window_tol` and
-#: ``strategy.staged.RefinementPlan.closing_window_tol`` default to (WP-2002,
-#: the sixth round's Q1 and Q2, ruled 2026-10-21).  Here for
-#: :data:`INTERMEDIATE_FTOL`'s reason: both mirrors quote one literal.
+#: ``strategy.staged.RefinementPlan.closing_window_tol`` default to ``None``,
+#: no closing stage, since WP-2222 (ruled 2026-11-19: TOPAS-level accuracy is
+#: sufficient, and users found the closing stage's time too high).  This is
+#: the value to opt in at, for an answer to publish.
+#:
+#: **What the opt-in costs, measured 2026-11-19** (WP-2222; macOS arm64,
+#: ``[dev]``, telemetry off): the whole fit takes 1.2-1.3× (11-BM NAC),
+#: 1.7× (cpd-1a, cpd-2) and 1.9× (the simulated ``trigger`` bench case) its
+#: time without the closing stage, and the answers move by 0.16, 0.92, 2.0 and
+#: 1.24 plain esd.  The declared stages drop 2 %, as TOPAS does.
 #:
 #: **What the closing stage is.**  Every stage freezes its peak windows, its
 #: reflection list and its axial-divergence nodes at the values it starts from
@@ -303,15 +311,16 @@ class PlanSpec(Base):
             "any value here, null too (WP-1958)"))
 
     closing_window_tol: float | None = Field(
-        CLOSING_WINDOW_TOL, description=(
+        None, description=(
+            "null (the default) = no closing stage.  A number asks for one: "
             "after the last declared stage, one more stage recompiles at the "
             "answer with peak windows dropping this fraction of each peak's "
-            "area and solves with every glob the plan freed.  Earlier stages "
-            "drop 2 %, which moves lab answers by up to an esd; 1e-3 meets "
-            "0.1 esd on three of four families at 1.2-2.3x the fit time.  Any "
-            "value under 2 % keeps the closing stage's finer axial-divergence "
-            "sampling.  null = no closing stage, today's answers bit for bit "
-            "(WP-2002)"))
+            "area and solves with every glob the plan freed.  Declared stages "
+            "drop 2 %, as TOPAS does, which moves lab answers by up to 1-2 "
+            "esd; 1e-3 meets 0.1 esd on three of four families at 1.2-2.3x "
+            "the fit time, the opt-in for an answer to publish.  Any value "
+            "under 2 % keeps the closing stage's finer axial-divergence "
+            "sampling (WP-2002, off by default since WP-2222)"))
 
     @field_validator("phase_support_sigma")
     @classmethod

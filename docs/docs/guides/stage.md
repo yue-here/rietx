@@ -19,8 +19,8 @@ This runs three stages by hand on the GSAS-II tutorial fluorapatite pattern that
 <!-- output of examples/guides/stage.py -->
 ```text
 scale_bkg    converged  Rwp 0.6050
-cell         converged  Rwp 0.4920
-profile      converged  Rwp 0.0976
+cell         converged  Rwp 0.4921
+profile      converged  Rwp 0.1028
 ```
 
 Each call returns a full `RefinementResult` for the stage it ran, with the statistics, the parameters and their esds, and the diagnostics.
@@ -54,19 +54,16 @@ displacement Rwp 0.4938
 cell         Rwp 0.4921
 profile_w    Rwp 0.1935
 profile      Rwp 0.0994
-closing      Rwp 0.0951
 ```
 
 The instrument is Bragg-Brentano, so the preset frees the specimen displacement in place of the zero shift, in a stage named `displacement` ([Plans](../concepts/plans.md)).
-The preset's `profile` stage reaches Rwp 0.0994.
-The preset then runs its closing stage, which refines the same parameters with wider peak windows and ends at 0.0951 ([The closing stage](../reference/refinement.md#the-closing-stage)).
-`run_stage` runs no closing stage, so by default it runs at the closing stage's wider windows.
-The hand-run `profile` stage therefore refines the same parameters at the same windows as the closing stage, and ends at 0.0976.
+The preset's `profile` stage reaches Rwp 0.0994, and the hand-run `profile` stage 0.1028.
+The preset ends there, because a plan runs a closing stage only when it asks for one ([The closing stage](../reference/refinement.md#the-closing-stage)).
 The difference comes from where each stage fixed its peak windows.
 A stage fixes them at the values it starts from.
 The hand-run stage fixed them at the default widths, and its result carries `FROZEN_COMPILE_STALE`.
-The closing stage fixed them at the widths the preset's `profile` stage had fitted.
-One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0951.
+The preset's `profile` stage fixed them at the widths its `profile_w` stage had fitted.
+One more hand-run stage that frees nothing new starts from the fitted widths too, and it ends at 0.0946.
 The full script is `examples/guides/stage.py`.
 
 ## Read a report at every stage

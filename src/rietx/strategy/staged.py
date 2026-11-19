@@ -27,7 +27,7 @@ from ..schemas.common import Mode
 # need them at class-definition time and this module is the *upper* layer;
 # they are re-exported here, where plan policy is read.
 from ..schemas.plan import (
-    CLOSING_WINDOW_TOL,
+    CLOSING_WINDOW_TOL,  # noqa: F401  re-exported: the opt-in value, no longer a default here
     CORRELATION_GUARD,
     INTERMEDIATE_FTOL,
     PHASE_SUPPORT_SIGMA,
@@ -425,10 +425,11 @@ class RefinementPlan:
     #: the sixth round's Q1 and Q2).  After the declared stages, one more
     #: recompiles at the answer with these windows and solves with every glob
     #: the plan freed (:meth:`closing_stage`); :data:`CLOSING_WINDOW_TOL` says
-    #: what it fixes, what it costs and what other programs do.  ``None``
-    #: runs the declared stages alone, which reproduces every fit before the
-    #: field, bit for bit.
-    closing_window_tol: float | None = CLOSING_WINDOW_TOL
+    #: what it fixes, what it costs and what other programs do.  ``None``, the
+    #: default since WP-2222, runs the declared stages alone, which reproduces
+    #: every fit before the field, bit for bit; :data:`CLOSING_WINDOW_TOL` is
+    #: the opt-in for an answer to publish.
+    closing_window_tol: float | None = None
 
     def closing_stage(self, paths: Iterable[str | tuple[str, ...]] | None = None) -> Stage | None:
         """The stage a fit runs after the declared ones, or ``None``.
@@ -700,8 +701,16 @@ class RefinementPlan:
         measure the *goniometer*; freeing a mount property against a fixed
         certified cell would let specimen preparation contaminate the
         calibration that every later sample inherits.  ``save_instrument_profile``
-        strips any roughness block for the same reason."""
-        return cls(stages=[
+        strips any roughness block for the same reason.
+
+        **It runs the closing stage** (:data:`CLOSING_WINDOW_TOL`), which
+        other plans leave off since WP-2222.  Every later fit holds this
+        result fixed, so its error reaches all of them.  On the simulated
+        pair of ``examples/guides/calibrate.py`` the sample's size and strain
+        land 2.9 and 2.4 esd from the truth with no closing stage anywhere,
+        1.3 and 0.8 esd with it in the calibration alone, and 0.3 and 0.4
+        esd with it in the sample fit too (WP-2222, ruled 2026-11-19)."""
+        return cls(closing_window_tol=CLOSING_WINDOW_TOL, stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
                                 "instrument.geometry.sample_displacement"]),
@@ -1060,7 +1069,8 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "the lattice parameters from one another. Of the two axial ratios "
             "only S/L refines. Set H/L to the receiving slit's height over the "
             "goniometer radius first, because swapping the two ratios leaves "
-            "the pattern unchanged."),
+            "the pattern unchanged. It ends with the closing stage, because "
+            "every later fit inherits the calibration's error."),
         modes=("rietveld",),
         when_to_use=(
             "A standard (LaB6, Si or corundum), once per instrument "
