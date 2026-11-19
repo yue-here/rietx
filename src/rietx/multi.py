@@ -2706,8 +2706,8 @@ class MultiHistogramRefinement:
         parametric_form, form_joint = _parametric_form_tests(models, mt, at_bounds,
                                                              weights, unseen)
         coefficients = self._parametric_rows(esd_hist0, per_esds)
-        diagnostics = diagnostics + _parametric_form_diagnostics(mt, parametric_form,
-                                                                 form_joint)
+        diagnostics = diagnostics + _parametric_form_diagnostics(
+            mt, parametric_form, form_joint, stage_results)
         # each equation a coefficient of which no stage freed (WP-2101)
         diagnostics = diagnostics + _parametric_not_freed_diagnostics(
             mt, coefficients, stage_results)
@@ -3693,7 +3693,8 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
 
 
 def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
-                                 joint: ParametricFormReading | None = None
+                                 joint: ParametricFormReading | None = None,
+                                 stage_results: list[StageResult] | None = None
                                  ) -> list[Diagnostic]:
     """``PARAMETRIC_FORM_REJECTED`` — a declaration whose data refuses its
     form (WP-1325): one warning per rejected
@@ -3713,20 +3714,24 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
     paths = {r.name: list(r.paths) for r in mtable.parametric}
     paths.update({r.name: mtable.variable_rows(r) for r in mtable.expressions})
     written = {r.name for r in mtable.expressions}
-    free = set(mtable.free_paths)
+    # what any stage freed or the support hold took, ``VARIABLE_NOT_FREED``'s
+    # reading; with no stages given, no coefficient is named as held
+    ever = (None if stage_results is None else
+            {p for sr in stage_results for p in (*sr.freed, *sr.held)})
     out: list[Diagnostic] = []
     for t in tests or []:
         if not t.rejected:
             continue
-        # a coefficient held at its start makes a right formula read as wrong:
+        # a coefficient no stage freed makes a right formula read as wrong:
         # name it before the rewrite (WP-2101, ruled 2026-11-19)
-        held = [p for p in paths[t.equation] if p not in free]
+        held = [] if ever is None else [p for p in paths[t.equation] if p not in ever]
         check = ""
         if held:
             them = len(held) > 1
-            check = (f"{', '.join(held)} {'were' if them else 'was'} held at the "
-                     f"answer. Free {'them' if them else 'it'} and refit before "
-                     "changing the equation. ")
+            check = (f"No stage freed {', '.join(held)}, so {'they' if them else 'it'} "
+                     f"kept {'their' if them else 'its'} starting "
+                     f"value{'s' if them else ''}. Free {'them' if them else 'it'} and "
+                     "refit before changing the equation. ")
         r = t.others_freed if t.others_freed is not None else t.tied
         # the verdict is the freed reading wherever there is one; say what the
         # tied one read when it passed, since a reader comparing refits will

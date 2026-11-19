@@ -6058,7 +6058,8 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
-            diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table))
+            diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table,
+                                                               mode))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -8386,7 +8387,8 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
 
 
 def _variable_not_freed_diagnostics(stage_results: list[StageResult],
-                                    table: ParameterTable) -> list[Diagnostic]:
+                                    table: ParameterTable,
+                                    mode: Mode = "rietveld") -> list[Diagnostic]:
     """``VARIABLE_NOT_FREED`` — a variable other parameters follow that no
     stage of the plan freed (WP-2101, ruled by the maintainer 2026-11-19).
 
@@ -8403,17 +8405,22 @@ def _variable_not_freed_diagnostics(stage_results: list[StageResult],
     blocks): ``where`` the variables, ``value`` how many.  A variable nothing
     follows is left out, since holding it changes nothing.  A tied variable
     has no freedom of its own and is left out too: its sources are the ones
-    named.  "Freed" is every stage's ``freed`` and ``held`` together, as the
-    joint reading counts it.  A report with no action (DESIGN.md Rule 4).
+    named.  So is one setting only what ``mode`` force-fixes
+    (:func:`mode_fixed_column`): ``_run_stage`` drops it from every stage, so
+    no ``turn_on`` could free it.  "Freed" is every stage's ``freed`` and
+    ``held`` together, as the joint reading counts it.  A report with no
+    action (DESIGN.md Rule 4).
     """
     ever = {p for sr in stage_results for p in (*sr.freed, *sr.held)}
+    unfreed = [e for e in table.entries
+               if is_variable_path(e.path) and e.tie is None and e.path not in ever]
+    if not unfreed:
+        return []
     reach = table.entry_reach()
     idle = []
-    for e in table.entries:
-        if not is_variable_path(e.path) or e.tie is not None or e.path in ever:
-            continue
+    for e in unfreed:
         follow = [q for q in reach.get(e.path, ()) if q != e.path]
-        if follow:
+        if follow and not mode_fixed_column(follow, mode):
             idle.append((e, follow))
     if not idle:
         return []
@@ -8433,7 +8440,10 @@ def _variable_not_freed_diagnostics(stage_results: list[StageResult],
                  "kept its starting value, so the parameters that follow it are set "
                  "from that start and the data did not measure them."),
         suggestion=("A plan frees a variable only where a stage's turn_on names it, "
-                    "such as a stage turning on vars.*."))]
+                    "such as a stage turning on vars.*."
+                    + (" A variable held by Refinement.hold stays fixed under any "
+                       "stage until unhold releases it."
+                       if any(e.held for e, _ in idle) else "")))]
 
 
 #: an atom's coordinate, which a site-symmetry table drives through
