@@ -138,18 +138,19 @@ present.
   settings, and the closest type has the same point group by construction, so the two
   routes cannot disagree where both exist. One rule beats a rule with an exception
   (DESIGN Rule 5). The alternative was a fallback used only where `closest_type` is `None`.
-  (2) The satellite generator keeps its written rule: a trigonal or hexagonal group gets the
-  candidates (⅓, ⅓, 0) and (⅓, ⅓, ½), now also on these children. Grounds: WP-1326's rule
-  keys on the crystal system alone, and it already adds them in rhombohedral axes on a
-  `:R` setting. The alternative was to skip them where the axes are unconventional.
-  Changing which candidates a magnetic report lists is a magnetic-path decision, so it is
-  a question for Mike below.
+  (2) The satellite generator decides on its hexagonal points, (⅓, ⅓, 0) and (⅓, ⅓, ½), from
+  the tabulated setting, not from the basis-free crystal system. An operation list with no
+  tabulated setting in its axes gets none. Grounds: accuracy. In the NiO child's
+  2a,a+b,a+c axes, (⅓, ⅓, 0) is no special point, so listing it would rank a k-vector that
+  WP-1326's rule never meant. Named groups and lists that resolve are unchanged, and these
+  children listed no candidates before, because the report raised. The alternative was the
+  rule keyed on the crystal system alone, which would add the two points in the child's own
+  axes. This came from the step-6 review; the first draft had taken the alternative.
 
-  *Question for Mike (magnetic path, #1075), not settled here.* In a cell whose axes are
-  not conventional for its trigonal or hexagonal point group (the NiO child in
-  2a,a+b,a+c), (⅓, ⅓, 0) in the child's own axes is not the hexagonal K point. Should the
-  generator carry the two points through the cell transform, skip them on such a cell, or
-  keep them as now? The same holds today for any `:R` setting.
+  *Question for Mike (magnetic path, #1075), not settled here.* On such a child, should the
+  generator carry the hexagonal points through the cell transform rather than leave them
+  out? A related case predates this WP: a named `:R` setting such as `R -3 m:R` also gets
+  (⅓, ⅓, 0) in rhombohedral axes, where it is no special point either.
 
   *Overlap.* `crystallography/symmetry.py` is also touched by Mike's open PR #1332, in
   `refuse_distortion_modes` (line ~119); this branch edits lines ~330-460 and

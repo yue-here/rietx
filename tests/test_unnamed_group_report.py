@@ -111,6 +111,15 @@ def test_an_unnamed_child_has_a_crystal_system_and_no_setting(build, label, syst
         sym.cell_constraints(sg)
 
 
+def test_an_unnamed_trigonal_child_gets_no_hexagonal_k_points():
+    """(⅓, ⅓, ·) is K/H on hexagonal axes; 2a,a+b,a+c of a rhombohedral cell is not."""
+    from rietx.crystallography.satellites import zone_boundary_candidates
+
+    third = Fraction(1, 3)
+    ks = [c.k for c in zone_boundary_candidates(_group(_nio_child()))]
+    assert ks and not [k for k in ks if k[:2] == (third, third)]
+
+
 def test_a_listed_named_group_keeps_its_cell_constraints():
     """An operation list with a closest type reads its ties exactly as before."""
     for symbol in ("P n m a", "R -3 m:R", "P 1 21/c 1", "P 63/m m c"):

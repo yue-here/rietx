@@ -382,6 +382,25 @@ def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
     return gemmi.find_spacegroup_by_ops(gemmi.GroupOps(list(seen.values())))
 
 
+def proper_rotations(rotations) -> list[np.ndarray]:
+    """The distinct proper parts of integer rotation matrices, in first-seen order.
+
+    An improper rotation R is replaced by −R, so −1, m, −3, −4 and −6 become
+    1, 2, 3, 4 and 6.  Shared by :func:`crystal_system_of` and the texture
+    frame (``spherical_harmonics``), which both read rotation orders.
+    """
+    seen, out = set(), []
+    for r in np.asarray(rotations, dtype=np.float64):
+        r = np.rint(r).astype(np.int64)
+        if round(np.linalg.det(r)) < 0:
+            r = -r
+        key = tuple(r.ravel())
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
 @functools.lru_cache(maxsize=256)
 def crystal_system_of(xyz: tuple[str, ...]) -> str:
     """The crystal system of an operation list, read from its rotations alone.
@@ -402,14 +421,8 @@ def crystal_system_of(xyz: tuple[str, ...]) -> str:
     ``tests/test_unnamed_group_report.py`` holds the two equal over gemmi's
     whole table, so a named group answers identically by either route.
     """
-    den = gemmi.Op.DEN
-    proper: set[tuple[int, ...]] = set()
-    for op in _op_list_from_xyz(xyz):
-        rot = np.array(op.rot, dtype=np.int64)
-        if round(np.linalg.det(rot / den)) < 0:
-            rot = -rot
-        proper.add(tuple(rot.ravel()))
-    traces = [(r[0] + r[4] + r[8]) // den for r in proper]
+    traces = [int(np.trace(r))
+              for r in proper_rotations(_group_arrays(("ops", xyz))[1])]
     n3 = traces.count(0)
     n2 = traces.count(-1)
     if n3 >= 8:
