@@ -170,6 +170,11 @@ class Project:
                 "create the project at another path")
         if not src.is_file():
             raise FileNotFoundError(f"pattern file not found: {src}")
+        # a cell the table refuses (WP-2150) is refused before the directory
+        # exists, so no project stores a root that no fit could start from
+        from .crystallography.symmetry import check_phase_cell_ties
+        for ip, phase in enumerate(structure.phases if structure is not None else []):
+            check_phase_cell_ties(phase, prefix=f"phases.{ip}")
         root.mkdir(parents=True, exist_ok=True)
 
         copied = root / src.name
