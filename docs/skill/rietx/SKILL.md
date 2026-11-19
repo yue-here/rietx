@@ -33,7 +33,7 @@ How to drive `rietx` on real data: the order of work, and the checks before you 
 | §5 quoting or comparing a number; Layer 0/1/2 | [numbers](references/numbers.md) |
 | §7b-7f the phase is unknown: peaks, indexing, extinction | [indexing](references/diagnostics-indexing.md) |
 | §7j a magnetic code, a satellite, a moment | [magnetic](references/magnetic.md), [api-magnetic](references/api-magnetic.md) |
-| §7k a TOF bank | [tof](references/tof.md), [api-tof](references/api-tof.md) |
+| §7k TOF | [tof](references/tof.md), [api-tof](references/api-tof.md) |
 | §4/4b the measurement behind a judging rule, before you override it | [judging](references/judging.md) |
 | §6 something declined to answer | [abstention](references/abstention.md) |
 | §8 a result that makes no sense | [surprises](references/surprises.md) |
