@@ -87,6 +87,7 @@ from .model.forward import (
 from .model.geometry import cell_volumes, geometry_table
 from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
+from .model.peak_equations import WIDTH_TARGETS
 from .model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
@@ -11928,8 +11929,9 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     :func:`~rietx.indexing.diagnostics.refinement_width_diagnostics`'s; this
     gathers the two numbers.  Declines, rather than guessing, where the model's
     width is not one number per angle: a phase with a Stephens ``microstrain``
-    block (its width is per reflection, and the isotropic law alone would
-    under-read it), or a width law that is not finite and positive on the grid.
+    block or a width peak equation (its width is per reflection, and the
+    isotropic law alone would under-read it; WP-2107), or a width law that is
+    not finite and positive on the grid.
     Only phases the data can see (``significance`` at or above
     :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA`, with a line in range)
     take part: an invisible phase's width explains no line of the census.
@@ -11941,8 +11943,10 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     from .indexing.diagnostics import refinement_width_diagnostics
     from .indexing.peaks import width_census
 
-    if not model.phases or any(ph.microstrain is not None
-                               for ph in structure.phases):
+    if not model.phases or any(
+            ph.microstrain is not None
+            or any(eq.target in WIDTH_TARGETS for eq in ph.peak_equations)
+            for ph in structure.phases):
         return []
     tt = np.asarray(model.tt, dtype=np.float64)
     fwhm_inst = np.asarray(model.instrument_fwhm_deg(tt, values), dtype=np.float64)

@@ -143,6 +143,16 @@ from .corrections import (
 )
 from .extinction import sabine_extinction, sabine_extinction_and_dx
 from .origin import CompiledOrigin, origin_residual
+from .peak_equations import (
+    WIDTH_TARGETS,
+    CompiledPeakEquation,
+    PhasePeakEquations,
+    check_orbits,
+    compile_equation,
+    compile_frame,
+    evaluate_angle,
+)
+from .peak_equations import evaluate as evaluate_peak_equation
 from .preferred_orientation import (
     TEXTURE_SAMPLE_PSI_DEG,
     TEXTURE_SPHERE_SAMPLES,
@@ -898,6 +908,11 @@ class CompiledPhase:
     win_mag: np.ndarray | None = None       # (n_lines, N, 2) int
     fcj_n_mag: np.ndarray | None = None     # (n_lines, N) int
     batch_mag: BatchLayout | None = None
+    # WP-2107.  The phase's peak equations by target, and the frozen frame
+    # (hkl, multiplicity, orbit images, harmonic coefficients) they are
+    # evaluated on.  ``None`` is exactly off: a phase declaring none reaches
+    # every expression below as it always did.
+    peq: PhasePeakEquations | None = None
 
 
 @dataclass
@@ -1055,6 +1070,10 @@ class CompiledModel:
     # ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a stage set
     # ``window_slack_deg``), so ``rewindow`` sizes by the compile's rule.
     window_slack_deg: float = WINDOW_MIN_DEG
+    # WP-2107.  The instrument's ``shift`` equation, which moves every phase's
+    # peaks and reads only the angle, so it sits in ``_position_shift_deg``
+    # beside the zero and the geometry's shifts.  ``None`` is exactly off.
+    inst_shift: CompiledPeakEquation | None = None
     # The origin restraint of a ``Phase.floating_origin = "centroid"`` phase
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
@@ -1257,6 +1276,13 @@ class CompiledModel:
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[0]}"],
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[1]}"],
                 self.radius_mm)
+        if self.inst_shift is not None:
+            # WP-2107: the instrument's equation reads the Bragg θ (radians)
+            # and the 2θ every term above has already moved the peak to
+            xp = get_backend()
+            shift = shift + evaluate_angle(
+                self.inst_shift, values, theta=xp.radians(theta),
+                two_theta=tt_bragg + shift)
         return shift
 
     def generation_window(self, values: dict[str, float]) -> tuple[float, float]:
@@ -1275,12 +1301,20 @@ class CompiledModel:
                                                              values))
 
     def apparent_two_theta(self, tt_bragg: np.ndarray,
-                           values: dict[str, float]) -> np.ndarray:
+                           values: dict[str, float], *, phase: int | None = None,
+                           d=None) -> np.ndarray:
         """Where a reflection at Bragg angle ``tt_bragg`` is drawn, in °2θ.
 
         The Bragg angle plus :meth:`_position_shift_deg`.  Pass one emission
         line's angles at a time: each line has its own θ, so a Kα2 image takes
         a different shift from its Kα1 partner.
+
+        ``phase`` adds that phase's ``shift`` equation (WP-2107), and then
+        ``tt_bragg`` must be the phase's own reflection list at one line, since
+        the equation reads each reflection's indices.  ``d`` is that list's
+        d-spacings, taken off the cell when not given.  A caller holding angles
+        that are no reflection list (the satellite report's lattice) passes no
+        phase and reads the pattern level.
 
         It is one function because the forward model and every builder of a
         position owe each other the same answer to *where is the peak*.  The
@@ -1291,8 +1325,13 @@ class CompiledModel:
         2·s·cosθ/R (0.26° at 27° for s = 0.5 mm on a 217.5 mm circle) while
         the calculated curve sat on the data.
         """
-        return tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
-                                                   values)
+        drawn = tt_bragg + self._position_shift_deg(0.5 * tt_bragg, tt_bragg,
+                                                    values)
+        peq = None if phase is None else self.phases[phase].peq
+        if peq is None or not peq.has("shift"):
+            return drawn
+        return drawn + self.phase_term(phase, "shift", values, tt_bragg, d=d,
+                                       drawn=drawn)
 
     def reflection_positions(self, ip: int, values: dict[str, float]
                              ) -> tuple[np.ndarray, np.ndarray]:
@@ -1340,7 +1379,7 @@ class CompiledModel:
         out = []
         for lam in self.line_lambdas(values):
             bragg = cp.reflections.two_theta(cell, lam)
-            out.append((bragg, self.apparent_two_theta(bragg, values)))
+            out.append((bragg, self.apparent_two_theta(bragg, values, phase=ip)))
         return out
 
     def _absorption(self, tt_bragg: np.ndarray) -> np.ndarray | float:
@@ -1403,11 +1442,58 @@ class CompiledModel:
         elif self.geometry_kind == "debye_scherrer" and self.radius_mm:
             key.extend(float(values[f"instrument.geometry.{name}"])
                        for name in CAPILLARY_OFFSETS)
+        if self.inst_shift is not None:
+            key.extend(self.inst_shift.key(values))
         return tuple(key)
 
+    def _phase_cell(self, ip: int, values: dict[str, float]) -> tuple:
+        return tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+
+    def phase_term(self, ip: int, target: str, values: dict[str, float],
+                   tt_bragg, *, d=None, drawn=None):
+        """Phase ip's ``target`` equation at one emission line's reflections.
+
+        ``tt_bragg`` is that line's Bragg 2θ of every reflection; ``d`` the
+        reflections' d-spacings (taken off the cell when not given); ``drawn``
+        the 2θ the pattern-level terms draw them at (taken from
+        :meth:`apparent_two_theta` when not given), which is what ``two_theta``
+        reads (WP-2107).  The value is on the active backend, one per
+        reflection.
+        """
+        cp = self.phases[ip]
+        eq = cp.peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        if d is None:
+            d = d_spacings(cp.reflections.index, *cell)
+        if drawn is None:
+            drawn = self.apparent_two_theta(tt_bragg, values)
+        xp = get_backend()
+        return evaluate_peak_equation(
+            eq, values, cp.peq.frame.at(cell), d=d,
+            theta=xp.radians(0.5 * tt_bragg), two_theta=drawn)
+
+    def _peq_key(self, ip: int, values: dict[str, float], targets) -> tuple:
+        """What phase ip's ``targets`` equations read beyond the cell and λ:
+        their coefficients, and the pattern-level shift their ``two_theta``
+        follows.  ``()`` for a phase with none of them."""
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has(*targets):
+            return ()
+        return (peq.key(values, targets), self._shift_key(values))
+
     def _width_block(self, ip: int, values: dict[str, float],
-                     tt_bragg_lines: list, aniso, *, magnetic: bool = False):
+                     tt_bragg_lines: list, aniso, *, magnetic: bool = False,
+                     d=None):
         """The (w₁, w₂) pair of every emission line, at the current widths.
+
+        A phase's width equations (WP-2107) add where the built-in terms do:
+        a ``gauss_fwhm`` equation's square and a ``gauss_fwhm_squared`` one's
+        value to Γ_G² before its floor, a ``lor_fwhm`` one's value to Γ_L.
+        They read the reflection list, so ``tt_bragg_lines`` must be the
+        phase's own (``d`` its d-spacings, taken off the cell when not given)
+        whenever the phase carries one.  Both components take them: the
+        magnetic one is the nuclear one widened (WP-1343).
 
         ``magnetic=True`` returns the **magnetic component's** pair (WP-1343):
         the same two laws with ``magnetic_lor_size`` added to the 1/cosθ
@@ -1436,13 +1522,19 @@ class CompiledModel:
             y_l = (values["instrument.profile.y"]
                    + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
+        peq = self.phases[ip].peq
+        widths_eq = peq is not None and peq.has(*WIDTH_TARGETS)
         for tt_bragg in tt_bragg_lines:
             theta = 0.5 * tt_bragg  # Bragg angle drives the widths
+            extra_g2 = extra_l = None
+            if widths_eq:
+                extra_g2, extra_l = self._width_terms(ip, values, tt_bragg, d)
             gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
                                   values["instrument.profile.v"],
                                   values["instrument.profile.w"],
                                   values[f"phases.{ip}.gauss_size"],
-                                  values[f"phases.{ip}.gauss_strain"])
+                                  values[f"phases.{ip}.gauss_strain"],
+                                  extra_squared=extra_g2)
             if magnetic:
                 gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
             else:
@@ -1451,8 +1543,31 @@ class CompiledModel:
                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
                     values["instrument.profile.y"] + self.lor_strain_term(ip, values),
                     aniso)
+            if extra_l is not None:
+                gam_l = gam_l + extra_l
             out.append(self._peak_widths(gam_g, gam_l))
         return out
+
+    def _width_terms(self, ip: int, values: dict[str, float], tt_bragg, d=None):
+        """(term of Γ_G², term of Γ_L) phase ip's width equations add at one
+        line, each ``None`` where the phase has no such equation (WP-2107).
+
+        A ``gauss_fwhm`` value g enters Γ_G² as g², a ``gauss_fwhm_squared``
+        value as it stands; both sum when both are declared.
+        """
+        peq = self.phases[ip].peq
+        drawn = self.apparent_two_theta(tt_bragg, values)
+        g2 = lor = None
+        if "gauss_fwhm" in peq.equations:
+            g = self.phase_term(ip, "gauss_fwhm", values, tt_bragg, d=d, drawn=drawn)
+            g2 = g * g
+        if "gauss_fwhm_squared" in peq.equations:
+            sq = self.phase_term(ip, "gauss_fwhm_squared", values, tt_bragg, d=d,
+                                 drawn=drawn)
+            g2 = sq if g2 is None else g2 + sq
+        if "lor_fwhm" in peq.equations:
+            lor = self.phase_term(ip, "lor_fwhm", values, tt_bragg, d=d, drawn=drawn)
+        return g2, lor
 
     def line_lambdas(self, values: dict[str, float]) -> list:
         """λ per emission line, from θ where it is a row and frozen otherwise.
@@ -2150,8 +2265,9 @@ class CompiledModel:
         # exactly what it depends on, which is what a Jacobian column's
         # perturbation is compared against.
         positions = self._memo(
-            cp, "pos", lambda: (cell_key(), self._shift_key(values)),
-            lambda: [self.apparent_two_theta(tt, values)
+            cp, "pos", lambda: (cell_key(), self._shift_key(values),
+                                self._peq_key(ip, values, ("shift",))),
+            lambda: [self.apparent_two_theta(tt, values, phase=ip, d=d)
                      for tt in tt_bragg_lines])
 
         def width_key():
@@ -2164,12 +2280,14 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(self.lor_strain_term(ip, values)))
+                    float(self.lor_strain_term(ip, values)),
+                    self._peq_key(ip, values, WIDTH_TARGETS))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
                                 lambda: self._width_block(ip, values,
-                                                          tt_bragg_lines, aniso))
+                                                          tt_bragg_lines, aniso,
+                                                          d=d))
         else:
             widths = self._memo(
                 cp, "widths_mag",
@@ -2177,7 +2295,7 @@ class CompiledModel:
                          float(values[f"phases.{ip}.magnetic_lor_size"]),
                          float(values[f"phases.{ip}.magnetic_lor_strain"])),
                 lambda: self._width_block(ip, values, tt_bragg_lines, aniso,
-                                          magnetic=True))
+                                          magnetic=True, d=d))
         if self.mode in ("lebail", "pawley"):
             lp_lines = absorb_lines = None
         else:
@@ -2191,6 +2309,17 @@ class CompiledModel:
             absorb_lines = self._memo(
                 cp, "abs", cell_key,
                 lambda: [self._absorption(tt) for tt in tt_bragg_lines])
+        # WP-2107: an ``intensity_factor`` equation, per line since it may
+        # read θ.  Rietveld only: compile refuses one under Le Bail or Pawley,
+        # whose extracted intensities would absorb it.
+        factor_lines = None
+        if cp.peq is not None and cp.peq.has("intensity_factor"):
+            factor_lines = self._memo(
+                cp, "peq_intensity",
+                lambda: (cell_key(),
+                         self._peq_key(ip, values, ("intensity_factor",))),
+                lambda: [self.phase_term(ip, "intensity_factor", values, tt, d=d)
+                         for tt in tt_bragg_lines])
 
         out = []
         for il, lam in enumerate(lams):
@@ -2225,6 +2354,8 @@ class CompiledModel:
                 rough = self._roughness_factor(tt_bragg, values)
                 if rough is not None:
                     intensity = intensity * rough
+                if factor_lines is not None:
+                    intensity = intensity * factor_lines[il]
             # a reflection pushed off the sphere (λ/2d > 1 → NaN position)
             # carries exactly zero intensity: Lp of a NaN angle is NaN, and the
             # masked profile (purity (c)) would otherwise multiply NaN·0
@@ -4405,7 +4536,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         hl_eff = max(hl_eff, AXIAL_SIZING_FLOOR)
     fcj_on = fcj_live(sl_eff, hl_eff)
 
+    # WP-2107: the instrument's shift equation, evaluated at the values the
+    # stage compiles from wherever the compile places a peak
+    inst_shift = None
+    inst_values: dict[str, float] = {}
+    for j, eq in enumerate(instrument.peak_equations):
+        inst_shift = compile_equation(eq, "instrument", j)
+        inst_values = {path: eq.coefficients[name].value
+                       for name, path in inst_shift.paths}
+
     def _shift_est(theta: np.ndarray, tt_bragg: np.ndarray) -> np.ndarray | float:
+        shift = _geometry_shift_est(theta, tt_bragg)
+        if inst_shift is not None:
+            shift = shift + evaluate_angle(inst_shift, inst_values,
+                                           theta=np.radians(theta),
+                                           two_theta=tt_bragg + shift)
+        return shift
+
+    def _geometry_shift_est(theta: np.ndarray, tt_bragg: np.ndarray
+                            ) -> np.ndarray | float:
         shift = zero
         if geom.kind == "bragg_brentano":
             s = geom.sample_displacement.value
@@ -4447,6 +4596,40 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         group = resolve_group(phase.space_group, phase.symmetry_operations)
         refl = _omit_reflections(generate_reflections(
             group, cell, lam_gen, two_theta_max=hi_eff, two_theta_min=gen_min))
+        # WP-2107: the phase's peak equations, compiled against this list
+        eqs: dict[str, CompiledPeakEquation] = {}
+        peq_values: dict[str, float] = {}
+        if phase.peak_equations:
+            _refuse_peak_equations(phase, ip, mode)
+            for j, eq in enumerate(phase.peak_equations):
+                eqs[eq.target] = compile_equation(eq, f"phases.{ip}", j)
+                peq_values.update({path: eq.coefficients[name].value
+                                   for name, path in eqs[eq.target].paths})
+
+        def _term(target, refl, frame, tt_bragg, drawn):
+            return np.asarray(evaluate_peak_equation(
+                eqs[target], peq_values, frame, d=d_spacings(refl.index, *cell),
+                theta=np.radians(0.5 * tt_bragg), two_theta=drawn), dtype=np.float64)
+
+        if "shift" in eqs and len(refl):
+            # ``generation_window`` runs before any reflection exists, so it
+            # cannot bound a shift in hkl.  The margin is the largest shift
+            # the equation gives over the list generated without it, applied
+            # to both edges and generated once more; every reader filters on
+            # the drawn position, so a superset costs nothing.
+            frame0 = compile_frame(group, refl, cell, list(eqs.values()))
+            widest = 0.0
+            for lam in lams:
+                tt_b = refl.two_theta(cell, lam)
+                moved = _term("shift", refl, frame0, tt_b,
+                              tt_b + _shift_est(0.5 * tt_b, tt_b))
+                moved = moved[np.isfinite(moved)]
+                if moved.size:
+                    widest = max(widest, float(np.max(np.abs(moved))))
+            if widest > 0.0:
+                refl = _omit_reflections(generate_reflections(
+                    group, cell, lam_gen, two_theta_max=min(hi_eff + widest, 180.0),
+                    two_theta_min=max(gen_min - widest, 0.05)))
         # WP-1326: a declared propagation vector adds the satellites at
         # Q = H ± k as a second ReflectionSet, frozen here with the nuclear one
         # and merged into a single list (see ``CompiledPhase.satellites``).
@@ -4553,9 +4736,25 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 tt_bragg = refl.two_theta(cell, lam)
                 theta = 0.5 * tt_bragg
                 pos = tt_bragg + _shift_est(theta, tt_bragg)
+                # WP-2107: the windows follow the phase's equations, read at
+                # the values the stage compiles from (the forward's own
+                # evaluation, ``model.peak_equations.evaluate``)
+                extra_g2 = extra_l = None
+                if eqs:
+                    drawn = pos
+                    if "shift" in eqs:
+                        pos = pos + _term("shift", refl, frame, tt_bragg, drawn)
+                    if "gauss_fwhm" in eqs:
+                        extra_g2 = _term("gauss_fwhm", refl, frame, tt_bragg, drawn) ** 2
+                    if "gauss_fwhm_squared" in eqs:
+                        sq = _term("gauss_fwhm_squared", refl, frame, tt_bragg, drawn)
+                        extra_g2 = sq if extra_g2 is None else extra_g2 + sq
+                    if "lor_fwhm" in eqs:
+                        extra_l = _term("lor_fwhm", refl, frame, tt_bragg, drawn)
                 g_est = gaussian_fwhm(theta, instrument.profile.u.value,
                                       instrument.profile.v.value, instrument.profile.w.value,
-                                      phase.gauss_size.value, phase.gauss_strain.value)
+                                      phase.gauss_size.value, phase.gauss_strain.value,
+                                      extra_squared=extra_g2)
                 x_l = instrument.profile.x.value + phase.lor_size.value
                 # a Stephens block replaces lor_strain (WP-1467,
                 # CompiledModel.lor_strain_term), so it sizes nothing here
@@ -4566,6 +4765,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     y_l = y_l + extra_strain
                 l_est = lorentzian_fwhm(theta, x_l, y_l,
                                         0.0 if aniso_est is None else aniso_est)
+                if extra_l is not None:
+                    l_est = l_est + extra_l
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
                 # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
@@ -4589,6 +4790,16 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                             fcj_n[il, k] = fcj_node_count(float(pos[k]), float(gamma_est[k]),
                                                           sl_eff, hl_eff, closing=closing_precision)
 
+        frame = None
+        if eqs:
+            frame = compile_frame(group, refl, cell, list(eqs.values()))
+            tt_b = refl.two_theta(cell, lams[0])
+            drawn0 = tt_b + _shift_est(0.5 * tt_b, tt_b)
+            for j, eq in enumerate(phase.peak_equations):
+                check_orbits(eqs[eq.target], peq_values, frame,
+                             d=d_spacings(refl.index, *cell),
+                             theta=np.radians(0.5 * tt_b), two_theta=drawn0,
+                             where=f"phases.{ip}.peak_equations.{j} ({eq.target})")
         _size_family(win, fcj_n, 0.0, 0.0, primary=True)
         if mag_split:
             # The widths the stage can *reach*, not the ones it starts at: a
@@ -4614,7 +4825,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n,
                            strain_monomials=strain_monomials,
                            satellites=satellites,
-                           win_mag=win_mag, fcj_n_mag=fcj_n_mag)
+                           win_mag=win_mag, fcj_n_mag=fcj_n_mag,
+                           peq=None if frame is None else PhasePeakEquations(eqs, frame))
         if satellites is not None:
             cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
@@ -4818,7 +5030,30 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         window_area_tol=float(window_area_tol),
         window_slack_deg=float(WINDOW_MIN_DEG if window_slack_deg is None
                                else window_slack_deg),
+        inst_shift=inst_shift,
     )
+
+
+def _refuse_peak_equations(phase, ip: int, mode: str) -> None:
+    """Refuse a phase's peak equations where the compile cannot honour them.
+
+    An ``intensity_factor`` under Le Bail or Pawley would be absorbed by the
+    extracted intensities and leave its coefficients flat, so it is refused
+    there.  A satellite reflection is labelled by its order, not by an hkl the
+    orbit images and ``harmonic`` could read, so a phase with a propagation
+    vector takes none (WP-2107).
+    """
+    if mode != "rietveld" and any(eq.target == "intensity_factor"
+                                  for eq in phase.peak_equations):
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): an intensity_factor peak equation "
+            f"under {mode}, whose extracted intensities would absorb it. Drop "
+            "the equation for this fit, or fit in Rietveld mode")
+    if phase.propagation_vector is not None:
+        raise ValueError(
+            f"phases.{ip} ({phase.name!r}): peak equations on a phase with a "
+            "propagation vector. A satellite reflection carries no hkl of the "
+            "phase's lattice for the equation to read")
 
 
 def window_sizing(model: CompiledModel, values: dict[str, float],
