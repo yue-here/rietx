@@ -76,6 +76,21 @@ rows), so re-measure before quoting one row.
 - **The `edit` start is a plan extension only.** The model was converged under the plan minus
   its last stage, and the timed fit ran the whole plan. A model swap that adds a block (a
   preferred-orientation block, a phase) was not measured.
+- **A model swap that adds a block (task 3, 2026-11-19).** `2224-batch/swap.py`, tree at
+  00dae473c, no closing stage, machine under load (seconds not quotable). Each case fitted the
+  standard without the block, added the block at its no-effect value with `edit`, and fitted
+  from there once as one stage and once staged.
+
+  | Case | Rwp one stage / staged | Largest gap, one stage from staged | Evaluations |
+  |---|---|---|---|
+  | brucite + March-Dollase (001) at r = 1 | 0.18476 / 0.18462 | 2.25 esd, profile W (gauss strain 1.51, gauss size 1.44) | 46 / 68 |
+  | brucite + spherical harmonics, order 4, at zero | 0.19696 / 0.19695 | 1.01 esd, Lorentzian strain | 60 / 92 |
+  | NAC fitted alone, then CaF₂ added at scale 1e-7 | 0.09317 / 0.09317 | 0.00 esd | 19 / 40 |
+
+  All three reach under § Measured's 3 % Rwp rule. Brucite's untextured first fit sits at Rwp
+  0.469, so the block moves the model far, and the one stage stops 2.25 esd from the staged
+  answer in the Gaussian width trio that `FLAT_DIRECTION` already flags as one direction.
+  Design 2 is not loosened: an `edit` still runs the plan. The result goes to Yue.
 - **Other levers, for scale.** Closing stage off: 1.40× median (1.23-2.35), WP-2222. Two cold
   stages in place of the plan: 1.3×, with 2 more misses in 48 and a size width up to 8.75 esd
   from the staged answer at Rwp equal to the fourth digit. Stopping at `ftol` 1e-4 on every
@@ -155,9 +170,11 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
       with `turn_off` runs staged.
 - [x] The record of design 4, and the `_audit` row for the new default action with its tier
       and families (the eight standards above).
-- [ ] Measure a re-fit after a model swap that adds a block at its identity value (a
+- [x] Measure a re-fit after a model swap that adds a block at its identity value (a
       preferred-orientation block on brucite, a second phase on NAC), one stage against staged.
       Loosen design 2 only if all reach; bring the result to Yue either way.
+      Measured 2026-11-19 (§ Measured): all reach by Rwp, brucite + March-Dollase 2.25 esd
+      off; design 2 kept strict; with Yue.
 - [ ] Tests: a first fit is staged; a re-fit is one stage and lands within 0.5 esd of the
       answer the model stood at on three families (never of a staged re-fit, which moves
       zincite 2 esd: § Measured); a written value, another pattern, another mode and a

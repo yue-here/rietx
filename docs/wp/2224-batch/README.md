@@ -19,6 +19,10 @@ telemetry off, tree at 936d17315). Its baseline is the staged plan without a clo
 the standard's own start. A fit "reached" the answer when its Rwp is within 3 % of the
 baseline's. The raw JSON lines are not committed (1.2 MB).
 
+`swap.py` is task 3's probe (a block added at its no-effect value, then one stage against
+staged), and `accept.py` the § Acceptance run on the eight standards. Each docstring says what
+it prints.
+
 Two cautions on the times in `summary.txt`:
 
 - The first pass ran under a load average of 46-71 on ten cores, and it covered the `shipped`,
