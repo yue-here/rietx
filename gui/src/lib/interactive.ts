@@ -20,7 +20,6 @@ import { paramKey, resolve } from "./help";
 import { fnmatch } from "./fnmatch";
 import type { ParamRow } from "./table";
 
-
 /** How a slider's default range is built (WP-2128 § Context, the prototype's rules). */
 export type Kind = "scale" | "zero" | "disp" | "cell" | "axial" | "gauss" | "lor";
 

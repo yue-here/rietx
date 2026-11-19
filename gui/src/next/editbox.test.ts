@@ -95,6 +95,21 @@ describe("the Interactive tab's value box (WP-2223)", () => {
     expect(preview).toHaveBeenCalled();
     expect(JSON.stringify(preview.mock.calls.at(-1))).toContain("0.0015");
   });
+
+  it("takes a range end typed back to the text it opened on", async () => {
+    await open();
+    const thumb = () => document.querySelector<HTMLInputElement>('input[type="range"]')!.value;
+    const from = () => document.querySelector<HTMLInputElement>('input[aria-label="Lowest value"]')!;
+    const before = thumb();
+    document.querySelector<HTMLButtonElement>("button.pname")!.click();
+    await settle();
+    const shown = from().value;
+    await key(from(), "Enter", "0.0001");
+    expect(thumb()).not.toBe(before);
+    // the old text is now a change back, never "the end as shown"
+    await key(from(), "Enter", shown);
+    expect(thumb()).toBe(before);
+  });
 });
 
 describe("the Parameters panel's editor (WP-2223)", () => {

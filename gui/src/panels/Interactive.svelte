@@ -260,6 +260,9 @@
     const [lo, hi] = typedRange(s);
     if (lo === s.lo && hi === s.hi) return;
     replace(s, { lo, hi, custom: true, track: s.track === "log" && !(lo > 0) ? "lin" : s.track });
+    // the fields now show the new ends, so typing the old text back is a change
+    shownLo = rangeLo;
+    shownHi = rangeHi;
   }
 
   function setTrack(s: Slider, track: Track) {

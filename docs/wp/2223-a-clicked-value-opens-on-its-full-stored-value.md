@@ -16,7 +16,7 @@ edit. The drawn numbers stay as they are.
 "go with best practice". The lead chose the spreadsheet model: Excel and Google Sheets draw a
 cell rounded and open its editor on the full stored value. Here that is the shortest text that
 reads back as the same double, JavaScript's `String(v)`: up to 17 significant figures, in
-e-form where JavaScript prints one (`2.7725887222397812e-7`) and plain where it prints plain.
+e-form where JavaScript prints one (`2.7725887222397814e-7`) and plain where it prints plain.
 
 **What the editors open on today.**
 

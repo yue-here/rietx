@@ -120,7 +120,7 @@ export function slotWidth(slots: Slots): number {
 
 /** The text a value editor opens with: the stored value to its last digit, as
  *  the shortest text that reads back as the same double (`String(v)`: plain
- *  where JavaScript prints plain, `2.7725887222397812e-7` where it prints
+ *  where JavaScript prints plain, `2.7725887222397814e-7` where it prints
  *  e-form). A cell is drawn rounded and edited in full, as a spreadsheet's is
  *  (WP-2223). An editor compares what was typed with the text it opened on,
  *  never with the drawn number, so a click in and out, or Enter on the text
