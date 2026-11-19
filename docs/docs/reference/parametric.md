@@ -181,6 +181,7 @@ A plan frees an equation's coefficients only where one of its stages reaches the
 `mccusker_structural` adds the coordinates and B.
 An equation on any other kind needs a `PlanSpec` stage naming its target.
 Otherwise its coefficients stay at their starting values, and the result has no row for them.
+[`VARIABLE_NOT_FREED`](diagnostics-series.md#variable_not_freed) then names the equation and those coefficients.
 
 ```python
 import rietx as rx
@@ -228,6 +229,7 @@ The variables are the refined numbers, declared by the `variables` keyword of `M
   A Debye temperature read by a cell formula and a Biso formula is one number.
 - A stage that frees a formula's target frees the variables it names.
   A variable declared `vary=False` stays fixed there, and a glob naming `vars.<name>` frees it.
+  A variable no stage freed is named by `VARIABLE_NOT_FREED` ([Range and visibility warnings](#range-and-visibility-warnings)).
 - A variable may not share its name with a coordinate column, and a variable no formula names is refused.
 - A formula equation with `target=None` drives nothing.
   It is an intermediate that a later formula names, such as a temperature calibration that the cell formulas read.
@@ -503,6 +505,13 @@ There the target's value and esd come from the patterns that do see the phase, c
 Quote the equation's coefficients rather than the target in those patterns.
 If the equation should hold only where the phase is measured, narrow the subset to those patterns.
 When no subset pattern sees the phase, the warning says the equation itself is not measured, and its coefficients stay where they started.
+
+[`VARIABLE_NOT_FREED`](diagnostics-series.md#variable_not_freed) is a warning, one per declaration, when no stage of the plan freed one of its coefficients.
+This happens when no stage reaches the target, or when a formula's variable was declared `vary=False`.
+`where` names each such coefficient, and `value` counts them.
+Each kept its starting value, so the equation's value at each pattern is not a measurement.
+A stage whose `turn_on` names the target frees the coefficients, and a stage naming `vars.<name>` frees a variable declared `vary=False`.
+On the same held variable, the suggestion of [`PARAMETRIC_FORM_REJECTED`](diagnostics-series.md#parametric_form_rejected) names it before it suggests revising the formula.
 
 ## Form test
 
