@@ -349,6 +349,38 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
+- **2026-11-19** — The fourth PR, PR #1684: the 2026-11-19 round merged up, and the Peak
+  shape row (§ Rulings 6).
+
+  This branch merges PR #1683's branch, which carries PR #1680's round of the day. It then
+  builds § Rulings 6. The Instrument dialog's Axial divergence row is now Peak shape. S/L, H/L
+  and the FCJ warning stay in view. Under the row's Advanced disclosure, closed by default,
+  sits the profile's shape, shown as "TCHZ pseudo-Voigt" or "Voigt". It applies with the
+  dialog's Apply, inside the whole-model edit. § Questions 10's row list says so, and
+  § Questions 12 is marked answered.
+
+  - *Done*: `next/instrument.ts` lets `profile.shape` through `dialogFields` and holds the
+    two labels in `SHAPE_LABELS`, since `rietx.help` has no entry for either shape.
+    `next/Instrument.svelte` draws the row. Tests: vitest `next/instrument.test.ts`, and the
+    dialog's browser case, which opens Advanced by a click, reads both labels, chooses
+    Voigt and reads `profile.shape == "voigt"` back after Apply. Pictures, light and dark:
+    every `instrument-*.png` re-shot, plus the new `instrument-advanced-*.png`.
+  - *Fixed on the way*: the first fast-suite run failed the dialog's browser case once.
+    After "Load an instrument profile…" the test read λ1 as 0.414 while the server held
+    0.4139. The dialog set its "Loaded" line before awaiting the reload, so for a moment
+    the line named the file over the values it replaced. It is now set after the reload.
+    Run alone, the case passed before and after; only the loaded suite showed it.
+  - *Measured*:
+    fast suite on the final tree 14951 passed, 424 skipped and 32 xfailed in 9:51, through
+    the shift's serial lock: two more than this PR's last count, PR #1680's palette test in
+    each theme. Vitest 850 of 850. svelte-check 0 errors in 459 files. Ruff clean. GUI python
+    files (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_preview`):
+    288 passed. The dialog's browser case alone: passed three times. The full browser glob
+    was stopped by a pause before it finished, so it has not run on this tree. CI's Vale
+    steps, run as `ci.yml` runs them: 0 errors.
+  - *Next*: the browser glob on this tree, stopped by a pause. Then Yue's look at the three
+    PRs' pictures and at § Questions 13. Then the WP closes.
+
 - **2026-11-19** — The third PR, PR #1683, brought up to the 2026-11-19 round of PR #1680.
 
   This branch merges PR #1680's round: the dark last-fit colour, the range pop-up's digits,
