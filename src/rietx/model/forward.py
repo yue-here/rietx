@@ -4281,9 +4281,11 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
 
     ``window_area_tol`` is the area each window may drop from its peak, for the
     phase windows and the declared sharp peaks alike.  ``None`` is
-    ``schemas.plan.CLOSING_WINDOW_TOL``, the fraction an answer is measured
-    at, so a model evaluated outside a fit is the model a default fit's answer
-    came from (WP-2002, the seventh round's Q1).  The plan runner passes
+    ``schemas.plan.CLOSING_WINDOW_TOL``, so a model evaluated outside a fit
+    carries near-complete tails (WP-2002, the seventh round's Q1).  A default
+    fit's answer comes from ``WINDOW_AREA_TOL`` windows since the closing
+    stage went off by default (WP-2222), so rebuilding a fit's own curve
+    passes :func:`recorded_window_tol` of its last stage's record.  The plan runner passes
     ``WINDOW_AREA_TOL`` for a declared stage and the plan's
     ``closing_window_tol`` for its closing stage; a caller rebuilding a stage
     from its record passes :func:`recorded_window_tol` of the recorded value.
