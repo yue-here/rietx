@@ -234,3 +234,37 @@ def test_a_pending_hold_is_held_for_that_answer_alone(tmp_path_factory, tmp_path
     assert excinfo.value.status == 400
     # the refusal points at the path that is missing, never at every one sent
     assert excinfo.value.where == ["instrument.background.c99"]
+
+
+def test_a_pending_glob_hold_is_held_as_the_hold_verb_resolves_it(tmp_path_factory, tmp_path):
+    """A pending hold may be a glob, as the hold verb takes one (WP-2218 review):
+    the band is the one every matching path held gives, and a glob matching
+    nothing is refused by name, as a missing path is."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    paths = ["instrument.background.c4", "instrument.background.c5"]
+    by_glob = session.background(["instrument.background.c[45]"])
+    by_paths = session.background(paths)
+    np.testing.assert_array_equal(by_glob.arrays["band_esd"], by_paths.arrays["band_esd"])
+    assert by_glob.header["pending_holds"] == ["instrument.background.c[45]"]
+    with pytest.raises(GuiError, match="phases.9") as excinfo:
+        session.background(["phases.9.*"])
+    assert excinfo.value.where == ["phases.9.*"]
+
+
+def test_releasing_a_pending_hold_reuses_the_unheld_answer(tmp_path_factory, tmp_path, monkeypatch):
+    """A chip pressed and released costs one band, not two (WP-2218 review):
+    the answers at one working state are kept per set of holds."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    calls = []
+    real = background.band_esd
+    monkeypatch.setattr(background, "band_esd", lambda *a: calls.append(1) or real(*a))
+    free = session.background()
+    session.background(["instrument.background.c3"])
+    assert session.background() is free
+    assert len(calls) == 2
+    # a moved working state forgets them all
+    project.refinement.hold("instrument.background.c2")
+    session.background()
+    assert len(calls) == 3
