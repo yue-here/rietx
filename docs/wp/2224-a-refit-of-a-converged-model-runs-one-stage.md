@@ -1,6 +1,6 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; the display text, the model-swap rule and the GUI's second Refine wait on Yue
+Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; four questions wait on Yue (handover log)
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
 Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
@@ -223,9 +223,11 @@ evaluations.
   frees. On the eight comparison standards it lands within 0.21 esd of the first fit's answer
   and costs 0.32-0.50 of a staged re-fit's evaluations (0.15-0.27 once the closing stage is off).
   None of the eight fell back. A first fit, any written value, another pattern, mode or channel
-  set, and a plan that fixes a parameter all still run the plan. Three things wait on Yue: the
+  set, and a plan that fixes a parameter all still run the plan. Four things wait on Yue: the
   text a display prints for a re-fit and for a fallback, keeping a model swap on the staged
-  plan, and whether the GUI's second Refine should re-fit (it stays staged until then).
+  plan, and whether the GUI's second Refine should re-fit (it stays staged until then). A
+  fourth came from the review: a plan that frees a block the first fit held still re-fits in
+  one stage, and on brucite that lands 2.25 esd off the staged answer.
 
   *Done.* `refit="single" | "stages"` on `Refinement.fit` and `refine`. The re-fit test is a
   digest of the pattern arrays, fitted mask, mode and the models' values with `vary` and
@@ -257,7 +259,18 @@ evaluations.
   ran one stage and landed on the `edit` route's numbers exactly: Rwp 0.18476 against staged
   0.18462, profile W 2.25 esd off (Gaussian strain 1.51, size 1.44), 46 / 68 evaluations. So a
   plan or `set_vary` that frees what the converged fit held is a re-fit under design 2 and is
-  not safe; this went to Yue with a recommendation to run such a fit staged. Suites: SUITE_COUNTS
+  not safe; this went to Yue with a recommendation to run such a fit staged. Suites, on the tree with `main` merged
+  (6bcd9a161), `[dev]`, macOS arm64, no other suite running (sampled each minute). Fast:
+  14 925 passed, 434 skipped, 32 xfailed, about 10 min. Before review the branch's fast run had
+  14 922 passed, 1 failed (the stale GUI help-key fixture, since regenerated) and 434 skipped,
+  so passed+skipped moved by exactly the two tests the review added. Full: 15 882 passed, 445
+  skipped, 50 xfailed, 1 failed, about 37 min. The failure is
+  `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
+  (moment 0.6995 against 3.5). It fails the same way on a snapshot of `origin/main`, with
+  this WP's default switched to `"stages"`, and on main's Linux nightly of 2026-11-18;
+  WP-1418's log has it. The 13 added tests (19 cases) cost 40.4 s of worker time locally
+  (largest: the one-stage re-fit on three families, 11.1 s). They stay in the fast tier because they are
+  the default's acceptance, split over three per-family xdist groups.
 
   *Gotchas.* Folded from WP-2225's note (this file's former `### Inherited`): the staged
   re-fit's 2.05 esd on zincite V and 0.83 on fluorite V is the width twin hold re-solving U, X
@@ -266,11 +279,153 @@ evaluations.
   the stage ladder finds no run matching the plan on screen and its Rwp column goes blank.
   `import rietx.refine as m` gives the function; use `importlib.import_module`.
 
-  *Generality.* GENERALITY
+  *Generality* (the author's answers first, one line each; the judge's report follows them,
+  unedited):
+  `WARM_REFIT_REJECTED` weak on families: the row now names its injected case.
+  `Refinement.fit:refit` contested for a newly freed block: measured (`held_block.py`, above),
+  2.25 esd, sent to Yue with a recommendation to run such a fit staged. The row now names its
+  dissent and gives the families as seven materials from four instruments.
+  `turn_off` refusal: kept. Collapsing such a plan through `closing_stage`'s `fixed_at_end` is
+  plausible and unmeasured, so it is a follow-up, not this branch.
+  GUI hold: design 5 and `concepts/plans.md` now say it is temporary.
+  Skill row weak on its cause clause: retagged `(Hypothesis: …)`, and `help.py` no longer
+  calls it the usual cause.
+  A `tie` that moves a value ends a re-fit: the docstring and manual now say so.
 
-  Next: Yue's three answers, in this order. The GUI one decides whether `gui/session.py` drops
-  `refit="stages"` and the ladder gains a one-stage view (a GUI WP). The display text one may
-  reword `_warm_refit_rejected` and `_protocol_lines`. When WP-2222 merges, merge `main` and
+  **WARM_REFIT_REJECTED**
+
+  **holds.** The case for acting is stronger. The fallback reuses the series' rejection test, which the maintainer has already ruled on, and the code reports a second fit the package ran on its own. The one gap: no real fit has ever triggered it.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "nothing: the result is the staged plan's answer, and the message names why the one-stage re-fit was discarded" (`_audit.py` row, `responds`) | The code decides nothing itself. It reports two acts the caller did not ask for. The one-stage attempt (`warm_refit`, the single stage the plan is collapsed into) is discarded. Then the full plan runs from the restored start (`refine.py` `_fit_refit`). | clear |
+  | 2. Kind | `ambiguity=1` | The trigger is `_rejected` (the series' test: the fit diverged, or it carries an error-level diagnostic). Throwing away a diverged fit is one of Rule 1's protections of work already done. Kind 1 agrees. | agrees |
+  | 3. Case against acting | none given | Nothing substantive found. One small point: if the staged plan is also rejected, its result is returned rather than the better of the two attempts. The series' ladder keeps the best attempt. Nothing is lost, because the discarded nodes stay in the history tree with the note `refit_discarded`. When the code fires, it costs one extra one-stage fit. | none found |
+  | 4. Case for acting | "Says out loud that the package ran a second fit, as SEQUENTIAL_RESEED does for the series' ladder" (`grounds`) | Every refiner would discard a diverged fit. Without the code, a result would list the full plan's stages and give no reason. Measured cost of staying silent: none given, since the code never fired on real data. | strong |
+  | 5. Tier | 3, "the trigger is the series' own _rejected (ruled by the maintainer 2026-11-03)", `approved="2026-11-19"` | Tier 3 is right: the trigger is rietx's own test. One of the codes it reads, `MODEL_FAR_FROM_DATA`, is itself a rietx threshold and is tiered in its own row. `approved` gives the date of Yue's ruling on the design (WP § Context). The maintainer has not yet approved this row. | holds |
+  | 6. Families | "On the eight comparison standards it fires on none from a converged start (WP-2224 § Measured)" (`evidence`) | No firing on the eight standards. They cover four laboratory/instrument groups, and all eight are development data. The only firing is injected: `tests/test_refit_single.py::test_a_rejected_one_stage_fit_falls_back_to_the_plan` patches `_rejected` so that it rejects every `warm_refit`. That test checks the plumbing: the state is restored, the answer equals the staged one bit for bit, and the job leaves one run directory. It does not test the trigger. The rule asks a row whose guard no ordinary fit reaches to name its injected case, and this row names none. | weak on this point |
+  | 7. What records it | the code (`evidence`) | The code is `info`. Its message names the error codes and the rejected attempt's Rwp. The discarded nodes carry `refit_discarded`. | holds |
+
+  What would change the verdict: a real one-stage re-fit that `_rejected` rejects, named in the row, would remove the only gap. A case where the staged fallback lands worse than the discarded attempt would weaken the row.
+
+  **rietx.refine.Refinement.fit:refit**
+
+  **holds.** The case for acting is stronger when the re-fit has the same free set: on 8 of 8 standards the one stage keeps the answer to within 0.41 esd, at about 0.4× the time. The row names no dissenter. It also leaves out the one measured case where one stage lands 2.25 esd away from the staged answer.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "Under `"single"` (the default) a re-fit runs the plan collapsed into one stage, `warm_refit`" (`Refinement.fit` docstring) | The caller passes plan X. When the start is an accepted fit's answer, the package runs X collapsed into one stage instead of X. Under `refit="stages"` the caller decides. | clear |
+  | 2. Kind | `ambiguity=1` | The kind-1 claim is that every competent refiner re-fits a converged model with everything free at once. That holds when the free set is unchanged. It is contestable when a changed plan frees a group the converged fit held (row 3). | agrees, with one exception |
+  | 3. Case against acting | No dissenter named. The rule asks the author to name one or say none exists. | (a) McCusker et al. 1999, which the skill §2 and the WP cite, frees groups cumulatively, each converged before the next. `docs/practice.md` § Staging says GSAS-II and FullProf users "stage a first approach by hand". The re-fit test treats a changed plan as still a re-fit (WP design 2), so such a user's situation reaches the one stage. WP § Measured task 3: brucite with a March-Dollase (001) block at r = 1 ended 2.25 esd from the staged answer on profile W (Rwp 0.18476 against 0.18462). That run went through `edit`, which the default sends staged. A structure that already carried the block at r = 1, held, followed by a plan with an added `po` stage, has the same digest and takes the one-stage path. That route is not tested. The gap lies in the Gaussian width trio that `FLAT_DIRECTION` (the code for a combination the data barely determine) already flags. (b) Against (a): the "edit" start was measured. The model was converged under each plan minus its last stage, then fitted with the full plan. Result: 8 of 8 within 0.00 esd max (`2224-batch/summary.txt`, "start edit"). (c) BGMN and MAUD stage by default (practice.md), and RIETAN-FP does under `NAUTO = 2`, though practice.md does not say whether that is its default. practice.md does not say what any of the three does on a second run from converged values. Not checked. | contested only for a plan change that frees a far-off block |
+  | 4. Case for acting | "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its time; from a cold start one stage reaches 20 of 48, which is why a first fit stays staged" (`evidence`) | `summary.txt` "start warm, single": 8/8, time 0.39× (0.34-0.50), evaluations 0.25×, largest gap 0.41 esd, cell gap at most 10.8 ppm. The saving is time, not calls or numbers. On these standards a staged re-fit takes 0.22-0.67 s and one stage 0.08-0.27 s; with the closing stage on (the shipped default before WP-2222), 0.37-1.21 s. No large model was measured. The Priority line says users complained about fit time. A staged re-fit moves zincite's profile V by 1.97 esd. WP-2225 traces that to the held instrument width, so it argues neither way. The docstring and `concepts/plans.md` quote "within 0.21 esd" and "0.32-0.50 of the staged re-fit's evaluations (0.15-0.27 with no closing stage)". Those numbers come from `accept.py`, and its printout is not in the WP or in `2224-batch/` at this tree. | strong for an unchanged free set |
+  | 5. Tier | 2: "TOPAS, GSAS-II and FullProf run one solve of whatever is free … (docs/practice.md § Staging)" | practice.md lists FullProf, GSAS-II, TOPAS and EasyDiffraction as staging nothing. The row leaves out EasyDiffraction, which supports it. Those practice.md rows carry no checked/recalled mark, and I did not check the programs. Dissenters keep the value at tier 2. But the default switches on an action, and the rule says a dissent counts at the action's judgement ground. The row carries no `grounds` or `approved`. Its judgement answer is "Ruled by the maintainer 2026-11-19, 'Yes, by default'", which WP § Context records. The precedent it leans on, `SequentialRefinement.fit:refit`, is still on `UNAUDITED_BASELINE`. | tier 2 fits the value; the action's ground rests on the ruling alone |
+  | 6. Families | "the eight comparison standards (…; six families)" (`evidence`) | By laboratory and instrument I count four groups. NIST's diffractometer (SRM 660c). The CPD round-robin Philips instrument (corundum, zincite, fluorite, brucite; `tests/data/README.md`: "same instrument/conditions"). GSAS-II LabData (fluorapatite). APS 11-BM (NAC, SRM 660a). That is seven materials. "Six" is not broken down. The reference is rietx's own staged answer, which verifies and validates nothing. Distance from SRM 660c's certified cell or SRM 676a's c/a: none given. All eight are development data, and the row does not say so. The test asserting under 0.5 esd uses zincite, fluorite and corundum, all from one instrument. | ≥3 either way; reference and data status missing |
+  | 7. What records it | "its one stage is named `warm_refit`" (WP design 4) | `result.stages` holds one stage named `warm_refit`, and history nodes carry the same name. `summary()`'s protocol line reads the private `Refinement._refit_plan`. No result field records which plan the caller passed. | thin but present |
+
+  What would change the verdict: run the brucite case through the default path (block present and held, plan extended), or free the atoms on a converged profile-only fit. Landing within 0.5 esd of staged makes the row unqualified. Landing over 2 esd in a direction `FLAT_DIRECTION` does not flag makes it weak.
+
+  **rietx.refine.refine:refit**
+
+  **holds.** As for `Refinement.fit:refit`, the case for acting is stronger, and on `refine`'s default path the default never acts.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "acts only when `history` is a tree whose head is an accepted fit of `data` at exactly these models' values" (`refine` docstring) | It acts only when `history` is a `RefinementTree` object whose head carries the `refit_key` note. `history=False` (the default) and a path never act (`Refinement.__init__`'s `isinstance` test). | clear |
+  | 2. Kind | `ambiguity=1` | As for `Refinement.fit:refit`. | agrees |
+  | 3. Case against acting | none given | As for `Refinement.fit:refit`. It is reached only when a caller hands in a live tree. | contested only for a far-off newly freed block |
+  | 4. Case for acting | as in `Refinement.fit:refit` (identical `evidence`) | Same measurement. No test drives `refine` itself through a re-fit. | strong |
+  | 5. Tier | 2 | As for `Refinement.fit:refit`. | as there |
+  | 6. Families | as in `Refinement.fit:refit` | As there. | as there |
+  | 7. What records it | — | The `warm_refit` stage name. | thin but present |
+
+  What would change the verdict: the same evidence as for `Refinement.fit:refit`.
+
+  **The re-fit test (`refine.py` `_refit_key`)**
+
+  **holds.** The case for acting is stronger. The test compares a digest of the state, and its strict side fails toward the old staged behaviour.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "Digesting the state, rather than tracking which verbs ran, makes 'no value written since' an observation" (`_refit_key` docstring) | It decides whether a fit is a re-fit. The digest covers the pattern arrays and σ, the fitted mask (`project.fitted_mask`, which includes the 2θ limits), the mode, the models with `vary` and `stderr` stripped, and the named variables. It leaves out the plan, holds, ties, backend and solver. | clear |
+  | 2. Kind | none given (no row) | Hash equality is arithmetic, so kind 1. What goes into the hash is a rietx design choice. | kind 1 |
+  | 3. Case against acting | none given | Being strict costs one staged fit after any write, including one that moves nothing material, such as a bound or a label. That costs time and moves no answer. `tie` writes the implied value into the models (`tie` docstring), so a tie that changes a value ends the re-fit. The manual's "Changing what is free with … `tie` … keeps it a re-fit" holds only where the implied value equals the stored one. The plan is left out of the key: see the `Refinement.fit:refit` section, row 3. | none found against the test itself |
+  | 4. Case for acting | "The strict side is the safe side: the staged plan reached 46 of 48 cold starts" (WP design 2) | Cold, one stage reached 20 of 48. Brucite + March-Dollase through `edit` ended 2.25 esd off. Both support sending any value change staged. | strong |
+  | 5. Tier | none (the table cannot see it) | Tier 1 for the equality. Tests: `test_a_written_value_runs_the_plan`, `test_another_pattern_channels_or_mode_runs_the_plan` (pattern, limits, mode), `test_a_fit_that_did_not_converge_leaves_no_refit`, `test_a_free_set_change_keeps_it_a_refit`, `test_a_reopened_tree_at_a_converged_answer_is_a_refit` (all in `tests/test_refit_single.py`). | holds |
+  | 6. Families | n/a: no threshold | — | n/a |
+  | 7. What records it | node note `refit_key` (`REFIT_KEY_NOTE`) | The note on the answer's node. The decision shows as the `warm_refit` stage name. | holds |
+
+  What would change the verdict: a state the digest calls a re-fit in which a value outside the hashed models moved.
+
+  **A plan with `Stage.turn_off` always runs staged**
+
+  **holds.** It takes the old path and moves no answer. The reason given is weaker than stated, so the case for collapsing such plans too has more behind it than the code admits.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "one stage frees then fixes, and cannot replay a fix a later stage undid (WP-2208), so such a plan runs staged" (`Refinement.fit` comment) | `refit="single"` is ignored for any plan that fixes parameters part way. Nothing tells the caller. | clear |
+  | 2. Kind | none given | Kind 1 in effect: it is the pre-WP behaviour. | n/a |
+  | 3. Case against acting (forcing stages) | none given | `RefinementPlan.closing_stage` already builds one stage for a plan that fixes. It frees every glob, then fixes the end state through `fixed_at_end(self.stages, paths)` (`strategy/staged.py:444-466`). So the obstacle named in the comment is already solved in the same module. Cost: a re-fit of such a plan pays the full staged time. Magnetic plans build their stages with `turn_off` (`strategy/magnetic.py:2328`), so magnetic re-fits never get the speed-up. Not measured. | moderate |
+  | 4. Case for acting | the same comment | Staged is the bit-for-bit old fit, so it moves no number. | holds |
+  | 5. Tier | none | Test: `test_a_plan_that_fixes_runs_staged`. | holds |
+  | 6. Families | n/a | — | n/a |
+  | 7. What records it | none given | None. The result lists the plan's stages and gives no note that `refit` was declined. | none |
+
+  What would change the verdict: a re-fit of a `turn_off` plan collapsed through `closing_stage`'s `fixed_at_end` that keeps the answer. That would make the refusal unnecessary.
+
+  **`_collapse` keeps the last stage's ftol, restraint weight and window slack**
+
+  **holds.** The case for acting is stronger. The answer converged under the last stage's objective, and the closing stage keeps the same three settings.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "the objective and windows the plan's answer converged under are its last stage's, which the closing stage copies for the same reason" (`strategy/refit.py` comment) | It decides the one stage's `ftol`, `restraint_weight_scale` and `window_slack_deg`. Before this change the one stage solved at the defaults, for example a restraint weight of 1.0. | clear |
+  | 2. Kind | none given | Kind 1: a re-fit re-solves the objective the answer converged under. | kind 1 |
+  | 3. Case against acting | none given | None found against the choice. Side effect: `_collapse` is shared with the series, so a series' warm patterns change too wherever a user's plan sets these on its last stage. No preset sets them. A grep finds only `closing_stage`, `refit.py` and `magnetic.py:1393`'s `ftol=last.ftol`, so series run on presets are unchanged. No series test or measurement is given, and the WP's non-goals say the series' `refit=` is unchanged. "As `closing_stage` does" holds for these three settings only: `closing_stage` takes the last stage's `max_iter` and Le Bail settings, while `_collapse` takes the plan's maximum. | none found |
+  | 4. Case for acting | the same comment | With a scheduled restraint weight, the old one stage minimised a different S = S_y + c_w·S_G than the one the answer converged under. | strong |
+  | 5. Tier | none | Test: `test_the_one_stage_keeps_the_last_stages_objective_and_windows`. It checks the built stage and runs no fit. | holds |
+  | 6. Families | n/a | — | n/a |
+  | 7. What records it | none given | `StageResult.ftol` records the ftol a stage ran at (project CLAUDE.md). I did not check whether c_w and slack are recorded. | partial |
+
+  What would change the verdict: a series run on a user plan with a scheduled restraint weight whose answers moved away from the staged ones.
+
+  **The GUI's Refine passes `refit="stages"` (`gui/session.py`)**
+
+  **holds** as a temporary hold. The case for holding is stronger, because the alternative is a display change waiting on Yue. Two costs are not recorded.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "staged until the stage ladder has a view of a one-stage re-fit" (code comment) | The GUI's Refine never takes the one-stage path, and the GUI user cannot choose it. | clear |
+  | 2. Kind | none given | Not a question the data could settle. It is a display question, held for the maintainer. | n/a |
+  | 3. Case against acting (forcing stages) | none given | GUI users pay the staged time: 0.22-0.67 s against 0.08-0.27 s on the standards, and 0.37-1.21 s with the closing stage on. The same `.rex` project now gives two answers depending on where it is re-fitted. On zincite a staged re-fit moves profile V by 1.97 esd and a one-stage re-fit does not (WP § Measured, explained by WP-2225). WP design 5 still says "the GUI's second Refine inherits it", so the WP file was not updated. | moderate |
+  | 4. Case for acting | "after one, no run on record matches the plan on screen and the Rwp column goes blank (WP-2224, with Yue)" (comment) | Visual design questions go to Yue. `"stages"` is the old fit bit for bit (`test_refit_stages_is_the_fit_without_a_refit_bit_for_bit`). | strong |
+  | 5. Tier | none | The value is a literal inside `gui/`, which `NOT_WALKED` declares out, so the table cannot see it. | n/a |
+  | 6. Families | n/a | — | n/a |
+  | 7. What records it | `concepts/plans.md`: "The GUI's Refine always runs the plan in stages" | No field records it. The manual states it as permanent. | thin |
+
+  What would change the verdict: Yue's ruling on how the stage ladder shows a one-stage re-fit.
+
+  **Skill: the §2 body line and the `WARM_REFIT_REJECTED` row in `references/diagnostics.md`**
+
+  **weak** for one clause of the diagnostics row; the body line holds. The case for both entries is stronger. The row's stated cause has no run behind it and carries no Hypothesis tag.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | Body: "A second `fit` of a converged model runs one stage (`refit="stages"` walks it)". Row: "the likely cause is a plan or free set that frees what the converged fit held: pass `refit="stages"` for such a change" | The body line tells an agent what the default does and how to opt out. The row advises a next call. | clear |
+  | 2. Kind | n/a | Rule 4's skill test: the body line names a keyword and the row names a code. Both pass. | passes |
+  | 3. Case against | none given | The row's tag "(Measured: no firing on the eight `rietx compare` standards from a converged start, WP-2224)" covers how often the code fires. The cause it names has never been observed, since the code never fired, so it needs "(Hypothesis: …)". `help.py`'s entry says the same thing as "the usual cause", a claim of frequency with zero firings behind it. The body line does not mention the one measured trap: a newly freed block far from its starting value (brucite + March-Dollase, 2.25 esd). The package's own output could carry that (WP-1338's cheapest place). The line was paid for by cuts elsewhere in the body ("A failure raises." among them), which I did not judge. | weak on the cause clause |
+  | 4. Case for | WP task: "a reference row for the fallback's diagnostic code" | A code needs its row, and the default changes what a second `fit` does. An agent needs that line before it calls `fit` a second time. | strong |
+  | 5. Tier | n/a | — | n/a |
+  | 6. Families | n/a | — | n/a |
+  | 7. What records it | n/a | — | n/a |
+
+  What would change the verdict: a real firing whose cause was a newly freed group would let the cause clause keep "Measured". Otherwise retagging it "(Hypothesis: …)" fixes the row.
+
+  Next: Yue's four answers, in this order. Whether a fit that frees what the converged fit held
+  runs staged decides one more clause in `_refit_key`'s caller (the free set at the last fit's
+  end against the plan's globs) and a test. The GUI one decides whether `gui/session.py` drops
+  `refit="stages"` and the ladder gains a one-stage view (a GUI WP). The model-swap one keeps
+  or loosens design 2. The display text one may reword `_warm_refit_rejected` and
+  `_protocol_lines`. When WP-2222 merges, merge `main` and
   re-run `accept.py`, then drop the "closing stage" bracket from the quoted numbers in
   `fit`'s docstring and `concepts/plans.md`.
 
