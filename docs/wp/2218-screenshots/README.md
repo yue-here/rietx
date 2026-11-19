@@ -47,7 +47,12 @@ The third PR's pictures, the Structure graph, on the fluorapatite example after 
 - `structure-coordination-*.png`: Show coordination on that atom.
 - `structure-drawing-*.png`: the view menu's Drawing… popover.
 - `structure-preview-*.png`: Lattice parameter a dragged 0.3 of its track in the Interactive
-  tab. The title reads "Preview, not refined".
+  tab. The title reads "Preview, not refined". On the default range that drag moves the
+  frame by about one pixel.
+- `structure-rest-wide-*.png` and `structure-preview-wide-*.png`: the same drag after the
+  range pop-up was typed to 6-14 Å, at rest and then 0.3 of the track along. Lattice
+  parameter a goes from 9.373 Å to 11.776 Å. The cell frame and the atoms stretch along a
+  and b, which are tied in this hexagonal cell. Taken 2026-11-19.
 
 Taken 2026-11-18 and 2026-11-19 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every drag and click was made
