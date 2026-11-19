@@ -251,7 +251,13 @@ evaluations.
   off, one stage against staged: brucite + March-Dollase at r = 1, Rwp 0.18476 / 0.18462,
   largest gap 2.25 esd (profile W), 46 / 68 evaluations; brucite + spherical harmonics order 4,
   0.19696 / 0.19695, 1.01 esd, 60 / 92; NAC + CaF₂ at scale 1e-7, 0.09317 both, 0.00 esd,
-  19 / 40. Design 2 kept strict. Suites: SUITE_COUNTS
+  19 / 40. Design 2 kept strict. The generality review then asked for the route the default
+  does take (`held_block.py`): the same March-Dollase block present from the start, held at
+  r = 1 by the first fit (Rwp 0.46947), then freed by the plan plus a `po` stage. The default
+  ran one stage and landed on the `edit` route's numbers exactly: Rwp 0.18476 against staged
+  0.18462, profile W 2.25 esd off (Gaussian strain 1.51, size 1.44), 46 / 68 evaluations. So a
+  plan or `set_vary` that frees what the converged fit held is a re-fit under design 2 and is
+  not safe; this went to Yue with a recommendation to run such a fit staged. Suites: SUITE_COUNTS
 
   *Gotchas.* Folded from WP-2225's note (this file's former `### Inherited`): the staged
   re-fit's 2.05 esd on zincite V and 0.83 on fluorite V is the width twin hold re-solving U, X

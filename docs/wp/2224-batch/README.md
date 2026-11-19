@@ -20,8 +20,9 @@ the standard's own start. A fit "reached" the answer when its Rwp is within 3 % 
 baseline's. The raw JSON lines are not committed (1.2 MB).
 
 `swap.py` is task 3's probe (a block added at its no-effect value, then one stage against
-staged), and `accept.py` the § Acceptance run on the eight standards. Each docstring says what
-it prints.
+staged), and `accept.py` the § Acceptance run on the eight standards. `held_block.py` is the
+same block present from the start and freed by a longer plan, which the default re-fits in
+one stage. Each docstring says what it prints.
 
 Two cautions on the times in `summary.txt`:
 
