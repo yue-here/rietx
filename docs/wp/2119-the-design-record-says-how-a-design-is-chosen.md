@@ -1,9 +1,8 @@
 # WP-2119 — the design record says how a design is chosen
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-07 — DESIGN.md Rule 5, choosing a design, approved as drafted by the maintainer
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-11-05 — the maintainer stated how designs are chosen and DESIGN.md does not yet say it; sessions apply it today only through the maintainer's questions
 
 ## Goal
 
@@ -87,14 +86,14 @@ a choice, and check the draft against past milestones before presenting it.
 
 ## Tasks
 
-- [ ] The maintainer polishes the draft: the wording, and whether it is a new Rule 5 or
+- [x] The maintainer polishes the draft: the wording, and whether it is a new Rule 5 or
       folds into Rule 4 and § Why this package exists.
-- [ ] Check the polished text against past decisions before it lands: WP-1964's decisions
+- [x] Check the polished text against past decisions before it lands: WP-1964's decisions
       (a) and (c), WP-1303's deletion of the second integration surface, and the 2026-11-04
       ruling that rietx takes no TOPAS aliases. Each should come out as it was decided,
       or the draft changes.
-- [ ] Apply it to `docs/DESIGN.md`, with a § History line if it supersedes a sentence.
-- [ ] Skill: none. The rule governs changing the package, not driving it.
+- [x] Apply it to `docs/DESIGN.md`, with a § History line if it supersedes a sentence.
+- [x] Skill: none. The rule governs changing the package, not driving it.
 
 ## Acceptance
 
@@ -111,6 +110,38 @@ The maintainer approves the text in the PR. The docs checks pass:
 - WP-1964's handover entry of 2026-11-05 (decisions (a) and (c)).
 
 ## Handover log
+
+- **2026-11-07** — The design record now says how rietx chooses between designs. It is
+  Rule 5 of `docs/DESIGN.md`: three tests (convention, direction, practice) and an order for
+  when they disagree. A session can now reach the maintainer's 2026-11-05 calls without the
+  maintainer's chain of questions. Checking the draft against four past decisions found two
+  places where it would have let a session decide the other way, and both are fixed. The
+  maintainer approved the revised text as drafted (2026-11-07, in session).
+  - *Done.* Rule 5 placed after Rule 4, and "Four" rules became "Five". No § History line,
+    because no sentence is superseded. Rule 4's "A new API takes the shape the surface
+    already has" stays, as Convention applied to an API.
+  - *The check (task 2).* WP-1964 (a), the formula on a parameter: comes out as decided
+    under the draft and the revision. The API's shape follows convention, so it is a `tie`
+    command, and Claude's lean at the time ("wire `Parameter.expr`") would have been
+    flipped. WP-1964 (c), the per-pattern variable: the draft asked a departure only to
+    "name its reason", and the proposed extra refusal on `vars.*` globs had one. The
+    revision asks for the likely mistake or the wrong number the convention would cause,
+    and the refusal guarded an unlikely mistake, so it comes out as decided. WP-1303, the
+    JSON surface: Direction and Practice both delete it, under either text. The 2026-11-04
+    ruling on TOPAS aliases: "a name follows the field's standard term" could be read as a
+    TOPAS keyword. The revision names the literature and the IUCr dictionaries and says one
+    program's keyword is not that term.
+  - *Other edits to the WP's draft.* "Four tests" became "three tests and an order". The
+    maintainer's reason for Convention came back as one sentence (one shape sets fewer
+    traps for a person or an agent). Direction covers work outside a milestone.
+  - *Settled by Claude.* No separate "easiest for agents" test, because Rule 4's "A new
+    API" already asks that a first call be right from the signature and docstring.
+    `docs/milestones/generality.md:24` still says "the four rules", left as that
+    milestone's dated record.
+  - *Gotchas.* The session-start hook in the main checkout flagged WP-1334 and WP-1956 for
+    repair. Both flags were stale: the checkout was 600 commits behind `origin/main`, where
+    both WP files postdate their last commits.
+  - *Next.* None. A convention found wrong later goes to its own WP under Rule 5 (Non-goals).
 
 - **2026-11-05** — Filed at the maintainer's request, as a draft to polish. No open WP
   owns DESIGN.md's rules on choosing a design. Next: the maintainer's polish (task 1).

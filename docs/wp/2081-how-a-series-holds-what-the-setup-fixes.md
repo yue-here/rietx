@@ -1,7 +1,6 @@
 # WP-2081 — How a series holds what the setup fixes (a design discussion)
 
-Milestone: unscheduled · Status: ⬜
-Track: A long run is not one fit
+Milestone: series · Status: 🔄 2026-11-18 — the rulings are being built; the width-growth removal is in review
 Depends on: 2003 soft (PR #1310 reshapes the ladder this discusses)
 Priority: P2 2026-11-04 — a scoping WP whose decision sets what a series frees after its first frame; Yue's account (2026-11-03) shows the default refits the instrument on every frame where an expert fixes it, and a held setup value lost on the cold rung carries to every later pattern (measured); no move
 
@@ -324,6 +323,63 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 ### Inherited
 
+- **2026-11-15, from the issue triage (issue #1556 § 5): a held setup value's error
+  moves every later cell together, and the series has no row for it.** The reporter ran a
+  synthetic LaB₆ ramp, 7 patterns × 150 noise replicates, and held zero and profile from
+  pattern 1 on at pattern 0's fitted values, the calibrate-then-hold practice this WP
+  starts from. Free on every pattern, the cell's pull std is 0.79-0.93 and neighbouring
+  patterns' errors correlate at −0.09 to 0.04. Held, the pull std is 2.30-2.43 and the
+  correlation 0.85-0.90. So each pattern's cell esd is about 2.4× too small, and a series
+  mean's esd about 5.5× too small (rms error 0.88 ppm against a naive esd of the mean of
+  0.16 ppm). The cause is the held calibration's own error, shared by every pattern.
+  Not rerun here. *Checked against the tree at `98d7ba8e3`:* `SeriesResult` carries no
+  row for a held parameter, and `HOLD_BLOCKED_PLAN` is info only. The reporter's
+  candidate: a per-pattern score statistic for each held parameter, as a row with no
+  threshold, and asks whether that sits inside the maintainer's 2026-11-03 "field, not
+  code" ruling. That question is for this WP's discussion. The rest of the issue (a χ²
+  pair per chain, now in WP-1453; equivalence mapping; the combined-esd step; unmeasured
+  points) is placed elsewhere or held for the maintainer.
+
+- **2026-11-06, from the issue triage (issue #1439): the free set can change
+  from frame to frame on its own, through the absent-phase hold.** A design
+  proposal from the recurring contributor, from a private multiphase in-situ
+  series fitted by their own driver, not by `refine_sequential`. They refitted
+  the series with two instrument parameters held and compared the two fits of
+  each frame by ΔBIC. In a few percent of frames the two fits refined different
+  parameters beyond the declared holds: a minor phase's cell, strain and size.
+  The cause was the absent-phase hold (WP-1301; a phase whose scale is under 3σ
+  of its counting-noise esd has its structural paths held for the stage,
+  `phase_support_sigma`). A minor phase near 3σ fell either side depending on
+  the rest of the fit. So the two fits were not nested, and along a chain the
+  gate can switch a phase's cell on and off and put steps in its trajectory.
+  *Checked against the tree at `a84379aac`:* `sequential._collapse` passes
+  `phase_support_sigma` into the collapsed warm plan (the WP-2002 B1 comment
+  there), so the hold decides afresh on every warm refit. Each entry records
+  what its last stage held (`sequential.py` reads `result.stages[-1].held`).
+  The effect has **not** been measured in `rietx.sequential`; the reporter
+  offers a synthetic reproduction. The proposal: the cold first frame resolves
+  the free set, gates included; every warm refit frees exactly that set; the
+  support test still runs per frame and a disagreement is recorded, not acted
+  on, as WP-2003 records steps; `SeriesResult` records the set once. A
+  companion check compares two `SeriesResult`s of the same frames, one a
+  declared restriction of the other, and reports per frame (a) free sets that
+  differ beyond the declared holds and (b) a larger model ending at a higher χ²
+  than the restricted one, which cannot happen at a true minimum. The reporter
+  says (b) found every local minimum they met (a magnetic moment stuck at zero
+  from a fixed start). **Where it lands here:** it is question 1 one rank down.
+  "What a series frees after the first frame" covers frees decided by a gate
+  as well as by the plan, and options b and c above fix the set by a caller's
+  statement, where #1439 fixes it by frame 0's own gates. **It pulls against
+  WP-1420**, whose goal is that a phase held in one frame gets back in when a
+  later frame supports it. A set fixed at frame 0 keeps a late-appearing
+  phase's structure held for the whole series, its scale alone free. Decide the
+  two together. **Prior art, corrected:** the issue says GSAS-II stops when the
+  vary list changes between histograms. GSAS-II 5.8.4 prints the variables
+  added and removed and carries on (`GSASIIstrMain.py:1038-1058`, the stop is
+  commented out; `docs/practice.md` § Sequential refinement already says so).
+  The issue's wider point stands: no program surveyed switches refine flags per
+  pattern on a significance test.
+
 ## Open questions for the discussion
 
 None is ruled. Rwp is inadmissible as evidence for any default here (Rule 4). Admissible
@@ -470,6 +526,269 @@ flag reprints the saved numbers without fitting.
   `tests/data/README.md`.
 
 ## Handover log
+
+- **2026-11-18** — the series no longer warns when a phase width grows (one session; package
+  code changed).
+
+  A series no longer raises a warning when a phase width grows while the fit worsens. Yue
+  ruled it removed on 2026-11-16, because it fired on three thresholds nobody had audited,
+  and the width's trajectory and each pattern's GoF were already on the result. A caller
+  who wants that reading now puts the two side by side, and the skill says so. Nothing a
+  fit computes has moved. The report-thresholds contract moved to 1.15, so a reader
+  counting codes can tell the two versions apart. This entry also stands for the two
+  2026-11-17 commits of the last session (the joint-ramp measurement and the WP-2028
+  fold), which the 2026-11-16 entry below already describes.
+
+  *Done.* Removed `SEQUENTIAL_WIDTH_GROWTH`, its suggestion, `WIDTH_GROWTH_FACTOR`,
+  `WIDTH_GROWTH_GOF_FACTOR`, `WIDTH_GROWTH_SIGMA` and `_WIDTH_SUFFIXES`
+  (`sequential.py`). Removed the "widths grown with a worsening fit" row of
+  `SeriesResult.summary(deliverable="series")`, the help entry and the five audit rows
+  with their `UNAUDITED_BASELINE` and `RESPONSE_BASELINE` lines. Removed eleven tests in
+  `test_sequential.py` and two in `test_termination_view.py`, and narrowed
+  `test_planted_series.EVENT_CODES`. `THRESHOLDS_VERSION` 1.14 → 1.15; its history line
+  also names WP-2003's `SEQUENTIAL_DISCONTINUITY` removal, which no version had recorded
+  (WP-2004 Inherited asked for that line). The skill, the manual's series and result
+  references, `docs/practice.md` and tutorial 05 lose their mentions, and the skill's
+  generated API index quotes 1.15. Added a release-note fragment
+  (`docs/releases/unreleased/wp2081.code-to-check.md`). The milestone record and WP-2004
+  say the removal landed with no field. The ruling supersedes the record field that
+  WP-2003's C7 and issue #1212 had proposed.
+
+  *Started in its own session.* The W esd question (WP-2028 Inherited, 2026-11-17) is
+  being worked in a separate session, PR #1668.
+
+  *Review.* `/code-review high --fix` found two items. Fixed: the release note named
+  only `ImportError`, where attribute access raises `AttributeError`. No change: an old
+  saved result carrying the code loses its help text. WP-2003's removal of
+  `SEQUENTIAL_DISCONTINUITY` set that precedent, and the help tests require every entry
+  to name a live code.
+
+  *Measured* (macOS arm64, worktree venv `[dev]`, Python 3.12.10). The fast selection ran
+  twice under heavy load from another session's 17-pattern ramp (load average 35-63).
+  The first run was killed from outside at 86 % with no failure. The second run ended
+  2 failed, 14701 passed, 433 skipped, 32 xfailed and 23 errors, in about 71 minutes.
+  One failure was real: the skill's API index was stale against 1.15, now regenerated
+  (`test_skill.py` 174 passed). The other failure and all 23 errors were the manual
+  build and the magnetic guide script hitting their 300 s runaway guards. Re-run once
+  the load fell, `test_manual.py`, `test_help.py` and the guide-script test passed
+  (129 passed). The count check is not done: no baseline ran, so passed+skipped cannot
+  be compared. The branch removes 13 tests and adds none, so the junit cost report has
+  nothing to rank. The full selection did not run: removing a diagnostic moves no
+  fitted number. `tests.reader_output` reports no change, but its fixtures hold no
+  series summary, so the removed summary row is a change it cannot see.
+
+  *Generality* (the `generality-review` judge, on the branch diff before this entry and the skill rewording; pasted unedited).
+
+  #### `SEQUENTIAL_WIDTH_GROWTH` (code), deleted
+
+  **holds.** The case against the code is stronger. Its thresholds rest on one real positive chain, and that chain is not on disk. A dissent was already named against it. The case for it is a single synthetic measurement showing that nothing else fires, and the raw numbers that measurement reads are still on the result.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | "The width trajectory and each pattern's GoF are already in the result, so rule 5 is met without it." (`docs/milestones/series.md` § Ruled after the open, lines 119-123). Release note: "read the two side by side" (`docs/releases/unreleased/wp2081.code-to-check.md`) | The deleted code made five choices the caller now makes. (a) The reference is the first width measured above 3 of its own esds, not the first value. (b) A Gaussian variance term is compared on its square root. (c) Quarantined patterns are skipped. (d) Widths tied to one column count as one trajectory. (e) It fires only where the width ratio is ≥3×, the growth exceeds 3 combined esds, and the GoF ratio is ≥2×. Deleted docstrings: `sequential.py` lines 401-446 and 464-500 of the diff. The series summary's "widths grown with a worsening fit" row goes too. | answered |
+  | 2. Which kind of ambiguity? | Row: none given (it was `unaudited`, with no `ambiguity`). WP-2003's draft (the audit of the series' automatic actions) gives `"ambiguity": 3` (`docs/wp/2003-batch/rows.json`:301) | Kind 3 is right. Whether a width grew because the specimen strained or because a phase is missing from the model depends on facts outside the pattern. The deleted docstring says so itself: "the finding reports and never judges". Series rule 5 puts kind 3 in a field with no code. | agrees with the draft; row itself none given |
+  | 3. Case against the code | C7 (class 7 of WP-2003's batch, width growth): "Three tier-3 thresholds decide whether the code exists, on one real family." The dissenter it names is "a refiner whose strain grows for real while GoF rises for a second, independent reason" (`docs/wp/2003-batch/batch.md`:639-648). That batch was settled by Claude and relabelled as evidence on 2026-11-02. | Confirmed, and one more mechanism found. With a fixed fractional misfit, χ² grows with the counts, so GoF grows as √counts. A series whose counts rise (a growing phase, a longer count time, a beam refill) can therefore double GoF under a model whose only fault was already there. The deleted GoF constant's docstring guards only against falling counts ("Rwp tracks Rexp"). Both of its measurements were at constant counts ("on the synthetic, whose counts are constant"). The deleted real-growth null test (`test_a_width_that_grows_for_real_is_not_named`) also used one scale throughout. No program among the seven screens widths along a series: the pre-change `docs/practice.md`:398-399 listed this screen among rietx's own behaviours (checked in this repo). | strong |
+  | 4. Case for the code | Deleted skill row: "No per-pattern code says so until `STRAIN_UNUSUALLY_LARGE` at 1.5° (Measured: a 0.4 %-split second phase, width 3.65×, GoF 3.1×, nothing else fired)". `docs/wp/1465-a-width-that-became-background.md` (WP-1465, which added the code) Finding 1: a one-phase fit's Rwp went 1.56 % → 11.74 % with no warning, and the width's background-projection R² moved only 0.047 → 0.053. | Real, but synthetic only. What a caller pays now is computing the statistic correctly. The deleted `WIDTH_GROWTH_FACTOR` docstring measures the naive version: against each trajectory's first value, width growth alone fires on 11 of 24 trajectories of the CPD chain (the clean quantitative-phase round-robin chain in the acceptance suite). Taking the first measured value fires on none. One CPD first value is 5.85e-5 with an esd of 3e3, so any later value reads as "946×" it. No number moved off a reference was measured: the soaked phase's scale or fraction error against truth is not given. DESIGN.md § Rules, 1 says "every withheld verdict leaves its statistic". Its inputs stay, but the statistic itself (the ratio with its esd, the GoF ratio) is no longer computed. WP-2003's C7 proposed exactly that field. The 2026-11-16 ruling supersedes it, and that ruling is yours. WP-2080's GoF-ratio field is ruled but not built. | moderate; synthetic only |
+  | 5. Tier | none given (row unaudited) | It could only have been tier 3: no program default exists (`docs/practice.md`, checked in this repo). It is not `invariant`, since it changed what a series printed. | consistent with removal |
+  | 6. Dataset families | none given in the row. Deleted docstrings and `rows.json`:302 list them. | 1. The synthetic soak (rietx's own test, LaB6 model with a planted 0.4 %-split phase). The reference is a known truth. Development data. 2. The CPD chain (real), silent. A null only, development data. 3. The 75 suite series that set the GoF clean bound of 1.52. Development data. 4. Issue #451's operando chain (the reporter's laboratory, real): widths 3.4×, not on disk. So there is one real positive family, and it is off disk. It falls short of the three-family ground. | fails the mechanical ground, so removal is consistent |
+  | 7. What says it fired, or that it is gone? | `THRESHOLDS_VERSION` 1.15 history comment (`src/rietx/report/schemas.py`) | After removal nothing fires. The disappearance is recorded by `THRESHOLDS_VERSION` 1.15 (the report-thresholds contract version), which every `SeriesResult.provenance.report_thresholds_version` stamps, and by the release note. | adequate |
+
+  Missing from the author's case: the WP-2081 handover log has no entry for this removal. Its latest entry (2026-11-16) still says "Neither is built".
+
+  What would change the verdict: a real chain on disk where a width grew with GoF, plus a measurement showing that a caller reading `statistics.gof` by hand either misses it or flags a clean chain.
+
+  #### `SEQUENTIAL_WIDTH_GROWTH.suggestion` (suggestion, value 1), deleted
+
+  **holds.** The case against is stronger: the suggestion assumed one of the code's two readings.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | none given beyond the code's removal | The deleted text was "Fit the pattern at the onset with the missing component before reading this width…". The caller now decides whether anything is missing at all. | answered |
+  | 2. Which kind? | Row: none given. `rows.json`:319: ambiguity 3 | Kind 3 is right. | agrees |
+  | 3. Case against | `rows.json`:320: "assumes a missing component, one of the docstring's two readings" | Confirmed by the deleted docstring, which allows that "the width may legitimately grow". | strong |
+  | 4. Case for | none found | none found | — |
+  | 5. Tier | none given | Tier 3 at best. | — |
+  | 6. Dataset families | as for the code | as for the code | — |
+  | 7. Record | the code's | It goes with its code, and no orphan site remains (grep of `src/`). | adequate |
+
+  What would change the verdict: none short of the code returning.
+
+  #### `rietx.sequential.WIDTH_GROWTH_FACTOR` (3.0), deleted
+
+  **holds.** The case against is stronger: the value is "the reporter's", fitted between two soaks, and it has no consumer left.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | milestone: "on three unaudited constants" | The caller picks their own multiple, or none. | answered |
+  | 2. Which kind? | n/a (constant) | It was a threshold on a kind-3 report. | — |
+  | 3. Case against | Deleted docstring: "3 is the reporter's, and it sits between the two soaks measured" (3.4× operando, 3.65× synthetic). "The width ratio does not separate on its own." | Fitted to two positives, one of them off disk. | strong |
+  | 4. Case for | Deleted docstring: against the first measured value it fires on none of CPD's 24 trajectories | That is a null on development data only. | weak |
+  | 5. Tier | none given | Tier 3. No program screens this. | — |
+  | 6. Families | as for the code | One real positive family, off disk. | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: three unrelated real chains where 3× separates a missing-phase soak from real growth.
+
+  #### `rietx.sequential.WIDTH_GROWTH_GOF_FACTOR` (2.0), deleted
+
+  **holds.** The case against is stronger. The value was set for margin on development data at constant counts, and GoF itself moves with counts.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | as for the code | The caller judges whether a GoF rise is "with" the width. | answered |
+  | 2. Which kind? | n/a | It was the threshold on the misfit half. | — |
+  | 3. Case against | Deleted docstring: "The value is set for margin". Clean bound 1.52 over 75 suite series; synthetic soak 3.05. | All of it is development data. A rise in counts raises GoF under a fixed misfit, and none of those measurements varied the counts. | strong |
+  | 4. Case for | Deleted docstring: "This half is also what keeps a width that grows *for real* silent" | True on the constant-count synthetic only. | weak |
+  | 5. Tier | none given | Tier 3. | — |
+  | 6. Families | 75 suite series (development), CPD 1.14, synthetic 3.05 | No real positive family on disk. | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: a real series with varying counts where a 2× GoF ratio still separates the two readings.
+
+  #### `rietx.sequential.WIDTH_GROWTH_SIGMA` (3.0), deleted
+
+  **holds.** The case against is stronger. Its job was to keep the reference meaningful, and with the code gone it has no consumer.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | none given | The caller chooses which pattern counts as the reference. Deleted docstring: CPD's "first `lor_strain` is 5.85e-5 with an esd of 3e3, so any later value is '946×' it". | answered; this is the trap the caller inherits |
+  | 2. Which kind? | n/a | It was a threshold. | — |
+  | 3. Case against | none given | It was rietx's own 3σ, with no source given. | moderate |
+  | 4. Case for | the deleted docstring above | It guarded the ratio. It is not needed without the ratio. | weak |
+  | 5. Tier | none given | Tier 3. | — |
+  | 6. Families | CPD (development) | one | fails |
+  | 7. Record | `THRESHOLDS_VERSION` 1.15 | adequate | — |
+
+  What would change the verdict: the code or a ratio field returning.
+
+  #### `rietx.sequential._WIDTH_SUFFIXES` (no row), deleted
+
+  **holds.** The case against keeping it is stronger: it maps width paths to "variance or width", an arithmetic fact, and its only consumer is gone.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What must the caller now decide? | C7: "`_WIDTH_SUFFIXES` is tier 1, no row" (`docs/wp/2004-…md`, inherited entry; `batch.md`:646) | Whether to compare the square root of `gauss_*`, which are variance coefficients. | answered |
+  | 2. Which kind? | n/a | n/a | — |
+  | 3. Case against | none needed | It has no other consumer in `src/` (grep). | — |
+  | 4. Case for | none found | none found | — |
+  | 5. Tier | tier 1 (WP-2003's batch, settled by Claude) | Correct: the variance-versus-width split is arithmetic. A dict of booleans is outside the constant walk, so having no row is consistent. | holds |
+  | 6. Families | n/a | n/a | — |
+  | 7. Record | n/a | n/a | — |
+
+  What would change the verdict: another consumer of the dict surviving in the tree. None found.
+
+  #### `UNAUDITED_BASELINE` and `RESPONSE_BASELINE` removals
+
+  **holds.** These are removals only: five names leave `UNAUDITED_BASELINE` (the shrink-only list of rows awaiting audit), and the code leaves `RESPONSE_BASELINE` (codes still without a reader response). Their rows are gone, so each list shrinks as designed. No name was added, so no reason is owed.
+
+  What would change the verdict: a name added to either list. There is none.
+
+  #### Skill line, `docs/skill/rietx/references/series.md`:355-359 (and its two synced copies)
+
+  **weak** as wording. It is not a new heuristic the table should see. The case against its verdict is stronger than the case for it.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide? | "Read each entry's `statistics.gof` beside the width's trajectory: a width that grows while GoF rises with it stands in for a missing component, and one that grows at a flat GoF is this rule. No code fires on either." | The package decides nothing here and prints nothing. Skill prose is outside the table's sight by declaration (`_audit.py` docstring: "a heuristic written as skill prose (WP-2008)"). No row of the five kinds could hold it. In substance it is the deleted code's conjunction without thresholds, so it is not new. | not a table item |
+  | 2. Which kind? | none given | The question is kind 3, but the sentence answers it as if kind 1: "stands in for a missing component". The deleted docstring was more careful: "the finding reports and never judges". | wording overstates |
+  | 3. Case against its wording | none given | C7 names the dissent, a real strain growth with GoF rising "for a second, independent reason" (`batch.md`:641). GoF also rises with counts under a fixed misfit. | strong |
+  | 4. Case for | It names a field (`statistics.gof`), which DESIGN.md § Rules, 4's skill-row test asks for. The outside source is issue #451's operando chain (a user's report), beside rietx's synthetic. | It passes the skill-row test. It is the only pointer left to this failure mode now that the code and the summary row are gone. | moderate |
+  | 5. Tier | n/a | n/a | — |
+  | 6. Families | as for the code | One real chain, off disk, plus rietx's synthetic. | thin |
+  | 7. Record | "No code fires on either." | Accurate. | holds |
+
+  What would change the verdict: rewording to "may stand in for a missing component; GoF also rises when counts rise". That would make it a pointer to two readings rather than a verdict.
+
+  *Author's answer on the skill line:* reworded as the judge proposed, so the line now names both readings and says GoF rises with the counts. *On the missing entry:* the judge read the diff before this entry was written.
+
+  *Ruled by Yue, in chat, later the same day.* The milestone record is out of draft. This
+  session read the title, § Scope and § Acceptance and proposed four corrections, all to
+  § Acceptance. Yue approved them ("Make them"). (1) The rule-3 row's bar is the measured
+  spread between two independent fits of a pattern, not 0.01 esd, and the direction gap no
+  longer stands in for it. (2) The rule-4 row's "name a second real series" task moved to
+  § The order. (3) The threshold row asks for each code's owner's ruling, since the one left
+  is magnetic. (4) A new row tests rule 2's refusal of a common or equation declaration in
+  the series call.
+
+  *Next:* rule 1's declaration on the series call, which the milestone's order puts next. The
+  remaining thresholded series code, `SEQUENTIAL_MOMENT_ONSET`, waits on the magnetic
+  path's owner.
+
+- **2026-11-16** — the discussion began, and the series milestone opened (one chat
+  session with Yue; no package code changed).
+
+  *Rulings by Yue, in chat.* Six design rules for series work were put to Yue. Five were
+  accepted at once and rule 2 after a second explanation, in a changed form. They are recorded with Yue's words
+  in [`docs/milestones/series.md`](../milestones/series.md) § The rules, which is now
+  their authority. Yue ruled that series is its own milestone, separate from parametric,
+  and this WP moved to it. Yue ruled WP-2080 to option A, the ratio as a field with no
+  automatic retry (that file's handover log), and approved the comment posted on PR #1473.
+
+  *What the rules settle here.* Questions 2 and 3 fall to rules 1 and 2, question 4 to
+  rule 6, question 5 to rule 4, questions 7 and 9 to rule 5 and question 11 to rules 1 and
+  2. Question 1, the default on later patterns, is still open and is the first open
+  decision in the milestone record. No question in § Open questions is edited: this entry
+  and the milestone record say where each stands.
+
+  *Two more rulings, later the same day.* Question 1 is ruled: the default stays as it is
+  (option a), in Yue's words "keep today's default". `SEQUENTIAL_WIDTH_GROWTH` is to be
+  removed ("Remove"). Both are in the milestone record § Ruled after the open, with the
+  options put. Neither is built. Rule 2 is ruled too: the series call and the joint call stay two
+  calls ("Yes, two calls"), the series call taking per-pattern and fixed parameters only.
+  All six rules are now accepted.
+
+  *Stale lines above, not yet corrected.* Context says PR #1310 is open and mergeable; it
+  has merged. Context says `SequentialRefinement.fit:plan` is unaudited; it has a tier-3
+  row approved 2026-11-03, recorded as unanimous, and `fit:refit` is still unaudited.
+  WP-2080's trigger no longer waits on anything, and is ruled to a field.
+
+  *Measured: a joint fit on the real ramp* (`2081-batch/measure_joint_ramp.py`, output
+  `joint_ramp.json`, `--report` reprints it; run by an Opus subagent, the saved numbers
+  re-read by this session; macOS arm64, worktree venv `[dev]`, Python 3.12.10, rietx
+  1.12.0.dev0, compiled tier on). All 17 CuCr2O4 patterns in one `refine_multi`, each
+  started from the `lab_sample_refine` chain's model for that pattern, Biso held at the
+  chain's values. Wall times are from a machine under uncontrolled load.
+
+  | arm | common to all patterns | per pattern | wall, evaluations | b − c closes between | \|b − c\| at 6.8 K (Å), paper 0.00746 | common zero (°) | mean axis error at 6.8 K vs the paper (ppm) |
+  |---|---|---|---|---|---|---|---|
+  | chain, default (WP table above) | nothing | zero, profile, cell, scale, background | — | 111 and 123 K | 0.00554(113) | −0.00095(65) per pattern | −7 |
+  | chain, `lab_sample_refine`, `.prm` | nothing; zero fixed at 0 | cell, scale, background, sample widths | 414 s | 111 and 123 K | 0.00562(90) | 0, fixed | +67 |
+  | A | zero; profile fixed at the `.prm` | the same | 584 s, 143 | 111 and 123 K | 0.00563(86) | −0.00073(11) | +10 |
+  | B | zero and U, V, W, X, Y declared | the same | 528 s, 227 | 111 and 123 K | 0.00562(89) | −0.00073(11) | +10 |
+  | C0 | zero and U, V, W, X, Y | cell, scale, background; every sample width 0 | 428 s, 277 | 123 and 134 K | 0.00801(41) | −0.00073(11) | +21 |
+
+  Five readings.
+
+  - A common zero shift works on real data. It is fixed about 6× tighter than a
+    per-pattern zero, the closure does not move, and the +67 ppm of the held-at-0 route
+    falls to +10 ppm. The split itself reads the same 25 % under the paper in A and B, so
+    the method did not cause that.
+  - A joint fit of 17 synchrotron patterns costs about what the chain costs here, 7 to 10
+    minutes.
+  - Arm B's declaration was narrowed by the package. `multi._hold_width_twins_multi` holds
+    U, X and Y from the stage where a per-pattern sample width of the same angular shape is
+    free. `StageResult.width_twins_held` records it; no diagnostic code does, and a held term
+    is absent from `result.parameters`. Only zero, V and W were common and free at the end.
+  - W is not determined in arm B. A second start with the profile moved 30 % ends at the
+    same χ² (274072.45 against 274072.74), the same cells and zero to 1e-9, and W at 6.5e-6
+    where the first ended on its floor of 1e-8, traded against every pattern's `gauss_size`.
+    Both report an esd for W near 1e-12, and `COVARIANCE_DIRECTION_DISCARDED` names W. A
+    small esd on a value two starts disagree on by 6.5e-6 looks like a defect against the
+    rule that an unmeasured direction has no esd. Not investigated.
+  - Arm C0 holds no width at one pattern's value: one profile is refined for all patterns
+    and no sample width is free. It closes between 123 and 134 K, which brackets the
+    paper's 130 K, and reads the split 7 % over the paper where every other route reads 25 %
+    under. Its common Y is 0.0508(37) against 0.0072(34) with the chain's sample widths
+    held (arm C in the JSON), so the one profile takes up the specimen's own broadening. This is one specimen on development data, so it shows only that "a held width
+    invents a transition" (the cautious routes above) is a statement about a width taken
+    from a single pattern.
+
+  Not run: Biso free; an arm that pins one pattern's sample widths so U, X and Y could be
+  common beside free widths; a second start for C0. The esd of b − c ignores their
+  correlation, as the table above does.
+
+  *Next:* Yue's read of the milestone record's title, scope and draft acceptance rows;
+  the open decisions listed there; W's esd in the joint fit, as its own investigation.
 
 - **2026-11-04** — rewritten around Yue's account (a ghostshift runner, one session). No
   package code changed, and no question is ruled. Yue said in chat on 2026-11-03 how an

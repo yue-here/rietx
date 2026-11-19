@@ -12,7 +12,7 @@ A joint fit is one refinement whose residual stacks several patterns, and the pa
 | Answer | a trajectory, such as a(T) or w(t) | one set of numbers, informed by every pattern |
 | Used for | an in-situ ramp, a parametric sweep, a tray of specimens | one specimen measured twice, at two wavelengths or on two instruments |
 | Entry point | `SequentialRefinement`, `refine_sequential` | `MultiHistogramRefinement`, `refine_multi` |
-| Modes | any | Rietveld only |
+| Modes | any | Rietveld or Pawley |
 
 The question that separates them is whether the specimen changed.
 Eight mixtures with different compositions are eight specimens, so their cells are eight measurements and a series is the right shape.
@@ -464,7 +464,6 @@ These diagnostics fence that, and none of them alters a fitted value.
 | `SEQUENTIAL_UNRECOVERED` | the pattern's fit was rejected on every attempt; it seeded no successor and joined no median |
 | `SEQUENTIAL_PATH_CHECK_NOT_RUN` | under `direction="both"`, the comparison did not run |
 | `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | under `direction="both"`, the comparison ran on fewer patterns or paths than the series has |
-| `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× its first measured value while GoF reached 2× its own at the same pattern; a width growing at a flat GoF fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |

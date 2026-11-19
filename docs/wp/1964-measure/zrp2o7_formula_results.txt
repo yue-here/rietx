@@ -1,0 +1,42 @@
+WP-1964 task 13: the ZrP2O7 input's cell equations as formula text (Durham TOPAS tutorial 9.5)
+rietx     1.12.0.dev0; load 2.7 7.7 10.4
+coefficients read from the input: a0 5.42999, const1 -1.26977, theta1 216.999, const2 4.81474, theta2 570.984, const3 1.01873, theta3 1500, a0_al2o3 4.75814, ax1_al2o3 6.55e-06, ax2_al2o3 1.82e-09, a_al2o3_offset 0, c0_al2o3 12.9911, cx1_al2o3 6.54e-06, cx2_al2o3 2.6e-09, c_al2o3_offset 0, t_middle 738, tra2 369, T_calibration_b 0, T_calibration_c 0, T_calibration_d 0
+  T_true (intermediate)   T + cal_b*(((T - 738)/369) - ((303 - 738)/369)) + cal_c*(((T - 738)/369)^2 - ((303 - 738)/369)^2) + cal_d*(((T - 738)/369)^3 - ((303 - 738)/369)^3)
+  si_a   phases.1.cell.a  exp(log(a0) + (const1/1000000)*theta1/(exp(theta1/T_true) - 1) + (const2/1000000)*theta2/(exp(theta2/T_true) - 1) + (const3/1000000)*theta3/(exp(theta3/T_true) - 1))
+  al_a   phases.2.cell.a  a_al2o3_offset + a0_al2o3*(1 + ax1_al2o3*(T_true - 273) + ax2_al2o3*(T_true - 273)^2)
+  al_c   phases.2.cell.c  c_al2o3_offset + c0_al2o3*(1 + cx1_al2o3*(T_true - 273) + cx2_al2o3*(T_true - 273)^2)
+
+(a) preview at the input's coefficients, against the cells it prints (37 patterns)
+    phases.1.cell.a  max |preview - printed| 6.63e-07 Å; max |input's arithmetic - printed| 6.63e-07 Å
+    phases.2.cell.a  max |preview - printed| 4.99e-07 Å; max |input's arithmetic - printed| 4.99e-07 Å
+    phases.2.cell.c  max |preview - printed| 4.84e-07 Å; max |input's arithmetic - printed| 4.84e-07 Å
+    worst 6.63e-07 Å at phases.1.cell.a, 853 K; bar 1e-06 Å: PASS
+    the input's own arithmetic reaches 6.63e-07 Å, the printed digits; preview against that arithmetic 0.0e+00 Å
+
+(b) preview with the calibration set nonzero ({'cal_b': 6.0, 'cal_c': -4.0, 'cal_d': 2.5}), against numpy of the input's arithmetic
+    the calibration moves the cells by up to 3.27e-03 Å, so the feed reaches
+    phases.1.cell.a  max |preview - hand| 0.00e+00 Å
+    phases.2.cell.a  max |preview - hand| 0.00e+00 Å
+    phases.2.cell.c  max |preview - hand| 0.00e+00 Å
+    worst 0.00e+00 Å at phases.1.cell.a, 303 K; bar 1e-06 Å: PASS
+
+(c) synthetic recovery: tests/test_parametric_expression.py::test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients
+
+(d) the real data, calibration b, c and d freed (no gate)
+    chain 23.6 s; status ['converged']; Σχ² 197331.9, Rwp 30.36-33.11 %
+    untied     44.5 s; status converged; Rwp 31.461 % (TOPAS 31.56 %); χ² 197331.9 with 1702 free; χ²r 1.2224
+    formula    62.5 s; status converged; Rwp 31.488 % (TOPAS 31.56 %); χ² 197666.4 with 1594 free; χ²r 1.2236
+    vars.cal_b     -0.403 ± 3.152 K
+    vars.cal_c    -20.403 ± 1.529 K
+    vars.cal_d     -4.241 ± 2.670 K
+    delta_T at 303 K: -0.00 K
+    delta_T at 600 K: +18.45 K
+    delta_T at 900 K: +16.46 K
+    delta_T at 1173 K: -14.85 K
+    the formula fit's silicon edge against the chain's free edge, per pattern:
+      (formula - chain)/chain esd: median +0.17, range -2.07 to +4.44; in Å -4.66e-4 to +7.54e-4
+    diagnostics ['BISO_UNUSUALLY_LARGE', 'FLOOR_HIT']
+    the formulas cost Δχ² 334.5 for 108 fewer free parameters against the untied fit
+    plots: tests/output/wp1964_zrp2o7_formula_h*_fit.png (patterns 0, 18, 36)
+
+total 133 s; load at end 4.8 7.0 9.7

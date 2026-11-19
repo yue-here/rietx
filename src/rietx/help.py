@@ -58,6 +58,8 @@ __all__ = [
     "HelpEntry",
     "PARAMETER_HELP",
     "DIAGNOSTIC_HELP",
+    "DIAGNOSTIC_VIEWS",
+    "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
     "READER_OPTION_HELP",
@@ -234,7 +236,14 @@ _STEPHENS_S = HelpEntry(
         "derivative would step 100 times further than the value itself. Like the "
         "anisotropic displacement components, these coefficients are tied. The "
         "refined quantities are the `microstrain.dof.k` entries of the Laue-allowed "
-        "subspace."
+        "subspace. The block is opt-in per phase. `phase.microstrain = "
+        "StephensStrain.isotropic(1000, phase.cell)` declares it at 1000 ppm, and "
+        "`lab_sample_refine` frees it with the other sample widths. Declare it where "
+        "reflections at similar 2θ stay broader along some directions than along "
+        "others once `lor_strain` has refined. `FitReport.strain` measures that and "
+        "names the broadest and narrowest directions. Anisotropic crystallite size "
+        "and a peak split by too high a symmetry also widen some directions more, "
+        "so rule them out before quoting the coefficients."
     ),
     unit="10⁻¹² Å⁻⁴", default="0.0",
     typical="0-500 for a sample with measurable anisotropic strain",
@@ -752,11 +761,17 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "polynomial on top cannot correct this, because it is additive and the "
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
-            "expected report."
+            "expected report. A curve another program computed for one phase, such as "
+            "a DIFFaX faulted-minus-ideal term, scales with that phase. Store "
+            "it as c*·D, with c* converting the program's units to counts at phase "
+            "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
+            "stored curve does not follow the zero shift or any other peak-position "
+            "correction."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank",
+                "of 1 for a measured blank; the phase scale, tied, for a "
+                "computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
@@ -891,6 +906,18 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
     "phases.*.cell.alpha": _CELL_ANGLE,
     "phases.*.cell.beta": _CELL_ANGLE,
     "phases.*.cell.gamma": _CELL_ANGLE,
+    # the parent cell's edges are cell lengths and angles too: ``phases.*.cell.a``
+    # claims them on purpose, since fnmatch's ``*`` spans the dots
+    # (``phases.0.parent_cell.cell.a``), and ``tests/test_help.py`` pins that
+    "phases.*.parent_cell.strain.*": HelpEntry(
+        title="Strain",
+        description=(
+            "Strain the parent forbids; seed it off zero."
+        ),
+        unit=None, default="0.0",
+        typical="1e-4 to 1e-2",
+        anchor="theory/peak-positions.html#a-child-s-cell-through-its-parent",
+    ),
     "phases.*.scale": HelpEntry(
         title="Phase scale",
         description=(
@@ -1204,7 +1231,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "it raises `ADP_NOT_POSITIVE_DEFINITE`, because the Debye-Waller factor "
             "then diverges at high Q. Free these parameters with "
             "`phases.*.atoms.*.adp.*`, alongside the `biso` pattern that every "
-            "displacement stage carries."
+            "displacement stage carries. The tensor is opt-in per atom. "
+            "`Structure.from_cif(path, aniso=True)` keeps a file's `U^ij`. "
+            "`atom.aniso = AnisoU.isotropic(uiso, phase.cell)` declares one at the "
+            "isotropic value, with Uiso = B/8π². The tensor replaces `biso`, so the "
+            "assignment raises while `atom.biso.vary` is True. A powder "
+            "pattern seldom determines six components per site. A declaration is worth "
+            "trying on a site that scatters strongly for the radiation used, with data "
+            "to high Q. Keep it only if the tensor stays positive-definite and each "
+            "diagonal component's esd is small against its value."
         ),
         unit="Å²", default=None,
         typical="0.005-0.05 Å²",
@@ -1289,6 +1324,111 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         anchor="guides/tie.html#tie-to-a-quantity-of-your-own",
     ),
 }
+
+
+@dataclass(frozen=True)
+class OptIn:
+    """An opt-in correction whose parameters exist only once it is declared.
+
+    ``owner`` is the glob of the object that carries the declaration, and each
+    of ``families`` is a :data:`PARAMETER_HELP` key under it.  ``declaration``
+    is the code a user runs, in the spelling the help entries use;
+    ``tests/test_help.py`` executes it against a model that lacks the
+    correction and checks that every family then has a row.  ``geometry``
+    and ``source`` are the only ``Geometry.kind`` and ``Source.kind`` the
+    schema accepts the declaration on, where it refuses the others.
+    """
+
+    name: str
+    owner: str
+    families: tuple[str, ...]
+    declaration: str
+    geometry: str | None = None
+    source: str | None = None
+
+
+#: The opt-in corrections, for answering an unknown path with the declaration
+#: that would create it rather than with the nearest real path (WP-2087).
+#: On a phase without extinction, ``phases.0.extinction`` was answered with
+#: ``phases.0.lor_strain``.  ``tests/test_help.py`` crosses this list with
+#: the families a model declaring nothing lacks, both ways, so a new opt-in
+#: correction adds a row here or a reason there.
+OPT_IN: tuple[OptIn, ...] = (
+    OptIn("extinction", "phases.*", ("phases.*.extinction",),
+          "phase.extinction = 0.0"),
+    OptIn("March-Dollase preferred orientation", "phases.*",
+          ("phases.*.preferred_orientation.r",),
+          # the axis is the crystallites' habit, so it prints as a placeholder
+          "phase.preferred_orientation = PreferredOrientation(axis=(h, k, l))"),
+    # order 4 is what report.layer2 already prints for a texture action
+    OptIn("spherical-harmonics texture", "phases.*", ("phases.*.texture.*",),
+          "phase.texture = SphericalHarmonicTexture(order=4)"),
+    OptIn("Stephens anisotropic strain", "phases.*",
+          ("phases.*.microstrain.s*", "phases.*.microstrain.dof.*"),
+          "phase.microstrain = StephensStrain.isotropic(1000, phase.cell)"),
+    # the tensor replaces biso, and the assignment raises while biso is free
+    OptIn("an anisotropic displacement tensor", "phases.*.atoms.*",
+          (*(f"phases.*.atoms.*.u{ij}" for ij in ("11", "22", "33", "12", "13", "23")),
+           "phases.*.atoms.*.adp.*"),
+          "atom.biso.vary = False; atom.aniso = AnisoU.isotropic("
+          "atom.biso.value / (8 * math.pi**2), phase.cell)"),
+    OptIn("Suortti surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.a",
+           "instrument.geometry.surface_roughness.b"),
+          "instrument.geometry.surface_roughness = RoughnessSuortti()",
+          geometry="bragg_brentano", source="xray_cw"),
+    OptIn("Pitschke surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.c",
+           "instrument.geometry.surface_roughness.tau"),
+          "instrument.geometry.surface_roughness = RoughnessPitschke()",
+          geometry="bragg_brentano", source="xray_cw"),
+)
+
+
+def family_matches(path: str, glob: str) -> bool:
+    """Whether ``glob``, a :data:`PARAMETER_HELP` key, names ``path`` at its depth.
+
+    :func:`fnmatch.fnmatchcase` alone lets ``*`` cross dots, so
+    ``phases.*.extinction`` would claim ``phases.0.atoms.1.extinction``.
+    """
+    return path.count(".") == glob.count(".") and fnmatchcase(path, glob)
+
+
+def undeclared_opt_in(path: str, known, instrument=None) -> tuple[OptIn, str] | None:
+    """The opt-in correction an unknown ``path`` belongs to, and its owner's path.
+
+    ``None`` unless the owner exists among the ``known`` paths and declares
+    none of the correction's families.  A declared correction answers a typo
+    in one of its own paths with the nearest real path, as any other path
+    does, and so does an owner the model lacks (``phases.7`` on one phase).
+    A row the schema accepts on one geometry or source only answers when
+    ``instrument`` is given and is of that kind, since a path cannot say
+    which geometry it is on.  A joint fit's ``hist.N.`` prefix is carried
+    onto the owner, and a shared row is read bare.
+    """
+    parts = path.split(".")
+    scope = ""
+    if len(parts) > 2 and parts[0] == "hist" and parts[1].isdigit():
+        scope, parts = f"hist.{parts[1]}.", parts[2:]
+    bare = ".".join(parts)
+    known = {k[len(scope):] if scope and k.startswith(scope) else k for k in known}
+    for row in OPT_IN:
+        if not any(family_matches(bare, f) for f in row.families):
+            continue
+        if row.geometry is not None and (
+                instrument is None or instrument.geometry.kind != row.geometry):
+            return None
+        if row.source is not None and (
+                instrument is None or instrument.source.kind != row.source):
+            return None
+        owner = ".".join(parts[:row.owner.count(".") + 1])
+        if not any(k.startswith(owner + ".") for k in known):
+            return None
+        tails = [owner + f[len(row.owner):] for f in row.families]
+        if any(family_matches(k, t) for k in known for t in tails):
+            return None
+        return row, scope + owner
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -1383,9 +1523,12 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
         label="at bound",
         description=(
             "The fitted position reached the limit on how far it could move from its "
-            "starting value. That means peak detection put the starting value in the "
-            "wrong place. The reported position is the limit itself, and the fit did "
-            "not find a minimum there."
+            "starting value. The reported position is the limit itself, and the fit did "
+            "not find a minimum there. The component may not be a line of its own. A "
+            "shoulder on the axial-divergence tail of a much stronger line ends here "
+            "too, because the peak shape does not carry all of that tail. That tail is "
+            "on the low-2θ side below 90° and the high-2θ side above it. One also "
+            "flagged `axial_tail` often is such a shoulder."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(
@@ -1659,10 +1802,14 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter is below zero. No real vibration "
             "does that, because the Debye-Waller factor would grow with angle instead of "
-            "falling. The parameter is absorbing something else. Likely causes are "
-            "uncorrected absorption or roughness, a wrong species or occupancy, or a "
-            "background that bends at high angle. Correct that cause, or hold the "
-            "parameter at a physical value."
+            "falling. The parameter is absorbing something else. A loss of low-angle "
+            "intensity does this, and three corrections for it are opt-in: surface "
+            "roughness on a Bragg-Brentano plate (`geometry.surface_roughness = "
+            "RoughnessSuortti()`), absorption in a capillary (`geometry.mu_r` or "
+            "`geometry.capillary_radius_mm`) and "
+            "extinction (`phase.extinction = 0.0`). A wrong species or occupancy, or a "
+            "background that bends at high angle, does it too. Correct that cause, or "
+            "hold the parameter at a physical value."
         ),
     ),
     "BISO_UNUSUALLY_LARGE": HelpEntry(
@@ -1670,8 +1817,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter exceeds the amplitude at which a "
             "solid with this cell would melt. That usually points at the model. A wrong "
-            "species or occupancy, a missing absorption correction or a background that "
-            "has taken high-angle intensity can all inflate it. A mobile site, such as a "
+            "species or occupancy, or a background that has taken high-angle intensity, "
+            "can inflate it. So can absorption in a flat plate of finite thickness, "
+            "which depresses high-angle intensity until `geometry.mu_t` or "
+            "`geometry.thickness_mm` declares it. A "
+            "mobile site, such as a "
             "cavity cation, can be genuinely this large. Check the model before you read "
             "the value as motion."
         ),
@@ -1965,11 +2115,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A constraint held the optimum on its edge",
         description=(
             "In the final stage the optimiser held some steps against a built-in "
-            "inequality constraint. Examples are the positivity of the strain broadening "
-            "and the positive Gaussian instrument width. The optimum therefore sits on "
+            "inequality constraint. Examples are the positivity of the strain broadening, "
+            "the positive Gaussian instrument width, and the bounds of a tied parameter or "
+            "of a parametric equation's target. The optimum therefore sits on "
             "or near the edge of the allowed region. The values are admissible but not "
-            "measured. Start from a different seed and quote the values only if they "
-            "survive."
+            "measured. A tied parameter held on its own limit also gets a BOUND_HIT or "
+            "FLOOR_HIT warning that names it. Start from a different seed and quote the "
+            "values only if they survive."
         ),
     ),
     "COVARIANCE_DIRECTION_DISCARDED": HelpEntry(
@@ -2153,7 +2305,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(
         title="A declared peak refined to zero intensity",
         description=(
-            "The area of a declared peak finished at zero. A peak reaches the pattern "
+            "The area of a declared peak finished at or below zero, or on its floor of "
+            "zero as the bound test reads it (`FLOOR_HIT`). Under `solver=\"trf\"` the "
+            "stored area can sit a hair above zero. A peak reaches the pattern "
             "only through its area, so at zero area nothing fixes its centre. The centre "
             "and its esd are then not measurements. Either the feature is not in the "
             "specimen or the bounds on the centre do not cover it. Drop the peak or move "
@@ -2958,8 +3112,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Some figures of merit are undefined",
         description=(
             "The peak list has fewer usable lines than the classical figures of merit "
-            "are defined on, so some are left out of the ranking. The search still runs "
-            "over the crystal systems the line count supports. Every candidate is ranked "
+            "are defined on, so some are left out of the ranking. The message names the "
+            "crystal systems with enough lines to determine a cell. A search narrows the "
+            "requested systems to those, unless that would leave none. Every candidate is "
+            "ranked "
             "on the same remaining figures, so the order stays meaningful. Confidence is "
             "capped, and a longer peak list restores the full panel."
         ),
@@ -3078,8 +3234,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The search covered only some crystal systems. A failure to find a cell "
             "means only that none was found in those systems. It says nothing about the "
-            "specimen, and it is no evidence of a mixture. Search the missing systems "
-            "before you draw a conclusion."
+            "specimen, and it is no evidence of a mixture. Where the list has enough lines "
+            "to determine a cell in a missing system, search it before you draw a "
+            "conclusion. Where it has too few, the message says so, and more lines are "
+            "the remedy. Where the list supports no search at all, nothing was searched, "
+            "and INDEX_DATA_INSUFFICIENT says why."
         ),
     ),
     "INDEX_VALIDATION_FAILED": HelpEntry(
@@ -3099,6 +3258,37 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first is an artefact of the search and describes no lattice. The second is "
             "a cell larger than the lines can justify. Narrow the maximum volume, or "
             "measure more lines."
+        ),
+    ),
+    "INDEX_WEAK_LINE_RETRY": HelpEntry(
+        title="The search was run again without the weak lines",
+        description=(
+            "The full peak list, inlier retry included, gave no lattice that two "
+            "engines agree on. The lines under 5 % of the strongest were set aside and "
+            "the search ran again on the rest. This is the second attempt of the 2004 "
+            "indexing round robin (Bergmann et al.). If that search found agreement, "
+            "the candidates are its own, ranked and scored on the kept lines only. "
+            "Otherwise they are the full list's. A trace second phase, or a peak the "
+            "picker split, adds weak lines the host's cell cannot index. Check the "
+            "set-aside lines against the leading candidate's predicted positions. A line "
+            "it does not predict is a second phase, a picker's artefact or an ordering "
+            "line of a supercell. A supercell of the leading cell predicts the last kind. "
+            "Declaring "
+            "`n_unindexed` forbids both retries."
+        ),
+    ),
+    "K_SEARCH_PARTNER": HelpEntry(
+        title="The cell's metric pairs this propagation vector with another",
+        description=(
+            "A near-symmetry of the cell's metric, within the tolerance passed, maps this "
+            "propagation vector onto another one that no symmetry of the space group "
+            "relates to it. The satellites of this vector and of vectors near the other "
+            "one can then agree within a match radius, so the positions alone may not say "
+            "which the peaks belong to. On a pseudo-tetragonal cell the swap of the two "
+            "near-equal axes is the usual case. Score the other vector and its "
+            "neighbourhood, and keep every vector that matches as a hypothesis. A moment or "
+            "modulation model, which reads intensities, or a sharper instrument separates "
+            "them."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -3251,9 +3441,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "error estimate, a single-pattern fit computes the angle's profile interval "
             "and stores it in `RefinedParameter.interval`. The message gives the angle's "
             "distance from "
-            "the direction and whether the interval includes it. Where it does, quote "
-            "the moment as lying along the symmetry direction. Where it does not, quote "
-            "the angle with its interval."
+            "the direction and whether the interval includes it. Where it does, the "
+            "data cannot tell the moment from one along that direction. Where it does "
+            "not, quote the angle with its interval. The fit also computes the profile "
+            "interval of each such site's moment size, because the size's error "
+            "estimate assumes the angles sit on the direction. Quote the size by that "
+            "interval. Where the profile found a fit better than the answer by a whole "
+            "threshold or more, the fit did not reach its minimum: the message gives "
+            "the better point, and the size is quoted only after a refit from it. "
+            "The size's coverage and that threshold were measured on one family, a "
+            "simulated two-site `Pnma` set, and are untested beyond it."
         ),
     ),
     "MOMENT_UNSUPPORTED": HelpEntry(
@@ -3343,7 +3540,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A parametric equation sets a parameter, in some patterns, to a value "
             "outside that parameter's own limits. The equation's coefficients are "
-            "unbounded, so the limits never constrained the solve. Do not quote the "
+            "unbounded. The default LM driver holds a linear equation's target inside "
+            "its limits, but TRF and an expression equation do not. The fit finishes. "
+            "The result keeps the equation's value, and that pattern's model holds the "
+            "limit the value crossed. Do not quote the "
             "parameter there as a measurement. Narrow the subset to where the form "
             "holds, lower the order of the polynomial, or use a basis that stays inside "
             "the range."
@@ -3358,6 +3558,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "equation in those patterns. Quote the equation's coefficients. If the "
             "equation should hold only where it is measured, narrow the subset to the "
             "patterns that see the phase."
+        ),
+    ),
+    "PARENT_STRAIN_HELD": HelpEntry(
+        title="A parent cell refined with its strain held",
+        description=(
+            "A stage freed the cell edges of a phase whose cell is stated through its "
+            "parent (`Phase.parent_cell`) while one of its lattice strains stayed held. "
+            "The cell glob frees the parent's edges and never a strain, because while "
+            "the child's atoms and moments keep the parent's symmetry a strain at zero is a "
+            "stationary point, and a distortion gives it only a small gradient there. The child's cell is then the "
+            "parent's carried through the transform with no shear beyond the held value. "
+            "To test for a shear, seed the strain off zero with `set_values` and free "
+            "`phases.*.parent_cell.strain.*` in a stage's `turn_on`."
         ),
     ),
     "PATTERN_DEAD_CHANNELS": HelpEntry(
@@ -3432,7 +3645,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "PATTERN_ROWS_DROPPED": HelpEntry(
         title="Some rows were not read as data",
         description=(
-            "The reader dropped rows from the file, for one of two reasons, and the "
+            "The reader dropped rows from the file, for one of three reasons, and the "
             "message says which. Every reader drops a point whose 2θ, count or error "
             "estimate is NaN or infinite, and names the dropped points by their 2θ. "
             "On a time-of-flight pattern, flight time takes the place of 2θ. "
@@ -3443,7 +3656,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "per line as the file's layout, and it skips numeric lines with a "
             "different count, naming them by line. A header table or a limits row "
             "usually causes this. If a skipped line was a real measurement, the file "
-            "mixes layouts. Re-export it with the same number of values on every row."
+            "mixes layouts. Re-export it with the same number of values on every row. "
+            "The same reader also names, by line, each line between the first and the "
+            "last data row that does not read as a row of numbers, such as '10.2 n/a'. "
+            "Text above the data is a header and text below it a footer, and both are "
+            "skipped without a report. A line inside the data is a lost point or a "
+            "note, and the reader cannot tell which."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
@@ -3462,6 +3680,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "weight and the fit is unweighted. The reader kept the values, because a "
             "uniform error is legal. Goodness of fit and χ² mean something only if every "
             "point has that error. A placeholder in the error field is the usual cause."
+        ),
+    ),
+    "PATTERN_SIGMA_NONPOSITIVE": HelpEntry(
+        title="Points with an error estimate of zero or below",
+        description=(
+            "The file's error column gives some points an esd of zero or a negative "
+            "one. Zero claims an exact intensity and a negative esd has no meaning, so "
+            "neither gives a weight. These points are left out of the fit, and the "
+            "file's numbers are kept as written. The message counts them, says how "
+            "many record an intensity of zero and gives their 2θ; the code's value is "
+            "the count. A column with no positive esd at "
+            "all is not read, and the Poisson σ = √max(y, 1) is used instead. Where "
+            "the points are channels that counted zero, and the writer computed "
+            "σ = √0, read the file with `nonpositive_sigma='poisson'` to keep them at "
+            "σ = √max(y, 1), one count at a zero count. "
+            "`RefinementResult.sigma_rule` counts what the fit weighted by each rule."
         ),
     ),
     "PATTERN_TOTAL_SCATTERING": HelpEntry(
@@ -3986,6 +4220,44 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measure the instrument on a standard, and hold that profile in this fit."
         ),
     ),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": HelpEntry(
+        title="A torsion turned, and the body's own contacts are not checked",
+        description=(
+            "A rigid body's torsion turned during the run, and the anti-bump checks do not "
+            "search the pairs inside one copy of that body. The builder, "
+            "`anti_bump_restraints`, skips those pairs by default, and the end-of-run contact "
+            "check always skips them, because a rigid body keeps its template distances. "
+            "A torsion breaks that: it turns part of the molecule about a bond, and two atoms "
+            "on either side of the bond can come together. Only a row you wrote for that pair "
+            "restrains it, and nothing reports it. The message says how many rows the list "
+            "holds inside the body. Read the distances between the body's "
+            "own atoms in `result.geometry.distances`, bonds included: a folded pair can be "
+            "short enough to be listed as a bond. Where a torsion brought two of its atoms closer than "
+            "you allow, add an anti-bump row for that pair, with a minimum you state for it, or "
+            "restrain or hold the torsion. Keep such a row off the two end atoms of a torsion: "
+            "they sit 2.5 to 3.9 Å apart in real molecules, and a floor there pushes the "
+            "torsion towards anti."
+        ),
+    ),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": HelpEntry(
+        title="A restraint measures geometry a rigid body holds fixed",
+        description=(
+            "A bond, angle, torsion or planarity restraint names atoms that all belong to one "
+            "copy of one rigid body, and no torsion the body declares changes the quantity. "
+            "The body places those atoms from its template, so the distance, angle or plane "
+            "is the template's whatever the fit does: the restraint's row is a constant, and "
+            "it restrains nothing. A quantity is either restrained or refined, never both by "
+            "accident, so the compile warns and keeps the row: a refiner may keep one "
+            "restraint set across a with-body and a without-body comparison, where the row "
+            "is the template's penalty. A declared torsion "
+            "changes the quantity when it turns some of the restrained atoms, other than its "
+            "two axis atoms, and not the others; whether the torsion is free in a stage does "
+            "not matter. A restraint across two bodies, between a body atom and a free "
+            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "a torsion that changes it, take the atoms out of the body and restrain them "
+            "as free atoms, or keep the row."
+        ),
+    ),
     "RESTRAINT_PAIRS_STALE": HelpEntry(
         title="Some contacts have no anti-bump row",
         description=(
@@ -4027,7 +4299,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A free rotation or shift of a rigid body has no effect on the pattern. The "
             "usual cause is a turn that moves only zero-occupancy atoms, or a turn about "
             "an axis the template is symmetric under. The value and the esds of the body "
-            "atoms are not measurements. Hold those parameters and refit."
+            "atoms are not measurements. Hold what the suggestion names and refit."
         ),
     ),
     "ROUGHNESS_ABSORPTION": HelpEntry(
@@ -4147,16 +4419,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measurement, so do not interpolate across it. It seeded no later pattern "
             "and was left out of the series median, so its neighbours are unaffected. "
             "Fit the pattern on its own to find out why."
-        ),
-    ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
         ),
     ),
     "SERIES_PATTERN_FAILED": HelpEntry(
@@ -4362,18 +4624,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model holds it fixed, there is nothing to refine. A pattern that names one "
             "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
             "frees nothing at that site. An atom on a fully fixed special position has "
-            "no directions, so its `dof.*` pattern matches no parameter."
+            "no directions, so its `dof.*` pattern matches no parameter. A pattern "
+            "that names one phase's cell, such as `phases.0.cell.*`, gets it too. On "
+            "a phase whose cell is derived from its parent's, it reaches no free "
+            "row, and `phases.0.parent_cell.cell.*` frees the parent's edges."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
         title="A stage named a parameter the model lacks",
         description=(
             "A stage asked to refine a parameter by a name that no parameter of the "
-            "model has. The usual cause is a typing slip or a retired spelling. Nothing "
+            "model has. The usual causes are a typing slip, a retired spelling and an "
+            "opt-in correction the model does not declare. Nothing "
             "was freed, yet the fit converged. A wildcard pattern that matches nothing "
-            "stays silent, because some models lack a component. Correct the name, or "
-            "use a wildcard if the stage should reach a component that only some models "
-            "declare."
+            "stays silent, because some models lack a component. Correct the name, "
+            "declare the correction, or use a wildcard if the stage should reach a "
+            "component that only some models declare."
         ),
     ),
     "STAGE_SLOW_DESCENT": HelpEntry(
@@ -4643,6 +4909,39 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
 }
 
 
+#: The rendered views a diagnostic can name (WP-1133), each as
+#: ``function.panel``, with the words a reader is shown.  Each view has a
+#: reference inside its frame: the eye judges a misfit only against something
+#: drawn beside it (WP-1130 § Finding 8).  ``plot_for_vlm`` gives each panel's
+#: axes its name as the matplotlib ``gid``, and
+#: ``tests/test_diagnostic_views.py`` renders the montage and fails on a name
+#: no panel carries, or on a name no code uses.
+DIAGNOSTIC_VIEWS: dict[str, str] = {
+    "plot_for_vlm.overview": (
+        "the top panel of rietx.viz.plot_for_vlm, observed and calculated "
+        "intensity over the whole pattern"
+    ),
+    "plot_for_vlm.residual": (
+        "the Δ/σ panel of rietx.viz.plot_for_vlm, the misfit in noise units "
+        "against a ±3σ band"
+    ),
+}
+
+#: The view that shows a code's finding, read by ``Diagnostic.view``.  It is
+#: the same for every finding with the code, so it is looked up and never
+#: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
+#: fit firing it was rendered and the finding read off that panel; the fits are
+#: in ``tests/test_diagnostic_views.py``.  A code not listed reads ``None``,
+#: which says no view was checked for it, not that none would help.  The one
+#: finding known to have no view is a background level: a uniform factor of
+#: two leaves a smooth decay with no visual signature (WP-1130).
+DIAGNOSTIC_VIEW_OF: dict[str, str] = {
+    "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
+    "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",
+    "MODEL_FAR_FROM_DATA": "plot_for_vlm.overview",
+}
+
+
 #: One entry per field of :class:`~rietx.schemas.plan.StageSpec`.  These are
 #: settings for one stage of a plan, not refined quantities, so ``default`` is
 #: the schema's default and ``typical`` says what a preset actually uses.
@@ -4661,11 +4960,26 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "Wildcard patterns for the parameter paths that the stage frees when it "
             "starts. For example, `phases.*.cell.*` frees every lattice parameter of "
             "every phase. Staging is cumulative, so a parameter freed here keeps "
-            "refining in every later stage. Paths contain no square brackets, because "
+            "refining in every later stage unless a later stage's `turn_off` fixes it. Paths contain no square brackets, because "
             "the matching reads brackets as a character class."
         ),
         default="[]",
         typical="one or two patterns per stage",
+        anchor="theory/parameterisation.html#from-tree-to-vector",
+    ),
+    "turn_off": HelpEntry(
+        title="Parameters fixed this stage",
+        description=(
+            "Wildcard patterns for the parameter paths that the stage fixes after it "
+            "frees its `turn_on` patterns. For example, `instrument.profile.*` keeps "
+            "the profile a Pawley fit settled while the structure refines. A fixed "
+            "parameter stays fixed in later stages until a later stage frees it again, "
+            "and the closing stage keeps it fixed too. The `.rxt` document writes the "
+            "patterns as a `fix` clause. To keep a parameter fixed in every plan, "
+            "use `Refinement.hold` instead."
+        ),
+        default="[]",
+        typical="empty; one pattern where a stage takes back what an earlier one freed",
         anchor="theory/parameterisation.html#from-tree-to-vector",
     ),
     "max_iter": HelpEntry(
@@ -4812,6 +5126,21 @@ READER_OPTION_HELP: dict[str, HelpEntry] = {
             "beside the file name."
         ),
         typical="`_meas` for measured data in a pdCIF",
+    ),
+    "nonpositive_sigma": HelpEntry(
+        title="Zero or negative esds",
+        description=(
+            "What a point whose esd in the file is zero or negative becomes. Such an "
+            "esd gives no weight. `exclude` leaves the point out of the fit and "
+            "reports it as `PATTERN_SIGMA_NONPOSITIVE`. `poisson` weights it by "
+            "σ = √max(y, 1), which is one count at a zero count: use it for a file "
+            "that wrote σ = √0 for a channel that counted nothing. The file's numbers "
+            "are kept either way, and `RefinementResult.sigma_rule` counts the points "
+            "each rule weighted. Taken by the formats whose σ is a column of the file: "
+            "plain columns, GSAS, pdCIF and `.chi`."
+        ),
+        default="exclude",
+        typical="`exclude`; `poisson` for raw counts with zeros written as σ = 0",
     ),
     "scan": HelpEntry(
         title="Scan index",
@@ -4983,7 +5312,9 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
     "systems": HelpEntry(
         title="Crystal systems to search",
         description=(
-            "Which crystal systems the search covers. They run in decreasing symmetry, "
+            "Which crystal systems the search covers. Below 20 usable lines, a requested "
+            "system with fewer than 5 lines per metric degree of freedom is dropped, "
+            "unless no requested system is left. They run in decreasing symmetry, "
             "so a cubic answer arrives in seconds and a triclinic one in minutes. "
             "Restricting the systems says nothing about the specimen. The result lists "
             "the systems it searched and makes no claim about the others."
@@ -5588,6 +5919,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "two Rwp values needs to see. `0` means none; `None` means nothing counted."
         ),
     ),
+    "RefinementResult.sigma_rule": HelpEntry(
+        title="Which σ weighted the fit",
+        description=(
+            "How many fitted points the file's own esd weighted (`n_file_sigma`), how "
+            "many the Poisson σ = √max(y, 1) weighted (`n_poisson_sigma`), and how "
+            "many points inside the fitted range left the fit because their esd was "
+            "zero or negative (`n_nonpositive_excluded`). The first two add up to the "
+            "fit's point count. `None` means nothing counted: a joint fit, which "
+            "counts per histogram, or a result recorded before the field existed."
+        ),
+    ),
     "RefinementResult.histograms": HelpEntry(
         title="Per-histogram results",
         description=(
@@ -5823,6 +6165,14 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Paths this stage's `turn_on` matched and did not free, because the caller "
             "declared a hold on them with `Refinement.hold`. A hold outranks a plan's "
             "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`."
+        ),
+    ),
+    "StageResult.fixed": HelpEntry(
+        title="Parameters fixed",
+        description=(
+            "The parameter paths this stage's `turn_off` patterns fixed after its "
+            "frees: the free paths they took, never a row that was already fixed. "
+            "Empty when the stage declares no `turn_off`."
         ),
     ),
     "StageResult.unknown_paths": HelpEntry(

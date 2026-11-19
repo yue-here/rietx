@@ -71,6 +71,9 @@ change.
 charges each column for whatever its predecessor evicted, and it over-read
 the scale family by 5×. And an unbounded-cache "would-hit" figure is not
 headroom — depth 8 built exactly the same blocks as depth 2, to the call.
+(*Corrected 2026-11-16, WP-1945:* that measurement could not have differed,
+because the lookup compared only the two newest keys whatever the depth. The
+first rule stands; this example of the second does not.)
 
 **Why volume, and not another cost-per-element win.** The exact plane seam
 is finished: WP-1115 fused the three plane kernels and threads them

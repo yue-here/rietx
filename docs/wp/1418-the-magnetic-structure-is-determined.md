@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-19 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -125,6 +125,41 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-19, from the issue triage (PR #1697; issue #1692): on co-sited magnetic atoms the support
+  test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
+  call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic
+  atoms, the support test reads the combination the powder measures there, Σ occ·f·m, with its
+  esd from the fit's covariance, against the same floor and the same `MOMENT_SUPPORT_SIGMA`
+  (3.0). A class whose combination passes is eligible, as a D8 pair is today through
+  `MomentRow.pair_supported`. Each atom's own modulus is still reported, marked as not
+  separately determined. The bar does not change. The ruling reads the degeneracy the way #1576
+  (Q14 (b), exclusion 4) reads it for the ΔBIC charge. Not ruled, proposed for the implementing
+  PR: f taken at Q → 0, so the tested number is Σ occ·m; the pin is the issue's six MAGNDATA
+  labels (0.206, 0.272, 0.673, 0.679, 0.882, 0.885), published class ineligible → eligible.
+  The measurement (published class best by ΔBIC and still ineligible on all six, best per-site
+  m/σ 0.07-2.57) is the reporter's on 90643335c and was not re-run (MAGNDATA files are not in
+  the tree). Checked against the tree at 7a4a6cd20: `moment_supported`
+  (`report/magnetic.py:460`), `MOMENT_SUPPORT_SIGMA` and `MomentRow.pair_supported`
+  (`strategy/magnetic.py:327`) stand as the issue describes. `moment_supported` is WP-1327's D4
+  null test; the change reaches it too.
+
+- **2026-11-19, from the issue triage (PR #1697; issue #1690): `solve_magnetic` abstains on most k ≠ 0
+  candidates from a centred parent, because #614's guard refuses every class.**
+  `isotropy.magnetic_cell` reduces the primitive basis, and in the reduced cell an operation
+  can mix two axes of unequal length, so `MagneticGroup.allowed_moment_basis` raises
+  (`crystallography/magnetic/operators.py:644`, `_refuse_crystal_axis_action`) and
+  `magnetic_supercell` and `_tilted_seed` never state the class. The guard is right (#614's
+  MnF₂ case). The reporter measured 18 of 31 k ≠ 0 labels of a 122-label MAGNDATA sample
+  abstaining this way on 545b79adb; with the guard disabled as a diagnostic, 13 of the 18 solve
+  to the published group. Proposed: state the child in a cell whose axes the group leaves
+  unmixed (the child-cell route, WP-1918 I-c on the read side), or use the fractional moment
+  action `isotropy` already uses. Pin: the 18 labels, refusal → solved. Checked against the
+  tree at 7a4a6cd20 on synthetic parents (no MAGNDATA): at k = (1, 1, 1), `I 4/m m m` gives 4
+  candidates and `magnetic_supercell` refuses all 4 by this guard; `I m -3 m` gives 6 and it
+  refuses 5. The same guard blocks NiO and MnO on `R -3 m:R` at k = (½ ½ ½) (#757); that
+  route's report-side raise is WP-2221 (#1688). Which route is a magnetic-path design call, so
+  Mike's (#1075).
+
 - **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
   chooses between two site assignments by a χ² gap smaller than its own stop scatter, and
   says nothing.** This is M-9's ranking and abstention, so it sits here. Decisions on it
@@ -168,6 +203,32 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   what the test may assert, since one noise draw on one platform cannot pin the site
   assignment. `SOLVE_MINIMUM_RTOL` is an `_audit` tier-3 row with "no stated source, never
   measured", so that row may move with it.
+
+  *2026-11-12, the Linux nightly went red on the same row* (run 43026125239, `4c48b890d`,
+  `full` job: 1 failed, 15 683 passed, 269 skipped, 51 xfailed). It found m1 = 0.69950, the
+  swap, where the 2026-11-10 run at `5e90f9b41` passed. Two PRs merged in between touch the
+  fit path: #1520 (WP-2208, `Stage.turn_off`) and #1528 (WP-1419 C2, `Phase.parent_cell`).
+  Neither caused it. On an arm64 Mac, `[dev]`, the three class-0 starts give the same χ² to
+  every digit at `5e90f9b41` and at `e0c969887`: 3708.764158295866 (flat),
+  3708.835382150959 (Mn1 only) and 3708.941370498575 (Mn2 only). No numerical package
+  moved between the two nightly environments either: numpy 2.5.4, scipy 1.18.1 and
+  rietx-kernels 1.4.0 both nights, and only five documentation packages changed. The
+  runner image was the same build. So the Linux result moved with something the log does
+  not record. The runner's CPU is the likeliest, as #865 measured for class 2 of this set.
+  A rounding-level nudge reproduces both answers on one Mac. Multiplying the instrument's
+  W by 1 + k·10⁻¹⁴ before the nuclear fit, for k = 0, ±1, ±3, ±7 and 20, the truth won at
+  k = −1 and −7 and the swap at the other six. Across the eight runs the starts stopped
+  between χ² 3708.10 and 3708.99. The lowest stop on each assignment was 3708.101 for the
+  truth and 3708.185 for the swap, so the truth's minimum is deeper by about 0.08. Most
+  starts stop 0.5-0.9 above their own assignment's lowest stop. So the sweep ranks where
+  each start stopped, and the stop scatter is about ten times the gap between the two
+  minima. Probe and log: `~/.cache/ghostshift/rietx/main-nightly-full/perturb.py` and
+  `perturb.log` (maintainer-local).
+  This widens *To decide* by one option. The starts could be made to reach their minima
+  before they are compared, since a converged truth start would win by 0.08 here. Whether
+  that gap is wide enough to pin a site assignment is still the open question. The nightly
+  stays red on this row until the decision is made. Until then a green `full` job on this
+  row is a coin toss, so it says nothing about a PR merged before it.
 
 - **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
 
@@ -958,6 +1019,94 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
+
+Michael's K1a is on main. An agent can now score a rational k-grid against a pattern's
+unexplained peaks and compare each score with a shuffle null, passing every setting by hand.
+Nothing yet ranks the grid or picks a k. That is K1b. The review left three follow-ups for
+Michael, none blocking, and one bears on K1b's defaults.
+
+*Done.* PR #1549 (outside contributor, head `ac10ceb5c`) merged as `1ea22b302` on
+2026-11-19. Its round-2 push answered all three asks of the round-1 review (posted
+2026-11-17). The PR closes no issue, since K1a is one part of #795 and of this WP. M-8 stays
+unticked: the ranking, `best_or_none()`, the default radius and the two warnings are K1b's.
+This entry was written by a ghostshift runner in PR #1701, which changes only this file.
+
+*Measured.* Full suite on the merged tree `e13d968a9` (main `efb3cd005` plus head
+`ac10ceb5c`; arm64 Mac, `[dev,jax]`, Python 3.12, run alone): 16 002 passed, 262 skipped,
+50 xfailed and 1 failed, in 2445 s. The failure is #1424's two-site row. It fails the same
+way on bare main `efb3cd005` and on the Linux nightly. `tests/test_indexing_kvector.py`
+alone: 50 passed. Ruff was clean. `tests.audit_delta` listed 11 added rows, none of them
+unaudited. `tests.reader_output` showed no change against `efb3cd005`.
+
+*Follow-ups, Michael's to take or leave.*
+
+1. The negative-arm test builds the same shuffle null 21 times. The null depends only on
+   the peak count. Built once, the test would drop from 7.4 s on the CI Python 3.11 leg to
+   about 1 s.
+2. A 99th percentile taken from 100 shuffles is a noisy threshold. Against a 2000-shuffle
+   null its true exceedance rate was 0.9-7.5 % over five seeds, where 1 % was meant. This
+   bears on K1b's default shuffle count and percentile, and those are Michael's call.
+3. A test comment says a fixed k component takes the values {0, ½, 1}. That holds for the
+   groups the test uses. P6/mmm gives 1/3 (its K point) and R-3m gives 3/2.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor) is
+Michael's, once #795's decisions 3 and 4 are ruled. The #1424 two-site row stays red on main
+until its own decision is made on that issue.
+
+### 2026-11-12 (2nd session) — M-8's machinery half, K1a (`indexing/kvector.py`, #795)
+
+Under the maintainer's 2026-11-11 rulings on #795 (decision 1: `indexing/kvector.py` under
+the indexing rulebook; decision 2: the rational grid now, through the existing generator),
+K1a lands the calls an agent composes by hand and nothing that ranks or chooses:
+`kgrid_strata` (rational k of step 1/n, n ≤ `K_MAX_DENOMINATOR`, one representative per
+class modulo the centred L*, strata from the little co-group), `kgrid_positions`,
+`score_kvector` and `score_kgrid` (the local Poisson-binomial score), `kgrid_null` (the
+per-pattern shuffle null, whole sample reported) and `kvector_equivalents` (star, −k,
+G − k, and the metric's near-symmetric partners, with `K_SEARCH_PARTNER`). The radius,
+denominator, strata, band, exclusion windows, shuffle count, percentile, seed and partner
+tolerance are required arguments. Per the maintainer's condition, every grid record carries
+its grid step, the strata searched and left, and a `coverage` sentence claiming nothing
+about k off the grid. M-8 stays unticked: the ranking, `best_or_none()`, the default
+radius and the two warnings are K1b's.
+
+*Measured.* arm64 Mac, `.venv-test` `[dev]`: `tests/test_indexing_kvector.py` and the
+audit, help and docs-consistency files green (counts in the PR). On the 1/64 Pnma grid
+(35 936 k = 33³ − 1, Γ excluded) a planted (0, 18/64, 0) with ten clean satellites scores
+9.61 against a 100-shuffle 99th percentile of 5.09 (+4.52 decades); positions build in
+14 s and the null costs 7 s more per pattern. Without satellites, a 10 % profile misfit put
+0 of 200 grid maxima above their thresholds at about four unexplained peaks each, and 2 of
+40 at about 26 (binomial expectation 0.4): shoulders just outside the exclusion windows
+are not uniform, which the exclusion half-width the caller passes decides.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor)
+once this merges and #795's decisions 3 and 4 are ruled.
+
+### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
+
+The Linux nightly went red on 2026-11-11 on the two-site row of issue #1424. Two PRs merged
+the day before were suspected, and neither caused it: the arithmetic of this solve did not
+move on a Mac, and no numerical package moved on the runner. The row is decided by
+rounding, because the sweep compares where its starts stopped and the stops scatter about
+ten times wider than the gap between the two site assignments. Nothing was fixed, because
+the fix is a design call on the magnetic path. The nightly stays red on this row until it
+is made.
+
+*Done.* The evidence is under `### Inherited`, in the #1424 entry's 2026-11-12 paragraph.
+No checklist item is ticked, and no code changed. A ghostshift runner wrote this entry.
+
+*Measured.* arm64 Mac, `[dev]` venv: `tests/test_pair_diagnostic_class.py` on `e0c969887`,
+1 failed (the row) and 2 passed. `tests/test_docs_consistency.py`, 26 passed.
+`python -m tests.reader_output`, exit 0.
+
+*Next.* The decision goes to Michael on issue #1424, drafted for the maintainer to post:
+"The two-site Pnma row now fails on the Linux nightly too (2026-11-11). Under a 1e-14 nudge
+the truth won 2 of 8 runs. The truth's deepest stop is 0.08 below the swap's, and the starts
+stop up to 0.9 above their own minimum. Should `solve_magnetic` converge each start before
+comparing, report both assignments when it cannot separate them, or both? And what may the
+test assert once it does?" Once ruled, the fix lands in `strategy/magnetic.py`'s `_starts`
+and `_best_start`, with the test rewritten to what the ruling allows.
 
 ### 2026-11-01 (2nd session) — #1197, a candidate names its own handedness
 

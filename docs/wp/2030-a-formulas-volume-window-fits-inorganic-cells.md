@@ -1,9 +1,8 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-06 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237) and the stale `duplicate_line` marks fixed (PR #1344); part 3, the GUI formula as two optional `IndexingControls` fields, merged from outside (PR #1351, 2026-11-06); closing #1121 is the maintainer's
+Milestone: unscheduled · Status: ✅ 2026-11-07 — closed by Yue; all three parts merged from outside (PRs #1123, #1253, #1237, #1344, #1351): a ceiling-only volume window, a two-way hydrate refused, and the formula stored by the GUI; issue #1121 closed
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
-Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
 
 ## Goal
 
@@ -207,6 +206,20 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
   that need no ruling, then the window rule once it is chosen).
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #1455) — closed. Decided 2026-11-07 (Yue): close it. A
+  formula's volume window now holds the true cell of an inorganic solid as well as an organic
+  one, because it is a ceiling only. A hydrate written with a full stop that reads two ways is
+  refused instead of read 39 % low. The GUI's indexing form stores the formula and temperature
+  with the project. Issue #1121 was closed by the shift lead on 2026-11-07 with a thanks to the
+  contributor.
+  *Checked before closing:* all twelve tasks are ticked, the withdrawn `INDEX_Z_NOT_INTEGER`
+  task and the superseded supercell task included, each with its reason. The five PRs are
+  merged: #1123 (2026-10-30), #1253 (2026-10-31), #1237 (2026-11-01), #1344 (2026-11-02) and
+  #1351 (2026-11-06). No `### Inherited` section was left. The `Priority:` line is deleted,
+  and the narrative moved to `docs/milestones/v1.12.md`. WP-2033 named this WP as a soft
+  dependency, and it closed on 2026-11-02, so no rating moves.
+  *Next:* none here.
 
 - **2026-11-06** (`/pr-review`) — part 3 merged from outside as PR #1351 (`544dff21`), adding to the contributor's own entry and ticks, which stand as written. `IndexingControls` now stores `formula` and `temperature`, and the GUI's Peaks panel sends them. The stored format changed, and the maintainer approved that on 2026-11-06 ("Yes, run #1351"). The 2026-11-02 entries say 1.10 and 1.11. The releases that apply are 1.11.0 and 1.12: 1.11.0 refuses any project 1.12 has saved. A bookkeeping sync (`f711a92e8`) kept both notes under schema 0.61, this PR's and WP-1542's, and rebuilt the dist. Merged tree, `[dev]`, macOS arm64: `-m slow` 939 passed, 19 skipped, 19 xfailed, 1 failed. The failure is `test_the_two_site_winner_finds_each_site_its_own_moment`, the Mac-only row of #1424 placed under WP-1418, which this PR's files do not reach. CI and the GUI build were green on that head. Closing #1121 and this WP stays the maintainer's. The PR carries no closing keyword.
 

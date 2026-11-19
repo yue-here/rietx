@@ -72,7 +72,7 @@ _WRAP_TOL = 1e-12
 
 def _held(parameter: Parameter, value: float | None = None) -> Parameter:
     """A copy of ``parameter`` as one fixed number: no flag, no tie, no esd."""
-    update: dict = {"vary": False, "expr": None, "stderr": None}
+    update: dict = {"vary": False, "stderr": None}
     if value is not None:
         update["value"] = float(value)
     return parameter.model_copy(update=update)

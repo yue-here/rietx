@@ -28,7 +28,7 @@ matrix — no pydantic objects are touched per iteration.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
@@ -123,6 +123,17 @@ DISTORTION_DRIFT_TOL = 1e-9
 #: the vectors are averages of permutation-times-rotation matrices, so a true
 #: zero sits at 1e-15 and a vector the site forbids is O(1) off.
 DISTORTION_SITE_TOL = 1e-8
+
+
+def _matrix_rank(a: np.ndarray) -> int:
+    """``np.linalg.matrix_rank`` at its default tolerance, through
+    :func:`~rietx.optimize.lapack.svd`, so the decomposition takes the
+    second driver where the first does not converge (that module's rule for
+    every decomposition on the fit path)."""
+    if not a.size:
+        return 0
+    s = lapack.svd(a, compute_uv=False)
+    return int(np.count_nonzero(s > s.max() * max(a.shape) * np.finfo(np.float64).eps))
 
 
 def _is_wavelength(path: str) -> bool:
@@ -503,6 +514,28 @@ def unknown_paths_among(path_globs: Iterable[str], known: set[str]) -> list[str]
 #: Cell parameter names in table order — lengths first, then angles.
 _CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
+#: Relative disagreement (on a length or an angle, against max(|value|, 1))
+#: between a ``Phase.parent_cell`` child's stored cell and the one its parent
+#: and strains give, past which the table refuses rather than overwrite it
+#: (WP-1419).  The builder and every write-back store the derived value itself,
+#: so a stored cell agrees to the bit; this only has to sit above a JSON round
+#: trip's zero and far below any edit a person makes.
+PARENT_CELL_DRIFT_TOL = 1e-9
+
+#: How far inside the positive-definite box a freed ``Phase.parent_cell`` strain
+#: is bounded, relative to the box (WP-1419, review of #1108).  The box of
+#: :meth:`ParameterTable._guard_strain_domain` is the sufficient condition
+#: Σⱼ 2|sⱼ|·‖Eⱼ‖₂ < λ_min(C) (Weyl's inequality: λ_min(C + 2E) ≥ λ_min(C) − ‖2E‖₂),
+#: which is arithmetic.  Its edge itself can be a singular metric, and the
+#: default LM driver lands a value exactly on a bound, so the bound sits this
+#: fraction inside it: at the edge λ_min(C + 2E) ≥ PARENT_STRAIN_PD_MARGIN·λ_min(C),
+#: some six decades above the round-off of an ``eigvalsh`` of a matrix of order
+#: one.  A numerical floor, not a choice of how far a lattice may strain: the
+#: package bounds a strain where the model is defined, and a tighter, physical
+#: bound is the caller's (``Parameter.min``/``max`` on the strain, kept where
+#: tighter).  #1224 moved this from a tier-3 fraction of ½.
+PARENT_STRAIN_PD_MARGIN = 1e-9
+
 #: Fraction of the value a stage *starts from* that a cell length may travel
 #: within that stage, and an additive pad in Å so a small cell is not held
 #: tighter than a large one in absolute terms.
@@ -592,14 +625,20 @@ def _cell_parameter_name(path: str, *, phases: set[int] | None) -> str | None:
     but their paths to go on.
     """
     parts = path.split(".")
-    if len(parts) == 4 and parts[0] == "phases" and parts[2] == "cell":
-        if parts[3] not in _CELL_NAMES:
+    # a phase's own cell, or the parent's cell a ``Phase.parent_cell`` child
+    # refines in its place (WP-1419): the latter is the cell that moves, and
+    # the child's own six are locked outputs, so the safeguards must read it
+    if (len(parts) == 4 and parts[0] == "phases" and parts[2] == "cell") or (
+            len(parts) == 5 and parts[0] == "phases" and parts[2] == "parent_cell"
+            and parts[3] == "cell"):
+        name = parts[-1]
+        if name not in _CELL_NAMES:
             return None
         try:
             ip = int(parts[1])
         except ValueError:
             return None
-        return parts[3] if phases is None or ip in phases else None
+        return name if phases is None or ip in phases else None
     return None
 
 
@@ -1157,6 +1196,65 @@ def _candidate_sites(rec: _OriginPhase, f: tuple[int, int, int]) -> set[str]:
     return {d.rsplit(".dof.", 1)[0] for d in rec.candidates[f]}
 
 
+def _mode_moved_atoms(phase) -> set[int]:
+    """The indices of the atoms some distortion mode of ``phase`` moves."""
+    modes = phase.distortion_modes
+    if modes is None:
+        return set()
+    return {j for j in range(len(phase.atoms))
+            if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+
+
+def fixed_sites_asking_to_vary(structure: Structure) -> list[tuple[str, object]]:
+    """Every site whose coordinates its symmetry fixes, while one asks to vary.
+
+    The one authority for which sites those are, read by the table's refusal
+    and by ``Refinement.fix_special_positions`` (WP-1913), because the verb
+    once walked atoms alone and missed a rigid body's origin.  It routes as
+    :meth:`ParameterTable._collect` does: an atom a rigid body places or a
+    distortion mode moves is checked by that owner's own refusal, and every
+    other atom and every body origin against its stabiliser.  Returns
+    ``(base path, site)`` pairs in walk order, the site being the structure's
+    own ``Atom`` or ``BodyOrigin``.
+    """
+    found: list[tuple[str, object]] = []
+    for ip, phase in enumerate(structure.phases):
+        sg = resolve_group(phase.space_group, phase.symmetry_operations)
+        placed = {label for body in phase.rigid_bodies for label in body.atoms}
+        moved = _mode_moved_atoms(phase)
+        sites = [(f"phases.{ip}.atoms.{j}", atom) for j, atom in enumerate(phase.atoms)
+                 if atom.label not in placed and j not in moved]
+        sites += [(f"phases.{ip}.rigid_bodies.{b}.origin", body.origin)
+                  for b, body in enumerate(phase.rigid_bodies)]
+        for base, site in sites:
+            if not any(getattr(site, c).vary for c in ("x", "y", "z")):
+                continue
+            xyz = np.array([site.x.value, site.y.value, site.z.value])
+            if len(coordinate_basis(stabilizer_rotations(sg, xyz))) == 0:
+                found.append((base, site))
+    return found
+
+
+def _refuse_fixed_but_free(bases: list[str]) -> None:
+    """Refuse every site that asks for a free coordinate it cannot have.
+
+    One site keeps the sentence it always had, byte for byte.  Several are
+    named together, in walk order, so one ``vary=False`` pass fixes them all.
+    """
+    if not bases:
+        return
+    fix = ("set vary=False (Refinement.fix_special_positions() does it for "
+           "every such site)")
+    if len(bases) == 1:
+        raise ValueError(
+            f"{bases[0]} sits on a fully fixed special position; its site "
+            f"symmetry allows no positional freedom — {fix}")
+    named = ", ".join(bases[:-1]) + f" and {bases[-1]}"
+    raise ValueError(
+        f"{named} sit on fully fixed special positions; their site symmetry "
+        f"allows no positional freedom — {fix}")
+
+
 class ParameterTable:
     """The tree-to-flat-θ machinery behind a fit — internal, not the agent surface.
 
@@ -1235,16 +1333,25 @@ class ParameterTable:
         self.derived: list[DerivedBlock] = []
         #: (body base path, body name, its block), in collection order
         #: (WP-1805): the write-back and the rigidity check walk this
-        self._bodies: list[tuple[str, str, DerivedBlock]] = []
-        #: body base path → its rotation DOF paths: the **anchored-rotation**
-        #: kind (WP-1805).  An increment δω = E·θ composed into the body's
-        #: R₀ and zeroed at every :meth:`commit`, so its value is a step
-        #: within one stage and never a position.  Built where the anchor is
-        #: (:meth:`_collect_body`), never read off a path's name, for
-        #: ``_anchored_dofs``' reason; and never *in* ``_anchored_dofs``,
+        #: A body's rotation DOFs are the **anchored-rotation** kind (WP-1805),
+        #: read off its block (``block.rotation_paths(bbase)``), which holds
+        #: the anchor and the axes they turn about: the kind belongs to the
+        #: group of rows, so a per-row field or a second map would restate
+        #: what the block already knows (the maintainer's answer (a),
+        #: 2026-10-08).  An increment δω = E·θ composed into the body's R₀
+        #: and zeroed at every :meth:`commit`, so its value is a step within
+        #: one stage and never a position; never read off a path's name, for
+        #: ``_anchored_dofs``' reason, and never *in* ``_anchored_dofs``,
         #: whose subtraction rule is wrong for a rotation by O(δω²)
         #: (WP-1803's record), so nothing rebases one.
-        self._anchored_rotations: dict[str, tuple[str, ...]] = {}
+        self._bodies: list[tuple[str, str, DerivedBlock]] = []
+        #: the cell blocks of ``Phase.parent_cell`` phases (WP-1419), declared
+        #: before every body block, which reads a phase's cell
+        self._cell_blocks: list[DerivedBlock] = []
+        #: strain path → the amplitude at which the child's metric stops being
+        #: positive definite, however it is combined (WP-1419); applied in
+        #: :meth:`bounds` to a **free** strain, never stored on the entry
+        self._strain_domain: dict[str, float] = {}
         #: body base path → its torsions' twist increments (WP-1808): the
         #: same anchored-rotation kind about one named axis each, composed
         #: into the torsion's ``angle`` and zeroed at every :meth:`commit`
@@ -1286,10 +1393,15 @@ class ParameterTable:
         #: :meth:`_collect_distortion_modes`; read by
         #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
         self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
+        # every fixed site at once, before the walk, which would stop at the
+        # first (WP-1913, #728 item 4)
+        _refuse_fixed_but_free([base for base, _ in fixed_sites_asking_to_vary(structure)])
         self._collect(structure, instrument)
         self._rebuild()
         if self._origin:
             self._fix_origin()
+        for block in self._cell_blocks:
+            self.add_derived(block)
         if self._bodies:
             # the stored atoms are checked against their bodies before the
             # blocks write them, so an edit of a body atom is refused rather
@@ -1315,23 +1427,15 @@ class ParameterTable:
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
         for ip, phase in enumerate(structure.phases):
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            # The cell ties come from the *setting*, not from the crystal system
-            # alone: a c-unique monoclinic symbol fixes β, not γ, and an R group
-            # on rhombohedral axes ties c←a and α=β=γ rather than leaving c free
-            # (WP-1036, crystallography.symmetry.CellConstraints).
-            constraints = cell_constraints(sg)
-            check_cell_angles(sg, {name: getattr(phase.cell, name).value
-                                   for name in ("alpha", "beta", "gamma")})
             base = f"phases.{ip}"
-            for name in _CELL_NAMES:
-                p: Parameter = getattr(phase.cell, name)
-                if name in constraints.ties:
-                    self._add(f"{base}.cell.{name}", p, tie=AffineTie.identity(
-                        f"{base}.cell.{constraints.ties[name]}"))
-                elif name in constraints.fixed_angles:
-                    self._add(f"{base}.cell.{name}", p, force_fixed=True)
-                else:
-                    self._add(f"{base}.cell.{name}", p)
+            if phase.parent_cell is not None:
+                self._collect_parent_cell(base, sg, phase)
+            else:
+                # The cell ties come from the *setting*, not from the crystal
+                # system alone: a c-unique monoclinic symbol fixes β, not γ,
+                # and an R group on rhombohedral axes ties c←a and α=β=γ rather
+                # than leaving c free (WP-1036, symmetry.CellConstraints).
+                self._collect_cell(f"{base}.cell", sg, phase.cell)
             self._add(f"{base}.scale", phase.scale)
             if phase.extinction is not None:
                 self._add(f"{base}.extinction", phase.extinction)
@@ -1372,13 +1476,14 @@ class ParameterTable:
                 self._add(f"{base}.magnetic_lor_strain",
                           phase.magnetic_lor_strain, force_fixed=off)
             self._collect_microstrain(base, sg, phase)
-            owner = {label: body.name for body in phase.rigid_bodies
+            owner = {label: (body.name, f"{base}.rigid_bodies.{b}")
+                     for b, body in enumerate(phase.rigid_bodies)
                      for label in body.atoms}
             moved = self._collect_distortion_modes(base, phase)
             for j, atom in enumerate(phase.atoms):
                 if atom.label in owner:
                     self._collect_body_atom_coords(f"{base}.atoms.{j}", atom,
-                                                   owner[atom.label])
+                                                   *owner[atom.label])
                 elif j in moved:
                     self._collect_mode_atom_coords(f"{base}.atoms.{j}", sg, phase, j)
                 else:
@@ -1394,6 +1499,161 @@ class ParameterTable:
         self._add_instrument_row(instrument, "instrument.zero_shift",
                                  instrument.zero_shift)
         self._collect_instrument(instrument)
+
+    def _collect_cell(self, prefix: str, sg, cell) -> None:
+        """Six cell entries under ``prefix``, tied and fixed as ``sg`` says."""
+        constraints = cell_constraints(sg)
+        check_cell_angles(sg, {name: getattr(cell, name).value
+                               for name in ("alpha", "beta", "gamma")})
+        for name in _CELL_NAMES:
+            p: Parameter = getattr(cell, name)
+            if name in constraints.ties:
+                self._add(f"{prefix}.{name}", p, tie=AffineTie.identity(
+                    f"{prefix}.{constraints.ties[name]}"))
+            elif name in constraints.fixed_angles:
+                self._add(f"{prefix}.{name}", p, force_fixed=True)
+            else:
+                self._add(f"{prefix}.{name}", p)
+
+    def _collect_parent_cell(self, base: str, sg, phase) -> None:
+        """The cell of a phase that states it through its parent (WP-1419).
+
+        The parent's six entries go in under ``{base}.parent_cell.cell``,
+        constrained by the **parent's** group, then one entry per Γ strain
+        the child's group allows (``{base}.parent_cell.strain.j``), then the
+        child's own six entries **locked**: a :class:`~rietx.params.
+        parent_cell.ParentCellBlock`, declared after collection, is their one
+        writer.  The child's own group is never asked for cell constraints,
+        which is the point: its axes need not be conventional for its point
+        group (a C-centred type in a primitive doubled cell), and the metric
+        it allows is the parent's plus the strains.
+
+        Refused by name: a child group that is not a subgroup of the parent's
+        under the transform, a strain list of the wrong length (the message
+        says the right one), and a stored child cell that is not the one the
+        parent and strains give, beyond :data:`PARENT_CELL_DRIFT_TOL` — an
+        edit of the child's cell would otherwise be overwritten silently, as a
+        body atom's would (``_check_body_drift``).
+        """
+        from ..crystallography import metric
+        from ..crystallography.magnetic.operators import parse_transform
+        from .parent_cell import ParentCellBlock
+
+        declared = phase.parent_cell
+        try:
+            parent_sg = resolve_group(declared.space_group)
+        except (RuntimeError, ValueError) as exc:
+            raise ValueError(
+                f"{base}.parent_cell.space_group {declared.space_group!r} is not "
+                f"a space group this package resolves ({exc})") from exc
+        self._collect_cell(f"{base}.parent_cell.cell", parent_sg, declared.cell)
+        p_matrix, _origin = parse_transform(declared.transform)
+        try:
+            basis = metric.strain_basis(
+                metric.rotations_of(parent_sg),
+                metric.in_parent_basis(p_matrix, metric.rotations_of(sg)),
+                cell_constraints(parent_sg).fixed_angles)
+        except ValueError as exc:
+            raise ValueError(
+                f"{base}.parent_cell: the phase's group under the transform "
+                f"{declared.transform!r} against the parent "
+                f"{declared.space_group!r}: {exc}") from exc
+        if len(declared.strain) != len(basis):
+            raise ValueError(
+                f"{base}.parent_cell.strain has {len(declared.strain)} "
+                f"amplitude(s); the phase's group allows {len(basis)} Γ "
+                f"strain(s) that the parent {declared.space_group!r} does not, "
+                f"so it needs exactly {len(basis)} (zero and held is the "
+                f"parent's metric carried through the transform)")
+        strains = [f"{base}.parent_cell.strain.{j}" for j in range(len(basis))]
+        for path, p in zip(strains, declared.strain, strict=True):
+            self._add(path, p)
+        for name in _CELL_NAMES:
+            self._add(f"{base}.cell.{name}", getattr(phase.cell, name),
+                      force_fixed=True)
+        self._guard_strain_domain(base, declared, parent_sg, strains, basis)
+        block = ParentCellBlock(f"{base}.parent_cell.cell", f"{base}.cell",
+                                strains, [[float(v) for v in row] for row in p_matrix],
+                                basis)
+        # the parent's tied entries hold their source's value only after the
+        # rebuild, so the drift test reads the sources through the constraints
+        cons = cell_constraints(parent_sg)
+        parent_values = {n: getattr(declared.cell, n).value for n in _CELL_NAMES}
+        for name, src in cons.ties.items():
+            parent_values[name] = parent_values[src]
+        x = np.array([parent_values[n] for n in _CELL_NAMES]
+                     + [p.value for p in declared.strain], dtype=np.float64)
+        derived = block.evaluate(x)
+        stored = np.array(phase.cell.lengths_angles(), dtype=np.float64)
+        drift = np.abs(derived - stored) / np.maximum(np.abs(stored), 1.0)
+        if float(drift.max()) > PARENT_CELL_DRIFT_TOL:
+            worst = int(np.argmax(drift))
+            raise ValueError(
+                f"{base}.cell.{_CELL_NAMES[worst]} is stored as "
+                f"{float(stored[worst])!r}, but the parent's cell and strains "
+                f"give {float(derived[worst])!r}: the child's cell is derived "
+                f"(Phase.parent_cell), so the two sides disagree and the table "
+                f"cannot tell which was edited.  An edit of the child's cell "
+                f"would be overwritten; an edit of the parent's cell or a "
+                f"strain in the model leaves the child's stored cell behind.  "
+                f"Move the parent through a verb that re-derives it "
+                f"(``Refinement.set_values`` on {base}.parent_cell.cell.* or "
+                f"{base}.parent_cell.strain.*), or drop parent_cell to refine "
+                f"the six parameters directly")
+        self._cell_blocks.append(block)
+
+    def _guard_strain_domain(self, base: str, declared, parent_sg, strains: list[str],
+                             basis: np.ndarray) -> None:
+        """Where the child's metric stays positive definite, by name (WP-1419).
+
+        G′ = Pᵀ·(G + 2·L·E·L)·P with G = L·C·L (L the parent's lengths, C its
+        cosine matrix) is positive definite exactly when C + 2E is, P being
+        invertible.  A stored amplitude outside that is a model to refuse here
+        (a negative diagonal under ``sqrt`` is a NaN mid-solve, and the
+        cosine clip in ``cell_from_metric`` would hide the off-diagonal case).
+        A **freed** strain is bounded in :meth:`bounds`, per amplitude, at
+        (1 − PARENT_STRAIN_PD_MARGIN)·λ_min(C)/(2·n·‖Eⱼ‖₂): the sum of the n
+        amplitudes' spectral norms then stays under λ_min(C), which keeps
+        C + 2E positive definite for any combination (Weyl's inequality).
+        A sufficient box, not the cone itself: the equal split binds first
+        when one amplitude carries the strain, stopping it at 1/n of the room
+        that amplitude would have alone while the metric is still far from
+        singular.  On a hexagonal parent (λ_min(C) = ½) with four strains that
+        is about 0.066 to 0.088 depending on ‖Eⱼ‖₂, roughly six times the real
+        strains the ½ fraction was weighed against; a fit reaching it is
+        reported as a bound hit.  The box is derived from the parent's
+        cell at this build (re-read each stage, like every bound) rather than
+        a tuned number.  A parent angle freed in the same
+        stage moves λ_min within the stage; the stage's next build re-reads it.
+        """
+        if len(basis) == 0:
+            return
+        from ..crystallography.lattice import direct_metric_tensor
+
+        cons = cell_constraints(parent_sg)
+        values = {n: getattr(declared.cell, n).value for n in _CELL_NAMES}
+        for name, src in cons.ties.items():
+            values[name] = values[src]
+        g = np.asarray(direct_metric_tensor(*(values[n] for n in _CELL_NAMES)),
+                       dtype=np.float64)
+        lengths = np.sqrt(np.diag(g))
+        cosines = g / np.outer(lengths, lengths)
+        lam_min = float(lapack.eigvalsh(cosines)[0])
+        amplitudes = np.array([p.value for p in declared.strain], dtype=np.float64)
+        strained = cosines + 2.0 * np.tensordot(amplitudes, basis, axes=1)
+        if not float(lapack.eigvalsh(strained)[0]) > 0.0:
+            raise ValueError(
+                f"{base}.parent_cell.strain {amplitudes.tolist()} makes the "
+                f"child's metric not positive definite (its smallest "
+                f"eigenvalue is {float(lapack.eigvalsh(strained)[0])!r} "
+                f"against {lam_min!r} unstrained): that is not a lattice. "
+                f"Use smaller amplitudes")
+        for path, e_j in zip(strains, basis, strict=True):
+            # E is symmetric, so its spectral norm is its largest |eigenvalue|
+            norm = float(np.max(np.abs(lapack.eigvalsh(e_j))))
+            if norm > 0.0:
+                self._strain_domain[path] = ((1.0 - PARENT_STRAIN_PD_MARGIN) * lam_min
+                                             / (2.0 * len(basis) * norm))
 
     def _collect_texture(self, base: str, sg, phase) -> None:
         """One ``phases.i.texture.<name>`` entry per term the Laue class allows.
@@ -1500,7 +1760,9 @@ class ParameterTable:
         allowed direction (``crystallography.wyckoff``) — and x, y, z become
         affine rows x = x₀ + Σₖ Bₖ·θₖ anchored at the compile-time position.
         Fully fixed special positions contribute none (their coordinates are
-        locked); ``vary=True`` on any coordinate of such a site is an error.
+        locked); ``vary=True`` on any coordinate of such a site is an error,
+        which ``__init__`` raises for every such site before the walk
+        (:func:`fixed_sites_asking_to_vary`).
         A vary request on a constrained-but-free site frees *all* of the
         site's DOFs — per-axis intent does not map onto rows such as [1,1,0].
         DOFs are unbounded displacements; bounds declared on x/y/z do not
@@ -1510,11 +1772,7 @@ class ParameterTable:
         basis = coordinate_basis(stabilizer_rotations(sg, xyz))
         want_vary = any(getattr(atom, c).vary for c in ("x", "y", "z"))
         if len(basis) == 0 and want_vary:
-            raise ValueError(
-                f"{base} sits on a fully fixed special position; its site "
-                "symmetry allows no positional freedom — set vary=False "
-                "(Refinement.fix_special_positions() does it for every such "
-                "site)")
+            _refuse_fixed_but_free([base])
         dof_paths = [f"{base}.dof.{k}" for k in range(len(basis))]
         for c_idx, c in enumerate(("x", "y", "z")):
             p: Parameter = getattr(atom, c)
@@ -1552,8 +1810,7 @@ class ParameterTable:
             paths.append(path)
         self._distortion[base] = (tuple(paths),
                                   tuple(mode.parent_invariant for mode in modes.modes))
-        return {j for j in range(len(phase.atoms))
-                if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+        return _mode_moved_atoms(phase)
 
     def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
         """An atom a distortion mode moves: x, y, z derived from the amplitudes.
@@ -1733,7 +1990,8 @@ class ParameterTable:
             candidates=candidates, labels=labels, coords=coords,
             mode=phase.floating_origin, sites=site_info)
 
-    def _collect_body_atom_coords(self, base: str, atom, body: str) -> None:
+    def _collect_body_atom_coords(self, base: str, atom, body: str,
+                                  bbase: str) -> None:
         """A body atom's x, y, z: locked rows its body's block writes (WP-1805).
 
         No displacement DOF, no affine row: the coordinates are outputs of a
@@ -1745,9 +2003,9 @@ class ParameterTable:
         if any(getattr(atom, c).vary for c in ("x", "y", "z")):
             raise ValueError(
                 f"{base} ({atom.label!r}) is placed by rigid body {body!r}; its "
-                "coordinates are the body's — refine the body's origin and "
-                "rotation (phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*) and set vary=False here")
+                "coordinates are the body's — refine the body's origin, "
+                f"rotation and torsions ({bbase}.origin.dof.*, {bbase}.rotation.*, "
+                f"{bbase}.torsions.*.twist) and set vary=False here")
         for c in ("x", "y", "z"):
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
@@ -1762,7 +2020,7 @@ class ParameterTable:
         DOFs as E has columns (``params.bodies``): the template's inertia rank
         at a general origin, and on a special position the axial directions
         the origin's site symmetry fixes (WP-1807: 0, 1 or 3).  It is never in
-        ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).  The block
+        ``_anchored_dofs`` (:attr:`_bodies` says why).  The block
         is declared after collection, through :meth:`add_derived`.
 
         Refused at build, each naming the body and the atom
@@ -1773,7 +2031,7 @@ class ParameterTable:
         body that straddles a symmetry element.
         """
         from ..schemas.structure import RIGID_BODY_ROTATION_BOUND
-        from .bodies import RigidBodyBlock
+        from .bodies import RigidBodyBlock, site_reach
         from .derived import cartesian_frame
 
         bbase = f"{base}.rigid_bodies.{b}"
@@ -1786,11 +2044,12 @@ class ParameterTable:
         # Cartesian frame at the stored cell: cell-independent in every
         # setting the check above lets through, so fixed for the table's life
         axial = axial_basis(list(origin.stabilizer))
-        site_axes = None
+        site_axes, reach = None, 0.0
         if len(axial) < 3:
             m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
             w = (m @ axial.T.astype(np.float64)).reshape(3, len(axial))
             site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
+            reach = site_reach(m)
         member = {label: i for i, label in enumerate(body.atoms)}
         try:
             block = RigidBodyBlock(
@@ -1801,7 +2060,8 @@ class ParameterTable:
                 torsions=[(member[t.axis[0]], member[t.axis[1]],
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
-                names=[t.name for t in body.torsions], site_axes=site_axes)
+                names=[t.name for t in body.torsions], site_axes=site_axes,
+                site_reach=reach, labels=list(body.atoms))
         except ValueError as exc:
             code, sep, rest = str(exc).partition(": ")
             if sep and code.startswith("RIGID_BODY_"):
@@ -1814,12 +2074,10 @@ class ParameterTable:
         # the anchored-rotation kind: identity entries (radians) that a commit
         # composes into R₀ and zeroes, boxed so |δω| stays below the 2π where
         # the exponential map's Jacobian degenerates (WP-1803's handover)
-        paths = block.rotation_paths(bbase)
-        for path in paths:
+        for path in block.rotation_paths(bbase):
             self.entries.append(Entry(
                 path=path, value=0.0, vary=body.rotation_vary,
                 lo=-RIGID_BODY_ROTATION_BOUND, hi=RIGID_BODY_ROTATION_BOUND))
-        self._anchored_rotations[bbase] = paths
         # named-bond torsions (WP-1808): the same kind about one axis each, in
         # degrees and unboxed — a turn about a fixed axis has no singular
         # chart to keep away from, and the commit wraps the record
@@ -2031,18 +2289,32 @@ class ParameterTable:
         """Every derived row a rigid body writes → that body's name (WP-1805)."""
         return {q: name for _, name, block in self._bodies for q in block.outputs}
 
+    def body_row_bases(self) -> dict[str, str]:
+        """Every derived row a rigid body writes → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: advice naming the owning body's own
+        DOFs, where :meth:`body_rows`' name is unique only in its phase."""
+        return {q: bbase for bbase, _, block in self._bodies for q in block.outputs}
+
     def body_dofs(self) -> dict[str, str]:
         """Every rigid body's own DOF → that body's name (WP-1805).
 
         Its origin's displacement DOFs, its rotation DOFs and its torsions'
         twists, read off the data :meth:`_collect_body` built.
         """
-        out: dict[str, str] = {}
-        for bbase, name, _ in self._bodies:
-            out.update(dict.fromkeys(self._anchored_rotations[bbase], name))
-            out.update(dict.fromkeys(self._anchored_torsions[bbase], name))
-            out.update(dict.fromkeys(self._body_origin_dofs[bbase], name))
-        return out
+        return {p: name for p, _, name in self._body_dof_owners()}
+
+    def body_dof_bases(self) -> dict[str, str]:
+        """Every rigid body's own DOF → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: :meth:`body_dofs` keyed where a
+        body's name is unique only in its phase, read off the same data."""
+        return {p: bbase for p, bbase, _ in self._body_dof_owners()}
+
+    def _body_dof_owners(self) -> Iterator[tuple[str, str, str]]:
+        """(DOF path, body base path, body name) for every body's own DOF."""
+        for bbase, name, block in self._bodies:
+            for p in (*block.rotation_paths(bbase), *self._anchored_torsions[bbase],
+                      *self._body_origin_dofs[bbase]):
+                yield p, bbase, name
 
     def body_bond_errors(self) -> dict[str, float]:
         """Per body, the largest |d_ij − d_ij(template)| over its atoms (Å).
@@ -2974,10 +3246,11 @@ class ParameterTable:
     def _body_increment_kind(self, path: str) -> str | None:
         """``"rotation"``/``"torsion"``/``"origin"`` for a body increment, else ``None``.
 
-        Read off :attr:`_anchored_rotations` and :attr:`_body_origin_dofs`,
-        the data built where each increment is anchored, never off the name.
+        Read off each body's block, :attr:`_anchored_torsions` and
+        :attr:`_body_origin_dofs`, the data built where each increment is
+        anchored, never off the name.
         """
-        if any(path in paths for paths in self._anchored_rotations.values()):
+        if any(path in block.rotation_paths(bbase) for bbase, _, block in self._bodies):
             return "rotation"
         if any(path in paths for paths in self._anchored_torsions.values()):
             return "torsion"
@@ -3006,6 +3279,97 @@ class ParameterTable:
                     "torsion and origin increments restart at zero at every build "
                     "while its record moves, so only an increment of the same "
                     "kind can follow one (or be followed by one)")
+
+    def add_expression(self, target: str, expression, *,
+                       variables: Mapping[str, str],
+                       constants: Mapping[str, float] | None = None):
+        """Set ``target`` by an expression the user wrote (WP-1964).
+
+        ``expression`` is text in the grammar of ``params.expression`` (or a
+        parsed :class:`~rietx.params.expression.Expression`).  Each of its names
+        is a **variable**, ``variables`` mapping it to an entry of this table
+        (``"zero_a" → "vars.zero_a"``), or a **constant**, ``constants`` giving
+        its number here (a pattern's coordinate).  A name in neither, or in
+        both, is refused, and so is a variable or constant the expression does
+        not use.
+
+        The target becomes a derived row (:class:`~rietx.params.derived.
+        ExpressionBlock`), locked with no tie.  So does every entry whose tie
+        reads the target alone, such as a cubic ``b`` and ``c``: the block
+        writes it from the same tie, after the target, where an affine row
+        would read the target's stale value.  An entry tied to the target
+        *and* to something else is refused by name, since the block cannot
+        carry the other half.  Returns the block.
+        """
+        from .derived import ExpressionBlock
+        from .expression import RESERVED, Expression, ExpressionError
+
+        expr = expression if isinstance(expression, Expression) else Expression(expression)
+        constants = dict(constants or {})
+        variables = dict(variables)
+        both = sorted(set(variables) & set(constants))
+        if both:
+            raise ValueError(f"{both[0]!r} is both a variable and a constant; "
+                             "a name has one meaning")
+        for name in (*variables, *constants):
+            if name in RESERVED:
+                raise ValueError(f"{name!r} is a reserved word of the expression "
+                                 "grammar; rename it")
+        known = {**variables, **constants}
+        for name in expr.names:
+            if name not in known:
+                from .._nearmiss import did_you_mean
+                hint = did_you_mean(name, known)
+                raise ExpressionError(
+                    "unbound", f"{target}: the expression names {name!r}, which is "
+                    "neither a variable nor a coordinate" + (f"; {hint}" if hint else ""))
+        unused = sorted(set(known) - set(expr.names))
+        if unused:
+            raise ValueError(f"{target}: {unused[0]!r} is declared but the expression "
+                             f"{expr.text!r} does not use it")
+        i = self._paths.get(target)
+        if i is None:
+            raise ValueError(f"unknown parameter {target!r}")
+        e = self.entries[i]
+        if e.tie is not None:
+            sources = ", ".join(src for src, _ in e.tie.terms)
+            raise ValueError(f"{target!r} is tied to {sources}, so an expression "
+                             f"cannot set it; set {sources} instead")
+        if e.locked or e.held:
+            raise ValueError(f"{target!r} is {'locked' if e.locked else 'held'}, "
+                             "so an expression cannot set it")
+        for name, path in variables.items():
+            if path not in self._paths:
+                raise ValueError(f"variable {name!r} names unknown parameter {path!r}")
+            if path == target:
+                raise ValueError(f"{target!r} cannot be a variable of its own expression")
+        followers: list[tuple[str, float, float]] = []
+        for f in self.entries:
+            if f.tie is None or f.path == target:
+                continue
+            terms, const = self._flatten(f.tie, (f.path,))
+            if not any(j == i for j, _ in terms):
+                continue
+            coeff = sum(c for j, c in terms if j == i)
+            if any(j != i and c != 0.0 for j, c in terms):
+                raise ValueError(
+                    f"{f.path!r} is tied to {target!r} and to another parameter "
+                    f"(= {f.tie}); an expression's block can carry a follower of "
+                    "the target alone")
+            followers.append((f.path, coeff, const))
+        e.vary = False
+        e.locked = True
+        for path, _, _ in followers:
+            fe = self.entries[self._paths[path]]
+            fe.tie = None
+            fe.vary = False
+            fe.locked = True
+        block = ExpressionBlock(expr, target, {n: variables[n] for n in expr.names
+                                               if n in variables},
+                                {n: constants[n] for n in expr.names if n in constants},
+                                followers)
+        self.add_derived(block)
+        return block
 
     def set_held(self, paths: str | Iterable[str], held: bool) -> list[str]:
         """Mark entries as the caller's declared hold.  Returns the ones that exist.
@@ -3376,10 +3740,12 @@ class ParameterTable:
         fits compares nothing.  The quaternion record and the body atoms' rows
         are what carry the answer.  A torsion's twist is the same kind about
         one axis (WP-1808), its record the torsion's ``angle``.  Read off
-        :attr:`_anchored_rotations` and :attr:`_anchored_torsions`.
+        each body's block and :attr:`_anchored_torsions`.
         """
-        return frozenset(p for kind in (self._anchored_rotations, self._anchored_torsions)
-                         for paths in kind.values() for p in paths)
+        return frozenset((*(p for bbase, _, block in self._bodies
+                            for p in block.rotation_paths(bbase)),
+                          *(p for paths in self._anchored_torsions.values()
+                            for p in paths)))
 
     @property
     def angle_dof_paths(self) -> frozenset[str]:
@@ -3509,7 +3875,7 @@ class ParameterTable:
         moved: list[str] = []
         for bbase, name, block in self._bodies:
             target = orientations.get(bbase)
-            paths = self._anchored_rotations[bbase]
+            paths = block.rotation_paths(bbase)
             if target is None or not (any(named(p) for p in paths)
                                       or any(named(q) for q in block.outputs)):
                 continue
@@ -4152,6 +4518,11 @@ class ParameterTable:
                 # narrows, so intersecting last is the tightest of all four and
                 # leaves each of their decisions reading the stored bounds.
                 e_lo, e_hi = max(e_lo, tied_window[0]), min(e_hi, tied_window[1])
+            domain = self._strain_domain.get(e.path)
+            if domain is not None:
+                # a freed Γ strain stays where the child's metric is positive
+                # definite (WP-1419, ``_guard_strain_domain``); only narrows
+                e_lo, e_hi = max(e_lo, -domain), min(e_hi, domain)
             scale = self._value_scale.get(e.path)
             if scale is not None:
                 # every bound above is a *physical* limit on this table's own
@@ -4284,7 +4655,7 @@ class ParameterTable:
         charts: dict[str, np.ndarray] = {}
         self._precommit_anchor = {}
         for bbase, _, block in self._bodies:
-            paths = self._anchored_rotations[bbase]
+            paths = block.rotation_paths(bbase)
             anchor = (block.q0, block.r0, block.axes)
             chart = block.commit_rotation([values[q] for q in paths])
             if chart is None:
@@ -4358,26 +4729,100 @@ class ParameterTable:
 
         The moment signs on the diagonal and each composed body's block on
         its rotation columns (disjoint sets).  A rotation entry's free column
-        is its value or an affine image of another's; the block is carried
-        through C's rows as pinv(A)·chart·A, A the rows of the body's rotation
-        entries over the columns that reach them.  That is exact when each
-        rotation entry is its own free column; a body with some rotation DOFs
-        held or tied gets the projection, because composing then changes which
-        orientations the held components leave reachable, and no matrix maps
-        one family onto the other.
+        is its value or an affine image of another's, so with A the rows of
+        the body's rotation entries over the columns that reach them, δω = A·θ
+        and the block is A⁻¹·chart·A.  Exact in the three shapes a stage
+        allows (:meth:`refuse_partial_turns`): no free direction, nothing to
+        carry; every direction free, A square and invertible; one, a turn
+        about one fixed axis a, where composing is addition — J_l(t·a)·a = a,
+        so the chart is the identity on that column and the block is left so.
+
+        Two free directions of three are refused at stage start rather than
+        approximated: two turns compose into the third, so no matrix maps the
+        old family onto the new one (the maintainer's answer (c) on #801,
+        replacing a pinv(A)·chart·A projection the 2026-10-08 probe measured
+        no closer to a fresh solve than no re-chart at all).  A caller driving
+        the table by hand into that shape gets no re-chart for the body.
         """
         n = len(self._free_idx)
         out = np.diag(np.ones(n) if signs is None else np.asarray(signs, dtype=np.float64))
-        C = self._C.toarray()
-        for bbase, chart in charts.items():
-            rows = [self._paths[q] for q in self._anchored_rotations[bbase]]
-            a = C[rows]
-            cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
-            if not len(cols):
+        for bbase, _, block in self._bodies:
+            if (chart := charts.get(bbase)) is None:
                 continue
+            a = self._C[[self._paths[q] for q in block.rotation_paths(bbase)]].toarray()
+            cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
             a = a[:, cols]
-            out[np.ix_(cols, cols)] = lapack.pinv(a) @ chart @ a
+            if len(cols) == len(a) and _matrix_rank(a) == len(cols):
+                out[np.ix_(cols, cols)] = np.linalg.solve(a, chart @ a)
         return out
+
+    def free_turn_directions(self, without: Iterable[str] = ()
+                             ) -> dict[str, tuple[str, int, int]]:
+        """Each body's free turn directions: base path → (name, free, of).
+
+        ``free`` is the rank of the body's rotation rows of C over the free
+        columns, so it counts what holds and ties leave: three rotation DOFs
+        tied to one free column are one direction, a turn about one fixed
+        axis.  ``of`` is the block's k, the directions the body has.  A free
+        path in ``without`` is counted as held, so advice can ask what a hold
+        would leave before recommending it (``RIGID_BODY_UNSUPPORTED``).
+        """
+        drop = set(without)
+        keep = [c for c, p in enumerate(self.free_paths) if p not in drop]
+        out: dict[str, tuple[str, int, int]] = {}
+        for bbase, name, block in self._bodies:
+            rows = [self._paths[q] for q in block.rotation_paths(bbase)]
+            a = self._C[rows][:, keep].toarray() if rows and keep else np.zeros((0, 0))
+            out[bbase] = (name, _matrix_rank(a), len(rows))
+        return out
+
+    def refuse_partial_turns(self, *, joint: bool = False) -> None:
+        """``RIGID_BODY_PARTIAL_TURN``: a body's turn is free in some directions only.
+
+        Raised at stage start (``Refinement._run_stage`` and the joint runner),
+        once the stage's globs, the caller's holds and ties and the mode's
+        force-fix have settled the free set, so a hold, a tie and a plan glob
+        reach it alike.  A body's free turn directions
+        (:meth:`free_turn_directions`) must number 0, 1 or all of them:
+        a commit composes R₀ ← Exp(δω)·R₀, and two turns of a three-direction
+        body compose into the third, so the next stage's two directions are
+        not this one's and :meth:`_chart_matrix` has no exact re-chart to give
+        (the maintainer's answer (c) on #801).  A linear body has two
+        directions, and one of them free is a turn about a fixed axis.
+
+        ``joint`` words the remedies for ``MultiHistogramRefinement``, which
+        has no hold or tie verb, so the stage's globs are the only lever.
+        """
+        turns = self.free_turn_directions()
+        for bbase, _, block in self._bodies:
+            name, free, k = turns[bbase]
+            if free in (0, 1, k):
+                continue
+            state, pinned = [], False
+            for q in block.rotation_paths(bbase):
+                e = self.entries[self._paths[q]]
+                pinned |= e.tie is not None or e.held
+                state.append(f"{q.rsplit('.', 1)[1]} "
+                             + ("tied" if e.tie is not None
+                                else "free" if e.vary else "held"))
+            glob = f"{bbase}.rotation.*"
+            if joint:
+                remedy = (f"Free all {k} ({glob}) or none of them in the stage's "
+                          "turn_on: a joint fit has no hold or tie verb")
+            else:
+                remedy = (f"Free all {k} ({glob}), hold all {k} "
+                          f"(Refinement.hold({glob!r})), or tie the turn to one axis "
+                          f"(Refinement.tie_equal({glob!r}), or Refinement.tie with "
+                          "scales for another axis)")
+                if pinned:
+                    remedy += ("; a held or tied DOF first needs Refinement.unhold "
+                               "or Refinement.untie")
+            raise ValueError(
+                f"RIGID_BODY_PARTIAL_TURN: rigid body {name!r} has {free} free turn "
+                f"directions of its {k} ({bbase}.rotation: {', '.join(state)}). "
+                "A commit composes the turn into the body's orientation, and two "
+                "turns compose into the third, so the stage cannot keep the "
+                f"directions it was given. {remedy}")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.
@@ -4393,7 +4838,7 @@ class ParameterTable:
         for bbase, _, block in self._bodies:
             restored = False
             if (bbase in self._precommit_anchor
-                    and wanted & set(self._anchored_rotations[bbase])):
+                    and wanted & set(block.rotation_paths(bbase))):
                 block.restore_anchor(*self._precommit_anchor.pop(bbase))
                 restored = True
             # a torsion's twist is the same kind (WP-1808): each one restored
@@ -4561,7 +5006,8 @@ class ParameterTable:
         return c_rows @ cov_free @ c_rows.T
 
     def apply_to_models(self, structure: Structure, instrument: Instrument,
-                        stderr: dict[str, float] | None = None) -> None:
+                        stderr: dict[str, float] | None = None, *,
+                        clamp: Iterable[str] = ()) -> None:
         """Write current table values back into (copies of) the pydantic models.
 
         With ``stderr`` (a path → esd map, e.g. from
@@ -4569,7 +5015,18 @@ class ParameterTable:
         ``stderr`` set — to ``None`` where the map has no entry, so a stale
         esd from an earlier stage can never survive.  That is what lets the
         CIF exporter write standard uncertainties.
+
+        ``clamp`` names paths whose value past its own bounds is written at the
+        bound it crossed instead of refused.  A ``Parameter`` validates its
+        bounds, so the model cannot hold such a value at all.  The one caller is
+        a joint fit's parametric targets
+        (:meth:`~rietx.params.multi.MultiParameterTable.apply_to_models`):
+        there the value is the equation's, it stays in this table and on the
+        result's rows, and ``PARAMETRIC_OUT_OF_RANGE`` names it (WP-1325,
+        settled by Claude 2026-11-09 under the Stephens-cone precedent).
+        Every other path is refused as before.
         """
+        clamped = frozenset(clamp)
         self._refresh_moment_components()
         self._refresh_derived()
         values = {e.path: e.value for e in self.entries}
@@ -4624,6 +5081,12 @@ class ParameterTable:
             base = f"phases.{ip}"
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
+            if phase.parent_cell is not None:
+                for name in ("a", "b", "c", "alpha", "beta", "gamma"):
+                    put(getattr(phase.parent_cell.cell, name),
+                        f"{base}.parent_cell.cell.{name}")
+                for j, p in enumerate(phase.parent_cell.strain):
+                    put(p, f"{base}.parent_cell.strain.{j}")
             put(phase.scale, f"{base}.scale")
             if phase.extinction is not None:
                 put(phase.extinction, f"{base}.extinction")
@@ -4712,6 +5175,8 @@ class ParameterTable:
         # for anything the check does not model.
         for p, path in pending:
             v = values[path]
+            if path in clamped:
+                v = values[path] = min(max(v, p.min), p.max)
             if not (p.min <= v <= p.max):
                 _refuse(path, v)
         for p, path in pending:
@@ -4722,7 +5187,7 @@ class ParameterTable:
         # pose Exp(δω)·R₀ not yet composed, written as the pose it describes
         for bbase, _, block in self._bodies:
             ip, b = (int(t) for t in bbase.split(".")[1::2][:2])
-            q = block.orientation([values[p] for p in self._anchored_rotations[bbase]])
+            q = block.orientation([values[p] for p in block.rotation_paths(bbase)])
             structure.phases[ip].rigid_bodies[b].orientation = tuple(
                 float(v) for v in np.asarray(q))
             # its torsions' records the same way (WP-1808): φ₀ + δφ, which is

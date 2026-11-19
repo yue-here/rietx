@@ -105,15 +105,25 @@ def test_a_held_cell_off_by_four_parts_per_thousand_abstains(si):
     assert screen.reference_rwp_net > REFERENCE_NET_RWP_MAX
     assert screen.best_or_none() is None
     assert "EXTINCTION_SCREEN_UNRELIABLE" in _codes(screen)
-    # what the gate withholds: a top class that is not the specimen's (F d - -)
-    # and not refuted, every rival's absences untestable because the misfit fills
-    # their windows.  Before this branch's rebase onto main (c9dde14d) the top was
-    # the absence-free F - - - with every rival 10 ΔBIC worse; the class moved
-    # and the withholding did not.
+    # what the gate withholds.  Under the Le Bail screen it was a class that is
+    # not the specimen's, every rival's absences untestable because the misfit
+    # filled their windows.  Since WP-2076 the nested comparison puts the
+    # specimen's own F d - - on top even here, so this arm now pins the gate
+    # abstaining on a reference it cannot vouch for, whatever the ranking says.
+    assert not screen.candidates[0].refuted
+
+
+def _leads_with_fd_and_abstains(screen):
+    """Si's answer since WP-2076: ``F d - -`` leads unrefuted, ``F 41 - -`` sits
+    within the margin (ΔBIC 9.3 apart on two testable positions against one),
+    so ``best_or_none`` abstains and the finding names where the two differ.
+    Ruled by the maintainer on 2026-11-07 (WP-2076's handover log)."""
     top = screen.candidates[0]
-    assert top.symbol != "F d - -" and not top.refuted
-    rivals = [c for c in screen.candidates if c.n_absent and not c.refuted]
-    assert rivals and all(c.n_testable == 0 for c in rivals)
+    assert top.symbol == "F d - -" and not top.refuted, top
+    assert screen.best_or_none() is None
+    ambiguous = next(d for d in screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert "tested position" in ambiguous.message, ambiguous.message
 
 
 def test_the_same_pattern_at_its_own_cell_passes_the_gate(si):
@@ -123,8 +133,7 @@ def test_the_same_pattern_at_its_own_cell_passes_the_gate(si):
         assert screen.status == "converged", refine_cell
         assert screen.reference_rwp_net < 0.1 * REFERENCE_NET_RWP_MAX
         assert "EXTINCTION_SCREEN_UNRELIABLE" not in _codes(screen)
-        best = screen.best_or_none()
-        assert best is not None and best.symbol == "F d - -", refine_cell
+        _leads_with_fd_and_abstains(screen)
 
 
 def test_a_cell_outside_the_prefits_basin_reaches_the_gate(si):
@@ -250,8 +259,7 @@ def test_the_default_prefit_brings_a_four_per_thousand_cell_back(si):
     assert screen.prefit_rwp is not None and screen.prefit_rwp < 0.05
     assert screen.cell[0] == pytest.approx(SI_A, rel=1e-4)
     assert screen.status == "converged"
-    best = screen.best_or_none()
-    assert best is not None and best.symbol == "F d - -"
+    _leads_with_fd_and_abstains(screen)
 
 
 def test_only_the_presets_all_zero_background_is_replaced():
@@ -311,9 +319,18 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     preset instrument — the issue's reproducer.
 
     Measured (M-C7-3): held, the screen abstains with ``P 21 21 21`` on top; the
-    default prefit gives ``P c - n`` (P n m a in this setting) at ΔBIC −564;
+    default prefit gave ``P c - n`` (P n m a in this setting) at ΔBIC −564;
     the same prefit from the preset's all-zero background returns ``P - - n``,
     confidently and wrongly, which is why the prefit seeds it.
+
+    **A known wrong answer since WP-2076, accepted by ruling.**  The nested
+    screen names ``P c - a``, the specimen being ``P c - n``.  The two classes'
+    scores differ by 0.8 in χ², and ``P c - a`` has eight testable positions to
+    ``P c - n``'s six, so its margin of 17 is the count of silent positions alone.
+    The maintainer ruled on 2026-11-07 (WP-2076's handover log) to land the
+    repair at the margin of 10 with this row wrong, and to measure a margin
+    derived from the count of silent positions before tightening.  The
+    assertion pins today's answer so that tightening shows here.
     """
     data, instrument, limits, peaks, candidate = _pbso4_inputs()
 
@@ -321,8 +338,7 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
                                          two_theta_limits=limits)
     best = screen.best_or_none()
     assert best is not None, [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
-    assert best.symbol == "P c - n"
-    assert "P c m n" in best.space_groups
+    assert best.symbol == "P c - a"          # wrong: the specimen is P c - n
     assert screen.status == "converged"
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
@@ -381,8 +397,11 @@ def test_the_gate_fires_on_a_real_family_outside_the_prefits_basin(inputs, facto
     right = screen_at(1.0)
     assert right.status == "converged"
     assert right.reference_rwp_net < 0.5 * REFERENCE_NET_RWP_MAX
+    assert right.candidates[0].symbol == truth
     best = right.best_or_none()
-    assert best is not None and best.symbol == truth
+    # FAP's class rests on one testable position and abstains (WP-2076)
+    assert (best is None) if truth == "P 63 - -" else (
+        best is not None and best.symbol == truth)
 
     wrong = screen_at(factor)
     assert abs(wrong.cell[0] / cell[0] - 1.0) > 0.005      # outside the basin
@@ -390,6 +409,30 @@ def test_the_gate_fires_on_a_real_family_outside_the_prefits_basin(inputs, facto
     assert wrong.reference_rwp_net > REFERENCE_NET_RWP_MAX
     assert wrong.best_or_none() is None
     assert wrong.perfect_fit_rwp_net < 0.2 * REFERENCE_NET_RWP_MAX   # misfit
+
+
+@pytest.mark.parametrize("nudge", [1e-14, -1e-12, 1e-10, 1e-8, -1e-6])
+def test_a_prefit_whose_widths_left_no_reflection_reads_unreliable(nudge):
+    """FAP at ×0.99 is outside the prefit's basin, and the prefit runs its Caglioti
+    W to the 32 400 deg² bound there: a Gaussian about 180° 2θ wide.  Whether any
+    reflection then keeps its area inside the window filter flips on rounding,
+    and these relative nudges to the start each left **none** on macOS arm64 (6
+    of 12 tried; Linux CI hit it at the unnudged start).  The screen took the
+    "predicts no reflections" branch and reported ``failed`` with advice about
+    the cell being too small.  The reference gate is read first now, so the
+    screen says what it says at every other cell outside the basin (WP-2076)."""
+    data, instrument, limits, cell, system, centring, _truth = _fap()
+    f = 0.99 * (1.0 + nudge)
+    scaled = tuple(v * f for v in cell[:3]) + tuple(cell[3:])
+    screen = determine_extinction_symbol(data, CellCandidate(
+        cell=scaled, cell_esd=(0.0,) * 6, system=system, centring=centring,
+        volume=1.0), instrument, two_theta_limits=limits)
+    codes = [d.code for d in screen.diagnostics]
+    assert screen.status == "unreliable", codes
+    assert screen.reference_rwp_net > REFERENCE_NET_RWP_MAX
+    assert "EXTINCTION_SCREEN_UNRELIABLE" in codes
+    assert "EXTINCTION_SCREEN_FAILED" not in codes
+    assert screen.best_or_none() is None
 
 
 @pytest.mark.slow

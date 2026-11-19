@@ -1,0 +1,52 @@
+21 CIFs under tests/data and src/rietx/data; tolerance 0.1 A, sizes (5, 6)
+
+tests/data/cod_1550439.cif: CH  2x2x2 block, 796 atoms, 799 bonds, 52 rings, 0.0 s
+   size 6 CCCCCC           max|d|=0.226 A  x20
+   size 6 CCCCCC           max|d|=0.235 A  x32
+
+tests/data/cod_1567181.cif: CHNO  2x2x2 block, 1144 atoms, 1056 bonds, 20 rings, 0.1 s
+   size 6 CCCCCN           max|d|=0.001 A  x20
+
+tests/data/cod_1577467.cif: CH  2x2x2 block, 224 atoms, 176 bonds, 0 rings, 0.0 s
+
+tests/data/cod_2104364.cif: CHNO  2x2x2 block, 752 atoms, 696 bonds, 16 rings, 0.0 s
+   size 6 CCCCCC           max|d|=0.010 A  x16
+
+tests/data/cod_2242872.cif: CHN  2x2x2 block, 880 atoms, 872 bonds, 80 rings, 0.0 s
+   size 6 CCCCCC           max|d|=0.012 A  x24
+   size 6 CCCCCC           max|d|=0.025 A  x32
+   size 6 CCCCCN           max|d|=0.005 A  x24
+
+tests/data/cod_4002052.cif: CCuHO  2x2x2 block, 5472 atoms, 6528 bonds, 1216 rings, 1.1 s
+   size 6 CCCCCC           max|d|=0.002 A  x256
+   size 8 CCCuCuOOOO       max|d|=0.025 A  x288
+   size 8 CCCuCuOOOO       max|d|=1.108 A  x288
+   size 8 CCCuCuOOOO       max|d|=1.140 A  x384
+
+tests/data/cod_4003235.cif: CHINPb  2x2x2 block, 2517 atoms, 2352 bonds, 56 rings, 0.3 s
+   size 8 IIIIPbPbPbPb     max|d|=0.150 A  x20
+   size 8 IIIIPbPbPbPb     max|d|=0.265 A  x36
+
+tests/data/cod_7252065.cif: CHO  2x2x2 block, 608 atoms, 564 bonds, 24 rings, 0.0 s
+   size 6 CCCCCC           max|d|=0.003 A  x24
+
+skipped: {'no carbon': 10, 'unreadable (ValueError)': 3}
+
+five- and six-rings: 396 within the tolerance, 52 past it
+flattest bound: largest planar deviation 0.025 A (CCCCCC, tests/data/cod_2242872.cif)
+puckered bound: smallest non-planar deviation 0.226 A (CCCCCC, tests/data/cod_1550439.cif)
+
+per phase: (largest planar, smallest puckered) five- or six-ring deviation, A
+      -    0.226  tests/data/cod_1550439.cif
+   0.001     -    tests/data/cod_1567181.cif
+   0.010     -    tests/data/cod_2104364.cif
+   0.025     -    tests/data/cod_2242872.cif
+   0.002     -    tests/data/cod_4002052.cif
+   0.003     -    tests/data/cod_7252065.cif
+
+five- and six-rings between 0.05 and 0.2 A: 0
+
+puckering amplitude Q (Cremer & Pople 1975) above which a ring is turned away, at its least-deviating phase:
+   5-ring envelope/twist   Q > 0.166 A
+   6-ring boat/twist-boat  Q > 0.200 A
+   6-ring chair            Q > 0.245 A

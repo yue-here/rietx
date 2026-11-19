@@ -66,7 +66,7 @@
       done: hasResult,
       hint: hasResult
         ? "every stage left a node in the history"
-        : "press Run, or the r key",
+        : "press Refine, or ⌘⏎",
     },
     {
       id: "report",
@@ -85,7 +85,7 @@
     <strong>Getting started</strong>
     <span class="muted">
       {#if remaining === 0}
-        that is the loop — edit, run, read, and go back to any state in History
+        edit, run, read, and go back to any state in History
       {:else}
         {remaining} left · this strip is only here until you dismiss it
       {/if}
