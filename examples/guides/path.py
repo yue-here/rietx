@@ -13,9 +13,13 @@ made from a known cell at each temperature.
 from _lab6_ramp import TEMPERATURES, TRUE_A, ramp, simulate, starting_model
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
+# Each pattern's fit ends with the closing stage, for an answer to publish.
+plan = rx.RefinementPlan.mccusker_default()
+plan.closing_window_tol = CLOSING_WINDOW_TOL
 patterns = ramp()
-series = rx.refine_sequential(patterns, *starting_model(), plan="mccusker_default",
+series = rx.refine_sequential(patterns, *starting_model(), plan=plan,
                               x=TEMPERATURES, x_label="T (K)", direction="both")
 
 print([d.code for d in series.diagnostics])
@@ -30,7 +34,7 @@ gap = max(abs(g.gap_esd) for g in gaps if g.gap_esd is not None)
 # guide: jump start
 jumped = list(patterns)
 jumped[4] = simulate(TRUE_A[4] * 1.015, seed=15)  # the 700 K cell 1.5 % larger
-series = rx.refine_sequential(jumped, *starting_model(), plan="mccusker_default",
+series = rx.refine_sequential(jumped, *starting_model(), plan=plan,
                               x=TEMPERATURES, x_label="T (K)", verify_steps=3)
 
 for s in series.steps[:4]:
