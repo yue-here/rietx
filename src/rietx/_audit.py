@@ -4257,7 +4257,15 @@ ROWS: tuple[Row, ...] = (
                   "flagged 15 of 96 correct fits at 0.05-0.2 counts a channel; Hamilton's "
                   "R-factor ratio test against a background-only fit flags none of those at "
                   "alpha = 0.05 and catches every full collapse; between alpha = 0.001 and "
-                  "0.05 at most 2 of 260 probe rows change verdict"),
+                  "0.05 at most 2 of 260 probe rows change verdict. Regression row, WP-2017 Q16a "
+                  "(2026-11-19, docs/wp/2017-batch/group_k_summary.md; tools tests/reach_harness.py): "
+                  "the same four families under their acceptance protocols, binomially thinned to "
+                  "0.05-1 counts a channel, three seeds, 464 fits; none of 64 correct starts flagged, "
+                  "largest Hamilton p 4.65e-142 (FAP, 0.05 counts, seed 3); all 204 full collapses "
+                  "(every phase scale 0, held or from a displaced start) flagged, p 1 to rounding; "
+                  "no case within a decade of alpha on either side. "
+                  "tests/test_far_from_data_family.py holds max correct p < alpha < min collapse p "
+                  "and fails with alpha moved past either edge"),
         grounds=("Hamilton (1965, Acta Cryst. 18, 502) at the conventional 0.05, the level not "
                  "tuned. An EXCEPTION TO DESIGN Rule 4 (\"an Rwp comparison is never its "
                  "evidence\"), ruled by Yue on 2026-11-17 and recorded here, where it acts: the "
