@@ -58,9 +58,19 @@ rows), so re-measure before quoting one row.
   `FLOOR_HIT` as its only warning. Not investigated.
 - **Warm seconds.** Shipped default (closing stage on) 0.37-1.21 s; staged, no closing stage
   0.22-0.67 s; one stage 0.08-0.27 s.
-- **A staged re-fit moves a converged answer.** From the `warm` start the staged plan ends up to
-  1.97 esd and 253 ppm in a cell length (brucite) from the baseline; one stage ends within
-  0.41 esd and 11 ppm.
+- **One stage keeps a converged answer, and a staged re-fit can move it.** The reference is the
+  baseline, and the `warm` model was converged by the shipped plan, closing stage on. One
+  stage ends within 0.41 esd of the baseline on every parameter (SRM 660c's U) and within
+  0.08 esd on the other seven standards. The staged re-fit moves
+  zincite's profile V 1.97 esd and its axial term 1.17 esd, to a lower Rwp (0.11017 to
+  0.10943), and fluorite's V 0.78 esd (0.18169 to 0.18139). Zincite's cell moves 20 ppm, which
+  is 0.23 esd. On the other six the staged re-fit stays within 0.62 esd. Brucite's c moves 253 ppm
+  under the staged re-fit at 0.00 esd, so that length is not measured by the fit. The
+  closing-stage session repeated this on WP-2222's branch, where a first fit has no closing
+  stage: one stage within 0.02 esd of the first answer on 8 of 8, the staged re-fit 2.05 esd
+  on zincite and 0.83 on fluorite. So the staged first fit stops short of the plan's best
+  point on two of eight standards, in instrument profile terms, and a one-stage re-fit does
+  not find the rest. Cause not investigated. `refit="stages"` reaches it.
 - **A failed one-stage fit reports `status="converged"`.** Most carried `MODEL_FAR_FROM_DATA`
   (error level) and `STAGE_WINDOWS_STALE`; NAC ended `max_iter`.
 - **The `edit` start is a plan extension only.** The model was converged under the plan minus
@@ -149,7 +159,8 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
       preferred-orientation block on brucite, a second phase on NAC), one stage against staged.
       Loosen design 2 only if all reach; bring the result to Yue either way.
 - [ ] Tests: a first fit is staged; a re-fit is one stage and lands within 0.5 esd of the
-      staged re-fit on three families; a written value, another pattern, another mode and a
+      answer the model stood at on three families (never of a staged re-fit, which moves
+      zincite 2 esd: § Measured); a written value, another pattern, another mode and a
       non-converged fit each run staged; a rejected one-stage fit falls back; `refit="stages"`
       is today's fit, bit for bit. Tests that pin a number through a second `fit` declare
       `refit="stages"`. Obs/calc/diff PNGs to `tests/output/`.
@@ -166,7 +177,8 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
 ## Acceptance
 
 On the eight standards, a second `fit` with the same plan runs one stage, ends within 0.5 esd
-of a staged re-fit on every parameter, and takes under 0.6× the staged re-fit's evaluations.
+of the first fit's answer on every parameter, and takes under 0.6× the staged re-fit's
+evaluations.
 `refit="stages"` reproduces today's fit bit for bit.
 
 ```sh
