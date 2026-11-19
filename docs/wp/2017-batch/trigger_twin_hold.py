@@ -28,8 +28,9 @@ bench = importlib.util.module_from_spec(spec)
 sys.modules["bench_refinement"] = bench
 spec.loader.exec_module(bench)
 
-import rietx as rx  # noqa: E402
 from test_acceptance_qpa_roundrobin import qpa_plan  # noqa: E402
+
+import rietx as rx  # noqa: E402
 
 refine_module = sys.modules["rietx.refine"]
 shipped_hold = refine_module._hold_width_twins
