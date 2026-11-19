@@ -384,6 +384,7 @@ def fap_series(n: int, span: int = 10) -> list[PatternData]:
         p, f = s.phases[0], k / (span - 1)
         at = {a.label: a for a in p.atoms}
         p.cell.a.value *= 1 + 3e-3 * f
+        p.cell.b.value = p.cell.a.value  # the cell's ties follow a
         p.cell.c.value *= 1 + 3e-3 * f
         p.scale.value = 2e-3
         at["Ca2"].x.value += 0.02 * f

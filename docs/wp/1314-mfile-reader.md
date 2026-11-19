@@ -61,6 +61,18 @@ flipping).
 
 ### Inherited
 
+- **2026-11-19, from [2150](2150-a-tied-cell-value-that-contradicts-its-symmetry.md):
+  the reader refuses a cell its space group contradicts, by name.**
+  The parameter table now refuses a tied cell entry (b and c to a on a cubic
+  cell, b to a on a tetragonal or hexagonal one, β and γ to α on rhombohedral
+  axes) further than `SYMMETRY_LENGTH_RTOL` (1e-5) or `SYMMETRY_ANGLE_TOL_DEG`
+  from its source. Every other project reader calls
+  `crystallography.symmetry.check_phase_cell_ties(phase, prefix="phases.N")`
+  inside the boundary that turns a refusal into one naming the file
+  (`io/projects/topas.py` is the shortest example). The Jana reader of PR
+  #1627 was open when WP-2150 landed and does not call it, so a `.m50` whose
+  cell contradicts its symbol is refused only later, by the table, without
+  the file's name.
 - **2026-09-16, from [1118](1118-foreign-model-files.md): the `write` arm
   publishes a registry member's writer, and a writer that is not the format's
   own file has no member to sit on.**
