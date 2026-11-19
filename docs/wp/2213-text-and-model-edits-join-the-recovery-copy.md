@@ -1,8 +1,7 @@
 # WP-2213 — the Text buffer and the Model forms join the recovery copy
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-17 — built, wording ruled 2026-11-17 and applied; PR #1633 is ready to merge
+Milestone: gui-overhaul · Status: ✅ 2026-11-19 — the Text document and the Model forms join the recovery copy; PR #1633, merged 2026-11-18
 Depends on: 2209 (the recovery copy); #1523 (its pull request)
-Priority: P2 2026-11-13 — the milestone's edit-recovery row, widened by the maintainer's ruling of 2026-11-10; WP-2209's store, which it lands on, is on main since #1523 and WP-2209 is closed
 
 ## Goal
 
@@ -121,6 +120,15 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1009 and WP-1013 (the `.rxt` document and the Text pane's sync rules).
 
 ## Handover log
+
+- **2026-11-19** — closed in repair, by the ghostshift close-only batch (PR #1696). PR #1633 merged on
+  2026-11-18 as `1620aae49` and shipped in 1.12.0, while this file still read "ready to merge".
+  This entry marks the WP closed, drops its priority line and moves its narrative to the v1.12
+  record. One commit landed after the last entry and rode the same PR: `ddc76ce9a` (2026-11-17)
+  shortened the manual's offer paragraph in `reference/gui-guide.md` to bring the page back
+  under its cap. Nothing else changed, and no GUI question was settled here. Next: none for
+  this WP. The `forget()` gap the review declined (a stale phase index after a project with
+  fewer phases) stays recorded in the entry below.
 
 ### 2026-11-17 (later) — the maintainer ruled the offer's wording; PR #1633 is ready to merge
 
