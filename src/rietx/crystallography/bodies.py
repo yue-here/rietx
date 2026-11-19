@@ -125,6 +125,8 @@ def _internals(a, b, c, d) -> tuple[float, float, float]:
     them returns ``a`` to rounding whatever the frame.  ``d`` is ``None`` for
     line 2, which ``zmatrix_points`` places in its reference half-plane.
     """
+    from .fragments import COLLINEAR_TOL
+
     w = a - b
     r = float(np.linalg.norm(w))
     u = (b - c) / np.linalg.norm(b - c)
@@ -134,8 +136,14 @@ def _internals(a, b, c, d) -> tuple[float, float, float]:
     if d is None:
         return r, angle, 0.0
     p = d - c
+    full = float(np.linalg.norm(p))
     p = p - (p @ u) * u
-    p = p / np.linalg.norm(p)
+    norm = float(np.linalg.norm(p))
+    if norm <= COLLINEAR_TOL * full:
+        # d on the line b–c (to ``COLLINEAR_TOL``): the reference half-plane is undefined, and so is
+        # the dihedral; 0 matches ``zmatrix_points`` on an angle of 0° or 180°
+        return r, angle, 0.0
+    p = p / norm
     dihedral = float(np.degrees(np.arctan2(perp @ np.cross(u, p), perp @ p)))
     return r, angle, dihedral
 

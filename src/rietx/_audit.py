@@ -2332,6 +2332,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.fragments.COLLINEAR_TOL", "constant", value=1e-06),
     Row("rietx.crystallography.fragments.INERTIA_RANK_TOL", "constant", value=1e-06),
     Row("rietx.crystallography.fragments._COINCIDENT_A2", "constant", value=1e-20),
+    Row("rietx.crystallography.fragments.ZMATRIX_ANGLE_EDGE", "constant", tier=1,
+        value=0.00011459155902616463,
+        evidence=("arithmetic: a Z-matrix line at 0 or 180 degrees leaves a later line's reference "
+                  "triple collinear (sine 0, refused by zmatrix_points below COLLINEAR_TOL); the "
+                  "angle whose sine is 2 x COLLINEAR_TOL keeps the sine above that test "
+                  "(test_zmatrix_body.py, edge and bounds tests); WP-1814, review of #1665")),
+    Row("rietx.crystallography.fragments.ZMATRIX_R_FLOOR", "constant", tier=1, value=1e-06,
+        evidence=("arithmetic: zmatrix_points refuses r <= 0, so a refined length's box stops "
+                  "above 0, at MARCH_R_MIN's 1e-6 where every placement and tangent is finite "
+                  "(test_zmatrix_body.py, edge test); WP-1814, review of #1665")),
     Row("rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B", "constant", value=0.02),
     Row("rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS", "constant", value=12),
     Row("rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE", "constant", value=5.0),

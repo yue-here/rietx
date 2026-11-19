@@ -32,7 +32,8 @@ mean the same thing in the released arm and is dropped there; the row's
 ``dropped`` lists each.  The arm's own rider ties are declared after that
 drop, so it never reaches them.  The body arm's glob ``torsions.*.twist``
 frees the body's torsions (WP-1808, #823), and it frees a Z body's internals
-whose ``vary`` the model sets (WP-1814).
+whose ``vary`` the model sets (WP-1814), with that body's torsions the model
+frees likewise.
 
 **What riding by tie is.**  The tie is on the coordinate DOFs, which are
 displacements in fractional coordinates, so at a held cell the parent–H
@@ -411,9 +412,16 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
             internals = [f"{bb}.zmatrix.{k}.{name}"
                          for k, line in enumerate(body.zmatrix)
                          for name, p in line.internals() if p.vary]
+            # a torsion beside a Z body's internals is freed only where the
+            # model frees it, as the internals are: a held torsion beside a
+            # varied dihedral about its bond would refuse the stage
+            # (RIGID_BODY_TORSION_REACH) in a model that fits
+            twists = ([f"{bb}.torsions.{t}.twist"
+                       for t, tor in enumerate(body.torsions) if tor.vary]
+                      if body.zmatrix else [f"{bb}.torsions.*.twist"])
             _, res_a, _ = _fit(ref, base.model_copy(deep=True), data,
                                [*free, f"{bb}.origin.dof.*", f"{bb}.rotation.*",
-                                f"{bb}.torsions.*.twist", *internals], max_iter)
+                                *twists, *internals], max_iter)
             if on_arm is not None:
                 on_arm(body.name, "body", res_a)
             # the released arm: same model, this body's heavy atoms freed and

@@ -21,8 +21,14 @@ import pytest
 
 from rietx import Refinement
 from rietx.crystallography.bodies import add_body, zmatrix_body_from_atoms
+from rietx.crystallography.fragments import (
+    ZMATRIX_ANGLE_EDGE,
+    ZMATRIX_R_FLOOR,
+    zmatrix_points,
+)
 from rietx.crystallography.riding import riding_parents, set_riding_lengths
 from rietx.crystallography.structure_factor import compile_phase_sites
+from rietx.model.forward import compile_model
 from rietx.model.geometry import geometry_from_sites
 from rietx.params import bodies as pbodies
 from rietx.params import vector as pvector
@@ -133,6 +139,25 @@ def test_the_tree_builder_reproduces_the_atoms_and_roots_at_its_origin():
         zmatrix_body_from_atoms(phase, labels, "tree", tree=tree[:-1])
 
 
+def test_the_tree_builder_reads_a_linear_group_without_nan():
+    """An exactly linear group (acetylene on an axis): the reference half-plane
+    is undefined, so the dihedral reads 0 as ``zmatrix_points`` takes it,
+    instead of the 0/0 that refused the body as "dihedral is not finite"."""
+    x = [-1.66, -0.60, 0.60, 1.66]
+    atoms = [Atom(label=f"{el}{i}", species=el, x=P(value=0.05 + v / 10.0),
+                  y=P(value=0.2), z=P(value=0.3))
+             for i, (el, v) in enumerate(zip("HCCH", x, strict=True))]
+    phase = Phase(name="ac", space_group="P1", cell=_cell(), atoms=atoms,
+                  scale=P(value=1e-2, min=0.0))
+    with np.errstate(all="raise"):
+        body = zmatrix_body_from_atoms(
+            phase, [a.label for a in atoms], "ac",
+            tree=[("H0", "C1"), ("C1", "C2"), ("C2", "H3")])
+    assert all(math.isfinite(p.value) for z in body.zmatrix for _, p in z.internals())
+    assert body.zmatrix[3].dihedral.value == 0.0
+    assert abs(body.zmatrix[3].angle.value - 180.0) < 1e-6
+
+
 def test_a_riding_h_rides_on_its_lines_b():
     """M13: on a Z body the parent is the H line's b, and the length is its r."""
     body = zbody_structure().phases[0].rigid_bodies[0]
@@ -150,8 +175,10 @@ def test_a_riding_h_rides_on_its_lines_b():
 
 
 def test_the_internals_are_absolute_boxed_entries():
-    """M7, M8: one entry per internal at its own path, r ≥ 0 and the angle in
-    [0, 180] whatever the parameter declared; the dihedral keeps its own box."""
+    """M7, M8: one entry per internal at its own path, r above 0 and the angle
+    inside (0, 180) whatever the parameter declared, each stopping a floor and
+    an edge short of what ``zmatrix_points`` refuses; the dihedral keeps its
+    own box."""
     zm = zlines(BRANCHED)
     zm[3] = zm[3].model_copy(update={"angle": P(value=112.7, min=-5.0, max=200.0),
                                      "dihedral": P(value=122.5, min=100.0, max=140.0)})
@@ -163,12 +190,71 @@ def test_the_internals_are_absolute_boxed_entries():
     assert len(paths) == 18 and paths[:3] == [f"{B0}.zmatrix.1.r", f"{B0}.zmatrix.2.r",
                                               f"{B0}.zmatrix.2.angle"]
     e = {x.path: x for x in table.entries}
-    assert (e[f"{B0}.zmatrix.1.r"].lo, e[f"{B0}.zmatrix.1.r"].hi) == (0.0, math.inf)
-    assert (e[f"{B0}.zmatrix.3.angle"].lo, e[f"{B0}.zmatrix.3.angle"].hi) == (0.0, 180.0)
+    assert (e[f"{B0}.zmatrix.1.r"].lo, e[f"{B0}.zmatrix.1.r"].hi) == (ZMATRIX_R_FLOOR, math.inf)
+    assert (e[f"{B0}.zmatrix.3.angle"].lo, e[f"{B0}.zmatrix.3.angle"].hi) == (
+        ZMATRIX_ANGLE_EDGE, 180.0 - ZMATRIX_ANGLE_EDGE)
     assert (e[f"{B0}.zmatrix.3.dihedral"].lo, e[f"{B0}.zmatrix.3.dihedral"].hi) == (100.0, 140.0)
     assert (e[f"{B0}.zmatrix.4.dihedral"].lo, e[f"{B0}.zmatrix.4.dihedral"].hi) == (-math.inf,
                                                                                    math.inf)
     assert set(paths) <= set(table.body_dofs())
+
+
+def _place_at(lines, k, name, value, *, tangents=False):
+    """``zmatrix_points`` with line ``k``'s ``name`` set to ``value`` (numpy)."""
+    zm = zlines(lines)
+    vals = [tuple(p.value for _, p in z.internals()) for z in zm]
+    col = ("r", "angle", "dihedral").index(name)
+    vals[k] = tuple(value if j == col else v for j, v in enumerate(vals[k]))
+    return zmatrix_points([z.refs() for z in zm], vals, tangents=tangents)
+
+
+CHAIN = [("C",), ("C", 0, 1.5), ("C", 1, 1.5, 0, 110.0), ("C", 2, 1.5, 1, 110.0, 0, 60.0),
+         ("C", 3, 1.5, 2, 110.0, 1, 60.0), ("C", 4, 1.5, 3, 110.0, 2, 60.0)]
+
+
+def test_an_internal_on_the_edge_of_its_box_still_places_every_line():
+    """The box stops short of what ``zmatrix_points`` refuses, because the
+    default LM driver lands a value exactly on its bound (WP-1938): a length at
+    0 raises "not positive", and an angle at 180° makes a later line's
+    reference triple collinear.  Every internal on either edge of its box
+    places every line, tangents included; the old edge (the control) raises."""
+    s = zbody_structure(CHAIN)
+    table = ParameterTable(s, INS)
+    entries = {e.path: e for e in table.entries if ".zmatrix." in e.path}
+    n_edges = 0
+    for k in range(1, len(CHAIN)):
+        for name in ("r", "angle", "dihedral")[:min(k, 3)]:
+            if name == "dihedral":
+                continue                    # the dihedral places at any value
+            e = entries[f"{B0}.zmatrix.{k}.{name}"]
+            for edge in (e.lo, e.hi):
+                if not math.isfinite(edge):
+                    continue
+                pts, tan = _place_at(CHAIN, k, name, edge, tangents=True)
+                assert np.isfinite(pts).all() and np.isfinite(tan).all(), (k, name, edge)
+                n_edges += 1
+    assert n_edges == 5 + 4 * 2             # five lengths, four angles at both edges
+    # positive arm: the values the box used to allow are refused mid-solve
+    with pytest.raises(ValueError, match="not positive"):
+        _place_at(CHAIN, 1, "r", 0.0)
+    with pytest.raises(ValueError, match="collinear"):
+        _place_at(CHAIN, 2, "angle", 180.0)
+
+
+def test_a_pattern_computes_with_an_angle_and_a_length_on_their_bounds():
+    """The solve's own path (``table.decode`` into the compiled model) with
+    line 2's angle on the box's far edge, where line 3 takes its triple: the
+    pattern is finite.  Before the box stopped short, 180° raised here."""
+    s = zbody_structure(CHAIN)
+    pattern = synthesize(s)
+    model = compile_model(s, INS, pattern, mode="rietveld")
+    for name, k, edge in (("angle", 2, "hi"), ("angle", 3, "lo"), ("r", 1, "lo")):
+        path = f"{B0}.zmatrix.{k}.{name}"
+        table = _table(s, [path])
+        e = table.entries[[x.path for x in table.entries].index(path)]
+        theta = np.array([e.hi if edge == "hi" else e.lo], dtype=float)
+        assert theta.shape == np.asarray(table.x0()).shape, path
+        assert np.isfinite(model.evaluate(table.decode(theta))).all(), path
 
 
 # ------------------------------------------------------------------- T1, T3
@@ -338,7 +424,8 @@ def test_an_inert_dihedral_and_a_pinned_angle_are_refused():
     with pytest.raises(ValueError, match=r"^RIGID_BODY_INERT_DIHEDRAL: .* line 4 \(H4\)"
                        r"'s dihedral .* exactly 180°"):
         _refusal(s, [f"{B0}.zmatrix.4.dihedral"])
-    with pytest.raises(ValueError, match=r"line 4 \(H4\)'s angle .* are collinear"):
+    with pytest.raises(ValueError, match=r"^RIGID_BODY_COLLINEAR_ANGLE: .* line 4 \(H4\)'s "
+                       r"angle .* are collinear"):
         _refusal(s, [f"{B0}.zmatrix.4.angle"])
     _refusal(s, [f"{B0}.zmatrix.5.dihedral", f"{B0}.zmatrix.4.r", f"{B0}.zmatrix.3.angle"])
 
@@ -354,7 +441,8 @@ def test_a_linear_body_refines_its_lengths_and_refuses_a_bend():
 def test_an_internal_that_moves_only_dummies_is_refused():
     """M17: a last dummy line, which no later line refers to."""
     s = zbody_structure([*BRANCHED, ("X", 0, 1.0, 1, 90.0, 2, 30.0)], dummies=(8,))
-    with pytest.raises(ValueError, match=r"line 8 \(dummy\)'s r .* moves nothing"):
+    with pytest.raises(ValueError, match=r"^RIGID_BODY_INERT_INTERNAL: .* line 8 \(dummy\)'s r .* "
+                       r"moves nothing"):
         _refusal(s, [f"{B0}.zmatrix.8.r"])
     _refusal(s, [f"{B0}.zmatrix.7.*"])
 
@@ -469,6 +557,37 @@ def test_the_misfit_body_arm_frees_the_internals_the_model_frees(monkeypatch):
     with pytest.raises(Stop):
         body_misfit.rigid_body_misfit(ref, pattern)
     assert f"{B0}.zmatrix.3.r" in seen[0] and f"{B0}.zmatrix.4.r" not in seen[0]
+
+
+def test_the_misfit_body_arm_frees_a_torsion_only_where_the_model_does(monkeypatch):
+    """A held torsion beside a varied Z dihedral about its bond: freeing both
+    makes the stage refuse (RIGID_BODY_TORSION_REACH) in a model that fits."""
+    from rietx.report import body_misfit
+
+    tw = f"{B0}.torsions.0.twist"
+    for vary_torsion in (False, True):
+        torsion = BodyTorsion(name="t", axis=("C1", "C3"), moves=["H7"],
+                              vary=vary_torsion)
+        s = zbody_structure(torsions=[torsion])
+        s.phases[0].rigid_bodies[0].zmatrix[7].dihedral.vary = True
+        pattern = synthesize(s)
+        ref = Refinement(s, INS, history=False)
+        ref.fit(pattern, plan=RefinementPlan(stages=[Stage(
+            "scale", ["phases.*.scale"], max_iter=3)]))
+        seen = []
+
+        class Stop(Exception):
+            pass
+
+        def spy(ref_, structure, data, globs, max_iter, **kw):
+            seen.append(list(globs))
+            raise Stop
+
+        monkeypatch.setattr(body_misfit, "_fit", spy)
+        with pytest.raises(Stop):
+            body_misfit.rigid_body_misfit(ref, pattern)
+        assert f"{B0}.zmatrix.7.dihedral" in seen[0]
+        assert (tw in seen[0]) is vary_torsion
 
 
 # ----------------------------------------------------------------------- T6c

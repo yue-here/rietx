@@ -52,6 +52,7 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 - [x] The restrain-or-refine refusals and the torsion-reach refusal.
 - [ ] Tests: placement partials vs complex step < 1e-12; the map's Jacobian vs FD < 1e-9; a freed C–C on acridine IX (COD 2242872) within its published esd
 - [ ] Skill: the routing row for refining a Z-matrix body
+- [ ] Theory tab: the section for the Z(ζ) − c₀ equation, deferred from the refine chunk to the acceptance chunk (a WP that adds physics adds its equation there)
 
 ## Acceptance
 
@@ -125,6 +126,21 @@ every free internal the construction cannot carry.
 - *Next*: the acceptance chunk (T7 simulated acridine, T8 the real-data
   record against WP-1806 Part 2's free-atom control) and the skill's routing
   row; the restraint rule on bodies with no Z-matrix is #1510.
+
+### 2026-11-19 — review round 1 (Yue on #1665)
+
+- *Done*: the box of a refined internal stops short of what `zmatrix_points`
+  refuses mid-solve (a length at 0 raises, and an angle at 0° or 180° makes a
+  later line's reference triple collinear): `ZMATRIX_R_FLOOR` (1e-6 Å) and
+  `ZMATRIX_ANGLE_EDGE` (the angle whose sine is twice `COLLINEAR_TOL`), an
+  anchor already past one keeping its own value in the box; `zmatrix_body_from_atoms`
+  reads 0° for the dihedral of an exactly linear group instead of 0/0; the
+  misfit check's body arm frees a Z body's torsions only where `vary` is set,
+  as it does the internals; the two stage-start refusals without a code
+  now carry `RIGID_BODY_COLLINEAR_ANGLE` and `RIGID_BODY_INERT_INTERNAL`; the
+  theory page's "a distance has no esd" qualified for a Z body.
+- *Next*: unchanged, the acceptance chunk (T7, T8), the routing row and the
+  Theory-tab section (Tasks).
 
 ### 2026-11-09 — the placement and its exact tangent
 

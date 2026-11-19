@@ -37,6 +37,7 @@ from pydantic import ValidationError
 from scipy import sparse
 
 from ..crystallography.adp import U_NAMES
+from ..crystallography.fragments import ZMATRIX_ANGLE_EDGE, ZMATRIX_R_FLOOR
 from ..crystallography.magnetic.moments import (
     canonical_dofs,
     dofs_from_moment,
@@ -2105,17 +2106,23 @@ class ParameterTable:
         # the Z-matrix internals (WP-1814): absolute entries, each in its own
         # units (Å, degrees), boxed to the coordinate's domain as
         # ``fragments.zmatrix_points`` defines it, so no step lands on a value
-        # the schema refuses: r ≥ 0, the angle in [0, 180]; the dihedral
-        # keeps the box its parameter declares (unboxed, it wraps at commit)
+        # it or the schema refuses: r above 0, the angle inside (0, 180); the
+        # dihedral keeps the box its parameter declares (unboxed, it wraps at
+        # commit)
         zpaths = block.zmatrix_paths(bbase)
         for path, (i, name) in zip(zpaths, () if zmap is None else zmap.columns,
                                    strict=True):
             p = getattr(body.zmatrix[i], name)
             lo, hi = p.min, p.max
+            # the box stops short of the values zmatrix_points refuses
+            # mid-solve: r ≤ 0 and, for a bend, an angle at the edge, where a
+            # later line over this one's triple is collinear.  An anchor
+            # already on the floor or the edge keeps its own value in the box.
             if name == "r":
-                lo = max(lo, 0.0)
+                lo = max(lo, min(ZMATRIX_R_FLOOR, p.value))
             elif name == "angle":
-                lo, hi = max(lo, 0.0), min(hi, 180.0)
+                lo = max(lo, min(ZMATRIX_ANGLE_EDGE, p.value))
+                hi = min(hi, max(180.0 - ZMATRIX_ANGLE_EDGE, p.value))
             self._add(path, p.model_copy(update={"min": lo, "max": hi}))
         self._zmatrix_paths[bbase] = zpaths
         if zpaths:
@@ -4913,9 +4920,7 @@ class ParameterTable:
           (inertia rank 2).  Bent, it lies in the half-plane the Z-matrix's
           frame fixes, and the body has no third turn to choose that plane.
         * ``RIGID_BODY_INERT_DIHEDRAL``: a dihedral on a line whose angle is
-          exactly 0° or 180°, where it moves nothing.  A free angle over a
-          collinear reference triple is refused beside it: no angle but the
-          edge places that line (``fragments.zmatrix_points``).
+          exactly 0° or 180°, where it moves nothing.
         * ``RIGID_BODY_TORSION_REACH``: a dihedral beside a free
           ``BodyTorsion`` about the same bond.  Equal reach does not make the
           two columns independent (a dihedral does not turn its atoms as one
@@ -4923,7 +4928,10 @@ class ParameterTable:
         * ``RIGID_BODY_NOT_INVARIANT``: on a body whose origin sits on a
           special position, an internal that moves a member on a special
           position (1807's rule for a torsion).
-        * an internal that moves no atom (only dummies): its column is zero.
+        * ``RIGID_BODY_COLLINEAR_ANGLE``: a free angle over a collinear
+          reference triple (above).
+        * ``RIGID_BODY_INERT_INTERNAL``: an internal that moves no atom (only
+          dummies): its column is zero.
         """
         moving = set(self.moving_paths)
         for bbase, (body, on_site) in self._zmatrix_bodies.items():
@@ -4967,7 +4975,7 @@ class ParameterTable:
                         f"{fix}")
                 if name == "angle" and k in block.zmatrix.on_line:
                     raise ValueError(
-                        f"{who}, but its reference atoms (lines "
+                        f"RIGID_BODY_COLLINEAR_ANGLE: {who}, but its reference atoms (lines "
                         f"{', '.join(map(str, line.refs()))}) are collinear, so no "
                         f"angle but {angle:g}° places line {k}; place it from a "
                         f"dummy atom off the line, or {fix}")
@@ -5000,7 +5008,7 @@ class ParameterTable:
                         f"{fix}")
                 if not reached:
                     raise ValueError(
-                        f"{who}, and it moves nothing: every line it places is a "
+                        f"RIGID_BODY_INERT_INTERNAL: {who}, and it moves nothing: every line it places is a "
                         f"dummy, so its column is zero; {fix}")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
