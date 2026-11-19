@@ -130,6 +130,25 @@ Filled in as the maintainer answers § Questions.
    are kept as written. Settled by Claude; this answers § Questions 2.
 4. **Review pictures drag 0.3 of the slider track**, so the compared curves separate. Yue,
    2026-11-18. The Interactive pictures in `docs/wp/2218-screenshots/` are re-shot that way.
+5. **The dark last fit is the light blue-grey `#7f8f94`.** Yue, 2026-11-19, on § Questions 5:
+   option (d), "since they never intersect". The difference curve sits in its own strip below
+   the pattern, so the last fit never draws beside it. The muted ink draws observed points
+   only inside an excluded region, where no model curve draws (Yue's #1538 ruling). So the
+   two pairs under the palette's 0.13 floor are named in `tests/test_gui_palette.py` at their
+   measured distances: 0.023 from `--plot-diff` (in `NAMED_PAIRS`) and 0.056 from `--muted`
+   (in `LAST_FROM_MUTED`). Naming them keeps each pair from coming closer unnoticed. Every
+   other plot colour is at least 0.131 away, and the contrast on `--panel` is 5.25:1. Light
+   mode is unchanged.
+6. **The peak-shape choice moves into the Instrument dialog.** Yue, 2026-11-19, on § Questions
+   12: option (a). The dialog's Axial divergence row becomes Peak shape, and the profile's
+   shape sits in it under an Advanced disclosure. Built on the fourth PR, #1684.
+7. **The R3 look: "mostly good".** Yue, 2026-11-19. Three things were asked for, built on this
+   PR: the range pop-up's From and To read in the value box's digits; the Peaks graph shows
+   as many windows as fit; and an overview strip of the whole pattern sits at the top of the
+   Peaks graph, shading each shown window's range. Yue also asked whether the Interactive
+   sliders move the Structure graph. They already do: the third PR, #1683, draws unapplied
+   values through `POST /api/structure3d`. A cell value moves the frame, a coordinate moves
+   its atom, and an instrument value moves nothing.
 
 ## Questions
 
@@ -183,6 +202,7 @@ Filled in by the session that builds each PR.
      always shares a graph with. Dropped as unreadable beside it.
    Claude leans to (c), since the named pair never draws together. This is a visual choice,
    so it waits for Yue's look.
+   *Answered by § Rulings 5: (d).*
 6. **The second PR: what the Peaks and Background graphs draw differently from the
    prototype, each by a written rule.**
    - The background curve and its band are drawn in `--plot-bkg`, the background curve's own
@@ -255,7 +275,77 @@ Filled in by the session that builds each PR.
    - One-line empty states: no WebGL2, loading, a load error, and the server's sentence for a
      project with no phase (row 82).
 
+13. **The look's three items (§ Rulings 7): the details Claude chose to build them.** Each is
+    a visual value the ruling did not fix, so each waits for Yue's look at
+    `peaks-rest-*.png`, `peaks-stepped-*.png` and `interactive-rangepop-*.png`.
+    - *Window height.* The ruling asked for 240 px columns and six windows at the default
+      split, two columns of three. Three rows of today's 240 px plots do not fit the graph's
+      height at 1440 × 900. So the windows share the height, each at least 190 px with its
+      caption, about 160 px of plot. At the default split each plot is about 200 px tall. A
+      taller window adds a row. Holding 240 px instead would show four windows.
+    - *Overview height.* 36 px of plot, with 12 px below it before the windows.
+    - *Overview ink.* The observed pattern in the observed points' ink, `--plot-obs`, 1 px.
+      Each pixel column draws the extremes of the points under it, as the Pattern graph does.
+    - *Window bands.* An accent wash, `color-mix` of `--accent` at 22 %, full height. The
+      accent marks a selection on a plot (`gui/STYLE.md` § Colour). `--plot-mask` was not
+      used, because it is the excluded-region wash.
+    - *Range digits.* A computed range is rounded outward to the value box's digits, so it
+      can widen by up to one digit of the box. Caglioti U opens on 0.2772×10⁻³ to
+      4.4362×10⁻³. The fields write the box's ×10ⁿ in superscript digits, and also read
+      `1.5e-3` and `1.5x10^-3`.
+
 ## Handover log
+
+- **2026-11-19** — Yue's rulings of 2026-11-19 applied to the second PR, PR #1680.
+
+  Yue looked at R3 and called it "mostly good". This branch carries the three things the look
+  asked for and the dark last-fit colour Yue chose. The dark last fit is now the blue-grey
+  `#7f8f94` (§ Rulings 5). The range pop-up's From and To read in the value box's digits:
+  Caglioti U opens on 0.2772×10⁻³ to 4.4362×10⁻³, where it read 0.000277258872224. The Peaks
+  graph shows six windows at the default split, two columns of three, under an overview strip
+  of the whole pattern that shades each window's range. § Rulings 5-7 record the rulings, and
+  § Questions 13 lists the visual values Claude chose to build the three items, for Yue's look.
+
+  - *Done*: `viz/theme.py`'s dark `--plot-last` and its docstring, `tokens.css` regenerated,
+    and the two pairs under the floor named in `tests/test_gui_palette.py` (`NAMED_PAIRS`, and
+    `LAST_FROM_MUTED` with a new test, made to fail once first). The rounding is at the
+    range, not only at the display: `lib/interactive.ts:roundRange` rounds a computed range
+    outward to the value box's digits where `/next` builds or restores one, so the fields
+    show the slider's real ends. `rangeText` writes them in the box's ×10ⁿ, `readNumber`
+    reads that back, and an end left as shown keeps the slider's own value, so a typed range
+    round-trips to the last digit. Today's page keeps its ranges. `lib/peakwin.ts` gained
+    `gridShape` (columns of at least 240 px, rows of at least 190 px) and `firstPicks` for
+    any count, which gives the prototype's three unchanged. `next/Peaks.svelte` sizes the
+    grid from the graph's measured size and draws the overview. Tests: vitest
+    `lib/interactive.test.ts` (3), `lib/peakwin.test.ts` (2), `next/Graphs.test.ts` (1); the
+    browser cases for the pop-up's digits and for the overview's bands, stepped by a real
+    click on ›, extend two existing cases. Pictures re-shot, light and dark: every
+    `interactive-*.png` and `peaks-*.png`, plus the new `peaks-stepped-*.png`.
+  - *Review*: `/code-review high` against the previous head (43eddfb48) returned ten. One was
+    on this round's code and is fixed: the Peaks graph rebuilt the preview's net curve per
+    window on every frame, six times now. The other nine are on the earlier commits of this
+    PR, mostly the Background graph, and are left for the PR's review: committed holds that
+    survive a Type switch or a Terms cut and land on the new background's coefficients of the
+    same name; pending value and vary edits on removed terms that make the next Apply
+    refused; the "Background preview" title read from the client's holds rather than the
+    answer's; a pending hold on a vanished path refusing every band fetch; glob holds left
+    out of the band; the TypeScript port of `for_range` with no corpus replay; the band cache
+    keeping one answer; a console echo that does not match the Terms edit; and `.vg` copied
+    into three files.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.0, Python 3.12):
+    fast suite 14948 passed, 424 skipped and 32 xfailed in 9:55, through the shift's serial
+    lock: two more than this PR's last count, the new palette test in each theme. Vitest 831
+    of 831, six more than 825. svelte-check 0 errors in 453 files. Ruff clean. GUI python
+    files (`test_gui_palette`, `_dist`, `_server`, `_manual`, `_style_guide`,
+    `_background`): 267 passed. Every browser file by glob (`tests/*_browser.py`),
+    serially: 169 passed. CI's Vale steps, run as `ci.yml` runs them: 0 errors.
+  - *Gotchas*: in jsdom an element is never measured, so the grid falls back to the
+    prototype's three windows until its size is known; the vitest cases see three. A
+    canvas cannot take `role="img"` under svelte-check, so the overview is `aria-hidden`
+    and the windows' captions carry the positions.
+
+  Next: Yue's look at § Questions 13 and the re-shot pictures. The same rulings reach the
+  third and fourth PRs by merge, and the fourth PR builds § Rulings 6.
 
 - **2026-11-18** — the review the third PR skipped, on PR #1683.
 
