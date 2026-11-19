@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from rietx import Instrument, Refinement
-from rietx.multi import _hold_width_twins_multi
+from rietx.multi import MultiHistogramRefinement, _hold_width_twins_multi
 from rietx.params.multi import MultiParameterTable, SharingMap
 from rietx.params.vector import AffineTie, ParameterTable
 from rietx.refine import _hold_width_twins
@@ -242,3 +242,52 @@ def test_the_stage_record_names_the_hold_and_the_value_stays(twin_fit):
     # held for the stage, never for good: the declared free set keeps it
     assert "instrument.profile.u" in ref._free_paths
     assert np.isfinite(result.statistics.rwp)
+
+
+_TRIPLE = ["instrument.profile.w", "phases.*.gauss_size", "phases.*.gauss_strain"]
+
+
+def _triple_plan() -> RefinementPlan:
+    return RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage(name="widths", turn_on=_TRIPLE, seed=1e-4),
+    ])
+
+
+@pytest.mark.parametrize("w_start", [5e-4, 1.5e-4])
+def test_the_lab6_triple_is_held_from_either_start(w_start):
+    """WP-2028's case: synthetic LaB6 with W, ``gauss_size`` and
+    ``gauss_strain`` free.  Unheld, two starts landed 140 esd apart in W, each
+    quoting ± 6.3e-7.  Held, W stays where the stage found it, the specimen
+    widths keep their esds, and no direction is discarded."""
+    structure, ins = perturbed_models()
+    ins.profile.w.value = w_start
+    ref = Refinement(structure, ins)
+    result = ref.fit(synthesize(), plan=_triple_plan())
+    widths = result.stages[2]
+    assert widths.width_twins_held == {"instrument.profile.w": [
+        "phases.0.gauss_size", "phases.0.gauss_strain"]}
+    rows = {p.path: p for p in result.parameters}
+    assert rows["phases.0.gauss_size"].stderr > 0.0
+    assert rows["phases.0.gauss_strain"].stderr > 0.0
+    assert not [d for d in result.diagnostics
+                if d.code == "COVARIANCE_DIRECTION_DISCARDED"]
+
+
+def test_the_lab6_triple_is_held_in_a_joint_fit():
+    """Three patterns at one wavelength, W shared and each pattern's own
+    Gaussian widths: the shared W takes every pattern's triple."""
+    structure, ins = perturbed_models()
+    data = [synthesize(noise_seed=s) for s in (7, 8, 9)]
+    mr = MultiHistogramRefinement(
+        structure, [ins.model_copy(deep=True) for _ in data],
+        sharing=SharingMap(shared=["instrument.profile.w"],
+                           per_histogram=["phases.*.gauss_*"]))
+    result = mr.fit(data, plan=_triple_plan())
+    assert "instrument.profile.w" in result.stages[2].held
+    rows = {p.path: p for p in result.parameters}
+    for h in range(3):
+        assert rows[f"hist.{h}.phases.0.gauss_size"].stderr > 0.0
+    assert not [d for d in result.diagnostics
+                if d.code == "COVARIANCE_DIRECTION_DISCARDED"]

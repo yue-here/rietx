@@ -353,6 +353,17 @@ class LSQOutcome:
     #: ``status="diverged"``, no Jacobian and no esds; ``refine`` and
     #: ``multi`` end the stage there and say so in ``STAGE_NOT_FINITE``.
     non_finite: NonFiniteStop | None = None
+    #: the covariance solve's discarded directions (WP-2219):
+    #: :func:`.statistics.discarded_directions` on the matrix the covariance
+    #: cut, the Pawley intensity block included, as ``(n, touched)`` with
+    #: ``touched`` indexing that matrix's columns (table columns first, so an
+    #: index past ``len(theta)`` is an intensity).  Every touched column's esd
+    #: is ``inf`` in :attr:`stderr_internal` and on ``model.pawley.stderr``,
+    #: the absent one.  Written by :func:`_guarded_covariance`'s callers;
+    #: ``None`` where no covariance was computed, or where a chart matrix
+    #: moved the columns (:func:`rechart_outcome`), and the guard then reads
+    #: :attr:`jac` itself.
+    discarded: tuple[int, np.ndarray] | None = None
 
 
 @dataclass(frozen=True)
@@ -504,8 +515,10 @@ def rechart_outcome(outcome: LSQOutcome, theta: np.ndarray,
     tests = _rechart_stationary(outcome, theta,
                                 np.diag(s) if s.ndim == 2 else s, free_paths)
     if s.ndim == 2:
+        # a discarded direction mixes under T, so the guard re-reads the
+        # new Jacobian; the esds it marked stay absent (the block rule above)
         return replace(_rechart_matrix(outcome, theta, s),
-                       moment_angle_tests=tests)
+                       moment_angle_tests=tests, discarded=None)
 
     def padded(n: int) -> np.ndarray:
         # a Pawley block rides after the table columns and never moves
@@ -641,13 +654,35 @@ def _guarded_covariance(jac, fun, n_free: int, n_data: int
     :func:`~.statistics.normal_covariance` without raising.  Only
     ``LinAlgError`` is caught, which is the one type an eigensolve reports
     non-convergence with; anything else is a defect and stays loud.
+
+    **A column a discarded direction touches gets an esd of** ``inf``, the
+    absent one (WP-2219).  The pseudo-inverse reports such a column's spread
+    along the directions the data did measure, at least √2 short and by a
+    factor nothing bounds: 140 esd between two starts of one LaB6 fit
+    (WP-2028).  A parameter that is not estimable has no standard error
+    (Searle 1971, *Linear Models*, p. 169), so the column joins the
+    gradient-free ones, and every consumer that marks those
+    (:meth:`~rietx.params.vector.ParameterTable.unmeasured_rows`) marks it
+    too.  The test is :func:`.statistics.discarded_directions` on this very
+    matrix, the Pawley intensity block included, and its answer is returned
+    as ``discards`` for the guard that names the parameters.  The
+    correlations stay the pseudo-inverse's.  The marking happens here and
+    not in :func:`covariance_estimates`, which the support test calls on a
+    sub-matrix to ask a different question (``refine._scale_significance``).
+    Returns ``(stderr, corr, factor, error, discards)``.
     """
+    from .statistics import discarded_directions
+
     try:
         stderr, corr, factor = _covariance_and_inflation(jac, fun, n_free,
                                                          n_data=n_data)
+        discards = discarded_directions(jac)
     except np.linalg.LinAlgError as exc:
-        return None, None, None, repr(exc)
-    return stderr, corr, factor, None
+        return None, None, None, repr(exc), None
+    if len(discards[1]):
+        stderr = np.array(stderr, dtype=np.float64)
+        stderr[discards[1]] = np.inf
+    return stderr, corr, factor, None, discards
 
 
 def _residual_cosine(jac, fun) -> np.ndarray | None:
@@ -3537,7 +3572,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     # esds from the *full* augmented covariance (table ↔ intensity correlation
     # feeds the table esds too), then split: table columns stay in the outcome,
     # the intensity tail lands on the model's Pawley block.
-    stderr = corr = stderr_full = None
+    stderr = corr = stderr_full = discards = None
     covariance_error = esd_inflation = None
     moment_angle_tests = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
@@ -3547,7 +3582,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
             probe, res.x, res.jac, len(model.tt), table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
             len(res.x), angle_block=_analytic_angle_block(model, table))
-        stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
+        (stderr_full, corr_full, esd_inflation, covariance_error,
+         discards) = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=len(model.tt))
     if stderr_full is not None:
@@ -3576,6 +3612,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
                       covariance_error=covariance_error,
+                      discarded=discards,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests)
 
@@ -3901,7 +3938,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
 
     stderr = corr = covariance_error = moment_angle_tests = esd_inflation = None
-    stderr_full = None
+    stderr_full = discards = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
         # the single-histogram rule (WP-1929) on the stacked residual: a
         # moment angle's column is every histogram's rows of it, and a shared
@@ -3915,9 +3952,9 @@ def run_multi_least_squares(models: list[CompiledModel],
         # off the full vector, the Pawley blocks with it, then sliced: the
         # single fit's rule, so the table esds carry the intensities'
         # correlation (``run_least_squares``)
-        stderr_full, corr, esd_inflation, covariance_error = _guarded_covariance(
-            _without_columns(res.jac, stationary), res.fun, len(res.x),
-            n_data=n_data_total)
+        stderr_full, corr, esd_inflation, covariance_error, discards = (
+            _guarded_covariance(_without_columns(res.jac, stationary), res.fun,
+                                len(res.x), n_data=n_data_total))
         if stderr_full is not None:
             stderr, corr = stderr_full[:n_table], corr[:n_table, :n_table]
     if pawley:
@@ -3945,6 +3982,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
                       covariance_error=covariance_error,
+                      discarded=discards,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests,
                       jacobian_layout=layout,

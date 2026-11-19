@@ -11,13 +11,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from rietx import Refinement
+from rietx.multi import MultiHistogramRefinement
 from rietx.optimize.statistics import discarded_directions
 from rietx.refine import _REVISABLE_CODES, _guard_diagnostics
 from rietx.strategy.staged import (
     GuardFinding,
     GuardReport,
+    RefinementPlan,
+    Stage,
     check_discarded_directions,
 )
+from tests.test_refine_synthetic import perturbed_models, synthesize
 
 pytestmark = pytest.mark.xdist_group("discarded-direction")
 
@@ -95,3 +100,54 @@ def test_the_code_is_retaken_on_the_answer_stage_not_accumulated():
     """An earlier stage's cut is not the matrix the result's esds came from, and
     an unkeyed code is appended once per stage."""
     assert "COVARIANCE_DIRECTION_DISCARDED" in _REVISABLE_CODES
+
+
+# ------------------------------------------------------------ WP-2219 -----
+# A parameter a discarded direction touches reports no esd, in every runner.
+
+def _three_way_zero(mode: str):
+    """``zero_shift = za + zb + zc``, all three free: two exact directions, and
+    pairwise |ρ| = 0.5, so no ``FLAT_DIRECTION`` covers them."""
+    structure, ins = perturbed_models()
+    ref = Refinement(structure, ins)
+    for name in ("za", "zb", "zc"):
+        ref.add_variable(name, 0.0, vary=True)
+    ref.tie("instrument.zero_shift", {"vars.za": 1.0, "vars.zb": 1.0, "vars.zc": 1.0})
+    plan = RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*",
+                                         "vars.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.profile.w"]),
+    ])
+    return ref.fit(synthesize(), plan=plan, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["rietveld", "pawley"])
+def test_a_combination_the_data_cannot_see_has_no_esd(mode):
+    """The three variables, and the tie built on them, report no esd; the cell
+    beside them keeps its own.  A Pawley solve's intensity block is in the
+    matrix the guard reads, so its finding is named too."""
+    result = _three_way_zero(mode)
+    rows = {p.path: p for p in result.parameters}
+    for path in ("vars.za", "vars.zb", "vars.zc", "instrument.zero_shift"):
+        assert rows[path].stderr is None, path
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    (d,) = [d for d in result.diagnostics if d.code == "COVARIANCE_DIRECTION_DISCARDED"]
+    assert set(d.where) == {"vars.za", "vars.zb", "vars.zc"}
+    assert "no esd" in d.message
+
+
+def test_a_joint_fit_gives_an_exact_pair_no_esd():
+    """Two identical phases: each pattern's two scales are one quantity."""
+    structure, ins = perturbed_models()
+    twin = structure.phases[0].model_copy(deep=True)
+    twin.name = "LaB6 twin"
+    structure.phases.append(twin)
+    data = synthesize()
+    mr = MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    result = mr.fit([data, data], plan=RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"])]))
+    rows = {p.path: p for p in result.parameters}
+    for h in (0, 1):
+        for ip in (0, 1):
+            assert rows[f"hist.{h}.phases.{ip}.scale"].stderr is None
+        assert rows[f"hist.{h}.instrument.background.c0"].stderr > 0.0

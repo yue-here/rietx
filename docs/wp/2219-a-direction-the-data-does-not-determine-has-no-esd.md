@@ -101,11 +101,11 @@ discarded-direction test names gets no esd.
   acceptance answers. This hold fires only on the exact triple, so measure that no
   acceptance answer moves beyond `test_acceptance_stephens`'s corundum row, and say what
   that row's answer did.
-- [ ] No esd on a discarded direction, dense path. The touched set from
+- [x] No esd on a discarded direction, dense path. The touched set from
   `statistics.discarded_directions` joins `unmeasured_rows`. Esds, correlations and every
   derived esd follow the existing marking rules. `COVARIANCE_DIRECTION_DISCARDED` keeps
   firing and its text changes from "do not quote" to "these parameters have no esd".
-- [ ] The same in the joint fit (`multi.py`, `blocked.discarded_directions`).
+- [x] The same in the joint fit (`multi.py`, `blocked.discarded_directions`).
 - [ ] The same in a Pawley fit: run the test on the matrix augmented by the intensity block,
   so the guard stops skipping `n_aux` solves. Measure the fast and slow selections' Pawley
   hits first and report how many are overlap groups already flagged.

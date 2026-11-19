@@ -2142,10 +2142,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A combination of parameters is not measured",
         description=(
             "The data do not constrain one combination of several parameters. The solver "
-            "discards that direction, so each esd in the group comes out too small, by "
-            "at least a factor of the square root of two. Do not quote these esds as "
-            "measured. Free fewer of the parameters in one stage, hold the ones you know "
-            "independently, or widen the fitted range. Esds of other parameters are "
+            "discards that direction, and each parameter on it has no esd: the result, "
+            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
+            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the parameters in one stage, hold the ones you know independently, or widen "
+            "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
         ),
     ),

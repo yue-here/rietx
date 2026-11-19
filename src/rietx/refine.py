@@ -7956,10 +7956,10 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
         out.append(Diagnostic(
             level="warning", code="COVARIANCE_DIRECTION_DISCARDED",
             where=list(finding.paths), value=finding.value,
-            message=f"{finding.message}.",
+            message=f"{finding.message}, so these parameters have no esd.",
             suggestion="Free fewer of these parameters in one stage, hold the "
-                       "ones known independently, or widen the fitted range. "
-                       "Do not quote their esds as measured from this fit.",
+                       "ones known independently, or widen the fitted range, "
+                       "and refit for their esds.",
         ))
     for finding in guard.large_biso:
         msg = str(finding)

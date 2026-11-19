@@ -2377,6 +2377,36 @@ def check_discarded_directions(jac, free: list[str],
     return [GuardFinding.discarded_direction(paths, n)]
 
 
+def outcome_discarded_directions(outcome, free: list[str],
+                                 flat: list[GuardFinding]) -> list[GuardFinding]:
+    """:func:`check_discarded_directions` on the directions the solve's own
+    covariance discarded (``LSQOutcome.discarded``, WP-2219).
+
+    Those are the columns whose esds the solve left absent, so the finding
+    and the missing esds name one set.  The test ran on the matrix the
+    covariance cut, a Pawley intensity block and a joint fit's penalty rows
+    included.  Only table paths are named: a touched intensity has no path,
+    and its own reports are ``PAWLEY_OVERLAP_UNRESOLVED`` and the off-data
+    note.  An outcome without the record (a chart matrix moved its columns)
+    is read off its Jacobian as before, which a Pawley solve's omits.
+    """
+    disc = getattr(outcome, "discarded", None)
+    if disc is None or len(outcome.theta) != len(free):
+        if getattr(outcome, "n_aux", 0) or outcome.jac is None:
+            return []
+        from ..optimize.least_squares import covariance_jacobian
+
+        return check_discarded_directions(covariance_jacobian(outcome, free),
+                                          free, flat)
+    n, touched = disc
+    paths = tuple(free[i] for i in touched if i < len(free))
+    if n == 0 or not paths:
+        return []
+    if any(set(paths) <= set(f.paths) for f in flat):
+        return []
+    return [GuardFinding.discarded_direction(paths, n)]
+
+
 def _correlation_findings(corr, free: list[str], threshold: float
                           ) -> tuple[list["GuardFinding"], list["GuardFinding"]]:
     """``high_correlations`` and ``flat_directions`` off one correlation matrix.
@@ -2480,16 +2510,13 @@ def check_guards(table, outcome, threshold: float,
         if scan_exchangeability and model is not None:
             report.measured_exchangeability = exchangeability_scan(model, table)
         try:
-            # no esds, nothing to qualify; and a Pawley solve cuts the matrix
-            # augmented by its intensity block, which ``outcome.jac`` omits.
-            # The matrix is the one the covariance cut: a moment angle the
-            # stationary test left out (WP-1929) is a zero column here too.
-            if outcome.correlation is not None and not outcome.n_aux:
-                from ..optimize.least_squares import covariance_jacobian
-
-                report.discarded_directions = check_discarded_directions(
-                    covariance_jacobian(outcome, free), free,
-                    report.flat_directions)
+            # no esds, nothing to qualify.  The matrix is the one the
+            # covariance cut: a moment angle the stationary test left out
+            # (WP-1929) is a zero column here too, and a Pawley solve's
+            # intensity block, which ``outcome.jac`` omits, is in it (WP-2219)
+            if outcome.correlation is not None:
+                report.discarded_directions = outcome_discarded_directions(
+                    outcome, free, report.flat_directions)
         except np.linalg.LinAlgError:
             # ``soft_modes``' rule above: the stage already said so
             if getattr(outcome, "covariance_error", None) is None:
