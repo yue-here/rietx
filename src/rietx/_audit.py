@@ -666,6 +666,17 @@ ROWS: tuple[Row, ...] = (
         responds=("note that the sites' tensors were read as U_eq, and pass aniso=True if "
                   "the anisotropy is wanted")),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
+    Row("CIF_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("check the named cell parameter against the source before quoting it: "
+                  "the phase is refined with it equal to its source"),
+        evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule: a tied "
+                  "cell entry (cell_constraints' ties) is read as its source where the two "
+                  "printed numbers lie within half a last digit each of one value, or within "
+                  "the table's own tolerance (SYMMETRY_LENGTH_RTOL, SYMMETRY_ANGLE_TOL_DEG) "
+                  "where that is wider; a move within the entry's own rounding is not "
+                  "reported. Past the band the value is left and the table refuses it "
+                  "(WP-2150, issue #1669; tests/test_cell_ties.py)")),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
                   "AUDIT category and its children under PUBLICATION, recording the data "
@@ -858,6 +869,13 @@ ROWS: tuple[Row, ...] = (
                   "_harmonic_diagnostics); the harmonic is the caller's declaration")),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
+    Row("HISTORY_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing to do: every fit of the stored model built the entry this way",
+        evidence=("arithmetic: ParameterTable has always built a tied cell entry from its "
+                  "source, so a stored node holding another value is read as the source and "
+                  "no number the history produced moves; fires past the table's own "
+                  "tolerance only, the size it now refuses (WP-2150)")),
     Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("check that the loaded tree is the run you meant before quoting a cell, a "
@@ -2518,6 +2536,14 @@ ROWS: tuple[Row, ...] = (
                   "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
                   "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
+    Row("rietx.crystallography.symmetry.SYMMETRY_LENGTH_RTOL", "constant", tier=1, value=1e-05,
+        evidence=("arithmetic on its consequence, as SYMMETRY_ANGLE_TOL_DEG was sized: the table "
+                  "builds a tied length from its source, so a stored length a relative eps off "
+                  "moves every d-spacing by at most eps from the caller's; 1e-5 bounds that at "
+                  "10 ppm, under SRM 660c's 48 ppm certificate band, and clears an indexing "
+                  "candidate's round-off (tied lengths equal to 1e-12 relative, "
+                  "test_an_indexing_candidate_still_builds; WP-2150's handover has the "
+                  "acceptance-set measurement)")),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
                   "whether atoms that would overfill one place are the same place, so the "
@@ -5436,6 +5462,9 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED.suggestion", "suggestion", value=1),
     Row("CIF_CELL_ANGLE_CORRECTED.suggestion", "suggestion", value=1),
+    Row("CIF_CELL_TIE_CORRECTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one way a real difference can be kept, a space "
+                  "group that leaves the parameter free; picks no group")),
     Row("CIF_MAGNETIC_CENTERING_ASSUMED.suggestion", "suggestion", value=1),
     Row("CIF_MAGNETIC_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion", "suggestion", value=1),

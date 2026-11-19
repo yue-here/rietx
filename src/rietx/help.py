@@ -1936,6 +1936,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "and c to a on a cubic cell, or beta and gamma to alpha on rhombohedral "
+            "axes. The file stores the two with slightly different values. They "
+            "agree within the digits the file prints, so the reader used the source "
+            "value for both. A refinement builds the tied parameter from its source "
+            "anyway. A larger disagreement is left as written and the refinement "
+            "refuses it. If the difference is real, the symmetry is lower than the "
+            "symbol claims, and the phase needs a space group that leaves the "
+            "parameter free."
+        ),
+    ),
     "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
         title="Data blocks that state nothing were skipped",
         description=(
@@ -2947,6 +2961,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "readable. This entry counts the weaker pairs left out. The fit used all of "
             "them. The identifiability record on the result holds the full correlation "
             "matrix."
+        ),
+    ),
+    "HISTORY_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter in a history set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "to a on a tetragonal cell. A history written by an earlier release "
+            "stores the two with different values. Every fit of that model built "
+            "the tied parameter from its source, so loading reads it that way and "
+            "no number the history produced changes. Releases since 1.13 refuse "
+            "such a cell, so the stored value could not otherwise be refined."
         ),
     ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
