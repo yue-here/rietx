@@ -1584,7 +1584,9 @@ def test_a_bank_edit_drops_a_tie_on_a_row_the_bank_does_not_carry(cw_models):
     ref.tie_equal(["instrument.profile.u", "instrument.profile.v"])
     assert ref._ties
     s2 = structure.model_copy(deep=True)
-    s2.phases[0].cell.a.value += 0.5
+    # the whole cubic cell moves: an `a` alone is refused against its tied
+    # `b` and `c` since WP-2150, which would stop the edit before the tie
+    s2.phases[0].cell = rx.Cell.cubic(SI_A + 0.5)
     bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=90.0)
     with pytest.warns(UserWarning, match=r"instrument\.profile\.v"):
         ref.edit(structure=s2, instrument=bank)
