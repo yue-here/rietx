@@ -36,6 +36,8 @@ from rietx.optimize.statistics import (
     residual_is_noise,
 )
 from rietx.schemas.instrument import Dispersion
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
+from rietx.strategy.staged import PLAN_PRESETS
 from rietx.viz.plots import plot_result
 
 pytestmark = pytest.mark.xdist_group("instrument-hold-noise")
@@ -224,6 +226,14 @@ def test_with_nothing_to_test_there_is_no_structure(delta, n_free):
     assert residual_is_noise(delta, n_free)
 
 
+def _closed_default():
+    """``mccusker_default`` with its closing stage declared, not inherited: off
+    by default since WP-2222, and the two tests using this were measured with it."""
+    plan = PLAN_PRESETS["mccusker_default"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    return plan
+
+
 # ---- a phase whose peaks missed ---------------------------------------------
 
 
@@ -262,7 +272,7 @@ def test_the_tutorials_step_is_reached_warm(lab6, no_check):
     def run():
         runner = rx.SequentialRefinement(_with_cell(lab6, 4.1566 * 1.001),
                                          _start_instrument())
-        return runner, runner.fit(patterns, plan="mccusker_default",
+        return runner, runner.fit(patterns, plan=_closed_default(),
                                   x=[600.0, 700.0], x_label="T (K)")
 
     runner, series = run()
@@ -376,7 +386,7 @@ def test_a_fit_left_unseen_carries_the_d_that_declined_the_hold(lab6, monkeypatc
     read = _spy(monkeypatch)
     data = _pattern(lab6, A_TRUE, seed=14)
     ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.05), _start_instrument(), history=False)
-    result = ref.fit(data, plan="mccusker_default")
+    result = ref.fit(data, plan=_closed_default())
     _draw(result, "hold_noise_unreached_5pct")
     assert not PEAK_ONLY & set(result.stages[-1].held)
     d, n, p, answer = read[-1]
