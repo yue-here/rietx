@@ -1030,7 +1030,7 @@ def test_a_direct_caller_with_no_site_reach_builds_a_body_typed_exactly():
         u = block.r0 @ np.cross(block.body_axes[:, 0], block.body_axes[:, 1])
         tilts.append(abs(float(_N111 @ u)))
         assert block.axis_tol is None and block.n_rot == 1
-        np.testing.assert_allclose(block.axes[:, 0], _N111, atol=0.0)
+        assert np.array_equal(block.axes[:, 0], _N111)
         assert block.commit_rotation(np.array([math.radians(3.0)])) is not None
         block.settle_anchor()
         assert block.n_rot == 1
