@@ -359,9 +359,15 @@ def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
     lattice *is* load-bearing — trigonal on rhombohedral axes, ``ext == "R"`` —
     is named by the **first** try, because an R centring is tabulated.
 
-    ``None`` only when even the point group does not resolve, which means the
-    list is not a crystallographic group in this setting — a caller error
-    rather than a naming problem.
+    ``None`` when even the point group does not resolve, which means no
+    tabulated setting has this point group with these axes.  That is a fact
+    about the **cell**, never about the group: NiO's magnetic child on
+    rhombohedral axes, BNS 2.7 in 2a,a+b,a+c, is a valid group of 24
+    operations with point group -3m, and this returns ``None`` for it (issue
+    #1688).  So nothing basis-free may be read off this lookup: the crystal
+    system comes from the operators (:func:`crystal_system_of`), and only the
+    setting-bound keys (the symbol, ``ext``, the monoclinic unique axis) are
+    undefined.
     """
     ops = _ops_from_xyz(xyz)
     found = gemmi.find_spacegroup_by_ops(ops.derive_symmorphic())
@@ -374,6 +380,49 @@ def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
         bare.tran = [0, 0, 0]
         seen.setdefault(tuple(v for row in op.rot for v in row), bare)
     return gemmi.find_spacegroup_by_ops(gemmi.GroupOps(list(seen.values())))
+
+
+@functools.lru_cache(maxsize=256)
+def crystal_system_of(xyz: tuple[str, ...]) -> str:
+    """The crystal system of an operation list, read from its rotations alone.
+
+    The crystal system is a property of the point group, so it needs no
+    tabulated setting (issue #1688).  The trace of a rotation matrix is the
+    same in every basis, and for a proper rotation through φ it is 1 + 2 cos φ:
+    3, 2, 1, 0 and −1 for the 1-, 6-, 4-, 3- and 2-fold.  An improper operation
+    is read through its proper part, −R, which turns −1 into 1, m into 2, −4
+    into 4, −3 into 3 and −6 into 6.  The system is then the highest-symmetry
+    holohedry the distinct proper parts reach: four 3-fold axes (eight
+    elements) is cubic, a 6-fold hexagonal, a 3-fold trigonal, a 4-fold
+    tetragonal, three 2-folds orthorhombic, one monoclinic, none triclinic
+    (Hahn & Klapper, *International Tables for Crystallography* Vol. A, 2016,
+    ch. 3.2, the point groups and the crystal system each belongs to).
+
+    The words are gemmi's ``crystal_system_str()`` values, and
+    ``tests/test_unnamed_group_report.py`` holds the two equal over gemmi's
+    whole table, so a named group answers identically by either route.
+    """
+    den = gemmi.Op.DEN
+    proper: set[tuple[int, ...]] = set()
+    for op in _op_list_from_xyz(xyz):
+        rot = np.array(op.rot, dtype=np.int64)
+        if round(np.linalg.det(rot / den)) < 0:
+            rot = -rot
+        proper.add(tuple(rot.ravel()))
+    traces = [(r[0] + r[4] + r[8]) // den for r in proper]
+    n3 = traces.count(0)
+    n2 = traces.count(-1)
+    if n3 >= 8:
+        return "cubic"
+    if 2 in traces:
+        return "hexagonal"
+    if n3:
+        return "trigonal"
+    if 1 in traces:
+        return "tetragonal"
+    if n2 >= 3:
+        return "orthorhombic"
+    return "monoclinic" if n2 else "triclinic"
 
 
 @dataclass(frozen=True)
@@ -400,9 +449,13 @@ class OperatorGroup:
     :attr:`ext`, :meth:`crystal_system_str`, :meth:`monoclinic_unique_axis`) is
     what every consumer in this package already asks a ``gemmi.SpaceGroup``
     for, so :func:`resolve_group` can hand either object to any of them.  The
-    four *naming* members delegate to :attr:`closest_type` and the reason they
-    may is the one :func:`_closest_type` states: the symmorphic derivation has
-    this list's point group and lattice exactly.
+    setting-bound members (:attr:`hm`, :attr:`ext`, :attr:`number`,
+    :meth:`monoclinic_unique_axis`) delegate to :attr:`closest_type` and the
+    reason they may is the one :func:`_closest_type` states: the symmorphic
+    derivation has this list's point group and lattice exactly.  They raise
+    where no tabulated setting has this point group with these axes.
+    :meth:`crystal_system_str` is basis-free, so it reads the operators
+    (:func:`crystal_system_of`) and never raises (issue #1688).
     """
 
     label: str
@@ -421,10 +474,14 @@ class OperatorGroup:
         if found is None:
             raise ValueError(
                 f"the operation list of {self.label!r} ({len(self.xyz)} "
-                f"operations) has no symmorphic space group in gemmi's table, "
-                f"so it is not a crystallographic group in this setting and "
-                f"neither its crystal system nor its cell constraints are "
-                f"defined. Check the list: {', '.join(self.xyz[:4])}...")
+                f"operations) has no symmorphic space group in gemmi's table "
+                f"with this cell's axes, so it has no tabulated symbol, "
+                f"setting or monoclinic unique axis here, and its cell "
+                f"constraints cannot be read from the table. Its crystal "
+                f"system is {self.crystal_system_str()!r}, read from the "
+                f"operators. A cell stated through the parent's "
+                f"(Phase.parent_cell) needs none of this. Operations: "
+                f"{', '.join(self.xyz[:4])}...")
         return found
 
     @property
@@ -441,7 +498,8 @@ class OperatorGroup:
         return int(self.closest_type.number)
 
     def crystal_system_str(self) -> str:
-        return self.closest_type.crystal_system_str()
+        """Read from the operators, so it is defined in any cell (issue #1688)."""
+        return crystal_system_of(self.xyz)
 
     def monoclinic_unique_axis(self) -> str:
         return self.closest_type.monoclinic_unique_axis()
@@ -660,8 +718,15 @@ def cell_constraints(sg: gemmi.SpaceGroup) -> CellConstraints:
     Raises ``ValueError`` naming the symbol and the setting if the group is one
     this package cannot serve.  See :class:`CellConstraints` for why the crystal
     system alone is the wrong key.
+
+    An operation list is read through its :attr:`OperatorGroup.closest_type`,
+    which raises where no tabulated setting has the list's point group with
+    these axes.  Its own :meth:`~OperatorGroup.crystal_system_str` answers in
+    any cell (issue #1688), but conventional ties in unconventional axes would
+    be wrong, so the system is never read from the list here.
     """
-    system = sg.crystal_system_str()
+    setting = sg.closest_type if isinstance(sg, OperatorGroup) else sg
+    system = setting.crystal_system_str()
     right = {"alpha": 90.0, "beta": 90.0, "gamma": 90.0}
     if system == "cubic":
         return CellConstraints({"b": "a", "c": "a"}, right)
@@ -674,12 +739,12 @@ def cell_constraints(sg: gemmi.SpaceGroup) -> CellConstraints:
     if system == "triclinic":
         return CellConstraints({}, {})
     if system == "trigonal":
-        if sg.ext == "R":  # rhombohedral axes: one length, one angle
+        if setting.ext == "R":  # rhombohedral axes: one length, one angle
             return CellConstraints({"b": "a", "c": "a", "beta": "alpha",
                                     "gamma": "alpha"}, {})
         return CellConstraints({"b": "a"}, right | {"gamma": _GAMMA_HEX})
     if system == "monoclinic":
-        axis = sg.monoclinic_unique_axis()
+        axis = setting.monoclinic_unique_axis()
         free = {"a": "alpha", "b": "beta", "c": "gamma"}.get(axis)
         if free is None:
             raise ValueError(
