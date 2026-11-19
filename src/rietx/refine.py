@@ -5867,7 +5867,6 @@ class Refinement:
         plan = resolve_plan(plan, mode)
         if refit not in REFIT_MODES:
             raise ValueError(f"refit must be one of {REFIT_MODES}, not {refit!r}")
-        frees = self._plan_frees(plan)
         # read before anything moves, then dropped: a fit that raises part way
         # has moved the values, and one that returns writes its own below
         converged_here = (refit == "single" and self._refit_key is not None
@@ -5883,8 +5882,9 @@ class Refinement:
         # a path the converged fit held starts cold, and one stage is not
         # reliable from cold, so freeing one runs the plan in stages (Yue,
         # 2026-11-19; brucite's March-Dollase block landed 2.25 esd off)
-        released = (sorted(frees - self._refit_frees) if converged_here
-                    else [])
+        # asked only here, so a first fit builds nothing before it solves
+        released = (sorted(self._plan_frees(plan) - self._refit_frees)
+                    if converged_here else [])
         is_refit = converged_here and not released
         self._refit_how = released or None
         self._refit_key = None
@@ -5906,7 +5906,7 @@ class Refinement:
             self._refit_how = (
                 "fallback" if any(d.code == "WARM_REFIT_REJECTED"
                                   for d in result.diagnostics) else "single")
-        self._note_refit_key(result, data, mode, two_theta_limits, frees)
+        self._note_refit_key(result, data, mode, two_theta_limits, plan)
         return result
 
     def _plan_frees(self, plan: RefinementPlan) -> frozenset[str]:
@@ -6002,15 +6002,20 @@ class Refinement:
 
     def _note_refit_key(self, result: RefinementResult, data: PatternData,
                         mode: Mode, two_theta_limits,
-                        frees: frozenset[str]) -> None:
+                        plan: RefinementPlan) -> None:
         """Record that this state is an accepted fit's answer, and what its
-        plan freed, or nothing."""
+        plan freed, or nothing.
+
+        The free set is asked of the answer's table, after the solve: the
+        holds, ties and locks a fit leaves are the ones the next fit starts
+        with, and a first fit builds no table before it solves.
+        """
         import json
 
         if result.status != "converged" or _rejected(result):
             return
         self._refit_key = _refit_key(self, data, mode, two_theta_limits)
-        self._refit_frees = frees
+        self._refit_frees = frees = self._plan_frees(plan)
         if self.history is not None and self._head_id is not None:
             self.history.annotate(
                 self._head_id,
