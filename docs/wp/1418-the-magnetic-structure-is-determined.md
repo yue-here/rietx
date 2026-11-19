@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-19 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -1019,6 +1019,41 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
+
+Michael's K1a is on main. An agent can now score a rational k-grid against a pattern's
+unexplained peaks and compare each score with a shuffle null, passing every setting by hand.
+Nothing yet ranks the grid or picks a k. That is K1b. The review left three follow-ups for
+Michael, none blocking, and one bears on K1b's defaults.
+
+*Done.* PR #1549 (outside contributor, head `ac10ceb5c`) merged as `1ea22b302` on
+2026-11-19. Its round-2 push answered all three asks of the round-1 review (posted
+2026-11-17). The PR closes no issue, since K1a is one part of #795 and of this WP. M-8 stays
+unticked: the ranking, `best_or_none()`, the default radius and the two warnings are K1b's.
+This entry was written by a ghostshift runner in PR #1701, which changes only this file.
+
+*Measured.* Full suite on the merged tree `e13d968a9` (main `efb3cd005` plus head
+`ac10ceb5c`; arm64 Mac, `[dev,jax]`, Python 3.12, run alone): 16 002 passed, 262 skipped,
+50 xfailed and 1 failed, in 2445 s. The failure is #1424's two-site row. It fails the same
+way on bare main `efb3cd005` and on the Linux nightly. `tests/test_indexing_kvector.py`
+alone: 50 passed. Ruff was clean. `tests.audit_delta` listed 11 added rows, none of them
+unaudited. `tests.reader_output` showed no change against `efb3cd005`.
+
+*Follow-ups, Michael's to take or leave.*
+
+1. The negative-arm test builds the same shuffle null 21 times. The null depends only on
+   the peak count. Built once, the test would drop from 7.4 s on the CI Python 3.11 leg to
+   about 1 s.
+2. A 99th percentile taken from 100 shuffles is a noisy threshold. Against a 2000-shuffle
+   null its true exceedance rate was 0.9-7.5 % over five seeds, where 1 % was meant. This
+   bears on K1b's default shuffle count and percentile, and those are Michael's call.
+3. A test comment says a fixed k component takes the values {0, ½, 1}. That holds for the
+   groups the test uses. P6/mmm gives 1/3 (its K point) and R-3m gives 3/2.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor) is
+Michael's, once #795's decisions 3 and 4 are ruled. The #1424 two-site row stays red on main
+until its own decision is made on that issue.
 
 ### 2026-11-12 (2nd session) — M-8's machinery half, K1a (`indexing/kvector.py`, #795)
 
