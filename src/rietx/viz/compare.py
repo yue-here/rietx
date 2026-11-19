@@ -174,11 +174,11 @@ def qpa_plan(*, texture: bool = False) -> RefinementPlan:
         Stage("profile_w", ["instrument.profile.w"]),
         Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                           "instrument.profile.x", "instrument.profile.y"]),
+        Stage("lines_axial", ["instrument.source.lines.*.weight",
+                              "instrument.geometry.axial_sl"]),
         Stage("sample_broadening",
               ["phases.*.lor_size", "phases.*.lor_strain",
                "phases.*.gauss_size", "phases.*.gauss_strain"], seed=1e-4),
-        Stage("lines_axial", ["instrument.source.lines.*.weight",
-                              "instrument.geometry.axial_sl"]),
         Stage("biso", ["phases.*.atoms.*.biso"]),
     ]
     if texture:
