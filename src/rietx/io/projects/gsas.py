@@ -1617,6 +1617,13 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
             f"{model.path or '<model>'}: phase {chosen.number} "
             f"({chosen.name!r}) states values this build's schema refuses "
             f"({exc}).  The file's own numbers are on `model.phases`") from exc
+    from ...crystallography.symmetry import check_phase_cell_ties
+    try:
+        check_phase_cell_ties(structure.phases[0], prefix="phases.0")
+    except ValueError as exc:
+        raise GsasExpError(
+            f"{model.path or '<model>'}: phase {chosen.number} "
+            f"({chosen.name!r}): {exc}") from exc
 
     # a site whose own images coincide is one atom on its special position
     # (#1007), said here because this is the channel the schema lacks
@@ -1904,6 +1911,7 @@ def from_structure(structure: Structure, *, title: str = "",
         refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
+        refuse_parent_cell,
         refuse_propagation_vector,
     )
 
@@ -1939,6 +1947,7 @@ def from_structure(structure: Structure, *, title: str = "",
                 f"{_WRITE_MAX_ATOMS + 1} has no key")
         refuse_operation_list(phase, "a GSAS `.EXP`")
         refuse_distortion_modes(phase, "a GSAS `.EXP`")
+        refuse_parent_cell(phase, "a GSAS `.EXP`")
         refuse_magnetic_phase(phase, "a GSAS `.EXP`")
         refuse_propagation_vector(
             phase, "a GSAS `.EXP`",

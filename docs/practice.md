@@ -184,6 +184,24 @@ scratch copies were not kept. The claims they marked inferred are TOPAS's quadra
 combination rule (not stated in the reference), the scope of `force_positive_fwhm`, and
 FullProf's constant-wavelength combination rule with an IRF.
 
+### When one twin reaches its limit, and a re-run
+
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
+specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
+earlier stage put it, and no free parameter in the stage can narrow that part of the width.
+
+| Program | A refined parameter that reaches a limit | A re-run of a converged refinement |
+|---|---|---|
+| rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
+| GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
+| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
+
+In the one program read, the parameter that crossed its limit is the one taken out, and its
+partner keeps refining. No program holds an instrument width because its specimen twin is free
+(the table above), so none meets this case in the form rietx does.
+
 ## Extinction
 
 Surveyed 2026-10-24 for WP-2044, one agent across six programs, with each
@@ -395,8 +413,8 @@ during the chain. The behaviours with no program default behind them are rietx's
 restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
 median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 its gap list; the step list and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
-counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`) and the per-pattern code
+counts.
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
@@ -869,6 +887,39 @@ undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jaco
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
 
+## The esd of a parameter on a direction the data does not determine
+
+Read 2026-11-18 for WP-2028 (PR #1668's open question). Several parameters can trade along a
+direction that leaves χ² unchanged. The Gaussian width is one case: Γ_G² = W + size/cos²θ +
+strain·tan²θ, and 1/cos²θ = 1 + tan²θ. Should each such parameter still get a finite esd from
+the directions the data did measure, or none? rietx keeps the finite esd and warns with
+`COVARIANCE_DIRECTION_DISCARDED` (WP-1535). That esd is at least √2 short by construction,
+and WP-2028 measured one 140× short. Which esd a fit gets is itself set by
+rounding. On that width triple the smallest eigenvalue sat at 2.2e-16 to 1.6e-15 of the largest,
+against a cut of 1e-15. A cut direction read ± 3.9e-7 on W, and a kept one ± 5.5 (WP-2028).
+
+| Source | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | A column with a zero diagonal is a "hard" singularity. The parameter is dropped from the refinement and reported as "Parameter(s) dropped" (`GSASIImath.HessianLSQ`, `:264-266`; `GSASIIstrMain.ReportProblems`, `:54-139`). A combination direction is "soft". The Hessian is scaled to unit diagonal and inverted by an SVD that zeroes every singular value under 1e-6 of the largest (`setHcorr`, `GSASIImath.py:131-148`). Every parameter keeps the finite esd that inverse gives. The count of zeroed values and the parameters most involved are reported as "soft (SVD) Hessian singularities" (`setSVDwarn`, `:150-162`) | checked (source) |
+| TOPAS 5 and v9 | `do_errors` gives errors and `C_matrix_normalized` from the A matrix (TOPAS 5 Technical Reference §3.7). v9 takes them from an SVD by default (§5.10); its cut is not stated. `bootstrap_errors` refits resampled data and quotes the spread of the refined values (TOPAS 5 Technical Reference, keyword `bootstrap_errors`; Efron & Tibshirani 1986). Nothing marks an esd as undetermined | checked (manuals) |
+| FullProf | A singular matrix stops the run. The manual advises starting from the scale factors alone and refining separately any pair correlated above about 50 % (FullProf manual, Trouble shooting and p. 14) | checked (manual) |
+| Prince (2004), *Mathematical Techniques in Crystallography and Materials Science*, § Correlation | An exactly singular Hessian "has no inverse". A variance computed while leaving out variables correlated with the one of interest is too small, and "the apparent precision will be illusory". The book's remedy is a constraint that removes the indeterminacy (§ Constraints, p. 127) | checked (text) |
+| Linear-models theory (Searle 1971, *Linear Models*, p. 169; summarised in the SAS/STAT guide, "Finding the Least Squares Estimators") | In a rank-deficient model a parameter that is not estimable has no unique estimate. A generalized inverse gives one solution of infinitely many, and a variance built from it depends on which inverse was taken. Standard errors are quoted for estimable combinations only, which no choice of inverse moves | checked (secondary) |
+| R `lm` | A pivoted QR drops each column that depends on the earlier ones. Its coefficient and standard error print as `NA`, "not defined because of singularities", and the others are conditional on it being zero (R-help, Ripley 2008; `?alias`) | checked (secondary) |
+| SAS PROC GLM | Estimates from a generalized inverse are flagged "B", "not uniquely estimable". A coefficient set to zero by the inverse shows a missing standard error (SAS usage note 22585; SAS/IML blog 2018-11-28) | checked (secondary) |
+| scipy 1.18.1 `curve_fit` | No treatment. On y = (a + b)x + c, the same data from two starts gave a and b esds of 5.0e6 and 9.1e6 (`lm`), or 4.3e4 and 1.5e5 (`trf`), with c's esd near 6.4e-3 in all four fits and no warning (run 2026-11-18) | measured |
+| SHELXL, Jana, MAUD, BGMN, RIETAN-FP | not checked | |
+
+**The practice.** Statistics is settled: a parameter the data cannot estimate has no standard
+error, and software that meets one prints none (R, SAS). Both then quote the other parameters
+conditional on a stated choice: R fixes the later column at zero. The crystallographic textbook
+agrees and asks for a constraint. The two crystallographic programs that report errors through
+a singular matrix (GSAS-II, TOPAS) do what rietx does today. They quote the finite esd of a
+truncated SVD, and GSAS-II adds a warning naming the parameters. GSAS-II drops a parameter only
+when its own column has no gradient. A truncated SVD is an unstated constraint: the minimum-norm
+solution in the units the matrix was scaled to. So its esd is conditional on a choice nobody
+made, and it changes with the scaling.
+
 ## Stephens anisotropic strain: the width's shape and its clamp
 
 Collected 2026-11-02 for WP-1467 from three sources. Stephens' paper was read by the lead. GSAS-II
@@ -1256,6 +1307,32 @@ members, Jmol fills what a query matches, and Mercury and VESTA fit a plane thro
 user picks. Bond orders matter only to Mercury's aromatic circle. A fill's default colour and
 opacity are almost never documented.
 
+## Which pairs inside a molecule a contact term checks
+
+Surveyed 2026-11-13 for WP-2144 and the follow-up it filed (issue #1507), one agent with web search and page fetches. The question is which intramolecular atom pairs get a non-bonded or minimum-distance term, counted in bonds, and how a program biases a torsion instead. Bonds apart means hops along the bond graph: a 1-2 pair is one bond apart, a 1-3 pair two, a 1-4 pair (the two ends of a torsion) three, a 1-5 pair four. Several publisher and program sites refused the fetch, so a row marked "secondary" rests on a mailing list, a search excerpt or a third-party copy and was not read in the primary text. Recall alone was not counted as checked.
+
+| Program or field | Pairs excluded | 1-4 pairs | Where it is set | Mark |
+|---|---|---|---|---|
+| rietx (WP-1809 builder) | Every pair inside one copy of a rigid body, whatever its bond count, under `exclude_same_body=True` (the default). A body stores no bonds | Excluded with the rest | `model.restraints.anti_bump_restraints` | checked (source) |
+| GROMACS | Pairs no more than `nrexcl` bonds apart; force fields ship 3, so 1-2, 1-3 and 1-4 | Added back through the `[ pairs ]` section, scaled by `fudgeLJ` and `fudgeQQ` from `[ defaults ]`. The factors (0.5, 0.8333) come from each force field's files | `nrexcl` in `[ moleculetype ]`; `gen-pairs`, `fudgeLJ`, `fudgeQQ` in `[ defaults ]` | checked (manual): reference manual § Topology file, table 13 |
+| CHARMM | `NBXMOD 5`: 1-2 and 1-3 excluded, 1-4 kept as "special" pairs. `NBXMOD 3` excludes 1-2 and 1-3 only, `NBXMOD 4` all 1-4 too. The page states no general default; the parameter file sets it | Special 1-4 parameters and `E14FAC` (1.0 for CHARMM's own force fields, 0.75 for MMFF) | `NBXMOD`, `E14FAC` | checked (manual): `nbonds.doc`, c48b2 |
+| AMBER | 1-2 and 1-3 excluded (not read in the primary text) | Electrostatics divided by `SCEE` = 1.2 and van der Waals by `SCNB` = 2.0 (Cornell et al. 1995); stored per dihedral since Amber 11 | `SCEE`, `SCNB`; prmtop `SCEE_SCALE_FACTOR`, `SCNB_SCALE_FACTOR` | checked (manual), secondary: AmberTools manual excerpt and mailing lists; ambermd.org refused the fetch |
+| OPLS-AA | Pairs fewer than three bonds apart | Coulomb and Lennard-Jones both scaled by 0.5 (Jorgensen, Maxwell & Tirado-Rives 1996) | the force field's own definition | secondary: GROMACS list posts and an encyclopaedia entry; the paper was not reached |
+| Rosetta (REF2015) | Pairs up to three bonds apart get weight 0, so 1-2, 1-3 and 1-4 | Excluded. Weight 0.2 at four bonds, 1 at five or more. The stated reason is to avoid counting a torsion twice, beside its knowledge-based torsion potential | `w_conn`, the "count-pair" crossover of four bonds (`CountPairCrossover4`) | checked (manual): Alford et al. (2017) eq. 5 and the RosettaCommons docs |
+| Probe (MolProbity's clashscore) | Pairs up to three bonds apart. A pair four bonds apart is excluded too when one end is a hydrogen | Excluded | the `-4H` option (the default), `-3`, `-2`, `-1`; `excluded_bond_chain_length` = 4 in cctbx's `probe2` | checked (source): `probe.c` help text and cctbx `probe2.py`; Word et al. (1999) and Chen et al. (2010) were not reached |
+| MoveIt (robot motion planning) | Link pairs listed in the Allowed Collision Matrix: pairs adjacent on the kinematic chain, always in collision, never in collision, or in collision in the default pose | Not applicable: the graph is the robot's links | the Setup Assistant's Self-Collisions step writes the matrix | checked (manual): MoveIt Humble docs, Setup Assistant and Planning Scene tutorials |
+| FOX / ObjCryst++ | No bond-count filter was seen. The anti-bump cost is set per pair of scattering powers at the crystal level and summed over the distance table, skipping only an atom with itself | Not distinguished | `Crystal::GetBumpMergeCost`; the molecule's own cost holds bond, angle and dihedral restraints only | checked (source and manual), partly: the FOX manual is silent on bonded pairs, and `CalcDistTable` was only partly read (GPL, concept only) |
+| TOPAS | Not determined. `AI_Anti_Bump` penalises every pair of the named site types; forum posts report that `ai_no_self_interaction` did not work in version 6 | not determined | `AI_Anti_Bump`, `Anti_Bump` | not checked: no public Technical Reference copy was reached, and the forum pages were search excerpts |
+
+How a structure-solution program biases a torsion instead:
+
+| Program | Torsion prior | Mark |
+|---|---|---|
+| DASH | Mogul Distribution Bias (MDB): each flexible torsion's distribution from the CSD, through Mogul, biases the simulated-annealing trial moves (Kabova et al. 2017). A CCDC worked example warns that it can bias the search away from the correct geometry | secondary: abstract and the CCDC example by search excerpt; the paper was not reached |
+| GALLOP | No intramolecular clash term in its cost, which is a correlated-integrated-intensity χ². Optional distance, angle and torsion restraints, and MDB torsion data, act in local optimisation only | checked (manual): the `gallop` README and the author's 2022 blog post; Spillman & Shankland (2021) was not reached |
+
+**Practice adds up to.** Every molecular code that checks contacts inside a molecule decides which pairs from the bond graph, and none uses one distance for every pair. The pairs one and two bonds apart are excluded everywhere the rule could be read. The torsion's own ends, three bonds apart, split the field. The classical force fields keep them at a scaled weight (AMBER, OPLS-AA, CHARMM's special 1-4 pairs, GROMACS's `[ pairs ]`), because their torsion terms were fitted with that 1-4 term present. Rosetta and Probe exclude them, and Rosetta gives the reason: its torsion preference is a separate term. A crystallographic restraint package with no fitted torsion potential is closer to Rosetta's position. The structure-solution programs put the torsion preference in a prior (DASH's MDB) rather than in a contact term. The one Rietveld program read in source, FOX, selects pairs by atom type with no bond filter.
+
 ## A named set of starting values, limits and refine flags
 
 Surveyed 2026-11-15 for WP-2020 (opt-in sets of bounds and defaults for one kind of
@@ -1301,6 +1378,58 @@ file" (FullProf), "include file" and "macro" (TOPAS), "template" (RIETAN-FP, and
 for its `.pcr`), "device file" (BGMN) and "refinement preset" (Profex). No program uses one
 word for a set spanning instrument, limits and refinement order.
 
+## A curve computed by another program
+
+Surveyed 2026-11-18 for WP-1512, on how a tabulated curve on 2θ enters a fit: a stacking-fault
+diffuse term from DIFFaX, a Debye sum, an amorphous reference. The questions were where the
+curve lands, what scales it, and whether it follows the specimen's position corrections.
+
+- GSAS-II 5.8.4, checked (source). A "fixed background file" is another histogram in the same
+  project (`Background[1]['background PWDR']`, a name, a multiplier and a refine flag). It is
+  read channel for channel over the same index range, with no interpolation and no position
+  correction (`GSASIIstrIO.py:579-592`). It is added to the background with one refinable
+  multiplier, `BF mult` (`GSASIIpwd.py:1144-1145`, derivative `:2149-2150`). A stacking-fault
+  model is a phase of its own, type `faulted`, simulated through DIFFaX (`StackSim`,
+  `CalcStackingPWDR`, `GSASIIpwd.py:4859, 5155`). Whether a faulted phase enters the least
+  squares was not checked.
+- FullProf, checked (manual; the copy read states no version). `Nba = 1` reads the background
+  from `FILE.bac`, either on a fixed step or as (2θ, intensity) pairs. It is applied as
+  Background(2θ) = b₁·Backg[(1 + b₃)·2θ + b₄] + b₂, eq. 3.6, so the curve has its own scale b₁,
+  offset b₂, stretch b₃ and shift b₄, each refinable. It lands in the background.
+- TOPAS, checked (manual; Technical Reference version 5, not the version 9 named above).
+  `user_y NAME file` loads a tabulated shape, §7.10. It enters any equation that is a function of
+  X, usually as `fit_obj = NAME`, and `fo_transform_X` maps the pattern's X onto the curve's
+  own axis, so a shift or stretch is an equation the user writes. The amplitude is likewise an
+  equation, so it can be a phase's scale times a constant. Where it lands is a flag on the
+  `fit_obj`: `fit_obj_phase` (§13.1). Example Quant-7.inp uses a `user_y` as a phase, linked to
+  a `dummy_str` for its weight fraction (§7.9.5-7.9.6).
+
+So two of the three put a file curve in the background with one multiplier, and the third lets
+the user say where it lands. Only GSAS-II applies no position correction, and its curve is a
+measured histogram on the same instrument, which already carries that instrument's zero offset.
+FullProf and TOPAS both let the curve move along the axis, by a refinable shift or by an
+equation. No program among the three ties the amplitude to a phase scale by default. TOPAS
+lets the user write that tie as an equation.
+
+## Inner threads in a process pool
+
+Surveyed 2026-11-18 for WP-1464 (whether a rietx process inside a pool of fits should
+default its kernel pool to one thread). This is Python practice for nested parallelism,
+since none of the seven programs runs its own process pool.
+
+| Library | What a worker process gets | Override |
+|---|---|---|
+| rietx | `model.compiled.n_threads()`: `RIETX_COMPILED_THREADS`, else `min(8, os.cpu_count())`; read once, when the kernel pool is built (`compiled.py:231-247`, checked (source)) | the variable |
+| joblib, loky backend | each worker's environment sets `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS` and others to `cpu_count() // n_jobs` (`doc/user_guide/parallel.rst`, "Avoiding over-subscription of CPU resources", checked (manual) at `main` 2026-11-18) | the same variables, set by the user |
+| numexpr | `NUMEXPR_NUM_THREADS`, then `OMP_NUM_THREADS` (recall, not re-checked) | either variable |
+
+Measured for WP-1464 (ran): on a 10-core arm64 Mac at load 9-84 from other work, a screen of
+26 cold fits on 10 worker processes ran 1.9-2.8× slower with `RIETX_COMPILED_THREADS=1` than
+with the default, in four interleaved pairs, and 104 fits ran 2.0× slower in two. BLAS was
+pinned to one thread in both. So rietx keeps its default in a pool and does not read
+`OMP_NUM_THREADS`: under loky, or under the BLAS pinning `batch-operating.md` 9c.31 advises,
+that variable is 1, the setting measured slower.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
@@ -1344,6 +1473,20 @@ A stage that fixes a parameter (WP-2208, read 2026-11-10):
 - RIETAN-FP manual `~/Code/rietx-bench/tools/rietan/RIETAN_VENUS/documents/RIETAN-FP_manual.pdf`: § 4.1.4 (text line 2830), § 11.3 (5116), § 17.3.17 (8625)
 - MAUD: `~/Code/rietx-bench/tools/maud/Maud.app/Contents/Java/Maud.jar`, classes `it/unitn/ing/rista/comp/launchRefineWizard` and `it/unitn/ing/rista/diffr/FilePar`, string table only (no Java runtime on this Mac, no source)
 - WP-1548 (structure figure): ChimeraX user docs https://www.rbvi.ucsf.edu/chimerax/docs/user/commands/ (`lighting`, `autostyle`, `save`, `style`, `nucleotides`, `color`); VESTA manual https://jp-minerals.org/vesta/archives/VESTA_Manual.pdf § 9.2, § 13.4; Jmol https://chemapps.stolaf.edu/jmol/docs/ (`cmds_.js`); PyMOL wiki https://pymolwiki.org/ (`Depth_cue`, `Fog`, `Fog_start`, `Ray_trace_fog`, `Ray_opaque_background`, `Cartoon_ring_mode`, `Cartoon_ring_transparency`); Mercury user guide https://www.ccdc.cam.ac.uk/media/mercury-1.pdf § 7.1, § 7.6, § 8.2-8.4; Mol* https://molstar.org/viewer-docs/ and https://molstar.org/mol-view-spec-docs/tree-schema/
+
+Which pairs inside a molecule a contact term checks (WP-2144, read 2026-11-13):
+
+- GROMACS reference manual, § Topology file (`topologies/topology-file-formats.html`, manual.gromacs.org): `nrexcl` in `[ moleculetype ]`; `gen-pairs`, `fudgeLJ`, `fudgeQQ` in `[ defaults ]`; table 13
+- CHARMM `nbonds.doc`, c48b2, academiccharmm.org/documentation/version/c48b2/nbonds: `NBXMOD`, `E14FAC`
+- AMBER: AmberTools13 manual (ambermd.org/doc12/AmberTools13.pdf) by search excerpt; the prmtop format (ambermd.org/FileFormats.php); Cornell, W. D. et al. (1995), *J. Am. Chem. Soc.* 117, 5179 (cited, not read)
+- OPLS-AA: Jorgensen, W. L., Maxwell, D. S. & Tirado-Rives, J. (1996), *J. Am. Chem. Soc.* 118, 11225 (cited, not read); the 0.5 factors from GROMACS mailing-list posts
+- Rosetta: Alford, R. F. et al. (2017), *J. Chem. Theory Comput.* 13, 3031 (PMC5717763), § Terms for atom-pair interactions, eq. 5; docs.rosettacommons.org, `CountPairCrossover4`
+- Probe: `probe.c` help text (`-4H`, `-3`, `-2`, `-1`; `Maxbonded = 4`); cctbx `mmtbx/probe` `probe2.py`, `excluded_bond_chain_length`; Word, J. M. et al. (1999), *J. Mol. Biol.* 285, 1711 and Chen, V. B. et al. (2010), *Acta Cryst.* D66, 12 (cited, not read)
+- MoveIt Humble docs, moveit.picknik.ai: `setup_assistant_tutorial.html` § Self-Collisions; `planning_scene_tutorial.html` (Allowed Collision Matrix)
+- FOX manual, objcryst-fox.readthedocs.io/en/latest/manual-crystal.html (anti-bump distances per pair of scattering powers); ObjCryst++ `Crystal.cpp` (`Crystal::GetBumpMergeCost`, `CalcDistTable`) and `Molecule.cpp` (`Molecule::GetLogLikelihood`), read for the concept only (GPL)
+- DASH: Kabova, E. A., Cole, J. C., Korb, O., Williams, A. C. & Shankland, K. (2017), *J. Appl. Cryst.* 50, 1421 (abstract by search excerpt); CCDC `Verapamil_DASH.pdf` (search excerpt)
+- GALLOP: github.com/mspillman/gallop README; mspillman.github.io/blog/posts/2022-05-30-restraints-for-rings-and-stereochemistry.html; Spillman, M. J. & Shankland, K. (2021), *CrystEngComm* 23, 6481 (cited, not read)
+- TOPAS: topas-academic.com/technical_reference is a script viewer that a page fetch cannot read; Durham TOPAS forum threads by search excerpt only
 
 A named set of starting values, limits and refine flags (WP-2020, read 2026-11-15):
 
