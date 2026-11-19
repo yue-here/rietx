@@ -5759,7 +5759,8 @@ class Refinement:
         model into the right basin, and a converged one is already there.
         Measured on the eight comparison standards, it ends within 0.21 esd
         of the first fit's answer and spends 0.32-0.50 of the staged
-        re-fit's evaluations (0.15-0.27 with no closing stage).  If that one-stage fit is rejected (it diverged or carries an
+        re-fit's evaluations (0.15-0.27 with no closing stage).  If that
+        one-stage fit is rejected (it diverged or carries an
         ``error``-level code), it is discarded, the models go back to where
         it started, the staged plan runs from there, and the result carries
         ``WARM_REFIT_REJECTED``.  ``"stages"`` runs the plan as a first fit
@@ -5832,6 +5833,8 @@ class Refinement:
         # read before anything moves, then dropped: a fit that raises part way
         # has moved the values, and one that returns writes its own below
         is_refit = (refit == "single" and self._refit_key is not None
+                    # an empty plan reaches ``_fit_pass``'s own refusal
+                    and bool(plan.stages)
                     # one stage frees then fixes, and cannot replay a fix a
                     # later stage undid (WP-2208), so such a plan runs staged
                     and not any(s.turn_off for s in plan.stages)

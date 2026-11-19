@@ -270,3 +270,30 @@ def test_a_reopened_tree_at_a_converged_answer_is_a_refit(tmp_path):
 def test_refit_rejects_an_unknown_mode(zincite):
     with pytest.raises(ValueError, match="refit must be one of"):
         zincite.fit(refit="once")
+
+
+def test_the_one_stage_keeps_the_last_stages_objective_and_windows():
+    """A restraint weight, an ftol or a window slack on the plan's last stage
+    is what its answer converged under, so the one stage keeps it, as the
+    closing stage does (``RefinementPlan.closing_stage``)."""
+    from rietx.strategy.refit import _collapse
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    plan = RefinementPlan(stages=[
+        Stage("a", ["phases.*.scale"], restraint_weight_scale=10.0),
+        Stage("b", ["phases.*.cell.*"], ftol=1e-11, restraint_weight_scale=0.1,
+              window_slack_deg=0.5)])
+    (one,) = _collapse(plan).stages
+    assert (one.ftol, one.restraint_weight_scale, one.window_slack_deg) == (
+        1e-11, 0.1, 0.5)
+    assert one.turn_on == ["phases.*.scale", "phases.*.cell.*"]
+
+
+@_ZINCITE
+def test_an_empty_plan_is_refused_on_a_refit_too(zincite):
+    """A re-fit does not collapse an empty plan into one stage freeing nothing."""
+    from rietx.strategy.staged import RefinementPlan
+
+    with pytest.raises(ValueError, match="a plan with no stages refines nothing"):
+        zincite.ref.fit(zincite.inputs.data, plan=RefinementPlan(stages=[]),
+                        **zincite.kw)
