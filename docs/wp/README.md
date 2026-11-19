@@ -529,6 +529,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2216](2216-the-refinement-window.md) | The refinement window: the Pattern graph, Parameters and the action bar at `/next` | ✅ 2026-11-18 | — | [2215](2215-the-frame.md) |
 | [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | 🔄 2026-11-18 | P2 | [2216](2216-the-refinement-window.md) |
 | [2223](2223-a-clicked-value-opens-on-its-full-stored-value.md) | A clicked value opens on its full stored value, and an unchanged one is no edit | 🔄 2026-11-19 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2224](2224-every-background-shape-change-releases-its-holds.md) | Every change to the background's shape releases its holds, and no pending edit outlives its path | ⬜ | P3 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
 
