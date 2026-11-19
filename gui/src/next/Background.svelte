@@ -21,13 +21,20 @@
    * - **A hold is a pending edit.** A chip is `Refinement.hold`, a parameter
    *   flag, so it joins the Parameters panel's pending set through `onhold`
    *   (one set: the action bar counts it once, Apply sends it once, the
-   *   recovery copy carries it). The band is fetched with the pending holds
-   *   (`?hold=`), so it shows at once where the curve may move once they
-   *   apply, and the title says "Background preview" until they do.
+   *   recovery copy carries it). The band is fetched with every pending
+   *   hold, globs and other parameters' included (`?hold=`), so it shows
+   *   where the curve may move once they apply, and the title says
+   *   "Background preview" while the band drawn is one fetched with holds:
+   *   the answer's own `pending_holds`, never the request's, so a refused
+   *   or late fetch cannot put the word over a band drawn without them.
    * - **Type, Terms and Stiffness change the model's shape**, so each is one
-   *   instrument edit committed at once, one history node, as a structural
-   *   edit is (gui/CLAUDE.md: a background family goes as a whole validated
-   *   model). The head moves and the band refetches.
+   *   instrument edit committed at once, as a structural edit is
+   *   (gui/CLAUDE.md: a background family goes as a whole validated model).
+   *   The hold and free registers keep their paths across it, so the edit
+   *   also releases the holds it removes or redefines and frees the terms it
+   *   adds (`./background.ts`' `kindArms`, `termsArms`), and the Parameters
+   *   panel drops its pending edits on those paths (`ondropped`). The head
+   *   moves and the band refetches.
    *
    * Nothing a click here changes may move the layout (interaction rule 8):
    * the controls keep their rows, and a refusal is the title's state.
@@ -49,8 +56,8 @@
     type Multiplier,
   } from "../lib/background";
   import { curveColors } from "../lib/plot";
-  import { DEFAULT_TERMS, LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, lambdaStop, pendingBackgroundHolds,
-           switchKind, withTerms } from "./background";
+  import { LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, heldWith, kindArms, kindEcho, lambdaStop,
+           pendingHolds, switchKind, termsArms, termsEcho, withTerms, type Arms } from "./background";
 
   let {
     head = null,
@@ -60,6 +67,7 @@
     holds = new Map(),
     say = (_line: string) => {},
     onhold = (_path: string, _held: boolean, _serverHeld: boolean) => {},
+    ondropped = (_gone: (path: string) => boolean) => {},
     onmoved = () => {},
   }: {
     head?: string | null;
@@ -73,6 +81,9 @@
     say?: (line: string) => void;
     /** a chip pressed: hold or release one term, pending until Apply */
     onhold?: (path: string, held: boolean, serverHeld: boolean) => void;
+    /** an instrument edit removed or redefined these paths: the pending
+     *  values, flags, holds and limits on them can no longer apply */
+    ondropped?: (gone: (path: string) => boolean) => void;
     /** an instrument edit landed: the head moved under the shell */
     onmoved?: () => void;
   } = $props();
@@ -88,13 +99,15 @@
   let pending = $state(false);
   let seq = 0;
 
-  /** The background paths held and not yet applied: the band is fetched with them. */
-  const pendingHolds = $derived(pendingBackgroundHolds(holds));
+  /** Every pending hold: the band is fetched with them. */
+  const sentHolds = $derived(pendingHolds(holds));
   const header = $derived(answer?.header ?? null);
   const esd = $derived(answer?.arrays.band_esd ?? null);
   const terms = $derived(header ? coefficientTerms(header.terms) : []);
   const kind = $derived(header?.kind ?? "");
-  const previewing = $derived(pendingHolds.length > 0);
+  /** the holds the band on screen was drawn with, from its answer */
+  const drawnHolds = $derived(header?.pending_holds ?? []);
+  const previewing = $derived(drawnHolds.length > 0);
 
   async function load(key: string, hold: string[]) {
     const mine = ++seq;
@@ -116,35 +129,33 @@
   // wait for idle.
   $effect(() => {
     if (busy || !head) return;
-    const hold = pendingHolds;
+    const hold = sentHolds;
     const key = JSON.stringify([head, protocol, hold]);
     if (key === loadedKey) return;
     void load(key, hold);
   });
 
-  /** Is this term held, counting a pending hold or release? */
+  /** Is this term held, counting a pending hold or release, a glob's too? */
   function isHeld(path: string, serverHeld: boolean): boolean {
-    const want = holds.get(path);
-    return want !== undefined ? want : serverHeld;
+    return heldWith(path, serverHeld, holds);
   }
 
-  /** Type, Terms and Stiffness: one instrument edit, committed at once.
-   *  `gone` names the background paths the edit removes or redefines: a
-   *  pending hold or release on one is dropped once the edit lands, or the
-   *  band and Apply would both be refused on a path the table no longer has. */
+  /** Type, Terms and Stiffness: one instrument edit, committed at once, with
+   *  what it asks of the registers (`arms`). Once it lands, the pending edits
+   *  on the paths it removed or redefined are dropped, or the band and Apply
+   *  would both be refused on a path the table no longer has. */
   async function editInstrument(build: (instrument: any) => any, label: string, echo: string,
-                                gone: (path: string) => boolean = () => false) {
+                                arms: Arms = { unhold: [], free: [], gone: () => false }) {
     if (pending) return;
     pending = true;
     try {
       const { instrument } = await api.instrument();
-      await api.patchInstrument(build(instrument), label);
+      await api.patchInstrument(build(instrument), label, { unhold: arms.unhold, free: arms.free });
+      if (arms.unhold.length) say(`ref.unhold(${JSON.stringify(arms.unhold)})`);
       say(echo);
+      if (arms.free.length) say(`ref.set_vary(${JSON.stringify(arms.free)}, True)`);
       error = "";
-      // held === serverHeld deletes the pending entry, whichever way it pointed
-      for (const path of [...holds.keys()]) {
-        if (path.startsWith("instrument.background.") && gone(path)) onhold(path, false, false);
-      }
+      ondropped(arms.gone);
       onmoved();
     } catch (exc) {
       error = (exc as Error).message;
@@ -156,12 +167,9 @@
   function chooseKind(next: "chebyshev" | "pspline") {
     if (!answer || next === kind) return;
     const tt = answer.arrays.two_theta;
-    void editInstrument((ins) => switchKind(ins, next, tt[0], tt[tt.length - 1]),
-      `background: ${next}`,
-      next === "pspline"
-        ? `instrument.background = BackgroundPSpline.for_range(${tt[0].toFixed(2)}, ${tt[tt.length - 1].toFixed(2)})`
-        : `instrument.background = BackgroundChebyshev.with_terms(${DEFAULT_TERMS})`,
-      () => true);
+    const lo = tt[0], hi = tt[tt.length - 1];
+    void editInstrument((ins) => switchKind(ins, next, lo, hi), `background: ${next}`,
+      kindEcho(next, lo, hi), kindArms());
   }
 
   /** The Terms slider's value while it is dragged; committed on release. */
@@ -172,8 +180,7 @@
     termsDrag = null;
     if (n === terms.length) return;
     void editInstrument((ins) => withTerms(ins, n), `background: ${n} terms`,
-      `instrument.background = BackgroundChebyshev.with_terms(${n})`,
-      (path) => termIndex(path) >= n);
+      termsEcho(terms.length, n), termsArms(terms, n));
   }
 
   let stopDrag = $state<number | null>(null);
@@ -191,8 +198,8 @@
   }
 
   const titleTip = $derived(
-    (previewing ? `Background preview: the band once ${pendingHolds.length} pending hold`
-      + `${pendingHolds.length === 1 ? "" : "s"} apply` : "Background at the current values")
+    (previewing ? `Background preview: the band once ${drawnHolds.length} pending hold`
+      + `${drawnHolds.length === 1 ? "" : "s"} apply` : "Background at the current values")
     + (error ? `. Edit refused: ${error}` : "")
     + (loadError ? `. Band refused: ${loadError}` : ""));
 
@@ -379,13 +386,6 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-
-  .vg {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
   }
 
   .view {

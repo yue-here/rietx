@@ -255,8 +255,11 @@ export const api = {
    *  changes what the parameter table *contains* (WP-1008).  One history node. */
   patchStructure: (structure: unknown, label?: string) =>
     call("PATCH", "/api/structure", { structure, label }),
-  patchInstrument: (instrument: unknown, label?: string) =>
-    call("PATCH", "/api/instrument", { instrument, label }),
+  /** `unhold` paths are released before the edit and `free` ones freed after
+   *  it, all or nothing (`GuiSession.instrument_patch`, WP-2218 review). */
+  patchInstrument: (instrument: unknown, label?: string,
+                    arms: { unhold?: string[]; free?: string[] } = {}) =>
+    call("PATCH", "/api/instrument", { instrument, label, ...arms }),
   /** Opt one atom into anisotropic ADPs.  Its own verb because both directions
    *  are physics (the isotropic tensor is not Uiso·δ, and U_eq weights by the
    *  metric) and a client that computed either would get non-orthogonal cells

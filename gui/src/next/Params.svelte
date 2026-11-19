@@ -44,6 +44,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import { fnmatch } from "../lib/fnmatch";
   import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
@@ -250,6 +251,12 @@
       const [p, s] = await Promise.all([api.params(), api.structure()]);
       rows = normalize(p.parameters);
       nFree = p.n_free;
+      // a pending edit on a path the working state no longer has can never
+      // apply, and would get every Apply refused (and the Background band, a
+      // hold): the head moved under it, by a checkout, the text editor or a
+      // structural edit (WP-2218 review)
+      const known = rows.map((r) => r.path);
+      dropPending((key) => !known.some((path) => fnmatch(path, key)));
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -374,6 +381,27 @@
     picked = new Set();
     error = "";
     refusal = "";
+  }
+
+  /** Drop the pending values, flags, holds and limits whose key `gone`
+   *  names: an edit on another surface removed or redefined those paths
+   *  (the Background graph's Type and Terms, WP-2218 review), so Apply
+   *  would be refused on them, or land on the new model's path of the same
+   *  name. Returns the keys dropped. */
+  export function dropPending(gone: (key: string) => boolean): string[] {
+    const dropped: string[] = [];
+    const keep = <V,>(m: Map<string, V>): Map<string, V> => {
+      const hit = [...m.keys()].filter(gone);
+      if (!hit.length) return m;
+      dropped.push(...hit);
+      return new Map([...m].filter(([k]) => !gone(k)));
+    };
+    edits = keep(edits);
+    varyEdits = keep(varyEdits);
+    holdEdits = keep(holdEdits);
+    limitEdits = keep(limitEdits);
+    if (dropped.length) say(`# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
+    return dropped;
   }
 
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
