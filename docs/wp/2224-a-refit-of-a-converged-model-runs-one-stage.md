@@ -185,7 +185,7 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
       basin, and the windows) and when a fit takes one stage; `reference/refinement.md` gets the
       keyword. The page's first sentence, "Most of what goes wrong in a refinement is a
       correlation", describes the mechanism and not the purpose.
-- [ ] `docs/practice.md`: the stopping rules and TOPAS's per-iteration limits from § Practice,
+- [x] `docs/practice.md`: the stopping rules and TOPAS's per-iteration limits from § Practice,
       and rietx's row in § Staging and what a stage holds.
 - [ ] Skill: the body's fit section says a second `fit` on a converged model runs one stage and
       how to ask for the plan; a reference row for the fallback's diagnostic code. Paid for by a
