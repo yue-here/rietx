@@ -829,8 +829,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {name!r}: {r.target} in "
@@ -939,8 +940,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {r.name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {r.name!r}: {r.target} in "
