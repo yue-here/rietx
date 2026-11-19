@@ -326,7 +326,8 @@ def _index(argv: list[str]) -> int:
                         "of the search (default 30 — so an unbounded "
                         "three-engine, seven-system run is up to 3x7x30 s of "
                         "search, before the probe and validation; --ceiling "
-                        "prints the arithmetic)")
+                        "prints the arithmetic). Under --total-budget no slice "
+                        "runs past the search's time over the engines")
     p.add_argument("--total-budget", type=float, default=None,
                    help="wall-clock ceiling for the WHOLE run — search, probe "
                         "and validation. The run returns what was reached and "
