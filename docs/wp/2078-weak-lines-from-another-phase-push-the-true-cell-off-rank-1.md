@@ -430,7 +430,7 @@ position-only list returns the same candidates as on `main`.
 
 ## Handover log
 
-- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
   two commits after the 2026-11-13 entry, and the entry below records them. Nothing else
   changed, and the status stays ✅.
 
