@@ -596,3 +596,124 @@ def test_a_psd_matrix_keeps_numpys_bits():
         assert not np.any((lam < 0) & (-lam > PINV_RCOND * np.abs(lam).max()))
         assert np.array_equal(_psd_pinv(e, PINV_RCOND),
                               np.linalg.pinv(e, rcond=PINV_RCOND, hermitian=True))
+
+
+# ----------------------------------------------------------------------
+# A floored width row: the gradient decides its esd, never the floor
+# (WP-2017 Q22a, PR #1577, the maintainer's corrected ground)
+# ----------------------------------------------------------------------
+#: W's esd may move this much, relative, when the floored rows' difference
+#: step moves ×10 and ÷10.  A dead column stays exactly zero at any step, so W
+#: should not move at all; the bar is rounding's.
+DEAD_COLUMN_W_REL = 1e-12
+#: a live floored row's own esd may move this much, relative, under the same
+#: steps.  Measured 1.7e-5 on this state (2026-11-19, macOS arm64): the column
+#: is differenced, so its esd carries the difference's error, and a row whose
+#: esd followed the step (cpd-1a's 51, 511, 4.26 in WP-2017 group N) fails.
+LIVE_FLOOR_ESD_REL = 1e-4
+
+
+def _floored_width_state(live: bool):
+    """The synthetic LaB₆ truth with a second LaB₆-like phase at scale 0.
+
+    Both phases' ``gauss_size`` sit on their floor of 0.  The ghost's width
+    column has no gradient: its scale of 0 empties every column of its peaks
+    (``statistics.normal_covariance``'s "zero upstream").  Phase 0's has
+    gradient on its floor, since ``gauss_size`` adds to the Gaussian variance
+    linearly (``caglioti``: ``g2 + gauss_size / c²``).  ``live`` frees phase
+    0's too.  The covariance is taken at the truth, on the Poisson draw.
+    """
+    import copy
+
+    from rietx import Instrument
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from tests import test_refine_synthetic as syn
+
+    pattern = syn.synthesize()
+    structure = syn.make_lab6()
+    for axis in "abc":
+        getattr(structure.phases[0].cell, axis).value = syn.TRUE_A
+    structure.phases[0].scale.value = syn.TRUE_SCALE
+    ghost = copy.deepcopy(structure.phases[0])
+    for axis in "abc":
+        getattr(ghost.cell, axis).value = 4.6
+    ghost.scale.value = 0.0
+    structure.phases.append(ghost)
+    ins = Instrument.debye_scherrer(wavelength=syn.WAVELENGTH)
+    ins.zero_shift.value = syn.TRUE_ZERO
+    ins.profile.w.value = syn.TRUE_W
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in syn.TRUE_BKG])
+    free = ["phases.0.scale", "phases.0.cell.a", "instrument.background.*",
+            "instrument.profile.w", "phases.1.gauss_size"]
+    if live:
+        free.append("phases.0.gauss_size")
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for path in free:
+        assert table.set_vary([path], True), path
+    for path in ("phases.0.gauss_size", "phases.1.gauss_size"):
+        entry = table.entries[table._paths[path]]
+        assert entry.lo == 0.0 and table.decode(table.x0())[path] == 0.0, path
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table
+
+
+def _esds_at_step(model, table, factor, monkeypatch):
+    """(J, internal esds, physical esds) with every floor-seed size ×``factor``,
+    the size a floored row's difference step is taken on (``_fd_typicals``)."""
+    import rietx.optimize.least_squares as ls
+
+    theta = table.x0()
+    with monkeypatch.context() as mp:
+        mp.setattr(ls, "FLOOR_SEEDS",
+                   {unit: size * factor for unit, size in ls.FLOOR_SEEDS.items()})
+        jac = ls._jacobian_for(model, table, "numpy")(theta)
+    resid = ls._make_residual(model, table)(theta)
+    internal, corr = covariance_estimates(jac, resid, jac.shape[1])
+    return jac, resid, internal, table.stderr_physical(theta, internal, corr)
+
+
+def test_a_floored_width_with_no_gradient_has_no_esd_and_leaves_w_alone(monkeypatch):
+    """(i) The ghost's floored width has a zero column at every step, so it
+    reports no esd, and W's esd is the one the matrix without that column gives,
+    whatever the step: ×10 and ÷10 move it by rounding at most."""
+    model, table = _floored_width_state(live=False)
+    dead = table.free_paths.index("phases.1.gauss_size")
+    w_col = table.free_paths.index("instrument.profile.w")
+    w = {}
+    for factor in (1.0, 10.0, 0.1):
+        jac, resid, internal, phys = _esds_at_step(model, table, factor, monkeypatch)
+        assert not np.any(jac[:, dead]), factor
+        assert phys.get("phases.1.gauss_size") is None, factor
+        w[factor] = phys["instrument.profile.w"]
+        # the matrix without the dead column, at the same N - P
+        keep = [c for c in range(jac.shape[1]) if c != dead]
+        without, _ = covariance_estimates(jac[:, keep], resid, jac.shape[1])
+        assert internal[w_col] == pytest.approx(without[keep.index(w_col)], rel=1e-9)
+    assert np.isfinite(w[1.0]) and w[1.0] > 0.0
+    for factor in (10.0, 0.1):
+        assert w[factor] == pytest.approx(w[1.0], rel=DEAD_COLUMN_W_REL), factor
+
+
+def test_a_floored_width_with_gradient_keeps_its_marginal_esd(monkeypatch):
+    """(ii) Phase 0's width on the same floor of 0 has a live column, so it
+    stays in the matrix and reports its marginal esd: the full covariance's
+    diagonal, finite, and steady under the ×10 and ÷10 steps.  Being on the
+    floor removes nothing (WP-1929; ``at_bound`` says where it sits)."""
+    model, table = _floored_width_state(live=True)
+    live = table.free_paths.index("phases.0.gauss_size")
+    esd = {}
+    for factor in (1.0, 10.0, 0.1):
+        jac, _, internal, phys = _esds_at_step(model, table, factor, monkeypatch)
+        assert np.linalg.norm(jac[:, live]) > 0.0, factor
+        esd[factor] = phys.get("phases.0.gauss_size")
+        assert esd[factor] is not None and np.isfinite(esd[factor]), factor
+        assert esd[factor] == pytest.approx(internal[live], rel=1e-12), factor
+        assert phys.get("phases.1.gauss_size") is None, factor
+    for factor in (10.0, 0.1):
+        assert esd[factor] == pytest.approx(esd[1.0], rel=LIVE_FLOOR_ESD_REL), factor

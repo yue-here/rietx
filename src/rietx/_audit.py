@@ -4123,8 +4123,15 @@ ROWS: tuple[Row, ...] = (
                   "size x10 and /10 on FAP, NAC, cpd-1a and LaB6 under their protocols: every "
                   "value within 2.4e-6 esd of shipped (FAP bit-identical), under the noise "
                   "arms' 4.8e-6; on cpd-1a the esds of the width rows at 0 and of W followed "
-                  "the step (51 shipped, 511 at x10, 4.26 at /10), the case Q22a takes, "
-                  "not an error in a value")),
+                  "the step (51 shipped, 511 at x10, 4.26 at /10), not an error in a value; "
+                  "Q22a's tests hold that the gradient decides an esd, never the floor "
+                  "(tests/test_covariance_scaling.py::"
+                  "test_a_floored_width_with_no_gradient_has_no_esd_and_leaves_w_alone and "
+                  "::test_a_floored_width_with_gradient_keeps_its_marginal_esd: a dead floored "
+                  "column has no esd and leaves W's within 1e-12 at x10 and /10, a live one "
+                  "keeps its marginal esd within 1e-4); a gauss_size column at 0 is live "
+                  "(it adds to the Gaussian variance linearly), so what moved cpd-1a's is "
+                  "open (PR #1577)")),
     Row("rietx.params.vector.FLOOR_SEED_UM2", "constant", tier=1, value=0.001,
         evidence=("numerical setting (B10, ruled 2026-10-19; Q22b, settled 2026-11-17): "
                   "FLOOR_SEEDS' size, the forward-difference typical of a width row bounded at "
@@ -4136,8 +4143,15 @@ ROWS: tuple[Row, ...] = (
                   "size x10 and /10 on FAP, NAC, cpd-1a and LaB6 under their protocols: every "
                   "value within 2.4e-6 esd of shipped (FAP bit-identical), under the noise "
                   "arms' 4.8e-6; on cpd-1a the esds of the width rows at 0 and of W followed "
-                  "the step (51 shipped, 511 at x10, 4.26 at /10), the case Q22a takes, "
-                  "not an error in a value")),
+                  "the step (51 shipped, 511 at x10, 4.26 at /10), not an error in a value; "
+                  "Q22a's tests hold that the gradient decides an esd, never the floor "
+                  "(tests/test_covariance_scaling.py::"
+                  "test_a_floored_width_with_no_gradient_has_no_esd_and_leaves_w_alone and "
+                  "::test_a_floored_width_with_gradient_keeps_its_marginal_esd: a dead floored "
+                  "column has no esd and leaves W's within 1e-12 at x10 and /10, a live one "
+                  "keeps its marginal esd within 1e-4); a gauss_size column at 0 is live "
+                  "(it adds to the Gaussian variance linearly), so what moved cpd-1a's is "
+                  "open (PR #1577)")),
     Row("rietx.params.vector.PARENT_STRAIN_PD_MARGIN", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: the box sum 2|s_j|.|E_j|_2 < lambda_min(C) keeps the child metric "
                   "positive definite (Weyl's inequality, Horn & Johnson, Matrix Analysis, 2nd ed., "
