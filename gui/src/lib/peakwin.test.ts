@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BINS, firstPicks, HALF_WIDTHS, peakWindows, widestFwhm, windowRange } from "./peakwin";
+import { BINS, firstPicks, gridShape, HALF_WIDTHS, peakWindows, widestFwhm, windowRange } from "./peakwin";
 
 /** A fitted payload: Gaussians of FWHM `w` at `centres` with `heights`, on 10 counts of background. */
 function curves(centres: number[], heights: number[], w = 0.1, fit = true): any {
@@ -42,10 +42,49 @@ describe("the single-peak windows (WP-2128)", () => {
     expect(firstPicks(4)).toEqual([0, 2, 3]);
   });
 
+  it("fits columns of 240 px and rows of 190 px, and always one of each (WP-2218)", () => {
+    // the default split at 1440 × 900: two columns of three
+    expect(gridShape(623, 706)).toEqual({ cols: 2, rows: 3 });
+    expect(gridShape(240, 190)).toEqual({ cols: 1, rows: 1 });
+    expect(gridShape(496, 396)).toEqual({ cols: 2, rows: 2 });
+    expect(gridShape(100, 50)).toEqual({ cols: 1, rows: 1 });
+  });
+
+  it("spreads any count of windows across 2θ, each named once (WP-2218)", () => {
+    expect(firstPicks(BINS, 6)).toEqual([1, 3, 5, 6, 8, 10]);
+    expect(firstPicks(7, 6)).toEqual([0, 1, 2, 4, 5, 6]);
+    expect(firstPicks(5, 6)).toEqual([0, 1, 2, 3, 4]);
+    expect(firstPicks(BINS, 1)).toEqual([6]);
+    for (let n = 1; n <= BINS; n++)
+      for (let k = 1; k <= 9; k++) {
+        const p = firstPicks(n, k);
+        expect(p.length).toBe(Math.min(n, k));
+        expect(new Set(p).size).toBe(p.length);
+        expect(p.every((i, j) => i >= 0 && i < n && (j === 0 || i > p[j - 1]))).toBe(true);
+      }
+  });
+
   it("draws a window from zero to a tenth above the last fit, whatever a preview does", () => {
     const xs = [1, 2, 3, 4], obs = [10, 50, 100, 20], fit = [12, 48, 90, null];
     const [lo, hi] = windowRange(xs, obs, fit, 1.5, 3.5);
     expect(lo).toBe(0);
     expect(hi).toBeCloseTo(110, 12);
+  });
+});
+
+describe("peak shape alone (WP-2218)", () => {
+  it("draws the model over its background and frames it from zero", async () => {
+    const { netCurve, shapeRange } = await import("./peakwin");
+    const c = curves([12], [100]);
+    const net = netCurve(c.arrays.y_calc, c.arrays.y_background);
+    expect(net[200]).toBeCloseTo(100, 9);
+    expect(net[0]).toBeCloseTo(0, 9);
+    const [lo, hi] = shapeRange(c.arrays.two_theta, net, 11.5, 12.5);
+    expect(lo).toBe(0);
+    expect(hi).toBeCloseTo(110, 9);
+    // a window with no peak still has a range to draw on
+    expect(shapeRange(c.arrays.two_theta, net, 40, 41)[1]).toBeGreaterThan(0);
+    // no background: the model itself
+    expect(netCurve([1, 2], undefined)).toEqual(Float64Array.from([1, 2]));
   });
 });
