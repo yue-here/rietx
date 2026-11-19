@@ -6471,6 +6471,8 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
+            diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table,
+                                                               mode))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -8860,6 +8862,68 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
                         "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
         ))
     return out
+
+
+def _variable_not_freed_diagnostics(stage_results: list[StageResult],
+                                    table: ParameterTable,
+                                    mode: Mode = "rietveld") -> list[Diagnostic]:
+    """``VARIABLE_NOT_FREED`` — a variable other parameters follow that no
+    stage of the plan freed (WP-2101, ruled by the maintainer 2026-11-19).
+
+    A plan replaces the vary flags (WP-1208), and in a single fit no stage
+    frees a ``vars.`` row unless its ``turn_on`` names it: a stage reaching a
+    tied parameter skips it, since the freedom sits with the variable.  So a
+    tie onto a variable, linear or a formula (WP-2118), under a preset plan
+    ends the fit with the variable at its start and everything following it
+    set from that start, and nothing said so.  The joint fit's equation-level
+    reading of the same fact is ``multi._parametric_not_freed_diagnostics``.
+
+    One warning per fit naming every such variable, with its start and what
+    follows it (``ParameterTable.entry_reach``, through chains and formula
+    blocks): ``where`` the variables, ``value`` how many.  A variable nothing
+    follows is left out, since holding it changes nothing.  A tied variable
+    has no freedom of its own and is left out too: its sources are the ones
+    named.  So is one setting only what ``mode`` force-fixes
+    (:func:`mode_fixed_column`): ``_run_stage`` drops it from every stage, so
+    no ``turn_on`` could free it.  So is one the caller holds
+    (``Refinement.hold``, read off the table through
+    :meth:`ParameterTable.held_by`): the hold says the start is meant, and a
+    variable at ``vary=False`` without one still warns (ruled by the
+    maintainer 2026-11-19, option (a)).  "Freed" is every stage's ``freed``
+    and ``held`` together, as the joint reading counts it.  A report with no
+    action (DESIGN.md Rule 4).
+    """
+    ever = {p for sr in stage_results for p in (*sr.freed, *sr.held)}
+    unfreed = [e for e in table.entries
+               if is_variable_path(e.path) and e.tie is None and e.path not in ever
+               and table.held_by(e.path) != "caller"]
+    if not unfreed:
+        return []
+    reach = table.entry_reach()
+    idle = []
+    for e in unfreed:
+        follow = [q for q in reach.get(e.path, ()) if q != e.path]
+        if follow and not mode_fixed_column(follow, mode):
+            idle.append((e, follow))
+    if not idle:
+        return []
+
+    def one(e, follow: list[str]) -> str:
+        shown = ", ".join(follow[:5])
+        more = f" and {len(follow) - 5} more" if len(follow) > 5 else ""
+        return f"{e.path} (start {e.value:.6g}; sets {shown}{more})"
+
+    many = len(idle) > 1
+    return [Diagnostic(
+        level="warning", code="VARIABLE_NOT_FREED",
+        where=[e.path for e, _ in idle], value=float(len(idle)),
+        message=(f"No stage freed {f'{len(idle)} variables' if many else 'a variable'} "
+                 f"that other parameters follow: "
+                 f"{'; '.join(one(e, f) for e, f in idle)}. {'Each' if many else 'It'} "
+                 "kept its starting value, so the parameters that follow it are set "
+                 "from that start and the data did not measure them."),
+        suggestion=("A plan frees a variable only where a stage's turn_on names it, "
+                    "such as a stage turning on vars.*."))]
 
 
 #: an atom's coordinate, which a site-symmetry table drives through

@@ -364,6 +364,14 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "joint-only (WP-1325): one equation sets its target across its "
                 "subset, so the patterns that cannot see it are told once per "
                 "declaration, naming each"),
+    "_parametric_not_freed_diagnostics": (
+        (FIT,), "joint-only (WP-2101): the plan's stages run once for every "
+                "pattern, so a coefficient no stage freed is told once per "
+                "declaration"),
+    "_variable_not_freed_diagnostics": (
+        (ABSENT,), "a single fit's reading of VARIABLE_NOT_FREED (WP-2101): a "
+                   "joint fit's variables are its equations' coefficients, which "
+                   "_parametric_not_freed_diagnostics names per equation"),
     "_fixed_literal_diagnostics": (
         (FIT,), "a plan read (#803, WP-1341), through _joint_fixed_literals: "
                 "each histogram's table is asked under the joint matching rule, "
@@ -2699,8 +2707,11 @@ class MultiHistogramRefinement:
         parametric_form, form_joint = _parametric_form_tests(models, mt, at_bounds,
                                                              weights, unseen)
         coefficients = self._parametric_rows(esd_hist0, per_esds)
-        diagnostics = diagnostics + _parametric_form_diagnostics(mt, parametric_form,
-                                                                 form_joint)
+        diagnostics = diagnostics + _parametric_form_diagnostics(
+            mt, parametric_form, form_joint, stage_results)
+        # each equation a coefficient of which no stage freed (WP-2101)
+        diagnostics = diagnostics + _parametric_not_freed_diagnostics(
+            mt, coefficients, stage_results)
         if stage_results:
             diagnostics = diagnostics + _constraint_diagnostics(
                 stage_results[-1].name, outcome)
@@ -3625,8 +3636,68 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
                       values=values, usable=usable, scope=mtable._canonical)
 
 
+def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
+                                      ) -> list[Diagnostic]:
+    """``VARIABLE_NOT_FREED`` — an equation with a coefficient no stage freed
+    (WP-2101, ruled by the maintainer 2026-11-19).
+
+    A coefficient refines only where a stage frees it: a polynomial's with its
+    target, a formula's variable with its target unless it was declared
+    ``vary=False``, either by a glob naming its ``vars.`` row
+    (``MultiParameterTable.set_vary``).  So a plan that never reaches the
+    target, or a variable left at ``vary=False``, ends the fit with the
+    coefficient at its start.  Before this the only trace was
+    ``ParametricCoefficient.vary`` False and no row in
+    ``RefinementResult.parameters``, and a held formula variable surfaced as a
+    ``PARAMETRIC_FORM_REJECTED`` blaming the formula.  One warning per
+    equation with any such coefficient: ``where`` names them, ``value``
+    counts them.  "Freed" is every stage's ``freed`` and ``held`` together, so
+    a coefficient the support hold took back is ``PARAMETRIC_TARGET_UNSEEN``'s
+    and is not named twice.  A report of the fact, with no action taken
+    (DESIGN.md Rule 4).  The single fit leaves out a variable the caller
+    holds (ruled 2026-11-19, option (a)); a joint fit has no hold verb yet
+    (WP-2103), so nothing here can be held and every such coefficient warns.
+    """
+    if not coefficients:
+        return []
+    ever = {p for sr in stage_results for p in (*sr.freed, *sr.held)}
+    out: list[Diagnostic] = []
+    for r in (*mtable.parametric, *mtable.expressions):
+        rows = [c for c in coefficients if c.equation == r.name]
+        idle = [c for c in rows if c.path not in ever]
+        if not idle:
+            continue
+        names = ", ".join(c.path for c in idle[:-1])
+        names = f"{names} and {idle[-1].path}" if names else idle[-1].path
+        starts = ", ".join(f"{c.value:.6g}" for c in idle)
+        if len(idle) == len(rows):
+            what = (f"no stage freed its coefficient{'s' if len(idle) > 1 else ''} "
+                    f"{names}. {'They' if len(idle) > 1 else 'It'} kept the starting "
+                    f"value{'s' if len(idle) > 1 else ''} ({starts}), so the "
+                    "equation is the one declared and the data did not measure it.")
+        else:
+            what = (f"no stage freed {names}, {len(idle)} of its {len(rows)} "
+                    f"coefficients. {'They' if len(idle) > 1 else 'It'} kept the "
+                    f"starting value{'s' if len(idle) > 1 else ''} ({starts}), and the "
+                    "others were fitted with "
+                    f"{'them' if len(idle) > 1 else 'it'} held there.")
+        if r.equation.basis == "expression":
+            how = (f"A stage whose turn_on names {r.target} frees the formula's "
+                   "variables declared vary=True. One declared vary=False is freed "
+                   f"only by a stage naming its path, such as {idle[0].path}.")
+        else:
+            how = f"A stage whose turn_on names {r.target} frees the coefficients with it."
+        out.append(Diagnostic(
+            level="warning", code="VARIABLE_NOT_FREED",
+            where=[c.path for c in idle], value=float(len(idle)),
+            message=f"Parametric equation {r.name!r} sets {r.target}, and {what}",
+            suggestion=how))
+    return out
+
+
 def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
-                                 joint: ParametricFormReading | None = None
+                                 joint: ParametricFormReading | None = None,
+                                 stage_results: list[StageResult] | None = None
                                  ) -> list[Diagnostic]:
     """``PARAMETRIC_FORM_REJECTED`` — a declaration whose data refuses its
     form (WP-1325): one warning per rejected
@@ -3646,10 +3717,24 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
     paths = {r.name: list(r.paths) for r in mtable.parametric}
     paths.update({r.name: mtable.variable_rows(r) for r in mtable.expressions})
     written = {r.name for r in mtable.expressions}
+    # what any stage freed or the support hold took, ``VARIABLE_NOT_FREED``'s
+    # reading; with no stages given, no coefficient is named as held
+    ever = (None if stage_results is None else
+            {p for sr in stage_results for p in (*sr.freed, *sr.held)})
     out: list[Diagnostic] = []
     for t in tests or []:
         if not t.rejected:
             continue
+        # a coefficient no stage freed makes a right formula read as wrong:
+        # name it before the rewrite (WP-2101, ruled 2026-11-19)
+        held = [] if ever is None else [p for p in paths[t.equation] if p not in ever]
+        check = ""
+        if held:
+            them = len(held) > 1
+            check = (f"No stage freed {', '.join(held)}, so {'they' if them else 'it'} "
+                     f"kept {'their' if them else 'its'} starting "
+                     f"value{'s' if them else ''}. Free {'them' if them else 'it'} and "
+                     "refit before changing the equation. ")
         r = t.others_freed if t.others_freed is not None else t.tied
         # the verdict is the freed reading wherever there is one; say what the
         # tied one read when it passed, since a reader comparing refits will
@@ -3678,7 +3763,8 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
                      f"the target in each would remove {r.statistic:.1f} times "
                      f"χ²_red of χ², past the {100 * FORM_TEST_LEVEL:g} % point "
                      f"{r.cut:.1f} of χ² for {r.dof} directions.{also}"),
-            suggestion=(("Revise the expression and refit, or narrow the subset "
+            suggestion=(check
+                        + ("Revise the expression and refit, or narrow the subset "
                          "to where it holds." if t.equation in written else
                          "Add the next term to the basis and refit, or narrow the "
                          "subset to where the form holds.")

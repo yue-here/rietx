@@ -27,7 +27,7 @@ The Lorentzian column is the area a pure Lorentzian loses to the default cut.
 | Program | Default cut | Lorentzian area lost | When the window is set |
 |---|---|---|---|
 | rietx | `WINDOW_AREA_TOL`, 2 % of each peak's own area | 2 % | once per stage, at the stage's start (checked (source)) |
-| TOPAS | `ymin_on_ymax` 0.001 of the strongest line's height | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
+| TOPAS | `ymin_on_ymax` 0.001 of each peak's own height (a property of the emission profile, TR v5 §5.3.2 p.48; corrected 2026-11-19 from "the strongest line's") | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
 | MAUD | ±30 HWHM (±15 FWHM) | 2.1 % | every evaluation, finite-difference columns included (checked (source)) |
 | RIETAN-FP | `PC` 0.002 of each peak's own height, in three of four shipped examples; no default | 2.8 % | every evaluation (ran) |
 | FullProf | `Wdt` × FWHM each side; no default, floored at 3; examples 3-15, PbSO₄ 6 | 5.3 % at 6 (10.5 % at 3, 2.1 % at 15) | once per run, at the starting widths (`Ias = 0`, ran); `Ias = 1` lags one cycle |
@@ -84,6 +84,33 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 | MAUD | `cutoff` × 0.1°, 3° at the default (checked (source)) |
 | EasyDiffraction | 4° in 2θ each side of the included points (checked (source)) |
 | BGMN | about the Kα₁-Kα₂ split, 0.05° at 30° to 0.6° at 150° (ran) |
+
+The two cuts agree only for a pure Lorentzian. For a mixed peak, the height cut keeps more
+tail than rietx's area cut. At 0.001 of the peak's height the window is ±1.6 FWHM at η = 0,
+±4.2 at η = 0.1 and ±11.2 at η = 0.6. rietx's 2 % of the area gives ±1.0, ±1.6 and ±9.5,
+before its 0.3° movement slack (`WINDOW_MIN_DEG`). Computed 2026-11-19 for WP-2228.
+
+### A reflection centred past the range end
+
+Surveyed 2026-11-19 for WP-2228, one agent, the GSAS-II lines from its source. The case: the
+range ends inside the tail of a strong reflection centred just outside it. In a Le Bail or
+Pawley fit, a neighbour's free intensity can absorb an unmodelled tail and drag the cell.
+
+| Program | Its in-range tail | Le Bail or Pawley handling | Warning or guidance |
+|---|---|---|---|
+| rietx | the reflection's own window, which can hold no channel (WP-2228) | Pawley ridges an off-data intensity toward zero (`PAWLEY_OFF_DATA_RIDGED`, WP-1459); Le Bail nothing | none |
+| GSAS-II 5.8.4 | not modelled: the reflection is not generated (`GSASIIstrIO.py:3177`) | the Pawley upper limit is clipped to the Pawley dmin (`GSASIIstrIO.py:3019-3025`) | the Pawley help page advises against reflections beyond the limits (checked (source), checked (manual)) |
+| TOPAS (TR v5) | an ordinary peak, generated within `extra_X_right` | a free intensity like any other (inferred, not run); p.111 warns that low-d-edge Pawley intensities can be badly wrong | none found (checked (manual)) |
+| FullProf | an ordinary peak, generated within 3 × `Wdt` × FWHM | none in the fit; `Dum = 3` leaves reflections near a limit out of R_Bragg and the hkl files | the manual warns a small `Wdt` leaves "discontinuities in the edges" (checked (manual)) |
+| RIETAN-FP | not modelled: the reflection is dropped with its tails | none in the fit; the `.lst` marks `H` a reflection whose profile passes 2θmax, left out of R_B and R_F (§17.8.10) | §11.1 advises widening Le Bail profile ranges step by step (checked (manual)) |
+| MAUD, BGMN, EasyDiffraction | not checked | not checked | not checked |
+
+What practice adds up to: no program windows or restrains such a reflection specially. Either
+it is generated and gets a free intensity on a sliver of data (TOPAS, FullProf, rietx), or it
+is left out and its tail is unmodelled (GSAS-II, RIETAN-FP). FullProf and RIETAN-FP flag edge
+reflections in their output. The literature read (McCusker et al. 1999 §5 and §12.4; Hill
+1992; Le Bail 2005; Toby 2006) treats each peak's own cut-off and says nothing about a peak
+centred outside the data. Pawley (1981) was not read.
 
 ## Staging and what a stage holds
 

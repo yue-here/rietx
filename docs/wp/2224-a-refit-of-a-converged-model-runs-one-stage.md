@@ -1,9 +1,8 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; Yue ruled on the four questions and approved the reworded text
+Milestone: unscheduled · Status: ✅ 2026-11-19 — merged as #1711; the GUI's view of how a run went is WP-2227
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
-Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
 
 ## Goal
 
@@ -222,6 +221,15 @@ evaluations.
   neighbour pattern in a wrong basin), WP-2222 (the closing stage off).
 
 ## Handover log
+
+- **2026-11-19 (closed)** — PR #1711 merged as `8068f9644`, with main's WP-2222 merged in first.
+  CI on the merged tree failed `examples/guides/moment.py` twice on Linux py3.14 (its blind
+  magnetic solve stopped after one round), while macOS gave bit-identical answers on both
+  trees. The fix that turned CI green: a first fit builds no parameter table before it
+  solves; the free set is asked only of a re-fit candidate and of an accepted answer. Why the
+  early table build moved a Linux-only knife edge is not established. Re-measured under
+  WP-2222's default: all eight standards re-fit in one stage within 0.045 esd of the first
+  answer, at 0.15-0.27 of a staged re-fit's evaluations.
 
 - **2026-11-19 (rulings)** — Yue answered the four questions. A re-fit that frees a parameter
   the converged fit held now runs in stages, because that parameter starts cold; on brucite the
