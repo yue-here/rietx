@@ -109,7 +109,7 @@ discarded-direction test names gets no esd.
 - [ ] The same in a Pawley fit: run the test on the matrix augmented by the intensity block,
   so the guard stops skipping `n_aux` solves. Measure the fast and slow selections' Pawley
   hits first and report how many are overlap groups already flagged.
-- [ ] CIF: a refined value with no esd writes its uncertainty as unknown, never as a bare
+- [x] CIF: a refined value with no esd writes its uncertainty as unknown, never as a bare
   value. Check the CIF core dictionary for the form (`?` beside the value is not legal inside
   one number; the likely answer is the value with a separate `_refine` note, or `?` for the
   su item where one exists). Fetch the dictionary per memory note `cif-dictionaries-via-gh`.

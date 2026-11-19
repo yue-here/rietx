@@ -136,6 +136,38 @@ def test_a_combination_the_data_cannot_see_has_no_esd(mode):
     assert "no esd" in d.message
 
 
+def test_a_refined_value_with_no_esd_writes_an_unknown_su(tmp_path):
+    """The CIF states the value with ``?`` in its su item, never a bare value
+    a reader would take as fixed, and the file reads back to the same value."""
+    import gemmi
+
+    import rietx as rx
+
+    structure, ins = perturbed_models()
+    ref = Refinement(structure, ins)
+    for name in ("ba", "bb", "bc"):
+        ref.add_variable(name, 0.15, vary=True)
+    ref.tie("phases.0.atoms.0.biso", {"vars.ba": 1.0, "vars.bb": 1.0, "vars.bc": 1.0})
+    result = ref.fit(synthesize(), plan=RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "vars.*"])]))
+    rows = {p.path: p for p in result.parameters}
+    assert rows["phases.0.atoms.0.biso"].stderr is None
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    ref.write_cif(tmp_path / "r.cif")
+    block = gemmi.cif.read(str(tmp_path / "r.cif"))[0]
+    labels = list(block.find_values("_atom_site_label"))
+    su = dict(zip(labels, block.find_values("_atom_site_U_iso_or_equiv_su"), strict=True))
+    assert su[structure.phases[0].atoms[0].label] == "?"
+    # the other site's B was not refined: inapplicable, not unknown
+    assert su[structure.phases[0].atoms[1].label] == "."
+    # nothing else in the file lost its su
+    assert block.find_value("_cell_length_a_su") is None
+    back = rx.Structure.from_cif(str(tmp_path / "r.cif")).phases[0].atoms[0]
+    assert back.biso.value == pytest.approx(ref.structure.phases[0].atoms[0].biso.value,
+                                            rel=1e-12)
+
+
 def test_a_joint_fit_gives_an_exact_pair_no_esd():
     """Two identical phases: each pattern's two scales are one quantity."""
     structure, ins = perturbed_models()
