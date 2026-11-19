@@ -710,7 +710,8 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
 #: document loads and refines as before; an older build refuses a phase
 #: carrying it.
-#: Also in 0.61 (WP-2080): ``SeriesEntry.warm_gof_over_seed``, the first warm
+#: 0.61 → 0.62 (WP-2080), the first change after 1.12.0 shipped 0.61:
+#: ``SeriesEntry.warm_gof_over_seed``, the first warm
 #: attempt's GoF over its seed pattern's, a record that triggers nothing.
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule; an older build
 #: refuses an entry carrying the key.
@@ -721,7 +722,7 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
