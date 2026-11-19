@@ -47,16 +47,14 @@ The seams:
 [WP-2081](2081-how-a-series-holds-what-the-setup-fixes.md) is a design discussion about
 the chain, and its answer on what "held" means should govern here. Read it first.
 
-### Inherited
-
-- **From WP-2101 (2026-11-19): a joint fit's hold must silence `VARIABLE_NOT_FREED`.**
-  The code names each parametric equation whose coefficients no plan stage freed. In a
-  single fit, a coefficient the caller holds is left out, read off the table with
-  `ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). A joint fit has
-  no hold verb yet, so `multi._parametric_not_freed_diagnostics` names every unfreed
-  coefficient, and its docstring says so. When this WP adds `hold` to a joint fit, that
-  builder leaves out a held coefficient the same way, with a test that fails when the
-  filter is removed.
+**Owed to WP-2101 (2026-11-19): a joint fit's hold must silence `VARIABLE_NOT_FREED`.** This PR added the hold verb, so the condition below now applies and is not met here.
+The code names each parametric equation whose coefficients no plan stage freed. In a
+single fit, a coefficient the caller holds is left out, read off the table with
+`ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). A joint fit has
+no hold verb yet, so `multi._parametric_not_freed_diagnostics` names every unfreed
+coefficient, and its docstring says so. When this WP adds `hold` to a joint fit, that
+builder leaves out a held coefficient the same way, with a test that fails when the
+filter is removed.
 
 ## Non-goals
 
