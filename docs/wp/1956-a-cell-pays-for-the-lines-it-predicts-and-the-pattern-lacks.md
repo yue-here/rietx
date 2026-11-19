@@ -152,6 +152,14 @@ absences; Si, corundum and magnetite keep their correct cells.
 
 ## Handover log
 
+- **2026-11-17** — Ruled by Yue 2026-11-17: issue #1267 closes with a pointer to
+  `preset="full"`. Under `quick` a validation verdict can vary with machine load, because
+  its ceiling is wall-clock time. `full` has no whole-run ceiling. The ruling also asks
+  for one manual sentence: `quick` results vary with machine load. Recorded from Part B item 45 of the
+  2026-11-17 decisions batch (Ghostshift runner, no code changed). *Not done here.* The
+  issue is still open, and the manual sentence is not written: an open PR (#1472) edits
+  `docs/docs/reference/indexing.md`, the page that documents `preset`.
+
 - **2026-11-08** — closed (ghostshift runner, PR #1469; no code changed). The repair this WP
   asked for is on `main`: a wrong indexing cell can no longer buy a count of zero missing lines
   by refitting its background, because the count is now read at the peak list's widths against
