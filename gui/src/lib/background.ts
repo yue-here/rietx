@@ -36,6 +36,9 @@ export interface Term {
 
 export interface BackgroundHeader {
   head: string | null;
+  /** the holds this answer's band was drawn with (`?hold=`), [] at rest:
+   *  today's tab sends none, the rebuilt graph its pending holds */
+  pending_holds?: string[];
   kind: string;
   lambda_smooth?: number;
   lambda_units?: string;
