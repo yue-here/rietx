@@ -156,7 +156,7 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
    converged fit of its pattern is a re-fit too. With `history=False` the fact is held on the
    `Refinement`. Superseded in part 2026-11-19: the GUI's Refine passes `refit="stages"`
    until it can show which way a run went. Yue ruled that it must ("there should be visual
-   feedback in the gui"), and WP-2226 carries it to the rebuilt Plan tab.
+   feedback in the gui"), and WP-2227 carries it to the rebuilt Plan tab.
 
 ## Non-goals
 
@@ -229,7 +229,7 @@ evaluations.
   on the staged answer exactly (68 evaluations either way). A model swap through `edit` stays
   staged on the same ground. Yue found the display text unnatural, so it is reworded, and
   `summary()` now states for every re-fit whether it ran in one stage or in stages, and why.
-  The GUI must show the same thing; that is WP-2226, filed for the rebuilt Plan tab, and today's
+  The GUI must show the same thing; that is WP-2227, filed for the rebuilt Plan tab, and today's
   GUI stays staged meanwhile.
 
   *Rulings, verbatim.* (1) "yes, default to staged if a new parameter is released, it is a
@@ -252,7 +252,7 @@ evaluations.
   re-fits; a narrower plan stays one stage; `hold` keeps a re-fit and `unhold` runs staged.
 
   *Next.* Yue approved the reworded lines ("Text is fine", 2026-11-19), so the PR merges once
-  CI is green. Then WP-2226: Yue's three design questions there come before any building.
+  CI is green. Then WP-2227: Yue's three design questions there come before any building.
 
 - **2026-11-19 (implementation)** — A second `fit` on a model that its last fit of the same
   pattern left converged now runs one stage, `warm_refit`, freeing at once everything the plan

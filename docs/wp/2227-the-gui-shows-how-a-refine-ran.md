@@ -1,4 +1,4 @@
-# WP-2226 — The GUI shows how a refine ran: in one stage or in stages
+# WP-2227 — The GUI shows how a refine ran: in one stage or in stages
 
 Milestone: gui-overhaul · Status: ⬜
 Depends on: 2224 (the re-fit rule)
