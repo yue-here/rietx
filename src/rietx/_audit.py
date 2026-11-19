@@ -725,11 +725,14 @@ ROWS: tuple[Row, ...] = (
         responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
                   "fit it names on to convergence and compare again"),
         evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
-                  "status other than 'converged', or the fuller fit's chi2 sits above the "
+                  "status other than 'converged', or the fuller fit's minimised cost "
+                  "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
                   "restricted one's by more than optimize.lm.FTOL relative (a model that "
-                  "contains another can reproduce it, so at both optima chi2_full <= "
-                  "chi2_restricted; report.layer2._chi2_ordered, on distortion.py's "
-                  "restart precedent); flags and refuses nothing, since a budget stop can "
+                  "contains another can reproduce it, so at both optima S_full <= "
+                  "S_restricted; the data chi2 alone carries no such bound; "
+                  "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
+                  "the FTOL margin is inherited unvaried from the solver's stopping test, "
+                  "tier 3 by FTOL's own row, and waits on the maintainer (WP-2220); flags and refuses nothing, since a budget stop can "
                   "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
                   "converged chi2); raised by compare_freed, predict_then_verify's "
                   "comparison and rigid_body_misfit (WP-2220)")),

@@ -219,7 +219,7 @@ def test_a_budget_stop_above_the_restricted_optimum_is_flagged(biso_pair):
     [d] = c.diagnostics
     assert d.code == "COMPARISON_UNCONVERGED" and d.level == "warning"
     assert d.value == pytest.approx(c.chi2_full - c.chi2_restricted)
-    assert "'max_iter'" in d.message and "above" in d.message
+    assert "'max_iter'" in d.message and "higher cost" in d.message
     assert d.where == [BISO]
     # flagged, never refused: the numbers are still there to read
     assert c.freed[0].t_ratio is not None
@@ -250,6 +250,8 @@ def test_a_verdict_short_fits_could_flip_is_not_judged():
     # a pass with the fuller fit short stands: more iterations only gain more
     assert _judged(True, "converged", "max_iter", False) == (True, None)
     assert _judged(False, "converged", "max_iter", True)[0] is None
+    # a diverged trial is a failure, not a budget stop: its fail stands
+    assert _judged(False, "converged", "diverged", True) == (False, None)
     assert _judged(False, "converged", "converged", False)[0] is None
     assert _judged(True, "max_iter", "converged", True)[0] is None
     assert _judged(False, "max_iter", "converged", True) == (False, None)

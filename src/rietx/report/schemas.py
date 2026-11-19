@@ -288,7 +288,7 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   consumer may count, on 1.12 → 1.13's.
 # 1.15 → 1.16 (WP-2220, issues #1685 and #1686): ``FreedComparison`` says
 #   which fits it rests on and which freed columns carried information.  It
-#   gains both fits' ``status``, ``chi2_ordered`` (the fuller χ² at or below
+#   gains both fits' ``status``, ``chi2_ordered`` (the fuller cost at or below
 #   the restricted one within ``optimize.lm.FTOL``), ``n_identified`` and a
 #   ``diagnostics`` list carrying the new ``COMPARISON_UNCONVERGED``;
 #   ``FreedParameter`` gains ``at_bound`` and ``t_reason``.  A verdict that
@@ -1317,7 +1317,9 @@ class FreedComparison(Base):
     **Which fits it rests on** (WP-2220, issue #1685).  ΔBIC is a difference
     of two optima, so it means something only where both fits reached
     theirs.  ``status_restricted`` and ``status_full`` are the two results'
-    own ``status``, and ``chi2_ordered`` says the fuller χ² sits at or below
+    own ``status``, and ``chi2_ordered`` says the fuller fit's cost
+    (the last stage's ``StageResult.cost_final``, what the solver minimised: the data χ²
+    plus any restraint and penalty rows) sits at or below
     the restricted one within :data:`~rietx.optimize.lm.FTOL`.  A nested model
     at its optimum cannot fit worse than the model it contains, so a
     ``False`` there proves the fuller fit short of its minimum, whatever its
@@ -1536,8 +1538,8 @@ class VerificationOutcome(Base):
     stop being nested.
 
     **``accepted`` is ``None`` where the trial was not judged** (WP-2220,
-    issue #1685).  A trial that stopped short of its optimum (``status`` not
-    ``"converged"``) and gained too little has not shown the action fails,
+    issue #1685).  A trial that stopped on its budget (``status``
+    ``"max_iter"``) and gained too little has not shown the action fails,
     since more iterations could only lower its χ².  The same holds the other
     way round: a gain over a caller's fit that was itself short may be that
     fit continuing.  ``reason`` names which.  Read ``None`` as "run it

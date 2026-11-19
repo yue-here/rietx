@@ -110,7 +110,8 @@ def test_a_silence_from_a_short_refit_is_not_judged():
     ref, pattern = _fitted(0.0)
     out = ref.check_rigid_bodies(pattern, max_iter=1)
     (row,) = out.rows
-    assert "max_iter" in (row.status_body, row.status_released)
+    # a silence stays open only where the released arm stopped short
+    assert row.status_released == "max_iter" or not row.chi2_ordered
     assert row.fires is None
     (diag,) = out.diagnostics
     assert diag.code == "COMPARISON_UNCONVERGED"

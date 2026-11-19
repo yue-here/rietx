@@ -92,7 +92,8 @@ class BodyMisfitRow:
     """One body's comparison; ``deviations`` are (label, template, released, Δ/σ).
 
     ``status_body`` and ``status_released`` are the two arms' own ``status``,
-    and ``chi2_ordered`` says the released arm's χ² sits at or below the
+    and ``chi2_ordered`` says the released arm's cost (data plus restraint
+    rows, what the solver minimised) sits at or below the
     body arm's (the released arm contains every pose the body can take).
     ``fires`` is ``None`` where an arm short of its optimum could flip the
     test, "not judged" rather than a pass or a fail (WP-2220): a short
@@ -112,12 +113,14 @@ class BodyMisfitRow:
     p_value: float
     delta_bic: float
     fires: bool | None
+    # no defaults: a defaulted "converged" would read as an answer about a
+    # refit no code had looked at (WP-1076's rule)
+    status_body: str
+    status_released: str
+    chi2_ordered: bool
     deviations: list[tuple[str, float, float, float]] = field(default_factory=list)
     #: declarations of the caller's that could not follow into the released arm
     dropped: list[str] = field(default_factory=list)
-    status_body: str = "converged"
-    status_released: str = "converged"
-    chi2_ordered: bool = True
 
 
 @dataclass
@@ -458,7 +461,7 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
                       and dbic > bic_threshold)
             # the test is between two optima: an arm short of its own can flip
             # it, in the direction its bias runs (WP-2220)
-            ordered = _chi2_ordered(chi_a, chi_b)
+            ordered = _chi2_ordered(res_a, res_b)
             fires, _ = _judged(passes, res_a.status, res_b.status, ordered,
                                names=("rigid-body", "released"))
             members = [index[lab] for lab in body.atoms]

@@ -381,7 +381,7 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
     # ΔBIC at raw N.  delta_bic wants the sums.
     chi2_r, chi2_f = _chi2_absolute(rs), _chi2_absolute(fs)
     n_eff = effective_sample_size(rs.n_points, rs.esd_inflation)
-    ordered = _chi2_ordered(chi2_r, chi2_f)
+    ordered = _chi2_ordered(restricted, fr)
     short = _comparison_unconverged(
         restricted.status, fr.status, chi2_r, chi2_f, ordered,
         where=[p.path for p in added])
@@ -395,22 +395,32 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
         status_restricted=restricted.status, status_full=fr.status,
         chi2_ordered=ordered,
         n_identified=sum(1 for q in freed
-                         if q.esd is not None and q.at_bound is not True),
+                         if q.esd and q.at_bound is not True),
         diagnostics=[] if short is None else [short])
 
 
-def _chi2_ordered(chi2_restricted: float, chi2_full: float) -> bool:
-    """Whether a fuller nested fit's χ² sits at or below the restricted one's.
+def _chi2_ordered(restricted: RefinementResult, full: RefinementResult) -> bool:
+    """Whether a fuller nested fit's cost sits at or below the restricted one's.
 
     A model that contains another can always reproduce it, so at both optima
-    χ²_full ≤ χ²_restricted.  The tolerance is the solver's own relative
-    stopping scale, :data:`~rietx.optimize.lm.FTOL`, on the precedent of
+    S_full ≤ S_restricted.  S is what the solver minimised,
+    the last stage's ``StageResult.cost_final``: the data χ² **plus** any restraint and
+    penalty rows.  The data χ² alone carries no such guarantee, since a fuller
+    model may trade data misfit against a restraint (generality review,
+    WP-2220).  The tolerance is the solver's own relative stopping scale,
+    :data:`~rietx.optimize.lm.FTOL`, on the precedent of
     :func:`~rietx.Refinement.distortion_block_tests`, which restarts the full
     fit when a restricted one lands below it by more than that.
     """
     from ..optimize.lm import FTOL
+    from ..optimize.statistics import _chi2_absolute
 
-    return chi2_full <= chi2_restricted * (1.0 + FTOL)
+    if restricted.stages and full.stages:
+        return (full.stages[-1].cost_final
+                <= restricted.stages[-1].cost_final * (1.0 + FTOL))
+    # a hand-built result records no stage: the data sums are all there is
+    return (_chi2_absolute(full.statistics)
+            <= _chi2_absolute(restricted.statistics) * (1.0 + FTOL))
 
 
 def _comparison_unconverged(status_restricted: str, status_full: str,
@@ -432,16 +442,16 @@ def _comparison_unconverged(status_restricted: str, status_full: str,
              if status != "converged"]
     if not ordered:
         parts.append(
-            f"the {names[1]} fit's χ² is {chi2_full - chi2_restricted:.4g} above "
-            f"the {names[0]} fit's ({chi2_full:.6g} against {chi2_restricted:.6g}), "
-            "and a model that contains another cannot fit worse at its optimum")
+            f"the {names[1]} fit ended at a higher cost than the {names[0]} fit "
+            f"(data χ² {chi2_full:.6g} against {chi2_restricted:.6g}), and a model "
+            "that contains another cannot fit worse at its optimum")
     if not parts:
         return None
     return Diagnostic(
         level="warning", code="COMPARISON_UNCONVERGED",
         message=("This comparison rests on a fit short of its optimum: "
-                 + "; ".join(parts) + ". Its ΔBIC and t-ratios can then "
-                 "have either sign."),
+                 + "; ".join(parts) + ". Its ΔBIC and t-ratios then measure "
+                 "where the fits stopped, not two optima."),
         where=list(where),
         suggestion=("Run the short fit on to convergence, with more iterations "
                     "or from the other fit's values, and compare again before "
@@ -1272,12 +1282,7 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
         comparison = _freed_comparison(restricted, held, trial)
     except ValueError:      # nothing newly freed, or a stage hold moved
         comparison = None
-    # the unreduced sums, as the comparison orders them: the reduced χ²
-    # carries each fit's own N − P
-    from ..optimize.statistics import _chi2_absolute
-
-    ordered = _chi2_ordered(_chi2_absolute(restricted.statistics),
-                           _chi2_absolute(result.statistics))
+    ordered = _chi2_ordered(restricted, result)
     accepted, short = _judged(passes, restricted.status, result.status, ordered,
                              names=("caller's", "trial"))
     verdict = ("accepted" if accepted else "rolled back" if accepted is False
@@ -1300,9 +1305,12 @@ def _judged(passes: bool, status_restricted: str, status_full: str,
     one) understates the gain, so a pass stands and a fail is not judged.  A
     restricted fit short of its optimum overstates it, so a fail stands and a
     pass is not judged.  ``why`` names the short fit where the verdict is
-    ``None``.
+    ``None``.  A fuller fit that ``"diverged"`` is a failed trial, not a
+    budget stop: the solver handed back its start, and more iterations would
+    not continue it, so its fail stands.
     """
-    full_short = status_full != "converged" or not ordered
+    full_short = status_full == "max_iter" or (status_full == "converged"
+                                               and not ordered)
     if passes and status_restricted != "converged":
         return None, (f"the {names[0]} fit stopped with status "
                       f"{status_restricted!r}, so the gain may be it continuing")

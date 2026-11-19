@@ -111,7 +111,7 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedComparison.delta_bic` | ΔBIC charged at `n_effective` | positive favours the fuller model |
 | `FreedComparison.delta_bic_raw_n` | the same at the channel count | an upper bound on the evidence, kept so the gap is visible |
 | `FreedComparison.status_restricted`, `FreedComparison.status_full` | each fit's own `status` | a fit not `converged` may not sit at its optimum |
-| `FreedComparison.chi2_ordered` | whether `chi2_full` is at or below `chi2_restricted`, within the solver's relative tolerance `rietx.optimize.lm.FTOL` | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
+| `FreedComparison.chi2_ordered` | whether the fuller fit's last `StageResult.cost_final`, the data χ² plus any restraint and penalty rows it minimised, is at or below the restricted fit's, within the solver's relative tolerance `rietx.optimize.lm.FTOL` | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
 | `FreedComparison.n_identified` | the freed parameters with an esd and off their bounds | fewer than `n_added` means some charged columns carried no information; `delta_bic` still charges `n_added` |
 | `FreedComparison.diagnostics` | [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) when either status is not `converged` or the ordering fails | read it before quoting `delta_bic` |
 
@@ -149,7 +149,8 @@ It accepts the action when the reduced χ² falls by more than `min_improvement`
 | `VerificationOutcome.comparison` | the trial's `FreedComparison`; `None` when no trial fit ran, when the action freed nothing new, or when a hold in the stage broke the nesting |
 
 An action with no parameter paths, and a trial whose fit fails, come back rejected with the reason.
-A trial that stopped short of its optimum and fell short of the rule comes back with `accepted` `None`, since more iterations could only lower its χ².
+A trial that stopped on its iteration budget and fell short of the rule comes back with `accepted` `None`, since more iterations could only lower its χ².
+A trial that diverged comes back rejected.
 A gain over your own fit that was itself short comes back `None` too, since the gain may be that fit continuing.
 The reason then says which fit was short.
 On a synthetic LaB₆ fit with the cell 0.0005 Å off, verifying `refine_cell` predicted 16.16 and observed 16.31, with the reason `χ² 16.93 → 0.6239 (+96.31%); accepted`.
@@ -253,7 +254,7 @@ It returns a `rietx.report.body_misfit.BodyMisfitResult`, whose `rows` hold one 
 | `BodyMisfitRow.f_statistic`, `BodyMisfitRow.p_value` | Hamilton's test |
 | `BodyMisfitRow.delta_bic` | ΔBIC, positive favouring the released atoms |
 | `BodyMisfitRow.fires` | whether both tests prefer the released atoms; `None` where a refit short of its optimum could flip the answer |
-| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's χ² is at or below the body refit's |
+| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's cost, restraint rows included, is at or below the body refit's |
 | `BodyMisfitRow.deviations` | (label, template value, released value, Δ/σ) for each template bond and angle, largest first |
 | `BodyMisfitRow.dropped` | your ties and holds that could not follow into the released refit |
 
