@@ -1,8 +1,7 @@
 # WP-2223 — A clicked value opens on its full stored value, and an unchanged one is no edit
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
+Milestone: gui-overhaul · Status: ✅ 2026-11-19 — both editors open on the full value, PR #1709
 Depends on: 2218 (the Interactive tab and the Parameters panel at `/next`)
-Priority: P2 2026-11-19 — Enter on an unchanged slider value moves the value by its 13th digit and records an edit nobody made
 
 ## Goal
 
@@ -67,6 +66,56 @@ npm --prefix gui test && npm --prefix gui run check
 ```
 
 ## Handover log
+
+- **2026-11-19** — Built and closed, PR #1709.
+
+  A value clicked in the GUI now opens on what is stored, to the last digit, in the
+  Parameters panel and in the Interactive tab, on both pages. Leaving the text as it opened
+  records nothing. Before, Enter on an unchanged Interactive value moved it by its 13th digit
+  and recorded an edit. One behaviour changed on purpose: typing a cell's drawn digits into the
+  Parameters editor, `4.1568` over a stored `4.15678`, is now an edit, since it is a different
+  number from the one the editor showed. The drawn numbers are unchanged.
+
+  - *Done*: `lib/numslot.ts:editText` is `String(v)` and serves both editors.
+    `lib/interactive.ts:parseTyped` reads through `readNumber`; its old 12-digit text is
+    `plainText`, kept for today's page's "Last fit" line and range fields. Each editor stores
+    the text it opened on and returns early when Enter or a click away leaves it unchanged.
+    `lib/table.ts:editState` gained `against: "stored"`, used by both Params panels, so the
+    pending count and Apply's payload compare a typed number with the stored float. The
+    Model form keeps `"drawn"`, since it still opens on the rounded value. Today's page's
+    range fields keep their 12-digit text, and an end left as shown keeps the slider's value,
+    the rule `/next` already had. The manual's two passages and the gui rulebook's line say
+    so, and a release-note fragment is staged (`docs/releases/unreleased/1709.changed.md`).
+  - *Review* (`/code-review high --fix`, 8 findings): 3 fixed. `setRange` did not record
+    the applied text as shown, so after one range change, typing the old end back was read as
+    "as shown" and moved nothing; fixed in both Interactive panels (the `/next` copy had it
+    since WP-2218), with a regression case. Also the docstring's e-form example and a blank
+    line. Declined: the early return compares with the text as opened even if a head move
+    changed the value meanwhile (the rule as ruled); an empty opened text closes without a
+    refusal (a non-finite value has no slider); a multi-cell selection opens blank ("Mixed")
+    unless the stored values are equal, where it used to match on the drawn digits (opening
+    on stored values is the ruling, and blank is honest); the range bookkeeping is copied in
+    both Interactive panels (today's page goes at the swap); the editor opens wider for a long
+    value (still clamped to the window).
+  - *Fixed on the way*: a re-export of `editText` through `lib/interactive.ts` made rolldown
+    emit a shared `rolldown-runtime.js` chunk with a modulepreload in `index.html`; the panels
+    import from `lib/numslot.ts` directly. Two browser cases typed a digit after End to make
+    an edit; at full precision that digit can sit past the double's last one, which is the
+    same number, so they type it after Home. `reference/gui-guide.md` stood 12 characters
+    under the manual's 50 000 cap, so the two passages were cut to fit (49 999).
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.2, Python 3.12):
+    fast suite on the final tree 15029 passed, 425 skipped and 32 xfailed in 9:38, through the
+    shift's serial lock. Playwright makes the browser files run inside it. The added python
+    test is the browser case `test_a_clicked_value_opens_on_its_full_value_and_enter_on_it_is_no_edit`,
+    1.78 s in the junit file. Vitest 864 of 864, 7 more than WP-2218's last 857 (5 in
+    `next/editbox.test.ts`, 1 each in `App.test.ts` and `lib/table.test.ts`). svelte-check 0
+    errors in 460 files. Ruff and CI's Vale steps clean. Every browser file by glob (`tests/*_browser.py`), serially: 173 passed, one more than WP-2218's 172.
+    The browser case fails with the editor text cut back to 12 digits (the Parameters cell
+    `phases.0.scale` opened as `0.0000130672077598` against a stored 1.3067207759799018e-05),
+    and so do two of the four vitest mount cases.
+  - *Generality*: no flag, threshold or automatic action; `tests.audit_delta` reports no row
+    changed. The judge was not dispatched.
+  - *Next*: none here. The follow-on for WP-2218's background holds is WP-2224.
 
 - **2026-11-19** — filed by the ghostshift runner for the edit-box ruling. No open WP owns the
   GUI's editor text: WP-2218 is the R3 build and waits only on Yue's look, and 2211 and 2212
