@@ -152,6 +152,17 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
    converged fit of its pattern is a re-fit too, and the GUI's second Refine inherits it. With
    `history=False` the fact is held on the `Refinement`.
 
+### Inherited
+
+- **From WP-2225 (2026-11-19).** The staged re-fit's movement on zincite and fluorite in this
+  WP's probe is the width twin hold, and under-convergence plays no part. The plan holds U, X
+  and Y at the instrument-only stage's values while their specimen twins sit on their floor, and
+  a staged re-fit re-solves them in that stage. A one-stage re-fit applies the hold again, so
+  under this WP's default a second `fit` stops showing the effect, and the first fit's answer is
+  unchanged. Tolerances, windows and seeds were each ruled out by one change
+  (`docs/wp/2225-batch/`). Read this before quoting "the first fit stops short" as a reason for
+  or against the one-stage default.
+
 ## Non-goals
 
 - One stage from a cold start, and shorter cold presets. Measured: 20 of 48, and 1.3× for two
