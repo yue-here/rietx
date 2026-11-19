@@ -213,7 +213,8 @@ standardisation {cite}`parthe1984` (pp. 172–173). Rule 2 is ITA's standard
 setting: unique axis b with cell choice 1, the obverse hexagonal cell of an R
 lattice, origin choice 2 where ITA gives two, and of an enantiomorphic pair
 the member with the smaller screw index, the structure then its mirror image
-and the result saying so. The group step is the one standardising step above, given
+and the result saying so, but only when `smaller_screw=True` asks for it; by
+default the input's hand is kept. The group step is the one standardising step above, given
 the Hall number of the target setting, because spglib's default for the
 two-origin types is origin choice 1. Rule 3 is the cell: the Niggli cell for a
 triclinic group; for a monoclinic P group without a glide, the shortest a and c

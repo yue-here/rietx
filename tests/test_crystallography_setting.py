@@ -329,14 +329,14 @@ def test_larger_screw_enantiomorph_is_inverted():
     """Rule 2(d) and p. 174: P3₂21 is standardized in P3₁21 as its mirror image, recorded."""
     quartz = _phase("P 32 2 1", (4.916, 4.916, 5.4054, 90, 90, 120),
                     [("Si", (0.4697, 0.0, 2 / 3)), ("O", (0.4135, 0.2669, 0.7858))])
-    r = S.standard_setting(quartz)
+    r = S.standard_setting(quartz, smaller_screw=True)
     assert r.inverted and r.symbol == "P 31 2 1"
     assert r.transform_text == "-a,-b,-c;0,0,0"
     for a, b in zip(quartz.atoms, r.phase.atoms):
         d = (np.array([a.x.value, a.y.value, a.z.value]) + [b.x.value, b.y.value, b.z.value] + 0.5) % 1 - 0.5
         assert np.max(np.abs(d)) < 1e-12
     _assert_f2_invariant(quartz, r.phase, r.P)
-    kept = S.standard_setting(quartz, smaller_screw=False)
+    kept = S.standard_setting(quartz)
     assert not kept.inverted and kept.symbol == "P 32 2 1"
 
 

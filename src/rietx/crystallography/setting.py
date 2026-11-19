@@ -5,7 +5,7 @@ public and callable alone; nothing here chooses among descriptions the rules
 leave open)::
 
     change_basis(phase, P, p=(0, 0, 0), *, allow_inversion=False) -> Phase
-    standard_setting(phase, *, origin_choice=2, smaller_screw=True,
+    standard_setting(phase, *, origin_choice=2, smaller_screw=False,
                      reduce_cell=True)                          -> StandardSetting
     orthorhombic_relabellings(space_group)                      -> tuple[(P, p), ...]
     enantiomorph_partner(number)                                -> int | None
@@ -23,10 +23,11 @@ cell half of the standardization behind the standardized data of Pearson's
 and the TYPIX-based databases:
 
 - rule 1, right-handed axes: every P here has det P > 0, except the
-  enantiomorph's inversion, which is reported;
+  enantiomorph's inversion, which is asked for and reported;
 - rule 2, ITA's standard setting (:func:`~.symmetry.ita_standard_setting`):
   (a) unique axis b, cell choice 1; (b) the obverse triple hexagonal cell of
-  an R lattice; (c) origin choice 2 where ITA gives two; (d) of an
+  an R lattice; (c) origin choice 2 where ITA gives two; (d) applied only on
+  request (``smaller_screw=True``; by default the input's hand is kept), of an
   enantiomorphic pair, the member with the smaller screw index, the structure
   then described as its mirror image (p. 174: "print minus signs in front of
   the standardized coordinates and name the true space group"), which
@@ -656,15 +657,16 @@ class StandardSetting:
         return _abc_text(self.P, self.p)
 
 
-def standard_setting(phase, *, origin_choice: int = 2, smaller_screw: bool = True,
+def standard_setting(phase, *, origin_choice: int = 2, smaller_screw: bool = False,
                      reduce_cell: bool = True) -> StandardSetting:
     """The phase in ITA's standard setting and the rule-3 cell (Parthé & Gelato 1984).
 
     Rule 2: the type's ITA setting (:func:`~.symmetry.ita_standard_setting`):
     unique axis b, cell choice 1; hexagonal axes for R; origin choice
     ``origin_choice`` (2, the paper's rule 2(c), unless 1 is asked for).  With
-    ``smaller_screw`` (rule 2(d)) a larger-screw enantiomorph is restated as
-    the mirror image in its partner, ``inverted`` reporting it.  With
+    ``smaller_screw=True`` (rule 2(d); off by default, which keeps the input's
+    hand, as spglib does) a larger-screw enantiomorph is restated as the mirror
+    image in its partner, ``inverted`` reporting it.  With
     ``reduce_cell`` (rule 3), the cell step of the module docstring, with
     Parthé & Gelato (1985)'s best cell for the monoclinic centred and glide
     groups.  Rules 4-6 (representative triplets, Γ,

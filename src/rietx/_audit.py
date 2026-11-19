@@ -5325,12 +5325,12 @@ ROWS: tuple[Row, ...] = (
                   "origin at the centre of symmetry where ITA gives two; Stokes (2011) § 5.1(2) and "
                   "WP-1452's decision (1) the same; dissent: spglib's default (hall_number=0) takes "
                   "origin choice 1, which is why _standardise names the target's Hall number")),
-    Row("rietx.crystallography.setting.standard_setting:smaller_screw", "default", tier=2,
-        ambiguity=1, value=True,
-        evidence=("Parthé & Gelato (1984) p. 172 rule 2(d) and p. 174: an enantiomorphic pair is "
-                  "standardized in the smaller-screw member (P4₁32, not P4₃32), the structure then "
-                  "its mirror image, reported (StandardSetting.inverted); powder |F|² is the same "
-                  "either way; False keeps the input's type")),
+    Row("rietx.crystallography.setting.standard_setting:smaller_screw", "default", tier="caller",
+        ambiguity=1, value=False,
+        evidence=("off by default; Parthé & Gelato (1984) p. 172 rule 2(d) inverts a larger-screw "
+                  "enantiomorph (P4₃32 to P4₁32, reported in StandardSetting.inverted), spglib keeps "
+                  "the hand; a caller asks for the mirror by name, as change_basis's "
+                  "allow_inversion")),
     Row("rietx.crystallography.setting.standard_setting:reduce_cell", "default", tier=2,
         ambiguity=1, value=True,
         evidence=("Parthé & Gelato (1984) p. 173 rule 3 (Niggli triclinic cell; reset monoclinic "
