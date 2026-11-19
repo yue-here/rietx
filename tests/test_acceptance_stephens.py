@@ -147,6 +147,11 @@ def _plan(*, texture: bool, stephens: bool) -> rx.RefinementPlan:
     ]
     if texture:
         stages.append(rx.Stage("po", ["phases.*.preferred_orientation.r"]))
+    # Axial and Kα2 before the specimen widths, as in qpa_plan (WP-2017
+    # § Inherited, 2026-11-19): the width twin hold freezes U, X and Y from
+    # sample_broadening on.
+    stages.append(rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
+                                           "instrument.geometry.axial_sl"]))
     # the Stephens patterns are freed *in* the sample-broadening stage, since a
     # block locks lor_strain and would otherwise leave the isotropic width
     # unrefined until the moment four correlated patterns turn on at once
@@ -157,11 +162,8 @@ def _plan(*, texture: bool, stephens: bool) -> rx.RefinementPlan:
         broadening.append("phases.*.microstrain.dof.*")
     stages.append(rx.Stage("sample_broadening", broadening,
                            seed=1e-4, strain_seed=800.0))
-    stages += [
-        rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                 "instrument.geometry.axial_sl"]),
-        rx.Stage("biso", ["phases.0.atoms.0.biso", "phases.0.atoms.1.biso"]),
-    ]
+    stages.append(
+        rx.Stage("biso", ["phases.0.atoms.0.biso", "phases.0.atoms.1.biso"]))
     plan = rx.RefinementPlan(stages=stages)
     # WP-1123: the shipped convergence schedule, named rather than inherited.
     # Every stage but the last stops at 1e-6 and the last at the solver's own
