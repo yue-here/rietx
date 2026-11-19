@@ -131,7 +131,7 @@ def test_a_malformed_expression_equation_is_refused_at_construction(kw, fragment
     (lambda: _table(parametric=[_expression(target="phases.0.cell.b")]),
      r"is tied: = 1·phases.0.cell.a"),
     (lambda: _table(parametric=[_expression(target="phases.0.cell.q")]),
-     "is not a parameter of histogram 0"),
+     r"is not a parameter of histogram 0's model\. To list them.*\.parameters\(\)"),
     (lambda: _table(parametric=[_expression(target="phases.0.atoms.0.x")]), "locked"),
     (lambda: _table(parametric=[_expression(patterns=[0, 5])]), "out of range"),
     (lambda: _table(coordinates=_coords(2)), "2 rows for 3 patterns"),
@@ -381,6 +381,88 @@ def test_a_line_written_over_an_einstein_cell_is_rejected_by_the_form_test():
     (d,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED"]
     assert d.where == ["vars.c0", "vars.c1"]
     assert d.suggestion.startswith("Revise the expression")
+    # every variable was freed, so none is reported idle
+    assert not [d for d in result.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+
+
+def _line_ramp():
+    """Five patterns whose cell edge is a straight line in T, and their models."""
+    from tests.test_sequential import A0, _start_models
+
+    temps = [300.0, 450.0, 600.0, 750.0, 900.0]
+    patterns = _ramp([A0 * (1 + 5e-6 * (t - 300.0)) for t in temps], seed=30)
+    structure, ins = _start_models()
+    coords = CoordinateTable(columns={"T": temps}, units={"T": "K"})
+    return patterns, structure, [ins] * len(temps), coords
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_a_held_slope_is_named_and_the_rejection_names_it_first():
+    """WP-2101, ruled 2026-11-19: a formula's variable left at ``vary=False`` keeps
+    its start, so a right line reads as a wrong form.  ``VARIABLE_NOT_FREED`` names
+    the slope, and the form rejection's suggestion names it before a rewrite.
+    Measured (macOS arm64): Rwp 0.043 with the slope free, 0.82 held."""
+    from tests.test_sequential import A0
+
+    patterns, structure, instruments, coords = _line_ramp()
+    fits = {}
+    for vary in (True, False):
+        fits[vary] = refine_multi(
+            patterns, structure, instruments, plan="mccusker_default",
+            sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+            coordinates=coords,
+            variables={"a0": rx.Parameter(value=A0, vary=True),
+                       "a1": rx.Parameter(value=0.0, vary=vary)},
+            parametric=[_expression(expression="a0 + a1*(T - 300)")])
+    free, held = fits[True], fits[False]
+    _plot(held, "parametric_expression_held_slope", (0, 4))
+    assert held.statistics.rwp > 5 * free.statistics.rwp
+    assert not [d for d in free.diagnostics if d.code in ("VARIABLE_NOT_FREED",
+                                                          "PARAMETRIC_FORM_REJECTED")]
+    (idle,) = [d for d in held.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+    assert (idle.level, idle.where, idle.value) == ("warning", ["vars.a1"], 1.0)
+    assert idle.message == (
+        "Parametric equation 'a' sets phases.0.cell.a, and no stage freed vars.a1, 1 of "
+        "its 2 coefficients. It kept the starting value (0), and the others were "
+        "fitted with it held there.")
+    assert idle.suggestion == ("A stage whose turn_on names phases.0.cell.a frees the "
+                               "formula's variables declared vary=True. One declared "
+                               "vary=False is freed only by a stage naming its path, "
+                               "such as vars.a1.")
+    (rejected,) = [d for d in held.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED"]
+    assert rejected.suggestion.startswith(
+        "No stage freed vars.a1, so it kept its starting value. Free it and refit "
+        "before changing the equation. Revise the expression")
+    # a fit-wide statement: every pattern's view carries it
+    assert "VARIABLE_NOT_FREED" in {d.code for d in held.for_histogram(2).diagnostics}
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_an_equation_on_a_target_no_stage_reaches_is_named():
+    """WP-2101, ruled 2026-11-19: ``mccusker_default`` reaches the cell and never
+    a Biso, so a line on La's B keeps its starting coefficients and has no row
+    in ``result.parameters``.  The cell line beside it refines and is not named."""
+    patterns, structure, instruments, coords = _line_ramp()
+    cell = ParametricEquation(name="a", target="phases.0.cell.a", basis="polynomial",
+                              terms=[[], ["T"]])
+    biso = ParametricEquation(name="b", target="phases.0.atoms.0.biso",
+                              basis="polynomial", terms=[[], ["T"]])
+    result = refine_multi(
+        patterns, structure, instruments, plan="mccusker_default",
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+        coordinates=coords, parametric=[cell, biso])
+    (d,) = [d for d in result.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+    assert (d.level, d.where, d.value) == ("warning", ["vars.b_0", "vars.b_1"], 2.0)
+    start = structure.phases[0].atoms[0].biso.value
+    assert d.message == (
+        "Parametric equation 'b' sets phases.0.atoms.0.biso, and no stage freed its "
+        f"coefficients vars.b_0 and vars.b_1. They kept the starting values ({start:.6g}, "
+        "0), so the equation is the one declared and the data did not measure it.")
+    assert d.suggestion == ("A stage whose turn_on names phases.0.atoms.0.biso frees "
+                            "the coefficients with it.")
+    rows = {p.path for p in result.parameters}
+    assert {"vars.a_0", "vars.a_1"} <= rows and not rows & {"vars.b_0", "vars.b_1"}
+    assert [c.vary for c in result.parametric] == [True, True, False, False]
 
 
 def test_targets_sharing_a_variable_are_recovered_together():
