@@ -2541,8 +2541,10 @@ ROWS: tuple[Row, ...] = (
                   "moves every d-spacing by at most eps from the caller's; 1e-5 bounds that at "
                   "10 ppm, under SRM 660c's 48 ppm certificate band, and clears an indexing "
                   "candidate's round-off (tied lengths equal to 1e-12 relative, "
-                  "test_an_indexing_candidate_still_builds; WP-2150's handover has the "
-                  "acceptance-set measurement)")),
+                  "test_an_indexing_candidate_still_builds). Measured 2026-11-19: 25351 tie "
+                  "checks over the fast suite, round-off at most 1e-14 relative and real "
+                  "disagreements 1e-4 and up; indexing acceptance candidates at most 1.9e-16, "
+                  "so any value from 1e-12 to 1e-4 refuses the same inputs (WP-2150)")),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
                   "whether atoms that would overfill one place are the same place, so the "

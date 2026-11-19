@@ -825,9 +825,10 @@ def check_phase_cell_ties(phase, *, prefix: str | None) -> None:
     The one call a project reader makes (WP-2150), inside the boundary that
     turns a refusal into one naming the file.  A reader refuses at read, so a
     project converted from the file can never store a cell the table refuses.
-    A project file prints neither the digits nor the su a CIF reader snaps
-    within, so nothing is snapped here: within the table's own tolerance the
-    cell builds as it always did, and past it the file is refused.  The cell
+    Nothing is snapped here.  A ``.gpx`` or a recipe stores binary or JSON
+    floats with no printed digits, and the text formats' digits are not
+    carried this far, so within the table's own tolerance the cell builds as
+    it always did, and past it the file is refused.  The cell
     checked is :func:`constrained_cell`'s, so a phase stating its cell through
     a parent is checked under the parent's group.  ``prefix`` is the phase's
     path (``"phases.0"``), and the message names the cell under it; with no
