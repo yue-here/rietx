@@ -1,6 +1,6 @@
 # WP-2150 — A tied cell value that contradicts its space group is repaired at read or refused
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-18 — a silent wrong answer on a path few fits run: a cell length (or a rhombohedral angle) that its space group ties to another is replaced by that other value with no word, at any size of disagreement (#1669)
