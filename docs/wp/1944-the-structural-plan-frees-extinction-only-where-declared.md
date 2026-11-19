@@ -116,6 +116,20 @@ with one phase declared and one not.
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+  a commit after this file was last touched, and the entry below records it. Nothing else
+  changed, and the status stays ✅.
+
+- **2026-11-05** (reconstructed post hoc) — `8aa2a2f0f` moved the wavelength suite's
+  neutron-width pins to the opt-in extinction fit. It rode PR #1429, which merged on
+  2026-11-05 as `7dec1f490`. Since PR #1391 made extinction opt-in, that suite's neutron fit
+  no longer refines it, and the nightly full job failed on the row at `d4839e02e`. The esd of
+  the Lorentzian width X moves from 0.0102922 to 0.0103546, a 0.6 % change. Y moves from
+  −0.0210949 to −0.0216150, and its esd from 0.0190970 to 0.0192658. Declaring extinction
+  returns the old esd to every digit, so the extinction stage is the whole of the move. The
+  commit changed `tests/test_acceptance_wavelength.py`, `tests/validation_matrix.py` and
+  `docs/VALIDATION.md`.
+
 ### 2026-11-05 — the warning removed under the maintainer's ruling, PR #1412
 
 Extinction stays opt-in, and a fit no longer warns that a phase might want
