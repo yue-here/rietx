@@ -516,6 +516,7 @@ def _shared_biso_two_cells(patterns, biso, cell1_scale):
     structure.phases[0].atoms[0].biso.value = biso
     other.phases[0].atoms[0].biso.value = biso
     other.phases[0].cell.a.value *= cell1_scale
+    other.phases[0].cell.b.value = other.phases[0].cell.c.value = other.phases[0].cell.a.value  # the cell's ties follow a
     ref = MultiHistogramRefinement(
         [structure, other], instruments,
         sharing=SharingMap(per_histogram=["phases.0.cell.*"]))
