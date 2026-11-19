@@ -56,6 +56,7 @@ print([d.code for d in bent.diagnostics if d.code.startswith("PARAMETRIC")])
 # guide: bowed end
 
 # guide: held start
+WATCHED = ("PARAMETRIC_FORM_REJECTED", "VARIABLE_NOT_FREED")
 variables = {"a0": rx.Parameter(value=4.16, vary=True),
              "a1": rx.Parameter(value=0.0)}  # vary=False, the default
 formula = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression",
@@ -65,7 +66,7 @@ held = rx.refine_multi(patterns, starting_model()[0], [starting_model()[1] for _
                        variables=variables, parametric=[formula])
 print(f"Rwp {held.statistics.rwp:.3f} against {result.statistics.rwp:.3f} with the slope free")
 print(f"slope {held.parametric[1].value} +/- {held.parametric[1].esd}")
-print([d.code for d in held.diagnostics if d.code.startswith("PARAMETRIC")])
+print([d.code for d in held.diagnostics if d.code in WATCHED])
 # guide: held end
 
 # guide: reach start
@@ -77,7 +78,7 @@ unreached = rx.refine_multi(patterns, starting_model()[0],
 for c in unreached.parametric:
     esd = "None" if c.esd is None else f"{c.esd:.1e}"
     print(f"{c.equation} [{c.term}] {c.value:.6g} +/- {esd}")
-print([d.code for d in unreached.diagnostics if d.code.startswith("PARAMETRIC")])
+print([d.code for d in unreached.diagnostics if d.code in WATCHED])
 # guide: reach end
 
 # The true slope is 0.05 % of a0 per 100 K; the fitted one lies within 2 esd.
@@ -105,17 +106,21 @@ assert form.rejected and f"{form.tied.statistic:.1f}" == "498.3"
 assert f"{held.statistics.rwp:.3f}" == "0.568" and f"{result.statistics.rwp:.3f}" == "0.041"
 assert held.parametric[1].term == "a1" and held.parametric[1].esd is None
 assert held.parametric[1].value == 0.0
-assert [d.code for d in held.diagnostics if d.code.startswith("PARAMETRIC")] == [
-    "PARAMETRIC_FORM_REJECTED"]
+assert [d.code for d in held.diagnostics if d.code in WATCHED] == [
+    "PARAMETRIC_FORM_REJECTED", "VARIABLE_NOT_FREED"]
+rejected = next(d for d in held.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED")
+assert rejected.suggestion.startswith("No stage freed vars.a1")
 # A line on a B that no stage of mccusker_default frees: both coefficients keep
-# their starts, with no esd and no diagnostic, while the cell line refines.
+# their starts, with no esd, while the cell line refines; VARIABLE_NOT_FREED says so.
 b_rows = [c for c in unreached.parametric if c.equation == "b"]
 assert [(f"{c.value:.6g}", c.esd, c.vary) for c in b_rows] == [("0.4", None, False),
                                                                ("0", None, False)]
 assert [(f"{c.value:.6g}", f"{c.esd:.1e}") for c in unreached.parametric
         if c.equation == "a"] == [("4.16283", "1.6e-06"), ("2.07819e-05", "8.2e-09")]
 assert held.parametric[1].vary is False
-assert not any(d.code.startswith("PARAMETRIC") for d in unreached.diagnostics)
+assert [d.code for d in unreached.diagnostics if d.code in WATCHED] == ["VARIABLE_NOT_FREED"]
+idle = next(d for d in unreached.diagnostics if d.code == "VARIABLE_NOT_FREED")
+assert idle.where == ["vars.b_0", "vars.b_1"]
 assert not any("biso" in p.path for p in unreached.parameters)
 
 # The trajectory's line: the declared line's coefficients to a small fraction of an

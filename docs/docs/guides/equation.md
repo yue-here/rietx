@@ -101,12 +101,14 @@ This writes the same line as a formula and leaves the slope held at 0:
 ```text
 Rwp 0.568 against 0.041 with the slope free
 slope 0.0 +/- None
-['PARAMETRIC_FORM_REJECTED']
+['PARAMETRIC_FORM_REJECTED', 'VARIABLE_NOT_FREED']
 ```
 
 With the slope held at 0, every pattern has the same lattice parameter.
-The form test then rejects the line, and its suggestion is to revise the expression.
-Check each variable's `vary` before changing the formula.
+The form test then rejects the line.
+[`VARIABLE_NOT_FREED`](../reference/diagnostics-series.md#variable_not_freed) names `vars.a1` as the coefficient no stage freed.
+The rejection's suggestion names it too, before it suggests revising the expression.
+Free the variable and refit before changing the formula.
 [Formula equations](../reference/parametric.md#formula-equations) says which stage frees a variable.
 
 A plan also frees an equation's coefficients only where one of its stages reaches the target.
@@ -125,11 +127,11 @@ a [1] 4.16283 +/- 1.6e-06
 a [T] 2.07819e-05 +/- 8.2e-09
 b [1] 0.4 +/- None
 b [T] 0 +/- None
-[]
+['VARIABLE_NOT_FREED']
 ```
 
 The cell line refines and the B line keeps its starting values.
-No diagnostic names it, and `result.parameters` has no row for it.
+`VARIABLE_NOT_FREED` names the equation `b` and its two coefficients, and `result.parameters` has no row for them.
 `mccusker_structural` adds the coordinates and B.
 An equation on any other kind of target needs a `PlanSpec` stage that names it ([Targets](../reference/parametric.md#targets)).
 
