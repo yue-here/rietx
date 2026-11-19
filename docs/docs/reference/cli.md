@@ -356,7 +356,8 @@ slowest: 17 s, done (9.6x the median, 1.8 s)
   screen-1/fluorite+corundum, .rietx/runs/20261119-010719-34608
 ```
 
-That job is 26 cold fits on five worker processes: six public patterns, each fitted alone and with one extra candidate phase, every cell free.
+That job is 26 cold fits on five worker processes, every cell free.
+Six public patterns were each fitted alone, and again once for each of four CPD round-robin phases added as a candidate, leaving out the pattern's own phase.
 Each fit was given `label=f"screen-1/{pattern}+{candidate}"`, with `alone` for the candidate where there was none.
 The slowest run is the fluorite pattern with a corundum candidate it does not contain.
 

@@ -753,7 +753,6 @@ def test_module_main_names_a_series_member_by_its_pattern(tmp_path, capsys):
     assert "17.34%" in out
 
 
-
 # ----------------------------------------------------------------------
 # a job of many runs (WP-1464): `rietx runs`
 # ----------------------------------------------------------------------
@@ -849,8 +848,17 @@ def test_label_is_a_glob_and_its_matches_are_one_job(tmp_path):
     assert str(job).splitlines()[-1] == "  screen-1/fluorite, b"
     (exact,) = runs.job_summary(tmp_path, label="calibration").jobs
     assert exact.n_runs == 1
+    # runs exist and none matched: the text must not say the root is empty
     none = runs.job_summary(tmp_path, label="nothing")
-    assert none.jobs == [] and str(none) == f"no runs under {tmp_path}"
+    assert none.jobs == []
+    assert str(none) == f"no runs labelled nothing under {tmp_path}"
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert str(runs.job_summary(empty)) == f"no runs under {empty}"
+    # a label holding a glob character is still asked for exactly
+    _ended(tmp_path / "d", "Fe2O3 [2]", 4.0, 5.0)
+    (literal,) = runs.job_summary(tmp_path, label="Fe2O3 [2]").jobs
+    assert literal.n_runs == 1
 
 
 def test_a_job_is_not_cut_at_the_watchers_poll_bound(tmp_path):
@@ -888,6 +896,7 @@ def test_rietx_runs_defaults_to_the_working_directory(tmp_path, monkeypatch,
     monkeypatch.chdir(tmp_path)
     assert main(["runs"]) == 0
     assert capsys.readouterr().out.startswith("here: 1 run, 1 done\n")
+
 
 # ----------------------------------------------------------------------
 # against a format a writer really produces

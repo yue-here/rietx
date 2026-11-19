@@ -2090,12 +2090,18 @@ class RunsSummary(Base):
     """What :func:`job_summary` returns: the jobs under one root."""
 
     root: str
+    #: The glob the runs were filtered by, ``None`` where none was given. It
+    #: is what tells an empty :attr:`jobs` apart: no runs under the root, or
+    #: runs none of whose labels matched.
+    label: str | None = None
     #: One per label, in order of each job's first start; the unlabelled
     #: block last.
     jobs: list[JobSummary] = Field(default_factory=list)
 
     def __str__(self) -> str:
         if not self.jobs:
+            if self.label is not None:
+                return f"no runs labelled {self.label} under {self.root}"
             return f"no runs under {self.root}"
         return "\n\n".join(str(job) for job in self.jobs)
 
@@ -2128,30 +2134,28 @@ def _summarise_job(label: str | None, members: list[Run],
             ends.append(end)
         if start is not None and end is not None:
             timed.append((end - start, state, run))
-    job = JobSummary(label=label, n_runs=len(members),
-                     states={k: v for k, v in counts.items() if v},
-                     n_timed=len(timed))
-    if starts:
-        job.first_start = min(starts)
-    if ends:
-        job.last_end = max(ends)
+    fields: dict = {"label": label, "n_runs": len(members),
+                    "states": {k: v for k, v in counts.items() if v},
+                    "n_timed": len(timed),
+                    "first_start": min(starts) if starts else None,
+                    "last_end": max(ends) if ends else None}
     if starts and ends:
-        job.wall_seconds = max(0.0, job.last_end - job.first_start)
+        fields["wall_seconds"] = max(0.0, fields["last_end"]
+                                     - fields["first_start"])
     if timed:
         seconds, state, slowest = max(timed, key=lambda row: row[0])
-        path = slowest.path
         median = statistics.median(row[0] for row in timed)
-        job.median_seconds = median
-        job.slowest_seconds = seconds
-        job.slowest_state = state
-        job.slowest_label = slowest.meta.label if slowest.meta else None
         try:
-            job.slowest_path = str(path.relative_to(root))
+            path = str(slowest.path.relative_to(root))
         except ValueError:
-            job.slowest_path = str(path)
-        if len(timed) >= 2 and median > 0:
-            job.slowest_over_median = seconds / median
-    return job
+            path = str(slowest.path)
+        fields.update(
+            median_seconds=median, slowest_seconds=seconds,
+            slowest_state=state, slowest_path=path,
+            slowest_label=slowest.meta.label if slowest.meta else None,
+            slowest_over_median=(seconds / median
+                                 if len(timed) >= 2 and median > 0 else None))
+    return JobSummary(**fields)
 
 
 def job_summary(root: str | Path | None = None, *,
@@ -2169,8 +2173,9 @@ def job_summary(root: str | Path | None = None, *,
     page's poll budget and would cut a job of a thousand runs at 500.
     ``label`` is an ``fnmatch`` glob, so a screen whose runs are each named
     after a candidate (``screen-1/zincite``) is one job under
-    ``label="screen-1/*"``. Given, the matched runs are one job. Absent, each
-    label is its own.
+    ``label="screen-1/*"``. A label equal to ``label`` matches too, so a name
+    holding a glob character (``Fe2O3 [2]``) can still be asked for exactly.
+    Given, the matched runs are one job. Absent, each label is its own.
 
     The reader rule holds (module docstring): this opens each run's two
     sidecars, and a lock file for a run that has not recorded a terminal state.
@@ -2183,7 +2188,8 @@ def job_summary(root: str | Path | None = None, *,
     if label is not None:
         members = [run for run in found
                    if run.meta is not None and run.meta.label is not None
-                   and fnmatch.fnmatchcase(run.meta.label, label)]
+                   and (run.meta.label == label
+                        or fnmatch.fnmatchcase(run.meta.label, label))]
         if members:
             groups[label] = members
     else:
@@ -2195,7 +2201,7 @@ def job_summary(root: str | Path | None = None, *,
     jobs.sort(key=lambda job: (job.label is None,
                                job.first_start if job.first_start is not None
                                else float("inf")))
-    return RunsSummary(root=str(root), jobs=jobs)
+    return RunsSummary(root=str(root), label=label, jobs=jobs)
 
 
 def _format_table(runs: list[Run], root: Path) -> str:
