@@ -31,6 +31,7 @@ from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import TCHZ_BOUNDS, BackgroundChebyshev
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_schemas import make_lab6
 
 OUT = Path(__file__).parent / "output"
@@ -68,7 +69,10 @@ def _fit(pattern, start: dict, free: str, solver: str = "lm"):
     plan = rx.RefinementPlan(stages=[
         rx.Stage(name="scale", turn_on=_B),
         rx.Stage(name="profile",
-                 turn_on=_B + [f"instrument.profile.{n}" for n in free])])
+                 turn_on=_B + [f"instrument.profile.{n}" for n in free])],
+        # declared, not inherited: off by default since WP-2222, and the
+        # pattern is drawn on compile_model's closing windows
+        closing_window_tol=CLOSING_WINDOW_TOL)
     ref = Refinement(structure, ins, solver=solver, history=False)
     return ref, ref.fit(pattern, plan=plan)
 

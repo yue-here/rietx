@@ -193,7 +193,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import PlanSpec
+from .schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -1479,6 +1479,17 @@ class SequentialRefinement:
         if x is not None and x_label == "index":
             x_label = "x"
         base_plan = resolve_plan(plan, mode)
+        if (mode == "pawley" and self.carry_hkl_intensities
+                and base_plan.closing_window_tol is None):
+            # Carried Pawley intensities compound the declared stages' 2 %
+            # window error down the chain, and the closing stage removes it
+            # (WP-2222, ruled 2026-11-19).  On the four-pattern chain of
+            # tests/test_sequential.py, Rwp per pattern read 0.0339, 0.0345,
+            # 0.0347, 0.0372 carried without it, 0.0339-0.0345 re-seeded,
+            # and about 0.034 throughout with it.  A plan's None cannot be
+            # told from the default, so the way out is
+            # carry_hkl_intensities=False.  Every stage it runs is recorded.
+            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".

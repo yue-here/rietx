@@ -955,7 +955,8 @@ def test_the_joint_path_holds_a_phase_no_histogram_can_see():
     assert result.stages[-1].held == ["phases.1.cell.a"]
     assert ref.mtable.structures[0].phases[1].cell.a.value == 5.2
     fired = [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
-    assert len(fired) == 1 and "was held for stages cell, closing" in fired[0].message
+    # no closing stage by default since WP-2222, so the cell stage alone
+    assert len(fired) == 1 and "was held for stage cell" in fired[0].message, fired[0].message
 
 
 def _held_columns(sharing=None) -> tuple[list[str], list[str]]:
