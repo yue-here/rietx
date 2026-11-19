@@ -4925,7 +4925,7 @@ ROWS: tuple[Row, ...] = (
         approved="2026-11-01"),
     Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=None,
         evidence=("None, no closing stage, since WP-2222 (2026-11-19): TOPAS cuts each peak at "
-                  "0.001 of the strongest line's height, 2 % of a Lorentzian, as the declared "
+                  "0.001 of its own height, 2 % of a Lorentzian, as the declared "
                   "stages' WINDOW_AREA_TOL does, and has no closing run (docs/practice.md); "
                   "measured 2026-11-19 (macOS arm64, [dev], three interleaved rounds) the "
                   "closing stage cost 1.2-1.3x on 11-BM NAC, 1.7x on CPD cpd-1a and cpd-2 "
@@ -5168,9 +5168,11 @@ ROWS: tuple[Row, ...] = (
                  "plan costs: the maintainer's 2026-11-19 ruling that TOPAS-level accuracy is "
                  "sufficient and the closing stage goes off by default (WP-2222), which "
                  "supersedes the seventh round's Q1 extension to this seat (2026-10-21); "
-                 "settled by Claude under that ruling, not yet approved for this seat. A "
+                 "approved for this seat at tier 2 on TOPAS's cut by the maintainer "
+                 "2026-11-19 (WP-2228). A Le Bail stage at a range end is WP-2228's. A "
                  "caller wanting near-complete tails passes CLOSING_WINDOW_TOL, and "
-                 "cherry_pick passes a recorded node's through forward.recorded_window_tol.")),
+                 "cherry_pick passes a recorded node's through forward.recorded_window_tol."),
+        approved="2026-11-19"),
     Row("rietx.refine.Refinement.run_stage:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
