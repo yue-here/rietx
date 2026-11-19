@@ -65,15 +65,29 @@ place D24's ruled action writes) is a magnetic-path decision, and those are Mike
 
 ## Tasks
 
-- [ ] A crystal system read from the operators for an `OperatorGroup` with no closest type, or
+- [x] A crystal system read from the operators for an `OperatorGroup` with no closest type, or
       each consumer skipping its one item with a recorded reason. Pin the NiO child.
-- [ ] `report()` returns on the NiO child; the satellite section either runs or says why it
-      did not, and every other section is present.
-- [ ] `write_structure_block` writes the NiO child's block.
-- [ ] Probe the unprobed callers listed in Context on the NiO child and on a WP-1419 child.
-- [ ] Tests (unit, synthetic, no data file) + obs/calc/diff PNGs to `tests/output/`
-- [ ] Skill: none expected. A raise that stops raising needs no routing row; if a section is
-      skipped with a reason, that reason is the package's own output.
+      Landed as `symmetry.crystal_system_of`, which reads the traces of the rotations'
+      proper parts. It agrees with gemmi on all 564 tabulated settings.
+      `OperatorGroup.crystal_system_str` always reads it. `cell_constraints` still reads an
+      operation list through `closest_type`, so a list in unconventional axes still refuses
+      rather than taking conventional ties.
+- [x] `report()` returns on the NiO child; the satellite section either runs or says why it
+      did not, and every other section is present. The satellite section runs.
+- [x] `write_structure_block` writes the NiO child's block, with
+      `_space_group_crystal_system trigonal` and no IT number.
+- [x] Probe the unprobed callers listed in Context on the NiO child and on a WP-1419 child.
+      Five cleared by reading, because no operation list reaches them: `gsas2.py:1537` (its
+      group is `gemmi.SpaceGroup(symbol)`), `crystallography/superspace/*` (gemmi groups
+      from a superspace group's basic part), `indexing/priors.py:140` and
+      `indexing/extinction.py:272` (symbols and gemmi's table). Probed on both children:
+      `gui/symmetry.phase_facts` returns its designed error row, whose text now names the
+      crystal system; `setting_phrase` raises inside it and is reached nowhere else for these
+      phases; `held_causes` raised `AttributeError` on any operation-list phase carrying a
+      Stephens block (`OperatorGroup` has no `laue_str`), now fixed.
+- [x] Tests (unit, synthetic, no data file) + obs/calc/diff PNGs to `tests/output/`
+      (`tests/test_unnamed_group_report.py`; `wp2221_nio_child.png`, `wp2221_pnma_child.png`).
+- [x] Skill: none. No section is skipped, so nothing new reaches a reader.
 
 ## Acceptance
 
@@ -91,6 +105,58 @@ present.
 
 ## Handover log
 
+- **2026-11-19** — implemented, by a ghostshift runner (PR #PRNUM). A phase whose space group
+  is an operation list that no tabulated setting names can now be reported and written to a
+  CIF. The crystal system is a property of the point group, so the package now reads it from
+  the rotations of the operations, in any cell. The fix checks that rule against gemmi on all
+  564 tabulated settings, and the two agree on every one. What still needs a tabulated
+  setting still raises: a symbol, an IT number, `ext`, a monoclinic unique axis, and the cell
+  ties read from the table. The children of this kind state their cell through the parent's,
+  so none of them needs those.
+
+  *Done.* `symmetry.crystal_system_of` reads the traces of the proper parts of the distinct
+  rotations (1 + 2cos φ is basis-free). `OperatorGroup.crystal_system_str` always uses it.
+  `cell_constraints` now reads an operation list through `closest_type` explicitly, so a
+  list in unconventional axes still refuses, rather than taking conventional ties from the
+  newly answerable system. The `closest_type` refusal no longer says the crystal system is
+  undefined; it names it. `gui/symmetry._strain_causes` asked an `OperatorGroup` for
+  `laue_str`, which it lacks, so any operation-list phase with a Stephens block crashed
+  `held_causes`. It now reads the Laue class off the closest type, or names the operators.
+
+  *Measured.* COUNTS
+
+  *Not generalised, deliberately.* `gui/symmetry.group_facts` still returns its error row
+  for these children, because its Laue class, point group and Sohncke flag come from the
+  closest type. A point-group symbol in unconventional axes has no tabulated spelling, so
+  filling those fields would mean a new rule. The error row is the panel's designed state
+  for a group it cannot describe, and its text is now accurate. The setting-bound members
+  (`hm`, `ext`, `number`, `monoclinic_unique_axis`) still raise; deriving them would mean
+  choosing a setting, which is #1330's standardisation route (Mike's PR #1332).
+
+  *Settled by Claude.* (1) The crystal system comes from the operators for every operation
+  list, not only as a fallback. Grounds: the trace rule equals gemmi's answer on all 564
+  settings, and the closest type has the same point group by construction, so the two
+  routes cannot disagree where both exist. One rule beats a rule with an exception
+  (DESIGN Rule 5). The alternative was a fallback used only where `closest_type` is `None`.
+  (2) The satellite generator keeps its written rule: a trigonal or hexagonal group gets the
+  candidates (⅓, ⅓, 0) and (⅓, ⅓, ½), now also on these children. Grounds: WP-1326's rule
+  keys on the crystal system alone, and it already adds them in rhombohedral axes on a
+  `:R` setting. The alternative was to skip them where the axes are unconventional.
+  Changing which candidates a magnetic report lists is a magnetic-path decision, so it is
+  a question for Mike below.
+
+  *Question for Mike (magnetic path, #1075), not settled here.* In a cell whose axes are
+  not conventional for its trigonal or hexagonal point group (the NiO child in
+  2a,a+b,a+c), (⅓, ⅓, 0) in the child's own axes is not the hexagonal K point. Should the
+  generator carry the two points through the cell transform, skip them on such a cell, or
+  keep them as now? The same holds today for any `:R` setting.
+
+  *Overlap.* `crystallography/symmetry.py` is also touched by Mike's open PR #1332, in
+  `refuse_distortion_modes` (line ~119); this branch edits lines ~330-460 and
+  `cell_constraints`. No other open PR of Mike's touches these files.
+
+  Next: none in this WP once the PR merges, apart from the question for Mike, which belongs
+  to WP-1326's successor if he wants a change.
 - **2026-11-19** — created, from the 2026-11-19 issue triage (PR #1697; issue #1688). A magnetic child
   that rietx itself builds can be fitted and then cannot be reported or written to a CIF.
   Checked against the tree at 7a4a6cd20: the issue's script reproduces, and the nuclear CIF

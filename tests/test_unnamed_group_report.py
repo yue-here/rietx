@@ -27,7 +27,7 @@ from rietx.crystallography import symmetry as sym
 from rietx.crystallography.magnetic import isotropy
 from rietx.crystallography.magnetic.supercell import magnetic_supercell
 from rietx.schemas.common import Parameter
-from rietx.schemas.structure import Atom, Cell, Phase, Structure
+from rietx.schemas.structure import Atom, Cell, Phase, StephensStrain, Structure
 
 OUT = Path(__file__).parent / "output"
 TWO_THETA = np.arange(10.0, 110.0, 0.02)
@@ -178,3 +178,15 @@ def test_the_nuclear_cif_block_is_written(build, label, system):
     ops = block.find_loop("_space_group_symop_operation_xyz")
     assert len(ops) == len(phase.symmetry_operations)
 
+
+@pytest.mark.parametrize("build,label,system", CHILDREN, ids=IDS)
+def test_a_strain_block_on_an_unnamed_child_names_its_causes(build, label, system):
+    """The GUI's held causes asked an operation list for a Laue class it lacks."""
+    from rietx.gui.symmetry import held_causes
+
+    phase = build().model_copy(
+        update={"microstrain": StephensStrain.from_values([0.0] * 15)})
+    causes = held_causes(Structure(phases=[phase]))
+    strain = [v for k, v in causes.items() if ".microstrain." in k]
+    assert len(strain) == 15
+    assert all(v.startswith(f"the operators of {label} ") for v in strain)
