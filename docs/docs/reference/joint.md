@@ -275,7 +275,7 @@ Its own rows lose their `hist.<h>.` prefix, so they are spelled as a single fit 
 Every other pattern's rows are dropped.
 The view carries that pattern's `tick_hkl` and `phase_agreement`, and the joint result's own `tick_hkl` mirrors pattern 0's beside its `ticks`.
 The view's `diagnostics` are that pattern's own, followed by the top-level findings a reader of that pattern needs, each once.
-These are a finding whose `where` names one of its `hist.<h>.` rows, a `STAGE_FREED_NOTHING` whose `value` is its index, and the fit-wide `SCALE_B_INSEPARABLE`, `PARAMETRIC_OUT_OF_RANGE`, `PARAMETRIC_FORM_REJECTED` and `STAGE_PATH_UNKNOWN`.
+These are a finding whose `where` names one of its `hist.<h>.` rows, a `STAGE_FREED_NOTHING` whose `value` is its index, and the fit-wide `SCALE_B_INSEPARABLE`, `PARAMETRIC_OUT_OF_RANGE`, `PARAMETRIC_FORM_REJECTED`, `STAGE_PATH_UNKNOWN` and `VARIABLE_NOT_FREED`.
 `RefinementResult.statistics` carries the joint solve's `Statistics.max_shift_over_esd`, one shift per column of the joint parameter vector against its esd, and every view carries the same figure.
 On the two LaB6 patterns a converged fit reads between 5 × 10⁻⁷ and 2.2 × 10⁻³ across both solvers, and a stage starved to one iteration reads 4.0 under LM and 17.9 under TRF.
 

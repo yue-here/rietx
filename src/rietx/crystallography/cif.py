@@ -114,6 +114,77 @@ def _correct_symmetry_angles(sg, angles: dict[str, float], path: str,
     return out
 
 
+def _printed_cell_tokens(source) -> dict[str, Decimal | None]:
+    """The six cell numbers as the block prints them, esd dropped, keyed by
+    cell name (``None`` where the block states none)."""
+    out: dict[str, Decimal | None] = {}
+    for name, tag in (("a", "length_a"), ("b", "length_b"), ("c", "length_c"),
+                      ("alpha", "angle_alpha"), ("beta", "angle_beta"),
+                      ("gamma", "angle_gamma")):
+        raw = source.find_value(f"_cell_{tag}") or source.find_value(f"_cell.{tag}")
+        out[name] = None if raw is None else _printed_decimal(gemmi.cif.as_string(raw))
+    return out
+
+
+def _correct_cell_ties(sg, cell: dict[str, float],
+                       printed: dict[str, Decimal | None], path: str,
+                       diagnostics: list[Diagnostic] | None) -> dict[str, float]:
+    """Read a tied cell parameter as its source where the file's digits allow it.
+
+    The length counterpart of :func:`_correct_symmetry_angles` (WP-2150, issue
+    #1669).  ``ParameterTable`` builds a tied entry (b and c from a on a cubic
+    cell; β and γ from α on rhombohedral axes) from its source and refuses a
+    stored value further from it than ``symmetry.SYMMETRY_LENGTH_RTOL`` (or
+    ``SYMMETRY_ANGLE_TOL_DEG`` for an angle).  A reader has a diagnostics
+    channel, so it may repair what is a report and must leave a contradiction.
+
+    The band is the file's own printing, :data:`CIF_PRINTED_ROUNDING` of the
+    last digit of each of the two numbers, so two numbers that could be
+    roundings of one value are read as one.  Where the table's own tolerance
+    is wider than that, the band is the table's, so no disagreement a reader
+    leaves can build silently.  A value moved by no more than its own printed
+    rounding is the file's rounding and is not reported
+    (:data:`CIF_PRINTED_ROUNDING`'s rule for a coordinate).  A larger move is
+    reported as ``CIF_CELL_TIE_CORRECTED``.  Past the band the value is left
+    as written, so the table refuses it: the symbol and the cell then
+    contradict each other, and which is wrong is the caller's call.
+    """
+    from .symmetry import cell_constraints, cell_tie_tolerance
+
+    out = dict(cell)
+    for name, source in cell_constraints(sg).ties.items():
+        value, target = out[name], out[source]
+        if value == target or not (math.isfinite(value) and math.isfinite(target)):
+            continue
+        mine, theirs = printed.get(name), printed.get(source)
+        own = float(_printed_half(mine)) if mine is not None else 0.0
+        rounding = (own + float(_printed_half(theirs))
+                    if mine is not None and theirs is not None else 0.0)
+        table = cell_tie_tolerance(name) * (abs(target) if name in ("a", "b", "c") else 1.0)
+        delta = value - target
+        if abs(delta) > max(rounding, table):
+            continue                      # a contradiction: the table refuses it
+        out[name] = target
+        if abs(delta) <= own or diagnostics is None:
+            continue                      # the file's own rounding of the value
+        unit = " Å" if name in ("a", "b", "c") else "°"
+        why = ("within the digits the file prints" if abs(delta) <= rounding
+               else "inside the tolerance the parameter table holds a tied "
+                    "value to")
+        diagnostics.append(Diagnostic(
+            level="warning", code="CIF_CELL_TIE_CORRECTED",
+            where=[f"phases.0.cell.{name}"],
+            message=(f"{path} stores {name} = {value}{unit} and {source} = "
+                     f"{target}{unit} under space group {sg.xhm()!r}, whose "
+                     f"symmetry makes {name} equal to {source}. The two agree "
+                     f"{why}, so {name} was read as {target}{unit} "
+                     f"({delta:+.3g}{unit} corrected)."),
+            suggestion=(f"If {name} differs from {source} in the specimen, give "
+                        f"the phase a space group that leaves {name} free."),
+        ))
+    return out
+
+
 def normalize_cif_species(species: str) -> tuple[str, str | None]:
     """Map the two wild CIF type-symbol forms onto the canonical grammar.
 
@@ -935,9 +1006,14 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
 
     angles = {"alpha": cell.alpha, "beta": cell.beta, "gamma": cell.gamma}
     angles = _correct_symmetry_angles(sg, angles, path, diagnostics)
+    tied = _correct_cell_ties(
+        sg, {"a": cell.a, "b": cell.b, "c": cell.c, **angles},
+        _printed_cell_tokens(source), path, diagnostics)
+    lengths = {name: tied[name] for name in ("a", "b", "c")}
+    angles = {name: tied[name] for name in ("alpha", "beta", "gamma")}
 
     if block is not None:
-        cell6 = (cell.a, cell.b, cell.c,
+        cell6 = (lengths["a"], lengths["b"], lengths["c"],
                  angles["alpha"], angles["beta"], angles["gamma"])
         written_ions, written_g = magcif.read_private_moment_items(block)
         ions = {**written_ions, **(moment_ions or {})}
@@ -1109,9 +1185,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             # (params.vector.cell_window), and a finite bound here would read
             # as a claim by the caller and suppress it.  0.1 Å was never a
             # meaningful floor anyway — cell_window's is 1.5 Å.
-            a=Parameter(value=cell.a),
-            b=Parameter(value=cell.b),
-            c=Parameter(value=cell.c),
+            a=Parameter(value=lengths["a"]),
+            b=Parameter(value=lengths["b"]),
+            c=Parameter(value=lengths["c"]),
             alpha=Parameter(value=angles["alpha"]),
             beta=Parameter(value=angles["beta"]),
             gamma=Parameter(value=angles["gamma"]),

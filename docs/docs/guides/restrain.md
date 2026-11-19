@@ -55,14 +55,14 @@ It refines the GSAS-II tutorial pattern that ships with rietx.
 <!-- output of examples/guides/restrain.py -->
 ```text
 bond [2, 4] 1.552 +1.2
-bond [2, 5] 1.574 +3.4
+bond [2, 5] 1.573 +3.3
 bond [2, 6] 1.526 -1.4
-angle [4, 2, 5] 110.796 +1.3
-['fluorapatite P3', 'fluorapatite O6'] The bond restraint deviates +3.4σ from its target (1.574 vs 1.54).
+angle [4, 2, 5] 110.833 +1.4
+['fluorapatite P3', 'fluorapatite O6'] The bond restraint deviates +3.3σ from its target (1.573 vs 1.54).
 ```
 
 `RefinementResult.restraints` holds one row per restraint, with the computed value and its deviation from the target in units of sigma.
-The P3–O6 bond ends 3.4 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement.md#restraint_tension).
+The P3–O6 bond ends 3.3 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement.md#restraint_tension).
 The diagnostic's `where` names the two atoms.
 
 Here the pattern's 5 751 points outweigh four restraints.

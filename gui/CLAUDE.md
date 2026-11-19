@@ -442,7 +442,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   hold, degenerate (`needs_held_cell`). An unknown reason still draws a mark.
   `tests/test_gui_server.py` reads `ParameterRow.refinable`'s fields and `lib/table.ts`'s
   branches, so a sixth fails on both sides (WP-1214).
-- **A typed number is compared to the rendered value** (WP-1011, WP-1009's rule).
+- **An editor opens on the stored value; its text as opened is no edit** (WP-2223, WP-1009).
 - **A flag is set beside the value it is about** (WP-1214), in the same
   `PATCH /api/params` as the value edits and before the model patches.
 - **A vary key is a path or a glob** (WP-1215): a site's DOFs are freed together as
