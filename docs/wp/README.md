@@ -725,7 +725,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | ✅ 2026-11-12 | — | — |
 | [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | ✅ 2026-11-19 | — | — |
 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | ⬜ | P2 | — ([2222](2222-the-closing-stage-off-by-default.md) soft) |
-| [2225](2225-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ⬜ | P3 | [2222](2222-the-closing-stage-off-by-default.md) |
+| [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ⬜ | P3 | [2222](2222-the-closing-stage-off-by-default.md) |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 

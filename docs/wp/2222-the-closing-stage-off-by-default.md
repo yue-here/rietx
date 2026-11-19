@@ -1,6 +1,6 @@
 # WP-2222 — The closing stage off by default
 
-Milestone: unscheduled · Status: ✅ 2026-11-19 — off by default; a carried Pawley series and lab_calibrate keep it; WP-2225 retunes the GUI preview
+Milestone: unscheduled · Status: ✅ 2026-11-19 — off by default; a carried Pawley series and lab_calibrate keep it; WP-2226 retunes the GUI preview
 Track: A long run is not one fit
 Depends on: —
 
@@ -93,7 +93,7 @@ the maintainer's ruling, and TOPAS's 2 % cut as named practice.
 
 - [x] Flip the default on `PlanSpec` and `RefinementPlan`; the help text, docstrings and field descriptions say what the default is and what 1e-3 buys. `Refinement.run_stage`'s `window_area_tol=None` and a FitReport action applied in the GUI follow, to the declared stages' 2 %; `compile_model`, `predict` and the FitReport misfit keep evaluating at 1e-3
 - [x] Tests: those that assumed a closing stage by default declare it, or assert the new default
-- [x] The three rulings of § Context: a carried Pawley series runs the closing stage (`SequentialRefinement.fit`); `lab_calibrate` declares it and the `calibrate`, `branch` and `path` guides ask for it; the GUI preview's shift accepted in its tests, WP-2225 filed to retune it
+- [x] The three rulings of § Context: a carried Pawley series runs the closing stage (`SequentialRefinement.fit`); `lab_calibrate` declares it and the `calibrate`, `branch` and `path` guides ask for it; the GUI preview's shift accepted in its tests, WP-2226 filed to retune it
 - [x] Audit rows, manual (`reference/refinement.md` speed section), skill rows (`batch-operating.md` 9c.34), staged release notes
 - [x] Skill: the opt-in row for a final answer: 9c.34 rewritten as the opt-in, and `series.md`'s runaway row says only an opted-in plan has a closing stage
 
@@ -115,7 +115,7 @@ the maintainer's ruling, and TOPAS's 2 % cut as named practice.
   `lab_calibrate` preset whose profile every later fit inherits, and the
   guides that teach numbers to quote. A GUI preview that starts from a
   default fit now shifts by up to 0.13 % of the strongest peak. That is
-  accepted, and WP-2225 retunes the preview.
+  accepted, and WP-2226 retunes the preview.
 
   *Done.* The default flipped on both plan mirrors. `run_stage` and an
   applied FitReport action follow to 2 %, while `compile_model`, `predict`,
@@ -207,7 +207,7 @@ Evidence that would change the verdict: cpd-1a/cpd-2 wt% against the weighed com
 | 1. What it decides; what the caller must now decide | Docstring, `refine.py` `run_stage`: "None is forward.WINDOW_AREA_TOL, the declared stages' 2 % … Pass CLOSING_WINDOW_TOL for an answer computed on near-complete tails" | A stage run by hand, including the GUI's "Run this stage" and an applied FitReport action (`report/apply.py`), now fits on 2 % windows. The caller must ask for 1e-3 to get the tighter tails. | clear |
 | 2. Kind of ambiguity | `ambiguity=1` (row) | Same trade as item 1: accuracy against speed, decided by the caller's purpose. | weak, as item 1 |
 | 3. Case against acting (against 1e-3 here) | Row grounds: "runs on the windows a default fit's stages run on, so it costs what the same stage in a plan costs" | Coherent. With plans off by default, a stage run by hand at 1e-3 would cost more than the same stage inside a plan, and its answer would sit on different windows. | sound |
-| 4. Case for acting (keeping 1e-3) | Old grounds, removed by the diff: "No closing stage follows a stage driven by hand … at the declared stages' 2 % that answer carried up to 0.97 esd on lab data" | That premise still holds: nothing follows a hand-run stage. In the GUI, that stage's answer is what the user keeps. The new row does not answer the 0.97 esd figure; it replaces it with parity. The GUI preview stays at 1e-3 (WP Context, ruling 3), so a hand-run stage and its preview now use different windows (follow-up WP-2225). | real, unanswered in the row |
+| 4. Case for acting (keeping 1e-3) | Old grounds, removed by the diff: "No closing stage follows a stage driven by hand … at the declared stages' 2 % that answer carried up to 0.97 esd on lab data" | That premise still holds: nothing follows a hand-run stage. In the GUI, that stage's answer is what the user keeps. The new row does not answer the 0.97 esd figure; it replaces it with parity. The GUI preview stays at 1e-3 (WP Context, ruling 3), so a hand-run stage and its preview now use different windows (follow-up WP-2226). | real, unanswered in the row |
 | 5. Tier and source | `tier=1`; evidence: "inherits that row's tier"; `approved` cleared; grounds: "settled by Claude under that ruling, not yet approved for this seat" | **Contradiction.** "That row" is `rietx.model.forward.WINDOW_AREA_TOL`, which is `tier=3` (`_audit.py` line 3080). The seat was tier 1 only because it used to inherit `CLOSING_WINDOW_TOL` (tier 1). Inheriting now gives tier 3, or tier 2 if it cites TOPAS. The `Row` docstring requires `approved` on a tier-3 row, so the stale `tier=1` is what lets this unapproved row pass the table test. | fails |
 | 6. Dataset families and reference | none given for this seat | It inherits item 1's measurements and `WINDOW_AREA_TOL`'s four families (SRM 660c, FAP, cpd-1a, NAC), on which that constant fails its accuracy test. | none given |
 | 7. Record that it fired | Row: "the stage records the fraction it ran at" | `StageResult.window_area_tol` and the node's `NodeAction.window_area_tol`. `api_call` now omits the keyword at 2 % (`schemas/history.py`), so a replayed line stays faithful. | adequate |
@@ -249,7 +249,7 @@ Evidence that would change the verdict: the cell, coordinate and Biso errors aga
 
 Evidence that would change the verdict: SRM 660c and SRM 676a calibrations with and without the closing stage, carried into a sample fit. If the instrument profile, zero and displacement do not move beyond their esds there, the action buys nothing on real data.
 
-  Next: none on this WP. WP-2225 (the preview) and WP-2224 (one-stage
+  Next: none on this WP. WP-2226 (the preview) and WP-2224 (one-stage
   re-fits, after PR 1710 merges) build on it.
 
 - **2026-11-19** — created. No open WP owns the default: WP-2017 measures

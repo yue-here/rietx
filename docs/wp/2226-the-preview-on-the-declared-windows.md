@@ -1,4 +1,4 @@
-# WP-2225 — The preview on the declared windows
+# WP-2226 — The preview on the declared windows
 
 Milestone: unscheduled · Status: ⬜
 Track: A long run is not one fit

@@ -233,7 +233,7 @@ def test_the_residuals_are_the_curves_route_s_at_the_last_fit(fap):
     declared stages' 2 % windows since WP-2222, so the pane moves by at most
     0.13 % of the strongest peak when a preview starts from there; Yue
     accepted that shift on 2026-11-19, and retuning the preview for 2 %
-    windows is a follow-up WP."""
+    windows is WP-2226."""
     answer = preview.evaluate(fap, {"values": {}})
     res = fap.refinement.result_
     raw = np.asarray(res.y_obs) - np.asarray(res.y_calc)
