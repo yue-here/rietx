@@ -60,6 +60,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | 2026-11-17 | P2 | [parametric](#parametric) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2218](2218-hand-fitting-and-the-other-graphs.md) | Hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next` | 2026-11-18 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | 2026-11-19 | P1 | [Unscheduled](#unscheduled) |
 
 ## Next, by priority
 
@@ -536,6 +537,10 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 🔄 2026-11-18 | P2 | — ([2003](2003-the-chain-actions.md) soft) |
 
 ## <a id="unscheduled"></a>Unscheduled
+
+| WP | Title | Status | Priority | Depends on |
+|---|---|---|---|---|
+| [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | 🔄 2026-11-19 | P1 | — |
 
 ### <a id="unscheduled-coming-from-another-code"></a>Coming from another code
 
