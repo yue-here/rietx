@@ -1031,7 +1031,7 @@ Michael, none blocking, and one bears on K1b's defaults.
 2026-11-19. Its round-2 push answered all three asks of the round-1 review (posted
 2026-11-17). The PR closes no issue, since K1a is one part of #795 and of this WP. M-8 stays
 unticked: the ranking, `best_or_none()`, the default radius and the two warnings are K1b's.
-This entry was written by a ghostshift runner, in a PR that changes only this file.
+This entry was written by a ghostshift runner in PR #1701, which changes only this file.
 
 *Measured.* Full suite on the merged tree `e13d968a9` (main `efb3cd005` plus head
 `ac10ceb5c`; arm64 Mac, `[dev,jax]`, Python 3.12, run alone): 16 002 passed, 262 skipped,
