@@ -871,6 +871,100 @@ def test_a_job_is_not_cut_at_the_watchers_poll_bound(tmp_path):
     assert job.n_runs == job.n_timed == n
 
 
+@posix_liveness
+def test_a_live_run_shows_how_long_it_has_gone(tmp_path):
+    """Yue's ruling of 2026-11-19: a screen checked mid-run must show its
+    runaway, which has no end yet and so no line of its own before this."""
+    for i, seconds in enumerate((17.0, 18.0, 19.0)):
+        _ended(tmp_path / f"r{i}", "screen-1/a", float(i), float(i) + seconds)
+    _write_run(tmp_path / "slow", events=_event_line("fit_start"),
+               meta={"record": "run", "label": "screen-1/b", "created": 5.0},
+               status={"state": "running", "heartbeat": 600.0,
+                       "pid": os.getpid()}, lock=True)
+    _write_run(tmp_path / "late", events=_event_line("fit_start"),
+               meta={"record": "run", "label": "screen-1/c", "created": 100.0},
+               status={"state": "running", "heartbeat": 600.0,
+                       "pid": os.getpid()}, lock=True)
+    handles = [open(tmp_path / d / runs.LOCK_FILE, "r+b")
+               for d in ("slow", "late")]
+    try:
+        for handle in handles:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        (job,) = runs.job_summary(tmp_path, label="screen-1/*").jobs
+    finally:
+        for handle in handles:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+
+    assert job.states == {"done": 3, "running": 2}
+    # earliest start first; a start, never an elapsed time
+    assert [(r.path, r.label, r.started) for r in job.running] == [
+        ("slow", "screen-1/b", 5.0), ("late", "screen-1/c", 100.0)]
+    assert job.running[0].evidence == "a process holds the run lock"
+    # 725 s at now = 730, against a median of 18 s
+    assert job._text(730.0).splitlines()[-2:] == [
+        "running: 2, longest so far 12 min 5 s (40x the median, 18 s)",
+        "  screen-1/b, slow"]
+    # the lines above it are the ones a job with nothing running prints
+    assert job._text(730.0).splitlines()[:4] == [
+        "screen-1/*: 5 runs, 3 done, 2 running",
+        "wall 21 s, first start to last end (2 runs recorded no end)",
+        "slowest: 19 s, done (1.1x the median, 18 s)",
+        "  screen-1/a, r2"]
+    # a slowest finished run longer than every live one: both lines print,
+    # and the live ratio reads under one
+    assert job._text(14.0).splitlines()[-2] == (
+        "running: 2, longest so far 9.0 s (0.5x the median, 18 s)")
+    assert "<0.1x the median" in job._text(5.5)
+
+
+@posix_liveness
+def test_a_run_whose_writer_died_is_abandoned_never_running(tmp_path):
+    """A free lock under a running status and a stale heartbeat: the writer
+    is gone, so the run is counted ``abandoned`` and never timed as running,
+    however old it is."""
+    _ended(tmp_path / "ok", "job", 0.0, 20.0)
+    _write_run(tmp_path / "dead", events=_event_line("fit_start"),
+               meta={"record": "run", "label": "job", "created": 1.0},
+               status={"state": "running", "heartbeat": 2.0, "pid": 1},
+               lock=True)
+
+    (job,) = runs.job_summary(tmp_path).jobs
+    assert job.states == {"done": 1, "abandoned": 1}
+    assert job.running == []
+    assert str(job).splitlines() == [
+        "job: 2 runs, 1 done, 1 abandoned",
+        "wall 20 s, first start to last end (1 run recorded no end)"]
+
+
+def test_a_live_run_with_no_finished_run_has_no_ratio(tmp_path):
+    """The pid rung, the one Windows has: the median is over finished runs,
+    and with none the line gives the time alone."""
+    _write_run(tmp_path / "going", events=_event_line("fit_start"),
+               meta={"record": "run", "label": "job", "created": 100.0},
+               status={"state": "running", "pid": os.getpid(),
+                       "host": socket.gethostname()})
+    (job,) = runs.job_summary(tmp_path).jobs
+    assert job.median_seconds is None
+    assert [r.started for r in job.running] == [100.0]
+    assert job._text(160.0).splitlines()[-2:] == [
+        "running: 1, longest so far 1 min 0 s", "  going"]
+
+
+def test_nothing_running_prints_as_before_and_json_says_so(tmp_path):
+    """The lines a finished job printed before the running line existed, byte
+    for byte; the JSON carries the empty list."""
+    _ended(tmp_path / "a", "screen-1", 0.0, 10.0)
+    _ended(tmp_path / "b", "screen-1", 1.0, 40.0)
+    summary = runs.job_summary(tmp_path)
+    assert str(summary) == "\n".join([
+        "screen-1: 2 runs, 2 done",
+        "wall 40 s, first start to last end",
+        "slowest: 39 s, done (1.6x the median, 24 s)",
+        "  b"])
+    assert json.loads(summary.model_dump_json())["jobs"][0]["running"] == []
+
+
 def test_rietx_runs_prints_and_its_json_round_trips(tmp_path, capsys):
     from rietx.cli import main
 

@@ -78,7 +78,9 @@ ones that returned. For runs the package recorded, `rietx runs --label
 'screen-1/*'` prints that count by state, the wall from first start to last
 end, and the slowest run against the median of every timed run, failed ones
 included rather than converged ones alone
-(`rietx.runs.job_summary` in Python; 9c.32 names the runs). One screen of 204 independent cold fits on 10 worker
+(`rietx.runs.job_summary` in Python; 9c.32 names the runs). Run mid-screen,
+it adds the longest a live run has gone against that median, so a runaway
+shows before it ends. One screen of 204 independent cold fits on 10 worker
 processes had a median job of 54 s and a slowest of 4559 s, 84× the median,
 and that job was a cell runaway. 43 jobs raised and carried no time, so the
 agent's summary printed a `nan` median, it never saw the 4559 s job, and it

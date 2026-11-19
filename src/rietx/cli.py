@@ -161,8 +161,9 @@ def _runs(argv: list[str]) -> int:
         prog="rietx runs",
         description="Summarise the recorded runs under a directory, one block "
                     "per label: runs counted by state, the wall clock from "
-                    "first start to last end, and the slowest run against the "
-                    "median, failed runs timed too.")
+                    "first start to last end, the slowest run against the "
+                    "median, failed runs timed too, and how long the runs "
+                    "still going have gone so far.")
     p.add_argument("directory", nargs="?", default=None,
                    help="directory to scan (default: the working directory, "
                         "as rietx watch)")

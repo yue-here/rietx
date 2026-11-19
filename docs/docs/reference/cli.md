@@ -378,6 +378,28 @@ The wall line then says how many runs recorded no end, and the wall is a lower b
 The slowest line needs two timed runs.
 Its ratio to the median is a number to read, and the command flags nothing on it.
 
+A job checked while it runs gets one more line, with the run that has gone longest under it:
+
+```console
+$ rietx runs --label 'screen-2/*'
+screen-2/*: 6 runs, 4 done, 1 running, 1 abandoned
+wall 5.0 s, first start to last end (2 runs recorded no end)
+slowest: 0.3 s, done (1.4x the median, 0.2 s)
+  screen-2/lab6-1, .rietx/runs/20261119-094950-56387
+running: 1, longest so far 26 s (103x the median, 0.2 s)
+  screen-2/lab6-held, .rietx/runs/20261119-094956-56428
+```
+
+Six fits of a synthetic LaB6 pattern made that output.
+Four finished.
+One was held at its first stage by a callback that sleeps, and one was killed with `kill -9` partway through.
+A run counts as running while a process holds its lock, so the killed run reads `abandoned` and is not on the running line.
+How long a run has gone is the time now less its recorded start.
+The ratio is to the median of the timed runs, and a job with none prints the time alone.
+The line prints whether or not the running run is the slowest, so a ratio under 1 means it has not yet reached the median.
+`--json` gives each running run's label, directory, start time in Unix seconds and the reason it reads as live, under `running`.
+It gives no elapsed time, so two calls on a directory that has not changed print the same JSON.
+
 ## `rietx html`
 
 `rietx html` writes a saved `RefinementResult` as a standalone HTML page.

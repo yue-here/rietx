@@ -2009,6 +2009,36 @@ def _span(seconds: float) -> str:
     return f"{total // 3600} h {total % 3600 // 60} min"
 
 
+def _times(ratio: float) -> str:
+    """A ratio to the median as printed: whole above 10, one decimal below,
+    and ``<0.1`` where one decimal would read as zero."""
+    if ratio >= 10:
+        return f"{ratio:.0f}"
+    if ratio >= 0.1:
+        return f"{ratio:.1f}"
+    return "<0.1"
+
+
+class RunningRun(Base):
+    """One run of a job that :func:`liveness_of` reads as ``running``.
+
+    It carries when the run started and never how long it has run: a field
+    computed from the clock differs on every call, so two answers about an
+    unchanged directory could never be told equal (WP-1427). The text view
+    reads the clock instead (:meth:`JobSummary.__str__`).
+    """
+
+    #: The run's own label, ``None`` where it recorded none.
+    label: str | None = None
+    #: Its directory, relative to the root where it lies under it.
+    path: str
+    #: ``meta.json``'s ``created``, Unix seconds; ``None`` where none was
+    #: recorded.
+    started: float | None = None
+    #: :attr:`Liveness.evidence`: which rule said the run is live.
+    evidence: str
+
+
 class JobSummary(Base):
     """One job's runs, counted and timed: one block of ``rietx runs``.
 
@@ -2025,6 +2055,12 @@ class JobSummary(Base):
     A run still going, an abandoned one, and one whose recorder latched an
     error have no end. So :attr:`n_timed` can be less than :attr:`n_runs`,
     and every time below is over the timed runs alone.
+
+    **A run still going is listed with its start, never with how long it has
+    gone** (:attr:`running`). "Still going" is :func:`liveness_of`'s
+    ``running``, so a run whose writer died counts ``abandoned`` and is never
+    timed as running for hours. The text view adds ``running: N, longest so
+    far …``, the oldest live run against the median of the timed runs.
 
     **A run that failed is timed like one that finished** (WP-1464 §9c.5). The
     screen behind this view printed a ``nan`` median because its failed jobs
@@ -2060,8 +2096,19 @@ class JobSummary(Base):
     #: ``slowest_seconds / median_seconds``. ``None`` under two timed runs,
     #: where the slowest run is the median's own.
     slowest_over_median: float | None = None
+    #: The runs :func:`liveness_of` reads as ``running``, earliest start
+    #: first. A run whose writer died reads ``abandoned`` and is not here.
+    running: list[RunningRun] = Field(default_factory=list)
 
     def __str__(self) -> str:
+        return self._text(time.time())
+
+    def _text(self, now: float) -> str:
+        """The text view at ``now``. **The one clock read in this view**, and
+        it is the renderer's: how long a run has gone is ``now`` minus its
+        recorded start, so the fields stay the same for an unchanged
+        directory and the printed minutes move. Printing one summary twice
+        can therefore show two times."""
         name = self.label if self.label is not None else "(no label)"
         noun = "run" if self.n_runs == 1 else "runs"
         counts = "".join(f", {n} {state}" for state, n in self.states.items())
@@ -2075,15 +2122,34 @@ class JobSummary(Base):
         else:
             lines.append("wall: no run recorded both a start and an end")
         if self.slowest_over_median is not None:
-            ratio = self.slowest_over_median
-            shown = f"{ratio:.0f}" if ratio >= 10 else f"{ratio:.1f}"
             lines.append(f"slowest: {_span(self.slowest_seconds)}, "
-                         f"{self.slowest_state} ({shown}x the median, "
+                         f"{self.slowest_state} "
+                         f"({_times(self.slowest_over_median)}x the median, "
                          f"{_span(self.median_seconds)})")
-            own = (f"{self.slowest_label}, "
-                   if self.slowest_label not in (None, self.label) else "")
-            lines.append(f"  {own}{self.slowest_path}")
+            lines.append(f"  {self._own(self.slowest_label)}"
+                         f"{self.slowest_path}")
+        if self.running:
+            lines.extend(self._running_lines(now))
         return "\n".join(lines)
+
+    def _own(self, label: str | None) -> str:
+        """A run's own label where it says more than the job's, else nothing."""
+        return f"{label}, " if label not in (None, self.label) else ""
+
+    def _running_lines(self, now: float) -> list[str]:
+        """``running: N, longest so far …`` and where that run is. The ratio
+        is to the median of the timed runs and is left out where none ended."""
+        head = f"running: {len(self.running)}"
+        started = [run for run in self.running if run.started is not None]
+        if not started:
+            return [f"{head}, no start recorded"]
+        oldest = min(started, key=lambda run: run.started)
+        elapsed = max(0.0, now - oldest.started)
+        head += f", longest so far {_span(elapsed)}"
+        if self.median_seconds:
+            head += (f" ({_times(elapsed / self.median_seconds)}x the median, "
+                     f"{_span(self.median_seconds)})")
+        return [head, f"  {self._own(oldest.label)}{oldest.path}"]
 
 
 class RunsSummary(Base):
@@ -2122,12 +2188,24 @@ def _summarise_job(label: str | None, members: list[Run],
                    root: Path) -> JobSummary:
     import statistics
 
+    def relative(path: Path) -> str:
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            return str(path)
+
     counts = {state: 0 for state in JOB_STATES}
-    starts, ends, timed = [], [], []
+    starts, ends, timed, running = [], [], [], []
     for run in members:
-        state = liveness_of(run).state
+        live = liveness_of(run)
+        state = live.state
         counts[state] += 1
         start, end = _run_times(run, state)
+        if state == "running":
+            running.append(RunningRun(
+                label=run.meta.label if run.meta else None,
+                path=relative(run.path), started=start,
+                evidence=live.evidence))
         if start is not None:
             starts.append(start)
         if end is not None:
@@ -2138,20 +2216,18 @@ def _summarise_job(label: str | None, members: list[Run],
                     "states": {k: v for k, v in counts.items() if v},
                     "n_timed": len(timed),
                     "first_start": min(starts) if starts else None,
-                    "last_end": max(ends) if ends else None}
+                    "last_end": max(ends) if ends else None,
+                    "running": sorted(running, key=lambda run: (
+                        run.started is None, run.started or 0.0))}
     if starts and ends:
         fields["wall_seconds"] = max(0.0, fields["last_end"]
                                      - fields["first_start"])
     if timed:
         seconds, state, slowest = max(timed, key=lambda row: row[0])
         median = statistics.median(row[0] for row in timed)
-        try:
-            path = str(slowest.path.relative_to(root))
-        except ValueError:
-            path = str(slowest.path)
         fields.update(
             median_seconds=median, slowest_seconds=seconds,
-            slowest_state=state, slowest_path=path,
+            slowest_state=state, slowest_path=relative(slowest.path),
             slowest_label=slowest.meta.label if slowest.meta else None,
             slowest_over_median=(seconds / median
                                  if len(timed) >= 2 and median > 0 else None))
