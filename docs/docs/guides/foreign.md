@@ -40,7 +40,7 @@ A construct the reader cannot carry without changing the model, such as a rigid 
 
 <!-- output of examples/guides/foreign.py -->
 ```text
-rietx Rwp 0.0953
+rietx Rwp 0.0948
 ```
 
 The wavelengths come from the file, so a cell compared with GSAS's is not shifted by a difference in the declared wavelength.

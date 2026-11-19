@@ -25,13 +25,12 @@ cell          2 freed  converged
 profile_w     1 freed  converged
 profile       4 freed  converged
 biso          7 freed  converged
-closing      22 freed  converged
 ```
 
 `StageResult.freed` lists the parameters each stage's names matched.
 The `cell` stage freed two, because the hexagonal space group leaves only `a` and `c` free.
-The fit ends with the closing stage, which every plan adds after its own stages ([The closing stage](../reference/refinement.md#the-closing-stage)).
-It names every parameter the other stages named, so it lists all 22.
+A plan runs its declared stages and no more.
+Setting `RefinementPlan.closing_window_tol` adds a closing stage that solves again with every parameter the stages freed, all 22 here, on tighter peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
 The full script is `examples/guides/plan.py`.
 
 ## Insert or remove a stage
@@ -88,7 +87,7 @@ The ones most often set are:
 
 `Stage.turn_off` lists parameter names the stage fixes after it frees its `turn_on`, and `StageSpec.turn_off` is the same list in a stored plan.
 A fixed parameter stays fixed in the stages after it, until a later stage frees it again.
-The closing stage that follows the declared ones keeps it fixed too.
+A closing stage, if the plan asks for one, keeps it fixed too.
 This plan refines the structure while the profile stays where an earlier Pawley or Le Bail fit left it, although its stage frees every instrument parameter:
 
 ```python
