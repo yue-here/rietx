@@ -1726,6 +1726,21 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_PHASE_TERM_READ", "code"),
     Row("TOPAS_SPECIES_NORMALISED", "code"),
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
+    Row("WARM_REFIT_REJECTED", "code", tier=3, ambiguity=1,
+        response="info",
+        responds=("nothing: the result is the staged plan's answer, and the message names "
+                  "why the one-stage re-fit was discarded"),
+        evidence=("info at one site (refine.py _warm_refit_rejected, appended by "
+                  "Refinement._fit_refit); fires exactly when a re-fit's one-stage fit was "
+                  "rejected by schemas/sequential.py _rejected (diverged, or an error-level "
+                  "diagnostic) and the staged plan ran in its place, so it reports the "
+                  "package's own act and gates nothing. On the eight comparison standards "
+                  "it fires on none from a converged start (WP-2224 § Measured); its one firing is injected, tests/test_refit_single.py::test_a_rejected_one_stage_fit_falls_back_to_the_plan patching _rejected"),
+        grounds=("Says out loud that the package ran a second fit, as SEQUENTIAL_RESEED "
+                 "does for the series' ladder; the trigger is the series' own _rejected "
+                 "(ruled by the maintainer 2026-11-03) and the fallback is the 2026-11-19 "
+                 "ruling (WP-2224 § Context, design 3)."),
+        approved="2026-11-19", scope=("all",)),
     Row("WAVELENGTH_CALIBRATION", "code", tier=1, ambiguity=1,
         response="info",
         responds="nothing: the message states the ppm shift of the free wavelength",
@@ -5367,6 +5382,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.Refinement.fit:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.Refinement.fit:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -5456,6 +5490,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.refine:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.refine:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"

@@ -1,6 +1,6 @@
 # The refinement
 
-This page gives the calls that run a refinement, where each setting goes, the fit modes, the plan and stage objects and their storage, what each stage records, the guard findings, the event stream, cancellation, and what a result records about the run.
+This page gives the calls that run a refinement, where each setting goes, the fit modes, plans and stages and their storage, what each stage records, guards, events, cancellation, and what a result records about the run.
 
 [About a fit](../concepts/fit.md) follows one stage from freeing its parameters to committing its history node.
 [Plan presets](plans.md) draws each preset's stages, and [Stage settings, flags and options](settings.md#stage-settings) gives each stage setting with its meaning.
@@ -33,7 +33,7 @@ A setting about one pattern, or one run in flight, belongs to the call.
 | `backend`, `solver` | `Refinement(...)` and `refine` | `"numpy"` and `"lm"` |
 | `history` | `Refinement(...)` and `refine` | on for `Refinement`, off for `refine`, which discards the tree with the object ([The refinement history](history.md)) |
 | `mode`, `two_theta_limits` | `Refinement.fit`, `Refinement.run_stage` and `refine` | `"rietveld"` and the whole pattern; `run_stage` reuses the last call's when given `None` |
-| `plan` | `Refinement.fit` and `refine` | `"mccusker_default"` |
+| `plan`, `refit` | `Refinement.fit` and `refine` | `"mccusker_default"`, `"single"` (one-stage re-fit) |
 | `events`, `cancel`, `telemetry`, `label` | `Refinement.fit`, `Refinement.run_stage` and `refine` | none; a run records itself unless told not to ([How to watch or stop a running fit](../guides/watch.md)) |
 | `stage_reports`, `progress` | `Refinement.fit` | off ([Reports at every stage](report.md#reports-at-every-stage), [Progress lines](result.md#progress-lines)) |
 | `correlation_guard`, `phase_support_sigma` | `Refinement.run_stage` | 0.98 and 3, since no plan supplies them; `Project.run_stage` passes the `phase_support_sigma` of the plan the project stores |
