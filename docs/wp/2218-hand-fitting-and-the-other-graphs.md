@@ -378,8 +378,15 @@ Filled in by the session that builds each PR.
     288 passed. The dialog's browser case alone: passed three times. The full browser glob
     was stopped by a pause before it finished, so it has not run on this tree. CI's Vale
     steps, run as `ci.yml` runs them: 0 errors.
-  - *Next*: the browser glob on this tree, stopped by a pause. Then Yue's look at the three
-    PRs' pictures and at § Questions 13. Then the WP closes.
+  - *After the pause*: the browser glob on 446d90f1c, serially: 171 passed.
+  - *Later the same day*: merged PR #1680's nine review fixes through PR #1683 (PR #1680's
+    entry lists them). The browser test file kept both branches' new cases, and the dist
+    was rebuilt. Fast suite 14956 passed, 424 skipped, 32 xfailed, five more than 14951
+    (PR #1680's four python cases and its browser case). Vitest 857. svelte-check 0 errors
+    in 459 files. GUI python files 302 passed. Browser glob 172 passed. Ruff and CI's
+    Vale steps clean.
+  - *Next*: Yue's look at the three PRs' pictures and at § Questions 13. Then the WP
+    closes.
 
 - **2026-11-19** — The third PR, PR #1683, brought up to the 2026-11-19 round of PR #1680.
 
