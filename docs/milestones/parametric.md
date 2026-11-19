@@ -6,7 +6,7 @@
 index lists the rows.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.11](v1.11.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 
