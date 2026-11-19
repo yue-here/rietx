@@ -83,8 +83,8 @@ def test_stage_start_carries_progress(ref, pattern):
     seen: list[dict] = []
     ref.fit(pattern, plan=PLAN, events=seen.append)
     starts = collect(seen)["stage_start"]
-    # the declared stages and the closing stage
-    assert [d["index"] for d in starts] == [1, 2, 3, 4]
+    # the declared stages; no closing stage by default since WP-2222
+    assert [d["index"] for d in starts] == [1, 2, 3]
     assert {d["n_stages"] for d in starts} == {len(PLAN.run_stages())}
     assert [d["stage"] for d in starts] == [s.name for s in PLAN.run_stages()]
 
