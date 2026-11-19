@@ -11,6 +11,7 @@ Data: the GSAS-II `LabData` tutorial fluorapatite, shipped in `rietx.examples`.
 
 import rietx as rx
 from rietx.examples import examples_dir
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
@@ -18,22 +19,24 @@ instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)
 limits = (15, 130)
+# Each stage runs on the closing stage's windows, so the two orders compare one objective.
+fine = dict(two_theta_limits=limits, window_area_tol=CLOSING_WINDOW_TOL)
 
 ref.run_stage(data, rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
-              two_theta_limits=limits)
+              **fine)
 cell = ref.run_stage(data, rx.Stage("cell", ["instrument.zero_shift", "phases.*.cell.*"]),
-                     two_theta_limits=limits)
+                     **fine)
 ref.history.tag(cell.node_id, "cell")
 
 # Strategy A: free the five width terms together.
 together = ref.run_stage(data, rx.Stage("profile", ["instrument.profile.*"]),
-                         two_theta_limits=limits)
+                         **fine)
 
 # Strategy B, on a branch from the tagged node: free w first, then all five.
 alt = ref.branch("cell")
-alt.run_stage(data, rx.Stage("profile_w", ["instrument.profile.w"]), two_theta_limits=limits)
+alt.run_stage(data, rx.Stage("profile_w", ["instrument.profile.w"]), **fine)
 w_first = alt.run_stage(data, rx.Stage("profile", ["instrument.profile.*"]),
-                        two_theta_limits=limits)
+                        **fine)
 # guide: end
 
 # guide: compare start
@@ -54,7 +57,7 @@ for path, (a, b) in tree.diff("together", "w_first").items():
 
 # guide: rollback start
 ref.checkout("w_first")
-ref.run_stage(data, rx.Stage("biso", ["phases.*.atoms.*.biso"]), two_theta_limits=limits)
+ref.run_stage(data, rx.Stage("biso", ["phases.*.atoms.*.biso"]), **fine)
 print(tree.summary())
 # guide: rollback end
 
@@ -65,7 +68,7 @@ for name in ("together", "w_first"):
 # guide: replay end
 
 # The page quotes both branch ends, the winner, four widths, the tree and the replay.
-# `run_stage` runs at the closing windows, and there the two orders find one fit:
+# On the closing windows the script asks for, the two orders find one fit:
 # "lower by 0.00002", and every differing value within 0.05 % of the other branch's.
 assert f"{tree['together'].rwp:.4f}" == f"{tree['w_first'].rwp:.4f}" == "0.0947"
 assert f"{tree['together'].rwp - tree['w_first'].rwp:.5f}" == "0.00002"
