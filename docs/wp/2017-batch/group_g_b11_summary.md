@@ -1,6 +1,6 @@
 # WP-2017 group G part B: B1.1 at 2 and 3 widths, NAC, a phase under 1 wt %
 
-Rows: 61 fits, head `b0346eb01` (this branch before a local rewrite that moved two private builders out of the tree; the code that ran is otherwise identical), Linux x86_64. Written by `group_g_b11.py summary`; the raw rows are not committed.
+Rows: 93 fits, head `b0346eb01` (a local commit, never pushed; its two off-tree builders are now `group_g_b11_offtree.py`, rearranged without changing a value), Linux x86_64. Written by `group_g_b11.py summary`; the raw rows are not committed.
 
 Columns: the minor phase's lowest significance the hold compared (σ, `refine._answer_significance`) and its value at the answer; the stages that held it; its weight % (esd) against the reference; the share of the off start's cell offset left against the database start's `s3` answer (0 recovered); Rwp; evaluations; the largest shift of any other row against the same start's `s3`, in plain esd (background apart); and whether `PHASE_UNCONSTRAINED` fired.
 
@@ -67,6 +67,38 @@ Columns: the minor phase's lowest significance the hold compared (σ, `refine._a
 | nac | 3 | s1 | CaF2 | 133.8 / 584.2 | none | 1.35(0.11) (—) | 0.000 | 0.0929 | 48 | 0 None | 0 | no |
 | nac | 3 | off | CaF2 | 133.8 / 584.2 | none | 1.35(0.11) (—) | 0.000 | 0.0929 | 48 | 0 None | 0 | no |
 | nac | 3 | noise | CaF2 | 133.8 / 584.2 | none | 1.35(0.11) (—) | 0.000 | 0.0929 | 48 | 2.79e-07 phases.0.atoms.5.biso | 2.34e-08 | no |
+| cr2wo6 | 0 | s3 | Cr2O3 | 92.2 / 92.2 | none | 0.78(0.10) (0.957) | — | 0.0843 | 64 | — | — | no |
+| cr2wo6 | 0 | s1 | Cr2O3 | 92.2 / 92.2 | none | 0.78(0.10) (0.957) | — | 0.0843 | 64 | 0 None | 0 | no |
+| cr2wo6 | 0 | off | Cr2O3 | 92.2 / 92.2 | none | 0.78(0.10) (0.957) | — | 0.0843 | 64 | 0 None | 0 | no |
+| cr2wo6 | 0 | noise | Cr2O3 | 92.2 / 92.2 | none | 0.78(0.10) (0.957) | — | 0.0843 | 64 | 3.04e-07 instrument.profile.v | 1.95e-08 | no |
+| cr2wo6 | 1 | s3 | Cr2O3 | 74.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 77 | — | — | no |
+| cr2wo6 | 1 | s1 | Cr2O3 | 74.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 77 | 0 None | 0 | no |
+| cr2wo6 | 1 | off | Cr2O3 | 74.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 77 | 0 None | 0 | no |
+| cr2wo6 | 1 | noise | Cr2O3 | 74.6 / 92.2 | none | 0.78(0.10) (0.957) | -0.000 | 0.0843 | 77 | 6.42e-07 instrument.profile.u | 4.26e-08 | no |
+| cr2wo6 | 2 | s3 | Cr2O3 | 42.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 91 | — | — | no |
+| cr2wo6 | 2 | s1 | Cr2O3 | 42.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 91 | 0 None | 0 | no |
+| cr2wo6 | 2 | off | Cr2O3 | 42.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 91 | 0 None | 0 | no |
+| cr2wo6 | 2 | noise | Cr2O3 | 42.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 91 | 4.67e-08 instrument.profile.v | 8.97e-09 | no |
+| cr2wo6 | 3 | s3 | Cr2O3 | 49.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 141 | — | — | no |
+| cr2wo6 | 3 | s1 | Cr2O3 | 49.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 141 | 0 None | 0 | no |
+| cr2wo6 | 3 | off | Cr2O3 | 49.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 141 | 0 None | 0 | no |
+| cr2wo6 | 3 | noise | Cr2O3 | 49.6 / 92.2 | none | 0.78(0.10) (0.957) | 0.000 | 0.0843 | 141 | 5e-07 instrument.profile.v | 3.18e-08 | no |
+| geco | 0 | s3 | Co10Ge3O16 | 164.0 / 165.2 | none | 1.39(0.19) (1.374) | — | 0.1095 | 153 | — | — | no |
+| geco | 0 | s1 | Co10Ge3O16 | 164.0 / 165.2 | none | 1.39(0.19) (1.374) | — | 0.1095 | 153 | 0 None | 0 | no |
+| geco | 0 | off | Co10Ge3O16 | 164.0 / 165.2 | none | 1.39(0.19) (1.374) | — | 0.1095 | 153 | 0 None | 0 | no |
+| geco | 0 | noise | Co10Ge3O16 | 164.0 / 165.2 | none | 1.39(0.19) (1.374) | — | 0.1095 | 153 | 1.48e-06 phases.1.cell.a | 3.96e-08 | no |
+| geco | 1 | s3 | Co10Ge3O16 | 97.9 / 165.2 | none | 1.39(0.19) (1.374) | -0.000 | 0.1095 | 182 | — | — | no |
+| geco | 1 | s1 | Co10Ge3O16 | 97.9 / 165.2 | none | 1.39(0.19) (1.374) | -0.000 | 0.1095 | 182 | 0 None | 0 | no |
+| geco | 1 | off | Co10Ge3O16 | 97.9 / 165.2 | none | 1.39(0.19) (1.374) | -0.000 | 0.1095 | 182 | 0 None | 0 | no |
+| geco | 1 | noise | Co10Ge3O16 | 97.9 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 182 | 4.79e-07 instrument.profile.w | 4.03e-08 | no |
+| geco | 2 | s3 | Co10Ge3O16 | 32.8 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 222 | — | — | no |
+| geco | 2 | s1 | Co10Ge3O16 | 32.8 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 222 | 0 None | 0 | no |
+| geco | 2 | off | Co10Ge3O16 | 32.8 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 222 | 0 None | 0 | no |
+| geco | 2 | noise | Co10Ge3O16 | 32.8 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 222 | 1.03e-06 phases.1.cell.b | 1.59e-08 | no |
+| geco | 3 | s3 | Co10Ge3O16 | 25.1 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 169 | — | — | no |
+| geco | 3 | s1 | Co10Ge3O16 | 25.1 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 169 | 0 None | 0 | no |
+| geco | 3 | off | Co10Ge3O16 | 25.1 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 169 | 0 None | 0 | no |
+| geco | 3 | noise | Co10Ge3O16 | 25.1 / 165.2 | none | 1.39(0.19) (1.374) | 0.000 | 0.1095 | 169 | 1.38e-06 phases.1.cell.b | 3.18e-08 | no |
 
 ## Off starts
 
@@ -76,10 +108,13 @@ Columns: the minor phase's lowest significance the hold compared (σ, `refine._a
 - `cucr_cold`: line (1, 1, 1) at 10.2290°, FWHM 0.01297°, one-FWHM factor 1.001264
 - `cucr_hot`: line (1, 1, 1) at 10.2007°, FWHM 0.00642°, one-FWHM factor 1.000627
 - `nac`: line (2, 2, 0) at 12.2981°, FWHM 0.00501°, one-FWHM factor 1.000406
+- `cr2wo6`: line (2, -1, 6) at 14.2059°, FWHM 0.01088°, one-FWHM factor 1.000762
+- `geco`: line (2, 2, 2) at 11.3041°, FWHM 0.02184°, one-FWHM factor 1.001926
 
 ## Codes per fit
 
 - nac s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- cr2wo6 s3: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
 - nac s1: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
 - nac noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
 - nac off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
@@ -87,7 +122,14 @@ Columns: the minor phase's lowest significance the hold compared (σ, `refine._a
 - cpd1a s3: DISPERSION_NEGLECTED, FLAT_DIRECTION, FLOOR_HIT, HIGH_CORRELATION, SPACE_GROUP_SETTING_ASSUMED
 - cpd1c s3: DISPERSION_NEGLECTED, FLAT_DIRECTION, FLOOR_HIT, HIGH_CORRELATION, SPACE_GROUP_SETTING_ASSUMED
 - cucr_cold s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- cr2wo6 off: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6 s1: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6 noise: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
 - cucr_hot s3: CAPILLARY_OFFSET_UNAVAILABLE, CONSTRAINT_ACTIVE, FLAT_DIRECTION, HIGH_CORRELATION, PATTERN_UNDERSAMPLED, RESOLUTION_UNCONSTRAINED
+- geco s1: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
 - cpd1a_off2 s1: DISPERSION_NEGLECTED, FLAT_DIRECTION, FLOOR_HIT, HIGH_CORRELATION, SPACE_GROUP_SETTING_ASSUMED
 - cpd1a_off3 s3: DISPERSION_NEGLECTED, FLAT_DIRECTION, FLOOR_HIT, HIGH_CORRELATION, SPACE_GROUP_SETTING_ASSUMED
 - cpd1a_off2 off: DISPERSION_NEGLECTED, FLAT_DIRECTION, FLOOR_HIT, HIGH_CORRELATION, SPACE_GROUP_SETTING_ASSUMED
@@ -140,3 +182,27 @@ Columns: the minor phase's lowest significance the hold compared (σ, `refine._a
 - nac_off3 s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
 - nac_off3 off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
 - nac_off3 noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- cr2wo6_off1 s1: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off1 s3: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off1 off: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off1 noise: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off2 off: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off2 s3: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off2 s1: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off2 noise: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off3 s3: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off3 s1: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off3 off: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- cr2wo6_off3 noise: CAPILLARY_OFFSET_UNAVAILABLE, RESOLUTION_UNCONSTRAINED
+- geco_off1 off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off1 s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off1 s1: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off1 noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off2 off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off2 s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off2 s1: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off2 noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off3 s1: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off3 noise: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off3 s3: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT
+- geco_off3 off: CAPILLARY_OFFSET_UNAVAILABLE, FLOOR_HIT

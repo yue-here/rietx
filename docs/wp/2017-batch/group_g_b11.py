@@ -16,12 +16,11 @@ Families and starts (each a whole fit through the closing stage):
   (the Le Bail seed, then ``mccusker_default`` with a Biso stage), CaF2 from 5.4631 Å and
   1, 2 and 3 FWHM off.  The third family: another laboratory and material, the
   instrument shared with the CuCr2O4 ramp;
-- two more cases from public-status data outside the tree, a phase under 1 wt % and a
-  fourth near-1 % case, both APS 11-BM patterns with their authors' refinements; their
-  register gate asks the data owner before posting, so their builders live outside the
-  repository (``WP2017G_PRIVATE`` names the module) and their rows are reported once he
-  clears them.  The registration's under-1 % case read 1.37 wt % in its authors' files, so
-  the other carries that case.
+- two published APS 11-BM patterns outside the tree, with their authors' refinements
+  (``group_g_b11_offtree.py``, which cites them): Cr2WO6 with Cr2O3 under 1 wt %
+  (``cr2wo6``), and GeCo2O4 at 6.6 K with Co10Ge3O16 (``geco``).  The registration's
+  under-1 % case was GeCo2O4, from a catalogue row reading 0.30 wt %; its authors' files read
+  1.37, so it ran as a fourth near-1 % case and Cr2WO6 carries the under-1 % one.
 
 Arms: ``s3`` (shipped), ``s1``, ``off`` (None) and ``noise`` (3, every free start nudged by
 1e-12 relative).  Each fit records ``group_g.fit_record``'s row, plus every call of
@@ -33,8 +32,8 @@ was compared with, in call order, which is the number the hold decides on.
     python docs/wp/2017-batch/group_g_b11.py summary   # write group_g_b11_summary.md
 
 ``WP2017G_RAW`` names the raw directory (shared with ``group_g.py``'s off-start files),
-``WP2017G_EXT`` the directory holding the off-tree files, ``WP2017G_PRIVATE`` the module
-building their starts, ``WP2017G_WORKERS`` the pool; ``summary`` writes only the bases loaded.
+``WP2017G_EXT`` the directory holding the off-tree files (their two bases load only when
+all three are there), ``WP2017G_WORKERS`` the pool; ``summary`` writes only the bases loaded.
 """
 
 from __future__ import annotations
@@ -68,17 +67,13 @@ REF_WT = {"cpd1a": 1.15, "cpd1b": 1.36, "cpd1c": 1.36, "cucr_cold": 1.1, "cucr_h
           "nac": None}
 REF_CELL = {"nac": [5.4631] * 3}
 
-_PRIVATE = None
-if os.environ.get("WP2017G_PRIVATE"):
-    import importlib.util
+import group_g_b11_offtree as _offtree  # noqa: E402
 
-    _spec = importlib.util.spec_from_file_location("wp2017g_private",
-                                                   os.environ["WP2017G_PRIVATE"])
-    _PRIVATE = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(_PRIVATE)
-    NEW_BASES = NEW_BASES + tuple(_PRIVATE.BASES)
-    MINOR.update(_PRIVATE.MINOR)
-    REF_WT.update(_PRIVATE.REF_WT)
+_OFFTREE = _offtree if _offtree.available(EXT) else None
+if _OFFTREE is not None:
+    NEW_BASES = NEW_BASES + tuple(_OFFTREE.BASES)
+    MINOR.update(_OFFTREE.MINOR)
+    REF_WT.update(_OFFTREE.REF_WT)
 
 
 def database_start(base: str) -> tuple:
@@ -90,8 +85,8 @@ def database_start(base: str) -> tuple:
         from tests.test_window_domain import _protocol
         data, st, ins, plan, kw = _protocol("nac")
         return data, st, ins, plan, kw
-    if _PRIVATE is not None and base in _PRIVATE.BASES:
-        return _PRIVATE.database_start(base, g, EXT)
+    if _OFFTREE is not None and base in _OFFTREE.BASES:
+        return _OFFTREE.database_start(base, g, EXT)
     raise KeyError(base)
 
 

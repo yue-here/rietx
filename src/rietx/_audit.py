@@ -4814,8 +4814,8 @@ ROWS: tuple[Row, ...] = (
                   "more at every stage, with 1, 3 and None bit-identical; a third family, 11-BM "
                   "NAC's CaF2 impurity (1.35 wt %; another laboratory and material, the instrument "
                   "shared with the CuCr2O4 ramp), 134 sigma or more from 1, 2 and 3 FWHM off, the "
-                  "arms bit-identical; a phase under 1 wt % on a public-status pattern outside the "
-                  "tree, whose posting waits on its owner, 42 sigma or more from 1-3 FWHM off, the "
+                  "arms bit-identical; Cr2O3 in 11-BM Cr2WO6, under 1 wt % (0.78 against TOPAS's 0.957), "
+                  "42 sigma or more from 1-3 FWHM off, and Co10Ge3O16 in GeCo2O4 (1.39), 25 or more, the "
                   "arms bit-identical; no real case read between 1 and 3 sigma, so the value has "
                   "decided no answer"),
         grounds=("The hold it gates passes the judgement ground; the 3 sigma is rietx's own, "
@@ -5384,8 +5384,8 @@ ROWS: tuple[Row, ...] = (
                   "more at every stage, with 1, 3 and None bit-identical; a third family, 11-BM "
                   "NAC's CaF2 impurity (1.35 wt %; another laboratory and material, the instrument "
                   "shared with the CuCr2O4 ramp), 134 sigma or more from 1, 2 and 3 FWHM off, the "
-                  "arms bit-identical; a phase under 1 wt % on a public-status pattern outside the "
-                  "tree, whose posting waits on its owner, 42 sigma or more from 1-3 FWHM off, the "
+                  "arms bit-identical; Cr2O3 in 11-BM Cr2WO6, under 1 wt % (0.78 against TOPAS's 0.957), "
+                  "42 sigma or more from 1-3 FWHM off, and Co10Ge3O16 in GeCo2O4 (1.39), 25 or more, the "
                   "arms bit-identical; no real case read between 1 and 3 sigma, so the value has "
                   "decided no answer"),
         grounds=("On by default: the hold touches only parameters the data cannot determine, "
@@ -5605,8 +5605,8 @@ ROWS: tuple[Row, ...] = (
                   "more at every stage, with 1, 3 and None bit-identical; a third family, 11-BM "
                   "NAC's CaF2 impurity (1.35 wt %; another laboratory and material, the instrument "
                   "shared with the CuCr2O4 ramp), 134 sigma or more from 1, 2 and 3 FWHM off, the "
-                  "arms bit-identical; a phase under 1 wt % on a public-status pattern outside the "
-                  "tree, whose posting waits on its owner, 42 sigma or more from 1-3 FWHM off, the "
+                  "arms bit-identical; Cr2O3 in 11-BM Cr2WO6, under 1 wt % (0.78 against TOPAS's 0.957), "
+                  "42 sigma or more from 1-3 FWHM off, and Co10Ge3O16 in GeCo2O4 (1.39), 25 or more, the "
                   "arms bit-identical; no real case read between 1 and 3 sigma, so the value has "
                   "decided no answer; every group G fit ran through a plan, none through this seat"),
         grounds=("On by default: the hold touches only parameters the data cannot determine, "
