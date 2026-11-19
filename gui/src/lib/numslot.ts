@@ -118,13 +118,13 @@ export function slotWidth(slots: Slots): number {
   return slots.int + 1 + slots.frac + slots.exp;
 }
 
-/** The text an editor opens with, and what a typed number is compared with
- *  (WP-1009's rule: compare to the *rendered* value, so a click in and out
- *  moves nothing). Plain where the drawn number is plain, `1.52e-3` where it
- *  is scientific. */
-export function editText(value: number, esd: number | null | undefined, sci = true): string {
-  if (!(sci && wantsSci(value))) return formatValue(value, esd);
-  const parts = numParts(value, esd, sci);
-  const mant = parts.frac ? `${parts.int}.${parts.frac}` : parts.int;
-  return `${mant.replace(MINUS, "-")}e${parts.exp}`;
+/** The text a value editor opens with: the stored value to its last digit, as
+ *  the shortest text that reads back as the same double (`String(v)`: plain
+ *  where JavaScript prints plain, `2.7725887222397812e-7` where it prints
+ *  e-form). A cell is drawn rounded and edited in full, as a spreadsheet's is
+ *  (WP-2223). An editor compares what was typed with the text it opened on,
+ *  never with the drawn number, so a click in and out, or Enter on the text
+ *  as opened, is no edit (WP-1009's rule). */
+export function editText(value: number): string {
+  return Number.isFinite(value) ? String(value) : "";
 }

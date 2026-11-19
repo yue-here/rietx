@@ -31,6 +31,7 @@
     buildSliders,
     defaults,
     editText,
+    plainText,
     fixFormat,
     formatParts,
     maxDecimals,
@@ -78,6 +79,8 @@
   /** the slider whose number is being typed, and the text so far */
   let typing = $state<string | null>(null);
   let typed = $state("");
+  /** the text the box opened on: Enter on it records nothing (WP-2223) */
+  let opened = "";
 
   const decimals = $derived(maxDecimals(sliders));
   const groups = $derived.by(() => {
@@ -175,7 +178,7 @@
 
   function startTyping(s: Slider) {
     typing = s.path;
-    typed = editText(current(s));
+    typed = opened = editText(current(s));
   }
 
   const typedCheck = $derived.by(() => {
@@ -187,6 +190,9 @@
     if (event.key === "Escape") {
       typing = null;
       event.stopPropagation();
+    } else if (event.key === "Enter" && typed.trim() === opened) {
+      // the text as it opened is no edit, whatever the value's digits (WP-2223)
+      typing = null;
     } else if (event.key === "Enter" && typedCheck && "value" in typedCheck) {
       set(s, typedCheck.value);
       typing = null;
@@ -201,6 +207,16 @@
   // -- the range-and-scale pop-up -----------------------------------------
   let rangeLo = $state("");
   let rangeHi = $state("");
+  // what the fields were filled with, so an end left as shown keeps the
+  // slider's value rather than reading back its 12-digit text (WP-2223)
+  let shownLo = "";
+  let shownHi = "";
+
+  /** The range the fields say: an end as shown is the slider's own value. */
+  function typedRange(s: Slider | null): [number, number] {
+    return [s && rangeLo === shownLo ? s.lo : Number(rangeLo),
+            s && rangeHi === shownHi ? s.hi : Number(rangeHi)];
+  }
 
   function openPop(s: Slider, event: MouseEvent) {
     if (popFor === s.path) return closePop();
@@ -209,8 +225,8 @@
     popAt = { left: Math.max(8, Math.min(box.left, window.innerWidth - 300)),
               top: below ? box.bottom + 6 : Math.max(8, box.top - 250) };
     popFor = s.path;
-    rangeLo = editText(s.lo);
-    rangeHi = editText(s.hi);
+    rangeLo = shownLo = plainText(s.lo);
+    rangeHi = shownHi = plainText(s.hi);
   }
 
   function closePop() {
@@ -227,7 +243,7 @@
   }
 
   const rangeWhy = $derived.by(() => {
-    const lo = Number(rangeLo), hi = Number(rangeHi);
+    const [lo, hi] = typedRange(popSlider);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return "not a number";
     if (!(hi > lo)) return "the end must be above the start";
     // a range past the row's bounds would let a drag reach a value the
@@ -240,7 +256,7 @@
 
   function setRange(s: Slider) {
     if (rangeWhy) return;
-    const lo = Number(rangeLo), hi = Number(rangeHi);
+    const [lo, hi] = typedRange(s);
     if (lo === s.lo && hi === s.hi) return;
     replace(s, { lo, hi, custom: true, track: s.track === "log" && !(lo > 0) ? "lin" : s.track });
   }
@@ -253,8 +269,8 @@
   function restoreDefault(s: Slider) {
     const d = defaults(s.kind, s.ref, s.bound, context);
     replace(s, { ...d, custom: false });
-    rangeLo = editText(d.lo);
-    rangeHi = editText(d.hi);
+    rangeLo = shownLo = plainText(d.lo);
+    rangeHi = shownHi = plainText(d.hi);
   }
 
   function clickAway(event: MouseEvent) {
@@ -360,7 +376,7 @@
   <div class="rangepop" role="dialog" aria-label={`Range and scale for ${s.name}`}
     style:left={`${popAt.left}px`} style:top={`${popAt.top}px`}>
     <strong>{s.name}{#if s.unit}<span class="muted"> ({s.unit})</span>{/if}</strong>
-    <p class="muted">Last fit <span class="mono">{editText(s.ref)}</span></p>
+    <p class="muted">Last fit <span class="mono">{plainText(s.ref)}</span></p>
     <label><span>From</span>
       <input class="mono" bind:value={rangeLo} aria-label="Lowest value"
         onchange={() => setRange(s)} onkeydown={(e) => e.key === "Enter" && setRange(s)} />

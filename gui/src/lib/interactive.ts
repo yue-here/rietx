@@ -20,6 +20,9 @@ import { paramKey, resolve } from "./help";
 import { fnmatch } from "./fnmatch";
 import type { ParamRow } from "./table";
 
+// the slider's value box opens as a Parameters cell does: one editor rule
+export { editText } from "./numslot";
+
 /** How a slider's default range is built (WP-2128 § Context, the prototype's rules). */
 export type Kind = "scale" | "zero" | "disp" | "cell" | "axial" | "gauss" | "lor";
 
@@ -228,15 +231,18 @@ export function readNumber(text: string): number {
   return mantissa * 10 ** exp;
 }
 
-/** The value as a person would type it back: no slot, no typographic minus. */
-export function editText(v: number): string {
+/** A value at 12 significant figures with no slot and no typographic minus:
+ *  the old page's "Last fit" line and its range fields draw this. An editor
+ *  opens on `editText` instead, the value to its last digit (WP-2223). */
+export function plainText(v: number): string {
   return Number.isFinite(v) ? String(Number(v.toPrecision(12))) : "";
 }
 
-/** Read a typed value, or say why it is refused (not a number, out of the row's bounds). */
+/** Read a typed value, or say why it is refused (not a number, out of the
+ *  row's bounds). It reads what the range fields read (`readNumber`): plain,
+ *  `1.5e-3`, `1.5×10⁻³` or `1.5x10^-3` (WP-2223). */
 export function parseTyped(s: Pick<Slider, "bound">, text: string): { value: number } | { why: string } {
-  const t = text.trim().replaceAll("−", "-");
-  const v = t === "" ? NaN : Number(t);
+  const v = text.trim() === "" ? NaN : readNumber(text);
   if (!Number.isFinite(v)) return { why: "not a number" };
   if (v < s.bound[0]) return { why: `below the lower bound ${s.bound[0]}` };
   if (v > s.bound[1]) return { why: `above the upper bound ${s.bound[1]}` };

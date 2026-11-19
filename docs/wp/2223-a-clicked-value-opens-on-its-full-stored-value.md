@@ -51,7 +51,7 @@ editor's text is display.
 
 ## Tasks
 
-- [ ] `lib/numslot.ts` and `lib/interactive.ts` `editText` give the full stored value;
+- [x] `lib/numslot.ts` and `lib/interactive.ts` `editText` give the full stored value;
       `parseTyped` reads through `readNumber`; both Interactive panels and both Params panels
       record no edit for an unchanged text. Vitest for each.
 - [ ] Browser case at `/next`, by real clicks: a ×10ⁿ value opens on its full text, Enter
