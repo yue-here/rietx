@@ -305,6 +305,17 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
   2026-11-19:* the single fit is covered, under the ruling's "wherever the trap occurs"
   and the measured preset behaviour; the alternative was the joint fit alone.
 
+  *Ruled by the maintainer 2026-11-19: (a), a hold silences it.* The single fit's
+  builder leaves out a variable the caller holds (`ref.hold`), read off the table with
+  `ParameterTable.held_by`, never re-derived. A variable at `vary=False` without a hold
+  still warns. The message wording stands. The suggestion's `unhold` sentence went with
+  it, since a held variable is no longer named. A joint fit has no hold verb yet (WP-2103
+  is not on this branch), so every unfreed coefficient there still warns; the joint
+  builder's docstring says so. `guides/tie.md`, `help.py` and the skill row say to hold
+  the variable when its start is meant. Test:
+  `test_a_held_variable_is_not_named_and_an_unheld_fixed_one_still_is`, which fails on
+  `where` with the filter removed.
+
   Next: none in this WP's tasks. The WP can close once #1714 merges.
 
 - **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR #1654, stacked on

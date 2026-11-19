@@ -4906,7 +4906,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "are tied to is freed only by a stage naming its `vars.<name>` path. The "
             "parameters that follow the variable are set from its start, and the data "
             "did not measure them. The result has no row for the variable in "
-            "`parameters`. Add a stage that frees it before you quote what it sets."
+            "`parameters`. Add a stage that frees it before you quote what it sets. In a "
+            "single fit, hold the variable with `Refinement.hold` to say the start is "
+            "meant, and it is not named."
         ),
     ),
     "WAVELENGTH_CALIBRATION": HelpEntry(

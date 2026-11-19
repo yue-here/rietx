@@ -145,6 +145,7 @@ From there it behaves like any other parameter: `parameters()` lists it, `set_va
 A plan replaces the vary flags, and none of the preset plans frees a variable.
 So a fit under a plan refines the variable only where a stage names it in `turn_on`, such as `rx.Stage("variables", ["vars.*"])`.
 Otherwise the variable keeps its start, and [`VARIABLE_NOT_FREED`](../reference/diagnostics-series.md#variable_not_freed) names it and the parameters that follow it.
+Hold the variable with `ref.hold("vars.<name>")` to say the start is meant, and the warning leaves it out.
 `Refinement.remove_variable` deletes one, and refuses while any parameter still follows it.
 
 A variable may follow other variables, so you can build a quantity from parts.

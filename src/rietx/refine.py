@@ -8407,13 +8407,18 @@ def _variable_not_freed_diagnostics(stage_results: list[StageResult],
     has no freedom of its own and is left out too: its sources are the ones
     named.  So is one setting only what ``mode`` force-fixes
     (:func:`mode_fixed_column`): ``_run_stage`` drops it from every stage, so
-    no ``turn_on`` could free it.  "Freed" is every stage's ``freed`` and
-    ``held`` together, as the joint reading counts it.  A report with no
+    no ``turn_on`` could free it.  So is one the caller holds
+    (``Refinement.hold``, read off the table through
+    :meth:`ParameterTable.held_by`): the hold says the start is meant, and a
+    variable at ``vary=False`` without one still warns (ruled by the
+    maintainer 2026-11-19, option (a)).  "Freed" is every stage's ``freed``
+    and ``held`` together, as the joint reading counts it.  A report with no
     action (DESIGN.md Rule 4).
     """
     ever = {p for sr in stage_results for p in (*sr.freed, *sr.held)}
     unfreed = [e for e in table.entries
-               if is_variable_path(e.path) and e.tie is None and e.path not in ever]
+               if is_variable_path(e.path) and e.tie is None and e.path not in ever
+               and table.held_by(e.path) != "caller"]
     if not unfreed:
         return []
     reach = table.entry_reach()
@@ -8440,10 +8445,7 @@ def _variable_not_freed_diagnostics(stage_results: list[StageResult],
                  "kept its starting value, so the parameters that follow it are set "
                  "from that start and the data did not measure them."),
         suggestion=("A plan frees a variable only where a stage's turn_on names it, "
-                    "such as a stage turning on vars.*."
-                    + (" A variable held by Refinement.hold stays fixed under any "
-                       "stage until unhold releases it."
-                       if any(e.held for e, _ in idle) else "")))]
+                    "such as a stage turning on vars.*."))]
 
 
 #: an atom's coordinate, which a site-symmetry table drives through

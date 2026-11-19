@@ -3653,7 +3653,9 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
     counts them.  "Freed" is every stage's ``freed`` and ``held`` together, so
     a coefficient the support hold took back is ``PARAMETRIC_TARGET_UNSEEN``'s
     and is not named twice.  A report of the fact, with no action taken
-    (DESIGN.md Rule 4).
+    (DESIGN.md Rule 4).  The single fit leaves out a variable the caller
+    holds (ruled 2026-11-19, option (a)); a joint fit has no hold verb yet
+    (WP-2103), so nothing here can be held and every such coefficient warns.
     """
     if not coefficients:
         return []
