@@ -115,7 +115,7 @@ npm --prefix gui test && npm --prefix gui run check
     and so do two of the four vitest mount cases.
   - *Generality*: no flag, threshold or automatic action; `tests.audit_delta` reports no row
     changed. The judge was not dispatched.
-  - *Next*: none here. The follow-on for WP-2218's background holds is WP-2228 (filed as 2224, renumbered at the merge with main, whose 2224 is another).
+  - *Next*: none here. The follow-on for WP-2218's background holds is WP-2229 (filed as 2224, renumbered twice at merges with main, whose 2224 and 2228 are others).
 
 - **2026-11-19** — filed by the ghostshift runner for the edit-box ruling. No open WP owns the
   GUI's editor text: WP-2218 is the R3 build and waits only on Yue's look, and 2211 and 2212

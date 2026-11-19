@@ -1,4 +1,4 @@
-# WP-2228 — Every change to the background's shape releases its holds, and no pending edit outlives its path
+# WP-2229 — Every change to the background's shape releases its holds, and no pending edit outlives its path
 
 Milestone: gui-overhaul · Status: ⬜
 Depends on: 2218 (the Background graph's fix this generalises)
