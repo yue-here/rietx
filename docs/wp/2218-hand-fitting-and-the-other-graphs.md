@@ -296,6 +296,28 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
+- **2026-11-19** — The third PR, PR #1683, brought up to the 2026-11-19 round of PR #1680.
+
+  This branch merges PR #1680's round: the dark last-fit colour, the range pop-up's digits,
+  the Peaks windows and the overview strip (§ Rulings 5-7). Nothing in the Structure graph
+  changed. § Rulings 7 also notes that the sliders already move the Structure graph. The
+  existing `structure-preview-*.png` shows that drag and its "Preview, not refined" title,
+  but on the default range a 0.3 drag moves the cell frame by about one pixel. A wider pair
+  was added, `structure-rest-wide-*.png` and `structure-preview-wide-*.png`: the pop-up range
+  typed to 6-14 Å, then the same 0.3 drag, which takes a from 9.373 Å to 11.776 Å.
+
+  - *Done*: the merge of PR #1680's branch, with the WP file's § Questions and handover log
+    and the screenshots README resolved by hand, and the dist rebuilt from the merged
+    sources. The wide pair, light and dark, each looked at.
+  - *Measured*:
+    fast suite 14950 passed, 424 skipped and 32 xfailed in 9:20, through the shift's serial
+    lock: two more than this PR's last count, PR #1680's palette test in each theme. Vitest
+    839 of 839. svelte-check 0 errors in 456 files. Ruff clean. GUI python files
+    (`test_gui_server`, `_dist`, `_manual`, `_style_guide`, `_palette`, `_preview`): 288
+    passed. Every browser file by glob (`tests/*_browser.py`), serially: 170 passed. CI's
+    Vale steps, run as `ci.yml` runs them: 0 errors.
+  - *Next*: PR #1684 takes the same merge, then § Rulings 6 (the Peak shape row).
+
 - **2026-11-19** — Yue's rulings of 2026-11-19 applied to the second PR, PR #1680.
 
   Yue looked at R3 and called it "mostly good". This branch carries the three things the look
