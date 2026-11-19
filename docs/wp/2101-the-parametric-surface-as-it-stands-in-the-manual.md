@@ -222,7 +222,7 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
 - **2026-11-19 (closed)** — The last slice, PR #1714, merged as `8aaaf54c3` at 22:09Z,
   merged by the maintainer. Every task was already ticked, and the entry below said the
   WP closes once #1714 merged. This close was done by a ghostshift runner in the
-  close-only PR #PRNUM: the Priority line and the consumed `### Inherited` section went
+  close-only PR #1719: the Priority line and the consumed `### Inherited` section went
   (its one note was done in WP-1325's PR #1497), and the narrative moved to the v1.13
   record. One follow-up went to WP-2103's `### Inherited`: once a joint fit has a
   `hold` verb, its `VARIABLE_NOT_FREED` builder leaves out a held coefficient, as the
