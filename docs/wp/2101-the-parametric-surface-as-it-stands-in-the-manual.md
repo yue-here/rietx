@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-17 — second slice in review (#1632), the Durham inventory stacked on it; two rulings owed
+Milestone: parametric · Status: 🔄 2026-11-19 — the maintainer's two rulings in; `VARIABLE_NOT_FREED` and the refusal's `.parameters()` in review
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
@@ -33,9 +33,10 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   `mccusker_default` left the coefficients of a coordinate, B, occupancy, size,
   strain, axial and wavelength equation at their starts, absent from
   `result.parameters`, with no diagnostic naming them. That is the held-slope trap's
-  sibling.
+  sibling. *Superseded 2026-11-19:* `VARIABLE_NOT_FREED` names it.
 - Freeing only `vars.a_0` holds the slope at its start of 0. Rwp went from 0.49 to 0.86
   on the ramp and nothing was reported. This is undocumented.
+  *Superseded 2026-11-19:* `VARIABLE_NOT_FREED` names the held slope.
 - Equations nonlinear in one scalar already work by scanning that scalar through
   `design` rows. Holding θ at 200, 400 and 800 K gave χ² of 150.1, 150.5 and 155.7, at
   about 0.4 s a fit. The scan gives no esd on θ. That example is not in the manual.
@@ -44,6 +45,7 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   So the scan task below may now be moot; the next session decides.
 - The refusal for an unknown target points at the private
   `mtable.tables[h].entries`, where `.parameters()` is the public answer.
+  *Superseded 2026-11-19:* it names `.parameters()`.
 
 ### Inherited
 
@@ -105,15 +107,21 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [x] Document the held-slope trap where a reader meets it, in `guides/equation.md`.
   *Done 2026-11-17:* § Check that every coefficient refined, with the plan-reach
   sibling beside it, both executed by `examples/guides/equation.py`.
-- [ ] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
+- [x] Decide whether the two traps earn a diagnostic, under Rule 1 of DESIGN.md. A new
   diagnostic changes what a fit prints, so the maintainer rules first (handover entry
-  2026-11-17 has the brief).
+  2026-11-17 has the brief). *Ruled by the maintainer 2026-11-19:* option (b). A new
+  code names each parametric equation whose coefficients no plan stage freed, listing
+  them, printed only when it happens, and `PARAMETRIC_FORM_REJECTED`'s suggestion names
+  a held variable in `where` before suggesting a rewrite. It reports the fact and its
+  meaning, with no automatic fix (DESIGN.md Rules 1 and 4). *Done 2026-11-19:*
+  `VARIABLE_NOT_FREED`, in the joint fit and in a single fit (handover entry).
 - [x] A worked `design` scan over a held scalar, in `examples/`, included into
   `guides/equation.md`, with its missing esd stated. *Withdrawn 2026-11-17:* a formula
   equation now refines the nonlinear scalar itself, with an esd (`guides/formula.md`,
   θ = 500.17 ± 0.61 K), so the scan is a weaker spelling of a fit the manual already
   shows.
-- [ ] The refusal message names `.parameters()`.
+- [x] The refusal message names `.parameters()`. *Ruled by the maintainer 2026-11-19:*
+  the consent item stood. *Done 2026-11-19.*
 - [x] Skill: the series reference's parametric row, or "none" and why. *Done
   2026-11-17:* the existing row in `series.md` carries the plan-reach rule, tightened to
   stay inside the file's budget, and `diagnostics.md`'s `PARAMETRIC_FORM_REJECTED` row
