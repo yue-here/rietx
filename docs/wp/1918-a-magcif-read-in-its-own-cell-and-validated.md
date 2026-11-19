@@ -148,6 +148,33 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   both through `OperatorGroup.closest_type`. Checked against the tree at 7a4a6cd20. WP-2221
   owns the fix. I-d's acceptance run reaches the same raise until it lands.
 
+- **2026-11-19, from the issue triage (issues #1689, #1691): the 4d ions past M⁺ have no
+  form-factor row, and computed rows are offered.** Folded here beside I-e because both add
+  rows to one table in `crystallography/magnetic/form_factor.py`, with an `ATTRIBUTION.md` row
+  and the table's fingerprint test, and because #1691's first question is I-e's own (which
+  analytic form the computed rows share). I-e as written covers 5d only, so this widens it.
+  - #1689: `magnetic_form_factor("Ru4+", s)` raises `KeyError`, as do `Ru3+` and `Rh4+`; the
+    table carries `Ru`, `Ru1+`. The refusal is #202's rule and stays. The reporter found no
+    held reference tabulating Ru²⁺-Ru⁴⁺ (Brown 2004 stops at M⁺ for every 4d element;
+    Kobayashi et al. 2011 is 5d). One MAGNDATA file among #757's 51 form-factor refusals is
+    Ru⁴⁺, so this row moves I-e's count.
+  - #1691: ten computed ⟨j₀⟩/⟨j₂⟩ rows (Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺), free-ion
+    Hartree-Fock from Cowan's RCN in Kobayashi's HFR footing, fitted to Brown's 7-parameter
+    form, with the reporter's controls (Brown's Fe³⁺ and Ru⁺, Kobayashi's Ir⁴⁺, a Dirac-Fock
+    check). It also proposes a user-supplied form factor with a required source string, and
+    leaves five questions open: which form ships, which ions, evaluation past s = 1.5 Å⁻¹,
+    where the input decks live, and where a user-supplied form factor is declared.
+  - #1691's comment of 2026-11-19: the shipped bare `"Mo"`, `"Tc"`, `"Ru"`, `"Rh"` rows are
+    Brown's fits to singly charged M⁺ 4dⁿ⁻³5s² curves under a neutral label, and the reporter
+    asks for a note on the rows or true neutral rows.
+  - Checked against the tree at 7a4a6cd20: the three `KeyError`s reproduce; the bare and `1+`
+    rows differ (`Ru` 0.4907 against `Ru1+` 0.4268 at s = 0.2 Å⁻¹). The configuration claims
+    in the comment were not re-derived.
+  - Who decides: every question above is a magnetic-path design call, so Mike's (#1075). Two
+    touch the maintainer's side and are named for the maintainer: computed coefficients would ship in the
+    wheel, where the data fence asks each file to state its status (root CLAUDE.md
+    § Licensing), and question 4 decides whether the input decks enter the repository.
+
 ## Non-goals
 
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.
