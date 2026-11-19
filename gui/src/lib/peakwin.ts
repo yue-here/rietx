@@ -16,8 +16,21 @@ import type { Curves } from "rxplot";
 
 /** How many equal 2θ bins the pattern is cut into, one window candidate each. */
 export const BINS = 12;
-/** How many windows show at once. */
+/** How many windows today's Single peaks graph shows; `/next` shows as many as fit. */
 export const SHOWN = 3;
+/** `/next`'s grid of windows (WP-2218): a column is at least this wide, the
+ *  prototype's 240 px, and a window, its caption included, at least this tall. */
+export const COLUMN_MIN = 240;
+export const FIGURE_MIN = 190;
+/** The gap between windows, the grid's `gap`. */
+export const GRID_GAP = 16;
+
+/** How many columns and rows of windows fit a grid of this inner size. */
+export function gridShape(width: number, height: number): { cols: number; rows: number } {
+  return { cols: Math.max(1, Math.floor((width + GRID_GAP) / (COLUMN_MIN + GRID_GAP))),
+           rows: Math.max(1, Math.floor((height + GRID_GAP) / (FIGURE_MIN + GRID_GAP))) };
+}
+
 /** A window spans the peak's FWHM this many times on each side. */
 export const HALF_WIDTHS = 5;
 
@@ -95,12 +108,19 @@ export function peakWindows(c: Curves, bins = BINS): PeakWindow[] {
   return best.filter((w): w is PeakWindow => !!w);
 }
 
-/** The windows shown first: one low, one in the middle and one high, as the prototype did. */
-export function firstPicks(n: number): number[] {
-  if (n <= SHOWN) return Array.from({ length: n }, (_, i) => i);
-  // at four, the prototype's [1, n/2, n − 2] names the third window twice
-  if (n === SHOWN + 1) return [0, Math.floor(n / 2), n - 1];
-  return [1, Math.floor(n / 2), n - 2];
+/**
+ * The `shown` windows shown first, of `n`, spread evenly across 2θ. The
+ * prototype showed three, one low, one in the middle and one high, and left
+ * out the two end bins: [1, n/2, n − 2]. Any other count spreads the same way
+ * (WP-2218), and takes the end bins only where leaving them out would name a
+ * window twice.
+ */
+export function firstPicks(n: number, shown = SHOWN): number[] {
+  const k = Math.max(0, Math.min(n, shown));
+  if (k === n) return Array.from({ length: n }, (_, i) => i);
+  if (k === 1) return [Math.floor(n / 2)];
+  const [a, b] = n >= k + 2 ? [1, n - 2] : [0, n - 1];
+  return Array.from({ length: k }, (_, i) => Math.round(a + (i * (b - a)) / (k - 1)));
 }
 
 /** The widest window peak, which the sliders' default ranges are measured in. */

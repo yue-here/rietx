@@ -14,7 +14,9 @@
    * The prototype's screen, restated in WP-2218 § Context: a title line saying
    * what the graph shows, with "Show" and its two choices; up to three windows
    * in a grid of 240 px columns, each titled ‹, the 2θ in mono, the hkl and
-   * phase muted, ›. "Data and model" draws the crosses, the last fit and any
+   * phase muted, ›. The maintainer's look of 2026-11-19 asked for more: the
+   * grid is filled with as many windows as fit, spread across 2θ, under an
+   * overview of the whole pattern that shades each shown window's range. "Data and model" draws the crosses, the last fit and any
    * preview over a 44 px residual strip with its ±3 esd band. "Peak shape
    * alone" draws the model over its background, the last fit and the preview.
    * Under a preview the last fit is the grey `--plot-last`, solid (the
@@ -28,8 +30,8 @@
 
   import type { PreviewAnswer } from "../lib/interactive";
   import { formatHkl } from "../lib/peaks";
-  import { firstPicks, netCurve, peakWindows, shapeRange, windowRange,
-           type PeakWindow } from "../lib/peakwin";
+  import { FIGURE_MIN, firstPicks, gridShape, netCurve, peakWindows, shapeRange, SHOWN,
+           windowRange, type PeakWindow } from "../lib/peakwin";
   import { curveColors } from "../lib/plot";
 
   let {
@@ -89,13 +91,23 @@
   });
 
   const windows = $derived(curves ? peakWindows(curves) : []);
-  // a new set of windows (a fit landed) starts again from the first picks; a
-  // payload framing the same reflections keeps the windows the person stepped
-  // to. Derived rather than reset in an effect, so a render never indexes a
-  // shorter set with the last set's picks
-  const windowsKey = $derived(windows.map((w) => w.center).join(","));
+
+  // the grid holds as many windows as fit (WP-2218); until it is measured it
+  // holds the prototype's three in one column
+  let width = $state(0);
+  let height = $state(0);
+  const grid = $derived(width && height ? gridShape(width - 32, height - 12) : { cols: 1, rows: SHOWN });
+  const cols = $derived(grid.cols);
+  const rows = $derived(grid.rows);
+
+  // a new set of windows (a fit landed) or a new count starts again from the
+  // first picks; a payload framing the same reflections keeps the windows the
+  // person stepped to. Derived rather than reset in an effect, so a render
+  // never indexes a shorter set with the last set's picks
+  const windowsKey = $derived(`${cols * rows}:${windows.map((w) => w.center).join(",")}`);
   let stepped = $state<{ key: string; picks: number[] } | null>(null);
-  const picks = $derived(stepped?.key === windowsKey ? stepped.picks : firstPicks(windows.length));
+  const picks = $derived(stepped?.key === windowsKey ? stepped.picks
+    : firstPicks(windows.length, cols * rows));
 
   /** The last fit's model on the pattern's channels, its channels' 2θ, and
    *  the model over its background there. */
@@ -108,13 +120,20 @@
              net: calc ? netCurve(calc, bkg) : null };
   });
 
+  /** The preview's model over its background, built once per answer rather
+   *  than once per window per frame. */
+  const previewNet = $derived.by(() => {
+    const pv = preview?.curves.arrays;
+    return pv ? netCurve(pv.y_calc, pv.y_background) : null;
+  });
+
   const previewing = $derived(!!preview && windows.length > 0);
   const pct = (x: number | null | undefined) => (x == null ? "" : `${(x * 100).toFixed(2)} %`);
   const titleTip = $derived(previewing ? "Preview, not refined"
     : previewError ? `Last fit. Preview refused: ${previewError}` : windows.length ? "Last fit" : "");
 
   let canvases: HTMLCanvasElement[] = $state([]);
-  let width = $state(0);
+  let overview: HTMLCanvasElement | undefined = $state();
 
   function step(slot: number, by: number) {
     const next = [...picks];
@@ -125,6 +144,7 @@
   $effect(() => {
     void theme;
     void width;
+    void height;
     void picks;
     void preview;
     void windows;
@@ -132,6 +152,73 @@
     // one microtask: the shell stamps the theme in an effect of the same flush
     void Promise.resolve().then(() => canvases.forEach((cv, i) => cv && draw(cv, windows[picks[i]])));
   });
+
+  // the overview follows the pattern, the theme and its width; the bands are
+  // DOM over it, so stepping a window repaints nothing
+  $effect(() => {
+    void theme;
+    void width;
+    const cv = overview, c = curves;
+    void Promise.resolve().then(() => cv && c && drawOverview(cv, c));
+  });
+
+  /** The whole pattern's 2θ extent, which the overview spans. */
+  const extent = $derived.by((): [number, number] | null => {
+    const tt = curves?.arrays.two_theta;
+    return tt && tt.length > 1 ? [tt[0], tt[tt.length - 1]] : null;
+  });
+
+  /** Where a window sits on the overview, as shares of its width. */
+  function bandOf(w: PeakWindow | undefined): { left: number; width: number } | null {
+    if (!w || !extent) return null;
+    const [t0, t1] = extent;
+    const a = Math.max(0, (w.lo - t0) / (t1 - t0)), b = Math.min(1, (w.hi - t0) / (t1 - t0));
+    return b > a ? { left: a, width: b - a } : null;
+  }
+
+  /**
+   * The overview: the observed pattern on the Pattern graph's default square-root
+   * scale, each pixel column drawn as the extremes of the points under it, as
+   * the chart module paints a dense pattern (gui/CLAUDE.md, WP-1461).
+   */
+  function drawOverview(cv: HTMLCanvasElement, c: Curves) {
+    const ctx = cv.getContext?.("2d");
+    const tt = c.arrays.two_theta, obs = c.arrays.y_obs;
+    if (!ctx || !extent || !obs) return;
+    const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
+    if (!W || !H) return;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const f = (v: number) => Math.sign(v) * Math.sqrt(Math.abs(v));
+    const [t0, t1] = extent;
+    const lo = new Float64Array(W).fill(Infinity), hi = new Float64Array(W).fill(-Infinity);
+    let y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < tt.length; i++) {
+      const v = f(obs[i]);
+      if (!Number.isFinite(v)) continue;
+      const col = Math.min(W - 1, Math.max(0, Math.floor(((tt[i] - t0) / (t1 - t0)) * W)));
+      lo[col] = Math.min(lo[col], v);
+      hi[col] = Math.max(hi[col], v);
+      y0 = Math.min(y0, v);
+      y1 = Math.max(y1, v);
+    }
+    if (!(y1 > y0)) return;
+    const T = 2, B = 2, py = (v: number) => T + ((y1 - v) / (y1 - y0)) * (H - T - B);
+    const style = getComputedStyle(document.body);
+    ctx.strokeStyle = curveColors((n) => style.getPropertyValue(n)).obs;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let pen = false;
+    for (let x = 0; x < W; x++) {
+      if (!(hi[x] >= lo[x])) { pen = false; continue; }
+      if (pen) ctx.lineTo(x + 0.5, py(hi[x])); else ctx.moveTo(x + 0.5, py(hi[x]));
+      ctx.lineTo(x + 0.5, py(lo[x]));
+      pen = true;
+    }
+    ctx.stroke();
+  }
 
   function draw(cv: HTMLCanvasElement, w: PeakWindow | undefined) {
     const ctx = cv.getContext?.("2d");
@@ -194,7 +281,7 @@
     // maintainer, 2026-11-18); the preview takes the model's ink
     const fitY = data ? calc : lastFit.net;
     if (fitTT && fitY) line(fitTT, fitY, pv ? c.last : c.calc, pv ? 1.2 : 1.3);
-    if (pv) line(pv.two_theta, data ? pv.y_calc : netCurve(pv.y_calc, pv.y_background), c.calc, 1.5);
+    if (pv) line(pv.two_theta, data ? pv.y_calc : previewNet ?? pv.y_calc, c.calc, 1.5);
     ctx.restore();
     if (data) {
       // the residual strip: the preview's when there is one, else the last fit's
@@ -266,7 +353,23 @@
     </div>
   </div>
 
-  <div class="wins" bind:clientWidth={width}>
+  {#if windows.length}
+    <!-- the whole pattern, with each shown window's 2θ range shaded -->
+    <div class="overview" aria-hidden="true">
+      <canvas bind:this={overview}></canvas>
+      {#each picks as k, slot (slot)}
+        {@const b = bandOf(windows[k])}
+        {#if b}
+          <span class="band"
+            style:left={`${b.left * 100}%`} style:width={`${b.width * 100}%`}></span>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+
+  <div class="wins" bind:clientWidth={width} bind:clientHeight={height}
+    style:grid-template-columns={`repeat(${cols}, minmax(0, 1fr))`}
+    style:grid-template-rows={`repeat(${rows}, minmax(${FIGURE_MIN}px, 1fr))`}>
     {#if loadError}
       <p class="empty bad">{loadError}</p>
     {:else if loaded && !windows.length}
@@ -306,15 +409,37 @@
     white-space: nowrap;
   }
 
+  /* the counts are the script's (cols, rows), so the grid holds what was picked */
   .wins {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    align-content: start;
     gap: 16px;
     padding: 0 16px 12px;
+  }
+
+  .overview {
+    position: relative;
+    flex: none;
+    height: 36px;
+    margin: 0 16px 12px;
+  }
+
+  .overview canvas {
+    height: 100%;
+    border-radius: 0;
+    background: none;
+  }
+
+  /* a shown window's range: an accent wash, the accent marking a selection
+     on a plot (gui/STYLE.md § Colour) */
+  .band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    pointer-events: none;
   }
 
   .empty {
@@ -330,6 +455,9 @@
   figure {
     margin: 0;
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   figcaption {
@@ -366,8 +494,13 @@
   canvas {
     display: block;
     width: 100%;
-    height: 240px;
     border-radius: 6px;
     background: var(--panel);
+  }
+
+  /* a window's plot takes what its row leaves under the caption */
+  figure canvas {
+    flex: 1 1 0;
+    min-height: 0;
   }
 </style>
