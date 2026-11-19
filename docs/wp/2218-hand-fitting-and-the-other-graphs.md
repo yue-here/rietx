@@ -259,6 +259,57 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
+- **2026-11-19** — Yue's rulings of 2026-11-19 applied to the second PR, PR #1680.
+
+  Yue looked at R3 and called it "mostly good". This branch carries the three things the look
+  asked for and the dark last-fit colour Yue chose. The dark last fit is now the blue-grey
+  `#7f8f94` (§ Rulings 5). The range pop-up's From and To read in the value box's digits:
+  Caglioti U opens on 0.2772×10⁻³ to 4.4362×10⁻³, where it read 0.000277258872224. The Peaks
+  graph shows six windows at the default split, two columns of three, under an overview strip
+  of the whole pattern that shades each window's range. § Rulings 5-7 record the rulings, and
+  § Questions 13 lists the visual values Claude chose to build the three items, for Yue's look.
+
+  - *Done*: `viz/theme.py`'s dark `--plot-last` and its docstring, `tokens.css` regenerated,
+    and the two pairs under the floor named in `tests/test_gui_palette.py` (`NAMED_PAIRS`, and
+    `LAST_FROM_MUTED` with a new test, made to fail once first). The rounding is at the
+    range, not only at the display: `lib/interactive.ts:roundRange` rounds a computed range
+    outward to the value box's digits where `/next` builds or restores one, so the fields
+    show the slider's real ends. `rangeText` writes them in the box's ×10ⁿ, `readNumber`
+    reads that back, and an end left as shown keeps the slider's own value, so a typed range
+    round-trips to the last digit. Today's page keeps its ranges. `lib/peakwin.ts` gained
+    `gridShape` (columns of at least 240 px, rows of at least 190 px) and `firstPicks` for
+    any count, which gives the prototype's three unchanged. `next/Peaks.svelte` sizes the
+    grid from the graph's measured size and draws the overview. Tests: vitest
+    `lib/interactive.test.ts` (3), `lib/peakwin.test.ts` (2), `next/Graphs.test.ts` (1); the
+    browser cases for the pop-up's digits and for the overview's bands, stepped by a real
+    click on ›, extend two existing cases. Pictures re-shot, light and dark: every
+    `interactive-*.png` and `peaks-*.png`, plus the new `peaks-stepped-*.png`.
+  - *Review*: `/code-review high` against the previous head (43eddfb48) returned ten. One was
+    on this round's code and is fixed: the Peaks graph rebuilt the preview's net curve per
+    window on every frame, six times now. The other nine are on the earlier commits of this
+    PR, mostly the Background graph, and are left for the PR's review: committed holds that
+    survive a Type switch or a Terms cut and land on the new background's coefficients of the
+    same name; pending value and vary edits on removed terms that make the next Apply
+    refused; the "Background preview" title read from the client's holds rather than the
+    answer's; a pending hold on a vanished path refusing every band fetch; glob holds left
+    out of the band; the TypeScript port of `for_range` with no corpus replay; the band cache
+    keeping one answer; a console echo that does not match the Terms edit; and `.vg` copied
+    into three files.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright 1.65.0, Python 3.12):
+    fast suite 14948 passed, 424 skipped and 32 xfailed in 9:55, through the shift's serial
+    lock: two more than this PR's last count, the new palette test in each theme. Vitest 831
+    of 831, six more than 825. svelte-check 0 errors in 453 files. Ruff clean. GUI python
+    files (`test_gui_palette`, `_dist`, `_server`, `_manual`, `_style_guide`,
+    `_background`): 267 passed. Every browser file by glob (`tests/*_browser.py`),
+    serially: 169 passed. CI's Vale steps, run as `ci.yml` runs them: 0 errors.
+  - *Gotchas*: in jsdom an element is never measured, so the grid falls back to the
+    prototype's three windows until its size is known; the vitest cases see three. A
+    canvas cannot take `role="img"` under svelte-check, so the overview is `aria-hidden`
+    and the windows' captions carry the positions.
+
+  Next: Yue's look at § Questions 13 and the re-shot pictures. The same rulings reach the
+  third and fourth PRs by merge, and the fourth PR builds § Rulings 6.
+
 - **2026-11-18** — the second PR of R3, PR #1680: the Peaks and Background graphs at `/next`.
 
   A person on the rebuilt page can now open the Peaks graph and see three windows of the last
