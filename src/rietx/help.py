@@ -4407,16 +4407,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Fit the pattern on its own to find out why."
         ),
     ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
-        ),
-    ),
     "SERIES_PATTERN_FAILED": HelpEntry(
         title="A pattern could not be fitted",
         description=(
