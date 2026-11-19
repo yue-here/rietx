@@ -563,14 +563,32 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
 
 ROWS: tuple[Row, ...] = (
     # code: 258
-    Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code"),
-    Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code"),
+    Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when the absorption record carries skipped, so "
+                  "the radius or thickness the caller declared entered no correction "
+                  "(refine.py _absorption_diagnostics); the record says why; gates nothing")),
+    Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code", tier=2, ambiguity=1,
+        evidence=("Rouse, Cooper, York & Chakera (1970) Acta Cryst. A26, 682: the "
+                  "correction's fit domain ends at muR = 1 "
+                  "(model.absorption.CYLINDER_MU_R_MAX, tier 2); fires exactly past it and "
+                  "gates nothing")),
     Row("ABSORPTION_PLATE_THICKNESS", "code"),
     Row("ABSORPTION_THICKNESS_MATTERS", "code"),
-    Row("ADP_NOT_POSITIVE_DEFINITE", "code"),
+    Row("ADP_NOT_POSITIVE_DEFINITE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a displacement tensor with a non-positive eigenvalue makes the "
+                  "Debye-Waller factor diverge at high Q; fires exactly when the smallest "
+                  "eigenvalue is <= 0 (staged.check_adp_positive_definite)")),
     Row("AIR_SCATTER_UNDECLARED", "code"),
     Row("BACKGROUND_ABSORPTION", "code"),
-    Row("BACKGROUND_ORDER_AT_CAP", "code"),
+    Row("BACKGROUND_ORDER_AT_CAP", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the chosen order is the scan's cap, not a Durbin-Watson stop",
+        scope=('all',),
+        evidence=("arithmetic: fires exactly when select_chebyshev_order's scan reached "
+                  "CHEBYSHEV_MAX_ORDER without its Durbin-Watson stop (both tier 3, approved "
+                  "2026-10-19); the pick verb is the caller's (auto_background); the code "
+                  "tiers its own part and the threshold keeps its row, as STAGE_SLOW_DESCENT "
+                  "does; settled by Claude 2026-11-17 (WP-2005)")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
         evidence=("a reading of the scan's own record: fires exactly when no candidate of "
                   "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
@@ -583,13 +601,35 @@ ROWS: tuple[Row, ...] = (
         responds=("note that the baseline's smoothing strength is the grid's end and not "
                   "the scan's choice, before holding that baseline fixed"),
         scope=("all",)),
-    Row("BISO_NEGATIVE", "code"),
+    Row("BISO_NEGATIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: Biso = 8 pi^2 <u^2> cannot be negative; fires exactly when a "
+                  "refined isotropic value is below zero (staged.check_biso_negative, no "
+                  "tolerance)")),
     Row("BISO_UNUSUALLY_LARGE", "code"),
-    Row("BOUND_HIT", "code"),
-    Row("BRINDLEY_OUTSIDE_REGIME", "code"),
+    Row("BOUND_HIT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: one finding per path staged.bound_findings reports on a "
+                  "caller's limit that carried load; its tests are BOUND_HIT_RTOL (tier 1) "
+                  "and BOUND_HIT_ESD_FRAC, BOUND_HIT_COS_MIN (tier 3, approved 2026-10-19); "
+                  "the code tiers its own part and the threshold keeps its row, as "
+                  "STAGE_SLOW_DESCENT does; settled by Claude 2026-11-17 (WP-2005)")),
+    Row("BRINDLEY_OUTSIDE_REGIME", "code", tier=2, ambiguity=1,
+        evidence=("Brindley (1945) Phil. Mag. 36, 347: the correction's medium-powder class "
+                  "ends at mu*D = 0.1 (optimize.qpa.BRINDLEY_MU_R_FENCE, tier 2, FullProf's "
+                  "classes agree); fires exactly past it and gates nothing")),
     Row("BRML_ABSORBER_ENGAGED", "code"),
-    Row("CAPILLARY_OFFSET_UNAVAILABLE", "code"),
-    Row("CELL_DEGENERATE_PROBE", "code"),
+    Row("CAPILLARY_OFFSET_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing; declare the goniometer radius to refine the capillary's offset",
+        evidence=("arithmetic: the specimen-offset terms of a capillary scale with the "
+                  "goniometer radius, so with none declared they are held at zero; fires "
+                  "exactly then (refine.py _capillary_offset_diagnostics)")),
+    Row("CELL_DEGENERATE_PROBE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("nothing: the solver rejected those trial cells and the answer is not one "
+                  "of them"),
+        evidence=("arithmetic: a trial cell of zero or negative volume has no metric; fires "
+                  "exactly when the solver probed one in the stage (refine.py "
+                  "_degenerate_cell_diagnostics); gates nothing")),
     Row("CELL_RUNAWAY", "code", tier=3, ambiguity=1,
         evidence=("WP-1110's trigger: a visible phase sharing its cell with a 2 % trace copy ran "
                   "4.16 -> 3803 A in one stage; fired in none of WP-1523's 104 fits; names what "
@@ -663,12 +703,33 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
     Row("CIF_SITE_TWINS_MERGED", "code"),
     Row("CIF_SPECIES_NORMALISED", "code"),
-    Row("CONSTRAINT_ACTIVE", "code"),
-    Row("COVARIANCE_DIRECTION_DISCARDED", "code"),
-    Row("COVARIANCE_UNAVAILABLE", "code"),
+    Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("note which width the floor held; the next fit's start decides whether it "
+                  "holds again"),
+        scope=('microstructure', 'calibration'),
+        evidence=("arithmetic: counts the LM steps held against a built-in linear inequality "
+                  "(the Stephens cone, Gamma_G^2 >= 1e-8) in the final stage; fires exactly "
+                  "when the count is above zero; the inequalities are physics (a variance "
+                  "cannot be negative); gates nothing")),
+    Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: names the parameters sharing a direction the covariance build "
+                  "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
+                  "holds (staged.check_discarded_directions)")),
+    Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when the esd calculation raised after the "
+                  "solver returned (refine.py _covariance_diagnostics), so the stage's "
+                  "values stand with no esds")),
     Row("DATA_SUPPORT_LOW", "code"),
-    Row("DECLARED_RANGE_NOT_RESTORED", "code"),
-    Row("DECLARED_RANGE_RESTORED", "code"),
+    Row("DECLARED_RANGE_NOT_RESTORED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: an older file's hand-set parameter has no limits and "
+                  "migration found no declared range for its path (schemas/migrate.py "
+                  "_not_restored_note); fires exactly then; a record of what migration did")),
+    Row("DECLARED_RANGE_RESTORED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: migration restored the declared range of an older file's "
+                  "hand-set parameter (schemas/migrate.py _restored_note), a warning where "
+                  "the value sits on the restored limit; its level is computed, so it keeps "
+                  "no response until split")),
     Row("DISPERSION_NEGLECTED", "code"),
     Row("EXTINCTION_CONDITIONS_PARTIAL", "code"),
     Row("EXTINCTION_FORBIDDEN_INTENSITY", "code"),
@@ -688,11 +749,21 @@ ROWS: tuple[Row, ...] = (
                   "scored against does not model the allowed lines; refine the cell or the "
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
-    Row("EXTRA_PEAK_NO_INTENSITY", "code"),
+    Row("EXTRA_PEAK_NO_INTENSITY", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a declared extra peak's area finished on its zero floor "
+                  "within staged.BOUND_HIT_RTOL (tier 1); fires exactly then")),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
-    Row("FLAT_DIRECTION", "code"),
+    Row("FLAT_DIRECTION", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires at |rho| >= staged.FLAT_DIRECTION_RHO, 1 - 5e-4, the "
+                  "half-width of rho's three-decimal print (tier 1), so it claims only "
+                  "'1.000 as printed'")),
     Row("FLAT_DIRECTION_OMITTED", "code"),
-    Row("FLOOR_HIT", "code", response="warning",
+    Row("FLOOR_HIT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: the zero-floor half of staged.bound_findings (a scale or "
+                  "width that cannot go negative, or W's clamp), tested as BOUND_HIT is; the "
+                  "code tiers its own part and the threshold keeps its row, as "
+                  "STAGE_SLOW_DESCENT does; settled by Claude 2026-11-17 (WP-2005)"),
+        response="warning",
         responds=("quote an upper limit, not a value, for the parameter on its floor, and "
                   "check whatever trades against it before quoting an ADP, an occupancy or "
                   "a scale")),
@@ -779,7 +850,12 @@ ROWS: tuple[Row, ...] = (
     Row("GSAS_PRM_VALUE_NARROWED", "code"),
     Row("HARMONIC_ABSENT", "code"),
     Row("HARMONIC_FRACTION", "code"),
-    Row("HARMONIC_HELD", "code"),
+    Row("HARMONIC_HELD", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the harmonic's weight is the value the caller declared",
+        evidence=("arithmetic: fires exactly when a declared harmonic's weight path is free "
+                  "in no stage, so it stays at its declared value (refine.py "
+                  "_harmonic_diagnostics); the harmonic is the caller's declaration")),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
     Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
@@ -794,7 +870,15 @@ ROWS: tuple[Row, ...] = (
                   "inside the last tree, so no other choice reloads with it. Nothing is "
                   "deleted. Load, not raise, is the maintainer's ruling of 2026-11-03 (old "
                   "files must always open; WP-2031)")),
-    Row("HOLD_BLOCKED_PLAN", "code"),
+    Row("HOLD_BLOCKED_PLAN", "code", tier='caller', ambiguity=1,
+        response="info",
+        responds="nothing: the held paths stayed where the caller held them",
+        evidence=("opt-in: Refinement.hold(), nothing held by default "
+                  "(StageResult.blocked_by_hold's row, caller); the package calls hold only "
+                  "at strategy/magnetic.py:1369, under solve_magnetic(tie_to_parent=True), "
+                  "default False; refine.py:4184 and sequential.py:1412 are docstrings "
+                  "(searched 2026-11-17); reports which turn_on glob met the caller's hold "
+                  "and moves no value")),
     Row("HUMP_TOO_NARROW", "code"),
     Row("INDEX_ABSTAINED", "code"),
     Row("INDEX_BRAVAIS_AMBIGUOUS", "code"),
@@ -845,6 +929,29 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
+    Row("INDEX_WEAK_LINE_RETRY", "code", tier=2, ambiguity=1,
+        evidence=("info; fires when the full list, inlier retry included, ends with no lattice "
+                  "two engines agree on (workflow._no_agreement, the inlier retry's own test, "
+                  "asked again), the search was not stopped, the caller declared no "
+                  "n_unindexed, and the floor sets at least one line aside.  WP-2078 measured "
+                  "that trigger on 19 lists (23 runs, preset full): it fired on the "
+                  "molybdenum + trace-oxide fixture (truth absent; the retry ranks it first, "
+                  "medium) and on 11-BM LaB6 + cBN (no candidate before or after), and on no "
+                  "run whose truth ranked first, SRM 660c LaB6 included.  The inlier retry's "
+                  "first-pass test alone fired on four correct mixture runs, which is why the "
+                  "trigger is read after it"),
+        grounds=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783, "
+                 "p. 789): removing weak peaks is not for routine use and is worth a try when "
+                 "the full list gives no clear answer (docs/practice.md, Which lines an "
+                 "indexing search is given).  The action is that retry, taken only where the "
+                 "package has no answer, and the diagnostic says which list the candidates "
+                 "came from (ruled by Yue 2026-11-13: a retry, never a floor before every "
+                 "search)."),
+        response="info",
+        responds=("note that the candidates were searched and scored without the lines under "
+                  "5 % of the strongest, and check those set-aside lines against the leading "
+                  "candidate's predicted positions"),
+        scope=("all",)),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -887,7 +994,11 @@ ROWS: tuple[Row, ...] = (
     Row("MAGNETIC_WIDTH_MOVED_MOMENT", "code"),
     Row("MAGNETIC_WIDTH_UNMEASURED", "code"),
     Row("MAGNETIC_WIDTH_UNMODELLED", "code"),
-    Row("MICROABSORPTION_SKIPPED", "code"),
+    Row("MICROABSORPTION_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when a particle radius was given and "
+                  "qpa.microabsorption_skipped says the Brindley correction could not run (a "
+                  "phase without a radius, or no attenuation entry at this wavelength); the "
+                  "fractions are then the uncorrected ones; gates nothing")),
     Row("MODEL_FAR_FROM_DATA", "code"),
     Row("MOMENT_ANGLE_STATIONARY", "code", tier=3, ambiguity=1,
         evidence=("WP-1929: two-site Pnma moduli 0.0015/0.0011 mu_B with the angle columns out, "
@@ -932,8 +1043,19 @@ ROWS: tuple[Row, ...] = (
                   "2026-10-19: occupancy unbounded above; an info record, ruled "
                   "2026-10-20, because noise puts a free full site above 1 about half "
                   "the time, 1.032 ± 0.025 on synthetic LaB6)")),
-    Row("ORIGIN_FIXED_ON_POLAR_AXIS", "code"),
-    Row("ORIGIN_NOT_FIXED", "code"),
+    Row("ORIGIN_FIXED_ON_POLAR_AXIS", "code", tier=1, ambiguity=1,
+        response="info",
+        responds=("nothing: the coordinates along the polar axis are quoted against the "
+                  "origin it names"),
+        evidence=("physics: along a polar axis the origin is a direction no intensity "
+                  "depends on, so a refinement must fix it (Flack & Schwarzenbach 1988, Acta "
+                  "Cryst. A44, 499; model.origin's rows); fires exactly when the package "
+                  "fixed it and names how (refine.py _origin_diagnostics, "
+                  "_centroid_finding); gates nothing")),
+    Row("ORIGIN_NOT_FIXED", "code", tier=1, ambiguity=1,
+        evidence=("physics: in a polar space group with nothing holding the origin along the "
+                  "polar axis, every coordinate along it shares one zero-gradient direction "
+                  "(Flack & Schwarzenbach 1988); fires exactly then")),
     Row("PARAMETRIC_FORM_REJECTED", "code"),
     Row("PARAMETRIC_OUT_OF_RANGE", "code", tier="caller", ambiguity=1,
         response="warning",
@@ -1068,7 +1190,12 @@ ROWS: tuple[Row, ...] = (
         response="info",
         responds=("nothing: the points of weight 0 are excluded, every other point keeps "
                   "its sigma")),
-    Row("PAWLEY_OFF_DATA_RIDGED", "code"),
+    Row("PAWLEY_OFF_DATA_RIDGED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a Pawley reflection with no emission line centred inside the "
+                  "fitted data has no data column, so only the ridge sets its intensity; "
+                  "fires exactly when such reflections exist; the ridge's floor "
+                  "(model.forward.PAWLEY_OFF_DATA_SCALE_FLOOR, tier 3) shapes the ridge and "
+                  "decides nothing here")),
     Row("PAWLEY_OVERLAP_UNRESOLVED", "code"),
     Row("PEAK_ASYMMETRY_UNMODELLED", "code"),
     Row("PEAK_AXIAL_TAIL", "code"),
@@ -1134,13 +1261,20 @@ ROWS: tuple[Row, ...] = (
         responds=("read every moment in result as the value supplied, not refined, and refit "
                   "under a plan that frees phases.*.atoms.*.moment.dof* before quoting a "
                   "moment or the nuclear values beside it")),
-    Row("QPA_ESD_UNAVAILABLE", "code"),
+    Row("QPA_ESD_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a weight fraction normalises by the sum of scales, so a scale "
+                  "with no measurable esd (statistics.normal_covariance drops its column) "
+                  "leaves every fraction's esd unmeasured; fires exactly then (CLAUDE.md: "
+                  "consumers mark, never clamp)")),
     Row("QPA_FRACTION_RANGE", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: an info record on every width profile whose fit carries an esd, "
                   "with no threshold (B12 3(a), ruled 2026-10-19, replacing "
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
-    Row("QPA_UNAVAILABLE", "code"),
+    Row("QPA_UNAVAILABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: weight fractions divide by the sum of the weighted scales, "
+                  "which is zero or less; fires exactly then (refine.py "
+                  "_qpa_unavailable_diagnostics)")),
     Row("RAS_ATTENUATOR_PRESENT", "code"),
     Row("READER_OPTION_IGNORED", "code"),
     Row("RECIPE_BACKGROUND_PEAK_DEGENERATE", "code"),
@@ -1158,10 +1292,54 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_SCALE_RESEEDED", "code"),
     Row("RECIPE_SCHEMA_UNTESTED", "code"),
     Row("RECIPE_ZERO_WEIGHT_EXCLUDED", "code"),
-    Row("RESOLUTION_NOT_POSITIVE", "code"),
+    Row("RESOLUTION_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a Gaussian variance Gamma_G^2 cannot be negative; fires exactly "
+                  "where the Caglioti function goes below zero in the fitted range, past "
+                  "staged.RESOLUTION_CONE_TOL (tier 1)")),
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED", "code", tier=1, ambiguity=1, response="warning",
+        responds=("before quoting a coordinate of a body whose torsion turned, read the "
+                  "distances between its own atoms in result.geometry.distances (a folded "
+                  "pair can be short enough to be listed as a bond): no check searched them"),
+        evidence=("arithmetic: a fact about the pair list, not a threshold.  The anti-bump "
+                  "builder skips two atoms of one rigid body in the body's own copy by default "
+                  "(model.restraints.anti_bump_restraints, exclude_same_body=True), the "
+                  "end-of-run search (stale_anti_bump_pairs) skips them always, and a declared "
+                  "torsion moves such a pair (WP-1808), so a fold no row holds is never reported "
+                  "(#1507: a chain folded to 1.498 A under a 3.0 A minimum).  Fires where the "
+                  "phase has an anti-bump row and a declared torsion's angle moved during the "
+                  "run; the message counts the rows inside the body "
+                  "(model.restraints.body_own_rows); moves no value and gates nothing.  Scope "
+                  "as RESTRAINT_PAIRS_STALE: the purposes whose numbers depend on atom "
+                  "coordinates"),
+        scope=("qpa", "structure", "magnetic")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY", "code", tier=1, ambiguity=3, response="warning",
+        responds=("read the restraint's row as no evidence on this fit, since no parameter "
+                  "moves it, and its target as no check on the refined geometry; then drop "
+                  "it, declare a body torsion that changes it, take its atoms out of the "
+                  "body and restrain them as free atoms, or keep it as the template's "
+                  "penalty"),
+        evidence=("arithmetic, no threshold: every atom of the restraint is in one copy of one "
+                  "rigid body (one frozen image, an isometry of the template, which is in "
+                  "Angstrom so the cell does not move it either), and no declared torsion of "
+                  "the body turns some of its atoms other than the two axis atoms and not the "
+                  "others; each such torsion is a rotation fixing the axis and moving the rest "
+                  "together, so the bond, angle, torsion or plane distance is the template's "
+                  "for every value of every parameter the body has and the row's partial is "
+                  "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
+                  "torsions of a generic seven-atom body with a chained torsion, the rule "
+                  "reports the 45 that stay put when every torsion twists and the pose and "
+                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
+                  "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
+                  "as on the axis, so an error lands on accepting. Action: a warning "
+                  "that keeps the row, because a competent refiner who would act otherwise "
+                  "can be named (the WP-1814 design review, 2026-11-09): one keeping a "
+                  "restraint set across a with-body and a without-body comparison, for whom "
+                  "the constant row is the template's penalty. Ruled by the maintainer, "
+                  "2026-11-13: warn, keep the row (DESIGN.md Rules, 1: the action is of the "
+                  "second or third kind, so ambiguity 3)")),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -1178,11 +1356,18 @@ ROWS: tuple[Row, ...] = (
         scope=("qpa", "structure", "magnetic")),
     Row("RESTRAINT_TENSION", "code"),
     Row("RIGID_BODY_MISFIT", "code"),
-    Row("RIGID_BODY_UNSUPPORTED", "code"),
+    Row("RIGID_BODY_UNSUPPORTED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a free rigid-body rotation or shift whose Jacobian column is "
+                  "zero has no information in the data; fires exactly then (refine.py "
+                  "_rigid_body_unsupported)")),
     Row("ROUGHNESS_ABSORPTION", "code"),
     Row("ROUGHNESS_OUTSIDE_REGIME", "code"),
     Row("ROUGHNESS_UNCONSTRAINED", "code"),
-    Row("SCALE_B_INSEPARABLE", "code"),
+    Row("SCALE_B_INSEPARABLE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: over the fitted range a phase's scale and Biso columns "
+                  "separate by less than SCALE_B_SEPARATION_FLOOR (2*sqrt(PINV_RCOND), tier "
+                  "1), where pinv cannot tell them apart; names the hold "
+                  "StageResult.scale_b_held records (tier 1)")),
     Row("SEQUENTIAL_CANCELLED", "code", tier="caller", ambiguity=1,
         response="warning",
         responds=("the chain the message names stopped early: past the last pattern a "
@@ -1258,7 +1443,6 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
-    Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("the named pattern has no fitted values in the chain the message names: in "
@@ -1352,7 +1536,10 @@ ROWS: tuple[Row, ...] = (
                   "(multi.py:2539-2584); raised only in the joint fit; states and gates nothing, "
                   "since one histogram can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
-    Row("STAGE_MAX_ITER", "code"),
+    Row("STAGE_MAX_ITER", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when a stage's solver stopped at its iteration "
+                  "cap before its convergence test passed; the cap is the stage's max_iter, "
+                  "tiered on its own default row")),
     Row("STAGE_NOT_FINITE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: a NaN or an infinity in the residual at a solve's start, or "
                   "in the Jacobian at a point the driver accepted, leaves neither driver a "
@@ -1383,9 +1570,14 @@ ROWS: tuple[Row, ...] = (
                   "names a phase literal or a concrete site; the package builds one "
                   "only from a caller's own model or flags (report/body_misfit's "
                   "released arm, an internal trial whose findings are not surfaced; "
-                  "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
-                  "glob answered by the same request's biso are excluded")),
-    Row("STAGE_PATH_UNKNOWN", "code"),
+                  "io/recipe's flagged coordinates); a user tie, a hold, an adp.* "
+                  "glob answered by the same request's biso, and a cell glob "
+                  "answered by the same request's freed parent_cell.cell rows are "
+                  "excluded")),
+    Row("STAGE_PATH_UNKNOWN", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a stage named a path the model's ParameterTable does not "
+                  "hold, so the stage did not refine it; fires exactly then, at three sites "
+                  "(a retired spelling, an undeclared opt-in, anything else)")),
     Row("STAGE_SLOW_DESCENT", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the stages whose StageResult.termination is "
                   "'slow_descent', the LM driver's stop under SLOW_DESCENT_ESD (WP-1334); "
@@ -1419,9 +1611,15 @@ ROWS: tuple[Row, ...] = (
                   "unconfirmed: refit from starting values nearer the data rather than "
                   "polishing, and compare Rwp and the axial terms"),
         scope=("all",)),
-    Row("STEPHENS_STRAIN_NOT_POSITIVE", "code"),
+    Row("STEPHENS_STRAIN_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: sigma^2(M) is a variance and cannot be negative (Stephens 1999); "
+                  "fires exactly where the refined coefficients give one below zero past "
+                  "staged.STEPHENS_CONE_TOL (tier 1)")),
     Row("STRAIN_UNUSUALLY_LARGE", "code"),
-    Row("TEXTURE_NOT_POSITIVE", "code"),
+    Row("TEXTURE_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a pole density cannot be negative; fires exactly where the "
+                  "truncated series goes below zero on the sphere past "
+                  "TEXTURE_POSITIVITY_TOL (tier 1)")),
     Row("TOPAS_BLOCK_SKIPPED", "code"),
     Row("TOPAS_CELL_COUPLING_DROPPED", "code"),
     Row("TOPAS_FEATURES_NOT_IMPORTED", "code"),
@@ -1438,7 +1636,12 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_PHASE_TERM_READ", "code"),
     Row("TOPAS_SPECIES_NORMALISED", "code"),
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
-    Row("WAVELENGTH_CALIBRATION", "code"),
+    Row("WAVELENGTH_CALIBRATION", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing: the message states the ppm shift of the free wavelength",
+        evidence=("arithmetic: fires exactly when a wavelength was free, and states its "
+                  "shift from the declared value in ppm with no test on its size; gates "
+                  "nothing")),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
     Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
         evidence=("info; a record of an act the file's own heading asks for. Two claims, "
@@ -2306,13 +2509,12 @@ ROWS: tuple[Row, ...] = (
                   "rigid-body uses (WP-1807, #1005). (1) params.vector._refuse_body_off_its_"
                   "sites holds the exact invariance miss to _BODY_SITE_MISS_FACTOR x SITE_TOL, "
                   "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
-                  "params.bodies.RigidBodyBlock._increment_basis compares a linear body's "
-                  "unit-vector residuals |n.u| and |u - (n.u)n|, a tilt in radians, with this "
-                  "fractional tolerance, so the two checks agree only for a body long against "
-                  "its cell: a CO2-like body (C-O 1.16 A) in the P n m a mirror passes the site "
-                  "check and is refused at '90 deg' from an O typed 4e-5 off the mirror at "
-                  "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
-                  "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
+                  "params.bodies._SNAP_REACH, the snap's reach per fractional coordinate, "
+                  "from which RigidBodyBlock._axis_tilt_bound derives the linear-body axis "
+                  "test's tilt bound in radians (a derived value, whose tier follows this "
+                  "row's once given); that test compared the tilt with "
+                  "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
+                  "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
@@ -2453,6 +2655,16 @@ ROWS: tuple[Row, ...] = (
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
         approved="2026-10-28"),
+    Row("rietx.indexing.engines.WEAK_LINE_RETRY_FLOOR", "constant", tier=2, value=0.05,
+        evidence=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783), "
+                  "set B: every line at or above 5 % of the strongest, offered to each "
+                  "program as a second attempt; Table 5, four programs x two entries x two "
+                  "modes, 5 better, 1 worse, 10 unchanged; the manual runs also tolerated "
+                  "8-10 unindexed lines, so the gain is not the floor's alone, and McMaille's "
+                  "default run lost its answer under it.  WP-2078: the trace-oxide fixture's "
+                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it; "
+                  "5 % keeps 5 of its host's 6 lines, the least margin of the four."),
+),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
     Row("rietx.indexing.engines._INDEX_MARGIN", "constant", value=1e-06),
@@ -3062,6 +3274,11 @@ ROWS: tuple[Row, ...] = (
                   "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
+    Row("rietx.model.restraints._SAME_IMAGE_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: compares an op translation plus a lattice shift, exact "
+                  "small rationals and integers, so any value far above roundoff and far "
+                  "below the smallest nonzero op translation (a fraction of a cell) "
+                  "decides the same inputs")),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
         evidence=("arithmetic: symmetry copies of one contact sit at exactly one distance, so "
                   "matching a contact to a listed row by distance is an identity test; 1e-6 A "
@@ -3584,6 +3801,28 @@ ROWS: tuple[Row, ...] = (
                   "column; 1e-6 A is far below any structural distance")),
     Row("rietx.params.bodies._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.bodies._SNAP_REACH", "constant", tier=1, value=0.00010000000010000001,
+        evidence=("arithmetic: site_orbit's snapped position is the mean of images each within "
+                  "SITE_TOL x (1 + _SITE_TOL_SLACK) of the typed site in every fractional "
+                  "coordinate (its step-1 test), so the mean is too, and it lies on the site's "
+                  "element. site_reach makes that a distance: |M d| is convex in d, so over the "
+                  "box it peaks at a corner, this x the cell's longest body diagonal (A). "
+                  "RigidBodyBlock._axis_tilt_bound makes that a tilt: with u the template's "
+                  "principal axis and s_i each point's offset along it from the centroid, "
+                  "n.u = sum s_i h_i / sum s_i^2 exactly (h_i the point's offset from the "
+                  "site's plane or line), so the tilt's sine is at most the reach x "
+                  "sum |s_i| / sum s_i^2. It replaces the comparison of that sine with "
+                  "SITE_TOL itself (#1226). Its tier follows SITE_TOL's: the value is SITE_TOL "
+                  "x (1 + _SITE_TOL_SLACK), both still unaudited, and the derivation has no "
+                  "free factor, so it takes whatever tier SITE_TOL is given "
+                  "(docs/milestones/generality.md, The rule). Tested: a CO2-like body (C-O 1.16 A) on the "
+                  "P n m a mirror with an O typed up to SITE_TOL/2 off it builds at b = 6 and "
+                  "20 A, as one along the P 1 2 1 2-fold does, both refused on main; a body "
+                  "exempt from the overlap refusal builds at 0.99 x the bound and is refused "
+                  "at 1.01 x, naming its atom (tests/test_rigid_body_special.py)"),
+        grounds=("Never refuses a body whose atoms all passed the site check, and a body "
+                 "tilted past it has an atom further from the element than any snap moves a "
+                 "site, so no refiner's choice turns on it")),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
@@ -4279,9 +4518,6 @@ ROWS: tuple[Row, ...] = (
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
                   "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
-    Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
     Row("rietx.solve.cluster._ISOMETRY_RTOL", "constant", tier=1, value=1e-06,
         evidence=("equivalences(): an integer {-1, 0, 1} matrix P is an isometry of "
                   "the cell when |P^T g P - g| <= 1e-6 x max|g|, element by element. "
@@ -5179,23 +5415,36 @@ ROWS: tuple[Row, ...] = (
         ambiguity=1, value=None,
         evidence="off by default; a caller names the cell whose translations every subgroup keeps"),
     # suggestion: 197
-    Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", value=1),
-    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=1),
+    Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the field that takes the value by hand, and the one "
+                  "input that lets the estimate run")),
+    Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the three ways to lower muR and the call that prices "
+                  "each; picks none")),
     Row("ABSORPTION_THICKNESS_MATTERS.suggestion", "suggestion", value=1),
-    Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", value=1),
+    Row("ADP_NOT_POSITIVE_DEFINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: names three ways back to a defined tensor; picks none"),
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ABSORPTION.suggestion", "suggestion", value=1),
-    Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
+    Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the finding that measures a too-flexible background "
+                  "and at the other kind; picks neither")),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
         evidence=("arithmetic: names the argument that overrides the fallback and the "
                   "package's other background forms, and ranks none of them, so no dissenter is "
                   "left (a held SNIP under a broad hump is one, references/judging.md)")),
-    Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
+    Row("BISO_NEGATIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: lists the usual causes and holding B with a note; picks none"),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
-    Row("BOUND_HIT.suggestion", "suggestion", value=1),
-    Row("BRINDLEY_OUTSIDE_REGIME.suggestion", "suggestion", value=1),
-    Row("CAPILLARY_OFFSET_UNAVAILABLE.suggestion", "suggestion", value=1),
+    Row("BOUND_HIT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names widening the limit or fixing the parameter; picks "
+                  "neither")),
+    Row("BRINDLEY_OUTSIDE_REGIME.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names grinding, a shorter wavelength, or quoting the "
+                  "uncorrected fractions; picks none")),
+    Row("CAPILLARY_OFFSET_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the field that lets the terms refine"),
     Row("CELL_RUNAWAY.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence=("WP-1110's trigger: a visible phase sharing its cell with a 2 % trace copy ran "
                   "4.16 -> 3803 A in one stage; fired in none of WP-1523's 104 fits"),
@@ -5216,10 +5465,13 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
     Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
-    Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", value=1),
+    Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names three levers, fewer free, held known values, a wider "
+                  "range; picks none")),
     Row("COVARIANCE_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("DATA_SUPPORT_LOW.suggestion", "suggestion", value=1),
-    Row("DECLARED_RANGE_NOT_RESTORED.suggestion", "suggestion", value=1),
+    Row("DECLARED_RANGE_NOT_RESTORED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the act that restores a limit"),
     Row("DECLARED_RANGE_RESTORED.suggestion", "suggestion", value=1),
     Row("DISPERSION_NEGLECTED.suggestion", "suggestion", value=1),
     Row("EXTINCTION_CONDITIONS_PARTIAL.suggestion", "suggestion", value=1),
@@ -5234,9 +5486,13 @@ ROWS: tuple[Row, ...] = (
                  "(PR #939) once it listed them unranked."),
         approved="2026-10-21"),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS.suggestion", "suggestion", value=4),
-    Row("EXTRA_PEAK_NO_INTENSITY.suggestion", "suggestion", value=1),
+    Row("EXTRA_PEAK_NO_INTENSITY.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names dropping the component or checking its centre bounds; "
+                  "picks neither")),
     Row("EXTRA_PEAK_ON_REFLECTION.suggestion", "suggestion", value=1),
-    Row("FLAT_DIRECTION.suggestion", "suggestion", value=1),
+    Row("FLAT_DIRECTION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names holding one at a known value or staging them apart; "
+                  "picks neither")),
     Row("FLOOR_HIT.suggestion", "suggestion", value=1),
     Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=2),
     Row("FULLPROF_MAGNETIC_PHASE_READ.suggestion", "suggestion", value=1),
@@ -5264,7 +5520,9 @@ ROWS: tuple[Row, ...] = (
         value=1,
         evidence=("arithmetic: names the skipped tree's line range, which is the whole of "
                   "what reading it needs, and the reader that loads it")),
-    Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", value=1),
+    Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", tier='caller', ambiguity=1, value=1,
+        evidence=("opt-in, as its code: names unhold(), the verb that lifts the caller's "
+                  "hold")),
     Row("HUMP_TOO_NARROW.suggestion", "suggestion", value=1),
     Row("INDEX_ABSTAINED.suggestion", "suggestion", value=1),
     Row("INDEX_BRAVAIS_AMBIGUOUS.suggestion", "suggestion", value=1),
@@ -5291,6 +5549,11 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: names the set-aside lines and asks whether the leading cell "
+                  "predicts them, lists the three readings of a line it does not predict "
+                  "(second phase, picker artefact, a supercell's ordering line) without "
+                  "ranking them, and names the argument that forbids the retry")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
@@ -5328,8 +5591,11 @@ ROWS: tuple[Row, ...] = (
     Row("OCCUPANCY_ABOVE_ONE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("physics: names the one reading under which the value is right (site "
                   "scattering on a mixed site) and the model terms to check otherwise")),
-    Row("ORIGIN_FIXED_ON_POLAR_AXIS.suggestion", "suggestion", value=2),
-    Row("ORIGIN_NOT_FIXED.suggestion", "suggestion", value=1),
+    Row("ORIGIN_FIXED_ON_POLAR_AXIS.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
+        evidence=("arithmetic: names the two other ways to fix the origin, and that letting "
+                  "it slide is a flat direction")),
+    Row("ORIGIN_NOT_FIXED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: names two ways to fix the origin; picks neither"),
     Row("PARAMETRIC_FORM_REJECTED.suggestion", "suggestion", value=2),
     Row("PARAMETRIC_OUT_OF_RANGE.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: names three changes to the caller's own declaration "
@@ -5359,7 +5625,8 @@ ROWS: tuple[Row, ...] = (
     Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_IMPLAUSIBLE.suggestion", "suggestion", value=1),
-    Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", value=1),
+    Row("PAWLEY_OFF_DATA_RIDGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: the one input that measures them, a wider fitted range"),
     Row("PAWLEY_OVERLAP_UNRESOLVED.suggestion", "suggestion", value=1),
     Row("PEAK_ASYMMETRY_UNMODELLED.suggestion", "suggestion", value=1),
     Row("PEAK_AXIAL_TAIL.suggestion", "suggestion", value=1),
@@ -5393,11 +5660,15 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: a parameter no stage frees cannot be refined, so the remedy "
                   "names the glob that frees the moment DOFs and the preset that names it "
                   "(magnetic_structural, WP-1418); it moves nothing by itself")),
-    Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", value=1),
+    Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: removing a phase at zero scale restores the others' esds; "
+                  "profile_fraction gives one fraction's range; picks neither")),
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),
-    Row("QPA_UNAVAILABLE.suggestion", "suggestion", value=1),
+    Row("QPA_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the model and the start, and at the run's other "
+                  "findings; picks no cause")),
     Row("RAS_ATTENUATOR_PRESENT.suggestion", "suggestion", value=1),
     Row("READER_OPTION_IGNORED.suggestion", "suggestion", value=1),
     Row("RECIPE_BACKGROUND_PEAK_DEGENERATE.suggestion", "suggestion", value=1),
@@ -5406,15 +5677,30 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: points at the table that lists the body's own distances and names "
+                  "the remedies (a row for that pair with a minimum the caller states, or a "
+                  "torsion restrained or held) and picks none; it cautions against a floor on a "
+                  "torsion's own ends, which the WP-1816 ruling says biases the conformation; it states no minimum (#677's rule)")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the four ways forward (drop the row, a torsion that "
+                  "changes it, free atoms, or keep it as the template's penalty) and picks "
+                  "none")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
     Row("RIGID_BODY_MISFIT.suggestion", "suggestion", value=1),
-    Row("RIGID_BODY_UNSUPPORTED.suggestion", "suggestion", value=1),
+    Row("RIGID_BODY_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: a zero column carries no information, so holding it loses "
+                  "none")),
     Row("ROUGHNESS_ABSORPTION.suggestion", "suggestion", value=1),
     Row("ROUGHNESS_OUTSIDE_REGIME.suggestion", "suggestion", value=2),
     Row("ROUGHNESS_UNCONSTRAINED.suggestion", "suggestion", value=1),
-    Row("SCALE_B_INSEPARABLE.suggestion", "suggestion", value=1),
+    Row("SCALE_B_INSEPARABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the two inputs that separate the columns, an outside B "
+                  "or a second d-spacing")),
     Row("SEQUENTIAL_CANCELLED.suggestion", "suggestion", tier="caller", ambiguity=1, value=1,
         evidence=("opt-in, as its code: says the one way to extend a trajectory the caller "
                   "stopped, re-running it (sequential.py:2166)")),
@@ -5439,7 +5725,6 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
                   "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
                   "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
-    Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
                   "on its own (sequential.py:2277)")),
@@ -5482,7 +5767,9 @@ ROWS: tuple[Row, ...] = (
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=3),
-    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=3),
+    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", tier=1, ambiguity=1, value=3,
+        evidence=("arithmetic: names the current spelling, the declaration, or the table "
+                  "that lists every path")),
     Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the findings that name a shallow direction, "
                   "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "
@@ -5499,7 +5786,9 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-25"),
     Row("STEPHENS_STRAIN_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("STRAIN_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
-    Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", value=1),
+    Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names a lower order, held top terms, or the LM driver; picks "
+                  "none")),
     Row("TOPAS_BLOCK_SKIPPED.suggestion", "suggestion", value=1),
     Row("TOPAS_CELL_COUPLING_DROPPED.suggestion", "suggestion", value=1),
     Row("TOPAS_FEATURES_NOT_IMPORTED.suggestion", "suggestion", value=2),
@@ -5511,7 +5800,8 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", value=1),
     Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", value=1),
-    Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", value=1),
+    Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence="arithmetic: points at the instrument's own record; picks no verdict"),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
     Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),
@@ -5521,33 +5811,16 @@ ROWS: tuple[Row, ...] = (
 #: The names allowed at ``unaudited``, sorted.  Written once at the open
 #: (2026-10-19); it shrinks as rows are audited.
 UNAUDITED_BASELINE: tuple[str, ...] = (
-    "ABSORPTION_ESTIMATE_UNAVAILABLE",
-    "ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion",
-    "ABSORPTION_MU_R_OUT_OF_RANGE",
-    "ABSORPTION_MU_R_OUT_OF_RANGE.suggestion",
     "ABSORPTION_PLATE_THICKNESS",
     "ABSORPTION_THICKNESS_MATTERS",
     "ABSORPTION_THICKNESS_MATTERS.suggestion",
-    "ADP_NOT_POSITIVE_DEFINITE",
-    "ADP_NOT_POSITIVE_DEFINITE.suggestion",
     "AIR_SCATTER_UNDECLARED",
     "AIR_SCATTER_UNDECLARED.suggestion",
     "BACKGROUND_ABSORPTION",
     "BACKGROUND_ABSORPTION.suggestion",
-    "BACKGROUND_ORDER_AT_CAP",
-    "BACKGROUND_ORDER_AT_CAP.suggestion",
-    "BISO_NEGATIVE",
-    "BISO_NEGATIVE.suggestion",
     "BISO_UNUSUALLY_LARGE",
     "BISO_UNUSUALLY_LARGE.suggestion",
-    "BOUND_HIT",
-    "BOUND_HIT.suggestion",
-    "BRINDLEY_OUTSIDE_REGIME",
-    "BRINDLEY_OUTSIDE_REGIME.suggestion",
     "BRML_ABSORBER_ENGAGED",
-    "CAPILLARY_OFFSET_UNAVAILABLE",
-    "CAPILLARY_OFFSET_UNAVAILABLE.suggestion",
-    "CELL_DEGENERATE_PROBE",
     "CHILD_GROUP_UNNAMED",
     "CHILD_GROUP_UNNAMED.suggestion",
     "CIF_CELL_ANGLE_CORRECTED",
@@ -5577,17 +5850,10 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "CIF_SITE_TWINS_MERGED",
     "CIF_SITE_TWINS_MERGED.suggestion",
     "CIF_SPECIES_NORMALISED",
-    "CONSTRAINT_ACTIVE",
     "CONSTRAINT_ACTIVE.suggestion",
-    "COVARIANCE_DIRECTION_DISCARDED",
-    "COVARIANCE_DIRECTION_DISCARDED.suggestion",
-    "COVARIANCE_UNAVAILABLE",
     "COVARIANCE_UNAVAILABLE.suggestion",
     "DATA_SUPPORT_LOW",
     "DATA_SUPPORT_LOW.suggestion",
-    "DECLARED_RANGE_NOT_RESTORED",
-    "DECLARED_RANGE_NOT_RESTORED.suggestion",
-    "DECLARED_RANGE_RESTORED",
     "DECLARED_RANGE_RESTORED.suggestion",
     "DISPERSION_NEGLECTED",
     "DISPERSION_NEGLECTED.suggestion",
@@ -5603,14 +5869,9 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "EXTINCTION_SCREEN_FAILED.suggestion",
     "EXTINCTION_SYMBOL_AMBIGUOUS",
     "EXTINCTION_SYMBOL_AMBIGUOUS.suggestion",
-    "EXTRA_PEAK_NO_INTENSITY",
-    "EXTRA_PEAK_NO_INTENSITY.suggestion",
     "EXTRA_PEAK_ON_REFLECTION",
     "EXTRA_PEAK_ON_REFLECTION.suggestion",
-    "FLAT_DIRECTION",
-    "FLAT_DIRECTION.suggestion",
     "FLAT_DIRECTION_OMITTED",
-    "FLOOR_HIT",
     "FLOOR_HIT.suggestion",
     "FROZEN_COMPILE_STALE",
     "FULLPROF_MAGNETIC_PHASE_OMITTED",
@@ -5686,13 +5947,10 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "HARMONIC_ABSENT.suggestion",
     "HARMONIC_FRACTION",
     "HARMONIC_FRACTION.suggestion",
-    "HARMONIC_HELD",
     "HARMONIC_HELD.suggestion",
     "HIGH_CORRELATION",
     "HIGH_CORRELATION.suggestion",
     "HIGH_CORRELATION_OMITTED",
-    "HOLD_BLOCKED_PLAN",
-    "HOLD_BLOCKED_PLAN.suggestion",
     "HUMP_TOO_NARROW",
     "HUMP_TOO_NARROW.suggestion",
     "INDEX_ABSTAINED",
@@ -5755,17 +6013,12 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "MAGNETIC_WIDTH_UNMEASURED.suggestion",
     "MAGNETIC_WIDTH_UNMODELLED",
     "MAGNETIC_WIDTH_UNMODELLED.suggestion",
-    "MICROABSORPTION_SKIPPED",
     "MICROABSORPTION_SKIPPED.suggestion",
     "MODEL_FAR_FROM_DATA",
     "MODEL_FAR_FROM_DATA.suggestion",
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
     "NEUTRON_RESONANT_ABSORBER.suggestion",
-    "ORIGIN_FIXED_ON_POLAR_AXIS",
-    "ORIGIN_FIXED_ON_POLAR_AXIS.suggestion",
-    "ORIGIN_NOT_FIXED",
-    "ORIGIN_NOT_FIXED.suggestion",
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_FORM_REJECTED.suggestion",
     "PARAMETRIC_TARGET_UNSEEN",
@@ -5788,8 +6041,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "PATTERN_X_AXIS_ASSUMED.suggestion",
     "PATTERN_X_AXIS_IMPLAUSIBLE",
     "PATTERN_X_AXIS_IMPLAUSIBLE.suggestion",
-    "PAWLEY_OFF_DATA_RIDGED",
-    "PAWLEY_OFF_DATA_RIDGED.suggestion",
     "PAWLEY_OVERLAP_UNRESOLVED",
     "PAWLEY_OVERLAP_UNRESOLVED.suggestion",
     "PEAK_ASYMMETRY_UNMODELLED",
@@ -5824,10 +6075,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "PEAK_WIDTH_LAW_MISMATCH.suggestion",
     "PHASE_UNCONSTRAINED",
     "PHASE_UNCONSTRAINED.suggestion",
-    "QPA_ESD_UNAVAILABLE",
-    "QPA_ESD_UNAVAILABLE.suggestion",
-    "QPA_UNAVAILABLE",
-    "QPA_UNAVAILABLE.suggestion",
     "RAS_ATTENUATOR_PRESENT",
     "RAS_ATTENUATOR_PRESENT.suggestion",
     "READER_OPTION_IGNORED",
@@ -5851,7 +6098,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "RECIPE_SCALE_RESEEDED",
     "RECIPE_SCHEMA_UNTESTED",
     "RECIPE_ZERO_WEIGHT_EXCLUDED",
-    "RESOLUTION_NOT_POSITIVE",
     "RESOLUTION_NOT_POSITIVE.suggestion",
     "RESOLUTION_UNCONSTRAINED",
     "RESOLUTION_UNCONSTRAINED.suggestion",
@@ -5859,22 +6105,16 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "RESTRAINT_TENSION.suggestion",
     "RIGID_BODY_MISFIT",
     "RIGID_BODY_MISFIT.suggestion",
-    "RIGID_BODY_UNSUPPORTED",
-    "RIGID_BODY_UNSUPPORTED.suggestion",
     "ROUGHNESS_ABSORPTION",
     "ROUGHNESS_ABSORPTION.suggestion",
     "ROUGHNESS_OUTSIDE_REGIME",
     "ROUGHNESS_OUTSIDE_REGIME.suggestion",
     "ROUGHNESS_UNCONSTRAINED",
     "ROUGHNESS_UNCONSTRAINED.suggestion",
-    "SCALE_B_INSEPARABLE",
-    "SCALE_B_INSEPARABLE.suggestion",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_WIDTH_GROWTH",
-    "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
     "SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion",
     "SIZE_UNUSUALLY_SMALL",
@@ -5885,17 +6125,11 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SPECIES_FALLBACK_NEUTRAL.suggestion",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion",
-    "STAGE_MAX_ITER",
     "STAGE_MAX_ITER.suggestion",
     "STAGE_PATH_NOT_FREE.suggestion",
-    "STAGE_PATH_UNKNOWN",
-    "STAGE_PATH_UNKNOWN.suggestion",
-    "STEPHENS_STRAIN_NOT_POSITIVE",
     "STEPHENS_STRAIN_NOT_POSITIVE.suggestion",
     "STRAIN_UNUSUALLY_LARGE",
     "STRAIN_UNUSUALLY_LARGE.suggestion",
-    "TEXTURE_NOT_POSITIVE",
-    "TEXTURE_NOT_POSITIVE.suggestion",
     "TOPAS_BLOCK_SKIPPED",
     "TOPAS_BLOCK_SKIPPED.suggestion",
     "TOPAS_CELL_COUPLING_DROPPED",
@@ -5923,8 +6157,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "TOPAS_PHASE_TERM_READ.suggestion",
     "TOPAS_SPECIES_NORMALISED",
     "TOPAS_SPECIES_WRITTEN_NEUTRAL",
-    "WAVELENGTH_CALIBRATION",
-    "WAVELENGTH_CALIBRATION.suggestion",
     "XRDML_ATTENUATOR_APPLIED",
     "rietx.background.diagnostics.COVERAGE_INFLATION_THRESHOLD",
     "rietx.background.diagnostics.COVERAGE_SMOOTH_DEG",
@@ -6351,9 +6583,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
-    "rietx.sequential.WIDTH_GROWTH_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_SIGMA",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -6374,14 +6603,11 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "ADP_NOT_POSITIVE_DEFINITE",
     "AIR_SCATTER_UNDECLARED",
     "BACKGROUND_ABSORPTION",
-    "BACKGROUND_ORDER_AT_CAP",
     "BISO_NEGATIVE",
     "BISO_UNUSUALLY_LARGE",
     "BOUND_HIT",
     "BRINDLEY_OUTSIDE_REGIME",
     "BRML_ABSORBER_ENGAGED",
-    "CAPILLARY_OFFSET_UNAVAILABLE",
-    "CELL_DEGENERATE_PROBE",
     "CELL_RUNAWAY",
     "CHILD_GROUP_UNNAMED",
     "CIF_CELL_ANGLE_CORRECTED",
@@ -6399,7 +6625,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "CIF_SITE_MULTIPLICITY_DISAGREES",
     "CIF_SITE_TWINS_MERGED",
     "CIF_SPECIES_NORMALISED",
-    "CONSTRAINT_ACTIVE",
     "COVARIANCE_DIRECTION_DISCARDED",
     "COVARIANCE_UNAVAILABLE",
     "DATA_SUPPORT_LOW",
@@ -6470,10 +6695,8 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "GSAS_PRM_VALUE_NARROWED",
     "HARMONIC_ABSENT",
     "HARMONIC_FRACTION",
-    "HARMONIC_HELD",
     "HIGH_CORRELATION",
     "HIGH_CORRELATION_OMITTED",
-    "HOLD_BLOCKED_PLAN",
     "HUMP_TOO_NARROW",
     "INDEX_ABSTAINED",
     "INDEX_BRAVAIS_AMBIGUOUS",
@@ -6516,7 +6739,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "MOMENT_PAIR_DEGENERATE",
     "NEUTRON_RESONANT_ABSORBER",
     "OCCUPANCY_ABOVE_ONE",
-    "ORIGIN_FIXED_ON_POLAR_AXIS",
     "ORIGIN_NOT_FIXED",
     "PARAMETRIC_FORM_REJECTED",
     "PARAMETRIC_TARGET_UNSEEN",
@@ -6577,7 +6799,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",
@@ -6604,6 +6825,5 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "TOPAS_PHASE_TERM_READ",
     "TOPAS_SPECIES_NORMALISED",
     "TOPAS_SPECIES_WRITTEN_NEUTRAL",
-    "WAVELENGTH_CALIBRATION",
     "XRDML_ATTENUATOR_APPLIED",
 )
