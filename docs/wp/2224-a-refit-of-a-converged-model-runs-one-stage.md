@@ -1,6 +1,6 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; Yue ruled on the four questions, the reworded text waits on Yue's look
+Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; Yue ruled on the four questions and approved the reworded text
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
 Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
@@ -251,8 +251,8 @@ evaluations.
   `concepts/plans.md` follow. Three tests: a released parameter runs staged and the next fit
   re-fits; a narrower plan stays one stage; `hold` keeps a re-fit and `unhold` runs staged.
 
-  *Next.* Yue reads the reworded lines above before merge (the reader-output rule). Then
-  WP-2226: Yue's three design questions there come before any building.
+  *Next.* Yue approved the reworded lines ("Text is fine", 2026-11-19), so the PR merges once
+  CI is green. Then WP-2226: Yue's three design questions there come before any building.
 
 - **2026-11-19 (implementation)** — A second `fit` on a model that its last fit of the same
   pattern left converged now runs one stage, `warm_refit`, freeing at once everything the plan
