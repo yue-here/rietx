@@ -183,3 +183,22 @@ def test_a_joint_fit_gives_an_exact_pair_no_esd():
         for ip in (0, 1):
             assert rows[f"hist.{h}.phases.{ip}.scale"].stderr is None
         assert rows[f"hist.{h}.instrument.background.c0"].stderr > 0.0
+
+
+def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
+    """A Pawley intensity on a discarded direction carries ``inf``; the
+    overlap report states it has no esd, never "reaches inf%"."""
+    from types import SimpleNamespace
+
+    from rietx.refine import _pawley_unresolved_diagnostics
+
+    pb = SimpleNamespace(stderr=np.array([1.0, np.inf, 2.0]), groups=[(0, 1)],
+                         phase_slices=[(0, 3)])
+    hklm = np.array([[1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]])
+    model = SimpleNamespace(
+        pawley=pb, pawley_x0=lambda: np.array([10.0, 20.0, 30.0]),
+        phases=[SimpleNamespace(reflections=SimpleNamespace(hklm=hklm))])
+    structure = SimpleNamespace(phases=[SimpleNamespace(name="P")])
+    (d,) = _pawley_unresolved_diagnostics(model, structure)
+    assert "inf" not in d.message
+    assert d.message.endswith("an individual value has no esd.")

@@ -10352,12 +10352,15 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
             h = reflection_label(model.phases[ip].reflections.hklm[k])
             labels.append(f"{structure.phases[ip].name} {h}")
         total = float(np.sum(inten))
+        # a split on a direction the covariance discards has no esd (WP-2219)
+        worst = (f"the relative esd of an individual value reaches "
+                 f"{float(np.max(rel)):.0%}." if np.all(np.isfinite(rel))
+                 else "an individual value has no esd.")
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
             message=(f"{len(g)} reflections overlap too strongly to split. "
                      f"Their summed intensity ({total:.4g}) is determined, and "
-                     f"the relative esd of an individual value reaches "
-                     f"{float(np.max(rel)):.0%}."),
+                     f"{worst}"),
             suggestion="Use the group's summed intensity as the datum.",
         ))
     return out
