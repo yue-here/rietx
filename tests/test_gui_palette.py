@@ -72,11 +72,18 @@ LAYERS = ("--plot-peak", "--plot-peakfit", "--plot-candidate")
 #: The pairs the shipped palette misses the floor on, named rather than exempted
 #: quietly, each held to the distance it was measured at so it can only improve.
 #:
-#: All three are the background (WP-2200).  The site's palette draws it dashed in
+#: Three are the background (WP-2200).  The site's palette draws it dashed in
 #: the figures' brown, beside an orange calculated curve and a grey difference,
 #: as the design rounds of 2026-11-06 to 11-08 drew it and as `viz/plots.PALETTES`
 #: has drawn every figure since.  The dash carries its identity, as the point
-#: marks carry the observations'.  A fourth pair fails.
+#: marks carry the observations'.
+#:
+#: The fourth is the dark last fit against the difference curve (WP-2218, Yue
+#: 2026-11-19: "since they never intersect").  The difference curve sits in its
+#: own strip below the pattern, so the last fit never draws beside it.  The last
+#: fit's other near neighbour, `--muted`, is held by
+#: `test_the_last_fit_keeps_its_distance_from_the_masked_points`.  A fifth pair
+#: fails.
 #:
 #: The pairs WP-1210 named here (light `--plot-bkg`/`--plot-diff` at 0.129, dark
 #: `--plot-obs`/`--plot-diff` at 0.124) cleared the floor under the new palette and
@@ -89,8 +96,15 @@ LAYERS = ("--plot-peak", "--plot-peakfit", "--plot-candidate")
 NAMED_PAIRS: dict[str, dict[tuple[str, str], float]] = {
     "light": {("--plot-bkg", "--plot-calc"): 0.064},
     "dark": {("--plot-bkg", "--plot-calc"): 0.092,
-             ("--plot-bkg", "--plot-diff"): 0.109},
+             ("--plot-bkg", "--plot-diff"): 0.109,
+             ("--plot-diff", "--plot-last"): 0.022},
 }
+
+#: The last fit's distance from the masked points' ink, named per theme where it
+#: misses the floor (WP-2218).  `--muted` draws observed points only inside an
+#: excluded region, where no model curve draws (Yue's #1538 ruling), so the
+#: dark last fit may sit 0.055 from it.
+LAST_FROM_MUTED: dict[str, float] = {"dark": 0.055}
 
 
 def _block(name: str, css: str) -> dict[str, str]:
@@ -240,6 +254,15 @@ def test_the_named_pairs_are_still_the_only_ones(themes, theme):
     }
     assert under == set(NAMED_PAIRS[theme]), (
         f"{theme}: the pairs under the floor have changed — {sorted(under)}")
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_last_fit_keeps_its_distance_from_the_masked_points(themes, theme):
+    """`--muted` is no curve, so the curve-pair tests never ask this pair."""
+    palette = themes[theme]
+    gap = _oklab_distance(_oklab(palette["--plot-last"]), _oklab(palette["--muted"]))
+    floor = LAST_FROM_MUTED.get(theme, MIN_SEPARATION)
+    assert gap >= floor, f"{theme}: --plot-last is {gap:.3f} from --muted"
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
