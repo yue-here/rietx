@@ -68,9 +68,10 @@ here"):
    nothing to compound and stays off. Le Bail carries the same way and was
    not measured.
 2. *`lab_calibrate` runs the closing stage, and the `branch` and `path`
-   guides ask for it.* At the default a calibration's size and strain land
-   2.9 and 2.4 esd from the simulated truth, and every later fit holds the
-   calibration fixed. The two guides teach comparisons of one objective,
+   guides ask for it.* At the default the calibrate guide's sample size and
+   strain land 2.9 and 2.4 esd from the simulated truth; with the closing
+   stage in the calibration alone, 1.3 and 0.8 esd; in the sample fit too,
+   0.3 and 0.4 esd. Every later fit holds the calibration fixed. The two guides teach comparisons of one objective,
    which the declared windows blur (Rwp 0.1031 against 0.0988 where the
    page shows one 0.0947; a 0.02 esd direction gap against 0.005).
 3. *The GUI preview keeps 1e-3 windows and the shift is accepted.* A preview

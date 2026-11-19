@@ -706,9 +706,10 @@ class RefinementPlan:
         **It runs the closing stage** (:data:`CLOSING_WINDOW_TOL`), which
         other plans leave off since WP-2222.  Every later fit holds this
         result fixed, so its error reaches all of them.  On the simulated
-        standard of ``examples/guides/calibrate.py``, the declared stages
-        alone put size and strain 2.9 and 2.4 esd from the truth, against
-        under 1 esd with the closing stage (WP-2222, ruled 2026-11-19)."""
+        pair of ``examples/guides/calibrate.py`` the sample's size and strain
+        land 2.9 and 2.4 esd from the truth with no closing stage anywhere,
+        1.3 and 0.8 esd with it in the calibration alone, and 0.3 and 0.4
+        esd with it in the sample fit too (WP-2222, ruled 2026-11-19)."""
         return cls(closing_window_tol=CLOSING_WINDOW_TOL, stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
@@ -1009,7 +1010,8 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "the lattice parameters from one another. Of the two axial ratios "
             "only S/L refines. Set H/L to the receiving slit's height over the "
             "goniometer radius first, because swapping the two ratios leaves "
-            "the pattern unchanged."),
+            "the pattern unchanged. It ends with the closing stage, because "
+            "every later fit inherits the calibration's error."),
         modes=("rietveld",),
         when_to_use=(
             "A standard (LaB6, Si or corundum), once per instrument "
