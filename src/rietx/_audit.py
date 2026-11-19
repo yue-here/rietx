@@ -3687,8 +3687,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.lm.BVLS_MAX_COLUMNS", "constant", tier=3, value=128,
         evidence=("WP-1937, WP-1953: BVLS costs 2-34 ms at 128 columns and 10-177 s at 2000; FAP "
                   "Pawley reaches Rwp 0.0803 on one side and 0.0782 on the other (lm.py:728-735); "
-                  "also the bound test's exactness limit; second pass owed (refits of three "
-                  "families on either side)"),
+                  "also the bound test's exactness limit; WP-2017 Q4 (2026-11-19), three Pawley "
+                  "families each refitted with the constant moved just across its largest solve "
+                  "(group C's protocol): 11-BM NAC (154 columns) answer-identical, 4.9e-8 plain esd; "
+                  "FAP (343) moved to BVLS shifts c 1.27 plain esd, Rwp 0.0786 to 0.0806, its c 1.4 esd "
+                  "from GSAS's against the shipped 0.15; cpd-1a (128, on the cut) moved to projected CG "
+                  "shifts c 1.19 plain esd, Rwp 0.164302 to 0.164328; noise arms within 2.5e-6; so the "
+                  "two paths do not give one answer on two of three families "
+                  "(docs/wp/2017-batch/group_b_q4_summary.md)"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
                  "three families on either side give one answer (B10, ruled 2026-10-19)."),
         approved="2026-10-19"),
