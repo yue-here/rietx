@@ -224,7 +224,7 @@ plan = rx.RefinementPlan(stages=[
     rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.c*"]),
     rx.Stage("cell", ["phases.*.cell.a"]),
     rx.Stage("displacement", ["phases.*.atoms.*.biso"]),
-])
+], closing_window_tol=1e-3)
 assert plan.intermediate_lorentz_window_tol == 1e-2
 assert len(plan.run_stages()) == 4
 assert plan.stage_lorentz_window_tols() == [1e-2, 1e-2, None, None]
@@ -232,7 +232,7 @@ assert plan.stage_lorentz_window_tols() == [1e-2, 1e-2, None, None]
 
 `RefinementPlan.stage_lorentz_window_tols` is parallel to `RefinementPlan.run_stages` and applies the rule `RefinementPlan.stage_ftols` applies ([Stage tolerances](stage-tolerances.md)).
 `Stage.lorentz_window_tol` overrides the schedule for one stage.
-The last declared stage and the closing stage take `None`, the one 1e-4 rule for every component, because they produce the answer.
+The last declared stage, and the closing stage when the plan asks for one, take `None`, the one 1e-4 rule for every component, because they produce the answer.
 The closing stage never takes a coarse value from the stage before it.
 The exponential wings and the Gaussian part keep 1e-4 in every stage, so a bank whose profile is Gaussian compiles the same windows either way, to the bit.
 

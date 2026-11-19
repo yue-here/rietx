@@ -30,7 +30,12 @@ from rietx.model.forward_tof import (
 )
 from rietx.params.vector import ParameterTable
 from rietx.schemas.pattern import PatternData
-from rietx.schemas.plan import INTERMEDIATE_LORENTZ_WINDOW_TOL, PlanSpec, StageSpec
+from rietx.schemas.plan import (
+    CLOSING_WINDOW_TOL,
+    INTERMEDIATE_LORENTZ_WINDOW_TOL,
+    PlanSpec,
+    StageSpec,
+)
 from tests.test_tof_refine import A_GEN, TZERO_GEN, bank, silicon
 
 #: 15000-30000 µs in 10 µs channels: d = 1.25-2.5 Å on the 12000 µs/Å bank, a
@@ -58,7 +63,7 @@ def _plan() -> rx.RefinementPlan:
                              "instrument.source.profile_tof.sig1",
                              "instrument.source.profile_tof.gam1"]),
         rx.Stage("displacement", ["phases.*.atoms.*.biso"]),
-    ])
+    ], closing_window_tol=CLOSING_WINDOW_TOL)  # opt in: off by default since WP-2222
 
 
 # ----------------------------------------------------------------------
@@ -89,7 +94,8 @@ def test_a_stage_override_wins_and_none_is_the_way_back():
 
 
 def test_a_one_stage_plan_is_all_endpoint():
-    plan = rx.RefinementPlan(stages=[rx.Stage("only", ["phases.*.scale"])])
+    plan = rx.RefinementPlan(stages=[rx.Stage("only", ["phases.*.scale"])],
+                             closing_window_tol=CLOSING_WINDOW_TOL)
     assert plan.stage_lorentz_window_tols() == [None, None]
     plan.closing_window_tol = None
     assert plan.stage_lorentz_window_tols() == [None]
@@ -283,5 +289,6 @@ def test_a_constant_wavelength_stage_records_no_lorentzian_window():
     result = rx.Refinement(structure, instrument, history=False).fit(
         data, plan=rx.RefinementPlan(stages=[
             rx.Stage("scale", ["phases.*.scale"]),
-            rx.Stage("cell", ["phases.*.cell.a"])]))
+            rx.Stage("cell", ["phases.*.cell.a"])],
+            closing_window_tol=CLOSING_WINDOW_TOL))
     assert [st.lorentz_window_tol for st in result.stages] == [None, None, None]
