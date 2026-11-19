@@ -34,6 +34,7 @@ A setting about one pattern, or one run in flight, belongs to the call.
 | `history` | `Refinement(...)` and `refine` | on for `Refinement`, off for `refine`, which discards the tree with the object ([The refinement history](history.md)) |
 | `mode`, `two_theta_limits` | `Refinement.fit`, `Refinement.run_stage` and `refine` | `"rietveld"` and the whole pattern; `run_stage` reuses the last call's when given `None` |
 | `plan` | `Refinement.fit` and `refine` | `"mccusker_default"` |
+| `refit` | `Refinement.fit` and `refine` | `"single"`: a re-fit of a converged model runs one stage ([A re-fit runs one stage](#a-re-fit-runs-one-stage)) |
 | `events`, `cancel`, `telemetry`, `label` | `Refinement.fit`, `Refinement.run_stage` and `refine` | none; a run records itself unless told not to ([How to watch or stop a running fit](../guides/watch.md)) |
 | `stage_reports`, `progress` | `Refinement.fit` | off ([Reports at every stage](report.md#reports-at-every-stage), [Progress lines](result.md#progress-lines)) |
 | `correlation_guard`, `phase_support_sigma` | `Refinement.run_stage` | 0.98 and 3, since no plan supplies them; `Project.run_stage` passes the `phase_support_sigma` of the plan the project stores |
@@ -55,6 +56,25 @@ A backend whose optional dependency is missing raises `ImportError` with the ins
 `Capabilities.backends` and `Capabilities.solvers` report what this installation has ([Backends](programs.md#backends)).
 
 `Refinement.result_` holds the most recent result, and `Refinement.snapshot` returns a `RefinementState` without refining anything.
+
+### A re-fit runs one stage
+
+`Refinement.fit` on a model that an accepted fit of the same pattern left in place runs the plan as one stage, `warm_refit` ([About refinement plans](../concepts/plans.md#a-re-fit-runs-one-stage) gives why and the measurement).
+The stage frees every pattern the plan's stages free, keeps their largest `max_iter` and `strain_seed`, and carries no `seed`.
+A seed would lift a converged value off its floor.
+
+| `refit=` | A first fit | A re-fit |
+|---|---|---|
+| `"single"` (default) | the plan, in stages | one stage, `warm_refit`; if it is rejected, the plan in stages from the same start, with `WARM_REFIT_REJECTED` |
+| `"stages"` | the plan, in stages | the plan, in stages |
+
+A re-fit needs the same pattern arrays and σ, the same `mode` and the same fitted channels as the fit it follows, and no value written since.
+That fit must have ended `status="converged"` with no error-level diagnostic.
+`set_vary`, `hold`, `tie` and a different plan keep a re-fit.
+A plan with a stage that fixes (`Stage.turn_off`) runs in stages.
+`refine` builds a new `Refinement`, so it re-fits only when `history` is a tree whose head is such a fit's answer.
+`Refinement.summary` names the re-fit on its `plan:` line.
+An unknown value raises `ValueError`.
 
 ## Modes
 

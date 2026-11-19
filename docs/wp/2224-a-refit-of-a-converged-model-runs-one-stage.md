@@ -181,7 +181,7 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
       non-converged fit each run staged; a rejected one-stage fit falls back; `refit="stages"`
       is today's fit, bit for bit. Tests that pin a number through a second `fit` declare
       `refit="stages"`. Obs/calc/diff PNGs to `tests/output/`.
-- [ ] Manual: `concepts/plans.md` § Why a fit runs in stages says what staging is for (the
+- [x] Manual: `concepts/plans.md` § Why a fit runs in stages says what staging is for (the
       basin, and the windows) and when a fit takes one stage; `reference/refinement.md` gets the
       keyword. The page's first sentence, "Most of what goes wrong in a refinement is a
       correlation", describes the mechanism and not the purpose.
