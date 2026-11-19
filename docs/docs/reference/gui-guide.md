@@ -343,9 +343,10 @@ always plain. The decimal points in a group line up, and the unit follows the
 value. A number you can edit is tinted; a number you cannot is not.
 
 Press a number to edit it. The editor opens over the number, so nothing else
-moves. Enter keeps the value, and Escape drops it. A value typed back as it was
-shown is no edit, so pressing into `4.1568(2)` and out again cannot truncate
-the parameter. Below the editor, the value's limits can be set, and
+moves. Enter keeps the value, and Escape drops it. The editor holds the stored
+value to its last digit, as a spreadsheet cell does: `4.1568(2)` opens as
+`4.15678`. Leaving the text as it opened is no edit, so pressing in and out
+again cannot truncate the parameter. Below the editor, the value's limits can be set, and
 `Restrain` adds a restraint toward a target with a σ. Press the word to tick
 its box.
 
@@ -414,7 +415,10 @@ width wide. Every range stops at the parameter's own bounds. Click the
 parameter's name to set the range and the track yourself. A range you set is
 kept when a fit moves the values, and `Default` gives the measured one back.
 
-Click the number to type a value. `Enter` takes it and `Esc` leaves it. A value
+Click the number to type a value. The box opens on the stored value to its last
+digit, as the Parameters editor does. `Enter` takes a changed value, and `Enter`
+on the text as it opened changes nothing. `Esc` leaves the box. The box reads
+`1.5e-3`, `1.5×10⁻³` and `1.5x10^-3`, as the range fields do. A value
 outside the parameter's bounds is refused with the bound it crossed. Each number
 keeps one format for its whole range, so the digits stay put while you drag. `↺`
 puts one slider back at the last fit, and the tick on the track marks where that
