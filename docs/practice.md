@@ -184,6 +184,24 @@ scratch copies were not kept. The claims they marked inferred are TOPAS's quadra
 combination rule (not stated in the reference), the scope of `force_positive_fwhm`, and
 FullProf's constant-wavelength combination rule with an IRF.
 
+### When one twin reaches its limit, and a re-run
+
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
+specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
+earlier stage put it, and no free parameter in the stage can narrow that part of the width.
+
+| Program | A refined parameter that reaches a limit | A re-run of a converged refinement |
+|---|---|---|
+| rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
+| GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
+| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
+
+In the one program read, the parameter that crossed its limit is the one taken out, and its
+partner keeps refining. No program holds an instrument width because its specimen twin is free
+(the table above), so none meets this case in the form rietx does.
+
 ## Extinction
 
 Surveyed 2026-10-24 for WP-2044, one agent across six programs, with each
@@ -395,8 +413,8 @@ during the chain. The behaviours with no program default behind them are rietx's
 restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
 median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 its gap list; the step list and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
-counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`) and the per-pattern code
+counts.
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
@@ -868,6 +886,39 @@ user setting with no stated derivation. No program found reports a correlation a
 undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
+
+## The esd of a parameter on a direction the data does not determine
+
+Read 2026-11-18 for WP-2028 (PR #1668's open question). Several parameters can trade along a
+direction that leaves χ² unchanged. The Gaussian width is one case: Γ_G² = W + size/cos²θ +
+strain·tan²θ, and 1/cos²θ = 1 + tan²θ. Should each such parameter still get a finite esd from
+the directions the data did measure, or none? rietx keeps the finite esd and warns with
+`COVARIANCE_DIRECTION_DISCARDED` (WP-1535). That esd is at least √2 short by construction,
+and WP-2028 measured one 140× short. Which esd a fit gets is itself set by
+rounding. On that width triple the smallest eigenvalue sat at 2.2e-16 to 1.6e-15 of the largest,
+against a cut of 1e-15. A cut direction read ± 3.9e-7 on W, and a kept one ± 5.5 (WP-2028).
+
+| Source | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | A column with a zero diagonal is a "hard" singularity. The parameter is dropped from the refinement and reported as "Parameter(s) dropped" (`GSASIImath.HessianLSQ`, `:264-266`; `GSASIIstrMain.ReportProblems`, `:54-139`). A combination direction is "soft". The Hessian is scaled to unit diagonal and inverted by an SVD that zeroes every singular value under 1e-6 of the largest (`setHcorr`, `GSASIImath.py:131-148`). Every parameter keeps the finite esd that inverse gives. The count of zeroed values and the parameters most involved are reported as "soft (SVD) Hessian singularities" (`setSVDwarn`, `:150-162`) | checked (source) |
+| TOPAS 5 and v9 | `do_errors` gives errors and `C_matrix_normalized` from the A matrix (TOPAS 5 Technical Reference §3.7). v9 takes them from an SVD by default (§5.10); its cut is not stated. `bootstrap_errors` refits resampled data and quotes the spread of the refined values (TOPAS 5 Technical Reference, keyword `bootstrap_errors`; Efron & Tibshirani 1986). Nothing marks an esd as undetermined | checked (manuals) |
+| FullProf | A singular matrix stops the run. The manual advises starting from the scale factors alone and refining separately any pair correlated above about 50 % (FullProf manual, Trouble shooting and p. 14) | checked (manual) |
+| Prince (2004), *Mathematical Techniques in Crystallography and Materials Science*, § Correlation | An exactly singular Hessian "has no inverse". A variance computed while leaving out variables correlated with the one of interest is too small, and "the apparent precision will be illusory". The book's remedy is a constraint that removes the indeterminacy (§ Constraints, p. 127) | checked (text) |
+| Linear-models theory (Searle 1971, *Linear Models*, p. 169; summarised in the SAS/STAT guide, "Finding the Least Squares Estimators") | In a rank-deficient model a parameter that is not estimable has no unique estimate. A generalized inverse gives one solution of infinitely many, and a variance built from it depends on which inverse was taken. Standard errors are quoted for estimable combinations only, which no choice of inverse moves | checked (secondary) |
+| R `lm` | A pivoted QR drops each column that depends on the earlier ones. Its coefficient and standard error print as `NA`, "not defined because of singularities", and the others are conditional on it being zero (R-help, Ripley 2008; `?alias`) | checked (secondary) |
+| SAS PROC GLM | Estimates from a generalized inverse are flagged "B", "not uniquely estimable". A coefficient set to zero by the inverse shows a missing standard error (SAS usage note 22585; SAS/IML blog 2018-11-28) | checked (secondary) |
+| scipy 1.18.1 `curve_fit` | No treatment. On y = (a + b)x + c, the same data from two starts gave a and b esds of 5.0e6 and 9.1e6 (`lm`), or 4.3e4 and 1.5e5 (`trf`), with c's esd near 6.4e-3 in all four fits and no warning (run 2026-11-18) | measured |
+| SHELXL, Jana, MAUD, BGMN, RIETAN-FP | not checked | |
+
+**The practice.** Statistics is settled: a parameter the data cannot estimate has no standard
+error, and software that meets one prints none (R, SAS). Both then quote the other parameters
+conditional on a stated choice: R fixes the later column at zero. The crystallographic textbook
+agrees and asks for a constraint. The two crystallographic programs that report errors through
+a singular matrix (GSAS-II, TOPAS) do what rietx does today. They quote the finite esd of a
+truncated SVD, and GSAS-II adds a warning naming the parameters. GSAS-II drops a parameter only
+when its own column has no gradient. A truncated SVD is an unstated constraint: the minimum-norm
+solution in the units the matrix was scaled to. So its esd is conditional on a choice nobody
+made, and it changes with the scaling.
 
 ## Stephens anisotropic strain: the width's shape and its clamp
 
