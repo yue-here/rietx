@@ -1684,6 +1684,16 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_PHASE_TERM_READ", "code"),
     Row("TOPAS_SPECIES_NORMALISED", "code"),
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
+    Row("VARIABLE_NOT_FREED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no value the named variable sets, nor the variable itself: it "
+                  "kept its start; add a stage that frees it and refit, or read it as a "
+                  "constant the caller chose"),
+        evidence=("arithmetic: fires exactly when a vars. row that other parameters "
+                  "follow (single fit: ParameterTable.entry_reach) or that a parametric "
+                  "equation declares as a coefficient (joint fit) is in no stage's "
+                  "StageResult.freed or held; no threshold; gates nothing (WP-2101, "
+                  "ruled 2026-11-19)")),
     Row("WARM_REFIT_REJECTED", "code", tier=3, ambiguity=1,
         response="info",
         responds=("nothing: the result is the staged plan's answer, and the message names "
@@ -6007,6 +6017,10 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", value=1),
     Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", value=1),
+    Row("VARIABLE_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
+        evidence=("arithmetic: names the stage turn_on that frees the variable, the only "
+                  "route a plan has, and picks nothing: holding it may be the caller's "
+                  "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
