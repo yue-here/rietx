@@ -138,3 +138,29 @@ def test_the_legacy_loop_tag_is_named(tmp_path):
     path.write_text(text, encoding="utf-8")
     with pytest.raises(ValueError, match="_symmetry_equiv_pos_as_xyz loop"):
         structure_from_cif(path)
+
+
+@pytest.mark.parametrize("loop_tag", ["_space_group_symop_operation_xyz",
+                                      "_symmetry_equiv_pos_as_xyz"])
+def test_an_identity_only_loop_names_both_remedies(tmp_path, loop_tag):
+    """A non-P1 symbol over an ``x, y, z``-only loop is refused (ruling of
+    2026-11-18), and the message names both remedies: ``P 1`` or no symbol where
+    the atoms are the whole cell; delete the loop where only the asymmetric
+    unit was listed and the loop was dropped."""
+    text = _cif(["x,y,z"], "P 61 2 2").replace("_space_group_symop_operation_xyz", loop_tag)
+    path = tmp_path / "identity.cif"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="a different group") as info:
+        structure_from_cif(path)
+    message = str(info.value)
+    assert "write 'P 1' as the symbol or drop the symbol" in message
+    assert "delete the loop" in message
+
+
+def test_another_contradiction_keeps_the_short_remedy(tmp_path):
+    path = tmp_path / "other.cif"
+    path.write_text(_cif(_ops("P 61"), "P 61 2 2"), encoding="utf-8")
+    with pytest.raises(ValueError) as info:
+        structure_from_cif(path)
+    assert "write 'P 1'" not in str(info.value)
+    assert str(info.value).endswith("correct the symbol or the loop")
