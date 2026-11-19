@@ -31,6 +31,7 @@ import numpy as np
 import rietx as rx
 from rietx.schemas.instrument import BackgroundChebyshev, BackgroundFixedPlusChebyshev
 from rietx.schemas.pattern import PatternData
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.strategy.staged import RefinementPlan, Stage
 from tests.test_schemas import make_lab6
 
@@ -131,14 +132,15 @@ def _loop_fixed_point(data, bragg, curve, cheb) -> float:
 def _tied_fit(data: PatternData):
     """One fit with the tie, the route the manual documents.
 
-    The plan keeps its closing stage, so the answer is measured on the closing
+    The plan declares its closing stage (off by default since WP-2222), so the answer is measured on the closing
     windows, which are the windows ``predict(grid)`` compiles at.  With
     ``closing_window_tol=None`` the fit's own columns lose tails the oracle's
     keep, and the two minima part by 4e-4 for that reason alone.
     """
     ref = rx.Refinement(_structure(1e-4), _instrument((0.0,) * len(LEVEL)))
     ref.tie("instrument.background.scale", "phases.0.scale")
-    plan = RefinementPlan(stages=[Stage("scale_bkg", ["phases.0.scale", "instrument.background.*"])])
+    plan = RefinementPlan(stages=[Stage("scale_bkg", ["phases.0.scale", "instrument.background.*"])],
+                          closing_window_tol=CLOSING_WINDOW_TOL)
     return ref, ref.fit(data, plan=plan, telemetry=False)
 
 

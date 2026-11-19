@@ -2,18 +2,20 @@
 
 ``Stage.turn_off`` lists globs a stage fixes after it frees its ``turn_on``,
 the flags carry, and the closing stage re-solves the declared stages' end
-state.  The maintainer's case (ruled 2026-11-09): a Pawley fit settles the
+state.  The closing stage is off by default since WP-2222, so a test about it
+declares ``closing_window_tol=CLOSING_WINDOW_TOL``.  The maintainer's case (ruled 2026-11-09): a Pawley fit settles the
 profile, and a Rietveld plan then refines the structure with it fixed.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
 
 import rietx as rx
-from rietx.schemas.plan import PlanSpec, StageSpec
+from rietx.schemas.plan import CLOSING_WINDOW_TOL, PlanSpec, StageSpec
 from rietx.strategy.staged import fixed_at_end
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -47,7 +49,8 @@ def test_the_last_glob_to_match_a_path_decides_it():
 
 
 def test_a_plan_that_never_fixes_closes_as_it_did():
-    plan = rx.RefinementPlan.mccusker_default()
+    plan = dataclasses.replace(rx.RefinementPlan.mccusker_default(),
+                               closing_window_tol=CLOSING_WINDOW_TOL)
     for closing in (plan.closing_stage(), plan.closing_stage(["phases.0.scale"])):
         assert closing.turn_off == []
         assert closing.turn_on == list(dict.fromkeys(
@@ -57,7 +60,8 @@ def test_a_plan_that_never_fixes_closes_as_it_did():
 def test_the_closing_stage_fixes_the_paths_the_plan_left_fixed():
     plan = rx.RefinementPlan(stages=[
         rx.Stage("one", ["phases.*.scale", PROFILE]),
-        rx.Stage("two", ["phases.*.cell.*"], turn_off=[PROFILE])])
+        rx.Stage("two", ["phases.*.cell.*"], turn_off=[PROFILE])],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     paths = ["phases.0.scale", "phases.0.cell.a", "instrument.profile.u",
              "instrument.profile.w"]
     assert plan.closing_stage(paths).turn_off == ["instrument.profile.u",
@@ -92,7 +96,8 @@ def test_a_pawley_profile_stays_fixed_through_a_rietveld_plan(pattern):
     plan = rx.RefinementPlan(stages=[
         rx.Stage("everything but the profile",
                  ["phases.*.scale", "instrument.background.*", "phases.*.cell.*",
-                  "instrument.*"], turn_off=[PROFILE], max_iter=30)])
+                  "instrument.*"], turn_off=[PROFILE], max_iter=30)],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     result = ref.fit(pattern, mode="rietveld", plan=plan)
     assert _profile(ref) == settled
     declared, closing = result.stages
@@ -113,7 +118,8 @@ def test_a_later_stage_frees_a_fixed_path_again(pattern):
                            "phases.*.cell.*"], max_iter=20),
         rx.Stage("hold the cell", ["instrument.profile.w"],
                  turn_off=["phases.*.cell.*"], max_iter=20),
-        rx.Stage("cell again", ["phases.*.cell.*"], max_iter=20)])
+        rx.Stage("cell again", ["phases.*.cell.*"], max_iter=20)],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     result = ref.fit(pattern, plan=plan)
     first, second, third, closing = result.stages
     assert "phases.0.cell.a" in second.fixed
@@ -196,7 +202,8 @@ def test_a_joint_fit_fixes_and_closes_on_the_fix():
         patterns, plan=rx.RefinementPlan(stages=[
             rx.Stage("all", ["phases.*.scale", "instrument.background.*",
                              "phases.*.cell.*", "instrument.zero_shift"],
-                     turn_off=["instrument.zero_shift"], max_iter=30)]))
+                     turn_off=["instrument.zero_shift"], max_iter=30)],
+            closing_window_tol=CLOSING_WINDOW_TOL))
     declared, closing = result.stages
     for stage in (declared, closing):
         assert not any(p.endswith("zero_shift") for p in stage.freed)

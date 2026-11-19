@@ -17,6 +17,7 @@ import pytest
 import rietx as rx
 from rietx.model.forward import compile_model, orbit_split_of
 from rietx.refine import _multiplicity_kept_diagnostics
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.viz.plots import plot_result
 
 P = rx.Parameter
@@ -69,12 +70,15 @@ def _fitted_oxygen(ref: rx.Refinement) -> float:
 def _split_pair_fit(data, stages):
     ref = rx.Refinement(rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
                         _instrument(), history=False)
-    res = ref.fit(data, plan=rx.RefinementPlan(stages=stages), telemetry=False)
+    # declared, not inherited: off by default since WP-2222.  The truth is
+    # drawn by ``predict`` on the closing windows, so χ² ≈ 0 needs them too.
+    res = ref.fit(data, plan=rx.RefinementPlan(
+        stages=stages, closing_window_tol=CLOSING_WINDOW_TOL), telemetry=False)
     return ref, res
 
 
 def test_a_split_pair_that_lands_on_its_mirror_keeps_its_atoms(truth):
-    """The default plan (one stage, then the closing stage) returns 12 O.
+    """One stage, then the closing stage, returns 12 O.
 
     Reverting the freeze returns 10 O at χ²_red 23 and Biso -1.6 here, so this
     is the test that fails on a revert.
@@ -131,8 +135,9 @@ def test_a_joint_fit_keeps_the_split_too(truth):
     multi = MultiHistogramRefinement(
         rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
         [_instrument(), _instrument()])
-    res = multi.fit([truth, truth], plan=rx.RefinementPlan(stages=[ALL]),
-                    telemetry=False)
+    # declared, not inherited: off by default since WP-2222
+    res = multi.fit([truth, truth], plan=rx.RefinementPlan(
+        stages=[ALL], closing_window_tol=CLOSING_WINDOW_TOL), telemetry=False)
     o1 = multi.fitted_structures[0].phases[0].atoms[O1]
     assert abs(o1.y.value - 0.25) < 5e-5
     assert res.statistics.chi2 < 1e-6
