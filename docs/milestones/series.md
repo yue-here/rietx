@@ -12,7 +12,7 @@ are the session's wording. On 2026-11-18 a later session proposed four correctio
 corrections in chat ("Make them"), which ends the draft.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
+[v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 

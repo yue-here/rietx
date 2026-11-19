@@ -847,6 +847,8 @@ def index_pattern(peaks: PeakList | None = None, *,
         search_anchors,
         search_line_order,
         single_engine_diagnostic,
+        weak_line_floor,
+        weak_line_retry_diagnostic,
     )
     from .pick import pick_peaks
     from .quality import assess_peak_list
@@ -887,6 +889,9 @@ def index_pattern(peaks: PeakList | None = None, *,
     if quality is None:
         quality = assess_peak_list(peaks, shift_from_pairs=shift_from_pairs,
                                    pair_seed=spec.seed, instrument=instrument)
+    # the caller's spec with the ceiling filled in: what the weak-line retry
+    # adopts its own shift and systems from, as a fresh call would
+    spec_caller = spec
     spec = _adopt_measured_shift(spec, quality)
     spec = _restrict_to_supported(spec, quality)
     names = tuple(engines) if engines is not None else engine_names()
@@ -992,9 +997,9 @@ def index_pattern(peaks: PeakList | None = None, *,
         # its dominant-zone probe explains a *whole-run* silence, which a
         # per-system unit cannot know — deferred below, asked once
         unit_kwargs["trial_error"]["probe"] = False
-    def run_units(spec):
+    def run_units(spec, peaks, quality, screen, systems):
         units: dict[str, list] = {name: [] for name in names}
-        for system in ordered_systems:
+        for system in systems:
             if search_cancel is not None and bool(search_cancel):
                 break
             for name in names:
@@ -1011,60 +1016,67 @@ def index_pattern(peaks: PeakList | None = None, *,
                 # graded (WP-1042); a system the token interrupted has not,
                 # and its candidates stay provisional in the log
                 _stream_system_snapshot(progress, system, units, names, peaks,
-                                        spec, quality, top,
-                                        screen=pattern_screen)
+                                        spec, quality, top, screen=screen)
         return [merge_engine_units(units[name]) for name in names
                 if units[name]]
 
-    results = run_units(spec)
-    retry_spec = replace(spec, n_unindexed=INLIERS)
-    if (spec.n_unindexed is None and _no_agreement(results)
-            and not (search_cancel is not None and bool(search_cancel))
-            # a list of one intensity has no anchor, so its inlier rule *is*
-            # the count of two and a retry would repeat the first pass
-            and len(search_anchors(peaks, search_line_order(peaks, spec),
-                                   retry_spec))):
-        # the inlier retry (indexing C4): the absolute count of two is what a
-        # list with more foreign lines than that cannot pass, so a run that
-        # ends with no lattice two engines agree on is searched again under
-        # the inlier rule — and only such a run, because the rule changes the
-        # pool the panel ranks (``engines.INLIER_FRACTION``)
-        first = sum(len(r.candidates) for r in results)
-        first_pass = {r.engine: r for r in results}
-        spec = retry_spec
-        # the retry repeats every unit, so the ladder grows by the same count
-        progress.add(len(names) * len(ordered_systems))
-        retried = run_units(spec)
-        # the retry adds and never removes (#951): a first-pass candidate
-        # indexes all but two driven lines, which is what a single-engine truth
-        # (a lab pattern's dichotomy-only cell, replaced by its a/2 subcell)
-        # needs to stay in the list even where the retry's anchors would have
-        # refused it.  First, so a lattice both passes found keeps the stricter
-        # fit.  An engine the retry never reached (deadline, cancel) keeps its
-        # first-pass result whole, and one it reached only in part keeps the
-        # first pass's systems
-        results = []
-        for name in names:
-            prev = first_pass.get(name)
-            now = next((r for r in retried if r.engine == name), None)
-            if now is None:
+    def search(spec, peaks, quality, screen, systems):
+        """The first pass and, where it found no agreement, the inlier retry:
+        the results and the spec they ran under."""
+        results = run_units(spec, peaks, quality, screen, systems)
+        retry_spec = replace(spec, n_unindexed=INLIERS)
+        if (spec.n_unindexed is None and _no_agreement(results)
+                and not (search_cancel is not None and bool(search_cancel))
+                # a list of one intensity has no anchor, so its inlier rule
+                # *is* the count of two and a retry would repeat the first pass
+                and len(search_anchors(peaks, search_line_order(peaks, spec),
+                                       retry_spec))):
+            # the inlier retry (indexing C4): the absolute count of two is
+            # what a list with more foreign lines than that cannot pass, so a
+            # run that ends with no lattice two engines agree on is searched
+            # again under the inlier rule — and only such a run, because the
+            # rule changes the pool the panel ranks (``engines.INLIER_FRACTION``)
+            first = sum(len(r.candidates) for r in results)
+            first_pass = {r.engine: r for r in results}
+            spec = retry_spec
+            # the retry repeats every unit, so the ladder grows by the same count
+            progress.add(len(names) * len(systems))
+            retried = run_units(spec, peaks, quality, screen, systems)
+            # the retry adds and never removes (#951): a first-pass candidate
+            # indexes all but two driven lines, which is what a single-engine
+            # truth (a lab pattern's dichotomy-only cell, replaced by its a/2
+            # subcell) needs to stay in the list even where the retry's
+            # anchors would have refused it.  First, so a lattice both passes
+            # found keeps the stricter fit.  An engine the retry never reached
+            # (deadline, cancel) keeps its first-pass result whole, and one it
+            # reached only in part keeps the first pass's systems
+            results = []
+            for name in names:
+                prev = first_pass.get(name)
+                now = next((r for r in retried if r.engine == name), None)
+                if now is None:
+                    if prev is not None:
+                        results.append(prev)
+                    continue
                 if prev is not None:
-                    results.append(prev)
-                continue
-            if prev is not None:
-                now.candidates[:0] = prev.candidates
-                now.systems_searched += tuple(
-                    s for s in prev.systems_searched
-                    if s not in now.systems_searched)
-                now.search_complete = {**prev.search_complete,
-                                       **now.search_complete}
-            results.append(now)
-        if results:
-            results[0].diagnostics.append(inlier_retry_diagnostic(first))
+                    now.candidates[:0] = prev.candidates
+                    now.systems_searched += tuple(
+                        s for s in prev.systems_searched
+                        if s not in now.systems_searched)
+                    now.search_complete = {**prev.search_complete,
+                                           **now.search_complete}
+                results.append(now)
+            if results:
+                results[0].diagnostics.append(inlier_retry_diagnostic(first))
+        return results, spec
+
+    results, spec = search(spec, peaks, quality, pattern_screen, ordered_systems)
     trial = next((r for r in results if r.engine == "trial_error"), None)
     if (trial is not None and not trial.candidates and trial.systems_searched
             and not (search_cancel is not None and bool(search_cancel))):
         # the deferred probe: once, over the systems the engine entered, and
+        # on the full list, before the weak-line retry can spend the clock
+        # it runs on (an adopted retry discards this result with its list);
         # only when the whole harvest is empty — a cancelled run's silence is
         # explained by the token, not by an index table.  Search phase, so it
         # runs against the search's own deadline, not the reserve
@@ -1078,6 +1090,48 @@ def index_pattern(peaks: PeakList | None = None, *,
         if hit is not None:
             trial.diagnostics.append(hit)
 
+    retry_diagnostics: list = []
+    retry_unadopted = False
+    if (spec_caller.n_unindexed is None and _no_agreement(results)
+            and not (search_cancel is not None and bool(search_cancel))):
+        # the weak-line retry (WP-2078, ruled 2026-11-13): a run that still
+        # ends with no lattice two engines agree on is searched once more on
+        # the lines at or above ``WEAK_LINE_RETRY_FLOOR`` of the strongest, as
+        # a fresh call on that list would search it, and is scored on those
+        # lines alone, because scoring the second search's cells on the full
+        # list left a trace phase's truth 2nd-9th (WP-2078 task 4).  The full
+        # list's answer stands unless that search finds agreement.  Never
+        # before every search: no floor separates a trace phase's lines from
+        # a superlattice's own, and the floor regrades SRM 660c
+        kept = weak_line_floor(peaks)
+        kept_ids = {id(p) for p in kept.usable()}
+        set_aside = [p.two_theta for p in peaks.usable() if id(p) not in kept_ids]
+        kept_quality = (assess_peak_list(kept, shift_from_pairs=shift_from_pairs,
+                                         pair_seed=spec_caller.seed,
+                                         instrument=instrument)
+                        if set_aside else None)
+        if kept_quality is not None and kept_quality.supports_indexing:
+            kept_spec = _restrict_to_supported(
+                _adopt_measured_shift(spec_caller, kept_quality), kept_quality)
+            kept_systems = [s for s in ordered_systems if s in kept_spec.systems]
+            kept_screen = PatternScreen.from_peaks(
+                kept, q_match=absence_window(kept, kept_spec, kept_quality),
+                k_sigma=kept_spec.k_sigma, data=data if validate else None,
+                instrument=instrument,
+                p0_floor_deg=kept_spec.k_sigma * effective_shift_allowance(
+                    kept_spec, kept_quality)[0])
+            progress.add(len(names) * len(kept_systems))
+            kept_results, kept_spec = search(kept_spec, kept, kept_quality,
+                                             kept_screen, kept_systems)
+            adopted = bool(kept_results) and not _no_agreement(kept_results)
+            retry_unadopted = not adopted
+            if adopted:
+                results, spec, peaks, quality = (kept_results, kept_spec, kept,
+                                                 kept_quality)
+                pattern_screen, ordered_systems = kept_screen, kept_systems
+            retry_diagnostics.append(weak_line_retry_diagnostic(
+                set_aside, len(kept.usable()), adopted,
+                stopped=search_cancel is not None and bool(search_cancel)))
     prior_cands, prior_reports = [], []
     if spec.prior_cells or spec.prior_spacegroups:
         # the stated cells, checked the engines' own way — what survives
@@ -1157,9 +1211,12 @@ def index_pattern(peaks: PeakList | None = None, *,
 
     # the reserve boundary is part of the ceiling's scheduling: a search it
     # stopped is a budget statement exactly as the ceiling itself is
+    # (a weak-line retry the run did not adopt reached the search's stop on
+    # its own list: the search it reports had finished, and the retry's
+    # diagnostic says the retry was stopped)
     search_expired = (search_cancel is not None
                       and search_cancel is not run_cancel
-                      and bool(search_cancel))
+                      and bool(search_cancel) and not retry_unadopted)
     if deadline is not None and not deadline.cancelled_by_user() \
             and (deadline.expired() or search_expired):
         requested = ordered_systems
@@ -1197,7 +1254,7 @@ def index_pattern(peaks: PeakList | None = None, *,
         n_usable_lines=len(peaks.usable()), provenance=provenance,
         preset=ran_preset, formula=formula, temperature=checked_at,
         diagnostics=list(quality.diagnostics) + outcome.diagnostics
-        + _pair_shift_diagnostics(quality))
+        + retry_diagnostics + _pair_shift_diagnostics(quality))
     out = result.model_copy(update={
         "diagnostics": list(result.diagnostics)
         + index_diagnostics(result, instrument)})
@@ -1244,7 +1301,12 @@ def _spec_notes(spec, names: Sequence[str], quality,
     chairs handing identical controls to this run produce identical notes,
     which is what the WP's acceptance asserts.
     """
-    from .engines import ANCHOR_LINES, DEFAULT_N_UNINDEXED, INLIER_FRACTION
+    from .engines import (
+        ANCHOR_LINES,
+        DEFAULT_N_UNINDEXED,
+        INLIER_FRACTION,
+        WEAK_LINE_RETRY_FLOOR,
+    )
 
     optional = {
         "max_volume": None if spec.max_volume is None else (
@@ -1271,7 +1333,8 @@ def _spec_notes(spec, names: Sequence[str], quality,
         "d_axis_range_A": f"{spec.min_d_axis:g}-{spec.max_d_axis:g}",
         "min_volume": f"{spec.min_volume:g}",
         "n_unindexed": (
-            f"{DEFAULT_N_UNINDEXED}, then inliers if no two engines agree"
+            f"{DEFAULT_N_UNINDEXED}, then inliers if no two engines agree, "
+            f"then the lines >= {WEAK_LINE_RETRY_FLOOR:g}·I_max if still none"
             if spec.n_unindexed is None
             else f"inliers >= {INLIER_FRACTION:g}·N and the {ANCHOR_LINES} "
                  f"strongest ({DEFAULT_N_UNINDEXED} on a list of one "
