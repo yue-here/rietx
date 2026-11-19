@@ -395,8 +395,8 @@ during the chain. The behaviours with no program default behind them are rietx's
 restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
 median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 its gap list; the step list and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
-counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`) and the per-pattern code
+counts.
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,

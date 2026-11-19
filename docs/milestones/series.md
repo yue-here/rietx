@@ -5,9 +5,11 @@ milestones, one for parametric, one for series"). The block 23xx is claimed for 
 [`../ROADMAP.md`](../ROADMAP.md) § series carries the short prose, and the WP index lists
 the rows.
 
-**This file is a draft of the open.** A Claude session wrote it the same day from that
-chat. The six rules carry the maintainer's answer to each, and all six are accepted. The title, § Scope and
-§ Acceptance are the session's wording and wait for the maintainer's read.
+A Claude session wrote this file the same day from that chat. The six rules carry the
+maintainer's answer to each, and all six are accepted. The title, § Scope and § Acceptance
+are the session's wording. On 2026-11-18 a later session proposed four corrections to
+§ Acceptance and found none to make to the title or § Scope. The maintainer approved the
+corrections in chat ("Make them"), which ends the draft.
 
 Narrative about the WPs below goes to the record of the release in flight,
 [v1.13](v1.13.md) today, as for every other WP (protocol rule 5).
@@ -119,8 +121,8 @@ which. "Accepted" records the maintainer's answer in chat on 2026-11-16.
 - **`SEQUENTIAL_WIDTH_GROWTH` is removed** (maintainer, 2026-11-16: "Remove"). The warning
   fired when a phase width reached 3× its first measured value, GoF had doubled and the
   growth exceeded 3 esds, on three unaudited constants. The width trajectory and each
-  pattern's GoF are already in the result, so rule 5 is met without it. The removal is
-  not built yet.
+  pattern's GoF are already in the result, so rule 5 is met without it. Removed in WP-2081
+  on 2026-11-17, with no field added, under `THRESHOLDS_VERSION` 1.15.
 
 ## Open decisions
 
@@ -160,22 +162,27 @@ structural one, WP-2108) are work of their own.
 ## The order
 
 Rules 3 to 6 describe the code as it nearly stands, so their work is small: the field for
-WP-2080, a fixed value surviving a restart (WP-2081 question 4), and the two thresholded
-codes once ruled. Rule 1 comes next, as a declaration on the series call. Rule 2's start
+WP-2080, a fixed value surviving a restart (WP-2081 question 4), and
+`SEQUENTIAL_MOMENT_ONSET` once ruled. `SEQUENTIAL_WIDTH_GROWTH` is removed. Rule 1 comes next, as a declaration on the series call. Rule 2's start
 from a series result waits on WP-2103. The default is ruled, so a preset for the typical
 temperature series can be written. The documentation for a user arriving from another program's
-sequential mode is written with rule 1. Each WP's `Priority:` line outranks this paragraph.
+sequential mode is written with rule 1. Before rule 2 is built, a second real series that
+nobody who changes the package has run is named, with its independent measurement. Each
+WP's `Priority:` line outranks this paragraph.
 
 ## Acceptance
 
-**These rows are drafted at the open**, as protocol rule 6 asks, and wait for the
-maintainer's read. Rwp is reported and is no part of any bar.
+These rows were drafted at the open, as protocol rule 6 asks, and approved with four
+corrections on 2026-11-18 (WP-2081's log). Rwp is reported and is no part of any bar.
 
 - **A series equals its patterns fitted alone** (rule 3). On the synthetic LaB6 thermal
-  ramp and the CuCr2O4 ramp, every pattern's value from the one-after-another fit is within
-  0.01 esd of the same pattern fitted alone from the caller's models, or the result's
-  direction gap reports the difference. Measured so far: eight CuCr2O4 patterns within
-  1e-6 Å (WP-2081, `cold_check`).
+  ramp and the CuCr2O4 ramp, every pattern's value from the one-after-another fit agrees
+  with the same pattern fitted cold and alone from the caller's models. The bar is the
+  measured spread between two independent fits of that pattern, because a fixed fraction of
+  an esd would test where the solver stopped (`tests/CLAUDE.md` § Budgets in tests). The
+  direction gap of `direction="both"` compares two chains with each other, so it is a
+  second check and never stands in for this one. Measured so far: eight CuCr2O4 patterns
+  within 1e-6 Å (WP-2081, `cold_check`). The spread is not measured yet.
 - **A fixed value stays fixed** (rules 1 and 6). On WP-2081's cold-restart fixture, a zero
   shift fixed at 0.00797° reads 0.00797° on every pattern and every attempt, and the cell
   stays within 2 ppm of the truth. Today the restarted pattern holds 0.0 and the cell is
@@ -191,12 +198,14 @@ maintainer's read. Rwp is reported and is no part of any bar.
   development data, so this row can fail a route and cannot prove one. Measured at the
   open (WP-2081's log, 2026-11-16): the default chain and a joint fit with a common zero
   shift both close between 111 and 123 K, and a joint fit with one common profile and no
-  sample width closes between 123 and 134 K. A second real series
-  that nobody who changes the package has run is named before rule 2 is built, with its
-  independent measurement.
+  sample width closes between 123 and 134 K.
 - **No series action or code rests on a tuned threshold over a fit metric** (rules 5 and
   6). The audit table holds no series row at `unaudited`, and each remaining thresholded
-  series code carries the maintainer's ruling.
+  series code carries its owner's ruling. The one left is `SEQUENTIAL_MOMENT_ONSET`, whose
+  owner is the magnetic path's.
+- **The series call refuses what it cannot honour** (rule 2). A parameter declared common
+  or by equation in the series call raises, and the message names the joint call. No series
+  result holds a common value by freezing one pattern's.
 - **The documentation agrees with itself** (rule 4). The skill, the guide and the manual
   give one route for the typical temperature series. Each skill trap names a source outside
   rietx's own runs. A page in the manual's Switching tab takes a user from another

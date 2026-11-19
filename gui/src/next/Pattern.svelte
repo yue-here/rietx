@@ -249,8 +249,10 @@
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
+      // a chart built under a preview (the graph tab came back to Pattern)
+      // has no view yet to keep: keeping one drew an empty plot (WP-2218)
       const p = untrack(() => preview);
-      if (p) chart.setPreview(p.curves);
+      if (p) chart.setPreview(p.curves, false);
     } else {
       chart.setCurves(c, keep);
       chart.update(overlayNow());
@@ -933,56 +935,6 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-
-  /* one row: what the graph shows on the left, the view's controls on the
-     right; the title gives way first, with an ellipsis (B1, 2026-11-09) */
-  .ghead {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 40px;
-    padding: 2px 16px;
-  }
-
-  .gtitle {
-    flex: 1 1 0;
-    min-width: 9em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .gtitle b {
-    font-weight: 600;
-  }
-
-  .gtitle > span {
-    margin-left: 10px;
-    color: var(--muted);
-    font-size: var(--text-sm);
-  }
-
-  .gtitle .num {
-    font-family: var(--mono-family);
-  }
-
-  .gtitle .bad {
-    color: var(--bad);
-  }
-
-  .gtitle b.pv {
-    color: var(--accent-ink);
-  }
-
-  .gctl {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: var(--text-sm);
-    color: var(--muted);
   }
 
   .view {
