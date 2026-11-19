@@ -94,7 +94,7 @@ What an operator must know, all measured:
   cannot propagate down the chain, but reading its parameters is on you.
 - **A closing `stage_start` with no `stage_end` for minutes is a runaway
   being polished.**  Only a plan that asks for a closing stage has one (off
-  by default since 1.13).  The closing stage rebuilds the model at the answer it is
+  by default since 1.13), and so does a Pawley series that carries intensities.  The closing stage rebuilds the model at the answer it is
   handed, so a runaway axial ratio or width gives it windows as wide as the
   pattern.  Refit with `closing_window_tol=None` and say the numbers came
   without the closing stage (up to 0.97 esd on lab answers).  *(Hypothesis:

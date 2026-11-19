@@ -16,6 +16,7 @@ from pathlib import Path
 from _calibration_pair import lab6, sample, standard
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 work = Path(tempfile.mkdtemp())
 
@@ -40,8 +41,6 @@ for d in calibrated.diagnostics:
 rx.save_instrument_profile(calibration.instrument, work / "first.json")
 
 from _calibration_pair import ceo2  # noqa: E402
-
-from rietx.schemas.plan import CLOSING_WINDOW_TOL  # noqa: E402
 
 
 def refine_sample(profile, data):

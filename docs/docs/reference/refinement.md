@@ -279,9 +279,8 @@ Use it for a number going into a paper, for a number reproduced from an earlier 
 A plan can end with one more stage than it declares.
 The closing stage compiles the model again at the answer, with peak windows that drop `RefinementPlan.closing_window_tol` of each peak's area, and solves once more with every pattern any declared stage freed.
 It is off by default since 1.13: `closing_window_tol` is `None`, and a plan runs its declared stages alone.
-Two cases keep it.
-`RefinementPlan.lab_calibrate` declares it, because every fit that loads the calibrated profile inherits the calibration's error.
-A Pawley series that carries per-hkl intensities from pattern to pattern runs it when its plan has none, because each pattern would start from the last one's window error; `carry_hkl_intensities=False` turns both off.
+`lab_calibrate` keeps it, since every later fit inherits a calibration's error.
+So does a Pawley series carrying intensities, since each pattern would start from the last one's error; `carry_hkl_intensities=False` turns both off.
 Ask for it with `CLOSING_WINDOW_TOL`, 1e-3, for an answer you will publish:
 
 ```python

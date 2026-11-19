@@ -5121,11 +5121,14 @@ ROWS: tuple[Row, ...] = (
                   "checked"
                   "; seven programs, 2026-10-21 (docs/practice.md): the full range in GSAS-II, FullProf, RIETAN-FP, MAUD and EasyDiffraction, BGMN the instrument function's range, TOPAS's default not stated")),
     Row("rietx.refine.Refinement.run_stage:correlation_guard", "default", value=0.98),
-    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=1, ambiguity=1, value=None,
+    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=2, ambiguity=1, value=None,
         evidence=("None resolves to forward.WINDOW_AREA_TOL since WP-2222, the windows a default "
-                  "fit's declared stages measure its answer on, and inherits that row's tier; "
-                  "until WP-2222 it resolved to schemas.plan.CLOSING_WINDOW_TOL; the stage "
-                  "records the fraction it ran at"),
+                  "fit's declared stages measure its answer on: TOPAS's cut, 2 % of a Lorentzian, "
+                  "inside the seven programs' range (docs/practice.md, How far a peak is "
+                  "computed), as PlanSpec:closing_window_tol's row cites; until WP-2222 it "
+                  "resolved to schemas.plan.CLOSING_WINDOW_TOL; nothing follows a stage run by "
+                  "hand, so its answer keeps the declared windows' error (up to 0.97 esd on lab "
+                  "data, WP-2002); the stage records the fraction it ran at"),
         grounds=("A stage driven by hand (the GUI's Run this stage among them) runs on the "
                  "windows a default fit's stages run on, so it costs what the same stage in a "
                  "plan costs: the maintainer's 2026-11-19 ruling that TOPAS-level accuracy is "
