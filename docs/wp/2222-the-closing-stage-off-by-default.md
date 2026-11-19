@@ -1,6 +1,7 @@
 # WP-2222 — The closing stage off by default
 
 Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here
+Track: A long run is not one fit
 Depends on: —
 Priority: P1 2026-11-19 — paid by every user on every run: users complained about fit time, and the closing stage is 1.2-1.9× of it
 

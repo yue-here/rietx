@@ -112,11 +112,14 @@ def test_at_the_base_values_the_answer_is_frozen_and_the_last_fit(fap):
     assert answer.header["evaluated"] == "frozen"
     ref = np.asarray(fap.refinement.result_.y_calc)
     y = answer.arrays["y_calc"]
-    # the closing compile the result came from, at the values it ended on
-    assert np.max(np.abs(y - ref)) <= 1e-9 * np.max(np.abs(ref))
     _, fresh = _fresh(fap, {})
     assert np.max(np.abs(y - fresh)) <= 1e-9 * np.max(np.abs(fresh))
-    assert answer.header["rwp"] == pytest.approx(fap.refinement.result_.statistics.rwp, rel=1e-9)
+    # The preview draws at compile_model's near-complete tails; a default fit
+    # measured its answer on the declared stages' 2 % windows since WP-2222,
+    # so the two differ by the tails: 0.13 % of the strongest peak on fap
+    # (26 counts on 20 310), the Rwp header in its third digit.
+    assert np.max(np.abs(y - ref)) <= 2e-3 * np.max(np.abs(ref))
+    assert answer.header["rwp"] == pytest.approx(fap.refinement.result_.statistics.rwp, rel=2e-2)
 
 
 @pytest.mark.parametrize("name", ["fap", "nac"])

@@ -4915,7 +4915,7 @@ class Refinement:
             data, stage, correlation_guard=node.action.correlation_guard,
             phase_support_sigma=node.action.phase_support_sigma,
             # a declared stage's record says None and ran at the declared 2 %,
-            # which run_stage's own None no longer is (the seventh round's Q1)
+            # which run_stage's own None is again since WP-2222
             window_area_tol=recorded_window_tol(node.action.window_area_tol))
 
     # ------------------------------------------------------------------

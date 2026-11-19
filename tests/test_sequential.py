@@ -1419,7 +1419,10 @@ def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
 #: `_CHEAP_WIDE` at twice its budget, so that `_CRAWL_FACTOR` times a first rung
 #: of about 9 evaluations lowers the budget and stays above the crawl's stop
 _CHEAP_ROOMY = staged.RefinementPlan(stages=[
-    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)])
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)],
+    # declared, not inherited: off by default since WP-2222, and the test
+    # below crawls this plan's closing stage
+    closing_window_tol=staged.CLOSING_WINDOW_TOL)
 _CRAWL_FACTOR = 40.0
 
 

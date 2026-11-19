@@ -51,6 +51,7 @@ from rietx.crystallography.symmetry import (
 )
 from rietx.report.schemas import MOMENT_SUPPORT_SIGMA
 from rietx.schemas.common import Parameter
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import (
     MOMENT_FLOOR_MU_B,
     Atom,
@@ -157,7 +158,10 @@ def simulate(phase, instrument, *, background=40.0, seed=20260906,
 NUCLEAR_PLAN = rx.RefinementPlan(stages=[
     rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
     rx.Stage("cell", ["phases.*.scale", "instrument.background.c*",
-                      "phases.*.cell.*"])])
+                      "phases.*.cell.*"])],
+    # declared, not inherited: off by default since WP-2222, and the nuclear
+    # fits every solve here starts from were measured with it
+    closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 def neutron():
@@ -1878,7 +1882,8 @@ def test_a_budget_stop_is_continued_from_where_it_stopped():
     start.cell.c.value += 0.004
     _ref, result = _fit(rx.Structure(phases=[start]), instrument,
                         data, starved)
-    assert [s.name for s in result.stages] == ["all (continued)", "closing"]
+    # the plan declares no closing stage, the default since WP-2222
+    assert [s.name for s in result.stages] == ["all (continued)"]
     freed = {p.path for p in result.parameters if p.vary}
     assert "phases.0.scale" in freed and "phases.0.cell.a" in freed
     # each continuation keeps the last stage's one-iteration budget, so this
