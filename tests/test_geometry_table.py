@@ -775,10 +775,10 @@ def test_the_census_is_the_unfitted_refinement_geometry(builder):
 
 
 def test_the_census_does_to_the_model_what_a_fit_does_first():
-    """A hexagonal cell stored with b ≠ a takes b ← a, and a site 3·10⁻⁴ off
+    """A hexagonal cell stored with b a hair off a (inside the 1e-5 tie tolerance) takes b ← a, and a site 3·10⁻⁴ off
     its special position is merged onto it and said in the notes, as `Refinement` does before any
     fit; without the merge the site's own images, 0.003 Å apart, are listed."""
-    phase = _phase_in("P 63 m c", (3.2499, 3.26, 5.2066, 90.0, 90.0, 120.0),
+    phase = _phase_in("P 63 m c", (3.2499, 3.24992, 5.2066, 90.0, 90.0, 120.0),
                       [("Zn", "Zn", 0.333, 0.667, 0.0),
                        ("O", "O", 0.333, 0.667, 0.3819)])
     structure = Structure(phases=[phase])
