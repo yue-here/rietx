@@ -82,7 +82,7 @@ Compare each coordinate's esd alone and jointly:
 
 <!-- output of examples/guides/joint.py -->
 ```text
-phases.0.atoms.0.z  X-ray 0.352124(40)  neutron 0.35190(14)  joint 0.352108(38)
+phases.0.atoms.0.z  X-ray 0.352124(40)  neutron 0.35190(14)  joint 0.352107(38)
 phases.0.atoms.1.x  X-ray 0.30630(18)  neutron 0.30643(17)  joint 0.30634(12)
 ```
 

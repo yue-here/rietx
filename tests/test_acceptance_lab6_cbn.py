@@ -163,8 +163,9 @@ def _inputs():
 #: that a future change to ``INTERMEDIATE_FTOL_DEFAULT`` shows up here as a
 #: decision rather than as a silent shift in the numbers above.
 INTERMEDIATE_FTOL = None   # i.e. plan.intermediate_ftol left at the shipped default
-#: and the shipped closing stage (WP-2002), for the same reason:
-#: ``plan.closing_window_tol`` is left at its default, 1e-3.
+#: and the shipped closing-stage setting, for the same reason:
+#: ``plan.closing_window_tol`` is left at its default, ``None`` since WP-2222
+#: (1e-3 under WP-2002).
 
 _BASE = [
     rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),

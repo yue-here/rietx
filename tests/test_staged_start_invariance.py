@@ -93,6 +93,7 @@ from rietx.model import compiled
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
 from rietx.schemas.instrument import HARMONIC_WEIGHT_SEED, BackgroundChebyshev
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests import test_window_domain as w
 from tests.test_acceptance_qpa_roundrobin import (
     DATA,
@@ -277,6 +278,7 @@ def _harmonic_fit(pattern, scale: float, seed: float) -> dict:
     st = rx.Structure(phases=[corundum_phase()])
     st.phases[0].scale.value = scale * 0.8
     st.phases[0].cell.a.value *= 1.0005
+    st.phases[0].cell.b.value = st.phases[0].cell.a.value  # R -3 c:H ties b to a
     st.phases[0].cell.c.value *= 1.0005
     for atom in st.phases[0].atoms:
         atom.biso.value = 0.5
@@ -285,7 +287,8 @@ def _harmonic_fit(pattern, scale: float, seed: float) -> dict:
     ins.background.coefficients[0].value = 500.0
     base = rx.RefinementPlan.mccusker_structural()
     plan = rx.RefinementPlan(stages=[
-        *base.stages, rx.Stage("harmonic", ["instrument.source.lines.*.weight"])])
+        *base.stages, rx.Stage("harmonic", ["instrument.source.lines.*.weight"])],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     result = rx.Refinement(st, ins, history=False).fit(pattern, plan=plan,
                                                         two_theta_limits=_LIMITS)
     assert result.stages[-1].name == "closing"
