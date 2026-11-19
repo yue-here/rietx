@@ -717,8 +717,8 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (issue #193, the time-of-flight profile, spectrum and
-#: corrections): a bank is **refined**, the forward half of the 0.52 → 0.53
+#: 0.61 → 0.62 (issue #193, the time-of-flight profile, spectrum and
+#: corrections), the first change after 1.12.0 shipped 0.61: a bank is **refined**, the forward half of the 0.52 → 0.53
 #: entry, and five observable changes land together because they are one
 #: feature.
 #: (a) the **result's** abscissa: ``RefinementResult.tof`` and
@@ -750,7 +750,7 @@ from .._nearmiss import did_you_mean
 #: by name — the twin of the σ²(d) check.
 #: **No constant-wavelength number moves**: every new field is read by the
 #: flight-time forward model and by nothing else.
-#: Also in 0.61 (issue #193, the staged Lorentzian window tolerance):
+#: Also in 0.62 (issue #193, the staged Lorentzian window tolerance):
 #: ``PlanSpec.intermediate_lorentz_window_tol``, defaulting to 1e-2, and
 #: ``StageSpec.lorentz_window_tol``, defaulting to ``None`` ("take the plan's"):
 #: the per-side area fraction a bank's pseudo-Voigt windows may leave outside
@@ -765,7 +765,7 @@ from .._nearmiss import did_you_mean
 #: 0.006 esd, ``None`` restores its windows bit for bit, and no
 #: constant-wavelength or Gaussian-branch number moves.  ``Refinement.fit``
 #: and ``run_stage`` write both records on every stage.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
