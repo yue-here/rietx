@@ -353,9 +353,11 @@ fractions, which is the one number such a run is normally for.  Measured on an 1
 cryostat ramp, a phase's `lor_strain` rose 0.019° → ~0.11° toward low temperature,
 reproducibly and in both directions; a chain with that term pinned would have had to absorb
 the same intensity redistribution somewhere else.  What separates that from a width standing
-in for something missing is whether the fit keeps up: a width that grows while GoF rises with
-it is `SEQUENTIAL_WIDTH_GROWTH` (the codes table below), and one that grows at a flat GoF is
-this rule and fires nothing.
+in for something missing is whether the fit keeps up.  Read each entry's
+`statistics.gof` beside the width's trajectory.  A width that grows while GoF rises with it
+may stand in for a missing component, but GoF also rises when the counts rise under a
+misfit that was already there.  One that grows at a flat GoF is this rule.  No code fires
+on either.
 
 The mirror-image mistake is a **numeric floor carried across instruments**.  A microstrain or
 size floor is a hedge against the term collapsing to zero and capturing no broadening at all,
@@ -438,7 +440,6 @@ The moment codes (`SEQUENTIAL_MOMENT_*`) are the magnetic family's, so their row
 | `series.direction_gaps` | Read a top row as "the per-pattern esd is enough"; where the gap is large against its esds, quote the between-chain spread, which is the honest uncertainty |
 | `SEQUENTIAL_CANCELLED` | Read the shortened `entries` list as the series |
 | `SEQUENTIAL_UNRECOVERED` | Read that point's values as a measurement, or its failure as evidence about its neighbours: nothing was chained through it. A converged pattern at a high Rwp with no `error` code is chained through |
-| `SEQUENTIAL_WIDTH_GROWTH` | Read that phase's width, or its scale, cell or weight fraction, as a measurement from the pattern the message names onward. It fires where the width reached 3× the first value the series measured **and** GoF 2× its own; `value` is the width ratio there. No per-pattern code says so until `STRAIN_UNUSUALLY_LARGE` at 1.5° (Measured: a 0.4 %-split second phase, width 3.65×, GoF 3.1×, nothing else fired). A Stephens block is not screened (WP-1465) |
 | `SERIES_PATTERN_FAILED` | Read a missing index in `SeriesResult.entries` as a pattern nobody asked to fit: it is one on which **every** rung of the ladder raised rather than returned (`SeriesResult.failures`/`.n_failed` name it, `SeriesFailure.exception` carries the last rung's `repr(exc)`), not a converged-but-rejected `"diverged"` entry. A rung that raises is a rung that lost and the ladder escalates past it. A pattern a later rung rescued has an entry whose `rungs_raised` says what the earlier rungs raised. With `direction="both"` a failure in the backward chain costs only the comparison (`SEQUENTIAL_PATH_CHECK_NOT_RUN`); the forward entry stands. The default `on_error="carry"` warm-starts the successor from the last accepted pattern; `"skip"` starts it cold; under `"raise"` the chain ends in the exception instead, so read `SequentialRefinement.results_`/`.failures_`, or the exception's own `series_results`/`series_failures` (and `series_result`, the forward `SeriesResult`, when the backward pass is what raised) for what completed. A chain that fitted **no** pattern raises under every policy, so an empty `SeriesResult` never comes back as an answer |
 | `SEQUENTIAL_PATH_CHECK_NOT_RUN` | Read an empty or missing gap list as agreement. The comparison **did not run** (the forward chain was cancelled, so the backward one never started; the backward chain was cancelled; or it raised under `on_error="raise"`), the message names the chain and the pattern it stopped on, and `direction_gaps` is `None` |
 | `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | Read the gap list as covering the whole series. At `info` it ran on less: `where` lists **patterns** one chain has no entry for (every rung raised there; `value` is the number compared), or **paths** some chain measured that no pattern could judge because no pattern has an esd for them in both chains (issue #269, a path held throughout one direction). Those rows carry `gap_esd=None`; read `result.trajectory(path)` against `result.backward.trajectory(path)` yourself |
