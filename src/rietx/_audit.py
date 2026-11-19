@@ -3426,13 +3426,22 @@ ROWS: tuple[Row, ...] = (
                   "bccg.solve, which no package code has called since WP-1953 (the LM step past "
                   "BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits, the spy counting one added call"
                   " on each, both arms bit-identical on all three. Unreachable from a fit, so three "
-                  "families cannot close it; the synthetic case that reaches it is "
-                  "tests/test_bccg.py::test_published_termination_is_deliberately_inexact"),
+                  "families cannot close it; the "
+                  "tests/test_bccg.py cases that reach it (2026-11-19, macOS arm64; a case reaches it when "
+                  "1e-3 or 1e-5 changes a solve it makes): "
+                  "test_published_termination_is_deliberately_inexact, "
+                  "test_damping_readings_under_the_published_rules, "
+                  "test_printed_damping_hurts_once_removal_shrinks_the_loop and "
+                  "test_removal_scheme_is_cheap_and_harmless; at 1e-3 "
+                  "test_damping_readings_under_the_published_rules fails"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 " Q5 (Yue accepted 2026-11-17): kept at tier 3 on the tests/test_bccg.py cases that reach"
+                 " it; the 2026-10-21 caller ruling bars 'no default path calls this' as a reason to "
+                 "remove a row."),
+        approved="2026-11-17"),
     Row("rietx.optimize.bccg._CONVERGED_RUNS", "constant", tier=3, value=3,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 termination (docstring; paper not on disk)."
                   " WP-2017 group C (2017-batch/group_c_summary.md, 2026-11-16), Pawley fits under the "
@@ -3440,13 +3449,23 @@ ROWS: tuple[Row, ...] = (
                   "bccg.solve, which no package code has called since WP-1953 (the LM step past "
                   "BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits, the spy counting one added call"
                   " on each, both arms bit-identical on all three. Unreachable from a fit, so three "
-                  "families cannot close it; the synthetic case that reaches it is "
-                  "tests/test_bccg.py::test_published_termination_is_deliberately_inexact"),
+                  "families cannot close it; the "
+                  "tests/test_bccg.py cases that reach it (2026-11-19, macOS arm64; a case reaches it when "
+                  "2 or 4 changes a solve it makes): test_cg_core_matches_direct_solve (all three sizes), "
+                  "test_published_termination_is_deliberately_inexact, "
+                  "test_damping_readings_under_the_published_rules, "
+                  "test_printed_damping_hurts_once_removal_shrinks_the_loop, "
+                  "test_printed_damping_is_safe_only_because_of_the_k_max_rule and "
+                  "test_zero_diagonal_column_is_survivable; at 2 and 4 every one still passes, so no case "
+                  "fails with it moved"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 " Q5 (Yue accepted 2026-11-17): kept at tier 3 on the tests/test_bccg.py cases that reach"
+                 " it; the 2026-10-21 caller ruling bars 'no default path calls this' as a reason to "
+                 "remove a row."),
+        approved="2026-11-17"),
     Row("rietx.optimize.bccg._PCG_BUDGET_PER_VARIABLE", "constant", tier=3, value=2,
         evidence=("WP-1953: 24 NAC Pawley systems of 1 493-1 499 columns, 2n held every solve under 0.64 "
                   "s, Rwp 0.12620721 against 0.12620514 unbudgeted. WP-2017 group C "
@@ -3470,7 +3489,9 @@ ROWS: tuple[Row, ...] = (
                   "cell is another protocol's, so this reads drift, not truth), Rwp 0.0806 against "
                   "0.0786. At 1e-12 FAP within 0.026 esd at 1.46x the evaluations; NAC within 2e-7 esd "
                   "both sides. Two families, the looser side failing silently on one; a third past the "
-                  "cut owed"),
+                  "cut owed. Its failing case is FAP at 1e-8 (Q6, settled 2026-11-17): every stage "
+                  "converged there, so no stop reason shows it, and no field is added (at the shipped "
+                  "1e-10 FAP sits 0.026 esd from the 1e-12 arm)"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
                  "three families on either side give one answer (B10, ruled 2026-10-19)."),
         approved="2026-10-19"),
@@ -3481,28 +3502,40 @@ ROWS: tuple[Row, ...] = (
                   "FAP, NAC and cpd-1a, all three development data: read only in bccg.solve, which no "
                   "package code has called since WP-1953 (the LM step past BVLS_MAX_COLUMNS is "
                   "projected_cg); 0 calls on 48 fits, the spy counting one added call on each, both arms "
-                  "bit-identical on all three. Unreachable from a fit, so three families cannot close it;"
-                  " the synthetic case that reaches it is "
-                  "tests/test_bccg.py::test_removal_scheme_is_cheap_and_harmless"),
+                  "bit-identical on all three. Unreachable from a fit, so three families cannot close it; "
+                  "the "
+                  "tests/test_bccg.py cases that reach it (2026-11-19, macOS arm64; a case reaches it when "
+                  "20 or 2000 changes a solve it makes): test_removal_scheme_is_cheap_and_harmless and "
+                  "test_printed_damping_hurts_once_removal_shrinks_the_loop; at 2000 both fail"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 " Q5 (Yue accepted 2026-11-17): kept at tier 3 on the tests/test_bccg.py cases that reach"
+                 " it; the 2026-10-21 caller ruling bars 'no default path calls this' as a reason to "
+                 "remove a row."),
+        approved="2026-11-17"),
     Row("rietx.optimize.bccg._SMALL_RUNS", "constant", tier=3, value=6,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 states 'six consecutive iterations' (read "
                   "2026-11-05); no other count is tried. WP-2017 group C (2017-batch/group_c_summary.md, "
                   "2026-11-16), Pawley fits under the default plan on FAP, NAC and cpd-1a, all three "
                   "development data: read only in bccg.solve, which no package code has called since "
                   "WP-1953 (the LM step past BVLS_MAX_COLUMNS is projected_cg); 0 calls on 48 fits, the "
-                  "spy counting one added call on each, both arms bit-identical on all three. Unreachable"
-                  " from a fit, so three families cannot close it; the synthetic case that reaches it is "
-                  "tests/test_bccg.py::test_removal_scheme_is_cheap_and_harmless"),
+                  "spy counting one added call on each, both arms bit-identical on all three. Unreachable "
+                  "from a fit, so three families cannot close it; the "
+                  "tests/test_bccg.py cases that reach it (2026-11-19, macOS arm64; a case reaches it when "
+                  "3 or 12 changes a solve it makes): test_removal_scheme_is_cheap_and_harmless, "
+                  "test_printed_damping_hurts_once_removal_shrinks_the_loop, "
+                  "test_bounds_are_enforced_and_reported and test_zero_diagonal_column_is_survivable; at 12"
+                  " test_removal_scheme_is_cheap_and_harmless fails"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 " Q5 (Yue accepted 2026-11-17): kept at tier 3 on the tests/test_bccg.py cases that reach"
+                 " it; the 2026-10-21 caller ruling bars 'no default path calls this' as a reason to "
+                 "remove a row."),
+        approved="2026-11-17"),
     Row("rietx.optimize.blocked.DENSE_JACOBIAN_MAX_BYTES", "constant", tier="invariant",
         value=268435456,
         evidence=("answer-invariant efficiency (Q7, Yue accepted 2026-11-17; generality.md "
@@ -4525,7 +4558,12 @@ ROWS: tuple[Row, ...] = (
         grounds=("The maintainer delegated this tier to the lead on 2026-10-23 ('use your best "
                  "judgement'), on the generality judge's reading that an answer-invariant claim "
                  "has no conditional form (MAGNETIC_SIZING_FLOOR's precedent): tier 3, with "
-                 "WP-2017 measuring the start without the closing stage on three families."),
+                 "WP-2017 measuring the start without the closing stage. Q19 (settled "
+                 "2026-11-17 under that delegation): tier 3 on 'invariant behind the closing "
+                 "stage', the arm with no closing stage its failing case (0.26-1.44 plain esd "
+                 "here; FAP 0.119 and LaB6, SRM 660c, 0.199 on BISO_SEED). Q20: it closes under "
+                 "generality.md's rare-feature clause on its one synthetic family; re-tier it "
+                 "when Nd2Ru2O7 is released."),
         approved="2026-10-23"),
     Row("rietx.schemas.instrument.HUMP_FWHM_MIN", "constant", value=0.1),
     Row("rietx.schemas.instrument.KA2_RATIO", "constant", tier=2, value=0.5,
@@ -4751,7 +4789,10 @@ ROWS: tuple[Row, ...] = (
         grounds=("The maintainer delegated this tier to the lead on 2026-10-23 ('use your best "
                  "judgement'), on the generality judge's reading that an answer-invariant claim "
                  "has no conditional form (MAGNETIC_SIZING_FLOOR's precedent): tier 3, with "
-                 "WP-2017 measuring the start without the closing stage on three families."),
+                 "WP-2017 measuring the start without the closing stage on three families. Q19 "
+                 "(settled 2026-11-17 under that delegation): tier 3 on 'invariant behind the "
+                 "closing stage', the arm with no closing stage its failing case (FAP 0.119 and "
+                 "LaB6, SRM 660c, 0.199 plain esd; the harmonic seed 0.26-1.44)."),
         approved="2026-10-23"),
     Row("rietx.schemas.structure.MARCH_R_MIN", "constant", tier=1, value=1e-06,
         evidence=("arithmetic: the March factor (r^2 cos^2 a + sin^2 a / r)^(-3/2) divides by "
