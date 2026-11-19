@@ -357,8 +357,13 @@ def test_a_series_hands_each_pattern_its_preview(synthetic_pattern):
     the preview passes through it, stamped like every other event."""
     structure, ins = perturbed_models()
     seen: list[dict] = []
+    # The second pattern is scaled: an identical one starts the warm refit
+    # already converged, so it takes no trial step and emits no ``eval`` to
+    # carry a preview (main's warm_refit, seen after the 2026-11-19 merge).
+    second = synthetic_pattern.model_copy(update={
+        "intensity": list(np.asarray(synthetic_pattern.intensity) * 1.2)})
     series = rx.SequentialRefinement(structure, ins, history=False)
-    series.fit([synthetic_pattern, synthetic_pattern], x=[1.0, 2.0],
+    series.fit([synthetic_pattern, second], x=[1.0, 2.0],
                events=EventStream(callback=seen.append, preview=True))
     previewed = [e for e in seen if "preview" in e]
     assert {e["data"]["series_index"] for e in previewed} == {0, 1}
