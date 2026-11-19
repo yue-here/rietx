@@ -1400,3 +1400,104 @@ def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_
     finally:
         httpd.shutdown()
     assert not failures, "\n".join(failures)
+
+
+def _set_terms(page, n: int) -> None:
+    """Click the Terms slider where it reads ``n``, a real pointer press, and
+    wait for the edit to land: the slider is offered again at ``n``."""
+    track = page.locator('input[aria-label="Terms"]')
+    lo, hi = int(track.get_attribute("min")), int(track.get_attribute("max"))
+    box = track.bounding_box()
+    # the thumb's centre runs from half a thumb in from each end
+    x = box["x"] + 8 + (box["width"] - 16) * (n - lo) / (hi - lo)
+    page.mouse.click(x, box["y"] + box["height"] / 2)
+    page.wait_for_function(
+        f"document.querySelectorAll('.chips .term').length === {n}"
+        " && !document.querySelector('input[aria-label=\"Terms\"]').disabled")
+    _frames(page, 4)
+
+
+def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browser, tmp_path_factory):
+    """WP-2218 review, the two behaviour fixes. Terms grown frees the terms
+    they add. A Terms cut releases the committed hold on a term it removes, so
+    the term comes back free when the Terms grow again, and the Parameters
+    panel drops its pending edit on a removed term, so nothing is left for
+    Apply to refuse. A Type switch releases the Chebyshev's holds and starts
+    every new coefficient free. Every press is a real click. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "next-bg-edits")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c1": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def pending() -> str:
+            note = page.locator(".actions .pending")
+            return note.text_content() if note.count() else ""
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+        _set_terms(page, 6)
+        grown = rows()
+        assert sorted(grown) == [f"instrument.background.c{k}" for k in range(6)]
+        assert all(grown[f"instrument.background.c{k}"]["vary"] for k in (3, 4, 5)), grown
+        assert grown["instrument.background.c1"]["held"]
+
+        # hold c5 by its chip and apply it: a committed hold on a term a cut removes
+        page.get_by_role("button", name="Hold term 5", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent !== '1 pending'")
+        assert rows()["instrument.background.c5"]["held"]
+
+        # pending flags on the free terms, c4 among them, by the Parameters
+        # panel's Background group box (its terms are drawn on the graph)
+        page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '4 pending'")
+
+        _set_terms(page, 4)
+        assert sorted(rows()) == [f"instrument.background.c{k}" for k in range(4)]
+        # the pending flag on c4 went with c4, and Apply sends the other three
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '3 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        cut = rows()
+        assert [cut[f"instrument.background.c{k}"]["vary"] for k in (0, 2, 3)] == [False] * 3, cut
+        # free them again by the same box, for what follows
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+
+        _set_terms(page, 6)
+        back = rows()
+        assert not back["instrument.background.c5"]["held"], back["instrument.background.c5"]
+        assert back["instrument.background.c5"]["vary"] and back["instrument.background.c4"]["vary"]
+        assert back["instrument.background.c1"]["held"]
+
+        page.locator('[aria-label="Type"] button', has_text="P-spline").click()
+        page.wait_for_selector('input[aria-label="Stiffness"]')
+        _frames(page, 4)
+        spline = rows()
+        assert len(spline) > 6
+        assert all(r["vary"] and not r["held"] for r in spline.values()), \
+            [p for p, r in spline.items() if r["held"] or not r["vary"]]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()

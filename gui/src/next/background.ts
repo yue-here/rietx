@@ -1,3 +1,5 @@
+import { fnmatch } from "../lib/fnmatch";
+
 /** The rebuilt Background graph's controls (WP-2218), as pure functions.
  *
  * `lib/background.ts` holds the drawing and the band's words, which today's
@@ -17,8 +19,13 @@ export const DEFAULT_TERMS = 6;
  *  dimensionless units, 1 the package's default (`PSPLINE_LAMBDA_SMOOTH`). */
 export const LAMBDA_STOPS = [1e-2, 1, 1e2, 1e4, 1e6] as const;
 
-/** The knot spacing `BackgroundPSpline.for_range` uses, in degrees 2θ. */
+/** The knot spacing `BackgroundPSpline.for_range` uses, in degrees 2θ.
+ *  `tests/data/gui/background_cases.json` holds it, the stiffness and the
+ *  knots equal to Python's (`tests/test_gui_background.py` writes it). */
 export const KNOT_STEP_DEG = 5;
+
+/** `PSPLINE_LAMBDA_SMOOTH`, the stiffness a fresh P-spline starts at. */
+export const DEFAULT_LAMBDA = 1;
 
 /** The stop nearest λ on a log scale, so a value typed elsewhere still sits
  *  somewhere on the track. */
@@ -32,16 +39,68 @@ export function lambdaStop(lambda: number): number {
   return best;
 }
 
-/** The background paths held and not yet applied, sorted: what the band is
- *  fetched with (`GET /api/background?hold=`). A pending release is left out,
- *  since a released term comes back fixed and its band is the held one. */
-export function pendingBackgroundHolds(holds: ReadonlyMap<string, boolean>): string[] {
-  return [...holds].filter(([path, held]) => held && /^instrument\.background\.[^*?[]+$/.test(path))
-    .map(([path]) => path).sort();
+/** Every path or glob held and not yet applied, sorted: what the band is
+ *  fetched with (`GET /api/background?hold=`). Not only the background's: a
+ *  held scale moves the band through the covariance too, and a glob is
+ *  resolved by the server as the hold verb resolves it. A pending release is
+ *  left out, since a released term comes back fixed and its band is the held
+ *  one. */
+export function pendingHolds(holds: ReadonlyMap<string, boolean>): string[] {
+  return [...holds].filter(([, held]) => held).map(([path]) => path).sort();
 }
 
-/** A copy of `instrument` with its Chebyshev cut or extended to `n` terms. An
- *  added term starts at zero and free, as `BackgroundChebyshev.with_terms`. */
+/** Is `path` held, counting a pending hold or release on it or on a glob
+ *  matching it? The path's own entry wins, then the last glob set. */
+export function heldWith(path: string, serverHeld: boolean,
+                         holds: ReadonlyMap<string, boolean>): boolean {
+  const own = holds.get(path);
+  if (own !== undefined) return own;
+  let held = serverHeld;
+  for (const [glob, want] of holds) if (fnmatch(path, glob)) held = want;
+  return held;
+}
+
+/** What a structural edit also asks of the hold and free registers, which
+ *  `Refinement` keeps by path and reapplies to whatever the new model calls
+ *  `c3` (`GuiSession.instrument_patch`): the holds to release first, the
+ *  paths to free after, and which paths the edit removes or redefines, whose
+ *  pending edits go too. */
+export interface Arms {
+  unhold: string[];
+  free: string[];
+  gone: (path: string) => boolean;
+}
+
+const BACKGROUND = "instrument.background.*";
+
+/** A Type switch redefines every coefficient: release them all, free the new
+ *  ones, so the fresh background starts at zero and free as its docstring
+ *  says, and nothing pending on the old one survives. */
+export function kindArms(): Arms {
+  return { unhold: [BACKGROUND], free: [BACKGROUND], gone: (path) => fnmatch(path, BACKGROUND) };
+}
+
+/** A Terms change from `held` terms (each path and whether it is held now)
+ *  to `n`: a cut releases the held terms it removes, or a later extension
+ *  would bring them back held; an extension frees the terms it adds, which
+ *  the free register does not name. */
+export function termsArms(terms: readonly { path: string; held: boolean }[], n: number): Arms {
+  const index = (path: string) => {
+    const m = /^instrument\.background\.c(\d+)$/.exec(path);
+    return m ? Number(m[1]) : -1;
+  };
+  return {
+    unhold: terms.filter((t) => t.held && index(t.path) >= n).map((t) => t.path),
+    free: Array.from({ length: Math.max(0, n - terms.length) },
+                     (_, k) => `instrument.background.c${terms.length + k}`),
+    gone: (path) => index(path) >= n,
+  };
+}
+
+/** A copy of `instrument` with its Chebyshev cut or extended to `n` terms,
+ *  keeping the fitted values and flags of the terms it keeps. An added term
+ *  is built at zero and free, as `BackgroundChebyshev.with_terms` builds one;
+ *  `termsArms`' `free` makes it free in the table too. */
 export function withTerms(instrument: any, n: number): any {
   const next = JSON.parse(JSON.stringify(instrument));
   const current = next.background.coefficients as any[];
@@ -64,16 +123,16 @@ export function knots(lo: number, hi: number, step = KNOT_STEP_DEG): number[] {
   return Array.from({ length: n }, (_, i) => lo + ((hi - lo) * i) / (n - 1));
 }
 
-/** A copy of `instrument` with a background of the other type, built as the
- *  package builds a fresh one: a P-spline over the measured range at the
- *  default stiffness, or a Chebyshev of `DEFAULT_TERMS`. Its coefficients start
- *  at zero and free, so the next refine fits them. */
+/** A copy of `instrument` with a background of the other type: a P-spline
+ *  as `BackgroundPSpline.for_range` builds one over the fitted channels' ends,
+ *  or a Chebyshev of `DEFAULT_TERMS`. Its coefficients start at zero, and
+ *  `kindArms`' `free` frees them, so the next refine fits them. */
 export function switchKind(instrument: any, kind: "chebyshev" | "pspline", lo: number, hi: number): any {
   const next = JSON.parse(JSON.stringify(instrument));
   if (kind === "pspline") {
     const breakpoints = knots(lo, hi);
     next.background = {
-      kind: "pspline", breakpoints, lambda_smooth: 1, lambda_units: "dimensionless",
+      kind: "pspline", breakpoints, lambda_smooth: DEFAULT_LAMBDA, lambda_units: "dimensionless",
       coefficients: Array.from({ length: breakpoints.length + 2 }, () => ({ value: 0, vary: true })),
     };
   } else {
@@ -83,4 +142,26 @@ export function switchKind(instrument: any, kind: "chebyshev" | "pspline", lo: n
     };
   }
   return next;
+}
+
+/** The Python a Terms change runs, for the console: the coefficients kept
+ *  with their values, or extended by zero terms. */
+export function termsEcho(from: number, n: number): string {
+  return n < from
+    ? `instrument.background.coefficients = instrument.background.coefficients[:${n}]`
+    : `instrument.background.coefficients += [Parameter(value=0.0, vary=True) for _ in range(${n - from})]`;
+}
+
+/** The Python a Type switch runs, for the console, at the bounds sent. */
+export function kindEcho(kind: "chebyshev" | "pspline", lo: number, hi: number): string {
+  return kind === "pspline"
+    ? `instrument.background = BackgroundPSpline.for_range(${pyFloat(lo)}, ${pyFloat(hi)})`
+    : `instrument.background = BackgroundChebyshev.with_terms(${DEFAULT_TERMS})`;
+}
+
+/** A float as Python's `repr` spells it: the shortest round-trip digits,
+ *  which `String` gives too, with ".0" on an integer value. */
+function pyFloat(x: number): string {
+  const t = String(x);
+  return /[.eE]/.test(t) ? t : `${t}.0`;
 }
