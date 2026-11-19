@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSliders, channelIndex, defaults, editText, fixFormat, formatParts, parseTyped,
-  posFrac, PreviewQueue, STEPS, valueAt,
+  posFrac, PreviewQueue, rangeText, readNumber, roundRange, STEPS, valueAt,
 } from "./interactive";
 
 const CTX = { fwhm: 0.1, thetaMaxDeg: 60 };
@@ -83,6 +83,46 @@ describe("the number's one format", () => {
     expect(parseTyped({ bound: [0, 1] }, "−0.5")).toEqual({ why: "below the lower bound 0" });
     expect(parseTyped({ bound: [0, 1] }, "2")).toEqual({ why: "above the upper bound 1" });
     expect(parseTyped({ bound: [0, 1] }, "x")).toEqual({ why: "not a number" });
+  });
+});
+
+describe("the range pop-up's From and To (WP-2218)", () => {
+  // Caglioti U at the fluorapatite example's last fit, ×¼ to ×4
+  const U = 0.0011090354888959;
+  const slider = (lo: number, hi: number, ref: number, bound: [number, number] = OPEN,
+                  track: "lin" | "log" = "log") => ({ lo, hi, ref, bound, track, ...fixFormat(lo, hi, ref) });
+
+  it("rounds a computed range outward to the value box's digits and power of ten", () => {
+    const s = roundRange(slider(U / 4, U * 4, U));
+    expect(rangeText(s, s.lo)).toBe("0.2772×10⁻³");
+    expect(rangeText(s, s.hi)).toBe("4.4362×10⁻³");
+    expect(formatParts(s, U)).toEqual({ int: "1", frac: ".1090", exp: "−3" });
+    // a plain slider rounds at its own decimals
+    const a = roundRange(slider(9.37123456, 9.38876543, 9.38, OPEN, "lin"));
+    expect([rangeText(a, a.lo), rangeText(a, a.hi)]).toEqual(["9.3712", "9.3888"]);
+  });
+
+  it("rounds inward at a bound, and keeps a range rounding would spoil", () => {
+    const s = roundRange(slider(0.12345678, 0.98765432, 0.5, [0.12345678, 0.98765432], "lin"));
+    expect([s.lo, s.hi]).toEqual([0.12346, 0.98765]);
+    // a range inside one of the box's digits widens to that digit
+    const w = roundRange(slider(1.00001, 1.00002, 1.000015, OPEN, "lin"));
+    expect([w.lo, w.hi]).toEqual([1, 1.0001]);
+    // a logarithmic track that rounding would start at zero stays as computed
+    const t = slider(0.000004, 0.5, 0.1);
+    expect(roundRange(t)).toBe(t);
+  });
+
+  it("reads back every end it writes, and a typed range to the last digit", () => {
+    const s = roundRange(slider(U / 4, U * 4, U));
+    for (const v of [s.lo, s.hi]) expect(readNumber(rangeText(s, v))).toBe(v);
+    // a range typed with more digits than the box keeps them all
+    expect(readNumber(rangeText(s, 0.000123456789))).toBe(0.000123456789);
+    expect(readNumber("1.5x10^-3")).toBe(1.5 * 10 ** -3);
+    expect(readNumber("−2e-4")).toBe(-2e-4);
+    expect(readNumber("0.5×10⁻³")).toBe(0.5 * 10 ** -3);
+    expect(readNumber("1×10")).toBeNaN();
+    expect(readNumber("")).toBeNaN();
   });
 });
 
