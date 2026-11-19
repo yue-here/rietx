@@ -32,6 +32,7 @@ from rietx.gui import ROUTES, UPLOAD_ROUTES, GuiSession, build_server
 from rietx.gui.imports import UPLOAD_DIR_PREFIX
 from rietx.gui.session import RESERVED_ROUTES, GuiError
 from rietx.history.events import read_events
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_project import _write_xye
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -2256,7 +2257,9 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
         {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
                                     "instrument.zero_shift"]},
         {"name": "two", "turn_on": ["phases.*.cell.*"],
-         "turn_off": ["instrument.zero_shift"]}]}
+         "turn_off": ["instrument.zero_shift"]}],
+        # declared, not inherited: off by default since WP-2222
+        "closing_window_tol": CLOSING_WINDOW_TOL}
     status, payload = client.put("/api/plan", {"plan": plan})
     assert status == 200, payload
     assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
@@ -2431,6 +2434,11 @@ def test_the_closing_stage_is_the_ladders_last_rung(blank, tmp_path, pattern_fil
     last declared rung's is not (0.04179 there against the result's 0.04156)."""
     session, client = blank
     project = _open(session, tmp_path / "closing.rex", pattern_file)
+    # off by default since WP-2222, so no rung until the plan asks for one
+    assert _ladder(client)["closing"] is None
+    plan = client.get("/api/plan")[1]["plan"]
+    plan["closing_window_tol"] = CLOSING_WINDOW_TOL
+    assert client.put("/api/plan", {"plan": plan})[0] == 200
     assert client.post("/api/run", {"kind": "fit"})[0] == 200
     _wait_idle(client)
     closing = _ladder(client)["closing"]
@@ -2501,9 +2509,9 @@ def test_running_the_same_plan_twice_shows_the_second_run(blank, tmp_path,
     nodes = [n.metrics.statistics.rwp for n in
              project.refinement.history.lineage(project.refinement._head_id)
              if n.action.kind == "stage"]
-    # a run records its closing stage too, a node the ladder does not show
+    # no closing stage by default since WP-2222, so a run is the ladder's rungs
     n_run = len(project.doc.plan.to_plan().run_stages())
-    assert n_run == len(second) + 1
+    assert n_run == len(second)
     assert len(nodes) == 2 * n_run
     assert second == nodes[n_run:n_run + len(second)]     # run 2…
     assert first == nodes[:len(first)]       # …and run 1 is what run 1 showed

@@ -51,7 +51,7 @@ import pytest
 
 import rietx as rx
 from rietx.io.recipe import read_recipe, write_recipe_tables
-from rietx.strategy.staged import CLOSING_WINDOW_TOL, INTERMEDIATE_FTOL
+from rietx.strategy.staged import INTERMEDIATE_FTOL
 
 DATA = Path(__file__).parent / "data" / "powderline"
 pytestmark = [pytest.mark.slow, pytest.mark.xdist_group("powderline")]
@@ -103,8 +103,9 @@ def _fit(name: str):
     # affect how the intermediate stages hand over, which is exactly the thing
     # a user would meet.
     assert recipe.plan.intermediate_ftol == INTERMEDIATE_FTOL
-    # and the shipped closing stage, for the same reason (WP-2002)
-    assert recipe.plan.closing_window_tol == CLOSING_WINDOW_TOL
+    # and the shipped closing-stage setting, for the same reason: none since
+    # WP-2222 (WP-2002 shipped one at CLOSING_WINDOW_TOL)
+    assert recipe.plan.closing_window_tol is None
 
     ref = rx.Refinement(recipe.structure, recipe.instrument, history=False)
     result = ref.fit(recipe.pattern, plan=recipe.plan,
