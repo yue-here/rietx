@@ -193,7 +193,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import PlanSpec
+from .schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -249,53 +249,6 @@ NOISE_FLOOR_REL = 1e-9
 #: ``STAGE_WINDOWS_STALE`` (WP-2047) is the same kind: a stage outgrowing the
 #: windows it was solved on is about where it started, not the model.
 NOT_A_SERIES_FINDING = frozenset({"FROZEN_COMPILE_STALE", "STAGE_WINDOWS_STALE"})
-
-#: A phase width is called a soak when it reaches this multiple of the first
-#: width the series measured **and** the fit's GoF reaches
-#: :data:`WIDTH_GROWTH_GOF_FACTOR` × its own at that pattern (WP-1465, issue
-#: #451).  3 is the reporter's, and it sits between the two soaks measured: the
-#: operando chain's widths were 3.4× their first scan at the onset, and the
-#: synthetic's one-phase chain passes 3.65× on its second soaked pattern (2.3×
-#: on its first, where GoF had risen 1.9×).  The width ratio does not separate
-#: on its own.  The round-robin chain ``tests/test_acceptance_sequential`` runs
-#: is a clean one, and its widths wander 4-946× across mixtures because a minor
-#: phase's width is barely determined: against each trajectory's first value,
-#: growth alone fires on 11 of its 24.  Against the first value the series
-#: *measured* (:data:`WIDTH_GROWTH_SIGMA`) it fires on none.
-WIDTH_GROWTH_FACTOR = 3.0
-
-#: The misfit half of the soak test: GoF at the flagged pattern over GoF at the
-#: reference.  **GoF rather than Rwp**, although the issue said Rwp: Rwp tracks
-#: Rexp, which rises as the counts fall, so a series losing intensity raises
-#: Rwp under a model that is right.  GoF divides that out, and on the
-#: synthetic, whose counts are constant, the two ratios are the same number.
-#: The value is set for margin, against the denominator it is applied to: the
-#: reference can be any pattern, so the clean bound is the largest GoF_j/GoF_i
-#: over every ordered pair of one chain.  Over the 75 multi-pattern series the
-#: suite runs that is **1.52**, on the thermal ramp's bounded-first-rung
-#: fixtures, whose model is right and some of whose fits stopped early (1.14
-#: on the round-robin chain, the one that frees widths).  1.5 would have had
-#: no margin.  The synthetic soak reads 3.05 where its width crosses 3×, so 2
-#: sits 1.3× clear of the one and 1.5× under the other.  This half is also what
-#: keeps a width that grows *for real* silent, and the suite has no such chain,
-#: so ``tests/test_sequential.py`` builds one: a correct model over a specimen
-#: whose strain grows 5×, GoF flat to within 2 %.
-WIDTH_GROWTH_GOF_FACTOR = 2.0
-
-#: How many of its own esds a width must be to serve as the reference, and how
-#: many combined esds its growth must be.  The first half is what keeps the
-#: ratio a ratio: the round-robin chain's first ``lor_strain`` is 5.85e-5 with
-#: an esd of 3e3, so any later value is "946×" it and means nothing.
-WIDTH_GROWTH_SIGMA = 3.0
-
-#: The phase widths the soak test reads, and whether each is a width or a
-#: variance.  The Gaussian pair are variance coefficients (deg² 2θ), so their
-#: ratio is taken on the square root, the width they contribute.  A Stephens
-#: block (``phases.i.microstrain.dof.k``) is not here: it has no single width,
-#: and while it is declared it locks ``lor_strain``, so a series refining one
-#: is not screened.
-_WIDTH_SUFFIXES = {".lor_strain": False, ".lor_size": False,
-                   ".gauss_strain": True, ".gauss_size": True}
 
 #: ``Diagnostic.level`` as an ordering, so a summary of many occurrences can
 #: carry the worst one rather than a fixed level of its own.
@@ -1531,6 +1484,17 @@ class SequentialRefinement:
         if x is not None and x_label == "index":
             x_label = "x"
         base_plan = resolve_plan(plan, mode)
+        if (mode == "pawley" and self.carry_hkl_intensities
+                and base_plan.closing_window_tol is None):
+            # Carried Pawley intensities compound the declared stages' 2 %
+            # window error down the chain, and the closing stage removes it
+            # (WP-2222, ruled 2026-11-19).  On the four-pattern chain of
+            # tests/test_sequential.py, Rwp per pattern read 0.0339, 0.0345,
+            # 0.0347, 0.0372 carried without it, 0.0339-0.0345 re-seeded,
+            # and about 0.034 throughout with it.  A plan's None cannot be
+            # told from the default, so the way out is
+            # carry_hkl_intensities=False.  Every stage it runs is recorded.
+            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".
@@ -1650,8 +1614,6 @@ class SequentialRefinement:
         # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110),
         # every count and no threshold (WP-2003, C6)
         series.code_counts = _code_counts(series)
-        # and a width that grew while the fit got worse (WP-1465)
-        diagnostics += _width_growth_diagnostics(series)
         # the moment along the chain: the hold, and the onset it locates.
         # Empty on any series whose entries carry no moment row at all, which
         # is every non-magnetic one (WP-1329).
@@ -3001,119 +2963,6 @@ def _code_counts(series: SeriesResult) -> list[SeriesCodeCount]:
                             n_patterns=n, level=levels[(code, path)])
             for (code, path), count in sorted(counts.items(),
                                               key=lambda kv: (-kv[1], kv[0]))]
-
-
-def _width_growth_diagnostics(series: SeriesResult) -> list[Diagnostic]:
-    """``SEQUENTIAL_WIDTH_GROWTH``: a phase width that grew while the fit got
-    worse (WP-1465, issue #451).
-
-    A phase broadened past what the specimen does turns into something else.
-    It becomes a second background, or it stands in for a phase the model
-    lacks, and a series is where that happens: the model was right on the
-    first patterns and stopped being right.  Each fit still converges, no
-    per-pattern code fires until ``STRAIN_UNUSUALLY_LARGE`` trips at 1.5°, and
-    a projection of the width onto the background block cannot see it either
-    (0.049 clean against 0.053 at a 15× soak, WP-1465 Finding 1).  What sees
-    it is the trajectory, which only the series has.
-
-    **A conjunction at one pattern.**  Against the first pattern that measured
-    the width, a later pattern must carry the width at
-    :data:`WIDTH_GROWTH_FACTOR` × or more, grown by more than
-    :data:`WIDTH_GROWTH_SIGMA` combined esds, **and** a GoF at
-    :data:`WIDTH_GROWTH_GOF_FACTOR` × or more.  The width may legitimately
-    grow (a coarsening specimen, strain building up); what separates that
-    from a soak is whether the model keeps up with the data, which is the
-    GoF.  So the finding reports and never judges, and its suggestion points
-    at the skill's "microstrain evolves" rule rather than past it.
-
-    One finding per trajectory, at its onset, the first pattern where the
-    conjunction holds; the message carries the largest ratio after it.  Widths
-    tied to one another (``tie_equal("phases.*.lor_strain")``) are one column
-    with one trajectory, so they share a finding whose ``where`` lists every
-    path, rather than one finding each about the same fact.  Grouped on the
-    trajectory itself, since a width driven by a ``vars.`` name is not
-    ``vary`` and ``paths(varied_only=True)`` would lose it.
-    Quarantined entries (``_rejected``: diverged, or carrying an
-    ``error``-level code) are skipped, as they are by every other fence here.  An entry whose Rwp sits high over the accepted median
-    (``rwp_over_median``) is **read**: a phase standing in for a missing one
-    is what lifts a pattern's Rwp, and every soaked pattern of the fixture in
-    ``tests/test_sequential.py`` sat above the 1.25× fence WP-2003 removed
-    (WP-1469), so skipping them would leave the finding nothing to fire on.
-    A width no pattern measured has no reference and is not judged.
-    """
-    out: list[Diagnostic] = []
-    by_trajectory: dict[tuple, Diagnostic] = {}
-    entries = series.entries
-    for path in series.paths():
-        if not path.startswith("phases."):
-            continue
-        suffix = next((s for s in _WIDTH_SUFFIXES if path.endswith(s)), None)
-        if suffix is None:
-            continue
-        variance = _WIDTH_SUFFIXES[suffix]
-        traj = series.trajectory(path)
-        _, value, sd = traj.arrays()
-        points = [(k, pos) for k, pos in enumerate(traj.positions)
-                  if not _rejected(entries[pos])
-                  and entries[pos].statistics is not None
-                  and np.isfinite(value[k])]
-        ref = next(((k, pos) for k, pos in points
-                    if np.isfinite(sd[k]) and sd[k] > 0
-                    and value[k] > WIDTH_GROWTH_SIGMA * sd[k]), None)
-        if ref is None:
-            continue
-        k0, p0 = ref
-        w0 = float(np.sqrt(value[k0]) if variance else value[k0])
-        gof0 = entries[p0].statistics.gof
-        if not (w0 > 0 and gof0 > 0):
-            continue
-
-        def width(k, variance=variance):
-            return float(np.sqrt(max(value[k], 0.0)) if variance else value[k])
-
-        flagged: list[tuple[int, int, float]] = []
-        for k, pos in points:
-            if pos <= p0 or not np.isfinite(sd[k]):
-                continue
-            ratio = width(k) / w0
-            grown = value[k] - value[k0]
-            combined = float(np.hypot(sd[k], sd[k0]))
-            if (ratio >= WIDTH_GROWTH_FACTOR
-                    and grown > WIDTH_GROWTH_SIGMA * combined
-                    and entries[pos].statistics.gof
-                    >= WIDTH_GROWTH_GOF_FACTOR * gof0):
-                flagged.append((k, pos, ratio))
-        if not flagged:
-            continue
-        key = (suffix, tuple(traj.positions), tuple(value.tolist()))
-        if key in by_trajectory:
-            by_trajectory[key].where.append(path)
-            continue
-        k1, p1, ratio1 = flagged[0]
-        kmax, _, ratio_max = max(flagged, key=lambda f: f[2])
-        # the patterns the conjunction could be tested on: one without an esd
-        # is skipped by the loop above, so it cannot count against it here
-        later = sum(1 for k, pos in points if pos > p1 and np.isfinite(sd[k]))
-        s0, s1 = entries[p0].statistics, entries[p1].statistics
-        as_width = " (as a width, the square root of the variance)" if variance else ""
-        peak = ("" if kmax == k1 else
-                f", reaching {ratio_max:.1f}× at {traj.labels[kmax]}")
-        by_trajectory[key] = finding = Diagnostic(
-            level="warning", code="SEQUENTIAL_WIDTH_GROWTH", where=[path],
-            value=ratio1,
-            message=(f"{path} grew {ratio1:.1f}×{as_width} from "
-                     f"{traj.labels[k0]} to {traj.labels[k1]} "
-                     f"({value[k0]:.4g} → {value[k1]:.4g}) while GoF rose "
-                     f"{s1.gof / s0.gof:.1f}× (Rwp {s0.rwp:.2%} → "
-                     f"{s1.rwp:.2%}). It passes both thresholds on "
-                     f"{len(flagged) - 1} of the {later} patterns after "
-                     f"it{peak}."),
-            suggestion=("Fit the pattern at the onset with the missing "
-                        "component before reading this width, or this phase's "
-                        "scale and cell, as physics."),
-        )
-        out.append(finding)
-    return out
 
 
 def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
