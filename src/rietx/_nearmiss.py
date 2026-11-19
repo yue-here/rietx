@@ -18,30 +18,59 @@ writes it — with ``instrument.profile.y``, a real path one character away and
 the wrong parameter.  An exact match up to case is therefore offered first; the
 ``difflib`` ranking (cutoff 0.6, the value all three older call sites used)
 fills the rest.
+
+**A word the package spells two ways is offered under its other spelling**
+(WP-1913, #728 item 5).  An estimated standard deviation is ``stderr`` on
+``RefinedParameter``, the geometry rows and QPA's ``weight_fraction_stderr``,
+and ``esd`` on ``ParameterRow`` and the parametric rows.  ``difflib`` scores
+``esd`` against ``stderr`` at 0.22, under the cutoff, so
+``RefinedParameter(...).esd`` never named the field.  :data:`SYNONYMS` swaps
+one dot- or underscore-delimited word at a time.  A candidate equal to a
+swapped name up to case comes second, after the case-only match.  The hint is
+a pointer and never an alias: the attribute still raises.
 """
 
 from __future__ import annotations
 
 import difflib
+import re
 from collections.abc import Iterable
 
 #: ``difflib.get_close_matches``' own default, and what every call site used
 #: before they shared this module
 CUTOFF = 0.6
 
+#: one word the package spells two ways, mapped both ways; a pair is added only
+#: where both spellings are real field names somewhere in the schemas
+SYNONYMS: dict[str, str] = {"esd": "stderr", "stderr": "esd"}
+
+
+def _respelled(name: str) -> list[str]:
+    """``name`` with each :data:`SYNONYMS` word swapped, one word at a time."""
+    parts = re.split(r"([._])", name)
+    forms = []
+    for i, part in enumerate(parts):
+        other = SYNONYMS.get(part.casefold())
+        if other is not None:
+            forms.append("".join(parts[:i] + [other] + parts[i + 1:]))
+    return forms
+
 
 def near_misses(name: str, candidates: Iterable[str], *, n: int = 3) -> list[str]:
     """Up to ``n`` of ``candidates`` closest to ``name``, best first.
 
-    Exact matches up to case come first, then ``difflib``'s ranking at
+    Exact matches up to case come first, then a match under the other
+    spelling of a :data:`SYNONYMS` word, then ``difflib``'s ranking at
     :data:`CUTOFF`, without repeats.  Empty when nothing is close, which a
     caller renders as no hint at all rather than as a guess.
     """
     pool = list(dict.fromkeys(candidates))
     folded = name.casefold()
     exact = [c for c in pool if c.casefold() == folded and c != name]
+    forms = {form.casefold() for form in _respelled(name)}
+    respelled = [c for c in pool if c.casefold() in forms]
     ranked = difflib.get_close_matches(name, pool, n=n, cutoff=CUTOFF)
-    return list(dict.fromkeys(exact + ranked))[:n]
+    return list(dict.fromkeys(exact + respelled + ranked))[:n]
 
 
 def did_you_mean(name: str, candidates: Iterable[str], *, n: int = 3) -> str:

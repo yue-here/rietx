@@ -123,6 +123,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--plot-calc": "#c65d0a",
         "--plot-bkg": "#b5793a",
         "--plot-diff": "#6b6259",
+        "--plot-last": "#849499",
         "--plot-zero": "#cfcfcf",
         "--plot-peak": "#0072b2",
         "--plot-peakfit": "#6f83e6",
@@ -148,6 +149,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--plot-calc": "#ff9d4d",
         "--plot-bkg": "#c99a6a",
         "--plot-diff": "#8f8f8f",
+        "--plot-last": "#776849",
         "--plot-zero": "#4a4a4a",
         "--plot-peak": "#008ad5",
         "--plot-peakfit": "#516494",
@@ -219,6 +221,12 @@ orange curve (0.065 light, 0.092 dark) and from the dark difference grey
 (0.110): the dash carries its identity, as the point marks carry the
 observations', and `tests/test_gui_palette.py` names the three pairs and holds
 each to its measured distance.""",
+    "--plot-last": """The last fit while a preview is drawn over it (WP-2218):
+the preview takes the calculated curve's accent and the last fit turns grey,
+as the design rounds drew it (`gui/STYLE.md` § Plots).  The round's greys
+(`#a79f94`, `#6f675b`) sat under the 0.13 floor from the background brown and
+the dark peak fit, and the light one under 3:1 on the page, so each is the
+nearest colour in OKLab that clears both.""",
     "--plot-peak": """The picked-peak layer (WP-1210, recoloured by WP-2200).
 The marks take Okabe-Ito blue, the complement of the orange fits, which the
 maintainer chose in the design rounds of 2026-11-08 (`#0072b2`).  Its dark

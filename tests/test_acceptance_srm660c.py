@@ -13,7 +13,7 @@ transparency is also held at 0.
 
 Reference values (see tests/data/README.md):
 * the CIF's own recomputed cell for this data block, a = 4.156780 Å at
-  20.85 °C (the certificate value 4.156826(8) Å applies at 22.5 °C);
+  20.85 °C (the certificate value 4.156826 ± 0.00008 Å, k = 2, applies at 22.5 °C);
 * the CIF's recorded specimen displacement, −0.07877 mm;
 * Hölzer et al. (1997): integrated CuKα2/Kα1 intensity ratio ≈ 0.52.
 
@@ -24,7 +24,7 @@ displacement −0.0801 mm (1.3 µm from NIST's), Kα2/Kα1 = 0.513.  The ±2e-4
 cell band below is *interim*: the remaining bias is the unmodelled
 equatorial (flat-specimen) divergence, tube tails and monochromator
 passband — fundamental-parameters territory, fenced for v2.  Certificate-
-level ±8e-6 accuracy is explicitly not claimed by this test.
+level ±8e-5 Å (k = 2, 19 ppm) accuracy is explicitly not claimed by this test.
 """
 
 from pathlib import Path

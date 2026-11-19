@@ -68,6 +68,12 @@ of issue #561, sized M.
 
 ## Handover log
 
+- **2026-11-17** — Mike's PR #1580 merged as `96f721c26`, after the WP closed. It
+  changes text only: the known-answer row's `measured` now quotes the worst
+  |Δ|/esd over eight seeds (0.64 to 2.27, median 1.5) against the bound of 4.
+  No test, bar or claim moved. Status stays ✅. Entry by a ghostshift close-only
+  runner (PR #1648).
+
 - **2026-11-12** — Part 2 is done and the WP closes. The rigid body on the real
   acridine pattern now has the bar Yue chose: the same model refined with its 14
   heavy atoms free lands where the body does. The free fit needed no restraints. Its
