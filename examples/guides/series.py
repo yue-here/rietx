@@ -44,6 +44,7 @@ assert [(c.code, c.path, c.count, c.level) for c in series.code_counts] == [
     ("CAPILLARY_OFFSET_UNAVAILABLE", "instrument.geometry.goniometer_radius_mm", 7, "info"),
     ("PATTERN_UNDERSAMPLED", None, 7, "warning")]
 assert [f"{r:.4f}" for r in series.rwp] == [
-    "0.0409", "0.0409", "0.0399", "0.0405", "0.0406", "0.0402", "0.0404"]
+    "0.0412", "0.0411", "0.0400", "0.0407", "0.0408", "0.0405", "0.0406"]
 assert [e.rung for e in series] == ["cold"] + ["warm"] * 6
-assert [e.n_iterations for e in series] == [38] + [15] * 6
+# Moved with WP-2222 (closing stage off by default, 2026-11-19): 38 -> 35 and 15 -> 12.
+assert [e.n_iterations for e in series] == [35] + [12] * 6
