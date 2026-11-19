@@ -190,7 +190,9 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
@@ -1171,7 +1173,9 @@ def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
     _frames(page)
     before = page.evaluate(SNAP, WINDOW_LANDMARKS)
     page.locator(".params .row button.ink").first.click()
-    page.keyboard.press("End")
+    # a leading digit changes any value: the editor opens on the full value,
+    # where a trailing one can sit past the double's last digit (WP-2223)
+    page.keyboard.press("Home")
     page.keyboard.type("1")
     page.keyboard.press("Enter")
     _frames(page)
