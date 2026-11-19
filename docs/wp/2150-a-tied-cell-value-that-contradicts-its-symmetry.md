@@ -215,8 +215,19 @@ indexing acceptance ranking is unchanged.
   model but builds the table from a consistent copy, so they stay
   bit-identical.
 
-  Next: the maintainer reads the reader-output section of PR #1698 and rules
-  on (3); WP-1314's Jana reader adds its `check_phase_cell_ties` call.
+  *Ruled by Yue 2026-11-19*, answering the shift's brief on PR #1698 with
+  "go". The ruling settles the three items above. (1) The three new reader
+  texts are approved as PR #1698's "What a reader receives" section quotes
+  them. They are the table's refusal, `CIF_CELL_TIE_CORRECTED`'s message
+  and suggestion, and `HISTORY_CELL_TIE_CORRECTED`. (2) The table itself
+  refuses. Editing `cell.a` alone on a cubic phase therefore fails. Refusing
+  in the readers only is declined. (3) `CIF_CELL_TIE_CORRECTED` stays a
+  warning, on the `CIF_CELL_ANGLE_CORRECTED` precedent. The judge's `info`
+  is declined. The code already matches: `cif._correct_cell_ties` emits it
+  at `level="warning"` (checked 2026-11-19).
+
+  Next: PR #1698 is ruled and can merge once green; WP-1314's Jana reader
+  adds its `check_phase_cell_ties` call.
 
 - **2026-11-18** — created, from the 2026-11-18 issue triage (issue #1669). Checked against
   the tree at 3f5167863: reproduced, a tied length builds from its source at 2 ppm and at
