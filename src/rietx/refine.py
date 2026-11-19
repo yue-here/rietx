@@ -5757,9 +5757,9 @@ class Refinement:
         collapsed into one stage, ``warm_refit``, which frees every glob the
         plan frees at once: the staged turn-on order exists to bring a cold
         model into the right basin, and a converged one is already there.
-        Measured on the eight comparison standards, it ends within 0.41 esd
-        of the first fit's answer and takes 0.35-0.50 of the staged re-fit's
-        time.  If that one-stage fit is rejected (it diverged or carries an
+        Measured on the eight comparison standards, it ends within 0.21 esd
+        of the first fit's answer and spends 0.32-0.50 of the staged
+        re-fit's evaluations (0.15-0.27 with no closing stage).  If that one-stage fit is rejected (it diverged or carries an
         ``error``-level code), it is discarded, the models go back to where
         it started, the staged plan runs from there, and the result carries
         ``WARM_REFIT_REJECTED``.  ``"stages"`` runs the plan as a first fit

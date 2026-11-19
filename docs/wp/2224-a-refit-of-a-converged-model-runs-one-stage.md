@@ -175,7 +175,7 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
       Loosen design 2 only if all reach; bring the result to Yue either way.
       Measured 2026-11-19 (§ Measured): all reach by Rwp, brucite + March-Dollase 2.25 esd
       off; design 2 kept strict; with Yue.
-- [ ] Tests: a first fit is staged; a re-fit is one stage and lands within 0.5 esd of the
+- [x] Tests: a first fit is staged; a re-fit is one stage and lands within 0.5 esd of the
       answer the model stood at on three families (never of a staged re-fit, which moves
       zincite 2 esd: § Measured); a written value, another pattern, another mode and a
       non-converged fit each run staged; a rejected one-stage fit falls back; `refit="stages"`
