@@ -32,8 +32,10 @@ So the first fit of a model stays staged.
 A fit counts as a re-fit when the working state is exactly where an accepted fit of the same pattern left it.
 The pattern, the mode and the fitted channels must be the same.
 No value may have been written since, by `set_values`, `edit`, `run_stage` or a checkout to another node.
-Changing what is free with `set_vary` or `hold`, or passing another plan, keeps it a re-fit.
-So does a `tie` that leaves every value where it was.
+Passing another plan, or changing what is free with `set_vary`, `hold` or `tie`, keeps it a re-fit as long as the plan frees nothing that the last fit held.
+A parameter the last fit held starts cold, so a plan that releases one runs in stages.
+On brucite, freeing a March-Dollase block in one stage ended 2.25 esd from the staged answer on the profile's W.
+`summary()` says how a re-fit ran: in one stage, or in stages, naming the parameter it released.
 An accepted fit is one with `status="converged"` and no error-level diagnostic.
 A project reopened at a converged fit's answer is a re-fit too.
 For now the GUI's Refine runs the plan in stages, so its stage ladder shows every stage's Rwp.

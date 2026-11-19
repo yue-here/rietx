@@ -2486,6 +2486,12 @@ def _refined_state():
 #: because notes are the tree's free-form channel and no schema moves.
 REFIT_KEY_NOTE = "refit_key"
 
+#: The node note beside :data:`REFIT_KEY_NOTE`: the paths the accepted fit's
+#: plan freed, as a JSON list (WP-2224, Yue's ruling of 2026-11-19).  A re-fit
+#: whose plan frees a path outside it releases a parameter the converged fit
+#: held, which is a cold start for that parameter, so it runs staged.
+REFIT_FREES_NOTE = "refit_frees"
+
 #: Model fields a fit or a free-set verb writes without moving the model:
 #: ``vary`` (a plan replaces the flags, ``set_vary`` edits them) and
 #: ``stderr`` (each fit writes its esds back).  Every other field is a value
@@ -2541,16 +2547,33 @@ def _node_refit_key(tree: RefinementTree, node_id: str | None) -> str | None:
     return None if node is None else node.notes.get(REFIT_KEY_NOTE)
 
 
+def _node_refit_frees(tree: RefinementTree,
+                      node_id: str | None) -> frozenset[str] | None:
+    """The :data:`REFIT_FREES_NOTE` on ``node_id`` as a set, or ``None``."""
+    import json
+
+    node = tree.nodes.get(node_id) if node_id is not None else None
+    raw = None if node is None else node.notes.get(REFIT_FREES_NOTE)
+    return None if raw is None else frozenset(json.loads(raw))
+
+
 def _warm_refit_rejected(rejected: RefinementResult) -> Diagnostic:
     """``WARM_REFIT_REJECTED``: the one-stage re-fit was discarded (WP-2224)."""
     errors = sorted({d.code for d in rejected.diagnostics if d.level == "error"})
-    why = ("its solver diverged" if rejected.status == "diverged"
-           else "it carried " + ", ".join(errors))
+    how = ("diverged" if rejected.status == "diverged"
+           else "ended with " + ", ".join(errors))
     return Diagnostic(
         level="info", code="WARM_REFIT_REJECTED",
-        message=(f"The one-stage re-fit (warm_refit) was discarded because "
-                 f"{why} at Rwp {rejected.statistics.rwp:.4f}, and the staged "
-                 f"plan ran from the same start."))
+        message=(f"The one-stage re-fit {how} (Rwp "
+                 f"{rejected.statistics.rwp:.4f}), so it was discarded and the "
+                 f"plan was run in stages from the same start."))
+
+
+def _name_paths(paths: list[str], at_most: int = 3) -> str:
+    """``paths`` for a sentence: the first few, then how many more."""
+    shown = ", ".join(paths[:at_most])
+    rest = len(paths) - at_most
+    return shown if rest <= 0 else f"{shown} and {rest} more"
 
 
 def _judge_magnetic_groups(structure: Structure) -> None:
@@ -2784,6 +2807,15 @@ class Refinement:
         self._refit_key: str | None = (
             _node_refit_key(history, history.head)
             if isinstance(history, RefinementTree) else None)
+        #: the paths that fit's plan freed (:data:`REFIT_FREES_NOTE`), or
+        #: ``None``.  A plan freeing anything outside it is not a re-fit.
+        self._refit_frees: frozenset[str] | None = (
+            _node_refit_frees(history, history.head)
+            if isinstance(history, RefinementTree) else None)
+        #: how the last :meth:`fit` treated a re-fit, for :meth:`summary`'s
+        #: plan line: ``None`` (not one), ``"single"``, ``"fallback"``, or the
+        #: paths that made it run staged
+        self._refit_how: str | list[str] | None = None
 
     # ------------------------------------------------------------------
     # history plumbing
@@ -2936,6 +2968,7 @@ class Refinement:
         self._restore_state(node.state)
         self._head_id = node.id
         self._refit_key = _node_refit_key(tree, node.id)
+        self._refit_frees = _node_refit_frees(tree, node.id)
         tree.set_head(node.id)
         return self
 
@@ -5752,9 +5785,12 @@ class Refinement:
         pattern left it: the same pattern arrays and σ, the same ``mode``, the
         same fitted channels, and no value written since (a ``set_values``,
         an ``edit``, a stage or a checkout to another node).  "Accepted" is
-        ``status="converged"`` and no ``error``-level diagnostic.  Changing the
-        free set (``set_vary``, ``hold``, ``tie``) or the plan keeps it a
-        re-fit.  Under ``"single"`` (the default) a re-fit runs the plan
+        ``status="converged"`` and no ``error``-level diagnostic.  The plan
+        may change, and so may the free set (``set_vary``, ``hold``, ``tie``),
+        as long as the plan frees nothing that fit's plan left fixed: a
+        parameter the converged fit held starts cold, so a plan releasing one
+        runs in stages, and :meth:`summary` names what it released.  Under
+        ``"single"`` (the default) a re-fit runs the plan
         collapsed into one stage, ``warm_refit``, which frees every glob the
         plan frees at once: the staged turn-on order exists to bring a cold
         model into the right basin, and a converged one is already there.
@@ -5831,17 +5867,28 @@ class Refinement:
         plan = resolve_plan(plan, mode)
         if refit not in REFIT_MODES:
             raise ValueError(f"refit must be one of {REFIT_MODES}, not {refit!r}")
+        frees = self._plan_frees(plan)
         # read before anything moves, then dropped: a fit that raises part way
         # has moved the values, and one that returns writes its own below
-        is_refit = (refit == "single" and self._refit_key is not None
-                    # an empty plan reaches ``_fit_pass``'s own refusal
-                    and bool(plan.stages)
-                    # one stage frees then fixes, and cannot replay a fix a
-                    # later stage undid (WP-2208), so such a plan runs staged
-                    and not any(s.turn_off for s in plan.stages)
-                    and self._refit_key == _refit_key(self, data, mode,
-                                                      two_theta_limits))
+        converged_here = (refit == "single" and self._refit_key is not None
+                          and self._refit_frees is not None
+                          # an empty plan reaches ``_fit_pass``'s own refusal
+                          and bool(plan.stages)
+                          # one stage frees then fixes, and cannot replay a fix
+                          # a later stage undid (WP-2208), so such a plan runs
+                          # staged
+                          and not any(s.turn_off for s in plan.stages)
+                          and self._refit_key == _refit_key(self, data, mode,
+                                                            two_theta_limits))
+        # a path the converged fit held starts cold, and one stage is not
+        # reliable from cold, so freeing one runs the plan in stages (Yue,
+        # 2026-11-19; brucite's March-Dollase block landed 2.25 esd off)
+        released = (sorted(frees - self._refit_frees) if converged_here
+                    else [])
+        is_refit = converged_here and not released
+        self._refit_how = released or None
         self._refit_key = None
+        self._refit_frees = None
         owns_split = self._decide_orbit_split()
         kw = dict(two_theta_limits=two_theta_limits, events=events,
                   cancel=cancel, telemetry=telemetry, label=label,
@@ -5854,11 +5901,34 @@ class Refinement:
         finally:
             if owns_split:
                 self._orbit_split = None
-        # a fallback ran the plan as given, and says so in its diagnostic
-        self._refit_plan = (plan if is_refit and self._last_plan is not plan
-                            else None)
-        self._note_refit_key(result, data, mode, two_theta_limits)
+        self._refit_plan = plan if is_refit else None
+        if is_refit:
+            self._refit_how = (
+                "fallback" if any(d.code == "WARM_REFIT_REJECTED"
+                                  for d in result.diagnostics) else "single")
+        self._note_refit_key(result, data, mode, two_theta_limits, frees)
         return result
+
+    def _plan_frees(self, plan: RefinementPlan) -> frozenset[str]:
+        """The paths ``plan`` leaves free at its end, asked of the table.
+
+        ``would_free`` is ``set_vary``'s own matcher, so a tied, locked or
+        held row is skipped as the stage runner skips it, and a stage's
+        ``turn_off`` takes its matches back out in the runner's order
+        (WP-2208).  What the data holds later (an unsupported phase) is not
+        seen here, on either side of the comparison :meth:`fit` makes.
+        """
+        if not plan.stages:
+            return frozenset()
+        table = self._table_for(self.structure)
+        free: set[str] = set()
+        for stage in plan.stages:
+            free.update(table.would_free(stage.turn_on))
+            if stage.turn_off:
+                free = {p for p in free
+                        if not any(fnmatch.fnmatchcase(p, g)
+                                   for g in stage.turn_off)}
+        return frozenset(free)
 
     def _fit_plan(self, data: PatternData, *, mode: Mode, plan: RefinementPlan,
                   **kw) -> RefinementResult:
@@ -5931,14 +6001,21 @@ class Refinement:
                 recorder.close()
 
     def _note_refit_key(self, result: RefinementResult, data: PatternData,
-                        mode: Mode, two_theta_limits) -> None:
-        """Record that this state is an accepted fit's answer, or nothing."""
+                        mode: Mode, two_theta_limits,
+                        frees: frozenset[str]) -> None:
+        """Record that this state is an accepted fit's answer, and what its
+        plan freed, or nothing."""
+        import json
+
         if result.status != "converged" or _rejected(result):
             return
         self._refit_key = _refit_key(self, data, mode, two_theta_limits)
+        self._refit_frees = frees
         if self.history is not None and self._head_id is not None:
-            self.history.annotate(self._head_id,
-                                  notes={REFIT_KEY_NOTE: self._refit_key})
+            self.history.annotate(
+                self._head_id,
+                notes={REFIT_KEY_NOTE: self._refit_key,
+                       REFIT_FREES_NOTE: json.dumps(sorted(frees))})
 
     def _decide_orbit_split(self) -> bool:
         """Decide each site's orbit split for the call starting now (WP-2052).
@@ -7353,12 +7430,22 @@ class Refinement:
         a bare result can also answer): the protocol actually run."""
         plan = self._last_plan
         lines = ["  protocol:"]
-        if plan is not None and self._refit_plan is not None:
+        how = self._refit_how
+        if plan is not None and how == "single" and self._refit_plan is not None:
             lines.append(
-                f"    plan: {', '.join(s.name for s in plan.stages)}, a re-fit of "
-                f"a converged model that frees in one stage what "
-                f"{', '.join(s.name for s in self._refit_plan.stages)} free; "
-                f"refit=\"stages\" runs them in turn")
+                f"    plan: one stage ({', '.join(s.name for s in plan.stages)}), "
+                f"because the model had already converged on this pattern. "
+                f"refit=\"stages\" runs "
+                f"{', '.join(s.name for s in self._refit_plan.stages)} in turn.")
+        elif plan is not None and how == "fallback":
+            lines.append(
+                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                f"after the one-stage re-fit was discarded.")
+        elif plan is not None and isinstance(how, list):
+            lines.append(
+                f"    plan: {', '.join(s.name for s in plan.stages)}, in stages, "
+                f"because this fit frees {_name_paths(how)}, which the last "
+                f"fit held.")
         elif plan is not None:
             lines.append(f"    plan: {', '.join(s.name for s in plan.stages)}")
         rows = self.parameters()

@@ -24,7 +24,7 @@ import pytest
 
 from rietx.history.tree import RefinementTree
 from rietx.refine import REFIT_KEY_NOTE, Refinement
-from rietx.strategy.staged import CLOSING_STAGE_NAME
+from rietx.strategy.staged import CLOSING_STAGE_NAME, Stage
 from rietx.viz import compare
 
 # the module, never ``rietx.refine``, which the package rebinds to the function
@@ -225,6 +225,10 @@ def test_a_rejected_one_stage_fit_falls_back_to_the_plan(monkeypatch, tmp_path, 
     assert _declared(fell) == _declared(f.first)
     codes = [d for d in fell.diagnostics if d.code == "WARM_REFIT_REJECTED"]
     assert len(codes) == 1 and codes[0].level == "info"
+    assert codes[0].message.startswith("The one-stage re-fit ")
+    assert "so it was discarded and the plan was run in stages" in codes[0].message
+    assert _summary_plan_line(f.ref).endswith(
+        "in stages, after the one-stage re-fit was discarded.")
     tree = f.ref.history
     discarded = [i for i in tree.order if tree.nodes[i].notes.get("refit_discarded")]
     assert discarded
@@ -297,3 +301,57 @@ def test_an_empty_plan_is_refused_on_a_refit_too(zincite):
     with pytest.raises(ValueError, match="a plan with no stages refines nothing"):
         zincite.ref.fit(zincite.inputs.data, plan=RefinementPlan(stages=[]),
                         **zincite.kw)
+
+
+def _summary_plan_line(ref):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        text = ref.summary()
+    return next(line for line in text.splitlines()
+                if line.strip().startswith("plan:"))
+
+
+@_ZINCITE
+def test_a_plan_freeing_what_the_converged_fit_held_runs_staged(zincite):
+    """Yue's ruling of 2026-11-19: a released parameter starts cold, so the
+    plan runs in stages and the summary says which parameter made it."""
+    plan = zincite.plan()
+    plan.stages.append(Stage("xyz", ["phases.*.atoms.*.dof.*"]))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = zincite.ref.fit(zincite.inputs.data, plan=plan, **zincite.kw)
+    assert _declared(res) == [s.name for s in plan.stages]
+    line = _summary_plan_line(zincite.ref)
+    assert "in stages, because this fit frees phases.0.atoms.0.dof.0" in line, line
+    assert "which the last fit held" in line
+
+    # that answer freed the coordinates, so fitting it again is a re-fit
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        again = zincite.ref.fit(zincite.inputs.data, plan=plan, **zincite.kw)
+    assert _declared(again) == ["warm_refit"]
+
+
+@_ZINCITE
+def test_a_plan_freeing_less_stays_a_refit(zincite):
+    plan = zincite.plan()
+    plan.stages.pop()                       # biso stays where the fit left it
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = zincite.ref.fit(zincite.inputs.data, plan=plan, **zincite.kw)
+    assert _declared(res) == ["warm_refit"]
+    line = _summary_plan_line(zincite.ref)
+    assert line.strip().startswith("plan: one stage (warm_refit), because the "
+                                   "model had already converged"), line
+
+
+@_ZINCITE
+def test_an_unhold_releases_a_parameter_and_runs_staged(zincite):
+    zincite.ref.hold("instrument.zero_shift")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        held = zincite.fit()
+    # holding narrows the free set: a re-fit
+    assert _declared(held) == ["warm_refit"]
+    zincite.ref.unhold("instrument.zero_shift")
+    assert _declared(zincite.fit()) == _declared(zincite.first)
