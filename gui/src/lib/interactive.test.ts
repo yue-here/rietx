@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildSliders, channelIndex, defaults, editText, fixFormat, formatParts, parseTyped,
-  posFrac, PreviewQueue, rangeText, readNumber, roundRange, STEPS, valueAt,
+  buildSliders, channelIndex, defaults, fixFormat, formatParts, parseTyped,
+  plainText, posFrac, PreviewQueue, rangeText, readNumber, roundRange, STEPS, valueAt,
 } from "./interactive";
+import { editText } from "./numslot";
 
 const CTX = { fwhm: 0.1, thetaMaxDeg: 60 };
 const OPEN: [number, number] = [-Infinity, Infinity];
@@ -78,8 +79,18 @@ describe("the number's one format", () => {
   });
 
   it("types back without slots and refuses what the row cannot hold", () => {
-    expect(editText(0.1 + 0.2)).toBe("0.3");
+    // the box opens on the stored value to its last digit (WP-2223)
+    expect(editText(0.1 + 0.2)).toBe("0.30000000000000004");
+    expect(editText(2.7725887222397814e-7)).toBe("2.7725887222397814e-7");
+    expect(parseTyped({ bound: [0, 1] }, editText(0.1 + 0.2))).toEqual({ value: 0.1 + 0.2 });
+    // the old page's Last fit line keeps its 12 digits
+    expect(plainText(0.1 + 0.2)).toBe("0.3");
     expect(parseTyped({ bound: [0, 1] }, "0.25")).toEqual({ value: 0.25 });
+    // the three forms the range fields read (WP-2223)
+    expect(parseTyped({ bound: [0, 1] }, "1.5×10⁻³")).toEqual({ value: 1.5e-3 });
+    expect(parseTyped({ bound: [0, 1] }, "1.5x10^-3")).toEqual({ value: 1.5e-3 });
+    expect(parseTyped({ bound: [0, 1] }, "1.5e-3")).toEqual({ value: 1.5e-3 });
+    expect(parseTyped({ bound: [0, 1] }, " ")).toEqual({ why: "not a number" });
     expect(parseTyped({ bound: [0, 1] }, "−0.5")).toEqual({ why: "below the lower bound 0" });
     expect(parseTyped({ bound: [0, 1] }, "2")).toEqual({ why: "above the upper bound 1" });
     expect(parseTyped({ bound: [0, 1] }, "x")).toEqual({ why: "not a number" });

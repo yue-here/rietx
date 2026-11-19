@@ -4900,6 +4900,34 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Respell the site in TOPAS if you want to refine the ion."
         ),
     ),
+    "VARIABLE_NOT_FREED": HelpEntry(
+        title="A variable was never refined",
+        description=(
+            "No stage of the plan freed a variable, so it kept its starting value. In "
+            "a joint fit the variable is a coefficient of a parametric equation. A "
+            "stage that frees the equation's target frees its coefficients. A "
+            "formula's variable declared `vary=False` is freed only by a stage naming "
+            "its `vars.<name>` path. In a single fit a variable that other parameters "
+            "are tied to is freed only by a stage naming its `vars.<name>` path. The "
+            "parameters that follow the variable are set from its start, and the data "
+            "did not measure them. The result has no row for the variable in "
+            "`parameters`. Add a stage that frees it before you quote what it sets. In a "
+            "single fit, hold the variable with `Refinement.hold` to say the start is "
+            "meant, and it is not named."
+        ),
+    ),
+    "WARM_REFIT_REJECTED": HelpEntry(
+        title="A re-fit fell back to the staged plan",
+        description=(
+            "A second `fit` on a model its last fit had converged runs the plan as one "
+            "stage, `warm_refit`, because a converged model needs no staged approach. "
+            "Here that one-stage fit diverged or carried an error-level finding, which "
+            "the message names. It was discarded, the model went back to where it "
+            "started, and the staged plan ran from there. The result is the staged "
+            "plan's answer, so nothing needs redoing. No ordinary fit has been seen to "
+            "fire it. `refit=\"stages\"` skips the one-stage attempt."
+        ),
+    ),
     "WAVELENGTH_CALIBRATION": HelpEntry(
         title="A refined wavelength moved from its declared value",
         description=(
