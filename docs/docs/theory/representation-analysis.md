@@ -260,7 +260,24 @@ M(R^\top\mathbf{h}),
 {cite}`gallego2012`, so an operation fixing $\mathbf{h}$ ($R^\top\mathbf{h} =
 \mathbf{h}$) constrains $M(\mathbf{h})$ to an eigenvalue-1 subspace of the
 right-hand side's matrix; where that leaves only zero, the reflection is
-absent whatever the moment. The MAGNEXT rule for a type IV group, one whose
+absent whatever the moment. The decision is made exactly. The operations
+fixing $\mathbf{h}$ form a group $H_\mathbf{h}$, and the number of independent
+directions $M(\mathbf{h})$ may take is the character average
+
+```{math}
+:label: rep-magnext-dim
+
+d(\mathbf{h}) \;=\; \frac{1}{|H_\mathbf{h}|}\sum_{g\in H_\mathbf{h}}
+\varepsilon_g\,\det(R_g)\,\operatorname{tr}(R_g)\,
+\exp(2\pi i\,\mathbf{h}\cdot\mathbf{t}_g),
+```
+
+{source}`rietx.crystallography.magnetic.operators.magnetically_allowed`
+
+a sum of roots of unity with integer coefficients. It is reduced modulo the
+cyclotomic polynomial of the translations' common denominator in integer
+arithmetic, so the reflection is absent exactly when $d(\mathbf{h}) = 0$, with
+no floating-point threshold. The MAGNEXT rule for a type IV group, one whose
 translations include an anti-translation $\mathbf{t}$ (Q22's construction
 gives it $\varepsilon = -1$ with $R = I$), is the special case
 $\mathbf{h}\cdot\mathbf{t}$ an integer, since then the two terms of

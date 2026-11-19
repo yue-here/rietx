@@ -53,6 +53,7 @@ crystallite
 crystallites
 crystallographer
 cyclohexane
+cyclotomic
 deuterated
 deuteration
 diffractometer
