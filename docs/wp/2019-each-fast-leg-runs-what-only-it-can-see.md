@@ -317,7 +317,7 @@ acceptance line is met, so the WP closes.
 
 - **Done** (PR #1354). The last open task, *Read ten runs again*, is read
   and ticked. Status ✅, the `Priority:` line deleted, the narrative in
-  `docs/milestones/v1.11.md`. No code changes, and `tests/shard_times.json`
+  `docs/milestones/v1.12.md` (moved there in review: 1.11.0 is cut). No code changes, and `tests/shard_times.json`
   is not touched.
 - **Measured: the wall clock.** The ten successful `ci.yml` push runs on main
   from 41430141218 (892e05fc0, the merge of #1329, 11-02 10:36 UTC), the
@@ -390,9 +390,24 @@ acceptance line is met, so the WP closes.
   `~/.cache/ghostshift/rietx/wp-2019/` under an `r3_` prefix (`r3_walls.py`,
   `r3_counts.py`, `r3_jaxcompare.py`, `r3_skips.py`). The CI job logs print
   pytest's summary bare, with no `=` rule around it.
-- **Next.** Nothing on this WP. If the wall drifts back over the bar, the
-  2026-11-01 entry's option (b), cutting the tier's work, is the next lever,
-  starting from py3.14 4/4, the slowest job in six of these ten runs.
+- **Today's reading, 2026-11-19 (round 2 of review).** The wall has drifted
+  back over the bar. The Acceptance block's own command on the ten latest
+  successful `ci.yml` push runs on main, 44065777513 (`dd675e0b5`, 11-17
+  10:32 UTC) to 44229061247 (`99ddcd42a`, 11-18 03:15 UTC), gives a median
+  slowest fast job of 15.8 min, range 14.1 to 17.1, nine of the ten over 15
+  (Yue's reading; not re-timed here). The fast tier has grown: `-m "not
+  slow" --collect-only` collects 15 230 cases on `99ddcd42a`, against 13 953
+  at the 11-02 reading (13 919 passed+skipped and 34 xfailed), about 9 %
+  more. The shards were not timed, so growth is the likely cause and not a
+  measured one. Both readings side by side: 11-02, median 13.5 min, range
+  12.5 to 14.9, 13 953 cases; 11-18, median 15.8 min, range 14.1 to 17.1,
+  15 230 cases. This WP closes on the 11-02 reading, which met every
+  acceptance line when taken (Yue, review of 11-19).
+- **Next.** Nothing on this WP. Getting the per-push wall back under 15 min
+  is a follow-on WP, to be opened by the maintainer: it starts from cutting
+  the tier's work (the 2026-11-01 entry's option (b)) and from the slowest
+  job of the newest ten runs, py3.14 4/4 having been the slowest in six of
+  the 11-02 ten.
 
 ### 2026-11-02 (3rd session) — four shards on a per-leg record; projected to a median 12.9 min against the bar of 15
 
