@@ -42,11 +42,11 @@ def fitted(pattern):
 def test_records_a_node_per_stage(fitted):
     ref, result = fitted
     tree = ref.history
-    # root + one node per stage the fit ran, the closing stage included
+    # root + one node per stage the fit ran; no closing stage by default (WP-2222)
     assert len(tree) == 1 + len(SHORT.run_stages())
     assert tree.root.action.kind == "root"
     assert [n.action.name for n in tree.nodes.values() if n.action.kind == "stage"] \
-        == ["scale_bkg", "cell", "closing"]
+        == ["scale_bkg", "cell"]
     assert result.node_id == tree.order[-1]
     assert result.tree_id == tree.header.tree_id
     # every fitted node carries its own agreement indices
@@ -227,7 +227,7 @@ def test_branching_creates_independent_leaves(pattern):
 
     leaves = tree.leaves()
     assert len(leaves) == 2, [n.id for n in leaves]
-    assert {n.action.name for n in leaves} == {"closing", "profile_w"}
+    assert {n.action.name for n in leaves} == {"cell", "profile_w"}
     assert tree.children(mid.id).__len__() == 2
     # recording a sibling must not disturb the node it branched from
     assert mid.model_dump_json() == frozen
@@ -558,7 +558,7 @@ def test_branch_overlay_plot(tmp_path, pattern):
     ref = rx.Refinement(structure, ins)
     result = ref.fit(pattern, plan=SHORT)
     tree = ref.history
-    fork = tree[result.node_id]                  # the fit's answer, its closing stage
+    fork = tree[result.node_id]                  # the fit's answer, its last stage
 
     # two plausible continuations of the same checkpoint: widen only W, or
     # free the whole TCHZ profile
@@ -645,17 +645,15 @@ def test_a_cherry_pick_replays_zero_le_bail_cycles_as_zero(pattern):
 def test_stage_node_without_seeds_renders_unchanged(pattern):
     """An unseeded stage's api_call keeps its pre-WP-1004 Stage text exactly.
 
-    A declared stage names its windows after it: run_stage's own default is
-    the closing stage's fraction since WP-2002's seventh round, so a line
-    without the keyword would replay a different stage from the one that ran."""
+    A declared stage's 2 % windows are run_stage's own default since WP-2222,
+    so its line names no window."""
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins)
     # the declared stages' rendered call; the closing stage is tests/test_closing_stage.py's
     ref.fit(pattern, plan=_with_settings(SHORT, closing_window_tol=None))
     node = ref.history[ref.history.order[-1]]
     assert node.action.api_call() == (
-        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40), "
-        "window_area_tol=0.02)")
+        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40))")
 
 
 # ------------------------------- the plan settings a stage ran at (WP-2002, B1)
@@ -679,8 +677,7 @@ def test_a_cherry_pick_replays_the_plan_settings_the_stage_ran_at(pattern):
     action = ref.history[picked].action
     assert (action.phase_support_sigma, action.correlation_guard) == (5.0, 0.9)
     assert action.api_call().endswith(
-        "max_iter=40), correlation_guard=0.9, phase_support_sigma=5.0, "
-        "window_area_tol=0.02)")
+        "max_iter=40), correlation_guard=0.9, phase_support_sigma=5.0)")
     reloaded = rx.NodeAction.model_validate_json(action.model_dump_json())
     assert (reloaded.phase_support_sigma, reloaded.correlation_guard) == (5.0, 0.9)
 
@@ -705,7 +702,7 @@ def test_the_hold_switched_off_is_recorded_and_rendered():
                            lebail_tol=stage.lebail_tol)
     assert action.api_call() == (
         "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], "
-        "max_iter=100), phase_support_sigma=None, window_area_tol=0.02)")
+        "max_iter=100), phase_support_sigma=None)")
     reloaded = rx.NodeAction.model_validate_json(action.model_dump_json())
     assert reloaded.phase_support_sigma is None
 
@@ -738,10 +735,10 @@ def test_a_node_written_before_the_plan_settings_replays_at_the_defaults(
     picked = tree.order[-1]
     action = tree[picked].action
     assert (action.phase_support_sigma, action.correlation_guard) == (3.0, 0.98)
-    # a node written before the window field ran at the declared 2 %
+    # a node written before the window field ran at the declared 2 %, which
+    # is run_stage's own default since WP-2222
     assert action.api_call() == (
-        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40), "
-        "window_area_tol=0.02)")
+        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40))")
 
     old = rx.Refinement.from_node(tree, picked)
     old.cherry_pick(picked, pattern)

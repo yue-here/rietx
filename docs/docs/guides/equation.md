@@ -18,9 +18,9 @@ This fits a straight line a(T) = a₀ + a₁(T − T<sub>ref</sub>) to the seven
 
 <!-- output of examples/guides/equation.py -->
 ```text
-[1] 4.1628327119 +/- 1.6e-06 Å
-[T] 0.0000207819 +/- 8.0e-09 Å/K
-form rejected: False (statistic 9.4, cut 11.1)
+[1] 4.1628327080 +/- 1.6e-06 Å
+[T] 0.0000207819 +/- 8.2e-09 Å/K
+form rejected: False (statistic 9.3, cut 11.1)
 ```
 
 Each term in `terms` is a list of coordinate names: `[]` is the intercept, `["T"]` is linear in T, and `["T", "T"]` would add T².
@@ -53,7 +53,7 @@ To show a rejection, the script fits a second ramp whose true cell edge bows 9.4
 
 <!-- output of examples/guides/equation.py -->
 ```text
-form rejected: True (statistic 504.2, cut 11.1)
+form rejected: True (statistic 498.3, cut 11.1)
 ['PARAMETRIC_FORM_REJECTED']
 ```
 
@@ -76,7 +76,7 @@ A pattern that cannot see the phase adds nothing to the statistic, and `PARAMETR
 
 <!-- output of examples/guides/equation.py -->
 ```text
-a: phases.0.cell.a at T=293 = 4.1564527(29) Å (extrapolating in T; form not rejected)
+a: phases.0.cell.a at T=293 = 4.1564527(30) Å (extrapolating in T; form not rejected)
 ```
 
 293 K lies below the fitted range of 300-900 K, so the line says it is extrapolating.
@@ -99,7 +99,7 @@ This writes the same line as a formula and leaves the slope held at 0:
 
 <!-- output of examples/guides/equation.py -->
 ```text
-Rwp 0.568 against 0.040 with the slope free
+Rwp 0.568 against 0.041 with the slope free
 slope 0.0 +/- None
 ['PARAMETRIC_FORM_REJECTED']
 ```
@@ -122,7 +122,7 @@ This adds a line on La's B to the cell line and fits under that plan:
 <!-- output of examples/guides/equation.py -->
 ```text
 a [1] 4.16283 +/- 1.6e-06
-a [T] 2.07819e-05 +/- 8.0e-09
+a [T] 2.07819e-05 +/- 8.2e-09
 b [1] 0.4 +/- None
 b [T] 0 +/- None
 []

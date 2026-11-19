@@ -188,16 +188,16 @@ def api_call(stage: StageSpec, *, plan=None) -> str:
     ``Project.run_stage`` passes on), since the node records them and its line
     then names any that differ from the default (WP-2002, B1).
     """
+    from ..model.forward import WINDOW_AREA_TOL
     from ..schemas.history import NodeAction
-    from ..schemas.plan import CLOSING_WINDOW_TOL
 
     settings = ({} if plan is None else
                 {"correlation_guard": plan.correlation_guard,
                  "phase_support_sigma": plan.phase_support_sigma})
-    # the fraction run_stage records when given none (WP-2002, the seventh
-    # round's Q1), so the tooltip and the node's line agree
+    # the fraction run_stage records when given none (the declared stages' 2 %
+    # since WP-2222), so the tooltip and the node's line agree
     return NodeAction(kind="stage", name=stage.name, turn_on=list(stage.turn_on),
-                      max_iter=stage.max_iter, window_area_tol=CLOSING_WINDOW_TOL,
+                      max_iter=stage.max_iter, window_area_tol=WINDOW_AREA_TOL,
                       # what the stage will write, so the line names them only
                       # where it runs other than the default (WP-1947)
                       lebail_cycles=stage.lebail_cycles,
