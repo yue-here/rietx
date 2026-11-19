@@ -346,6 +346,17 @@ describe("pending edits", () => {
     expect(untouched.touched).toBe(0);
   });
 
+  it("compares with the stored float for an editor that opened on it (WP-2223)", () => {
+    // the Parameters panel opens 4.156783 in full, so 4.1568 typed is a new number
+    const rows = [row("phases.0.cell.a", { value: 4.156783, esd: 0.00019 })];
+    const typed = editState(rows, new Map([["phases.0.cell.a", "4.1568"]]), 0, "stored");
+    expect(typed.values).toEqual({ "phases.0.cell.a": 4.1568 });
+    expect(typed.touched).toBe(1);
+    const back = editState(rows, new Map([["phases.0.cell.a", "4.156783"]]), 0, "stored");
+    expect(back.values).toEqual({});
+    expect(back.touched).toBe(0);
+  });
+
   it("counts an invalid cell as touched, so Revert exists for it", () => {
     const state = editState([bounded], new Map([["instrument.profile.w", "2"]]), 1);
     expect(state.values).toEqual({});
