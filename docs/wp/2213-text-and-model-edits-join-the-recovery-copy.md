@@ -121,7 +121,7 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-- **2026-11-19** — closed in repair, by the ghostshift close-only batch. PR #1633 merged on
+- **2026-11-19** — closed in repair, by the ghostshift close-only batch (PR #1696). PR #1633 merged on
   2026-11-18 as `1620aae49` and shipped in 1.12.0, while this file still read "ready to merge".
   This entry marks the WP closed, drops its priority line and moves its narrative to the v1.12
   record. One commit landed after the last entry and rode the same PR: `ddc76ce9a` (2026-11-17)
