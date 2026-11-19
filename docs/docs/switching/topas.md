@@ -62,9 +62,9 @@ rietx has three calls for the same jobs, `tie` taking either a source or an expr
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
 
 ```text
-site O5 x O5_x 0.32467 y O5_y 0.484898 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O6 x O6_x 0.591092 y O6_y 0.469105 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O7 x O7_x 0.339828 y O7_y 0.257684 z O7_z 0.0705402 occ O ! 1.0 beq O5_biso 0.366488
+site O5 x O5_x 0.324668 y O5_y 0.484847 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O6 x O6_x 0.591016 y O6_y 0.468991 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O7 x O7_x 0.33985 y O7_y 0.257709 z O7_z 0.0704391 occ O ! 1.0 beq O5_biso 0.382804
 ```
 
 In rietx it is one call:
@@ -314,19 +314,19 @@ rx.write_topas_inp(ref.fitted_structure, "refined.inp", free=ref, scale="topas",
 The file names each free parameter after its path, which in TOPAS is also its refine flag.
 This file comes from the refinement above that held the zero shift at 0.
 It holds the zero shift with `!`, and states the specimen displacement that took its place as an equation in `th2_offset`.
-The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 111 ppm lower.
+The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 110 ppm lower.
 These lines are an excerpt, with each number cut to six significant figures:
 
 ```text
 xdd "refined.xye" xye_format
   weighting = 1 / SigmaYobs^2;
-  bkg @ 152.446 -171.263 124.821 -73.5215 36.6909 -16.1333
+  bkg @ 154.768 -172.223 123.708 -71.9987 35.2492 -15.3107
   th2_offset ! 0
-  th2_offset = -2*Rad*(0.0629551)*Cos(Th)/217.5;
+  th2_offset = -2*Rad*(0.0632254)*Cos(Th)/217.5;
 str
-  scale p0_scale 0.000469265 min 0
-  a p0_cell_a 9.37332
-  b p0_cell_a 9.37332
+  scale p0_scale 0.000470097 min 0
+  a p0_cell_a 9.37331
+  b p0_cell_a 9.37331
 ```
 
 The data go beside it as `refined.xye`, with the esd rietx weights by.

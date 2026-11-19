@@ -193,7 +193,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import PlanSpec
+from .schemas.plan import CLOSING_WINDOW_TOL, PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -211,7 +211,8 @@ from .schemas.structure import (
     Structure,
 )
 from .strategy.parameter_interval import attach_stationary_intervals
-from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, Stage, resolve_plan
+from .strategy.refit import REFIT_MODES, _collapse, _unseeded
+from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, resolve_plan
 
 #: Converged first rungs needed before a caller's ``first_rung_factor`` bounds
 #: anything (WP-1127); read only once a factor is passed, the bound being off
@@ -254,12 +255,9 @@ NOT_A_SERIES_FINDING = frozenset({"FROZEN_COMPILE_STALE", "STAGE_WINDOWS_STALE"}
 #: carry the worst one rather than a fixed level of its own.
 _LEVEL_RANK = {"info": 0, "warning": 1, "error": 2}
 
-#: What ``refit=`` and ``direction=`` accept, as data rather than as two literals
-#: inside :meth:`SequentialRefinement.fit`.  A caller that has to *offer* the
-#: choices (the GUI's series panel, WP-1016) needs the same list this validates
-#: against, and a menu that could disagree with the validator would be a second
-#: authority — the ``capabilities()`` rule at a smaller scale.
-REFIT_MODES = ("single", "stages")
+#: What ``direction=`` accepts, as data, for :data:`REFIT_MODES`' reason
+#: (``REFIT_MODES`` itself is :mod:`rietx.strategy.refit`'s, shared with
+#: :meth:`~rietx.refine.Refinement.fit` since WP-2224).
 DIRECTIONS = ("forward", "backward", "both")
 
 #: How ``SequentialRefinement.fit`` reacts to a pattern on which **every
@@ -403,87 +401,6 @@ def _labels_for(patterns: Sequence[PatternData],
             src = str(d.metadata.get("source_file", "") or "")
             out.append(Path(src).stem if src else f"p{i:03d}")
     return unique_labels(out)
-
-
-def _collapse(plan: RefinementPlan) -> RefinementPlan:
-    """One stage freeing everything the plan would free, in one solve.
-
-    Never for a plan that fixes (``Stage.turn_off``, WP-2208): one stage
-    frees then fixes, and cannot replay a fix that a later stage undid, so
-    :meth:`SequentialRefinement.fit` refits such a plan stage by stage.
-
-    The default ``refit="single"`` strategy: with a converged neighbour as the
-    starting point the staged turn-on order has already done its job of keeping
-    early stages well conditioned, so re-walking it per pattern is mostly
-    overhead.  Measured on the round-robin sample-1 series: 904 iterations
-    against 1623 for the staged refit and 2863 unchained, for the same weight
-    fractions to three decimals.
-
-    The warm refit carries no ``seed``.  ``seed_floored`` lifts every freed
-    row sitting exactly on its floor, and a warm start's rows on a floor are
-    the neighbour's converged answers.  A stage seed says where a cold solve
-    starts.  On a warm start it lifts that answer off its floor before the
-    solve begins.  Measured on the
-    four-pattern LaB₆ ramp of ``tests/test_sequential.py`` under
-    ``mccusker_structural``, the plan's 0.3 lifted pattern 1's converged
-    ``instrument.profile.y`` from 0 to 0.3° and ``phases.0.extinction`` from
-    0 to 0.3.  That refit ended at χ²_red 1.05828 in 15 iterations, against
-    1.05145 in 11 with no seed.  Patterns 2 and 3 lifted extinction alone and
-    ended at the same χ² either way.
-
-    ``strain_seed`` does carry over, as the maximum across the plan's
-    stages.  ``seed_stephens`` touches only a block that is still all zero,
-    and such a block cannot move without it, warm or cold.
-    """
-    turn_on: list[str] = []
-    for stage in plan.stages:
-        for glob in stage.turn_on:
-            if glob not in turn_on:
-                turn_on.append(glob)
-    # the cap below is the plan's largest, which a fixed count would run in full,
-    # so one stage's stop keeps the collapsed stage stopping
-    stops = [s.lebail_tol for s in plan.stages if s.lebail_tol > 0.0]
-    return RefinementPlan(
-        stages=[Stage("warm_refit", turn_on,
-                      max_iter=max((s.max_iter for s in plan.stages), default=100),
-                      lebail_cycles=max((s.lebail_cycles for s in plan.stages),
-                                        default=Stage.lebail_cycles),
-                      lebail_tol=min(stops, default=0.0 if plan.stages
-                                     else Stage.lebail_tol),
-                      seed=0.0,
-                      strain_seed=max((s.strain_seed for s in plan.stages),
-                                      default=0.0))],
-        correlation_guard=plan.correlation_guard,
-        # inert, the lone warm stage being the last declared one, which
-        # converges whether or not a closing stage follows (WP-2045: at 1e-6
-        # the hostile series' cpd-1b warm stage stopped on its frozen windows'
-        # plateau at axial_sl 555); carried anyway, because this is the
-        # compressed plan rather than a different protocol (WP-1123)
-        intermediate_ftol=plan.intermediate_ftol,
-        # and the closing stage itself, the protocol's like the two below
-        # (WP-2002, the sixth round's Q1 and Q2)
-        closing_window_tol=plan.closing_window_tol,
-        # the alternation is the protocol's, not a stage's: a collapsed warm
-        # refit under mode="lebail" would otherwise run one pass (WP-1323)
-        lebail_passes=plan.lebail_passes,
-        # the absent-phase hold is the protocol's too: a collapsed warm refit
-        # would otherwise hold at the default a phase the caller set free
-        # (WP-2002, B1)
-        phase_support_sigma=plan.phase_support_sigma)
-
-
-def _unseeded(plan: RefinementPlan) -> RefinementPlan:
-    """``plan`` with no stage ``seed``, for a solve that starts warm.
-
-    A stage seed says where a cold solve starts.  On a warm start a row on its
-    floor is the neighbour's converged answer, and seeding it lifts that
-    answer before the solve begins (:func:`_collapse` has the measurement).
-    ``strain_seed`` stays, for the reason it stays there.  ``plan`` itself
-    comes back when no stage seeds.
-    """
-    if not any(s.seed for s in plan.stages):
-        return plan
-    return replace(plan, stages=[replace(s, seed=0.0) for s in plan.stages])
 
 
 def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
@@ -1479,6 +1396,20 @@ class SequentialRefinement:
         if x is not None and x_label == "index":
             x_label = "x"
         base_plan = resolve_plan(plan, mode)
+        if (mode == "pawley" and self.carry_hkl_intensities
+                and base_plan.closing_window_tol is None):
+            # Ruled 2026-11-19 (WP-2222) on a drift along a carried chain:
+            # on the ten-pattern ramp of tests/test_pawley.fap_series, Rwp
+            # rose to 0.0407 at pattern 5 against about 0.034 with the
+            # closing stage, and the cell moved up to 0.77 esd, recovering
+            # by pattern 7.  Its cause is the range end, not the carrying
+            # (WP-2228): (6 0 2), centred 0.4 deg past the data, has a 2 %
+            # window that reaches no channel, so its tail in the data goes
+            # unmodelled.  Cut the data at 72 deg and the carried chain
+            # without the closing stage lands within 0.05 esd.  WP-2228's
+            # fix replaces this rule.  A plan's None cannot be told from the
+            # default, so the way out is carry_hkl_intensities=False.
+            base_plan = replace(base_plan, closing_window_tol=CLOSING_WINDOW_TOL)
         # A plan that fixes is refit stage by stage (WP-2208): one stage cannot
         # replay a fix a later stage undoes, so the collapse would free what
         # the plan left fixed.  The entry's ``rung`` reads "warm_staged".
