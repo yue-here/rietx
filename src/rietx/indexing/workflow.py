@@ -846,7 +846,9 @@ def index_pattern(peaks: PeakList | None = None, *,
         merge_engine_units,
         search_anchors,
         search_line_order,
+        shared_unit_advice,
         single_engine_diagnostic,
+        unit_share_seconds,
         weak_line_floor,
         weak_line_retry_diagnostic,
     )
@@ -929,16 +931,26 @@ def index_pattern(peaks: PeakList | None = None, *,
     deadline = None
     run_cancel = cancel
     search_cancel = cancel
+    search_seconds = None
     if spec.total_budget_seconds is not None:
         from .engines import VALIDATION_RESERVE_FRACTION
 
         deadline = Deadline(spec.total_budget_seconds, cancel=cancel)
         run_cancel = deadline
         search_cancel = deadline
+        search_seconds = float(spec.total_budget_seconds)
         if validate and data is not None and instrument is not None:
             reserve = VALIDATION_RESERVE_FRACTION * spec.total_budget_seconds
-            search_cancel = Deadline(spec.total_budget_seconds - reserve,
-                                     cancel=deadline)
+            search_seconds = spec.total_budget_seconds - reserve
+            search_cancel = Deadline(search_seconds, cancel=deadline)
+    # each (engine × system) unit's share of the search's time (#1374): under
+    # a ceiling no unit runs past min(budget_seconds, search / n_engines), so
+    # one unit that does not finish leaves the other engines their time on
+    # the same system.  ``None`` with no ceiling, and a share at or above the
+    # caller's budget_seconds changes nothing (the quick default: 34 s > 30 s)
+    unit_share = unit_share_seconds(search_seconds, len(names))
+    if unit_share is not None and unit_share >= spec.budget_seconds:
+        unit_share = None
 
     provenance = Provenance(
         package_version=_VERSION, created_utc=_utcnow(),
@@ -1006,10 +1018,17 @@ def index_pattern(peaks: PeakList | None = None, *,
                 if search_cancel is not None and bool(search_cancel):
                     break
                 unit_spec = replace(spec, systems=(system,))
-                units[name].append(get_engine(name)(
+                if unit_share is not None:
+                    unit_spec = replace(unit_spec, budget_seconds=unit_share)
+                unit = get_engine(name)(
                     peaks, spec=unit_spec, quality=quality,
                     cancel=search_cancel, progress=progress,
-                    **unit_kwargs[name]))
+                    **unit_kwargs[name])
+                if unit_share is not None:
+                    unit.diagnostics[:] = [
+                        shared_unit_advice(d, unit_share, len(names))
+                        for d in unit.diagnostics]
+                units[name].append(unit)
             if stream is not None \
                     and not (search_cancel is not None and bool(search_cancel)):
                 # a *completed* system has been through consensus and streams
@@ -1229,7 +1248,8 @@ def index_pattern(peaks: PeakList | None = None, *,
                                  if s not in outcome.systems_searched],
             candidates_not_validated=sum(
                 1 for i in checked if outcome.candidates[i].lebail is None)
-            if validated else 0))
+            if validated else 0,
+            unit_share=unit_share, n_engines=len(names)))
 
     # the gate's ``checked`` is what the enumeration actually covered, not what
     # was scheduled: under a fired token the two differ, and a candidate whose
