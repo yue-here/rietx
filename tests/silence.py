@@ -588,6 +588,49 @@ def _parametric_range_silent() -> list:
     return _parametric_range(0.0) + _parametric_range(-2e-4)
 
 
+def _not_freed(freed: list[str]) -> list:
+    """``VARIABLE_NOT_FREED``'s two builders, after one stage that freed ``freed``.
+
+    The single fit's: ``vars.B`` sets two Biso by a linear tie and a formula, and
+    ``vars.spare`` sets nothing.  The joint fit's: one declaration whose
+    coefficients are ``vars.b_0`` and ``vars.b_1``."""
+    from types import SimpleNamespace
+
+    import rietx as rx
+    from rietx.multi import _parametric_not_freed_diagnostics
+    from rietx.refine import _variable_not_freed_diagnostics
+    from rietx.schemas.parametric import ParametricCoefficient
+    from rietx.schemas.results import StageResult
+    from tests.test_schemas import make_lab6
+
+    ref = rx.Refinement(make_lab6(), rx.Instrument.bragg_brentano(radiation="CuKa"))
+    ref.add_variable("B", 0.5, vary=True)
+    ref.add_variable("spare", 1.0, vary=True)
+    ref.tie("phases.0.atoms.0.biso", "vars.B")
+    ref.tie("phases.0.atoms.1.biso", expression="2 * B")
+    stage = StageResult(name="s", status="converged", n_iterations=1, cost_initial=1.0,
+                        cost_final=1.0, freed=freed)
+    line = SimpleNamespace(name="b", target="phases.0.atoms.0.biso",
+                           equation=SimpleNamespace(basis="polynomial"))
+    rows = [ParametricCoefficient(equation="b", target=line.target, term=term,
+                                  path=f"vars.b_{j}", value=0.4 * (1 - j), esd=None,
+                                  vary=False, unit=None, reference=None)
+            for j, term in enumerate(("1", "T"))]
+    mtable = SimpleNamespace(parametric=[line], expressions=[])
+    return (_variable_not_freed_diagnostics([stage], ref._working_table())
+            + _parametric_not_freed_diagnostics(mtable, rows, [stage]))
+
+
+def _not_freed_fires() -> list:
+    """No stage freed the variable or the coefficients."""
+    return _not_freed([])
+
+
+def _not_freed_silent() -> list:
+    """A stage freed the variable and both coefficients."""
+    return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
+
+
 def _reseed(**escalation) -> list:
     """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
     escalated as ``escalation`` says."""
@@ -1094,6 +1137,9 @@ SILENCE: dict[str, Pair] = {
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
+    "VARIABLE_NOT_FREED": Pair(
+        _not_freed_fires, _not_freed_silent,
+        "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(
