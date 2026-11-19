@@ -1264,6 +1264,10 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     page.wait_for_selector(".rangepop")
     _frames(page)
     failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    # the ends read in the value box's digits, never at full precision (WP-2218)
+    for end in ("Lowest value", "Highest value"):
+        text = page.get_by_label(end, exact=True).input_value()
+        assert len(text) <= 12, f"{end} reads {text!r}"
     page.keyboard.press("Escape")
 
     redraws = page.evaluate(REDRAWS)
@@ -1278,3 +1282,413 @@ def test_a_slider_drag_previews_in_the_rebuilt_window_and_moves_nothing(browser,
     print(f"\n[next] {len(redraws)} preview redraws, drag to redraw "
           f"{min(redraws):.0f}-{max(redraws):.0f} ms")
     assert not failures, "\n".join(failures)
+
+
+#: The rebuilt Peaks and Background graphs' own places (WP-2218): the title
+#: line, the windows, the plot and the block under it.
+NEXT_GRAPHS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", ".overview", "section.graphs figure", "section.graphs canvas",
+    "section.graphs .plot", ".bgctls", ".bgctl > *", ".chips .term",
+    ".actions", ".actions .go > *",
+]
+
+#: How many pixels of each 2D canvas in the graphs column carry paint.
+PAINTED = """() => [...document.querySelectorAll("section.graphs canvas")].map((c) => {
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+  return n;
+})"""
+
+
+def test_the_rebuilt_peaks_and_background_graphs_move_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 59-68. The Peaks graph fills its grid with painted windows
+    of the last fit under an overview of the pattern that shades each window's
+    range, and its Show choice and a window's › repaint them in place. On the Background
+    graph a term chip is a pending hold: the action bar counts it, the title
+    says "Background preview", the head stays where it was, and the band is
+    refetched for it. Neither the chip nor "Band drawn" moves a place, and
+    Revert brings the title back. Every press is a real click. A project of its
+    own, since the call that frees the background terms is written."""
+    httpd, client = _serve(tmp_path_factory, "next-graphs")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+        failures = []
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.wait_for_function("document.querySelector('.gtitle b')?.textContent === 'Last fit'")
+        _frames(page, 4)
+        windows = page.locator("section.graphs figure").count()
+        assert windows >= 1, windows
+        assert page.locator(".overview .band").count() == windows
+        painted = page.evaluate(PAINTED)
+        # the overview's canvas, then one per window
+        assert len(painted) == windows + 1 and min(painted) > 0, painted
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        bands = page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)")
+        step = page.locator('section.graphs button[aria-label="Next peak"]:not([disabled])').first
+        step.click()
+        _frames(page, 4)
+        assert page.locator(".overview .band").evaluate_all("bs => bs.map((b) => b.style.left)") != bands
+        failures += [f"Next peak: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        page.locator('[aria-label="Show"] button', has_text="Peak shape alone").click()
+        _frames(page, 4)
+        assert page.locator('[aria-label="Show"] button[aria-pressed="true"]').text_content() \
+            == "Peak shape alone"
+        failures += [f"Peak shape alone: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert min(page.evaluate(PAINTED)) > 0
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector(".chips .term:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+        page.wait_for_selector('[aria-label="Band drawn"] button:not([disabled])')
+        _frames(page, 4)
+        before = page.evaluate(SNAP, NEXT_GRAPHS)
+        head = client.get("/api/project")[1]["head"]
+        page.get_by_role("button", name="Hold term 1", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b.pv')?.textContent === 'Background preview'")
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        _frames(page, 4)
+        assert page.get_by_role("button", name="Hold term 1", exact=True).get_attribute(
+            "aria-pressed") == "true"
+        # pending, so nothing is written
+        assert client.get("/api/project")[1]["head"] == head
+        failures += [f"hold chip: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        page.locator('[aria-label="Band drawn"] button', has_text="×5").click()
+        _frames(page)
+        failures += [f"Band drawn ×5: {m}" for m in _moved(before, page.evaluate(SNAP, NEXT_GRAPHS))]
+        assert page.evaluate(PAINTED)[0] > 0
+
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Background at the current values'")
+
+        # A preview up while the Pattern graph is built again draws, at the
+        # last fit's view: a graph tab's trip once left it empty.
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_selector("section.graphs .gutter .gut")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        rest = page.evaluate(PAINTED)
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        track = page.locator('section.model .interactive input[type="range"]').first
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Peaks", exact=True).click()
+        page.wait_for_selector("section.graphs figure canvas")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Pattern", exact=True).click()
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        page.wait_for_timeout(500)
+        _frames(page, 4)
+        back = page.evaluate(PAINTED)
+        # the main pane's canvas carries the curves: at least half its paint at rest
+        assert len(back) == len(rest) and back[0] > rest[0] / 2, (rest, back)
+        page.locator(".actions button", has_text="Revert").click()
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _colours(page, selector: str) -> int:
+    """Distinct colours in a screenshot of one element: a WebGL canvas cannot
+    be read back, so the picture is what is measured (browser-driving note)."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    png = page.locator(selector).screenshot()
+    # through numpy, which reads every Pillow; Pillow's own pixel list is
+    # `get_flattened_data` only on a recent release
+    pixels = np.asarray(Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100)))
+    return len(np.unique(pixels.reshape(-1, 3), axis=0))
+
+
+def test_the_rebuilt_structure_graph_draws_a_preview_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 69-82. The Structure graph draws the working model and says
+    so; Look down, the draw mode and a colour-key switch move no place; a drag
+    turns the picture; a click on an atom opens its selection bar; and a
+    Lattice parameter a slider drawn in the Interactive tab redraws it as
+    "Preview, not refined" without writing, until Revert. Every press is real."""
+    httpd, client = _serve(tmp_path_factory, "next-structure")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open_window(browser, url)
+        failures = []
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Structure", exact=True).click()
+        page.wait_for_selector(".structgraph .key .entry")
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        page.wait_for_timeout(300)
+        _frames(page, 4)
+        rest = _colours(page, ".structgraph canvas")
+        assert rest > 20, rest
+        landmarks = NEXT_GRAPHS + [".key", ".key .entry", ".structgraph .view"]
+        before = page.evaluate(SNAP, landmarks)
+        for axis in ("a", "b", "c"):
+            page.locator(".structgraph .gctl button.axis", has_text=axis).click()
+            _frames(page, 2)
+        failures += [f"Look down: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Ellipsoids").click()
+        _frames(page, 3)
+        assert "Ellipsoids at 50 %" in page.locator(".gtitle").inner_text()
+        failures += [f"Ellipsoids: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry = page.locator(".structgraph .key .entry").first
+        entry.click()
+        _frames(page, 2)
+        assert entry.get_attribute("aria-pressed") == "false"
+        failures += [f"key switch: {m}" for m in _moved(before, page.evaluate(SNAP, landmarks))]
+        entry.click()
+        page.locator('[aria-label="Draw atoms as"] button', has_text="Balls").click()
+        _frames(page, 3)
+
+        # a real drag turns the picture
+        shot = page.locator(".structgraph canvas").screenshot()
+        box = page.locator(".structgraph canvas").bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(cx, cy)
+        page.mouse.down()
+        for k in range(1, 11):
+            page.mouse.move(cx + 8 * k, cy + 4 * k)
+            _frames(page, 1)
+        page.mouse.up()
+        _frames(page, 3)
+        assert page.locator(".structgraph canvas").screenshot() != shot
+
+        # a click on an atom selects it: hunt for one by hovering, as a person would
+        hit = None
+        for dx in range(-150, 151, 10):
+            for dy in range(-100, 101, 10):
+                page.mouse.move(cx + dx, cy + dy)
+                text = page.locator(".statusbar .right").inner_text()
+                if "(" in text and "Å" not in text:
+                    hit = (cx + dx, cy + dy)
+                    break
+            if hit:
+                break
+        assert hit, "no atom under any hovered point"
+        page.mouse.click(*hit)
+        page.wait_for_selector(".structgraph .selbar")
+        assert "Show coordination" in page.locator(".structgraph .selbar").inner_text()
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".structgraph .selbar", state="detached")
+
+        # a structural slider value is drawn as a preview, and writes nothing
+        head = client.get("/api/project")[1]["head"]
+        page.locator("section.model .tabs").get_by_role("tab", name="Interactive", exact=True).click()
+        page.wait_for_selector("section.model .interactive .slider")
+        row = page.locator("section.model .slider",
+                           has=page.locator("button.pname", has_text="Lattice parameter a")).first
+        track = row.locator('input[type="range"]')
+        track.scroll_into_view_if_needed()
+        value = int(track.input_value()) / 1000
+        _drag(page, track, value, min(1.0, value + 0.3))
+        page.wait_for_function("document.querySelector('.gtitle b.pv')?.textContent === 'Preview, not refined'")
+        assert client.get("/api/project")[1]["head"] == head
+        page.locator(".actions button", has_text="Revert").click()
+        page.wait_for_function(
+            "document.querySelector('.gtitle b')?.textContent === 'Structure at the current values'")
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _open_instrument(page) -> None:
+    page.get_by_role("button", name="Instrument actions", exact=True).click()
+    page.get_by_role("menuitem", name="Source and geometry…", exact=True).click()
+    page.wait_for_selector('[role="dialog"] [data-field="geometry.axial_sl"]')
+    _frames(page)
+
+
+def test_the_instrument_dialog_applies_what_it_shows_and_moves_nothing(browser, tmp_path_factory):
+    """WP-2218 rows 133-136. The Instrument band's ⋯ opens the Instrument
+    dialog over the window, which moves nothing. S/L typed equal to H/L shows
+    the warning beside the pair. The profile's shape waits under the Peak shape
+    row's Advanced, closed. Apply sends the wavelength and the shape in the
+    model and S/L through the table, then closes. Cancel writes nothing. Loading a
+    profile replaces the instrument at once. A project of its own, since
+    Apply writes."""
+    httpd, client = _serve(tmp_path_factory, "next-instrument")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, saved = client.post("/api/export/instrument_profile", {})
+        assert status == 200, saved
+        page = _open_window(browser, url)
+        page.locator("section.model .tabs button", has_text="Parameters").first.click()
+        page.wait_for_selector("tr[data-atom]")
+        before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+        _open_instrument(page)
+        failures = [f"open: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert page.locator('[role="dialog"] h2').inner_text() == "Instrument"
+
+        dialog = page.locator('[role="dialog"]')
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.02")
+        dialog.locator('[data-field="geometry.axial_hl"]').fill("0.02")
+        _frames(page)
+        assert "S/L = H/L = 0.02" in dialog.locator(".warn").inner_text()
+        dialog.locator('[data-field="geometry.axial_sl"]').fill("0.015")
+        dialog.locator('[data-field="source.lines.0.wavelength"]').fill("0.4140")
+        _frames(page)
+        assert dialog.locator(".warn").count() == 0
+        # the shape under the Peak shape row's Advanced, closed until asked
+        row = dialog.locator(".nrow", has=page.locator(".nl", has_text="Peak shape"))
+        shape = row.locator('[data-field="profile.shape"]')
+        assert not shape.is_visible()
+        row.locator("summary", has_text="Advanced").click()
+        _frames(page)
+        assert shape.input_value() == "tchz_pv"
+        assert shape.locator("option").all_inner_texts() == ["TCHZ pseudo-Voigt", "Voigt"]
+        shape.select_option("voigt")
+        _frames(page)
+        head = client.get("/api/project")[1]["head"]
+        dialog.get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.414
+        assert ins["geometry"]["axial_sl"]["value"] == 0.015
+        assert ins["geometry"]["axial_hl"]["value"] == 0.02
+        assert ins["profile"]["shape"] == "voigt"
+        assert client.get("/api/project")[1]["head"] != head
+
+        # an anode choice, then Cancel: nothing is written
+        head = client.get("/api/project")[1]["head"]
+        _open_instrument(page)
+        dialog.locator("select").first.select_option("MoKa1")
+        _frames(page)
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value().startswith("0.709")
+        dialog.get_by_role("button", name="Cancel", exact=True).click()
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        assert client.get("/api/project")[1]["head"] == head
+
+        # a saved profile replaces the instrument at once, one node
+        _open_instrument(page)
+        dialog.locator('input[type="file"]').set_input_files(saved["path"])
+        page.wait_for_function(
+            "document.querySelector('[role=dialog] .reason')?.textContent.startsWith('Loaded')")
+        ins = client.get("/api/instrument")[1]["instrument"]
+        assert ins["source"]["lines"][0]["wavelength"]["value"] == 0.4139
+        assert dialog.locator('[data-field="source.lines.0.wavelength"]').input_value() == "0.4139"
+        page.keyboard.press("Escape")
+        page.wait_for_selector('[role="dialog"]', state="detached")
+        failures += [f"closed: {m}" for m in _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not failures, "\n".join(failures)
+
+
+def _set_terms(page, n: int) -> None:
+    """Click the Terms slider where it reads ``n``, a real pointer press, and
+    wait for the edit to land: the slider is offered again at ``n``."""
+    track = page.locator('input[aria-label="Terms"]')
+    lo, hi = int(track.get_attribute("min")), int(track.get_attribute("max"))
+    box = track.bounding_box()
+    # the thumb's centre runs from half a thumb in from each end
+    x = box["x"] + 8 + (box["width"] - 16) * (n - lo) / (hi - lo)
+    page.mouse.click(x, box["y"] + box["height"] / 2)
+    page.wait_for_function(
+        f"document.querySelectorAll('.chips .term').length === {n}"
+        " && !document.querySelector('input[aria-label=\"Terms\"]').disabled")
+    _frames(page, 4)
+
+
+def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browser, tmp_path_factory):
+    """WP-2218 review, the two behaviour fixes. Terms grown frees the terms
+    they add. A Terms cut releases the committed hold on a term it removes, so
+    the term comes back free when the Terms grow again, and the Parameters
+    panel drops its pending edit on a removed term, so nothing is left for
+    Apply to refuse. A Type switch releases the Chebyshev's holds and starts
+    every new coefficient free. Every press is a real click. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "next-bg-edits")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c1": True}})
+        assert status == 200, body
+        page = _open_window(browser, url)
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def pending() -> str:
+            note = page.locator(".actions .pending")
+            return note.text_content() if note.count() else ""
+
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+        _set_terms(page, 6)
+        grown = rows()
+        assert sorted(grown) == [f"instrument.background.c{k}" for k in range(6)]
+        assert all(grown[f"instrument.background.c{k}"]["vary"] for k in (3, 4, 5)), grown
+        assert grown["instrument.background.c1"]["held"]
+
+        # hold c5 by its chip and apply it: a committed hold on a term a cut removes
+        page.get_by_role("button", name="Hold term 5", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '1 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent !== '1 pending'")
+        assert rows()["instrument.background.c5"]["held"]
+
+        # pending flags on the free terms, c4 among them, by the Parameters
+        # panel's Background group box (its terms are drawn on the graph)
+        page.locator("section.model .tabs").get_by_role("tab", name="Parameters", exact=True).click()
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '4 pending'")
+
+        _set_terms(page, 4)
+        assert sorted(rows()) == [f"instrument.background.c{k}" for k in range(4)]
+        # the pending flag on c4 went with c4, and Apply sends the other three
+        page.wait_for_function(
+            "document.querySelector('.actions .pending')?.textContent === '3 pending'")
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        cut = rows()
+        assert [cut[f"instrument.background.c{k}"]["vary"] for k in (0, 2, 3)] == [False] * 3, cut
+        # free them again by the same box, for what follows
+        page.locator('section.model input[aria-label="refine the background group"]').click()
+        page.locator(".actions").get_by_role("button", name="Apply", exact=True).click()
+        page.wait_for_function(
+            "(document.querySelector('.actions .pending')?.textContent ?? '') === ''")
+        page.locator("section.graphs .tabs").get_by_role("tab", name="Background", exact=True).click()
+        page.wait_for_selector('input[aria-label="Terms"]:not([disabled])')
+
+        _set_terms(page, 6)
+        back = rows()
+        assert not back["instrument.background.c5"]["held"], back["instrument.background.c5"]
+        assert back["instrument.background.c5"]["vary"] and back["instrument.background.c4"]["vary"]
+        assert back["instrument.background.c1"]["held"]
+
+        page.locator('[aria-label="Type"] button', has_text="P-spline").click()
+        page.wait_for_selector('input[aria-label="Stiffness"]')
+        _frames(page, 4)
+        spline = rows()
+        assert len(spline) > 6
+        assert all(r["vary"] and not r["held"] for r in spline.values()), \
+            [p for p, r in spline.items() if r["held"] or not r["vary"]]
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
