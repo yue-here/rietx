@@ -36,6 +36,7 @@ from rietx.io.exporters import reflection_table
 from rietx.model.forward import WINDOW_AREA_TOL, compile_model, recorded_window_tol
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter as P
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import Atom, Cell, MagneticSymmetry, Moment, Phase
 
 TRUE_M = (2.5, 0.0, 2.5)
@@ -43,13 +44,16 @@ TT = np.arange(8.0, 150.0, 0.04)
 BASE = ["phases.*.scale", "instrument.background.c*"]
 CELL = ["phases.*.cell.*"]
 MOMENT = ["phases.*.atoms.*.moment.dof*"]
-#: scale → cell → cell + moment: the angle moves in stage 2, before the moment
+#: scale → cell → cell + moment: the angle moves in stage 2, before the moment.
+#: Both plans declare the closing stage, not inherit it: off by default since
+#: WP-2222, and these compare the fit with ``predict``, which draws on its windows.
 PLAN_3 = rx.RefinementPlan(stages=[
     rx.Stage("scale", BASE), rx.Stage("cell", BASE + CELL),
-    rx.Stage("moment", BASE + CELL + MOMENT)])
+    rx.Stage("moment", BASE + CELL + MOMENT)], closing_window_tol=CLOSING_WINDOW_TOL)
 #: scale → cell + moment: the angle moves inside the stage that fits the moment
 PLAN_2 = rx.RefinementPlan(stages=[
-    rx.Stage("scale", BASE), rx.Stage("cell+moment", BASE + CELL + MOMENT)])
+    rx.Stage("scale", BASE), rx.Stage("cell+moment", BASE + CELL + MOMENT)],
+    closing_window_tol=CLOSING_WINDOW_TOL)
 
 
 def _atom(label, sp, xyz, biso, moment=None):
