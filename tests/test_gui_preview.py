@@ -112,11 +112,14 @@ def test_at_the_base_values_the_answer_is_frozen_and_the_last_fit(fap):
     assert answer.header["evaluated"] == "frozen"
     ref = np.asarray(fap.refinement.result_.y_calc)
     y = answer.arrays["y_calc"]
-    # the closing compile the result came from, at the values it ended on
-    assert np.max(np.abs(y - ref)) <= 1e-9 * np.max(np.abs(ref))
     _, fresh = _fresh(fap, {})
     assert np.max(np.abs(y - fresh)) <= 1e-9 * np.max(np.abs(fresh))
-    assert answer.header["rwp"] == pytest.approx(fap.refinement.result_.statistics.rwp, rel=1e-9)
+    # The preview draws at compile_model's near-complete tails; a default fit
+    # measured its answer on the declared stages' 2 % windows since WP-2222,
+    # so the two differ by the tails: 0.13 % of the strongest peak on fap
+    # (26 counts on 20 310), the Rwp header in its third digit.
+    assert np.max(np.abs(y - ref)) <= 2e-3 * np.max(np.abs(ref))
+    assert answer.header["rwp"] == pytest.approx(fap.refinement.result_.statistics.rwp, rel=2e-2)
 
 
 @pytest.mark.parametrize("name", ["fap", "nac"])
@@ -224,17 +227,23 @@ def test_the_phases_and_background_sum_to_the_total(nac):
 
 
 def test_the_residuals_are_the_curves_route_s_at_the_last_fit(fap):
-    """At the last fit's values the three residuals are the ones the curves
-    route sends, so the residual pane does not change when a preview starts
-    from there (WP-2128)."""
+    """At the last fit's values the three residuals are the curves route's,
+    over the same σ, up to the tails (WP-2128).  The preview draws at
+    compile_model's near-complete tails and a default fit ended on the
+    declared stages' 2 % windows since WP-2222, so the pane moves by at most
+    0.13 % of the strongest peak when a preview starts from there; Yue
+    accepted that shift on 2026-11-19, and retuning the preview for 2 %
+    windows is WP-2226."""
     answer = preview.evaluate(fap, {"values": {}})
     res = fap.refinement.result_
     raw = np.asarray(res.y_obs) - np.asarray(res.y_calc)
-    delta = raw / np.asarray(res.sig())
-    np.testing.assert_allclose(answer.arrays["delta_raw"], raw, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(answer.arrays["delta"], delta, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(answer.arrays["cumulative_chi2"], np.cumsum(delta**2),
-                               rtol=1e-6)
+    sig = np.asarray(res.sig())
+    tail = 2e-3 * np.max(np.abs(res.y_calc))
+    np.testing.assert_allclose(answer.arrays["delta_raw"], raw, rtol=0, atol=tail)
+    np.testing.assert_allclose(answer.arrays["delta"], answer.arrays["delta_raw"] / sig,
+                               rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(answer.arrays["cumulative_chi2"],
+                               np.cumsum(answer.arrays["delta"] ** 2), rtol=1e-6)
     # and the Rwp in the header is taken over the same σ
     sig = answer.arrays["delta_raw"] / answer.arrays["delta"]
     y = answer.arrays["y_calc"] + answer.arrays["delta_raw"]
@@ -330,6 +339,36 @@ def test_a_preview_while_a_run_is_in_flight_is_a_409(fap, tmp_path):
             session.preview({"values": {"instrument.nope": 1.0}})
         assert excinfo.value.code == "RUN_IN_FLIGHT"
         assert excinfo.value.status == 409
+    finally:
+        session._state = "idle"
+
+
+def test_the_structure_graph_draws_unapplied_values_and_writes_nothing(fap, tmp_path):
+    """``POST /api/structure3d`` draws the cell a slider holds (WP-2218), through
+    the preview's own refusal, and leaves the project as it found it."""
+    session = GuiSession(fap, state_dir=tmp_path)
+    r = fap.refinement
+    before = _digest(fap.path)
+    models = (r.structure.model_dump_json(), r.instrument.model_dump_json())
+    a = preview._base(fap).values["phases.0.cell.a"]
+    now = session.structure3d(0)
+    grown = session.structure3d(0, body={"values": {"phases.0.cell.a": a * 1.01}})
+    # hexagonal: b follows a, so the volume grows by 1.01² and c stays
+    assert grown["volume"] == pytest.approx(now["volume"] * 1.01 ** 2, rel=1e-9)
+    assert grown["lattice"][2] == pytest.approx(now["lattice"][2], rel=1e-12)
+    assert session.structure3d(0, body={"values": {}})["volume"] == pytest.approx(
+        now["volume"], rel=1e-12)
+    with pytest.raises(GuiError, match="unknown parameter path"):
+        session.structure3d(0, body={"values": {"phases.0.nope": 1.0}})
+    assert _digest(fap.path) == before
+    assert (r.structure.model_dump_json(), r.instrument.model_dump_json()) == models
+    session._state = "running"
+    try:
+        with pytest.raises(GuiError) as excinfo:
+            session.structure3d(0, body={"values": {}})
+        assert excinfo.value.status == 409
+        # the drawing of the working state stays open mid-run
+        assert session.structure3d(0)["volume"] == pytest.approx(now["volume"])
     finally:
         session._state = "idle"
 

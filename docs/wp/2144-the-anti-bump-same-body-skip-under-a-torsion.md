@@ -131,6 +131,14 @@ default gets one.
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
+  a commit after the 2026-11-13 entry, and the entry below records it. Nothing else changed,
+  and the status stays ✅.
+
+- **2026-11-17** (reconstructed post hoc) — `e490668d1` recorded Yue's ruling of that day: the
+  `RESTRAINT_BODY_CONTACTS_UNCHECKED` torsion warning is accepted as reader output. It rode
+  PR #1562, which merged on 2026-11-18 as `37bda00b1`. It touched this file only.
+
 ### 2026-11-13 — the warning and the docs land; the bonds direction filed as WP-1816 (PR #1562)
 
 A fit that turns a torsion inside a rigid body now says that the anti-bump checks do not look inside that molecule. Before, a chain could fold to half its stated minimum with no row, no stale report and no message. The docstrings and the theory chapter now say which pairs the skip covers, and that a torsion-moved pair is among them. Yue's direction for the real fix, a body that keeps its declared bonds and anti-bump rows for pairs four or more bonds apart, is filed as WP-1816 and proposed to Mike before anything is built. The intramolecular-exclusion practice behind that ruling is now in `docs/practice.md`.

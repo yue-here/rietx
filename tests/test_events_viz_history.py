@@ -34,7 +34,8 @@ def test_events_written_and_readable(tmp_path, synthetic_pattern):
     assert kinds[0] == "fit_start"
     assert kinds[-1] == "fit_end"
     stages = [e.data["stage"] for e in events if e.kind == "stage_start"]
-    assert stages == ["scale_bkg", "zero", "cell", "profile_w", "profile", "closing"]
+    # no closing stage by default since WP-2222
+    assert stages == ["scale_bkg", "zero", "cell", "profile_w", "profile"]
     # per-iteration heartbeat really came from inside the solver
     evals = [e for e in events if e.kind == "eval"]
     assert len(evals) > 10
@@ -793,12 +794,12 @@ def test_live_session_and_watch_server(tmp_path, synthetic_pattern):
     assert not (live / "fit.html").exists()
     assert (live / "events.jsonl").exists()
     snapshot = json.loads((live / "snapshot.json").read_text(encoding="utf-8"))
-    assert snapshot["stage"] == "closing"        # the last stage a fit runs
+    assert snapshot["stage"] == "profile"        # the last stage a fit runs
     assert len(snapshot["two_theta"]) == snapshot["n_drawn"]
     assert snapshot["ticks"]["phase 0"]["n_total"] > 0
 
     status = json.loads((live / "status.json").read_text(encoding="utf-8"))
-    assert status["stage"] == "closing"
+    assert status["stage"] == "profile"
     assert status["rwp"] < 0.2
     # status.json is written from the snapshot payload, so the two cannot
     # disagree about what the stage achieved
