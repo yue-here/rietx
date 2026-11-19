@@ -74,7 +74,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from ._about import (
     LIVE_DIR_NAME,
@@ -1985,6 +1985,217 @@ def attach(stream, events, *, telemetry=None, project_hint=None,
     recorder._prior_callback = prior
     recorder._chain = _combined
     return recorder
+
+
+# -- a job of many runs, summarised (WP-1464) -------------------------------
+
+#: The order a job's run states are listed in, terminal ones first. Every
+#: answer :func:`liveness_of` can give is here, so no count can land under a
+#: name the text view would not print (``tests/test_runs.py`` holds the two
+#: equal).
+JOB_STATES = ("done", "failed", "cancelled", "running", "abandoned", "unknown")
+
+
+def _span(seconds: float) -> str:
+    """A duration in the units a person reads it in: ``54 s``, ``7 min 18 s``,
+    ``1 h 29 min``."""
+    if seconds < 10:
+        return f"{seconds:.1f} s"
+    total = round(seconds)
+    if total < 60:
+        return f"{total} s"
+    if total < 3600:
+        return f"{total // 60} min {total % 60} s"
+    return f"{total // 3600} h {total % 3600 // 60} min"
+
+
+class JobSummary(Base):
+    """One job's runs, counted and timed: one block of ``rietx runs``.
+
+    A **job** is the runs that carry one ``label=`` (WP-1431), or match the
+    glob ``--label`` was given. A run nobody named carries the working
+    directory's name, the recorder's default, and groups under it. A run with
+    no ``meta.json`` (legacy) has no recorded label and forms the ``None`` block.
+
+    **Every time is one a writer recorded, and a time none recorded is absent,
+    never zero** (WP-1076). A run *starts* at ``meta.json``'s ``created``,
+    which a legacy run has not got. It *ends* at ``status.json``'s
+    ``heartbeat`` once that file names a terminal state and no recording
+    error: :meth:`RunRecorder.close` writes that heartbeat as the run closes.
+    A run still going, an abandoned one, and one whose recorder latched an
+    error have no end. So :attr:`n_timed` can be less than :attr:`n_runs`,
+    and every time below is over the timed runs alone.
+
+    **A run that failed is timed like one that finished** (WP-1464 §9c.5). The
+    screen behind this view printed a ``nan`` median because its failed jobs
+    carried no time, and so never saw its 4559 s job. :attr:`slowest_over_median`
+    is a number for the reader and gates nothing.
+    """
+
+    #: The job's label; under ``--label``, the glob the runs matched. ``None``
+    #: is the runs with no recorded label.
+    label: str | None = None
+    n_runs: int
+    #: :func:`liveness_of`'s answer → how many runs gave it, in
+    #: :data:`JOB_STATES` order, zero counts left out.
+    states: dict[str, int] = Field(default_factory=dict)
+    #: Runs with both a recorded start and a recorded end.
+    n_timed: int = 0
+    #: Earliest start and latest end, Unix seconds, each over the runs that
+    #: recorded one.
+    first_start: float | None = None
+    last_end: float | None = None
+    #: ``last_end - first_start``: the job's wall clock where every run ended,
+    #: a lower bound on it where some did not.
+    wall_seconds: float | None = None
+    #: Median start-to-end of the timed runs, failed ones included.
+    median_seconds: float | None = None
+    #: The longest timed run: its seconds, its state, its own label (which
+    #: names the candidate where ``--label`` gathered a glob) and its
+    #: directory, relative to the root where it lies under it.
+    slowest_seconds: float | None = None
+    slowest_state: str | None = None
+    slowest_label: str | None = None
+    slowest_path: str | None = None
+    #: ``slowest_seconds / median_seconds``. ``None`` under two timed runs,
+    #: where the slowest run is the median's own.
+    slowest_over_median: float | None = None
+
+    def __str__(self) -> str:
+        name = self.label if self.label is not None else "(no label)"
+        noun = "run" if self.n_runs == 1 else "runs"
+        counts = "".join(f", {n} {state}" for state, n in self.states.items())
+        lines = [f"{name}: {self.n_runs} {noun}{counts}"]
+        if self.wall_seconds is not None:
+            untimed = self.n_runs - self.n_timed
+            gap = (f" ({untimed} {'run' if untimed == 1 else 'runs'} "
+                   f"recorded no end)" if untimed else "")
+            lines.append(f"wall {_span(self.wall_seconds)}, first start to "
+                         f"last end{gap}")
+        else:
+            lines.append("wall: no run recorded both a start and an end")
+        if self.slowest_over_median is not None:
+            ratio = self.slowest_over_median
+            shown = f"{ratio:.0f}" if ratio >= 10 else f"{ratio:.1f}"
+            lines.append(f"slowest: {_span(self.slowest_seconds)}, "
+                         f"{self.slowest_state} ({shown}x the median, "
+                         f"{_span(self.median_seconds)})")
+            own = (f"{self.slowest_label}, "
+                   if self.slowest_label not in (None, self.label) else "")
+            lines.append(f"  {own}{self.slowest_path}")
+        return "\n".join(lines)
+
+
+class RunsSummary(Base):
+    """What :func:`job_summary` returns: the jobs under one root."""
+
+    root: str
+    #: One per label, in order of each job's first start; the unlabelled
+    #: block last.
+    jobs: list[JobSummary] = Field(default_factory=list)
+
+    def __str__(self) -> str:
+        if not self.jobs:
+            return f"no runs under {self.root}"
+        return "\n\n".join(str(job) for job in self.jobs)
+
+
+def _run_times(run: Run, state: str) -> tuple[float | None, float | None]:
+    """A run's recorded start and end, each ``None`` where nothing recorded it."""
+    start = (float(run.meta.created)
+             if run.meta is not None and run.meta.created is not None else None)
+    st = run.status
+    end = None
+    if (state in TERMINAL_STATES and st is not None
+            and st.heartbeat is not None and st.error is None):
+        end = float(st.heartbeat)
+    return start, end
+
+
+def _summarise_job(label: str | None, members: list[Run],
+                   root: Path) -> JobSummary:
+    import statistics
+
+    counts = {state: 0 for state in JOB_STATES}
+    starts, ends, timed = [], [], []
+    for run in members:
+        state = liveness_of(run).state
+        counts[state] += 1
+        start, end = _run_times(run, state)
+        if start is not None:
+            starts.append(start)
+        if end is not None:
+            ends.append(end)
+        if start is not None and end is not None:
+            timed.append((end - start, state, run))
+    job = JobSummary(label=label, n_runs=len(members),
+                     states={k: v for k, v in counts.items() if v},
+                     n_timed=len(timed))
+    if starts:
+        job.first_start = min(starts)
+    if ends:
+        job.last_end = max(ends)
+    if starts and ends:
+        job.wall_seconds = max(0.0, job.last_end - job.first_start)
+    if timed:
+        seconds, state, slowest = max(timed, key=lambda row: row[0])
+        path = slowest.path
+        median = statistics.median(row[0] for row in timed)
+        job.median_seconds = median
+        job.slowest_seconds = seconds
+        job.slowest_state = state
+        job.slowest_label = slowest.meta.label if slowest.meta else None
+        try:
+            job.slowest_path = str(path.relative_to(root))
+        except ValueError:
+            job.slowest_path = str(path)
+        if len(timed) >= 2 and median > 0:
+            job.slowest_over_median = seconds / median
+    return job
+
+
+def job_summary(root: str | Path | None = None, *,
+                label: str | None = None) -> RunsSummary:
+    """The runs under ``root`` summarised as jobs: ``rietx runs``' answer.
+
+    A job's count, its runs by state, its wall clock from first start to last
+    end, and its slowest run against the median, failed runs timed too
+    (:class:`JobSummary` says where each time comes from). The question an
+    overnight batch leaves, asked of the run directories it left: a screen of
+    887 runs was once counted by hand, and its 89-minute wall read as 15.
+
+    ``root`` defaults to the working directory, ``rietx watch``'s default, and
+    is walked by :func:`discover` **without its count bound**, which is a web
+    page's poll budget and would cut a job of a thousand runs at 500.
+    ``label`` is an ``fnmatch`` glob, so a screen whose runs are each named
+    after a candidate (``screen-1/zincite``) is one job under
+    ``label="screen-1/*"``. Given, the matched runs are one job. Absent, each
+    label is its own.
+
+    The reader rule holds (module docstring): this opens each run's two
+    sidecars, and a lock file for a run that has not recorded a terminal state.
+    """
+    import fnmatch
+
+    root = Path.cwd() if root is None else Path(root)
+    found = discover(root, max_runs=sys.maxsize)
+    groups: dict[str | None, list[Run]] = {}
+    if label is not None:
+        members = [run for run in found
+                   if run.meta is not None and run.meta.label is not None
+                   and fnmatch.fnmatchcase(run.meta.label, label)]
+        if members:
+            groups[label] = members
+    else:
+        for run in found:
+            key = run.meta.label if run.meta is not None else None
+            groups.setdefault(key, []).append(run)
+    jobs = [_summarise_job(key, members, root)
+            for key, members in groups.items()]
+    jobs.sort(key=lambda job: (job.label is None,
+                               job.first_start if job.first_start is not None
+                               else float("inf")))
+    return RunsSummary(root=str(root), jobs=jobs)
 
 
 def _format_table(runs: list[Run], root: Path) -> str:

@@ -1,18 +1,21 @@
 # The command line
 
-The `rietx` command has seven subcommands: one finds the unit cell of a pattern, one starts the GUI, one installs the agent skill, and four show runs and results the Python API produced.
+The `rietx` command has eight subcommands: one finds the unit cell of a pattern, one starts the GUI, one installs the agent skill, and five show runs and results the Python API produced.
 
 ```console
 $ rietx --help
 usage: rietx <command> [...]
 
 commands:
-  gui [PROJECT.rex] [--scratch] [--port N] [--no-open]
+  gui [PROJECT.rex] [--scratch] [--new] [--port N] [--no-open]
                                     the refinement GUI (localhost)
   watch [dir] [--port N] [--open] [--read-only]
                                     list and watch the runs under a directory
   events <events.jsonl | run dir> [--json]
                                     summarise an event log, run by run
+  runs [dir] [--label NAME] [--json]
+                                    summarise the runs under a directory,
+                                    job by job
   html <result.json> <out.html>     render a saved RefinementResult to HTML
   index <pattern> --wavelength A [...]
                                     determine the unit cell of an unknown
@@ -338,6 +341,41 @@ A fit run with `stage_reports=True` adds `s of it stage reports` to its line, re
 
 A line that is not JSON is counted and skipped.
 The half line a running writer has not finished is left alone, so a running job can be summarised.
+
+## `rietx runs`
+
+`rietx runs` summarises the run directories under a directory, one block per job.
+A job is the runs that share one `label=`.
+It is the question an overnight batch leaves: how many runs ended, how many failed, how long the whole job took, and which run was slowest.
+
+```console
+$ rietx runs --label 'screen-1/*'
+screen-1/*: 26 runs, 26 done
+wall 21 s, first start to last end
+slowest: 17 s, done (9.6x the median, 1.8 s)
+  screen-1/fluorite+corundum, .rietx/runs/20261119-010719-34608
+```
+
+That job is 26 cold fits on five worker processes: six public patterns, each fitted alone and with one extra candidate phase, every cell free.
+Each fit was given `label=f"screen-1/{pattern}+{candidate}"`, with `alone` for the candidate where there was none.
+The slowest run is the fluorite pattern with a corundum candidate it does not contain.
+
+The directory defaults to the working directory, as for `rietx watch`, and every run under it counts, including the `.rietx/runs` a fit records into when no directory was named.
+Without `--label`, each label is its own block, and runs with no recorded label form a last block, `(no label)`.
+`--label` takes a glob (a pattern where `*` matches any text), so runs named after their candidates are one job under their shared prefix.
+A run nobody named carries the name of the directory it ran in.
+`--json` prints the same summary as JSON, and `rietx.runs.job_summary` returns it in Python.
+A directory that does not exist exits 2.
+
+The first line counts the runs by state: `done`, `failed`, `cancelled`, `running`, `abandoned` (the run says it is running and no process holds its lock), and `unknown`.
+Every time is one the run recorded.
+A run starts when its recorder writes `meta.json`, and ends with the last status write of a run that recorded `done`, `failed` or `cancelled`.
+A failed run is timed like one that finished, so the slowest run can be one that raised.
+A run still going and an abandoned run have no end.
+A legacy run, one with no `meta.json`, has neither a start nor a label.
+The wall line then says how many runs recorded no end, and the wall is a lower bound.
+The slowest line needs two timed runs.
+Its ratio to the median is a number to read, and the command flags nothing on it.
 
 ## `rietx html`
 

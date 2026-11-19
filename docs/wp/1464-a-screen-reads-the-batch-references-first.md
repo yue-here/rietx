@@ -152,10 +152,18 @@ stands with or without #385.
       a cell runaway) and "time the failed jobs too", from the `nan` median
       above.
 - [x] Re-sync the committed copies (`rietx skill --install . --copy`).
-- [ ] From Inherited (2026-11-18): decide whether a job's count, failures,
+- [x] From Inherited (2026-11-18): decide whether a job's count, failures,
       wall and slowest run are a second mode of `rietx events` or another
       verb, and name the answer in `batch-operating.md`. A new CLI surface,
       so the name goes to the maintainer.
+      **Decided 2026-11-19 by Yue: (b), a new verb, `rietx runs [root]
+      [--label NAME] [--json]`**, over (a) a second mode of `rietx events`
+      and (c) Python only. A person checks an overnight batch from the
+      shell; the verb names what it points at, `.rietx/runs`, and `runs.py`
+      already uses the word; (a) would branch on what a directory holds.
+      The verb is a thin printer over `runs.job_summary(root, label=None)`,
+      built on `runs.discover` and `runs.read_run`; the ratio to the median
+      is displayed and gates nothing.
 
 ## Acceptance
 

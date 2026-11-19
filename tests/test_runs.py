@@ -753,6 +753,142 @@ def test_module_main_names_a_series_member_by_its_pattern(tmp_path, capsys):
     assert "17.34%" in out
 
 
+
+# ----------------------------------------------------------------------
+# a job of many runs (WP-1464): `rietx runs`
+# ----------------------------------------------------------------------
+def _ended(directory: Path, label: str | None, start: float, end: float,
+           state: str = "done", **status) -> Path:
+    """A run a recorder closed: ``created`` in its meta, the closing
+    heartbeat in its status."""
+    meta = {"record": "run", "created": start}
+    if label is not None:
+        meta["label"] = label
+    return _write_run(directory, events=_event_line("fit_start"), meta=meta,
+                      status={"state": state, "heartbeat": end, **status})
+
+
+def test_job_states_name_every_liveness_answer():
+    """A count under a state the list lacks would be dropped from the text."""
+    import typing
+
+    assert set(runs.JOB_STATES) == set(typing.get_args(runs.LivenessState))
+
+
+def test_a_failed_run_is_timed_and_counted_beside_the_rest(tmp_path):
+    """The screen behind WP-1464 printed a ``nan`` median because its failed
+    jobs carried no time, and so never saw its slowest job, a failure."""
+    for i, seconds in enumerate((50.0, 54.0, 58.0)):
+        _ended(tmp_path / f"r{i}", "screen-1", 1000.0 + i, 1000.0 + i + seconds)
+    _ended(tmp_path / "slow", "screen-1", 1001.0, 1001.0 + 4559.0,
+           state="failed")
+
+    (job,) = runs.job_summary(tmp_path).jobs
+    assert job.label == "screen-1"
+    assert job.n_runs == job.n_timed == 4
+    assert job.states == {"done": 3, "failed": 1}
+    assert job.first_start == 1000.0 and job.last_end == 1001.0 + 4559.0
+    assert job.wall_seconds == pytest.approx(4560.0)
+    assert job.median_seconds == pytest.approx(56.0)       # the failure counts
+    assert job.slowest_seconds == pytest.approx(4559.0)
+    assert job.slowest_state == "failed"
+    assert job.slowest_path == "slow"
+    assert job.slowest_over_median == pytest.approx(4559.0 / 56.0)
+    text = str(job)
+    assert text.splitlines()[0] == "screen-1: 4 runs, 3 done, 1 failed"
+    assert "wall 1 h 16 min, first start to last end" in text
+    assert "slowest: 1 h 15 min, failed (81x the median, 56 s)" in text
+
+
+def test_a_time_nothing_recorded_is_absent_never_zero(tmp_path):
+    """No end without a terminal state, and none from a recorder that latched
+    an error: its last heartbeat says when telemetry stopped, not the fit."""
+    _ended(tmp_path / "ok", "job", 10.0, 70.0)
+    _ended(tmp_path / "latched", "job", 10.0, 20.0, error="writing: OSError")
+    _write_run(tmp_path / "going", events=_event_line("fit_start"),
+               meta={"record": "run", "label": "job", "created": 5.0},
+               status={"state": "running", "heartbeat": 30.0}, lock=True)
+
+    (job,) = runs.job_summary(tmp_path).jobs
+    assert job.n_runs == 3 and job.n_timed == 1
+    assert job.first_start == 5.0 and job.last_end == 70.0
+    assert job.wall_seconds == pytest.approx(65.0)    # a lower bound, said so
+    assert "(2 runs recorded no end)" in str(job)
+    # one timed run is its own median: no ratio and no slowest line
+    assert job.slowest_over_median is None
+    assert "slowest" not in str(job)
+
+
+def test_a_legacy_run_has_no_label_and_no_time(tmp_path):
+    _write_run(tmp_path / "old", events=_event_line("fit_start"))
+    _ended(tmp_path / "new", "named", 1.0, 2.0)
+
+    jobs = runs.job_summary(tmp_path).jobs
+    assert [job.label for job in jobs] == ["named", None]   # unlabelled last
+    old = jobs[1]
+    assert old.n_timed == 0 and old.first_start is None
+    assert old.wall_seconds is None and old.median_seconds is None
+    assert str(old).splitlines() == [
+        "(no label): 1 run, 1 unknown",
+        "wall: no run recorded both a start and an end"]
+
+
+def test_label_is_a_glob_and_its_matches_are_one_job(tmp_path):
+    """A screen names each run after its candidate (9c.32), so the job is a
+    prefix: ``screen-1/*`` gathers it, where a label read exactly could not."""
+    _ended(tmp_path / "a", "screen-1/zincite", 0.0, 10.0)
+    _ended(tmp_path / "b", "screen-1/fluorite", 1.0, 31.0, state="failed")
+    _ended(tmp_path / "c", "calibration", 2.0, 3.0)
+
+    assert len(runs.job_summary(tmp_path).jobs) == 3
+    (job,) = runs.job_summary(tmp_path, label="screen-1/*").jobs
+    assert job.label == "screen-1/*"
+    assert job.n_runs == 2 and job.states == {"done": 1, "failed": 1}
+    # the glob names the job; the slowest run's own label names the candidate
+    assert job.slowest_label == "screen-1/fluorite"
+    assert str(job).splitlines()[-1] == "  screen-1/fluorite, b"
+    (exact,) = runs.job_summary(tmp_path, label="calibration").jobs
+    assert exact.n_runs == 1
+    none = runs.job_summary(tmp_path, label="nothing")
+    assert none.jobs == [] and str(none) == f"no runs under {tmp_path}"
+
+
+def test_a_job_is_not_cut_at_the_watchers_poll_bound(tmp_path):
+    """``discover`` stops at ``MAX_RUNS`` for a web page's poll; a job of
+    887 runs was the case this view exists for."""
+    n = runs.MAX_RUNS + 1
+    for i in range(n):
+        _ended(tmp_path / f"r{i:04d}", "big", float(i), float(i) + 1.0)
+    (job,) = runs.job_summary(tmp_path).jobs
+    assert job.n_runs == job.n_timed == n
+
+
+def test_rietx_runs_prints_and_its_json_round_trips(tmp_path, capsys):
+    from rietx.cli import main
+
+    _ended(tmp_path / "a", "screen-1", 0.0, 10.0)
+    _ended(tmp_path / "b", "screen-1", 1.0, 40.0)
+    assert main(["runs", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("screen-1: 2 runs, 2 done\n")
+    assert main(["runs", str(tmp_path), "--label", "screen-1", "--json"]) == 0
+    raw = capsys.readouterr().out
+    assert (runs.RunsSummary.model_validate_json(raw)
+            == runs.job_summary(tmp_path, label="screen-1"))
+    assert main(["runs", str(tmp_path / "missing")]) == 2
+    assert main(["runs", "--help"]) == 0
+
+
+def test_rietx_runs_defaults_to_the_working_directory(tmp_path, monkeypatch,
+                                                      capsys):
+    """``rietx watch``'s root, and the ``.rietx/runs`` a fit records into."""
+    from rietx.cli import main
+
+    _ended(tmp_path / ".rietx" / "runs" / "r1", "here", 0.0, 5.0)
+    monkeypatch.chdir(tmp_path)
+    assert main(["runs"]) == 0
+    assert capsys.readouterr().out.startswith("here: 1 run, 1 done\n")
+
 # ----------------------------------------------------------------------
 # against a format a writer really produces
 # ----------------------------------------------------------------------

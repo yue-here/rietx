@@ -74,7 +74,10 @@ default) is a factor times the dearest *converged* first rung, never a fixed
 wall (WP-1127); a job several times the median converged job is a flat
 direction or a degeneracy to read in its trajectory, not a fit to wait for.
 Time the jobs that raise as well, in a `finally`, and count them beside the
-ones that returned. One screen of 204 independent cold fits on 10 worker
+ones that returned. For runs the package recorded, `rietx runs --label
+'screen-1/*'` prints that count by state, the wall from first start to last
+end, and the slowest run against the median, failed runs timed too
+(`rietx.runs.job_summary` in Python; 9c.32 names the runs). One screen of 204 independent cold fits on 10 worker
 processes had a median job of 54 s and a slowest of 4559 s, 84× the median,
 and that job was a cell runaway. 43 jobs raised and carried no time, so the
 agent's summary printed a `nan` median, it never saw the 4559 s job, and it
@@ -270,7 +273,8 @@ list, and the reader tells the runs apart by start time alone. `label=` is on
 every verb that records a run (`fit`, `run_stage`, `refine`,
 `refine_sequential`, `Project.fit`) and costs one keyword at the call. Pass the
 candidate, the phase, the specimen: the fact that makes this fit the one you
-will want to reopen. It is telemetry, so it changes no number the fit produces
+will want to reopen. Put the job first, `screen-1/zincite`, so
+`rietx runs --label 'screen-1/*'` gathers the job (9c.5). It is telemetry, so it changes no number the fit produces
 and appears in no result. On a chain `label=` names the job while `labels=`
 names the patterns, and the list shows the pattern. *(Hypothesis: the limit it
 removes is measured, WP-1424 having made the rows tell apart by start second

@@ -2,7 +2,7 @@
 
 Deliberately tiny: the package is API-first, and the CLI exists for the few
 things that are genuinely terminal-shaped — watching a running refinement,
-summarising an event log after the fact, rendering a result file, launching the settings-comparison UI, and asking "what
+summarising an event log or a batch's runs after the fact, rendering a result file, launching the settings-comparison UI, and asking "what
 is the cell of this pattern I just collected?".
 
 ``rietx index`` prints the **candidate list**, never one cell, and carries the
@@ -58,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
               "                                    list and watch the runs under a directory\n"
               "  events <events.jsonl | run dir> [--json]\n"
               "                                    summarise an event log, run by run\n"
+              "  runs [dir] [--label NAME] [--json]\n"
+              "                                    summarise the runs under a directory,\n"
+              "                                    job by job\n"
               "  html <result.json> <out.html>     render a saved RefinementResult to HTML\n"
               "  index <pattern> --wavelength A [...]\n"
               "                                    determine the unit cell of an unknown\n"
@@ -91,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
         return compare_main(rest)
     if command == "events":
         return _events(rest)
+    if command == "runs":
+        return _runs(rest)
     if command == "html":
         if len(rest) != 2:
             print("usage: rietx html <result.json> <out.html>", file=sys.stderr)
@@ -138,6 +143,48 @@ def _events(argv: list[str]) -> int:
     except FileNotFoundError as exc:
         print(f"rietx events: {exc}", file=sys.stderr)
         return 2
+    print(summary.model_dump_json(indent=1) if args.json else summary)
+    return 0
+
+
+def _runs(argv: list[str]) -> int:
+    """``rietx runs`` — the run directories under a root, job by job (WP-1464).
+
+    ``events`` reads one log; this reads the many directories a batch leaves,
+    because a person checks an overnight screen from the shell.  Thin over
+    :func:`rietx.runs.job_summary`; ``--json`` is that function's answer,
+    serialised, as ``events --json`` is.
+    """
+    import argparse
+
+    p = argparse.ArgumentParser(
+        prog="rietx runs",
+        description="Summarise the recorded runs under a directory, one block "
+                    "per label: runs counted by state, the wall clock from "
+                    "first start to last end, and the slowest run against the "
+                    "median, failed runs timed too.")
+    p.add_argument("directory", nargs="?", default=None,
+                   help="directory to scan (default: the working directory, "
+                        "as rietx watch)")
+    p.add_argument("--label", default=None, metavar="NAME",
+                   help="only the runs whose label= matches NAME, a glob "
+                        "('screen-1/*'), summarised as one job")
+    p.add_argument("--json", action="store_true",
+                   help="print the summary as JSON instead of text")
+    try:
+        args = p.parse_args(argv)
+    except SystemExit as exc:
+        return int(exc.code or 0)
+
+    from pathlib import Path
+
+    from .runs import job_summary
+
+    if args.directory is not None and not Path(args.directory).is_dir():
+        print(f"rietx runs: {args.directory} is not a directory",
+              file=sys.stderr)
+        return 2
+    summary = job_summary(args.directory, label=args.label)
     print(summary.model_dump_json(indent=1) if args.json else summary)
     return 0
 
