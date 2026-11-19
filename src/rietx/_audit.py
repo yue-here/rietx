@@ -2179,7 +2179,15 @@ ROWS: tuple[Row, ...] = (
                   " plain esd and a weight fraction at most 0.19 wt %, 3 deg sitting nearer the weighed"
                   " values on two and within 0.05 wt % on six; one real hump, two families, development"
                   " data "
-                  "(docs/wp/2017-batch/group_f_summary.md)"),
+                  "(docs/wp/2017-batch/group_f_summary.md); WP-2017 part B (2026-11-19), the second "
+                  "real hump: 11-BM SRM 660b LaB6 with cubic BN in its Kapton capillary scores 0.048 over"
+                  " the file's range and 0.028 over its protocol's 5.1-50 deg, so the pick takes 8 deg "
+                  "knots; against the measured empty capillary (run 4736) at a refined scale, 8 deg "
+                  "moves the instrument's Lorentzian X and Y 1.62 and 1.82 plain esd and no structural "
+                  "row past 0.56, while 3 deg lands within 0.41 on every row and the weight fractions "
+                  "agree within 0.03 wt %; of 85 in-tree patterns scored, the 11-BM capillary ones but "
+                  "Si read 0.036-0.048 over their files' ranges; two real humps, one instrument "
+                  "(docs/wp/2017-batch/group_f_b2_summary.md)"),
         grounds=("On the default path, since the skill tells every agent to call "
                  "auto_background (B12's ruling); the pick is kept, not an abstention (Yue, "
                  "decision 9, 2026-11-16), and its ground is the real hump: Si SRM 640c in a "
