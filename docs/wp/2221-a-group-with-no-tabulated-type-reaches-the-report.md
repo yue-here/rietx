@@ -1,6 +1,6 @@
 # WP-2221 — A phase whose group has no tabulated type still gets its report and its CIF
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: — (1918 soft: its I-d reads phases of this kind)
 Priority: P2 2026-11-19 — a fit completes and then `report()` raises, so no section of the FitReport can be read; the NiO and MnO rhombohedral magnetic children reach it, a path few fits run
