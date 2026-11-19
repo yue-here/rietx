@@ -70,7 +70,7 @@ Repro 2's seeds 3, 4 and 8 give intervals of non-zero width that contain m = 0; 
 
 ## Handover log
 
-- **2026-11-19** — repair, by the ghostshift close-only batch. The session-start scan flagged
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
   a commit after this file was last touched, and the entry below records it. Nothing else
   changed, the status stays ✅, and nothing on the magnetic path was decided here.
 
