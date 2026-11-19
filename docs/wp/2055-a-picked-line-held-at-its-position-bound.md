@@ -183,6 +183,14 @@ records why holding the declared shape is right and the census stands.
 
 ## Handover log
 
+- **2026-11-19** — repair, by the ghostshift close-only batch (PR #1696). The session-start scan flagged
+  a commit dated after the 2026-11-06 entry, and the entry below records it. Nothing else
+  changed, and the status stays ✅.
+
+- **2026-11-07** (reconstructed post hoc) — `18fd53831` merged main into the branch before
+  PR #1445 merged on 2026-11-07 as `54ed894b9`. Its message says it kept both v1.12 narrative
+  sections, WP-1964's and this WP's. It added no work of this WP's own.
+
 - **2026-11-06** — closed (ghostshift runner, PR #1445). The picker keeps the Kα2 weight and
   apertures it is handed. Refining them per pattern would not give usable lines better
   positions: on 16 round-robin patterns, freeing the bound moves 8 lines towards the known
