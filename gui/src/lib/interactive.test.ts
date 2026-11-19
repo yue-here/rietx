@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildSliders, channelIndex, defaults, editText, fixFormat, formatParts, parseTyped,
+  buildSliders, channelIndex, defaults, fixFormat, formatParts, parseTyped,
   plainText, posFrac, PreviewQueue, rangeText, readNumber, roundRange, STEPS, valueAt,
 } from "./interactive";
+import { editText } from "./numslot";
 
 const CTX = { fwhm: 0.1, thetaMaxDeg: 60 };
 const OPEN: [number, number] = [-Infinity, Infinity];

@@ -20,8 +20,6 @@ import { paramKey, resolve } from "./help";
 import { fnmatch } from "./fnmatch";
 import type { ParamRow } from "./table";
 
-// the slider's value box opens as a Parameters cell does: one editor rule
-export { editText } from "./numslot";
 
 /** How a slider's default range is built (WP-2128 § Context, the prototype's rules). */
 export type Kind = "scale" | "zero" | "disp" | "cell" | "axial" | "gauss" | "lor";

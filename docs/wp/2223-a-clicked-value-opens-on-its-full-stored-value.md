@@ -54,7 +54,7 @@ editor's text is display.
 - [x] `lib/numslot.ts` and `lib/interactive.ts` `editText` give the full stored value;
       `parseTyped` reads through `readNumber`; both Interactive panels and both Params panels
       record no edit for an unchanged text. Vitest for each.
-- [ ] Browser case at `/next`, by real clicks: a ×10ⁿ value opens on its full text, Enter
+- [x] Browser case at `/next`, by real clicks: a ×10ⁿ value opens on its full text, Enter
       records nothing; `1.5×10⁻³` typed into a slider's box is a pending edit at 0.0015.
 - [ ] Dist rebuilt; the manual's GUI chapters checked for a sentence about the editor's text.
 - [ ] Skill: none. The skill drives the python API, not the GUI.
@@ -63,7 +63,7 @@ editor's text is display.
 
 ```sh
 npm --prefix gui test && npm --prefix gui run check
-.venv/bin/python -m pytest tests/test_gui_browser.py -k "full_value" -p no:randomly
+.venv/bin/python -m pytest tests/test_gui_layout_browser.py -k "full_value" -p no:randomly
 ```
 
 ## Handover log

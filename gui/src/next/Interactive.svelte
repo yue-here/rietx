@@ -40,7 +40,6 @@
     PreviewQueue,
     buildSliders,
     defaults,
-    editText,
     fixFormat,
     formatParts,
     maxDecimals,
@@ -55,6 +54,8 @@
     type Slider,
     type Track,
   } from "../lib/interactive";
+  // the box opens as a Parameters cell does: one editor rule (WP-2223)
+  import { editText } from "../lib/numslot";
   import type { InteractiveDraft } from "../lib/recovery";
   import { normalize, type ParamRow } from "../lib/table";
   import { unitText } from "./words";
