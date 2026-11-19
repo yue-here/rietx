@@ -30,6 +30,7 @@ from rietx.params.vector import (
 )
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import EmissionLine, NeutronSource
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from tests.test_schemas import make_lab6
 
 WL = "instrument.source.lines.0.wavelength"
@@ -902,7 +903,8 @@ def test_arm_a_refines_lambda_against_a_held_standard(cu_mixture, shape):
     stages = ([first, Stage("lam", [WL]), Stage("lam_cell", [CEO2_A, WL])]
               if shape == "own_stage" else [first, Stage("lam_cell", [CEO2_A, WL])])
     ref = Refinement(_start(), _ds(1.5406), history=False)
-    result = ref.fit(cu_mixture, plan=RefinementPlan(stages=stages))
+    result = ref.fit(cu_mixture, plan=RefinementPlan(
+        stages=stages, closing_window_tol=CLOSING_WINDOW_TOL))
     rows = {p.path: p for p in result.parameters}
     assert WL in result.stages[-1].freed
     assert abs(_z(rows[WL], LAM_CU)) < 3.0
@@ -930,7 +932,8 @@ def test_a_stage_that_frees_every_cell_says_it_declined_lambda(cu_mixture):
 
     plan = RefinementPlan(stages=[
         Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
-        Stage("cells_lam", ["phases.*.cell.*", WL])])
+        Stage("cells_lam", ["phases.*.cell.*", WL])],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     ref = Refinement(_start(), _ds(1.5406), history=False)
     result = ref.fit(cu_mixture, plan=plan)
     last = result.stages[-1]
@@ -990,7 +993,8 @@ def test_the_clause_names_the_standard_the_caller_held_not_a_support_hold():
     start.phases[1].cell.a.vary = False                # CeO₂, the standard
     plan = RefinementPlan(stages=[
         Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
-        Stage("lam", [WL, "phases.0.cell.*"])])
+        Stage("lam", [WL, "phases.0.cell.*"])],
+        closing_window_tol=CLOSING_WINDOW_TOL)
     result = Refinement(start, _ds(1.5406), history=False).fit(data, plan=plan)
     rows = {p.path: p for p in result.parameters}
     assert WL in result.stages[-1].freed
