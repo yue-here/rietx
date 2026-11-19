@@ -68,6 +68,14 @@ A β of 90.002(3) under `P m m m` is an experimenter quoting a refined number.
 Past `rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG` the symbol and the angle contradict each other, and one of the two is wrong.
 Choosing between them is yours, so the value is left byte for byte and the read raises.
 
+A cell parameter that the space group makes equal to another is set to that other where the two agree within the digits the file prints, and reported as [`CIF_CELL_TIE_CORRECTED`](diagnostics-structures.md#cif_cell_tie_corrected).
+The ties are b and c to a on a cubic cell, b to a on a tetragonal or hexagonal cell, and β and γ to α on rhombohedral axes.
+A file printing `a = 5.641` and `b = 5.64101` under `F m -3 m` states two numbers that could both round one length.
+A move within the tied value's own last printed digit is the file's rounding and is not reported.
+A larger disagreement is left as written, and the parameter table refuses the cell, naming the entry, both values and the symbol.
+The table's tolerance on a tied length is `rietx.crystallography.symmetry.SYMMETRY_LENGTH_RTOL`, which bounds the change in any d-spacing at 10 ppm.
+The GSAS-II, GSAS, TOPAS, FullProf and recipe readers have no printed digits to judge by, so they refuse such a cell when they read it, naming the file.
+
 An anisotropic tensor read with `aniso=True` that misses the form its site symmetry allows only by the file's rounding is moved onto that form, and reported as [`CIF_ADP_SYMMETRY_PROJECTED`](diagnostics-structures.md#cif_adp_symmetry_projected).
 ZnO printed with U11 = 0.0123 and U12 = 0.0062 is U12 = U11/2 rounded to four decimals.
 Each component moves by at most half a unit in its last printed digit, and a component printed as zero, such as `0` or `0.0`, does not move.

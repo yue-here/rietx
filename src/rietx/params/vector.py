@@ -52,6 +52,7 @@ from ..crystallography.stephens import S_NAMES, isotropic_coefficients, strain_b
 from ..crystallography.symmetry import (
     cell_constraints,
     check_cell_angles,
+    check_cell_ties,
     resolve_group,
     rotation_matrices,
     site_orbit,
@@ -1513,6 +1514,8 @@ class ParameterTable:
         constraints = cell_constraints(sg)
         check_cell_angles(sg, {name: getattr(cell, name).value
                                for name in ("alpha", "beta", "gamma")})
+        stored = {name: getattr(cell, name).value for name in _CELL_NAMES}
+        check_cell_ties(sg, stored, prefix=prefix)
         for name in _CELL_NAMES:
             p: Parameter = getattr(cell, name)
             if name in constraints.ties:
