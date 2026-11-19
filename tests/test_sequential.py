@@ -1833,7 +1833,7 @@ _W_PLAN = staged.RefinementPlan(stages=[
     staged.Stage("displ", ["instrument.geometry.sample_displacement"]),
     staged.Stage("cell", ["phases.*.cell.*"]),
     staged.Stage("strain", ["phases.*.lor_strain"]),
-])
+], closing_window_tol=staged.CLOSING_WINDOW_TOL)   # the protocol the ratio was measured under (closing stage on; off by default since WP-2222)
 
 
 def test_issue_1214s_warm_fit_in_a_wrong_basin_is_recorded_at_twice_its_seed():
