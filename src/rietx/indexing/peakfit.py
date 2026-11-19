@@ -362,8 +362,9 @@ class _GroupModel:
         here, and native bounds keep the analytic Jacobian in physical units
         with no chain factor.  Positions are bounded to
         ``PEAK_POSITION_BOUND_FWHM`` of their seed: a fit that wants to move
-        further is reporting a detection failure, so it comes back *at* its
-        bound with a flag rather than converging somewhere unrelated.
+        further is reporting a misplaced seed or profile shape the model lacks,
+        so it comes back *at* its bound with a flag rather than converging
+        somewhere unrelated.
         """
         f_lo, f_hi = PEAK_WIDTH_BOUND_FACTORS
         r = PEAK_POSITION_BOUND_FWHM * self.seed_fwhm

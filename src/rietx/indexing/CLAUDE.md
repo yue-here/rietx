@@ -25,9 +25,9 @@ space groups; there the singleton is not unsupported but unmeasurable. Its absen
 can only speak where its own null model is silent — a σ threshold is counting noise, not
 model error, and a forbidden position inside a neighbour's tail measures the *profile*,
 which refuted certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the
-sham-probe measurement are in `extinction.py`'s docstring, and `n_testable` is `None`
-until `screened` because it needs that class's fit). Its reference fit is gated on the
-picker's envelope (`REFERENCE_NET_RWP_MAX`).
+sham-probe measurement are in `extinction.py`'s docstring; `n_testable` is `None` until the
+class's own fit runs). Its reference fit is gated on the picker's envelope
+(`REFERENCE_NET_RWP_MAX`). **A raised fit is no evidence**: its class stays unscored (WP-2076).
 
 ## The pipeline
 
@@ -359,3 +359,8 @@ roughly the shift (+1400 ppm).
   the default for every run — it moves the pool Borda ranks (LaB6 rank 1 → 3);
   no anchor (one intensity), no fraction. Candidates report
   `n_search_unindexed`/`unindexed_two_theta` under every rule.
+- **Still no agreement → once more on the lines ≥ 5 % of the strongest**
+  (`INDEX_WEAK_LINE_RETRY`, WP-2078; Bergmann 2004's second attempt), the
+  trigger read **after** the inlier retry (before it, it fired on correct
+  mixtures); searched *and scored* as a fresh call, adopted only on agreement.
+  **Never a floor first**: trace-phase and superlattice lines overlap in intensity.

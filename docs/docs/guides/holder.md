@@ -177,6 +177,7 @@ The full script is `examples/guides/holder.py`.
 
 ## See also
 
+- [How to fit a sample holder's lines from its cell](holder_cell.md) places every line of a known holder crystal from one lattice parameter and one height.
 - [How to add a hump to the background](hump.md) declares a broad feature, such as a container's amorphous halo, on the same list.
 - `save_instrument_profile` leaves declared peaks out, holder lines included, so declare the line again on each sample's instrument. [How to calibrate an instrument on a standard and reuse it](calibrate.md) covers the profile.
 - In a series, `carry=["*"]` passes the peak's refined values from each pattern to the next, and its area and centre come back as trajectories. [How to fit a temperature series](series.md) has the details.

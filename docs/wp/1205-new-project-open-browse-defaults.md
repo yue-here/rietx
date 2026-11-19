@@ -150,6 +150,31 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1014 (two-phase uploads, the `instrument_hint` rule), WP-1047 (reader
   options and the scan picker).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The filesystem browser** (WP-1205, `GET /api/fs`, `Browse.svelte`) is the
+empty state's third way to reach a project, beside the recent list and the
+examples: read-only, confined to `Path.home()` and the process's cwd, and not
+behind the 409 like `/api/recent`. **The gate is containment, not a
+blocklist** — `path` is resolved (symlinks included) before it is checked
+against the two roots, the same shape `GuiSession._export_target` already used
+for the exports directory. Browse is **one modal, two jobs**: `mode="open"`
+opens a `.rex` entry, `mode="pick"` hands a plain directory back to the
+wizard's path field, keeping whatever basename was already suggested (a
+browser cannot name a new project, only where it lives). **`Model` is mounted
+exactly once in `App.svelte`**, never one instance per branch of
+`{#if project}`: two instances is two independent `wizardOpen`s, and opening a
+*different* project from the tab-mounted instance's wizard used to leave it
+painted over the freshly-opened one, because `project` stayed truthy the whole
+time and Svelte never tore the stale instance down. And **every opener settles
+`wizardOpen` on success through one function**, `Model.svelte`'s `openPath()`
+— the recent list's own handler never did, which is what let the bug ship.
+
 ## Handover log
 
 - **2026-08-25** — created from the v1.2 triage.

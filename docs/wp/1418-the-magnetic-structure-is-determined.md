@@ -125,6 +125,41 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-19, from the issue triage (PR #1697; issue #1692): on co-sited magnetic atoms the support
+  test reads Σ occ·f·m, not each modulus. Ruled by Mike on #1692 (2026-11-18), a magnetic-path
+  call under #1075.** Decided 2026-11-18 (Mike): at a position shared by co-sited magnetic
+  atoms, the support test reads the combination the powder measures there, Σ occ·f·m, with its
+  esd from the fit's covariance, against the same floor and the same `MOMENT_SUPPORT_SIGMA`
+  (3.0). A class whose combination passes is eligible, as a D8 pair is today through
+  `MomentRow.pair_supported`. Each atom's own modulus is still reported, marked as not
+  separately determined. The bar does not change. The ruling reads the degeneracy the way #1576
+  (Q14 (b), exclusion 4) reads it for the ΔBIC charge. Not ruled, proposed for the implementing
+  PR: f taken at Q → 0, so the tested number is Σ occ·m; the pin is the issue's six MAGNDATA
+  labels (0.206, 0.272, 0.673, 0.679, 0.882, 0.885), published class ineligible → eligible.
+  The measurement (published class best by ΔBIC and still ineligible on all six, best per-site
+  m/σ 0.07-2.57) is the reporter's on 90643335c and was not re-run (MAGNDATA files are not in
+  the tree). Checked against the tree at 7a4a6cd20: `moment_supported`
+  (`report/magnetic.py:460`), `MOMENT_SUPPORT_SIGMA` and `MomentRow.pair_supported`
+  (`strategy/magnetic.py:327`) stand as the issue describes. `moment_supported` is WP-1327's D4
+  null test; the change reaches it too.
+
+- **2026-11-19, from the issue triage (PR #1697; issue #1690): `solve_magnetic` abstains on most k ≠ 0
+  candidates from a centred parent, because #614's guard refuses every class.**
+  `isotropy.magnetic_cell` reduces the primitive basis, and in the reduced cell an operation
+  can mix two axes of unequal length, so `MagneticGroup.allowed_moment_basis` raises
+  (`crystallography/magnetic/operators.py:644`, `_refuse_crystal_axis_action`) and
+  `magnetic_supercell` and `_tilted_seed` never state the class. The guard is right (#614's
+  MnF₂ case). The reporter measured 18 of 31 k ≠ 0 labels of a 122-label MAGNDATA sample
+  abstaining this way on 545b79adb; with the guard disabled as a diagnostic, 13 of the 18 solve
+  to the published group. Proposed: state the child in a cell whose axes the group leaves
+  unmixed (the child-cell route, WP-1918 I-c on the read side), or use the fractional moment
+  action `isotropy` already uses. Pin: the 18 labels, refusal → solved. Checked against the
+  tree at 7a4a6cd20 on synthetic parents (no MAGNDATA): at k = (1, 1, 1), `I 4/m m m` gives 4
+  candidates and `magnetic_supercell` refuses all 4 by this guard; `I m -3 m` gives 6 and it
+  refuses 5. The same guard blocks NiO and MnO on `R -3 m:R` at k = (½ ½ ½) (#757); that
+  route's report-side raise is WP-2221 (#1688). Which route is a magnetic-path design call, so
+  Mike's (#1075).
+
 - **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
   chooses between two site assignments by a χ² gap smaller than its own stop scatter, and
   says nothing.** This is M-9's ranking and abstention, so it sits here. Decisions on it
@@ -168,6 +203,32 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   what the test may assert, since one noise draw on one platform cannot pin the site
   assignment. `SOLVE_MINIMUM_RTOL` is an `_audit` tier-3 row with "no stated source, never
   measured", so that row may move with it.
+
+  *2026-11-12, the Linux nightly went red on the same row* (run 43026125239, `4c48b890d`,
+  `full` job: 1 failed, 15 683 passed, 269 skipped, 51 xfailed). It found m1 = 0.69950, the
+  swap, where the 2026-11-10 run at `5e90f9b41` passed. Two PRs merged in between touch the
+  fit path: #1520 (WP-2208, `Stage.turn_off`) and #1528 (WP-1419 C2, `Phase.parent_cell`).
+  Neither caused it. On an arm64 Mac, `[dev]`, the three class-0 starts give the same χ² to
+  every digit at `5e90f9b41` and at `e0c969887`: 3708.764158295866 (flat),
+  3708.835382150959 (Mn1 only) and 3708.941370498575 (Mn2 only). No numerical package
+  moved between the two nightly environments either: numpy 2.5.4, scipy 1.18.1 and
+  rietx-kernels 1.4.0 both nights, and only five documentation packages changed. The
+  runner image was the same build. So the Linux result moved with something the log does
+  not record. The runner's CPU is the likeliest, as #865 measured for class 2 of this set.
+  A rounding-level nudge reproduces both answers on one Mac. Multiplying the instrument's
+  W by 1 + k·10⁻¹⁴ before the nuclear fit, for k = 0, ±1, ±3, ±7 and 20, the truth won at
+  k = −1 and −7 and the swap at the other six. Across the eight runs the starts stopped
+  between χ² 3708.10 and 3708.99. The lowest stop on each assignment was 3708.101 for the
+  truth and 3708.185 for the swap, so the truth's minimum is deeper by about 0.08. Most
+  starts stop 0.5-0.9 above their own assignment's lowest stop. So the sweep ranks where
+  each start stopped, and the stop scatter is about ten times the gap between the two
+  minima. Probe and log: `~/.cache/ghostshift/rietx/main-nightly-full/perturb.py` and
+  `perturb.log` (maintainer-local).
+  This widens *To decide* by one option. The starts could be made to reach their minima
+  before they are compared, since a converged truth start would win by 0.08 here. Whether
+  that gap is wide enough to pin a site assignment is still the open question. The nightly
+  stays red on this row until the decision is made. Until then a green `full` job on this
+  row is a coin toss, so it says nothing about a PR merged before it.
 
 - **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
 
@@ -958,6 +1019,31 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
+
+The Linux nightly went red on 2026-11-11 on the two-site row of issue #1424. Two PRs merged
+the day before were suspected, and neither caused it: the arithmetic of this solve did not
+move on a Mac, and no numerical package moved on the runner. The row is decided by
+rounding, because the sweep compares where its starts stopped and the stops scatter about
+ten times wider than the gap between the two site assignments. Nothing was fixed, because
+the fix is a design call on the magnetic path. The nightly stays red on this row until it
+is made.
+
+*Done.* The evidence is under `### Inherited`, in the #1424 entry's 2026-11-12 paragraph.
+No checklist item is ticked, and no code changed. A ghostshift runner wrote this entry.
+
+*Measured.* arm64 Mac, `[dev]` venv: `tests/test_pair_diagnostic_class.py` on `e0c969887`,
+1 failed (the row) and 2 passed. `tests/test_docs_consistency.py`, 26 passed.
+`python -m tests.reader_output`, exit 0.
+
+*Next.* The decision goes to Michael on issue #1424, drafted for the maintainer to post:
+"The two-site Pnma row now fails on the Linux nightly too (2026-11-11). Under a 1e-14 nudge
+the truth won 2 of 8 runs. The truth's deepest stop is 0.08 below the swap's, and the starts
+stop up to 0.9 above their own minimum. Should `solve_magnetic` converge each start before
+comparing, report both assignments when it cannot separate them, or both? And what may the
+test assert once it does?" Once ruled, the fix lands in `strategy/magnetic.py`'s `_starts`
+and `_best_start`, with the test rewritten to what the ruling allows.
 
 ### 2026-11-01 (2nd session) — #1197, a candidate names its own handedness
 

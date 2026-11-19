@@ -17,7 +17,9 @@ round-trip, so a self-driving lab can write one and a result can carry it:
   ``design`` matrix, the escape hatch for splines, Scheffé mixture forms and
   sin²ψ), the pattern subset, and the reference point and scale per
   coordinate.  A form with a coefficient inside a power or an exponential is
-  not linear in it and is not expressible here (``Parameter.expr``, WP-1119).
+  not linear in it, and is written as an ``expression`` (WP-1964): text in
+  the grammar of :mod:`rietx.params.expression` over named variables, which
+  ``refine_multi(variables=…)`` declares, and the coordinate columns.
 * :class:`ParametricCoefficient` — one refined coefficient on
   :attr:`RefinementResult.parametric <rietx.schemas.results.RefinementResult.parametric>`,
   in the caller's units at the reference.
@@ -53,8 +55,10 @@ from .common import Base
 #: The closed basis vocabulary.  ``constant`` is one coefficient, the same in
 #: every pattern of the subset (a shared parameter over a subset);
 #: ``polynomial`` is a sum of monomials in named coordinates; ``design`` is a
-#: caller's own matrix, one row per pattern of the subset.
-ParametricBasis = Literal["constant", "polynomial", "design"]
+#: caller's own matrix, one row per pattern of the subset; ``expression`` is
+#: the caller's own text over named variables and coordinates (WP-1964), the
+#: one basis that may be nonlinear in what it refines.
+ParametricBasis = Literal["constant", "polynomial", "design", "expression"]
 
 #: fnmatch's metacharacters: a target names one path, never a family
 _GLOB_CHARS = frozenset("*?[")
@@ -110,17 +114,33 @@ class CoordinateTable(Base):
 
 
 class ParametricEquation(Base):
-    """One target refined as a declared linear function of the coordinates.
+    """One target refined as a declared function of the coordinates.
 
-    Its coefficients are named variables ``vars.{name}_{j}``, j = 0…m−1, one
-    shared column each in the joint fit, and the target in each pattern of the
-    subset is tied onto Σ_j Φ_kj·``vars.{name}_{j}``.  A plan frees them when a
-    stage's glob reaches the target, so ``mccusker_default``'s cell stage frees
-    a parametric cell as it would a plain one.
+    For the three linear bases, its coefficients are named variables
+    ``vars.{name}_{j}``, j = 0…m−1, one shared column each in the joint fit,
+    and the target in each pattern of the subset is tied onto
+    Σ_j Φ_kj·``vars.{name}_{j}``.  A plan frees them when a stage's glob
+    reaches the target, so ``mccusker_default``'s cell stage frees a
+    parametric cell as it would a plain one.
+
+    For ``basis="expression"`` the target in each pattern of the subset is the
+    ``expression`` evaluated at that pattern's coordinates.  Its free names are
+    variables, ``vars.{name}`` for each name the caller declares with
+    ``refine_multi(variables=…)`` (one shared column, however many equations
+    name it), or coordinate columns.  It has no coefficients of its own, and a
+    stage's glob reaching the target frees the variables it names.
+
+    An ``expression`` equation's ``name`` may be used in the expression of a
+    **later** expression equation, so one equation feeds another: a
+    temperature calibration ``T_true = T + c0 + c1*T`` feeding a cell edge
+    ``a0 + k*T_true``.  An expression equation with ``target=None`` is such an
+    **intermediate** alone.  It drives nothing itself and is evaluated wherever
+    a later equation names it, so it takes no ``patterns``.
 
     * ``target`` — one model parameter's bare dot-path, no glob and no
       ``hist.`` scope (the subset says which patterns): ``phases.0.cell.a``,
-      ``instrument.background.c2``.
+      ``instrument.background.c2``.  ``None`` only on an expression equation,
+      which is then an intermediate.
     * ``basis`` — ``constant``; ``polynomial``, with ``terms``: each a list of
       coordinate names, a repeat being a power and ``[]`` the intercept
       (``[[], ["T"]]`` is a + b·T, ``[[], ["x"], ["y"], ["x", "y"]]`` a bilinear
@@ -131,16 +151,20 @@ class ParametricEquation(Base):
     * ``reference``/``scale`` — per coordinate a polynomial uses: terms are
       evaluated on (z − reference)/scale.  Left out, they are the subset's
       mid-range and half-range, computed once at resolution and stored.
+    * ``expression`` — for ``basis="expression"`` alone, and required there:
+      the text, parsed at construction, so a malformed one is refused here
+      (:class:`~rietx.params.expression.ExpressionError`).
     """
 
     name: str
-    target: str
+    target: str | None = None
     basis: ParametricBasis
     terms: list[list[str]] | None = None
     design: list[list[float]] | None = None
     patterns: list[int] | None = None
     reference: dict[str, float] | None = None
     scale: dict[str, float] | None = None
+    expression: str | None = None
 
     @model_validator(mode="after")
     def _check(self) -> "ParametricEquation":
@@ -150,11 +174,22 @@ class ParametricEquation(Base):
                 f"its coefficients are the variables vars.{self.name}_0, …, and a "
                 "glob must be able to name them")
         t = self.target
-        if not t or _GLOB_CHARS & set(t):
+        if t is None:
+            if self.basis != "expression":
+                raise ValueError(
+                    f"a {self.basis} basis needs a target: only an expression "
+                    "equation can be an intermediate (target=None), named by a "
+                    "later expression equation")
+            if self.patterns is not None:
+                raise ValueError(
+                    f"parametric equation {self.name!r} is an intermediate "
+                    "(target=None), so it takes no patterns: it is evaluated at the "
+                    "patterns of each later equation that names it")
+        elif not t or _GLOB_CHARS & set(t):
             raise ValueError(
                 f"target {t!r} must be one bare dot-path, not a glob: one "
                 "declaration ties one parameter")
-        if not t.startswith(("phases.", "instrument.")):
+        elif not t.startswith(("phases.", "instrument.")):
             raise ValueError(
                 f"target {t!r} must be a model parameter, a dot-path under "
                 "'phases.' or 'instrument.'; name the patterns it applies to "
@@ -166,14 +201,27 @@ class ParametricEquation(Base):
                 raise ValueError(f"pattern indices are non-negative: {self.patterns}")
             if len(set(self.patterns)) != len(self.patterns):
                 raise ValueError(f"a pattern appears twice in the subset: {self.patterns}")
+        if self.basis != "expression" and self.expression is not None:
+            raise ValueError(
+                f"a {self.basis} basis takes no expression: an equation written as "
+                "text is basis='expression'")
         if self.basis == "constant":
             self._forbid("constant", "terms", "design", "reference", "scale")
         elif self.basis == "polynomial":
             self._forbid("polynomial", "design")
             self._check_terms()
-        else:
+        elif self.basis == "design":
             self._forbid("design", "terms", "reference", "scale")
             self._check_design()
+        else:
+            self._forbid("expression", "terms", "design", "reference", "scale")
+            if self.expression is None:
+                raise ValueError(
+                    "an expression basis needs expression='…', e.g. "
+                    "'zero_a + grad/(exp(theta/T) - 1)'")
+            from ..params.expression import Expression
+
+            Expression(self.expression)
         return self
 
     def _forbid(self, basis: str, *fields: str) -> None:
@@ -186,7 +234,9 @@ class ParametricEquation(Base):
                    "polynomial": "its rows are built from terms over the "
                                  "coordinate table",
                    "design": "its rows are the caller's own, already in the units "
-                             "the caller wants each coefficient in"}[basis])
+                             "the caller wants each coefficient in",
+                   "expression": "the expression names its own variables and "
+                                 "coordinates"}[basis])
 
     def _check_terms(self) -> None:
         if not self.terms:
@@ -243,7 +293,12 @@ class ParametricEquation(Base):
 
     @property
     def n_coefficients(self) -> int:
-        """m, the number of coefficients this declaration refines."""
+        """m, the number of coefficients this declaration refines.
+
+        0 for an expression, whose freedom is the variables it names.
+        """
+        if self.basis == "expression":
+            return 0
         if self.basis == "constant":
             return 1
         if self.basis == "polynomial":
@@ -251,7 +306,11 @@ class ParametricEquation(Base):
         return len((self.design or [[]])[0])
 
     def coefficient_paths(self) -> list[str]:
-        """``vars.{name}_{j}`` for j = 0…m−1, the coefficients' dot-paths."""
+        """``vars.{name}_{j}`` for j = 0…m−1, the coefficients' dot-paths.
+
+        Empty for an expression: its variables are ``vars.{variable}``, named
+        by the caller rather than by the equation.
+        """
         return [f"vars.{self.name}_{j}" for j in range(self.n_coefficients)]
 
 
@@ -270,6 +329,15 @@ class ParametricCoefficient(Base):
     the solve that produced the answer (``vary`` False).  ``unit`` is the target's unit over the term's coordinate
     units, and ``None`` unless the target's and every such coordinate's unit
     is recorded (a ``design`` coefficient's is the caller's, so never).
+
+    An ``expression`` equation has no terms, so its rows are its variables
+    (WP-1964).  ``term`` is the variable's name and ``path`` its row,
+    ``vars.<name>``.  ``value`` and ``esd`` are the variable's own, in the
+    variable's ``unit``, and ``reference`` is ``None``.  A variable two
+    formulas read is listed under each, once per equation.  A per-pattern
+    variable (one ``SharingMap.per_histogram`` names) has a row per pattern
+    of the subset, ``path`` its ``hist.<h>.vars.<name>`` row.  So this table
+    does not count free parameters; ``RefinementResult.parameters`` does.
 
     ``equation`` was ``tie`` in 1.9.0 (schema 0.55), whose results still open:
     the old key is read as ``equation`` and only ``equation`` is written.
@@ -330,7 +398,9 @@ class ParametricFormTest(Base):
       the test cannot check it there; ``PARAMETRIC_TARGET_UNSEEN`` names the
       patterns that cannot see it.
     * ``tied`` — the reading with every other equation still tied.  ``None`` when
-      the test did not run: a coefficient was not free at the answer.
+      the test did not run: a coefficient was not free at the answer.  An
+      ``expression`` equation is read through its exact gradient in place of
+      Φ, and untested only when none of its variables was free (WP-1964).
     * ``others_freed`` — the reading with every other tested equation's target
       freed too, so its verdict does not assume the other equations' forms: the
       gain with every equation's targets freed less the gain with only the others'
@@ -460,7 +530,9 @@ class RefinedParametricEquation(Base):
                  form: ParametricFormTest | None = None,
                  coordinates: dict[str, float] | None = None,
                  row: list[float] | None = None,
-                 joint: ParametricFormReading | None = None) -> ParametricValue:
+                 joint: ParametricFormReading | None = None,
+                 definitions: list[RefinedParametricEquation] | None = None
+                 ) -> ParametricValue:
         """The target at ``coordinates`` (or a ``design`` equation's ``row``).
 
         Σ_j x_j·c_j and √(x·Σ·xᵀ), with c the coefficients in the caller's
@@ -470,9 +542,21 @@ class RefinedParametricEquation(Base):
         coordinate set or a row that does not match the basis.  ``joint`` is the
         joint reading of every tested equation, read only where ``form`` took
         part in it.
+
+        An ``expression`` equation (WP-1964) is the expression at the
+        coefficients' values and ``coordinates``, with √(g·Σ·gᵀ) for g its
+        exact gradient in the variables.  Its coefficients are the
+        variables' rows of ``RefinementResult.parametric``, in that order,
+        and ``definitions`` the intermediates it names, as
+        ``RefinementResult.parametric_equations`` lists them.  An expression
+        reading a per-pattern variable is refused: it has a value at each
+        pattern, the target's own row there, and none between them.
         """
         equation = self.equation
         paths = [c.path for c in coefficients]
+        if equation.basis == "expression":
+            return self._evaluate_expression(coefficients, coordinates or {},
+                                             row, definitions or [], form, joint)
         if paths != equation.coefficient_paths():
             raise ValueError(f"equation {equation.name!r} takes its coefficients "
                              f"{equation.coefficient_paths()} in that order, got {paths}")
@@ -518,5 +602,67 @@ class RefinedParametricEquation(Base):
             outside=outside, form_rejected=None if form is None else form.rejected,
             provisional_on=[] if form is None else list(form.provisional_on),
             # an equation took part in the joint reading iff it has a freed one
+            joint_rejected=(None if joint is None or form is None
+                            or form.others_freed is None else joint.rejected))
+
+    def _evaluate_expression(self, coefficients: list[ParametricCoefficient],
+                             coordinates: dict[str, float], row,
+                             definitions: list[RefinedParametricEquation],
+                             form: ParametricFormTest | None = None,
+                             joint: ParametricFormReading | None = None
+                             ) -> ParametricValue:
+        """:meth:`evaluate` for an ``expression`` equation; see there."""
+        from ..params.expression import Expression, ExpressionError
+
+        equation = self.equation
+        if row is not None:
+            raise ValueError(f"equation {equation.name!r} is an expression: pass "
+                             "coordinates, never a design row")
+        wrong = [c.path for c in coefficients if c.equation != equation.name]
+        if wrong:
+            raise ValueError(f"equation {equation.name!r} takes its own variables' rows; "
+                             f"{wrong} belong to another equation")
+        local = [c.path for c in coefficients if c.path.startswith("hist.")]
+        if local:
+            raise ValueError(
+                f"equation {equation.name!r} reads a per-pattern variable ({local[0]}), "
+                "which has a value at each pattern and none between them, so the "
+                f"equation is not evaluated anywhere else; its value at pattern h is "
+                f"the result row hist.h.{equation.target}, with its esd")
+        if self.covariance is not None and len(self.covariance) != len(coefficients):
+            raise ValueError(f"equation {equation.name!r} takes {len(self.covariance)} "
+                             f"variables' rows, in result.parametric's order; got "
+                             f"{len(coefficients)}")
+        defs: dict[str, Expression] = {}
+        for d in definitions:
+            if d.equation.basis == "expression":
+                defs[d.equation.name] = Expression(d.equation.expression).inline(defs)
+        tree = Expression(equation.expression).inline(defs)
+        for c, v in coordinates.items():
+            _finite(v, f"coordinate {c!r}")
+        bindings = {c.term: c.value for c in coefficients}
+        clash = sorted(set(bindings) & set(coordinates))
+        if clash:
+            raise ValueError(f"equation {equation.name!r}: {clash} are variables, "
+                             "never coordinates")
+        try:
+            value, grads = tree.gradient({**bindings, **coordinates}, list(bindings))
+        except ExpressionError as exc:
+            raise ValueError(f"equation {equation.name!r} cannot be evaluated at "
+                             f"{coordinates}: {exc}") from exc
+        g = [float(d) for d in grads]
+        esd = None
+        if self.covariance is not None:
+            var = sum(g[i] * g[j] * self.covariance[i][j]
+                      for i in range(len(g)) for j in range(len(g)))
+            esd = math.sqrt(max(var, 0.0))
+        outside = [c for c, (lo, hi) in self.span.items()
+                   if c in coordinates and not lo <= coordinates[c] <= hi]
+        return ParametricValue(
+            equation=equation.name, target=equation.target or "",
+            coordinates=dict(coordinates), row=None, value=float(value), esd=esd,
+            unit=self.unit, outside=outside,
+            form_rejected=None if form is None else form.rejected,
+            provisional_on=[] if form is None else list(form.provisional_on),
             joint_rejected=(None if joint is None or form is None
                             or form.others_freed is None else joint.rejected))

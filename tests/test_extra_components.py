@@ -13,8 +13,9 @@ would notice:
   in ``apply_to_models``, or a refined hump silently reverts at the next stage;
 * the peak paths must stay out of ``bkg_paths``, whose branch of
   ``_make_jacobian`` claims an exact linear column;
-* the whole-model FD column has to be the *declared* fallback, and exact —
-  including on the rows it never writes;
+* the hump's columns are a closed form read off the hump alone (WP-2116),
+  checked against an exact oracle, and a hump tied to anything outside the
+  component keeps the whole-model FD column;
 * and the width bound is the feature's physical content, not a numerical
   guard: a free position/height/width is a Bragg peak with no cell behind it,
   and enough of those improve any Rwp.
@@ -30,13 +31,14 @@ from __future__ import annotations
 import json
 import sys
 import typing
+from pathlib import Path
 
 import numpy as np
 import pytest
 from pydantic import ValidationError
 
 import rietx as rx
-from rietx.background.models import hump_curve
+from rietx.background.models import hump_curve, hump_partials
 from rietx.io.exporters import _background_description
 from rietx.io.instrument_profile import save_instrument_profile
 from rietx.model.components import COMPONENT_AGGREGATE, EXTRA_TICK_KEY
@@ -49,7 +51,7 @@ from rietx.optimize.statistics import (
     background_absorption,
     extra_peak_absorption,
 )
-from rietx.params.vector import ParameterTable, extra_component_parameters
+from rietx.params.vector import AffineTie, ParameterTable, extra_component_parameters
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import (
     COMPONENT_FIELDS,
@@ -74,6 +76,8 @@ from rietx.strategy.staged import (
     check_hump_width,
 )
 from tests.test_schemas import make_lab6
+
+OUT = Path(__file__).parent / "output"
 
 WAVELENGTH = 1.5405929
 PEAK_PATHS = tuple(f"instrument.extra_components.0.{n}"
@@ -288,90 +292,178 @@ def test_peak_paths_never_join_the_linear_background_block():
 
 @pytest.mark.parametrize("path", PEAK_PATHS)
 def test_no_analytic_branch_claims_a_peak_path(path):
-    """The FD fallback is declared, not discovered (WP-1070's failure mode)."""
+    """The scalar chain's exclusion is declared, not discovered (WP-1070).
+
+    A hump path's column is built by its own branch (WP-2116), which the
+    chain must not claim first.
+    """
     _s, _i, _d, _t, model = _state(peaks=(_peak(),))
     assert model.scalar_chain_supported(path) is False
 
 
-def test_the_fd_column_matches_a_hand_written_derivative():
-    """Each peak column against a hand-written derivative, not against another FD.
+def _complex_step(path, values):
+    """∂(hump curve)/∂(path) by complex step, exact to rounding.
 
-    The whole-model FD is the right *fallback* and the wrong *reference*
-    (CLAUDE.md § Invariants), so the oracle here is the analytic derivative of
-    the Gaussian chained through the transform.  ``position`` and ``fwhm`` are
-    nonlinear in their parameter, so their columns carry O(h) truncation error
-    and the bar says so.
-
-    ``height`` is different and its bar is derived rather than declared.  y is
-    **linear** in h, so that column has no truncation error at any step — but
-    that is not the same as being exact.  ``_make_jacobian`` takes a *forward*
-    difference of the whole residual at h = 1e-6·max(1, |θ|), so the two
-    vectors it subtracts agree to ~h·∂r/∂u and the accuracy floor is the
-    **cancellation** term ε·max|r|/h.  This is the invariant's own sentence —
-    "the error growing as the step shrinks is cancellation rather than a
-    defect" — and it is why the bar cannot be zero-with-a-tight-tolerance.
-
-    That distinction is not academic here.  An earlier version of this test
-    called the column exact and asserted a flat ``1e-9 * scale``, which on this
-    fixture is 7.07e-11 against a floor of 7.45e-11 — a bar sitting *on* the
-    floor, so which side of it a platform lands is decided by BLAS summation
-    order.  It passed CI py3.11, py3.13 and py3.14 and failed py3.12 at 1.22×
-    the floor, while this machine measured 0.34×.  The margin below is over the
-    floor, which is the quantity that actually moves.
+    Squire & Trapp (1998), *SIAM Review* 40, 110-112: Im f(x + ih)/h has no
+    subtractive cancellation, so a step of 1e-30 leaves only the rounding of
+    one evaluation.  It differentiates :func:`hump_curve` itself, so it shares
+    no line with the closed form it checks.
     """
+    tt = values["tt"]
+    args = {f: complex(values[f]) for f in HUMP_FIELDS}
+    step = 1e-30
+    args[path] += 1j * step
+    y = hump_curve(tt.astype(complex), args["position"], args["height"],
+                   args["fwhm"], np)
+    return y.imag / step
+
+
+def test_the_hump_partials_meet_a_complex_step_derivative():
+    """The closed form against an exact oracle (root CLAUDE.md § Invariants).
+
+    A forward difference carries O(h) truncation, so it can only certify the
+    FD column it is a copy of.  The complex step is exact to rounding at any
+    point, so the bar is a few ulps of the column's own scale.  Three points:
+    the hump's centre on the grid, a centre off the grid, and a narrow hump
+    whose tails are nearly zero.
+    """
+    tt = np.arange(15.0, 110.0, 0.05)
+    for pos, height, fwhm in ((32.0, 400.0, 7.0), (61.37, 55.0, 23.0),
+                              (88.0, 3.0, HUMP_FWHM_MIN)):
+        values = {"tt": tt, "position": pos, "height": height, "fwhm": fwhm}
+        got = hump_partials(tt, pos, height, fwhm)
+        for field, col in zip(HUMP_FIELDS, got, strict=True):
+            truth = _complex_step(field, values)
+            scale = np.max(np.abs(truth))
+            assert scale > 0.0, field
+            assert np.max(np.abs(col - truth)) <= 1e-14 * scale, (field, pos)
+
+
+def test_a_hump_column_is_the_closed_form_and_costs_no_bragg_evaluation(
+        monkeypatch):
+    """What WP-2116 changed: the three columns, and what building them costs.
+
+    The column is −(1/σ)·∂y/∂p exactly, so it equals the closed form to the
+    bit.  And a Jacobian whose only free parameters are a hump's evaluates
+    the Bragg sum zero times, where the whole-model forward difference paid
+    four full evaluations a Jacobian (issue #1418).
+    """
+    from rietx.model.forward import CompiledModel
+
     _s, _i, _d, table, model = _state(peaks=(_peak(),))
     theta = table.x0()
-    jac = _make_jacobian(model, table)(theta)
     values = table.decode(theta)
+    calls = []
+    real = CompiledModel.bragg_component
+
+    def counted(self, *a, **kw):
+        calls.append(1)
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(CompiledModel, "bragg_component", counted)
+    jac = _make_jacobian(model, table)(theta)
+    assert calls == []
     free = list(table.free_paths)
-    sqrt_w = 1.0 / model.sigma
     n_data = len(model.tt)
-
-    tt = model.tt
-    pos = values[PEAK_PATHS[0]]
-    height = values[PEAK_PATHS[1]]
-    fwhm = values[PEAK_PATHS[2]]
-    u = (tt - pos) / fwhm
-    curve = height * np.exp(-4.0 * np.log(2.0) * u * u)
-
-    expect = {
-        # ∂/∂2θ₀ = +8 ln2 · u/Γ · curve
-        PEAK_PATHS[0]: 8.0 * np.log(2.0) * u / fwhm * curve,
-        PEAK_PATHS[1]: curve / height,
-        # ∂/∂Γ = +8 ln2 · u²/Γ · curve
-        PEAK_PATHS[2]: 8.0 * np.log(2.0) * u * u / fwhm * curve,
-    }
-    # ε·max|r|/h, with h spelled exactly as ``_make_jacobian`` spells it — the
-    # floor is a property of this fixture's residual, so it is measured here
-    # rather than carried as a constant that would rot when the fixture moves.
-    resid = _make_residual(model, table)(theta)[:n_data]
-
-    def cancellation_floor(path):
-        h = 1e-6 * max(1.0, abs(float(theta[free.index(path)])))
-        return np.finfo(np.float64).eps * np.max(np.abs(resid)) / h
-
-    # relative, against the column's own scale, for the two truncation-limited
-    # columns; absolute, against the floor, for the one that has no truncation
-    # term to be limited by.  4× is ~3× clear of the worst reading seen on any
-    # CI platform and still leaves the height column ~2500× tighter than these.
-    rel_bars = {PEAK_PATHS[0]: 2e-5, PEAK_PATHS[2]: 2e-5}
-    for path, dy in expect.items():
-        col = jac[:n_data, free.index(path)]
+    partials = hump_partials(model.tt, *(values[p] for p in PEAK_PATHS))
+    for path, dy in zip(PEAK_PATHS, partials, strict=True):
         # the residual is (y_obs − y_calc)/σ, hence the minus sign
-        truth = -sqrt_w * dy
-        err = np.max(np.abs(col - truth))
-        if path in rel_bars:
-            assert err <= rel_bars[path] * np.max(np.abs(truth)), path
-        else:
-            assert err <= 4.0 * cancellation_floor(path), path
+        assert np.array_equal(jac[:n_data, free.index(path)],
+                              -(1.0 / model.sigma) * dy), path
+
+
+def test_a_hump_column_meets_the_whole_model_fd_to_the_bar_the_step_allows():
+    """The closed form against the column it replaced, at the step it used.
+
+    A forward difference at h misses the derivative by h/2·|∂²y/∂p²| at
+    most, plus a cancellation floor ε·max|r|/h from subtracting two residuals
+    that agree to h·∂r/∂p.  The bar is the sum of the two, measured on this
+    fixture rather than declared, with a margin of 2.  ``height`` is linear,
+    so its truncation term is zero and only the floor remains.
+
+    The reach is widened for one case: two humps whose widths are tied, so
+    the second hump's partial enters the first one's column at 1.5.
+    """
+    from rietx.optimize.least_squares import FD_STEP, _fd_typicals, fd_step
+
+    second = _peak(position=70.0, height=150.0, fwhm=11.0)
+    _s, _i, _d, table, model = _state(peaks=(_peak(), second))
+    w0 = "instrument.extra_components.0.fwhm"
+    w1 = "instrument.extra_components.1.fwhm"
+    table.set_tie(w1, AffineTie(terms=((w0, 1.5),), const=0.5))
+    table.refresh_ties()
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    n_data = len(model.tt)
+    typicals = _fd_typicals(table)
+    eps = np.finfo(np.float64).eps
+    free = list(table.free_paths)
+    assert w1 not in free
+    humps = [c for c, path in enumerate(free)
+             if path.startswith("instrument.extra_components.")]
+    assert len(humps) == 3 + 2      # hump 1's width follows hump 0's
+    for c in humps:
+        path = free[c]
+        h = fd_step(theta[c], typicals[c])
+        tp = theta.copy()
+        tp[c] += h
+        fd = (residual(tp)[:n_data] - r0[:n_data]) / h
+        # the curvature at a step 1000× larger, where rounding is negligible
+        big = 1e3 * FD_STEP * max(typicals[c], abs(theta[c]))
+        tm, tq = theta.copy(), theta.copy()
+        tm[c] -= big
+        tq[c] += big
+        curv = (residual(tq)[:n_data] - 2.0 * r0[:n_data]
+                + residual(tm)[:n_data]) / big**2
+        bar = 2.0 * (0.5 * h * np.max(np.abs(curv))
+                     + eps * np.max(np.abs(r0[:n_data])) / h)
+        err = np.max(np.abs(jac[:n_data, c] - fd))
+        assert err <= bar, (path, err, bar)
+        assert np.max(np.abs(jac[:n_data, c])) > 10.0 * bar, path
+
+
+def test_a_hump_tied_outside_the_component_keeps_the_whole_model_column():
+    """The gate: a column reaching a non-component path is not the closed form.
+
+    The zero shift follows the hump's height here, so the height column moves
+    every Bragg peak too.  The closed form would see only the hump and come
+    back short (WP-1070's failure).  So it must take the whole-model forward
+    difference, which the doubled ``FD_STEP`` reveals by moving the column.
+    """
+    import rietx.optimize.least_squares as ls
+
+    _s, _i, _d, table, model = _state(peaks=(_peak(),))
+    table.set_tie("instrument.zero_shift",
+                  AffineTie(terms=((PEAK_PATHS[1], 1e-4),), const=-0.04))
+    table.refresh_ties()
+    model = compile_model(_s, _i, _d, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    theta = table.x0()
+    free = list(table.free_paths)
+    jac = _make_jacobian(model, table)(theta)
+    original = ls.FD_STEP
+    try:
+        ls.FD_STEP = 2.0 * original
+        doubled = _make_jacobian(model, table)(theta)
+    finally:
+        ls.FD_STEP = original
+    c = free.index(PEAK_PATHS[1])
+    assert not np.array_equal(jac[:, c], doubled[:, c])
+    # and the two untied columns stay the closed form
+    for path in (PEAK_PATHS[0], PEAK_PATHS[2]):
+        k = free.index(path)
+        assert np.array_equal(jac[:, k], doubled[:, k]), path
 
 
 def test_a_peak_column_is_exactly_zero_on_every_row_below_the_data():
     """Why writing only the data rows is *exact* rather than short.
 
     A P-spline background carries penalty rows √λ·D₂·c in the background
-    *coefficients*; a peak parameter moves none of them, so the rows the FD
-    leaves at their zero initialisation are the rows whose true value is zero.
+    *coefficients*; a peak parameter moves none of them, so the rows the
+    hump's branch leaves at their zero initialisation are the rows whose true
+    value is zero.
     """
     _s, _i, _d, table, model = _state(
         peaks=(_peak(),),
@@ -388,6 +480,37 @@ def test_a_peak_column_is_exactly_zero_on_every_row_below_the_data():
     # and the coefficient column beside it is *not* zero there, so the test
     # above is not passing because the block is empty
     assert np.any(jac[n_data:, free.index("instrument.background.c3")])
+
+
+@pytest.mark.parametrize("follower", [PEAK_PATHS[1], "instrument.zero_shift"])
+def test_a_tied_background_column_keeps_its_penalty_rows(follower):
+    """A background coefficient whose tie reaches past the linear block.
+
+    Its column takes the whole-model FD, since no closed form sees the whole
+    reach.  That difference writes the data rows only, and the coefficient
+    also moves its own P-spline penalty rows, which are linear in it.  So the
+    fallback writes those rows exactly, from the penalty matrix.  Left at
+    zero they were short (WP-1070's failure): found in WP-2116's review, for
+    a hump's height and for the zero shift alike, and older than either.
+    """
+    coef = "instrument.background.c3"
+    _s, _i, _d, table, model = _state(
+        peaks=(_peak(vary=False),),
+        background=BackgroundPSpline.for_range(15.0, 110.0, knot_step_deg=8.0),
+        free=(coef,))
+    table.set_vary(["*"], False)
+    assert table.set_vary([coef], True) == [coef]
+    table.set_tie(follower, AffineTie(terms=((coef, 1e-3),), const=0.0
+                                      if follower.endswith("zero_shift") else 400.0))
+    table.refresh_ties()
+    model = compile_model(_s, _i, _d, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    n_data, n_pen = len(model.tt), model.bkg_penalty.shape[0]
+    n = list(model.bkg_paths).index(coef)
+    assert np.any(model.bkg_penalty[:, n])
+    assert np.array_equal(jac[n_data:n_data + n_pen, 0], model.bkg_penalty[:, n])
 
 
 def test_the_residual_sees_the_peak():
@@ -1914,7 +2037,7 @@ def test_both_partition_nets_subtract_the_same_curve():
 
 
 # ----------------------------------------------------------------------
-# the Jacobian: the FD fallback is declared, not discovered
+# the Jacobian: what each branch claims, declared rather than discovered
 # ----------------------------------------------------------------------
 
 
@@ -1959,6 +2082,64 @@ def test_peak_component_paths_never_join_the_linear_background_block():
     peak_paths = {f"instrument.extra_components.0.{n}" for n in PEAK_FIELDS}
     assert set(model.bkg_paths).isdisjoint(peak_paths)
     assert model.component_paths == ()          # it is not a hump either
+
+
+def test_a_peak_component_column_is_differenced_on_the_peak_alone(monkeypatch):
+    """A declared peak's four columns cost no Bragg evaluation (WP-2116).
+
+    They stay forward differences, at the same step, of the peak curve alone.
+    The Bragg sum reads no peak path, so this is the whole-model column with
+    the Bragg term cancelled before it is computed.  The two agree to the
+    cancellation floor ε·max|y|/h of the whole-model difference, which the
+    bar takes with a margin of 4.
+    """
+    from rietx.model.forward import CompiledModel
+    from rietx.optimize.least_squares import _fd_typicals, fd_step
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 3e-4
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa")
+    ins.source.dispersion = None
+    ins.extra_components = [make_peak(
+        center=40.0, area=300.0,
+        fwhm=Parameter(value=0.2, min=EXTRA_PEAK_FWHM_MIN, max=0.5, unit="deg"),
+        eta=Parameter(value=0.4, min=0.0, max=1.0))]
+    tt = np.arange(30.0, 50.0, 0.01)
+    data = PatternData(two_theta=tt.tolist(),
+                       intensity=np.full_like(tt, 50.0).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    paths = [f"instrument.extra_components.0.{n}" for n in PEAK_FIELDS]
+    assert table.set_vary(paths, True) == paths
+    model = compile_model(structure, ins, data, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    theta = table.x0()
+
+    calls = []
+    real = CompiledModel.bragg_component
+
+    def counted(self, *a, **kw):
+        calls.append(1)
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(CompiledModel, "bragg_component", counted)
+    jac = _make_jacobian(model, table)(theta)
+    assert calls == []
+    monkeypatch.undo()
+
+    n_data = len(model.tt)
+    sqrt_w = 1.0 / model.sigma
+    y0 = np.asarray(model.evaluate(table.decode(theta)))
+    typicals = _fd_typicals(table)
+    eps = np.finfo(np.float64).eps
+    for c, path in enumerate(table.free_paths):
+        h = fd_step(theta[c], typicals[c])
+        tp = theta.copy()
+        tp[c] += h
+        whole = -sqrt_w * (np.asarray(model.evaluate(table.decode(tp))) - y0) / h
+        floor = eps * np.max(np.abs(sqrt_w * y0)) / h
+        assert np.max(np.abs(jac[:n_data, c] - whole)) <= 4.0 * floor, path
+        assert np.max(np.abs(jac[:n_data, c])) > 1e3 * floor, path
 
 
 # ----------------------------------------------------------------------
@@ -2038,6 +2219,127 @@ def test_a_declared_peak_the_data_cannot_see_says_so():
     assert rows["area"].value == 0.0 and rows["area"].at_bound is True
     assert rows["area"].stderr is not None and rows["area"].stderr > 0.0
     assert rows["center"].stderr is None          # unmeasured, not precise
+
+
+@pytest.mark.parametrize("area, lo, floored, fires", [
+    (1e-6, 0.0, True, True),      # TRF's stopping point, the floor carried load
+    (1e-6, 0.0, False, False),    # the same number, the bound test declined
+    (0.0, 0.0, False, True),      # stored as zero reads as zero
+    (-2.0, -5.0, False, True),    # off below its identity, not "at" a bound
+    (5.0, 5.0, False, False),     # on a positive bound: BOUND_HIT, counts remain
+])
+def test_no_intensity_is_the_bound_tests_floor_and_not_a_distance(
+        area, lo, floored, fires):
+    """WP-2141: ``EXTRA_PEAK_NO_INTENSITY`` reads ``FLOOR_HIT``.
+
+    The default LM driver lands a floored area on 0.0.  ``solver="trf"``
+    stops strictly inside the box, so a distance window of the function's
+    own could disagree with the finding beside it.  The rule is pinned here
+    directly, on numbers no solver chose.
+    """
+    from rietx.refine import _extra_peak_diagnostics
+
+    peak = make_peak(center=40.0, span=0.4, area=Parameter(
+        value=area, min=lo, vary=True, unit="counts*deg"))
+    _s, _i, _d, table, model = _peak_state(peak)
+    values = table.decode(table.x0())
+    area_path = "instrument.extra_components.0.area"
+    floors = {area_path} if floored else set()
+
+    found = _extra_peak_diagnostics(model, values, {}, table, floors=floors)
+    assert [d.code for d in found] == (
+        ["EXTRA_PEAK_NO_INTENSITY"] if fires else [])
+
+
+def _floor_plan() -> PlanSpec:
+    """Scale and background, then the declared area alone, stopped early.
+
+    The area stage stops at ``ftol=1e-5`` with no closing stage after it.
+    Converged at the default 1e-9, TRF lands the area within 1e-19 of zero,
+    inside the ``BOUND_HIT_RTOL`` distance the pre-WP-2141 code used, so a
+    test at the default could not tell the two rules apart.  Stopped here,
+    TRF leaves the area near 2e-5 counts·deg (macOS arm64): far above that
+    distance, and far below the hundredth of an esd (about 0.008) inside
+    which the bound test names a floor.
+    """
+    return PlanSpec(stages=[
+        StageSpec(name="scale_bkg",
+                  turn_on=["phases.*.scale", "instrument.background.*"]),
+        StageSpec(name="area", ftol=1e-5,
+                  turn_on=["instrument.extra_components.0.area"])],
+        closing_window_tol=None)
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_either_driver_reports_a_declared_peak_on_its_floor(solver):
+    """WP-2141 end to end, single fit and its replay.
+
+    Only the area is freed.  The peak sits on a LaB6 line the phase already
+    fits, so the fit drives the area to its floor of zero.  Where TRF stops
+    above that floor moves with platform libm, so the test pins the decision.
+    The code fires exactly where the area is stored at or below zero or
+    ``FLOOR_HIT`` names it, and a replay of the node reads the recorded
+    finding the same way.  ``_floor_plan`` says why its stage stops early.
+    """
+    from rietx.refine import replay
+
+    structure, ins, data, _strong = _clean_lab6()
+    ins_fit = ins.model_copy(deep=True)
+    ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
+    ref = rx.Refinement(structure.model_copy(deep=True), ins_fit,
+                        solver=solver)
+    result = ref.fit(data, plan=_floor_plan())
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / f"wp2141_peak_floor_{solver}_fit.png")
+    again = replay(ref.history, ref.history.order[-1], data)
+
+    area_path = "instrument.extra_components.0.area"
+    for res in (result, again):
+        area = next(p.value for p in res.parameters if p.path == area_path)
+        floors = {p for d in res.diagnostics if d.code == "FLOOR_HIT"
+                  for p in d.where}
+        fired = any(d.code == "EXTRA_PEAK_NO_INTENSITY"
+                    for d in res.diagnostics)
+        assert fired == (area <= 0.0 or area_path in floors), (solver, area)
+    assert any(d.code == "EXTRA_PEAK_NO_INTENSITY" for d in result.diagnostics)
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_joint_fit_judges_a_declared_peak_after_the_bound_test(solver):
+    """WP-2141: the joint fit runs its bound test before the per-histogram
+    diagnostics, so each histogram's declared peak reads that histogram's
+    ``FLOOR_HIT`` (``multi._hist_floors``).
+
+    The peak sits on a LaB6 line the phase already fits.  On seed 1 the phase
+    takes every count there, so the area goes to its floor.  Seed 2's noise
+    leaves a small excess, which the area fits at a free optimum (0.84
+    counts·deg against an esd near 0.8 on macOS arm64).  So one histogram
+    fires and the other does not, and each answers for itself.
+    ``_floor_plan`` says why its stage stops early.
+    """
+    structure, ins, data_a, _ = _clean_lab6(seed=1)
+    _s, _i, data_b, _ = _clean_lab6(seed=2)
+    ins_fit = ins.model_copy(deep=True)
+    ins_fit.extra_components = [make_peak(center=43.5, span=0.5, area=50.0)]
+    joint = rx.refine_multi(
+        [data_a, data_b], structure.model_copy(deep=True),
+        [ins_fit, ins_fit.model_copy(deep=True)], solver=solver,
+        plan=_floor_plan())
+    OUT.mkdir(exist_ok=True)
+    for h in range(len(joint.histograms)):
+        joint.for_histogram(h).plot(
+            OUT / f"wp2141_peak_floor_{solver}_joint_h{h}.png")
+
+    floors = {p for d in joint.diagnostics if d.code == "FLOOR_HIT"
+              for p in d.where}
+    fired = []
+    for h, hist in enumerate(joint.histograms):
+        scoped = f"hist.{h}.instrument.extra_components.0.area"
+        area = next(p.value for p in joint.parameters if p.path == scoped)
+        fired.append(any(d.code == "EXTRA_PEAK_NO_INTENSITY"
+                         for d in hist.diagnostics))
+        assert fired[h] == (area <= 0.0 or scoped in floors), (solver, h, area)
+    assert fired == [True, False], solver
 
 
 def test_a_declared_peak_on_a_predicted_line_is_named_as_a_degeneracy():

@@ -99,6 +99,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `cr2wo6_hb2a` | `tests/data/gsas2_hb2a_cr2wo6_4K.dat` | characterisation | HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at 4 K, below its ordering temperature, and its 150 K partner gsas2_hb2a_cr2wo6_150K.dat, above it -- the GSAS-II Magnetic-II tutorial pair, vendored verbatim.  No certified moment exists, so every row referenced to it is characterisation: a moment the report supports below T_N and refuses above it |
 | `lamno3_bt1` | `tests/data/gsas2_bt1_lamno3_50K.gsas` | characterisation | NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) LaMnO3 at 50 K, below its ordering temperature, with the tutorial's own structure file -- the GSAS-II Magnetic-I tutorial, vendored verbatim.  k = 0, and two magnetic groups index every line.  The tutorial quotes no moment, so every row referenced to it is characterisation: which group the data prefers, and the shape of the moment it carries |
 | `srm1976a_plate` | `tests/data/srm1976a_corundum_xpert.xy` | cross-code | NIST SRM 1976a sintered corundum plate, lab Cu Ka on a Philips/PANalytical X'Pert with X'Celerator, 2013; a genuinely textured flat specimen, committed with its solved TOPAS refinement (PO_Spherical_Harmonics at order 4).  The certificate certifies relative intensities on another instrument, not this texture, so every row referenced to it is cross-code |
+| `acridine_ix` | `tests/data/cod_2242872.cif` | characterisation | Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data at lambda 0.699789 A deposited with the structure in one CC0 COD file.  A molecular crystal refined as one rigid body and as free atoms; no row asserts against the deposited coordinates, cell or esds, which are another model's answer under another protocol (docs/DESIGN.md Rule 2), so every row referenced to it is about the body machinery, not the structure's accuracy |
 
 `consistency` is a fence, not a label: 11-BM calibrated its wavelength against
 SRM 660a LaB6 itself, so a refined LaB6 cell from that file reproduces the
@@ -287,7 +288,7 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Claims:** the absolute lab cell anchor: a, the Berar-Lelann esd inflation, the held zero shift, the sample displacement and the Ka2 ratio
 
-**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+**Referenced to:** NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -1691,6 +1692,70 @@ The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a corundum 
 
 **Measured:** Rwp 0.3563 against 0.1142; chi2_red 46.09 against 4.74 (ratio 9.7, bar 5); 0.3562, 0.1146, 46.07 and 4.77 before the closing stage
 
+### `tests/test_acceptance_acridine_ix.py`
+
+WP-1806: the rigid body on acridine form IX (COD 2242872, CC0), whose synchrotron pattern is deposited with the structure.  The body is the 14 deposited heavy atoms plus 9 riding H, and only its pose refines, under the authors' profile as read from the paper.  Its bar is a free-atom control in rietx: the same model with the heavy atoms free lands where the body does.  Four more checks: the template round trip; start-independence on the real data; the esd rules (an intra-body distance is absent, an inter-body one is full); and a simulated known answer whose positive arm, a regular-hexagon template, must fail.  The per-atom and cell table against the deposit is written to tests/output/ as a record and asserts nothing.
+
+#### `test_the_deposited_body_reproduces_the_deposited_atoms`
+
+`identity` · dataset `acridine_ix`
+
+**Claims:** a body built from the 14 deposited heavy atoms and placed by its own map puts every atom back where the CIF has it
+
+**Referenced to:** the deposited fractional coordinates; the template is built from them, so the floor is zero by construction
+
+**Measured:** worst fractional difference 5.6e-17 (bar 1e-9)
+
+#### `test_a_perturbed_start_reaches_the_same_minimum`
+
+`own_result` `ceiling` · dataset `acridine_ix` · survives 2 starts
+
+**Claims:** the deposited pose and one turned 10 deg and shifted 0.3 A (atoms up to 0.89 A off) reach one minimum on the real pattern
+
+**Referenced to:** the deposited-start fit of the same pattern under the same protocol
+
+**Measured:** worst heavy-atom Cartesian gap 1.6e-6 A (bar 1e-3 A); Rwp 0.058424 from both, differing by 1.7e-9 (bar 1e-5)
+
+#### `test_the_body_agrees_with_the_free_atom_control`
+
+`own_result` `ceiling` · dataset `acridine_ix`
+
+**Claims:** the same model with the 14 heavy atoms free and unrestrained (H riding on their carriers), refined under the same data, profile, background and plan, lands where the rigid body does: every heavy-atom coordinate and the molecule's mean position along each axis within four esds of the body-control difference
+
+**Referenced to:** the free-atom control fit of the same pattern (Yue's bar, 2026-11-05); the esd of each difference is sqrt(sigma_control^2 - sigma_body^2) for nested fits on one sigma scale (Hausman 1978), and four of them over 45 statistics is a 0.3 % union false-alarm rate under Gaussian errors.  The bar can fail: a regular-hexagon body on the same pattern breaks it at 8.7, 7 of 42 components over 4
+
+**Measured:** worst |delta|/esd 2.29 (C8 along b; bar 4), median 0.62 over 42 components; mean along c 0.97: the body 0.0019 A below the control, the control 0.0027(31) A below the deposit; Rwp 0.05842 body, 0.05780 control
+
+#### `test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd`
+
+`identity` `ceiling` · dataset `acridine_ix`
+
+**Claims:** a distance inside the rigid body is held exactly, so it reports no esd rather than a small one; a contact to another molecule reports a full one
+
+**Referenced to:** the body's construction: an intra-body distance is constant under every free parameter, so its propagated variance cancels below VARIANCE_CANCELLATION_FLOOR and the honest answer is absent (WP-1072)
+
+**Measured:** 212 intra-body rows, all None; 112 inter-body rows, all with an esd; the full esd differs from the diagonal-only one by more than 1 % on 100 of the 112 (ratio 0.81 to 1.13); shortest heavy-atom contact N1...C7 3.4824(36) A, diagonal-only 0.0038
+
+#### `test_a_simulated_known_answer_is_recovered_from_the_perturbed_start`
+
+`own_result` `ceiling` · dataset `acridine_ix`
+
+**Claims:** a pattern simulated from the deposited coordinates at the real fit's profile, with Gaussian noise at the deposit's own sigma, is refitted from the perturbed start and returns the planted coordinates within four of rietx's own esds, every component
+
+**Referenced to:** the planted (deposited) coordinates; four esds over 42 components is a 0.3 % union false-alarm rate under Gaussian errors
+
+**Measured:** worst |delta|/esd 0.64 over 42 components at seed 1806 (bar 4); 0.64 to 2.27 over seeds 1806 and 1 to 7, median 1.5, so the margin is about 1.8x; Rwp 0.0282, GoF 0.995 at seed 1806
+
+#### `test_a_regular_hexagon_template_fails_the_known_answer_bound`
+
+`characterisation` `ceiling` · dataset `acridine_ix`
+
+**Claims:** the positive arm: the same simulated pattern refitted with a regular hexagon template (C-C 1.39, C-N 1.34 A, floor 0.064 A RMS) breaks the bound above, so that bound can fail
+
+**Referenced to:** the known-answer row's own bound on the identical pattern and start
+
+**Measured:** worst |delta|/esd 38.7, 29 of 42 components over 4; Rwp 0.0389 against 0.0282, GoF 1.37
+
 ## The one default this matrix decided
 
 `Source.dispersion` shipped opt-in through v0.6 so that landing it did not
@@ -1741,7 +1806,7 @@ should know about before trusting a number, each with what would close it.
 
 - **No dataset here can constrain a low-angle intensity correction.** The qarr phases first reflect at 25.6/28.3/31.8 deg and SRM 660c at 21.4, so surface roughness (WP-0502) has a negative acceptance result only: two of three phases collapse to the identity and raise ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below ~15 deg with real low-angle reflections.
 
-- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 ppm against a certificate uncertainty of +-8e-6 A.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
+- **The SRM 660c certificate band is not reached and is not claimed.** Measured +24 +- 5 ppm at 20.85 C, against NIST's recompute 4.156780 A, and a certificate uncertainty of +-8e-5 A (k = 2, 19 ppm): outside the band by about one esd.  The residual is a characterised cotTheta/sin2Theta aberration — equatorial divergence, tube tails, monochromator passband — which is the fundamental-parameters territory fenced to v2, not a tuning gap.
 
 - **GoF does not reach 1 on lab data and should not be expected to.** Cline et al. (2015) put the floor for analytical-PSF fits on this instrument class at 1.5-1.9; FPA reaches 1.08.  Measured 1.63 on corundum with Rexp ~ 8.9 %, so Rwp 14.6 % is mostly counting statistics.  A policy demanding GoF -> 1 would be demanding FPA.
 

@@ -92,6 +92,12 @@ run directory unless asked, because an evaluation is not a fit.
 
 ### Inherited
 
+- **2026-11-06, from the issue triage (issue #1381): the `api.md` row "a
+  reflection table without a fit" is now this WP's alone.** WP-1532 dropped
+  it, so the skill task here writes the row new for the documented call
+  rather than changing an existing one. Nothing under `docs/skill/rietx/`
+  teaches the `run_stage` spelling today (checked at `a84379aac`).
+
 - **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: two `lebail_cycles` slips.** A node's `api_call` drops `lebail_cycles` (`schemas/history.py:126-135`), so a stage run with a non-default value renders a call that runs a different stage; this WP's replay already reads `lebail_cycles or 3`. And `rietx.help`'s `lebail_cycles` text, shown on `docs/docs/reference/settings.md`, says Pawley mode ignores it, where `refine.py:3916-3920` uses it to seed the Pawley intensities.
 
 - **2026-10-11, from WP-1938 (PR #883): LM refuses `max_iter=0` now, in

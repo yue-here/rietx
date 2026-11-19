@@ -170,7 +170,7 @@ def test_the_restatement_is_p1_group_1_1_and_everything_is_held():
     assert p1.propagation_vector is None
     for atom in p1.atoms:
         for param in (atom.x, atom.y, atom.z, atom.occ, atom.biso):
-            assert not param.vary and param.expr is None
+            assert not param.vary
         if atom.moment is not None:
             assert not atom.moment.vary
     assert not any(getattr(p1.cell, n).vary

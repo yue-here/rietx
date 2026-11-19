@@ -32,11 +32,14 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy.linalg
+from scipy import sparse
 from scipy.optimize import least_squares
 
 from ..backend import get_backend
 from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64, to_host_fp64
+from ..background.models import hump_partials
 from ..crystallography.adp import U_NAMES
 from ..crystallography.lattice import DegenerateCellError
 from ..crystallography.magnetic.moments import (
@@ -219,12 +222,13 @@ class LSQOutcome:
     #: which driver produced this — "trf" (scipy, the reference) or "lm"
     solver: str = DEFAULT_SOLVER
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
-    #: Stephens strain cone, the Γ_G² floor), each solved over the box and the
+    #: Stephens strain cone, a width floor, a tied entry's own bounds), each
+    #: solved over the box and the
     #: rows together (WP-1938 D8).  0 under TRF, which has no such vocabulary —
     #: see ``optimize/lm.py``.
     n_constraint_truncations: int = 0
     #: the same count by the label of each block the box-only step crossed
-    #: (:attr:`.lm.LMOutcome.truncated_by`); empty under TRF and in a joint fit
+    #: (:attr:`.lm.LMOutcome.truncated_by`); empty under TRF
     truncated_by: dict[str, int] = field(default_factory=dict)
     #: McCusker et al. (1999) §7's convergence quantity, measured over the
     #: final accepted step with both sides in external parameter units — see
@@ -1260,7 +1264,7 @@ def fd_step(theta_c: float, typical: float = 1.0) -> float:
     ``FD_STEP · max(typical, |θ_c|)``: relative to the coordinate's size, and
     absolute at ``typical`` near zero (Dennis & Schnabel 1996, *Numerical
     Methods for Unconstrained Optimization and Nonlinear Equations*, SIAM,
-    § 5.4).  Both FD sites call it, so one rule sizes every column, and
+    § 5.4).  Every FD site calls it, so one rule sizes every column, and
     :func:`_fd_typicals` says what ``typical`` is.
     """
     return FD_STEP * max(typical, abs(theta_c))
@@ -1315,19 +1319,32 @@ def _fd_typicals(table: ParameterTable,
     coef = table.constraint_block()[0].tocsc()
     out = np.ones(len(table.free_paths), dtype=np.float64)
     for c, path in enumerate(table.free_paths):
-        row, unit, k = path, table._units.get(path), 1.0
-        if unit is None and is_variable_path(path) and identities[c][0] != path:
+        row, k = path, 1.0
+        if (table._units.get(path) is None and is_variable_path(path)
+                and identities[c][0] != path):
             row = identities[c][0]
-            unit = table._units.get(row)
             k = abs(float(coef[table._paths[row], c]))
-        size = FLOOR_SEEDS.get(unit)
-        if (size is not None and k > 0.0
-                and (table.entries[table._paths[row]].lo >= 0.0
-                     or unit == "deg^2"
-                     or any(row == w or row.endswith("." + w)
-                            for w in _SIGNED_WIDTHS))):
+        size = _row_typical(table, row)
+        if size is not None and k > 0.0:
             out[c] = size / k
     return out
+
+
+def _row_typical(table: ParameterTable, row: str) -> float | None:
+    """One physical row's width size, or ``None`` where its step is absolute.
+
+    The row test of :func:`_fd_typicals`, whose docstring says which rows are
+    widths and why.  The chained columns (WP-1964) size their step on the
+    rows they move, so they read it here too.
+    """
+    unit = table._units.get(row)
+    size = FLOOR_SEEDS.get(unit)
+    if size is not None and (table.entries[table._paths[row]].lo >= 0.0
+                             or unit == "deg^2"
+                             or any(row == w or row.endswith("." + w)
+                                    for w in _SIGNED_WIDTHS)):
+        return size
+    return None
 
 
 #: Width rows in deg that may go negative, so :func:`_fd_typicals` cannot read
@@ -1368,7 +1385,21 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
     if affected is None:
         affected = ([int(path.split(".")[1])] if path.startswith("phases.")
                     else range(len(model.phases)))
+    return _peak_chain_at(model, bases, values_p, h, path, intensities, affected)
 
+
+def _peak_chain_at(model: CompiledModel, bases: DerivativeBases,
+                   values_p: dict[str, float], h: float, path: str,
+                   intensities: list[np.ndarray] | None,
+                   affected: "list[int] | range") -> np.ndarray:
+    """∂y along one step: the peak scalars at ``values_p`` against the bases.
+
+    The body of :func:`_peak_chain_column`, which perturbs one θ column, and
+    of :func:`_chained_columns`, which perturbs the physical rows a group of
+    columns shares (WP-1964).  ``h`` is the step's length in whatever
+    coordinate the caller moved; ``path`` names the column in the
+    ``profile_derivs=False`` error.
+    """
     parts = []
     for ip in affected:
         # WP-1343: one pass per drawn component.  ``components`` hands back
@@ -1991,6 +2022,150 @@ def _affected_phases(model: CompiledModel, path: str, extra: list[str]):
     return sorted({int(p.split(".")[1]) for p in touched})
 
 
+#: A group's columns are dependent when a singular value of their block of
+#: ∂p/∂θ falls under this fraction of the largest.  Coefficients of one
+#: target are exactly proportional, so theirs sit at rounding (1e-16).
+_CHAIN_RANK_RTOL = 1e-10
+
+
+def _chained_columns(model: CompiledModel, table: ParameterTable,
+                     bases: DerivativeBases, theta: np.ndarray,
+                     values: dict[str, float], cols: list[int],
+                     identities: list[tuple[str, list[str], bool]],
+                     typicals: np.ndarray,
+                     intensities: list[np.ndarray] | None,
+                     sqrt_w: np.ndarray, J: np.ndarray, n_data: int) -> None:
+    """Write the peak-chain columns, a target's column once per group (WP-1964).
+
+    Columns that move the same physical rows are grouped.  A group's block
+    L of ∂p/∂θ (:meth:`ParameterTable.local_jacobian`, exact for an
+    equation's rows) has rank r.  Where r is below the group's size, the
+    columns are J_targets·L, so r directional columns along a basis of L's
+    span serve them all: J_cols = D·X with L = B·X.  Every coefficient of
+    a tie on ``cell.a`` is one direction, so one ``phase_peaks`` call per
+    pattern serves the whole series of coefficients, where each column
+    re-ran it before (1.48-1.52× on the Jacobian loop, WP-1325 § Measured).
+
+    The step then sits on the moved rows, sized by :func:`fd_step` at each
+    row's value and :func:`_row_typical`, the tightest row setting it.  On a
+    coefficient it sat on θ, which a pattern near the reference turns into
+    almost no move of the target.  A group of independent columns, a lone
+    column included, keeps :func:`_peak_chain_column` and so stays
+    bit-identical.  The grouping takes the general form, never a shortcut
+    keyed on a name, since one coefficient may reach several targets.
+    """
+    reach = []
+    for c in cols:
+        path, extra, _ = identities[c]
+        reach.append([q for q in (path, *extra)
+                      if q in table._paths and not is_variable_path(q)])
+    # union-find over shared rows
+    parent = list(range(len(cols)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, rows in enumerate(reach):
+        for q in rows:
+            if q in owner:
+                parent[find(i)] = find(owner[q])
+            else:
+                owner[q] = i
+    groups: dict[int, list[int]] = {}
+    for i in range(len(cols)):
+        groups.setdefault(find(i), []).append(i)
+
+    L = None
+    for members in groups.values():
+        rows = sorted({q for i in members for q in reach[i]})
+        block = None
+        if len(members) > 1 and rows:
+            if L is None:
+                L = table.local_jacobian(np.asarray(theta, dtype=np.float64)).tocsc()
+            idx = [table._paths[q] for q in rows]
+            block = L[idx][:, [cols[i] for i in members]].toarray()
+            sv = lapack.svd(block, compute_uv=False)
+            rank = int(np.sum(sv > _CHAIN_RANK_RTOL * sv[0])) if sv[0] > 0 else 0
+            if rank == 0 or rank >= len(members):
+                block = None
+        if block is None:
+            for i in members:
+                c = cols[i]
+                path, extra, _ = identities[c]
+                J[:n_data, c] = -sqrt_w * _peak_chain_column(
+                    model, table, bases, theta, values, c, path, intensities,
+                    affected=_affected_phases(model, path, extra),
+                    typical=typicals[c])
+            continue
+        _q, _r, piv = scipy.linalg.qr(block, pivoting=True, mode="economic")
+        basis = block[:, piv[:rank]]
+        coeffs = lapack.lstsq(basis, block, rcond=None)[0]
+        affected = _affected_phases(model, rows[0], rows[1:])
+        sizes = np.array([fd_step(values[q], _row_typical(table, q) or 1.0)
+                          for q in rows])
+        D = np.empty((n_data, rank), dtype=np.float64)
+        for j in range(rank):
+            d = basis[:, j]
+            moved = d != 0.0
+            h = float(np.min(sizes[moved] / np.abs(d[moved])))
+            values_p = dict(values)
+            for q, dq in zip(rows, d, strict=True):
+                if dq != 0.0:
+                    values_p[q] = values[q] + h * dq
+            D[:, j] = _peak_chain_at(model, bases, values_p, h,
+                                     identities[cols[members[piv[j]]]][0],
+                                     intensities, affected)
+        J[:n_data, [cols[i] for i in members]] = -sqrt_w[:, None] * (D @ coeffs)
+
+
+def _component_columns(model: CompiledModel, table: ParameterTable,
+                       identities: list[tuple[str, list[str], bool]]
+                       ) -> tuple[list[list[tuple[int, int, int]] | None], set[int]]:
+    """Which columns an extra component's own evaluator can build (WP-2116).
+
+    Two answers per column, both read off the column's whole reach, the free
+    path and every path its ties move:
+
+    * ``hump_reach[c]``: every reached path is a field of some compiled hump.
+      It lists ``(table row, hump index, field index)`` for each, and the
+      column is then the closed form of :func:`hump_partials`.  ``None``
+      otherwise.
+    * ``c in peak_cols``: every reached path is a field of some declared
+      sharp peak, so the column is a forward difference of
+      :meth:`CompiledModel.extra_peak_curve` alone.
+
+    A column reaching anything else keeps the whole-model FD column.  That
+    includes a hump tied to a cell, to the zero shift or to a peak, since no
+    single component's evaluator sees the rest of what such a column moves
+    (root CLAUDE.md, "An analytic Jacobian branch claims what one parameter
+    name reaches").  A third member of ``Instrument.extra_components`` lands
+    in neither set until its own evaluator is written, so it takes the
+    whole-model column too, which is correct and only slow.
+
+    The membership is read from the compiled model, ``component_paths`` for
+    the humps and ``peak_components`` for the peaks, and never from a path's
+    spelling.
+    """
+    hump_index = {p: (k, j) for k, triple in enumerate(model.component_paths)
+                  for j, p in enumerate(triple)}
+    peak_paths = {p for pc in model.peak_components for p in pc.paths.values()}
+    hump_reach: list[list[tuple[int, int, int]] | None] = []
+    peak_cols: set[int] = set()
+    for c, (path, extra, _own) in enumerate(identities):
+        reached = (path, *extra)
+        if all(q in hump_index for q in reached):
+            hump_reach.append([(table._paths[q], *hump_index[q]) for q in reached])
+            continue
+        hump_reach.append(None)
+        if all(q in peak_paths for q in reached):
+            peak_cols.add(c)
+    return hump_reach, peak_cols
+
+
 def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                    moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
@@ -2047,8 +2222,20 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                          for q in (path, *extra)])
                if all(q in bkg_cols for q in (path, *extra)) else None
                for c, (path, extra, _) in enumerate(identities)]
+    # The background coefficients a column moves when it also moves something
+    # else, so the whole-model FD below can write their penalty rows.  Those
+    # rows are linear in the coefficients, so they are written exactly from
+    # the penalty matrix.  The FD writes the data rows alone, and a column
+    # reaching a P-spline coefficient through a tie came back short on its
+    # penalty rows before WP-2116's review found it.
+    bkg_part = [None if bkg_mix[c] is not None or not any(
+                    q in bkg_cols for q in (path, *extra))
+                else np.array([[bkg_cols[q], coef_c[table._paths[q], c]]
+                               for q in (path, *extra) if q in bkg_cols])
+                for c, (path, extra, _) in enumerate(identities)]
 
     typicals = _fd_typicals(table, identities)
+    hump_reach, peak_cols = _component_columns(model, table, identities)
 
     fixed_intens = _lebail_snapshot(model)
     # the origin rows are linear in the coordinates, so their physical
@@ -2066,6 +2253,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
         values = table.decode(theta_t)
         J = np.zeros((n_rows, len(theta)), dtype=np.float64)
         fd_cols = []
+        chain_cols: list[int] = []
+        hump_cols: list[int] = []
+        peak_fd_cols: list[int] = []
         bases: DerivativeBases | None = None
         # the aperture node-FD bases feed only the axial columns, so ask for
         # them only in a stage that will build those columns — two FCJ node
@@ -2103,6 +2293,10 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 J[:n_data, c] = -sqrt_w * (w @ model.bkg_design[n])
                 if n_bkg_pen:
                     J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
+            elif hump_reach[c] is not None:
+                hump_cols.append(c)
+            elif c in peak_cols:
+                peak_fd_cols.append(c)
             elif path in axial_paths and own:
                 b = get_bases()
                 if b.axial_ok:
@@ -2145,24 +2339,68 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
             elif model.scalar_chain_supported(path) and all(
                     model.scalar_chain_supported(p) and p not in bkg_cols
                     and p not in axial_paths for p in extra):
-                J[:n_data, c] = -sqrt_w * _peak_chain_column(
-                    model, table, get_bases(), theta_t, values, c, path, intens,
-                    affected=_affected_phases(model, path, extra),
-                    typical=typicals[c])
+                chain_cols.append(c)
             else:
                 fd_cols.append(c)
 
+        if chain_cols:
+            _chained_columns(model, table, get_bases(), theta_t, values,
+                             chain_cols, identities, typicals, intens,
+                             sqrt_w, J, n_data)
+
+        if hump_cols:
+            # Closed form, from the hump alone (WP-2116).  The column is
+            # Σ_q (∂p_q/∂θ_c)·∂y/∂p_q over the hump rows it reaches, the
+            # coefficient read off the local Jacobian, so a tie between two
+            # humps' widths or a variable driving one is carried exactly.
+            # A hump moves no penalty, Pawley or restraint row, so the rows
+            # below the data stay at their zero initialisation, which is
+            # their true value.
+            # C itself unless a derived row (an expression) sets a hump field,
+            # whose coefficient then moves with θ
+            lj = (coef_c if not table.derived else table.local_jacobian(
+                np.asarray(theta_t, dtype=np.float64)).tocsc())
+            partials: dict[int, tuple[np.ndarray, ...]] = {}
+            for c in hump_cols:
+                col = np.zeros(n_data, dtype=np.float64)
+                for row, k, j in hump_reach[c]:
+                    coef = lj[row, c]
+                    if coef == 0.0:
+                        continue
+                    if k not in partials:
+                        pos, height, fwhm = model.component_paths[k]
+                        partials[k] = hump_partials(
+                            model.tt, values[pos], values[height], values[fwhm])
+                    col += coef * partials[k][j]
+                J[:n_data, c] = -sqrt_w * col
+
+        if peak_fd_cols:
+            # A declared sharp peak's columns, differenced on the peak curve
+            # alone (WP-2116).  The Bragg sum does not read a peak path, so
+            # this is the whole-model forward difference with the Bragg term
+            # cancelled before it is computed: the same step, the same column
+            # to rounding, and no Bragg evaluation.
+            y0 = model.extra_peak_curve(values)
+            for c in peak_fd_cols:
+                h = fd_step(theta_t[c], typicals[c])
+                tp = theta_t.copy()
+                tp[c] += h
+                yp = model.extra_peak_curve(table.decode(tp))
+                J[:n_data, c] = -sqrt_w * ((yp - y0) / h)
+
         if fd_cols:
-            # The declared fallback.  A background-peak parameter lands here by
-            # design, not by omission: ``scalar_chain_supported`` names the
-            # prefix and returns False, so the reach gate knows the path is
-            # outside every analytic branch instead of discovering it (the
-            # column-comes-back-**short** failure mode of WP-1070).  Writing
-            # only ``[:n_data]`` is exact for it — a peak parameter moves no
-            # penalty, Pawley or restraint row at all, so the rows left at their
-            # zero initialisation are the rows whose true value is zero.  Three
-            # parameters per hump means three residual evaluations per Jacobian,
-            # which is why analytic columns for them are not worth writing.
+            # The declared fallback, for every column no branch above claims:
+            # an unrecognised path, a column whose tie reaches past its
+            # branch, an aperture column off its smooth side.  The difference
+            # covers the data rows.  A background coefficient in the reach
+            # adds its penalty rows, exactly, from ``bkg_part``.  The restraint
+            # and origin rows are written below for every column, and no
+            # table column moves a Pawley row.  Each column costs one whole-model
+            # evaluation, every Bragg window included, plus ``r0``.  That cost
+            # is why the extra components left this loop (WP-2116): on
+            # acridine form IX at the closing windows, a free hump's three
+            # columns and ``r0`` were 49 % of the Jacobian and 24 % of the
+            # fit (issue #1418).
             r0 = sqrt_w * (model.y_obs - model.evaluate(values, intens))
             for c in fd_cols:
                 h = fd_step(theta_t[c], typicals[c])
@@ -2170,6 +2408,9 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 tp[c] += h
                 rp = sqrt_w * (model.y_obs - model.evaluate(table.decode(tp), intens))
                 J[:n_data, c] = (rp - r0) / h
+                if n_bkg_pen and bkg_part[c] is not None:
+                    n, w = bkg_part[c][:, 0].astype(np.intp), bkg_part[c][:, 1]
+                    J[n_data:n_data + n_bkg_pen, c] = model.bkg_penalty[:, n] @ w
 
         if model.pawley is not None:
             _pawley_intensity_columns(model, get_bases(), values, sqrt_w, J,
@@ -2577,6 +2818,145 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
             T[:, cols] = block.T
             out.append(lm_mod.LinearInequality(T=T, c=block.c,
                                                label=f"hist.{h} {block.label}"))
+    return out
+
+
+#: how far inside a tied entry's own bound :func:`tied_bound_inequalities`
+#: puts the row's face, relative to the row's scale at the start: ten times
+#: the polished step's feasibility tolerance (``lm._POLISH_FEASIBLE``, 1e-10),
+#: the largest amount by which an accepted step leaves a row.  A held target
+#: then sits 1e-9 of its scale inside the bound rather than on it.
+TIED_BOUND_MARGIN = 1e-9
+
+
+def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
+                            lo: np.ndarray, hi: np.ndarray
+                            ) -> list["lm_mod.LinearInequality"]:
+    """Each tied entry's own bounds, as rows held inside the step (WP-1325).
+
+    A tied entry is not a column, so the box never holds it: its value is its
+    row of **C** times θ plus d, a combination of columns.  The root rule for a
+    bound on a combination is an LM row, and this builds one per finite side:
+
+        C_i·θ + d_i − lo_i ≥ 0        hi_i − C_i·θ − d_i ≥ 0
+
+    for every entry that is neither a free column nor a derived row (an
+    expression is not affine, and is written after the matmul), whose C row
+    reaches a free column.  Two cases need it.  A parametric equation's target
+    in each pattern is Σ_j Φ_kj·c_j over unbounded coefficients, so a
+    polynomial could step it through its floor mid-solve.  A user's tie with
+    several sources gets only :func:`~rietx.params.vector.tie_window`'s outer
+    box, which admits an infeasible corner: occ_C = 1 − occ_A − occ_B passes
+    the box at occ_A = occ_B = 0.7.
+
+    **A row the box already implies is dropped**, read by interval arithmetic
+    over ``lo``/``hi`` (the solver's box, tie windows included).  A one-source
+    tie's window is exact, and so is a ``constant`` equation's coefficient,
+    which carries the target's box, so neither adds a row and a fit that only
+    has those runs exactly as before.  A row the start violates is dropped too,
+    the other builders' rule: the step keeps feasibility and cannot restore it.
+    One block per entry, labelled ``"<path> bounds"``.
+
+    **Each face sits a margin inside the bound** (:data:`TIED_BOUND_MARGIN`
+    of the row's own scale at the start, ``|T|·|θ₀| + |c|``), because the
+    write-back after the solve (``ParameterTable.apply_to_models``) checks the
+    schema's bounds exactly and refuses a value an ulp outside.  The driver
+    accepts a step that crosses a row by its rounding (``lm._ROW_ROUNDING``)
+    and keeps a polished step that holds the rows to ``lm._POLISH_FEASIBLE``
+    of their scale, so a face on the bound itself could hand the write-back
+    a value just past it.  A start inside the margin keeps the face on the
+    bound, since a margin there would read the start as violating the row.
+    """
+    from . import lm as lm_mod
+
+    if not table.free_paths:
+        return []
+    C, d = table.constraint_block()
+    C = sparse.csr_matrix(C)
+    free = set(table._free_idx)
+    derived = table.derived_paths()
+    lo = np.asarray(lo, dtype=np.float64)
+    hi = np.asarray(hi, dtype=np.float64)
+    out: list[lm_mod.LinearInequality] = []
+    for i, e in enumerate(table.entries):
+        if i in free or e.path in derived:
+            continue
+        if not (math.isfinite(e.lo) or math.isfinite(e.hi)):
+            continue
+        if not np.any(C.data[C.indptr[i]:C.indptr[i + 1]] != 0.0):
+            continue
+        t = C.getrow(i).toarray().ravel()
+        nz = t != 0.0
+        # the entry's lowest and highest value anywhere in the box
+        low = float(d[i] + np.sum(np.where(t[nz] > 0, t[nz] * lo[nz], t[nz] * hi[nz])))
+        high = float(d[i] + np.sum(np.where(t[nz] > 0, t[nz] * hi[nz], t[nz] * lo[nz])))
+        T_rows, c_rows = [], []
+        for bound, sign, reach in ((e.lo, 1.0, low), (e.hi, -1.0, high)):
+            if not math.isfinite(bound):
+                continue
+            tol = lm_mod._ON_FACE * max(1.0, abs(bound))
+            if sign * (reach - bound) >= -tol:       # the box already holds it
+                continue
+            c_row = sign * (float(d[i]) - bound)
+            margin = TIED_BOUND_MARGIN * float(np.abs(t) @ np.abs(x0) + abs(c_row))
+            if sign * float(t @ x0) + c_row >= margin:      # the start's slack
+                c_row -= margin
+            T_rows.append(sign * t)
+            c_rows.append(c_row)
+        if not T_rows:
+            continue
+        block = lm_mod.LinearInequality(T=np.vstack(T_rows),
+                                        c=np.asarray(c_rows, dtype=np.float64))
+        keep = ~block.violated(x0)
+        if keep.any():
+            out.append(lm_mod.LinearInequality(
+                T=np.ascontiguousarray(block.T[keep]), c=block.c[keep],
+                label=f"{e.path} bounds"))
+    return out
+
+
+def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
+                                   hi: np.ndarray) -> list["lm_mod.LinearInequality"]:
+    """:func:`tied_bound_inequalities` asked of each histogram, laid on the
+    joint columns (``mtable.col_map``), as :func:`_joint_width_inequalities`
+    lays the width rows.
+
+    A linear parametric equation's target rows, one per subset pattern, are
+    gathered into one block per equation, labelled by the equation, so a
+    library of hundreds of patterns names one constraint rather than hundreds.
+    Any other tied entry keeps its own block, prefixed ``hist.{h}``, once: a
+    shared tied entry gives every histogram the same rows on the same joint
+    columns, and only the first histogram's block is kept.
+    """
+    from . import lm as lm_mod
+
+    n = len(x0)
+    owner = {(h, r.target): r.name for r in mtable.parametric for h in r.patterns}
+    by_equation: dict[str, list[lm_mod.LinearInequality]] = {}
+    out: list[lm_mod.LinearInequality] = []
+    seen: set[tuple[str, bytes, bytes]] = set()
+    for h, (table, local) in enumerate(zip(mtable.tables, mtable.split(x0),
+                                           strict=True)):
+        cols = np.asarray(mtable.col_map(h), dtype=np.intp)
+        for block in tied_bound_inequalities(table, local, lo[cols], hi[cols]):
+            T = np.zeros((block.T.shape[0], n), dtype=np.float64)
+            T[:, cols] = block.T
+            path = block.label.removesuffix(" bounds")
+            name = owner.get((h, path))
+            if name is None:
+                key = (path, T.tobytes(), block.c.tobytes())
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(lm_mod.LinearInequality(
+                    T=T, c=block.c, label=f"hist.{h} {block.label}"))
+            else:
+                by_equation.setdefault(f"parametric equation {name!r} ({path} bounds)",
+                                       []).append(lm_mod.LinearInequality(T=T, c=block.c))
+    for label, blocks in by_equation.items():
+        out.append(lm_mod.LinearInequality(
+            T=np.vstack([b.T for b in blocks]),
+            c=np.concatenate([b.c for b in blocks]), label=label))
     return out
 
 
@@ -3009,14 +3389,17 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
     shape; a function of its own so that one ``try`` covers both drivers
     (WP-2048)."""
     if solver == "lm":
-        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
-        # are built against the *starting* point, because feasibility is
-        # maintained rather than restored (see the builders)
+        # the strain cone, the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002) and
+        # each tied entry's own bounds (WP-1325) are built against the
+        # *starting* point, because feasibility is maintained rather than
+        # restored (see the builders)
         ineqs = _pad_inequalities(
             strain_cone_inequalities(model, table, x0[:n_table])
             + texture_positivity_inequalities(model, table, x0[:n_table])
             + gaussian_width_inequalities(model, table, x0[:n_table])
-            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+            + lorentzian_width_inequalities(model, table, x0[:n_table])
+            + tied_bound_inequalities(table, x0[:n_table], lo[:n_table],
+                                      hi[:n_table]), n_aux)
         from . import lm as lm_mod
 
         # a Pawley block past the BVLS cut takes its normal matrix sparse,
@@ -3199,10 +3582,54 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
 
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
     """``(n_data_total, n_rows)`` of the stacked joint residual: every
-    histogram's data rows, then every histogram's background-penalty rows."""
+    histogram's data rows, then every histogram's rows below its data."""
     n_data = sum(len(m.tt) for m in models)
-    n_pen = sum(0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models)
-    return n_data, n_data + n_pen
+    return n_data, n_data + sum(_rows_below_data(m) for m in models)
+
+
+def _rows_below_data(model: CompiledModel) -> int:
+    """One histogram's rows after its data: the background penalty, then a
+    Pawley model's restraint rows (``model/rows.py``'s order).  A joint fit
+    refuses soft restraints and a floating origin, so nothing else sits there."""
+    return row_layout.n_rows(model) - len(model.tt)
+
+
+def _joint_aux_counts(models: list[CompiledModel]) -> list[int]:
+    """Each histogram's Pawley intensity count, 0 outside Pawley (WP-2104).
+
+    A joint Pawley fit keeps one off-table intensity block per histogram,
+    never shared across them.  The joint vector is ``[the table's columns |
+    histogram 0's block | histogram 1's …]``, so each block is one
+    histogram's own columns, the arrow's diagonal in ``optimize/blocked.py``.
+    """
+    return [0 if m.pawley is None else int(m.pawley.n) for m in models]
+
+
+def _joint_aux_slices(models: list[CompiledModel], n_table: int) -> list[slice]:
+    """Where each histogram's intensity block sits in the joint vector."""
+    off = n_table + np.concatenate([[0], np.cumsum(_joint_aux_counts(models))])
+    return [slice(int(a), int(b)) for a, b in zip(off[:-1], off[1:], strict=True)]
+
+
+def _joint_aux_paths(models: list[CompiledModel]) -> list[str]:
+    """A name per joint intensity column, ``hist.<h>.pawley.<k>``, in vector
+    order.  Not table paths: a reader that counts free columns (the form
+    test's χ²_red) or aligns a matrix with names reads these after
+    ``free_paths``."""
+    return [f"hist.{h}.pawley.{k}" for h, n in enumerate(_joint_aux_counts(models))
+            for k in range(n)]
+
+
+def _table_part(jac, n_table: int, n_maps: list[int]):
+    """The joint Jacobian against the table's columns alone, the Pawley
+    blocks dropped, as :func:`run_least_squares` slices its own."""
+    if jac is None:
+        return None
+    if isinstance(jac, BlockJacobian):
+        return BlockJacobian([b[:, :k] for b, k in zip(jac.blocks, n_maps, strict=True)],
+                             [c[:k] for c, k in zip(jac.col_maps, n_maps, strict=True)],
+                             jac.n_data, jac.n_pen, n_table)
+    return np.asarray(jac)[:, :n_table]
 
 
 def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
@@ -3218,6 +3645,11 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     :class:`~.blocked.BlockJacobian`, each histogram's weighted rows against
     its own columns, whose :meth:`~.blocked.BlockJacobian.toarray` is the
     dense matrix entry for entry (WP-1325).
+
+    In Pawley mode θ is ``[mtable.free_paths | each histogram's intensity
+    block]`` (:func:`_joint_aux_slices`, WP-2104), and each histogram's rows
+    below its data carry its Pawley restraint rows after its background
+    penalty.  Outside Pawley θ is the table's alone.
     """
     if layout not in blocked.LAYOUTS:
         raise ValueError(f"unknown Jacobian layout {layout!r}; "
@@ -3239,15 +3671,28 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     jacobians = [_jacobian_for(m, t, backend)
                  for m, t in zip(models, mtable.tables, strict=True)]
     n_data = [len(m.tt) for m in models]
-    n_pen = [0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models]
+    n_pen = [_rows_below_data(m) for m in models]
     data_off = np.concatenate([[0], np.cumsum(n_data)])
     n_data_total = int(data_off[-1])
     pen_off = n_data_total + np.concatenate([[0], np.cumsum(n_pen)])
     n_rows = int(pen_off[-1])
-    n_cols = len(mtable.free_paths)
+    # a Pawley histogram's intensity block rides after the table's columns,
+    # one block per histogram (WP-2104); outside Pawley every slice is empty
+    n_table = len(mtable.free_paths)
+    aux = _joint_aux_slices(models, n_table)
+    n_cols = aux[-1].stop if aux else n_table
+    col_maps = [np.concatenate([np.asarray(mtable.col_map(h), dtype=np.int64),
+                                np.arange(a.start, a.stop, dtype=np.int64)])
+                if a.stop > a.start else mtable.col_map(h)
+                for h, a in enumerate(aux)]
+
+    def split(theta: np.ndarray) -> list[np.ndarray]:
+        thetas = mtable.split(theta)
+        return [np.concatenate([t, theta[a]]) if a.stop > a.start else t
+                for t, a in zip(thetas, aux, strict=True)]
 
     def residual(theta: np.ndarray) -> np.ndarray:
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         data_parts: list[np.ndarray] = []
         pen_parts: list[np.ndarray] = []
         for h in range(n_hist):
@@ -3258,11 +3703,11 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
         return np.concatenate(data_parts + pen_parts) if n_rows else np.zeros(0)
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         J = np.zeros((n_rows, n_cols), dtype=np.float64)
         for h in range(n_hist):
             Jh = jacobians[h](thetas[h])
-            cm = mtable.col_map(h)
+            cm = col_maps[h]
             do = int(data_off[h])
             J[do:do + n_data[h], cm] = sqrt_w[h] * Jh[:n_data[h]]
             if n_pen[h]:
@@ -3273,10 +3718,10 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     def block_jacobian(theta: np.ndarray) -> BlockJacobian:
         # the dense closure's entries, never scattered: each histogram's rows
         # stay against its own columns (WP-1325)
-        thetas = mtable.split(theta)
+        thetas = split(theta)
         return BlockJacobian(
             [sqrt_w[h] * jacobians[h](thetas[h]) for h in range(n_hist)],
-            [mtable.col_map(h) for h in range(n_hist)], n_data, n_pen, n_cols)
+            col_maps, n_data, n_pen, n_cols)
 
     return (residual, jacobian if layout == "dense" else block_jacobian,
             n_data_total)
@@ -3325,7 +3770,11 @@ def run_multi_least_squares(models: list[CompiledModel],
     silently on scipy.  The Stephens cone is not built here: its rows are
     per-model and the stacked column map would have to scatter each phase's T
     into the joint vector.  Deferred rather than half-done — a joint refinement
-    with `solver="lm"` gets the bounded driver, not the cone.
+    with `solver="lm"` gets the bounded driver, not the cone.  The width rows
+    (:func:`_joint_width_inequalities`) and each tied entry's own bounds, a
+    parametric target's in every subset pattern among them
+    (:func:`_joint_tied_bound_inequalities`, WP-1325), are built, and the
+    steps they shaped are counted as the single fit counts them.
 
     ``events``, ``stage`` and ``cancel`` are :func:`run_least_squares`' own
     (WP-1341).  An ``eval`` is one evaluation of the *stacked* residual, so
@@ -3345,8 +3794,10 @@ def run_multi_least_squares(models: list[CompiledModel],
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
     lapack_start = lapack.retries()
     # dense below a size, blocked above it (WP-1325, ``blocked.choose_layout``)
-    layout = blocked.choose_layout(_stacked_rows(models)[1], len(mtable.free_paths),
-                                   solver)
+    n_table = len(mtable.free_paths)
+    aux = _joint_aux_slices(models, n_table)
+    n_aux = sum(a.stop - a.start for a in aux)
+    layout = blocked.choose_layout(_stacked_rows(models)[1], n_table + n_aux, solver)
     residual, jacobian, n_data_total = _multi_closures(
         models, mtable, weights=weights, backend=backend, layout=layout)
     # The same two guards :func:`run_least_squares` wires up, for the same
@@ -3361,7 +3812,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     residual = cell_guard
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
     jacobian = _FiniteJacobianGuard(jacobian)
-    n_cols = len(mtable.free_paths)
+    n_cols = n_table + n_aux
 
     if cancel is not None:
         # read at an evaluation boundary, below the event wrapper, as in
@@ -3387,6 +3838,14 @@ def run_multi_least_squares(models: list[CompiledModel],
     _freeze_cell_windows_multi(models, mtable, phase_support_sigma)
     x0 = mtable.x0()
     lo, hi = mtable.bounds()
+    pawley = [m for m in models if m.pawley is not None]
+    if pawley:
+        # each histogram's intensity block, bounded ≥ 0, in histogram order
+        # (``_joint_aux_slices``), as :func:`run_least_squares` appends one
+        bounds = [m.pawley_bounds() for m in pawley]
+        x0 = np.concatenate([x0, *[m.pawley_x0() for m in pawley]])
+        lo = np.concatenate([lo, *[b[0] for b in bounds]])
+        hi = np.concatenate([hi, *[b[1] for b in bounds]])
     x0 = _feasible_start(x0, lo, hi, solver)
     r0 = residual(x0)
     require_fp64(r0, "least-squares residual")
@@ -3398,8 +3857,19 @@ def run_multi_least_squares(models: list[CompiledModel],
                           n_degenerate_cell_probes=cell_guard.n_degenerate,
                           jacobian_layout=layout)
 
+    def set_intensities(x: np.ndarray, stderr_full: np.ndarray | None = None) -> None:
+        # each histogram's block into its model's per-phase buffers, as the
+        # single fit pins its own
+        for m, a in zip(models, aux, strict=True):
+            if m.pawley is not None:
+                m.set_pawley_intensities(x[a])
+                if stderr_full is not None:
+                    m.pawley.stderr = stderr_full[a]
+
     def stopped(kind: str, columns=()) -> LSQOutcome:
-        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_cols,
+        # the evaluations wrote trial intensities; the outcome is the start
+        set_intensities(x0)
+        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_table,
                                    cost0, solver, cell_guard, lapack_start,
                                    jacobian_layout=layout)
 
@@ -3412,7 +3882,11 @@ def run_multi_least_squares(models: list[CompiledModel],
         if solver == "lm":
             res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                               ftol=ftol,
-                              inequalities=_joint_width_inequalities(models, mtable, x0),
+                              inequalities=_pad_inequalities(
+                                  _joint_width_inequalities(models, mtable, x0[:n_table])
+                                  + _joint_tied_bound_inequalities(
+                                      mtable, x0[:n_table], lo[:n_table],
+                                      hi[:n_table]), n_aux),
                               events=events, stage=stage, track=tracker, table=mtable,
                               cancel=cancel)
         else:
@@ -3427,6 +3901,7 @@ def run_multi_least_squares(models: list[CompiledModel],
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
 
     stderr = corr = covariance_error = moment_angle_tests = esd_inflation = None
+    stderr_full = None
     if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
         # the single-histogram rule (WP-1929) on the stacked residual: a
         # moment angle's column is every histogram's rows of it, and a shared
@@ -3437,19 +3912,33 @@ def run_multi_least_squares(models: list[CompiledModel],
                            [mtable.col_map(h) for h in range(len(mtable.tables))],
                            len(res.x)),
             len(res.x))
-        stderr, corr, esd_inflation, covariance_error = _guarded_covariance(
+        # off the full vector, the Pawley blocks with it, then sliced: the
+        # single fit's rule, so the table esds carry the intensities'
+        # correlation (``run_least_squares``)
+        stderr_full, corr, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=n_data_total)
-    if isinstance(res.jac, BlockJacobian):
-        jac_data = res.jac.data_rows()
+        if stderr_full is not None:
+            stderr, corr = stderr_full[:n_table], corr[:n_table, :n_table]
+    if pawley:
+        # the last evaluation need not sit at the solution (the single fit's
+        # reason), so the answer's intensities are written back here
+        set_intensities(res.x, stderr_full)
+    jac_table = (res.jac if not n_aux else _table_part(
+        res.jac, n_table, [len(mtable.col_map(h)) for h in range(len(mtable.tables))]))
+    if isinstance(jac_table, BlockJacobian):
+        jac_data = jac_table.data_rows()
     else:
-        jac_data = np.asarray(res.jac)[:n_data_total] if res.jac is not None else None
+        jac_data = np.asarray(jac_table)[:n_data_total] if jac_table is not None else None
+    cosine = _residual_cosine(res.jac, res.fun)
+    if cosine is not None:
+        cosine = cosine[:n_table]
     # ``jac_data`` drops the penalty and restraint *rows*; the angle keeps
     # them, being read off the cost the driver actually minimised
-    return LSQOutcome(res.x, cost0, float(res.cost), int(res.nfev), status,
-                      jac_data, stderr, corr, solver=solver,
-                      residual_cosine=_residual_cosine(res.jac, res.fun),
-                      active_bounds=_active_bounds(res, len(res.x)),
+    return LSQOutcome(res.x[:n_table], cost0, float(res.cost), int(res.nfev), status,
+                      jac_data, stderr, corr, n_aux=n_aux, solver=solver,
+                      residual_cosine=cosine,
+                      active_bounds=_active_bounds(res, n_table),
                       max_shift_over_esd=_final_shift_over_esd_multi(
                           mtable, tracker.step(), stderr, corr),
                       termination=termination,
@@ -3458,7 +3947,13 @@ def run_multi_least_squares(models: list[CompiledModel],
                       covariance_error=covariance_error,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests,
-                      jacobian_layout=layout)
+                      jacobian_layout=layout,
+                      # the single fit's count (WP-1938 D8): without it a
+                      # joint fit's held steps never reached CONSTRAINT_ACTIVE
+                      n_constraint_truncations=(res.n_truncated if solver == "lm"
+                                                else 0),
+                      truncated_by=(dict(res.truncated_by) if solver == "lm"
+                                    else {}))
 
 
 def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,

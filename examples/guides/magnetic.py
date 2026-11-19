@@ -50,6 +50,8 @@ print(f"{row.atom} ({row.ion}): |m| = {row.magnitude:.2f} ± {row.magnitude_esd:
 polar = next(p for p in result.parameters if p.path == moment[1])
 inside = polar.interval.lower <= math.pi / 2 <= polar.interval.upper
 print(f"polar angle: esd {polar.stderr}, 95 % interval includes 90°: {inside}")
+size = next(p for p in result.parameters if p.path == moment[0])
+print(f"modulus: 95 % interval {size.interval.lower:.2f} to {size.interval.upper:.2f} μB")
 print([d.code for d in result.diagnostics if d.code.startswith("MOMENT")])
 # guide: read end
 

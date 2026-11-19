@@ -239,6 +239,51 @@ server with the console echo matching the API call that would reproduce it; the
 - `viz/compare.py` + `compare_app.py`, `watch.py` — the stdlib-`http.server`
   precedent this follows.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **peak picker and indexing panel** (WP-1027, `src/rietx/gui/peaks.py`,
+`panels/Peaks.svelte`, `lib/peaks.ts`, the plot's peak layer) is where the
+indexing line meets the GUI line. Peak lists are a **project artifact**
+(`peaks.json`, keyed by `data_fingerprint` and refused against the wrong
+pattern); every edit refits exactly one group through the picker's own solver,
+and the human-owned facts (`origin`, `excluded`) carry across refits. **A cross-group
+mark (`duplicate_line`, the ghosts) follows the edit by its judgement's change alone**
+(WP-2030); a new cross-group flag joins `_follow_cross_group_marks`. The plot
+is an editing surface **only while the Peaks tab is active**, and every pointer
+verb has a non-pointer route (typed 2θ, the `.rxt` peaks block — whose only
+editable columns are `2theta` and `flags`; everything else is derived and
+regenerated). Two pointer rules are measured, not aesthetic: the **move
+gesture's grab radius is `grabToleranceDeg` — min(10 px, 1.5× median fitted
+FWHM)** — because a pixel radius alone is ±1.9° at the survey view, where a
+zoom drag starting 0.9° from a marker silently moved a line 11° (the coarse
+10 px stays for shift-toggle and click-to-add, whose precision comes from the
+group refit); and a drawn **σ whisker is capped at 3×FWHM**, because a
+degenerate component reports σ in tens of degrees (111° measured) and an
+uncapped error bar spans the pattern (under plotly it owned the autorange). `/api/index` and
+`/api/index/extinction` are run *kinds* on the one machine — a cancelled
+search or screen **returns** what it has and its status is read off the token.
+Both tables' badges follow the server (`adopt`, `best`); the screen is gated on neither the adopt verdict nor a phase
+(a read-only measurement; a pattern-only project is where indexing starts). **Any candidate can be adopted** (Yue's
+ruling B, 2026-11-08, WP-2124): the arm's `picked` is the gate's pick, its `why` the sentence an adoption of any other
+row writes into the `edit_model` node. The old panel still enables Adopt, and a space-group chip of an unrefuted
+class, on `allowed`, which carries `picked` under its old name until the port redraws it.
+
+Its second pass (2026-07-31) added three browser facts; the one about plotly's
+screen-relative `lightposition` left with plotly (WP-1462), whose renderer lights
+from a fixed direction in view space, so the key follows every rotation by
+construction. **A style sampled synchronously inside an effect races the
+shell's `applyTheme` effect in the same flush** — `Plot.svelte` and the 3D
+panel's `rebuild` each await one microtask before `getComputedStyle`, or the
+first dark repaint wears light ink. And **an effect that reads the project
+*object* refires on every ui-only PATCH** — Model reloads on a boolean
+`$derived` (`hasProject`), or a theme click refetches three routes plus the 3D
+geometry with the head unmoved.
+
 ## Handover log
 
 - **2026-08-01** — **closed.** The two open items, done. **(1) Browser pass**

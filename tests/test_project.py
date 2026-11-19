@@ -17,6 +17,7 @@ import pytest
 
 import rietx as rx
 from rietx import Parameter
+from rietx.history.store import fingerprint
 from rietx.project import PROJECT_JSON, fitted_mask
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -276,6 +277,35 @@ def test_same_bytes_parsed_differently_is_reported_as_a_reader_change(
         rx.Project.open(project.path)
 
 
+def test_a_project_on_a_gsas_file_from_before_wp_1952_still_opens(
+        tmp_path, tmp_path_factory, pattern):
+    """The ``gsas`` reader dropped channels whose esd is zero or below until
+    WP-1952 and now keeps them, so a project made before records a shorter
+    pattern's fingerprint. It opens: the fit excludes those channels anyway.
+    """
+    from tests.test_readers import write_gsas_esd
+
+    esd = pattern.sig().copy()
+    esd[[100, 2000]] = 0.0
+    tt = np.asarray(pattern.two_theta)
+    path = write_gsas_esd(tmp_path_factory.mktemp("gsas") / "a.gsas",
+                          pattern.intensity, esd.tolist(),
+                          start=tt[0] * 100.0, step=(tt[1] - tt[0]) * 100.0)
+    project = _create(tmp_path / "s.rex", path)
+    assert len(project.data.two_theta) == len(tt)
+    keep = np.ones(len(tt), dtype=bool)
+    keep[[100, 2000]] = False
+    old = fingerprint(np.asarray(project.data.x())[keep],
+                      np.asarray(project.data.intensity)[keep])
+    doc_path = project.path / PROJECT_JSON
+    raw = json.loads(doc_path.read_text(encoding="utf-8"))
+    raw["patterns"][0]["fingerprint"] = old
+    doc_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    reopened = rx.Project.open(project.path)
+    assert reopened.data.in_range_mask().sum() == len(tt) - 2
+
+
 def test_history_recorded_against_another_pattern_is_refused(
         tmp_path, tmp_path_factory, pattern):
     """A container may not silently rebind a tree to different data.
@@ -419,9 +449,9 @@ def test_an_unbounded_biso_written_after_206_is_a_choice_and_kept(
     assert reopened.history_diagnostics == []
 
 
-#: The keys of a stored ``Parameter`` since schema 0.46, which dropped
-#: ``transform`` (WP-1938); every release before wrote that key too.
-_PARAMETER_KEYS = {"value", "vary", "min", "max", "expr", "unit", "stderr"}
+#: The keys of a stored ``Parameter`` since schema 0.61, which dropped
+#: ``expr`` (WP-1964); 0.46 had dropped ``transform`` (WP-1938).
+_PARAMETER_KEYS = {"value", "vary", "min", "max", "unit", "stderr"}
 
 
 def _stamp_transforms(obj) -> None:

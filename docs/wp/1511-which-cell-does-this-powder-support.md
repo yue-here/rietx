@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: Data and metadata in, a structure out
-Depends on: — (1323 soft, the Le Bail call and its background protocol; 1510 soft)
+Depends on: 2062 (Pawley as the structure-free fit, and `compare_rivals` in Pawley); 1323 soft (the Le Bail call and its background protocol); 1510 soft
 Priority: P3 2026-09-28 — a workaround covers it: the agent in `solution case 1` did it by hand across six scripts
 
 ## Goal
@@ -61,6 +61,24 @@ accepted cell is tested as the explanation of the leftovers.
 - Two settings of one lattice are one row.
 
 ### Inherited
+
+- **2026-11-06, from the issue triage (issue #1381): build the call on
+  Pawley, after WP-2062.** This WP's Goal compares Le Bail agreement across
+  candidate cells under one protocol. [2062](2062-pawley-is-the-structure-free-default.md)
+  makes Pawley the structure-free fit at every site where rietx picks one
+  for the user (maintainer's decision 0, 2026-11-01), and renames the
+  `lebail` public names (`LeBailValidation`, `CellCandidate.lebail`,
+  `validate_by_lebail`) in the same change. The maintainer restated the
+  direction on 2026-11-05: Le Bail work stays minimal, and Pawley is where
+  effort goes. A cell comparison also needs `compare_rivals`, which raises
+  in Pawley today ("compare_rivals is not defined in Pawley mode",
+  `report/layer2.py:1261`, checked at `a84379aac`) and is one of 2062's bug
+  tasks. Decided 2026-11-06: `Depends on:` gains 2062, and the call is built
+  on Pawley or mode-neutral after 2062's bug tasks, so it is built once.
+  Settled by Claude under the maintainer's 2026-11-01 and 2026-11-05 rulings.
+  The design-note task can start before 2062 lands, so the Priority line
+  does not move. What WP-1323 settled about Le Bail still holds for a
+  caller who asks for `mode="lebail"`.
 
 - **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed): the
   supported-supercell count this WP reads may change.** 1510's review found that the
@@ -142,7 +160,9 @@ accepted cell is tested as the explanation of the leftovers.
 
 - [ ] Design note in this file: answer type, protocol, doubling score and
       its control. Maintainer decision recorded.
-- [ ] The call, on the Le Bail path WP-1323 settles.
+- [ ] The call, on Pawley or mode-neutral, after WP-2062's bug tasks
+      (Decided 2026-11-06, Inherited; it read "on the Le Bail path WP-1323
+      settles").
 - [ ] Metric drift and the per-cell unindexed-line list.
 - [ ] Doubling scores for leftover lines, with the chance control.
 - [ ] Tests on a public pattern with a known cell and a decoy that fits
