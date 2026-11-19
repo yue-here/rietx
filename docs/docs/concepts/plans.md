@@ -32,10 +32,11 @@ So the first fit of a model stays staged.
 A fit counts as a re-fit when the working state is exactly where an accepted fit of the same pattern left it.
 The pattern, the mode and the fitted channels must be the same.
 No value may have been written since, by `set_values`, `edit`, `run_stage` or a checkout to another node.
-Changing what is free with `set_vary`, `hold` or `tie`, or passing another plan, keeps it a re-fit.
+Changing what is free with `set_vary` or `hold`, or passing another plan, keeps it a re-fit.
+So does a `tie` that leaves every value where it was.
 An accepted fit is one with `status="converged"` and no error-level diagnostic.
 A project reopened at a converged fit's answer is a re-fit too.
-The GUI's Refine always runs the plan in stages, so its stage ladder shows every stage's Rwp.
+For now the GUI's Refine runs the plan in stages, so its stage ladder shows every stage's Rwp.
 
 If the one stage diverges or carries an error-level diagnostic, rietx discards it.
 The model goes back to where that stage started, the staged plan runs from there, and the result carries `WARM_REFIT_REJECTED`.

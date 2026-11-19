@@ -2512,7 +2512,8 @@ def _refit_key(ref: Refinement, data: PatternData, mode: Mode,
     rather than tracking which verbs ran, makes "no value written since" an
     observation: ``set_values``, ``edit``, a stage, a checkout to another
     node and a direct assignment to ``ref.structure`` all change it, and
-    ``set_vary``, ``hold`` and ``tie`` (which move no value) do not.
+    ``set_vary`` and ``hold`` (which move no value) do not, nor does a ``tie``
+    that leaves every value where it was.
     """
     import hashlib
     import json

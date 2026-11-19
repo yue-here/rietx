@@ -1685,7 +1685,7 @@ ROWS: tuple[Row, ...] = (
                   "rejected by schemas/sequential.py _rejected (diverged, or an error-level "
                   "diagnostic) and the staged plan ran in its place, so it reports the "
                   "package's own act and gates nothing. On the eight comparison standards "
-                  "it fires on none from a converged start (WP-2224 § Measured)"),
+                  "it fires on none from a converged start (WP-2224 § Measured); its one firing is injected, tests/test_refit_single.py::test_a_rejected_one_stage_fit_falls_back_to_the_plan patching _rejected"),
         grounds=("Says out loud that the package ran a second fit, as SEQUENTIAL_RESEED "
                  "does for the series' ladder; the trigger is the series' own _rejected "
                  "(ruled by the maintainer 2026-11-03) and the fallback is the 2026-11-19 "
@@ -5100,11 +5100,14 @@ ROWS: tuple[Row, ...] = (
                   "written since; refine.py _refit_key), and a rejected one-stage fit falls "
                   "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
                   "on the eight comparison standards (SRM 660c, corundum, zincite, "
-                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6; six families): "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
                   "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
                   "time; from a cold start one stage reaches 20 of 48, which is why a first "
-                  "fit stays staged (WP-2224 § Measured). Ruled by the maintainer "
-                  "2026-11-19, 'Yes, by default'")),
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a plan newly freeing a "
+                  "block far from its start is unmeasured on this path (the same swap "
+                  "through edit, which runs staged, ended 2.25 esd off). Ruled by the "
+                  "maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.Refinement.fit:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -5199,11 +5202,14 @@ ROWS: tuple[Row, ...] = (
                   "written since; refine.py _refit_key), and a rejected one-stage fit falls "
                   "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
                   "on the eight comparison standards (SRM 660c, corundum, zincite, "
-                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6; six families): "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
                   "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
                   "time; from a cold start one stage reaches 20 of 48, which is why a first "
-                  "fit stays staged (WP-2224 § Measured). Ruled by the maintainer "
-                  "2026-11-19, 'Yes, by default'")),
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a plan newly freeing a "
+                  "block far from its start is unmeasured on this path (the same swap "
+                  "through edit, which runs staged, ended 2.25 esd off). Ruled by the "
+                  "maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.refine:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"

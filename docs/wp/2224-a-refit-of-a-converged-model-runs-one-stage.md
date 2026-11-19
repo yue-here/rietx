@@ -1,6 +1,6 @@
 # WP-2224 — A re-fit of a converged model runs one stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-19 — implemented, PR #1711 in review; the display text, the model-swap rule and the GUI's second Refine wait on Yue
 Track: A long run is not one fit
 Depends on: 2222 soft (the closing stage off by default; the numbers here are against that default)
 Priority: P2 2026-11-19 — users complained about fit time, and every fit after the first on a model re-walks the whole plan at about 2.5× the cost of one stage; `run_stage` with a hand-written free list is the workaround
@@ -149,19 +149,9 @@ Each is the implementer's to revisit with a measurement, and a reversal goes to 
    fallback leaves a diagnostic. What a display prints for it is a reader-output change and goes
    to Yue before merge.
 5. **A project.** The history head is the working state, so a reopened `.rex` whose head is a
-   converged fit of its pattern is a re-fit too, and the GUI's second Refine inherits it. With
-   `history=False` the fact is held on the `Refinement`.
-
-### Inherited
-
-- **From WP-2225 (2026-11-19).** The staged re-fit's movement on zincite and fluorite in this
-  WP's probe is the width twin hold, and under-convergence plays no part. The plan holds U, X
-  and Y at the instrument-only stage's values while their specimen twins sit on their floor, and
-  a staged re-fit re-solves them in that stage. A one-stage re-fit applies the hold again, so
-  under this WP's default a second `fit` stops showing the effect, and the first fit's answer is
-  unchanged. Tolerances, windows and seeds were each ruled out by one change
-  (`docs/wp/2225-batch/`). Read this before quoting "the first fit stops short" as a reason for
-  or against the one-stage default.
+   converged fit of its pattern is a re-fit too. With `history=False` the fact is held on the
+   `Refinement`. Superseded in part 2026-11-19: the GUI's Refine passes `refit="stages"`
+   until Yue rules on how the stage ladder shows one stage (handover log).
 
 ## Non-goals
 
@@ -227,6 +217,56 @@ evaluations.
   neighbour pattern in a wrong basin), WP-2222 (the closing stage off).
 
 ## Handover log
+
+- **2026-11-19 (implementation)** — A second `fit` on a model that its last fit of the same
+  pattern left converged now runs one stage, `warm_refit`, freeing at once everything the plan
+  frees. On the eight comparison standards it lands within 0.21 esd of the first fit's answer
+  and costs 0.32-0.50 of a staged re-fit's evaluations (0.15-0.27 once the closing stage is off).
+  None of the eight fell back. A first fit, any written value, another pattern, mode or channel
+  set, and a plan that fixes a parameter all still run the plan. Three things wait on Yue: the
+  text a display prints for a re-fit and for a fallback, keeping a model swap on the staged
+  plan, and whether the GUI's second Refine should re-fit (it stays staged until then).
+
+  *Done.* `refit="single" | "stages"` on `Refinement.fit` and `refine`. The re-fit test is a
+  digest of the pattern arrays, fitted mask, mode and the models' values with `vary` and
+  `stderr` stripped (`refine._refit_key`), held on the `Refinement` and as the `refit_key` note
+  on the answer's node, so a checkout or a reopened tree counts. A rejected one-stage fit
+  (`schemas.sequential._rejected`) is discarded: its nodes are noted `refit_discarded`, the
+  state and head go back, the plan runs, and the result carries `WARM_REFIT_REJECTED` (info).
+  One run directory per job, as the Le Bail alternation does it; the recorder ignores a
+  `fit_end` stamped `refit`. `_collapse` moved to `strategy/refit.py`. The GUI passes
+  `refit="stages"`. Manual (`concepts/plans.md`, `reference/refinement.md`), practice survey,
+  skill body line and diagnostics row, audit rows (code tier 3, the two defaults tier 2).
+
+  *Review* (`/code-review high --fix`, 5 findings). Fixed: `_collapse` dropped the last stage's
+  `ftol`, `restraint_weight_scale` and `window_slack_deg`, so a plan ending at c_w = 0.1 would
+  re-fit at 1.0 (the closing stage already copies all three, and the series' warm refit shares
+  the fix); an empty plan on a re-fit start ran a no-op stage instead of its refusal; a long
+  docstring line. Two tests added. Skipped: `_fit_refit` repeats the alternation's
+  recorder plumbing (a shared helper would edit the alternation, outside this WP); the GUI history
+  has no chip for `refit_discarded` nodes (a visual question, and the GUI runs staged).
+
+  *Measured* (`2224-batch/accept.py`, `swap.py`; `[dev]`, macOS arm64; evaluations do not
+  depend on load). Acceptance as § Measured and the docstring quote. Model swap, closing stage
+  off, one stage against staged: brucite + March-Dollase at r = 1, Rwp 0.18476 / 0.18462,
+  largest gap 2.25 esd (profile W), 46 / 68 evaluations; brucite + spherical harmonics order 4,
+  0.19696 / 0.19695, 1.01 esd, 60 / 92; NAC + CaF₂ at scale 1e-7, 0.09317 both, 0.00 esd,
+  19 / 40. Design 2 kept strict. Suites: SUITE_COUNTS
+
+  *Gotchas.* Folded from WP-2225's note (this file's former `### Inherited`): the staged
+  re-fit's 2.05 esd on zincite V and 0.83 on fluorite V is the width twin hold re-solving U, X
+  and Y, and the first fit's answer does not stop short; quote it as such. The GUI's
+  `test_running_the_same_plan_twice_shows_the_second_run` is what a one-stage GUI re-fit breaks:
+  the stage ladder finds no run matching the plan on screen and its Rwp column goes blank.
+  `import rietx.refine as m` gives the function; use `importlib.import_module`.
+
+  *Generality.* GENERALITY
+
+  Next: Yue's three answers, in this order. The GUI one decides whether `gui/session.py` drops
+  `refit="stages"` and the ladder gains a one-stage view (a GUI WP). The display text one may
+  reword `_warm_refit_rejected` and `_protocol_lines`. When WP-2222 merges, merge `main` and
+  re-run `accept.py`, then drop the "closing stage" bracket from the quoted numbers in
+  `fit`'s docstring and `concepts/plans.md`.
 
 - **2026-11-19** — created, from Yue's question on whether staging still earns its cost and
   the measurement it led to. A model that has already converged can be re-fitted in one stage

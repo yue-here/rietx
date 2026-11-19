@@ -4903,9 +4903,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Here that one-stage fit diverged or carried an error-level finding, which "
             "the message names. It was discarded, the model went back to where it "
             "started, and the staged plan ran from there. The result is the staged "
-            "plan's answer, so nothing needs redoing. A re-fit starts from unchanged "
-            "values, so the usual cause is a plan or free set that frees what the "
-            "converged fit held; `refit=\"stages\"` skips the one-stage attempt."
+            "plan's answer, so nothing needs redoing. No ordinary fit has been seen to "
+            "fire it. A plan or free set that frees what the converged fit held is a "
+            "likely cause; `refit=\"stages\"` skips the one-stage attempt."
         ),
     ),
     "WAVELENGTH_CALIBRATION": HelpEntry(
