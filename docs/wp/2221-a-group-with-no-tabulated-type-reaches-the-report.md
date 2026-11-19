@@ -105,7 +105,7 @@ present.
 
 ## Handover log
 
-- **2026-11-19** — implemented, by a ghostshift runner (PR #PRNUM). A phase whose space group
+- **2026-11-19** — implemented, by a ghostshift runner (PR #1721). A phase whose space group
   is an operation list that no tabulated setting names can now be reported and written to a
   CIF. The crystal system is a property of the point group, so the package now reads it from
   the rotations of the operations, in any cell. The fix checks that rule against gemmi on all
