@@ -114,6 +114,25 @@ rectangle closed by two half-ellipses.
 
 ### Inherited
 
+- **2026-11-18, from the issue triage (#1667): WP-1537's two external checks are this
+  WP's.** PR #1666 (open on 2026-11-18, head `da2f04fd2`) adds the POV-Ray and glTF writers
+  and closes WP-1537 with three tasks moved to issue #1667. Two of them land here, since this
+  WP's session works the same writers' dispatch (`render.WRITERS`), the same figures and
+  `tests/test_render_structure.py`, and already plans an external-tool check of its own
+  (`rsvg-convert`, Inkscape). (a) Render fluorapatite and NAC once in POV-Ray 3.7 and once
+  in Blender (Cycles, the imported camera), and commit each beside its PNG under
+  `docs/wp/1537-renders/`. That is WP-1537's acceptance that the chiral NAC phase (I2₁3)
+  keeps its hand in POV-Ray; the merged tests check the hand by projection without
+  rendering. (b) Run the Khronos validator on `tests/output/figure3d/nac_ball.glb` and
+  `nac_ellipsoid.glb` and fix what it reports. The npm package `gltf-validator`
+  (2.0.0-dev.3.10) declares no `bin`, so `npx gltf-validator` does not run; call its
+  `validateBytes` from a short Node script. Checked against the tree at 3f5167863: no
+  writer is on `main` yet (`render.WRITERS`, `.pov` and `.glb` absent under
+  `viz/figure3d/`), POV-Ray and Blender are not installed on the machine that checked, and
+  the npm metadata confirms no `bin`. Both tasks wait on #1666 merging. The issue's third
+  task, the GUI export menu, is GUI work and stays with the issue until the GUI track takes
+  it into the rebuilt Structure graph (WP-2218, open in PR #1673; inventory row 79 of
+  WP-2214 homes the PNG export there).
 - **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the
   agent task an SVG answers.** 1504's tasks are in `docs/wp/1504-eval/`. Task 6, fluorapatite
   for print, is the one an agent could answer with an SVG once this lands. A later round that
