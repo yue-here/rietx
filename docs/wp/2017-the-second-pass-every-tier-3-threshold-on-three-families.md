@@ -198,6 +198,14 @@ and have no free factor to measure, so this file's old list named them without c
   the tree needs a new carrier. A demotion here of a limit, a starting value or a plan setting
   is one of the two observations that would flip that pick to a new scenario-set file. Name
   any such demotion in WP-2020's handover log when it lands.
+- **From WP-2225 (2026-11-19).** The width twin hold reads no bound. On the four comparison
+  standards that run the QPA plan (zincite, fluorite, corundum, brucite) the specimen twins end on
+  their floor, U, X and Y stay at the instrument-only stage's values, and a staged re-fit lowers
+  χ² by re-solving them (zincite: V +3.3 esd, Zn Biso +0.51 esd at the converged chain). Row R's
+  real families (cpd-1a, LaB₆ + cBN, SRM 660c) are WP-2225's task 1 too; a session working either
+  reads the other's measurements. WP-2225 also re-measured the swap prototype on the four
+  single-phase standards (`docs/wp/2225-batch/swap_summary.txt`).
+
 - **From WP-2064 (2026-11-16, PR #1601).** Once #1601 merges, CI's audit delta fails a pull
   request that changes the value of a row carrying `approved` and leaves it at any tier but 1
   or `invariant`, until the maintainer writes a later date. A group whose measurement moves a

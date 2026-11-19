@@ -67,10 +67,12 @@ for n_terms in (3, 6):
 
 # compiled path, 2026-11-04, darwin/arm64: Biso 0.4170(649), 0.4245(116),
 # 0.4254(257), extinction undeclared since WP-1944; hump 4.161(104)° FWHM 5.586(252)°, 5.238(40)° FWHM 1.912(105)°
+# Moved with WP-2222 (closing stage off by default, 2026-11-19): Biso 0.417 -> 0.418,
+# hump 4.16 -> 4.19° and FWHM 5.59 -> 5.57°, 5.24 -> 5.25° and FWHM 1.91 -> 1.96°.
 def rounded(p, digits):
     return round(p.value, digits), round(p.stderr, digits)
 
 
-assert [rounded(b, 3) for b in bisos.values()] == [(0.417, 0.065), (0.425, 0.012), (0.425, 0.026)]
-assert [rounded(p, 2) for p in humps[3]] == [(4.16, 0.10), (5.59, 0.25)]
-assert [rounded(p, 2) for p in humps[6]] == [(5.24, 0.04), (1.91, 0.11)]
+assert [rounded(b, 3) for b in bisos.values()] == [(0.418, 0.065), (0.425, 0.012), (0.425, 0.026)]
+assert [rounded(p, 2) for p in humps[3]] == [(4.19, 0.11), (5.57, 0.26)]
+assert [rounded(p, 2) for p in humps[6]] == [(5.25, 0.05), (1.96, 0.13)]
