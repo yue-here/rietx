@@ -14,6 +14,7 @@ import tempfile
 from _cr2wo6_pair import BACKGROUND, CELL, ZERO, instrument, nuclear_plan, pattern, trirutile
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 ordered, paramagnetic = pattern(4), pattern(150)
 
@@ -61,12 +62,13 @@ with tempfile.TemporaryDirectory() as folder:
 structure.phases[0].scale.value = blind.fitted_structure.phases[0].scale.value
 fitted_instrument = blind.fitted_instrument
 
-# every nuclear term, and the moment, free in one stage
+# every nuclear term, and the moment, free in one stage; the rounds are compared,
+# so each ends with the closing stage
 everything = rx.RefinementPlan(stages=[rx.Stage("all", [
     "phases.0.scale", *BACKGROUND, "phases.0.atoms.*.moment.dof*",
     "instrument.zero_shift", "phases.0.cell.*", "phases.0.atoms.*.dof.*",
     "phases.0.atoms.*.biso", *(f"instrument.profile.{k}" for k in "uvwx")],
-    max_iter=200)], intermediate_ftol=1e-6)
+    max_iter=200)], intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL)
 
 ROUNDS = 5
 previous = moment.magnitude
