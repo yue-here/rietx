@@ -618,13 +618,17 @@ back between 1e-16 and 4e-15 of the largest. Before the change Linux raised no
 `HIGH_CORRELATION` there. On macOS a 1e-14 change to one start value left six
 widths at ± 0.
 
-`COVARIANCE_DIRECTION_DISCARDED` names the touched parameters and leaves their
-esds as they are. A touched set that is exactly a pair `FLAT_DIRECTION` already
-reported adds no row. On the acceptance fixtures 183 of 1 899 whole-pattern
-solves discarded such a direction, most of them within a factor of ten of the
-cut, over four to eight columns each. Marking those esds absent would blank the
-QPA, SRM 676a and brucite fixtures on a threshold that rounding sets, so the
-finding reports and the esd stays.
+A touched parameter has no esd: its variance is set infinite, the absent
+one, so every tie and derived quantity built on it is absent too. A parameter
+that is not estimable has no standard error, and a generalised inverse's
+variance for it depends on which inverse was taken {cite}`searle1971`. The
+pseudo-inverse's number was at least √2 short and by a factor nothing bounds:
+two starts of one synthetic LaB₆ fit with W, `gauss_size` and `gauss_strain`
+free landed 140 esd apart in W. `COVARIANCE_DIRECTION_DISCARDED` names the
+touched parameters, and a touched set that is exactly a pair `FLAT_DIRECTION`
+already reported adds no row. The test runs on the matrix the covariance
+inverted, a Pawley intensity block included. That triple itself is held at
+W, the instrument term, as the other width twins are (`refine.WIDTH_TERMS`).
 
 ## Staged strategy and series
 

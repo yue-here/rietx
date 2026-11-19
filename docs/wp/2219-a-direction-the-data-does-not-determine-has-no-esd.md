@@ -117,7 +117,7 @@ discarded-direction test names gets no esd.
   shows today; check by looking.
 - [ ] Tests: the LaB6 triple (held, so no warning), a deliberately exact pair with no esd in all
   three runners, a CIF round trip. Re-run the slow-suite probe and quote the count.
-- [ ] Skill: the `COVARIANCE_DIRECTION_DISCARDED` row says the esds are absent and what to hold.
+- [x] Skill: the `COVARIANCE_DIRECTION_DISCARDED` row says the esds are absent and what to hold.
   Manual: `reference/result.md`'s esd section, and the Theory tab if the covariance chapter
   describes the cut.
 - [ ] Release fragment: what a reader now receives (`tests.reader_output`), and Yue sees it
