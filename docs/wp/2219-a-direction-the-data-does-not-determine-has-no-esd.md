@@ -129,7 +129,7 @@ discarded-direction test names gets no esd.
 - [x] Skill: the `COVARIANCE_DIRECTION_DISCARDED` row says the esds are absent and what to hold.
   Manual: `reference/result.md`'s esd section, and the Theory tab if the covariance chapter
   describes the cut.
-- [ ] Release fragment: what a reader now receives (`tests.reader_output`), and Yue sees it
+- [x] Release fragment: what a reader now receives (`tests.reader_output`), and Yue sees it
   before merge (a change to what a fit returns).
 
 ## Acceptance
