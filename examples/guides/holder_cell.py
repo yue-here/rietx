@@ -109,7 +109,8 @@ for name, true in (("a_holder", A_HOLDER), ("offset", OFFSET), ("height", HEIGHT
 # guide: phase start
 as_phase = FLUORAPATITE.model_copy(deep=True)
 as_phase.phases.append(ALUMINIUM.model_copy(deep=True).phases[0])
-as_phase.phases[1].cell.a.value = 4.05
+cubic = as_phase.phases[1].cell
+cubic.a.value = cubic.b.value = cubic.c.value = 4.05   # F m -3 m ties b and c to a
 geometry_plan = rx.RefinementPlan.mccusker_structural()
 geometry_plan.stages[names.index("zero")] = rx.Stage(
     "zero_height", ["instrument.zero_shift", "instrument.geometry.sample_displacement"])

@@ -268,6 +268,7 @@ def _harmonic_fit(pattern, scale: float, seed: float) -> dict:
     st = rx.Structure(phases=[corundum_phase()])
     st.phases[0].scale.value = scale * 0.8
     st.phases[0].cell.a.value *= 1.0005
+    st.phases[0].cell.b.value = st.phases[0].cell.a.value  # R -3 c:H ties b to a
     st.phases[0].cell.c.value *= 1.0005
     for atom in st.phases[0].atoms:
         atom.biso.value = 0.5

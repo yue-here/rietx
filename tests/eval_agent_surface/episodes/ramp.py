@@ -118,6 +118,7 @@ def simulate(n: int = N_PATTERNS) -> tuple[np.ndarray, list[np.ndarray]]:
     counts: list[np.ndarray] = []
     for T in temps:
         truth.phases[0].cell.a.value = a_of_T(T)
+        truth.phases[0].cell.b.value = truth.phases[0].cell.c.value = truth.phases[0].cell.a.value  # the cell's ties follow a
         truth.phases[1].scale.value = 4.0e-4 * w_of_T(T)
         # at the declared stages' windows, the draw the registered baseline
         # was captured from: predict's default became the closing stage's

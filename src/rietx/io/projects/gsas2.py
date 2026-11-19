@@ -2094,6 +2094,11 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
             f"{named}: phase {chosen.name!r} states values this build's "
             f"schema refuses ({exc}).  The file's own numbers are on "
             f"`model.phases`") from exc
+    from ...crystallography.symmetry import check_phase_cell_ties
+    try:
+        check_phase_cell_ties(structure.phases[0], prefix="phases.0")
+    except ValueError as exc:
+        raise Gsas2GpxError(f"{named}: phase {chosen.name!r}: {exc}") from exc
 
     # a site whose own images coincide is one atom on its special position
     # (#1007), said here because this is the channel the schema lacks
