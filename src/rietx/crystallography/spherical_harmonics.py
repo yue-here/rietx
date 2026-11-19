@@ -432,8 +432,9 @@ def _symmetric_cell(group, cell) -> tuple[float, ...]:
     """``cell`` with the setting's ties and fixed angles applied exactly.
 
     ``ParameterTable`` accepts a fixed angle up to
-    ``symmetry.SYMMETRY_ANGLE_TOL_DEG`` from its value and a tied length at any
-    stored value, while :func:`frame_rotations` and the projector check
+    ``symmetry.SYMMETRY_ANGLE_TOL_DEG`` from its value and a tied length up to
+    ``symmetry.SYMMETRY_LENGTH_RTOL`` from its source, while
+    :func:`frame_rotations` and the projector check
     hold to about 1e-9.  The coefficients do not depend on the free values, so
     the basis is built on the cell the symmetry demands.
     """
