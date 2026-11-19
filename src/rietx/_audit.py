@@ -4079,6 +4079,32 @@ ROWS: tuple[Row, ...] = (
         evidence=("linear-algebra round-off: R.v - v of an allowed mode vector is ~1e-15, a "
                   "forbidden one O(1) (docstring, WP-1419); tests/test_distortion_block.py::"
                   "test_a_mode_vector_its_site_does_not_allow_is_refused")),
+    Row("rietx.params.vector.FLOOR_SEED_DEG", "constant", tier=1, value=0.001,
+        evidence=("numerical setting (B10, ruled 2026-10-19; Q22b, settled 2026-11-17): "
+                  "FLOOR_SEEDS' size, the forward-difference typical of a width row bounded at "
+                  "0 (optimize.least_squares._fd_typicals, WP-1936), which sets how accurately "
+                  "a column is computed and decides nothing; "
+                  "tests/test_cross_backend.py::test_every_fd_column_meets_a_converged_oracle "
+                  "holds every column differenced at these typicals to a Richardson oracle; "
+                  "WP-2017 group N (docs/wp/2017-batch/group_n_summary.md, 2026-11-16) put every "
+                  "size x10 and /10 on FAP, NAC, cpd-1a and LaB6 under their protocols: every "
+                  "value within 2.4e-6 esd of shipped (FAP bit-identical), under the noise "
+                  "arms' 4.8e-6; on cpd-1a the esds of the width rows at 0 and of W followed "
+                  "the step (51 shipped, 511 at x10, 4.26 at /10), the case Q22a takes, "
+                  "not an error in a value")),
+    Row("rietx.params.vector.FLOOR_SEED_UM2", "constant", tier=1, value=0.001,
+        evidence=("numerical setting (B10, ruled 2026-10-19; Q22b, settled 2026-11-17): "
+                  "FLOOR_SEEDS' size, the forward-difference typical of a width row bounded at "
+                  "0 (optimize.least_squares._fd_typicals, WP-1936), which sets how accurately "
+                  "a column is computed and decides nothing; "
+                  "tests/test_cross_backend.py::test_every_fd_column_meets_a_converged_oracle "
+                  "holds every column differenced at these typicals to a Richardson oracle; "
+                  "WP-2017 group N (docs/wp/2017-batch/group_n_summary.md, 2026-11-16) put every "
+                  "size x10 and /10 on FAP, NAC, cpd-1a and LaB6 under their protocols: every "
+                  "value within 2.4e-6 esd of shipped (FAP bit-identical), under the noise "
+                  "arms' 4.8e-6; on cpd-1a the esds of the width rows at 0 and of W followed "
+                  "the step (51 shipped, 511 at x10, 4.26 at /10), the case Q22a takes, "
+                  "not an error in a value")),
     Row("rietx.params.vector.PARENT_STRAIN_PD_MARGIN", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: the box sum 2|s_j|.|E_j|_2 < lambda_min(C) keeps the child metric "
                   "positive definite (Weyl's inequality, Horn & Johnson, Matrix Analysis, 2nd ed., "
