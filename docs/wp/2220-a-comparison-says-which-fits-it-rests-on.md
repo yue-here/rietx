@@ -152,7 +152,7 @@ at its bound. Every existing `compare_freed` number is unchanged.
   +8.5), `n_identified` 2. Ordering tolerance probe: refitting a converged fit's own free set
   from its answer moved χ² by 0 on four LaB₆ seeds and by −1.1e-7 relative on the correlated
   fixture, never upward, so `FTOL` (1e-9) does not fire on converged pairs there.
-  Gates: GATES_PLACEHOLDER
+  Gates: touched-area selection (`tests/test_compare_freed.py`, `tests/test_body_misfit.py`, `tests/test_audit_table.py`, `tests/test_help.py`, `-n 4 --dist loadgroup`) 91 passed on the final code; earlier the same plus `test_skill.py`, `test_skill_cli.py`, `test_docs_consistency.py` all passed; ruff clean; Vale 0 errors (one warning on line 225 of `reference/comparison.md`, not written here); `tests.reader_output` exit 0. Eight tests added (seven in `test_compare_freed.py`, one in `test_body_misfit.py`), none marked slow. The local fast selection did not run: it queued 25 min behind another runner's slow suite on the machine lock and was cancelled, so CI's fast matrix is the first full fast run.
 
   *Review* (`/code-review high --fix`, 8 findings). Fixed: a diverged trial now stays a
   rejection rather than "not judged"; `BodyMisfitRow`'s new fields are required, not defaulted
