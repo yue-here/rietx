@@ -16,14 +16,14 @@ assert plan.intermediate_ftol == 1e-6
 
 ftols = plan.stage_ftols()
 assert len(ftols) == len(plan.run_stages())
-assert set(ftols[:-2]) == {1e-6} and ftols[-2:] == [None, None]
+assert set(ftols[:-1]) == {1e-6} and ftols[-1] is None
 ```
 
-The list is parallel to `RefinementPlan.run_stages`: the declared stages, then the closing stage ([The closing stage](refinement.md#the-closing-stage)).
+The list is parallel to `RefinementPlan.run_stages`: the declared stages, then the closing stage when the plan asks for one ([The closing stage](refinement.md#the-closing-stage)).
 Three rules decide a stage's tolerance, in this order.
 
 1. A stage that declares `Stage.ftol` runs at it.
-2. The last declared stage runs at the solver's default of 1e-9, shown as `None`, because it produces the answer. The closing stage after it runs at 1e-9 too.
+2. The last declared stage runs at the solver's default of 1e-9, shown as `None`, because it produces the answer. A closing stage after it runs at 1e-9 too.
 3. Every other stage runs at `RefinementPlan.intermediate_ftol`.
 
 A one-stage plan is therefore all last stage, and nothing is loosened.
