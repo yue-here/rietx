@@ -889,7 +889,14 @@ def _stinton_evans(seed: int):
                            per_histogram=["vars.dT"]),
         coordinates=CoordinateTable(columns={"T": TEMPS_SE}, units={"T": "K"}),
         variables=variables, parametric=equations)
-    return ref.fit(patterns, plan="mccusker_default")
+    # declared, not inherited: off by default since WP-2222, and both tests
+    # reading this were measured with it
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+    from rietx.strategy.staged import PLAN_PRESETS
+
+    plan = PLAN_PRESETS["mccusker_default"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
+    return ref.fit(patterns, plan=plan)
 
 
 def _z_scores(result: rx.RefinementResult) -> dict[str, float]:

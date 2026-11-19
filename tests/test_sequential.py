@@ -1419,7 +1419,10 @@ def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
 #: `_CHEAP_WIDE` at twice its budget, so that `_CRAWL_FACTOR` times a first rung
 #: of about 9 evaluations lowers the budget and stays above the crawl's stop
 _CHEAP_ROOMY = staged.RefinementPlan(stages=[
-    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)])
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)],
+    # declared, not inherited: off by default since WP-2222, and the test
+    # below crawls this plan's closing stage
+    closing_window_tol=staged.CLOSING_WINDOW_TOL)
 _CRAWL_FACTOR = 40.0
 
 
@@ -3232,10 +3235,18 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
     the Rwp of the same chain re-seeded.  ``carry_hkl_intensities=False`` is
     the re-seeded chain; the two must agree to 1e-3 relative on every pattern
     (measured: identical to five digits), and the switch must actually clear
-    what the carried chain hands on."""
+    what the carried chain hands on.
+
+    Both chains declare the closing stage.  A carried Pawley chain runs it by
+    default since WP-2222 and a re-seeded one does not, so without the
+    declaration the two would compare different windows."""
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+    from rietx.strategy.staged import PLAN_PRESETS
     from tests.test_pawley import FAP_CIF, _fap_instrument, fap_series
 
     patterns = fap_series(4)
+    plan = PLAN_PRESETS["pawley_default"]()
+    plan.closing_window_tol = CLOSING_WINDOW_TOL
     seen: dict[bool, list[int]] = {True: [], False: []}
     rwp = {}
     for carry in (True, False):
@@ -3245,7 +3256,7 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
         sr = SequentialRefinement(rx.Structure.from_cif(str(FAP_CIF)),
                                   _fap_instrument(False),
                                   carry_hkl_intensities=carry)
-        series = sr.fit(patterns, mode="pawley", plan="pawley_default",
+        series = sr.fit(patterns, mode="pawley", plan=plan,
                         reseed=False, constrain=hook)
         assert all(e.status == "converged" for e in series.entries)
         rwp[carry] = [e.statistics.rwp for e in series.entries]
@@ -3253,6 +3264,38 @@ def test_pawley_chain_carried_intensities_refit_as_far_as_cleared():
     assert seen[False] == [0, 0, 0, 0]
     np.testing.assert_allclose(rwp[True], rwp[False], rtol=1e-3)
 
+
+
+def test_a_carried_pawley_chain_runs_the_closing_stage(monkeypatch):
+    """WP-2222, ruled 2026-11-19: carried Pawley intensities compound the
+    declared stages' 2 % window error, so a chain that carries them runs the
+    closing stage when its plan has none; a chain that re-seeds does not, and
+    a plan's own value is kept."""
+    from rietx.refine import Refinement
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+    from rietx.strategy.staged import PLAN_PRESETS
+    from tests.test_pawley import FAP_CIF, _fap_instrument, fap_series
+
+    ran: list[float | None] = []
+    real_fit = Refinement.fit
+
+    def spy(self, data, *args, plan=None, **kw):
+        ran.append(plan.closing_window_tol)
+        return real_fit(self, data, *args, plan=plan, **kw)
+
+    monkeypatch.setattr(Refinement, "fit", spy)
+    patterns = fap_series(2)
+    loose = PLAN_PRESETS["pawley_default"]()
+    loose.closing_window_tol = 5e-3
+    for carry, plan, want in ((True, "pawley_default", CLOSING_WINDOW_TOL),
+                              (False, "pawley_default", None),
+                              (True, loose, 5e-3)):
+        ran.clear()
+        SequentialRefinement(rx.Structure.from_cif(str(FAP_CIF)), _fap_instrument(False),
+                             carry_hkl_intensities=carry).fit(
+            patterns, mode="pawley", plan=plan, reseed=False)
+        assert ran and set(ran) == {want}
+    assert loose.closing_window_tol == 5e-3  # the caller's plan is not written to
 
 # --------------------------------------------------------------------------- #
 # SeriesResult.direction_gaps (WP-2003, C5): the gaps recorded, no threshold
