@@ -232,6 +232,12 @@ from .structure import Cell
 #: chance rate (``PatternScreen.p0``), so ``n_seen ≤ n_extra·p0``, both
 #: p-values and ``SupercellCheck.p0`` read the windows the count is taken in.
 #: The assumed shift bound floors only the power check (``p0_power``, #951).
+#: Also 1.12 (WP-2078): a run that still has no lattice two engines agree on
+#: after the inlier retry searches again on the lines at or above
+#: ``engines.WEAK_LINE_RETRY_FLOOR`` (5 %) of the strongest, and returns that
+#: search's ranking when it finds agreement (``INDEX_WEAK_LINE_RETRY``).  A run
+#: that found agreement, a declared ``n_unindexed`` and a position-only list
+#: rank exactly as before.
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1747,11 +1753,13 @@ class SearchSpecSpec(Base):
         None, description=(
             "None (default): a cell may leave 2 search lines unindexed, and a "
             "run that ends with no lattice two engines agree on is searched "
-            "again under 'inliers' (INDEX_INLIER_RETRY). 'inliers': accept a "
+            "again under 'inliers' (INDEX_INLIER_RETRY), then, still with no "
+            "agreement, on the lines at or above 5 % of the strongest "
+            "(INDEX_WEAK_LINE_RETRY). 'inliers': accept a "
             "cell indexing at least 60 % of the search lines (and n_dof + 4) "
             "including the 5 strongest — a list whose lines carry one "
-            "intensity has no 'strongest' and keeps 2. An int: that absolute "
-            "count, no retry; raising it MANUFACTURES cells — every tolerated "
+            "intensity has no 'strongest' and keeps 2; no retry. An int: that "
+            "absolute count, no retry; raising it MANUFACTURES cells — every tolerated "
             "line is one more coincidence a wrong metric is allowed — so it is "
             "a statement about the specimen. Every rule reports what a cell "
             "left (CellCandidate.n_search_unindexed)"))
