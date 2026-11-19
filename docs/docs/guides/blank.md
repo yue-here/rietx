@@ -77,6 +77,60 @@ held scale 1.0
 
 [How to keep a parameter fixed whatever the plan frees](hold.md) explains why a cleared refine flag is not enough.
 
+## Hold a curve another program computed
+
+The same slot holds a curve computed by another program for one phase.
+An example is a stacking-fault diffuse term from DIFFaX, the faulted pattern minus the ideal one.
+Such a curve scales with its phase, so its scale is tied to the phase scale instead of refined.
+A curve whose amount is independent of the phase, such as an amorphous fraction, keeps a free scale.
+
+Store the curve as c*·D.
+D is the other program's curve in its own units.
+c* converts those units to counts at phase scale 1.
+To find c*, compute the ideal pattern in the other program too.
+Then take the least-squares ratio of `Refinement.predict` at phase scale 1 to that pattern, over the whole fitted range.
+Check that the ratio is flat across 2θ: the two programs may treat Lorentz-polarisation or absorption differently.
+`predict` returns the whole model, so make that comparison before the curve is stored, with every background coefficient at zero.
+Then tie the curve's scale to the phase scale:
+
+```python
+import numpy as np
+import rietx as rx
+from rietx.examples import examples_dir
+
+two_theta = np.arange(10.0, 120.0, 0.01)
+diffuse = 1.0 / (1.0 + ((two_theta - 31.9) / 0.15) ** 2)  # stands in for D
+c_star = 5e5
+
+instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
+instrument.background = rx.BackgroundFixedPlusChebyshev(
+    fixed_two_theta=two_theta.tolist(),
+    fixed_intensity=(c_star * diffuse).tolist(),
+    fixed_source="DIFFaX, faulted minus ideal, c* = 5e5")
+structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+ref = rx.Refinement(structure, instrument)
+ref.tie("instrument.background.scale", "phases.0.scale")
+
+rows = {row.path: row for row in ref.parameters()}
+assert rows["instrument.background.scale"].tie.terms == [("phases.0.scale", 1.0)]
+```
+
+The curve then adds S·c*·D to the model, with S the phase scale.
+A plan that frees `instrument.background.*` frees the Chebyshev terms and leaves the tied scale alone.
+One fit reaches the least-squares minimum in S, with the curve's dependence on S included.
+A loop of refits that rebuilds the curve from each new scale stops elsewhere, because it holds the curve fixed while it refits S.
+In two synthetic cases the loop's scale differed from the fit's by 0.09 % and 0.5 %.
+
+In a series, a tie is not carried from one pattern to the next.
+Declare it in the `constrain=` hook, which runs before each pattern's fit.
+
+The curve is fixed on the 2θ axis.
+Every peak-position correction moves only the Bragg peaks: the zero shift, the specimen displacement and transparency on a flat plate, and the offsets on a capillary.
+With a zero shift of 0.05° and curve features 0.15° wide, the phase scale came out 0.16 % low and GoF rose from 1.02 to 1.04.
+With features 2.5° wide the bias was 0.009 %.
+If the fit finds a peak shift Δ(2θ), the sum of those corrections at each angle, store the curve at `two_theta + Δ(two_theta)` and fit again.
+For a zero shift alone, Δ is the constant Z.
+
 ## Know the limits
 
 - The blank must cover every fitted channel.
