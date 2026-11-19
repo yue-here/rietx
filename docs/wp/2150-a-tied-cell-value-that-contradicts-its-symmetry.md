@@ -139,7 +139,7 @@ indexing acceptance ranking is unchanged.
   from GSAS-II, GSAS, TOPAS, FullProf or a recipe is refused naming the
   file. A history saved by an older release opens as its fits read it, with
   a note. The cost: a script that edits `cell.a.value` alone on a cubic or
-  tetragonal phase now raises, and 14 test sites plus the holder-cell guide
+  tetragonal phase now raises, and 16 test sites plus the holder-cell guide
   had to move b and c with a.
 
   *Done.* `symmetry.check_cell_ties` beside `check_cell_angles`, called from
@@ -166,7 +166,17 @@ indexing acceptance ranking is unchanged.
   under `F m -3 m` (probe on a `git archive` of origin/main), which is why
   the history repair exists. CIF scans: `tests/data` 16 read, 0 corrected,
   0 refused; `~/Code/rietx-bench` 80 read (349 unreadable to the reader),
-  0 corrected, 0 refused. FASTCOUNT
+  0 corrected, 0 refused. Suites on the branch with main merged (`[dev]` venv, macOS
+  arm64): fast 6 failed, 14823 passed, 434 skipped, 32 xfailed in 657 s; full
+  6 failed, 15779 passed, 445 skipped, 50 xfailed in 2113 s. Five failures
+  were this branch's (four backend-shim goldens, a missing silence pair) and
+  one the stale GUI help-key fixture; all three files pass after the fix
+  commit (with `test_cell_ties.py` and the staged-start file: 110 passed, 2
+  xfailed). The sixth, the two-site magnetic winner in
+  `test_pair_diagnostic_class.py`, fails on main's nightly of 2026-11-18 with
+  the same number. Collected: fast 15250 → 15285 and full 16235 → 16270, +35
+  each (34 in `test_cell_ties.py`, one silence pair), no new skip. The added
+  tests cost 0.42 s in the fast run.
 
   *Review.* `/code-review high --fix` found 8: the six fixed are the parent
   cell paths (helper, GUI preview, GUI edit, history repair, readers), a
