@@ -223,6 +223,12 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.indexing.engines.SearchSpec": 2007,
     "rietx.solve.workflow.solve_structure": 2007,
     "rietx.solve.engines.SolveSpec": 2007,
+    "rietx.indexing.kvector.kgrid_strata": 2007,
+    "rietx.indexing.kvector.kgrid_positions": 2007,
+    "rietx.indexing.kvector.score_kvector": 2007,
+    "rietx.indexing.kvector.score_kgrid": 2007,
+    "rietx.indexing.kvector.kgrid_null": 2007,
+    "rietx.indexing.kvector.kvector_equivalents": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
 }
 
@@ -955,6 +961,45 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
+    Row("INDEX_WEAK_LINE_RETRY", "code", tier=2, ambiguity=1,
+        evidence=("info; fires when the full list, inlier retry included, ends with no lattice "
+                  "two engines agree on (workflow._no_agreement, the inlier retry's own test, "
+                  "asked again), the search was not stopped, the caller declared no "
+                  "n_unindexed, and the floor sets at least one line aside.  WP-2078 measured "
+                  "that trigger on 19 lists (23 runs, preset full): it fired on the "
+                  "molybdenum + trace-oxide fixture (truth absent; the retry ranks it first, "
+                  "medium) and on 11-BM LaB6 + cBN (no candidate before or after), and on no "
+                  "run whose truth ranked first, SRM 660c LaB6 included.  The inlier retry's "
+                  "first-pass test alone fired on four correct mixture runs, which is why the "
+                  "trigger is read after it"),
+        grounds=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783, "
+                 "p. 789): removing weak peaks is not for routine use and is worth a try when "
+                 "the full list gives no clear answer (docs/practice.md, Which lines an "
+                 "indexing search is given).  The action is that retry, taken only where the "
+                 "package has no answer, and the diagnostic says which list the candidates "
+                 "came from (ruled by Yue 2026-11-13: a retry, never a floor before every "
+                 "search)."),
+        response="info",
+        responds=("note that the candidates were searched and scored without the lines under "
+                  "5 % of the strongest, and check those set-aside lines against the leading "
+                  "candidate's predicted positions"),
+        scope=("all",)),
+    Row("K_SEARCH_PARTNER", "code", tier=1, ambiguity=2,
+        evidence=("a geometric fact of the cell: fires once per image of k under a near-symmetry "
+                  "of the metric (indexing.ambiguity.lattice_point_group at the caller's tol) "
+                  "that is no star arm, -k or G - k of k modulo the centred L*; on a "
+                  "pseudo-tetragonal Pnma cell (5.74 x 7.70 x 5.54 A, tol 0.08) the x <-> z "
+                  "image of k = (15/64, 7/64, 3/8) is listed (deviation 0.0735) and none on a "
+                  "5.74 x 7.70 x 6.40 A cell at the same tol; with ten planted satellites at a "
+                  "0.12 deg radius the exact image matched 2 of 10 (seed 0) and the best grid "
+                  "k within four steps of it 8 of 10, 7 of 10 on seeds 1 and 2 "
+                  "(tests/test_indexing_kvector.py, V6)"),
+        grounds=("Arithmetic: W G W^T against G is a statement about the cell alone; the code "
+                 "lists the partner as one equivalence row and never says which k is right "
+                 "(Mighell & Santoro 1975, one rank over)."),
+        response="info",
+        responds=("score the partner's neighbourhood beside k and keep every k that matches "
+                  "as a hypothesis until intensities or a sharper instrument separate them")),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -1302,6 +1347,47 @@ ROWS: tuple[Row, ...] = (
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED", "code", tier=1, ambiguity=1, response="warning",
+        responds=("before quoting a coordinate of a body whose torsion turned, read the "
+                  "distances between its own atoms in result.geometry.distances (a folded "
+                  "pair can be short enough to be listed as a bond): no check searched them"),
+        evidence=("arithmetic: a fact about the pair list, not a threshold.  The anti-bump "
+                  "builder skips two atoms of one rigid body in the body's own copy by default "
+                  "(model.restraints.anti_bump_restraints, exclude_same_body=True), the "
+                  "end-of-run search (stale_anti_bump_pairs) skips them always, and a declared "
+                  "torsion moves such a pair (WP-1808), so a fold no row holds is never reported "
+                  "(#1507: a chain folded to 1.498 A under a 3.0 A minimum).  Fires where the "
+                  "phase has an anti-bump row and a declared torsion's angle moved during the "
+                  "run; the message counts the rows inside the body "
+                  "(model.restraints.body_own_rows); moves no value and gates nothing.  Scope "
+                  "as RESTRAINT_PAIRS_STALE: the purposes whose numbers depend on atom "
+                  "coordinates"),
+        scope=("qpa", "structure", "magnetic")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY", "code", tier=1, ambiguity=3, response="warning",
+        responds=("read the restraint's row as no evidence on this fit, since no parameter "
+                  "moves it, and its target as no check on the refined geometry; then drop "
+                  "it, declare a body torsion that changes it, take its atoms out of the "
+                  "body and restrain them as free atoms, or keep it as the template's "
+                  "penalty"),
+        evidence=("arithmetic, no threshold: every atom of the restraint is in one copy of one "
+                  "rigid body (one frozen image, an isometry of the template, which is in "
+                  "Angstrom so the cell does not move it either), and no declared torsion of "
+                  "the body turns some of its atoms other than the two axis atoms and not the "
+                  "others; each such torsion is a rotation fixing the axis and moving the rest "
+                  "together, so the bond, angle, torsion or plane distance is the template's "
+                  "for every value of every parameter the body has and the row's partial is "
+                  "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
+                  "torsions of a generic seven-atom body with a chained torsion, the rule "
+                  "reports the 45 that stay put when every torsion twists and the pose and "
+                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
+                  "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
+                  "as on the axis, so an error lands on accepting. Action: a warning "
+                  "that keeps the row, because a competent refiner who would act otherwise "
+                  "can be named (the WP-1814 design review, 2026-11-09): one keeping a "
+                  "restraint set across a with-body and a without-body comparison, for whom "
+                  "the constant row is the template's penalty. Ruled by the maintainer, "
+                  "2026-11-13: warn, keep the row (DESIGN.md Rules, 1: the action is of the "
+                  "second or third kind, so ambiguity 3)")),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -1405,7 +1491,6 @@ ROWS: tuple[Row, ...] = (
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
-    Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("the named pattern has no fitted values in the chain the message names: in "
@@ -2491,13 +2576,12 @@ ROWS: tuple[Row, ...] = (
                   "rigid-body uses (WP-1807, #1005). (1) params.vector._refuse_body_off_its_"
                   "sites holds the exact invariance miss to _BODY_SITE_MISS_FACTOR x SITE_TOL, "
                   "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
-                  "params.bodies.RigidBodyBlock._increment_basis compares a linear body's "
-                  "unit-vector residuals |n.u| and |u - (n.u)n|, a tilt in radians, with this "
-                  "fractional tolerance, so the two checks agree only for a body long against "
-                  "its cell: a CO2-like body (C-O 1.16 A) in the P n m a mirror passes the site "
-                  "check and is refused at '90 deg' from an O typed 4e-5 off the mirror at "
-                  "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
-                  "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
+                  "params.bodies._SNAP_REACH, the snap's reach per fractional coordinate, "
+                  "from which RigidBodyBlock._axis_tilt_bound derives the linear-body axis "
+                  "test's tilt bound in radians (a derived value, whose tier follows this "
+                  "row's once given); that test compared the tilt with "
+                  "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
+                  "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
@@ -2638,6 +2722,16 @@ ROWS: tuple[Row, ...] = (
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
         approved="2026-10-28"),
+    Row("rietx.indexing.engines.WEAK_LINE_RETRY_FLOOR", "constant", tier=2, value=0.05,
+        evidence=("Bergmann, Le Bail, Shirley & Zlokazov (2004, Z. Kristallogr. 219, 783), "
+                  "set B: every line at or above 5 % of the strongest, offered to each "
+                  "program as a second attempt; Table 5, four programs x two entries x two "
+                  "modes, 5 better, 1 worse, 10 unchanged; the manual runs also tolerated "
+                  "8-10 unindexed lines, so the gain is not the floor's alone, and McMaille's "
+                  "default run lost its answer under it.  WP-2078: the trace-oxide fixture's "
+                  "truth ranks first at 0.5, 1, 2 and 5 %, so the value is not tuned on it; "
+                  "5 % keeps 5 of its host's 6 lines, the least margin of the four."),
+),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
     Row("rietx.indexing.engines._INDEX_MARGIN", "constant", value=1e-06),
@@ -2696,6 +2790,26 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-21"),
     Row("rietx.indexing.fom._AGGREGATE_FLOOR_RTOL", "constant", value=1e-06),
     Row("rietx.indexing.fom._BOUNDARY_RTOL", "constant", value=1e-09),
+    Row("rietx.indexing.kvector._BLOCK", "constant", tier="invariant", value=2000.0,
+        evidence=("answer-invariant layout: the degrees each k's windows are shifted by so one "
+                  "searchsorted locates a peak in every k's list; any value past the 2θ axis and "
+                  "_PAD gives the same rows to rounding (row 2047 sits about 4.1e6 deg along the axis, "
+                  "so the shift is exact to about 1e-9 deg, not exactly); "
+                  "test_the_layout_constants_do_not_change_the_rows runs _BLOCK 5000 beside "
+                  "2000 and holds every grid row equal, and "
+                  "test_each_grid_row_is_score_kvector_of_its_k holds each to score_kvector's "
+                  "single-k answer)")),
+    Row("rietx.indexing.kvector._CHUNK", "constant", tier="invariant", value=2048,
+        evidence=("answer-invariant: the rows scored per vectorised block, bounding working "
+                  "memory; each row's arithmetic is its own, so the grid rows equal "
+                  "score_kvector's per k whatever the block: "
+                  "test_each_grid_row_is_score_kvector_of_its_k sets the block to 7 so the 1/8 "
+                  "grid's strata cross many block boundaries, and "
+                  "test_the_layout_constants_do_not_change_the_rows sets 31)")),
+    Row("rietx.indexing.kvector._PAD", "constant", tier="invariant", value=900.0,
+        evidence=("answer-invariant layout: where an unused window slot sits, past any 2θ, so "
+                  "no peak locates it; any value in (180, _BLOCK) gives the same rows "
+                  "(test_the_layout_constants_do_not_change_the_rows runs _PAD 300 beside 900)")),
     Row("rietx.indexing.peakfit._H_POS", "constant", value=1e-05),
     Row("rietx.indexing.peakfit._H_WIDTH", "constant", value=1e-07),
     Row("rietx.indexing.peakfit._SEED_GAUSS_FRACTION", "constant", value=0.8),
@@ -3247,6 +3361,11 @@ ROWS: tuple[Row, ...] = (
                   "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
+    Row("rietx.model.restraints._SAME_IMAGE_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: compares an op translation plus a lattice shift, exact "
+                  "small rationals and integers, so any value far above roundoff and far "
+                  "below the smallest nonzero op translation (a fraction of a cell) "
+                  "decides the same inputs")),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
         evidence=("arithmetic: symmetry copies of one contact sit at exactly one distance, so "
                   "matching a contact to a listed row by distance is an identity test; 1e-6 A "
@@ -3769,6 +3888,28 @@ ROWS: tuple[Row, ...] = (
                   "column; 1e-6 A is far below any structural distance")),
     Row("rietx.params.bodies._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.bodies._SNAP_REACH", "constant", tier=1, value=0.00010000000010000001,
+        evidence=("arithmetic: site_orbit's snapped position is the mean of images each within "
+                  "SITE_TOL x (1 + _SITE_TOL_SLACK) of the typed site in every fractional "
+                  "coordinate (its step-1 test), so the mean is too, and it lies on the site's "
+                  "element. site_reach makes that a distance: |M d| is convex in d, so over the "
+                  "box it peaks at a corner, this x the cell's longest body diagonal (A). "
+                  "RigidBodyBlock._axis_tilt_bound makes that a tilt: with u the template's "
+                  "principal axis and s_i each point's offset along it from the centroid, "
+                  "n.u = sum s_i h_i / sum s_i^2 exactly (h_i the point's offset from the "
+                  "site's plane or line), so the tilt's sine is at most the reach x "
+                  "sum |s_i| / sum s_i^2. It replaces the comparison of that sine with "
+                  "SITE_TOL itself (#1226). Its tier follows SITE_TOL's: the value is SITE_TOL "
+                  "x (1 + _SITE_TOL_SLACK), both still unaudited, and the derivation has no "
+                  "free factor, so it takes whatever tier SITE_TOL is given "
+                  "(docs/milestones/generality.md, The rule). Tested: a CO2-like body (C-O 1.16 A) on the "
+                  "P n m a mirror with an O typed up to SITE_TOL/2 off it builds at b = 6 and "
+                  "20 A, as one along the P 1 2 1 2-fold does, both refused on main; a body "
+                  "exempt from the overlap refusal builds at 0.99 x the bound and is refused "
+                  "at 1.01 x, naming its atom (tests/test_rigid_body_special.py)"),
+        grounds=("Never refuses a body whose atoms all passed the site check, and a body "
+                 "tilted past it has an atom further from the element than any snap moves a "
+                 "site, so no refiner's choice turns on it")),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
@@ -4464,9 +4605,6 @@ ROWS: tuple[Row, ...] = (
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
                   "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
-    Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
     Row("rietx.solve.cluster._ISOMETRY_RTOL", "constant", tier=1, value=1e-06,
         evidence=("equivalences(): an integer {-1, 0, 1} matrix P is an isometry of "
                   "the cell when |P^T g P - g| <= 1e-6 x max|g|, element by element. "
@@ -5311,6 +5449,31 @@ ROWS: tuple[Row, ...] = (
         evidence=("answer-invariant: the run recorder, one run a job; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
     Row("rietx.sequential.SequentialRefinement.fit:label", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
+    Row("rietx.indexing.kvector.kgrid_positions:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k the satellite generator "
+                  "builds; another order is another hypothesis the caller names, never added "
+                  "by the package (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.kgrid_null:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "a cut stops every shuffle at one stratum boundary and names strata_left")),
+    Row("rietx.indexing.kvector.kgrid_null:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kgrid:budget", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: budget=None sets no cap; a Budget or Deadline is passed by name, and "
+                  "a cut is reported as strata_left, never as a smaller search called complete")),
+    Row("rietx.indexing.kvector.score_kgrid:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; another order is "
+                  "another hypothesis the caller names (issue #795, K1a)")),
+    Row("rietx.indexing.kvector.score_kvector:harmonics", "default", tier=1, ambiguity=1,
+        value=(1,),
+        evidence=("definition: (1,) is the first-order hypothesis H ± k; (2,) or (3,) scores 2k "
+                  "or 3k as its own hypothesis (issue #795, K1a)")),
     Row("rietx.indexing.workflow.index_pattern:peaks", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:data", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:instrument", "default", value=None),
@@ -5522,6 +5685,16 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("INDEX_WEAK_LINE_RETRY.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: names the set-aside lines and asks whether the leading cell "
+                  "predicts them, lists the three readings of a line it does not predict "
+                  "(second phase, picker artefact, a supercell's ordering line) without "
+                  "ranking them, and names the argument that forbids the retry")),
+    Row("K_SEARCH_PARTNER.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic: the metric is unchanged within tol by the map between the two "
+                  "k, so the suggestion names the calls that would separate them (score the "
+                  "partner's neighbourhood; a moment or modulation model reading intensities) "
+                  "and ranks neither")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
@@ -5645,6 +5818,17 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_BODY_CONTACTS_UNCHECKED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: points at the table that lists the body's own distances and names "
+                  "the remedies (a row for that pair with a minimum the caller states, or a "
+                  "torsion restrained or held) and picks none; it cautions against a floor on a "
+                  "torsion's own ends, which the WP-1816 ruling says biases the conformation; it states no minimum (#677's rule)")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the four ways forward (drop the row, a torsion that "
+                  "changes it, free atoms, or keep it as the template's penalty) and picks "
+                  "none")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
@@ -5682,7 +5866,6 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
                   "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
                   "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
-    Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
                   "on its own (sequential.py:2277)")),
@@ -6073,8 +6256,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_WIDTH_GROWTH",
-    "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
     "SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion",
     "SIZE_UNUSUALLY_SMALL",
@@ -6543,9 +6724,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
-    "rietx.sequential.WIDTH_GROWTH_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
-    "rietx.sequential.WIDTH_GROWTH_SIGMA",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
@@ -6762,7 +6940,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",
     "SPACE_GROUP_SETTING_ASSUMED",

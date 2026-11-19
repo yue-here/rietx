@@ -74,4 +74,11 @@ quaternion and origin, never by its increment. This is chunk R11 of issue #561, 
 
 ## Handover log
 
+- **2026-11-17** — Ruled by Yue 2026-11-17: the result surface #1558 asks for is built. Its
+  design follows the written rules, and the field's shape (a typed field or absolute rows)
+  is settled at PR review. This lifts the 2026-11-15 hold under `### Inherited`. Recorded
+  from Part B item 44 of the 2026-11-17 decisions batch (Ghostshift runner, no code
+  changed). Next: take the reporter's rewrite of the goal, tasks and acceptance into this
+  file, then build.
+
 - **2026-10-06** — created by WP-1803's re-cut, from #596's proposal.

@@ -1657,7 +1657,7 @@
   "judgement": null,
   "demote_to": null,
   "confidence": "high",
-  "note": "Depth 8 built exactly the same 35 596 blocks as depth 2 (WP-1121). The bit-identity test denies the memo whole, which covers any depth."
+  "note": "Depth 8 built exactly the same 35 596 blocks as depth 2 (WP-1121). Corrected 2026-11-16 (WP-1945): that measurement was vacuous, since the lookup then compared only the two newest keys whatever the depth; the lookup now scans every key and the expansion point is pinned. The bit-identity test denies the memo whole, which covers any depth."
  },
  {
   "reader": "M",

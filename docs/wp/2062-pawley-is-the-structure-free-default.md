@@ -159,6 +159,12 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-19, from WP-2219: a Pawley fit's discarded direction is never named.**
+  `staged.py`'s guard skips every solve with `outcome.n_aux`, because the intensity block
+  lies outside `outcome.jac`. So `COVARIANCE_DIRECTION_DISCARDED` cannot fire on a Pawley
+  fit. WP-2219 owns the fix, which tests the augmented matrix. Once Pawley is the
+  default, read that WP's Pawley count before quoting Pawley esds as complete.
+
 - **2026-11-15, from the issue triage (issue #1552): the Le Bail partition clips each
   channel's net count at zero, and that biases the intensities up and the background
   down. Decide it or retire it with this move.** `lebail_update` hands the reflections
