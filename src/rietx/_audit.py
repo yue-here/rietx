@@ -4910,10 +4910,13 @@ ROWS: tuple[Row, ...] = (
                   "the winner's 143.9) and keeps the pick and every class's ranking, at 0.21x the "
                   "wall time; 3 adds no trial; Cr2WO6 150 K tries one k and the k = 0 route of "
                   "Cr2WO6 4 K and LaMnO3 never reads it, so those arms measured nothing "
-                  "(docs/wp/2017-batch/group_l_summary.md)"),
+                  "(docs/wp/2017-batch/group_l_summary.md). Revisit: when the star / multi-k "
+                  "rung lands, re-measure on a k != 0 star"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
                  "with the pick; kept at the measured value, untested beyond its one family (B12, "
-                 "ruled 2026-10-19)."),
+                 "ruled 2026-10-19). Closed under generality.md's rare-feature clause (Q18, "
+                 "ruled by Michael 2026-11-18): its one reaching family, Ba2FeSbSe5, kept its "
+                 "pick when the runner-up's trial was dropped."),
         approved="2026-10-19"),
     Row("rietx.strategy.magnetic.SOLVE_MAX_CONTINUATIONS", "constant", tier=3, value=10,
         evidence=("review of #592: Cr2WO6 150 K (HB-2A) needed 5 continuations for the reference "
@@ -4929,13 +4932,20 @@ ROWS: tuple[Row, ...] = (
                   "WP-2017 group L (2026-11-16), solve_magnetic on Cr2WO6 at 4 K and 150 K (HFIR HB-2A), LaMnO3 at 50 K (NIST BT-1) and Ba2FeSbSe5 at 1.5 K (LLB G4.1, now in tests/data), three laboratories, all development data: unreached on all four: every trial ran one start, so no two "
                   "Rwp were compared (each solve names one site, so each class builds one "
                   "start), and 1e-5 and 1e-3 gave the shipped answer to every digit recorded; it "
-                  "also words the 'distinct minima' caveat; a solve that runs several starts of "
-                  "one class is owed (the two-site synthetic case in test_magnetic_solve runs "
-                  "three) "
-                  "(docs/wp/2017-batch/group_l_summary.md)"),
+                  "also words the 'distinct minima' caveat "
+                  "(docs/wp/2017-batch/group_l_summary.md); "
+                  "named synthetic case (2026-11-19): tests/test_magnetic_solve.py::"
+                  "test_the_minimum_tolerance_decides_one_minimum_or_two, the two-site Pnma "
+                  "solve, three starts in each of four classes: neighbouring start Rwps a "
+                  "relative 9.6e-6 and 1.4e-5 apart on the winner count as one minimum, 1.1e-3 "
+                  "(62.447) and 1.5e-2 (62.441) as two (macOS arm64); 1e-2 merges 62.447's two, "
+                  "1e-6 splits a pair 1e-4 counts as one, and the pick never moves"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
-                 "with the pick; kept at its value, which no family measured (B12, ruled "
-                 "2026-10-19)."),
+                 "with the pick (B12, ruled 2026-10-19). A solver constant no measured solve "
+                 "reaches closes on a named synthetic case that runs more than one start per "
+                 "class (generality.md, ruled 2026-11-05; Q17, ruled by Michael 2026-11-18): "
+                 "the case sits 7x above the largest same-minimum gap and 11x below the "
+                 "smallest two-minima gap, and it reports a count, never the pick."),
         approved="2026-10-19"),
     Row("rietx.strategy.magnetic.SOLVE_RELEASE_FRACTION", "constant", tier=3, value=0.05,
         evidence=("WP-1327: Ba6Co6 (GSAS-II Magnetic-III tutorial, not vendored), released from "
@@ -4978,10 +4988,18 @@ ROWS: tuple[Row, ...] = (
                   "fourth k matches 0 and 5 satellites against the top-ranked k's 2 and 11; on the "
                   "k = 0 route (Cr2WO6 4 K, LaMnO3) it cuts the reported list alike and the pick "
                   "never consults it; the walk past refused k's it also bounds was not exercised "
-                  "(docs/wp/2017-batch/group_l_summary.md)"),
+                  "(docs/wp/2017-batch/group_l_summary.md); "
+                  "named synthetic case (2026-11-19): tests/test_magnetic_k_trials.py::"
+                  "test_top_k_cuts_the_reported_candidate_list_and_never_the_pick, a "
+                  "k = (0,0,1/2) tetragonal pattern whose real satellite arm lists five k "
+                  "(the true one matching 11, four matching none): 2, 3 and 4 report 2, 3 and "
+                  "4 k_candidates with the same pick and the same ranked trials. Revisit: when "
+                  "the star / multi-k rung lands, re-measure on a k != 0 star"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
-                 "with the pick; kept at its value, which no family measured (B12, ruled "
-                 "2026-10-19)."),
+                 "with the pick (B12, ruled 2026-10-19). A constant the measured solves barely "
+                 "reach closes on a named synthetic case (generality.md, ruled 2026-11-05; "
+                 "Q17, ruled by Michael 2026-11-18): it cuts the reported list and not the "
+                 "pick."),
         approved="2026-10-19"),
     Row("rietx.strategy.staged.BACKGROUND_ABSORPTION_GUARD", "constant", value=0.25),
     Row("rietx.strategy.staged.BOUND_HIT_COS_MIN", "constant", tier=3, value=0.0001,

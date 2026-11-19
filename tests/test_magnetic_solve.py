@@ -587,8 +587,42 @@ def two_site(m1=None, m2=None, magnetic=None) -> Phase:
         magnetic_symmetry=magnetic)
 
 
+@pytest.fixture(scope="module")
+def two_site_solution():
+    """The two-site A-type solve, with every class's start Rwps recorded.
+
+    The spy wraps `_best_start` and changes nothing it returns, so the solve is
+    the one `solve_magnetic` runs by default.  **Consumers carry**
+    ``@pytest.mark.xdist_group("magnetic-solve-two-site")``, or each xdist
+    worker runs the solve again (about 8 s on macOS arm64).
+    """
+    instrument = neutron()
+    truth = candidate_named("P n m a", MN_SITE, (0, 0, 0), A_TYPE_BNS)
+    ops, cent = truth.group.xyz_strings()
+    data = simulate(two_site(
+        m1=Moment.from_values((3.5, 0.0, 0.0), "Mn3+"),
+        m2=Moment.from_values((0.7, 0.0, 0.0), "Mn3+"),
+        magnetic=MagneticSymmetry(operations=list(ops),
+                                  centerings=list(cent))), instrument)
+    ref = nuclear_fit(two_site(), data, instrument)
+    starts = []
+    real = _magnetic_module._best_start
+
+    def spy(found):
+        found = list(found)
+        starts.append(found)
+        return real(found)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_magnetic_module, "_best_start", spy)
+        solution = rx.solve_magnetic(ref, data, sites=["Mn1", "Mn2"], ion="Mn3+")
+    return solution, starts
+
+
 @pytest.mark.slow
-def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them():
+@pytest.mark.xdist_group("magnetic-solve-two-site")
+def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them(
+        two_site_solution):
     """The flat seed is not enough, and the answer records how many were tried.
 
     A moment stage over several sites is not convex.  Measured on Ba₆Co₆ with a
@@ -605,16 +639,7 @@ def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them():
     visible; more than one minimum is a fact about the candidate, and it is a
     caveat on the answer rather than something the run hides.
     """
-    instrument = neutron()
-    truth = candidate_named("P n m a", MN_SITE, (0, 0, 0), A_TYPE_BNS)
-    ops, cent = truth.group.xyz_strings()
-    data = simulate(two_site(
-        m1=Moment.from_values((3.5, 0.0, 0.0), "Mn3+"),
-        m2=Moment.from_values((0.7, 0.0, 0.0), "Mn3+"),
-        magnetic=MagneticSymmetry(operations=list(ops),
-                                  centerings=list(cent))), instrument)
-    ref = nuclear_fit(two_site(), data, instrument)
-    solution = rx.solve_magnetic(ref, data, sites=["Mn1", "Mn2"], ion="Mn3+")
+    solution, _starts = two_site_solution
 
     winner = solution.trials[0]
     # flat + one per site
@@ -630,6 +655,50 @@ def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them():
     # and the sweep did not cost correctness: the stated arrangement still wins
     assert solution.verdict == "solved", solution.reason
     assert winner.bns_number == A_TYPE_BNS
+
+
+@pytest.mark.xdist_group("magnetic-solve-two-site")
+def test_the_minimum_tolerance_decides_one_minimum_or_two(two_site_solution,
+                                                          monkeypatch):
+    """`SOLVE_MINIMUM_RTOL`'s named synthetic case (WP-2017 group L, ruled 2026-11-18).
+
+    No measured solve reaches the constant: each named one magnetic site, so
+    each class ran one start and no two Rwp were compared.  This two-site
+    synthetic runs three starts in every class (flat, and one per site
+    released), so the tolerance has pairs to judge.  Measured on macOS arm64,
+    the gaps between neighbouring start Rwps, relative, fall in two groups:
+
+    - the same minimum reached twice, up to 1.4e-5 (the winner, 62.448:
+      9.6e-6 and 1.4e-5), about 7x under the shipped 1e-4;
+    - two minima, from 1.1e-3 (62.447: Rwp 0.45258 and 0.45209) upward,
+      about 11x over it.
+
+    So at 1e-4 the winner's three starts count as one minimum and 62.447's
+    and 62.441's as two.  Moved past either group the count changes: at
+    1e-2 the 62.447 class's two minima merge into one, at 1e-6 a pair the
+    shipped value counts as one minimum splits.  The count is reported
+    (`MagneticTrial.n_minima` and the "distinct minima" caveat) and never
+    changes the pick.  Not marked slow: it is the only case that reaches an
+    audited constant, and it shares the slow neighbour's one solve.
+    """
+    solution, starts = two_site_solution
+    by_bns = {t.bns_number: t for t in solution.trials if t.status == "refined"}
+    shipped = {bns: t.n_minima for bns, t in by_bns.items()}
+    assert all(t.n_starts == 3 for t in by_bns.values()), shipped
+    assert shipped == {"62.448": 1, "62.447": 2, "62.446": 1, "62.441": 2}, shipped
+    assert solution.best.bns_number == A_TYPE_BNS
+
+    def recount(rtol):
+        monkeypatch.setattr(_magnetic_module, "SOLVE_MINIMUM_RTOL", rtol)
+        return sorted(_magnetic_module._best_start(s)[2] for s in starts)
+
+    rtol = _magnetic_module.SOLVE_MINIMUM_RTOL
+    base = recount(rtol)
+    assert base == sorted(shipped.values()), (base, shipped)
+    looser = recount(rtol * 100)
+    tighter = recount(rtol / 100)
+    assert sum(looser) < sum(base), (looser, base)
+    assert sum(tighter) > sum(base), (tighter, base)
 
 
 @pytest.mark.slow
