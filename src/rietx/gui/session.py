@@ -2144,7 +2144,11 @@ class GuiSession:
             plan = self._effective_plan(body.get("plan"))
 
             def call(stream, token):
-                return p.fit(plan=plan, events=stream, cancel=token)
+                # staged until the stage ladder has a view of a one-stage
+                # re-fit: after one, no run on record matches the plan on
+                # screen and the Rwp column goes blank (WP-2224, with Yue)
+                return p.fit(plan=plan, events=stream, cancel=token,
+                             refit="stages")
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts

@@ -4,13 +4,53 @@ A refinement plan frees the parameters in stages, and this page says why rietx s
 
 ## Why a fit runs in stages
 
-Most of what goes wrong in a refinement is a correlation.
-Two parameters change the calculated pattern in nearly the same way, so the data cannot tell them apart ([About correlations and esds](correlations.md)).
-Freed together from a poor starting point, such parameters walk into a local minimum that a staged release avoids.
+A staged plan brings a model from its starting values into the basin of the right answer.
+While the peaks sit in the wrong place or the scale is wrong, the width and intensity parameters point at the wrong repair.
+Two parameters can also change the calculated pattern in nearly the same way, so the data cannot tell them apart ([About correlations and esds](correlations.md)).
+Freed together from a poor start, such parameters walk into a false minimum.
+Freed in order, each group starts from values the earlier stages have already put near the answer.
+
+rietx has a second reason.
+A stage fixes its peak windows and reflection list at the values it starts from, and holds them while the solver runs ([The forward model](../theory/forward-model.md)).
+Each stage compiles them again, so a long move is made over several compiles.
+One stage from a rough start ends on windows sized for where it began.
 
 A plan is a list of stages, and each stage frees one group of parameters and runs before the next group joins.
 Staging is cumulative: a parameter stays free once freed, so each stage refines everything released so far, and the last stage refines everything together.
 The IUCr guidelines {cite}`mccusker1999` ask for that last joint stage, because an esd is correct only when every parameter, profile and structural, is refined at once.
+
+### A re-fit runs one stage
+
+A second `Refinement.fit` on a model that its last fit converged runs one stage, named `warm_refit`.
+That stage frees everything the plan frees, at once.
+The model is already in the basin, and its windows compile at the answer, so the staged order has nothing left to do.
+On the eight standards of `rietx compare`, a one-stage re-fit ended within 0.21 esd of the first fit's answer on every parameter.
+It spent 0.32-0.50 of the staged re-fit's evaluations, and 0.15-0.27 for a plan without a closing stage.
+From a cold start, one stage reached the staged answer on 20 of 48 starts, and the staged plan on 46.
+So the first fit of a model stays staged.
+
+A fit counts as a re-fit when the working state is exactly where an accepted fit of the same pattern left it.
+The pattern, the mode and the fitted channels must be the same.
+No value may have been written since, by `set_values`, `edit`, `run_stage` or a checkout to another node.
+Passing another plan, or changing what is free with `set_vary`, `hold` or `tie`, keeps it a re-fit as long as the plan frees nothing that the last fit held.
+A parameter the last fit held starts cold, so a plan that releases one runs in stages.
+On brucite, freeing a March-Dollase block in one stage ended 2.25 esd from the staged answer on the profile's W.
+`summary()` says how a re-fit ran: in one stage, or in stages, naming the parameter it released.
+An accepted fit is one with `status="converged"` and no error-level diagnostic.
+A project reopened at a converged fit's answer is a re-fit too.
+For now the GUI's Refine runs the plan in stages, so its stage ladder shows every stage's Rwp.
+
+If the one stage diverges or carries an error-level diagnostic, rietx discards it.
+The model goes back to where that stage started, the staged plan runs from there, and the result carries `WARM_REFIT_REJECTED`.
+| `refit=` | A first fit | A re-fit |
+|---|---|---|
+| `"single"` (default) | the plan, in stages | one stage, `warm_refit`; if it is rejected, the plan in stages from the same start, with `WARM_REFIT_REJECTED` |
+| `"stages"` | the plan, in stages | the plan, in stages |
+
+`Refinement.fit` and `refine` both take `refit=`.
+`refine` builds a new `Refinement`, so it re-fits only when its `history` is a tree whose head is such a fit's answer.
+A plan with a stage that fixes parameters (`Stage.turn_off`) always runs in stages, because one stage cannot replay a fix that a later stage undid.
+A series has made the same choice per pattern since v0.5 ([How to refine a series of patterns](../guides/series.md)).
 
 A plan is an ordinary Python object.
 `RefinementPlan.stages` is a list of `Stage`, and [How to add a stage to a refinement plan](../guides/plan.md) edits one.
