@@ -1544,9 +1544,11 @@ class RunRecorder(EventStream):
             # the exception: it ends the *chain*, not just this pattern.
             if data.get("status") == "cancelled":
                 self._status["state"] = "cancelled"
-            elif "series_index" not in data and "lebail_pass" not in data:
+            elif not {"series_index", "lebail_pass", "refit"} & data.keys():
                 # a Le Bail alternation's pass ends a pass, as a series'
-                # member ends a pattern (WP-1323); ``close`` says "done"
+                # member ends a pattern (WP-1323), and so does a re-fit's
+                # one-stage pass, which a staged fallback may follow
+                # (WP-2224); ``close`` says "done"
                 self._status["state"] = "done"
 
     def _write(self, event: dict) -> None:
