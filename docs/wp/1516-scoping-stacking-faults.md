@@ -74,6 +74,17 @@ TOPAS is closed, so both are papers only (DESIGN.md § Locked decisions).
 GSAS-II wraps DIFFaX rather than reimplementing it. DISCUS's licence is
 unverified.
 
+### Inherited
+
+From **WP-1512** (closed 2026-11-18 as option A, Yue's ruling): the `Depends on: 1512 (the
+component any diffuse curve enters as)` premise above changed. WP-1512 built no component. A
+DIFFaX curve, or one from an in-house code, enters through the fixed-background slot
+(`BackgroundFixedPlusChebyshev`, stored as c*·D) plus
+`ref.tie("instrument.background.scale", "phases.0.scale")`; the manual's blank guide
+(`docs/docs/guides/blank.md` § Hold a curve another program computed) has the route and what
+the frozen curve costs under a zero shift. Yue also plans an in-house stacking-fault code
+(2026-11-18).
+
 ## What the scoping decides
 
 1. The DIFFaX I/O WP's scope, filed first.
