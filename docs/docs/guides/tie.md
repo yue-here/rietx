@@ -41,14 +41,14 @@ This fit refines the GSAS-II tutorial fluorapatite pattern twice under one plan,
 
 <!-- output of examples/guides/tie.py -->
 ```text
-34 0.0898
-  phases.0.atoms.4.biso  0.242 ± 0.150
-  phases.0.atoms.5.biso  0.467 ± 0.159
-  phases.0.atoms.6.biso  0.363 ± 0.110
-32 0.0898
-  phases.0.atoms.4.biso  0.360 ± 0.077
-  phases.0.atoms.5.biso  0.360 ± 0.077
-  phases.0.atoms.6.biso  0.360 ± 0.077
+34 0.0893
+  phases.0.atoms.4.biso  0.264 ± 0.149
+  phases.0.atoms.5.biso  0.467 ± 0.157
+  phases.0.atoms.6.biso  0.385 ± 0.109
+32 0.0894
+  phases.0.atoms.4.biso  0.377 ± 0.076
+  phases.0.atoms.5.biso  0.377 ± 0.076
+  phases.0.atoms.6.biso  0.377 ± 0.076
 ```
 
 For each pair of free values, divide their difference by their combined esd, the square root of the sum of the two squared esds.
@@ -56,14 +56,14 @@ The script prints the three ratios:
 
 <!-- output of examples/guides/tie.py -->
 ```text
-pair gaps: 1.03, 0.65, 0.53
+pair gaps: 0.94, 0.66, 0.43
 ```
 
 All three are under 2, so the free fit does not contradict the claim that the three oxygens share one displacement parameter.
 Where a ratio is larger, the atoms are probably not in the same environment, and a tie would replace a measurement with an assumption.
 
-The tie gives one Biso with an esd of 0.077 Å², smaller than any of the three free esds.
-Rwp is the same to four figures, which says only that the tie does not make the fit worse.
+The tie gives one Biso with an esd of 0.076 Å², smaller than any of the three free esds.
+Rwp rises by 0.0001, which says only that the tie costs the fit almost nothing.
 The full script is `examples/guides/tie.py`.
 
 ## Tie with a scale and an offset
