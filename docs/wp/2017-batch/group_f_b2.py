@@ -14,7 +14,7 @@ CuCr2O4 ramp's frames counting as one family (its nearest frame).
     python docs/wp/2017-batch/group_f_b2.py run       # the arms on the picked pattern
     python docs/wp/2017-batch/group_f_b2.py summary   # write group_f_b2_summary.md
 
-The pick (scored 2026-11-19 on pearl): ``11BM_LaB6_cBN_mg2044.xye``, NIST SRM 660b LaB6 with
+The pick (scored 2026-11-19 on the workstation): ``11BM_LaB6_cBN_mg2044.xye``, NIST SRM 660b LaB6 with
 cubic BN in a Kapton capillary, 0.0484.  Its arms, under ``test_acceptance_lab6_cbn``'s shipped
 protocol (``PLAN_SHARED`` over 5.1-50°, LaB6's cell held at its certificate, zero held):
 ``pick`` (the instrument's 16 Chebyshev terms replaced by ``auto_background(data,

@@ -1,6 +1,6 @@
 # WP-2017 group G part B: B1.1 at 2 and 3 widths, NAC, a phase under 1 wt %
 
-Rows: 61 fits, head `b0346eb01ce5f08d2e8a9c3c01af5c2730f0e9ba`, Linux x86_64. Written by `group_g_b11.py summary`; the raw rows are not committed.
+Rows: 61 fits, head `b0346eb01` (this branch before a local rewrite that moved two private builders out of the tree; the code that ran is otherwise identical), Linux x86_64. Written by `group_g_b11.py summary`; the raw rows are not committed.
 
 Columns: the minor phase's lowest significance the hold compared (σ, `refine._answer_significance`) and its value at the answer; the stages that held it; its weight % (esd) against the reference; the share of the off start's cell offset left against the database start's `s3` answer (0 recovered); Rwp; evaluations; the largest shift of any other row against the same start's `s3`, in plain esd (background apart); and whether `PHASE_UNCONSTRAINED` fired.
 

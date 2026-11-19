@@ -1,6 +1,6 @@
 # WP-2017 group B, Q4: `BVLS_MAX_COLUMNS` on three Pawley fits
 
-Rows: 9 fits, head `b0346eb01ce5f08d2e8a9c3c01af5c2730f0e9ba`, Linux x86_64, numpy 2.5.3, rietx-kernels 1.5.0.  Written by `group_b_q4.py summary`; the raw rows are not committed.
+Rows: 9 fits, head `b0346eb01` (this branch before a local rewrite that moved two private builders out of the tree; the code that ran is otherwise identical), Linux x86_64, numpy 2.5.3, rietx-kernels 1.5.0.  Written by `group_b_q4.py summary`; the raw rows are not committed.
 
 Columns: the constant; the largest LM solve's column count and the path it took; solves by path; Rwp; evaluations; status; the largest shift of any row against `shipped` in plain esd over the larger esd, and of the background rows apart.
 
