@@ -94,13 +94,18 @@ discarded-direction test names gets no esd.
 
 ## Tasks
 
-- [ ] Hold the width triple at its source. When W, `gauss_size` and `gauss_strain` are free for
+- [x] Hold the width triple at its source. When W, `gauss_size` and `gauss_strain` are free for
   a seen phase and the null space of `_width_twin_flats` contains their move, hold W, the
   instrument member, as U, X and Y are held already. Record it where WP-2002's holds are
   recorded. Check the WIDTH_TERMS comment's warning: holding W unconditionally moved three
   acceptance answers. This hold fires only on the exact triple, so measure that no
   acceptance answer moves beyond `test_acceptance_stephens`'s corundum row, and say what
   that row's answer did.
+  *Done:* the hold fires on all three Stephens fits, since each frees the triple with U held
+  (base W esd 102 on corundum, 221 and 263 on the two brucite fits, each a `FLAT_DIRECTION`).
+  Corundum's answer moved at most 0.40 base esd (`lor_size` +0.398, `lor_strain` −0.388, V
+  +0.21; cell under 0.03, Biso under 0.10), Rwp 14.5745 % → 14.5720 %, and its
+  `FLAT_DIRECTION` is gone. Brucite moved at most 0.11 esd (V), Rwp +0.003 to +0.004 points.
 - [x] No esd on a discarded direction, dense path. The touched set from
   `statistics.discarded_directions` joins `unmeasured_rows`. Esds, correlations and every
   derived esd follow the existing marking rules. `COVARIANCE_DIRECTION_DISCARDED` keeps
@@ -113,8 +118,12 @@ discarded-direction test names gets no esd.
   value. Check the CIF core dictionary for the form (`?` beside the value is not legal inside
   one number; the likely answer is the value with a separate `_refine` note, or `?` for the
   su item where one exists). Fetch the dictionary per memory note `cif-dictionaries-via-gh`.
-- [ ] GUI and text output: the parameter table shows the missing esd the way an unmeasured row
+- [x] GUI and text output: the parameter table shows the missing esd the way an unmeasured row
   shows today; check by looking.
+  *Done, no GUI code changed:* `/api/params` already sends `esd: null`, and after a Refine
+  click on a scratch LaB6 project the Text tab printed `cell.a … esd 5.85e-05` and the tied
+  `atoms.0.biso` with no esd, as a locked row prints. The Text tab writes no `vars.` rows at
+  all, before and after this WP.
 - [ ] Tests: the LaB6 triple (held, so no warning), a deliberately exact pair with no esd in all
   three runners, a CIF round trip. Re-run the slow-suite probe and quote the count.
 - [x] Skill: the `COVARIANCE_DIRECTION_DISCARDED` row says the esds are absent and what to hold.
