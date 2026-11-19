@@ -140,8 +140,32 @@ the maintainer's ruling, and TOPAS's 2 % cut as named practice.
   fluorite 0.83 esd to a slightly lower Rwp (0.1102 → 0.1094,
   0.1817 → 0.1814). So WP-2224's acceptance line, "within 0.5 esd of a
   staged re-fit", would fail on zincite. It should compare with the first
-  answer, as its § Measured does. That WP is on PR 1710, not on `main`; its
-  session has the finding.
+  answer, as its § Measured does. Its session folded this in before PR 1710
+  merged.
+
+  *Full suite*, on `main` merged in (same venv and platform, alone on the
+  machine, 1:05:05): 12 failed, 15 854 passed, 444 skipped, 50 xfailed. Ten
+  failures pinned numbers through the old default and now declare the
+  closing stage, or regenerate a record that measures a plain call:
+  the NAC start-invariance protocol, the harmonic-seed fits, the wavelength
+  suite's solo fits, the Le Bail cycle bar and the planted-series record. On
+  the null series, the largest scale step is a rank of noise and moved from
+  201→202 to 32→33; every planted signal is unchanged. One was the stale WP
+  index. One was a real defect that the default change caused.
+  `solve_magnetic`'s winner continues with a closing stage through
+  `run_stage`, which took `run_stage`'s default window and so ran at 2 %
+  while still being called "closing". It now names `closing_window_tol`, and
+  `test_the_winners_closing_stage_runs_on_the_closing_windows` pins it (0.02
+  without the fix). The other internal `run_stage` callers (the interval and
+  fraction profiles, a suggestion's verify fit, the rival fits) pass the
+  fit's own `_plan_settings`, so they follow the fit's window. The last
+  failure, `test_the_two_site_winner_finds_each_site_its_own_moment`
+  (m₁ = 0.6995 for 3.5), fails the same way on a snapshot of `main` and in
+  the 2026-11-18 Linux nightly. It is not this branch's. At 2 % windows,
+  LaMnO₃'s Le Bail partition misses its bar: partitions at the tolerance and
+  at a tenth of it differ by 0.30σ against a 0.1σ bar. That is a measured
+  cost of the default for Le Bail, which is not being developed further
+  (Pawley is the direction).
 
   *Review.* `/code-review high --fix` found five. Three were fixed: the
   calibration's error split, `PLAN_INFO`'s `lab_calibrate` text and the

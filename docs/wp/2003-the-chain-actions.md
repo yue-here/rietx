@@ -185,7 +185,9 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
   (`_pending_reflections`) and was not measured. Measure the same chain under
   `mode="lebail"`, carried and re-seeded, without the closing stage. If it drifts, widen
   the condition in `SequentialRefinement.fit` to Le Bail and bring the cost to Yue, since
-  Le Bail work stays minimal by Yue's ruling of 2026-11-05.
+  Le Bail work stays minimal by Yue's ruling of 2026-11-05. One related number: on a single
+  fit at 2 % windows, LaMnO₃'s Le Bail partition misses `tests/test_lebail_cycles.py`'s bar
+  1 by 0.30σ against 0.1σ, and meets it behind the closing stage.
 - **2026-11-05, from the issue triage (issue #1411): what PR #1410 still owes.** The issue
   lists ten items, and this file's handover log and `2003-batch/` hold the detail. It is this
   WP's own list, so nothing moves out except item 9, which WP-2004's Inherited now carries.

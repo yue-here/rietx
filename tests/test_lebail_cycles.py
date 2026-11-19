@@ -481,7 +481,9 @@ def _domain_fit(family, tol):
     data, structure, ins, limits = FAMILIES[family]()
     ref = rx.Refinement(structure, ins)
     plan = resolve_plan("profile_only", "lebail")
-    plan = dataclasses.replace(plan, stages=[
+    # the bars were measured behind the closing stage, declared since WP-2222:
+    # at the declared stages' 2 % windows LaMnO3's partition misses bar 1 by 0.30σ
+    plan = dataclasses.replace(plan, closing_window_tol=CLOSING_WINDOW_TOL, stages=[
         dataclasses.replace(s, lebail_cycles=REFERENCE_CAP if tol < TOL else CAP, lebail_tol=tol)
         for s in plan.stages])
     fitted = ref.fit(data, mode="lebail", plan=plan, two_theta_limits=limits, telemetry=False)
