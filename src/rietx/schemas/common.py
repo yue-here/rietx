@@ -722,7 +722,7 @@ from .._nearmiss import did_you_mean
 #: and an empty list).  0.26 → 0.27 recorded the same kind of change on the
 #: same types (``delta_bic_raw_n``, ``n_effective``).  ``gain`` itself now
 #: means the gain the candidate's bounds let it reach, so a saved number does
-#: not compare with 1.11.0's.  An older build refuses a document carrying
+#: not compare with 1.12.0's.  An older build refuses a document carrying
 #: either new key.
 SCHEMA_VERSION = "0.61"
 
