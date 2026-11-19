@@ -153,6 +153,7 @@ from .peak_equations import (
     evaluate_angle,
 )
 from .peak_equations import evaluate as evaluate_peak_equation
+from .peak_equations import gradient as peak_equation_gradient
 from .preferred_orientation import (
     TEXTURE_SAMPLE_PSI_DEG,
     TEXTURE_SPHERE_SAMPLES,
@@ -164,7 +165,7 @@ from .preferred_orientation import (
     texture_index,
     texture_term_weights,
 )
-from .profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
+from .profiles.caglioti import _MIN_GAMMA_G2, gaussian_fwhm, lorentzian_fwhm
 from .profiles.fcj import (
     fcj_extent_deg,
     fcj_live,
@@ -178,6 +179,7 @@ from .profiles.pseudovoigt import (
     pseudo_voigt_basis,
     pseudo_voigt_derivs,
     tch_gamma_eta,
+    tch_gamma_eta_partials,
 )
 from .profiles.voigt import (
     GAUSS_FWHM_TO_SIGMA,
@@ -1514,7 +1516,25 @@ class CompiledModel:
         ``+ 0.0``, so that a phase with no magnetic component reaches the same
         expression it always did.
         """
-        out = []
+        return [self._peak_widths(*self._line_fwhms(ip, values, tt_bragg, aniso,
+                                                    magnetic=magnetic, d=d))
+                for tt_bragg in tt_bragg_lines]
+
+    def _line_fwhms(self, ip: int, values: dict[str, float], tt_bragg, aniso, *,
+                    magnetic: bool = False, d=None):
+        """(Γ_G, Γ_L) of phase ip at one emission line: :meth:`_width_block`'s
+        arithmetic, which :meth:`peak_equation_partials` reads too."""
+        theta = 0.5 * tt_bragg  # Bragg angle drives the widths
+        extra_g2 = extra_l = None
+        peq = self.phases[ip].peq
+        if peq is not None and peq.has(*WIDTH_TARGETS):
+            extra_g2, extra_l = self._width_terms(ip, values, tt_bragg, d)
+        gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
+                              values["instrument.profile.v"],
+                              values["instrument.profile.w"],
+                              values[f"phases.{ip}.gauss_size"],
+                              values[f"phases.{ip}.gauss_strain"],
+                              extra_squared=extra_g2)
         if magnetic:
             x_l = (values["instrument.profile.x"]
                    + values[f"phases.{ip}.lor_size"]
@@ -1522,30 +1542,94 @@ class CompiledModel:
             y_l = (values["instrument.profile.y"]
                    + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
-        peq = self.phases[ip].peq
-        widths_eq = peq is not None and peq.has(*WIDTH_TARGETS)
-        for tt_bragg in tt_bragg_lines:
-            theta = 0.5 * tt_bragg  # Bragg angle drives the widths
-            extra_g2 = extra_l = None
-            if widths_eq:
-                extra_g2, extra_l = self._width_terms(ip, values, tt_bragg, d)
-            gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
-                                  values["instrument.profile.v"],
-                                  values["instrument.profile.w"],
-                                  values[f"phases.{ip}.gauss_size"],
-                                  values[f"phases.{ip}.gauss_strain"],
-                                  extra_squared=extra_g2)
-            if magnetic:
-                gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+            gam_l = lorentzian_fwhm(theta, x_l, y_l, aniso)
+        else:
+            gam_l = lorentzian_fwhm(
+                theta,
+                values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
+                values["instrument.profile.y"] + self.lor_strain_term(ip, values),
+                aniso)
+        if extra_l is not None:
+            gam_l = gam_l + extra_l
+        return gam_g, gam_l
+
+    def peak_equation_partials(self, ip: int, values: dict[str, float], path: str
+                               ) -> list[tuple] | None:
+        """Exact ∂(pos, w₁, w₂, intensity)/∂c per emission line for one phase
+        coefficient ``path`` (WP-2107), numpy, or ``None`` where it is not one
+        of phase ip's or the exact form does not hold.
+
+        The equation's own gradient (:func:`~rietx.model.peak_equations.gradient`)
+        carried through the one seam its target enters at:
+
+        * ``shift`` adds to the drawn position, so ∂pos = ∂f.
+        * ``lor_fwhm`` adds to Γ_L, so ∂Γ_L = ∂f.
+        * ``gauss_fwhm_squared`` adds to Γ_G² before the floor, so
+          ∂Γ_G = ∂f/(2Γ_G), and 0 on the floor, where Γ_G is constant.
+          ``gauss_fwhm`` adds f², so ∂Γ_G = f·∂f/Γ_G.
+        * Γ_G and Γ_L reach (w₁, w₂) through TCHZ's partials
+          (:func:`~rietx.model.profiles.pseudovoigt.tch_gamma_eta_partials`)
+          or the true Voigt's two divisions, which are linear.
+        * ``intensity_factor`` multiplies, so ∂I = (I/F)·∂F.  At F = 0 the
+          quotient is 0/0, so the method returns ``None`` and the caller
+          takes the scalar chain, which stays correct there.
+
+        No target reads another's value, and ``two_theta`` reads the position
+        before the phase's own ``shift``, so a phase coefficient reaches
+        nothing else.  Only the nuclear component: compile refuses an
+        equation on a phase that draws a magnetic one.
+        """
+        cp = self.phases[ip]
+        peq = cp.peq
+        if peq is None:
+            return None
+        hit = next(((target, k) for target, eq in peq.equations.items()
+                    for k, (_, p) in enumerate(eq.paths) if p == path), None)
+        if hit is None:
+            return None
+        target, k = hit
+        eq = peq.equations[target]
+        cell = self._phase_cell(ip, values)
+        d, tt_lines = self._cell_block(cp, cell, self.line_lambdas(values))
+        frame = peq.frame.at(cell)
+        peaks = self.phase_peaks(ip, values)
+        aniso = (self.strain_width(ip, values, d)
+                 if target in WIDTH_TARGETS else None)
+        out = []
+        for il, tt in enumerate(tt_lines):
+            f, parts = peak_equation_gradient(
+                eq, values, frame, d=d, theta=np.radians(0.5 * tt),
+                two_theta=self.apparent_two_theta(tt, values))
+            g = parts[k]
+            zero = np.zeros_like(g)
+            if target == "shift":
+                out.append((g, zero, zero, zero))
+                continue
+            if target == "intensity_factor":
+                inten = np.asarray(peaks[il][3], dtype=np.float64)
+                live = inten != 0.0
+                if np.any(live & (f == 0.0)):
+                    return None
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    out.append((zero, zero, zero,
+                                np.where(live, inten / f * g, 0.0)))
+                continue
+            gam_g, gam_l = self._line_fwhms(ip, values, tt, aniso, d=d)
+            gam_g = np.asarray(gam_g, dtype=np.float64)
+            d_g = d_l = zero
+            if target == "lor_fwhm":
+                d_l = g
             else:
-                gam_l = lorentzian_fwhm(
-                    theta,
-                    values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
-                    aniso)
-            if extra_l is not None:
-                gam_l = gam_l + extra_l
-            out.append(self._peak_widths(gam_g, gam_l))
+                d_g2 = g if target == "gauss_fwhm_squared" else 2.0 * f * g
+                floored = gam_g == np.sqrt(_MIN_GAMMA_G2)
+                d_g = np.where(floored, 0.0, d_g2 / (2.0 * gam_g))
+            if self.shape == "voigt":
+                d_w1, d_w2 = fwhm_to_voigt_params(d_g, d_l)
+            else:
+                pg, pl, eg, el = tch_gamma_eta_partials(
+                    gam_g, np.asarray(gam_l, dtype=np.float64))
+                d_w1, d_w2 = pg * d_g + pl * d_l, eg * d_g + el * d_l
+            out.append((zero, d_w1, d_w2, zero))
         return out
 
     def _width_terms(self, ip: int, values: dict[str, float], tt_bragg, d=None):
@@ -1993,6 +2077,20 @@ class CompiledModel:
                                              values[f"{base}.b"])
         return surface_roughness_pitschke(tt_bragg, values[f"{base}.c"],
                                           values[f"{base}.tau"])
+
+    def _intensity_factor(self, ip: int, values: dict[str, float], tt_bragg, d):
+        """Phase ip's ``intensity_factor`` equation at one line, or ``None``.
+
+        **Every site that folds intensity by hand must call this**, for the
+        reason :meth:`_roughness_factor` states: the analytic coordinate, ADP,
+        March and texture columns bypass :meth:`phase_peaks`, and one that
+        skips the factor comes back short by exactly 1/F − 1 (43 % at F = 0.7
+        in the probe that scoped WP-2107).
+        """
+        peq = self.phases[ip].peq
+        if peq is None or not peq.has("intensity_factor"):
+            return None
+        return self.phase_term(ip, "intensity_factor", values, tt_bragg, d=d)
 
     def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
                      ) -> tuple[np.ndarray, np.ndarray]:
@@ -3040,6 +3138,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -3127,6 +3230,11 @@ class CompiledModel:
             rough = self._roughness_factor(tt_bragg, values)
             if rough is not None:
                 col = col * rough
+            # a peak equation's intensity factor reads no coordinate, so it
+            # chains through unchanged, as roughness does (WP-2107)
+            factor = self._intensity_factor(ip, values, tt_bragg, d)
+            if factor is not None:
+                col = col * factor
             out.append(col)
         return out
 
@@ -3180,6 +3288,12 @@ class CompiledModel:
         if path.startswith("phases."):
             return True
         if path in ("instrument.zero_shift", "instrument.polarization"):
+            return True
+        # an instrument peak equation (WP-2107) moves the drawn position of
+        # every phase's reflections, and through ``two_theta`` whatever a
+        # phase equation reads of it, all per-peak scalars; a declared peak
+        # is drawn where it is declared and never reads it
+        if path.startswith("instrument.peak_equations."):
             return True
         if path.startswith("instrument.geometry.sample_"):
             return True
