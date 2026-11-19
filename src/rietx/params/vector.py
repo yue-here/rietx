@@ -51,6 +51,7 @@ from ..crystallography.stephens import S_NAMES, isotropic_coefficients, strain_b
 from ..crystallography.symmetry import (
     cell_constraints,
     check_cell_angles,
+    check_cell_ties,
     resolve_group,
     rotation_matrices,
     site_orbit,
@@ -1517,6 +1518,8 @@ class ParameterTable:
         constraints = cell_constraints(sg)
         check_cell_angles(sg, {name: getattr(cell, name).value
                                for name in ("alpha", "beta", "gamma")})
+        stored = {name: getattr(cell, name).value for name in _CELL_NAMES}
+        check_cell_ties(sg, stored, prefix=prefix)
         for name in _CELL_NAMES:
             p: Parameter = getattr(cell, name)
             if name in constraints.ties:
@@ -2043,7 +2046,7 @@ class ParameterTable:
         body that straddles a symmetry element.
         """
         from ..schemas.structure import RIGID_BODY_ROTATION_BOUND
-        from .bodies import RigidBodyBlock
+        from .bodies import RigidBodyBlock, site_reach
         from .derived import cartesian_frame
 
         bbase = f"{base}.rigid_bodies.{b}"
@@ -2056,11 +2059,12 @@ class ParameterTable:
         # Cartesian frame at the stored cell: cell-independent in every
         # setting the check above lets through, so fixed for the table's life
         axial = axial_basis(list(origin.stabilizer))
-        site_axes = None
+        site_axes, reach = None, 0.0
         if len(axial) < 3:
             m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
             w = (m @ axial.T.astype(np.float64)).reshape(3, len(axial))
             site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
+            reach = site_reach(m)
         member = {label: i for i, label in enumerate(body.atoms)}
         try:
             block = RigidBodyBlock(
@@ -2071,7 +2075,8 @@ class ParameterTable:
                 torsions=[(member[t.axis[0]], member[t.axis[1]],
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
-                names=[t.name for t in body.torsions], site_axes=site_axes)
+                names=[t.name for t in body.torsions], site_axes=site_axes,
+                site_reach=reach, labels=list(body.atoms))
         except ValueError as exc:
             code, sep, rest = str(exc).partition(": ")
             if sep and code.startswith("RIGID_BODY_"):

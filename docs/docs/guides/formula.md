@@ -45,10 +45,10 @@ The formula's grammar is [Expressions](../reference/expressions.md): python's lo
 <!-- output of examples/guides/formula.py -->
 ```text
 a0 = 4.587 +/- 6.2e-06
-ga = 0.01720567 +/- 2.6e-05
+ga = 0.01720566 +/- 2.6e-05
 c0 = 2.954001 +/- 5.3e-06
-gc = 0.01410529 +/- 2.1e-05
-theta = 500.1692 +/- 0.61
+gc = 0.01410531 +/- 2.1e-05
+theta = 500.1693 +/- 0.61
 [False, False]
 ```
 

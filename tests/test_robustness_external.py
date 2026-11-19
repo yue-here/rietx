@@ -689,13 +689,17 @@ def test_a_collapse_below_rwp_08_is_caught_and_a_high_rwp_good_fit_is_not(tmp_pa
 
 def test_a_fit_on_the_data_reports_neither_robustness_diagnostic(tmp_path):
     from rietx import Refinement
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
     from rietx.strategy.staged import Stage
 
     start, ins, pattern = _nacl_pattern(tmp_path)          # exact cell
     ref = Refinement(start, ins)
+    # the pattern is simulated at near-complete tails, so the fit declares
+    # them too: the declared stages' 2 % windows alone leave Rwp 0.025 (WP-2222)
     result = ref.run_stage(pattern, Stage(name="scale",
                                           turn_on=["phases.*.scale"],
-                                          max_iter=20))
+                                          max_iter=20),
+                           window_area_tol=CLOSING_WINDOW_TOL)
 
     assert result.statistics.rwp < 0.01
     codes = {d.code for d in result.diagnostics}
