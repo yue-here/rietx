@@ -206,7 +206,7 @@ star, puts it back, because the skill's role is now narrower than interpreting v
 
 ## Handover log
 
-- **2026-11-19 (repair)** — A repair by a ghostshift runner, in the close-only PR #PRNUM.
+- **2026-11-19 (repair)** — A repair by a ghostshift runner, in the close-only PR #1719.
   The session-start scan flagged this WP because commit `3f5d58d23` (2026-11-17 02:07Z)
   postdates the newest entry, dated 2026-11-16. That commit only added the PR line to
   the 2026-11-16 entry, and #1630 merged on 2026-11-17 as `de95ea24e`, so no entry
