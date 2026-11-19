@@ -1,6 +1,6 @@
 # WP-2101 — the parametric surface as it stands, in the manual
 
-Milestone: parametric · Status: 🔄 2026-11-19 — the maintainer's two rulings in; `VARIABLE_NOT_FREED` and the refusal's `.parameters()` in review
+Milestone: parametric · Status: 🔄 2026-11-19 — every task done; `VARIABLE_NOT_FREED` and the refusal's `.parameters()` in review (#1714)
 Depends on: —
 Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it needs no machinery
 
@@ -233,6 +233,79 @@ temperature-calibration and cell coefficient carries `!`, so the 1167 frees none
 | `chi2_convergence_criteria`, `iters`, `seed`, `Rietveld_Plot` | numerics and output | nothing to write | not parametric |
 
 ## Handover log
+
+- **2026-11-19 (the rulings; PR #1714)** — A fit now says when a variable never
+  refined. In a joint fit, an equation whose coefficients no stage freed is named with
+  those coefficients and their starting values. A form rejection caused by a held
+  variable names that variable before it suggests rewriting the formula. Measuring the
+  rulings found the same trap in a single fit, and wider: no preset plan frees a
+  variable there, so a variable that parameters are tied to keeps its start unless a
+  stage names it. The same code covers that case. The refusal of an unknown target
+  points at the public `.parameters()`.
+
+  *Ruled by the maintainer 2026-11-19.* (1) Option (b): a new code naming each
+  parametric equation whose coefficients no plan stage freed, listing them, printed
+  only when it happens; and `PARAMETRIC_FORM_REJECTED`'s suggestion names a held
+  variable before suggesting a rewrite. It reports the fact and its meaning and offers
+  no automatic fix (DESIGN.md Rules 1 and 4). (2) The consent item stood: the refusal
+  names `.parameters()`. Yue ruled for the added reader output, so the handover did not
+  ask again.
+
+  *Done.* `VARIABLE_NOT_FREED`, a warning. Joint fit:
+  `multi._parametric_not_freed_diagnostics`, one per equation, `where` the coefficients
+  no stage's `freed` or `held` names, `value` their count, carried into every
+  histogram's view (`FINDINGS_IN_EVERY_VIEW`). Single fit:
+  `refine._variable_not_freed_diagnostics`, one finding naming each untied variable
+  that something follows (`ParameterTable.entry_reach`) and no stage freed, with its
+  start and its followers. It leaves out a variable whose followers the mode
+  force-fixes, and names `unhold` for a variable `hold` holds. It is called from `fit()`
+  only, since a lone `run_stage` is not a plan. The form rejection's suggestion opens
+  with each `where` coefficient no stage freed, read off the same stage record. Both
+  refusal sites in `params/multi.py` name `.parameters()`. Rows: `rietx._audit` (code
+  tier 1, response warning; suggestion tier 1, value 2), `help.py`, the skill's
+  diagnostics row, `DIAGNOSTIC_SCOPES` (two rows), a silence pair, the GUI help-key
+  fixture, `reference/joint.md`, `reference/parametric.md`, `guides/equation.md` (both
+  traps now print the code; `examples/guides/equation.py` asserts it),
+  `guides/formula.md`, and `guides/tie.md`, whose "the fit refines `vars.thD`" was
+  false under every preset plan. `tests/test_compare_ui.py` does not apply: no
+  correction landed.
+
+  *Measured* (`[dev]` venv, macOS arm64). Single fit on one LaB6 ramp pattern, a
+  variable at `vary=True` set by a formula and a linear tie: under `mccusker_default`,
+  `mccusker_structural` and the default plan it stayed at 0.5 with no row in
+  `result.parameters`; a stage on `vars.*` refined it. Joint fit: held slope Rwp 0.568
+  against 0.041 free on the equation guide's ramp, 0.82 against 0.043 on the tests'
+  five-pattern line ramp. Fast suite, `-m "not slow"` on 8fb1475dc: 1 failed, 14916
+  passed, 433 skipped, 32 xfailed. The one failure,
+  `test_examples.py::...[moment]`, fails with the same numbers on an `origin/main`
+  snapshot. Added tests (local junit): 6.38 s, 0.82 s and 0.36 s; the first does two
+  joint fits and stays in the fast tier beside its file's other fits.
+
+  *Level.* Warning, under `docs/milestones/generality.md` § The rule clause 2: the
+  coefficient and every target it sets are result numbers that are not measurements,
+  and the plan did not reach what the declaration asked.
+
+  *Generality* (judge, condensed). The code: holds, tier 1. Its suggestion: holds. The
+  form prefix: weak, since "held at the answer" disagreed with the code's own reading;
+  fixed to read the stage record. The level: weak, because a deliberate `vary=False`
+  hold (ZrP₂O₇'s calibration coefficients) also warns. Author: kept, because the ruled
+  held-slope case is a `vary=False` declaration no code can tell from a deliberate one,
+  and the skill row says a deliberate hold is the caller's constant. The skill row:
+  weak; fixed to keep the deliberate-hold reading and the `vars.` path route.
+
+  *Review.* `/code-review high --fix` found seven. Fixed: the mode-fixed follower, the
+  held variable's `unhold`, `entry_reach` called only when needed, the form prefix
+  naming a support-held coefficient. Declined: a per-pattern variable counts one row
+  per pattern; a variable two formulas read is named under each equation, as the
+  ruling asks per equation; `run_stage` raises nothing.
+
+  *Settled by Claude 2026-11-19:* the code is `VARIABLE_NOT_FREED`, one name for both
+  fits since every coefficient is a `vars.` row; the alternative was a
+  `PARAMETRIC_`-prefixed name, which misreads a single fit's tie. *Settled by Claude
+  2026-11-19:* the single fit is covered, under the ruling's "wherever the trap occurs"
+  and the measured preset behaviour; the alternative was the joint fit alone.
+
+  Next: none in this WP's tasks. The WP can close once #1714 merges.
 
 - **2026-11-17 (inventory)** — Task 2, by a ghostshift runner, in PR #1654, stacked on
   #1632. The milestone's agent-port row now has numbers to judge against. WO₃'s input fits
