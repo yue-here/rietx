@@ -84,7 +84,7 @@ From x = 10 up it is the tail series (π²/6 − Σ e⁻ᵏˣ(x/k + 1/k²))/x.
 Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
 
 Two functions read a reflection, so they work only inside a peak equation (`PeakEquation`).
-Anywhere else they raise with code `unbound`.
+Anywhere else, such as in a tie or a `ParametricEquation`, the expression is refused where it is parsed, with code `unbound`.
 
 | Function | Value | Derivative used |
 |---|---|---|

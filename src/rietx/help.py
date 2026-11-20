@@ -4012,6 +4012,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": HelpEntry(
+        title="A peak equation's coefficient is shared across wavelengths",
+        description=(
+            "In a joint fit of patterns at different wavelengths, a peak equation's "
+            "coefficient is one number in degrees for every pattern. The right value "
+            "in degrees can differ with wavelength. A size-like term scales with λ, "
+            "and a strain-like one, such as a tan θ term, does not. The package "
+            "converts its own size terms, but cannot tell which kind an equation "
+            "holds. For a wavelength-dependent term, give each pattern its own "
+            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
+            "such a term per pattern, or with Lam in the expression."
+        ),
+    ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
         title="A peak equation takes a width below zero",
         description=(
@@ -4102,13 +4115,14 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A weight fraction ignores an intensity factor",
         description=(
             "A phase carries an `intensity_factor` peak equation, so each of its "
-            "reflections is multiplied by a number the weight fraction does not read. "
-            "The fraction is formed from the scale times the cell's mass and volume, "
-            "as if the factor were 1. A factor that averages 0.7 makes the scale, and "
-            "so the fraction, about 0.7 of what it would be. The message quotes the "
-            "factor's range over the phase's reflections in range. Write the factor so "
-            "that it averages 1, or divide the scale by the mean factor before reading "
-            "the fraction."
+            "reflections' intensities is multiplied by a number. The weight fraction "
+            "is computed from the phase's scale, which absorbs that factor. A factor "
+            "that averages 0.83 makes the scale, and so the fraction relative to the "
+            "other phases, about 1/0.83 = 1.2× too high. A factor averaging above 1 "
+            "makes it too low. The message quotes the factor's range and mean over the "
+            "phase's reflections in range. Write the factor so it averages 1, or "
+            "multiply the phase's scale by the mean factor before reading its "
+            "fraction."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(

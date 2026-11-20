@@ -285,18 +285,44 @@ then adds both to its protocol.
     change to what a reader receives comes to you before merge.
   - *Next.* The maintainer's read of the diagnostics and the schema bump, then merge. After
     merge: the real-data ZrP₂O₇ port frees the curve and the TCHZ terms beside the
-    calibration (the milestone row).
+    calibration (the milestone row). A follow-on from the 2026-11-20 ruling: a
+    `wavelength` name in a peak equation's grammar, so a size-like term can be written
+    once for patterns at several wavelengths, as TOPAS's `Lam` allows. Not built here.
   - *Review, fixed.* A phase whose magnetic component is drawn on its own profile family
     took a short analytic column, so its coefficients now take the scalar chain. A
     negative Lorentzian term sized an empty window and dropped the reflection unseen; the
     window sizing now floors it.
-  - *Review, left open.* Three findings need a design call, none of them a wrong answer
+  - *Review, left open.* Three findings needed a design call, none of them a wrong answer
     on the tests' fits. (1) A joint fit across wavelengths shares a phase coefficient in
     degrees, while the size rule shares the size; an equation's λ dependence is the
     user's to write, and nothing warns. (2) The LM driver's width inequalities read the
     built-in terms alone, so a negative equation term is caught by the guard after the
     fit rather than held inside the step. (3) `orbit_mean` and `harmonic` parse in any
     expression and raise only when a tie or a background evaluates one.
+  - *Ruled by the maintainer, 2026-11-20.* (1) Option a: a warning, not a conversion.
+    `PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` (`multi._peak_equation_sharing_diagnostics`,
+    a joint fit's fit-level row) fires once per equation whose degree-valued coefficients
+    are one column across patterns declaring two or more wavelengths. It names the
+    equation and the shared coefficients, says the right value in degrees can differ
+    with λ (a size-like term scales with it, a strain-like one does not), and names the
+    `SharingMap(per_histogram=[...])` glob that unshares them. Silent with one wavelength,
+    an unshared or parametric coefficient, or an `intensity_factor`. Practice, in the
+    guide: TOPAS writes such a term per pattern or with `Lam` in the expression. Audit,
+    help, silence-pair and skill rows added. (2) `QPA_INTENSITY_FACTOR` reworded in the
+    maintainer's words. The code multiplies intensity by scale × factor, so the fitted
+    scale absorbs 1/mean factor: the message now says the fraction is *too high* by
+    1/mean where the mean is below 1, and *too low* above 1. The maintainer's draft
+    suggestion said "divide this phase's scale by 0.83"; the code's direction makes the
+    correction a multiplication, so the suggestion says "multiply this phase's scale by
+    0.74" (its real mean on the test fixture). The help entry and guide had the
+    direction backwards ("about 0.7 of what it would be"), and both now agree with the
+    code.
+  - *Settled by the lead, 2026-11-20.* (3) `orbit_mean` and `harmonic` are refused where
+    an expression is parsed, with code `unbound`, naming the function and saying it reads
+    a reflection. `Expression(text)` refuses them, and only the peak equation's compile
+    passes `reflection=True`, so a tie, a variable and a `ParametricEquation` each refuse
+    them at declaration. `tests/test_peak_equations.py` holds all three surfaces.
+  - *Left open.* (2) The LM driver's width inequalities read the built-in terms alone.
 
 - **2026-11-19 (the ruling)** — The maintainer ruled on 2026-11-19 on the 2026-11-17
   decision. **Option A**: a peak equation is a field on the model. No objection was raised

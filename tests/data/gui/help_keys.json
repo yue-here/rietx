@@ -206,6 +206,7 @@
   "diagnostics:PEAK_ASYMMETRY_UNMODELLED",
   "diagnostics:PEAK_AXIAL_TAIL",
   "diagnostics:PEAK_CONTAMINATION_LINE",
+  "diagnostics:PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS",
   "diagnostics:PEAK_EXPECTED_FALSE_LINES",
   "diagnostics:PEAK_KALPHA2_ALIAS",
   "diagnostics:PEAK_KALPHA2_RESIDUAL",

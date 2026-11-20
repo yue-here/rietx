@@ -237,10 +237,80 @@ def test_a_fraction_beside_an_intensity_factor_says_it_reads_the_scale_alone():
                                                 lambda p: p)
     assert diag.code == "QPA_INTENSITY_FACTOR"
     assert diag.where == ["phases.0.peak_equations.0"]
-    assert "from 0.7 to 1" in diag.message and 0.7 < diag.value < 1.0
+    assert "by 0.7 to 1 (mean 0.74)" in diag.message and 0.7 < diag.value < 1.0
+    # intensity = scale × factor, so the scale absorbs 1/mean: too high
+    assert "too high by about 1/0.74 = 1.4×" in diag.message
+    assert "multiply this phase's scale by 0.74" in diag.suggestion
     # one phase in the analysis has a fraction of 1 whatever its factor
     assert _qpa_intensity_factor_diagnostics(structure, values, model, [1],
                                              lambda p: p) == []
+
+
+def _mo(ins: rx.Instrument) -> rx.Instrument:
+    """``ins`` at Mo Kα's wavelengths, everything else unchanged."""
+    out = ins.model_copy(deep=True)
+    for line in out.source.lines:
+        line.wavelength.value *= 0.7093 / 1.5406
+    return out
+
+
+def _shared_across_wavelengths(equations, instruments, **kw) -> list:
+    from rietx.multi import _peak_equation_sharing_diagnostics
+    from rietx.params.multi import MultiParameterTable
+
+    mt = MultiParameterTable(Structure(phases=[brucite(peak_equations=equations)]),
+                             instruments, **kw)
+    return _peak_equation_sharing_diagnostics(mt)
+
+
+def test_a_coefficient_shared_across_wavelengths_is_a_warning():
+    """The maintainer's ruling of 2026-11-20 (option a): a coefficient in
+    degrees shared by patterns at two wavelengths fires, naming the equation
+    and the coefficient; one wavelength, an unshared coefficient or an
+    intensity factor stays quiet."""
+    from rietx.params.multi import SharingMap
+
+    cu = _instrument()
+    width = [_eq("lor_fwhm", "w*tan(theta) + x/cos(theta)", w=0.02, x=0.01)]
+    (diag,) = _shared_across_wavelengths(width, [cu, _mo(cu)])
+    assert diag.code == "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS"
+    assert diag.level == "warning"
+    assert diag.where == ["phases.0.peak_equations.0"]
+    assert "shares its coefficients w, x in degrees" in diag.message
+    assert "a size-like term scales with λ" in diag.message
+    assert ('SharingMap(per_histogram=["phases.0.peak_equations.0.w", '
+            '"phases.0.peak_equations.0.x"])') in diag.suggestion
+    assert diag.value == pytest.approx(cu.source.lines[0].wavelength.value
+                                       / _mo(cu).source.lines[0].wavelength.value)
+    # one wavelength
+    assert _shared_across_wavelengths(width, [cu, cu.model_copy(deep=True)]) == []
+    # each pattern its own coefficients
+    assert _shared_across_wavelengths(
+        width, [cu, _mo(cu)],
+        sharing=SharingMap(per_histogram=["phases.*.peak_equations.*"])) == []
+    # a pure number reads no wavelength
+    assert _shared_across_wavelengths(
+        [_eq("intensity_factor", "if(l == 0, 1, p)", p=0.7)], [cu, _mo(cu)]) == []
+
+
+@pytest.mark.parametrize("build", [
+    lambda text: __import__("rietx.params.expression", fromlist=["Expression"])
+    .Expression(text),
+    lambda text: __import__("rietx.schemas.parametric", fromlist=["ParametricEquation"])
+    .ParametricEquation(name="a", target="phases.0.cell.a", basis="expression",
+                        expression=text),
+    lambda text: rx.Refinement(Structure(phases=[brucite()]), _instrument())
+    .tie("phases.0.cell.a", expression=text),
+], ids=["expression", "parametric", "tie"])
+@pytest.mark.parametrize("text, func", [("a0*(1 + k*orbit_mean(l^2))", "orbit_mean"),
+                                        ("a0 + k*harmonic(2, 0)", "harmonic")])
+def test_a_reflection_function_outside_a_peak_equation_is_refused(build, text, func):
+    """The lead's call of 2026-11-20: ``orbit_mean`` and ``harmonic`` read a
+    reflection, so any other expression refuses them where it is parsed,
+    rather than when something first evaluates them."""
+    with pytest.raises((ValueError, ValidationError),
+                       match=rf"{func}\(\) reads a reflection's hkl"):
+        build(text)
 
 
 # --- recovery: a width, a position and an intensity equation -------------------

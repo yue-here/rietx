@@ -1135,6 +1135,35 @@ def _peak_width_silent() -> list:
     return _peak_width(-2e-4) + _peak_width(2e-3)
 
 
+def _peak_eq_shared(mo: bool, per_histogram: list) -> list:
+    """The sharing note for brucite's ``w*tan(theta)`` over a Cu pattern and a
+    second pattern, at Mo Kα or at Cu again."""
+    from rietx.params.multi import SharingMap
+    from tests.test_peak_equations import (
+        _eq,
+        _instrument,
+        _mo,
+        _shared_across_wavelengths,
+    )
+
+    cu = _instrument()
+    other = _mo(cu) if mo else cu.model_copy(deep=True)
+    return _shared_across_wavelengths(
+        [_eq("lor_fwhm", "w*tan(theta)", w=0.02)], [cu, other],
+        sharing=SharingMap(per_histogram=per_histogram))
+
+
+def _peak_eq_shared_fires() -> list:
+    """One shared coefficient across Cu and Mo patterns."""
+    return _peak_eq_shared(True, [])
+
+
+def _peak_eq_shared_silent() -> list:
+    """Two Cu patterns sharing it, and Cu and Mo patterns each with its own."""
+    return (_peak_eq_shared(False, [])
+            + _peak_eq_shared(True, ["phases.*.peak_equations.*"]))
+
+
 def _qpa_factor(p: float, unmeasured: list) -> list:
     """The QPA note for brucite carrying ``if(l == 0, 1, p)`` beside rocksalt."""
     from rietx.refine import _qpa_intensity_factor_diagnostics
@@ -1204,6 +1233,8 @@ SILENCE: dict[str, Pair] = {
         _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": Pair(
+        _peak_eq_shared_fires, _peak_eq_shared_silent, "tests/test_peak_equations.py"),
     "PEAK_WIDTH_NOT_POSITIVE": Pair(
         _peak_width_fires, _peak_width_silent, "tests/test_peak_equations.py"),
     "PLAN_FREES_NO_MOMENT": Pair(

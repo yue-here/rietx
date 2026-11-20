@@ -622,6 +622,32 @@ def names_in(node) -> list[str]:
     return list(out)
 
 
+def _refuse_reflection_functions(text: str, tree) -> None:
+    """Refuse ``orbit_mean`` and ``harmonic`` outside a peak equation (WP-2107).
+
+    Both read the reflection a peak equation is evaluated on.  A tie, a
+    variable or a parametric equation has none, so the call could only fail
+    later, when something evaluates it.  The peak equation's compile passes
+    ``reflection=True``; every other expression is built without it.
+    """
+    stack = [tree]
+    while stack:
+        n = stack.pop()
+        if isinstance(n, Neg | Not):
+            stack.append(n.arg)
+        elif isinstance(n, BinOp | Compare | BoolOp):
+            stack.extend((n.right, n.left))
+        elif isinstance(n, Call):
+            if n.func in REFLECTION_FUNCTIONS:
+                at = text.find(n.func)
+                raise ExpressionError(
+                    "unbound", f"{n.func}() reads a reflection's hkl, and only a "
+                    "peak equation (rx.PeakEquation) is evaluated on one. "
+                    "Write it in a peak equation's expression.",
+                    text, at if at >= 0 else None)
+            stack.extend(reversed(n.args))
+
+
 def rewrite(node):
     """``exp(u) - 1`` → ``expm1(u)``, ``log(1 + u)``/``log(u + 1)`` → ``log1p(u)``.
 
@@ -974,9 +1000,11 @@ class Expression:
     (:func:`rewrite`).
     """
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, *, reflection: bool = False):
         self.text = text
         self.tree = parse(text)
+        if not reflection:
+            _refuse_reflection_functions(text, self.tree)
         self._compiled = rewrite(self.tree)
         #: the free names, first use first, ``pi`` left out
         self.names: tuple[str, ...] = tuple(names_in(self.tree))

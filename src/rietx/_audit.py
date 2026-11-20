@@ -1270,6 +1270,20 @@ ROWS: tuple[Row, ...] = (
                  "is info everywhere (Yue's ruling, #993 round 2, 2026-10-21: of the "
                  "19 usable above-bar components freed on 16 Oct, 12 moved away from "
                  "the lattice's line and 7 towards it)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS", "code", tier=1, ambiguity=2,
+        evidence=("physics: a size-like width coefficient in degrees is (180/pi)K lambda/L, "
+                  "so one specimen needs coefficients in the ratio of the wavelengths, while "
+                  "a strain-like one reads no lambda (Scherrer; params/multi.py "
+                  "SIZE_LAMBDA_POWER); the package cannot tell which term the user wrote, so "
+                  "it warns rather than converts. Fires exactly where a degree-valued peak "
+                  "equation's coefficient is one column across patterns declaring two or more "
+                  "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
+                  "of 2026-11-20, option a, WP-2107)"),
+        response="warning",
+        responds=("do not quote the named equation's coefficients as one size or width "
+                  "for every pattern; unshare a wavelength-dependent term's coefficient with "
+                  "SharingMap(per_histogram=...) and refit, and keep a term that reads no "
+                  "wavelength shared")),
     Row("PEAK_WIDTH_NOT_POSITIVE", "code", tier=1, ambiguity=1,
         evidence=("physics: a Gaussian variance and a Lorentzian FWHM cannot be negative; "
                   "fires exactly where a phase's width peak equations take Γ_G² or Γ_L "
@@ -1321,9 +1335,9 @@ ROWS: tuple[Row, ...] = (
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
     Row("QPA_INTENSITY_FACTOR", "code", tier=1, ambiguity=1,
-        evidence=("arithmetic: W_p reads S_p·(ZMV)_p as the phase's whole intensity, so a "
-                  "factor other than 1 multiplying its reflections moves the fraction by "
-                  "its mean; fires exactly where a measured phase of two or more carries "
+        evidence=("arithmetic: W_p reads S_p·(ZMV)_p as the phase's whole intensity, and "
+                  "intensity = scale × factor, so the fitted scale absorbs 1/mean factor "
+                  "and the fraction moves with it; fires exactly where a measured phase of two or more carries "
                   "an intensity_factor equation that is not 1 everywhere in range "
                   "(WP-2107)"),
         response="warning",
@@ -5857,6 +5871,11 @@ ROWS: tuple[Row, ...] = (
                  "far past the bound the fit would have moved. It says nothing "
                  "of the line's true position, which the 16 Oct re-solve showed the "
                  "bound does not predict (Yue, #993 round 2, 2026-10-21)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS.suggestion", "suggestion", tier=1,
+        ambiguity=3, value=1,
+        evidence=("arithmetic: names the SharingMap glob that gives each pattern its own "
+                  "coefficient, and says a term reading no wavelength can stay shared; "
+                  "picks neither")),
     Row("PEAK_WIDTH_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names a bound, a square or max(x, 0) as ways to keep the "
                   "width positive; picks none")),
@@ -5880,8 +5899,8 @@ ROWS: tuple[Row, ...] = (
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),
     Row("QPA_INTENSITY_FACTOR.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: a factor averaging 1 leaves the scale the phase's amount; "
-                  "dividing by the mean factor is the same correction after the fit; "
-                  "picks neither")),
+                  "multiplying the scale by the mean factor is the same correction after "
+                  "the fit; picks neither")),
     Row("QPA_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the model and the start, and at the run's other "
                   "findings; picks no cause")),

@@ -88,10 +88,19 @@ In a joint fit a phase's coefficient is shared by default, and an instrument's i
 To make a coefficient follow a pattern's coordinate, declare a `ParametricEquation` whose target is the coefficient's path, such as `phases.0.peak_equations.0.w`.
 [How to refine a cell edge as a function of temperature](equation.md) shows the declaration.
 
+A shared coefficient is one number in degrees for every pattern.
+Across patterns at different wavelengths, the right value in degrees can differ.
+A size-like term, such as `x/cos(theta)`, scales with λ.
+A strain-like term, such as `w*tan(theta)`, does not.
+For a wavelength-dependent term, give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.peak_equations.0.x"])`.
+TOPAS writes such a term per pattern, or with `Lam` in the expression.
+
 ## Read what the fit says
 
-Two diagnostics are specific to peak equations.
+Three diagnostics are specific to peak equations.
 `PEAK_WIDTH_NOT_POSITIVE` fires where a width equation takes Γ<sub>G</sub>² or Γ<sub>L</sub> below zero at a fitted reflection.
 A negative term is legal, but the total width is not.
+`PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS` fires in a joint fit where a width or shift coefficient is shared across patterns of different wavelengths.
 `QPA_INTENSITY_FACTOR` fires on a mixture whose phase carries an intensity factor.
-A weight fraction reads the scale as the phase's whole intensity, so a factor that averages 0.7 makes the fraction about 0.7 of what it would be.
+The fraction is computed from the phase's scale, which absorbs the factor.
+A factor that averages 0.83 makes the fraction about 1/0.83 = 1.2× too high relative to the other phases.

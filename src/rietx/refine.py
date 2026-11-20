@@ -11568,13 +11568,14 @@ def _qpa_intensity_factor_diagnostics(structure: Structure,
     factor, which its weight fraction does not read (WP-2107).
 
     W_p ∝ S_p·(ZMV)_p reads the scale as the phase's whole intensity.  An
-    ``intensity_factor`` equation multiplies each reflection's intensity, so
-    one that is not 1 on average moves part of the phase's amount into the
-    factor: at a factor of 0.7 on every reflection the scale comes back 0.7
-    of the truth, and the fraction with it.  The finding quotes the factor's
-    range over the phase's reflections in the fitted range on the primary
-    line, so a reader sees how far from 1 it is.  Silent with one phase in
-    the analysis, whose fraction is 1 whatever its scale.
+    ``intensity_factor`` equation multiplies each reflection's intensity
+    (scale × factor × ..., ``CompiledModel._intensity_factor``), so for the
+    same peaks the fitted scale is the factor-free one divided by the
+    factor's mean f̄: at f̄ = 0.83 the scale, and the fraction relative to
+    the other phases, come out 1/0.83 = 1.2× too high, and at f̄ > 1 too
+    low.  The finding quotes the factor's range and mean over the phase's
+    reflections in the fitted range on the primary line.  Silent with one
+    phase in the analysis, whose fraction is 1 whatever its scale.
     """
     import numpy as np
 
@@ -11597,17 +11598,23 @@ def _qpa_intensity_factor_diagnostics(structure: Structure,
         if not f.size or (f.min() == 1.0 and f.max() == 1.0):
             continue
         path = cp.peq.equations["intensity_factor"].prefix
+        mean = float(f.mean())
+        # intensity = scale × factor, so the scale absorbs 1/mean
+        bias = (f"too high by about 1/{mean:.2g} = {1.0 / mean:.2g}×"
+                if mean < 1.0 else f"too low by about {mean:.2g}×")
         out.append(Diagnostic(
             level="warning", code="QPA_INTENSITY_FACTOR",
-            where=[where_of(path)], value=float(f.mean()),
-            message=(f"Phase {ip} ({structure.phases[ip].name}) carries an "
-                     f"intensity factor from {f.min():.3g} to {f.max():.3g} "
-                     f"over its {f.size} reflections in range (mean "
-                     f"{f.mean():.3g}), and its weight fraction reads the "
-                     "scale as if the factor were 1."),
-            suggestion=("Write the factor so that it averages 1 over the "
-                        "phase's reflections, or divide the phase's scale by "
-                        "its mean factor before reading its fraction."),
+            where=[where_of(path)], value=mean,
+            message=(f"Phase {ip} ({structure.phases[ip].name})'s peak equation "
+                     "multiplies its reflection intensities by "
+                     f"{f.min():.2g} to {f.max():.2g} (mean {mean:.2g}). Its "
+                     "weight fraction is computed from the phase's scale, which "
+                     f"absorbs that factor, so the fraction is {bias} relative "
+                     "to the other phases."),
+            suggestion=("Write the factor so it averages 1 over the phase's "
+                        "reflections, for example by dividing by its mean, or "
+                        f"multiply this phase's scale by {mean:.2g} before "
+                        "reading its fraction."),
         ))
     return out
 

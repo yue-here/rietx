@@ -94,7 +94,7 @@ def compile_equation(eq: PeakEquation, base: str, index: int) -> CompiledPeakEqu
     """``eq`` at ``{base}.peak_equations.{index}``."""
     prefix = f"{base}.peak_equations.{index}"
     return CompiledPeakEquation(
-        target=eq.target, expression=Expression(eq.expression),
+        target=eq.target, expression=Expression(eq.expression, reflection=True),
         paths=tuple((name, f"{prefix}.{name}") for name in eq.coefficients),
         prefix=prefix)
 

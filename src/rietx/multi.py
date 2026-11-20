@@ -352,6 +352,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "per histogram and its displacement parameters shared (WP-1534)"),
     "_size_sharing_diagnostics": (
         (FIT,), "joint-only: what the sharing map did to a size across λ"),
+    "_peak_equation_sharing_diagnostics": (
+        (FIT,), "joint-only (WP-2107): a peak equation's coefficient shared "
+                "across patterns of different λ"),
     "_unreached_histogram_diagnostics": (
         (FIT,), "joint-only, and the plan's (WP-1414): a stage's reach is "
                 "decided before any histogram is compiled"),
@@ -3044,7 +3047,8 @@ class MultiHistogramRefinement:
                 if getattr(outcome, "covariance_error", None) is None:
                     raise
         report.at_bounds = at_bounds
-        return _guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+        return (_guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+                + _peak_equation_sharing_diagnostics(mt))
 
 
 def _refuse_joint_mode(mtable, mode: str) -> None:
@@ -3345,6 +3349,69 @@ def _size_sharing_diagnostics(mtable) -> list[Diagnostic]:
                 "λ. To refine an independent size per histogram, use "
                 'SharingMap(per_histogram=["phases.*.lor_size", '
                 '"phases.*.gauss_size"]).'),
+        ))
+    return out
+
+
+def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
+    """``PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS`` — a peak equation's
+    coefficient is one number in degrees across patterns of different λ
+    (WP-2107, the maintainer's ruling of 2026-11-20, option a).
+
+    A peak equation's width and position targets are in degrees 2θ.  A
+    size-like term, (180/π)·K·λ/(L·cosθ), needs coefficients in the ratio of
+    the wavelengths for one specimen, while a strain-like term, 2ε·tanθ,
+    reads no λ.  The package cannot tell which one the user wrote, so where
+    :data:`~rietx.params.multi.SIZE_LAMBDA_POWER` converts the built-in size
+    terms, this one warns.  TOPAS's practice is to write such a term per
+    pattern, or with its ``Lam`` in the expression.
+
+    Fires once per equation whose coefficients are shared (one column of the
+    joint fit, :func:`~rietx.params.multi.row_shared`, and no parametric
+    equation's target), whose target carries degrees, in a joint fit whose
+    patterns declare at least two different wavelengths.  Silent with one
+    wavelength, with a source that declares no line, and for an
+    ``intensity_factor``, a pure number.
+    """
+    lams = [_longest_wavelength(ins) for ins in mtable.instruments]
+    if any(lam is None for lam in lams) or len(set(lams)) < 2:
+        return []
+    driven = set().union(*(mtable.parametric_targets(h) for h in range(len(lams))))
+    shared: dict[str, list[str]] = {}
+    for e in mtable.tables[0].entries:
+        m = re.fullmatch(r"((?:phases\.\d+|instrument)\.peak_equations\.\d+)\.(\w+)",
+                         e.path)
+        if m and _row_shared(mtable, e) and e.path not in driven:
+            shared.setdefault(m.group(1), []).append(m.group(2))
+    out: list[Diagnostic] = []
+    for prefix, names in shared.items():
+        base, _, index = prefix.rpartition(".peak_equations.")
+        if base == "instrument":
+            eq = mtable.instruments[0].peak_equations[int(index)]
+            owner = "The instrument"
+        else:
+            phase = mtable.structures[0].phases[int(base.split(".")[1])]
+            eq = phase.peak_equations[int(index)]
+            owner = f"Phase {base.split('.')[1]} ({phase.name})"
+        if eq.target == "intensity_factor":
+            continue
+        unit = "deg²" if eq.target == "gauss_fwhm_squared" else "degrees"
+        noun = "its coefficient" if len(names) == 1 else "its coefficients"
+        out.append(Diagnostic(
+            level="warning", code="PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS",
+            where=[prefix], value=float(max(lams) / min(lams)),
+            message=(
+                f"{owner}'s peak equation {eq.target} = {eq.expression} "
+                f"({prefix}) shares {noun} {', '.join(names)} in {unit} across "
+                f"patterns at λ = {min(lams):.5g}-{max(lams):.5g} Å. The right "
+                f"value in {unit} can differ with wavelength: a size-like term "
+                "scales with λ, and a strain-like one does not."),
+            suggestion=(
+                "For a wavelength-dependent term, give each pattern its own "
+                "coefficient: SharingMap(per_histogram=["
+                + ", ".join(f'"{prefix}.{n}"' for n in names) + "]). "
+                "A term that reads no λ, such as a strain's tan(theta), can "
+                "stay shared."),
         ))
     return out
 
