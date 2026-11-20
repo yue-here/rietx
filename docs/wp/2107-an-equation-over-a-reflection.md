@@ -286,6 +286,17 @@ then adds both to its protocol.
   - *Next.* The maintainer's read of the diagnostics and the schema bump, then merge. After
     merge: the real-data ZrP₂O₇ port frees the curve and the TCHZ terms beside the
     calibration (the milestone row).
+  - *Review, fixed.* A phase whose magnetic component is drawn on its own profile family
+    took a short analytic column, so its coefficients now take the scalar chain. A
+    negative Lorentzian term sized an empty window and dropped the reflection unseen; the
+    window sizing now floors it.
+  - *Review, left open.* Three findings need a design call, none of them a wrong answer
+    on the tests' fits. (1) A joint fit across wavelengths shares a phase coefficient in
+    degrees, while the size rule shares the size; an equation's λ dependence is the
+    user's to write, and nothing warns. (2) The LM driver's width inequalities read the
+    built-in terms alone, so a negative equation term is caught by the guard after the
+    fit rather than held inside the step. (3) `orbit_mean` and `harmonic` parse in any
+    expression and raise only when a tie or a background evaluates one.
 
 - **2026-11-19 (the ruling)** — The maintainer ruled on 2026-11-19 on the 2026-11-17
   decision. **Option A**: a peak equation is a field on the model. No objection was raised
