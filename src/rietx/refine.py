@@ -7173,8 +7173,8 @@ class Refinement:
 
     def _covariance_block(self):
         """``paths → physical covariance`` of the last fit's answer, or ``None``
-        (:func:`answer_covariance_block` on :attr:`result_`)."""
-        return answer_covariance_block(self, self.result_)
+        (:func:`_answer_covariance_block` on :attr:`result_`)."""
+        return _answer_covariance_block(self, self.result_)
 
     def check_rigid_bodies(self, data: PatternData, **kw):
         """Test each rigid body against the data (``RIGID_BODY_MISFIT``).
@@ -9745,7 +9745,7 @@ def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | N
     return stderr / esd_inflation
 
 
-def answer_covariance_block(ref, result):
+def _answer_covariance_block(ref, result):
     """``paths → physical covariance`` of ``result``'s answer stage, or ``None``.
 
     The covariance every esd ``result`` quotes was read off, while ``ref``

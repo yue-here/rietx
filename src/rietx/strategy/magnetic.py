@@ -1635,7 +1635,7 @@ def _moment_rows(ref, result, structure
     # than the fit that produced it.  WP-1327's own writer either way — the
     # ``supported`` ratio, the held directions and the degenerate pairing are not
     # recomputed here.
-    from ..refine import answer_covariance_block
+    from ..refine import _answer_covariance_block
 
     evidence = analyse_moments(
         ref._model, _values_of(ref), structure,
@@ -1643,7 +1643,7 @@ def _moment_rows(ref, result, structure
         esd={p.path: p.stderr for p in result.parameters
              if p.stderr is not None},
         correlations=_moment_correlations(ref, result),
-        covariance=answer_covariance_block(ref, result))
+        covariance=_answer_covariance_block(ref, result))
     rows = [
         MomentRow(label=e.atom, ion=e.ion, magnitude=float(e.magnitude),
                   esd=None if e.magnitude_esd is None
