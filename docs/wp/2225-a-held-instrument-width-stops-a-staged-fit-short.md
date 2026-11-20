@@ -1,6 +1,6 @@
 # WP-2225 — A held instrument width stops a staged fit short of its own plan's point
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-20 — claimed by ghostshift runner
 Track: The audits
 Depends on: 2002 (the width twin hold); 2017 soft (its row R measures the same hold); 2224 soft (a one-stage re-fit hides this)
 Priority: P2 2026-11-19 — a fit that frees an instrument width beside its specimen twin returns "converged" at a point its own plan lowers on the next run, and nothing flags it; few fits run such a plan, and calibrating the instrument on a standard is the workaround
