@@ -1,0 +1,40 @@
+srm660c         chain      rwp 0.087515->0.087515 chi2 3.56462->3.56461 (-0.00%) background: background.c0 -0.03; instrument: profile.x +0.01; scale: 0.scale +0.00; atoms: 0.atoms.0.biso +0.00; cell: 0.cell.a +0.00
+srm660c         shipped+1  rwp 0.087515->0.087515 chi2 3.56462->3.56461 (-0.00%) background: background.c0 -0.03; instrument: profile.x +0.01; scale: 0.scale +0.00; atoms: 0.atoms.0.biso +0.00; cell: 0.cell.a +0.00
+                profile first {'u': -0.0005051975561488144, 'v': 0.0017268913434667873, 'w': 0.0005168180743224188, 'x': 0.027924560565648727, 'y': 0.015328507111489649}
+                profile chain {'u': -0.0005053384360409375, 'v': 0.0017276617023404114, 'w': 0.0005158791394826491, 'x': 0.027937471968343213, 'y': 0.015313023482299543}
+                floor first []
+corundum        chain      rwp 0.145745->0.145745 chi2 2.65093->2.65093 (-0.00%) background: background.c0 -0.04; specimen width: 0.lor_strain +0.02; atoms: 0.atoms.1.biso -0.02; instrument: profile.v -0.01; scale: 0.scale -0.00; cell: 0.cell.a -0.00
+corundum        shipped+1  rwp 0.145745->0.145746 chi2 2.65093->2.65098 (+0.00%) background: background.c0 -0.04; specimen width: 0.lor_strain +0.02; atoms: 0.atoms.1.biso -0.02; instrument: profile.v -0.01; scale: 0.scale -0.00; cell: 0.cell.a -0.00
+                profile first {'u': -0.0022656023145641415, 'v': 0.00519839384924979, 'w': 0.01591749024334539, 'x': 0.026864310298102326, 'y': 0.04290550652958802}
+                profile chain {'u': -0.0022656023145641415, 'v': 0.005163159677607981, 'w': 0.01593560013799667, 'x': 0.026864310298102326, 'y': 0.04290550652958802}
+                floor first ['instrument.geometry.axial_sl', 'phases.0.gauss_size', 'phases.0.gauss_strain']
+zincite         chain      rwp 0.109726->0.109669 chi2 2.60999->2.60727 (-0.10%) instrument: profile.v +0.07; specimen width: 0.lor_size +0.04; scale: 0.scale +0.03; atoms: 0.atoms.0.biso +0.02; background: background.c0 +0.02; cell: 0.cell.c +0.01
+zincite         shipped+1  rwp 0.109726->0.109670 chi2 2.60999->2.60733 (-0.10%) instrument: profile.v +0.10; specimen width: 0.lor_size +0.03; background: background.c0 +0.02; scale: 0.scale +0.02; atoms: 0.atoms.0.biso +0.02; cell: 0.cell.a -0.00
+                profile first {'u': -0.000967422233534037, 'v': -0.0001789320240583733, 'w': 0.00663840921503619, 'x': 0.02640014365369703, 'y': 0.03802854933022892}
+                profile chain {'u': -0.000967422233534037, 'v': 0.00010498551076181446, 'w': 0.006562160143199824, 'x': 0.02640014365369703, 'y': 0.03802854933022892}
+                floor first ['phases.0.lor_strain']
+fluorite        chain      rwp 0.181309->0.181303 chi2 2.10981->2.10966 (-0.01%) background: background.c0 -0.01; specimen width: 0.lor_strain +0.01; atoms: 0.atoms.1.biso -0.01; instrument: profile.w +0.00; scale: 0.scale -0.00; cell: 0.cell.a -0.00
+fluorite        shipped+1  rwp 0.181309->0.181303 chi2 2.10981->2.10966 (-0.01%) background: background.c0 -0.01; specimen width: 0.lor_strain +0.01; atoms: 0.atoms.1.biso -0.01; instrument: profile.w +0.00; scale: 0.scale -0.00; cell: 0.cell.a -0.00
+                profile first {'u': 0.004203974027342632, 'v': -0.004916398905053732, 'w': 0.00783938492075925, 'x': 0.0030632929278146563, 'y': 0.06183681552598078}
+                profile chain {'u': 0.004203974027342632, 'v': -0.0049276372805824266, 'w': 0.007843645294395114, 'x': 0.0030632929278146563, 'y': 0.06183681552598078}
+                floor first []
+brucite         chain      rwp 0.469477->0.469481 chi2 52.81589->52.81699 (+0.00%) background: background.c0 -0.01; specimen width: 0.lor_size -0.00; scale: 0.scale -0.00; atoms: 0.atoms.0.biso -0.00; instrument: profile.v +0.00; cell: 0.cell.c +0.00
+brucite         shipped+1  rwp 0.469477->0.469481 chi2 52.81589->52.81700 (+0.00%) background: background.c0 -0.02; specimen width: 0.lor_size -0.00; scale: 0.scale -0.00; atoms: 0.atoms.0.biso -0.00; instrument: profile.v +0.00; cell: 0.cell.c +0.00
+                profile first {'u': -0.0074383461379569065, 'v': 0.0627385839478753, 'w': 0.012948917345909148, 'x': 0.0, 'y': 0.16751336919407928}
+                profile chain {'u': -0.0074383461379569065, 'v': 0.0629100105394146, 'w': 0.013031227860973835, 'x': 0.0, 'y': 0.16751336919407928}
+                floor first ['instrument.geometry.axial_sl', 'instrument.source.lines.1.weight', 'phases.0.gauss_size', 'phases.0.gauss_strain', 'phases.0.lor_strain']
+fap             chain      rwp 0.092498->0.092498 chi2 2.72843->2.72844 (+0.00%) background: background.c1 -0.02; scale: 0.scale +0.01; atoms: 0.atoms.1.biso +0.01; specimen width: 0.lor_size +0.01; instrument: geometry.axial_sl -0.01; cell: 0.cell.a -0.00
+fap             shipped+1  rwp 0.092498->0.092498 chi2 2.72843->2.72844 (+0.00%) background: background.c1 -0.02; scale: 0.scale +0.01; atoms: 0.atoms.1.biso +0.01; specimen width: 0.lor_size +0.01; instrument: geometry.axial_sl -0.01; cell: 0.cell.a -0.00
+                profile first {'u': 0.0011090354888959124, 'v': -0.0011090354888959124, 'w': 0.0027725887222397813, 'x': 0.001, 'y': 0.0}
+                profile chain {'u': 0.0011090354888959124, 'v': -0.0011090354888959124, 'w': 0.0027725887222397813, 'x': 0.001, 'y': 0.0}
+                floor first []
+nac             chain      rwp 0.093170->0.093170 chi2 12.48456->12.48456 (-0.00%) background: background.c1 -0.00; instrument: profile.x -0.00; scale: 0.scale -0.00; atoms: 0.atoms.0.biso -0.00; cell: 0.cell.a +0.00
+nac             shipped+1  rwp 0.093170->0.093170 chi2 12.48456->12.48456 (-0.00%) background: background.c1 -0.00; instrument: profile.x -0.00; scale: 0.scale -0.00; atoms: 0.atoms.0.biso -0.00; cell: 0.cell.a +0.00
+                profile first {'u': 0.0010621022082478253, 'v': -0.0002498246206969761, 'w': 2.6484908408927368e-05, 'x': 0.0019908837811414845, 'y': 0.005239838755753733}
+                profile chain {'u': 0.00106210873100449, 'v': -0.0002498279720315821, 'w': 2.6485198749955358e-05, 'x': 0.0019908549652345358, 'y': 0.005240090796098877}
+                floor first ['phases.1.atoms.0.biso']
+lab6_capillary  chain      rwp 0.088761->0.088761 chi2 2.08139->2.08139 (-0.00%) background: background.c0 +0.01; instrument: profile.y -0.00; atoms: 0.atoms.0.biso -0.00; scale: 0.scale -0.00; cell: 0.cell.a +0.00
+lab6_capillary  shipped+1  rwp 0.088761->0.088761 chi2 2.08139->2.08139 (-0.00%) background: background.c0 +0.01; instrument: profile.y -0.00; atoms: 0.atoms.0.biso -0.00; scale: 0.scale -0.00; cell: 0.cell.a +0.00
+                profile first {'u': 0.0013098516315585256, 'v': -0.0002966773283878159, 'w': 3.3868427406229923e-05, 'x': 0.0025073823993045272, 'y': 0.002139512231853954}
+                profile chain {'u': 0.001309910568474785, 'v': -0.0002966868551984552, 'w': 3.386856359704524e-05, 'x': 0.0025074655560500415, 'y': 0.002138790950216707}
+                floor first []
