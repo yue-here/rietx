@@ -200,6 +200,7 @@ from .strategy.staged import (
     check_biso_negative,
     check_discarded_directions,
     check_hump_width,
+    check_peak_width_positive,
     check_resolution_positive,
     check_resolution_supported,
     check_stephens_positive,
@@ -472,6 +473,11 @@ GUARD_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (SPECIMEN,), "one coefficient set, sampled at each histogram's own ψ: "
                      "a phase is named once, from the first histogram where "
                      "P leaves the physical set (WP-1960)"),
+    "nonpositive_peak_width": (
+        (SPECIMEN,), "a phase's width equations, evaluated at each histogram's "
+                     "own reflections and angles: an equation is named once, "
+                     "from the first histogram where its width goes below zero "
+                     "(WP-2107)"),
     "high_correlations": ((FIT,), "one correlation matrix, of the joint solve"),
     "flat_directions": ((FIT,), "read off the same matrix, beside the correlation"),
     "discarded_directions": ((FIT,), "the joint normal matrix's own cut, read "
@@ -3018,6 +3024,8 @@ class MultiHistogramRefinement:
         report.negative_biso = _specimen_once(mt, models, check_biso_negative)
         report.nonpositive_strain = _stephens_once(mt, models)
         report.nonpositive_texture = _texture_once(mt, models)
+        report.nonpositive_peak_width = _first_per_path(
+            mt, models, check_peak_width_positive)
         if outcome.correlation is not None and len(free) > 1:
             # the single fit's loop (``check_guards``' rule), on the joint
             # correlation matrix
@@ -3271,6 +3279,16 @@ def _texture_once(mtable, models) -> list[GuardFinding]:
     seen: dict[tuple[str, ...], GuardFinding] = {}
     for table, model in zip(mtable.tables, models, strict=True):
         for finding in check_texture_positive(table, model):
+            seen.setdefault(tuple(finding.paths), finding)
+    return list(seen.values())
+
+
+def _first_per_path(mtable, models, check) -> list[GuardFinding]:
+    """``check(table, model)`` on every histogram, one finding per path tuple:
+    :func:`_texture_once`'s shape for a guard that reads the compile."""
+    seen: dict[tuple[str, ...], GuardFinding] = {}
+    for table, model in zip(mtable.tables, models, strict=True):
+        for finding in check(table, model):
             seen.setdefault(tuple(finding.paths), finding)
     return list(seen.values())
 

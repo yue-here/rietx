@@ -1235,6 +1235,17 @@ class GuardFinding:
                    f"over the sphere)")
 
     @classmethod
+    def nonpositive_peak_width(cls, paths: tuple[str, ...], component: str,
+                               n_bad: int, n_total: int, worst: float, unit: str,
+                               hkl: str) -> "GuardFinding":
+        """A phase's width equations (``paths``, one per equation) driving
+        ``component`` (Γ_G² or Γ_L) below zero at ``n_bad`` of its ``n_total``
+        fitted reflections (WP-2107, :func:`check_peak_width_positive`)."""
+        return cls("PEAK_WIDTH_NOT_POSITIVE", tuple(paths), float(worst),
+                   f"{' and '.join(paths)} ({component} below zero at {n_bad} of {n_total} "
+                   f"reflections, worst {worst:+.2e} {unit} at {hkl})")
+
+    @classmethod
     def unsupported_resolution(cls, freed: tuple[str, ...], share: float,
                                n_lorentzian: int, n_total: int) -> "GuardFinding":
         names = ", ".join(path.rsplit(".", 1)[1].upper() for path in freed)
@@ -1349,6 +1360,9 @@ class GuardReport:
     # phases whose spherical-harmonics pole density dips below zero on the
     # sphere (WP-1960, see check_texture_positive)
     nonpositive_texture: list[GuardFinding] = field(default_factory=list)
+    # phases whose width peak equations take Γ_G² or Γ_L below zero at a
+    # fitted reflection (WP-2107, see check_peak_width_positive)
+    nonpositive_peak_width: list[GuardFinding] = field(default_factory=list)
     # the instrument resolution function dipping below zero somewhere in the
     # fitted range — a variance the forward model then clamps to a floor
     # (see check_resolution_positive)
@@ -1407,7 +1421,7 @@ class GuardReport:
         rule, since a declared name whose reader is missing fails no test)."""
         return [*self.high_correlations, *self.at_bounds, *self.nonpositive_adps,
                 *self.nonpositive_strain, *self.nonpositive_texture,
-                *self.unsupported_resolution,
+                *self.nonpositive_peak_width, *self.unsupported_resolution,
                 *self.flat_directions, *self.discarded_directions,
                 *self.large_biso, *self.negative_biso,
                 *self.nonpositive_resolution, *self.narrow_humps,
@@ -1723,6 +1737,74 @@ def check_texture_positive(table, model) -> list[GuardFinding]:
             out.append(GuardFinding.nonpositive_texture(
                 f"phases.{ip}.texture", int((p < -TEXTURE_POSITIVITY_TOL).sum()),
                 len(p), on_reflections, on_sphere))
+    return out
+
+
+def check_peak_width_positive(table, model) -> list[GuardFinding]:
+    """Phases whose width peak equations take a width below zero (WP-2107).
+
+    A peak equation's Gaussian term adds to Γ_G² and its Lorentzian term to
+    Γ_L, and either may be negative: Stinton & Evans's per-phase TCHZ stores a
+    negative v and w.  The total is what must stay positive, and it couples
+    every coefficient with the instrument's and the phase's own terms, so it
+    cannot be a box bound.  The forward model floors Γ_G² at
+    ``caglioti._MIN_GAMMA_G2``, and a negative Γ_L is no peak shape, so below
+    zero the reflection's width is no longer the equation's.
+
+    Tested at the answer on the primary emission line, over the frozen
+    reflections whose Bragg 2θ lies in the fitted range.  Γ_G² is the built-in
+    terms' floored value plus the equation's, so a dip the instrument's own
+    U, V and W cause stays ``RESOLUTION_NOT_POSITIVE``'s.  Zero is a legal Γ_L,
+    so that test is one-sided.  A phase with no width equation is skipped.
+    """
+    import numpy as np
+
+    from ..crystallography.symmetry import reflection_label
+    from ..model.peak_equations import WIDTH_TARGETS
+    from ..model.profiles.caglioti import gaussian_fwhm
+
+    if model is None:
+        return []
+    values = {e.path: e.value for e in table.entries}
+    lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
+    out: list[GuardFinding] = []
+    for ip, cp in enumerate(model.phases):
+        if cp.peq is None or not cp.peq.has(*WIDTH_TARGETS):
+            continue
+        cell = model._phase_cell(ip, values)
+        d, tt_lines = model._cell_block(cp, cell, model.line_lambdas(values))
+        tt = np.asarray(tt_lines[0], dtype=np.float64)
+        on = np.isfinite(tt) & (tt >= lo) & (tt <= hi)
+        if not on.any():
+            continue
+        aniso = model.strain_width(ip, values, d)
+        extra_g2, _ = model._width_terms(ip, values, tt_lines[0], d)
+        _g, gam_l = model._line_fwhms(ip, values, tt_lines[0], aniso, d=d)
+        eqs = cp.peq.equations
+        checks = []
+        if "lor_fwhm" in eqs:
+            checks.append(("Γ_L", "deg", (eqs["lor_fwhm"].prefix,),
+                           np.asarray(gam_l, dtype=np.float64)))
+        if extra_g2 is not None:
+            base = np.asarray(gaussian_fwhm(
+                0.5 * tt, values["instrument.profile.u"],
+                values["instrument.profile.v"], values["instrument.profile.w"],
+                values[f"phases.{ip}.gauss_size"],
+                values[f"phases.{ip}.gauss_strain"]), dtype=np.float64)
+            checks.insert(0, ("Γ_G²", "deg²",
+                              tuple(eqs[t].prefix for t in ("gauss_fwhm",
+                                                            "gauss_fwhm_squared")
+                                    if t in eqs),
+                              base * base + np.asarray(extra_g2, dtype=np.float64)))
+        for component, unit, paths, total in checks:
+            total = np.broadcast_to(total, tt.shape)
+            bad = on & (total < 0.0)
+            if bad.any():
+                k = int(np.argmin(np.where(on, total, np.inf)))
+                out.append(GuardFinding.nonpositive_peak_width(
+                    paths, component, int(bad.sum()),
+                    int(on.sum()), float(total[k]), unit,
+                    reflection_label(cp.reflections.hklm[k])))
     return out
 
 
@@ -2429,6 +2511,7 @@ def check_guards(table, outcome, threshold: float,
     report.nonpositive_adps = check_adp_positive_definite(table)
     report.nonpositive_strain = check_stephens_positive(table, model)
     report.nonpositive_texture = check_texture_positive(table, model)
+    report.nonpositive_peak_width = check_peak_width_positive(table, model)
     report.nonpositive_resolution = check_resolution_positive(table, model)
     report.large_biso = check_biso_plausible(table, model)
     report.negative_biso = check_biso_negative(table, model)

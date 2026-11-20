@@ -7813,7 +7813,8 @@ _REVISABLE_CODES = ("BOUND_HIT", "FLOOR_HIT", "RESOLUTION_NOT_POSITIVE",
                     "BISO_UNUSUALLY_LARGE", "BISO_NEGATIVE",
                     "COVARIANCE_DIRECTION_DISCARDED",
                     "ADP_NOT_POSITIVE_DEFINITE", "STEPHENS_STRAIN_NOT_POSITIVE",
-                    "TEXTURE_NOT_POSITIVE", "HUMP_TOO_NARROW")
+                    "TEXTURE_NOT_POSITIVE", "PEAK_WIDTH_NOT_POSITIVE",
+                    "HUMP_TOO_NARROW")
 
 
 #: ``FLOOR_HIT``'s advice: the limit that carried load is a lower bound of
@@ -7899,6 +7900,18 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "fractions) also leaned on the reflections left with "
                        "no strain width; the share says how much of the "
                        "phase's m·|F|² they carry.",
+        ))
+    for finding in guard.nonpositive_peak_width:
+        out.append(Diagnostic(
+            level="warning", code="PEAK_WIDTH_NOT_POSITIVE",
+            where=list(finding.paths), value=finding.value,
+            message=f"The peak equation {finding} takes a width below zero.",
+            suggestion="Bound the coefficients, or write the term so that it "
+                       "cannot go negative, as a square or with max(x, 0). "
+                       "The forward model floors a negative Γ_G², and a "
+                       "negative Γ_L is no peak shape, so those reflections "
+                       "do not carry the equation's width. Do not report the "
+                       "coefficients as measured.",
         ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)
@@ -11538,10 +11551,65 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
     diagnostics = microabsorption_diagnostics(qpa, structure)
+    diagnostics = diagnostics + _qpa_intensity_factor_diagnostics(
+        structure, values, model, unmeasured, where_of or (lambda p: p))
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))
     return qpa, diagnostics
+
+
+def _qpa_intensity_factor_diagnostics(structure: Structure,
+                                      values: dict[str, float],
+                                      model: CompiledModel, unmeasured,
+                                      where_of: Callable[[str], str],
+                                      ) -> list[Diagnostic]:
+    """``QPA_INTENSITY_FACTOR``: a phase's intensities carry a peak equation's
+    factor, which its weight fraction does not read (WP-2107).
+
+    W_p ∝ S_p·(ZMV)_p reads the scale as the phase's whole intensity.  An
+    ``intensity_factor`` equation multiplies each reflection's intensity, so
+    one that is not 1 on average moves part of the phase's amount into the
+    factor: at a factor of 0.7 on every reflection the scale comes back 0.7
+    of the truth, and the fraction with it.  The finding quotes the factor's
+    range over the phase's reflections in the fitted range on the primary
+    line, so a reader sees how far from 1 it is.  Silent with one phase in
+    the analysis, whose fraction is 1 whatever its scale.
+    """
+    import numpy as np
+
+    measured = [ip for ip in range(len(structure.phases))
+                if ip not in set(unmeasured)]
+    if len(measured) < 2:
+        return []
+    lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
+    out: list[Diagnostic] = []
+    for ip in measured:
+        cp = model.phases[ip]
+        if cp.peq is None or not cp.peq.has("intensity_factor"):
+            continue
+        cell = model._phase_cell(ip, values)
+        d, tt_lines = model._cell_block(cp, cell, model.line_lambdas(values))
+        tt = np.asarray(tt_lines[0], dtype=np.float64)
+        on = np.isfinite(tt) & (tt >= lo) & (tt <= hi)
+        f = np.broadcast_to(np.asarray(model._intensity_factor(
+            ip, values, tt_lines[0], d), dtype=np.float64), tt.shape)[on]
+        if not f.size or (f.min() == 1.0 and f.max() == 1.0):
+            continue
+        path = cp.peq.equations["intensity_factor"].prefix
+        out.append(Diagnostic(
+            level="warning", code="QPA_INTENSITY_FACTOR",
+            where=[where_of(path)], value=float(f.mean()),
+            message=(f"Phase {ip} ({structure.phases[ip].name}) carries an "
+                     f"intensity factor from {f.min():.3g} to {f.max():.3g} "
+                     f"over its {f.size} reflections in range (mean "
+                     f"{f.mean():.3g}), and its weight fraction reads the "
+                     "scale as if the factor were 1."),
+            suggestion=("Write the factor so that it averages 1 over the "
+                        "phase's reflections, or divide the phase's scale by "
+                        "its mean factor before reading its fraction."),
+        ))
+    return out
 
 
 def _qpa_esd_unavailable_diagnostics(structure: Structure,

@@ -3978,6 +3978,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
+        title="A peak equation takes a width below zero",
+        description=(
+            "A phase's width peak equation makes the Gaussian variance Γ_G² or the "
+            "Lorentzian FWHM Γ_L negative at some reflections in the fitted range. A "
+            "term in an equation may be negative, as a TCHZ v or w often is, but the "
+            "total width may not. The forward model floors a negative Γ_G², and a "
+            "negative Γ_L is no peak shape, so those reflections do not carry the "
+            "equation's width. Bound the coefficients, or write the term so that it "
+            "cannot go negative, and refit."
+        ),
+    ),
     "PHASE_HELD_IN_PATTERNS": HelpEntry(
         title="A phase was held in some patterns of a joint fit",
         description=(
@@ -4050,6 +4062,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
             "that takes the broad hump, or longer counting can narrow the range."
+        ),
+    ),
+    "QPA_INTENSITY_FACTOR": HelpEntry(
+        title="A weight fraction ignores an intensity factor",
+        description=(
+            "A phase carries an `intensity_factor` peak equation, so each of its "
+            "reflections is multiplied by a number the weight fraction does not read. "
+            "The fraction is formed from the scale times the cell's mass and volume, "
+            "as if the factor were 1. A factor that averages 0.7 makes the scale, and "
+            "so the fraction, about 0.7 of what it would be. The message quotes the "
+            "factor's range over the phase's reflections in range. Write the factor so "
+            "that it averages 1, or divide the scale by the mean factor before reading "
+            "the fraction."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(

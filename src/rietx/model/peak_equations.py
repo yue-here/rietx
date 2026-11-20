@@ -60,6 +60,8 @@ class CompiledPeakEquation:
     expression: Expression
     #: (coefficient name, table path), in the declaration's order
     paths: tuple[tuple[str, str], ...]
+    #: the equation's own path, ``{base}.peak_equations.{index}``
+    prefix: str = ""
 
     def coefficient_values(self, values) -> dict:
         return {name: values[path] for name, path in self.paths}
@@ -93,7 +95,8 @@ def compile_equation(eq: PeakEquation, base: str, index: int) -> CompiledPeakEqu
     prefix = f"{base}.peak_equations.{index}"
     return CompiledPeakEquation(
         target=eq.target, expression=Expression(eq.expression),
-        paths=tuple((name, f"{prefix}.{name}") for name in eq.coefficients))
+        paths=tuple((name, f"{prefix}.{name}") for name in eq.coefficients),
+        prefix=prefix)
 
 
 @dataclass
