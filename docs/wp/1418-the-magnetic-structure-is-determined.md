@@ -1030,7 +1030,7 @@ no magnetic model declared.
 
 *Next.* Follow-ups 1 and 2 of the 2026-11-19 entry stay Michael's to take or leave, follow-up 2 inside K1b. K1b itself waits on #795's decisions 3 and 4. The alarm-pin failure on this Mac is main's, and the Linux nightly of 2026-11-19 passed it.
 
-This entry was written by a ghostshift runner in PR #PRNUM, which changes only the WP files and the index.
+This entry was written by a ghostshift runner in PR #1729, which changes only the WP files and the index.
 
 ### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
 
