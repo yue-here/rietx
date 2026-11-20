@@ -790,6 +790,21 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
                 "rise; 1e-3 as a seed where they do",
         anchor="theory/background.html#additive-background-models",
     ),
+    "instrument.peak_equations.*.*": HelpEntry(
+        title="Instrument peak equation coefficient",
+        description=(
+            "A coefficient of the instrument's position equation, which adds a shift "
+            "in degrees 2θ to every phase's peaks as a function of the angle alone, "
+            "such as a calibration curve in `two_theta`. Its unit is whatever makes "
+            "the expression come out in degrees. In a joint fit it is per pattern "
+            "unless the sharing map shares it, like every instrument parameter. No "
+            "preset plan frees it, so a stage names `instrument.peak_equations.*` "
+            "itself."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a shift of hundredths of a degree",
+        anchor="guides/peak_equation.html",
+    ),
     "instrument.extra_components.*.position": HelpEntry(
         title="Background-peak position",
         description=(
@@ -1075,6 +1090,25 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="0.6-1.4; a value outside 0.5-2 describes a texture few powder "
                 "mounts produce",
         anchor="theory/corrections.html#preferred-orientation-march-dollase",
+    ),
+    "phases.*.peak_equations.*.*": HelpEntry(
+        title="Peak equation coefficient",
+        description=(
+            "A coefficient of one of the phase's peak equations, named in its "
+            "`coefficients` and read by its expression. The equation adds a term to "
+            "each reflection's Lorentzian or Gaussian width or to its position, or "
+            "multiplies its intensity, as its `target` says. Its unit is whatever "
+            "makes the expression come out in the target's unit: degrees 2θ for a "
+            "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
+            "intensity factor. No preset plan frees it, so a stage names "
+            "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
+            "its own unit refines better rescaled near 1, by writing its factor into "
+            "the expression."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a Lorentzian tanθ coefficient near "
+                "lor_strain's",
+        anchor="guides/peak_equation.html",
     ),
     "phases.*.texture.*": HelpEntry(
         title="Texture coefficient",

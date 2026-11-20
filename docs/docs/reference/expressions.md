@@ -79,6 +79,10 @@ GSAS-II's expressions read `sin`, `cos` and `tan` in degrees (GSAS-II 5.8.4, `GS
 `debye(x)` follows Abramowitz and Stegun § 27.1.
 A Debye temperature $\theta_D$ enters as `debye(theta_D / T)`.
 
+Below |x| = 10 it is a 32-point Gauss-Legendre rule on $\int_0^1 g(xu)\,du$, with $g(s) = s/(e^s - 1)$.
+From x = 10 up it is the tail series (π²/6 − Σ e⁻ᵏˣ(x/k + 1/k²))/x.
+Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
+
 Two functions read a reflection, so they work only inside a peak equation (`PeakEquation`).
 Anywhere else they raise with code `unbound`.
 
@@ -86,9 +90,6 @@ Anywhere else they raise with code `unbound`.
 |---|---|---|
 | `orbit_mean(x)` | the mean of `x` over the images of the reflection's Laue orbit | the mean of the derivatives |
 | `harmonic(l, n)` | the symmetrised spherical harmonic $K_l^n$ of the reflection's direction, with `l` and `n` integer literals | none: it reads no coefficient |
-Below |x| = 10 it is a 32-point Gauss-Legendre rule on $\int_0^1 g(xu)\,du$, with $g(s) = s/(e^s - 1)$.
-From x = 10 up it is the tail series (π²/6 − Σ e⁻ᵏˣ(x/k + 1/k²))/x.
-Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
 
 ## Conditions
 
