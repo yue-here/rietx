@@ -323,14 +323,19 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
 
 ## Acceptance
 
+Under option 3, as ruled by the maintainer on 2026-11-20:
+
 ```sh
-RIETX_TELEMETRY=0 .venv/bin/python docs/wp/2225-batch/eight.py out.jsonl
-.venv/bin/python docs/wp/2225-batch/shifts.py out.jsonl
-.venv/bin/python -m pytest -n auto --dist loadgroup tests/test_width_twin_hold.py tests/test_compare_ui.py
+.venv/bin/python -m pytest -n auto --dist loadgroup tests/test_width_twin_hold.py tests/test_suite_alarms.py tests/test_silence.py tests/test_compare_ui.py
 ```
 
-The `shipped+1` rows of `shifts.py` stay under 0.1 esd on zincite, fluorite, corundum and brucite,
-or the chosen code fires on exactly those four.
+`WIDTH_TWIN_HELD` fires on exactly zincite, fluorite, corundum and brucite among the eight
+comparison standards, and on none of the other four. The pin in `tests/data/suite_alarms.json`
+says so, and the slow row `test_the_standards_fire_what_the_pin_says` holds the measurement to it.
+The code fires on a synthetic fit whose last stage held U, and stays silent on the same plan with
+no specimen width free. The earlier bar, a staged re-fit moving no reported parameter by more than
+0.1 esd, belonged to options 1 and 2 and is dropped. Option 3 moves no number.
+`2225-batch/eight.py` and `shifts.py` still measure that bar, for a follow-up such as option 4.
 
 ## References
 
