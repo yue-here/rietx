@@ -205,6 +205,16 @@ and have no free factor to measure, so this file's old list named them without c
   real families (cpd-1a, LaB₆ + cBN, SRM 660c) are WP-2225's task 1 too; a session working either
   reads the other's measurements. WP-2225 also re-measured the swap prototype on the four
   single-phase standards (`docs/wp/2225-batch/swap_summary.txt`).
+- **From WP-2225 (2026-11-20), task 1.** The hold measured on row R's real families with
+  `docs/wp/2225-batch/families.py` (§ Task 1 there). With the hold off, cpd-1a's answers from the
+  Biso starts 0.5 and 1.5 Å² agree to 0.01 reported esd on every row that keeps one, against 5.11
+  with it on. The hold-off fit
+  gets there with U = −0.138 deg² and Y = −0.198°, and it walks on corundum, brucite and brucite
+  with a Stephens block. On LaB₆ + cBN's twin plan, a staged re-fit moves La Biso 1.76 reported
+  esd with the hold on. The hold costs no weight fraction on either sample: cpd-1a's arms differ by
+  at most 0.33 wt %, and LaB₆ + cBN reads 16.79 wt % with the hold and 16.85 without, against TOPAS's
+  17.907-17.950. A probe of a staged re-fit must pass `refit="stages"` since WP-2224. WP-2225's
+  2026-11-19 reading that the reorder met its bar was a one-stage measurement.
 - **For group R, from a side investigation (2026-11-19).** The simulated `trigger` case in
   `examples/bench_refinement.py` fitted to Rwp 0.01998 on v1.9.0 and reached 0.0276 on
   main (closing stage off), against 0.0195 for the truth model. The cause is the width twin

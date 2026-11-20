@@ -1,6 +1,6 @@
 # WP-2225 — A held instrument width stops a staged fit short of its own plan's point
 
-Milestone: generality · Status: 🔄 2026-11-20 — claimed by ghostshift runner
+Milestone: generality · Status: 🔄 2026-11-20 — task 1 measured; the choice among options 0, 3 and 4 waits on the maintainer (brief in the handover log)
 Track: The audits
 Depends on: 2002 (the width twin hold); 2017 soft (its row R measures the same hold); 2224 soft (a one-stage re-fit hides this)
 Priority: P2 2026-11-19 — a fit that frees an instrument width beside its specimen twin returns "converged" at a point its own plan lowers on the next run, and nothing flags it; few fits run such a plan, and calibrating the instrument on a standard is the workaround
@@ -303,7 +303,8 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
       fractions against the weighed composition and LaB₆ + cBN's against TOPAS's interval, both
       references the acceptance suites already carry. Extend `2225-batch/swap.py`.
       *Done 2026-11-20: § Task 1, `families.py`.*
-- [ ] Brief the maintainer with those numbers: the choice among options 0-4.
+- [x] Brief the maintainer with those numbers: the choice among options 0-4.
+      *Written 2026-11-20 in the handover entry; the choice waits on the maintainer.*
 - [ ] Build the chosen option, with its record field or code and its `_audit` row.
 - [ ] Tests: the four standards' staged re-fit of the shipped first fit moves no reported
       parameter by more than 0.1 esd (or, under option 3 alone, the code fires on all four and on
@@ -330,6 +331,103 @@ or the chosen code fires on exactly those four.
 - IUCr CPD quantitative phase analysis round robin, `tests/data/qarr/` (`tests/data/README.md`).
 
 ## Handover log
+
+- **2026-11-20** — task 1 measured, and the brief below waits on the maintainer (PR #1722).
+  Neither fix inside one fit works on the families that matter. Option 1 (free the instrument
+  width when its specimen twins sit on their floor) never fires on cpd-1a. On LaB₆ + cBN it
+  quietly stops the specimen widths from refining at all. Option 2 (repeat the instrument stage
+  and the last stage) settles the single-phase standards in 2-4 rounds. On the three multi-phase
+  or Stephens families it was still moving after 8 rounds, having spent 1.8-3.7 times a fit's solver iterations. The
+  2026-11-19 note that the axial-first reorder had met the acceptance bar was wrong. It measured
+  one-stage re-fits, which WP-2224 had made the default. A staged re-fit still moves zincite's V
+  by 1.49 reported esd. What is left is a choice about what such a fit should say, set out below.
+
+  **The decision.** What a fit should do when its plan frees an instrument width and the specimen
+  width with the same angular shape on an uncalibrated instrument. The choices are to say
+  nothing (0), print a diagnostic (3), or change rietx's own comparison and acceptance plans (4).
+  It goes to the maintainer for three reasons. It revisits decision 1 of WP-2002. Option 3 changes
+  what a fit prints. And its crux is a value judgement.
+
+  **Why it matters.** Instrument and specimen broadening add up in each peak's width. For three
+  pairs the two have exactly the same angular shape (U with the Gaussian strain, X with the
+  Lorentzian size, Y with the Lorentzian strain), so the data fix only their sum. Since WP-2002
+  the package holds the instrument half of such a pair for the stage, at whatever value the
+  stage before left it. Without the hold the pair drifts: corundum ends at Rwp 0.85 instead of
+  0.146. With it, the split between instrument and specimen is set by the plan's order and by
+  where the fit started. A user who frees both gets specimen widths with small esds that two
+  starts disagree on by 5 of those esds (cpd-1a's fluorite Lorentzian strain, Biso starting at 0.5
+  against 1.5 Å²). Quoted values move less: up to 0.57 esd on a Biso between starts, and 0.55 on
+  zincite's Zn Biso between a fit and its staged re-fit. The held instrument values are not in the
+  result's parameter list, and nothing printed says they were held. No preset frees both halves,
+  so only a caller's own plan meets this, including rietx's comparison standards
+  (`rietx compare`) and the round-robin QPA acceptance. Importance: moderate.
+
+  **Aim.** Honest numbers for a user who writes a plan freeing both halves, and for the readers of
+  rietx's own comparison standards. The reported specimen widths are not a measurement in that
+  case, and the fit should not present them as one. How often users write such a plan is not
+  observed.
+
+  **Options.** Dropped on task 1's numbers: option 1 meets the bar on none of the three families
+  that miss it and turns LaB₆ + cBN into a different plan; option 2 does not converge on the
+  multi-phase families after 8 rounds at 1.8-3.7 times a fit's iterations; switching the hold off walks on three of
+  eight families.
+  0. *Do nothing, plus one line in the skill's degeneracy table* (task 5's second branch). Fits
+     print as today. An agent learns the rule only if it reads that row. Free, undoable.
+  3. *A diagnostic on every fit whose last stage held a twin.* It names the held instrument
+     widths and the stage whose values they keep, and says the specimen widths are the
+     remainder of a split the plan's order chose. Its suggestion is the calibrated route:
+     `lab_calibrate` on a standard, `load_instrument_profile`, then a sample-only plan. The test
+     is exact (the record `StageResult.width_twins_held` already exists), so it has no
+     threshold. Measured on the eight standards it would fire on zincite, fluorite, corundum and
+     brucite and on none of the other four, plus LaB₆ + cBN's twin plan, brucite with a Stephens
+     block and cpd-1a. It moves no number. Cost: a code, its `_audit` row, a skill row, a test.
+     Undoable.
+  4. *Change rietx's own plans to calibrate first.* The comparison standards and the QPA
+     acceptance stop freeing both halves. Their goldens move and the `rietx compare` rows
+     change. A caller's own plan is untouched. It needs an instrument function for the round
+     robin's diffractometer, and whether the round robin supplies a standard for one is not
+     checked.
+
+  **Practice** (`docs/practice.md` § Instrument and specimen widths refined together, and
+  § When one twin reaches its limit; read from source and manuals). No program holds a twin pair
+  automatically, so none has this case in rietx's form. Every program that separates the two
+  fixes the instrument from a standard: FullProf by its resolution file, BGMN by ray tracing,
+  RIETAN-FP by its advised protocol, GSAS-II by defaults that leave the sample terms off. On a
+  user's limit, GSAS-II freezes the offending parameter with a printed warning, and TOPAS 5 keeps
+  it refined and prints `_LIMIT_MIN_#` beside its value. Both tell the user in the output. That
+  is option 3's shape. Option 4 is the practice itself, applied to rietx's own test plans.
+  rietx's convention for where agent guidance goes points the same way: the package's own output
+  first, the skill body last (root CLAUDE.md § skill, WP-1338).
+
+  **Recommendation: 3, a lean.** The crux is whether a fit should print that its specimen widths
+  are a split the plan chose. That is a value judgement. It falls toward printing, because the
+  widths come back with esds that look determined while two starts disagree by five of them.
+  The FitReport rule against a confident wrong singleton covers exactly that, and the held values
+  print nowhere else. Option 0 loses there: the skill row reaches an agent only if it reads it,
+  and a person not at all. Option 4 is worth doing for rietx's own plans but needs the
+  calibration standard checked first, so it is a follow-up rather than this choice. What would
+  flip it: if the maintainer reads the existing record field as enough (DESIGN Rule 1, "act and
+  record it in a field"), option 0 with the skill row wins. The 2026-11-04 ruling that findability
+  is documentation leans that way, though it concerned a warning built on a residual rather
+  than on an exact fact.
+
+  *Done*: `families.py` and `families_summary.py` (task 1); `swap.py` made importable;
+  `eight.py` and `swap.py` pass `refit="stages"` and set the closing stage on for a "shipped" row;
+  `eight_summary_staged.txt` re-measures the reorder; § The axial-first reorder replaces
+  `### Inherited` with a dated "superseded in part" note; § Task 1 holds the tables; practice.md
+  gains TOPAS 5's limit behaviour. The review (`/code-review high --fix`) found ten defects in the
+  probe scripts and the practice wording, and nine were fixed in `31e1ca8a5`. The tenth (the hold
+  monkeypatch left installed if a fit raises) was declined, since a one-shot script exits anyway.
+  The fix that changed numbers rebuilt option 2's rounds the way a warm re-fit collapses a plan
+  and made its iteration count total every round. Option 2 was re-run after it, and the tables
+  carry the re-run. Docs and probe scripts only: no test added, no suite run.
+  *Gotchas*: since WP-2224 a second `fit` runs one stage unless it gets `refit="stages"`, so a
+  probe measuring a staged re-fit must ask for one. `eight_summary_axial_first.txt` is such a
+  one-stage run. Option 1 holds a specimen width that starts at 0 with no stage seed at once and
+  for good.
+  *Next*: the maintainer's choice among 0, 3 and 4 (the brief above). Then task 3 builds it,
+  task 4 tests it and task 5 writes the skill row. Under option 3 the acceptance's first branch
+  (re-fit under 0.1 esd) is replaced by the code firing on exactly the twin-holding families.
 
 - **2026-11-19** — created. A staged first fit on zincite and fluorite stops short of the point a
   staged re-fit reaches, and the cause is the width twin hold. Converged stopping tolerances,
