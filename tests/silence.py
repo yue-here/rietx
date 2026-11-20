@@ -143,6 +143,29 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+def _cell_tie_fires() -> list:
+    """A cubic b printed 5.64101 beside a = 5.641: one value within the file's
+    digits, read as a and said (``cif.py``'s ``_correct_cell_ties``)."""
+    from tests.test_cell_ties import CIF, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    return _read_cif(CIF.format(symbol=symbol, **printed))
+
+
+def _cell_tie_silent() -> list:
+    """The same cell printed equal; b printed 5.641 beside a = 5.64101, inside
+    b's own rounding; and b = 5.900, past every band, which the reader leaves
+    for the table to refuse."""
+    from tests.test_cell_ties import CIF, PAST_PRINT, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    equal = dict(printed, b=printed["a"])
+    own = dict(printed, a="5.64101", b="5.641")
+    return (_read_cif(CIF.format(symbol=symbol, **equal))
+            + _read_cif(CIF.format(symbol=symbol, **own))
+            + _read_cif(CIF.format(symbol=PAST_PRINT[0][0], **PAST_PRINT[0][1])))
+
+
 # ---------------------------------------------------- the FullProf project reader
 
 
@@ -563,6 +586,49 @@ def _parametric_range_fires() -> list:
 def _parametric_range_silent() -> list:
     """The declared start, and a slope that keeps W positive over the ramp."""
     return _parametric_range(0.0) + _parametric_range(-2e-4)
+
+
+def _not_freed(freed: list[str]) -> list:
+    """``VARIABLE_NOT_FREED``'s two builders, after one stage that freed ``freed``.
+
+    The single fit's: ``vars.B`` sets two Biso by a linear tie and a formula, and
+    ``vars.spare`` sets nothing.  The joint fit's: one declaration whose
+    coefficients are ``vars.b_0`` and ``vars.b_1``."""
+    from types import SimpleNamespace
+
+    import rietx as rx
+    from rietx.multi import _parametric_not_freed_diagnostics
+    from rietx.refine import _variable_not_freed_diagnostics
+    from rietx.schemas.parametric import ParametricCoefficient
+    from rietx.schemas.results import StageResult
+    from tests.test_schemas import make_lab6
+
+    ref = rx.Refinement(make_lab6(), rx.Instrument.bragg_brentano(radiation="CuKa"))
+    ref.add_variable("B", 0.5, vary=True)
+    ref.add_variable("spare", 1.0, vary=True)
+    ref.tie("phases.0.atoms.0.biso", "vars.B")
+    ref.tie("phases.0.atoms.1.biso", expression="2 * B")
+    stage = StageResult(name="s", status="converged", n_iterations=1, cost_initial=1.0,
+                        cost_final=1.0, freed=freed)
+    line = SimpleNamespace(name="b", target="phases.0.atoms.0.biso",
+                           equation=SimpleNamespace(basis="polynomial"))
+    rows = [ParametricCoefficient(equation="b", target=line.target, term=term,
+                                  path=f"vars.b_{j}", value=0.4 * (1 - j), esd=None,
+                                  vary=False, unit=None, reference=None)
+            for j, term in enumerate(("1", "T"))]
+    mtable = SimpleNamespace(parametric=[line], expressions=[])
+    return (_variable_not_freed_diagnostics([stage], ref._working_table())
+            + _parametric_not_freed_diagnostics(mtable, rows, [stage]))
+
+
+def _not_freed_fires() -> list:
+    """No stage freed the variable or the coefficients."""
+    return _not_freed([])
+
+
+def _not_freed_silent() -> list:
+    """A stage freed the variable and both coefficients."""
+    return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
 
 
 def _reseed(**escalation) -> list:
@@ -1042,6 +1108,8 @@ def _sigma_nonpositive_silent() -> list:
 
 
 SILENCE: dict[str, Pair] = {
+    "CIF_CELL_TIE_CORRECTED": Pair(
+        _cell_tie_fires, _cell_tie_silent, "tests/test_cell_ties.py"),
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
     "CIF_SITE_MULTIPLICITY_DISAGREES": Pair(
@@ -1069,6 +1137,9 @@ SILENCE: dict[str, Pair] = {
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
+    "VARIABLE_NOT_FREED": Pair(
+        _not_freed_fires, _not_freed_silent,
+        "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(

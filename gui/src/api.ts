@@ -235,7 +235,8 @@ export const api = {
    *  The arguments are drawing thresholds, not settings, which is why they ride
    *  on the query string and are never persisted. */
   structure3d: (phase = 0, bondTolerance?: number, disorder?: "all" | "major",
-                centres?: string[] | null, ligands?: string[] | null) => {
+                centres?: string[] | null, ligands?: string[] | null,
+                values?: Record<string, number> | null) => {
     const query = new URLSearchParams({ phase: String(phase) });
     if (bondTolerance !== undefined) {
       query.set("bond_tolerance", String(bondTolerance));
@@ -244,15 +245,21 @@ export const api = {
     // present and empty asks for none, so only null leaves the chemistry's
     if (centres != null) query.set("centres", centres.join(","));
     if (ligands != null) query.set("ligands", ligands.join(","));
-    return call("GET", `/api/structure3d?${query}`);
+    // unapplied values ride in a POST body, as `POST /api/preview` takes them
+    // (WP-2218): the Structure graph's preview, which writes nothing
+    return values ? call("POST", `/api/structure3d?${query}`, { values })
+      : call("GET", `/api/structure3d?${query}`);
   },
   instrument: () => call("GET", "/api/instrument"),
   /** A whole validated model, not a field patch — adding a phase or an ADP block
    *  changes what the parameter table *contains* (WP-1008).  One history node. */
   patchStructure: (structure: unknown, label?: string) =>
     call("PATCH", "/api/structure", { structure, label }),
-  patchInstrument: (instrument: unknown, label?: string) =>
-    call("PATCH", "/api/instrument", { instrument, label }),
+  /** `unhold` paths are released before the edit and `free` ones freed after
+   *  it, all or nothing (`GuiSession.instrument_patch`, WP-2218 review). */
+  patchInstrument: (instrument: unknown, label?: string,
+                    arms: { unhold?: string[]; free?: string[] } = {}) =>
+    call("PATCH", "/api/instrument", { instrument, label, ...arms }),
   /** Opt one atom into anisotropic ADPs.  Its own verb because both directions
    *  are physics (the isotropic tensor is not Uiso·δ, and U_eq weights by the
    *  metric) and a client that computed either would get non-orthogonal cells
@@ -277,7 +284,9 @@ export const api = {
   curves: () => arrays("/api/result/curves"),
   /** The background curve, the observed pattern and the curve's esd at each
    *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
-  background: () => arrays("/api/background"),
+  background: (hold: readonly string[] = []) => arrays(hold.length
+    // WP-2218: paths held for this answer alone, a person's pending holds
+    ? `/api/background?hold=${encodeURIComponent(hold.join(","))}` : "/api/background"),
   /** The curves at values nobody has applied, writing nothing (WP-2125): the
    *  fitted channels, the model, its background, each phase, the three
    *  residuals and the ticks, with the Rwp there. */

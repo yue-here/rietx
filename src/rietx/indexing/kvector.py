@@ -1157,8 +1157,10 @@ class KEquivalent:
     (``canonical_kvector``), so −k and G − k are one row.  A partner carries
     ``operation``, the map on conventional reciprocal components that takes k
     to it (exact), and ``metric_deviation``, the largest relative change of
-    the reduced metric under it (0 for an exact lattice symmetry); structural
-    rows carry ``None`` for both.
+    the reduced metric under the lattice operation that map represents: the
+    basis change B with ``operation`` = B⁻¹ on reciprocal components, so the
+    map carries the reciprocal metric to (B·G·Bᵀ)⁻¹ exactly (0 for an exact
+    lattice symmetry); structural rows carry ``None`` for both.
     """
 
     k: KVector
@@ -1264,7 +1266,11 @@ def kvector_equivalents(parent: KParent, k, *, tol: float) -> KEquivalents:
     rows += [KEquivalent(k=a, relation="-k") for a in sorted(minus)]
     structural = own | minus
 
-    centring = sg.xhm()[0]
+    # the lattice's own centring, never the symbol's first letter: a ":R" group
+    # is primitive on its rhombohedral cell, and read as R-centred that cell
+    # names a lattice of a third its volume, whose near-symmetries are not
+    # this one's (#1549's review)
+    centring = sg.centring_type()
     w_ops, m = lattice_point_group(parent.cell, centring, rtol=t)
     reduced = reduce_cell(parent.cell, centring)
     g = np.asarray(direct_metric_tensor(*reduced.cell), dtype=np.float64)
@@ -1273,6 +1279,10 @@ def kvector_equivalents(parent: KParent, k, *, tol: float) -> KEquivalents:
     mf_inv = _inv(mf)
     partners: dict[KVector, tuple[float, tuple]] = {}
     for w in w_ops:
+        # W acts on the reduced basis rows and sends k to W⁻¹k, so the stored
+        # map is W⁻¹ and it carries the reciprocal metric to (W·G·Wᵀ)⁻¹
+        # exactly: W's own deviation is the map's, and the one W was admitted
+        # on.  W⁻¹'s would describe k → W·k, the inverse map.
         dev = float(np.max(np.abs(w @ g @ w.T - g) / np.outer(d, d)))
         wf = tuple(tuple(Fraction(int(x)) for x in row) for row in w)
         op = _matmul(_matmul(mf_inv, _inv(wf)), mf)
