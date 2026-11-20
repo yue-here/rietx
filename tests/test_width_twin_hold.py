@@ -207,6 +207,24 @@ def test_the_answer_says_which_widths_the_hold_kept_and_whose_values(twin_fit):
     assert "lab_calibrate" in found.suggestion
 
 
+def test_a_width_seeded_then_held_names_the_seed_and_not_an_earlier_stage():
+    """A stage seeds a floored width before the hold reads it, so a Y lifted
+    off 0 and held keeps the seed: the stage that seeded it is the source,
+    even where it is the last stage and an earlier one refined X."""
+    from rietx.refine import _width_twin_diagnostics
+    from rietx.schemas.results import StageResult
+
+    common = dict(status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0)
+    first = StageResult(name="widths", freed=["instrument.profile.x"], **common)
+    last = StageResult(name="sample", freed=[], seeded={"instrument.profile.y": 1e-4},
+                       width_twins_held={"instrument.profile.x": ["phases.0.lor_size"],
+                                         "instrument.profile.y": ["phases.0.lor_strain"]},
+                       **common)
+    (found,) = _width_twin_diagnostics([first, last])
+    assert ("the ones stage 'widths' left for instrument.profile.x; "
+            "the ones stage 'sample' seeded for instrument.profile.y") in found.message
+
+
 def test_a_fit_whose_last_stage_held_no_twin_says_nothing():
     data = synthesize()
     structure, ins = perturbed_models()

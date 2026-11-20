@@ -4940,7 +4940,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The plan freed an instrument width and a specimen width with the same "
             "angular shape: U with the Gaussian strain or size, X with the Lorentzian "
-            "size, Y with the Lorentzian strain. The data fix only each pair's sum, so "
+            "size, Y with the Lorentzian strain or a Stephens anisotropic strain "
+            "block. The data fix only each pair's sum, so "
             "the last stage held the instrument width at the value an earlier stage "
             "left, or at its start. The message names that stage. The specimen widths "
             "are the remainder of a split that the plan's stage order chose. Two starts "

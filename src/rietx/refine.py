@@ -8719,8 +8719,10 @@ def _width_twin_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic
     because the answer is that stage's, and exact, with no threshold.  One
     finding per fit.  ``where`` is the held instrument widths, then their
     specimen twins; ``value`` the count of held instrument widths.  Each held
-    width is named with the latest earlier stage whose ``freed`` lists it,
-    which is the stage whose value it keeps, or its start where none did.  The
+    width is named with the latest stage whose ``freed`` lists it, which is
+    the stage whose value it keeps, or whose ``seeded`` lists it, since a stage
+    seeds a floored width before the hold reads it; or its start where none
+    did.  The
     specimen widths' esds are left as they are: they are conditional on the
     held values, and whether they should say so is WP-2219's question.
     """
@@ -8733,27 +8735,27 @@ def _width_twin_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic
     held = sorted(twins)
     specimen = sorted({t for path in held for t in twins[path]})
 
-    def source(path: str) -> str | None:
-        for sr in reversed(stage_results[:-1]):
+    def source(path: str) -> str:
+        # a stage seeds before it holds, so a floored width held in the stage
+        # that seeded it keeps the seed; one the stage refined keeps its answer
+        for sr in reversed(stage_results):
             if path in sr.freed:
-                return sr.name
-        return None
+                return f"stage {sr.name!r} left"
+            if path in (sr.seeded or {}):
+                return f"stage {sr.name!r} seeded"
+        return "the fit started from"
 
-    by_source: dict[str | None, list[str]] = {}
+    by_source: dict[str, list[str]] = {}
     for path in held:
         by_source.setdefault(source(path), []).append(path)
     n = len(held)
-
-    def left(name: str | None) -> str:
-        return f"stage {name!r} left" if name is not None else "the fit started from"
-
     if len(by_source) == 1:
         kept = (f"The held value{' is the one' if n == 1 else 's are the ones'} "
-                f"{left(next(iter(by_source)))}")
+                f"{next(iter(by_source))}")
     else:
         kept = "The held values are " + "; ".join(
-            f"the ones {left(name)} for {' and '.join(paths)}"
-            for name, paths in by_source.items())
+            f"the ones {phrase} for {' and '.join(paths)}"
+            for phrase, paths in by_source.items())
     pairs = "; ".join(f"{path} with {', '.join(twins[path])}" for path in held)
     return [Diagnostic(
         level="warning", code="WIDTH_TWIN_HELD",
