@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-19 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-20 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549), #1692's moment per position (PR #1725); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -1019,6 +1019,46 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-20 — #1692's moment per position (PR #1725)
+
+Mike's ruling on #1692 (`### Inherited`, 2026-11-19) is implemented as written. Where magnetic
+atoms share one position, the support test now judges the moment per position, |Σ occ·m| (f at
+Q → 0). Its esd comes from the answer's covariance over every modulus, angle and occupancy at
+the position, and it is tested by the unchanged `moment_supported` with no new constant. A
+co-sited row's `supported` is the position's verdict, so `MagneticTrial.supported`, the series
+hold and the trajectories read it unchanged. Each atom's modulus stays in its row, with a note
+naming the atom it shares the position with. The quadrature fold skips co-sited rows.
+
+*Done.* `MagneticSites.cosited` (`cosited_groups`, at compile: coordinates mod 1 to `SITE_TOL`,
+with ops, axial matrices and frames checked equal). `report.magnetic.cosited_moments` and
+`_fold_cosited`. `MomentEvidence.cosited_*` and `MomentRow.cosited_*`. `covariance=` on
+`analyse_moments`/`build_report`. `MOMENT_UNSUPPORTED`'s position sentence. Also the
+`MOMENT_UNSUPPORTED` audit row's evidence, the manual's reference rows, the skill row and the
+release fragments. New `tests/test_magnetic_cosited_support.py` (20 tests): restoring the
+per-site test turns 3 of them red, and a quadrature sum turns 9 red.
+
+*Measured.* The issue's harness (simulate at the published moments, blind nuclear fit,
+`solve_magnetic` at the published k) ran on main `20255ddfa` and on this branch:
+
+- Published class ineligible on main, eligible here, and now the winner: 0.206, 0.679, 0.882,
+  0.885. Positions 2.95 ± 0.08, 0.79 ± 0.17, 2.32 ± 0.08 and 1.88 ± 0.32 / 2.36 ± 0.12 μ_B.
+- 0.272: eligible, and an abstention between 14.75 and 14.79 (ΔBIC 117.2 against 113.4, tie
+  width 6.0), where main declared 14.79 solved.
+- 0.673: still ineligible as run. Its Mn2/Fe2 site is (x, 0, ¼), and the nuclear fit refines each
+  species' x separately, 0.014 apart at the solve, so it is not one position. With the two
+  coordinates tied, it is eligible and the winner, with the position at 1.324 ± 0.032 μ_B
+  (published 1.4).
+- 0.500 and 0.84 (correlated, not co-sited): unchanged.
+
+Synthetic: at zero moment with equal form factors, main passed each modulus (0.59 ± 0.13 and
+0.41 ± 0.13) and read the quadrature sum as 0.72 ± 0.03. The position here reads 0.09 ± 0.13,
+unsupported. Full suite on `d1b81cfd7`: in the PR.
+
+*Next.* 0.673's residual is open on #1692: whether `solve_magnetic` should tie, or warn about, a
+mixed site whose species' coordinates are refined apart. Neither a symmetry-equivalent
+representative nor a position that is also pair-correlated is combined.
+`MOMENT_ANGLE_STATIONARY` still reads per site.
 
 ### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
 
