@@ -6,7 +6,6 @@ A chain measures a parameter once per pattern ([Sequential refinement](series.md
 Between the two is a parameter that differs from pattern to pattern by an equation you can write down: a cell edge linear in temperature down a ramp, or a cell edge that follows the composition across a combinatorial library.
 Declaring the equation puts every pattern in one residual with the equation's coefficients as the refined parameters, which is parametric refinement {cite}`stinton2007`.
 Pattern k's value of the target is p<sub>k</sub> = Σ<sub>j</sub> Φ<sub>k,j</sub> c<sub>j</sub>, with Φ built from each pattern's coordinates ({ref}`par-parametric-section`), and each coefficient comes back with an esd from the joint covariance.
-A chain's trajectory can be fitted afterwards instead ([An equation fitted to a trajectory](trajectory.md)).
 [How to refine a cell edge as a function of temperature](../guides/equation.md) runs one from start to finish.
 
 A declaration is a joint fit, so [Joint refinement](joint.md) applies unchanged: Rietveld mode only, one `MultiHistogramRefinement` or `refine_multi` call, an `Instrument` per pattern, and a `SharingMap` deciding what else is shared.
