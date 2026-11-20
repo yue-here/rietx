@@ -369,7 +369,7 @@ no specimen width free. The earlier bar, a staged re-fit moving no reported para
   `<THING>_HELD` form of `PARENT_STRAIN_HELD` and `HARMONIC_HELD`.
 
   *Measured*: macOS arm64, worktree venv `[dev]`, merged with `origin/main` at `20255ddfa`.
-  Fast selection 14949 passed, 433 skipped, 32 xfailed in 466 s; this branch adds 5 tests (4 functions and the `WIDTH_TWIN_HELD` case of `test_silence.py`), no new skip, the added tests 0.32 s in all (local junit). FULL_COUNTS. The pin's slow row passed (1 passed). The re-pin differs from PR #1723's pin
+  Fast selection 14949 passed, 433 skipped, 32 xfailed in 466 s; this branch adds 5 tests (4 functions and the `WIDTH_TWIN_HELD` case of `test_silence.py`), no new skip, the added tests 0.32 s in all (local junit). Full suite on the tree at `277a764e7` (main merged in): 15909 passed, 444 skipped, 52 xfailed in 2577 s, shared with other sessions' runs. The pin's slow row passed (1 passed). The re-pin differs from PR #1723's pin
   (`wp2036-suite-alarms-closing-stage`, which re-pins main's moves from #1707) only by this
   code's four rows, its count of 4, and warnings per result under microstructure 9.0 → 9.5 and
   calibration 9.125 → 9.625. The other moves in the diff (fluorite's `FLOOR_HIT` gone and
