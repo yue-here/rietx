@@ -137,6 +137,21 @@ def test_the_gaussian_triple_holds_w():
     assert {"phases.0.gauss_size", "phases.0.gauss_strain"} <= set(table.free_paths)
 
 
+def test_a_stephens_block_beside_the_triple_is_not_ws_twin():
+    """Y is held against the block by rule, which leaves the block on a
+    direction of its own; W's twins are the two Gaussian terms that move with
+    W, read off the projector (the generality judge, WP-2219)."""
+    structure = make_lab6()
+    structure.phases[0].microstrain = StephensStrain.from_values([0.0] * 15)
+    table = _table(structure, ["instrument.profile.w", "instrument.profile.y",
+                               "phases.*.gauss_size", "phases.*.gauss_strain",
+                               "phases.*.microstrain.dof.*"])
+    held, _, twins = _hold_width_twins(table, set())
+    assert sorted(held) == ["instrument.profile.w", "instrument.profile.y"]
+    assert twins["instrument.profile.w"] == ["phases.0.gauss_size",
+                                             "phases.0.gauss_strain"]
+
+
 def test_the_triple_with_u_free_holds_u_and_w():
     """With U free as well the null space is two-dimensional: U pairs with the
     strain, and the triple survives U's hold, so both instrument terms go."""
