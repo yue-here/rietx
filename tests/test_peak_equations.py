@@ -350,3 +350,108 @@ def test_a_coefficient_follows_a_coordinate_in_a_joint_fit():
         w = rows[f"hist.{h}.phases.0.peak_equations.0.w"].value
         assert w == pytest.approx(rows["vars.w0"].value + rows["vars.w1"].value * t,
                                   rel=1e-12)
+
+
+# --- the ZrP2O7 shape: a calibration curve and a per-phase TCHZ, jointly ------
+#
+# Stinton & Evans (2007) §§ 4.1-4.2 refine a 2θ calibration curve over the
+# whole pattern and give each phase its own six TCHZ terms, shared across the
+# patterns of a parametric fit.  Here a Si standard (cell held) pins the curve
+# and a brucite sample's cell is each pattern's own.
+
+RAMP_TT = np.arange(12.0, 100.0, 0.02)
+RAMP_TEMPS = [300.0, 400.0, 500.0, 600.0, 700.0]
+CURVE = "1e-3*(sq*(two_theta - 54)^2/1000 + ln*(two_theta - 54))"
+TCHZ_GAUSS = "1e-3*(u*tan(theta)^2 + v*tan(theta) + w)"
+TCHZ_LOR = "1e-3*(x/cos(theta) + y*tan(theta))"
+#: the curve passes 0.0105° at 15°, zero at 54° and 0.0059° at 90°, as the
+#: milestone's ZrP2O7 row quotes it; v is negative, as in two of its phases
+TRUE_CURVE = {"sq": 5.775, "ln": -0.04401}
+TRUE_TCHZ = [{"u": 10.0, "v": -5.0, "w": 3.0, "x": 20.0, "y": 30.0},
+             {"u": 6.0, "v": -2.0, "w": 5.0, "x": 40.0, "y": 15.0}]
+
+
+def _tchz(values):
+    return [rx.PeakEquation(target="gauss_fwhm_squared", expression=TCHZ_GAUSS,
+                            coefficients={k: Parameter(value=values[k]) for k in "uvw"}),
+            rx.PeakEquation(target="lor_fwhm", expression=TCHZ_LOR,
+                            coefficients={k: Parameter(value=values[k]) for k in "xy"})]
+
+
+def _ramp_structure(tchz, a, c):
+    p = Parameter
+    si = Phase(name="Si", space_group="F d -3 m:2",
+               cell=Cell(a=p(value=5.4311), b=p(value=5.4311), c=p(value=5.4311),
+                         alpha=p(value=90.0), beta=p(value=90.0), gamma=p(value=90.0)),
+               atoms=[Atom(label="Si", species="Si", x=p(value=0.125), y=p(value=0.125),
+                           z=p(value=0.125), biso=p(value=0.5))],
+               scale=p(value=2e-3), peak_equations=_tchz(tchz[0]))
+    sample = brucite(peak_equations=_tchz(tchz[1]))
+    sample.cell.a.value = sample.cell.b.value = a
+    sample.cell.c.value = c
+    sample.scale.value = 1.5e-2
+    return Structure(phases=[si, sample])
+
+
+def _ramp_instrument(curve):
+    ins = _instrument()
+    ins.profile.w.value = 1e-6  # each phase carries its own TCHZ
+    ins.background = rx.BackgroundChebyshev(coefficients=[Parameter(value=40.0)])
+    ins.peak_equations = [_eq("shift", CURVE, **curve)]
+    return ins
+
+
+def _ramp_cell(t):
+    return 3.147 * (1 + 1.2e-5 * (t - 300)), 4.769 * (1 + 3.0e-5 * (t - 300))
+
+
+def test_a_calibration_curve_and_per_phase_tchz_are_recovered_jointly():
+    """Each of the twelve coefficients within 2 esd on the pinned ramp (the
+    WP's acceptance; worst 1.68 esd, [dev] macOS arm64, 2026-11-20).
+
+    Over twelve ramps (seeds 1-12) every mean z-score was 0.50 or less in
+    size, the largest Si's x (-0.50) and y (+0.50).  The worst |z| among the
+    twelve went past 2 on two of the twelve ramps, as it can for twelve
+    coefficients each scattering with sd 0.5-1.1, so the pin is one ramp and
+    the means are the evidence.  The data are drawn at the closing window, so
+    the fit closes there too: at the declared stages' windows the cut
+    Lorentzian tails took a sample x 1.2 esd low on average.
+    """
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.params.multi import SharingMap
+    from rietx.schemas.plan import CLOSING_WINDOW_TOL
+
+    patterns = []
+    for k, t in enumerate(RAMP_TEMPS):
+        y = rx.Refinement(_ramp_structure(TRUE_TCHZ, *_ramp_cell(t)),
+                          _ramp_instrument(TRUE_CURVE)).predict(RAMP_TT)
+        y = np.maximum(y, 1.0)
+        counts = np.random.default_rng([2107, k]).poisson(y).astype(float)
+        patterns.append(rx.PatternData(two_theta=RAMP_TT, intensity=counts,
+                                       sigma=np.sqrt(y)))
+    start = [{"u": 5.0, "v": 0.0, "w": 5.0, "x": 10.0, "y": 10.0}] * 2
+    ref = MultiHistogramRefinement(
+        _ramp_structure(start, *_ramp_cell(300.0)),
+        [_ramp_instrument({"sq": 0.0, "ln": 0.0}) for _ in RAMP_TEMPS],
+        sharing=SharingMap(shared=["instrument.peak_equations.*"],
+                           per_histogram=["phases.1.cell.*"]))
+    base = ["phases.*.scale", "instrument.background.*", "phases.1.cell.*"]
+    widths = [*base, "phases.*.peak_equations.*"]
+    result = ref.fit(patterns, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", base[:2]), rx.Stage("cell", base),
+        rx.Stage("widths", widths),
+        rx.Stage("curve", [*widths, "instrument.peak_equations.*"])],
+        closing_window_tol=CLOSING_WINDOW_TOL))
+    assert result.status == "converged"
+    OUT.mkdir(exist_ok=True)
+    from rietx.viz.plots import plot_result
+    for h in (0, len(RAMP_TEMPS) - 1):
+        plot_result(result.for_histogram(h), path=OUT / f"peak_equations_ramp_h{h}.png")
+    rows = {p.path: p for p in result.parameters}
+    truths = {f"instrument.peak_equations.0.{k}": v for k, v in TRUE_CURVE.items()}
+    for ip, values in enumerate(TRUE_TCHZ):
+        truths.update({f"phases.{ip}.peak_equations.0.{k}": values[k] for k in "uvw"})
+        truths.update({f"phases.{ip}.peak_equations.1.{k}": values[k] for k in "xy"})
+    z = {path: (rows[path].value - truth) / rows[path].stderr
+         for path, truth in truths.items()}
+    assert all(abs(v) < 2.0 for v in z.values()), z
