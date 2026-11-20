@@ -47,14 +47,15 @@ The seams:
 [WP-2081](2081-how-a-series-holds-what-the-setup-fixes.md) is a design discussion about
 the chain, and its answer on what "held" means should govern here. Read it first.
 
-**Owed to WP-2101 (2026-11-19): a joint fit's hold must silence `VARIABLE_NOT_FREED`.** This PR added the hold verb, so the condition below now applies and is not met here.
+**Owed to WP-2101 (2026-11-19), done 2026-11-20: a joint fit's hold silences `VARIABLE_NOT_FREED`.**
 The code names each parametric equation whose coefficients no plan stage freed. In a
 single fit, a coefficient the caller holds is left out, read off the table with
-`ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). A joint fit has
-no hold verb yet, so `multi._parametric_not_freed_diagnostics` names every unfreed
-coefficient, and its docstring says so. When this WP adds `hold` to a joint fit, that
-builder leaves out a held coefficient the same way, with a test that fails when the
-filter is removed.
+`ParameterTable.held_by` (maintainer's ruling 2026-11-19, option (a)). This PR added the
+joint fit's `hold`, so `multi._parametric_not_freed_diagnostics` now leaves out a held
+coefficient the same way, read off every table the row lives in through
+`MultiParameterTable.held_by`; a coefficient at `vary=False` that nobody holds still
+warns. `test_joint_verbs.py::test_a_held_coefficient_is_not_named_as_one_no_stage_freed`
+goes red with the filter removed.
 
 ## Non-goals
 
@@ -124,6 +125,16 @@ rerun from stored values, `load_save_locals`), and the WO₃ protocol of
 - WP-1325 (the joint path), WP-1435 (the hold), WP-1070 (user ties), WP-2081.
 
 ## Handover log
+
+- **2026-11-20 (post-close, WP-2101's owed item)** — A coefficient the caller holds in a
+  joint fit is no longer named by `VARIABLE_NOT_FREED`, as in a single fit; one nobody
+  freed or held still is. `multi._parametric_not_freed_diagnostics` reads
+  `MultiParameterTable.held_by` (new: each table's `held_by` over the row's places). When
+  some of an equation's coefficients are held, the message counts over the rest. Test
+  `test_a_held_coefficient_is_not_named_as_one_no_stage_freed`, red with the filter
+  removed. Reader output unchanged (`tests.reader_output`, exit 0). Found, not changed:
+  a stage whose glob reaches a held coefficient's *target* records no `blocked_by_hold`,
+  so a held equation coefficient raises no `HOLD_BLOCKED_PLAN`.
 
 - **2026-11-17** — A joint fit can now be steered by hand the way a single fit is. A
   person can hold a calibrated setup through every pattern, tie each pattern's sites to one

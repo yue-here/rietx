@@ -404,3 +404,33 @@ def test_a_row_tied_to_itself_in_two_spellings_is_refused_as_a_self_tie():
 def test_tie_equal_names_the_pattern_spelling_for_a_bad_scope():
     with pytest.raises(ValueError, match=r"hist\.<h>\."):
         _ref().tie_equal("hist.x.phases.0.atoms.*.biso")
+
+
+def test_a_held_coefficient_is_not_named_as_one_no_stage_freed(pair):
+    """WP-2101's follow-up, owed once the joint fit had ``hold``: as in the single
+    fit, ``VARIABLE_NOT_FREED`` leaves out a coefficient the caller holds (read off
+    the tables, ``MultiParameterTable.held_by``) and still names one nobody freed
+    or held.  The cheap plan reaches no Biso, so neither line's coefficients are
+    freed; ``b``'s are held and ``c``'s are not."""
+    def ref():
+        return _ref(coordinates=CoordinateTable(columns={"T": [300.0, 600.0]},
+                                                units={"T": "K"}),
+                    parametric=[ParametricEquation(
+                        name=n, target=f"phases.0.atoms.{j}.biso",
+                        basis="polynomial", terms=[[], ["T"]]) for j, n in enumerate("bc")])
+
+    def idle(held):
+        r = ref()
+        assert r.hold(held)
+        fit = r.fit(pair, plan=_cheap_joint_plan(), telemetry=False)
+        return {tuple(d.where): d for d in fit.diagnostics
+                if d.code == "VARIABLE_NOT_FREED"}
+
+    whole = idle("vars.b_*")
+    assert list(whole) == [("vars.c_0", "vars.c_1")]
+    part = idle("vars.b_0")
+    assert list(part) == [("vars.b_1",), ("vars.c_0", "vars.c_1")]
+    assert part[("vars.b_1",)].message == (
+        "Parametric equation 'b' sets phases.0.atoms.0.biso, and no stage freed "
+        "vars.b_1, and the caller holds the other. It kept the starting value (0), "
+        "so the equation is the one declared and the data did not measure it.")

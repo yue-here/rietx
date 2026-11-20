@@ -3898,9 +3898,12 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
     counts them.  "Freed" is every stage's ``freed`` and ``held`` together, so
     a coefficient the support hold took back is ``PARAMETRIC_TARGET_UNSEEN``'s
     and is not named twice.  A report of the fact, with no action taken
-    (DESIGN.md Rule 4).  The single fit leaves out a variable the caller
-    holds (ruled 2026-11-19, option (a)); a joint fit has no hold verb yet
-    (WP-2103), so nothing here can be held and every such coefficient warns.
+    (DESIGN.md Rule 4).  A coefficient the caller holds
+    (:meth:`MultiHistogramRefinement.hold`, WP-2103) is left out, read off the
+    tables through ``MultiParameterTable.held_by``: the hold says the start is
+    meant.  A coefficient at ``vary=False`` without one still warns, as in the single
+    fit (ruled 2026-11-19, option (a)).  Counts in the message are then over
+    the coefficients the caller does not hold.
     """
     if not coefficients:
         return []
@@ -3908,20 +3911,31 @@ def _parametric_not_freed_diagnostics(mtable, coefficients, stage_results
     out: list[Diagnostic] = []
     for r in (*mtable.parametric, *mtable.expressions):
         rows = [c for c in coefficients if c.equation == r.name]
-        idle = [c for c in rows if c.path not in ever]
+        unfreed = [c for c in rows if c.path not in ever]
+        held = [c for c in unfreed if mtable.held_by(c.path) == "caller"]
+        idle = [c for c in unfreed if c not in held]
         if not idle:
             continue
         names = ", ".join(c.path for c in idle[:-1])
         names = f"{names} and {idle[-1].path}" if names else idle[-1].path
         starts = ", ".join(f"{c.value:.6g}" for c in idle)
+        left = len(rows) - len(held)
+        of = (f"of its {len(rows)} coefficients" if not held else
+              f"of the {left} coefficients the caller does not hold")
         if len(idle) == len(rows):
             what = (f"no stage freed its coefficient{'s' if len(idle) > 1 else ''} "
                     f"{names}. {'They' if len(idle) > 1 else 'It'} kept the starting "
                     f"value{'s' if len(idle) > 1 else ''} ({starts}), so the "
                     "equation is the one declared and the data did not measure it.")
+        elif len(idle) == left:
+            what = (f"no stage freed {names}, and the caller holds the "
+                    f"other{'s' if len(held) > 1 else ''}. "
+                    f"{'They' if len(idle) > 1 else 'It'} kept the starting "
+                    f"value{'s' if len(idle) > 1 else ''} ({starts}), so the "
+                    "equation is the one declared and the data did not measure it.")
         else:
-            what = (f"no stage freed {names}, {len(idle)} of its {len(rows)} "
-                    f"coefficients. {'They' if len(idle) > 1 else 'It'} kept the "
+            what = (f"no stage freed {names}, {len(idle)} {of}. "
+                    f"{'They' if len(idle) > 1 else 'It'} kept the "
                     f"starting value{'s' if len(idle) > 1 else ''} ({starts}), and the "
                     "others were fitted with "
                     f"{'them' if len(idle) > 1 else 'it'} held there.")
