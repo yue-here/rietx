@@ -215,6 +215,11 @@ and have no free factor to measure, so this file's old list named them without c
   at most 0.33 wt %, and LaB₆ + cBN reads 16.79 wt % with the hold and 16.85 without, against TOPAS's
   17.907-17.950. A probe of a staged re-fit must pass `refit="stages"` since WP-2224. WP-2225's
   2026-11-19 reading that the reorder met its bar was a one-stage measurement.
+- **From WP-2225 (2026-11-20), the ruling.** The maintainer chose option 3: the hold stays as it
+  is, and a fit whose last stage held a twin carries the warning `WIDTH_TWIN_HELD`, naming the
+  held widths and the stage whose values they keep. Row R's verdict on the hold's tier is
+  unchanged by it. The code fires on 4 of the 8 comparison standards (pinned). By task 1's
+  records of the hold it also fires on cpd-1a and on LaB₆ + cBN's twin plan; not run there.
 - **For group R, from a side investigation (2026-11-19).** The simulated `trigger` case in
   `examples/bench_refinement.py` fitted to Rwp 0.01998 on v1.9.0 and reached 0.0276 on
   main (closing stage off), against 0.0195 for the truth model. The cause is the width twin

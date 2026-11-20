@@ -1,9 +1,8 @@
 # WP-2225 — A held instrument width stops a staged fit short of its own plan's point
 
-Milestone: generality · Status: 🔄 2026-11-20 — ruled by the maintainer 2026-11-20: option 3 (a diagnostic on every fit whose last stage held a width twin); tasks 3-5 in progress
+Milestone: generality · Status: ✅ 2026-11-20 — option 3, ruled by the maintainer 2026-11-20: `WIDTH_TWIN_HELD` reports the held width twins; PR #1722
 Track: The audits
 Depends on: 2002 (the width twin hold); 2017 soft (its row R measures the same hold); 2224 soft (a one-stage re-fit hides this)
-Priority: P2 2026-11-19 — a fit that frees an instrument width beside its specimen twin returns "converged" at a point its own plan lowers on the next run, and nothing flags it; few fits run such a plan, and calibrating the instrument on a standard is the workaround
 
 ## Goal
 
@@ -344,6 +343,103 @@ no specimen width free. The earlier bar, a staged re-fit moving no reported para
 - IUCr CPD quantitative phase analysis round robin, `tests/data/qarr/` (`tests/data/README.md`).
 
 ## Handover log
+
+- **2026-11-20, option 3 built** — a fit whose last stage held an instrument width beside its
+  specimen twin now says so. The new warning `WIDTH_TWIN_HELD` names the held widths, their
+  specimen twins and the stage whose values they keep. It says the specimen widths are what the
+  plan's stage order left over, and suggests calibrating the instrument on a standard first. It
+  moves no number. Of the eight comparison standards it fires on exactly the four whose plan
+  frees a twin pair: zincite, fluorite, corundum and brucite. All five tasks are done and the WP
+  closes on the maintainer's ruling of 2026-11-20 (option 3).
+
+  *Done*: `refine._width_twin_diagnostics`, read off the last stage's
+  `StageResult.width_twins_held` with no threshold, called by the single fit, `run_stage` and the
+  joint fit (`multi.DIAGNOSTIC_SCOPES` row `FIT`). The shape follows the package's other holds:
+  `PHASE_UNCONSTRAINED` reports the absent-phase hold and `HOLD_BLOCKED_PLAN` a caller's hold,
+  and here `where` is the held instrument paths, then their twins. Level `warning`, which the
+  purpose table makes a warning under microstructure and calibration (the `instrument.profile.*`
+  and specimen-width globs) and info elsewhere. Audit rows: the code at tier 1 (exact read of the
+  record, approved 2026-11-20 on the ruling), its suggestion at tier 2 (`docs/practice.md`
+  § Instrument and specimen widths refined together). Help entry, silence pair, the GUI's
+  help-key fixture regenerated, the skill's reference row beside `RESOLUTION_UNCONSTRAINED`
+  (copies re-synced), a release-note fragment (`docs/releases/unreleased/1722.new.md`).
+  `tests/data/suite_alarms.json` re-pinned, a fast test holding the pin's firing set to the four,
+  and two fits in `test_width_twin_hold.py`. Acceptance rewritten to option 3's branch.
+  The code was named `WIDTH_TWIN_HELD` after its record field, `width_twins_held`, in the
+  `<THING>_HELD` form of `PARENT_STRAIN_HELD` and `HARMONIC_HELD`.
+
+  *Measured*: macOS arm64, worktree venv `[dev]`, merged with `origin/main` at `20255ddfa`.
+  Fast selection 14949 passed, 433 skipped, 32 xfailed in 466 s; this branch adds 5 tests (4 functions and the `WIDTH_TWIN_HELD` case of `test_silence.py`), no new skip, the added tests 0.32 s in all (local junit). FULL_COUNTS. The pin's slow row passed (1 passed). The re-pin differs from PR #1723's pin
+  (`wp2036-suite-alarms-closing-stage`, which re-pins main's moves from #1707) only by this
+  code's four rows, its count of 4, and warnings per result under microstructure 9.0 → 9.5 and
+  calibration 9.125 → 9.625. The other moves in the diff (fluorite's `FLOOR_HIT` gone and
+  `COVARIANCE_DIRECTION_DISCARDED` added, zincite's `RESOLUTION_NOT_POSITIVE`, `CONSTRAINT_ACTIVE`
+  1 → 3) are main's, and #1723 carries the same. **The two pins must be reconciled**: whichever PR
+  merges second re-runs `python -m tests.suite_alarms --write`. `python -m tests.reader_output` is
+  unchanged (its standard fit frees no twin pair); on zincite `str(result)` gains one line,
+  quoted in the PR body. Plots looked at: `tests/output/suite_alarms_{zincite,brucite}.png`
+  (the known low-angle peak-top underfit and brucite's anisotropic widths, unchanged) and
+  `wp2225_no_twin_held.png` (Rwp 0.042, GoF 1.04).
+
+  *Review* (`/code-review high --fix`, 7 findings): fixed in `072b87275`, a width a stage seeded
+  and then held now names that stage ("stage 'x' seeded"), and the help entry names the Stephens
+  block as Y's twin. Declined, each for the maintainer if it matters: under `run_stage` the
+  message names the start rather than the node an earlier `run_stage` left (true for that call,
+  and naming the node means reading history); a `vars.` column driving U is called an
+  "instrument width"; `summary(deliverable="microstructure")` gains no "not quotable" line for
+  this code as it does for `RESOLUTION_UNCONSTRAINED`, since that is a further change to what a
+  fit prints; the pin's other moves are main's (above).
+
+  *Generality* (the `generality-review` judge, unedited):
+
+  **`WIDTH_TWIN_HELD`** (code, tier 1, ambiguity 1, warning). **Holds.** The case for acting
+  is stronger. The code reports an exact fact, a hold the package made itself, and the cost of
+  saying nothing was measured. The case against is a single unmeasured edge case, and it narrows
+  only the wording of the advice.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | It reports the hold and tells the reader "quote no specimen size or strain width named in where as a measurement" (`_audit.py:1712-1715`). | It decides no number. It adds a warning-level verdict on fits whose last stage held a twin (`refine.py:8729-8734`). | ok |
+  | 2. Kind | ambiguity=1 (`_audit.py:1710`) | Kind 1 is right. The trigger is the package's own record. The verdict rests on an exact degeneracy (Caglioti, Paoletti & Ricci 1958, cited at `refine.py:8707`). | agrees |
+  | 3. Case against | None given. | One case found by reasoning, not measured. Suppose a caller loads a calibrated instrument profile, then runs their own plan that frees U only in stages where its twin is also free. The hold then keeps U at the calibrated start, which is exactly the calibrated route. The message correctly says "the one the fit started from" (`refine.py:8746`). The advice still says the specimen widths are not a measurement. A competent refiner in that situation would quote them. A user hold (`hold`) on U never fires the code, because the hold reads only free paths (`refine.py:1174`). | weak case |
+  | 4. Case for | Two starts on cpd-1a (a round-robin QPA mixture) put fluorite `lor_strain` 5.11 reported esds apart (`_audit.py:1722-1723`; WP:253). The held values print nowhere else (`refine.py:8712-8714`). | Confirmed in the WP, whose 17.13 is the same shift in plain, uninflated esds. Practice reports the analogous cases: GSAS-II warns on a parameter frozen at a limit, and TOPAS 5 prints `_LIMIT_MIN_#` (`practice.md:246-247`). GSAS-II also prints a singularity warning when both twins are free (`_audit.py:1827-1828`). The cost of silence is specimen widths with small esds that are not determined. | strong |
+  | 5. Tier | Tier 1, arithmetic: it fires exactly on a non-empty `StageResult.width_twins_held`, with no threshold (`_audit.py:1716-1719`). | Correct. Tests: `tests/test_width_twin_hold.py::test_the_answer_says_which_widths_the_hold_kept_and_whose_values` (line 194, fires), `::test_a_fit_whose_last_stage_held_no_twin_says_nothing` (line 228, silent), `::test_a_width_seeded_then_held_names_the_seed_and_not_an_earlier_stage` (line 210). The pin `tests/data/suite_alarms.json:74` says it fires on 4 of the 8 standards. | holds |
+  | 6. Families | No threshold. It fires on zincite, fluorite, corundum and brucite, the four whose plan frees a twin pair (`_audit.py:1724-1725`). | No threshold exists, so no family count is owed. The firing set is exact by construction. The 5.11-esd figure is one family, cpd-1a, which is development data. It supports the advice, not a trigger. | n/a |
+  | 7. Record | The code itself, read off `StageResult.width_twins_held` (`_audit.py:1717`). | `where` lists the held instrument widths and their specimen twins. `value` is the count of held widths (`refine.py:8760-8762`). | ok |
+
+  Evidence that would change the verdict: a fit with a loaded instrument profile where the code
+  fires and the specimen widths are in fact calibrated. If one occurs, the "fit started from"
+  case should get softer wording.
+
+  **`WIDTH_TWIN_HELD.suggestion`** (suggestion, tier 2, ambiguity 1, value 1). **Holds.** The
+  case for is stronger. Established practice is to fix the instrument from a standard, and the
+  survey in this repository shows that. The suggestion is also phrased conditionally: it starts
+  "To measure the specimen widths".
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | It names the calibrated route: `lab_calibrate`, `load_instrument_profile`, then a sample-only plan (`_audit.py:6018-6019`; `refine.py:8770-8774`). | It is advice only. All the verbs and presets it names exist (`strategy/staged.py:862-863`; `io/instrument_profile.py:107,157`). | ok |
+  | 2. Kind | ambiguity=1 (`_audit.py:6013`) | Kind 1 holds. The text is conditional on wanting the specimen widths, so a caller who wants only the phase fractions is not told to act. | agrees |
+  | 3. Case against | None given. | A caller with no standard measured on the same instrument cannot take this route, and no alternative is named. One alternative is a plan freeing only the instrument widths. The round robin is that case: the WP did not check whether it supplies a standard (WP:165, 413-414). BGMN instead computes the instrument from the geometry (`practice.md:221`). rietx has no such route, because the fundamental-parameters approach sits behind the v2 fence. | weak |
+  | 4. Case for | Every program that separates instrument from specimen broadening fixes the instrument from a standard (`_audit.py:6014-6018`). | `practice.md:225-229` confirms this for FullProf, BGMN, RIETAN-FP and GSAS-II, each cited to source or manual. It is also the package's own documented workflow, `lab_calibrate` with the certified cell held fixed (CLAUDE.md § Conventions, instrument ⊕ sample split). | strong |
+  | 5. Tier | Tier 2, on `docs/practice.md` § Instrument and specimen widths refined together. | I checked this in the repository, not from memory (`practice.md:215-229`). TOPAS's row records nothing on separation, MAUD's says to free U, V and W by hand, and EasyDiffraction has no constant-wavelength sample term. None of the three separates the widths by another route, so none dissents from the suggestion. | holds |
+  | 6. Families | n/a: it has no threshold. | n/a | n/a |
+  | 7. Record | `suggestion=` on the `WIDTH_TWIN_HELD` diagnostic, at one site (value=1). | One site, at `refine.py:8770`. | ok |
+
+  Evidence that would change the verdict: a program's documented default that separates the two
+  widths by a route other than a standard, which rietx could offer. Alternatively, a measured case
+  where a caller with no standard is left with no usable next call.
+
+  Author's answer to the two weak cases: both concern the advice's wording, not whether the code
+  fires. Neither was observed, and each is recorded here for the maintainer.
+
+  *Gotchas*: the specimen widths' esds are unchanged; they are conditional on the held values, and
+  whether they should say so is WP-2219's (#1718). No note went into WP-2219's file because #1718
+  rewrites it. WP-2017's `### Inherited` gains the ruling.
+
+  *Next*: none in this WP. A possible follow-up, not filed: rietx's own comparison and acceptance
+  plans calibrate the instrument first (the brief's option 4), which first needs a standard for
+  the round robin's diffractometer.
 
 - **2026-11-20, decision** — ruled by the maintainer 2026-11-20: option 3. Given in chat to the
   shift lead. A diagnostic fires on every fit whose last stage held a width twin. It names the
