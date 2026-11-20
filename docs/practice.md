@@ -249,7 +249,8 @@ earlier stage put it, and no free parameter in the stage can narrow that part of
 
 In GSAS-II the parameter that crossed its limit is the one taken out, and its partner keeps
 refining. In TOPAS it stays refined at its limit, and the output marks it. Neither touches the
-partner. rietx's `FLOOR_HIT` is the analogue of TOPAS's mark. No program holds an instrument width because its specimen twin is free
+partner. rietx's analogue of TOPAS's mark is `FLOOR_HIT` on a floor of 0 and `BOUND_HIT` on
+any other limit, and rietx marks a limit only when it carried load. No program holds an instrument width because its specimen twin is free
 (the table above), so none meets this case in the form rietx does.
 
 ## Extinction

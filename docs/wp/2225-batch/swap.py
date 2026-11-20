@@ -39,7 +39,7 @@ def swap_hold(table, unseen):
 
 
 def plan(std, closing, single=False):
-    p = std.build(dd).plan
+    p = std.build(compare.default_data_dir()).plan
     if single:
         g = list(dict.fromkeys(x for s in p.stages for x in s.turn_on))
         p = RefinementPlan(stages=[Stage("all", g, seed=max(s.seed for s in p.stages))])

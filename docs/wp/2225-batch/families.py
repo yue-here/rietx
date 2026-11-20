@@ -10,6 +10,7 @@ protocol, run under `today` alone), brucite_steph (brucite with an all-zero Step
 `tests/test_acceptance_stephens._plan(texture=True, stephens=True)`, default LM driver),
 and the comparison standards zincite, fluorite, corundum, brucite.
 CLOSING: decl (the protocol's own setting), off (None), on (1e-3).  Default decl.
+ARMS=opt2,... in the environment runs only those arms.
 
 Arms, each from the protocol's start:
   today    the shipped width twin hold
@@ -17,8 +18,11 @@ Arms, each from the protocol's start:
            their floor at a stage start holds the twins and frees the instrument column
   opt2     today's fit, then rounds of a two-stage plan until Rwp moves under 1e-7 (at most
            8 rounds): every glob the plan frees before the first stage that held a twin,
-           then every glob the plan frees.  No seed, the plan's ftol schedule and closing
-           setting, refit="stages".  The instrument-only stage and the last stage, repeated.
+           then every glob the plan frees, each half collapsed as a warm re-fit collapses a
+           plan (`strategy.refit._collapse`: no seed, the half's last-stage ftol, restraint
+           weight and window slack) under the plan's own plan-level settings, refit="stages".
+           No round runs when the first stage held a twin or only the closing stage did.
+           `iterations` and `seconds` total the first fit and every round.
   nohold   the hold switched off (the hold-off reference)
 `today` and `opt1` are each followed by one staged re-fit under the same rule (`+1`,
 refit="stages"), the WP's acceptance reading.
@@ -29,9 +33,11 @@ parameter (value, plain esd, reported esd), and for brucite_steph the count of r
 """
 import copy
 import json
+import os
 import sys
 import time
 import warnings
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -42,7 +48,7 @@ import numpy as np  # noqa: E402
 
 import rietx as rx  # noqa: E402
 from rietx.schemas.plan import CLOSING_WINDOW_TOL  # noqa: E402
-from rietx.strategy.staged import RefinementPlan, Stage  # noqa: E402
+from rietx.strategy.refit import _collapse  # noqa: E402
 from rietx.viz import compare  # noqa: E402
 
 warnings.simplefilter("ignore")
@@ -94,10 +100,6 @@ def family(name):
             {"two_theta_limits": inp.two_theta_limits})
 
 
-def union(stages):
-    return list(dict.fromkeys(g for s in stages for g in s.turn_on))
-
-
 def row(fam, arm, clos, ref, res, dt, extra=None):
     prof = ref.instrument.profile
     last = res.stages[-1]
@@ -116,13 +118,11 @@ def row(fam, arm, clos, ref, res, dt, extra=None):
                         ((f"phases.{i}.{w}", getattr(ph, w).value)
                          for i, ph in enumerate(ref.structure.phases)
                          for w in ("gauss_size", "gauss_strain", "lor_size", "lor_strain"))}}
-    try:
-        out["qpa"] = {r.name: [100.0 * r.weight_fraction,
-                               None if r.weight_fraction_stderr is None
-                               else 100.0 * r.weight_fraction_stderr]
-                      for r in res.qpa.phases}
-    except Exception:  # single phase, or no QPA block
-        out["qpa"] = {}
+    # a single-phase fit carries no QPA block
+    out["qpa"] = {} if res.qpa is None else {
+        r.name: [100.0 * r.weight_fraction,
+                 None if r.weight_fraction_stderr is None else 100.0 * r.weight_fraction_stderr]
+        for r in res.qpa.phases}
     if fam == "brucite_steph":
         from tests.test_acceptance_stephens import _sigma2_of
         out["sigma2_negative"] = int(np.sum(_sigma2_of(ref) < 0.0))
@@ -170,6 +170,8 @@ def main():
         for fam in fams:
             for clos in closings:
                 arms = ["today"] if fam == "lab6cbn_shared" else ["today", "opt1", "opt2", "nohold"]
+                if os.environ.get("ARMS"):  # e.g. ARMS=opt2 re-runs one arm
+                    arms = [a for a in arms if a in os.environ["ARMS"].split(",")]
                 for arm in arms:
                     RF._hold_width_twins = RULES[arm]
                     data, st, ins, base, kw = family(fam)
@@ -180,21 +182,30 @@ def main():
                         names = [s.name for s in plan.stages]
                         k = next((i for i, s in enumerate(res.stages) if s.width_twins_held), None)
                         rounds, total, trace = 0, dt, [res.statistics.rwp]
-                        if k is not None:
-                            kp = names.index(res.stages[k].name) if res.stages[k].name in names \
-                                else len(names)
-                            p2 = RefinementPlan(stages=[Stage("inst_round", union(plan.stages[:kp])),
-                                                        Stage("all_round", union(plan.stages))])
-                            p2.intermediate_ftol = plan.intermediate_ftol
-                            p2.closing_window_tol = plan.closing_window_tol
+                        its = sum(s.n_iterations for s in res.stages)
+                        kp = (names.index(res.stages[k].name) if res.stages[k].name in names
+                              else len(names)) if k is not None else None
+                        # kp == 0 leaves no instrument-only stage, and kp == len(names) (the
+                        # closing stage held first) makes it the whole plan: no round to run
+                        if kp is not None and 0 < kp < len(names):
+                            # `_collapse` carries each half's stage and plan fields (max_iter,
+                            # ftol, restraint weight, window slack, strain_seed, no seed), as a
+                            # warm re-fit does; the plan-level fields come from `plan` itself
+                            inst = _collapse(replace(plan, stages=plan.stages[:kp])).stages[0]
+                            whole = _collapse(plan).stages[0]
+                            p2 = replace(plan, stages=[replace(inst, name="inst_round"),
+                                                       replace(whole, name="all_round")])
                             for rounds in range(1, 9):
                                 res, d2 = fit(ref, data, copy.deepcopy(p2), kw, refit="stages")
                                 total += d2
+                                its += sum(s.n_iterations for s in res.stages)
                                 trace.append(res.statistics.rwp)
                                 if abs(trace[-1] - trace[-2]) < 1e-7:
                                     break
+                        # iterations and seconds both total the first fit and every round
                         put(row(fam, arm, clos, ref, res, total,
-                                {"rounds": rounds, "rwp_trace": trace}))
+                                {"rounds": rounds, "rwp_trace": trace, "iterations": its,
+                                 "first_held_stage": kp}))
                         plot(res, f"{fam}_{clos}_{arm}")
                         continue
                     put(row(fam, arm, clos, ref, res, dt))

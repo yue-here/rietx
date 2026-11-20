@@ -127,7 +127,8 @@ terms off. In GSAS-II a variable that crosses a user's limit is reset to it and 
 refinements, with a printed warning, while its partner keeps refining. That is the shape of
 option 1, on a limit the user set. TOPAS 5 keeps a parameter at its limit refined and appends
 `_LIMIT_MIN_#` to its printed value at the end (Technical Reference §3.8, read 2026-11-20). That is
-the shape of option 3, on a limit the user set, and rietx's `FLOOR_HIT` is its analogue.
+the shape of option 3, on a limit the user set. rietx's analogue is `FLOOR_HIT` on a floor of 0
+and `BOUND_HIT` on any other limit.
 
 ### Interplay
 
@@ -238,8 +239,10 @@ three families that miss it today.
 
 Option 2 reaches the hold-off point in 2-4 rounds on the single-phase standards. On the three
 other families it was still moving after 8 rounds, by 4e-6 to 3e-5 in Rwp a round. On brucite
-with a Stephens block Rwp rose again after round 6. Its wall clock was 3-11 times today's fit on
-those families (two jobs ran at once, so this is a range).
+with a Stephens block Rwp rose again after round 6. Counted in solver iterations, the first fit
+and its 8 rounds cost 1.8-3.7 times today's fit on those families, and 1.0-1.8 times on the
+standards. The rounds are built as a warm re-fit collapses a plan (`strategy.refit._collapse`), a
+review fix that left every Rwp above unchanged to six digits.
 
 **Do the quoted answers depend on the start?** cpd-1a, Biso start 0.5 against 1.5 Å² on every
 atom, the largest shift between the two answers.
@@ -277,7 +280,8 @@ because the two plans become one fit.
 pair on an uncalibrated instrument a determined split. The hold makes the split depend on the
 stage order and the start, and the data cannot say which split is right. Option 1 changes nothing
 on the multi-phase sample and silently drops the specimen widths on the two-phase one. Option 2
-converges on the single-phase standards and costs 3-11 times a fit elsewhere without converging.
+converges on the single-phase standards and costs 1.8-3.7 times a fit's iterations elsewhere
+without converging.
 Switching the hold off removes the start dependence on cpd-1a and walks on three of the eight
 families. No preset in `PLAN_PRESETS` frees both halves (checked against all nine). Only a
 caller's own plan meets the case, including rietx's own comparison and acceptance plans.

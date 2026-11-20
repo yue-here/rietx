@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 from tests.test_window_domain import _shift  # noqa: E402
 
-rows = [json.loads(line) for f in sys.argv[1:] for line in open(f, encoding="utf-8")]
+rows = [json.loads(line) for f in sys.argv[1:]
+        for line in Path(f).read_text(encoding="utf-8").splitlines() if line.strip()]
 by = {(r["family"], r["closing"], r["arm"]): r for r in rows}
 
 
@@ -52,12 +53,13 @@ for (fam, clos, arm), r in by.items():
     if "rounds" in r:
         line += f" rounds {r['rounds']} trace {[round(x, 6) for x in r['rwp_trace']]}"
     if arm.endswith("+1"):
-        line += f" | re-fit shift {shift(r, by[(fam, clos, arm[:-2])])}"
+        base = by.get((fam, clos, arm[:-2]))
+        line += f" | re-fit shift {shift(r, base) if base else '- (no first-fit row)'}"
     print(line)
     print(f"{'':28s}{q} | {prof} | floor {floor} | swapped {r['swapped']} "
           f"| codes {r['codes']}" + (f" | sigma2<0 {r['sigma2_negative']}" if "sigma2_negative" in r else ""))
 
-print("\ncpd-1a, Biso 0.5 against 1.5, largest shift in plain esd")
+print("\ncpd-1a, Biso 0.5 against 1.5, largest shift: plain esd / reported esd / quoted rows")
 for (fam, clos, arm), r in by.items():
     if fam == "cpd1a_b0.5" and ("cpd1a_b1.5", clos, arm) in by:
         print(f"  {clos:4s} {arm:8s} {shift(r, by[('cpd1a_b1.5', clos, arm)])}")
