@@ -36,7 +36,7 @@ export type Scale = "linear" | "sqrt" | "log";
  * (jsdom); `read` is injected so this stays a pure function.
  */
 export function curveColors(read: (name: string) => string): {
-  obs: string; calc: string; bkg: string; diff: string; zero: string;
+  obs: string; calc: string; bkg: string; diff: string; last: string; zero: string;
   mask: string; edge: string; peak: string; peakfit: string; candidate: string;
   phase: string[];
 } {
@@ -46,6 +46,8 @@ export function curveColors(read: (name: string) => string): {
     calc: pick("--plot-calc", "#c65d0a"),
     bkg: pick("--plot-bkg", "#b5793a"),
     diff: pick("--plot-diff", "#6b6259"),
+    // the last fit while a preview is drawn over it (WP-2218)
+    last: pick("--plot-last", "#849499"),
     zero: pick("--plot-zero", "#cfcfcf"),
     // The peak layer's two (WP-1210).  It had none: the markers took `--accent`
     // and the fitted curve `--bad`, which on the light theme *are* `--plot-diff`

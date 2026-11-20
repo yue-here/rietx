@@ -62,9 +62,9 @@ rietx has three calls for the same jobs, `tie` taking either a source or an expr
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
 
 ```text
-site O5 x O5_x 0.32467 y O5_y 0.484898 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O6 x O6_x 0.591092 y O6_y 0.469105 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O7 x O7_x 0.339828 y O7_y 0.257684 z O7_z 0.0705402 occ O ! 1.0 beq O5_biso 0.366488
+site O5 x O5_x 0.324668 y O5_y 0.484847 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O6 x O6_x 0.591016 y O6_y 0.468991 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O7 x O7_x 0.33985 y O7_y 0.257709 z O7_z 0.0704391 occ O ! 1.0 beq O5_biso 0.382804
 ```
 
 In rietx it is one call:
@@ -97,7 +97,10 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `min` and `max` on a `prm` | `rx.Parameter(min=..., max=...)` |
 | `for xdds { ... }`, with `existing_prm i += 1;` and `#T_val(i)` | a python loop over the files, with each file's `T` at the same row of the coordinate table |
 | `#define`, `#ifdef` and `macro` | no equivalent: write out what they expand to, or a python function that builds the repeated part |
-| a phase's parameter under one name in every `xdd`, such as its `TCHZ_Peak_Type` terms | nothing: every pattern shares a phase's parameters unless `SharingMap.per_histogram` names them |
+| `fn cell_fT(a0, grad, theta, te) = a0 + grad/(Exp(theta/te) - 1);` | no equivalent: write the body into each formula with the arguments substituted, or build the text with a python function |
+| a phase's parameter under one name in every `xdd`, such as its `Strain_L` term or a coordinate | nothing: every pattern shares a phase's parameters unless `SharingMap.per_histogram` names them |
+| `TCHZ_Peak_Type` on a phase | the phase's `gauss_strain` for the Gaussian tan²θ term U, `gauss_size` for the Gaussian 1/cos²θ term Z, `lor_strain` for the Lorentzian tanθ term X and `lor_size` for the Lorentzian 1/cosθ term Y. A phase's own V and W have no spelling, because rietx's V and W belong to the instrument. |
+| `local height` and `th2_offset = -2 57.2957795 (height) Cos(Th) / Rs;` | `instrument.geometry.sample_displacement`, in mm with the same sign, one per pattern. This is TOPAS's `Specimen_Displacement` written out, and the instrument's `goniometer_radius_mm` takes the place of `Rs`. |
 | `local` on a phase's parameter, such as each temperature's `beq` | `rx.SharingMap(per_histogram=["phases.0.atoms.0.biso"])` |
 | `local` on a scale, a `bkg` term, `th2_offset` or a specimen height | nothing: each phase scale, and every parameter under `instrument.`, is one per pattern already |
 | an instrument term under one name in every `xdd` | `rx.SharingMap(shared=["instrument.zero_shift"])` |
@@ -109,6 +112,7 @@ Each line of a TOPAS parametric input has its rietx spelling:
 | `range 3` of a multi-range RAW file | `rx.read_pattern(path, scan=2)`, since `scan` counts from 0 |
 | `Get(r_wp)`, `Out(Get(a), ...)` and `MVW(...)` | `result.histograms[h].statistics`, the rows of `result.parameters` (a per-pattern row is `hist.<h>.<path>`), and `result.histograms[h].qpa` |
 | `val_on_continue = Val*Rand(0.99, 1.01);` | no equivalent: rietx refines once from its starting values, so a python loop over starting values repeats the fit |
+| `load_save_locals` or `use_stored_values`, which start each value from the last run's | no equivalent: a joint fit starts from the values its models carry |
 
 A formula is evaluated in radians, and `pi` is the constant.
 `MultiHistogramRefinement.preview_equations` evaluates every formula at its starting values before any fit.
@@ -163,7 +167,7 @@ Four things a TOPAS input does have no rietx spelling yet:
 
 - A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
 - A restraint or a `penalty` in a joint fit, which refuses soft restraints.
-- An equation over a reflection or a point: `th2_offset` written in `Xo`, or a width, position or intensity written in `Th` or `D_spacing`. An overall B is the exception, through the formulas above.
+- An equation over a reflection or a point: `th2_offset` written in `Xo`, a phase's own TCHZ V and W, or a width, position or intensity written in `Th` or `D_spacing`. An overall B and a height written in `Cos(Th)` are the exceptions, through the rows above.
 - `fit_obj`, a term added to the calculated pattern.
 
 ### Coordinates are refined along the symmetry directions
@@ -192,6 +196,8 @@ The `lab_calibrate` and `lab_sample_refine` plans do the two halves.
 TOPAS's `CS_L` and `Strain_L` macros state a size and a strain.
 rietx reads neither from a file, and says so when it meets one.
 `gauss_size`, `lor_size`, `gauss_strain` and `lor_strain` are the terms to set by hand.
+TOPAS's `Strain_L(e)` adds a Lorentzian FWHM e·tanθ, so `lor_strain` is e.
+Its `Strain_G(e)` adds a Gaussian FWHM e·tanθ, and rietx states the Gaussian FWHM², so `gauss_strain` is e².
 
 ### The scale is not TOPAS's scale
 
@@ -300,19 +306,19 @@ rx.write_topas_inp(ref.fitted_structure, "refined.inp", free=ref, scale="topas",
 The file names each free parameter after its path, which in TOPAS is also its refine flag.
 This file comes from the refinement above that held the zero shift at 0.
 It holds the zero shift with `!`, and states the specimen displacement that took its place as an equation in `th2_offset`.
-The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 111 ppm lower.
+The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 110 ppm lower.
 These lines are an excerpt, with each number cut to six significant figures:
 
 ```text
 xdd "refined.xye" xye_format
   weighting = 1 / SigmaYobs^2;
-  bkg @ 152.446 -171.263 124.821 -73.5215 36.6909 -16.1333
+  bkg @ 154.768 -172.223 123.708 -71.9987 35.2492 -15.3107
   th2_offset ! 0
-  th2_offset = -2*Rad*(0.0629551)*Cos(Th)/217.5;
+  th2_offset = -2*Rad*(0.0632254)*Cos(Th)/217.5;
 str
-  scale p0_scale 0.000469265 min 0
-  a p0_cell_a 9.37332
-  b p0_cell_a 9.37332
+  scale p0_scale 0.000470097 min 0
+  a p0_cell_a 9.37331
+  b p0_cell_a 9.37331
 ```
 
 The data go beside it as `refined.xye`, with the esd rietx weights by.

@@ -59,8 +59,7 @@ EVENT_AT = default_events(LENGTH)
 #: the committed full-length output (``python -m tests.planted_series``)
 DATA = Path(__file__).parent / "data" / "planted_series"
 #: series-level codes that mark an event
-EVENT_CODES = {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-               "SEQUENTIAL_WIDTH_GROWTH"}
+EVENT_CODES = {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"}
 
 _MASKED = ("the transition falls inside the second phase's growth, and no "
            "rule reads what marks it: no cell length steps most there, while "

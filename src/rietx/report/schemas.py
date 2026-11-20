@@ -286,7 +286,18 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   side.  ``add_impurity_phase`` no longer counts a row on a flank.  A new
 #   type a consumer reads, on 1.11 → 1.12's precedent, and an action a
 #   consumer may count, on 1.12 → 1.13's.
-THRESHOLDS_VERSION = "1.14"
+# 1.14 → 1.15 (WP-2081, the maintainer's ruling of 2026-11-16): 1.9's
+#   ``SEQUENTIAL_WIDTH_GROWTH`` is removed with its three thresholds, so a
+#   series raises no finding about a width that grew.  The width trajectory
+#   and each pattern's GoF were already on the result, and the series
+#   milestone's rule 5 puts a statistic in a field with no threshold.  A
+#   consumer counting the code sees it vanish, and
+#   ``SeriesResult.summary(deliverable="series")`` drops its row.  The bump
+#   also carries WP-2003's earlier removal of ``SEQUENTIAL_DISCONTINUITY`` with
+#   ``DISCONTINUITY_FACTOR``, ``DISCONTINUITY_SIGMA`` and
+#   ``MIN_POINTS_FOR_DISCONTINUITY``, which no version recorded; its statistic
+#   is ``SeriesResult.steps``.
+THRESHOLDS_VERSION = "1.15"
 
 #: WP-1343.  How far the moment must move when a magnetic width is released
 #: before the release is called a *measurement of the correlation*, in units

@@ -107,7 +107,7 @@ truth = {"a0": A0, "ga": GA, "c0": C0, "gc": GC, "theta": THETA}
 z = {n: (rows[f"vars.{n}"].value - t) / rows[f"vars.{n}"].stderr for n, t in truth.items()}
 assert all(abs(v) < 2 for v in z.values()), z
 assert result.status == "converged"
-assert f"{rows['vars.theta'].value:.7g}" == "500.1692" and f"{rows['vars.theta'].stderr:.2g}" == "0.61"
-assert f"{rows['vars.ga'].value:.7g}" == "0.01720567"
+assert f"{rows['vars.theta'].value:.7g}" == "500.1693" and f"{rows['vars.theta'].stderr:.2g}" == "0.61"
+assert f"{rows['vars.ga'].value:.7g}" == "0.01720566"
 assert [f.rejected for f in result.parametric_form] == [False, False]
 assert f"{result.parametric_value('c', {'T': 300.0}).value:.7f}" == "2.9572836"

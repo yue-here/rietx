@@ -3647,7 +3647,9 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                        if scale is None else
                        _p(scale, "the phase scale", min=0.0))))
             from ...crystallography.magnetic.scattering import check_group_is_structure_symmetry
+            from ...crystallography.symmetry import check_phase_cell_ties
             check_group_is_structure_symmetry(phases[-1])
+            check_phase_cell_ties(phases[-1], prefix=f"phases.{len(phases) - 1}")
         except FullProfPcrError:
             raise
         except Exception as exc:
@@ -4315,6 +4317,7 @@ def from_structure(structure: Structure, *,
         refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
+        refuse_parent_cell,
     )
 
     job, lambda1, lambda2, ratio = _radiation(instrument)
@@ -4454,6 +4457,7 @@ def from_structure(structure: Structure, *,
     for index, phase in enumerate(structure.phases):
         refuse_operation_list(phase, "a FullProf `.pcr`")
         refuse_distortion_modes(phase, "a FullProf `.pcr`")
+        refuse_parent_cell(phase, "a FullProf `.pcr`")
         refuse_magnetic_phase(phase, "a FullProf `.pcr`")
         phase, restated = restate_in_hexagonal_axes(phase, "a FullProf `.pcr`")
         if restated:

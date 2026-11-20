@@ -38,6 +38,7 @@ from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.fraction import FractionProfile
 from rietx.schemas.instrument import BackgroundChebyshev
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
 from rietx.strategy.fraction_profile import WIDTH_TERMS, width_value
 from rietx.strategy.staged import RefinementPlan, Stage
@@ -61,7 +62,7 @@ PLAN = RefinementPlan(stages=[
     Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
     Stage("cell", ["phases.*.cell.*", "instrument.zero_shift"]),
     Stage("width", FREE),
-])
+], closing_window_tol=CLOSING_WINDOW_TOL)   # declared, not inherited: off by default since WP-2222
 
 
 def _p(value: float) -> Parameter:
