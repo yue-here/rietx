@@ -119,7 +119,6 @@ class ReflectionFrame:
     harmonics: dict = field(default_factory=dict)
     #: the cell the harmonic values below were taken at, and the values
     cell: tuple | None = None
-    _images: bool = False
 
     def bindings(self, d, theta, two_theta) -> dict:
         """The reflection names, bound at the representatives."""

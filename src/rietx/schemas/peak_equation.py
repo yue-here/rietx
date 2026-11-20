@@ -84,15 +84,7 @@ def harmonic_args(call) -> tuple[int, int]:
     """
     from ..params import expression as ex
 
-    def literal(node) -> int | None:
-        sign = 1
-        if isinstance(node, ex.Neg):
-            sign, node = -1, node.arg
-        if isinstance(node, ex.Num) and float(node.value).is_integer():
-            return sign * int(node.value)
-        return None
-
-    degree, n = (literal(a) for a in call.args)
+    degree, n = (ex._int_literal(a) for a in call.args)
     if degree is None or n is None:
         raise ValueError("harmonic(l, n) takes two integer literals, as in "
                          "harmonic(4, 0) or harmonic(4, -4)")

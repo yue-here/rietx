@@ -297,6 +297,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "histogram's scales"),
     "_qpa_unavailable_diagnostics": (
         (HISTOGRAM,), "through _quantify_phases, as above"),
+    "_qpa_intensity_factor_diagnostics": (
+        (HISTOGRAM,), "through _quantify_phases, as above"),
     # -- both: a converter ----------------------------------------------------
     "_guard_diagnostics": (
         (HISTOGRAM, FIT), "a GuardReport converter: background absorption and "

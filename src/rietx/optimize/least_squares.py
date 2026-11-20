@@ -2373,6 +2373,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 J[:n_data, c] = -sqrt_w * _scale_column(
                     model, get_bases(), values, int(sc.group(1)))
             elif ((pq := _PEQ_PATH.match(path)) and own
+                    and not model.mag_split(int(pq.group(1)))
                     and (col := _peak_equation_column(
                         model, get_bases(), values, int(pq.group(1)), path))
                     is not None):

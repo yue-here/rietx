@@ -1576,8 +1576,10 @@ class CompiledModel:
 
         No target reads another's value, and ``two_theta`` reads the position
         before the phase's own ``shift``, so a phase coefficient reaches
-        nothing else.  Only the nuclear component: compile refuses an
-        equation on a phase that draws a magnetic one.
+        nothing else.  Only the nuclear component: a phase whose magnetic
+        component is drawn on its own family (:meth:`mag_split`) carries the
+        equations there too, so ``_make_jacobian`` sends its coefficients to
+        the scalar chain instead, as it does the March and texture columns.
         """
         cp = self.phases[ip]
         peq = cp.peq
@@ -1592,7 +1594,8 @@ class CompiledModel:
         cell = self._phase_cell(ip, values)
         d, tt_lines = self._cell_block(cp, cell, self.line_lambdas(values))
         frame = peq.frame.at(cell)
-        peaks = self.phase_peaks(ip, values)
+        peaks = (self.phase_peaks(ip, values) if target == "intensity_factor"
+                 else None)
         aniso = (self.strain_width(ip, values, d)
                  if target in WIDTH_TARGETS else None)
         out = []
@@ -4880,7 +4883,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 l_est = lorentzian_fwhm(theta, x_l, y_l,
                                         0.0 if aniso_est is None else aniso_est)
                 if extra_l is not None:
-                    l_est = l_est + extra_l
+                    # floored for sizing alone: a negative Γ_L gives a NaN
+                    # width, which would size an empty window and drop the
+                    # reflection unseen (PEAK_WIDTH_NOT_POSITIVE reports it)
+                    l_est = np.maximum(l_est + extra_l, 0.0)
                 # TCHZ combined (Γ, η) is a compile-time proxy for window sizing
                 # and FCJ node counts under *both* shapes: it tracks the true
                 # Voigt FWHM to ~1 % (that is what the TCH quintic is fit to),
