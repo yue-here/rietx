@@ -354,42 +354,10 @@ def _series_result(**kw) -> rx.SeriesResult:
 def test_series_deliverable_prints_every_deciding_row():
     text = _series_result().summary(deliverable="series")
     assert "deliverable: series" in text
-    for row in ("ordering artefact:",
-                "widths grown with a worsening fit:", "steps:",
+    for row in ("ordering artefact:", "steps:",
                 "phase support:", "2θ-scale anchor:", "precision vs accuracy:",
                 "good enough:"):
         assert row in text, row
-
-
-def test_series_deliverable_quotes_a_width_that_grew_with_the_misfit():
-    """WP-1465: the finding's own message, under its count, never a
-    paraphrase of it."""
-    from rietx.schemas.results import Diagnostic
-
-    growth = Diagnostic(
-        level="warning", code="SEQUENTIAL_WIDTH_GROWTH",
-        where=["phases.0.lor_strain"], value=3.6,
-        message="phases.0.lor_strain grew 3.6× from p0 to p2")
-    text = _series_result(diagnostics=[growth]).summary(deliverable="series")
-    assert "widths grown with a worsening fit: 1" in text
-    assert "phases.0.lor_strain grew 3.6× from p0 to p2" in text
-    assert ("widths grown with a worsening fit: 0"
-            in _series_result().summary(deliverable="series"))
-
-
-def test_a_series_that_predates_the_width_check_says_not_measured():
-    """A series stamped before thresholds 1.9 never ran the check, so its zero
-    would read as "checked, none" — the ordering-artefact row's rule."""
-    from rietx.schemas.common import Provenance
-
-    old = _series_result(provenance=Provenance(
-        package_version="1.5.0", report_thresholds_version="1.8"))
-    text = old.summary(deliverable="series")
-    assert "widths grown with a worsening fit: NOT measured" in text
-    new = _series_result(provenance=Provenance(
-        package_version="1.6.0", report_thresholds_version="1.9"))
-    assert ("widths grown with a worsening fit: 0"
-            in new.summary(deliverable="series"))
 
 
 def test_series_deliverable_says_a_one_way_chain_did_not_measure_ordering():

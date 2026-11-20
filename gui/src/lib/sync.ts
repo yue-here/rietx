@@ -65,7 +65,10 @@ export type SyncEvent =
   | { kind: "checked"; seq: number; wouldChange: boolean }
   | { kind: "applying" }
   | { kind: "applied"; text: string; revision: string; verbs: string[] }
-  | { kind: "refused"; seq?: number; code: string; message: string; problems?: Problem[] };
+  | { kind: "refused"; seq?: number; code: string; message: string; problems?: Problem[] }
+  /** A buffer kept in the recovery copy (WP-2213) comes back over a fresh
+   *  rendering. `kept` is the revision it was typed against. */
+  | { kind: "restored"; text: string; revision: string; buffer: string; kept: string };
 
 export const STALE_NOTICE =
   "the project changed underneath this text — re-read it and re-apply your edit";
@@ -123,6 +126,18 @@ export function reduce(state: SyncState, event: SyncEvent): SyncState {
                    event.verbs.length
                      ? `applied ${event.verbs.length} change(s)`
                      : "nothing to apply");
+
+    case "restored": {
+      const fresh = adopt(state, event.text, event.revision, "");
+      if (event.buffer === event.text) return fresh;
+      // typed against this very rendering: a dirty buffer, as it was left
+      if (event.kept === event.revision) return { ...fresh, phase: "dirty", buffer: event.buffer };
+      // typed against another one, and there is no merge: the buffer comes back
+      // stale, on screen to copy from, with re-read the one way out.  It keeps
+      // the revision it was typed against, so kept again it is stale again.
+      return { ...fresh, phase: "dirty", buffer: event.buffer, revision: event.kept,
+               stale: true, notice: STALE_NOTICE };
+    }
 
     case "refused": {
       if (event.seq !== undefined && event.seq !== state.seq) return state;
