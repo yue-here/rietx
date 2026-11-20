@@ -6351,6 +6351,7 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 stage_results, table.free_paths, self.structure))
+            diagnostics.extend(_width_twin_diagnostics(stage_results))
             diagnostics.extend(_variable_not_freed_diagnostics(stage_results, table,
                                                                mode))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
@@ -6960,6 +6961,7 @@ class Refinement:
                                                  table.origin_holds))
             diagnostics.extend(_parent_strain_held_diagnostics(
                 [stage_result], table.free_paths, self.structure))
+            diagnostics.extend(_width_twin_diagnostics([stage_result]))
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -8693,6 +8695,82 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
                         "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
         ))
     return out
+
+
+def _width_twin_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``WIDTH_TWIN_HELD`` — the answer's specimen widths are what a held
+    instrument width leaves (WP-2225, ruled by the maintainer 2026-11-20).
+
+    The width twin hold (:func:`_hold_width_twins`, WP-2002) fixes an
+    instrument width for a stage whenever a specimen width with its angular
+    shape is free beside it, since the data fix only the pair's sum
+    (Caglioti, Paoletti & Ricci 1958, *Nucl. Instrum.* **3**, 223: Gaussian
+    variances add, Lorentzian FWHMs add).  The held value is whatever an
+    earlier stage left, or the start.  So the specimen width is the remainder
+    of a split that the plan's stage order chose, and two starts disagree on
+    it by several of its own esds (5.11 on cpd-1a's fluorite ``lor_strain``,
+    WP-2225 task 1).  The held paths are not measurements and leave
+    ``RefinementResult.parameters`` (WP-1999), so without this finding the
+    split prints nowhere.
+
+    Said aloud as a package-made hold is (:func:`_phase_support_diagnostics`
+    for the absent-phase hold, :func:`_hold_diagnostics` for a caller's):
+    read off the **last** stage's :attr:`~StageResult.width_twins_held`,
+    because the answer is that stage's, and exact, with no threshold.  One
+    finding per fit.  ``where`` is the held instrument widths, then their
+    specimen twins; ``value`` the count of held instrument widths.  Each held
+    width is named with the latest earlier stage whose ``freed`` lists it,
+    which is the stage whose value it keeps, or its start where none did.  The
+    specimen widths' esds are left as they are: they are conditional on the
+    held values, and whether they should say so is WP-2219's question.
+    """
+    if not stage_results:
+        return []
+    last = stage_results[-1]
+    twins = last.width_twins_held or {}
+    if not twins:
+        return []
+    held = sorted(twins)
+    specimen = sorted({t for path in held for t in twins[path]})
+
+    def source(path: str) -> str | None:
+        for sr in reversed(stage_results[:-1]):
+            if path in sr.freed:
+                return sr.name
+        return None
+
+    by_source: dict[str | None, list[str]] = {}
+    for path in held:
+        by_source.setdefault(source(path), []).append(path)
+    n = len(held)
+
+    def left(name: str | None) -> str:
+        return f"stage {name!r} left" if name is not None else "the fit started from"
+
+    if len(by_source) == 1:
+        kept = (f"The held value{' is the one' if n == 1 else 's are the ones'} "
+                f"{left(next(iter(by_source)))}")
+    else:
+        kept = "The held values are " + "; ".join(
+            f"the ones {left(name)} for {' and '.join(paths)}"
+            for name, paths in by_source.items())
+    pairs = "; ".join(f"{path} with {', '.join(twins[path])}" for path in held)
+    return [Diagnostic(
+        level="warning", code="WIDTH_TWIN_HELD",
+        where=held + specimen, value=float(n),
+        message=(f"The last stage, {last.name!r}, held {n} instrument width"
+                 f"{'' if n == 1 else 's'} fixed because a specimen width with the "
+                 f"same angular shape was free beside {'it' if n == 1 else 'each'}: "
+                 f"{pairs}.  {kept}.  The data fix only each pair's sum, "
+                 "so the specimen widths are the remainder of a split that the "
+                 "plan's stage order chose.  Their esds are conditional on the held "
+                 "instrument values."),
+        suggestion=("To measure the specimen widths, calibrate the instrument on a "
+                    "standard first: fit it with the lab_calibrate plan, its certified "
+                    "cell held, and save_instrument_profile.  Then "
+                    "load_instrument_profile here and refine with a sample-only plan "
+                    "such as lab_sample_refine."),
+    )]
 
 
 def _variable_not_freed_diagnostics(stage_results: list[StageResult],

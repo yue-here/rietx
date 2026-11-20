@@ -1707,6 +1707,28 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: fires exactly when a wavelength was free, and states its "
                   "shift from the declared value in ppm with no test on its size; gates "
                   "nothing")),
+    Row("WIDTH_TWIN_HELD", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no specimen size or strain width named in where as a measurement "
+                  "of the specimen: it is the remainder of the split the plan's stage order "
+                  "chose; calibrate the instrument on a standard and refit with a "
+                  "sample-only plan"),
+        evidence=("arithmetic: fires exactly when the last stage's "
+                  "StageResult.width_twins_held is not empty, a record the hold writes "
+                  "itself (refine._width_twin_diagnostics); no threshold; gates nothing, "
+                  "moves no number. Physics behind the reading: the data fix only each "
+                  "pair's sum (Gaussian variances add, Lorentzian FWHMs add; Caglioti, "
+                  "Paoletti & Ricci 1958), so the held instrument value sets the specimen "
+                  "value. Measured (WP-2225 task 1): two Biso starts on cpd-1a put fluorite "
+                  "lor_strain 5.11 reported esds apart under the hold; on the eight "
+                  "comparison standards it fires on zincite, fluorite, corundum and brucite, "
+                  "the four whose plan frees a twin pair (tests/data/suite_alarms.json)"),
+        grounds=("Ruled by the maintainer 2026-11-20 (WP-2225, option 3): a package-made "
+                 "hold is said aloud with what it held, as PHASE_UNCONSTRAINED says the "
+                 "absent-phase hold; TOPAS 5 marks a parameter at its limit _LIMIT_MIN_# "
+                 "and GSAS-II prints a warning on a variable it freezes at a limit "
+                 "(docs/practice.md § When one twin reaches its limit, and a re-run)."),
+        approved="2026-11-20"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
     Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
         evidence=("info; a record of an act the file's own heading asks for. Two claims, "
@@ -5988,6 +6010,13 @@ ROWS: tuple[Row, ...] = (
                   "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
+    Row("WIDTH_TWIN_HELD.suggestion", "suggestion", tier=2, ambiguity=1, value=1,
+        evidence=("practice: every program that separates instrument from specimen "
+                  "broadening fixes the instrument from a standard (FullProf's resolution "
+                  "file, BGMN's ray tracing, RIETAN-FP's advised protocol, GSAS-II's "
+                  "defaults; docs/practice.md § Instrument and specimen widths refined "
+                  "together); names rietx's route for it, lab_calibrate, "
+                  "load_instrument_profile and a sample-only plan")),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),
     Row("rietx.crystallography.symmetry.rhombohedral_restated_diagnostic.suggestion", "suggestion", value=1),
     Row("rietx.refine._dedup_high_correlations.suggestion", "suggestion", value=1),

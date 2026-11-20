@@ -305,7 +305,9 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
       *Done 2026-11-20: § Task 1, `families.py`.*
 - [x] Brief the maintainer with those numbers: the choice among options 0-4.
       *Written 2026-11-20 in the handover entry; the choice waits on the maintainer.*
-- [ ] Build the chosen option, with its record field or code and its `_audit` row.
+- [x] Build the chosen option, with its record field or code and its `_audit` row.
+      *Done 2026-11-20: option 3, `WIDTH_TWIN_HELD` (`refine._width_twin_diagnostics`, single,
+      `run_stage` and joint fits), its code and suggestion rows, help entry and silence pair.*
 - [ ] Tests: the four standards' staged re-fit of the shipped first fit moves no reported
       parameter by more than 0.1 esd (or, under option 3 alone, the code fires on all four and on
       none of the other four); obs/calc/diff PNGs to `tests/output/`.

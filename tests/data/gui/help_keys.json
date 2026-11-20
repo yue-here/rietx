@@ -303,6 +303,7 @@
   "diagnostics:VARIABLE_NOT_FREED",
   "diagnostics:WARM_REFIT_REJECTED",
   "diagnostics:WAVELENGTH_CALIBRATION",
+  "diagnostics:WIDTH_TWIN_HELD",
   "diagnostics:XRDML_ATTENUATOR_APPLIED",
   "diagnostics:XYDATA_INTER_APPLIED",
   "instrument_fields:capillary_radius_mm",
