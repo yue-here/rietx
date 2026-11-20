@@ -733,7 +733,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: names the parameters sharing a direction the covariance build "
                   "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
                   "holds, whose esds the solve left absent (WP-2219; "
-                  "least_squares._guarded_covariance, staged.outcome_discarded_directions)")),
+                  "least_squares._guarded_covariance, staged.outcome_discarded_directions); "
+                  "a parameter that is not estimable has no standard error (Searle 1971 p. 169; "
+                  "R lm prints NA), where GSAS-II and TOPAS quote the truncated-SVD esd "
+                  "(docs/practice.md)")),
     Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when the esd calculation raised after the "
                   "solver returned (refine.py _covariance_diagnostics), so the stage's "
@@ -1792,10 +1795,10 @@ ROWS: tuple[Row, ...] = (
                   "(CompiledModel._width_block): U with gauss_strain in tan^2, X with lor_size in "
                   "1/cos, Y with lor_strain in tan; gauss_size (1/cos^2 = 1 + tan^2) is flat with "
                   "U and W together and holding U alone removes it, so W, the constant width, is "
-                  "held only where a flat direction survives the other holds, the triple W, "
-                  "gauss_size and gauss_strain (WP-2219; holding W whenever gauss_size was free "
-                  "moved three CPD acceptance answers, the generality judge, WP-2002 9th "
-                  "session); "
+                  "never held (holding W too moved three CPD acceptance answers; the generality "
+                  "judge, WP-2002 9th session; holding it on the triple W, gauss_size and "
+                  "gauss_strain alone moved the cpd-1 chain, WP-2219, so that triple is left "
+                  "to COVARIANCE_DIRECTION_DISCARDED and has no esd); "
                   "refine._width_twin_flats holds the instrument "
                   "terms on the null space of those totals read off C, so one seen phase with its "
                   "specimen width held holds nothing; a free Stephens block is Y's twin by rule "

@@ -94,18 +94,21 @@ discarded-direction test names gets no esd.
 
 ## Tasks
 
-- [x] Hold the width triple at its source. When W, `gauss_size` and `gauss_strain` are free for
+- [ ] Hold the width triple at its source. When W, `gauss_size` and `gauss_strain` are free for
   a seen phase and the null space of `_width_twin_flats` contains their move, hold W, the
   instrument member, as U, X and Y are held already. Record it where WP-2002's holds are
   recorded. Check the WIDTH_TERMS comment's warning: holding W unconditionally moved three
   acceptance answers. This hold fires only on the exact triple, so measure that no
   acceptance answer moves beyond `test_acceptance_stephens`'s corundum row, and say what
   that row's answer did.
-  *Done:* the hold fires on all three Stephens fits, since each frees the triple with U held
-  (base W esd 102 on corundum, 221 and 263 on the two brucite fits, each a `FLAT_DIRECTION`).
-  Corundum's answer moved at most 0.40 base esd (`lor_size` +0.398, `lor_strain` −0.388, V
-  +0.21; cell under 0.03, Biso under 0.10), Rwp 14.5745 % → 14.5720 %, and its
-  `FLAT_DIRECTION` is gone. Brucite moved at most 0.11 esd (V), Rwp +0.003 to +0.004 points.
+  *Declined on measurement* (settled by Claude under § Acceptance, "either held or with no
+  esd", and "no acceptance number moves except where this WP names it"). Built and measured,
+  then reverted. On the Stephens fits it moved corundum at most 0.40 esd, Rwp 14.5745 % →
+  14.5720 %. The full suite then showed it moved what this WP does not name: the cpd-1 chain
+  (`test_chained_agrees_with_independent_fits`, 0.1469 against 0.1373 ± 0.005), the
+  hostile-pairs runaway no longer raised, `RESOLUTION_NOT_POSITIVE` newly fired on brucite and
+  zincite, and `test_corundum_block_is_inert_and_hamilton_blesses_it_only_at_raw_n` failed.
+  The triple is left to the no-esd rule, which meets the acceptance line by itself.
 - [x] No esd on a discarded direction, dense path. The touched set from
   `statistics.discarded_directions` joins `unmeasured_rows`. Esds, correlations and every
   derived esd follow the existing marking rules. `COVARIANCE_DIRECTION_DISCARDED` keeps

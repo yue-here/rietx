@@ -618,17 +618,14 @@ back between 1e-16 and 4e-15 of the largest. Before the change Linux raised no
 `HIGH_CORRELATION` there. On macOS a 1e-14 change to one start value left six
 widths at ± 0.
 
-A touched parameter has no esd: its variance is set infinite, the absent
-one, so every tie and derived quantity built on it is absent too. A parameter
-that is not estimable has no standard error, and a generalised inverse's
-variance for it depends on which inverse was taken {cite}`searle1971`. The
-pseudo-inverse's number was at least √2 short and by a factor nothing bounds:
-two starts of one synthetic LaB₆ fit with W, `gauss_size` and `gauss_strain`
-free landed 140 esd apart in W. `COVARIANCE_DIRECTION_DISCARDED` names the
-touched parameters, and a touched set that is exactly a pair `FLAT_DIRECTION`
-already reported adds no row. The test runs on the matrix the covariance
-inverted, a Pawley intensity block included. That triple itself is held at
-W, the instrument term, as the other width twins are (`refine.WIDTH_TERMS`).
+A touched parameter has no esd, nor has a tie or derived quantity built on
+it. A parameter that is not
+estimable has no standard error, and a generalised inverse's variance for it
+depends on the inverse taken {cite}`searle1971`. Two starts of one synthetic
+LaB₆ fit with W, `gauss_size` and `gauss_strain` free landed 140 esd apart in
+W. `COVARIANCE_DIRECTION_DISCARDED` names the touched parameters, unless
+`FLAT_DIRECTION` already reported them as a pair. The test runs on the matrix
+the covariance inverted, a Pawley intensity block included.
 
 ## Staged strategy and series
 

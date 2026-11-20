@@ -1021,17 +1021,16 @@ def _hold_scale_b_ridges(model: CompiledModel, table: ParameterTable,
 #: the size terms (WP-1131) are in **C**, so the test below reads them without
 #: naming them.
 #:
-#: **W is held last, and only where a flat direction survives the other
-#: holds.**  It is the constant width every fit needs and has no specimen twin
-#: of its own: with U and W free beside ``gauss_size``, (δU, δW, δsize) =
-#: (−1, −1, 1) is flat, and holding U alone removes it, since
+#: **W is never held.**  It is the constant width every fit needs and has no
+#: specimen twin of its own: with U and W free beside ``gauss_size``,
+#: (δU, δW, δsize) = (−1, −1, 1) is flat, and holding U alone removes it, since
 #: δW + δsize·(1 + tan²θ) = 0 at every angle forces both to zero.  W's total
 #: stays a row of the test, so a held W pins the size and nothing is held.
-#: Holding W there as well moved three acceptance answers (the generality
-#: judge, WP-2002 9th session).  With ``gauss_strain`` free too, holding U
-#: leaves (δW, δsize, δstrain) = (1, −1, 1) flat, and with U fixed it is the
-#: only flat direction; that one is held at W (WP-2219), since U is not free
-#: to take it.
+#: Holding W as well moved three acceptance answers (the generality judge,
+#: WP-2002 9th session).  Holding it only on the triple W, ``gauss_size`` and
+#: ``gauss_strain`` still moved the cpd-1 chain and the standards' diagnostics
+#: (WP-2219), so that flat direction is left to the covariance, where its
+#: three parameters have no esd.
 WIDTH_TERMS: tuple[tuple[str, tuple[str, ...], bool], ...] = (
     ("instrument.profile.u", ("gauss_strain", "gauss_size"), True),  # tan²θ in Γ_G²
     ("instrument.profile.w", ("gauss_size",), False),                # 1 in Γ_G²
@@ -1056,10 +1055,8 @@ def _width_twin_flats(parts: list[tuple[ParameterTable, np.ndarray, set[int]]],
     fit's λ factor all enter as coefficients.  The pairs U with
     ``gauss_strain``, X with ``lor_size`` and Y with ``lor_strain`` are flat
     this way, and ``gauss_size`` with U and W together, of which only U is
-    held (:data:`WIDTH_TERMS`).  W is tested second, on the null space left
-    once those holds pin their columns, so it is held only for the triple W,
-    ``gauss_size`` and ``gauss_strain``.  Two consequences follow without a
-    rule of their own.
+    held (:data:`WIDTH_TERMS`).  Two consequences follow without a rule of
+    their own.
     One seen phase whose specimen width is held pins the instrument term for
     every phase, so nothing is flat.  A pattern whose instrument width is held
     pins the shared specimen width, and every other pattern's instrument width
@@ -1123,7 +1120,7 @@ def _width_twin_flats(parts: list[tuple[ParameterTable, np.ndarray, set[int]]],
                                     set(np.flatnonzero(r_phase).tolist())))
                 ip += 1
     inst_cols = set().union(*(a for a, _ in couples))
-    if not inst_cols:
+    if not inst_cols & holdable:
         return {}
     # the columns a family entry reaches; a move of any other is no twin's
     cand = sorted(inst_cols.union(*(b for _, b in couples)))
@@ -1139,41 +1136,18 @@ def _width_twin_flats(parts: list[tuple[ParameterTable, np.ndarray, set[int]]],
                 others.append(row(C, col_map, int(i)))
     A = np.array([r[cand] for r in (*sums, *others) if r[cand].any()],
                  dtype=np.float64).reshape(-1, len(cand))
-
-    def null_space(keep: list[int]) -> np.ndarray:
-        """An orthonormal basis of the flat moves of ``keep``, one row per
-        column of ``keep``, the other columns pinned."""
-        sub = A[:, [cand.index(c) for c in keep]]
-        if sub.shape[0] and sub.any():
-            _, s, vt = lapack.svd(sub)
-            rank = int(np.sum(s > s[0] * len(keep) * np.finfo(np.float64).eps))
-            return vt[rank:].T
-        return np.eye(len(keep))
-
-    null = null_space(cand)
+    if A.shape[0]:
+        _, s, vt = lapack.svd(A)
+        rank = int(np.sum(s > s[0] * len(cand) * np.finfo(np.float64).eps))
+        null = vt[rank:].T
+    else:
+        null = np.eye(len(cand))
     on_flat = {c for c, r in zip(cand, null, strict=True)
                if r.size and np.abs(r).max() > 1e-8}
     out: dict[int, list[int]] = {}
     for c in sorted(inst_cols & holdable & on_flat):
         twins = {k for a, b in couples if c in a
                  for k in b if k in on_flat and k not in inst_cols}
-        if twins:
-            out[c] = sorted(twins)
-    # W is held only where a flat direction survives every hold above: W,
-    # ``gauss_size`` and ``gauss_strain`` free with U not (WP-2219).  Its
-    # twins are the specimen columns that move *with* it on that direction
-    # (the null-space projector's column for W), so a column left unpinned on
-    # a direction of its own, such as a Stephens block whose Y is held by
-    # rule, is not named as W's twin
-    keep = [c for c in cand if c not in out]
-    rest = null_space(keep)
-    specimen = {k for _, b in couples for k in b} - inst_cols
-    for c in sorted(inst_cols - holdable):
-        if c not in keep:
-            continue
-        move = rest @ rest[keep.index(c)]
-        twins = {k for k, m in zip(keep, move, strict=True)
-                 if k in specimen and abs(m) > 1e-8}
         if twins:
             out[c] = sorted(twins)
     return out

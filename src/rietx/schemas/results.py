@@ -1307,9 +1307,8 @@ class StageResult(Base):
     #: widths have its angular dependence (WP-2002), the specimen columns it
     #: pairs with: U with ``gauss_strain`` and ``gauss_size`` (tan²θ in Γ_G²;
     #: the size's 1/cos²θ is 1 + tan²θ, so it is flat with U and W together,
-    #: and W, the constant width, is held only where a flat direction survives
-    #: those holds: W with ``gauss_size`` and ``gauss_strain``, WP-2219), X with
-    #: ``lor_size`` (1/cosθ in Γ_L), Y with ``lor_strain`` (tanθ in Γ_L).  The data see each
+    #: and W, the constant width, is never held), X with ``lor_size`` (1/cosθ in
+    #: Γ_L), Y with ``lor_strain`` (tanθ in Γ_L).  The data see each
     #: angular term only as a total, so with both sides free it walks along a
     #: flat direction.  The instrument side is held at the value the stage
     #: started from, which is how every program that separates the two does

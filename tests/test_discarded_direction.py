@@ -202,3 +202,53 @@ def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
     (d,) = _pawley_unresolved_diagnostics(model, structure)
     assert "inf" not in d.message
     assert d.message.endswith("an individual value has no esd.")
+
+
+_TRIPLE = ["instrument.profile.w", "phases.*.gauss_size", "phases.*.gauss_strain"]
+_TRIPLE_PATHS = ("instrument.profile.w", "phases.0.gauss_size", "phases.0.gauss_strain")
+
+
+def _triple_plan() -> RefinementPlan:
+    return RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage(name="widths", turn_on=_TRIPLE, seed=1e-4),
+    ])
+
+
+@pytest.mark.parametrize("w_start", [5e-4, 1.5e-4])
+def test_the_lab6_width_triple_has_no_esd_from_either_start(w_start):
+    """WP-2028's case: synthetic LaB6 with W, ``gauss_size`` and
+    ``gauss_strain`` free.  (δW, δsize, δstrain) = (1, −1, 1) changes no width
+    at any angle; two starts landed 140 esd apart in W, each quoting ± 6.3e-7.
+    None of the three now quotes an esd."""
+    structure, ins = perturbed_models()
+    ins.profile.w.value = w_start
+    result = Refinement(structure, ins).fit(synthesize(), plan=_triple_plan())
+    rows = {p.path: p for p in result.parameters}
+    assert [rows[p].stderr for p in _TRIPLE_PATHS] == [None, None, None]
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    assert not result.stages[2].width_twins_held
+
+
+def test_the_lab6_width_triple_has_no_esd_in_a_joint_fit():
+    """Three patterns at one wavelength, W shared and each pattern's own
+    Gaussian widths: every pattern's triple is the same flat direction.  Its
+    eigenvalue lands on either side of the cut as rounding falls, so each
+    parameter has no esd or one thousands of times its value, never a short
+    one (measured 2026-11-20: W 2.5e-4 ± 1.56)."""
+    from rietx.params.multi import SharingMap
+
+    structure, ins = perturbed_models()
+    data = [synthesize(noise_seed=s) for s in (7, 8, 9)]
+    mr = MultiHistogramRefinement(
+        structure, [ins.model_copy(deep=True) for _ in data],
+        sharing=SharingMap(shared=["instrument.profile.w"],
+                           per_histogram=["phases.*.gauss_*"]))
+    result = mr.fit(data, plan=_triple_plan())
+    rows = {p.path: p for p in result.parameters}
+    paths = ["instrument.profile.w",
+             *(f"hist.{h}.phases.0.gauss_{t}" for h in range(3) for t in ("size", "strain"))]
+    for path in paths:
+        row = rows[path]
+        assert row.stderr is None or row.stderr > 1e3 * abs(row.value), (path, row)
