@@ -68,7 +68,7 @@ On synthetic LaB₆ with W, `gauss_size` and `gauss_strain` free, two starts lan
 So each parameter on a discarded direction has no esd either, and `COVARIANCE_DIRECTION_DISCARDED` names them.
 This is the rule of linear models: a parameter the data cannot estimate has no standard error {cite}`searle1971`.
 A parameter tied to one of them, and a quantity derived from one, has no esd, even where the combination itself is determined.
-The CIF writes such a value with `?`, unknown, in its su item.
+The CIF writes `?`, unknown, in such a value's standard-uncertainty item.
 
 The [scale-and-B section](../theory/estimation.md#a-scale-and-a-b-the-range-cannot-separate) derives the test.
 
