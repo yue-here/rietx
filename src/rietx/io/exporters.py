@@ -368,7 +368,18 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
         if terms:
             lines.append(f"Phase {phase.name}, sample broadening: "
                          + ", ".join(terms) + ".")
+        # peak equations (WP-2107) state their own term, as written
+        for eq in phase.peak_equations:
+            lines.append(f"Phase {phase.name}, peak equation {_peak_equation_text(eq)}.")
+    for eq in instrument.peak_equations:
+        lines.append(f"Instrument peak equation {_peak_equation_text(eq)}.")
     return _wrapped(lines)
+
+
+def _peak_equation_text(eq) -> str:
+    """``target = expression`` with each coefficient's value (WP-2107)."""
+    coefs = ", ".join(f"{name}={_value(p)}" for name, p in eq.coefficients.items())
+    return f"{eq.target} = {eq.expression}" + (f", with {coefs}" if coefs else "")
 
 
 def _background_description(instrument: Instrument) -> str:

@@ -105,6 +105,9 @@ _TEXTURE_PATH = re.compile(r"^phases\.(\d+)\.texture\.c\d+_(?:neg)?\d+$")
 #: Phase scale — the one parameter the intensity is *exactly linear* in, so
 #: its column needs no perturbed ``phase_peaks`` at all (``_scale_column``).
 _SCALE_PATH = re.compile(r"^phases\.(\d+)\.scale$")
+#: a phase's peak-equation coefficient (WP-2107); the instrument's ride the
+#: scalar chain, since a phase equation's ``two_theta`` reads their shift
+_PEQ_PATH = re.compile(r"^phases\.(\d+)\.peak_equations\.\d+\.\w+$")
 
 #: Residual evaluations per accepted iteration that TRF's budget must allow
 #: for, so that a run genuinely needing ``max_iter`` iterations is never cut
@@ -1753,6 +1756,39 @@ def _scale_column(model: CompiledModel, bases: DerivativeBases,
     return _accumulate(len(model.tt), parts)
 
 
+def _peak_equation_column(model: CompiledModel, bases: DerivativeBases,
+                          values: dict[str, float], ip: int,
+                          path: str) -> np.ndarray | None:
+    """∂y/∂c for one coefficient of phase ip's peak equations, exact.
+
+    :meth:`~rietx.model.forward.CompiledModel.peak_equation_partials` gives
+    ∂(pos, w₁, w₂, intensity)/∂c per line, and the bases carry them onto the
+    pattern as :func:`_peak_chain_at` carries its differences.  ``None``
+    where the partials decline (an intensity factor at zero), and the caller
+    then takes the scalar chain.
+    """
+    partials = model.peak_equation_partials(ip, values, path)
+    if partials is None:
+        return None
+    pp = bases.planes[ip]
+    lay = pp.layout
+    if not len(lay.i0):
+        return np.zeros(len(model.tt))
+    d_pos, d_w1, d_w2, d_i = (lay.gather(partials, slot) for slot in range(4))
+    terms = []
+    with np.errstate(invalid="ignore"):
+        d_i = np.where(pp.finite, d_i, 0.0)
+        coefs = [np.where(pp.finite, pp.inten * x, 0.0) for x in (d_pos, d_w1, d_w2)]
+    if np.any(d_i != 0.0):
+        terms.append((d_i, pp.omega))
+    for coef, plane, what in zip(coefs, (pp.d_pos, pp.d_gamma, pp.d_eta),
+                                 ("position", "width", "mixing")):
+        if np.any(coef != 0.0):
+            _require_basis(plane, path, what)
+            terms.append((coef, plane))
+    return _accumulate(len(model.tt), [(lay, terms)])
+
+
 def _axial_column(model: CompiledModel, bases: DerivativeBases,
                   which: int) -> np.ndarray:
     """∂y/∂θ_c for S/L (which=8) or H/L (which=9) from the node-FD bases.
@@ -2336,6 +2372,12 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                 # a phase sitting at zero falls through to the FD path below
                 J[:n_data, c] = -sqrt_w * _scale_column(
                     model, get_bases(), values, int(sc.group(1)))
+            elif ((pq := _PEQ_PATH.match(path)) and own
+                    and not model.mag_split(int(pq.group(1)))
+                    and (col := _peak_equation_column(
+                        model, get_bases(), values, int(pq.group(1)), path))
+                    is not None):
+                J[:n_data, c] = -sqrt_w * col
             elif model.scalar_chain_supported(path) and all(
                     model.scalar_chain_supported(p) and p not in bkg_cols
                     and p not in axial_paths for p in extra):

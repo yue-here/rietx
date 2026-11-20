@@ -87,6 +87,7 @@ from .model.forward import (
 from .model.geometry import cell_volumes, geometry_table
 from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
+from .model.peak_equations import WIDTH_TARGETS
 from .model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
@@ -7812,7 +7813,8 @@ _REVISABLE_CODES = ("BOUND_HIT", "FLOOR_HIT", "RESOLUTION_NOT_POSITIVE",
                     "BISO_UNUSUALLY_LARGE", "BISO_NEGATIVE",
                     "COVARIANCE_DIRECTION_DISCARDED",
                     "ADP_NOT_POSITIVE_DEFINITE", "STEPHENS_STRAIN_NOT_POSITIVE",
-                    "TEXTURE_NOT_POSITIVE", "HUMP_TOO_NARROW")
+                    "TEXTURE_NOT_POSITIVE", "PEAK_WIDTH_NOT_POSITIVE",
+                    "HUMP_TOO_NARROW")
 
 
 #: ``FLOOR_HIT``'s advice: the limit that carried load is a lower bound of
@@ -7898,6 +7900,18 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "fractions) also leaned on the reflections left with "
                        "no strain width; the share says how much of the "
                        "phase's m·|F|² they carry.",
+        ))
+    for finding in guard.nonpositive_peak_width:
+        out.append(Diagnostic(
+            level="warning", code="PEAK_WIDTH_NOT_POSITIVE",
+            where=list(finding.paths), value=finding.value,
+            message=f"The peak equation {finding} takes a width below zero.",
+            suggestion="Bound the coefficients, or write the term so that it "
+                       "cannot go negative, as a square or with max(x, 0). "
+                       "The forward model floors a negative Γ_G², and a "
+                       "negative Γ_L is no peak shape, so those reflections "
+                       "do not carry the equation's width. Do not report the "
+                       "coefficients as measured.",
         ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)
@@ -11537,10 +11551,72 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
     diagnostics = microabsorption_diagnostics(qpa, structure)
+    diagnostics = diagnostics + _qpa_intensity_factor_diagnostics(
+        structure, values, model, unmeasured, where_of or (lambda p: p))
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))
     return qpa, diagnostics
+
+
+def _qpa_intensity_factor_diagnostics(structure: Structure,
+                                      values: dict[str, float],
+                                      model: CompiledModel, unmeasured,
+                                      where_of: Callable[[str], str],
+                                      ) -> list[Diagnostic]:
+    """``QPA_INTENSITY_FACTOR``: a phase's intensities carry a peak equation's
+    factor, which its weight fraction does not read (WP-2107).
+
+    W_p ∝ S_p·(ZMV)_p reads the scale as the phase's whole intensity.  An
+    ``intensity_factor`` equation multiplies each reflection's intensity
+    (scale × factor × ..., ``CompiledModel._intensity_factor``), so for the
+    same peaks the fitted scale is the factor-free one divided by the
+    factor's mean f̄: at f̄ = 0.83 the scale, and the fraction relative to
+    the other phases, come out 1/0.83 = 1.2× too high, and at f̄ > 1 too
+    low.  The finding quotes the factor's range and mean over the phase's
+    reflections in the fitted range on the primary line.  Silent with one
+    phase in the analysis, whose fraction is 1 whatever its scale.
+    """
+    import numpy as np
+
+    measured = [ip for ip in range(len(structure.phases))
+                if ip not in set(unmeasured)]
+    if len(measured) < 2:
+        return []
+    lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
+    out: list[Diagnostic] = []
+    for ip in measured:
+        cp = model.phases[ip]
+        if cp.peq is None or not cp.peq.has("intensity_factor"):
+            continue
+        cell = model._phase_cell(ip, values)
+        d, tt_lines = model._cell_block(cp, cell, model.line_lambdas(values))
+        tt = np.asarray(tt_lines[0], dtype=np.float64)
+        on = np.isfinite(tt) & (tt >= lo) & (tt <= hi)
+        f = np.broadcast_to(np.asarray(model._intensity_factor(
+            ip, values, tt_lines[0], d), dtype=np.float64), tt.shape)[on]
+        if not f.size or (f.min() == 1.0 and f.max() == 1.0):
+            continue
+        path = cp.peq.equations["intensity_factor"].prefix
+        mean = float(f.mean())
+        # intensity = scale × factor, so the scale absorbs 1/mean
+        bias = (f"too high by about 1/{mean:.2g} = {1.0 / mean:.2g}×"
+                if mean < 1.0 else f"too low by about {mean:.2g}×")
+        out.append(Diagnostic(
+            level="warning", code="QPA_INTENSITY_FACTOR",
+            where=[where_of(path)], value=mean,
+            message=(f"Phase {ip} ({structure.phases[ip].name})'s peak equation "
+                     "multiplies its reflection intensities by "
+                     f"{f.min():.2g} to {f.max():.2g} (mean {mean:.2g}). Its "
+                     "weight fraction is computed from the phase's scale, which "
+                     f"absorbs that factor, so the fraction is {bias} relative "
+                     "to the other phases."),
+            suggestion=("Write the factor so it averages 1 over the phase's "
+                        "reflections, for example by dividing by its mean, or "
+                        f"multiply this phase's scale by {mean:.2g} before "
+                        "reading its fraction."),
+        ))
+    return out
 
 
 def _qpa_esd_unavailable_diagnostics(structure: Structure,
@@ -12301,8 +12377,9 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     :func:`~rietx.indexing.diagnostics.refinement_width_diagnostics`'s; this
     gathers the two numbers.  Declines, rather than guessing, where the model's
     width is not one number per angle: a phase with a Stephens ``microstrain``
-    block (its width is per reflection, and the isotropic law alone would
-    under-read it), or a width law that is not finite and positive on the grid.
+    block or a width peak equation (its width is per reflection, and the
+    isotropic law alone would under-read it; WP-2107), or a width law that is
+    not finite and positive on the grid.
     Only phases the data can see (``significance`` at or above
     :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA`, with a line in range)
     take part: an invisible phase's width explains no line of the census.
@@ -12314,8 +12391,10 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     from .indexing.diagnostics import refinement_width_diagnostics
     from .indexing.peaks import width_census
 
-    if not model.phases or any(ph.microstrain is not None
-                               for ph in structure.phases):
+    if not model.phases or any(
+            ph.microstrain is not None
+            or any(eq.target in WIDTH_TARGETS for eq in ph.peak_equations)
+            for ph in structure.phases):
         return []
     tt = np.asarray(model.tt, dtype=np.float64)
     fwhm_inst = np.asarray(model.instrument_fwhm_deg(tt, values), dtype=np.float64)
