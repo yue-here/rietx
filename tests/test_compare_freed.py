@@ -219,7 +219,7 @@ def test_a_budget_stop_above_the_restricted_optimum_is_flagged(biso_pair):
     [d] = c.diagnostics
     assert d.code == "COMPARISON_UNCONVERGED" and d.level == "warning"
     assert d.value == pytest.approx(c.chi2_full - c.chi2_restricted)
-    assert "'max_iter'" in d.message and "higher cost" in d.message
+    assert "'max_iter'" in d.message and "a cost more than 2 above" in d.message
     assert d.where == [BISO]
     # flagged, never refused: the numbers are still there to read
     assert c.freed[0].t_ratio is not None
@@ -238,6 +238,33 @@ def test_ordering_alone_fires_where_status_says_converged():
     assert d is not None and "restricted fit stopped" in d.message
     assert _comparison_unconverged("converged", "converged", 101.0, 100.0, True,
                                    where=["x"]) is None
+
+
+def test_the_ordering_margin_is_two_cost_units_at_any_scale():
+    """The margin is absolute, in the units ΔBIC is read in (ruled
+    2026-11-20): an excess just under 2 is ordered, just over is not, on a
+    small cost and on a large one alike, and on the stage-less fallback."""
+    from types import SimpleNamespace as NS
+
+    from rietx.report.layer2 import NESTED_COST_MARGIN, _chi2_ordered
+
+    assert NESTED_COST_MARGIN == 2.0
+
+    def staged(cost):
+        return NS(stages=[NS(cost_final=cost)])
+
+    def bare(chi2_red, n_points, n_free):
+        return NS(stages=[], statistics=NS(chi2=chi2_red, n_points=n_points,
+                                           n_free_parameters=n_free))
+
+    for base in (100.0, 1.0e6):
+        assert _chi2_ordered(staged(base), staged(base + 1.999))
+        assert _chi2_ordered(staged(base), staged(base + 2.0))
+        assert not _chi2_ordered(staged(base), staged(base + 2.001))
+        assert _chi2_ordered(staged(base), staged(base - 50.0))
+    # no stage recorded: the data sums, Σw·Δ² = χ²_red·(N − P), are compared
+    assert _chi2_ordered(bare(1.0, 101, 1), bare(101.999 / 99, 101, 2))
+    assert not _chi2_ordered(bare(1.0, 101, 1), bare(102.001 / 99, 101, 2))
 
 
 def test_a_verdict_short_fits_could_flip_is_not_judged():

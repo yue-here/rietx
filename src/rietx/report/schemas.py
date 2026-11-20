@@ -288,8 +288,9 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   consumer may count, on 1.12 → 1.13's.
 # 1.15 → 1.16 (WP-2220, issues #1685 and #1686): ``FreedComparison`` says
 #   which fits it rests on and which freed columns carried information.  It
-#   gains both fits' ``status``, ``chi2_ordered`` (the fuller cost at or below
-#   the restricted one within ``optimize.lm.FTOL``), ``n_identified`` and a
+#   gains both fits' ``status``, ``chi2_ordered`` (the fuller cost at most 2
+#   cost units above the restricted one, ``report.layer2.NESTED_COST_MARGIN``),
+#   ``n_identified`` and a
 #   ``diagnostics`` list carrying the new ``COMPARISON_UNCONVERGED``;
 #   ``FreedParameter`` gains ``at_bound`` and ``t_reason``.  A verdict that
 #   rests on a fit short of its optimum in the direction that could flip it is
@@ -1320,7 +1321,10 @@ class FreedComparison(Base):
     own ``status``, and ``chi2_ordered`` says the fuller fit's cost
     (the last stage's ``StageResult.cost_final``, what the solver minimised: the data χ²
     plus any restraint and penalty rows) sits at or below
-    the restricted one within :data:`~rietx.optimize.lm.FTOL`.  A nested model
+    the restricted one, or above it by at most
+    :data:`~rietx.report.layer2.NESTED_COST_MARGIN` (2, an absolute margin in
+    cost units: the lower edge of Kass & Raftery 1995's "positive evidence"
+    band, so an excess it hides cannot change a ΔBIC verdict).  A nested model
     at its optimum cannot fit worse than the model it contains, so a
     ``False`` there proves the fuller fit short of its minimum, whatever its
     status says.  Either reading short adds ``COMPARISON_UNCONVERGED`` to

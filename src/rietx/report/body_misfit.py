@@ -94,7 +94,9 @@ class BodyMisfitRow:
     ``status_body`` and ``status_released`` are the two arms' own ``status``,
     and ``chi2_ordered`` says the released arm's cost (data plus restraint
     rows, what the solver minimised) sits at or below the
-    body arm's (the released arm contains every pose the body can take).
+    body arm's, within the absolute margin
+    :data:`~rietx.report.layer2.NESTED_COST_MARGIN` (the released arm contains
+    every pose the body can take).
     ``fires`` is ``None`` where an arm short of its optimum could flip the
     test, "not judged" rather than a pass or a fail (WP-2220): a short
     released arm understates the gain, so only a firing stands, and a short

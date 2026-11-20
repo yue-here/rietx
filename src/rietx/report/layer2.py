@@ -399,6 +399,25 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
         diagnostics=[] if short is None else [short])
 
 
+#: How far a fuller nested fit's minimised cost may end above the restricted
+#: fit's and still count as ordered, in cost units (WP-2220, ruled by the
+#: maintainer 2026-11-20).  The cost is what the solver minimised: the data
+#: χ², Σw·Δ², plus any restraint and penalty rows.  The margin is absolute, so
+#: it is in the units ΔBIC is read in.  2 is the lower edge of the "positive
+#: evidence" band of Kass & Raftery (1995, *J. Am. Stat. Assoc.* **90**, 773),
+#: 2 ln B from 2 to 6.  An excess the margin hides is therefore smaller than
+#: the weakest difference that band counts as evidence, and cannot change a
+#: ΔBIC verdict.  Measured stopping noise between two converged fits of one
+#: nested pair is far smaller: 1.1e-7 relative on issue #1685's fixture, about
+#: 0.0006 cost units.  **Known limit:** that noise is relative, so it reaches 2
+#: near a cost of 10⁷, where a converged pair can read unordered.  Rejected:
+#: the solver's ``optimize.lm.FTOL``, 1e-9 relative, which sits below the
+#: measured noise between independently fitted arms; and GSAS-II's 1e-3
+#: relative stop, about 6 cost units on that fixture, already "strong"
+#: evidence, so it could hide a verdict flip.
+NESTED_COST_MARGIN = 2.0
+
+
 def _chi2_ordered(restricted: RefinementResult, full: RefinementResult) -> bool:
     """Whether a fuller nested fit's cost sits at or below the restricted one's.
 
@@ -407,20 +426,18 @@ def _chi2_ordered(restricted: RefinementResult, full: RefinementResult) -> bool:
     the last stage's ``StageResult.cost_final``: the data χ² **plus** any restraint and
     penalty rows.  The data χ² alone carries no such guarantee, since a fuller
     model may trade data misfit against a restraint (generality review,
-    WP-2220).  The tolerance is the solver's own relative stopping scale,
-    :data:`~rietx.optimize.lm.FTOL`, on the precedent of
-    :func:`~rietx.Refinement.distortion_block_tests`, which restarts the full
-    fit when a restricted one lands below it by more than that.
+    WP-2220).  The fuller cost may exceed the restricted one by up to
+    :data:`NESTED_COST_MARGIN`, an absolute margin in cost units, and still
+    read as ordered.
     """
-    from ..optimize.lm import FTOL
     from ..optimize.statistics import _chi2_absolute
 
     if restricted.stages and full.stages:
         return (full.stages[-1].cost_final
-                <= restricted.stages[-1].cost_final * (1.0 + FTOL))
+                <= restricted.stages[-1].cost_final + NESTED_COST_MARGIN)
     # a hand-built result records no stage: the data sums are all there is
     return (_chi2_absolute(full.statistics)
-            <= _chi2_absolute(restricted.statistics) * (1.0 + FTOL))
+            <= _chi2_absolute(restricted.statistics) + NESTED_COST_MARGIN)
 
 
 def _comparison_unconverged(status_restricted: str, status_full: str,
@@ -431,8 +448,9 @@ def _comparison_unconverged(status_restricted: str, status_full: str,
     """``COMPARISON_UNCONVERGED`` when a nested comparison rests on a fit short
     of its optimum, else ``None`` (WP-2220, issue #1685).
 
-    Short means a status other than ``"converged"``, or a fuller χ² above the
-    restricted one (:func:`_chi2_ordered`).  The second catches what status
+    Short means a status other than ``"converged"``, or a fuller cost more
+    than :data:`NESTED_COST_MARGIN` above the restricted one
+    (:func:`_chi2_ordered`).  The second catches what status
     misses: the LM driver calls a slow-descent stop ``converged`` (#222).
     ``names`` are the two fits' names in the message, restricted first.
     """
@@ -442,7 +460,8 @@ def _comparison_unconverged(status_restricted: str, status_full: str,
              if status != "converged"]
     if not ordered:
         parts.append(
-            f"the {names[1]} fit ended at a higher cost than the {names[0]} fit "
+            f"the {names[1]} fit ended at a cost more than "
+            f"{NESTED_COST_MARGIN:g} above the {names[0]} fit's "
             f"(data χ² {chi2_full:.6g} against {chi2_restricted:.6g}), and a model "
             "that contains another cannot fit worse at its optimum")
     if not parts:

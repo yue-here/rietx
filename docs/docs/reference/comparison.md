@@ -111,7 +111,7 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 | `FreedComparison.delta_bic` | ΔBIC charged at `n_effective` | positive favours the fuller model |
 | `FreedComparison.delta_bic_raw_n` | the same at the channel count | an upper bound on the evidence, kept so the gap is visible |
 | `FreedComparison.status_restricted`, `FreedComparison.status_full` | each fit's own `status` | a fit not `converged` may not sit at its optimum |
-| `FreedComparison.chi2_ordered` | whether the fuller fit's last `StageResult.cost_final`, the data χ² plus any restraint and penalty rows it minimised, is at or below the restricted fit's, within the solver's relative tolerance `rietx.optimize.lm.FTOL` | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
+| `FreedComparison.chi2_ordered` | whether the fuller fit's last `StageResult.cost_final`, the data χ² plus any restraint and penalty rows it minimised, is at or below the restricted fit's plus 2, the absolute margin `rietx.report.layer2.NESTED_COST_MARGIN` in cost units | `False` proves the fuller fit short of its minimum, since a model that contains another cannot fit worse at its optimum |
 | `FreedComparison.n_identified` | the freed parameters with an esd and off their bounds | fewer than `n_added` means some charged columns carried no information; `delta_bic` still charges `n_added` |
 | `FreedComparison.diagnostics` | [`COMPARISON_UNCONVERGED`](diagnostics-refinement.md#comparison_unconverged) when either status is not `converged` or the ordering fails | read it before quoting `delta_bic` |
 
@@ -127,6 +127,9 @@ On a synthetic LaB₆ fit whose model lacks the data's Lorentzian width (21 400 
 
 There is no verdict field.
 A comparison that rests on a fit short of its optimum is flagged and not refused, because a fit stopped on its budget can still sit at its optimum.
+The ordering test lets the fuller fit's cost end up to 2 above the restricted fit's.
+That margin is the lower edge of the "positive evidence" band of Kass and Raftery (1995), so an excess inside it can't change a ΔBIC verdict.
+Two converged fits stop about 1e-7 of their cost apart, so above a cost of about 10⁷ a converged pair can read as unordered.
 On the synthetic LaB₆ pattern of `tests/test_compare_freed.py`, freeing La Biso gave ΔBIC +264 when the fuller fit converged.
 Stopped after one iteration from Biso = 4, the same comparison gave −1941, with `status_full` `max_iter`, `chi2_ordered` `False` and `COMPARISON_UNCONVERGED` on `diagnostics`.
 A pair that is not nested raises `ValueError`: a different channel count, different intensities or a different mode, a path the restricted fit frees and the fuller one does not, nothing added, or a free count that moved by other than the added paths.
@@ -254,7 +257,7 @@ It returns a `rietx.report.body_misfit.BodyMisfitResult`, whose `rows` hold one 
 | `BodyMisfitRow.f_statistic`, `BodyMisfitRow.p_value` | Hamilton's test |
 | `BodyMisfitRow.delta_bic` | ΔBIC, positive favouring the released atoms |
 | `BodyMisfitRow.fires` | whether both tests prefer the released atoms; `None` where a refit short of its optimum could flip the answer |
-| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's cost, restraint rows included, is at or below the body refit's |
+| `BodyMisfitRow.status_body`, `BodyMisfitRow.status_released`, `BodyMisfitRow.chi2_ordered` | each refit's `status`, and whether the released refit's cost, restraint rows included, is at or below the body refit's plus 2 |
 | `BodyMisfitRow.deviations` | (label, template value, released value, Δ/σ) for each template bond and angle, largest first |
 | `BodyMisfitRow.dropped` | your ties and holds that could not follow into the released refit |
 

@@ -727,12 +727,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
                   "status other than 'converged', or the fuller fit's minimised cost "
                   "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
-                  "restricted one's by more than optimize.lm.FTOL relative (a model that "
+                  "restricted one's by more than report.layer2.NESTED_COST_MARGIN (a model that "
                   "contains another can reproduce it, so at both optima S_full <= "
                   "S_restricted; the data chi2 alone carries no such bound; "
                   "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
-                  "the FTOL margin is inherited unvaried from the solver's stopping test, "
-                  "tier 3 by FTOL's own row, and waits on the maintainer (WP-2220); flags and refuses nothing, since a budget stop can "
+                  "the margin is tiered on its own row; flags and refuses nothing, since a budget stop can "
                   "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
                   "converged chi2); raised by compare_freed, predict_then_verify's "
                   "comparison and rigid_body_misfit (WP-2220)")),
@@ -4240,6 +4239,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
+    Row("rietx.report.layer2.NESTED_COST_MARGIN", "constant", tier=2, value=2.0,
+        evidence=("Kass & Raftery (1995) J. Am. Stat. Assoc. 90, 773: 2 ln B from 2 to 6 is "
+                  "'positive' evidence, so 2 is the band's lower edge and an excess of the "
+                  "fuller fit's minimised cost under it cannot move a delta_bic verdict; "
+                  "absolute, in the cost units delta_bic is read in; measured stopping noise "
+                  "between two converged fits of one nested pair is 1.1e-7 relative, about "
+                  "0.0006 cost units on issue #1685's fixture, so the margin holds until a "
+                  "cost near 1e7 (the docstring's known limit); replaces optimize.lm.FTOL "
+                  "(1e-9 relative, below that noise) and was chosen over GSAS-II 5.8.4's 1e-3 "
+                  "relative stop (about 6 cost units there, already 'strong'); ruled by the "
+                  "maintainer 2026-11-20 (WP-2220)")),
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
