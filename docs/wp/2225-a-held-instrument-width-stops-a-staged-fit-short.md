@@ -315,9 +315,11 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
       exactly zincite, fluorite, corundum and brucite, held by
       `test_suite_alarms.py`'s fast pin test and its slow measurement row; two fits in
       `test_width_twin_hold.py` (fires on the hold, silent without it). PNGs looked at.*
-- [ ] Skill: under option 3, the code's reference row; otherwise a line in §3's degeneracy table
+- [x] Skill: under option 3, the code's reference row; otherwise a line in §3's degeneracy table
       that a plan freeing an instrument width and its specimen twin on an uncalibrated instrument
       gives an answer that depends on the stage order.
+      *Done 2026-11-20: `WIDTH_TWIN_HELD`'s row in `references/diagnostics.md`, beside
+      `RESOLUTION_UNCONSTRAINED`, whose remedy it shares; copies re-synced.*
 
 ## Acceptance
 
