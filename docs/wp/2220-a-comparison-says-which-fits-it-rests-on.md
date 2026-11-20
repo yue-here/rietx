@@ -1,6 +1,6 @@
 # WP-2220 — A nested comparison says which fits it rests on, and which freed columns carried information
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — all tasks landed; PR #1717 waits on the maintainer's reader-output review
+Milestone: unscheduled · Status: 🔄 2026-11-20 — both rulings made and built; PR #1717 waits on CI
 Track: What fires, and what stays silent
 Depends on: — (2076 soft: its extinction-screen nesting finding fences that caller out; 2053 soft: the same stationary-point t)
 Priority: P2 2026-11-19 — a ΔBIC of the wrong sign is quoted beside a fit that stopped on its budget, and nothing on the comparison says so; a path few fits run
@@ -125,6 +125,54 @@ at its bound. Every existing `compare_freed` number is unchanged.
 - Issues #1685, #1686; related #270 (WP-1417), #222, #538, #831, #1008, #1010 (WP-2053).
 
 ## Handover log
+
+- **2026-11-20** — both rulings made; the ordering margin is now 2 cost units (ghostshift
+  runner). Main merged in at 8112e3b09 with no conflicts.
+
+  *Ruled by Yue, 2026-11-20.* (A) Approved: every new field
+  (`FreedComparison.status_restricted`/`status_full`/`chi2_ordered`/`n_identified`/
+  `diagnostics`, `FreedParameter.at_bound`/`t_reason`, `VerificationOutcome.accepted:
+  bool | None`, `BodyMisfitRow.status_body`/`status_released`/`chi2_ordered`, `fires:
+  bool | None`) and the `COMPARISON_UNCONVERGED` warning belong, as PR #1717 describes them.
+  (B) The ordering margin is option (iii): an absolute margin of 2, in units of the minimised
+  cost (data χ² plus any restraint and penalty rows), replacing the relative
+  `optimize.lm.FTOL` = 1e-9. `chi2_ordered` is True when the fuller fit's minimised cost is at
+  most the restricted fit's plus 2. Grounds: the margin is then in the units ΔBIC is read in,
+  and 2 is the lower edge of the "positive evidence" band of Kass & Raftery (1995, J. Am.
+  Stat. Assoc. 90, 773), so an excess the margin hides cannot change a verdict. It sits far
+  above measured stopping noise (1.1e-7 relative, about 0.0006 χ² units on the #1685
+  fixture) until χ² reaches about 10⁷, the known limit. Rejected: 1e-9 relative (below the
+  measured stopping noise between independently fitted arms); 1e-3 relative (GSAS-II's stop;
+  about 6 χ² units on that fixture, already "strong" evidence, so it can hide a verdict
+  flip); dropping the ordering warning.
+
+  *Done.* `report.layer2.NESTED_COST_MARGIN = 2.0`, its docstring citing Kass & Raftery and
+  stating the known limit; `_chi2_ordered` adds it to the restricted cost, and
+  `compare_freed`, `predict_then_verify` and `rigid_body_misfit` all reach it there. Its
+  `_audit` row is tier 2 (quoted from the literature), and `COMPARISON_UNCONVERGED`'s row no
+  longer names FTOL. The warning now reads "ended at a cost more than 2 above the restricted
+  fit's" in place of "ended at a higher cost than the restricted fit". Docstrings
+  (`FreedComparison`, `BodyMisfitRow`, the 1.15 → 1.16 note), the `help.py` entry, the
+  `diagnostics.md` skill row (copies re-synced) and the manual rows in
+  `reference/comparison.md` say 2 in place of FTOL. One test added,
+  `test_the_ordering_margin_is_two_cost_units_at_any_scale`: an excess of 1.999 and 2.0 is
+  ordered, 2.001 is not, at a cost of 100 and of 10⁶, and on the stage-less fallback.
+
+  *Measured* (macOS arm64, this worktree's `[dev]` venv, Python 3.12). #1685's script reads
+  as before: ΔBIC +264.1 converged, −1941.3 on the `max_iter` arm, which sits 4365 cost units
+  above the restricted fit and still reads unordered. Gates on the final tree: the touched-area
+  selection (`tests/test_compare_freed.py`, `tests/test_body_misfit.py`,
+  `tests/test_audit_table.py`, `tests/test_help.py`, `tests/test_skill.py`,
+  `tests/test_docs_consistency.py`, `tests/test_manual_api.py`, `-n 4 --dist loadgroup`) 320
+  passed; ruff clean; `ruff format --check examples/tutorials` clean; `tests.skill_caps`
+  exit 0 (`diagnostics.md` +275 bytes, 1633 under its budget); Vale 0 errors, no warning on a
+  line written here; `tests.reader_output` exit 0. The fast selection was not run locally.
+
+  *Not generalised.* `distortion_block_tests` still compares at `FTOL` relative
+  (`report/distortion.py`), a restart test outside this WP's diff; WP-2220's ruling names
+  only `chi2_ordered`.
+
+  Next: CI on PR #1717, then merge.
 
 - **2026-11-19** — all seven tasks landed, PR #1717 (ghostshift runner). A reader of a ΔBIC
   comparison can now tell when it rests on a fit that stopped short. The comparison carries
