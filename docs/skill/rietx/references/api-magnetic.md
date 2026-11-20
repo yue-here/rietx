@@ -17,7 +17,7 @@ this; everything in `rx.` is `import rietx as rx`.*
 - `rx.MagneticTrial` — One powder-equivalence class, refined once, with what the data said.
   Fields: `class_index: int`, `representative: str`, `members: tuple[str, ...]`, `site: str`, `irrep: str`, `direction: str`, `bns_number: str`, `uni_number: int | None`, `msg_type: int | None`, `free_amplitudes: int`, `determinable_amplitudes: int | None`, `status: str`, `refusal: str | None = None`, `rwp: float | None = None`, `gof: float | None = None`, `delta_bic: float | None = None`, `r_magnetic: float | None = None`, `n_moment_parameters: int | None = None`, `n_free_parameters: int | None = None`, `moments: tuple[MomentRow, ...] = ()`, `held: tuple[str, ...] = ()`, `anti_translation_drift: float | None = None`, `n_starts: int | None = None`, `n_minima: int | None = None`, `start: str | None = None`, `fit_status: str | None = None`, `reference_status: str | None = None`
 - `rx.MomentRow` — One site's refined moment inside one trial.
-  Fields: `label: str`, `ion: str`, `magnitude: float`, `esd: float | None`, `crystalaxis: tuple[float, float, float]`, `supported: bool`, `unmeasured_directions: tuple[str, ...] = ()`, `paired_with: tuple[str, ...] = ()`, `paired_magnitude: float | None = None`, `paired_magnitude_esd: float | None = None`
+  Fields: `label: str`, `ion: str`, `magnitude: float`, `esd: float | None`, `crystalaxis: tuple[float, float, float]`, `supported: bool`, `unmeasured_directions: tuple[str, ...] = ()`, `paired_with: tuple[str, ...] = ()`, `paired_magnitude: float | None = None`, `paired_magnitude_esd: float | None = None`, `cosited_with: tuple[str, ...] = ()`, `cosited_magnitude: float | None = None`, `cosited_magnitude_esd: float | None = None`
 
 ## Displacive mode amplitudes
 

@@ -11,6 +11,12 @@ orthogonal sum, Pythagorean) with no cross term -- the quadrature invariant
 Q5's formula assumes, engineered rather than found, because a real two-site
 isotropy candidate with this exact shape was not located in the time
 available (flagged in the report).
+
+Since issue #1692 two atoms on one position are a *co-sited* group, read by
+the moment per position |Σ occ·m| and never quadrature-paired: the fit test
+below now reads that number, which for these orthogonal moments at full
+occupancy is the same √(m1² + m2²).  The quadrature fold itself, for distinct
+sites, is held by the arithmetic tests after it.
 """
 
 from __future__ import annotations
@@ -89,12 +95,13 @@ def _fit_from(m1_start, m2_start, data):
 
 
 @pytest.mark.slow
-def test_two_starting_splits_report_the_same_quadrature_number(degenerate_pattern):
+def test_two_starting_splits_report_the_same_moment_per_position(degenerate_pattern):
     """A 50/50-ish split and a lopsided split of the same total: both must
-    converge to (near enough) the true total modulus and, more to Q5's
-    point, both must report the *same* quadrature number within 1 sigma via
-    the pairing mechanism, even though m1 and m2 themselves may differ
-    between the two runs (the flat direction the pairing exists for)."""
+    converge to (near enough) the true total modulus and both must report
+    the *same* moment per position within 1 sigma, even though m1 and m2
+    themselves may differ between the two runs (the flat direction).  The
+    atoms share one position, so the number is the co-sited group's
+    |Σ occ·m| (issue #1692) and no quadrature pair is formed."""
     ref_a, result_a = _fit_from(1.75, 1.75, degenerate_pattern)
     ref_b, result_b = _fit_from(2.4, 0.3, degenerate_pattern)
 
@@ -118,22 +125,24 @@ def test_two_starting_splits_report_the_same_quadrature_number(degenerate_patter
             ref._model, values, ref.structure,
             esd={p.path: p.stderr for p in result.parameters
                 if p.stderr is not None},
-            correlations=result.identifiability.top_correlations)
-        paired = [r for r in rows if r.paired_with]
-        assert len(paired) == 2, rows
-        return paired[0]
+            correlations=result.identifiability.top_correlations,
+            covariance=ref._covariance_block())
+        assert not any(r.paired_with for r in rows), rows
+        grouped = [r for r in rows if r.cosited_with]
+        assert len(grouped) == 2, rows
+        return grouped[0]
 
     row_a = quadrature_of(ref_a, result_a)
     row_b = quadrature_of(ref_b, result_b)
 
-    assert row_a.paired_magnitude is not None and row_a.paired_magnitude_esd
-    assert row_b.paired_magnitude is not None and row_b.paired_magnitude_esd
-    assert row_a.paired_magnitude == pytest.approx(TRUE_QUADRATURE, abs=0.3)
-    combined_sigma = math.sqrt(row_a.paired_magnitude_esd ** 2
-                               + row_b.paired_magnitude_esd ** 2)
-    assert abs(row_a.paired_magnitude - row_b.paired_magnitude) <= combined_sigma, (
-        row_a.paired_magnitude, row_a.paired_magnitude_esd,
-        row_b.paired_magnitude, row_b.paired_magnitude_esd)
+    assert row_a.cosited_magnitude is not None and row_a.cosited_magnitude_esd
+    assert row_b.cosited_magnitude is not None and row_b.cosited_magnitude_esd
+    assert row_a.cosited_magnitude == pytest.approx(TRUE_QUADRATURE, abs=0.3)
+    combined_sigma = math.sqrt(row_a.cosited_magnitude_esd ** 2
+                               + row_b.cosited_magnitude_esd ** 2)
+    assert abs(row_a.cosited_magnitude - row_b.cosited_magnitude) <= combined_sigma, (
+        row_a.cosited_magnitude, row_a.cosited_magnitude_esd,
+        row_b.cosited_magnitude, row_b.cosited_magnitude_esd)
 
 
 def test_pair_degenerate_moments_quadrature_and_esd_are_correct():

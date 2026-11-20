@@ -145,6 +145,7 @@ from .params.vector import (
 )
 from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
+    cosited_moments,
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
     moment_unsupported_diagnostics,
@@ -7167,7 +7168,13 @@ class Refinement:
                             structure=answer["structure"],
                             instrument=answer["instrument"],
                             held=list(answer["held"]),
-                            free_paths=list(answer["free_paths"]), **kw)
+                            free_paths=list(answer["free_paths"]),
+                            covariance=self._covariance_block(), **kw)
+
+    def _covariance_block(self):
+        """``paths → physical covariance`` of the last fit's answer, or ``None``
+        (:func:`_answer_covariance_block` on :attr:`result_`)."""
+        return _answer_covariance_block(self, self.result_)
 
     def check_rigid_bodies(self, data: PatternData, **kw):
         """Test each rigid body against the data (``RIGID_BODY_MISFIT``).
@@ -9738,6 +9745,25 @@ def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | N
     return stderr / esd_inflation
 
 
+def _answer_covariance_block(ref, result):
+    """``paths → physical covariance`` of ``result``'s answer stage, or ``None``.
+
+    The covariance every esd ``result`` quotes was read off, while ``ref``
+    still holds it for that result (after :meth:`Refinement.fit` or
+    :meth:`Refinement.run_stage`, before an edit, checkout or replay); it is
+    never serialized, so a reopened result has none.  The moment arm
+    propagates a mixed-occupancy position's esd through it (issue #1692): the
+    moment per position is a function of every modulus, angle and occupancy
+    of its group, so it needs their whole block, not the moduli's pairwise ρ.
+    """
+    kept = getattr(ref, "_answer_covariance", None)
+    if kept is None or result is None or kept[0] is not result or kept[3] is None:
+        return None
+    _result, table, theta, stderr_internal, correlation = kept
+    return lambda paths: table.physical_covariance(
+        theta, stderr_internal, correlation, list(paths))
+
+
 def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray, *,
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
@@ -9914,8 +9940,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         diagnostics = diagnostics + moment_angle_stationary_diagnostics(
             stage_results[-1], params)
     # WP-2060: a modulus the data do not support, the FitReport's verdict on
-    # the result, where its esd would otherwise read as an interval
-    diagnostics = diagnostics + moment_unsupported_diagnostics(params)
+    # the result, where its esd would otherwise read as an interval.  On a
+    # mixed-occupancy position the verdict is the position's moment, its esd
+    # through this answer's own covariance (issue #1692)
+    diagnostics = diagnostics + moment_unsupported_diagnostics(
+        params, cosited_moments(
+            model, values, stderr_phys,
+            None if stderr_internal is None else
+            (lambda paths: table.physical_covariance(
+                theta, stderr_internal, correlation, paths))))
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so

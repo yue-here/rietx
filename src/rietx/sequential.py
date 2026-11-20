@@ -181,6 +181,7 @@ from .params.vector import VAR_PREFIX, ParameterTable
 from .refine import (
     _VERSION,
     Refinement,
+    _answer_covariance_block,
     _declared_wavelengths,
     _extract_reflections,
     _judge_magnetic_groups,
@@ -957,7 +958,10 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
                       if result.identifiability is not None else None),
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
-        turned=(result.stages[-1].moment_turned if result.stages else None))
+        turned=(result.stages[-1].moment_turned if result.stages else None),
+        # a mixed-occupancy position is judged by its moment per position,
+        # whose esd needs the answer's covariance (issue #1692)
+        covariance=_answer_covariance_block(ref, result))
 
 
 def _floor_unsupported_moments(structure: Structure,

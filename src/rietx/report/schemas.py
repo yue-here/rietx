@@ -1744,10 +1744,30 @@ class MomentEvidence(Base):
     #: for an ordinary row.
     paired_magnitude: float | None = None
     paired_magnitude_esd: float | None = None
+    #: paths of the other ``MomentEvidence`` rows whose atoms share this
+    #: atom's position (a mixed-occupancy site, frozen at compile:
+    #: ``MagneticSites.cosited``) -- empty for an atom alone on its position.
+    #: Each modulus of such a group is not separately determined: the powder
+    #: measures the moment per position (issue #1692).  A co-sited row is
+    #: never also a :attr:`paired_with` row, the quadrature sum being the
+    #: wrong invariant for atoms on one position.
+    cosited_with: list[str] = Field(default_factory=list)
+    #: the moment per position the powder measures where :attr:`cosited_with`
+    #: is non-empty, |Σ occ_j·m_j| over the group, the form factors taken at
+    #: Q → 0 (unequal ones leave a weak Q-dependence the combination does not
+    #: carry), with its esd propagated through the fit's own covariance of
+    #: every modulus, angle and occupancy in the group.  The esd is ``None``
+    #: where that covariance was not in hand, or a modulus of the group has
+    #: none; the magnitude is ``None`` for an atom alone on its position.
+    cosited_magnitude: float | None = None
+    cosited_magnitude_esd: float | None = None
     #: the null test: ``True`` or ``False`` where the modulus carries an esd
     #: to test against, ``None`` where it does not (stated and held, or left
     #: out of the covariance as unmeasured) — "not tested", which a defaulted
-    #: ``True`` used to read as an answer
+    #: ``True`` used to read as an answer.  On a co-sited row
+    #: (:attr:`cosited_with`) it is the **position's** verdict, the same test
+    #: on :attr:`cosited_magnitude` and its esd (``None`` without one), never
+    #: this atom's own modulus's (issue #1692)
     supported: bool | None = None
     note: str = ""
 
