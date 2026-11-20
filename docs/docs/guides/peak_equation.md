@@ -92,7 +92,7 @@ A shared coefficient is one number in degrees for every pattern.
 Across patterns at different wavelengths, the right value in degrees can differ.
 A size-like term, such as `x/cos(theta)`, scales with λ.
 A strain-like term, such as `w*tan(theta)`, does not.
-For a wavelength-dependent term, give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.peak_equations.0.x"])`.
+For a wavelength-dependent term, give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.peak_equations.0.w"])`.
 TOPAS writes such a term per pattern, or with `Lam` in the expression.
 
 ## Read what the fit says
