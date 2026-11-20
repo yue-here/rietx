@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import inspect
 import itertools
+import math
 from fractions import Fraction as F
 
 import numpy as np
@@ -54,6 +55,7 @@ from rietx.indexing import kvector
 from rietx.indexing.ambiguity import chance_rate
 from rietx.indexing.engines import Budget
 from rietx.indexing.kvector import (
+    KBound,
     KGridPositions,
     KGridScores,
     KNull,
@@ -62,6 +64,7 @@ from rietx.indexing.kvector import (
     _kgrid_strata,
     _poisson_binomial_tail,
     _structural_class,
+    kgrid_bound,
     kgrid_null,
     kgrid_positions,
     kgrid_strata,
@@ -515,7 +518,7 @@ def test_grid_records_carry_their_step_strata_and_no_off_grid_claim():
 # ============================================ V8 no decision inside the records
 
 def test_no_record_picks_a_row_and_no_extent_has_a_default():
-    for cls in (KGridScores, KNull, KGridPositions):
+    for cls in (KGridScores, KNull, KGridPositions, KBound):
         names = set(dir(cls)) | {f for f in getattr(cls, "__dataclass_fields__", {})}
         assert not names & {"k", "best", "top", "best_or_none", "row"}, cls
         for name, member in inspect.getmembers(cls, inspect.isfunction):
@@ -529,12 +532,16 @@ def test_no_record_picks_a_row_and_no_extent_has_a_default():
                          (score_kgrid, {"radius", "band_deg"}),
                          (kgrid_null, {"radius", "band_deg", "exclude", "n_shuffles",
                                        "percentile", "seed"}),
+                         (kgrid_bound, {"alpha", "weighting"}),
                          (kvector_equivalents, {"tol"})):
         params = inspect.signature(fn).parameters
         for name in required:
             assert params[name].default is inspect.Parameter.empty, (fn.__name__, name)
         defaulted = {n for n, p in params.items() if p.default is not inspect.Parameter.empty}
-        assert defaulted <= {"harmonics", "budget"}, (fn.__name__, defaulted)
+        # the scorers' exclude (none) and the null's exclude_in_score (off) are
+        # switches that change nothing unless the caller turns them on
+        assert defaulted <= {"harmonics", "budget", "exclude", "exclude_in_score"}, \
+            (fn.__name__, defaulted)
 
 
 # ===================================================== V6 the metric partner
@@ -738,3 +745,200 @@ def test_counts_saturate_under_the_null_while_scores_do_not(pnma64):
     assert s.n_matched == 10
     assert np.median(null.max_matched) >= 9
     assert s.score > np.max(null.sample)
+
+
+# ===================================== the allowed band and the analytic bound
+
+def _measure(intervals, a, b):
+    """Total length of the union of ``intervals`` inside [a, b], by sweeping."""
+    total, cur = 0.0, a
+    for s_, e_ in sorted(intervals):
+        s_, e_ = max(s_, cur), min(e_, b)
+        if e_ > s_:
+            total += e_ - s_
+            cur = e_
+    return total
+
+
+def _allowed_windows(pos, radius, exclude, lo, hi):
+    """The ±radius windows of ``pos`` cut by the exclusions, as plain intervals."""
+    pieces = [(max(x - radius, lo), min(x + radius, hi)) for x in pos]
+    for c, h in sorted(exclude):
+        cut = []
+        for a, b in pieces:
+            if b <= c - h or a >= c + h:
+                cut.append((a, b))
+                continue
+            if a < c - h:
+                cut.append((a, c - h))
+            if b > c + h:
+                cut.append((c + h, b))
+        pieces = cut
+    return pieces
+
+
+def test_with_exclude_each_p_is_the_allowed_share_of_its_band():
+    lo, hi = PNMA.two_theta_min, PNMA.two_theta_max
+    exclude = _exclude(PNMA)
+    pk = _planted(PNMA, K_LINE, 8, 21, spurious=3)
+    nuc = _nuclear(PNMA)
+    pk = pk[np.min(np.abs(pk[:, None] - nuc[None, :]), axis=1) >= RADIUS]
+    s = score_kvector(pk, PNMA, K_LINE, radius=RADIUS, band_deg=BAND, exclude=exclude)
+    plain = score_kvector(pk, PNMA, K_LINE, radius=RADIUS, band_deg=BAND)
+    windows = _allowed_windows(_sat(PNMA, K_LINE), RADIUS, exclude, lo, hi)
+    allowed = _allowed_windows([(lo + hi) / 2], (hi - lo) / 2, exclude, lo, hi)
+    for x, p in zip(pk, s.p):
+        a, b = max(lo, x - BAND), min(hi, x + BAND)
+        assert p == pytest.approx(_measure(windows, a, b) / _measure(allowed, a, b),
+                                  rel=1e-9, abs=1e-12)
+    assert s.matched == plain.matched and s.n_matched == plain.n_matched
+    assert s.p != plain.p and s.exclude == tuple((float(c), float(h)) for c, h in exclude)
+    assert plain.exclude == ()
+    assert s.p_value == pytest.approx(float(_poisson_binomial_tail(
+        np.array([s.p]), np.array([s.n_matched]))[0]), rel=1e-12)
+
+
+def test_windows_outside_every_band_change_no_p():
+    pk = np.array([30.0, 31.5, 40.2])
+    far = [(80.0, 0.2), (95.0, 0.5)]
+    a = score_kvector(pk, PNMA, K_LINE, radius=RADIUS, band_deg=BAND, exclude=far)
+    b = score_kvector(pk, PNMA, K_LINE, radius=RADIUS, band_deg=BAND)
+    np.testing.assert_allclose(a.p, b.p, rtol=1e-12, atol=1e-14)
+
+
+def test_a_peak_inside_an_exclusion_window_is_refused_naming_both():
+    with pytest.raises(ValueError, match=r"30\.05° 2θ inside the window 30\.0 ± 0\.12°") as e:
+        score_kvector([30.05, 50.0], PNMA, K_LINE, radius=RADIUS, band_deg=BAND,
+                      exclude=[(30.0, 0.12)])
+    assert "Drop that peak" in str(e.value) and "narrow or remove that window" in str(e.value)
+    with pytest.raises(ValueError, match="inside an exclusion window"):
+        score_kgrid([30.05], PNMA, kgrid_strata("P n m a", denominator=4), radius=RADIUS,
+                    band_deg=BAND, exclude=[(30.0, 0.12)])
+    # on its edge is outside
+    score_kvector([30.12], PNMA, K_LINE, radius=RADIUS, band_deg=BAND, exclude=[(30.0, 0.12)])
+
+
+def test_the_grid_rows_carry_exclude_and_equal_score_kvector():
+    strata = kgrid_strata("P n m a", denominator=8)
+    exclude = _exclude(PNMA)
+    pk = _planted(PNMA, K_GENERAL, 8, 10)
+    grid = score_kgrid(pk, PNMA, strata, radius=RADIUS, band_deg=BAND, exclude=exclude)
+    assert grid.exclude == tuple((float(c), float(h)) for c, h in exclude)
+    for r in grid.rows[::13]:
+        s = score_kvector(pk, PNMA, r.k, radius=RADIUS, band_deg=BAND, exclude=exclude)
+        assert r.score == pytest.approx(s.score, rel=1e-12, abs=1e-12)
+
+
+def test_the_null_scores_with_the_statistic_it_is_told():
+    strata = kgrid_strata("P n m a", denominator=8)
+    exclude = _exclude(PNMA)
+    pk = _planted(PNMA, K_LINE, 8, 15)
+    kw = dict(radius=RADIUS, band_deg=BAND, exclude=exclude, n_shuffles=6, percentile=99, seed=5)
+    plain = kgrid_null(pk, PNMA, strata, **kw)
+    cut = kgrid_null(pk, PNMA, strata, exclude_in_score=True, **kw)
+    assert plain.shuffles == cut.shuffles
+    assert not plain.exclude_in_score and cut.exclude_in_score
+    for s_ in (0, 3):
+        g = score_kgrid(cut.shuffles[s_], PNMA, strata, radius=RADIUS, band_deg=BAND,
+                        exclude=exclude)
+        assert cut.sample[s_] == pytest.approx(g.scores.max(), rel=1e-12)
+        h = score_kgrid(plain.shuffles[s_], PNMA, strata, radius=RADIUS, band_deg=BAND)
+        assert plain.sample[s_] == pytest.approx(h.scores.max(), rel=1e-12)
+
+
+def test_the_bound_is_booles_arithmetic_over_the_k_scored():
+    strata = kgrid_strata("P n m a", denominator=8)
+    grid = score_kgrid(_planted(PNMA, K_LINE, 6, 13), PNMA, strata, radius=RADIUS,
+                       band_deg=BAND)
+    n_s = [st.n_points for st in strata]
+    flat = kgrid_bound(grid, alpha=0.01, weighting="flat")
+    assert flat.strata == tuple(st.name for st in strata)
+    assert flat.n_scored == tuple(n_s) and flat.n_total == sum(n_s)
+    assert flat.thresholds == tuple(math.log10(sum(n_s) / 0.01) for _ in n_s)
+    assert sum(flat.weights) == pytest.approx(1.0)
+    per = kgrid_bound(grid, alpha=0.01, weighting="stratum")
+    assert per.thresholds == tuple(math.log10(len(n_s) * n / 0.01) for n in n_s)
+    assert per.weights == tuple(1 / len(n_s) for _ in n_s)
+    # Σ over the k of each one's share of alpha is alpha, the bound's whole content
+    for b in (flat, per):
+        assert sum(n * 10.0 ** -t for n, t in zip(b.n_scored, b.thresholds)) == \
+            pytest.approx(0.01, rel=1e-12)
+    assert "No claim is made about any k off this grid" in flat.coverage
+
+
+def test_a_cut_search_is_bounded_over_the_points_it_scored():
+    strata = kgrid_strata("P n m a", denominator=8)
+    cut = score_kgrid(_planted(PNMA, K_LINE, 6, 13), PNMA, strata, radius=RADIUS,
+                      band_deg=BAND, budget=Budget(3600.0, cancel=_FlipAfter(3)))
+    b = kgrid_bound(cut, alpha=0.05, weighting="stratum")
+    assert b.strata == cut.strata_searched
+    assert b.n_scored == tuple(st.n_points for st in strata[:3])
+    assert b.thresholds == tuple(math.log10(3 * st.n_points / 0.05) for st in strata[:3])
+
+
+def test_the_bound_needs_its_arguments_and_something_scored():
+    strata = kgrid_strata("P n m a", denominator=4)
+    grid = score_kgrid([30.0, 50.0], PNMA, strata, radius=RADIUS, band_deg=BAND)
+    with pytest.raises(TypeError):
+        kgrid_bound(grid, alpha=0.01)  # type: ignore[call-arg]
+    for alpha in (0.0, 1.0, -0.1):
+        with pytest.raises(ValueError, match="alpha"):
+            kgrid_bound(grid, alpha=alpha, weighting="flat")
+    with pytest.raises(ValueError, match="'flat'.*'stratum'"):
+        kgrid_bound(grid, alpha=0.01, weighting="oversampled")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="KGridScores"):
+        kgrid_bound(grid.rows, alpha=0.01, weighting="flat")  # type: ignore[arg-type]
+    none = score_kgrid([30.0], PNMA, strata, radius=RADIUS, band_deg=BAND,
+                       budget=Budget(3600.0, cancel=_FlipAfter(0)))
+    with pytest.raises(ValueError, match="nothing to bound"):
+        kgrid_bound(none, alpha=0.01, weighting="flat")
+
+
+def _local_null(rng, anchors, exclude, lo, hi):
+    """Each peak uniform on the allowed part of the band about its anchor."""
+    out = []
+    for c in anchors:
+        a, b = max(lo, c - BAND), min(hi, c + BAND)
+        pieces = _allowed_windows([(a + b) / 2], (b - a) / 2, exclude, lo, hi)
+        lengths = np.array([e - s for s, e in pieces])
+        u = rng.uniform(0.0, lengths.sum())
+        i = int(np.searchsorted(np.cumsum(lengths), u, side="right"))
+        out.append(pieces[i][0] + u - (np.cumsum(lengths)[i] - lengths[i]))
+    return np.sort(out)
+
+
+def test_the_bound_holds_under_its_null_and_a_planted_k_clears_it():
+    """A seeded validity arm small enough for the fast suite, with its positive
+    arm: lists drawn by the local null cross the bound no more often than
+    alpha, and a planted line k crosses it."""
+    lo, hi = PNMA.two_theta_min, PNMA.two_theta_max
+    strata = kgrid_strata("P n m a", denominator=8)
+    exclude = _exclude(PNMA)
+    built = kgrid_positions(PNMA, strata)
+    rng = np.random.default_rng(20261121)
+    alpha, n_lists, crossed = 0.2, 150, {"flat": 0, "stratum": 0}
+    for _ in range(n_lists):
+        anchors = _draw_allowed(rng, exclude, lo, hi, 6)
+        pk = _local_null(rng, anchors, exclude, lo, hi)
+        grid = score_kgrid(pk, PNMA, built, radius=RADIUS, band_deg=BAND, exclude=exclude)
+        for w in crossed:
+            b = kgrid_bound(grid, alpha=alpha, weighting=w)
+            t = dict(zip(b.strata, b.thresholds))
+            crossed[w] += any(r.score >= t[r.stratum] for r in grid.rows)
+    for w, n in crossed.items():
+        assert n <= alpha * n_lists, (w, n)
+    pk = _planted(PNMA, (F(0), F(3, 8), F(0)), 10, 17)
+    grid = score_kgrid(pk, PNMA, built, radius=RADIUS, band_deg=BAND, exclude=exclude)
+    for w in crossed:
+        b = kgrid_bound(grid, alpha=0.01, weighting=w)
+        t = dict(zip(b.strata, b.thresholds))
+        assert any(r.score >= t[r.stratum] for r in grid.rows), w
+
+
+def _draw_allowed(rng, exclude, lo, hi, n):
+    pieces = _allowed_windows([(lo + hi) / 2], (hi - lo) / 2, exclude, lo, hi)
+    lengths = np.array([e - s for s, e in pieces])
+    cum = np.cumsum(lengths)
+    u = rng.uniform(0.0, cum[-1], n)
+    i = np.searchsorted(cum, u, side="right")
+    return np.array([pieces[j][0] + x - (cum[j] - lengths[j]) for j, x in zip(i, u)])
