@@ -1418,7 +1418,10 @@ def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
     # the model's paths, which a plan that fixes needs (WP-2208)
     paths = ([r.path for r in ref.parameters()]
              if any(s.turn_off for s in plan.stages) else None)
+    # the window is named: run_stage's own default is the declared stages' 2 %
+    # since WP-2222, and a closing stage there drops the tails it exists for
     result = ref.run_stage(data, plan.closing_stage(paths), two_theta_limits=limits,
+                           window_area_tol=plan.closing_window_tol,
                            correlation_guard=plan.correlation_guard,
                            phase_support_sigma=plan.phase_support_sigma,
                            telemetry=False)

@@ -31,6 +31,7 @@ Both formulas read `vars.theta`, the one shared θ.
 A starting value that gives a non-finite cell, such as θ = 0, is listed in `EquationPreview.nonfinite` before any fit.
 
 Each variable is a `Parameter`, so it takes `vary`, bounds and a unit.
+A variable declared `vary=False` keeps its start unless a stage names `vars.<name>`, and [`VARIABLE_NOT_FREED`](../reference/diagnostics-series.md#variable_not_freed) names it after the fit.
 The bounds on θ keep it positive.
 The formula's grammar is [Expressions](../reference/expressions.md): python's lowercase function names, with angles in radians.
 
@@ -45,10 +46,10 @@ The formula's grammar is [Expressions](../reference/expressions.md): python's lo
 <!-- output of examples/guides/formula.py -->
 ```text
 a0 = 4.587 +/- 6.2e-06
-ga = 0.01720567 +/- 2.6e-05
+ga = 0.01720566 +/- 2.6e-05
 c0 = 2.954001 +/- 5.3e-06
-gc = 0.01410529 +/- 2.1e-05
-theta = 500.1692 +/- 0.61
+gc = 0.01410531 +/- 2.1e-05
+theta = 500.1693 +/- 0.61
 [False, False]
 ```
 
