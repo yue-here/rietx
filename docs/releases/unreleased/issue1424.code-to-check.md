@@ -1,0 +1,1 @@
+- **`rietx.strategy.magnetic.SOLVE_MINIMUM_RTOL` is gone** (#1424). Two starts are now one minimum when their moduli agree to `SOLVE_MINIMUM_MODULUS_RTOL` (0.1 of the largest |m|), so code that reads or patches the old constant raises `AttributeError`.

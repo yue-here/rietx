@@ -4699,13 +4699,21 @@ ROWS: tuple[Row, ...] = (
                  "with the pick; kept at the measured value, untested beyond its one family (B12, "
                  "ruled 2026-10-19)."),
         approved="2026-10-19"),
-    Row("rietx.strategy.magnetic.SOLVE_MINIMUM_RTOL", "constant", tier=3, value=0.0001,
-        evidence=("WP-1327: no stated source, never measured; gates the reported n_minima count, "
-                  "not the pick"),
+    Row("rietx.strategy.magnetic.SOLVE_MINIMUM_MODULUS_RTOL", "constant", tier=3, value=0.1,
+        evidence=("#1424 (ruled 2026-11-12: distinct minima counted by moduli, replacing "
+                  "SOLVE_MINIMUM_RTOL's Rwp test at 1e-4, never measured): the two-site Pnma set "
+                  "(Mn1 4b, Mn2 4a, 3.5/0.7 muB, synthetic neutron), 24 noise draws plus 8 at "
+                  "B(Mn2) = 1.2, every start of every class: one minimum's stopped starts differ "
+                  "by at most 0.058 of the largest |m| (3.2e-3 in the true class, 0.058 in a "
+                  "wrong group answering ~0.13 muB), different minima by at least 0.147 (0.80 "
+                  "for the swapped assignment); the Rwp test miscounted the swap on 15/24 "
+                  "draws, the moduli test records both assignments on 24/24. Gates the reported "
+                  "n_minima and MagneticTrial.minima, never the pick (the lowest chi2 start "
+                  "wins); one synthetic family, untested beyond it"),
         grounds=("Rare feature inside solve_magnetic, a pick verb whose whole ranking travels "
-                 "with the pick; kept at its value, which no family measured (B12, ruled "
-                 "2026-10-19)."),
-        approved="2026-10-19"),
+                 "with the pick; a value in the measured gap, untested beyond its one "
+                 "synthetic family (the B12 clause, ruled 2026-10-19)."),
+        ),
     Row("rietx.strategy.magnetic.SOLVE_RELEASE_FRACTION", "constant", tier=3, value=0.05,
         evidence=("WP-1327: Ba6Co6 (GSAS-II Magnetic-III tutorial, not vendored), released from "
                   "the one-site leg: Rwp 0.08752 (the published answer) against 0.08952 flat; one "

@@ -262,9 +262,25 @@ SOLVE_STAGE_NAMES: tuple[str, ...] = ("moduli", "moment", "all")
 #: not vendored).
 SOLVE_RELEASE_FRACTION = 0.05
 
-#: Relative Rwp separation above which two starts of one candidate are counted
-#: as **different minima** rather than the same one reached twice.
-SOLVE_MINIMUM_RTOL = 1e-4
+#: Separation of the **moduli** above which two starts of one candidate ended
+#: in different minima rather than in one minimum reached twice
+#: (:func:`_distinct_minima`): some site's |m| differs by more than this
+#: fraction of the largest |m| either start carries.  Moduli and not Rwp,
+#: because two minima of one model can sit at one Rwp: on the two-site Pnma
+#: set (Mn1 4b and Mn2 4a related by c/2, 3.5 and 0.7 μ_B, issue #1424; 24
+#: noise draws) the swapped assignment's Rwp differs from the truth's by 1.0e-4
+#: relative (median) and one minimum's own stopped starts by 1.1e-4, so the
+#: Rwp test that stood here until 1.x (1e-4, never measured) miscounted the
+#: solve's three starts on 15 of 24 draws.  In moduli the two separate: the
+#: minima differ by at least 2.79 μ_B, 0.80 of the largest, and one minimum's
+#: stopped starts by at most 0.011 μ_B, 3.2e-3 of it.  The edge is a candidate
+#: whose moduli all sit near zero (a wrong group answering ~0.1 μ_B), where a
+#: hundredth of a μ_B is a few percent: over every class of those draws and of
+#: eight with B(Mn2) = 1.2, one minimum's starts differ by at most 0.058 and
+#: different minima by at least 0.147, and the value sits in that gap.  A
+#: modulus at or below :data:`~rietx.schemas.structure.MOMENT_FLOOR_MU_B` reads
+#: as the floor, so two starts that both removed a moment are one minimum.
+SOLVE_MINIMUM_MODULUS_RTOL = 0.1
 
 #: How many times :func:`_fit` continues a fit that stopped on its iteration
 #: budget (``max_iter``), each continuation from where the last one stopped,
@@ -354,6 +370,38 @@ class MomentRow:
 
 
 @dataclass(frozen=True)
+class MomentMinimum:
+    """One distinct minimum the moment stage's starts reached (issue #1424).
+
+    A class with several magnetic sites is refined from several starts
+    (:func:`_starts`), and they need not end in one place.  Two minima of one
+    model are told apart by **where the moments are** — every site's |m| —
+    and not by their Rwp, which two minima can share: when two sites are
+    related by a translation that leaves |F_m|² invariant at equal Biso, the
+    pattern measures m₁ + m₂ and m₁ − m₂ and swapping the two moduli moves the
+    fit by about one χ² unit, either way (:data:`SOLVE_MINIMUM_MODULUS_RTOL`).
+
+    ``chi2`` is the absolute weighted residual sum of squares at the
+    declared stages' windows, the precision every trial is ranked at — never
+    the winner's closing stage.  Every minimum of a trial is the same model
+    with the same free count, so the difference of two minima's ``chi2`` is
+    their ΔBIC.  ``moduli`` is each moment-carrying site's |m| in μ_B under
+    the crystal-axis cosine metric (:attr:`MomentRow.magnitude`'s), read at
+    the best of ``starts``.
+
+    Two minima that differ only in the moments' *directions* or relative
+    signs, at the same moduli, are one entry here: a direction the powder
+    does not determine wanders between starts, so counting by it would split
+    one minimum into as many as there were starts.
+    """
+
+    #: the starts that ended here, lowest χ² first
+    starts: tuple[str, ...]
+    chi2: float
+    moduli: tuple[tuple[str, float], ...]
+
+
+@dataclass(frozen=True)
 class MagneticTrial:
     """One powder-equivalence class, refined once, with what the data said.
 
@@ -401,11 +449,19 @@ class MagneticTrial:
     #: how many seeds the moment stage was started from — one for a class with
     #: a single magnetic site, one per site plus the flat start otherwise
     n_starts: int | None = None
-    #: how many *distinct* converged minima those starts found.  More than one
-    #: is a reportable fact about the candidate and not about the run: it says
-    #: the moment stage of this model is multimodal, so the answer below is the
+    #: how many *distinct* converged minima those starts found, counted by
+    #: their moduli (:attr:`minima`, ``len`` of it).  More than one is a
+    #: reportable fact about the candidate and not about the run: it says the
+    #: moment stage of this model is multimodal, so the answer below is the
     #: best of several and a different seed would have reported another
     n_minima: int | None = None
+    #: every distinct minimum those starts reached, lowest χ² first — the
+    #: first is the one the moments below come from.  Each names the starts
+    #: that ended there, its χ² and every site's |m|, so two assignments of
+    #: the moduli the pattern cannot tell apart are both on the record, not
+    #: only the one a start happened to reach first (issue #1424).  ``None`` on
+    #: a refused trial, like :attr:`n_minima`
+    minima: tuple["MomentMinimum", ...] | None = None
     #: which start won, named
     start: str | None = None
     #: the winning start's ``RefinementResult.status`` — ``"converged"``,
@@ -1207,7 +1263,7 @@ def _descend(parent, winner_trial: "MagneticTrial",
                     refusal="forbids a moment on every named site"))
                 continue
             child_structure = Structure(phases=[child])
-            (_start, ref, result), _n_starts, _n_minima = _best_start(
+            (_start, ref, result), _n_starts, _minima = _best_start(
                 _starts(child_structure, instrument, data, plan, True,
                        owners, limits))
         except Exception as exc:      # noqa: BLE001 - reported, never swallowed
@@ -1569,18 +1625,68 @@ def _starts(child_structure, instrument, data, plan, zero: bool,
 
 
 def _best_start(starts):
-    """The lowest-χ² start, and how many distinct minima the sweep found.
+    """The lowest-χ² start, how many starts there were, and the distinct
+    minima they reached (:func:`_distinct_minima`), lowest χ² first.
 
     Every start ends with the same free set on the same data, so the absolute
     weighted residual sum of squares compares them directly — this is one model
     at several minima, not two models.
     """
     ranked = sorted(starts, key=lambda s: _chi2_absolute(s[2].statistics))
-    rwps = sorted(float(s[2].statistics.rwp) for s in starts)
-    minima = 1 if not rwps else 1 + sum(
-        1 for a, b in zip(rwps, rwps[1:])
-        if abs(b - a) > SOLVE_MINIMUM_RTOL * max(abs(a), 1e-12))
-    return ranked[0], len(starts), minima
+    return ranked[0], len(starts), _distinct_minima(ranked)
+
+
+def _start_moduli(structure) -> tuple[tuple[str, float], ...]:
+    """Every moment-carrying site's |m| in a fitted structure, in atom order."""
+    from ..crystallography.magnetic.operators import moment_magnitude
+
+    phase = structure.phases[0]
+    cell = tuple(float(getattr(phase.cell, k).value)
+                 for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    return tuple((a.label, moment_magnitude(a.moment.values(), cell))
+                 for a in phase.atoms if a.moment is not None)
+
+
+def _same_minimum(a, b) -> bool:
+    """Whether two starts' moduli are one minimum reached twice.
+
+    Every site's |m| within :data:`SOLVE_MINIMUM_MODULUS_RTOL` of the larger
+    of the two starts' largest |m|, each read no lower than
+    ``MOMENT_FLOOR_MU_B`` (a moment the fit removed is at the floor whatever
+    digit it stopped on).  Starts of one trial carry the same sites in the
+    same order; a pair that does not is two minima, never one.
+    """
+    from ..schemas.structure import MOMENT_FLOOR_MU_B
+
+    if [label for label, _m in a] != [label for label, _m in b]:
+        return False
+    ma = [max(m, MOMENT_FLOOR_MU_B) for _label, m in a]
+    mb = [max(m, MOMENT_FLOOR_MU_B) for _label, m in b]
+    scale = max(ma + mb, default=MOMENT_FLOOR_MU_B)
+    return all(abs(x - y) <= SOLVE_MINIMUM_MODULUS_RTOL * scale
+               for x, y in zip(ma, mb))
+
+
+def _distinct_minima(ranked) -> tuple[MomentMinimum, ...]:
+    """The distinct minima of starts already sorted by χ², lowest first.
+
+    Each start joins the first minimum, in χ² order, whose best start's moduli
+    it matches (:func:`_same_minimum`), or opens a new one.  So every
+    minimum's moduli and χ² are its best start's, and the first minimum is the
+    one :func:`_best_start` picks.
+    """
+    groups: list[tuple[list[str], float, tuple[tuple[str, float], ...]]] = []
+    for name, ref, result in ranked:
+        moduli = _start_moduli(ref.fitted_structure)
+        for names, _chi2, kept in groups:
+            if _same_minimum(kept, moduli):
+                names.append(name)
+                break
+        else:
+            groups.append(([name], _chi2_absolute(result.statistics), moduli))
+    return tuple(MomentMinimum(starts=tuple(names), chi2=float(chi2),
+                               moduli=moduli)
+                 for names, chi2, moduli in groups)
 
 
 def _dead_globs(plan, result) -> tuple[str, ...]:
@@ -2479,7 +2585,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                           if any(a.moment is not None
                                  and _moment_owner(a.label, [label]) == label
                                  for a in child_structure.phases[0].atoms)]
-                (start, ref, result), n_starts, n_minima = _best_start(
+                (start, ref, result), n_starts, minima = _best_start(
                     _starts(child_structure, instrument, data, trial_plan, zero,
                             owners, limits, extra))
                 moments, n_moment, pair_diag = _moment_rows(
@@ -2494,13 +2600,15 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                         f"model — a Stage entry that matches nothing is accepted "
                         f"silently, so the model that was ranked is not the one "
                         f"the plan describes")
+                n_minima = len(minima)
                 if n_minima > 1:
                     caveats.append(
                         f"class {index}: {n_starts} starts found {n_minima} "
                         f"distinct minima of the moment stage (best from "
                         f"{start!r}); this candidate's moment problem is "
                         f"multimodal and a single seed would have reported a "
-                        f"different answer")
+                        f"different answer; each minimum is in the trial's "
+                        f"minima")
                 if not zero:
                     drift = anti_translation_residual(
                         ref.fitted_structure.phases[0])
@@ -2547,7 +2655,8 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                 moments=moments,
                 held=tuple(result.stages[-1].held) if result.stages else (),
                 anti_translation_drift=drift,
-                n_starts=n_starts, n_minima=n_minima, start=start,
+                n_starts=n_starts, n_minima=n_minima, minima=minima,
+                start=start,
                 fit_status=result.status,
                 reference_status=reference_of[(kk, index)][5],
                 _structure=ref.fitted_structure, _result=result,

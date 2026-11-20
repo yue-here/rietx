@@ -637,7 +637,7 @@ def test_a_class_with_two_magnetic_sites_is_started_from_every_one_of_them():
     assert winner.n_starts == 3, winner.n_starts
     assert winner.start in ("flat", "Mn1 only, then released",
                             "Mn2 only, then released")
-    assert winner.n_minima >= 1
+    assert winner.n_minima == len(winner.minima) >= 1
     # a multimodal class says so in the answer, not only in a log
     multimodal = [t for t in solution.trials if (t.n_minima or 0) > 1]
     if multimodal:
@@ -902,9 +902,9 @@ def test_a_caller_stated_ion_still_needs_an_explicit_g_issue_257_a5(dy_charged_t
     # it had been (one start, one minimum, a flat start, zero free parameters,
     # "the powder determines none")
     for t in solution.trials:
-        assert (t.determinable_amplitudes, t.n_starts, t.n_minima, t.start,
-                t.n_moment_parameters, t.n_free_parameters,
-                t.fit_status, t.reference_status) == (None,) * 8
+        assert (t.determinable_amplitudes, t.n_starts, t.n_minima, t.minima,
+                t.start, t.n_moment_parameters, t.n_free_parameters,
+                t.fit_status, t.reference_status) == (None,) * 9
     codes = {d.code for d in solution.diagnostics}
     assert "LANDE_G_ASSUMED" not in codes
 

@@ -111,6 +111,20 @@ def test_the_two_site_winner_measures_the_sum_and_difference(monkeypatch):
     a1, a2 = m1.crystalaxis[0], m2.crystalaxis[0]
     assert abs(a1 + a2) == pytest.approx(4.20, abs=0.02)
     assert abs(a1 - a2) == pytest.approx(2.80, abs=0.02)
+    # both assignments are on the record (#1424, D8's machinery): the two
+    # one-site starts end on opposite sites, and every start is in one of
+    # them, the winner's first
+    assert winner.n_minima == len(winner.minima) == 2, winner.minima
+    first, second = (dict(x.moduli) for x in winner.minima)
+    for moduli in (first, second):
+        assert sorted(moduli.values()) == pytest.approx([0.70, 3.50], abs=0.02)
+    assert (first["Mn1"] > first["Mn2"]) != (second["Mn1"] > second["Mn2"])
+    assert sorted(s for x in winner.minima for s in x.starts) == sorted(
+        ["flat", "Mn1 only, then released", "Mn2 only, then released"])
+    assert winner.minima[0].starts[0] == winner.start
+    assert winner.minima[0].chi2 <= winner.minima[1].chi2
+    assert any("class 0:" in c and "2 distinct minima" in c
+               for c in solution.caveats), solution.caveats
     # esds and rho matched by size, not by site
     assert sorted(r.esd for r in winner.moments) == pytest.approx(
         [0.00111, 0.00150], rel=0.05)
@@ -125,27 +139,80 @@ def test_the_two_site_winner_measures_the_sum_and_difference(monkeypatch):
     assert "MOMENT_ANGLE_STATIONARY" in {d.code for d in winner._result.diagnostics}
 
 
+def _start(label, chi2_red, n_free, rwp, moduli):
+    """A constructed start: its statistics, and a fitted structure carrying
+    a moment along **a** of each given size on an orthorhombic cell."""
+    from types import SimpleNamespace as NS
+
+    stats = NS(chi2=chi2_red, n_points=1000, n_free_parameters=n_free, rwp=rwp)
+    cell = NS(**{k: NS(value=v) for k, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"),
+        (5.74, 7.70, 5.54, 90.0, 90.0, 90.0))})
+    atoms = [NS(label=site, moment=Moment.from_values((m, 0.0, 0.0), "Mn3+"))
+             for site, m in moduli.items()]
+    atoms.append(NS(label="O1", moment=None))
+    structure = NS(phases=[NS(cell=cell, atoms=atoms)])
+    return (label, NS(fitted_structure=structure), NS(statistics=stats))
+
+
 def test_best_start_picks_the_lowest_absolute_chi2_not_the_lowest_rwp():
     """``_best_start`` ranks starts by absolute weighted chi², the quantity the
     ranking compares (#1424).  Constructed starts, where the lowest Rwp and the
     lowest chi² disagree, so a pick by ``rwp``, by reduced chi² or by list order
     fails."""
-    from types import SimpleNamespace as NS
-
     from rietx.strategy import magnetic as solve
-
-    def start(label, chi2_red, n_free, rwp):
-        stats = NS(chi2=chi2_red, n_points=1000, n_free_parameters=n_free,
-                   rwp=rwp)
-        return (label, None, NS(statistics=stats))
 
     # absolute chi²: 1.0*990 = 990, 1.0005*990 = 990.495, 1.002*980 = 981.96;
     # the truth start has the highest reduced chi² and the highest Rwp, so a
     # pick by either (or by list order) fails
-    flat = start("flat", 1.0, 10, 0.050)
-    swap = start("swap", 1.0005, 10, 0.040)      # lowest Rwp, higher chi²
-    truth = start("truth", 1.002, 20, 0.060)     # lowest absolute chi²
+    flat = _start("flat", 1.0, 10, 0.050, {"Mn1": 0.70, "Mn2": 3.50})
+    swap = _start("swap", 1.0005, 10, 0.040, {"Mn1": 0.701, "Mn2": 3.499})
+    truth = _start("truth", 1.002, 20, 0.060, {"Mn1": 3.50, "Mn2": 0.70})
     best, n, minima = solve._best_start([flat, swap, truth])
-    assert best[0] == "truth" and n == 3 and minima == 3
+    assert best[0] == "truth" and n == 3
+    # two minima, lowest chi² first, each named by the starts that reached it
+    assert [m.starts for m in minima] == [("truth",), ("flat", "swap")]
+    assert [m.chi2 for m in minima] == pytest.approx([981.96, 990.0])
+    assert dict(minima[0].moduli) == pytest.approx({"Mn1": 3.50, "Mn2": 0.70})
+    assert dict(minima[1].moduli) == pytest.approx({"Mn1": 0.70, "Mn2": 3.50})
     best, _, _ = solve._best_start([truth, swap, flat])
     assert best[0] == "truth"
+
+
+def test_distinct_minima_are_counted_by_moduli_not_by_rwp():
+    """D8's machinery (#1424): two starts are one minimum when every site's
+    |m| agrees to ``SOLVE_MINIMUM_MODULUS_RTOL`` of the largest, whatever
+    their Rwp.  The swapped assignment at one Rwp is two minima, which the
+    Rwp test this replaced counted as one; one minimum reached at two Rwp is
+    one, which it counted as two; and moments the fit removed are one
+    minimum whatever digit each stopped on."""
+    from rietx.schemas.structure import MOMENT_FLOOR_MU_B
+    from rietx.strategy import magnetic as solve
+
+    rtol = solve.SOLVE_MINIMUM_MODULUS_RTOL
+
+    def count(*moduli, rwps=None):
+        starts = [_start(f"s{i}", 1.0 + 1e-3 * i, 10,
+                         (rwps or [0.05] * len(moduli))[i], m)
+                  for i, m in enumerate(moduli)]
+        return [m.starts for m in solve._best_start(starts)[2]]
+
+    truth, swap = {"Mn1": 3.5, "Mn2": 0.7}, {"Mn1": 0.7, "Mn2": 3.5}
+    # the swap at one Rwp: two minima
+    assert count(truth, swap) == [("s0",), ("s1",)]
+    # one minimum at Rwp 2 % apart: one
+    assert count(truth, {"Mn1": 3.49, "Mn2": 0.71},
+                 rwps=[0.050, 0.051]) == [("s0", "s1")]
+    # the tolerance is the boundary, read against the largest |m|
+    step = rtol * 3.5
+    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 0.9 * step}) == [("s0", "s1")]
+    assert count(truth, {"Mn1": 3.5, "Mn2": 0.7 + 1.1 * step}) == [("s0",), ("s1",)]
+    # two removed moments are one minimum; a removed and a kept one are two
+    floor = MOMENT_FLOOR_MU_B
+    assert count({"Mn1": 0.2 * floor, "Mn2": 0.0},
+                 {"Mn1": 0.9 * floor, "Mn2": 0.5 * floor}) == [("s0", "s1")]
+    assert count({"Mn1": 0.0, "Mn2": 0.0},
+                 {"Mn1": 0.3, "Mn2": 0.0}) == [("s0",), ("s1",)]
+    # a later start joins the minimum whose best start it matches, not the
+    # minimum it happens to follow
+    assert count(truth, swap, {"Mn1": 3.49, "Mn2": 0.70}) == [("s0", "s2"), ("s1",)]
