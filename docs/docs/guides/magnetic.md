@@ -62,6 +62,8 @@ On this site every direction is allowed, and the angles are measured from the ce
 The plan frees the modulus and the angle from c, and leaves the azimuth at its seed of 0.
 That keeps the component along b at zero, as the tutorial does.
 The first stage frees the moment with the scale and background only, and the second frees every nuclear term with it.
+The plan then ends with the closing stage ([The closing stage](../reference/refinement.md#the-closing-stage)), because the modulus's interval below is the number to quote.
+Without it, the interval's lower end moved in its second decimal from one machine to another.
 
 ## Read the moment
 
@@ -75,7 +77,7 @@ The first stage frees the moment with the scale and background only, and the sec
 ```text
 Mn2 (Mn3+): |m| = 3.56 ± 0.04 μB, supported
 polar angle: esd None, 95 % interval includes 90°: True
-modulus: 95 % interval 3.46 to 3.65 μB
+modulus: 95 % interval 3.47 to 3.65 μB
 ['MOMENT_ANGLE_STATIONARY']
 ```
 
@@ -93,7 +95,7 @@ In its place the fit computes the angle's 95 % profile interval, which runs abou
 
 The interval includes 90°, so the data cannot tell this moment from one along a.
 The modulus esd of 0.04 μ<sub>B</sub> assumes the angle sits at 90°.
-So the fit also computes the modulus's 95 % profile interval, 3.46 to 3.65 μ<sub>B</sub>, which does not assume it.
+So the fit also computes the modulus's 95 % profile interval, 3.47 to 3.65 μ<sub>B</sub>, which does not assume it.
 Quote the modulus by that interval.
 The modulus is the moment's length at the angle where the fit stopped, so it is never shorter than the moment along a.
 The message gives both intervals.
