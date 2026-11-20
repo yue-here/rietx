@@ -1140,19 +1140,19 @@ def _width_twin_flats(parts: list[tuple[ParameterTable, np.ndarray, set[int]]],
     A = np.array([r[cand] for r in (*sums, *others) if r[cand].any()],
                  dtype=np.float64).reshape(-1, len(cand))
 
-    def flat(keep: list[int]) -> set[int]:
-        """The columns of ``keep`` on a flat direction, the rest pinned."""
+    def null_space(keep: list[int]) -> np.ndarray:
+        """An orthonormal basis of the flat moves of ``keep``, one row per
+        column of ``keep``, the other columns pinned."""
         sub = A[:, [cand.index(c) for c in keep]]
         if sub.shape[0] and sub.any():
             _, s, vt = lapack.svd(sub)
             rank = int(np.sum(s > s[0] * len(keep) * np.finfo(np.float64).eps))
-            null = vt[rank:].T
-        else:
-            null = np.eye(len(keep))
-        return {c for c, r in zip(keep, null, strict=True)
-                if r.size and np.abs(r).max() > 1e-8}
+            return vt[rank:].T
+        return np.eye(len(keep))
 
-    on_flat = flat(cand)
+    null = null_space(cand)
+    on_flat = {c for c, r in zip(cand, null, strict=True)
+               if r.size and np.abs(r).max() > 1e-8}
     out: dict[int, list[int]] = {}
     for c in sorted(inst_cols & holdable & on_flat):
         twins = {k for a, b in couples if c in a
@@ -1160,11 +1160,20 @@ def _width_twin_flats(parts: list[tuple[ParameterTable, np.ndarray, set[int]]],
         if twins:
             out[c] = sorted(twins)
     # W is held only where a flat direction survives every hold above: W,
-    # ``gauss_size`` and ``gauss_strain`` free with U not (WP-2219)
-    rest = flat([c for c in cand if c not in out])
-    for c in sorted((inst_cols - holdable) & rest):
-        twins = {k for _, b in couples for k in b
-                 if k in rest and k not in inst_cols}
+    # ``gauss_size`` and ``gauss_strain`` free with U not (WP-2219).  Its
+    # twins are the specimen columns that move *with* it on that direction
+    # (the null-space projector's column for W), so a column left unpinned on
+    # a direction of its own, such as a Stephens block whose Y is held by
+    # rule, is not named as W's twin
+    keep = [c for c in cand if c not in out]
+    rest = null_space(keep)
+    specimen = {k for _, b in couples for k in b} - inst_cols
+    for c in sorted(inst_cols - holdable):
+        if c not in keep:
+            continue
+        move = rest @ rest[keep.index(c)]
+        twins = {k for k, m in zip(keep, move, strict=True)
+                 if k in specimen and abs(m) > 1e-8}
         if twins:
             out[c] = sorted(twins)
     return out

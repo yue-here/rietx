@@ -500,15 +500,20 @@ def _special_details(result: RefinementResult, structure: Structure) -> list[str
                     "SCOR; the TOPAS Technical Reference describes no such "
                     "factor")
         out.append(esd + ".")
-    for phase in structure.phases:
+    # a refined value with no esd says so, as the profile text does (WP-2219)
+    no_su = {p.path for p in result.parameters if p.stderr is None}
+    tag = "_pd_proc_ls_special_details"
+    for ip, phase in enumerate(structure.phases):
         po = phase.preferred_orientation
         if po is not None and (po.r.vary or po.r.value != 1.0):
             hkl = " ".join(str(i) for i in po.axis)
+            r = _value(po.r, tag,
+                       unknown=f"phases.{ip}.preferred_orientation.r" in no_su)
             out.append(f"Preferred orientation of {phase.name}: March-Dollase "
-                       f"(Dollase 1986), axis the normal to ({hkl}), r="
-                       f"{_value(po.r, '_pd_proc_ls_special_details')}.")
+                       f"(Dollase 1986), axis the normal to ({hkl}), r={r}.")
         tex = phase.texture
-        terms = [f"{name}={_value(c, '_pd_proc_ls_special_details')}"
+        terms = [name + "=" + _value(c, tag,
+                                     unknown=f"phases.{ip}.texture.{name}" in no_su)
                  for name, c in (tex.coefficients.items() if tex else ())
                  if c.vary or c.value != 0.0]
         if terms:

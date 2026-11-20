@@ -639,12 +639,13 @@ def _rechart_matrix(outcome: LSQOutcome, theta: np.ndarray,
 
 def _guarded_covariance(jac, fun, n_free: int, n_data: int
                         ) -> tuple[np.ndarray | None, np.ndarray | None,
-                                   float | None, str | None]:
+                                   float | None, str | None,
+                                   tuple[int, np.ndarray] | None]:
     """:func:`covariance_estimates`, with an eigensolver failure made absent.
 
-    Returns ``(stderr, corr, factor, None)``, ``factor`` the Bérar-Lelann
-    factor ``stderr`` carries (:func:`_covariance_and_inflation`), or
-    ``(None, None, None, repr(exc))`` when
+    Returns ``(stderr, corr, factor, None, discards)``, ``factor`` the
+    Bérar-Lelann factor ``stderr`` carries (:func:`_covariance_and_inflation`),
+    or ``(None, None, None, repr(exc), None)`` when
     ``np.linalg.LinAlgError`` escapes the pseudo-inverse.  Issue #225 met it
     at a converged fit, pattern 78 of a 182-pattern chain, as ``Eigenvalues
     did not converge`` out of ``eigh``, and the raise discarded the answer the
@@ -676,9 +677,11 @@ def _guarded_covariance(jac, fun, n_free: int, n_data: int
     try:
         stderr, corr, factor = _covariance_and_inflation(jac, fun, n_free,
                                                          n_data=n_data)
-        discards = discarded_directions(jac)
     except np.linalg.LinAlgError as exc:
         return None, None, None, repr(exc), None
+    # outside the guard: where the covariance did form, a failure of the
+    # discard test stays loud, as it was in ``check_guards`` before WP-2219
+    discards = discarded_directions(jac)
     if len(discards[1]):
         stderr = np.array(stderr, dtype=np.float64)
         stderr[discards[1]] = np.inf

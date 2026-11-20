@@ -732,7 +732,8 @@ ROWS: tuple[Row, ...] = (
     Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the parameters sharing a direction the covariance build "
                   "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
-                  "holds (staged.check_discarded_directions)")),
+                  "holds, whose esds the solve left absent (WP-2219; "
+                  "least_squares._guarded_covariance, staged.outcome_discarded_directions)")),
     Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when the esd calculation raised after the "
                   "solver returned (refine.py _covariance_diagnostics), so the stage's "

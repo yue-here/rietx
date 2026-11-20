@@ -474,7 +474,7 @@ GUARD_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "high_correlations": ((FIT,), "one correlation matrix, of the joint solve"),
     "flat_directions": ((FIT,), "read off the same matrix, beside the correlation"),
     "discarded_directions": ((FIT,), "the joint normal matrix's own cut, read "
-                                     "off the joint Jacobian"),
+                                     "off the joint solve's covariance"),
     "at_bounds": ((FIT,), "the joint θ's bounds"),
 }
 

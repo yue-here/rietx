@@ -2346,7 +2346,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two parameters are correlated so completely that the data measure only one "
             "combination of them. This is a statement about the rank of the problem and "
             "not about a strong correlation. Each esd is conditional on the other "
-            "parameter being right. Fix one at an independently known value and refine "
+            "parameter being right. Where the data do not move their difference at "
+            "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
             "histogram can separate them."
         ),
