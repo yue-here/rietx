@@ -1,6 +1,6 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: parametric · Status: 🔄 2026-11-19 — the maintainer ruled option A and the consent list (PR #1635); nothing built; next is the Compile task
+Milestone: parametric · Status: 🔄 2026-11-20 — every task built and tested (PR #1635, ready for review); waiting on the maintainer's read of two new diagnostics and the schema bump
 Depends on: 1964 (the grammar, evaluated on arrays)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
@@ -167,40 +167,40 @@ every image. A port meets the refusal and takes the exit knowingly.
 
 ## Tasks
 
-- [ ] **The surface.** A consent item for the maintainer, since it names a field and a
+- [x] **The surface.** A consent item for the maintainer, since it names a field and a
   top-level type. `rx.PeakEquation(target=..., expression=...)` is a placeholder. The
   target names follow the package's own words (`lor_`, `gauss_`, position), and the
   manual's table maps TOPAS's onto them.
-- [ ] **Stored format.** A `Phase` field is a stored-format change, so it goes to the
+- [x] **Stored format.** A `Phase` field is a stored-format change, so it goes to the
   maintainer with the version it bumps. `.rxt` rendering, `help.py`, `capabilities()` and
   the `rietx._audit` rows follow.
-- [ ] **Compile.** Freeze `h`, `k`, `l`, `m` on `CompiledPhase`. Evaluate on every orbit
+- [x] **Compile.** Freeze `h`, `k`, `l`, `m` on `CompiledPhase`. Evaluate on every orbit
   image and refuse a disagreement, with `orbit_mean` as the exit. Refuse a moving
   condition. Teach `_shift_est` and `_size_family` the equation, and pin the windows with
   the probe's number. `generation_window` runs before reflections exist
   (`forward.py:4133`), so a phase-level position in hkl needs a bound over the expression
   that takes no reflection list, or a margin stated and tested.
-- [ ] **Forward.** Width in `_width_block`, position in `apparent_two_theta` with its
+- [x] **Forward.** Width in `_width_block`, position in `apparent_two_theta` with its
   phase index, and every memo key. Check `reflection_positions`, the ticks and the
   exporters' reflection table read the same answer. `apparent_two_theta` also takes arrays
   that are no reflection list (`report/satellites.py`, `refine.py:11552`), so those callers
   read the pattern level or refuse. Width readers outside `_width_block` follow too
   (`refine.py:11342`, `report/strain.py:120`, `io/exporters.py:362`).
-- [ ] **Derivatives.** An exact branch for a coefficient, reached through
+- [x] **Derivatives.** An exact branch for a coefficient, reached through
   `scalar_chain_supported` and the extras gate. `test_cross_backend.py` gains a row, and
   the oracle follows the invariant on exactness.
-- [ ] **The guard.** A total width at or below zero at the answer.
-- [ ] **A joint fit.** An equation on each table, a coefficient shared across patterns,
+- [x] **The guard.** A total width at or below zero at the answer.
+- [x] **A joint fit.** An equation on each table, a coefficient shared across patterns,
   and a pattern's coordinate readable in the expression.
-- [ ] **Intensity.** The third target, the two hand-folded builders, the Le Bail and Pawley
+- [x] **Intensity.** The third target, the two hand-folded builders, the Le Bail and Pawley
   refusal, and the QPA diagnostic with its row in `rietx._audit`.
-- [ ] **The harmonic.** A symmetric function of hkl in the grammar, with its derivative.
-- [ ] **An independent check.** Each target against a built-in with the same physics,
+- [x] **The harmonic.** A symmetric function of hkl in the grammar, with its derivative.
+- [x] **An independent check.** Each target against a built-in with the same physics,
   so no code is shared with what it certifies: `y*tan(th)` against `lor_strain`, a cosθ
   position against sample displacement, an exponential in s² (sinθ/λ squared) against
   Biso. A variance term against the instrument's U, V and W. TOPAS at zero cycles is a
   welcome extra if a run is cheap, and no gate.
-- [ ] **Manual and skill.** A guide page, `reference/parametric.md`, the Theory tab's
+- [x] **Manual and skill.** A guide page, `reference/parametric.md`, the Theory tab's
   equation, a keyword-to-target table in `switching/topas.md`, the skill's row.
 
 ## Acceptance
@@ -226,6 +226,66 @@ then adds both to its protocol.
 - WP-1964 (the grammar), WP-0503 (Stephens), WP-1102 (the expression clause), WP-2061.
 
 ## Handover log
+
+- **2026-11-20 (ghostshift runners, two sessions; PR #1635)** — A user can now write
+  a peak's width, position or intensity as an equation in its hkl and angle, refine the
+  coefficients with exact derivatives, and share or parametrise them in a joint fit. Every
+  task in the list is built. On synthetic data each target matches the built-in term with
+  the same physics to 1e-12, twelve noise seeds recover every coefficient with a mean
+  z-score under 0.31, and a ZrP₂O₇-shaped ramp (a 2θ calibration curve plus two phases'
+  own TCHZ terms, five patterns) recovers all twelve coefficients within 2 esd. Two new
+  diagnostics and a schema version bump reach a reader, and they wait on the maintainer.
+  - *Done, first session (2026-11-19, commits 9f0a7f0bd-81d759009).* The grammar's
+    `orbit_mean` and `harmonic` with `GRAMMAR_VERSION` 2; `rx.PeakEquation` and the two
+    fields; the compile with the orbit refusal; the forward model; the exact phase
+    coefficient column (`least_squares._peak_equation_column`), with instrument
+    coefficients on the scalar chain; the intensity factor in both hand-folded intensity
+    builders; the `peak_equations` config in `tests/test_cross_backend.py`.
+  - *Done, this session.* Merged origin/main (clean). `PEAK_WIDTH_NOT_POSITIVE`
+    (`staged.check_peak_width_positive`, joint fit included) and `QPA_INTENSITY_FACTOR`
+    (`refine._qpa_intensity_factor_diagnostics`), with help, audit and skill rows.
+    `tests/test_peak_equations.py` (26 tests, about 6 s). Schema 0.61 → 0.62. Help
+    families for the coefficients, a parameter-map group, the GUI's `PLACES` entries and a
+    rebuilt dist. The `.rxt` shows each equation as a comment on its coefficient rows.
+    `features["peak_equations"]`. A guide page with its example script, the reference in
+    `reference/data.md`, the Theory tab's `fm-peak-equation`, a keyword table in
+    `switching/topas.md`. The milestone's ZrP₂O₇ row now names the equations.
+  - *The joint fit needed no code.* A `ParametricEquation` whose target is
+    `phases.0.peak_equations.0.w` makes the coefficient follow a coordinate: w0 and w1
+    came back 0.63 and 0.94 esd from their truth over four patterns.
+  - *Measured* ([dev,jax], macOS arm64). Twins: lor_strain, U, sample displacement (both
+    levels) and Biso each under 1e-12 relative. Twelve-seed single-pattern recovery:
+    mean z from -0.24 to +0.31. ZrP₂O₇-shaped ramp: pinned seed worst 1.68 esd; over
+    twelve ramps every mean z-score 0.50 or less, and the worst of the twelve passed 2 esd
+    on two ramps. `python -m tests.reader_output`: exit 0, the standard fit's text
+    unchanged.
+  - *Gotchas.* `Refinement.predict` draws at the closing window (1e-3) while a default fit
+    measures at 2e-2, so a synthetic pattern carries Lorentzian tails the fit cuts. On the
+    ramp that took a broad phase's x coefficient 1.2 esd low on average until the plan
+    closed at `CLOSING_WINDOW_TOL`. A noise seed shared between runs (`seed + k`) made
+    twelve ramps look biased; seed each pattern with `[seed, k]`. `F d -3 m` takes origin
+    choice 1, where Si at 1/8 loses its 220; write `F d -3 m:2`.
+  - *Settled by Claude.*
+    1. Schema 0.61 → 0.62 rather than "also in 0.61": 1.12.0 shipped 0.61 two days
+       after the consent list was written, and the changelog's practice bumps once a
+       version has shipped. Alternative: keep 0.61, which would let a 1.12 build read the
+       version as its own and refuse the field without saying why.
+    2. No `.rxt` `FORMAT_VERSION` bump, against consent item 1's "1 → 2 for the new
+       block". The coefficients render as ordinary rows and the equation as a comment, so
+       there is no new block, and `textdoc.py`'s written rule says a new line is not a bump
+       because a bump refuses every stored document. Alternative: a real equation block,
+       editable as text, which would need the bump.
+    3. The guard reads Γ_G² as the built-in terms' floored value plus the equation's, so
+       a dip the instrument's own U, V and W cause stays `RESOLUTION_NOT_POSITIVE`'s.
+       Alternative: one guard over the whole width, which would report the instrument's
+       fault twice.
+    4. `QPA_INTENSITY_FACTOR` is a warning, silent with one phase in the analysis.
+       Alternative: info, on the reading that the user chose the factor.
+  - *For the maintainer.* The two new diagnostics' text, shown in the PR body, since a
+    change to what a reader receives comes to you before merge.
+  - *Next.* The maintainer's read of the diagnostics and the schema bump, then merge. After
+    merge: the real-data ZrP₂O₇ port frees the curve and the TCHZ terms beside the
+    calibration (the milestone row).
 
 - **2026-11-19 (the ruling)** — The maintainer ruled on 2026-11-19 on the 2026-11-17
   decision. **Option A**: a peak equation is a field on the model. No objection was raised
