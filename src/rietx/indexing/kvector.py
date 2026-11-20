@@ -1288,33 +1288,36 @@ def kgrid_bound(scores: KGridScores, *, alpha: float, weighting: Weighting) -> K
     **The guarantee.**  Every row's P is a valid p-value under the local null
     :func:`score_kvector` writes out (peaks independent, each uniform on the
     allowed part of its band), so P(P_k ≤ t) ≤ t for each k scored.  Boole's
-    inequality (the Bonferroni correction) bounds the chance that *any* k
-    reaches its stratum's threshold: with n_s k scored in stratum s and
-    thresholds log₁₀(n_s / (wₛ·α)),
+    inequality, P(A₁ ∪ … ∪ A_N) ≤ Σ P(Aⱼ) for any events (the Bonferroni
+    correction), bounds the chance that *any* k reaches its stratum's
+    threshold: with n_s k scored in stratum s and thresholds
+    log₁₀(n_s / (wₛ·α)),
 
         P(some k has score ≥ its threshold) ≤ Σ_s n_s · wₛ·α / n_s = α,
 
-    whatever the correlation between k (Bonferroni, C. E. (1936),
-    *Pubblicazioni del R. Istituto Superiore di Scienze Economiche e
-    Commerciali di Firenze* **8**, 3-62).  Correlated k make it conservative,
+    whatever the correlation between k.  Correlated k make it conservative,
     never invalid.  It holds for the k actually scored, a budget's cut
     included, and for nothing off the grid (``coverage``).
 
     No free factor enters: no oversampling factor, no effective number of
-    independent k, no margin.  The look-elsewhere correction for the maximum
-    of a periodogram is the same question in astronomy (Baluev, R. V. (2008),
-    *Mon. Not. R. Astron. Soc.* **385**, 1279-1285; VanderPlas, J. T. (2018),
-    *Astrophys. J. Suppl. Ser.* **236**, 16, § 7), where a resolution-element
-    count replaces N; that count needs an oversampling factor, which this
-    bound does not.
+    independent k, no margin.  The maximum of a periodogram over a frequency
+    grid is the same look-elsewhere question in astronomy, where the
+    multiple-trial form with an effective number of independent frequencies
+    is a heuristic (Baluev, R. V. (2008), *Mon. Not. R. Astron. Soc.* **385**,
+    1279-1285, § 3) and its naive version underestimates the false-alarm
+    probability, while the grid is oversampled by a chosen number of points
+    per peak (VanderPlas, J. T. (2018), *Astrophys. J. Suppl. Ser.* **236**,
+    16, §§ 7.1 and 7.4.2).  This bound needs neither number.
 
     ``weighting`` splits ``alpha`` across the strata, and both are the
     caller's (no default): ``"flat"`` gives each k the same share,
     wₛ = n_s/N, so every k is held to log₁₀(N/α); ``"stratum"`` gives each
     stratum scored the same share, wₛ = 1/S, so a stratum of few k (a point or
-    a line) is held to a lower bar than the general stratum, the order a k
-    search visits strata in (Wills, A. S. (2009), *Z. Kristallogr. Suppl.*
-    **30**, 39-44, § 3.1).  The bound holds for either; which one a verdict
+    a line) is held to a lower bar than the general stratum.  A k search
+    tries the points, then the lines, then the planes (Wills, A. S. (2009),
+    *Z. Kristallogr. Suppl.* **30**, 39-44, § 3.1); that is a search order,
+    and whether it should also lower a stratum's bar is not something that
+    paper says.  The bound holds for either weighting; which one a verdict
     reads is the heuristic's.
 
     What this does **not** do: no comparison of any row with a threshold, no
