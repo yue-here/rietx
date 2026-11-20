@@ -803,7 +803,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         ),
         unit=None, default=None,
         typical="set by the expression; a shift of hundredths of a degree",
-        anchor="guides/peak_equation.html",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
     ),
     "instrument.extra_components.*.position": HelpEntry(
         title="Background-peak position",
@@ -1108,7 +1108,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         unit=None, default=None,
         typical="set by the expression; a Lorentzian tanθ coefficient near "
                 "lor_strain's",
-        anchor="guides/peak_equation.html",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
     ),
     "phases.*.texture.*": HelpEntry(
         title="Texture coefficient",
