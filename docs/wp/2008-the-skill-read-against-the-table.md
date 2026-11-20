@@ -1,6 +1,6 @@
 # WP-2008 — The skill slimmed to the API, the feedback surface and sourced traps
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-19 — one ruled slice landed (#1630, the held-SNIP recipe withdrawn); every task still open
 Track: The prose
 Depends on: 2001, 2002, 2003, 2004 (2005, 2006, 2007 soft: those three move few skill rows)
 Priority: P3 2026-10-18 — down a rung from P2: nothing here can start until the audits have ruled; lifts when 2002–2004 close
@@ -205,6 +205,26 @@ star, puts it back, because the skill's role is now narrower than interpreting v
 - `docs/milestones/generality.md`; WP-1330, 1338, 1905, 1985; `tests/skill_caps.py`.
 
 ## Handover log
+
+- **2026-11-19 (repair)** — A repair by a ghostshift runner, in the close-only PR #1719.
+  The session-start scan flagged this WP because commit `3f5d58d23` (2026-11-17 02:07Z)
+  postdates the newest entry, dated 2026-11-16. That commit only added the PR line to
+  the 2026-11-16 entry, and #1630 merged on 2026-11-17 as `de95ea24e`, so no entry
+  was missing and none is reconstructed. The repair changed three things. The Status
+  reads 🔄, since the held-SNIP slice landed while the header still read ⬜. The
+  2026-11-16 entry now sits above the 2026-10-18 one, newest first. And this entry
+  is dated today, so the scan stops flagging. The WP is not closed: all ten tasks are
+  open, the baseline `eval_skill` round included, and the Priority line stands.
+  Next: unchanged. 2002 has closed and 2003 (🔄) and 2004 (⬜) have not, so the
+  Priority line's lift has not fired and the baseline round still waits on them.
+
+- **2026-11-16** — Ruled by Yue 2026-11-16: withdraw the held-SNIP hump recipe now (option
+  (b) of the decisions walk); the Le Bail hump guidance falls back to a co-refined
+  background. Done on branch `wp2008-withdraw-held-snip`: `judging.md` § rules 4-5, SKILL.md
+  §2 item 5 and the `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` row now say to co-refine, with
+  #1569's measurement; `optimize.statistics.background_absorption`'s docstring says the
+  screen cannot see a held curve. This WP's tasks are otherwise unchanged.
+  PR: #1630.
 
 - **2026-10-18** — created, from the milestone's opening session. The acceptance row the
   first plan had here, "the skill's reference total falls", was dropped on the second

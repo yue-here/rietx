@@ -1,8 +1,7 @@
 # WP-2215 — the frame: the rebuild's first piece, served at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the frame is built at `/next`; the maintainer's review rulings are applied, and it waits on the merge
+Milestone: gui-overhaul · Status: ✅ 2026-11-17 — merged in PR #1534 on 2026-11-11; the rebuilt GUI's frame is served at `/next`, and the action bar and the recovery offer moved to R2 (WP-2216)
 Depends on: 2214 (the rebuild's plan and inventory)
-Priority: P2 2026-11-11 — a feature the open milestone was opened for: every later piece of the rebuild mounts in this frame
 
 ## Goal
 
@@ -107,6 +106,27 @@ with the ruling in the maintainer's words.
 
 ## Handover log
 
+- **2026-11-17** — closed by a ghostshift runner in the close-only batch PR #1658. PR #1534
+  merged on 2026-11-11 with all ten tasks ticked, after the maintainer ruled on its three
+  review questions; the merge was the maintainer's look at the screens that the acceptance
+  asks for. The rebuilt GUI now has a frame on `main`: `rietx gui --new` opens it at `/next`
+  beside today's page, and every later piece of the rebuild mounts in it. It goes out with
+  v1.12.
+
+  *Changed by this close.* Status ✅, the `Priority:` line removed, the narrative moved to
+  `docs/milestones/v1.12.md`, and the R1 row of `docs/milestones/gui-overhaul.md` § The
+  rebuild marked merged. This WP had no `### Inherited` section. WP-2211 and WP-2212 are
+  re-rated P3 to P2: each was held a rung down until R1's bottom panel landed.
+
+  *Leftovers, and where each went.* The action bar and the recovery offer were already
+  moved to R2 and sit in WP-2216's Goal. Two items the review declined on 2026-11-11 had
+  no owner on file, so they went to issue #1656 rather than a WP: the rebuilt Console's
+  "frames dropped" count is always 0, because `follow()` does not report its losses (the
+  bottom panel is R5's); and `lib/style.test.ts`'s register guards do not scan
+  `gui/src/next/`, which waits on a call on whether `.ib` and `.mbtn` are registers (R2's,
+  per the entry below). Docs only; no test moved.
+
+  Next: none in this WP. R2 (WP-2216) is in flight in this frame.
 - **2026-11-11** — The maintainer's three review rulings on PR #1534 are applied (§ Questions).
   The workflow menu and the command palette now mark each unbuilt workflow "not built yet",
   and no label in `gui/src/next/` says "placeholder". The frame now draws in its own faces:

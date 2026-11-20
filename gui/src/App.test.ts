@@ -1140,14 +1140,26 @@ describe("the parameter table", () => {
     });
   });
 
-  it("treats a value typed back as it was drawn as no edit", async () => {
+  it("opens a value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1009's rule: the drawn value is compared, so a click in and out of a
-    // cell cannot truncate a parameter
+    // drawn as 4.1568(2), edited in full, as a spreadsheet cell is
+    numberAt("phases.0.cell.a").click();
+    await flush();
+    const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+    expect(editor.value).toBe("4.15678");
+    // WP-1009's rule against the text the editor opened on: Enter on it, or a
+    // click in and out, cannot truncate a parameter
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(host.textContent).not.toContain("pending edit");
+    // the drawn digits typed in are a different number, so they are an edit
     await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).toContain("1 pending edit");
+    // and the stored value typed back takes the edit away
+    await editValue("phases.0.cell.a", "4.15678");
     expect(host.textContent).not.toContain("pending edit");
   });
 
@@ -6435,6 +6447,49 @@ describe("the Interactive tab (WP-2128)", () => {
     expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
   });
 
+  it("opens a typed value on its stored digits, and Enter on them is no edit (WP-2223)", async () => {
+    // a w with 14 significant figures: a 12-digit box would read back different
+    const W = 0.0011090354888959;
+    const params = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "instrument.profile.w" ? { ...p, value: W } : p) };
+    const stub = server({ ...boot(), ...FITTED, "/api/params": () => ({ body: params }),
+                          "/api/preview": preview });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Interactive")!.click();
+    await flush();
+    const box = () => panel().querySelector<HTMLButtonElement>("button.num")!;
+    const typedInput = () => panel().querySelector<HTMLInputElement>("input.typed")!;
+    const enter = async (text?: string) => {
+      box().click();
+      await flush();
+      if (text !== undefined) {
+        typedInput().value = text;
+        typedInput().dispatchEvent(new Event("input", { bubbles: true }));
+        await flush();
+      }
+      typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flush();
+    };
+
+    box().click();
+    await flush();
+    expect(typedInput().value).toBe("0.0011090354888959");
+    typedInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/preview")).toBe(false);
+    expect(host.querySelector(".actions .pending")?.textContent ?? "").toBe("");
+
+    // the box reads ×10ⁿ as the range fields do
+    await enter("1.5×10⁻³");
+    expect(stub.calls.filter((c) => c.path === "/api/preview").at(-1)!.body.values)
+      .toEqual({ "instrument.profile.w": 0.0015 });
+    // leave nothing pending, or its recovery copy is written into the next test
+    bar("Revert").click();
+    await flush();
+  });
+
   it("frames single peaks in a graph tab of their own", async () => {
     await openInteractive();
     button("Single peaks")!.click();
@@ -6466,13 +6521,16 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     app = mount(App, { target: host });
     await flush();
     expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
-    expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
+    expect(dialog()?.querySelector("p")?.textContent).toMatch(
+      /^Not applied when the project closed on Nov 10, 2026, \d{1,2}:05 [AP]M: 1 edit waiting at Apply\.$/);
     expect(dialog()?.textContent).not.toContain("since");
 
     [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
     await flush();
     expect(dialog()).toBeNull();
     expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    expect(host.querySelector("section.console")?.textContent).toContain(
+      "# Restored: 1 edit waiting at Apply.");
     // the server holds exactly these, so nothing is written until they change
     await wait();
     expect(recoveryPuts(stub)).toEqual([]);
@@ -6598,5 +6656,172 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     const puts = recoveryPuts(stub).map((c) => c.body);
     expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
     expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+  });
+});
+
+describe("the Text buffer and the Model forms join the recovery copy (WP-2213)", () => {
+  const TYPED = TEXTDOC + "# my note\nlimits 3 60\n";
+  const NO_ARMS = { params: null, interactive: null, plan: null, text: null, model: null };
+  const wait = async (ms = 600) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await flush();
+  };
+  const recoveryPuts = (stub: { calls: Call[] }) =>
+    stub.calls.filter((c) => c.path === "/api/recovery" && c.method === "PUT");
+  const dialog = () => document.querySelector<HTMLElement>(".rc-dialog");
+  const answer = (label: string) =>
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === label)!.click();
+  function routes(kept: unknown, revision = "r1", text = TEXTDOC) {
+    return {
+      "/api/recovery": (call: Call) => ({ body: call.method === "GET" ? kept : {} }),
+      "/api/textdoc": (call: Call) => ({
+        body: call.method === "GET"
+          ? { text, revision, format_version: "1" }
+          : { valid: true, applied: [], delta: {}, revision, would_change: true },
+      }),
+      "/api/params": () => ({ body: MODEL_PARAMS }),
+    };
+  }
+  async function start(extra: Record<string, any>) {
+    const stub = server({ ...boot(), ...extra });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    return stub;
+  }
+  const field = (path: string) =>
+    host.querySelector<HTMLInputElement>(`[data-field="${path}"]`)!;
+  async function typeField(path: string, value: string) {
+    field(path).value = value;
+    field(path).dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+  }
+
+  it("keeps a typed Text buffer, comments included, uncounted", async () => {
+    const stub = await start(routes({ draft: null }));
+    button("Text")!.click();
+    await waitForEditor();
+    await typeInto(TYPED);
+    // past the validation, whose answer is a change of the pane too
+    await settle();
+    await wait();
+    const last = recoveryPuts(stub).at(-1)!.body;
+    expect(last.draft).toEqual({ ...NO_ARMS, count: 0, text: { buffer: TYPED, revision: "r1" } });
+    // the action bar counts none of it: the Text panel keeps its own Apply
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // a buffer read back to the rendering is no edit, and the copy goes
+    host.querySelector<HTMLButtonElement>(".text header button[title^='discard']")!.click();
+    await wait();
+    expect(recoveryPuts(stub).at(-1)!.body.draft).toBeNull();
+  });
+
+  it("restores the buffer dirty over the rendering it was typed against", async () => {
+    const stub = await start(routes({
+      draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
+      saved_utc: null, head: "n0000", head_now: "n0000" }));
+    expect(dialog()?.textContent).toContain(
+      "Not applied when the project closed: the Text document.");
+    answer("Restore");
+    await flush();
+    expect(dialog()).toBeNull();
+    button("Text")!.click();
+    await waitForEditor();
+    expect(editorView().state.doc.toString()).toBe(TYPED);
+    await settle();
+    expect(host.textContent).toContain("ready to apply");
+    // validated against the revision it was typed against, and Apply is live
+    const put = stub.calls.find((c) => c.method === "PUT" && c.path === "/api/textdoc")!;
+    expect(put.body).toEqual({ text: TYPED, base_revision: "r1", validate_only: true });
+    // the server holds exactly this, so nothing is written until it changes
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("restores the buffer stale when the project has moved, with re-read the one exit", async () => {
+    const stub = await start(routes({
+      draft: { count: 0, text: { buffer: TYPED, revision: "r1" } },
+      saved_utc: null, head: "n0042", head_now: "n0000" }, "r2", TEXTDOC_MOVED));
+    // a Text arm alone: no values to replace, and the buffer is said to come back out of date
+    expect([...dialog()!.querySelectorAll("p")].map((p) => p.textContent)).toEqual([
+      "Not applied when the project closed: the Text document.",
+      "The project has been refined or edited since. "
+      + "The Text document comes back marked out of date. Copy what you need from it, then re-read.",
+    ]);
+    answer("Restore");
+    await flush();
+    button("Text")!.click();
+    await waitForEditor();
+    await flush();
+    // on screen to copy from, but there is no merge
+    expect(editorView().state.doc.toString()).toBe(TYPED);
+    expect(host.textContent).toContain("stale");
+    expect(host.textContent).toContain("There is no merge");
+    expect(host.querySelector<HTMLButtonElement>(".text header button[title^='apply']")!.disabled)
+      .toBe(true);
+    await settle();
+    expect(stub.calls.some((c) => c.method === "PUT" && c.path === "/api/textdoc")).toBe(false);
+  });
+
+  it("keeps the Model forms' typed fields, and restores them through the form", async () => {
+    const stub = await start(routes({ draft: null }));
+    button("Model")!.click();
+    await flush();
+    await typeField("phases.0.name", "LaB6 batch 2");
+    await wait();
+    const model = recoveryPuts(stub).at(-1)!.body.draft.model;
+    expect(model).toEqual({ count: 1, edits: { "phases.0.name": "LaB6 batch 2" }, params: {},
+                            positions: {}, vary: {}, atom: null });
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    unmount(app);
+    host.innerHTML = "";
+
+    await start(routes({ draft: { count: 0, model }, saved_utc: null,
+                         head: "n0000", head_now: "n0000" }));
+    expect(dialog()?.textContent).toContain(
+      "Not applied when the project closed: 1 edit in the Model forms.");
+    answer("Restore");
+    await flush();
+    button("Model")!.click();
+    await flush();
+    expect(field("phases.0.name").value).toBe("LaB6 batch 2");
+    expect(host.textContent).toContain("1 edit");
+  });
+
+  it("opens another project with neither the Text buffer nor the Model forms carried over", async () => {
+    const other = { ...PROJECT, path: "/tmp/nac.rex",
+                    data: { ...PROJECT.data, filename: "nac.fxye" } };
+    const stub = await start({
+      ...routes({ draft: null }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: other }),
+    });
+    button("Model")!.click();
+    await flush();
+    await typeField("phases.0.name", "LaB6 batch 2");
+    button("Text")!.click();
+    await waitForEditor();
+    await typeInto(TYPED);
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    // the project left behind keeps both, written at once on the way out
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
+    expect(puts[0].draft.text.buffer).toBe(TYPED);
+    expect(puts[0].draft.model.edits).toEqual({ "phases.0.name": "LaB6 batch 2" });
+    // and the next project's panes hold none of it
+    button("Model")!.click();
+    await flush();
+    expect(field("phases.0.name").value).toBe("LaB6");
+    button("Text")!.click();
+    await waitForEditor();
+    await flush();
+    expect(editorView().state.doc.toString()).toBe(TEXTDOC);
+    expect(host.textContent).toContain("in sync");
   });
 });
