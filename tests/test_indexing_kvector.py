@@ -841,7 +841,7 @@ def test_the_null_scores_with_the_statistic_it_is_told():
     for s_ in (0, 3):
         g = score_kgrid(cut.shuffles[s_], PNMA, strata, radius=RADIUS, band_deg=BAND,
                         exclude=exclude)
-        assert cut.sample[s_] == pytest.approx(g.scores.max(), rel=1e-12)
+        assert cut.sample[s_] == g.scores.max()    # exact: one block map, every shuffle
         h = score_kgrid(plain.shuffles[s_], PNMA, strata, radius=RADIUS, band_deg=BAND)
         assert plain.sample[s_] == pytest.approx(h.scores.max(), rel=1e-12)
 

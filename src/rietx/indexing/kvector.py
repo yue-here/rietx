@@ -650,13 +650,25 @@ def _allowed_coordinate(allowed: np.ndarray, hi: float, x: np.ndarray) -> np.nda
     return np.interp(x, knots, level) + np.maximum(x - hi, 0.0)
 
 
+def _allowed_windows(windows, allowed: np.ndarray, hi: float):
+    """The windows' starts, ends and running covered length in the allowed
+    coordinate: built once per block and shared by every peak list scored on it."""
+    s, e, _ = windows
+    su = _allowed_coordinate(allowed, hi, s)
+    eu = _allowed_coordinate(allowed, hi, e)
+    cu = np.zeros_like(su)
+    cu[:, 1:] = np.cumsum(eu - su, axis=1)[:, :-1]
+    return su, eu, cu
+
+
 def _score_rows(windows, tt: np.ndarray, lo: float, hi: float, band: float,
-                allowed: np.ndarray | None = None):
+                allowed: np.ndarray | None = None, uwin=None):
     """matched (rows, N) bool, p (rows, N), n (rows,), P (rows,), score (rows,).
 
     With ``allowed`` (the (m, 2) intervals :func:`_exclude_windows` leaves),
     every measure is taken in the allowed coordinate u: pᵢ is the share of the
-    allowed part of the band that the windows' allowed parts cover."""
+    allowed part of the band that the windows' allowed parts cover.  ``uwin``
+    is :func:`_allowed_windows` of the same windows, when the caller has it."""
     s, e, cumex = windows
     rows = np.arange(s.shape[0])[:, None]
     if len(tt) == 0:
@@ -673,10 +685,7 @@ def _score_rows(windows, tt: np.ndarray, lo: float, hi: float, band: float,
                    - _covered_to(s, e, cumex, _locate(s, a), a))
         p = np.clip(covered / (b - a)[None, :], 0.0, 1.0)
     else:
-        su = _allowed_coordinate(allowed, hi, s)
-        eu = _allowed_coordinate(allowed, hi, e)
-        cu = np.zeros_like(su)
-        cu[:, 1:] = np.cumsum(eu - su, axis=1)[:, :-1]
+        su, eu, cu = uwin if uwin is not None else _allowed_windows(windows, allowed, hi)
         au = _allowed_coordinate(allowed, hi, a)
         bu = _allowed_coordinate(allowed, hi, b)
         covered = (_covered_to(su, eu, cu, _locate(su, bu), bu)
@@ -1202,9 +1211,10 @@ def kgrid_null(peaks, parent: KParent, strata, *, radius: float, band_deg: float
         pos = _stratum_positions(parent, st, orders, built, i)
         for c in range(0, st.n_points, _CHUNK):
             win = _windows(pos[c:c + _CHUNK], r, lo, hi)
+            uwin = None if score_allowed is None else _allowed_windows(win, score_allowed, hi)
             for s_ in range(n_sh):
                 _m, _p, n, _bp, score = _score_rows(win, draws[s_], lo, hi, band,
-                                                    score_allowed)
+                                                    score_allowed, uwin)
                 t = int(np.argmax(score))
                 if score[t] > best[s_]:
                     best[s_], at_best[s_] = score[t], n[t]
