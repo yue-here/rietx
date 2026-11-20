@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-19 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-20 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549) and its review follow-ups (PR #1703); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -1019,6 +1019,18 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-20 — K1a's review follow-ups merged from outside (PR #1703)
+
+`kvector_equivalents` now reads a parent on rhombohedral axes (`:R`) as the primitive lattice it is. Before, it took the centring from the symbol's first letter. A `:R` cell was then read as R-centred, a lattice of a third its volume, and partners were listed that its hexagonal twin (`:H`) does not list. On a pseudo-cubic R -3 m cell at α = 89°, 453 of 511 k on the 1/8 grid gave different partners or deviations. With the fix, the two settings agree on all 511.
+
+*Done.* PR #1703 (outside contributor, head `f7d2f7c60`) merged as `20255ddfa` on 2026-11-20. It closes three of the #1549 review's open points. Follow-up 3 of the 2026-11-19 entry (the {0, ½, 1} comment) is now a corrected comment. The `metric_deviation` question became a test that pins the number to the map stored in `operation`, and the code was already right. The `:R` centring fix is the one code change. Follow-ups 1 and 2 of that entry (the repeated shuffle null, the 100-shuffle percentile) are not in this PR. Follow-up 2 stays K1b's. No issue closed. M-8 stays unticked, so the WP stays 🔄.
+
+*Checked in review.* Both of the PR's revert checks reproduced. Only gemmi's 7 `:R` settings disagree between `xhm()[0]` and `centring_type()`. The three other places that read a centring from the symbol's letter are safe: `irreps.primitive_basis` falls back to the Hermite normal form, `superspace.generation._holohedry` sees only standard settings, and `superspace.symbols._positions` refuses `:R`. Full suite on the merged tree `5ee5012bd` (main `6c3a2db5e` plus head `f7d2f7c60`; arm64 Mac, `[dev]`, Python 3.12): 15 898 passed, 444 skipped, 52 xfailed and 1 failed, in 2654 s, slow tier included, with nothing else holding the suite lock. The failure is `test_suite_alarms.py::test_the_standards_fire_what_the_pin_says`: the acceptance standards' diagnostics no longer match `tests/data/suite_alarms.json`. It fails identically on bare main `6c3a2db5e` on this Mac, and `kvector_equivalents` has no caller on the fit path, so I count it against main, not this PR. The venv has no jax, which accounts for the extra skips. `tests.audit_delta`: no change. `tests.reader_output`: no change.
+
+*Next.* Follow-ups 1 and 2 of the 2026-11-19 entry stay Michael's to take or leave, follow-up 2 inside K1b. K1b itself waits on #795's decisions 3 and 4. The alarm-pin failure on this Mac is main's, and the Linux nightly of 2026-11-19 passed it.
+
+This entry was written by a ghostshift runner in PR #PRNUM, which changes only the WP files and the index.
 
 ### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
 
