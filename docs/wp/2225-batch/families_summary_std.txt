@@ -1,0 +1,122 @@
+zincite        off  today    Rwp 0.109726 chi2 vs hold-off  +0.79% it 125   0.9s
+                             | u=-0.0009674 v=-0.0001789 w=0.006638 x=0.0264 y=0.03803 | floor ['0.lor_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        off  today+1  Rwp 0.109282 chi2 vs hold-off  -0.03% it  43   0.6s | re-fit shift 4.19 (profile.v) / 1.24 (profile.v) / quoted 0.55 (0.atoms.0.biso)
+                             | u=-0.002279 v=0.004782 w=0.004049 x=0.03239 y=0.02512 | floor ['0.lor_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        off  opt1     Rwp 0.109726 chi2 vs hold-off  +0.79% it 125   0.7s
+                             | u=-0.0009674 v=-0.0001789 w=0.006638 x=0.0264 y=0.03803 | floor ['0.lor_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        off  opt1+1   Rwp 0.109282 chi2 vs hold-off  -0.03% it  43   0.5s | re-fit shift 4.19 (profile.v) / 1.24 (profile.v) / quoted 0.55 (0.atoms.0.biso)
+                             | u=-0.002279 v=0.004782 w=0.004049 x=0.03239 y=0.02512 | floor ['0.lor_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        off  opt2     Rwp 0.109278 chi2 vs hold-off  -0.04% it   5   1.4s rounds 4 trace [0.109726, 0.109276, 0.109277, 0.109278, 0.109278]
+                             | u=-0.002697 v=0.005753 w=0.003747 x=0.03277 y=0.02454 | floor ['0.gauss_size', '0.lor_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        off  nohold   Rwp 0.109274 chi2 vs hold-off  +0.00% it 127   0.6s
+                             | u=-0.1256 v=0.005397 w=0.0016 x=0.02903 y=0.02421 | floor [] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE', 'RESOLUTION_UNCONSTRAINED']
+zincite        on   today    Rwp 0.105611 chi2 vs hold-off  +0.55% it 134   0.8s
+                             | u=-0.0009674 v=0.0002143 w=0.006483 x=0.0264 y=0.03803 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        on   today+1  Rwp 0.105308 chi2 vs hold-off  -0.03% it  57   0.7s | re-fit shift 3.76 (profile.v) / 1.23 (profile.v) / quoted 0.54 (0.atoms.0.biso)
+                             | u=-0.001986 v=0.004498 w=0.004323 x=0.03198 y=0.02542 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        on   opt1     Rwp 0.105356 chi2 vs hold-off  +0.06% it 136   0.8s
+                             | u=-0.0009674 v=0.002082 w=0.005499 x=0.0264 y=0.02658 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped ['instrument.profile.y'] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        on   opt1+1   Rwp 0.105300 chi2 vs hold-off  -0.06% it  53   0.6s | re-fit shift 3.03 (profile.v) / 1.02 (profile.v) / quoted 0.17 (0.cell.a)
+                             | u=-0.002502 v=0.005419 w=0.003922 x=0.02727 y=0.02688 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.y'] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        on   opt2     Rwp 0.105300 chi2 vs hold-off  -0.04% it  23   1.9s rounds 3 trace [0.105611, 0.105301, 0.1053, 0.1053]
+                             | u=-0.002425 v=0.00525 w=0.004 x=0.03312 y=0.02235 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+zincite        on   nohold   Rwp 0.105300 chi2 vs hold-off  +0.00% it 137   0.7s
+                             | u=-0.1259 v=0.005421 w=0.001364 x=0.02856 y=0.02548 | floor [] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'DISPERSION_NEGLECTED', 'FLAT_DIRECTION', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE', 'RESOLUTION_UNCONSTRAINED']
+fluorite       off  today    Rwp 0.181309 chi2 vs hold-off  -0.04% it 108   0.5s
+                             | u=0.004204 v=-0.004916 w=0.007839 x=0.003063 y=0.06184 | floor [] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'HIGH_CORRELATION']
+fluorite       off  today+1  Rwp 0.181303 chi2 vs hold-off  -0.05% it  25   0.4s | re-fit shift 0.03 (0.atoms.1.biso) / 0.01 (0.atoms.1.biso) / quoted 0.01 (0.atoms.1.biso)
+                             | u=0.004195 v=-0.004928 w=0.007844 x=0.003018 y=0.06198 | floor [] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'HIGH_CORRELATION']
+fluorite       off  opt1     Rwp 0.181309 chi2 vs hold-off  -0.04% it 108   0.5s
+                             | u=0.004204 v=-0.004916 w=0.007854 x=0.003063 y=0.06887 | floor ['0.gauss_size', '0.lor_strain'] | swapped ['instrument.profile.y'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       off  opt1+1   Rwp 0.181303 chi2 vs hold-off  -0.05% it  28   0.4s | re-fit shift 0.03 (0.atoms.1.biso) / 0.01 (0.atoms.1.biso) / quoted 0.01 (0.atoms.1.biso)
+                             | u=0.004195 v=-0.004927 w=0.007818 x=0.003018 y=0.06901 | floor [] | swapped [] | codes ['FLAT_DIRECTION', 'HIGH_CORRELATION']
+fluorite       off  opt2     Rwp 0.181303 chi2 vs hold-off  -0.05% it   3   0.9s rounds 2 trace [0.181309, 0.181303, 0.181303]
+                             | u=0.004196 v=-0.004928 w=0.007844 x=0.00302 y=0.06197 | floor [] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'HIGH_CORRELATION']
+fluorite       off  nohold   Rwp 0.181309 chi2 vs hold-off  +0.00% it 108   0.5s
+                             | u=0.00399 v=-0.004915 w=0.007596 x=0.001842 y=0.06527 | floor ['0.gauss_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       on   today    Rwp 0.176110 chi2 vs hold-off  -0.04% it 121   0.7s
+                             | u=0.004204 v=-0.005711 w=0.008041 x=0.003063 y=0.06184 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       on   today+1  Rwp 0.176111 chi2 vs hold-off  -0.04% it  50   0.6s | re-fit shift 0.70 (0.lor_strain) / 0.21 (0.lor_strain) / quoted 0.00 (0.atoms.1.biso)
+                             | u=0.004243 v=-0.005772 w=0.008063 x=0.002664 y=0.05964 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       on   opt1     Rwp 0.176110 chi2 vs hold-off  -0.04% it 121   0.7s
+                             | u=0.004204 v=-0.005711 w=0.008041 x=0.003063 y=0.07154 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped ['instrument.profile.y'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       on   opt1+1   Rwp 0.176108 chi2 vs hold-off  -0.06% it  52   1.2s | re-fit shift 0.46 (profile.v) / 0.13 (profile.v) / quoted 0.00 (0.atoms.1.biso)
+                             | u=0.003757 v=-0.004996 w=0.007777 x=0.002664 y=0.07187 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.y'] | codes ['FLAT_DIRECTION', 'HIGH_CORRELATION']
+fluorite       on   opt2     Rwp 0.176111 chi2 vs hold-off  -0.04% it  29   2.1s rounds 2 trace [0.17611, 0.176111, 0.176111]
+                             | u=0.004236 v=-0.005762 w=0.00806 x=0.002277 y=0.05752 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+fluorite       on   nohold   Rwp 0.176108 chi2 vs hold-off  +0.00% it 126   0.8s
+                             | u=0.003564 v=-0.004996 w=0.007584 x=0.001914 y=0.06677 | floor ['0.gauss_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'HIGH_CORRELATION']
+corundum       off  today    Rwp 0.145745 chi2 vs hold-off -97.05% it 116   0.5s
+                             | u=-0.002266 v=0.005198 w=0.01592 x=0.02686 y=0.04291 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       off  today+1  Rwp 0.145746 chi2 vs hold-off -97.05% it  31   0.4s | re-fit shift 0.07 (profile.v) / 0.02 (profile.v) / quoted 0.01 (0.atoms.1.biso)
+                             | u=-0.002333 v=0.005311 w=0.01588 x=0.0268 y=0.04306 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       off  opt1     Rwp 0.145744 chi2 vs hold-off -97.05% it 117   0.7s
+                             | u=-0.002329 v=0.005337 w=0.01587 x=0.02686 y=0.04291 | floor ['0.gauss_size', '0.gauss_strain'] | swapped ['instrument.profile.u'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       off  opt1+1   Rwp 0.145746 chi2 vs hold-off -97.05% it  31   0.5s | re-fit shift 0.05 (0.atoms.1.biso) / 0.02 (0.atoms.1.biso) / quoted 0.02 (0.atoms.1.biso)
+                             | u=-0.002333 v=0.005311 w=0.01588 x=0.02681 y=0.04302 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       off  opt2     Rwp 0.145746 chi2 vs hold-off -97.05% it   4   2.1s rounds 2 trace [0.145745, 0.145746, 0.145746]
+                             | u=-0.002333 v=0.005312 w=0.01588 x=0.02681 y=0.04306 | floor ['0.gauss_size'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       off  nohold   Rwp 0.847779 chi2 vs hold-off  +0.00% it 110   1.1s
+                             | u=-0.002269 v=0.007254 w=0.01495 x=0 y=-180 | floor [] | swapped [] | codes ['BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'MODEL_FAR_FROM_DATA', 'PHASE_UNCONSTRAINED', 'RESOLUTION_NOT_POSITIVE', 'SPACE_GROUP_SETTING_ASSUMED', 'STAGE_NOT_FINITE', 'STRAIN_UNUSUALLY_LARGE']
+corundum       on   today    Rwp 0.143581 chi2 vs hold-off -96.93% it 126   1.9s
+                             | u=-0.002266 v=0.005472 w=0.01508 x=0.02686 y=0.04291 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       on   today+1  Rwp 0.143580 chi2 vs hold-off -96.93% it  47   1.7s | re-fit shift 2.01 (0.lor_size) / 0.65 (0.lor_size) / quoted 0.00 (0.scale)
+                             | u=-0.002332 v=0.005616 w=0.01503 x=0.02354 y=0.04583 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       on   opt1     Rwp 0.143579 chi2 vs hold-off -96.93% it 126   1.4s
+                             | u=-0.002471 v=0.00602 w=0.01488 x=0.02686 y=0.04291 | floor ['0.gauss_size', '0.gauss_strain'] | swapped ['instrument.profile.u'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       on   opt1+1   Rwp 0.143579 chi2 vs hold-off -96.93% it  43   0.9s | re-fit shift 2.09 (0.lor_size) / 0.67 (0.lor_size) / quoted 0.00 (0.scale)
+                             | u=-0.002471 v=0.00602 w=0.01488 x=0.02347 y=0.04595 | floor ['0.gauss_size', '0.gauss_strain'] | swapped ['instrument.profile.u'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       on   opt2     Rwp 0.143580 chi2 vs hold-off -96.93% it  23   2.4s rounds 2 trace [0.143581, 0.14358, 0.14358]
+                             | u=-0.002337 v=0.005576 w=0.01505 x=0.02042 y=0.04857 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'SPACE_GROUP_SETTING_ASSUMED']
+corundum       on   nohold   Rwp 0.820367 chi2 vs hold-off  +0.00% it 112   0.4s
+                             | u=-0.002269 v=0.007254 w=0.01495 x=0 y=-180 | floor [] | swapped [] | codes ['FLAT_DIRECTION', 'HIGH_CORRELATION', 'MODEL_FAR_FROM_DATA', 'PHASE_UNCONSTRAINED', 'RESOLUTION_NOT_POSITIVE', 'SPACE_GROUP_SETTING_ASSUMED', 'STAGE_NOT_FINITE', 'STRAIN_UNUSUALLY_LARGE']
+brucite        off  today    Rwp 0.469477 chi2 vs hold-off  +0.00% it 296   0.9s
+                             | u=-0.007438 v=0.06274 w=0.01295 x=0 y=0.1675 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+brucite        off  today+1  Rwp 0.469367 chi2 vs hold-off  -0.05% it  43   0.4s | re-fit shift 0.17 (profile.v) / 0.02 (profile.v) / quoted 0.00 (0.atoms.0.biso)
+                             | u=-0.03418 v=0.09654 w=0.007799 x=0.01008 y=0.1116 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        off  opt1     Rwp 0.469477 chi2 vs hold-off  +0.00% it 296   0.9s
+                             | u=-0.007438 v=0.06274 w=0.01295 x=0.01353 y=0.1675 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.x'] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+brucite        off  opt1+1   Rwp 0.469367 chi2 vs hold-off  -0.05% it  43   0.4s | re-fit shift 0.19 (profile.v) / 0.03 (profile.v) / quoted 0.00 (0.atoms.0.biso)
+                             | u=-0.03418 v=0.09685 w=0.007741 x=0.02361 y=0.1107 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped ['instrument.profile.y'] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        off  opt2     Rwp 0.469367 chi2 vs hold-off  -0.05% it   9   1.4s rounds 2 trace [0.469477, 0.469367, 0.469367]
+                             | u=-0.03436 v=0.09716 w=0.007689 x=0.01045 y=0.1103 | floor ['0.gauss_size', '0.gauss_strain'] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        off  nohold   Rwp 0.469378 chi2 vs hold-off  +0.00% it 294   1.4s
+                             | u=-3.24e+04 v=0.09881 w=1e-08 x=0.0122 y=-180 | floor [] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE', 'STRAIN_UNUSUALLY_LARGE']
+brucite        on   today    Rwp 0.469025 chi2 vs hold-off -70.67% it 306   1.4s
+                             | u=-0.007438 v=0.0633 w=0.01289 x=0 y=0.1675 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_strain'] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION']
+brucite        on   today+1  Rwp 0.468923 chi2 vs hold-off -70.68% it  56   0.9s | re-fit shift 0.33 (0.lor_size) / 0.05 (0.lor_size) / quoted 0.00 (0.atoms.0.biso)
+                             | u=-0.03394 v=0.09162 w=0.00769 x=0.009928 y=0.1127 | floor [] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        on   opt1     Rwp 0.468923 chi2 vs hold-off -70.68% it 306   1.6s
+                             | u=-0.03248 v=0.09162 w=0.008569 x=0.0216 y=0.1242 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.x', 'instrument.profile.y'] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        on   opt1+1   Rwp 0.468923 chi2 vs hold-off -70.68% it  48   0.7s | re-fit shift 0.33 (profile.y) / 0.04 (profile.y) / quoted 0.00 (0.scale)
+                             | u=-0.0489 v=0.1033 w=0.006949 x=0.02357 y=0.1148 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.y'] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        on   opt2     Rwp 0.468918 chi2 vs hold-off -70.68% it  31   6.1s rounds 8 trace [0.469025, 0.468923, 0.468922, 0.468919, 0.468918, 0.468917, 0.468916, 0.468916, 0.468918]
+                             | u=-0.07104 v=0.1144 w=0.005255 x=0.02368 y=0.02674 | floor ['0.lor_size'] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE']
+brucite        on   nohold   Rwp 0.865814 chi2 vs hold-off  +0.00% it 295   1.0s
+                             | u=-3.24e+04 v=0.09881 w=1e-08 x=0.0122 y=-180 | floor [] | swapped [] | codes ['BISO_UNUSUALLY_LARGE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'MODEL_FAR_FROM_DATA', 'PHASE_UNCONSTRAINED', 'RESOLUTION_NOT_POSITIVE', 'STAGE_NOT_FINITE', 'STRAIN_UNUSUALLY_LARGE']
+brucite_steph  decl today    Rwp 0.181235 chi2 vs hold-off  +1.39% it 310   1.1s
+                             | u=0.008142 v=0.01839 w=0.01745 x=0 y=0.1417 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION'] | sigma2<0 6
+brucite_steph  decl today+1  Rwp 0.180235 chi2 vs hold-off  +0.27% it  81   0.7s | re-fit shift 5.64 (profile.v) / 1.40 (profile.v) / quoted 0.26 (0.scale)
+                             | u=-0.01927 v=0.04903 w=0.01268 x=0.001733 y=0.1274 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  decl opt1     Rwp 0.180453 chi2 vs hold-off  +0.50% it 315   0.9s
+                             | u=-0.01578 v=0.04116 w=0.01407 x=0 y=0.1417 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.x'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  decl opt1+1   Rwp 0.180055 chi2 vs hold-off  +0.07% it  75   0.5s | re-fit shift 2.53 (profile.v) / 0.62 (profile.v) / quoted 0.06 (0.atoms.0.biso)
+                             | u=-0.02506 v=0.05439 w=0.01207 x=0 y=0.1286 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.x'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  decl opt2     Rwp 0.179904 chi2 vs hold-off  -0.09% it  15   3.8s rounds 8 trace [0.181235, 0.180244, 0.180022, 0.179946, 0.179915, 0.179889, 0.179863, 0.179874, 0.179904]
+                             | u=-0.03102 v=0.06584 w=0.01033 x=0 y=0.1074 | floor ['0.gauss_size', '0.lor_size', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  decl nohold   Rwp 0.179951 chi2 vs hold-off  +0.00% it 335   1.2s
+                             | u=-27.34 v=0.06447 w=7.701e-06 x=0 y=0.1027 | floor ['0.lor_size', '0.lor_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'LOW_ANGLE_UNMODELLED', 'RESOLUTION_NOT_POSITIVE', 'RESOLUTION_UNCONSTRAINED', 'STRAIN_UNUSUALLY_LARGE'] | sigma2<0 6
+brucite_steph  on   today    Rwp 0.180391 chi2 vs hold-off  +1.45% it 332   1.7s
+                             | u=0.008142 v=0.01901 w=0.01738 x=0 y=0.1417 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION'] | sigma2<0 6
+brucite_steph  on   today+1  Rwp 0.179331 chi2 vs hold-off  +0.26% it  88   1.1s | re-fit shift 6.23 (profile.v) / 1.44 (profile.v) / quoted 0.25 (0.scale)
+                             | u=-0.0193 v=0.04955 w=0.0126 x=0.001799 y=0.127 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped [] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  on   opt1     Rwp 0.179460 chi2 vs hold-off  +0.39% it 345   1.6s
+                             | u=-0.01667 v=0.04261 w=0.01388 x=0 y=0.1417 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.u', 'instrument.profile.x'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 5
+brucite_steph  on   opt1+1   Rwp 0.179129 chi2 vs hold-off  +0.04% it 114   1.3s | re-fit shift 2.57 (profile.v) / 0.59 (profile.v) / quoted 0.04 (0.scale)
+                             | u=-0.02509 v=0.05518 w=0.01196 x=0 y=0.1284 | floor ['0.gauss_size', '0.gauss_strain', '0.lor_size', '0.lor_strain'] | swapped ['instrument.profile.x'] | codes ['FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  on   opt2     Rwp 0.179051 chi2 vs hold-off  -0.05% it  82  13.5s rounds 8 trace [0.180391, 0.17934, 0.179168, 0.179033, 0.179014, 0.179019, 0.179029, 0.17904, 0.179051]
+                             | u=-0.03007 v=0.06581 w=0.008802 x=0 y=0.1069 | floor ['0.lor_size', '0.lor_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'RESOLUTION_NOT_POSITIVE'] | sigma2<0 6
+brucite_steph  on   nohold   Rwp 0.179059 chi2 vs hold-off  +0.00% it 432   3.1s
+                             | u=-27.44 v=0.05871 w=1e-08 x=0 y=0.1137 | floor ['0.lor_size', '0.lor_strain'] | swapped [] | codes ['COVARIANCE_DIRECTION_DISCARDED', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'LOW_ANGLE_UNMODELLED', 'RESOLUTION_NOT_POSITIVE', 'RESOLUTION_UNCONSTRAINED', 'STRAIN_UNUSUALLY_LARGE'] | sigma2<0 6
+
+cpd-1a, Biso 0.5 against 1.5, largest shift in plain esd

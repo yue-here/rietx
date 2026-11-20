@@ -125,7 +125,9 @@ fixing the instrument from a standard: FullProf through its resolution file, BGM
 tracing, RIETAN-FP by its advised protocol and GSAS-II through defaults that leave the sample
 terms off. In GSAS-II a variable that crosses a user's limit is reset to it and frozen for later
 refinements, with a printed warning, while its partner keeps refining. That is the shape of
-option 1, on a limit the user set.
+option 1, on a limit the user set. TOPAS 5 keeps a parameter at its limit refined and appends
+`_LIMIT_MIN_#` to its printed value at the end (Technical Reference §3.8, read 2026-11-20). That is
+the shape of option 3, on a limit the user set, and rietx's `FLOOR_HIT` is its analogue.
 
 ### Interplay
 
@@ -171,35 +173,118 @@ A choice among 1, 2 and 4 changes fit answers and revisits the maintainer's deci
 WP-2002, so it goes to the maintainer with task 1's numbers. Option 3 changes what a fit prints,
 so it goes too.
 
-### Inherited
+*Superseded 2026-11-20 by task 1's numbers* (§ Task 1 below). Option 1 meets the bar on none of
+the three families that miss it, and on LaB₆ + cBN it drops the specimen widths. Option 2 does
+not converge in 8 rounds on the multi-phase families. The brief in the handover entry of
+2026-11-20 carries the choice that is left.
 
-- **From WP-2017 (2026-11-19): the QPA plan now refines `lines_axial` before
-  `sample_broadening`, and most of the effect above is gone.** A side investigation traced
-  the simulated `trigger` bench case's Rwp rise (0.0200 on v1.9.0, 0.0276 on main) to this
-  hold. Its `profile` stage fitted U, X and Y with the axial ratio still wrong, and the hold
-  froze the bias. The maintainer kept a reorder (2026-11-19): `qpa_plan` in the tests, in
-  `viz.compare` and in the Stephens acceptance plan now runs the Kα2 ratio and S/L before
-  the specimen widths, as `lab_bragg_brentano` does. `eight.py` re-run on the merged tree
-  (macOS arm64, worktree `[dev]`, compiled tier on, closing stage off, which merged main now
-  ships by default): [`eight_summary_axial_first.txt`](2225-batch/eight_summary_axial_first.txt).
+### The axial-first reorder (2026-11-19), re-measured with staged re-fits
 
-  | Standard | Re-fit's largest shift, before → after | First fit Rwp, before → after | Chain limit, after | Hold off |
-  |---|---|---|---|---|
-  | zincite | V +3.32 → +0.07 esd | 0.110169 → 0.109726 | 0.109669 | 0.109274 |
-  | fluorite | V +1.18 → 0.01 | 0.181695 → 0.181309 | 0.181303 | 0.181309 |
-  | corundum | V +0.23 → 0.04 | 0.145752 → 0.145745 | 0.145745 | 0.848 (walks) |
-  | brucite | `lor_size` −0.10 → 0.02 | 0.469465 → 0.469477 | 0.469481 | 0.469378 |
+Folded from `### Inherited` (WP-2017, 2026-11-19). A side investigation traced the simulated
+`trigger` bench case's Rwp rise (0.0200 on v1.9.0, 0.0276 on main) to this hold. Its `profile`
+stage fitted U, X and Y with the axial ratio still wrong, and the hold froze the bias. The
+maintainer kept a reorder (2026-11-19). `qpa_plan` in the tests, in `viz.compare` and in the
+Stephens acceptance plan now runs the Kα2 ratio and S/L before the specimen widths, as
+`lab_bragg_brentano` does.
 
-  So a staged re-fit now moves no reported parameter by more than 0.1 esd on all four. This
-  WP's acceptance bar is met without a code change (zincite's `shipped+1` reads V +0.10, at
-  the bar). One thing is left. Zincite's chain now settles at Rwp 0.109669, 0.7 % in χ²
-  above the hold-off point (0.109274). Before the reorder the chain reached that point. The
-  hold still fixes a split the data do not determine, and the reorder only changed which
-  split. That is the start dependence behind cpd-1a's Biso-start xfail (15.68 esd), which
-  the reorder leaves as it was. Re-read options 0-4 with that in mind: the stopping-short
-  defect is now small, and the open question is what a sample-only plan should report for
-  a twin pair. The maintainer asked for that question to have a WP (2026-11-19). It is folded
-  here because this WP already carries it.
+*Superseded in part, 2026-11-20.* The entry went on to report that a staged re-fit then moved no
+reported parameter by more than 0.1 esd on the four standards, so the acceptance bar was met
+without a code change. That re-run (`eight_summary_axial_first.txt`) measured one-stage re-fits.
+WP-2224 had already made a second `fit` run one stage (`warm_refit`), and `eight.py` passed no
+`refit=`. Checked on zincite: the second and third fits print the single stage `warm_refit`, at Rwp
+0.109670 and 0.109669. `eight.py` now passes `refit="stages"`. Re-run on the reordered tree
+([`eight_summary_staged.txt`](2225-batch/eight_summary_staged.txt)), staged re-fits still move
+zincite's V by 1.49 reported esd at the chain limit, and its Zn Biso by 0.59. One staged re-fit
+with the closing stage on moves them by 1.23 and 0.54. With the closing stage on, corundum's
+`lor_size` moves 0.65 and fluorite's `lor_strain` 0.21. Every other row on the eight standards stays
+under 0.1, apart from SRM 660c's `u` (0.19, a non-goal). The reorder shrank the effect and did not
+remove it, so the acceptance bar is not met.
+
+### Task 1: options 1 and 2 on the multi-phase families (2026-11-20)
+
+macOS arm64, worktree venv `[dev]`, compiled tier on, telemetry off, tree `6c3a2db5e`.
+[`families.py`](2225-batch/families.py) runs each family four ways from its protocol's start:
+today's hold, option 1 (`swap.swap_hold`), option 2 and the hold switched off. Option 2 is
+today's fit followed by rounds of a two-stage plan until Rwp moves under 1e-7, capped at 8
+rounds. The first stage of a round frees every glob the plan frees before the first stage that
+held a twin. The second frees every glob the plan frees. Today's and option 1's fits are each
+followed by one staged re-fit (`refit="stages"`) under the same rule, the WP's acceptance
+reading. Shifts are in reported esds (Bérar-Lelann inflated, the unit of `shifts.py`), the larger
+of the two fits', background rows apart. "Quoted" restricts them to cell, atom and scale rows.
+Summaries: [`families_summary_multi.txt`](2225-batch/families_summary_multi.txt) and
+[`families_summary_std.txt`](2225-batch/families_summary_std.txt). Each family runs at its
+protocol's own closing-stage setting: on (1e-3) for cpd-1a, off for the rest.
+
+**Does one fit reach its plan's point?**
+
+| Family | Today: fit → staged re-fit, Rwp | Re-fit's largest shift (quoted) | Option 1 | Option 2 | Hold off |
+|---|---|---|---|---|---|
+| zincite | 0.109726 → 0.109282 | V 1.24 (Zn Biso 0.55) | never swaps; same as today | 4 rounds, 0.109278 | 0.109274 |
+| fluorite | 0.181309 → 0.181303 | 0.01 | never swaps | 2 rounds | 0.181309 |
+| corundum | 0.145745 → 0.145746 | 0.02 | 0.02 | 2 rounds | 0.848, walks |
+| brucite | 0.469477 → 0.469367 | 0.02 | never swaps | 2 rounds, 0.469367 | 0.469378 |
+| brucite + Stephens | 0.181235 → 0.180235 | V 1.40 (scale 0.26) | swaps U and X; 0.180453, re-fit still V 0.62 | 8 rounds, unconverged and not monotone, 0.179904 | U = −27 deg², walks |
+| LaB₆ + cBN, X and Y freed with both phases' Lorentzian widths | 0.137906 → 0.129300 | La Biso 1.76 | swaps X and Y at the stage that frees the specimen widths; becomes `PLAN_SHARED` to six digits, 0.168656 | 8 rounds, unconverged, 0.129146 | 0.128941 |
+| cpd-1a, Biso start 1.5 | 0.162214 → 0.162177 | fluorite `lor_strain` 0.21 (0.02) | never swaps | 8 rounds, unconverged, 0.162089 | 0.161872 |
+| cpd-1a, Biso start 0.5 | 0.162572 → 0.162492 | fluorite `lor_strain` 0.38 (0.06) | never swaps | 8 rounds, unconverged, 0.162280 | 0.161872 |
+
+Option 1 fires only where every specimen twin of a pair sits on its floor at a stage start. On
+cpd-1a one phase's twin is always off its floor, so it never fires, and the same holds for zincite
+with no closing stage. On LaB₆ + cBN it fires at once. The four specimen Lorentzian widths start at
+0 with no stage seed, so the swap holds them there for the whole fit. The fit becomes the suite's
+trusted `PLAN_SHARED` protocol, which frees the instrument widths alone. On brucite with a Stephens
+block it halves the re-fit's shift and leaves 0.62 esd. It meets the 0.1 esd bar on none of the
+three families that miss it today.
+
+Option 2 reaches the hold-off point in 2-4 rounds on the single-phase standards. On the three
+other families it was still moving after 8 rounds, by 4e-6 to 3e-5 in Rwp a round. On brucite
+with a Stephens block Rwp rose again after round 6. Its wall clock was 3-11 times today's fit on
+those families (two jobs ran at once, so this is a range).
+
+**Do the quoted answers depend on the start?** cpd-1a, Biso start 0.5 against 1.5 Å² on every
+atom, the largest shift between the two answers.
+
+| Arm | Every row, reported esd (plain) | Quoted rows | Fractions (corundum / zincite / fluorite, wt %), start 1.5 |
+|---|---|---|---|
+| weighed | | | 1.15 / 4.04 / 94.81 |
+| today | 5.11 (17.13), fluorite `lor_strain` | 0.57, zincite Zn Biso | 1.65 / 3.45 / 94.90 |
+| option 1 | identical to today | | |
+| option 2 | 4.27 (14.33) | 0.33 | 1.68 / 3.47 / 94.85 |
+| hold off | 0.01 (0.04) | 0.00 | 1.98 / 3.54 / 94.48 |
+
+The hold off is start-independent on every row that keeps an esd. It reaches that by driving the
+instrument widths negative: U = −0.138 deg² and Y = −0.198°, with `FLAT_DIRECTION` and
+`COVARIANCE_DIRECTION_DISCARDED`. On corundum, brucite and brucite with a Stephens block it walks.
+Every arm's fractions lie within the suite's tolerance of the weighed values (2 wt % for a trace
+phase). The arms differ from each other by at most 0.33 wt %, under each fraction's esd of
+0.21-0.69 wt %.
+
+**LaB₆ + cBN against TOPAS** (LaB₆ 17.907-17.950 wt %, cBN a = 3.616463 Å):
+
+| Arm | LaB₆, wt % | cBN a, ppm from TOPAS | Rwp |
+|---|---|---|---|
+| today | 16.79 ± 0.19, 5.8 esd below | +38 | 0.137906 |
+| option 1 = `PLAN_SHARED` | 17.79 ± 0.32, 0.37 esd below | +16 | 0.168656 |
+| option 2 | 16.79 ± 0.19 | +38 | 0.129146 |
+| hold off | 16.85 ± 0.19 | +39 | 0.128941 |
+
+Freeing the specimen Lorentzian widths beside X and Y costs 1 wt % of LaB₆ with the hold on or
+off. The suite already records this plan as the control whose lowest Rwp is the worst answer
+(`test_the_lowest_rwp_is_the_worst_answer`). Under option 1 that control stops controlling,
+because the two plans become one fit.
+
+**What the measurements say.** No rule inside one fit gives a plan that frees both halves of a twin
+pair on an uncalibrated instrument a determined split. The hold makes the split depend on the
+stage order and the start, and the data cannot say which split is right. Option 1 changes nothing
+on the multi-phase sample and silently drops the specimen widths on the two-phase one. Option 2
+converges on the single-phase standards and costs 3-11 times a fit elsewhere without converging.
+Switching the hold off removes the start dependence on cpd-1a and walks on three of the eight
+families. No preset in `PLAN_PRESETS` frees both halves (checked against all nine). Only a
+caller's own plan meets the case, including rietx's own comparison and acceptance plans.
+
+The plots (`tests/output/wp2225_*.png`) were looked at for LaB₆ + cBN today and cpd-1a option 2.
+Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 13°, fluorite 111 at
+28.3°), and nothing in either picture separates the arms.
 
 ## Non-goals
 
@@ -209,10 +294,11 @@ so it goes too.
 
 ## Tasks
 
-- [ ] Measure options 1 and 2 on the multi-phase families beside the four standards: cpd-1a from
+- [x] Measure options 1 and 2 on the multi-phase families beside the four standards: cpd-1a from
       both starts, 11-BM LaB₆ + cBN and brucite with a Stephens block. Read cpd-1a's phase
       fractions against the weighed composition and LaB₆ + cBN's against TOPAS's interval, both
       references the acceptance suites already carry. Extend `2225-batch/swap.py`.
+      *Done 2026-11-20: § Task 1, `families.py`.*
 - [ ] Brief the maintainer with those numbers: the choice among options 0-4.
 - [ ] Build the chosen option, with its record field or code and its `_audit` row.
 - [ ] Tests: the four standards' staged re-fit of the shipped first fit moves no reported

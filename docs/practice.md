@@ -234,7 +234,8 @@ FullProf's constant-wavelength combination rule with an IRF.
 
 ### When one twin reaches its limit, and a re-run
 
-Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only; the TOPAS row added 2026-11-20
+from the TOPAS 5 Technical Reference. rietx holds the instrument half of
 a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
 specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
 earlier stage put it, and no free parameter in the stage can narrow that part of the width.
@@ -243,11 +244,12 @@ earlier stage put it, and no free parameter in the stage can narrow that part of
 |---|---|---|
 | rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
 | GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
-| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| TOPAS 5 | `min`/`max` on a `prm`, kept inside the solve by a bound-constrained conjugate-gradient step (Coelho 2005). The parameter stays refined. At the end of the refinement, a value close to its limit is printed with `_LIMIT_MIN_#` or `_LIMIT_MAX_#` appended, where # is the limit; `no_LIMIT_warnings` suppresses this. Its partner is untouched (Technical Reference §3.8 and §5, checked (manual), 2026-11-20, WP-2225) | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
 | FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
 
-In the one program read, the parameter that crossed its limit is the one taken out, and its
-partner keeps refining. No program holds an instrument width because its specimen twin is free
+In GSAS-II the parameter that crossed its limit is the one taken out, and its partner keeps
+refining. In TOPAS it stays refined at its limit, and the output marks it. Neither touches the
+partner. rietx's `FLOOR_HIT` is the analogue of TOPAS's mark. No program holds an instrument width because its specimen twin is free
 (the table above), so none meets this case in the form rietx does.
 
 ## Extinction
