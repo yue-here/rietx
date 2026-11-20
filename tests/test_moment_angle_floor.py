@@ -17,9 +17,12 @@ moment column by the peak chain, as ``test_moment_jacobian._fit_arm`` does):
 * the on-axis cell (both moments along **a**), forty noise seeds;
 * WP-2068's six deep starts, a one-site moment tilted or turned off **a**.
 
-Measured 2026-11-20 on darwin/arm64 (Python 3.12, compiled tier) and on
-linux/x86-64; the numbers are in each test's docstring.  The fits run with
-the closing stage the fixture declares.
+Measured 2026-11-20 on darwin/arm64 (Python 3.12, compiled tier); the
+numbers are in each test's docstring.  Linux/x86-64 (numpy 2.5.3) gave the
+same outcome on every row: the same zeroed sets, profile widths within 1.1e-4
+relative of the forward difference's, coverage 20 of 20 and 33 of 40 in both
+arms, the same four on-axis stops at the same Δχ², and the six deep starts
+within 1e-10.  The fits run with the closing stage the fixture declares.
 """
 from __future__ import annotations
 
@@ -119,10 +122,11 @@ def test_a_profiled_two_site_fit_lands_where_the_forward_difference_does(seed):
     zeroed, the zeroed set is the forward difference's, and the profile
     interval's width is within 25 % of its width.  Three seeds here, ~10 s
     each for both arms, and fast because this is the solve the ruling was
-    for: seeds 4-6 are the first whose profile refits reach the floor (95, 83
-    and 29 forward-difference columns, against 0-6 on seeds 0-3).  Twenty
+    for: seeds 4-6 send the profile's refits to the floor most often among the
+    first seven (95, 83 and 29 forward-difference columns, against 0-6 on
+    seeds 0-3).  Twenty
     seeds, with coverage, in the slow test below; measured 2026-11-20
-    (darwin/arm64) the widths agree to 6e-6 relative on every seed and 20 of
+    (darwin/arm64) the widths agree to 1.1e-4 relative on every seed and 20 of
     20 cover in both arms."""
     exact, fd = _profiled_pair(seed)
     _check_profiled(seed, exact, fd)

@@ -681,16 +681,18 @@ def test_a_fit_reaches_the_same_minimum_and_esds_either_way():
     stops inside its tolerance.  What must agree is what the data decides —
     χ², the values on the scale of their esds, and the esds.
 
-    Measured on two platforms ([dev,jax], Python 3.12; the linux run three
-    times, identical each time), χ² / values / esds:
+    Since the angle columns joined the branch (issue #1404) the analytic arm
+    builds all four moment columns exactly, the moduli and the angles.
+    Measured on two platforms (Python 3.12), χ² / values / esds:
 
-    * darwin/arm64, 2026-10-28: 2.1e-16 relative, 1.0e-9 esd, 5.9e-7 relative;
-    * linux/x86-64 (numpy 2.5.3, scipy 1.18.1), 2026-10-31: 4.1e-9 esd for the
-      values, 6.0e-7 relative for the esds.
+    * darwin/arm64, 2026-11-20: 4.3e-16 relative, 4.0e-9 esd, 2.3e-6 relative;
+    * linux/x86-64 (numpy 2.5.3), 2026-11-20: 2.1e-16 relative, 1.5e-9 esd,
+      2.3e-6 relative.
 
-    The esds agree across platforms to 2 %, so the esd bar sits at 10× the
-    larger; the values differ by 4× between platforms and both are four
-    decades under their bar.  The χ²
+    The esds agree across platforms to the two digits printed, so the esd bar
+    sits at 10× the larger; the values differ by 3× between platforms and both
+    are four decades under their bar.  (With the moduli alone exact, before
+    #1404: 1.0e-9 / 4.1e-9 esd and 5.9e-7 / 6.0e-7 relative.)  The χ²
     and value bars are wider on purpose: the difference between two
     converged fits senses where each solver stopped (tests/CLAUDE.md
     § Budgets in tests), so they are set at what "the same minimum" means —
@@ -720,7 +722,7 @@ def test_a_fit_reaches_the_same_minimum_and_esds_either_way():
         de = max(de, abs(p.stderr - q.stderr) / p.stderr)
     print(f"max |dv|/esd {dv:.1e}, max rel d(esd) {de:.1e}")
     assert dv < 1e-4
-    assert de < 6e-6
+    assert de < 2.5e-5
 
 
 def test_a_generic_start_never_takes_the_forward_difference(monkeypatch):

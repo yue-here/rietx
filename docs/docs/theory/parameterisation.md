@@ -347,6 +347,15 @@ or the caller holds is left where it is. The chart still has a cut at
 $\phi = \pm\pi$, so the series fences compare an angle across patterns
 modulo a turn.
 
+At a direction the site symmetry fixes, the pattern is even in each angle, so
+the angle's exact Jacobian column is zero there while its curvature is not.
+Where that direction is a maximum along the angle, a zero column gives the
+solver nothing to leave it with. So at an evaluation where an angle's column is
+at most {{ MOMENT_DIRECTION_SUPPORT }} of the largest of its sites' modulus
+columns, that column alone is a forward difference, which reads half the
+curvature times the step. Away from such a direction the column is far above
+that floor and stays exact.
+
 ## Rigid bodies
 
 A rigid body is a set of a phase's atoms placed by one template. The atoms'

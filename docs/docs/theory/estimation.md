@@ -22,7 +22,7 @@ Poisson $\sigma = \sqrt{\max(y, 1)}$ is only the fallback for bare counts.
 The Jacobian is assembled column by column, exact wherever it can be: linear background columns, analytic peak-chain columns (per-peak
 position, width, mixing and intensity), analytic
 site-DOF columns for coordinates and anisotropic ADPs over the frozen operator
-subsets, analytic columns for magnetic-moment moduli and angles, analytic axial columns for the FCJ apertures, and forward
+subsets, analytic columns for magnetic moments, analytic axial columns for the FCJ apertures, and forward
 differences otherwise.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
@@ -459,14 +459,6 @@ and so do the esds of everything correlated with it. On a simulated two-site
 $Pnma$ pattern with both moments along $\mathbf{a}$, the two moduli read 0.031
 and 0.159 μ_B with the angle columns in, and 0.0015 and 0.0011 μ_B with them
 left out.
-
-The solver meets the same zero. Where the direction is a maximum along the
-angle, an exact column of zero gives the solver nothing to leave it with. So at
-an evaluation where an angle's column is at most
-{{ MOMENT_DIRECTION_SUPPORT }} of the largest of its sites' modulus columns, that
-column alone is a forward difference, which reads half the curvature times the
-step there. Away from such a direction the column is far above that floor and
-stays exact.
 
 So after each solve the fit tests its free angles $S$. These are the $k$ free
 columns that move only moment angles, where some free column also moves each of
