@@ -189,3 +189,40 @@ def test_the_stage_record_names_the_hold_and_the_value_stays(twin_fit):
     # held for the stage, never for good: the declared free set keeps it
     assert "instrument.profile.u" in ref._free_paths
     assert np.isfinite(result.statistics.rwp)
+
+
+def test_the_answer_says_which_widths_the_hold_kept_and_whose_values(twin_fit):
+    """``WIDTH_TWIN_HELD`` (WP-2225, ruled 2026-11-20): read off the last
+    stage's record, exactly, so it names U, its twin and where U's value came
+    from, which here is the start: no earlier stage freed U."""
+    _, result = twin_fit
+    (found,) = [d for d in result.diagnostics if d.code == "WIDTH_TWIN_HELD"]
+    last = result.stages[-1]
+    assert found.where == sorted(last.width_twins_held) + ["phases.0.gauss_strain"]
+    assert found.where[0] == "instrument.profile.u"
+    assert found.level == "warning" and found.value == 1.0
+    assert f"The last stage, {last.name!r}" in found.message
+    assert "the ones the fit started from" not in found.message
+    assert "The held value is the one the fit started from" in found.message
+    assert "lab_calibrate" in found.suggestion
+
+
+def test_a_fit_whose_last_stage_held_no_twin_says_nothing():
+    data = synthesize()
+    structure, ins = perturbed_models()
+    ins.profile.u.value = 2e-3
+    plan = RefinementPlan(stages=[  # twin_fit's, with no specimen width freed
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage(name="widths", turn_on=["instrument.profile.u", "instrument.profile.w"]),
+    ])
+    result = Refinement(structure, ins).fit(data, plan=plan, telemetry=False)
+    from pathlib import Path
+
+    from rietx.viz.plots import plot_result
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(result, path=str(out / "wp2225_no_twin_held.png"))
+    assert all(not s.width_twins_held for s in result.stages)
+    assert result.statistics.rwp < 0.2
+    assert "WIDTH_TWIN_HELD" not in {d.code for d in result.diagnostics}
