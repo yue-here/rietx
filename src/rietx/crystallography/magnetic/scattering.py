@@ -115,6 +115,12 @@ class MagneticSites:
     approximations: list[str | None]
     #: (n_asym,) bool, ``carries[j] == (mom_mat[j] is not None)``
     carries: list[bool] = field(default_factory=list)
+    #: the groups, two or more atoms each, of moment-carrying atoms that share
+    #: one position (a mixed-occupancy site), by atom index, frozen with the
+    #: frames (:func:`cosited_groups`).  At such a position F_m reads only
+    #: Σ occ_j·f_j·T_j·m_j, so the powder measures the combination and not
+    #: each moment (issue #1692); empty where no two moments share a position
+    cosited: tuple[tuple[int, ...], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.carries:
@@ -187,8 +193,59 @@ def compile_magnetic_sites(phase, ops) -> MagneticSites | None:
         ions.append(atom.moment.ion)
         gs.append(resolve_g(atom.moment.ion, atom.moment.g))
         names.append(approximation_name(atom.moment.ion, atom.moment.g))
+    positions = [np.array([a.x.value, a.y.value, a.z.value], dtype=np.float64)
+                 for a in phase.atoms]
     return MagneticSites(mom_mat=mom_mat, ops=list(ops), frames=frames,
-                         ions=ions, g_factors=gs, approximations=names)
+                         ions=ions, g_factors=gs, approximations=names,
+                         cosited=cosited_groups(positions, mom_mat, frames, ops))
+
+
+def cosited_groups(positions, mom_mat, frames, ops) -> tuple[tuple[int, ...], ...]:
+    """The moment-carrying atoms that share one position, grouped by index.
+
+    Two atoms are co-sited when their stored coordinates agree modulo a
+    lattice translation to :data:`~rietx.crystallography.symmetry.SITE_TOL` in
+    every component, and both carry a moment.  The frozen operation subset,
+    its axial matrices and the moment frame are then the same for both (they
+    are functions of the position and the magnetic group alone), and that is
+    checked rather than assumed: a pair whose operations, axial matrices or
+    frames differ is not grouped, so no combination is ever formed over
+    images that do not coincide.  Then every image of the position scatters
+    through one axial matrix acting on
+    Σ_j occ_j·f_j(s)·T_j·m_j (the module's F_m with the sum over j split by
+    position), and only that combination is measured (issue #1692).
+
+    Read **at compile**, from the stored coordinates, like every other frozen
+    per-stage fact here: whether two atoms share a position is decided before
+    the fit and never re-decided inside it.  An atom listed at a different
+    but symmetry-equivalent representative of the same orbit is not
+    recognised, since its moment would first have to be carried back through
+    the operation relating the two positions; a magCIF lists a mixed site
+    once per species at one coordinate triple.
+    """
+    carriers = [j for j, m in enumerate(mom_mat) if m is not None]
+    groups: list[list[int]] = []
+    for j in carriers:
+        for group in groups:
+            k = group[0]
+            d = np.asarray(positions[j]) - np.asarray(positions[k])
+            if (np.all(np.abs(d - np.rint(d)) <= SITE_TOL)
+                    and _same_images(ops[j][0], ops[k][0])
+                    and _same_images(ops[j][1], ops[k][1])
+                    and _same_images(mom_mat[j], mom_mat[k])
+                    and _same_images(frames[j], frames[k])):
+                group.append(j)
+                break
+        else:
+            groups.append([j])
+    return tuple(tuple(g) for g in groups if len(g) > 1)
+
+
+def _same_images(a, b) -> bool:
+    """Whether two frozen per-atom arrays (axial matrices or frames) agree."""
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    return a.shape == b.shape and bool(np.allclose(a, b, rtol=0.0, atol=1e-12))
 
 
 #: |RᵀGR − G| / max|G| above which a magnetic operation is not a symmetry of

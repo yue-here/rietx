@@ -72,7 +72,12 @@ its ΔBIC.  When no trial has a supported moment the verdict is that there is
 nothing to solve.  A powder-degenerate pair (``MOMENT_PAIR_DEGENERATE``) is tested as the pair: each
 modulus alone rides a flat direction and fails the ratio however large it is,
 so the gate reads the quadrature sum the powder does measure
-(:attr:`MomentRow.pair_supported`).
+(:attr:`MomentRow.pair_supported`).  Magnetic atoms sharing one position (a
+mixed-occupancy site) are tested by the moment per position, |Σ occ·m| with
+its esd from the fit's own covariance, against the same floor and the same
+``MOMENT_SUPPORT_SIGMA`` (a co-sited :attr:`MomentRow.supported`; ruled by
+Mike on issue #1692): only that linear sum scatters from one position, and each
+atom's own modulus is reported as not separately determined.
 
 **What it refuses.**  An X-ray histogram, by name: the *position* of a magnetic
 satellite and of a superstructure reflection are the same and the inference is
@@ -315,6 +320,16 @@ class MomentRow:
     #: covariance, when :attr:`paired_with` is non-empty; ``None`` otherwise.
     paired_magnitude: float | None = None
     paired_magnitude_esd: float | None = None
+    #: dot-path(s) of the other site(s) sharing this atom's position, a
+    #: mixed-occupancy site (``MomentEvidence.cosited_with``, issue #1692) —
+    #: empty for an atom alone on its position.  Such a row's own modulus is
+    #: not separately determined, and its :attr:`supported` is the position's
+    #: verdict, read on :attr:`cosited_magnitude` and its esd.
+    cosited_with: tuple[str, ...] = ()
+    #: the moment per position |Σ occ·m| and its esd from the fit's own
+    #: covariance, when :attr:`cosited_with` is non-empty; ``None`` otherwise
+    cosited_magnitude: float | None = None
+    cosited_magnitude_esd: float | None = None
 
     @property
     def sigma(self) -> float | None:
@@ -433,7 +448,10 @@ class MagneticTrial:
     @property
     def supported(self) -> bool:
         """Whether any site's moment — or any degenerate pair's quadrature sum
-        (:attr:`MomentRow.pair_supported`) — survived WP-1327's null test."""
+        (:attr:`MomentRow.pair_supported`) — survived WP-1327's null test.  On
+        a mixed-occupancy position a row's :attr:`MomentRow.supported` is
+        already the position's verdict (issue #1692), never its own
+        modulus's."""
         return any(m.supported or m.pair_supported for m in self.moments)
 
     @property
@@ -1617,12 +1635,15 @@ def _moment_rows(ref, result, structure
     # than the fit that produced it.  WP-1327's own writer either way — the
     # ``supported`` ratio, the held directions and the degenerate pairing are not
     # recomputed here.
+    from ..refine import answer_covariance_block
+
     evidence = analyse_moments(
         ref._model, _values_of(ref), structure,
         held=list(result.stages[-1].held) if result.stages else [],
         esd={p.path: p.stderr for p in result.parameters
              if p.stderr is not None},
-        correlations=_moment_correlations(ref, result))
+        correlations=_moment_correlations(ref, result),
+        covariance=answer_covariance_block(ref, result))
     rows = [
         MomentRow(label=e.atom, ion=e.ion, magnitude=float(e.magnitude),
                   esd=None if e.magnitude_esd is None
@@ -1632,7 +1653,10 @@ def _moment_rows(ref, result, structure
                   unmeasured_directions=tuple(e.unmeasured_directions),
                   paired_with=tuple(e.paired_with),
                   paired_magnitude=e.paired_magnitude,
-                  paired_magnitude_esd=e.paired_magnitude_esd)
+                  paired_magnitude_esd=e.paired_magnitude_esd,
+                  cosited_with=tuple(e.cosited_with),
+                  cosited_magnitude=e.cosited_magnitude,
+                  cosited_magnitude_esd=e.cosited_magnitude_esd)
         for e in evidence]
     return tuple(rows), n_moment, tuple(moment_pair_diagnostics(evidence))
 
@@ -2004,10 +2028,14 @@ def _rank(trials: list[MagneticTrial], tie_width: float):
                    f"solver stopped: "
                    + ", ".join(f"class {t.class_index}" for t in short) + ")")
         if refined and not any(t.supported for t in refined):
+            cosited = any(m.cosited_with for t in refined for m in t.moments)
             return (tuple(ordered), (), "nothing to solve",
                     f"{len(refined)} candidate(s) refined and not one came "
                     f"back with a supported moment — every modulus (and "
-                    f"every degenerate pair's quadrature sum) is at its "
+                    f"every degenerate pair's quadrature sum"
+                    + (", and every mixed-occupancy position's moment"
+                       if cosited else "")
+                    + f") is at its "
                     f"floor or below MOMENT_SUPPORT_SIGMA of its own esd, "
                     f"which is what an unmagnetised pattern looks like under a "
                     f"magnetic model{stopped}")

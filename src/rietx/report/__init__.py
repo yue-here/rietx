@@ -355,7 +355,7 @@ def _twin(model, structure, instrument, window_area_tol):
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, instrument=None, held: list[str] | None = None,
-                 top_n: int = 15, match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
+                 covariance=None, top_n: int = 15, match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
                  min_peak_sigma: float = 5.0) -> FitReport:
     """Build the report, going as deep as the inputs allow.
 
@@ -388,6 +388,12 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         The last stage's hold list (``StageResult.held``), so the moment arm's
         "unmeasured" directions are the refinement's answer rather than a
         second opinion about it.
+    covariance:
+        ``paths → physical covariance block`` of the fit's answer stage, or
+        ``None``.  The moment arm propagates the esd of a mixed-occupancy
+        position's moment through it (issue #1692); without it the position
+        is named on its rows with no esd.  ``Refinement.report()`` fills it
+        in while the fit's covariance is live.
 
     ``model`` without ``structure`` and ``instrument`` is refused, except for a
     Pawley model, whose intensity block is the solve's and is read as it is.
@@ -482,7 +488,10 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         # that, never a fresh probe (review of #624, item 2)
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
-        turned=(result.stages[-1].moment_turned if result.stages else None))
+        turned=(result.stages[-1].moment_turned if result.stages else None),
+        # #1692: a mixed-occupancy position's moment takes its esd from the
+        # answer's own covariance, never from the worst-|rho| list
+        covariance=covariance)
     misfit, shapes = _reading_models(model, structure, instrument)
     nominal_axial = _nominal_axial(shapes, structure, instrument, values)
     attributions = attribute_regions(misfit, values, report.regions,

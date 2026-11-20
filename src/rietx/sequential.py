@@ -187,6 +187,7 @@ from .refine import (
     _refined_state,
     _refuse_without_phases,
     _utcnow,
+    answer_covariance_block,
 )
 from .report.schemas import THRESHOLDS_VERSION, MomentEvidence
 from .schemas.common import Diagnostic, Mode, Provenance
@@ -957,7 +958,10 @@ def _moment_evidence(ref, result: RefinementResult) -> list[MomentEvidence]:
                       if result.identifiability is not None else None),
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
-        turned=(result.stages[-1].moment_turned if result.stages else None))
+        turned=(result.stages[-1].moment_turned if result.stages else None),
+        # a mixed-occupancy position is judged by its moment per position,
+        # whose esd needs the answer's covariance (issue #1692)
+        covariance=answer_covariance_block(ref, result))
 
 
 def _floor_unsupported_moments(structure: Structure,
