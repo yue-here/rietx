@@ -227,9 +227,13 @@ Both carry the figure's atoms, sticks, rings, polyhedra, cell, letters, camera a
 The returned figure is the same `StructureFigure`, and its `path` names the file written.
 `outline=` and `depth_cue=` belong to the PNG's renderer and are refused with either suffix.
 
+<!-- api-doc: no-exec — it takes the reader's own structure and writes two scene files into the working directory -->
+
 ```python
-fig = rx.viz.render_structure(structure, mode="ellipsoid", path="nac.pov")
-rx.viz.render_structure(structure, mode="ellipsoid", path="nac.glb")
+from rietx.viz import render_structure
+
+fig = render_structure(structure, mode="ellipsoid", path="nac.pov")
+render_structure(structure, mode="ellipsoid", path="nac.glb")
 ```
 
 The POV-Ray scene is drawn at the figure's size, which its second line gives:

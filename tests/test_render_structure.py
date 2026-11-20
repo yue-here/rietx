@@ -1649,7 +1649,7 @@ def test_a_pov_scene_draws_each_atom_where_the_png_did_and_in_its_depth_order(na
     pixels with every depth reversed, so the depth is what this checks."""
     path = tmp_path / "nac.pov"
     fig = render_structure(nac, mode="ellipsoid", size=300, path=path)
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     view, shift = _pov_matrix(re.search(r"RIETX_VIEW = transform \{ (matrix <[^>]*>)",
                                         text).group(1))
     assert not shift.any()
@@ -1679,7 +1679,7 @@ def test_a_pov_scene_draws_each_atom_where_the_png_did_and_in_its_depth_order(na
     assert cam["right"][0] == pytest.approx(width / ppa) and cam["up"][1] == pytest.approx(
         height / ppa)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    (OUTPUT / "nac_ellipsoid.pov").write_text(text)
+    (OUTPUT / "nac_ellipsoid.pov").write_text(text, encoding="utf-8")
     _save(fig, "nac_ellipsoid_for_pov")
 
 
@@ -1692,7 +1692,7 @@ def test_a_pov_atoms_matrix_is_the_shapes_columns(tmp_path):
     assert np.abs(shape - shape.T).max() > 1e-3
     path = tmp_path / "one.pov"
     render_structure(geo, mode="ellipsoid", size=64, path=path)
-    [(m, pos)] = _pov_atoms(path.read_text())
+    [(m, pos)] = _pov_atoms(path.read_text(encoding="utf-8"))
     assert np.allclose(m, shape, rtol=0, atol=1e-11)
     assert np.allclose(pos, geo["atoms"][0]["pos"], rtol=0, atol=1e-11)
     rng = np.random.default_rng(1537)
@@ -1709,7 +1709,7 @@ def test_the_pov_text_matches_the_committed_small_case(tmp_path):
     After a deliberate change, regenerate it with the call below and read the diff."""
     path = tmp_path / "one.pov"
     render_structure(_one_atom(_general_ellipsoid()), mode="ellipsoid", size=64, path=path)
-    ours, theirs = path.read_text(), POV_CASE.read_text()
+    ours, theirs = path.read_text(encoding="utf-8"), POV_CASE.read_text(encoding="utf-8")
     assert _NUMBER.sub("#", ours) == _NUMBER.sub("#", theirs)
     assert np.allclose(_pov_numbers(ours), _pov_numbers(theirs), rtol=1e-9, atol=1e-9)
 
