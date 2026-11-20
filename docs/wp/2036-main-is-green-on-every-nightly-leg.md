@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
+Milestone: unscheduled · Status: 🔄 2026-11-20 — the suite alarm pin re-pinned after #1707 (PR #1723); fluorite's row depends on rounding and waits on WP-2225
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
@@ -296,6 +296,14 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
       to 11-01 took 84-131 min, so 150 was 1.15× the slowest pass, a load
       sensor by `tests/CLAUDE.md` § Budgets in tests. Raised to 300, 2.3× the
       slowest pass, on the Windows job's precedent above.*
+- [x] The suite alarm pin red on main since #1707: bisect, explain each moved code,
+      re-pin. *Done 2026-11-20 (PR #1723); the reasons are in the handover entry.*
+- [ ] The comparison standards' plans run no closing stage since #1708, while all seven
+      acceptance suites they mirror declare `closing_window_tol = 1e-3`.
+      `test_compare_ui.py` compares stage lists only, so nothing caught it. Waits on the
+      maintainer: declare it in `viz.compare` (moves the example projects and every
+      test that builds on the standards), or record that the standards follow
+      the package default.
 
 ## Acceptance
 
@@ -316,6 +324,44 @@ gh run list --workflow nightly.yml --branch main --limit 1
   (the two degeneracies); WP-1930 (the 1e-14 nudge).
 
 ## Handover log
+
+- **2026-11-20** — The suite alarm pin went red on main the moment #1707 merged. #1707 is
+  the QPA plan's stage reorder, which the maintainer ruled for on 2026-11-19. Its own
+  session missed the pin because the row is in the slow tier. Each moved code is the
+  reordered plan's honest reading of its fit, so the table is re-pinned. One row is
+  not stable: fluorite's two extra codes now depend on rounding, so Linux may read it the
+  other way and the nightly could stay red on that row alone. That and zincite's newly
+  negative instrument width went to WP-2225, which owns the width hold behind both.
+
+  *Done* (ghostshift main-health runner, PR #1723). Bisected the nine first-parent merges
+  since the last green nightly (6bcd9a161) with the one slow row on a source snapshot of
+  each. Every merge up to 8aaaf54c3 passes (#1708 among them, so the closing stage's new
+  default moved nothing in this table). dccc45bdb (#1707) fails with exactly main's
+  16-line diff. `tests/data/suite_alarms.json` re-pinned with `python -m tests.suite_alarms
+  --write`. Per standard, read against 8aaaf54c3: zincite's U goes +0.0021 → −0.00097, the
+  Gaussian instrument variance is negative on 658 of 7251 points, and
+  `RESOLUTION_NOT_POSITIVE` (warning) plus `CONSTRAINT_ACTIVE` (info, 12 cone steps) appear.
+  Brucite's U goes +0.00057 → −0.0074 and `CONSTRAINT_ACTIVE` (info, 4 steps) appears.
+  Fluorite's `gauss_size` and `gauss_strain` leave their floor, so `FLOOR_HIT` gives way to
+  `COVARIANCE_DIRECTION_DISCARDED` on the same flat combination with W.
+
+  *Measured* (macOS arm64, worktree `[dev]` venv, compiled tier on). The pin row ran in
+  27-38 s per snapshot. `tests/test_suite_alarms.py` on the branch: 8 passed. Fluorite
+  under 1e-14 nudges to the start W at k = 0, ±1, ±3, 7, 20: three code sets
+  (`COVARIANCE_DIRECTION_DISCARDED` at k = 0 only, `FLOOR_HIT` at five, neither at 20),
+  with Rwp equal to 7 digits. Before #1707 the same seven starts gave one set. Zincite and
+  brucite give one set after it. `tests.reader_output`: unchanged against the merge-base.
+  Probes in `~/.cache/ghostshift/rietx/main-suite-alarms/` (`probe_codes.py`,
+  `probe_nudge.py`, `probe_fluorite.py`), outside the tree.
+
+  *Found, not fixed.* Since #1708 every comparison standard's plan runs without the
+  closing stage, while the seven acceptance suites it mirrors declare it at 1e-3.
+  `test_compare_ui.py` compares stage lists, never the plan's own fields, so nothing went
+  red. It is an unticked task above because the fix moves the example projects.
+
+  Next: the maintainer decides whether to merge the re-pin before Linux has read fluorite.
+  Then read the first nightly after the merge. If its only red row is fluorite's, the row
+  waits on WP-2225's design rather than on another re-pin.
 
 - **2026-11-02** — The Linux full suite was red or cancelled every night from
   10-24 to 11-01, and none of what was left is a defect this WP owns. One red
