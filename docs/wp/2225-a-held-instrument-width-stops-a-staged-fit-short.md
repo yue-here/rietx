@@ -1,6 +1,6 @@
 # WP-2225 — A held instrument width stops a staged fit short of its own plan's point
 
-Milestone: generality · Status: 🔄 2026-11-20 — task 1 measured; the choice among options 0, 3 and 4 waits on the maintainer (brief in the handover log)
+Milestone: generality · Status: 🔄 2026-11-20 — ruled by the maintainer 2026-11-20: option 3 (a diagnostic on every fit whose last stage held a width twin); tasks 3-5 in progress
 Track: The audits
 Depends on: 2002 (the width twin hold); 2017 soft (its row R measures the same hold); 2224 soft (a one-stage re-fit hides this)
 Priority: P2 2026-11-19 — a fit that frees an instrument width beside its specimen twin returns "converged" at a point its own plan lowers on the next run, and nothing flags it; few fits run such a plan, and calibrating the instrument on a standard is the workaround
@@ -331,6 +331,18 @@ or the chosen code fires on exactly those four.
 - IUCr CPD quantitative phase analysis round robin, `tests/data/qarr/` (`tests/data/README.md`).
 
 ## Handover log
+
+- **2026-11-20, decision** — ruled by the maintainer 2026-11-20: option 3. Given in chat to the
+  shift lead. A diagnostic fires on every fit whose last stage held a width twin. It names the
+  held instrument widths and the stage whose values they keep. It says the specimen widths are
+  the remainder of a split the plan's order chose. Its suggestion is the calibrated route:
+  `lab_calibrate` on a standard, `load_instrument_profile`, then a sample-only plan. Not option 0,
+  and not option 4, which stays a possible follow-up and is not built here. The code follows the
+  precedent of the package's other holds: `PHASE_UNCONSTRAINED` reports the absent-phase hold
+  recorded in `StageResult.held`, and `HOLD_BLOCKED_PLAN` reports a user hold that blocked a
+  glob. Here the record is `StageResult.width_twins_held`, the code says what was done, and the
+  held paths go in `where`. The specimen widths' esds do not change; that question belongs to
+  WP-2219 (#1718).
 
 - **2026-11-20** — task 1 measured, and the brief below waits on the maintainer (PR #1722).
   Neither fix inside one fit works on the families that matter. Option 1 (free the instrument
