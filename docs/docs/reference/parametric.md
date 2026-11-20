@@ -17,9 +17,9 @@ The declaration adds two keywords to both: `coordinates`, a `CoordinateTable`, a
 These figures come from synthetic LaB6 ramps of ten patterns at 300-1200 K, each built with a known a(T) and fitted over twenty noise seeds.
 
 - While each pattern pins the parameter on its own, the joint slope is the straight line through the chain's trajectory, weighted by each pattern's information. It came back a mean 0.0012 esd from that line, with an esd within 2 % of the line's. In this regime the declaration gives the coefficient and its esd in one result, and no extra precision.
-- Sharing the instrument across the patterns does add precision. With the zero shift and the profile shared, the slope's esd fell 2.6 times and its scatter over the seeds 2.8 times. A joint fit with every pattern's cell left free got the same gain to within 0.001 esd, so the gain comes from the sharing and not from the declaration. It holds only while nothing about the mount moves between patterns, which a heating stage can break.
-- Where one pattern cannot see the parameter on its own, the declaration adds precision itself. A minor phase that dissolved on heating was held in the chain's last five patterns ([A phase that appears part-way](series.md#a-phase-that-appears-part-way)). Against a line through the points the chain kept, the declared line's slope scattered 0.72 times as much over the seeds, about two standard errors from no gain at twenty seeds, and its error at the held patterns was 6.8 × 10⁻⁴ Å against 10.1 × 10⁻⁴ Å. The joint fit uses the little each faint pattern carries, which the chain discards.
-- The esd is conditional on the declared form being right. Fitted as a line to a cell that in truth curved, the true value at the held patterns lay within two esds of the declared curve in 3 % of cases. Declare the terms the physics needs, and draw the declared curve over the chain's `SeriesResult.trajectory` before quoting a coefficient.
+- Sharing the instrument across the patterns does add precision. With the zero shift and the profile shared, the slope's esd fell 2.6 times and its scatter over the seeds 2.8 times. A joint fit with every cell left free got the same gain to within 0.001 esd, so it comes from the sharing, not the declaration. It needs the mount fixed across patterns.
+- Where one pattern cannot see the parameter on its own, the declaration adds precision itself. A minor phase that dissolved on heating was held in the chain's last five patterns ([A phase that appears part-way](series.md#a-phase-that-appears-part-way)). Against a line through the chain's kept points, the declared slope scattered 0.72 times as much over the seeds, about two standard errors from no gain at twenty seeds, and its error at the held patterns was 6.8 × 10⁻⁴ Å against 10.1 × 10⁻⁴ Å.
+- The esd assumes the declared form is right. Fitted as a line to a cell that in truth curved, the true value at the held patterns lay within two esds of the declared curve in 3 % of cases. Draw the declared curve over the chain's `SeriesResult.trajectory` before quoting a coefficient.
 
 ### Intervals of an expression's variables
 
@@ -86,13 +86,13 @@ The coordinates need not be compositions or temperatures: a position on the subs
 | Field | Holds |
 |---|---|
 | `ParametricEquation.name` | the declaration's name, a single identifier; its coefficients are named variables, `vars.<name>_0`, `vars.<name>_1`, one per term |
-| `ParametricEquation.target` | one dot-path under `phases.` or `instrument.`, with no `hist.` scope; on a linear basis it may be a glob, expanded into one declaration per path ([Conditions and globs](parametric-spellings.md#a-target-glob)); `None` only on an expression equation, which is then an intermediate that a later expression names |
+| `ParametricEquation.target` | one dot-path under `phases.` or `instrument.`, no `hist.` scope; a glob on a linear basis ([Conditions and globs](parametric-spellings.md#a-target-glob)); `None` only on an intermediate expression equation |
 | `ParametricEquation.basis` | `"constant"`, `"polynomial"`, `"design"` or `"expression"` |
 | `ParametricEquation.expression` | an expression basis's text, in the grammar of [Expressions](expressions.md), over the variables `refine_multi(variables=…)` declares, the coordinate columns and the names of earlier expression equations |
 | `ParametricEquation.terms` | a polynomial's terms, each a list of coordinate names: `[]` is the intercept, and a repeated name is a power |
 | `ParametricEquation.design` | a design basis's rows, one per pattern of the subset, in subset order |
 | `ParametricEquation.patterns` | the subset the equation holds over, by index into the patterns as passed; `None` is every pattern |
-| `ParametricEquation.where` | the subset as a condition on the coordinate columns, such as `"T < 800"`, re-evaluated whenever the declaration is resolved ([Conditions and globs](parametric-spellings.md#a-subset-by-condition)); not with `patterns`, and not on a design basis |
+| `ParametricEquation.where` | the subset as a condition on the coordinates, such as `"T < 800"` ([Conditions and globs](parametric-spellings.md#a-subset-by-condition)), not with `patterns` |
 | `ParametricEquation.reference`, `ParametricEquation.scale` | per coordinate, the point a polynomial is centred on and the length it is scaled by |
 
 `ParametricEquation.coefficient_paths` lists the coefficients' dot-paths, `ParametricEquation.n_coefficients` counts them, and `ParametricEquation.coordinates_used` names the coordinates the terms use.
@@ -110,7 +110,6 @@ A property varies smoothly within a field and not across its boundary, so name t
 Outside the subset the target is each pattern's own parameter, refined wherever a stage frees it.
 Two fields with an equation each are two declarations on one target with disjoint subsets, each with its own name and its own reference.
 A pattern both subsets hold is refused.
-The subset is given by index (`patterns`) or by a condition on the coordinates (`where`), and a target may be a glob ([Conditions and globs](parametric-spellings.md)).
 
 A thermal-expansion line down a ramp, declared and resolved without a fit:
 
@@ -363,7 +362,7 @@ assert preview.nonfinite == [0, 1, 2]   # theta = 0 divides by exp(0) - 1 at eve
 ## Refusals
 
 Every refusal is a `ValueError`, raised when the declaration or the `MultiHistogramRefinement` is built, and most name their fix.
-A malformed declaration is refused on its own: a name that is not an identifier, a target with a glob, a `hist.` scope or a root other than `phases.` or `instrument.`, an empty `terms` list, a repeated term (in any order of its names), an empty subset or a negative or repeated subset index, a non-positive scale, a `reference` or `scale` naming a coordinate no term uses, design rows of unequal length, a non-finite number, or a field the basis does not take (`terms` on a constant or design basis, `design` on a polynomial one).
+A malformed declaration is refused on its own: a name that is not an identifier, a target glob on an expression basis, a `hist.` scope or a root other than `phases.` or `instrument.`, an empty `terms` list, a repeated term (in any order of its names), an empty subset or a negative or repeated subset index, a non-positive scale, a `reference` or `scale` naming a coordinate no term uses, design rows of unequal length, a non-finite number, or a field the basis does not take (`terms` on a constant or design basis, `design` on a polynomial one).
 The rest need the patterns:
 
 | Refused | Fix |
