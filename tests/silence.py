@@ -143,6 +143,29 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+def _cell_tie_fires() -> list:
+    """A cubic b printed 5.64101 beside a = 5.641: one value within the file's
+    digits, read as a and said (``cif.py``'s ``_correct_cell_ties``)."""
+    from tests.test_cell_ties import CIF, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    return _read_cif(CIF.format(symbol=symbol, **printed))
+
+
+def _cell_tie_silent() -> list:
+    """The same cell printed equal; b printed 5.641 beside a = 5.64101, inside
+    b's own rounding; and b = 5.900, past every band, which the reader leaves
+    for the table to refuse."""
+    from tests.test_cell_ties import CIF, PAST_PRINT, WITHIN_PRINT
+
+    symbol, printed, _, _ = WITHIN_PRINT[0]
+    equal = dict(printed, b=printed["a"])
+    own = dict(printed, a="5.64101", b="5.641")
+    return (_read_cif(CIF.format(symbol=symbol, **equal))
+            + _read_cif(CIF.format(symbol=symbol, **own))
+            + _read_cif(CIF.format(symbol=PAST_PRINT[0][0], **PAST_PRINT[0][1])))
+
+
 # ---------------------------------------------------- the FullProf project reader
 
 
@@ -565,6 +588,49 @@ def _parametric_range_silent() -> list:
     return _parametric_range(0.0) + _parametric_range(-2e-4)
 
 
+def _not_freed(freed: list[str]) -> list:
+    """``VARIABLE_NOT_FREED``'s two builders, after one stage that freed ``freed``.
+
+    The single fit's: ``vars.B`` sets two Biso by a linear tie and a formula, and
+    ``vars.spare`` sets nothing.  The joint fit's: one declaration whose
+    coefficients are ``vars.b_0`` and ``vars.b_1``."""
+    from types import SimpleNamespace
+
+    import rietx as rx
+    from rietx.multi import _parametric_not_freed_diagnostics
+    from rietx.refine import _variable_not_freed_diagnostics
+    from rietx.schemas.parametric import ParametricCoefficient
+    from rietx.schemas.results import StageResult
+    from tests.test_schemas import make_lab6
+
+    ref = rx.Refinement(make_lab6(), rx.Instrument.bragg_brentano(radiation="CuKa"))
+    ref.add_variable("B", 0.5, vary=True)
+    ref.add_variable("spare", 1.0, vary=True)
+    ref.tie("phases.0.atoms.0.biso", "vars.B")
+    ref.tie("phases.0.atoms.1.biso", expression="2 * B")
+    stage = StageResult(name="s", status="converged", n_iterations=1, cost_initial=1.0,
+                        cost_final=1.0, freed=freed)
+    line = SimpleNamespace(name="b", target="phases.0.atoms.0.biso",
+                           equation=SimpleNamespace(basis="polynomial"))
+    rows = [ParametricCoefficient(equation="b", target=line.target, term=term,
+                                  path=f"vars.b_{j}", value=0.4 * (1 - j), esd=None,
+                                  vary=False, unit=None, reference=None)
+            for j, term in enumerate(("1", "T"))]
+    mtable = SimpleNamespace(parametric=[line], expressions=[])
+    return (_variable_not_freed_diagnostics([stage], ref._working_table())
+            + _parametric_not_freed_diagnostics(mtable, rows, [stage]))
+
+
+def _not_freed_fires() -> list:
+    """No stage freed the variable or the coefficients."""
+    return _not_freed([])
+
+
+def _not_freed_silent() -> list:
+    """A stage freed the variable and both coefficients."""
+    return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
+
+
 def _reseed(**escalation) -> list:
     """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
     escalated as ``escalation`` says."""
@@ -813,6 +879,26 @@ def _stale_structure(*, drift: bool):
     return Structure(phases=[ph]), [start]
 
 
+def _body_unchecked_fires() -> list:
+    """A chain body whose two torsions folded N1 onto O6 (1.50 A under a
+    3.0 A minimum) while the anti-bump list held no row inside the body."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    return _body_contacts_unchecked_diagnostics(*_chain_run(-120.0, -120.0))
+
+
+def _body_unchecked_silent() -> list:
+    """The same chain with its torsions where they started, and the folded
+    chain in a phase the run did not search (no anti-bump row at its start)."""
+    from rietx.refine import _body_contacts_unchecked_diagnostics
+    from tests.test_one_sided_restraints import _chain_run
+
+    folded, _ = _chain_run(-120.0, -120.0)
+    return (_body_contacts_unchecked_diagnostics(*_chain_run(0.0, 0.0))
+            + _body_contacts_unchecked_diagnostics(folded, [None]))
+
+
 def _stale_fires() -> list:
     """A contact that was outside r0 at the start and came inside it with no
     row restraining it."""
@@ -968,6 +1054,49 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+# ------------------------------------------------------------ the restraint compile
+
+
+def _restraint_compile(*restraints) -> list:
+    """``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` from ``resolve_phase_restraints``
+    on the bodies of ``tests/test_restraint_body_refusal.py``, one restraint
+    at a time: the warning arrives with the compiled restraints."""
+    from rietx.crystallography.structure_factor import compile_phase_sites
+    from rietx.model.restraints import resolve_phase_restraints
+    from tests.test_restraint_body_refusal import _phase
+
+    found: list = []
+    for r in restraints:
+        phase = _phase([r])
+        resolve_phase_restraints(phase, 0, compile_phase_sites(phase),
+                                 phase.cell.lengths_angles(), found)
+    return found
+
+
+def _fixed_body_fires() -> list:
+    """A bond inside a body with no torsion, and one no declared torsion splits."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("T0"), atom_j=_index("T1"), target=1.2, sigma=0.01),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=1.5, sigma=0.01))
+
+
+def _fixed_body_silent() -> list:
+    """A bond a torsion splits, one to a free atom, one across two bodies and
+    one between two copies of the body."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K3"), target=3.0, sigma=0.01),
+        BondRestraint(atom_i=_index("Li"), atom_j=_index("K0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("T0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=8.0, sigma=0.1,
+                      op_index=0, translation=(1, 0, 0)))
+
+
 def _sigma_xye(sigma: list[float], **options) -> list:
     """Twelve points of an ``.xye`` whose σ column is ``sigma``, read."""
     from rietx.io.readers import read_pattern
@@ -1000,6 +1129,8 @@ def _sigma_nonpositive_silent() -> list:
 
 
 SILENCE: dict[str, Pair] = {
+    "CIF_CELL_TIE_CORRECTED": Pair(
+        _cell_tie_fires, _cell_tie_silent, "tests/test_cell_ties.py"),
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
     "CIF_SITE_MULTIPLICITY_DISAGREES": Pair(
@@ -1030,6 +1161,9 @@ SILENCE: dict[str, Pair] = {
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
+    "VARIABLE_NOT_FREED": Pair(
+        _not_freed_fires, _not_freed_silent,
+        "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(
@@ -1046,6 +1180,8 @@ SILENCE: dict[str, Pair] = {
         "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": Pair(
+        _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_refusal.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
         _resolution_fires, _resolution_silent,
         "strategy.staged.check_resolution_supported (no test pinned it before)"),
@@ -1062,6 +1198,8 @@ SILENCE: dict[str, Pair] = {
         _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
+    "RESTRAINT_BODY_CONTACTS_UNCHECKED": Pair(
+        _body_unchecked_fires, _body_unchecked_silent, "tests/test_one_sided_restraints.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
     "SITE_MULTIPLICITY_KEPT": Pair(

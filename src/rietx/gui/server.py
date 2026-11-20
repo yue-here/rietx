@@ -166,7 +166,7 @@ def _compare(s: GuiSession, q: dict, _body: dict) -> dict:
     return s.history_compare(ids)
 
 
-def _structure3d(s: GuiSession, q: dict, _body: dict) -> dict:
+def _structure3d(s: GuiSession, q: dict, body: dict | None) -> dict:
     """Geometry for one phase.  The knobs are *drawing* thresholds, not physics,
     which is why they ride here rather than in a settings document: the
     probability level an ellipsoid is drawn at, the radius-sum slack a bond is
@@ -178,7 +178,9 @@ def _structure3d(s: GuiSession, q: dict, _body: dict) -> dict:
                          bond_tolerance=_query_float(q, "bond_tolerance"),
                          disorder=(q.get("disorder") or ["all"])[0],
                          centres=_query_list(q, "centres"),
-                         ligands=_query_list(q, "ligands"))
+                         ligands=_query_list(q, "ligands"),
+                         # a POST carries unapplied values to draw (WP-2218)
+                         body=body if isinstance(body, dict) and body else None)
 
 
 def _query_list(q: dict, name: str) -> list[str] | None:
@@ -265,6 +267,7 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/plan/resolve"): lambda s, q, b: s.plan_resolve(),
     ("GET", "/api/structure"): lambda s, q, b: s.structure(),
     ("GET", "/api/structure3d"): _structure3d,
+    ("POST", "/api/structure3d"): _structure3d,
     ("PATCH", "/api/structure"): lambda s, q, b: s.structure_patch(b),
     ("POST", "/api/structure/aniso"): lambda s, q, b: s.structure_aniso(b),
     # a typed coordinate, projected onto the site's DOFs (WP-1215) — a
@@ -297,7 +300,7 @@ ROUTES: dict[tuple[str, str], Any] = {
     # the curves at values nobody has applied, writing nothing (WP-2125)
     ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
     # the background curve and its band from the fit's covariance (WP-2129)
-    ("GET", "/api/background"): lambda s, q, b: s.background(),
+    ("GET", "/api/background"): lambda s, q, b: s.background(_query_list(q, "hold")),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 

@@ -248,6 +248,91 @@ def test_a_list_below_every_systems_support_abstains():
     assert not any(x.code == "INDEX_PANEL_REDUCED" for x in report.diagnostics)
 
 
+# ----------------------------------------------------------------------
+# What the messages say was searched (WP-2149)
+# ----------------------------------------------------------------------
+#: fifteen lines, the count tutorial 03b's cut aragonite list has: five per
+#: metric DOF in every system up to orthorhombic, too few in the other two
+FIFTEEN = np.linspace(20.0, 60.0, 15)
+SHORT_SYSTEMS = ("monoclinic", "triclinic")
+
+
+def _not_covered(report, searched):
+    from rietx import IndexingResult
+    from rietx.indexing.diagnostics import index_diagnostics
+    from rietx.schemas.common import Provenance
+
+    result = IndexingResult(systems_searched=list(searched), quality=report,
+                            provenance=Provenance(package_version="t"))
+    return next(d for d in index_diagnostics(result)
+                if d.code == "INDEX_SYSTEMS_NOT_COVERED")
+
+
+def _asked_to_search(suggestion: str) -> set[str]:
+    """The systems a suggestion's "Search …" sentence names."""
+    import re
+    match = re.search(r"Search (.*?) before", suggestion)
+    return set() if match is None else set(match.group(1).split(", "))
+
+
+def test_the_reduced_panel_states_the_list_never_a_search():
+    """``INDEX_PANEL_REDUCED`` is built inside ``assess_peak_list``, before any
+    search exists, and a caller may run it with none.  So it says which systems
+    the list can determine a cell in, and never what a search ran over: the
+    message once read "The search runs over cubic, hexagonal, …" beside a
+    result whose ``systems_searched`` was ``["orthorhombic"]``."""
+    from rietx.indexing.engines import SYSTEM_ORDER
+
+    report = assess_peak_list(_peak_list(FIFTEEN))
+    d = next(x for x in report.diagnostics if x.code == "INDEX_PANEL_REDUCED")
+    assert "search" not in d.message.lower()
+    supported = [s for s in SYSTEM_ORDER if s not in SHORT_SYSTEMS]
+    assert report.systems_supported == sorted(supported)
+    # named in the order INDEX_SYSTEMS_NOT_COVERED lists its systems
+    assert f"Only {', '.join(supported)} have" in d.message
+    for system in SHORT_SYSTEMS:
+        assert system not in d.message
+
+
+@pytest.mark.parametrize("searched", [
+    ("orthorhombic",),                 # a narrowed request, tutorial 03b's
+    ("monoclinic",),                   # a request disjoint from the support
+    ("cubic", "hexagonal", "trigonal", "tetragonal", "orthorhombic"),
+], ids=["narrowed", "disjoint", "all-seven-restricted"])
+def test_not_covered_asks_only_for_a_search_the_list_supports(searched):
+    """``INDEX_SYSTEMS_NOT_COVERED`` names what the run left out, split by
+    whether the list could determine a cell there.  Its suggestion asks for a
+    search only where the list supports one, because below the scoring bar a
+    re-run drops an unsupported system from the request again; for those it
+    names the line count a cell needs."""
+    from rietx.indexing.engines import SYSTEM_ORDER
+
+    report = assess_peak_list(_peak_list(FIFTEEN))
+    d = _not_covered(report, searched)
+    missing = [s for s in SYSTEM_ORDER if s not in searched]
+    assert d.where == missing
+    short = [s for s in missing if s in SHORT_SYSTEMS]
+    assert _asked_to_search(d.suggestion) == {
+        s for s in missing if s not in SHORT_SYSTEMS}
+    for system in short:
+        assert system in d.message
+        need = int(np.ceil(MIN_LINES_PER_DOF * METRIC_DOF[system]))
+        assert f"{system} {need}" in d.suggestion or (
+            f"{system} needs {need}" in d.suggestion)
+    if short:
+        assert f"the list has {report.n_usable}" in d.suggestion
+
+
+def test_not_covered_on_an_abstained_list_asks_for_no_search():
+    """Where the list supports no search at all the result searched nothing,
+    and the remedy is ``INDEX_DATA_INSUFFICIENT``'s, never a search."""
+    report = assess_peak_list(_peak_list(np.linspace(20.0, 60.0, 4)))
+    assert not report.supports_indexing
+    d = _not_covered(report, ())
+    assert _asked_to_search(d.suggestion) == set()
+    assert "INDEX_DATA_INSUFFICIENT" in d.suggestion
+
+
 def _fitted(tt: np.ndarray, esd: float) -> PeakList:
     """The same list, but declaring its σ **measured** — which is what makes the
     σ(Q)/Q abstention applicable at all (see the next test)."""
