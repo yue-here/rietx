@@ -114,9 +114,16 @@ discarded-direction test names gets no esd.
   derived esd follow the existing marking rules. `COVARIANCE_DIRECTION_DISCARDED` keeps
   firing and its text changes from "do not quote" to "these parameters have no esd".
 - [x] The same in the joint fit (`multi.py`, `blocked.discarded_directions`).
-- [ ] The same in a Pawley fit: run the test on the matrix augmented by the intensity block,
+- [x] The same in a Pawley fit: run the test on the matrix augmented by the intensity block,
   so the guard stops skipping `n_aux` solves. Measure the fast and slow selections' Pawley
   hits first and report how many are overlap groups already flagged.
+  *Measured* over the full suite (2026-11-20, `[dev]`, macOS arm64; a probe plugin wrapping
+  `_guarded_covariance`, run with the since-reverted W hold in place): 357 Pawley solves
+  discarded a direction, 356 of them through the intensity block. They touched 6 758
+  intensity columns: 5 800 in overlap groups, which `PAWLEY_OVERLAP_UNRESOLVED` now reports
+  as "an individual value has no esd", 423 off the data, and 535 in neither, which no code
+  names. Two of the 357 touched a table path. `test_acceptance_indexing.py` held 126 of them
+  and passed.
 - [x] CIF: a refined value with no esd writes its uncertainty as unknown, never as a bare
   value. Check the CIF core dictionary for the form (`?` beside the value is not legal inside
   one number; the likely answer is the value with a separate `_refine` note, or `?` for the
@@ -127,8 +134,12 @@ discarded-direction test names gets no esd.
   click on a scratch LaB6 project the Text tab printed `cell.a … esd 5.85e-05` and the tied
   `atoms.0.biso` with no esd, as a locked row prints. The Text tab writes no `vars.` rows at
   all, before and after this WP.
-- [ ] Tests: the LaB6 triple (held, so no warning), a deliberately exact pair with no esd in all
+- [x] Tests: the LaB6 triple (held, so no warning), a deliberately exact pair with no esd in all
   three runners, a CIF round trip. Re-run the slow-suite probe and quote the count.
+  *Done*, with the triple tested for no esd since the hold was declined. The probe over the
+  full suite: 441 solves discarded a direction, in 38 test files, five touching a scale (two
+  of them this WP's own exact pairs). That run had the W hold in place, so the triple's fits
+  are missing from it.
 - [x] Skill: the `COVARIANCE_DIRECTION_DISCARDED` row says the esds are absent and what to hold.
   Manual: `reference/result.md`'s esd section, and the Theory tab if the covariance chapter
   describes the cut.
