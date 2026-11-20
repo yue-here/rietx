@@ -1,6 +1,6 @@
 # WP-2221 — A phase whose group has no tabulated type still gets its report and its CIF
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-20 — implemented, PR #1721 in review; one magnetic-path question for Mike
 Track: What fires, and what stays silent
 Depends on: — (1918 soft: its I-d reads phases of this kind)
 Priority: P2 2026-11-19 — a fit completes and then `report()` raises, so no section of the FitReport can be read; the NiO and MnO rhombohedral magnetic children reach it, a path few fits run
@@ -105,7 +105,7 @@ present.
 
 ## Handover log
 
-- **2026-11-19** — implemented, by a ghostshift runner (PR #1721). A phase whose space group
+- **2026-11-20** — implemented, by a ghostshift runner (PR #1721). A phase whose space group
   is an operation list that no tabulated setting names can now be reported and written to a
   CIF. The crystal system is a property of the point group, so the package now reads it from
   the rotations of the operations, in any cell. The fix checks that rule against gemmi on all
@@ -123,7 +123,29 @@ present.
   `laue_str`, which it lacks, so any operation-list phase with a Stephens block crashed
   `held_causes`. It now reads the Laue class off the closest type, or names the operators.
 
-  *Measured.* COUNTS
+  *Measured.* macOS arm64, this worktree's `[dev]` venv (no jax), on the branch tree before
+  the WP-1918 note. Fast selection: 14951 passed, 433 skipped, 32 xfailed. No base run was
+  made, so the delta is not measured. The new file adds 11 cases in 7 tests, which ran 3.87 s
+  in total on one local run; the slowest is the two report fits, 2.75 s together. The
+  related files (`test_magnetic_supercell`, `test_satellites`, `test_operator_list_phase`,
+  `test_parent_cell`, `test_magcif`, `test_wyckoff`, `test_magnetic_p1`,
+  `test_distortion_candidates` and the new file): 582 passed, before the step-6 review
+  fixes. `tests.reader_output`: unchanged. The PNGs `tests/output/wp2221_nio_child.png` and
+  `wp2221_pnma_child.png` were looked at: GoF 1.00 on both, and the NiO child's magnetic
+  (½ ½ ½) line sits at 22.6° as d = 4.82 Å predicts.
+
+  *Review (step 6).* `/code-review high --fix` found six items. Two were applied: the
+  hexagonal k points read off the setting, and one shared proper-rotation helper. Declined:
+  filling the GUI symmetry row (a panel change, Yue's call, see below); the refusal
+  message's wording for a list that is not a group (only reachable past the schema's
+  closure check); the pre-existing `:R` k points (named-group output, a question for
+  Mike); and a note that the `laue_str` fix also covers a listed group whose closest type
+  resolves, which it does.
+
+  *Generality.* Not dispatched. No `_audit` row was added or changed, and the two
+  fallbacks added are definedness conditions, not tuned choices: a setting exists or it
+  does not. Settled by Claude under the judge's trigger list in `/wp-handover` step 7; a
+  reviewer could read the satellite gate as a fallback chain and dispatch it.
 
   *Not generalised, deliberately.* `gui/symmetry.group_facts` still returns its error row
   for these children, because its Laue class, point group and Sohncke flag come from the
