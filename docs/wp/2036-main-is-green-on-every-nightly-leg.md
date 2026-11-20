@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
+Milestone: unscheduled · Status: 🔄 2026-11-20 — claimed by @yue-here (ghostshift main-health runner): the suite alarm pin #1707 moved
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
