@@ -1457,6 +1457,18 @@ class MultiParameterTable:
             self._rebuild_columns()
         return new
 
+    def held_by(self, name: str) -> str | None:
+        """Who holds the joint row ``name``: ``"caller"``, ``"origin"`` or ``None``.
+
+        :meth:`ParameterTable.held_by <rietx.params.vector.ParameterTable.held_by>`
+        asked of every table the row lives in (a bare per-pattern path is
+        every pattern's row), so the answer is the tables', as the hold itself
+        is, never :attr:`user_holds` read at a call site.  ``"caller"`` wins
+        where any table says so, as it does on one table.
+        """
+        who = {self.tables[h].held_by(p) for h, p in self.places(name, every=True)}
+        return "caller" if "caller" in who else "origin" if "origin" in who else None
+
     def unhold(self, path_globs: list[str] | str) -> list[str]:
         """Take back the caller's holds; returns the joint names released, sorted.
 
