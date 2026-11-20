@@ -1,6 +1,6 @@
 # WP-2219 — A direction the data does not determine has no esd
 
-Milestone: unscheduled · Status: 🔄 2026-11-20 — PR #1718 in review; two calls wait on Yue
+Milestone: unscheduled · Status: 🔄 2026-11-20 — PR #1718 in review; ruled to merge as it stands, the two calls moved to WP-2230
 Track: What fires, and what stays silent
 Depends on: 2028 soft (its joint-fit covariance fix, PR #1668)
 Priority: P2 2026-11-19 — a quoted esd too small by up to 140×, and the CIF that carries it says nothing; a path few fits run
@@ -168,6 +168,38 @@ discarded-direction test names gets no esd.
 - `docs/practice.md`, the row on esds along undetermined directions (WP-2028, PR #1668).
 
 ## Handover log
+
+### 2026-11-20 (2nd session) — the maintainer's ruling, main merged, the follow-up filed
+
+Ruled by the maintainer 2026-11-20 (option (a)): merge #1718 as it stands; the two open calls
+go to a follow-up WP. That follow-up is
+[WP-2230](2230-an-estimable-combination-keeps-its-esd.md). Nothing in the package changed in
+this session. Main was merged in and the WP-2230 file was added. Next: the maintainer merges
+PR #1718.
+
+*Done.* Merged `origin/main` 838437dca (#1702, #1716, #1703, #1721, #1723, #1729). The only
+file both sides touched was `docs/wp/README.md`, which merged clean through the `wpindex`
+driver and was regenerated. GitHub's CONFLICTING state came from that file alone, because its
+web merge runs no driver.
+
+*Measured* (`[dev]` venv, macOS arm64, Python 3.12, merged tree 1069f5c21).
+- `python -m tests.suite_alarms --write` rewrote `tests/data/suite_alarms.json` byte for byte:
+  the pin #1723 set on main holds under this branch.
+- `python -m tests.reader_output`: unchanged against the merge-base 838437dca (exit 0).
+- Fast selection (`-m "not slow"`): 1 failed, 14 963 passed, 433 skipped, 32 xfailed in 8:07. The failure is a wall-clock bar in `test_events_aggregator.py` (0.907 s against 0.915 s) under the full load. The file passes 12 of 12 alone, and this branch does not touch the events code.
+
+*Settled by Claude.*
+- Estimable combinations go to WP-2230, which builds a per-row estimability test: a derived row
+  keeps its esd when its gradient is orthogonal to the discarded directions. The cases are a tie
+  such as `zero_shift = za + zb + zc` and the moment-pair quadrature sum, whose test is a strict
+  xfail. Grounds: DESIGN Rule 5 (a number follows accuracy); Searle 1971 p. 169, this WP's own
+  grounds; and the existing convention that a geometry row is marked only if its partials touch
+  an unmeasured column. Alternative: hold #1718 until the test lands.
+- The 535 Pawley intensities on a discarded direction outside any overlap group get no new
+  message. Grounds: DESIGN Rule 4, since `None` already says it, and the maintainer's 2026-11-03
+  reversal of warnings that restate what the reader sees. WP-2230 investigates why they sit in
+  no overlap group, because a missed near-overlap would be a grouping defect. Alternative: a
+  message naming them.
 
 - **2026-11-20** — PR #1718. A parameter the data cannot place now reports no esd. Before,
   it reported the spread along the directions the data did measure, short by a factor nothing
