@@ -159,6 +159,13 @@ def test_the_written_back_moment_is_the_fitted_one_after_the_angle_moved(cw, bet
     On main the written-back |m| sat 0.4σ, 2.2σ and 9σ from the refined
     modulus, scaling with the move, and ``fitted_structure`` re-evaluated
     9.5e-4, 4.8e-3 and 1.9e-2 of the peak height from ``y_calc``.
+
+    The moment stage starts the azimuth at 0, a direction the b-axis mirror
+    fixes, so these rows also pin the angle columns' floor rule (issue
+    #1404): with the forward difference on the floor removed, the fits from
+    101.1° and 103.0° stopped at φ = 0 with |m| 3.1804 and 3.1766 instead of
+    3.1772 at φ = ±0.047 (2026-11-20, darwin/arm64), the first outside the
+    pin below.
     """
     ref, result = _fit(cw, beta0, PLAN_3)
     assert result.status == "converged"
@@ -239,17 +246,85 @@ def test_a_series_moment_row_states_the_written_back_moment(cw):
                                rtol=0, atol=1e-9)
 
 
+@pytest.fixture(scope="module")
+def cw_seed11():
+    """Noise seed 11, where the minimum lies on the symmetric direction."""
+    instrument = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.25)
+    data, scale = _simulate(instrument, seed=11)
+    return instrument, data, scale
+
+
+@pytest.mark.parametrize("beta0", [101.1, 101.5, 103.0])
+def test_a_minimum_on_the_symmetric_direction_is_not_pushed_off(cw_seed11, beta0):
+    """The angle floor rule's negative arm (issue #1404).
+
+    On noise seed 11 the minimum is at φ = 0 itself, so the forward
+    difference the rule hands an angle on the floor must not walk a fit off
+    it.  Each fit is compared with the forward-difference fit
+    (``moment_grad_supported`` forced off, every moment column by the peak
+    chain): χ² within 1e-9 relative and |m| within 1e-4 of its esd, the
+    either-way bars, and the azimuth zeroed by the stationary-angle test in
+    both.  Neither lands on φ = 0 to round-off, and neither did before.  A
+    zeroed angle has no esd, so the residual is read against its profile
+    interval, ±0.108 rad at 95 % (σ ≈ 0.055 rad): from 103.0° it is
+    3.0e-4 rad (0.005σ) here against 1.2e-4 rad (0.002σ) for the forward
+    difference, and under 1e-6 rad from 101.1° and 101.5° in both
+    (2026-11-20, darwin/arm64).
+    """
+    from rietx.model.forward import CompiledModel
+
+    def arm(exact):
+        real = CompiledModel.moment_grad_supported
+        if not exact:
+            CompiledModel.moment_grad_supported = lambda self, ip: False
+        try:
+            ref, result = _fit(cw_seed11, beta0, PLAN_3)
+        finally:
+            CompiledModel.moment_grad_supported = real
+        m_back, cell = _written_back(ref)
+        row = ref.report().magnetic[0]
+        azimuth = next(p for p in result.parameters
+                       if p.path == "phases.0.atoms.0.moment.dof2")
+        zeroed = {q for st in result.stages
+                  for t in (st.moment_angle_tests or []) if t.zeroed
+                  for q in t.paths}
+        return (result, moment_magnitude(m_back, cell), row.magnitude_esd,
+                azimuth, zeroed)
+
+    a, b = arm(True), arm(False)
+    for result, m, _esd, azimuth, zeroed in (a, b):
+        assert result.status == "converged"
+        assert "phases.0.atoms.0.moment.dof2" in zeroed, zeroed
+        print(f"β₀ {beta0}: χ²_red {result.statistics.chi2:.12f}, |m| {m:.7f}, "
+              f"azimuth {azimuth.value:.1e} rad")
+    assert abs(a[0].statistics.chi2 - b[0].statistics.chi2) / b[0].statistics.chi2 < 1e-9
+    assert abs(a[1] - b[1]) < 1e-4 * b[2], (a[1], b[1], b[2])
+
+
 # --------------------------------------------------------------------------
 # the joint path builds its tables once too (params/multi.py)
 # --------------------------------------------------------------------------
-def test_the_joint_path_writes_back_the_moment_it_fitted():
+def test_the_joint_path_writes_back_the_moment_it_fitted(monkeypatch):
     instruments = [rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.25),
                    rx.Instrument.constant_wavelength_neutron(1.8, fwhm_deg=0.25)]
     sims = [_simulate(ins, seed) for ins, seed in zip(instruments, (7, 11), strict=True)]
     data = [d for d, _ in sims]
     structure = rx.Structure(phases=[_phase(103.0, scale=sims[0][1])])
+    # the joint fit's Jacobians apply the angle floor rule (issue #1404): its
+    # moment stage starts the azimuth on the mirror's direction, so the floor
+    # test fires there, and the rule then gives way to the exact column
+    from rietx.optimize import least_squares as lsq
+
+    real_floor, floor = lsq._moment_angle_on_floor, []
+
+    def floor_spy(column_norm, modulus_norm):
+        floor.append(real_floor(column_norm, modulus_norm))
+        return floor[-1]
+
+    monkeypatch.setattr(lsq, "_moment_angle_on_floor", floor_spy)
     ref = rx.MultiHistogramRefinement(structure, instruments)
     result = ref.fit(data, plan=PLAN_3)
+    assert any(floor) and not all(floor), floor
     dofs = [_dof_value(result, k) for k in range(3)]
     for h in range(len(data)):
         # the joint path has no result-time compile (#272 is single-histogram),
