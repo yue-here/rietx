@@ -1,6 +1,6 @@
 # WP-2219 — A direction the data does not determine has no esd
 
-Milestone: unscheduled · Status: 🔄 2026-11-19 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-20 — PR #1718 in review; two calls wait on Yue
 Track: What fires, and what stays silent
 Depends on: 2028 soft (its joint-fit covariance fix, PR #1668)
 Priority: P2 2026-11-19 — a quoted esd too small by up to 140×, and the CIF that carries it says nothing; a path few fits run
@@ -168,6 +168,91 @@ discarded-direction test names gets no esd.
 - `docs/practice.md`, the row on esds along undetermined directions (WP-2028, PR #1668).
 
 ## Handover log
+
+- **2026-11-20** — PR #1718. A parameter the data cannot place now reports no esd. Before,
+  it reported the spread along the directions the data did measure, short by a factor nothing
+  bounds. That holds in a single fit, a joint fit and a Pawley fit, and the CIF writes `?` in
+  the value's su item. The WP's first task, holding W on the width triple, was built and then
+  reverted: the full suite showed it moved answers the WP does not name. The triple's three
+  parameters have no esd instead, which the acceptance line allows. Two calls wait on Yue,
+  listed at the end.
+
+  *Done.* `_guarded_covariance` sets esd `inf` on every column `discarded_directions` touches
+  and returns the test's answer as `LSQOutcome.discarded`. The discard test runs outside the
+  eigensolve guard, so a failure there stays loud. `staged.outcome_discarded_directions` names
+  the table paths from it, so a Pawley solve is no longer skipped. CIF: `?` in `_cell_*_su`,
+  `_atom_site_*_su` and `_atom_site_aniso_U_*_su`, `.` for an unrefined row, "(su unknown)" in
+  the profile and special-details prose. The GUI background band is absent on a discarded
+  direction. The Pawley overlap message says "has no esd" where it printed "inf%". Help
+  (`COVARIANCE_DIRECTION_DISCARDED`, `FLAT_DIRECTION`), manual (concepts, theory, reference),
+  skill row and three release fragments updated.
+
+  *Measured* (`[dev]` venv, macOS arm64, Python 3.12).
+  - The W hold, while it stood: on the Stephens fits it moved corundum at most 0.40 base esd
+    (`lor_size` +0.398, `lor_strain` −0.388, V +0.21) and Rwp 14.5745 % → 14.5720 %. The full
+    suite then failed the cpd-1 chain (0.1469 against 0.1373 ± 0.005), the hostile-pairs
+    runaway, the Stephens corundum block test and four closing-stage alarm rows. The probe
+    showed the hold firing in 17 test files, the QPA round robin among them.
+  - Full suite with the hold (a5d574a28 + 72b29ff30): 13 failed, 15 898 passed, 444 skipped,
+    51 xfailed, 1 xpassed. After the revert every one of the 13 passes when rerun by file,
+    except the standards pin (below).
+  - Full suite on the final tree: 1 failed, 15 903 passed, 444 skipped, 53 xfailed in 44:48, on a231d87c8 (origin/main 6c3a2db5e merged in). The one failure is the standards pin below. The first run's 1 xpassed is gone and xfailed rose by 2: the new strict xfail and that test.
+  - Probe over the first full run: 441 solves discarded a direction, in 38 test files, five
+    touching a scale (two of them this WP's exact pairs). 357 Pawley solves discarded a
+    direction through the intensity block, touching 6 758 intensity columns: 5 800 in overlap
+    groups, 423 off the data, 535 in neither. Over the final run: 458 solves in 40 files, 18 of them the width triple (`test_refit_single.py` 13, `test_suite_alarms.py` 2, `test_surface_roughness.py` 1, this WP's own 2), none in the QPA round robin; the Pawley counts are unchanged.
+  - LaB6 triple: no esd on W, `gauss_size` or `gauss_strain` from either start. In the joint
+    fit the direction lands just over the cut, and W reads 2.5e-4 ± 1.56.
+  - GUI, by looking: after a Refine click on a scratch LaB6 project, `/api/params` sends
+    `esd: null` and the Text tab prints the tied Biso with no esd, as a locked row prints.
+  - `tests.reader_output`: unchanged against the merge-base (exit 0).
+
+  *Gotchas.* `test_suite_alarms.py::test_the_standards_fire_what_the_pin_says` fails on
+  `origin/main` itself (a snapshot of 6c3a2db5e, the same five moved codes), so its re-pin
+  belongs to whoever moved them. `from rietx import refine` gives the function; a probe needs
+  `importlib.import_module("rietx.refine")`.
+
+  *Review.* `/code-review high --fix` applied six fixes (a 4-tuple unpack in
+  `test_covariance_scaling.py`, W's twins off the projector, the GUI band, the CIF
+  special-details text, two stale texts). Declined: reusing `normal_factors`' eigenpairs
+  (one more `eigh` per solve; not measured); `_refine_ls_extinction_coef_su` and a wavelength
+  su item (new registry rows); `where` after a `rechart_outcome` can differ from the set that
+  lost its esds.
+
+  *Settled by Claude.*
+  - The W hold is declined, under § Acceptance ("either held or with no esd"; "no acceptance
+    number moves except where this WP names it") and the full-suite measurement above.
+    Alternative: keep the hold and re-pin the moved answers.
+  - The marking sits in `_guarded_covariance`, not `covariance_estimates`, because
+    `refine._scale_significance` calls the latter on a sub-matrix for phase support.
+    Alternative: mark in `covariance_estimates`.
+  - CIF form: a separate `_su` item holding `?`, under the dictionary's definition of `?` as
+    unknown (DDLm Measurand option b; the registry test checks each tag against the fetched
+    dictionaries). Alternative: the bare value with a `_refine` note.
+  - The guard names table paths only. A Pawley intensity on a discarded direction carries
+    `inf` and keeps its overlap or off-data report, under the WP's non-goal that those stay.
+  - A floor-hit row on a discarded direction falls back to the plain distance test, as
+    `bound_findings`' docstring prescribes for a non-finite esd.
+
+  *Generality* (the judge, on the tree with the hold): `COVARIANCE_DIRECTION_DISCARDED`
+  **holds**, with the tie edge below as its strong case against. `width_twins_held`'s
+  extension was **weak** and asked for the QPA, cpd-1 chain and zircon numbers; the full
+  suite supplied them and the hold is gone. The projector floor, the GUI band and the CIF `?`
+  **hold**.
+
+  *For Yue.*
+  1. An estimable combination of parameters that are not estimable loses its esd. A tie
+     `zero_shift = za + zb + zc` reports none, and the moment-pair quadrature sum loses the
+     esd it is built from (`test_two_starting_splits_report_the_same_quadrature_number` is a
+     strict xfail). The WP's rule says a tie and a derived quantity inherit the blindness.
+     Searle's rule says an estimable function keeps its esd, which a per-row test (gradient
+     orthogonal to the discarded directions) would restore. The quadrature path is magnetic,
+     so Mike may own that half.
+  2. The 535 Pawley intensities on a discarded direction outside any overlap group carry no
+     esd and no report names them.
+
+  *Next.* Yue answers the two calls. Call 1 decides whether a follow-up WP builds the
+  estimability test.
 
 - **2026-11-19** — created from WP-2028's open question and the maintainer's delegation. No
   open WP owns it: WP-2028's own handover says the answer is its own WP, and WP-1535 is closed.
