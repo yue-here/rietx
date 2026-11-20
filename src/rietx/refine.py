@@ -1028,7 +1028,10 @@ def _hold_scale_b_ridges(model: CompiledModel, table: ParameterTable,
 #: δW + δsize·(1 + tan²θ) = 0 at every angle forces both to zero.  W's total
 #: stays a row of the test, so a held W pins the size and nothing is held.
 #: Holding W as well moved three acceptance answers (the generality judge,
-#: WP-2002 9th session).
+#: WP-2002 9th session).  Holding it only on the triple W, ``gauss_size`` and
+#: ``gauss_strain`` still moved the cpd-1 chain and the standards' diagnostics
+#: (WP-2219), so that flat direction is left to the covariance, where its
+#: three parameters have no esd.
 WIDTH_TERMS: tuple[tuple[str, tuple[str, ...], bool], ...] = (
     ("instrument.profile.u", ("gauss_strain", "gauss_size"), True),  # tan²θ in Γ_G²
     ("instrument.profile.w", ("gauss_size",), False),                # 1 in Γ_G²
@@ -7950,10 +7953,10 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
         out.append(Diagnostic(
             level="warning", code="COVARIANCE_DIRECTION_DISCARDED",
             where=list(finding.paths), value=finding.value,
-            message=f"{finding.message}.",
+            message=f"{finding.message}, so these parameters have no esd.",
             suggestion="Free fewer of these parameters in one stage, hold the "
-                       "ones known independently, or widen the fitted range. "
-                       "Do not quote their esds as measured from this fit.",
+                       "ones known independently, or widen the fitted range, "
+                       "and refit for their esds.",
         ))
     for finding in guard.large_biso:
         msg = str(finding)
@@ -10346,12 +10349,15 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
             h = reflection_label(model.phases[ip].reflections.hklm[k])
             labels.append(f"{structure.phases[ip].name} {h}")
         total = float(np.sum(inten))
+        # a split on a direction the covariance discards has no esd (WP-2219)
+        worst = (f"the relative esd of an individual value reaches "
+                 f"{float(np.max(rel)):.0%}." if np.all(np.isfinite(rel))
+                 else "an individual value has no esd.")
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
             message=(f"{len(g)} reflections overlap too strongly to split. "
                      f"Their summed intensity ({total:.4g}) is determined, and "
-                     f"the relative esd of an individual value reaches "
-                     f"{float(np.max(rel)):.0%}."),
+                     f"{worst}"),
             suggestion="Use the group's summed intensity as the datum.",
         ))
     return out

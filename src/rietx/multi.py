@@ -52,7 +52,6 @@ from .optimize.least_squares import (
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
-    covariance_jacobian,
     rechart_outcome,
     run_multi_least_squares,
     stationary_columns,
@@ -198,13 +197,13 @@ from .strategy.staged import (
     bound_findings,
     check_adp_positive_definite,
     check_biso_negative,
-    check_discarded_directions,
     check_hump_width,
     check_peak_width_positive,
     check_resolution_positive,
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    outcome_discarded_directions,
     pressed_tied_paths,
     resolve_plan,
     tied_bound_findings,
@@ -486,7 +485,7 @@ GUARD_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "high_correlations": ((FIT,), "one correlation matrix, of the joint solve"),
     "flat_directions": ((FIT,), "read off the same matrix, beside the correlation"),
     "discarded_directions": ((FIT,), "the joint normal matrix's own cut, read "
-                                     "off the joint Jacobian"),
+                                     "off the joint solve's covariance"),
     "at_bounds": ((FIT,), "the joint θ's bounds"),
 }
 
@@ -3040,9 +3039,8 @@ class MultiHistogramRefinement:
         if outcome.jac is not None and len(free) > 1:
             try:
                 # the matrix the covariance cut (``check_guards``' rule)
-                report.discarded_directions = check_discarded_directions(
-                    covariance_jacobian(outcome, free), free,
-                    report.flat_directions)
+                report.discarded_directions = outcome_discarded_directions(
+                    outcome, free, report.flat_directions)
             except np.linalg.LinAlgError:
                 if getattr(outcome, "covariance_error", None) is None:
                     raise

@@ -42,7 +42,7 @@ rietx reports a correlation at three strengths:
 - `FLAT_DIRECTION`, for a pair at |ρ| = 1.000 to three decimals.
   The data measure only one combination, and each esd holds only if the other parameter is right.
 - `COVARIANCE_DIRECTION_DISCARDED`, for a combination of several parameters the data do not constrain.
-  Every esd in the group is too small, by at least a factor of √2.
+  No parameter in the group has an esd.
 
 `FitReport.identifiability` lists the strongest correlations and the combinations the data fix least well.
 
@@ -63,7 +63,12 @@ rietx prevents this in three ways:
 - A phase whose reflections in range cannot separate its scale from its displacement parameters has those parameters fixed for the stage, and `SCALE_B_INSEPARABLE` reports it.
 
 A combination the data move a little, but below that cutoff, is still discarded.
-Its parameters keep esds, and those esds are too small, so `COVARIANCE_DIRECTION_DISCARDED` marks them.
+The pseudo-inverse would give each parameter on it the spread along the directions the data did measure, which is too small by a factor nothing bounds.
+On synthetic LaB₆ with W, `gauss_size` and `gauss_strain` free, two starts landed 140 esd apart in W.
+So each parameter on a discarded direction has no esd either, and `COVARIANCE_DIRECTION_DISCARDED` names them.
+This is the rule of linear models: a parameter the data cannot estimate has no standard error {cite}`searle1971`.
+A parameter tied to one of them, and a quantity derived from one, has no esd, even where the combination itself is determined.
+The CIF writes `?`, unknown, in such a value's standard-uncertainty item.
 
 The [scale-and-B section](../theory/estimation.md#a-scale-and-a-b-the-range-cannot-separate) derives the test.
 
