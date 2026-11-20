@@ -2176,10 +2176,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A combination of parameters is not measured",
         description=(
             "The data do not constrain one combination of several parameters. The solver "
-            "discards that direction, so each esd in the group comes out too small, by "
-            "at least a factor of the square root of two. Do not quote these esds as "
-            "measured. Free fewer of the parameters in one stage, hold the ones you know "
-            "independently, or widen the fitted range. Esds of other parameters are "
+            "discards that direction, and each parameter on it has no esd: the result, "
+            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
+            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the parameters in one stage, hold the ones you know independently, or widen "
+            "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
         ),
     ),
@@ -2379,7 +2380,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two parameters are correlated so completely that the data measure only one "
             "combination of them. This is a statement about the rank of the problem and "
             "not about a strong correlation. Each esd is conditional on the other "
-            "parameter being right. Fix one at an independently known value and refine "
+            "parameter being right. Where the data do not move their difference at "
+            "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
             "histogram can separate them."
         ),
