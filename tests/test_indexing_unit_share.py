@@ -229,7 +229,14 @@ def test_1374_cases_monoclinic_all_systems_finds_the_cell(monkeypatch):
     thread, as the issue measured.  On macOS arm64, ``[dev]``, 2026-11-19,
     dichotomy's monoclinic unit found it in 4.8 s of its 10 s share; T = 60
     no longer separates the two rules there, since svd's orthorhombic unit
-    took 16 s of CPU, not the issue's 49."""
+    took 16 s of CPU, not the issue's 49.
+
+    Sized for a macOS arm64 core (M-series, 2026-11-21).  The monoclinic unit
+    alone, on the same list, with a 2 s CPU budget: dichotomy and svd each
+    found the cell, so the unit has a margin of about 5 against its 10 s
+    share there.  A core twice as slow still has about 2.5.  Linux x86_64
+    (pearl, nearer the nightly runner) was unreachable when this was
+    measured, so the margin there is not shown."""
     from tests.test_indexing_engines import CASES, assert_same_lattice, spec_for
 
     _cpu_clock(monkeypatch)
@@ -246,7 +253,15 @@ def test_1374_cases_monoclinic_all_systems_finds_the_cell(monkeypatch):
 def test_1374_780_monoclinic_gains_a_second_finder(monkeypatch):
     """#1374's row "#780, mono, T = 60": with each unit at the ceiling,
     dichotomy held it and its cell had one finder; with the share svd also
-    finds it, and the cell can reach the agreement gate."""
+    finds it, and the cell can reach the agreement gate.
+
+    Sized for a macOS arm64 core (M-series, 2026-11-21).  The monoclinic unit
+    alone, on this list, under a CPU budget: svd found the cell at 2 s,
+    dichotomy not at 6 s and at 8 s.  The share here is 60 s over three
+    engines, 20 s, so svd has a margin of about 10 and dichotomy, the
+    assertion's limiting finder, at least 2.5 (it found the cell by 8 s).
+    That is thinner than tests/CLAUDE.md § Budgets asks, so a core more than
+    about 2.5 times slower fails this row.  Linux x86_64 was unreachable when this was measured."""
     from tests.repro_780 import CELL, peaks, spec
     from tests.test_indexing_engines import assert_same_lattice
 
