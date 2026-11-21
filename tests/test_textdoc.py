@@ -126,6 +126,35 @@ def test_the_fixed_point_holds_over_the_shapes_that_broke_it(tmp_path,
     assert (errors, delta.is_empty()) == ([], True)
 
 
+def test_a_peak_equation_renders_as_rows_and_its_text_as_a_comment(tmp_path,
+                                                                    pattern_file):
+    """A peak equation's coefficients are ordinary rows; the equation itself
+    rides on them as a comment, so the grammar and FORMAT_VERSION hold and
+    the fixed point holds with it (WP-2107)."""
+    structure, ins = perturbed_models()
+    structure.phases[0].peak_equations = [rx.PeakEquation(
+        target="lor_fwhm", expression="w*tan(theta)",
+        coefficients={"w": rx.Parameter(value=0.01, min=0.0)})]
+    ins.peak_equations = [rx.PeakEquation(
+        target="shift", expression="sq*(two_theta - 60)^2",
+        coefficients={"sq": rx.Parameter(value=0.0)})]
+    project = rx.Project.create(tmp_path / "peq.rex", pattern=pattern_file,
+                                structure=structure, instrument=ins,
+                                plan="mccusker_default")
+    text = td.render(project)
+    line = next(ln for ln in text.splitlines()
+                if ln.split()[:1] == ["peak_equations.0.w"])
+    assert line.endswith("# lor_fwhm = w*tan(theta)")
+    assert "# shift = sq*(two_theta - 60)^2" in text
+    delta, errors = _changes(text, project)
+    assert (errors, delta.is_empty()) == ([], True)
+    edited = _edit(text, "peak_equations.0.w", "  peak_equations.0.w @ 0.02")
+    delta, errors = _changes(edited, project)
+    assert errors == []
+    assert delta.as_dict()["values"] == {"phases.0.peak_equations.0.w": 0.02}
+    assert delta.as_dict()["vary"] == {"phases.0.peak_equations.0.w": True}
+
+
 def test_a_document_written_with_transform_words_still_reads(project):
     """An ``.rxt`` rendered before schema 0.46 carries ``softplus``/``logit``
     beside the bounds (WP-1938).  The renderer no longer writes them; the

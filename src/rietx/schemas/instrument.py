@@ -20,6 +20,7 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from ..model.profiles.caglioti import _MIN_GAMMA_G2
 from .common import Base, Parameter, _InheritsDeclaredDefaults, reading_stored_document
+from .peak_equation import PeakEquation, check_level
 
 if TYPE_CHECKING:  # the blank a measured background is built from
     from .pattern import PatternData
@@ -2387,6 +2388,20 @@ class Instrument(_InheritsDeclaredDefaults):
     #: underscore puts the paths outside that glob by construction instead of
     #: by retightening seven presets.
     extra_components: list[ExtraComponent] = Field(default_factory=list)
+    #: Peak equations at the pattern level (WP-2107): a ``shift`` in θ and 2θ
+    #: that moves every phase's peaks, as a 2θ calibration curve does.  The
+    #: list holds at most one equation per target, and the instrument's takes
+    #: ``shift`` alone and reads no reflection (:func:`~rietx.schemas.
+    #: peak_equation.check_level`).  Coefficients are entries at
+    #: ``instrument.peak_equations.<j>.<name>``, a path no preset's glob
+    #: reaches, so only a stage the caller writes frees one.  Empty is exactly
+    #: off, as ``extra_components`` is.
+    peak_equations: list[PeakEquation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _peak_equations_fit_the_instrument(self) -> "Instrument":
+        check_level(self.peak_equations, "instrument")
+        return self
 
     @model_validator(mode="before")
     @classmethod

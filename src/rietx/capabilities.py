@@ -582,6 +582,11 @@ def _features() -> dict[str, bool]:
         "stephens_strain": "microstrain" in Phase.model_fields,
         "primary_extinction": "extinction" in Phase.model_fields,
         "restraints": "restraints" in Phase.model_fields,
+        # an equation over a reflection on a width, position or intensity
+        # (WP-2107): both levels, since a calibration curve is the
+        # instrument's and an hkl term the phase's
+        "peak_equations": ("peak_equations" in Phase.model_fields
+                           and "peak_equations" in Instrument.model_fields),
         # a commensurate propagation vector, hence satellites at G ± k
         # (WP-1326).  Derived from the field, so it flips on its own
         # exactly as the rest of this arm does.

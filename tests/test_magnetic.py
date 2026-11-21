@@ -2176,8 +2176,8 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # WP-2042's ``RefinementResult.radiation`` 0.60, and WP-1419's
     # ``Phase.distortion_modes``, in the same number, and WP-1944's optional
     # ``Phase.extinction`` 0.61, which WP-1419 C2's ``Phase.parent_cell`` shares,
-    # and the time-of-flight profile, spectrum and corrections (issue #193)
-    # 0.62, the first change after 1.12.0 shipped 0.61.
+    # and WP-2107's ``Phase.peak_equations`` and ``Instrument.peak_equations`` 0.62.
+    # and the time-of-flight profile, spectrum and corrections (issue #193) in the same number.
     assert caps.schema_version == "0.62"
 
 

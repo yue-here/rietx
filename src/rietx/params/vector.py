@@ -1565,6 +1565,11 @@ class ParameterTable:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r, force_fixed=tof)
             self._collect_texture(base, sg, phase, tof=tof)
+            # peak equations (WP-2107): each coefficient is an ordinary entry,
+            # so bounds, holds, ties and esds need no new path
+            for j, eq in enumerate(phase.peak_equations):
+                for name, p in eq.coefficients.items():
+                    self._add(f"{base}.peak_equations.{j}.{name}", p)
             # **The four sample widths are refinable on both arms** (T-3c).
             # They were force-fixed on the flight-time arm until then, and the
             # reason given was that the branch could not use them; it can.  A
@@ -2885,6 +2890,9 @@ class ParameterTable:
         # union.
         for sub, cp in extra_component_parameters(instrument.extra_components):
             self._add(f"instrument.extra_components.{sub}", cp)
+        for j, eq in enumerate(instrument.peak_equations):
+            for name, p in eq.coefficients.items():
+                self._add(f"instrument.peak_equations.{j}.{name}", p)
 
     def _add_instrument_row(self, instrument: Instrument, path: str,
                             p: Parameter, *, force_fixed: bool = False) -> None:
@@ -5257,6 +5265,9 @@ class ParameterTable:
             put(phase.lor_strain, f"{base}.lor_strain")
             put(phase.gauss_size, f"{base}.gauss_size")
             put(phase.gauss_strain, f"{base}.gauss_strain")
+            for j, eq in enumerate(phase.peak_equations):
+                for name, p in eq.coefficients.items():
+                    put(p, f"{base}.peak_equations.{j}.{name}")
             if phase.magnetic_symmetry is not None:
                 put(phase.magnetic_lor_size, f"{base}.magnetic_lor_size")
                 put(phase.magnetic_lor_strain, f"{base}.magnetic_lor_strain")
@@ -5321,6 +5332,9 @@ class ParameterTable:
         # stage's recompile
         for sub, cp in extra_component_parameters(instrument.extra_components):
             put(cp, f"instrument.extra_components.{sub}")
+        for j, eq in enumerate(instrument.peak_equations):
+            for name, p in eq.coefficients.items():
+                put(p, f"instrument.peak_equations.{j}.{name}")
         # the walk is over.  Check every value against the schema *before*
         # assigning any of them, so the refusal below leaves the models exactly
         # as it found them; the assignment pass keeps the guard as a backstop

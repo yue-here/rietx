@@ -334,18 +334,23 @@ def _wrapped(paragraphs: list[str]) -> str:
                      for p in paragraphs)
 
 
-def _value(p, tag: str = "_pd_proc_ls_profile_function") -> str:
-    """A parameter's value with its su in parentheses where it has one."""
-    return number(tag, p.value, p.stderr)
+def _value(p, tag: str = "_pd_proc_ls_profile_function", *,
+           unknown: bool = False) -> str:
+    """A parameter's value with its su in parentheses where it has one, and
+    ``(su unknown)`` after a refined one whose su the fit could not determine
+    (WP-2219): in text a bare number reads as a fixed one."""
+    out = number(tag, p.value, p.stderr)
+    return f"{out} (su unknown)" if unknown and p.stderr is None else out
 
 
-def _profile_description(instrument: Instrument, structure: Structure | None = None
-                         ) -> str:
+def _profile_description(instrument: Instrument, structure: Structure | None = None,
+                         no_su: frozenset[str] = frozenset()) -> str:
     """The profile function as CIF text, every value with its su.
 
     The shape is the one the fit computed (``ProfileTCHZ.shape``), and each
     phase's sample broadening is stated beside the instrument's, since the
-    widths add (Gaussian variances, Lorentzian FWHMs).
+    widths add (Gaussian variances, Lorentzian FWHMs).  ``no_su`` holds the
+    paths of refined values with no esd (:func:`_value`).
 
     **Per source arm.**  A time-of-flight bank shares no width law with the
     constant-wavelength model: its shape is the back-to-back exponential pair
@@ -356,8 +361,13 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
     unit rather than in the parameter's degree default.
     """
     units: dict[str, str] = {}
+
+    def v(p, path: str) -> str:
+        return _value(p, unknown=path in no_su)
+
     if instrument.source.kind == "neutron_tof":
         p = instrument.source.profile_tof
+        t = "instrument.source.profile_tof."
         kind = ("Peak shape: back-to-back exponentials convolved with a "
                 "pseudo-Voigt (GSAS TOF type 3)."
                 if any(getattr(p, g).value for g in ("gam0", "gam1", "gam2"))
@@ -365,12 +375,13 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
                      "Gaussian (GSAS TOF type 1).")
         lines = [
             kind,
-            f"alpha = {_value(p.alpha0)} + {_value(p.alpha1)}/d in 1/us; "
-            f"beta = {_value(p.beta0)} + {_value(p.beta1)}/d^4 in 1/us.",
-            f"sigma^2 = {_value(p.sig0)} + {_value(p.sig1)} d^2 + "
-            f"{_value(p.sig2)} d^4 in us^2.",
-            f"gamma = {_value(p.gam0)} + {_value(p.gam1)} d + "
-            f"{_value(p.gam2)} d^2 in us.",
+            f"alpha = {v(p.alpha0, t + 'alpha0')} + {v(p.alpha1, t + 'alpha1')}/d "
+            f"in 1/us; beta = {v(p.beta0, t + 'beta0')} + "
+            f"{v(p.beta1, t + 'beta1')}/d^4 in 1/us.",
+            f"sigma^2 = {v(p.sig0, t + 'sig0')} + {v(p.sig1, t + 'sig1')} d^2 + "
+            f"{v(p.sig2, t + 'sig2')} d^4 in us^2.",
+            f"gamma = {v(p.gam0, t + 'gam0')} + {v(p.gam1, t + 'gam1')} d + "
+            f"{v(p.gam2, t + 'gam2')} d^2 in us.",
         ]
         units = {"lor_size": "1/A", "gauss_size": "1/A^2"}
     else:
@@ -379,17 +390,18 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
                  "TCHZ pseudo-Voigt (Thompson, Cox & Hastings 1987)")
         lines = [
             f"{shape} with Finger, Cox & Jephcoat (1994) axial divergence.",
-            f"Caglioti Gaussian FWHM^2 in deg^2: U={_value(prof.u)}, "
-            f"V={_value(prof.v)}, W={_value(prof.w)}.",
-            f"Lorentzian FWHM in deg: X={_value(prof.x)}, Y={_value(prof.y)}.",
-            f"Axial divergence: S/L={_value(geom.axial_sl)}, "
-            f"H/L={_value(geom.axial_hl)}.",
+            f"Caglioti Gaussian FWHM^2 in deg^2: U={v(prof.u, 'instrument.profile.u')}, "
+            f"V={v(prof.v, 'instrument.profile.v')}, W={v(prof.w, 'instrument.profile.w')}.",
+            f"Lorentzian FWHM in deg: X={v(prof.x, 'instrument.profile.x')}, "
+            f"Y={v(prof.y, 'instrument.profile.y')}.",
+            f"Axial divergence: S/L={v(geom.axial_sl, 'instrument.geometry.axial_sl')}, "
+            f"H/L={v(geom.axial_hl, 'instrument.geometry.axial_hl')}.",
         ]
-    for phase in (structure.phases if structure is not None else []):
+    for ip, phase in enumerate(structure.phases if structure is not None else []):
         # a Stephens block replaces lor_strain (WP-1467,
         # CompiledModel.lor_strain_term): its stored value is no width the
         # fit drew, so stating it would describe a broadening that is not there
-        terms = [f"{label}={_value(getattr(phase, name))} "
+        terms = [f"{label}={v(getattr(phase, name), f'phases.{ip}.{name}')} "
                  f"{units.get(name, getattr(phase, name).unit)}"
                  for name, label in _SAMPLE_BROADENING
                  if not (name == "lor_strain" and phase.microstrain is not None)
@@ -397,7 +409,18 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
         if terms:
             lines.append(f"Phase {phase.name}, sample broadening: "
                          + ", ".join(terms) + ".")
+        # peak equations (WP-2107) state their own term, as written
+        for eq in phase.peak_equations:
+            lines.append(f"Phase {phase.name}, peak equation {_peak_equation_text(eq)}.")
+    for eq in instrument.peak_equations:
+        lines.append(f"Instrument peak equation {_peak_equation_text(eq)}.")
     return _wrapped(lines)
+
+
+def _peak_equation_text(eq) -> str:
+    """``target = expression`` with each coefficient's value (WP-2107)."""
+    coefs = ", ".join(f"{name}={_value(p)}" for name, p in eq.coefficients.items())
+    return f"{eq.target} = {eq.expression}" + (f", with {coefs}" if coefs else "")
 
 
 def _background_description(instrument: Instrument) -> str:
@@ -521,15 +544,20 @@ def _special_details(result: RefinementResult, structure: Structure) -> list[str
                     "SCOR; the TOPAS Technical Reference describes no such "
                     "factor")
         out.append(esd + ".")
-    for phase in structure.phases:
+    # a refined value with no esd says so, as the profile text does (WP-2219)
+    no_su = {p.path for p in result.parameters if p.stderr is None}
+    tag = "_pd_proc_ls_special_details"
+    for ip, phase in enumerate(structure.phases):
         po = phase.preferred_orientation
         if po is not None and (po.r.vary or po.r.value != 1.0):
             hkl = " ".join(str(i) for i in po.axis)
+            r = _value(po.r, tag,
+                       unknown=f"phases.{ip}.preferred_orientation.r" in no_su)
             out.append(f"Preferred orientation of {phase.name}: March-Dollase "
-                       f"(Dollase 1986), axis the normal to ({hkl}), r="
-                       f"{_value(po.r, '_pd_proc_ls_special_details')}.")
+                       f"(Dollase 1986), axis the normal to ({hkl}), r={r}.")
         tex = phase.texture
-        terms = [f"{name}={_value(c, '_pd_proc_ls_special_details')}"
+        terms = [name + "=" + _value(c, tag,
+                                     unknown=f"phases.{ip}.texture.{name}" in no_su)
                  for name, c in (tex.coefficients.items() if tex else ())
                  if c.vary or c.value != 0.0]
         if terms:
@@ -596,7 +624,8 @@ def _write_refinement_metadata(block, result: RefinementResult,
     pairs += [
         ("_pd_proc_ls_profile_function",
          text("_pd_proc_ls_profile_function",
-              _profile_description(instrument, structure))),
+              _profile_description(instrument, structure, frozenset(
+                  p.path for p in result.parameters if p.stderr is None)))),
         ("_pd_proc_ls_background_function",
          text("_pd_proc_ls_background_function",
               _wrapped([_background_description(instrument)]))),
@@ -890,6 +919,9 @@ def refinement_cif_doc(result: RefinementResult, structure: Structure,
     probe = "neutron" if instrument.source.kind == "neutron_cw" else "xray"
     taken: set[str] = set()
     volume_su = {row.phase_index: row.stderr for row in result.cell_volumes or []}
+    # every row of ``parameters`` refined (WP-1999), so one with no esd is a
+    # refined value whose su is unknown, never a fixed one (WP-2219)
+    no_su = [p.path for p in result.parameters if p.stderr is None]
     for ip, phase in enumerate(structure.phases):
         block = doc.add_new_block(block_name(phase.name, ip, taken))
         # the structure block, its operation loop included: the geometry
@@ -900,7 +932,10 @@ def refinement_cif_doc(result: RefinementResult, structure: Structure,
                               moment_magnitude_esds=_moment_esds(result, ip, phase),
                               composition=result.mode == "rietveld",
                               cell_volume_su=volume_su.get(ip),
-                              dispersion=_dispersion(instrument, phase))
+                              dispersion=_dispersion(instrument, phase),
+                              undetermined=frozenset(
+                                  p.removeprefix(f"phases.{ip}.") for p in no_su
+                                  if p.startswith(f"phases.{ip}.")))
         # Structure-sensitive R factors, on the phase's *own* block: both tags
         # are core-dictionary `_refine_ls` items, whose scope is the structure
         # in the block, not the pattern.  So a multi-phase export gives each

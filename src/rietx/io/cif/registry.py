@@ -150,6 +150,21 @@ _TAGS: tuple[Tag, ...] = (
          "State", "Text"),
     ),
     # the refinement CIF (io/exporters.py)
+    # the su items of a refined value whose su the fit could not determine,
+    # written as ``?`` (WP-2219, io/cif/blocks._undetermined_su)
+    *_rows(
+        _REFINEMENT,
+        *((f"_cell_length_{n}_su", f"_cell.length_{n}_su", "SU", "Real") for n in "abc"),
+        *((f"_cell_angle_{n}_su", f"_cell.angle_{n}_su", "SU", "Real")
+          for n in ("alpha", "beta", "gamma")),
+        ("_cell_volume_su", "_cell.volume_su", "SU", "Real"),
+        *((f"_atom_site_fract_{n}_su", f"_atom_site.fract_{n}_su", "SU", "Real")
+          for n in "xyz"),
+        ("_atom_site_occupancy_su", "_atom_site.occupancy_su", "SU", "Real"),
+        ("_atom_site_U_iso_or_equiv_su", "_atom_site.U_iso_or_equiv_su", "SU", "Real"),
+        *((f"_atom_site_aniso_U_{n}_su", f"_atom_site_aniso.U_{n}_su", "SU", "Real")
+          for n in ("11", "22", "33", "12", "13", "23")),
+    ),
     *_rows(
         _REFINEMENT,
         ("_diffrn_radiation_wavelength", "_diffrn_radiation_wavelength.value",
