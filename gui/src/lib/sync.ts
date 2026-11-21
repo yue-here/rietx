@@ -228,7 +228,9 @@ export function editedLines(base: string, buffer: string): number[] {
   const n = endA - head;
   const m = endB - head;
   const out: number[] = [];
-  if (n === 0 || n * m > EDITED_LINES_MAX_CELLS) {
+  // only deleted lines: nothing left in the buffer to mark
+  if (m === 0) return out;
+  if (n === 0 || (n + 1) * (m + 1) > EDITED_LINES_MAX_CELLS) {
     for (let j = head; j < endB; j++) out.push(j + 1);
     return out;
   }

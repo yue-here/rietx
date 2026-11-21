@@ -57,21 +57,33 @@
   let sync = $state(initial());
   let host = $state<HTMLDivElement | null>(null);
   let editor = $state<EditorHandle | null>(null);
+  /** the editor chunk did not load */
   let bootError = $state("");
+  /** the last read of the rendering failed; cleared by the next one that succeeds */
+  let readError = $state("");
   let timer: ReturnType<typeof setTimeout> | null = null;
   /** the document has never been fetched, so the empty buffer is not "clean" */
   let loaded = $state(false);
+  /** bumped by `forget`, so a read begun for the project left is dropped */
+  let generation = 0;
 
   const problems = $derived(sync.problems);
+  // primitives, so the line diff below reruns only when a text changes and
+  // not on every dispatch (checking, checked) that leaves both alone
+  const base = $derived(sync.base);
+  const buffer = $derived(sync.buffer);
   /** A comment does not survive a re-render (WP-1009), so say so before Apply
    *  replaces the buffer. */
   const addedComments = $derived(
-    Math.max(0, commentLines(sync.buffer) - commentLines(sync.base)));
-  const edited = $derived(loaded && sync.buffer !== sync.base);
+    Math.max(0, commentLines(buffer) - commentLines(base)));
+  const edited = $derived(loaded && buffer !== base);
+  const editedMarks = $derived(edited ? editedLines(base, buffer) : []);
   const why = $derived(!edited ? ""
     : sync.stale ? "The text is stale: re-read it in the Text tab."
     : sync.phase === "invalid"
-      ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
+      ? (problems.length
+        ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
+        : sync.notice || "The text was not read.")
       : "");
 
   $effect(() => {
@@ -86,8 +98,10 @@
    *  it instead, once a read has succeeded (WP-2213). */
   async function load(force = false) {
     const kept = restoring;
+    const at = generation;
     try {
       const payload = await api.textdoc();
+      if (at !== generation) return;
       if (kept && restoring !== kept) return;
       if (kept && !force) {
         dispatch({ kind: "restored", text: payload.text, revision: payload.revision,
@@ -102,9 +116,11 @@
         if (force) restoring = null;
       }
       loaded = true;
+      readError = "";
     } catch (error) {
+      if (at !== generation) return;
       if (error instanceof ApiError && error.empty) return;
-      bootError = (error as Error).message;
+      readError = (error as Error).message;
     }
   }
 
@@ -113,7 +129,7 @@
   let restoring = $state.raw<TextDraft | null>(null);
   export function draft(): TextDraft | null {
     if (restoring) return restoring;
-    if (!loaded || sync.buffer === sync.base) return null;
+    if (!edited) return null;
     return { buffer: sync.buffer, revision: sync.revision };
   }
 
@@ -136,10 +152,12 @@
   /** The open project changed: drop this buffer and read the next one afresh. */
   export function forget() {
     if (timer) clearTimeout(timer);
+    generation += 1;
     restoring = null;
     sync = initial();
     loaded = false;
     bootError = "";
+    readError = "";
   }
 
   function typed(text: string) {
@@ -165,7 +183,7 @@
    *  was waiting or the buffer applied; false when it was refused, and the
    *  tab then says why. */
   export async function apply(): Promise<boolean> {
-    if (!loaded || sync.buffer === sync.base) return true;
+    if (!edited) return true;
     // the server read the buffer and it changes nothing, such as a comment
     // added: applying it is reading the rendering again
     if (sync.phase === "valid" && !sync.wouldChange && !sync.stale && !busy) {
@@ -202,7 +220,7 @@
   // The editor's document, squiggles and chrome are derived from `sync` and the
   // theme, never pushed (WP-1013).
   $effect(() => {
-    editor?.setDoc(sync.buffer);
+    editor?.setDoc(buffer);
   });
   $effect(() => {
     editor?.setProblems(sync.problems);
@@ -211,7 +229,7 @@
     editor?.setTheme(dark);
   });
   $effect(() => {
-    editor?.setEdited(loaded ? editedLines(sync.base, sync.buffer) : []);
+    editor?.setEdited(editedMarks);
   });
 
   // re-read when the working state moved, once the tab has been opened
@@ -258,7 +276,8 @@
     : sync.phase === "dirty" ? "edited"
     : sync.phase === "checking" ? "checking…"
     : sync.phase === "invalid"
-      ? `${problems.length} line${problems.length === 1 ? "" : "s"} not read`
+      ? (problems.length ? `${problems.length} line${problems.length === 1 ? "" : "s"} not read`
+        : "not read")
     : sync.phase === "applying" ? "applying…"
     : sync.wouldChange ? "edited" : "no change");
 </script>
@@ -275,8 +294,8 @@
   {:else if sync.notice}
     <p class="notice">{sync.notice}</p>
   {/if}
-  {#if bootError}
-    <p class="notice bad">{bootError}</p>
+  {#if bootError || readError}
+    <p class="notice bad">{bootError || readError}</p>
   {/if}
   {#if addedComments > 0}
     <p class="notice">{addedComments} comment line{addedComments === 1 ? "" : "s"} you added will not survive Apply.</p>
@@ -286,7 +305,7 @@
 
   {#if problems.length}
     <ul class="problems" aria-label="Problems">
-      {#each problems as problem (problem.line + problem.message)}
+      {#each problems as problem}
         <li>
           <button class="link mono" onclick={() => editor?.goToLine(problem.line)}
             >line {problem.line}</button>

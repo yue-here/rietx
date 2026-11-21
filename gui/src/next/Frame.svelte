@@ -425,6 +425,19 @@
    *  forward. The result is not refetched: a `set_values` keeps the last fit
    *  (today's `App.svelte:moved` says why). */
   async function applyPending(): Promise<boolean> {
+    // a second Apply or ⌘⏎ while one is in flight would find each panel
+    // mid-apply, read that as a refusal and pull its tab forward
+    if (applying) return false;
+    applying = true;
+    try {
+      return await applyAll();
+    } finally {
+      applying = false;
+    }
+  }
+  let applying = false;
+
+  async function applyAll(): Promise<boolean> {
     if (!(await applyText())) return false;
     const ok = !!(await paramsPanel?.apply());
     if (!ok) {

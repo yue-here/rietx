@@ -144,4 +144,33 @@ describe("the Text tab", () => {
     expect(pending).toHaveBeenLastCalledWith(true, "The text has 1 problem.");
     expect(await app.apply()).toBe(false);
   });
+
+  it("says the server's words when a refusal names no line, never \"0 problems\"", async () => {
+    const pending = vi.fn();
+    app = mount(Text, { target: document.body, props: { active: true, name: "fap", onpending: pending } });
+    await settle();
+    putTextdoc.mockRejectedValueOnce(Object.assign(new (ApiError as any)("the document is not rxt 1"),
+                                                   { code: "TEXTDOC_INVALID", details: [] }));
+    typed!("rxt 2\n");
+    await new Promise((r) => setTimeout(r, 350));
+    await settle();
+    expect(text(document.querySelector(".bar .sync"))).toBe("not read");
+    const why = pending.mock.calls.at(-1)![1];
+    expect(why).not.toMatch(/0 problems/);
+    expect(why.length).toBeGreaterThan(0);
+  });
+
+  it("drops a read begun for the project it was told to forget", async () => {
+    app = mount(Text, { target: document.body, props: { active: true, name: "fap" } });
+    await settle();
+    let late: (v: unknown) => void = () => {};
+    textdoc.mockImplementationOnce(() => new Promise((r) => { late = r; }) as any);
+    const reading = app.revert();
+    app.forget();
+    late({ text: "rxt 1\nproject \"other\"\n", revision: "rX" });
+    await reading;
+    await settle();
+    expect(app.draft()).toBeNull();
+    expect(text(document.querySelector(".bar .sync"))).toBe("loading…");
+  });
 });
