@@ -334,7 +334,7 @@ honestly. Four cases qualify:
   against $x$, $y$ and $z$ do not vanish, so the quadratic form lands on
   roundoff. A torsion held at 180° by an inversion centre cancels one step
   earlier, between the two images of one atom, so every net partial is
-  roundoff; its absolute terms are therefore taken from the partials before
+  roundoff; its absolute terms are taken from the partials before
   they are summed;
 * an angle within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°, where the
   angle is a stationary point of the coordinates and the linearisation the

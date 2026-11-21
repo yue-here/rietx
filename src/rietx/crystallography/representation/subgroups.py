@@ -662,18 +662,25 @@ def _probe(H: _Group, metric: np.ndarray, points):
     return cell, positions, numbers
 
 
-def _standardise(H: _Group, metric: np.ndarray, index: int = 1):
+def _standardise(H: _Group, metric: np.ndarray, index: int = 1, hall_number: int = 0):
     """(number, symbol, (P, p)) of H, checked exactly against spglib's setting.
 
     spglib returns floats; the rational each stands for has a denominator that
     grows with H's index in G (an inversion centre at a/2 of a p-fold
     supercell is 1/2p in H's own axes, a hexagonal origin 1/3p), so the bound
     that recovers it does too.  The exact comparison below accepts or raises.
+
+    ``hall_number`` 0 is spglib's default setting of H's type, which is origin
+    choice 1 for the 24 two-origin types; a caller wanting another setting of
+    the same type (origin choice 2, Parthé & Gelato 1984 rule 2(c), as
+    :func:`rietx.crystallography.setting.standard_setting` does) names its Hall
+    number, and the exact check is then made against that setting.
     """
     bound = max(_PROBE_DENOMINATOR_FLOOR, _PROBE_DENOMINATOR_PER_INDEX * index)
     cell, positions, numbers = _probe(H, metric, _PROBE_POINTS)
     try:
-        data = spglib.get_symmetry_dataset((cell, positions, numbers), symprec=_PROBE_SYMPREC)
+        data = spglib.get_symmetry_dataset((cell, positions, numbers), symprec=_PROBE_SYMPREC,
+                                           hall_number=int(hall_number))
     except SPGLIB_REFUSALS:
         data = None
     if data is None:
