@@ -58,6 +58,8 @@ __all__ = [
     "HelpEntry",
     "PARAMETER_HELP",
     "DIAGNOSTIC_HELP",
+    "DIAGNOSTIC_VIEWS",
+    "DIAGNOSTIC_VIEW_OF",
     "PEAK_FLAG_HELP",
     "PEAK_ORIGIN_HELP",
     "READER_OPTION_HELP",
@@ -759,11 +761,17 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "polynomial on top cannot correct this, because it is additive and the "
             "error is multiplicative. Free the scale only against a low-order "
             "polynomial. Expect `HIGH_CORRELATION` against c0 and read it as an "
-            "expected report."
+            "expected report. A curve another program computed for one phase, such as "
+            "a DIFFaX faulted-minus-ideal term, scales with that phase. Store "
+            "it as c*·D, with c* converting the program's units to counts at phase "
+            "scale 1, and tie this scale to the phase scale with `Refinement.tie`. The "
+            "stored curve does not follow the zero shift or any other peak-position "
+            "correction."
         ),
         unit=None, default="1.0",
         typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank",
+                "of 1 for a measured blank; the phase scale, tied, for a "
+                "computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
@@ -781,6 +789,21 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="absent unless the pattern diagnostics report a low-angle "
                 "rise; 1e-3 as a seed where they do",
         anchor="theory/background.html#additive-background-models",
+    ),
+    "instrument.peak_equations.*.*": HelpEntry(
+        title="Instrument peak equation coefficient",
+        description=(
+            "A coefficient of the instrument's position equation, which adds a shift "
+            "in degrees 2θ to every phase's peaks as a function of the angle alone, "
+            "such as a calibration curve in `two_theta`. Its unit is whatever makes "
+            "the expression come out in degrees. In a joint fit it is per pattern "
+            "unless the sharing map shares it, like every instrument parameter. No "
+            "preset plan frees it, so a stage names `instrument.peak_equations.*` "
+            "itself."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a shift of hundredths of a degree",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
     ),
     "instrument.extra_components.*.position": HelpEntry(
         title="Background-peak position",
@@ -1067,6 +1090,25 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="0.6-1.4; a value outside 0.5-2 describes a texture few powder "
                 "mounts produce",
         anchor="theory/corrections.html#preferred-orientation-march-dollase",
+    ),
+    "phases.*.peak_equations.*.*": HelpEntry(
+        title="Peak equation coefficient",
+        description=(
+            "A coefficient of one of the phase's peak equations, named in its "
+            "`coefficients` and read by its expression. The equation adds a term to "
+            "each reflection's Lorentzian or Gaussian width or to its position, or "
+            "multiplies its intensity, as its `target` says. Its unit is whatever "
+            "makes the expression come out in the target's unit: degrees 2θ for a "
+            "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
+            "intensity factor. No preset plan frees it, so a stage names "
+            "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
+            "its own unit refines better rescaled near 1, by writing its factor into "
+            "the expression."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a Lorentzian tanθ coefficient near "
+                "lor_strain's",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
     ),
     "phases.*.texture.*": HelpEntry(
         title="Texture coefficient",
@@ -1928,6 +1970,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "and c to a on a cubic cell, or beta and gamma to alpha on rhombohedral "
+            "axes. The file stores the two with slightly different values. They "
+            "agree within the digits the file prints, so the reader used the source "
+            "value for both. A refinement builds the tied parameter from its source "
+            "anyway. A larger disagreement is left as written and the refinement "
+            "refuses it. If the difference is real, the symmetry is lower than the "
+            "symbol claims, and the phase needs a space group that leaves the "
+            "parameter free."
+        ),
+    ),
     "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
         title="Data blocks that state nothing were skipped",
         description=(
@@ -2120,10 +2176,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A combination of parameters is not measured",
         description=(
             "The data do not constrain one combination of several parameters. The solver "
-            "discards that direction, so each esd in the group comes out too small, by "
-            "at least a factor of the square root of two. Do not quote these esds as "
-            "measured. Free fewer of the parameters in one stage, hold the ones you know "
-            "independently, or widen the fitted range. Esds of other parameters are "
+            "discards that direction, and each parameter on it has no esd: the result, "
+            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
+            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the parameters in one stage, hold the ones you know independently, or widen "
+            "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
         ),
     ),
@@ -2323,7 +2380,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two parameters are correlated so completely that the data measure only one "
             "combination of them. This is a statement about the rank of the problem and "
             "not about a strong correlation. Each esd is conditional on the other "
-            "parameter being right. Fix one at an independently known value and refine "
+            "parameter being right. Where the data do not move their difference at "
+            "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
             "histogram can separate them."
         ),
@@ -2941,6 +2999,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_CELL_TIE_CORRECTED": HelpEntry(
+        title="Tied cell parameter in a history set to its source",
+        description=(
+            "The space group makes one cell parameter equal to another, such as b "
+            "to a on a tetragonal cell. A history written by an earlier release "
+            "stores the two with different values. Every fit of that model built "
+            "the tied parameter from its source, so loading reads it that way and "
+            "no number the history produced changes. This release refuses "
+            "such a cell, so the stored value could not otherwise be refined."
+        ),
+    ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
         title="Earlier tree in a history file skipped",
         description=(
@@ -3267,6 +3336,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "line of a supercell. A supercell of the leading cell predicts the last kind. "
             "Declaring "
             "`n_unindexed` forbids both retries."
+        ),
+    ),
+    "K_SEARCH_PARTNER": HelpEntry(
+        title="The cell's metric pairs this propagation vector with another",
+        description=(
+            "A near-symmetry of the cell's metric, within the tolerance passed, maps this "
+            "propagation vector onto another one that no symmetry of the space group "
+            "relates to it. The satellites of this vector and of vectors near the other "
+            "one can then agree within a match radius, so the positions alone may not say "
+            "which the peaks belong to. On a pseudo-tetragonal cell the swap of the two "
+            "near-equal axes is the usual case. Score the other vector and its "
+            "neighbourhood, and keep every vector that matches as a hypothesis. A moment or "
+            "modulation model, which reads intensities, or a sharper instrument separates "
+            "them."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -3931,6 +4014,31 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": HelpEntry(
+        title="A peak equation's coefficient is shared across wavelengths",
+        description=(
+            "In a joint fit of patterns at different wavelengths, a peak equation's "
+            "coefficient is one number in degrees for every pattern. The right value "
+            "in degrees can differ with wavelength. A size-like term scales with λ, "
+            "and a strain-like one, such as a tan θ term, does not. The package "
+            "converts its own size terms, but cannot tell which kind an equation "
+            "holds. For a wavelength-dependent term, give each pattern its own "
+            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
+            "such a term per pattern, or with Lam in the expression."
+        ),
+    ),
+    "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
+        title="A peak equation takes a width below zero",
+        description=(
+            "A phase's width peak equation makes the Gaussian variance Γ_G² or the "
+            "Lorentzian FWHM Γ_L negative at some reflections in the fitted range. A "
+            "term in an equation may be negative, as a TCHZ v or w often is, but the "
+            "total width may not. The forward model floors a negative Γ_G², and a "
+            "negative Γ_L is no peak shape, so those reflections do not carry the "
+            "equation's width. Bound the coefficients, or write the term so that it "
+            "cannot go negative, and refit."
+        ),
+    ),
     "PHASE_HELD_IN_PATTERNS": HelpEntry(
         title="A phase was held in some patterns of a joint fit",
         description=(
@@ -4003,6 +4111,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
             "that takes the broad hump, or longer counting can narrow the range."
+        ),
+    ),
+    "QPA_INTENSITY_FACTOR": HelpEntry(
+        title="A weight fraction ignores an intensity factor",
+        description=(
+            "A phase carries an `intensity_factor` peak equation, so each of its "
+            "reflections' intensities is multiplied by a number. The weight fraction "
+            "is computed from the phase's scale, which absorbs that factor. A factor "
+            "that averages 0.83 makes the scale, and so the fraction relative to the "
+            "other phases, about 1/0.83 = 1.2× too high. A factor averaging above 1 "
+            "makes it too low. The message quotes the factor's range and mean over the "
+            "phase's reflections in range. Write the factor so it averages 1, or "
+            "multiply the phase's scale by the mean factor before reading its "
+            "fraction."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(
@@ -4397,16 +4519,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measurement, so do not interpolate across it. It seeded no later pattern "
             "and was left out of the series median, so its neighbours are unaffected. "
             "Fit the pattern on its own to find out why."
-        ),
-    ),
-    "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
-        title="A phase width grows as the fit worsens",
-        description=(
-            "A peak-width parameter grew a long way over the series while the goodness "
-            "of fit rose. A phase broadened that far usually stands in for something the "
-            "model lacks, such as a second phase, a diffuse signal or a background the "
-            "function cannot follow. Its width, scale and cell are then unreliable. Fit "
-            "the pattern at the onset with the missing component added."
         ),
     ),
     "SERIES_PATTERN_FAILED": HelpEntry(
@@ -4858,6 +4970,34 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Respell the site in TOPAS if you want to refine the ion."
         ),
     ),
+    "VARIABLE_NOT_FREED": HelpEntry(
+        title="A variable was never refined",
+        description=(
+            "No stage of the plan freed a variable, so it kept its starting value. In "
+            "a joint fit the variable is a coefficient of a parametric equation. A "
+            "stage that frees the equation's target frees its coefficients. A "
+            "formula's variable declared `vary=False` is freed only by a stage naming "
+            "its `vars.<name>` path. In a single fit a variable that other parameters "
+            "are tied to is freed only by a stage naming its `vars.<name>` path. The "
+            "parameters that follow the variable are set from its start, and the data "
+            "did not measure them. The result has no row for the variable in "
+            "`parameters`. Add a stage that frees it before you quote what it sets. In a "
+            "single fit, hold the variable with `Refinement.hold` to say the start is "
+            "meant, and it is not named."
+        ),
+    ),
+    "WARM_REFIT_REJECTED": HelpEntry(
+        title="A re-fit fell back to the staged plan",
+        description=(
+            "A second `fit` on a model its last fit had converged runs the plan as one "
+            "stage, `warm_refit`, because a converged model needs no staged approach. "
+            "Here that one-stage fit diverged or carried an error-level finding, which "
+            "the message names. It was discarded, the model went back to where it "
+            "started, and the staged plan ran from there. The result is the staged "
+            "plan's answer, so nothing needs redoing. No ordinary fit has been seen to "
+            "fire it. `refit=\"stages\"` skips the one-stage attempt."
+        ),
+    ),
     "WAVELENGTH_CALIBRATION": HelpEntry(
         title="A refined wavelength moved from its declared value",
         description=(
@@ -4894,6 +5034,39 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "multiplying."
         ),
     ),
+}
+
+
+#: The rendered views a diagnostic can name (WP-1133), each as
+#: ``function.panel``, with the words a reader is shown.  Each view has a
+#: reference inside its frame: the eye judges a misfit only against something
+#: drawn beside it (WP-1130 § Finding 8).  ``plot_for_vlm`` gives each panel's
+#: axes its name as the matplotlib ``gid``, and
+#: ``tests/test_diagnostic_views.py`` renders the montage and fails on a name
+#: no panel carries, or on a name no code uses.
+DIAGNOSTIC_VIEWS: dict[str, str] = {
+    "plot_for_vlm.overview": (
+        "the top panel of rietx.viz.plot_for_vlm, observed and calculated "
+        "intensity over the whole pattern"
+    ),
+    "plot_for_vlm.residual": (
+        "the Δ/σ panel of rietx.viz.plot_for_vlm, the misfit in noise units "
+        "against a ±3σ band"
+    ),
+}
+
+#: The view that shows a code's finding, read by ``Diagnostic.view``.  It is
+#: the same for every finding with the code, so it is looked up and never
+#: stored (WP-1985's rule for ``explanation``).  A code is listed only where a
+#: fit firing it was rendered and the finding read off that panel; the fits are
+#: in ``tests/test_diagnostic_views.py``.  A code not listed reads ``None``,
+#: which says no view was checked for it, not that none would help.  The one
+#: finding known to have no view is a background level: a uniform factor of
+#: two leaves a smooth decay with no visual signature (WP-1130).
+DIAGNOSTIC_VIEW_OF: dict[str, str] = {
+    "AIR_SCATTER_UNDECLARED": "plot_for_vlm.residual",
+    "LOW_ANGLE_UNMODELLED": "plot_for_vlm.residual",
+    "MODEL_FAR_FROM_DATA": "plot_for_vlm.overview",
 }
 
 
