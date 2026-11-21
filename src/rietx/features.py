@@ -235,6 +235,7 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "parameterisation § Rigid bodies",
+            "parameterisation § Placing the origin",
         ),
     ),
     "restraints": Feature(
@@ -508,8 +509,17 @@ FEATURES: dict[str, Feature] = {
     "parametric_refinement": Feature(
         "A parameter as a function of each pattern's coordinates",
         theory=(
-            "parameterisation § A parameter as a function of each pattern's coordinates",
-            "parameterisation § A formula equation",
+            "parametric § A formula equation",
+        ),
+    ),
+    "peak_equations": Feature(
+        "A user-written term per reflection (peak equations)",
+        parameters=(
+            "instrument.peak_equations.*.*",
+            "phases.*.peak_equations.*.*",
+        ),
+        theory=(
+            "forward-model § Peak equations",
         ),
     ),
     "distortion_modes": Feature(

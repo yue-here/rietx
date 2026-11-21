@@ -3305,6 +3305,13 @@ FEATURE_TESTS: dict[str, tuple[str, ...]] = {
         "test_parametric_series.py::test_a_constant_declaration_is_refine_multi_bit_for_bit",
         "test_parametric_series.py::test_a_parametric_slope_recovers_a_known_expansion_within_its_esd",
     ),
+    "peak_equations": (
+        "test_peak_equations.py::test_a_tan_theta_lorentzian_term_is_lor_strain",
+        "test_peak_equations.py::test_a_variance_term_in_tan_squared_is_caglioti_u",
+        "test_peak_equations.py::test_a_cos_theta_shift_is_sample_displacement",
+        "test_peak_equations.py::test_an_exponential_in_s_squared_is_biso",
+        "test_peak_equations.py::test_twelve_seeds_recover_every_coefficient_without_bias",
+    ),
     "distortion_modes": (
         "test_distortion_modes.py::test_lamno3_reproduces_table_13",
     ),

@@ -127,7 +127,7 @@ Cell and Bragg's law.
 
 **Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
 
-- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 - *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
 - *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -147,7 +147,7 @@ Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy.
 
 **Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
 
-- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 - *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
 - *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -161,7 +161,7 @@ Zero, specimen displacement and transparency.
 
 **Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
 
-- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-5 A (k = 2, 19 ppm) at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
 - *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
 - *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
@@ -592,6 +592,14 @@ Joint multi-histogram refinement (refine_multi).
 A parameter as a function of each pattern's coordinates.
 
 **Verified by:** unit tests `tests/test_parametric_series.py::test_a_constant_declaration_is_refine_multi_bit_for_bit`, `tests/test_parametric_series.py::test_a_parametric_slope_recovers_a_known_expansion_within_its_esd`
+
+**State:** not yet validated.
+
+### `peak_equations`
+
+A user-written term per reflection (peak equations).
+
+**Verified by:** unit tests `tests/test_peak_equations.py::test_a_tan_theta_lorentzian_term_is_lor_strain`, `tests/test_peak_equations.py::test_a_variance_term_in_tan_squared_is_caglioti_u`, `tests/test_peak_equations.py::test_a_cos_theta_shift_is_sample_displacement`, `tests/test_peak_equations.py::test_an_exponential_in_s_squared_is_biso`, `tests/test_peak_equations.py::test_twelve_seeds_recover_every_coefficient_without_bias`
 
 **State:** not yet validated.
 
