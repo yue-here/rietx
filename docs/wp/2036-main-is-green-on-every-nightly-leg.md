@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-20 — the suite alarm pin re-pinned after #1707 (PR #1723); fluorite's row depends on rounding and waits on WP-2225
+Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by ghostshift MacBook-Air-9db21f (fluorite's rounding-dependent alarm row)
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
