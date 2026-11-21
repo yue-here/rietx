@@ -1184,6 +1184,58 @@ def test_the_schur_covariance_is_the_dense_pseudo_inverse(case):
     np.testing.assert_allclose(corr_b, corr_d, rtol=0, atol=1e-10)
 
 
+def _flat_across_the_border(seed: int) -> BlockJacobian:
+    """``_random_arrow(3)`` with shared column 0 set, in every block, to a
+    combination of two of that block's own columns: one exactly flat
+    direction reaching the border and every block, the shape of a shared W
+    beside each pattern's ``gauss_size`` and ``gauss_strain`` (WP-2028)."""
+    bj = _random_arrow(3)
+    rng = np.random.default_rng(seed)
+    blocks = [b.copy() for b in bj.blocks]
+    for h, (b, cm) in enumerate(zip(blocks, bj.col_maps, strict=True)):
+        b[:, int(np.flatnonzero(cm == 0)[0])] = b[:, _own(bj, h)[:2]] @ rng.uniform(0.5, 2.0, 2)
+    return BlockJacobian(blocks, bj.col_maps, bj.n_data, bj.n_pen, bj.n_cols)
+
+
+def _flat_inside_a_block(seed: int) -> BlockJacobian:
+    """:func:`_flat_across_the_border` plus a second flat direction inside
+    block 2's own columns (one own column a multiple of another), so the
+    projection carries an own block's discard beside the border's."""
+    bj = _flat_across_the_border(seed)
+    blocks = [b.copy() for b in bj.blocks]
+    own = _own(bj, 2)
+    blocks[2][:, own[3]] = 1.5 * blocks[2][:, own[2]]
+    return BlockJacobian(blocks, bj.col_maps, bj.n_data, bj.n_pen, bj.n_cols)
+
+
+@pytest.mark.parametrize("build,seed,n_gone", [(_flat_across_the_border, 0, 1),
+                                               (_flat_across_the_border, 4, 1),
+                                               (_flat_inside_a_block, 0, 2)])
+def test_a_direction_the_schur_form_discards_is_the_dense_pseudo_inverses(build, seed,
+                                                                          n_gone):
+    """With a discarded direction, the Schur form is a generalised inverse of
+    the arrow and not its pseudo-inverse: it gave the whole direction to the
+    border, so shared column 0 read 1.3e-20 against the dense 9.1e-5 (seed 0;
+    a joint W read 2.7e-17 against 3.9e-7).  Projected off the discarded
+    directions, the esds, correlations and the touched columns are the dense
+    path's.  Both layouts discard the one direction here (smallest
+    equilibrated eigenvalue 1.4e-16 and 9.3e-18 of the largest, under the
+    1e-15 cut)."""
+    bj = build(seed)
+    r = np.random.default_rng(4).standard_normal(bj.shape[0])
+    n_data = sum(bj.n_data)
+    esd_b, corr_b = covariance_estimates(bj, r, bj.n_cols, n_data=n_data)
+    esd_d, corr_d = covariance_estimates(bj.toarray(), r, bj.n_cols, n_data=n_data)
+    assert blocked._schur(bj).s_gone.shape[1] == 1
+    np.testing.assert_allclose(esd_b, esd_d, rtol=1e-10)
+    np.testing.assert_allclose(corr_b, corr_d, rtol=0, atol=1e-10)
+    n_b, touched_b = discarded_directions(bj)
+    n_d, touched_d = discarded_directions(bj.toarray())
+    assert n_b == n_d == n_gone
+    np.testing.assert_array_equal(touched_b, touched_d)
+    assert 0 in touched_b
+
+
 def test_a_joint_covariance_at_a_real_point_is_the_dense_one():
     """The same at the start of a real library fit, χ² and the Bérar-Lelann
     factor included."""

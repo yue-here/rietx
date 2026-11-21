@@ -83,4 +83,10 @@ From issue #1225 (mustachefeeling, 2026-10-29), "Kind: machinery" in #1224's sen
 
 ## Handover log
 
+- **2026-11-17** — Ruled by Yue 2026-11-17: Mike's statement on #1225 is accepted. The
+  collaborator that WP-1419's 2026-10-06 entry names is his own group. So this proposal is
+  that work, and the "Check before starting" item is answered. The reporter's four open
+  questions were not part of this ruling. Recorded from Part B item 45 of the 2026-11-17
+  decisions batch (Ghostshift runner, no code changed).
+
 - **2026-10-31** — created, from the issue triage (issue #1225). No open WP owns it: WP-1419 owns single-irrep `distortion_candidates` and is the consumer, but its scope is refining a stated child on its amplitudes and its handover puts multi-k children out; WP-1919 owns maximal subgroups only, and is the cross-check; WP-1418 owns magnetic isotropy.

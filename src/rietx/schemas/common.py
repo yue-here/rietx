@@ -717,14 +717,21 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (WP-1340): ``PhaseQuantity.mole_fraction``,
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: Also in 0.62 (WP-1340): ``PhaseQuantity.mole_fraction``,
 #: ``.mole_fraction_stderr``, ``.mole_fraction_formula_unit``,
 #: ``.mole_fraction_formula_unit_stderr`` and ``.z_source``;
 #: ``QuantitativePhaseAnalysis.formula_unit_withheld``; and
 #: ``Phase.formula_units``, a caller-declared Z read only by QPA.  Additive and
 #: defaulted to ``None``, the 0.25 → 0.26 rule: a result stored before reads
 #: as "not computed"; an older build refuses a document carrying any of them.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
@@ -1253,3 +1260,17 @@ class Diagnostic(Base):
 
         entry = explain(self.code)
         return None if entry is None else entry.description
+
+    @property
+    def view(self) -> str | None:
+        """The rendered view that shows this finding, from
+        :data:`rietx.help.DIAGNOSTIC_VIEW_OF` (WP-1133).
+
+        A name in :data:`rietx.help.DIAGNOSTIC_VIEWS`, such as
+        ``"plot_for_vlm.residual"``.  ``None`` where no view has been checked
+        for the code, which is most codes.  The pointer is a name and never an image, so the caller
+        decides whether to draw it.
+        """
+        from ..help import DIAGNOSTIC_VIEW_OF
+
+        return DIAGNOSTIC_VIEW_OF.get(self.code)

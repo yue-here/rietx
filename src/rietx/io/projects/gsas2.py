@@ -1830,6 +1830,11 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
             f"{named}: phase {chosen.name!r} states values this build's "
             f"schema refuses ({exc}).  The file's own numbers are on "
             f"`model.phases`") from exc
+    from ...crystallography.symmetry import check_phase_cell_ties
+    try:
+        check_phase_cell_ties(structure.phases[0], prefix="phases.0")
+    except ValueError as exc:
+        raise Gsas2GpxError(f"{named}: phase {chosen.name!r}: {exc}") from exc
 
     # a site whose own images coincide is one atom on its special position
     # (#1007), said here because this is the channel the schema lacks
@@ -1928,6 +1933,7 @@ def from_structure(structure, *,
         refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
+        refuse_parent_cell,
         refuse_propagation_vector,
         restate_in_hexagonal_axes,
         rhombohedral_restated_diagnostic,
@@ -1951,6 +1957,7 @@ def from_structure(structure, *,
                 "without a warning (measured on GSAS-II 5.6.3)")
         refuse_operation_list(phase, "a GSAS-II phase CIF")
         refuse_distortion_modes(phase, "a GSAS-II phase CIF")
+        refuse_parent_cell(phase, "a GSAS-II phase CIF")
         phase, restated = restate_in_hexagonal_axes(
             phase, "a GSAS-II phase CIF")
         if restated:

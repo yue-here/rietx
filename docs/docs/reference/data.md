@@ -244,6 +244,7 @@ Its first five fields describe the crystal, and the rest describe what this spec
 | `Phase.propagation_vector` | three rational strings, or None | `None` | a commensurate k on the conventional reciprocal cell, adding satellites at Q = H ± k, {eq}`sat-position` |
 | `Phase.magnetic_symmetry` | `MagneticSymmetry` or `None` | `None` | the magnetic space group, as its magCIF operator and centring loops, {eq}`int-Fmag` |
 | `Phase.restraints` | `list` | `[]` | soft restraints on bonds, angles and values, {eq}`par-restraint` |
+| `Phase.peak_equations` | `list[PeakEquation]` | `[]` | terms you write on each reflection's width, position or intensity, {eq}`fm-peak-equation`; see [Peak equations](#peak-equations) |
 | `Phase.floating_origin` | `"hold"`, `"centroid"` or `None` | `None` | what fixes the origin of a polar space group |
 
 A phase can also carry rigid bodies over its own atoms.
@@ -385,6 +386,7 @@ A bound stated on the parent's cell carries over to the child's `parent_cell.cel
 Coordinates do not refine as x, y and z.
 The parameter table refines one shift per direction the site symmetry allows, and ties x, y and z to those shifts.
 A fully fixed special position therefore has no free entry, and `vary=True` on one of its coordinates raises.
+The refusal names every such site at once, a rigid body's origin among them.
 `Refinement.fix_special_positions` clears `vary` on every such coordinate and returns their names.
 The [parameter map](parameters.md#atoms) gives the names of the shifts.
 
@@ -417,6 +419,68 @@ lab6 = Structure(phases=[Phase(
 )])
 assert lab6.phases[0].cell.lengths_angles()[:3] == (4.15689, 4.15689, 4.15689)
 ```
+
+### Peak equations
+
+`PeakEquation` writes a term on each reflection's peak as an equation in its indices and angle.
+[How to write a peak's width or position as an equation](../guides/peak_equation.md) runs one from start to finish.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `PeakEquation.target` | `"lor_fwhm"`, `"gauss_fwhm"`, `"gauss_fwhm_squared"`, `"shift"` or `"intensity_factor"` | what the value adds to or multiplies |
+| `PeakEquation.expression` | `str` | the equation, in the grammar of [Expressions](expressions.md) |
+| `PeakEquation.coefficients` | `dict[str, Parameter]` | each name the expression reads beyond the reflection |
+
+| Target | Unit | Where the value goes |
+|---|---|---|
+| `lor_fwhm` | degrees 2θ | added to the Lorentzian FWHM, as `lor_size` and `lor_strain` are |
+| `gauss_fwhm` | degrees 2θ | squared and added to Γ<sub>G</sub>², so it adds in quadrature |
+| `gauss_fwhm_squared` | deg² | added to Γ<sub>G</sub>² as it stands, beside U, V and W, so it may be negative |
+| `shift` | degrees 2θ | added to the peak position |
+| `intensity_factor` | 1 | multiplies the reflection's intensity |
+
+The expression reads the coefficients by name, and the reflection through seven names.
+`h`, `k` and `l` are the Miller indices, `m` the multiplicity and `d` the d-spacing in Å.
+`theta` is the Bragg angle in radians, so `tan(theta)` works.
+`two_theta` is in degrees, where the peak sits before the phase's own equations act.
+`orbit_mean(x)` and `harmonic(l, n)` read the reflection's orbit and direction ([Expressions](expressions.md)).
+
+A phase holds at most one equation per target, so a sum goes in one expression.
+`Instrument.peak_equations` takes `shift` alone and reads only `theta` and `two_theta`, because it moves every phase's peaks.
+Each coefficient is a parameter under its equation's path, such as `phases.0.peak_equations.0.w` or `instrument.peak_equations.0.sq`.
+The second index counts the equations in their list, and the last part is the coefficient's name.
+A plan frees it only by naming that path, since no preset does.
+Deleting an equation renumbers the later ones, so a hold on `peak_equations.1.*` then names another equation.
+
+The constructor refuses five things.
+
+- A name the expression reads that is neither a coefficient nor a reflection name.
+- A coefficient the expression does not read, which would move nothing.
+- A coefficient named after a reflection name, after the grammar's own names, after one of the phase's fields, or `scale`.
+  A plan's `phases.*.lor_size` would match a coefficient called `lor_size`, and a joint fit shares paths ending in `.scale` its own way.
+- A condition inside `if` that reads anything but `h`, `k`, `l` and `m`.
+  Those four cannot change during a solve, so a reflection cannot switch branch mid-fit.
+- `harmonic(l, n)` with an odd or zero `l`, or with |n| > l, and `orbit_mean` inside `orbit_mean`.
+
+The compile refuses three more.
+An equation that gives different values on two symmetry images of one reflection is refused, naming both.
+It is tested at the stored coefficients and at random trial ones, since `if(l == 0, a, b)` with a equal to b agrees until the fit splits them.
+An `intensity_factor` is refused under Le Bail and Pawley, whose extracted intensities would absorb it.
+A phase with a propagation vector takes no peak equation.
+
+```python
+import rietx as rx
+
+eq = rx.PeakEquation(target="lor_fwhm", expression="if(h*k*l == 0, w0, w1)*tan(theta)",
+                     coefficients={"w0": rx.Parameter(value=0.05, min=0.0),
+                                   "w1": rx.Parameter(value=0.03, min=0.0)})
+assert eq.reads() == ("h", "k", "l", "theta")
+```
+
+`PeakEquation.reads` gives the reflection names the expression reads, in first-use order, and `PeakEquation.functions` the reflection functions it calls.
+
+A fit checks the total width at the answer.
+Where a phase's width equations take Γ<sub>G</sub>² or Γ<sub>L</sub> below zero at a fitted reflection, `GuardFinding.nonpositive_peak_width` reports it as `PEAK_WIDTH_NOT_POSITIVE`, with the worst value.
 
 ## Optional blocks
 
