@@ -1,6 +1,6 @@
 # WP-2229 — Every change to the background's shape releases its holds, and no pending edit outlives its path
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — claimed by @yue-here (ghostshift runner)
 Depends on: 2218 (the Background graph's fix this generalises)
 Priority: P3 2026-11-19 — a held term can come back held on a background that never had it, and nothing says so; `unhold` by hand is the workaround, and two of the three surfaces leave with today's page at the swap
 
