@@ -313,7 +313,7 @@ def _pbso4_inputs(factor: float = 1.0):
 
 
 @pytest.mark.slow
-def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
+def test_pbso4_xray_abstains_on_two_silent_positions():
     """The X-ray histogram of ``tests/data/gsas2_pbso4.gpx`` (Hill 1992) at the
     cell ``index_pattern`` returned for its neutron twin, 0.1-0.2 % long, on the
     preset instrument — the issue's reproducer.
@@ -323,23 +323,27 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     the same prefit from the preset's all-zero background returns ``P - - n``,
     confidently and wrongly, which is why the prefit seeds it.
 
-    **A known wrong answer since WP-2076, accepted by ruling.**  The nested
-    screen names ``P c - a``, the specimen being ``P c - n``.  The two classes'
-    scores differ by 0.8 in χ², and ``P c - a`` has eight testable positions to
-    ``P c - n``'s six, so its margin of 17 is the count of silent positions alone.
-    The maintainer ruled on 2026-11-07 (WP-2076's handover log) to land the
-    repair at the margin of 10 with this row wrong, and to measure a margin
-    derived from the count of silent positions before tightening.  The
-    assertion pins today's answer so that tightening shows here.
+    **Abstains since the margin WP-2076 landed.**  The nested screen leads
+    with ``P c - a``, the specimen being ``P c - n``.  The two classes' scores
+    differ by 0.8 in χ², and ``P c - a`` has eight testable positions to
+    ``P c - n``'s six, so its lead of 17 is the count of silent positions
+    alone.  At the margin of 10 that named the wrong class (accepted by the
+    ruling of 2026-11-07); the maintainer ruled on 2026-11-13 that the lead
+    must strictly exceed max(10, 2·ln N + d), here 2·ln 5800 + 2 = 19.3, so
+    the screen abstains and names the two positions where the classes differ.
     """
     data, instrument, limits, peaks, candidate = _pbso4_inputs()
 
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
-    best = screen.best_or_none()
-    assert best is not None, [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
-    assert best.symbol == "P c - a"          # wrong: the specimen is P c - n
+    ranked = [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
+    assert screen.best_or_none() is None, ranked
+    assert screen.candidates[0].symbol == "P c - a", ranked
     assert screen.status == "converged"
+    ambiguous = next(d for d in screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert "2·ln N + d with d = 2" in ambiguous.message, ambiguous.message
+    assert "tested position" in ambiguous.message, ambiguous.message
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                        two_theta_limits=limits, refine_cell=False)

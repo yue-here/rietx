@@ -2625,8 +2625,11 @@ class ExtinctionScreen(Base):
         Returns a class only when the reference fit passed its gate (``status``
         is not ``"unreliable"``), the class was fitted, is not refuted, rests on
         at least one absence the data could **test** (or is the absence-free
-        class itself, whose claim is that there is nothing to see), is separated
-        from the next surviving class by a decisive ΔBIC margin, and **no
+        class itself, whose claim is that there is nothing to see), leads the
+        next surviving class by **more than** max(``DECISIVE_DELTA_BIC``,
+        2·ln N + d) in ΔBIC, d the tested positions where the two differ
+        (WP-2076, ruled 2026-11-13: a position that shows nothing buys ln N
+        alone, so two of them never decide), and **no
         unrefuted class was left unfitted** — a ``max_classes`` cap or a
         cancelled run leaves an unasked question, which must not read as a clean
         answer.  Every other situation returns None with the reason in
@@ -2644,7 +2647,7 @@ class ExtinctionScreen(Base):
         accessor anywhere in this module that yields one space group from the
         data alone.
         """
-        from ..indexing.extinction import DECISIVE_DELTA_BIC
+        from ..indexing.extinction import DECISIVE_DELTA_BIC, _decisive_margin
 
         if self.status == "unreliable":
             return None                 # the absence tests read the misfit
@@ -2663,7 +2666,8 @@ class ExtinctionScreen(Base):
             return None                 # the data contradict the declaration
         if top.n_absent and top.n_testable == 0:
             return None
-        if (len(admissible) > 1
-                and admissible[1].delta_bic - top.delta_bic < DECISIVE_DELTA_BIC):
-            return None
+        if len(admissible) > 1:
+            need, _d = _decisive_margin(self.n_points, top, admissible[1])
+            if not admissible[1].delta_bic - top.delta_bic > need:
+                return None             # not strictly exceeded: undecided
         return top
