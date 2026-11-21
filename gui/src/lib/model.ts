@@ -279,6 +279,13 @@ export function registerEcho(answer: Partial<InstrumentEdit>, edit: string): str
   ];
 }
 
+/** The paths an instrument edit ended (`InstrumentEdit.ended`), as the test
+ *  a pending edit's key is asked, or `null` when it ended none (WP-2229). */
+export function endedBy(answer: Partial<InstrumentEdit>): ((path: string) => boolean) | null {
+  const ended = new Set(answer.ended ?? []);
+  return ended.size ? (path) => ended.has(path) : null;
+}
+
 /** A deep copy of a model with the non-parameter edits written into it. */
 export function applyFields(model: any, fields: readonly Field[],
                             edits: ReadonlyMap<string, string>): any {

@@ -55,7 +55,7 @@
     type BackgroundHeader,
     type Multiplier,
   } from "../lib/background";
-  import { registerEcho } from "../lib/model";
+  import { endedBy, registerEcho } from "../lib/model";
   import { curveColors } from "../lib/plot";
   import { LAMBDA_STOPS, TERMS_MAX, TERMS_MIN, heldWith, kindEcho, lambdaStop,
            pendingHolds, switchKind, termsEcho, withTerms } from "./background";
@@ -154,8 +154,8 @@
       const answer = await api.patchInstrument(build(instrument), label);
       for (const line of registerEcho(answer, echo)) say(line);
       error = "";
-      const ended = new Set(answer.ended ?? []);
-      ondropped((path) => ended.has(path));
+      const ended = endedBy(answer);
+      if (ended) ondropped(ended);
       onmoved();
     } catch (exc) {
       error = (exc as Error).message;

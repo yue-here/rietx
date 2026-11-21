@@ -24,7 +24,7 @@
   import { ApiError, api, type InstrumentEdit } from "../api";
   import Help from "../Help.svelte";
   import { GEOMETRIES, applyFields, axialWarning, editableValue, fieldParam, fieldText,
-           registerEcho, splitEdits, type InstrumentField } from "../lib/model";
+           endedBy, registerEcho, splitEdits, type InstrumentField } from "../lib/model";
   import type { ParamRow } from "../lib/table";
   import { PRESET_TITLES, anodeLabel } from "../lib/wizard";
   import { SHAPE_LABELS, anodeChoices, anodeOf, clearForGeometry, dialogFields, dialogRows,
@@ -56,11 +56,13 @@
   } = $props();
 
   /** Say what an instrument edit did, the registers' part included, and drop
-   *  the pending edits on the paths it ended. */
-  function landedEdit(answer: InstrumentEdit, echo: string) {
+   *  the pending edits on the paths it ended. Returns the test for those
+   *  paths, or `null` when it ended none. */
+  function landedEdit(answer: InstrumentEdit, echo: string): ((path: string) => boolean) | null {
     for (const line of registerEcho(answer, echo)) say(line);
-    const ended = new Set(answer.ended ?? []);
-    if (ended.size) ondropped((path) => ended.has(path));
+    const ended = endedBy(answer);
+    if (ended) ondropped(ended);
+    return ended;
   }
 
   let model = $state<any>(null);
@@ -177,12 +179,13 @@
     if (!d || !d.touched || d.invalid.length || busy || sending) return;
     sending = true;
     let moved = false;
+    let ended: ((path: string) => boolean) | null = null;
     try {
       // the model first, read fresh: it carries every value the table holds,
       // so values set before it would be written back by it
       if (d.fields.length) {
         const fresh = (await api.instrument()).instrument;
-        landedEdit(await api.patchInstrument(clearForGeometry(applyFields(fresh, d.fields, edits)),
+        ended = landedEdit(await api.patchInstrument(clearForGeometry(applyFields(fresh, d.fields, edits)),
                                              "instrument edited"), "ref.edit(instrument=…)");
         moved = true;
         // what landed is no longer an edit: kept, it would compare unequal to
@@ -192,9 +195,14 @@
         rest.delete("geometry.kind");
         edits = rest;
       }
-      const values = Object.entries(d.values);
+      // a value typed against a parameter the model edit ended would be
+      // refused once the model had landed, or set the new model's parameter
+      // of the same name: the request half applied (WP-2229 review)
+      const values = Object.entries(d.values).filter(([path]) => !ended?.(path));
+      const gone = Object.keys(d.values).filter((path) => ended?.(path));
+      if (gone.length) say(`# typed values dropped: ${gone.sort().join(", ")}`);
       if (values.length) {
-        await api.patchParams({ values: d.values });
+        await api.patchParams({ values: Object.fromEntries(values) });
         say(`ref.set_values({${values.map(([k, v]) => `"${k}": ${v}`).join(", ")}})`);
         moved = true;
       }

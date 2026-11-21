@@ -34,7 +34,8 @@ const EDIT = {
   freed: ["instrument.background.c0", "instrument.background.c1"],
   ended: ["instrument.background.c0", "instrument.background.c1", "instrument.background.c2"],
 };
-const patchInstrument = vi.fn(async (_instrument: unknown, _label?: string) => EDIT);
+const patchInstrument = vi.fn(async (_instrument: unknown, _label?: string): Promise<any> => EDIT);
+const patchParams = vi.fn(async (_delta: unknown) => ({}));
 
 vi.mock("../api", async (original) => {
   const real = await original<typeof import("../api")>();
@@ -47,6 +48,7 @@ vi.mock("../api", async (original) => {
       instrument: async () => ({ instrument: LAB }),
       uploadFile: async () => ({ upload: "u1" }),
       patchInstrument: (instrument: unknown, label?: string) => patchInstrument(instrument, label),
+      patchParams: (delta: unknown) => patchParams(delta),
     },
   };
 });
@@ -68,6 +70,7 @@ afterEach(() => {
   app = null;
   document.body.innerHTML = "";
   patchInstrument.mockClear();
+  patchParams.mockClear();
 });
 
 describe("the Parameters panel's pending edits (WP-2229 case 3)", () => {
@@ -137,5 +140,34 @@ describe("the Instrument dialog's Load profile (WP-2229 case 1)", () => {
     const ended = ondropped.mock.calls[0][0] as (path: string) => boolean;
     expect(["instrument.background.c2", "instrument.background.c3", "instrument.background.*"]
       .map(ended)).toEqual([true, false, false]);
+  });
+});
+
+describe("the Instrument dialog's Apply (WP-2229 review)", () => {
+  it("sends no typed value on a path its own model edit ended", async () => {
+    const lines: string[] = [];
+    const rows = [row("instrument.geometry.axial_sl", 0.02), row("instrument.geometry.axial_hl", 0.02)];
+    patchInstrument.mockImplementationOnce(async () => ({
+      ...EDIT, released: [], freed: [], ended: ["instrument.geometry.axial_sl"] }));
+    app = mount(Instrument, { target: document.body, props: {
+      rows, anodes: [], say: (line: string) => lines.push(line), ondropped: () => {},
+      onlanded: () => {}, onclose: () => {} } });
+    await settle();
+    const typeInto = (field: string, value: string) => {
+      const input = document.querySelector<HTMLInputElement>(`input[data-field="${field}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    // one model field and two typed parameter values; the edit ends one of them
+    typeInto("geometry.goniometer_radius_mm", "200");
+    typeInto("geometry.axial_sl", "0.03");
+    typeInto("geometry.axial_hl", "0.04");
+    await settle();
+    const apply = [...document.querySelectorAll("button")].find((b) => b.textContent === "Apply")!;
+    apply.click();
+    await settle();
+    expect(patchInstrument).toHaveBeenCalledTimes(1);
+    expect(patchParams).toHaveBeenCalledWith({ values: { "instrument.geometry.axial_hl": 0.04 } });
+    expect(lines).toContain("# typed values dropped: instrument.geometry.axial_sl");
   });
 });
