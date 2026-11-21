@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: 2219 (the no-esd rule this refines, PR #1718); 2062 soft (cross-phase overlap groups)
-Priority: P3 2026-11-20 — an esd the data do determine is withheld, and nothing wrong is printed; quoting the source parameters' combination by hand is the workaround
+Priority: P3 2026-11-21 — unblocked, WP-2219 merged (PR #1718); an esd the data do determine is withheld, and nothing wrong is printed; quoting the source parameters' combination by hand is the workaround
 
 ## Goal
 

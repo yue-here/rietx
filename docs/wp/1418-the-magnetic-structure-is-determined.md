@@ -158,7 +158,9 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   candidates and `magnetic_supercell` refuses all 4 by this guard; `I m -3 m` gives 6 and it
   refuses 5. The same guard blocks NiO and MnO on `R -3 m:R` at k = (½ ½ ½) (#757); that
   route's report-side raise is WP-2221 (#1688). Which route is a magnetic-path design call, so
-  Mike's (#1075).
+  Mike's (#1075). **Update 2026-11-21, from WP-2221:** the raise is fixed (PR #1721, merged
+  2026-11-20), so the NiO child reports and writes its CIF. Mike's ruling on #1688 states such
+  a child's magnetic group and directions in the parent's frame; WP-2221 carries that work.
 
 - **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
   chooses between two site assignments by a χ² gap smaller than its own stop scatter, and

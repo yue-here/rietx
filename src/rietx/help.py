@@ -2159,6 +2159,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "but the species spelling in the model now differs from the file."
         ),
     ),
+    "COMPARISON_UNCONVERGED": HelpEntry(
+        title="A comparison rests on a fit short of its optimum",
+        description=(
+            "ΔBIC and the t-ratios beside it compare two optima. One of the two fits "
+            "stopped before its convergence test passed, or the fuller fit ended with a "
+            "cost more than 2 above the fit it contains. The cost is the data χ² plus any "
+            "restraint and penalty rows. A model that contains another cannot fit worse at "
+            "its optimum, so that fit had not reached its minimum. The margin of 2 is the "
+            "lower edge of Kass and Raftery's (1995) \"positive evidence\" band, so an "
+            "excess inside it cannot change a ΔBIC verdict. The ΔBIC can "
+            "then have either sign. Run the named fit on to convergence and compare again. "
+            "A fit stopped on its budget can sit on its optimum, so the comparison is "
+            "flagged and not refused."
+        ),
+    ),
     "CONSTRAINT_ACTIVE": HelpEntry(
         title="A constraint held the optimum on its edge",
         description=(
