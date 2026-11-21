@@ -91,7 +91,7 @@ def snip(y: np.ndarray, max_half_window: int, *, decreasing: bool = True) -> np.
     under the tails of the reflections and takes their intensity, so Biso
     comes out high: on a synthetic LaB₆ with a known background, La Biso is
     8.8 esd high at a half-window of 3 FWHM and still 6.0 esd high at 6 FWHM,
-    and every Biso rises on SRM 1976a and FAP (#1569; WP-2017 group Q).
+    and every Biso rises on SRM 1976a and FAP (#1569).
     ``BACKGROUND_ABSORPTION`` cannot see a held curve, so nothing in the
     report flags it.  Co-refine the background instead.  The estimator is kept
     for a quick look at a pattern or a comparison while debugging.
