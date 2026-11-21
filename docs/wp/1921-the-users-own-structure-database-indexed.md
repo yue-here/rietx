@@ -70,6 +70,22 @@ cell 0.2 s. Phase keys at 0.5 % cell tolerance: 149 373 for 136 727
 
 ### Inherited
 
+- **2026-11-16, from [1933](1933-the-cif-module-beyond-the-structure-block.md)
+  (#913 items 1-3, PR #1587): the core CIF reader now refuses two shapes a
+  database export writes, so an adapter reading such files in bulk meets
+  refusals rather than silent misreads.** `structure_from_cif` refuses a
+  fractional coordinate written `.` or `?` by file, site and tag, so this WP's
+  "read `.` as 0" repair (the export's convention, not CIF's) must run before
+  the text reaches the core reader, with its own diagnostic. It also refuses a
+  file whose closed operator loop is a group of another type than its H-M
+  symbol, naming both: #913 counts 3 C2/m entries with the centring lost and
+  7 `B 1 21 1` entries whose screw axis has the wrong sign on y (a closed
+  B-centred P-1) in one release of 200 809 entries. The last 7 read correctly
+  on `main` by luck (gemmi fell back on the symbol) and are now refused too.
+  The maintainer's ruling of 2026-11-02 declined a tie-break and a
+  `symmetry_source` keyword for rarity, and named this WP as the trigger to
+  revisit: a refusal stops a batch. Not checked against any database here.
+
 - **2026-11-03, from the issue triage (#1330): S3 of the standardization
   proposal lands here, as `analogues()`'s identity test.** #1330 proposes two
   levels for "is this the same entry?". First an invariant key: space-group

@@ -1,0 +1,166 @@
+"""An operator loop that generates a different group from the H-M symbol is refused.
+
+Issue #913, item (3), ruled "minimum" by the maintainer on 2026-11-02 (WP-1933).
+gemmi takes a tabulated loop's group over the symbol, so a loop that lost the
+C-centring of C2/m built P2/m, and a P6₁ loop under ``P 61 2 2`` built P6₁,
+each with half the atoms and no diagnostic.  The reader now names both groups
+and stops.  A loop that is the symbol's group in another setting or origin
+reads as before, and so does a loop that is no group at all (the declined
+half of the issue): both are the controls here.  The files are the issue's own
+synthetic cases, A to L.
+"""
+
+from __future__ import annotations
+
+import re
+
+import gemmi
+import pytest
+
+from rietx.crystallography.cif import structure_from_cif
+
+_HEX = (5, 5, 12, 90, 90, 120)
+_MONO = (10, 6, 7, 90, 100, 90)
+_TRI = (8, 13, 14, 93, 116, 90)
+
+
+def _ops(name):
+    return [op.triplet() for op in gemmi.find_spacegroup_by_name(name).operations()]
+
+
+def _uncentred(name):
+    """The setting's operations with its centring translations dropped."""
+    return [op.triplet() for op in gemmi.find_spacegroup_by_name(name).operations().sym_ops]
+
+
+def _cif(op_list, hm, cell=_HEX, mult="?"):
+    head = "data_toy\n" + "".join(
+        f"_cell_{k} {v}\n" for k, v in zip(
+            ("length_a", "length_b", "length_c", "angle_alpha", "angle_beta",
+             "angle_gamma"), cell))
+    return (head + f"_space_group_name_H-M_alt '{hm}'\nloop_\n"
+            "_space_group_symop_operation_xyz\n"
+            + "".join(f"'{o}'\n" for o in op_list)
+            + "loop_\n_atom_site_label\n_atom_site_type_symbol\n"
+              "_atom_site_symmetry_multiplicity\n_atom_site_fract_x\n"
+              "_atom_site_fract_y\n_atom_site_fract_z\n_atom_site_occupancy\n"
+              "_atom_site_U_iso_or_equiv\n"
+            + f"Cu1 Cu {mult} 0.1234 0.3456 0.0789 1 0.01\n")
+
+
+#: B 1 21 1 as one database export writes it: the screw axis with the wrong
+#: sign on y, a closed list that is a B-centred P-1 (the issue's row L)
+_EXPORT_B21 = ["x,y,z", "-x,-y+1/2,-z", "x+1/2,y,z+1/2", "-x+1/2,-y+1/2,-z+1/2"]
+
+REFUSED = {
+    # the loop a proper subgroup of the symbol's group
+    "C subgroup": (_cif(_ops("P 61"), "P 61 2 2"), "P 61 2 2 (No. 178", "P 61 (No. 169"),
+    "C' subgroup, stated multiplicity": (
+        _cif(_ops("P 61"), "P 61 2 2", mult=12), "P 61 2 2 (No. 178", "P 61 (No. 169"),
+    # the C-centring lost
+    "F lost centring, stated multiplicity": (
+        _cif(_ops("P 1 2/m 1"), "C 1 2/m 1", cell=_MONO, mult=8),
+        "C 1 2/m 1 (No. 12", "P 1 2/m 1 (No. 10"),
+    "H lost centring": (_cif(_ops("P 1 2/m 1"), "C 1 2/m 1", cell=_MONO),
+                        "C 1 2/m 1 (No. 12", "P 1 2/m 1 (No. 10"),
+    # a closed list of another type: tabulated (K) and at an untabulated origin
+    # (J, L), where gemmi fell back on the symbol and built it by luck
+    "K inversion at the origin": (_cif(["x,y,z", "-x,-y,-z"], "P 1 21 1", cell=_MONO),
+                                  "P 1 21 1 (No. 4", "P -1 (No. 2"),
+    "J inversion off the origin": (_cif(["x,y,z", "-x,-y+1/2,-z"], "P 1 21 1", cell=_MONO),
+                                   "P 1 21 1 (No. 4", "P -1 (No. 2"),
+    "L the export's B 1 21 1": (_cif(_EXPORT_B21, "B 1 21 1", cell=_MONO),
+                                "B 1 21 1 (No. 4", "P -1 (No. 2"),
+    # a non-standard centred setting of a primitive type that lost its
+    # centring: the loop's group is of the symbol's type, with half the
+    # operations, so only the count of pure translations tells them apart
+    "B 1 21 1 lost centring": (_cif(_uncentred("B 1 21 1"), "B 1 21 1", cell=_MONO),
+                               "B 1 21 1 (No. 4", "P 1 21 1 (No. 4) with 1 pure translation"),
+    "C -1 lost centring": (_cif(_uncentred("C -1"), "C -1", cell=_TRI),
+                           "C -1 (No. 2", "P -1 (No. 2) with 1 pure translation"),
+    "I -1 lost centring": (_cif(_uncentred("I -1"), "I -1", cell=_TRI),
+                           "I -1 (No. 2", "P -1 (No. 2) with 1 pure translation"),
+}
+
+READ = {
+    "A control": (_cif(_ops("P 61 2 2"), "P 61 2 2"), "P 61 2 2"),
+    "G control": (_cif(_ops("C 1 2/m 1"), "C 1 2/m 1", cell=_MONO, mult=8), "C 1 2/m 1"),
+    "I control": (_cif(["x,y,z", "-x,y+1/2,-z"], "P 1 21 1", cell=_MONO), "P 1 21 1"),
+    # another origin of the same group: the loop's setting is taken, as before
+    "origin choice 2 under a bare symbol": (
+        _cif(_ops("F d -3 m:2"), "F d -3 m", cell=(8, 8, 8, 90, 90, 90)), "F d -3 m:2"),
+    # the same centring order in another cell choice of the same type
+    "I 1 2/a 1 loop under C 1 2/c 1": (
+        _cif(_ops("I 1 2/a 1"), "C 1 2/c 1", cell=_MONO), "I 1 2/a 1"),
+    # rhombohedral axes (1 pure translation) under a bare R symbol (hexagonal
+    # axes, 3): exempt from the count, since it is the same group
+    "rhombohedral axes under a bare R symbol": (
+        _cif(_ops("R -3 m:R"), "R -3 m", cell=(5, 5, 5, 80, 80, 80)), "R -3 m:R"),
+    # the loop is no group (the 1/6 and 5/6 translations dropped): declined by
+    # the ruling, so the symbol is read and nothing is said, as before
+    "B not a group": (
+        _cif([re.sub(r"\+[15]/6", "", t) for t in _ops("P 61 2 2")], "P 61 2 2"),
+        "P 61 2 2"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(REFUSED))
+def test_a_loop_of_another_group_is_refused_naming_both(tmp_path, name):
+    text, symbol_group, loop_group = REFUSED[name]
+    path = tmp_path / "toy.cif"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="a different group") as info:
+        structure_from_cif(path)
+    message = str(info.value)
+    assert str(path) in message
+    assert symbol_group in message
+    assert loop_group in message
+    assert "_space_group_symop_operation_xyz" in message
+
+
+@pytest.mark.parametrize("name", sorted(READ))
+def test_a_loop_of_the_same_group_or_no_group_reads_as_before(tmp_path, name):
+    text, group = READ[name]
+    path = tmp_path / "toy.cif"
+    path.write_text(text, encoding="utf-8")
+    diagnostics = []
+    phase = structure_from_cif(path, diagnostics=diagnostics).phases[0]
+    assert phase.space_group == group
+    assert diagnostics == []
+
+
+def test_the_legacy_loop_tag_is_named(tmp_path):
+    """A CIF 1 file's ``_symmetry_equiv_pos_as_xyz`` loop is checked the same
+    way, and the refusal names the tag the file used."""
+    text = (_cif(_ops("P 1 2/m 1"), "C 1 2/m 1", cell=_MONO)
+            .replace("_space_group_symop_operation_xyz", "_symmetry_equiv_pos_as_xyz"))
+    path = tmp_path / "legacy.cif"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="_symmetry_equiv_pos_as_xyz loop"):
+        structure_from_cif(path)
+
+
+@pytest.mark.parametrize("loop_tag", ["_space_group_symop_operation_xyz",
+                                      "_symmetry_equiv_pos_as_xyz"])
+def test_an_identity_only_loop_names_both_remedies(tmp_path, loop_tag):
+    """A non-P1 symbol over an ``x, y, z``-only loop is refused (ruling of
+    2026-11-18), and the message names both remedies: ``P 1`` or no symbol where
+    the atoms are the whole cell; delete the loop where only the asymmetric
+    unit was listed and the loop was dropped."""
+    text = _cif(["x,y,z"], "P 61 2 2").replace("_space_group_symop_operation_xyz", loop_tag)
+    path = tmp_path / "identity.cif"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="a different group") as info:
+        structure_from_cif(path)
+    message = str(info.value)
+    assert "write 'P 1' as the symbol or drop the symbol" in message
+    assert "delete the loop" in message
+
+
+def test_another_contradiction_keeps_the_short_remedy(tmp_path):
+    path = tmp_path / "other.cif"
+    path.write_text(_cif(_ops("P 61"), "P 61 2 2"), encoding="utf-8")
+    with pytest.raises(ValueError) as info:
+        structure_from_cif(path)
+    assert "write 'P 1'" not in str(info.value)
+    assert str(info.value).endswith("correct the symbol or the loop")

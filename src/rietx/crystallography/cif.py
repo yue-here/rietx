@@ -376,6 +376,12 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
     parenthesis unclosed, ``8.6l(2)`` with a letter for a digit), and the NaN
     then reached the schema as "value nan lies outside bounds" with no file,
     tag or value in the message.  Called only once a NaN has been found.
+
+    A CIF null is refused the same way, by tag and site (issue #913, item 1).
+    ``?`` means the value is unknown and ``.`` that it is inapplicable; neither
+    is zero, and gemmi reads both as NaN for a coordinate.  The occupancy is the
+    one exception: its null reads by the core dictionary's default, which is
+    the caller's business (:func:`structure_from_cif`), so it is skipped here.
     """
     for tag in tags:
         values = ([block.find_value(tag)] if label is None else
@@ -383,14 +389,118 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
                                                                 tag[11:]])
                    if row.str(0) == label])
         for value in values:
-            if value is None or value in ("?", "."):
+            if value is None:
                 continue
+            if value in ("?", "."):
+                if tag == "_atom_site_occupancy":
+                    continue
+                where = "" if label is None else f" for site {label!r}"
+                meaning = "unknown" if value == "?" else "inapplicable"
+                raise ValueError(
+                    f"{path}: {tag}{where} is {value!r}, which CIF reads as "
+                    f"{meaning}, not as a number, and this reader has no value "
+                    f"to put in its place. State the number; a file from a "
+                    f"source that writes 0 as '.' needs that repair before it "
+                    f"is read")
             if math.isnan(gemmi.cif.as_number(value)):
                 where = "" if label is None else f" for site {label!r}"
                 raise ValueError(
                     f"{path}: {tag}{where} is {value!r}, which is not a CIF "
                     f"number (digits, an optional exponent and an optional "
                     f"standard uncertainty in parentheses, as in '5.4307(2)')")
+
+
+def _closed_operations(triplets) -> tuple[np.ndarray, np.ndarray] | None:
+    """The listed operations as integer arrays, or ``None`` where they are no group.
+
+    Rotations and translations are taken in gemmi's units of 1/``Op.DEN``,
+    translations modulo one cell, so the closure test is exact: every product
+    of two listed operations must be listed.  A list gemmi cannot parse is
+    ``None`` too, since there is then nothing to compare.
+    """
+    try:
+        ops = [gemmi.Op(str(t)).wrap() for t in triplets]
+    except (RuntimeError, ValueError):
+        return None
+    den = gemmi.Op.DEN
+    rot = np.array([op.rot for op in ops], dtype=np.int64)
+    tran = np.array([op.tran for op in ops], dtype=np.int64) % den
+    listed = {r.tobytes() + t.tobytes() for r, t in zip(rot, tran)}
+    rr = np.einsum("aij,bjk->abik", rot, rot) // den
+    tt = (np.einsum("aij,bj->abi", rot, tran) // den + tran[:, None, :]) % den
+    for r, t in zip(rr.reshape(-1, 3, 3), tt.reshape(-1, 3)):
+        if r.tobytes() + t.tobytes() not in listed:
+            return None
+    return rot // den, tran / den
+
+
+def _refuse_operators_against_symbol(path: str, block, hm: str, triplets) -> None:
+    """Refuse a file whose operator loop is a different group from its H-M symbol.
+
+    Issue #913, item (3), ruled "minimum" by the maintainer on 2026-11-02.
+    gemmi takes the loop's group where the loop is a tabulated setting and the
+    symbol otherwise, so a loop that lost a centring (C2/m written over the
+    four operations of P2/m) or a generator (P6₁ under ``P 61 2 2``) built the
+    smaller group, half the atoms, with nothing said.  Here the group the loop
+    generates is identified by type (spglib, any setting or origin) and
+    compared with the symbol's type, and its pure translations (the centring)
+    are counted against those of the symbol's tabulated setting.  The same type
+    with the same number of centring translations is a choice of setting or
+    origin and passes, as before.  A different type is a contradiction the
+    reader cannot settle, and so is the same type with another centring: a
+    non-standard centred setting of a primitive type (``B 1 21 1``, ``C -1``,
+    ``I -1``) whose loop lost its centring is still type 4 or 2, but has half
+    the operations.  Either way the reader names both groups and stops.  The
+    two settings of an R group are exempt from the count, since a loop on
+    rhombohedral axes (1 translation) under a bare ``R`` symbol (hexagonal
+    axes, 3) is the same group.  No keyword overrides it.
+
+    A loop that is no group is left alone (the symbol is read, as before), as
+    is a symbol gemmi cannot name: the declined part of the ruling.
+    """
+    symbol = gemmi.find_spacegroup_by_name(hm.strip().strip("'\""))
+    arrays = _closed_operations(triplets)
+    if symbol is None or arrays is None:
+        return
+    import spglib
+
+    # spglib says "no match" as None or as SpglibError depending on a
+    # process-wide flag (magnetic.operators.identification says why)
+    try:
+        found = spglib.get_spacegroup_type_from_symmetry(
+            np.ascontiguousarray(arrays[0], dtype="intc"), arrays[1])
+    except spglib.error.SpglibError:
+        found = None
+    if found is None:
+        return
+    centring = len(symbol.operations().cen_ops)
+    translations = int(np.all(arrays[0] == np.eye(3, dtype=np.int64), axis=(1, 2)).sum())
+    if int(found.number) == symbol.number and (
+            translations == centring or symbol.hm.startswith("R")):
+        return
+    generated = gemmi.find_spacegroup_by_number(int(found.number))
+    tag = next((t for t in ("_space_group_symop_operation_xyz",
+                            "_symmetry_equiv_pos_as_xyz")
+                if block.find_values(t)), "operator")
+    lattice = ("" if int(found.number) != symbol.number else
+               f" with {translations} pure translation"
+               f"{'s' if translations != 1 else ''} a cell against the symbol's "
+               f"{centring}")
+    # the loop lists x,y,z alone under a symbol that is not P 1: two shapes
+    # write it, and each has its own remedy (maintainer's ruling, 2026-11-18)
+    remedy = ("correct the symbol or the loop" if int(found.number) != 1 else
+              "if the listed atoms are the whole cell, write 'P 1' as the "
+              "symbol or drop the symbol; if they are only the asymmetric "
+              "unit, the loop was dropped: delete the loop and the structure "
+              "is built from the symbol")
+    raise ValueError(
+        f"{path}: the H-M symbol {hm.strip()!r} names {symbol.hm} (No. "
+        f"{symbol.number}, {len(symbol.operations())} operations a cell), and "
+        f"the {tag} loop's {len(triplets)} operations generate a group of type "
+        f"{generated.hm} (No. {generated.number}){lattice}: a different group, "
+        f"not another setting or origin of the same one. One of the two "
+        f"statements is wrong and the file does not say which, so it is not "
+        f"read; {remedy}")
 
 
 #: Two occupancies agree, and two sites fill a position without overfilling it,
@@ -761,7 +871,12 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
 
     Uses gemmi's small-molecule reader, which resolves the space group from
     the recorded H-M (or Hall) symbol and carries fractional coordinates,
-    occupancies, and isotropic/equivalent displacement parameters.
+    occupancies, and isotropic/equivalent displacement parameters.  Where the
+    file states both an H-M symbol and an operator loop, and the loop is a
+    group of another type than the symbol's (a lost centring, a lost
+    generator), the file is refused naming both groups (issue #913); another
+    setting or origin of the symbol's group reads in the loop's setting, as
+    before.  A coordinate written ``.`` or ``?`` is refused by site and tag.
 
     ``aniso=True`` keeps ``_atom_site_aniso_U_ij`` as an
     :class:`~rietx.schemas.structure.AnisoU` block on each site that has
@@ -886,6 +1001,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     listed = None
     if split_group_label(small.spacegroup_hm or "") is not None and small.symops:
         listed = [str(op) for op in small.symops]
+    elif block is None and small.symops and (small.spacegroup_hm or "").strip():
+        # a magCIF's nuclear group is magcif.resolve_nuclear_symmetry's to check
+        _refuse_operators_against_symbol(path, source, small.spacegroup_hm,
+                                         [str(op) for op in small.symops])
     sg = (OperatorGroup(label=small.spacegroup_hm.strip(), xyz=tuple(listed))
           if listed else small.spacegroup)
     if sg is None:
@@ -974,6 +1093,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             x=Parameter(value=site.fract.x),
             y=Parameter(value=site.fract.y),
             z=Parameter(value=site.fract.z),
+            # an occupancy the file leaves out, or writes as a null ('?' or
+            # '.'), reads as 1.0: the default `_enumeration_default 1.0` of
+            # `_atom_site_occupancy` in the IUCr core dictionary 2.4.5 (DDL1).
+            # The DDLm core 3.3.0 vendored in tests/data states none (#913)
             occ=Parameter(value=(site.occ if site.occ or said.get("occ")
                                  else 1.0), min=0.0),
             biso=Parameter(value=b_iso, unit="A^2"),
