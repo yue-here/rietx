@@ -77,6 +77,7 @@ here.
 
 from __future__ import annotations
 
+import ast
 import math
 import pickle
 import re
@@ -88,7 +89,7 @@ import numpy as np
 
 from ...crystallography.twins import merge_site_twins
 from ...model.profiles.caglioti import GAUSSIAN_VARIANCE_TO_FWHM_SQUARED
-from ...schemas.common import Diagnostic
+from ...schemas.common import Diagnostic, Parameter
 from .coverage import Stance
 
 #: Which description of the format this reader was written against.  Stated
@@ -132,11 +133,11 @@ def _standin(name: str) -> type:
 #: ids, which :func:`read_gsas2_gpx` resolves against the project itself.
 G2VarObj = _standin("G2VarObj")
 
-#: A GSAS-II expression object, as stored by the sequential single-peak fit.  It
+#: A GSAS-II expression object, as stored with a sequential fit's results.  It
 #: carries the expression as **text**; the compiled form is ``None`` on disk, so
-#: reading one compiles nothing.  rietx's formulas are joint-fit equations
-#: (``ParametricEquation(basis="expression")``, WP-1964) with no single-fit
-#: landing site yet (WP-2118), so this is reported rather than carried.
+#: reading one compiles nothing.  One stored to fit to the sequential table is
+#: read into :class:`Gsas2SequentialEquation` (WP-2106), whose text
+#: :func:`rietx.fit_trajectory` takes; nothing else of one is carried.
 ExpressionObj = _standin("ExpressionObj")
 
 
@@ -292,11 +293,12 @@ TREE_ITEM_STANCE: dict[str, tuple[Stance, str]] = {
                                      "any phase's model"),
     "Restraints": (Stance.REPORTED, "restraints on bonds, angles and planes"),
     "Sequential results": (Stance.REPORTED, "the per-histogram results of a "
-                                            "sequential fit"),
+                                            "sequential fit; the equations stored "
+                                            "with them are read"),
     "Sequential peak fit results": (
         Stance.REPORTED, "the per-histogram results of a sequential "
-                         "single-peak fit, which is where a stored expression "
-                         "lives"),
+                         "single-peak fit; the equations stored with them are "
+                         "read"),
     "IMG": (Stance.REPORTED, "a detector image and its calibration"),
     "HKLF": (Stance.REPORTED, "single-crystal structure factors"),
     "PDF": (Stance.REPORTED, "a pair distribution function"),
@@ -695,6 +697,41 @@ class Gsas2Constraint:
 
 
 @dataclass(frozen=True)
+class Gsas2SequentialEquation:
+    """One equation GSAS-II stored to fit to its sequential results table.
+
+    GSAS-II fits it after a sequential refinement, to one column of the table,
+    and keeps it in the project's ``SeqParFitEqList`` (WP-2106).  Read here into
+    the input of :func:`rietx.fit_trajectory`: :attr:`expression` is
+    :attr:`text` written in rietx's expression grammar, :attr:`variables` the
+    labels it fits with their stored values and flags, and :attr:`bindings`
+    the table column each other label reads.  Every rewrite between the two
+    spellings is in :attr:`rewrites` (:data:`GSAS2_EXPRESSION_REWRITES`).
+
+    An equation the grammar cannot carry has :attr:`expression` ``None`` and
+    :attr:`refused` naming why, and the read reports it.  :attr:`dependent` is
+    the column fitted, as GSAS-II names it.  Where that column is one of
+    GSAS-II's pseudo-variables, :attr:`dependent_text` is its own expression,
+    :attr:`dependent_expression` the same in the grammar and
+    :attr:`dependent_bindings` the columns it reads.
+    """
+
+    #: the tree item it was stored in: ``Sequential results`` or
+    #: ``Sequential peak fit results``
+    source: str
+    text: str
+    expression: str | None
+    variables: dict[str, Parameter] = field(default_factory=dict)
+    bindings: dict[str, str] = field(default_factory=dict)
+    dependent: str | None = None
+    dependent_text: str | None = None
+    dependent_expression: str | None = None
+    dependent_bindings: dict[str, str] = field(default_factory=dict)
+    rewrites: tuple[str, ...] = ()
+    refused: str | None = None
+
+
+@dataclass(frozen=True)
 class Gsas2Model:
     """What a ``.gpx`` states.
 
@@ -730,6 +767,8 @@ class Gsas2Model:
     #: where GSAS-II last saved it, which is not where it is now
     saved_as: str | None = None
     path: str | None = None
+    #: the equations stored to fit to a sequential results table (WP-2106)
+    sequential_equations: tuple[Gsas2SequentialEquation, ...] = ()
     #: One line per thing the **read** could not carry across, in this package's
     #: words, kept on the model whether or not a ``diagnostics=`` list was passed
     unsupported: tuple[str, ...] = ()
@@ -1193,6 +1232,218 @@ def _constraints(payload: Any, phases: dict[int, str], histograms: dict[int, int
     return tuple(rows)
 
 
+# --------------------------------------------------------------------------
+# the equations stored with a sequential fit (WP-2106)
+
+#: The two tree items a stored sequential equation lives in.
+_SEQUENTIAL_ITEMS = ("Sequential results", "Sequential peak fit results")
+
+#: How each GSAS-II spelling a stored equation may use is written in rietx's
+#: expression grammar, and why.  An equation is python syntax read with
+#: :mod:`ast`, which parses and runs nothing, and printed back in the grammar;
+#: a function or operator not here is refused by name, never guessed: the
+#: walk in :func:`lower_gsas2_expression` reads this table and nothing else.
+#: The degree functions are recorded in ``docs/practice.md`` § Angles:
+#: GSAS-II's expressions read ``sin``, ``cos`` and ``tan`` in degrees, beside
+#: ``sind``, ``cosd`` and ``tand``.
+GSAS2_EXPRESSION_REWRITES: dict[str, tuple[str, str]] = {
+    "a**b": ("a^b", "python's power; a chain is grouped as python groups it, "
+                    "right to left, with the parentheses the grammar asks for"),
+    "sind(u)": ("sin(pi*u/180)", "the sine of an angle in degrees"),
+    "cosd(u)": ("cos(pi*u/180)", "the cosine of an angle in degrees"),
+    "tand(u)": ("tan(pi*u/180)", "the tangent of an angle in degrees"),
+    "sin(u)": ("sin(pi*u/180)", "GSAS-II's sine reads degrees too"),
+    "cos(u)": ("cos(pi*u/180)", "GSAS-II's cosine reads degrees too"),
+    "tan(u)": ("tan(pi*u/180)", "GSAS-II's tangent reads degrees too"),
+    "exp(u)": ("exp(u)", "unchanged"),
+    "log(u)": ("log(u)", "unchanged: the natural logarithm in both"),
+    "sqrt(u)": ("sqrt(u)", "unchanged"),
+    "pi": ("pi", "unchanged"),
+}
+
+#: python's arithmetic operators, each the grammar's own; ``**`` is the one
+#: :data:`GSAS2_EXPRESSION_REWRITES` names, the rest are spelt alike
+_PYTHON_OPS = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/", ast.Pow: "^"}
+
+
+def _functions() -> dict[str, tuple[str, bool]]:
+    """Each GSAS-II function the table carries: its grammar name, and whether
+    its argument is converted from degrees."""
+    out: dict[str, tuple[str, bool]] = {}
+    for spelled, (written, _) in GSAS2_EXPRESSION_REWRITES.items():
+        if spelled.endswith("(u)"):
+            name, target = spelled[:-3], written.split("(", 1)[0]
+            out[name] = (target, written == f"{target}(pi*u/180)")
+    return out
+
+
+class _Unlowerable(Exception):
+    """A stored expression the grammar cannot carry; the message says why."""
+
+
+def _python_construct(node: ast.AST) -> str:
+    """A python construct named for a refusal."""
+    named = {ast.BitXor: "'^', which python reads as exclusive or",
+             ast.Mod: "'%'", ast.FloorDiv: "'//'", ast.IfExp: "a conditional (x if c else y)",
+             ast.Compare: "a comparison", ast.BoolOp: "'and'/'or'",
+             ast.Attribute: "an attribute (such as np.exp)", ast.Subscript: "an index"}
+    for kind, text in named.items():
+        if isinstance(node, kind) or isinstance(getattr(node, "op", None), kind):
+            return text
+    return f"python's {type(node).__name__}"
+
+
+def lower_gsas2_expression(text: str, names: set[str]) -> tuple[str, tuple[str, ...]]:
+    """``text``, a GSAS-II expression, in rietx's expression grammar.
+
+    ``names`` are the labels the equation binds: those it fits and those it
+    reads from the table.  Returns the grammar's text and the rewrites made, one
+    line each.  Raises :class:`ValueError` naming the first construct
+    :data:`GSAS2_EXPRESSION_REWRITES` does not carry: an unknown function,
+    python's ``^`` (exclusive or), a conditional, an attribute such as
+    ``np.exp``, a name the equation does not bind, or a label that is a
+    reserved word of the grammar.
+    """
+    from ...params.expression import (
+        RESERVED,
+        BinOp,
+        Call,
+        Expression,
+        Name,
+        Neg,
+        Num,
+        to_text,
+    )
+
+    try:
+        tree = ast.parse(text.strip(), mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"it is not python syntax ({exc.msg})") from exc
+    functions = _functions()
+    rewrites: list[str] = []
+
+    # The grammar's own tree is built and printed, so the text carries only
+    # the parentheses its precedence needs and nests no deeper than python's.
+    def walk(node: ast.AST):
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            if not math.isfinite(node.value):
+                raise _Unlowerable(f"it holds the number {node.value!r}, which is not finite")
+            return Num(float(node.value))
+        if isinstance(node, ast.Name):
+            if node.id in names:
+                return Name(node.id)
+            if node.id in GSAS2_EXPRESSION_REWRITES:
+                return Name(node.id)
+            raise _Unlowerable(f"it names {node.id!r}, which it neither fits nor "
+                               "reads from the table")
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            arg = walk(node.operand)
+            return Neg(arg) if isinstance(node.op, ast.USub) else arg
+        if isinstance(node, ast.BinOp) and type(node.op) in _PYTHON_OPS:
+            if isinstance(node.op, ast.Pow):
+                rewrites.append("** → ^")
+            return BinOp(_PYTHON_OPS[type(node.op)], walk(node.left), walk(node.right))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            raise _Unlowerable(f"it uses {_python_construct(node.func)}")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and not node.keywords and len(node.args) == 1:
+            func = node.func.id
+            if func not in functions:
+                raise _Unlowerable(f"it calls {func}(), which the rewrite table does not carry")
+            target, degrees = functions[func]
+            arg = walk(node.args[0])
+            if degrees:
+                rewrites.append(f"{func}(u) → {target}(pi*u/180)")
+                arg = BinOp("/", BinOp("*", Name("pi"), arg), Num(180.0))
+            return Call(target, (arg,))
+        if isinstance(node, ast.Call):
+            raise _Unlowerable("it calls a function with other than one plain argument")
+        raise _Unlowerable(f"it uses {_python_construct(node)}")
+
+    reserved = sorted(n for n in names if n in RESERVED)
+    if reserved:
+        raise ValueError(f"its label {reserved[0]!r} is a reserved word of rietx's "
+                         "expression grammar; rename it in GSAS-II")
+    try:
+        lowered = Expression(to_text(walk(tree.body))).to_text()
+    except _Unlowerable as exc:
+        raise ValueError(str(exc)) from None
+    return lowered, tuple(dict.fromkeys(rewrites))
+
+
+def _sequential_equation(source: str, stored: Any, pseudo: dict) -> Gsas2SequentialEquation:
+    """One stored equation, lowered onto the grammar or refused by name."""
+    text = str(getattr(stored, "expression", "") or "")
+    blank = Gsas2SequentialEquation(source=source, text=text, expression=None)
+    if not isinstance(stored, ExpressionObj):
+        return _refused(blank, f"it is a {type(stored).__name__}, not a stored expression")
+    if getattr(stored, "distance_atoms", None) or getattr(stored, "distance_dict", None):
+        return _refused(blank, "it is a distance or angle between atoms, which GSAS-II "
+                               "computes from the structure")
+    free = getattr(stored, "freeVars", None) or {}
+    bound = getattr(stored, "assgnVars", None) or {}
+    if not isinstance(free, dict) or not isinstance(bound, dict):
+        return _refused(blank, "its variables are not stored as this reader knows them")
+    variables: dict[str, Parameter] = {}
+    for label, row in free.items():
+        if not (isinstance(row, (list, tuple)) and len(row) == 3
+                and _float(row[1]) is not None):
+            return _refused(blank, f"its variable {label!r} is not stored as "
+                                   "[name, value, refine flag]")
+        variables[str(label)] = Parameter(value=_float(row[1]), vary=bool(row[2]))
+    bindings = {str(k): str(v) for k, v in bound.items()}
+    dependent = getattr(stored, "depVar", None)
+    found = {"variables": variables, "bindings": bindings,
+             "dependent": dependent if isinstance(dependent, str) else None}
+    try:
+        expression, rewrites = lower_gsas2_expression(text, set(variables) | set(bindings))
+    except ValueError as exc:
+        return _refused(Gsas2SequentialEquation(source=source, text=text, expression=None,
+                                                **found), str(exc))
+    if not isinstance(dependent, str):
+        return _refused(Gsas2SequentialEquation(source=source, text=text, expression=None,
+                                                **found),
+                        "its dependent column is not stored as a name")
+    out = Gsas2SequentialEquation(source=source, text=text, expression=expression,
+                                  rewrites=rewrites, **found)
+    pv = pseudo.get(dependent)
+    if pv is None:
+        return out
+    pv_text = str(getattr(pv, "expression", "") or "")
+    pv_bound = {str(k): str(v) for k, v in (getattr(pv, "assgnVars", None) or {}).items()}
+    try:
+        if getattr(pv, "freeVars", None):
+            raise ValueError("it fits variables of its own")
+        pv_expression, pv_rewrites = lower_gsas2_expression(pv_text, set(pv_bound))
+    except ValueError as exc:
+        return _refused(Gsas2SequentialEquation(
+            source=source, text=text, expression=None, dependent_text=pv_text,
+            dependent_bindings=pv_bound, **found),
+            f"its dependent is the pseudo-variable {dependent!r}, and {exc}")
+    return Gsas2SequentialEquation(
+        source=source, text=text, expression=expression, dependent_text=pv_text,
+        dependent_expression=pv_expression, dependent_bindings=pv_bound,
+        rewrites=tuple(dict.fromkeys(rewrites + pv_rewrites)), **found)
+
+
+def _refused(equation: Gsas2SequentialEquation, why: str) -> Gsas2SequentialEquation:
+    from dataclasses import replace
+
+    return replace(equation, expression=None, refused=why)
+
+
+def _sequential_equations(source: str, payload: Any) -> list[Gsas2SequentialEquation]:
+    """Every equation one sequential item stores, in the order stored."""
+    if not isinstance(payload, dict):
+        return []
+    stored = payload.get("SeqParFitEqList") or []
+    pseudo = payload.get("SeqPseudoVars") or {}
+    if not isinstance(stored, (list, tuple)):
+        return []
+    return [_sequential_equation(source, eq, pseudo if isinstance(pseudo, dict) else {})
+            for eq in stored]
+
+
 def read_gsas2_gpx(path: str | Path, *,
                    diagnostics: list[Diagnostic] | None = None) -> Gsas2Model:
     """Read a GSAS-II ``.gpx`` project file.
@@ -1224,6 +1475,7 @@ def read_gsas2_gpx(path: str | Path, *,
     reported: list[str] = []
     constraints_payload: Any = None
     covariance: dict = {}
+    equations: list[Gsas2SequentialEquation] = []
     controls: dict = {}
 
     for item in items:
@@ -1259,6 +1511,17 @@ def read_gsas2_gpx(path: str | Path, *,
                 reported.append(
                     "the project states restraints. This reader does not "
                     "carry their targets and weights.")
+        elif kind in _SEQUENTIAL_ITEMS:
+            reported.append(
+                f"{label!r} holds the per-histogram results of a sequential fit, which "
+                f"this reader does not carry. The equations stored with them are on "
+                f"model.sequential_equations.")
+            for equation in _sequential_equations(label, payload):
+                equations.append(equation)
+                if equation.refused:
+                    reported.append(
+                        f"the equation {equation.text!r} stored in {label!r} is not "
+                        f"read into rietx's grammar: {equation.refused}.")
         elif stance is Stance.REPORTED:
             reported.append(f"{label!r} is {what}. This reader does not carry it.")
         elif stance is None:
@@ -1333,6 +1596,7 @@ def read_gsas2_gpx(path: str | Path, *,
         saved_as=(str(controls["LastSavedAs"])
                   if controls.get("LastSavedAs") is not None else None),
         path=str(p),
+        sequential_equations=tuple(equations),
         unsupported=tuple(reported))
 
     if diagnostics is not None:
