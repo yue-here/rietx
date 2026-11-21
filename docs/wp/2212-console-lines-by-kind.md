@@ -101,7 +101,10 @@ prototype with the changed region boxed, on a private page.
 
 Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`.
 
-### Inherited
+### Folded in on arrival
+
+Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4dd48`), so each became a task below.
+
 
 - **2026-11-11, from WP-2214** (the rebuild's plan). The maintainer ruled the same night to
   rebuild the GUI's front end beside today's instead of porting it piece by piece. PR #1521
@@ -161,6 +164,10 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   same parameter values.
 - [ ] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
   screenshots retaken, each beside the prototype's at 1440 by 900 in the PR (milestone row 11).
+- [ ] `follow()` reports the frames it lost on both paths, and the Console reads the count
+  (#1656 item 1, folded above). One vitest case per path.
+- [ ] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
+  the registers when only the old table fails (finding 5). One server test each.
 - [ ] Skill: none. The GUI is a human surface, and an agent drives the python API.
 
 ## Acceptance
