@@ -88,6 +88,9 @@ promise stages every break).
 - [ ] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
       table with a recommendation per row.
 - [ ] Approved demotions (expected few); rulings dated into the table.
+- [ ] The import wizard's scan picker for a file holding several scans (ruled by Yue
+      2026-11-21, § Rulings 23). It may move to a gui-overhaul WP if the rebuilt page
+      owns the wizard by then.
 - [ ] Tests; the fast count moved by exactly the tests added.
 - [ ] Skill: `references/diagnostics-projects.md` and the io rows of `diagnostics.md`
       checked against the table; none expected to move.
@@ -180,9 +183,18 @@ him: a tier-3 keep needs his dated approval, and a reader-output change or a del
 22. `GSAS_PRM_GEOMETRY_ASSUMED`: adopt GSAS-II's rule (one wavelength is Debye-Scherrer, a
     doublet is Bragg-Brentano) at tier 2, keeping the warning.
 
-**Awaiting Yue, with a brief.** 23. Two reader picks where careful refiners differ:
-`PATTERN_MULTISCAN_DEFAULTED` and `SPACE_GROUP_SETTING_ASSUMED`. The brief is in the
-2026-11-21 handover entry.
+**Ruled by Yue, 2026-11-21.** 23. The two reader picks where careful refiners differ (the
+brief is in the 2026-11-21 handover entry).
+
+- `PATTERN_MULTISCAN_DEFAULTED`: "we do need a scan picker for the gui". The import wizard
+  gains a scan picker, so a person chooses the scan rather than receiving scan 0. Owed as a
+  task. Claude's reading, for Yue to correct: `read_pattern` with no `scan=` keeps reading
+  scan 0 and warning, under the principle of the next ruling. The refusal option is not
+  taken.
+- `SPACE_GROUP_SETTING_ASSUMED`: "this shouldn't be statistical—if unknown, warn the user".
+  No count of which origin the files in the corpora mean decides the pick. Where a bare
+  symbol leaves the origin unknown, the reader keeps today's pick, origin choice 1, and
+  warns, quoting the cell contents each setting implies. The row is approved as it stands.
 
 **Mike's** (#1075): the nine other magnetic tier-3 candidates in `tiers.md`,
 `_OCCUPANCY_RTOL`'s Scale × f² use, `_MAGNETIC_MATCH_ATOL`, the two-level
