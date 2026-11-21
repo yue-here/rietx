@@ -188,7 +188,7 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
                species_counts=species_counts)
 
 
-def weight_fractions(zmv, scales, scale_cov=None):
+def weight_fractions(zmv, scales, scale_cov=None, *, with_covariance=False):
     """Weight fractions and their esds from refined scales.
 
     ``zmv`` is the per-phase Z·M·V, ``scales`` the refined phase scales; W_p =
@@ -207,6 +207,11 @@ def weight_fractions(zmv, scales, scale_cov=None):
     so callers can show that the correlated path genuinely differs.  Both esds
     are ``None`` when ``scale_cov`` is ``None`` or carries no variance (no scale
     was freed) — an all-zero block is absence of information, not σ(W) = 0.
+
+    ``with_covariance=True`` appends a fourth element, the full correlated
+    ``Cov(W)`` (``None`` exactly when the esds are), whose diagonal is
+    ``sigma_corr²``; its rows sum to zero because W sums to one.  The first
+    three elements are the same either way.
     """
     zmv = np.asarray(zmv, dtype=np.float64)
     scales = np.asarray(scales, dtype=np.float64)
@@ -216,16 +221,19 @@ def weight_fractions(zmv, scales, scale_cov=None):
         raise ValueError("phase scales give a non-positive scaled total "
                          f"(Σ S·ZMV = {total}); cannot form weight fractions")
     w = a / total
+    none = (w, None, None, None) if with_covariance else (w, None, None)
     if scale_cov is None:
-        return w, None, None
+        return none
     cov = np.asarray(scale_cov, dtype=np.float64)
     if not np.any(cov):
-        return w, None, None
+        return none
     jac = (np.diag(zmv) - np.outer(w, zmv)) / total
     cov_w = jac @ cov @ jac.T
     sigma_corr = np.sqrt(np.maximum(np.diag(cov_w), 0.0))
     cov_w_indep = jac @ np.diag(np.diag(cov)) @ jac.T
     sigma_indep = np.sqrt(np.maximum(np.diag(cov_w_indep), 0.0))
+    if with_covariance:
+        return w, sigma_corr, sigma_indep, cov_w
     return w, sigma_corr, sigma_indep
 
 
@@ -481,6 +489,9 @@ def compute_qpa(structure: Structure, values: dict[str, float],
     measured = [ip for ip in range(len(structure.phases)) if ip not in skip]
     w_of: dict[int, float] = {}
     sigma_of: dict[int, float] = {}
+    # Cov(W) in phase order; stays None wherever the esds do (no scale esds,
+    # a blind scale, or a fraction that is a definition, not a measurement)
+    covariance: list[list[float | None]] | None = None
     if not measured:
         pass   # no phase seen in range: every fraction is absent
     elif skip and len(measured) == 1:
@@ -494,12 +505,20 @@ def compute_qpa(structure: Structure, values: dict[str, float],
         # (the fraction is a definition, not a measurement), so it stays None
         w_of = {measured[0]: 1.0}
     else:
-        w, sigma_corr, _ = weight_fractions([zmvs[ip].zmv for ip in measured],
-                                            [scales[ip] for ip in measured],
-                                            scale_cov)
+        w, sigma_corr, _, cov_w = weight_fractions(
+            [zmvs[ip].zmv for ip in measured], [scales[ip] for ip in measured],
+            scale_cov, with_covariance=True)
         w_of = {ip: float(w[k]) for k, ip in enumerate(measured)}
         if sigma_corr is not None:
             sigma_of = {ip: float(sigma_corr[k]) for k, ip in enumerate(measured)}
+            # an unmeasured phase's row and column carry no number (None),
+            # never a zero that would read as a fraction known exactly
+            slot = {ip: k for k, ip in enumerate(measured)}
+            covariance = [
+                [float(cov_w[slot[ip], slot[jp]])
+                 if ip in slot and jp in slot else None
+                 for jp in range(len(structure.phases))]
+                for ip in range(len(structure.phases))]
     rows = [
         PhaseQuantity(
             name=phase.name,
@@ -509,11 +528,13 @@ def compute_qpa(structure: Structure, values: dict[str, float],
             z=zmvs[ip].z, molar_mass=zmvs[ip].molar_mass,
             cell_mass=zmvs[ip].cell_mass, cell_volume=zmvs[ip].cell_volume,
             zmv=zmvs[ip].zmv,
+            element_counts=dict(zmvs[ip].element_counts),
         )
         for ip, phase in enumerate(structure.phases)
     ]
     qpa = QuantitativePhaseAnalysis(
         phases=rows,
+        weight_fraction_covariance=covariance,
         unmeasured_phases=[structure.phases[ip].name for ip in sorted(skip)
                            if 0 <= ip < len(structure.phases)],
         unmeasured_held=[structure.phases[ip].name for ip in sorted(skip)

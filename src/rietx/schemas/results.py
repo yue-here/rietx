@@ -457,6 +457,12 @@ class PhaseQuantity(Base):
     off it would be the caller's start.  Absent rather than zero, the rule its
     esd already followed; :attr:`QuantitativePhaseAnalysis.unmeasured_phases`
     names it.
+
+    ``element_counts`` is the cell's composition at the refined occupancies:
+    atoms per unit cell (occupancy × site multiplicity, summed by element
+    symbol), the counts ``cell_mass`` was weighed from.  It is the refined
+    model's composition, never a declared or nominal one.  ``None`` on a row
+    no QPA pass wrote (an older document).
     """
 
     name: str                                       # matches Phase.name / ticks key
@@ -468,6 +474,10 @@ class PhaseQuantity(Base):
     cell_mass: float                                # Z·M, g/mol per unit cell
     cell_volume: float                              # V, Å³
     zmv: float                                       # cell_mass · V
+    #: atoms per unit cell by element symbol at the refined occupancies;
+    #: written by ``optimize.qpa.compute_qpa`` from the Z·M·V pass, None on a
+    #: row it did not write
+    element_counts: dict[str, float] | None = None
 
     # -- Brindley microabsorption (WP-0305); None unless the correction ran --
     weight_fraction_corrected: float | None = None  # W/τ, renormalised
@@ -574,6 +584,14 @@ class QuantitativePhaseAnalysis(Base):
     content; a specimen known to hold the unmeasured phase has no absolute
     fractions from this range.  Empty when every phase was seen.
     ``unmeasured_held`` says which of them a stage held with a line now in range.
+
+    ``weight_fraction_covariance`` is the full correlated covariance of the
+    uncorrected fractions, a square matrix in ``phases`` order whose diagonal
+    is each ``weight_fraction_stderr`` squared; its rows sum to zero because
+    the fractions sum to one.  An unmeasured phase's row and column hold
+    ``None``, never zero.  The whole matrix is ``None`` whenever the esds are:
+    no scale esds, a scale the data could not see, or the lone phase seen
+    beside unmeasured ones (100 % by definition).
     """
 
     phases: list[PhaseQuantity]
@@ -586,6 +604,10 @@ class QuantitativePhaseAnalysis(Base):
     #: none.  The two read differently to a caller: widening the range helps
     #: only the second (#1103).
     unmeasured_held: list[str] = Field(default_factory=list)
+    #: Cov(W) in ``phases`` order, of the uncorrected Hill-Howard fractions;
+    #: written by ``optimize.qpa.compute_qpa`` through ``weight_fractions``,
+    #: None wherever ``weight_fraction_stderr`` is None
+    weight_fraction_covariance: list[list[float | None]] | None = None
 
     # Brindley microabsorption: the mixture-level record when the correction
     # ran, or the reason it was skipped when radii were supplied but the
@@ -659,14 +681,17 @@ class RestraintRow(Base):
     ``deviation_over_sigma`` is the headline: a restraint fighting the data
     shows up as |deviation/σ| ≫ 1 (and, past a threshold, a ``RESTRAINT_TENSION``
     diagnostic).  ``atoms`` (bond/angle) or ``path`` (value) names the target;
-    exactly one is set.  A planarity restraint gives one row per atom: its
+    exactly one is set.  A ``linear`` row (WP-1942) is a structure-level
+    ``LinearRestraint``: ``path`` is ``restraints.<index>``, its place in
+    ``Structure.restraints``, ``phase_index`` is ``None`` and ``computed`` is
+    Σ c·p.  A planarity restraint gives one row per atom: its
     signed distance to the plane (target 0), ``atoms`` listing that atom first
     and then the rest of the plane in restraint order.
     """
 
     phase_index: int | None = None
     kind: Literal["bond", "angle", "value", "tether", "anti_bump", "planarity",
-                  "torsion"]
+                  "torsion", "linear"]
     atoms: list[int] | None = None                  # bond (2) / angle (3) / torsion (4) indices
     path: str | None = None                         # value-restraint dot-path
     computed: float                                 # Å (bond), deg (angle), or value

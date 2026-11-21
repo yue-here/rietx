@@ -1,6 +1,6 @@
 # WP-1942 — a soft restraint on a sum of parameters across phases
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-17 — all tasks built; PR #1642 awaits its fast suite
 Track: Coming from another code
 Depends on: —
 Priority: P3 2026-10-11 — a named user has waited since 2026-09-01; a variable, a tie and a value restraint cover it today, clumsily
@@ -92,56 +92,45 @@ equation over named parameters. GSAS-II carries linear constraints and
 equivalences as (coefficient, parameter) lists. The (path, coefficient) pair
 form here follows WP-1119's decision 4, which kept strings out of storage.
 
-### Inherited
+**Issue #349's three exports come with this WP** (from the 2026-10-11 issue
+triage; WP-1325's mailbox, 2026-09-21): `rietx.navigate` (#349, fenced at
+v2+) reads the same quantity. The three: `PhaseQuantity.element_counts:
+dict[str, float]`; a weight-fraction covariance beside the existing
+`weight_fraction_stderr` diagonal; and `FitReport.unidentified_phase`
+(`present`, `n_foreign`, `n_shift_matched`, `strongest_two_theta`), which a
+program today recovers by parsing `layer0_actions` for
+`add_impurity_phase`. Rechecked at `6f704aaa5` (2026-11-17): none of the
+three exists; `optimize/qpa.py`'s `ZMV.element_counts` is still internal.
+The third shares no code with the row and may split off if it grows.
+**Decided 2026-09-21** (posted on #349): when `navigate` is cut, the nominal
+composition is an argument to `sample_from_result`, never a field on a
+result, which records measurements only. The same rule binds the ratio
+helper here: the declared ratio is an input, and no result field stores it
+as if measured.
 
-- **2026-10-11, from the issue triage: issue #349's three exports come with
-  this WP.** WP-1325's mailbox recorded on 2026-09-21 that whichever WP cuts
-  the #212 row exports them, since `rietx.navigate` (#349, fenced at v2+)
-  reads the same quantity. The three:
-  `PhaseQuantity.element_counts: dict[str, float]` (a `SCHEMA_VERSION`
-  bump); a weight-fraction covariance beside the existing
-  `weight_fraction_stderr` diagonal; and `FitReport.unidentified_phase`
-  (`present`, `n_foreign`, `n_shift_matched`, `strongest_two_theta`), which a
-  program today recovers by parsing `layer0_actions` for
-  `add_impurity_phase`. Checked at `f11e22d3`: none of the three exists. The
-  third shares no code with the row and may split off if it grows.
-  **Decided 2026-09-21** (posted on #349, moved here from 1325): when
-  `navigate` is cut it lives inside the package on `indexing`'s pattern, and
-  the nominal composition is an argument to `sample_from_result`, never a
-  field on a result, which records measurements only. The same rule binds
-  the ratio helper here: the declared ratio is an input, and no result
-  field stores it as if measured.
-- **2026-10-13, from the issue triage (#212): the reporter's answers to task
-  1's two questions.** Posted 2026-10-12. (1) The row lives on
-  `Structure.restraints`: a row over several phases has no single owner, and
-  in one phase's list it dangles when phases are removed or reordered or the
-  phase is copied into a structure where its paths do not resolve; the
-  per-phase union stays for rows inside one phase. (2) It is an item inside
-  the `soft_restraint` block, not a new `BLOCK_ORDER` entry:
-  r = (Σ aᵢ·pᵢ − t)/σ is `ValueRestraint`'s form generalised to (path,
-  coefficient) pairs, with the same χ² term and `RESTRAINT_TENSION`
-  reporting. Checked against the tree at c3d0367: `_Value`
-  (`model/restraints.py:100`) holds one `path` and the block makes one row
-  per item (`CompiledRestraints.n_rows`), so the item shape fits without a
-  new block. Task 1 still records the maintainer's decision.
-- **2026-10-13, from the issue triage (#727): a second consumer is waiting on
-  this item.** WP-1912's floating-origin fix gains a `"centroid"` mode once
-  this WP's (path, coefficient) item exists: the Flack & Schwarzenbach (1988)
-  restraint is one such row per floating direction, a weighted sum of the
-  coordinates along it held at its starting value. Keep the item general
-  enough for coordinate paths and per-atom weights, not only phase scales and
-  cross-phase composition. *Superseded 2026-10-13 (WP-1912): the consumer no
-  longer waits.* The centroid landed without this item, as a row block of its
-  own (`origin_restraint`, `model/origin.py`). The paper's restraint has no σ
-  and data-derived weights, and the soft-restraint block's √c_w would free
-  the origin at c_w = 0. What this item can reuse is the shape: a linear row
-  whose partials are a constant matrix over entry paths, chained through C
-  (`origin.origin_partials`, beside `restraints.restraint_partials`).
+**What WP-1912 left to reuse** (from the 2026-10-13 triage, #727). The
+floating-origin centroid landed without this item, as a row block of its own
+(`origin_restraint`, `model/origin.py`), because its restraint has no σ and
+the soft-restraint block's √c_w would free the origin at c_w = 0. What this
+item reuses is the shape: a linear row whose partials are a constant matrix
+over entry paths, chained through C (`origin.origin_partials`, beside
+`restraints.restraint_partials`).
+
+**The tier of each rule this WP adds** ([generality § The rule](../milestones/generality.md#the-rule)).
+The row is arithmetic on the caller's own prior (tier 1, Waser 1963), and
+the helper's coefficients are physics (tier 1, Hill & Howard 1987's
+W ∝ S·ZMV). `RESTRAINT_TENSION` reuses its existing 3σ threshold. The
+stale-coefficient report is arithmetic (a coefficient is a function of the
+occupancies it was computed from), reports and acts on nothing, so it has no
+kind of ambiguity. No published reference exists for the worked case: it
+ships verified on synthetic known answers and not yet validated.
 
 ## Non-goals
 
-- Nonlinear expressions over parameters. That is `Parameter.expr`'s
-  designed-but-unbuilt DSL (WP-1119 § Non-goals).
+- Nonlinear expressions over parameters. That is the formula tie
+  (`Refinement.tie(path, expression=...)`, WP-2118; *superseded in part
+  2026-11-17*: `Parameter.expr` left the schema at 0.61 and the DSL landed
+  as ties over named variables, not as restraints).
 - A hard linear constraint. `Refinement.tie` with several sources is one
   already (WP-1119).
 - A parametric function of the series axis. That is WP-1325.
@@ -158,24 +147,42 @@ form here follows WP-1119's decision 4, which kept strings out of storage.
       the row lives on `Structure.restraints`, and it is an item kind inside
       the `soft_restraint` block, not a new `BLOCK_ORDER` entry: the
       reporter's answers in § Inherited, taken as written.
-- [ ] The schema type, (path, coefficient) pairs plus target, σ and weight,
+- [x] The schema type, (path, coefficient) pairs plus target, σ and weight,
       with its JSON round-trip and the `SCHEMA_VERSION` or project-format
-      bump it needs.
-- [ ] Compile, residual and analytic partials; the geometry-esd path
+      bump it needs. *Done 2026-11-17:* `LinearRestraint` (`terms` as
+      `TieSpec.terms` stores them) on `Structure.restraints`, additive under
+      the open 0.61 (no bump; its note in `schemas/common.py`); carried and
+      renumbered through `carry_restraints` like a phase's own list.
+- [x] Compile, residual and analytic partials; the geometry-esd path
       handles or excludes it; `summarise_restraints` and
-      `RESTRAINT_TENSION` report it under one stable `where`.
-- [ ] The elemental-ratio helper: coefficients from `element_counts` and
+      `RESTRAINT_TENSION` report it under one stable `where`. *Done
+      2026-11-17:* `_Linear` in the soft-restraint block, key
+      `restraints.<index>`; geometry builds its own items and never sees it.
+- [x] The elemental-ratio helper: coefficients from `element_counts` and
       cell volumes, σ stated on the ratio, and a report when a stage frees
       an occupancy of a phase in the row.
-- [ ] The three #349 exports from § Inherited.
-- [ ] Tests: the probe above as a regression, a synthetic two-phase series
+- [x] The three #349 exports from § Inherited (now in Context). *Done
+      2026-11-17 (a lane):* `PhaseQuantity.element_counts`,
+      `QuantitativePhaseAnalysis.weight_fraction_covariance` (phase order,
+      `None` where an esd is, rows summing to zero) and
+      `FitReport.unidentified_phase`, a projection of the evidence
+      `layer0_actions` words its `add_impurity_phase` from
+      (`layer2._impurity_evidence`).
+- [x] Tests: the probe above as a regression, a synthetic two-phase series
       where the ratio decides the partition, cross-backend agreement for the
       new partials (`tests/test_cross_backend.py`); obs/calc/diff PNGs to
       `tests/output/`.
-- [ ] Manual: Part 1 `using/constraints.md` (restraint vs constraint, the
+- [x] Manual: Part 1 `using/constraints.md` (restraint vs constraint, the
       worked ratio); Part 2 the row's equation with its *Source* line.
-- [ ] Skill: a reference row for the new restraint kind and the ratio
-      helper, keyed by their names.
+      *Done 2026-11-17:* the manual has moved, so Part 1 is
+      `guides/restrain.md` § Restrain a sum across phases and Part 2
+      `theory/parameterisation.md`'s `par-linear-restraint` and
+      `par-ratio-restraint`.
+- [x] Skill: a reference row for the new restraint kind and the ratio
+      helper, keyed by their names. *Done 2026-11-17:* one
+      `references/diagnostics.md` row, keyed by `LINEAR_RESTRAINT_STALE`,
+      naming `LinearRestraint`, `elemental_ratio_restraint` and the
+      flat-partition trap; the API rows are the regenerated `api.md`.
 
 ## Acceptance
 
@@ -199,6 +206,75 @@ the declared ratio is wrong by 5σ.
   weight-fraction relation W_p ∝ S_p·(ZMV)_p the coefficients rest on.
 
 ## Handover log
+
+- **2026-11-17 (later)** — gates run on the final tree, follow-ups filed,
+  PR #1642 marked ready. Current main (13 commits) merged in cleanly first,
+  so the counts below are the merged tree's.
+  - *Measured:* fast suite on the workstation (Linux x86_64, `-n 8 --dist
+    loadgroup -m "not slow"`, after a 4-file canary of 436 passed, 0 failed):
+    3 failed, 14893 passed, 283 skipped, 32 xfailed on cf1ae813b. All three
+    were rows the new code owed: `LINEAR_RESTRAINT_STALE` had no silence
+    pair (`tests/silence.py`) and no joint-fit scope (`multi.DIAGNOSTIC_SCOPES`,
+    absent: a joint fit refuses soft restraints), and the GUI help-key
+    fixture lacked its key; fixed in 8ee692b02, after which those three files
+    pass (5, 129 and 37) and `test_audit_table` 23 ([dev,jax], darwin arm64).
+    `rietx_vale.sh` (the CI Vale step) 0 errors; `tests.reader_output` exit 0
+    (unchanged against the merge-base); `test_docs_consistency` 26 passed;
+    ruff clean.
+  - *Filed:* #1653, the small follow-ups named below (the QPA table export
+    and the series trajectory do not carry `element_counts` or
+    `weight_fraction_covariance`; the GUI list join drops structure-level
+    rows).
+  - *For the maintainer:* the Acceptance asks `RESTRAINT_TENSION` to fire on
+    the flat-partition pair when the ratio is wrong by 5σ; measured, it
+    cannot there (no data pull on the partition), and fires only where the
+    data measure it. The tests pin both halves; whether that is the
+    acceptance wanted is his call. The tier of `LINEAR_RESTRAINT_STALE`
+    (tier 1, arithmetic) is for his read.
+  - *Next:* review of #1642.
+
+- **2026-11-17** — every task built, review fixes in; PR #1642 (draft), its
+  fast suite and handover steps still owed. A refinement can now hold a sum of
+  parameters across phases near a target as a soft observation, and one call
+  turns a conserved elemental ratio (issue #212's Cu/(Ca+Al)) into that row.
+  On a synthetic pair whose partition the pattern cannot measure (Cu and Ni
+  on one fcc cell, unrestrained W_Cu ± 0.97) the ratio row recovers the
+  weight fraction to 0.643426 ± 0.0032 against 0.643425 true. The flip side,
+  measured and pinned: where the data cannot see the partition, a wrong ratio
+  is met silently and `RESTRAINT_TENSION` cannot fire; it fires (−3.6σ) only
+  where the data measure the partition (Cu, Ni on their own cells). The three
+  #349 exports landed too.
+  - *Done:* `LinearRestraint` on `Structure.restraints` (open schema 0.61, no
+    bump); `_Linear` in the soft-restraint block keyed `restraints.<k>`, with
+    the cross-backend row `toy_linear` (numpy and jax agree); carried through
+    edits by the phase list's place rule; `elemental_ratio_restraint`
+    (`model/restraints.py`) and `LINEAR_RESTRAINT_STALE` (read off the values
+    against the row's declared `occupancies`, so an earlier stage or a series
+    carry is seen); `PhaseQuantity.element_counts`,
+    `QuantitativePhaseAnalysis.weight_fraction_covariance`,
+    `FitReport.unidentified_phase` (a lane); manual `guides/restrain.md` and
+    `theory/parameterisation.md` (`par-linear-restraint`,
+    `par-ratio-restraint`); skill row in `references/diagnostics.md`.
+  - *Review:* a read-only reviewer found four bugs (a row deleted in an edit
+    that renumbers phases was silently re-read; a trailing phase removed
+    refused the edit; the stale check saw only the last stage; a misspelt
+    element built a row) and an inverted σ statement (it is σ·D₀/D away from
+    the declared scales); all fixed in fb126f579 with tests. Generality:
+    `LINEAR_RESTRAINT_STALE` judged *weak* because it reports no size of the
+    change; the message now quotes each occupancy's declared and current value.
+    A refined cell volume also moves a coefficient and is not reported (stated
+    in the docstring and the theory page).
+  - *Measured* ([dev,jax], darwin arm64): `tests/test_linear_restraint.py` 24
+    passed; a touched-area selection (restraints, qpa, cross_backend,
+    schemas, manual_api, help, audit, planarity) 670 passed, 115 skipped
+    before the review fixes; `tests.reader_output` exit 0 (unchanged); Vale
+    over the manual 0 errors before the review-fix prose edit.
+  - *Not done:* the fast suite on the final tree; Vale re-run after fb126f579;
+    the PR body. `io/exporters.py` and `schemas/sequential.py` do not carry the
+    new QPA fields; the GUI's list-payload join (`gui/session.py` near 4170)
+    would drop structure-level rows (the GUI cannot author them).
+  - *Next:* run the fast suite (on the workstation, canary first), re-run
+    `rietx_vale.sh`, rewrite the PR body from this entry, mark #1642 ready.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #212).
   Checked against the tree at `f11e22d3`: every seam the issue names exists
