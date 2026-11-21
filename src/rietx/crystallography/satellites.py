@@ -743,7 +743,14 @@ def _zone_boundary_candidates(sg) -> tuple[KCandidate, ...]:
         if held is None or _shortest_spelling_key(kk) < _shortest_spelling_key(held):
             stars[arms] = kk
     raw: list[KVector] = sorted(stars.values())
-    if sg.crystal_system_str() in ("hexagonal", "trigonal"):
+    # (⅓, ⅓, ·) is K/H only on a tabulated setting's axes.  An operation list's
+    # own crystal system is basis-free (issue #1688), so read the setting: an
+    # unnamed child's axes are no tabulated setting's, and there it is no point.
+    try:
+        setting = sg.closest_type if isinstance(sg, OperatorGroup) else sg
+    except ValueError:
+        setting = None
+    if setting is not None and setting.crystal_system_str() in ("hexagonal", "trigonal"):
         raw.extend(_TRIGONAL_POINTS)
     out: list[KCandidate] = []
     seen: set[frozenset[KVector]] = set()
