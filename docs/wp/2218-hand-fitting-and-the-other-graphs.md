@@ -1,8 +1,7 @@
 # WP-2218 — hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, and the Instrument dialog at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-18 — every row built: #1680, #1683 and #1684; waits on Yue's look at § Questions 5-12
+Milestone: gui-overhaul · Status: ✅ 2026-11-21 — #1673 merged on 2026-11-18 and #1680, #1683 and #1684 on 2026-11-19, after Yue's look (§ Rulings 8); the hand-fitting tab and the other graphs are served at `/next`
 Depends on: 2216 (the refinement window)
-Priority: P2 2026-11-17 — a feature the open milestone was opened for: R3, the next piece after R2
 
 ## Goal
 
@@ -357,6 +356,42 @@ Filled in by the session that builds each PR.
     ×10ⁿ value looks once clicked, went to WP-2223.*
 
 ## Handover log
+
+- **2026-11-21** — closed by a ghostshift runner, on a `main` that includes #1736.
+
+  R3 of the GUI rebuild is done. A person on `/next` can move the model by hand in the
+  Interactive tab and watch the preview on the Pattern graph. The Peaks, Background and
+  Structure graphs and the Instrument dialog are there too. Yue looked at the screens beside
+  the prototype on 2026-11-19 and called them "mostly good" (§ Rulings 7). After the three
+  changes that look asked for, Yue wrote "All the changes look good" (§ Rulings 8). That
+  second look is the acceptance's review of the screens. Every task is ticked and every
+  question is answered. The work goes out with v1.13.
+
+  - *Checked before closing*: the five tasks are ticked in the checklist. `gh pr view` shows
+    all four PRs merged into `main`: #1673 on 2026-11-18, and #1680, #1683 and #1684 together
+    at 10:36 UTC on 2026-11-19. § Rulings 8 quotes Yue's own words, which the shift log of
+    2026-11-19 records at 08:50 UTC.
+  - *Changed by this close*: Status ✅, the `Priority:` line removed, the narrative moved to
+    `docs/milestones/v1.13.md`, the R3 row of `docs/milestones/gui-overhaul.md` § The rebuild
+    marked merged, and the index regenerated. This WP had no `### Inherited` section, and no
+    other WP's priority waited on it. The priority was P2, so no release is owed.
+  - *Leftovers, and where each lives*:
+    - The three background-hold cases the review fix left alone: other surfaces that change
+      the background without releasing its holds (the old Background tab, and `.rxt`, which
+      that WP's first task checks), a hold registered before the fix, and pending positions
+      and restraints. All three are WP-2229, filed as 2224 and renumbered at merges.
+    - Yue's question of how a ×10ⁿ value looks once clicked: WP-2223, closed by PR #1709.
+    - File › Export does not list the structure image yet (§ Questions 9, inventory row 79).
+      The canvas's menus offer it, and the File menu is today's shared panel. The Swap row of
+      `gui-overhaul.md` § The rebuild now names it, and the milestone's acceptance row 13
+      walks the inventory at the swap. Settled by Claude under `/wp-handover` step 5: a note
+      left in a closed WP is never read again.
+    - The register guard over `gui/src/next/`: issue #1656, WP-2215's leftover.
+    - PR #1683's Structure graph code reached `main` without a `/code-review` pass (its entry
+      of 2026-11-18). This close changes no code and did not run one.
+  - *Measured*: docs only, so no test count moved. The close PR is CLOSE_PR.
+
+  Next: none in this WP. R4, the Plan and Text tabs, has no WP yet.
 
 - **2026-11-19** — The fourth PR, PR #1684: the 2026-11-19 round merged up, and the Peak
   shape row (§ Rulings 6).
