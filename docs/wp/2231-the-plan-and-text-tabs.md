@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Plan tab in review (#1755); the Text tab is next
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Text tab in review (#PRNUM); the maintainer's look at both tabs waits
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -148,15 +148,16 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   ⌘Z and ⇧⌘Z; `.` runs the selected stage; the plan counted in the action bar and kept in the
   recovery copy; `min="1"` on the iteration field (#1652 item 1). A vitest mount case and a
   browser pass over a five-stage plan with a real drag (acceptance row 8). The first PR.
-- [ ] The Text tab at `/next` (rows 139-146), from `panels/Text.svelte`. The file's name and
+- [x] The Text tab at `/next` (rows 139-146), from `panels/Text.svelte`. The file's name and
   its sync word on the title line; a typed change counted as one pending edit in the action
   bar, applied by its Apply and by ⌘Enter; Re-read inside the stale notice; one-line notices;
   problems in the gutter and in the list under the editor; the `?` box; the recovery copy's
   text arm offered and restored here. A vitest mount case and a browser pass that types a
   value and applies it from the bar. The second PR.
-- [ ] Screenshots at 1440 × 900, light and dark, under `docs/wp/2231-screenshots/`, beside the
+- [x] Screenshots at 1440 × 900, light and dark, under `docs/wp/2231-screenshots/`, beside the
   prototype's at the same size in the runner's scratch, with an inventory of where each of
   today's Plan and Text features lives. The last PR waits on the maintainer's look.
+  Taken in the second PR; the inventory is the folder's README.
 
 ## Acceptance
 
@@ -234,8 +235,109 @@ The Plan tab (the first PR), most consequential first:
     glob (WP-2208), and a picker of named options alone would lose it. The alternative is
     the prototype's picker, which offers named options only.
 
+The Text tab (the second PR), most consequential first:
+
+11. **The `?` box is not built here.** The task line names it, and no panel on `/next` has
+    one yet. WP-2215 settled that the tab strips' `?` boxes (WP-2214 row 246) wait for a
+    help piece, and no WP owns that piece yet. A box drawn for the Text tab alone would put
+    a control on the strip that the other three tabs lack. The footer's words are removed from the tab and kept here for that
+    piece: "Rectangular selection: ⌥-drag. Everything applies through the same verbs the
+    forms call, so a bulk edit lands as history nodes and is undone by a checkout." The
+    prototype's box adds: "Change a number or a refine flag and it becomes a pending edit,
+    as in Parameters. Edited values are highlighted; a line rietx cannot read is
+    underlined." The alternative is a `?` button on the model strip now, drawn only on the
+    Text tab.
+12. **The whole buffer is one pending edit, and a text edit draws no preview.** The
+    prototype turns each changed value into an entry of the Parameters panel's pending set,
+    so the Pattern graph previews it. Grounds: this WP's task line counts "a typed change"
+    as one pending edit, and the document applies as one delta through the verbs a form
+    calls (WP-1009, WP-1013). The alternative is the prototype's per-value edits, which
+    would need the text parsed into parameter values on the client.
+13. **The text applies first** when Apply sends several panels' edits. The buffer carries
+    the revision it was typed against, and any other apply moves the head under it, which
+    would make it stale (WP-1013: no merge). A path that both the text and the Parameters
+    panel change takes the Parameters value, applied after it. Run this stage applies the
+    text too, as it applies the other edits waiting in the bar. The alternative is the
+    text last, which would refuse every combined Apply as stale.
+14. **⌘⏎ inside the editor is Apply, never Refine.** Grounds: today's tab binds ⌘⏎ to its
+    Apply (WP-1013), and the task line names it. The frame's own ⌘⏎ (Refine) now skips a key
+    pressed in the editor; without that, ⌘⏎ on an unedited buffer started a fit. The
+    alternative is the frame's meaning, Apply and refine, everywhere.
+15. **An edited line's text is marked in the accent at 16 %**, over the text and not the
+    gutter. The prototype marks the line in its soft accent, about 10 %, with the text in
+    the accent's ink. The editor's active line is already the accent at 8 %, so 16 % keeps
+    a mark apart on the line the caret is on. Lines are matched by a longest common
+    subsequence, so an inserted line marks itself and not every line after it.
+16. **A buffer the server reads as changing nothing applies by reading the rendering
+    again.** A comment added is such an edit. The tab already says, before Apply, that an
+    added comment will not survive it. The alternative is refusing Apply, which would leave
+    an edit in the bar that no Apply clears.
+17. **A stale or unreadable buffer reads "invalid edit" in the action bar**, with its reason
+    in the tooltip, as a refused Parameters edit reads. It refuses Apply, Refine and Run
+    this stage for every panel's edits, as an invalid Parameters edit does, until the text
+    is re-read or reverted. The alternative is applying the other panels' edits and leaving
+    the text waiting, which would make the bar's one Apply apply only part of what it
+    counts.
+18. **The tab's title names the file after the project**, `<name>.rxt`, from the project's
+    path (`lib/filemenu.ts:projectStem`), as the File menu names the project.
+
 ## Handover log
 
+- **2026-11-21** — the Text tab at `/next`, the second of R4's two PRs (#PRNUM), and the
+  screenshots and inventory for both tabs. The rebuilt page now shows the project as `.rxt`
+  text. A typed change is one pending edit in the action bar beside the Parameters panel's,
+  so the window has one Apply, and the editor marks each line that differs from the stored
+  project. A buffer kept from a crash or a close is offered again and restored into the
+  tab. Twenty-two pictures of the Plan and Text tabs wait in `docs/wp/2231-screenshots/` for
+  the maintainer's look beside the prototype's, with a table placing every one of today's
+  Plan and Text features. The tab's `?` box is not built, since no tab on `/next` has one
+  yet (§ Settled 11).
+  - *Done*: `gui/src/next/Text.svelte` carries today's panel's logic with no Apply of its
+    own, Re-read only inside the stale notice, and no footer. `gui/src/next/Frame.svelte`
+    mounts it, counts its edit, applies it first, applies it before Run this stage, reverts
+    and forgets it, and offers and restores the recovery copy's Text arm, which it no longer
+    only carries. `lib/sync.ts:editedLines` and `lib/editor.ts`'s `setEdited` mark edited
+    lines; today's page does not call them. § Settled by Claude lists eight values, 11-18.
+    The browser pass in `tests/test_gui_layout_browser.py` types a value with real keys,
+    applies it from the bar, applies a second with ⌘⏎ and checks no run started. It was
+    run red once without the frame's editor guard.
+  - *Measured* (`[dev]` venv, darwin/arm64, at `6d9715351`, before a merge of main that
+    moved docs and the suite-alarm tests only): the fast selection 15238 passed, 433
+    skipped, 32 xfailed, playwright installed; the new browser test 19.7 s
+    (`tests.added_test_times`); vitest 905 passed in 50 files; svelte-check 0 errors over
+    467 files; every `tests/*_browser.py` together with the GUI python files and
+    `test_docs_consistency.py`, 493 passed; ruff, the tutorials' prose build and Vale (0
+    errors); `tests.reader_output` exit 0, unchanged against the merge base.
+    The rebuilt page's second build pass now carries its own CodeMirror chunks
+    (`next-editor.js`, `next-vendor-cm.js`, 328 kB), fetched on the first Text tab, as
+    today's page fetches its own.
+  - *Review*: `/code-review high --fix` over this branch's commits found nine defects and
+    fixed seven in one commit, with two new vitest cases (the forget case run red without
+    its fix): a second Apply while one ran was read as a refusal; a read begun for a
+    project the tab was told to forget could land in the next project's buffer; a failed
+    read stayed on screen after a good one; a refusal naming no line said "0 problems";
+    the line diff reran on every sync event; the problem list's key could repeat;
+    `editedLines` sized its cap off the wrong product. Declined: a stale buffer refusing the
+    other panels' edits (§ Settled 17, by design); Run this stage repeating Apply's
+    sequence by hand, since sharing it would commit a half-typed Parameters cell on every
+    stage run. No heuristic, audit-table row or CLAUDE.md line was added, so no generality
+    review.
+  - *Not done*: the register guard's reach into `gui/src/next/` (folded into § Inherited by
+    the issue triage, #1656 item 2) was measured and left listed. Extending
+    `styledFiles()` to `next/*.svelte` with `.ib` added fires all three of the guard's
+    assertions, not one: 6 geometry overrides, 2 literal font sizes in `next/Params.svelte`,
+    and 45 filled buttons across 13 files, because `next.css` draws a bare button outlined
+    where `app.css` draws it filled. The last needs the one-filled-primary check restated
+    for the new page, which is more than this PR's fix.
+  - *Gotchas*: Shift+End in the editor scrolls a long line's comment column into view and
+    leaves the view scrolled after the line is retyped shorter; the pictures scroll back
+    first. `Window.test.ts` mocks `lib/editor`, since CodeMirror in jsdom throws while
+    measuring after a test has ended. A Window test that leaves a recovery write on the
+    timer leaks it into the next test, so the Apply case waits for it.
+  - *Next*: the maintainer's look at the pictures beside the prototype's (WP-2214 § How the
+    maintainer reviews), which closes the WP. Questions 1 (a)-(c), carried from WP-2227,
+    wait for that review. The `?` boxes wait for a help piece that no WP owns yet; the
+    swap's inventory walk (WP-2214 § The swap, item 1) reaches their row, 246.
 - **2026-11-21** — the Plan tab at `/next`, the first of R4's two PRs (#1755). The rebuilt page
   now shows the plan as the prototype draws it: one block per stage with its Free and Fix rows
   of named chips, a grouped picker behind `+ Add`, the closing stage, and the parameters no
