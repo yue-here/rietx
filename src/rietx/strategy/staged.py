@@ -1827,6 +1827,11 @@ def check_peak_width_positive(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
+    # nothing to test, and a flight-time bank has no 2θ grid to read: ``model.tt``
+    # raises on one (issue #193), so look before reading it
+    if not any(cp.peq is not None and cp.peq.has(*WIDTH_TARGETS)
+               for cp in model.phases):
+        return []
     values = {e.path: e.value for e in table.entries}
     lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
     out: list[GuardFinding] = []
