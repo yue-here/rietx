@@ -588,11 +588,12 @@ def test_the_order_screen_rank_tolerance_sits_in_a_gap(label):
     2026-11-16 over these seven phases: largest dropped 7.6e-16 (the one-atom
     −3m1 phase's c4_3, c6_3 and c8_3, which the partition averages away),
     smallest kept 0.13 (−3m1 at order 8), so on those six any tolerance from
-    1e-14 to 1e-2 returns the same ranks.  The seventh, a P −1 phase read only
+    1e-12 to 1e-2 returns the same ranks.  The seventh, a P −1 phase read only
     to 2θ = 60° ("-1 short range"), is where collinearity among visible terms
     shrinks singular values: kept 5.9e-3 at order 6 and 2.1e-4 at order 8, and
     13 of order 8's 44 terms dropped at 1.3e-15 (rank 31).  The window over all
-    seven is therefore 1e-14 to 1e-4 (PR #1604 review).  Where no gap exists
+    seven is therefore 1e-12 to 1e-4: the dropped values are roundoff, 1.3e-15
+    on arm64 and above 1e-14 on the Linux py3.14 CI leg (PR #1604 review).  Where no gap exists
     (visible terms nearly but not exactly collinear) the cut itself decides the
     rank that ``added_rank`` and ΔBIC read: the screen reports the rank it
     kept (``min_kept_sv`` shows how close to the cut) and does not warn.  The
@@ -622,8 +623,8 @@ def test_the_order_screen_rank_tolerance_sits_in_a_gap(label):
     kept = [f.min_kept_sv for f in screen.fits if f.rank]
     dropped = [f.max_dropped_sv for f in screen.fits if f.rank < f.n_terms]
     # the gap each side of the cut: every kept value above 1e4 x the cut, every
-    # dropped one below 1e-6 x it (on the short-range P -1 phase the smallest
+    # dropped one below 1e-4 x it (roundoff differs by platform) (on the short-range P -1 phase the smallest
     # kept is 2.1e-4, so the cut's safe window ends at 1e-4, not 1e-2)
     assert kept and min(kept) > 1e4 * _ORDER_RANK_TOL
-    assert all(d < 1e-6 * _ORDER_RANK_TOL for d in dropped)
+    assert all(d < 1e-4 * _ORDER_RANK_TOL for d in dropped)
     assert bool(dropped) == (label in ("-3m1 Mg only", "-1 short range"))

@@ -300,8 +300,9 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
 #: makes it a surviving fraction for a column orthogonal to the rest;
 #: collinearity among visible terms also makes small ones).  ``tests/test_texture.py`` records the gap it
 #: sits in over six Laue classes and a short-range P -1 phase at orders 2-8:
-#: dropped columns at roundoff, kept ones at least 2e-4, so any value from
-#: 1e-14 to 1e-4 gives the same ranks there.  With no gap the tolerance decides.
+#: dropped columns at roundoff (1e-15 on arm64, above 1e-14 on one Linux
+#: py3.14 leg), kept ones at least 2e-4, so any value from 1e-12 to 1e-4 gives
+#: the same ranks there.  With no gap the tolerance decides.
 _ORDER_RANK_TOL = 1e-8
 
 
