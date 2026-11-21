@@ -582,12 +582,21 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
     measurement.  A row whose partials touch nothing blind is unaffected, which
     is the case that matters: an unmeasured profile term must not cost a bond
     length its esd.
+
+    **A row the data determine keeps its esd although a source does not**
+    (WP-2230).  With the solve's discarded subspace, ``cov`` carries
+    ``functions``, :meth:`~rietx.params.vector.ParameterTable.unmeasured_functions`
+    over these entries, and a row whose blind sources are only columns a
+    discarded direction touched is asked whether its combination is
+    estimable.  Kept, it reports σ through the pseudo-inverse's covariance and
+    no diagonal-only σ, since a touched column's own variance is not
+    measured and a sum of diagonal terms would quote it.
     """
     if not items:
         return []
     if cov is None:
         return [(None, None)] * len(items)
-    cov_full, cov_diag, blind = cov
+    cov_full, cov_diag, blind, functions = cov
     compiled = CompiledRestraints(items=items)
     gross_rows = np.zeros((compiled.n_rows, len(table.entries)), dtype=np.float64)
     rows = restraint_partials(compiled, values, table, gross=gross_rows)
@@ -604,22 +613,36 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
     floor = VARIANCE_CANCELLATION_FLOOR * scale
     touches_blind = (np.abs(g[:, blind]) > 0.0).any(axis=1) if blind.any() \
         else np.zeros(len(items), dtype=bool)
+    kept = np.zeros(len(items), dtype=bool)
+    if functions is not None and touches_blind.any():
+        kept = touches_blind & ~functions(g)
+        touches_blind = touches_blind & ~kept
     return [(None, None) if (b or f <= max(fl, 0.0)) else
-            (math.sqrt(f), math.sqrt(max(float(d), 0.0)))
-            for f, d, fl, b in zip(var_full, var_diag, floor, touches_blind,
-                                   strict=True)]
+            (math.sqrt(f), None if k else math.sqrt(max(float(d), 0.0)))
+            for f, d, fl, b, k in zip(var_full, var_diag, floor, touches_blind,
+                                      kept, strict=True)]
 
 
 def _covariance(table, theta, ip: int, n_atoms: int, stderr_internal,
-                correlation):
-    """``(full, diagonal-only, blind)`` over phase ``ip``'s entries, or None."""
+                correlation, discarded=None):
+    """``(full, diagonal-only, blind, functions)`` over phase ``ip``'s
+    entries, or None.  ``functions`` is ``None`` without a discarded subspace
+    (WP-2230; :func:`_sigmas`)."""
     if stderr_internal is None:
         return None
     paths = _phase_paths(ip, n_atoms)
-    return (table.physical_covariance(theta, stderr_internal, correlation, paths),
+    rows = [table._paths[q] for q in paths]
+    functions = None
+    if discarded is not None and correlation is not None:
+        def functions(g):
+            return table.unmeasured_functions(
+                theta, stderr_internal, rows, g, correlation=correlation,
+                discarded=discarded)
+    return (table.physical_covariance(theta, stderr_internal, correlation, paths,
+                                      discarded=discarded),
             table.physical_covariance(theta, stderr_internal, None, paths),
-            table.unmeasured_rows(theta, stderr_internal,
-                                  [table._paths[q] for q in paths]))
+            table.unmeasured_rows(theta, stderr_internal, rows),
+            functions)
 
 
 def _torsion_row(ip: int, labels, item: _Torsion, codes, values, sigma):
@@ -637,7 +660,7 @@ def _torsion_row(ip: int, labels, item: _Torsion, codes, values, sigma):
 
 
 def geometry_table(model, table, theta: np.ndarray, structure, *,
-                   stderr_internal=None, correlation=None):
+                   stderr_internal=None, correlation=None, discarded=None):
     """The converged model's distances, angles and torsions, or ``None``.
 
     ``None`` outside Rietveld mode, where the mandatory dummy atom of a Le Bail
@@ -653,11 +676,11 @@ def geometry_table(model, table, theta: np.ndarray, structure, *,
         return None
     return geometry_from_sites([cp.sites for cp in model.phases], table, theta,
                                structure, stderr_internal=stderr_internal,
-                               correlation=correlation)
+                               correlation=correlation, discarded=discarded)
 
 
 def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
-                        stderr_internal=None, correlation=None):
+                        stderr_internal=None, correlation=None, discarded=None):
     """:func:`geometry_table` over each phase's frozen orbit subsets.
 
     ``sites_of[ip]`` is phase ``ip``'s :class:`~rietx.crystallography.
@@ -682,7 +705,8 @@ def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
         labels, bonds, contacts, angle_rows, torsion_rows = _phase_items(
             phase, sites, values, ip, notes)
         n_atoms = len(phase.atoms)
-        cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
+        cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation,
+                          discarded)
         pairs = ([(i, e, True) for i, e in bonds]
                  + [(i, e, False) for i, e in contacts])
         pair_items = [_bond_item(ip, i, e) for i, e, _ in pairs]
@@ -740,7 +764,7 @@ def _volume_and_gradient(a, b, c, alpha, beta, gamma) -> tuple[float, np.ndarray
 
 
 def cell_volumes(table, theta: np.ndarray, structure, *,
-                 stderr_internal=None, correlation=None):
+                 stderr_internal=None, correlation=None, discarded=None):
     """Each phase's cell volume, its esd through the cell covariance.
 
     σ²(V) = gᵀ·Cov·g with g = ∂V/∂(a, b, c, α, β, γ), the covariance built by
@@ -749,7 +773,9 @@ def cell_volumes(table, theta: np.ndarray, structure, *,
     is ``None`` on the terms :func:`_sigmas` states: no covariance, nothing
     refined, a cancelling variance, or a source that measured nothing.  Every
     mode, since the cell of a Le Bail or Pawley fit is refined as surely as a
-    Rietveld one's.
+    Rietveld one's.  A volume whose blind sources are only columns a discarded
+    direction touched keeps its esd when it is estimable (``discarded``,
+    WP-2230), with no diagonal-only one, as :func:`_sigmas` says.
     """
     from ..schemas.results import CellVolume
 
@@ -760,15 +786,20 @@ def cell_volumes(table, theta: np.ndarray, structure, *,
         v, g = _volume_and_gradient(*(values[p] for p in paths))
         sig = sig_d = None
         if stderr_internal is not None:
-            full = table.physical_covariance(theta, stderr_internal, correlation, paths)
+            full = table.physical_covariance(theta, stderr_internal, correlation,
+                                             paths, discarded=discarded)
             diag = table.physical_covariance(theta, stderr_internal, None, paths)
-            blind = table.unmeasured_rows(theta, stderr_internal,
-                                          [table._paths[q] for q in paths])
+            rows = [table._paths[q] for q in paths]
+            blind = table.unmeasured_rows(theta, stderr_internal, rows)
             var = float(g @ full @ g)
             floor = VARIANCE_CANCELLATION_FLOOR * float(np.abs(g) @ np.abs(full) @ np.abs(g))
-            if not (np.abs(g[blind]) > 0.0).any() and var > max(floor, 0.0):
+            uses_blind = bool((np.abs(g[blind]) > 0.0).any())
+            kept = uses_blind and not table.unmeasured_functions(
+                theta, stderr_internal, rows, g[None, :], correlation=correlation,
+                discarded=discarded)[0]
+            if (kept or not uses_blind) and var > max(floor, 0.0):
                 sig = math.sqrt(var)
-                sig_d = math.sqrt(max(float(g @ diag @ g), 0.0))
+                sig_d = None if kept else math.sqrt(max(float(g @ diag @ g), 0.0))
         out.append(CellVolume(phase_index=ip, volume=v, stderr=sig,
                               stderr_diagonal=sig_d))
     return out
@@ -795,7 +826,7 @@ def _parse_code(code: str, symops, what: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def request_table(request, sites_of, table, theta: np.ndarray, structure, *,
-                  stderr_internal=None, correlation=None):
+                  stderr_internal=None, correlation=None, discarded=None):
     """The rows ``request`` names, as a :class:`GeometryTable`.
 
     Each atom is placed by its CIF code where one is given, and otherwise at
@@ -871,7 +902,8 @@ def request_table(request, sites_of, table, theta: np.ndarray, structure, *,
         return p[1] @ x[p[0]] + p[2]
 
     n_atoms = len(phase.atoms)
-    cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
+    cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation,
+                      discarded)
     notes: list[str] = []
     zero = np.zeros(3)
 

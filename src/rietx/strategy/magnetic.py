@@ -1688,7 +1688,7 @@ def _moment_correlations(ref, result):
     kept = getattr(ref, "_answer_covariance", None)
     if kept is None or kept[0] is not result or kept[3] is None:
         return None
-    _result, table, theta, stderr_internal, correlation = kept
+    _result, table, theta, stderr_internal, correlation = kept[:5]
     paths = [p.path for p in result.parameters
              if p.vary and p.stderr is not None and _MOMENT_GLOB in p.path
              and p.path.endswith(".dof0")]

@@ -2469,14 +2469,19 @@ class MultiHistogramRefinement:
         # The slices are kept for the loop: with a correlation matrix each is
         # a dense copy, taken once per histogram.
         per_stderr, per_corr, per_esds = [], [], []
+        # a tie the data determine keeps its esd (WP-2230), per histogram's
+        # columns as the esds are
+        sub = outcome.discarded_subspace
         for h_table, h_theta, cm in zip(mt.tables, thetas,
                                         map(mt.col_map, range(n))):
             s_h = stderr[cm] if stderr is not None else None
             corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
             per_stderr.append(s_h)
             per_corr.append(corr_h)
-            per_esds.append(h_table.stderr_physical(h_theta, s_h, corr_h)
-                            if s_h is not None else {})
+            per_esds.append(h_table.stderr_physical(
+                h_theta, s_h, corr_h,
+                discarded=None if sub is None else sub.take(cm))
+                if s_h is not None else {})
         # one bound test, three consumers: the rows' at_bound flag, the
         # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
         # declared-peak diagnostics (WP-2141)
@@ -2701,7 +2706,8 @@ class MultiHistogramRefinement:
         # a second build here would double the cost for the same dict.
         esd_hist0 = per_esds[0] if per_esds else {}
         parameters = self._parameters(thetas, stderr, corr, at_bounds, esd_hist0,
-                                      answer_runaway, outcome.esd_inflation)
+                                      answer_runaway, outcome.esd_inflation,
+                                      discarded=outcome.discarded_subspace)
         diagnostics = list(opening_diags) + self._top_diagnostics(
             outcome, correlation_guard, top_bg, at_bounds, models)
         # what a parametric declaration did to each pattern's dependent that
@@ -2956,7 +2962,8 @@ class MultiHistogramRefinement:
         return rows
 
     def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
-                    answer_runaway=(), esd_inflation=None) -> list[RefinedParameter]:
+                    answer_runaway=(), esd_inflation=None, *,
+                    discarded=None) -> list[RefinedParameter]:
         mt = self.mtable
         params: list[RefinedParameter] = []
         # The single-histogram rule (``refine._build_result``): a cell the
@@ -2999,8 +3006,10 @@ class MultiHistogramRefinement:
                     equations=equations.get(e.path, [])))
         for h, table in enumerate(mt.tables):
             cm = mt.col_map(h)
-            esd = (table.stderr_physical(thetas[h], stderr[cm],
-                                         corr[np.ix_(cm, cm)] if corr is not None else None)
+            esd = (table.stderr_physical(
+                thetas[h], stderr[cm],
+                corr[np.ix_(cm, cm)] if corr is not None else None,
+                discarded=None if discarded is None else discarded.take(cm))
                    if stderr is not None else {})
             for e in table.entries:
                 if not _row_shared(mt, e) and e.path in moving[h]:

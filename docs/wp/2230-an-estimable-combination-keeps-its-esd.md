@@ -77,12 +77,12 @@ measured into the docstring.
 
 ## Tasks
 
-- [ ] `discarded_directions` (and `blocked.discarded_directions` for the joint layout) returns
+- [x] `discarded_directions` (and `blocked.discarded_directions` for the joint layout) returns
       the discarded eigenvectors in equilibrated coordinates beside the touched set.
-- [ ] A per-row estimability test in `ParameterTable.unmeasured_rows`; a tied row whose C row
+- [x] A per-row estimability test in `ParameterTable.unmeasured_rows`; a tied row whose C row
       is orthogonal to the discarded subspace keeps its propagated esd. Test on a synthetic
       `zero_shift = za + zb + zc` tie.
-- [ ] The same test in `model/geometry.py` for a geometry row.
+- [x] The same test in `model/geometry.py` for a geometry row.
 - [ ] The quadrature sum (magnetic path, Mike's to rule): the pair's esd from gᵀ·Cov·g when g is
       orthogonal to the discarded subspace; the strict xfail becomes a pass.
 - [ ] Probe: list the 535 intensities by reflection and phase over the slow selection, and say

@@ -6375,7 +6375,8 @@ class Refinement:
                 stage_results=stage_results, diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -6397,7 +6398,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -6785,7 +6787,8 @@ class Refinement:
             stage_results=[], diagnostics=list(stage_diagnostics),
             structure=self.structure, stderr_internal=outcome.stderr_internal,
             esd_inflation=outcome.esd_inflation,
-            correlation=outcome.correlation, backend=self._backend,
+            correlation=outcome.correlation,
+            discarded=outcome.discarded_subspace, backend=self._backend,
             solver=self._solver, mu_r_source=self._mu_r_source,
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
@@ -7009,7 +7012,8 @@ class Refinement:
                 stage_results=[stage_result], diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -7025,7 +7029,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -7560,7 +7565,7 @@ class Refinement:
                 and live[0] is self.result_ and self._answer is not None):
             if self._model.mode != "rietveld" or not self._model.phases:
                 return None
-            _result, table, theta, stderr_internal, correlation = live
+            _result, table, theta, stderr_internal, correlation, discarded = live
             structure = self._answer["structure"]
             sites_of = [cp.sites for cp in self._model.phases]
         else:
@@ -7569,14 +7574,16 @@ class Refinement:
             structure = self.structure
             table = ParameterTable(structure, self.instrument)
             theta, stderr_internal, correlation = table.x0(), None, None
+            discarded = None
             sites_of = [compile_phase_sites(p) for p in structure.phases]
         if request is None:
             return geometry_from_sites(sites_of, table, theta, structure,
                                        stderr_internal=stderr_internal,
-                                       correlation=correlation)
+                                       correlation=correlation,
+                                       discarded=discarded)
         return request_table(request, sites_of, table, theta, structure,
                              stderr_internal=stderr_internal,
-                             correlation=correlation)
+                             correlation=correlation, discarded=discarded)
 
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
@@ -9759,6 +9766,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
                   stderr_internal=None, correlation=None,
+                  discarded=None,
                   esd_inflation: float | None = None,
                   backend: str = "numpy", solver: str = DEFAULT_SOLVER,
                   mu_r_source: str = "given",
@@ -9782,7 +9790,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # is the one writer); an evaluate-only caller leaves the honest None
     stats.max_shift_over_esd = max_shift_over_esd
 
-    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation)
+    # ``discarded``: a tie the data determine keeps its esd (WP-2230)
+    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation,
+                                         discarded=discarded)
                    if stderr_internal is not None else {})
     # at_bound is the BOUND_HIT and FLOOR_HIT findings projected onto the
     # rows, never a second bound test (WP-1076).  Only the free set was
@@ -9883,10 +9893,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # of a rung's result build (WP-1335)
     geometry = (geometry_table(model, table, theta, structure,
                                stderr_internal=stderr_internal,
-                               correlation=correlation)
+                               correlation=correlation, discarded=discarded)
                 if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
-                           stderr_internal=stderr_internal, correlation=correlation)
+                           stderr_internal=stderr_internal, correlation=correlation,
+                           discarded=discarded)
 
     # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
     # T² off the same final covariance, for geometry's reason.  Quantities only.

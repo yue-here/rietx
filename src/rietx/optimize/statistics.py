@@ -24,6 +24,7 @@ correlated with its predecessor, S'' ≥ S, and multiplies every esd by √(S''/
 from __future__ import annotations
 
 import fnmatch
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -229,7 +230,8 @@ def _psd_pinv(a: np.ndarray, rcond: float) -> np.ndarray:
     return np.matmul(u, np.multiply(s[..., None], uh))
 
 
-def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
+def discarded_directions(jac: np.ndarray, *, basis: bool = False
+                         ) -> tuple[int, np.ndarray] | tuple[int, np.ndarray, np.ndarray]:
     """How many directions of the equilibrated normal matrix ``_psd_pinv`` discards
     beyond dead columns, and which columns they *touch* (WP-1535).
 
@@ -256,11 +258,21 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     whose signature and bits stay as they were: one more ``eigh``.  A joint
     fit's :class:`~.blocked.BlockJacobian` is read on its blocked covariance's
     own discards (:func:`.blocked.discarded_directions`, WP-1325).
+
+    **With** ``basis=True`` **the subspace comes back too** (WP-2230), as a
+    third element ``B``, ``(n_cols, n_gone)``: the discarded eigenvectors in
+    equilibrated coordinates, mapped back to the matrix's own columns by the
+    same Jacobi and power-of-two scales and divided by √cut.  So for a linear
+    function c·θ of the columns, ``‖Bᵀc‖²`` is the least variance the
+    discarded subspace adds to it, in the units of ``K`` before χ² (the
+    *lost* half of the touched test, read for any c and not only a unit
+    vector).  :func:`estimable` is that test.  ``B`` has no columns where
+    nothing is touched.
     """
     if _is_blocked(jac):
         from .blocked import discarded_directions as blocked_discarded
 
-        return blocked_discarded(jac)
+        return blocked_discarded(jac, basis=basis)
     jac = to_host_fp64(jac)
     s = column_rescale(jac)
     if s is not None:
@@ -269,7 +281,8 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     JTJ = 0.5 * (JTJ + JTJ.T)
     d = np.sqrt(np.diag(JTJ))
     live = d > 0.0
-    none = (0, np.zeros(0, dtype=np.intp))
+    none = ((0, np.zeros(0, dtype=np.intp), np.zeros((jac.shape[1], 0)))
+            if basis else (0, np.zeros(0, dtype=np.intp)))
     if live.sum() < 2:
         return none
     inv_d = np.where(live, 1.0 / np.where(live, d, 1.0), 0.0)
@@ -284,8 +297,73 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     kept_var = (vec[:, ~gone] ** 2 / np.abs(lam[~gone])).sum(axis=1)
     lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
     touched = np.flatnonzero(live & (lost_var >= kept_var))
-    return (n_gone, touched) if len(touched) >= 1 else none
+    if len(touched) < 1:
+        return none
+    if not basis:
+        return n_gone, touched
+    # θ = s·θ_s and θ_eq = d·θ_s, so c·θ = (c·s/d)·θ_eq; a dead column's 1/d
+    # is 0, which drops its own zero eigenvector from every product
+    to_eq = inv_d if s is None else inv_d * s
+    return n_gone, touched, to_eq[:, None] * vec[:, gone] / np.sqrt(cut)
 
+
+
+@dataclass(frozen=True)
+class DiscardedSubspace:
+    """What a derived number needs from a covariance solve that discarded a
+    direction, to tell whether the data determine it (WP-2230).
+
+    ``lost`` is :func:`discarded_directions`' basis times √(χ²_red)·the
+    Bérar-Lelann factor, so ``‖lostᵀc‖²`` is the least variance the discarded
+    subspace adds to c·θ, in the units of the reported covariance.
+    ``stderr`` is the pseudo-inverse's own esd of every column, before
+    WP-2219 marked the touched ones ``inf``: a dead column alone is ``inf``
+    here.  Both are indexed by the solve's columns, and :meth:`take` selects
+    the rows a narrower consumer (a table's columns, one histogram's) reads.
+    """
+
+    lost: np.ndarray     # (n_cols, n_gone)
+    stderr: np.ndarray   # (n_cols,)
+
+    def take(self, cols) -> DiscardedSubspace:
+        return DiscardedSubspace(np.asarray(self.lost)[cols],
+                                 np.asarray(self.stderr)[cols])
+
+    def signed(self, signs: np.ndarray) -> DiscardedSubspace:
+        """Restated after each column's sign flipped (a chart's ±1)."""
+        return DiscardedSubspace(np.asarray(self.lost) * signs[:, None], self.stderr)
+
+
+def estimable(grad: np.ndarray, cov: np.ndarray, lost: np.ndarray) -> np.ndarray:
+    """Which rows of ``grad`` are linear functions the data determine.
+
+    ``grad`` is ``(m, n)``, each row a function's gradient over the solve's
+    columns; ``cov`` the pseudo-inverse's covariance of those columns, the
+    touched ones at their own pseudo-inverse esds
+    (:attr:`DiscardedSubspace.stderr`); ``lost`` the subspace's
+    :attr:`~DiscardedSubspace.lost`.
+
+    A function c·θ is estimable exactly when c lies in the row space of J,
+    which is when it is orthogonal to every direction J does not move
+    (Searle, S. R., 1971, *Linear Models*, Wiley, p. 169).  Its variance is
+    then cᵀ·Cov·c for any generalised inverse, the cut pseudo-inverse
+    included, so the number the covariance already gives is the right one.
+    **The test is** :func:`discarded_directions`' **touched test, asked of c
+    rather than of a unit vector**: c is not estimable when the variance the
+    discarded subspace adds to it, ‖lostᵀc‖², is at least the variance the
+    solve reports, cᵀ·Cov·c, its esd then at least √2 short.  For c = eᵢ it
+    is the column test itself, so a column the solve marked stays marked and
+    no tolerance is new.  An exactly orthogonal c meets rounding only: on the
+    three-way zero shift of ``tests/test_discarded_direction.py`` the sum's
+    ‖lostᵀc‖² is 5e-19 to 1.5e-18 of cᵀ·Cov·c, and each source's 2.3e+14
+    (Rietveld and Pawley, three starting splits, macOS arm64).  A row whose
+    gradient is zero has nothing to compare and is not estimable here; its
+    caller decides on reach.
+    """
+    g = np.atleast_2d(np.asarray(grad, dtype=np.float64))
+    lost_var = ((g @ lost) ** 2).sum(axis=1)
+    kept_var = np.einsum("ra,ab,rb->r", g, cov, g)
+    return lost_var < kept_var
 
 def resolved_correlation(corr: np.ndarray, jac: np.ndarray
                          ) -> tuple[np.ndarray, np.ndarray]:
