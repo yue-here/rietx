@@ -410,6 +410,7 @@ def compute_qpa(structure: Structure, values: dict[str, float],
                 wavelength: float | None = None, *,
                 source_kind: str = "xray_cw",
                 unmeasured=(), held=(),
+                support_sigma=None, conditional_on=None,
                 ) -> QuantitativePhaseAnalysis | None:
     """Assemble the per-phase QPA rows from a decoded parameter dict.
 
@@ -428,6 +429,10 @@ def compute_qpa(structure: Structure, values: dict[str, float],
     is 100 % of them by definition and carries no esd, and the Brindley
     correction is skipped with its reason, since its mixture-average µ̄
     needs the unmeasured phase's fraction too.
+    ``support_sigma`` (one number per phase) and ``conditional_on`` (one list of
+    paths per phase) are what each fraction rests on (WP-2073), copied onto the
+    rows by the caller that measured them (``refine._build_result``) and read
+    nowhere here; ``None`` leaves each row's field unmeasured.
     ``multiplicities`` (one list per phase, one entry per atom) should be the
     site multiplicities frozen on the compiled model, so QPA counts the same
     orbits the forward model did rather than re-deriving them from refined
@@ -509,6 +514,10 @@ def compute_qpa(structure: Structure, values: dict[str, float],
             z=zmvs[ip].z, molar_mass=zmvs[ip].molar_mass,
             cell_mass=zmvs[ip].cell_mass, cell_volume=zmvs[ip].cell_volume,
             zmv=zmvs[ip].zmv,
+            support_sigma=(None if support_sigma is None
+                           else float(support_sigma[ip])),
+            conditional_on=(None if conditional_on is None
+                            else list(conditional_on[ip])),
         )
         for ip, phase in enumerate(structure.phases)
     ]

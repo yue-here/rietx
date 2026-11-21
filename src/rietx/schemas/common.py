@@ -724,6 +724,14 @@ from .._nearmiss import did_you_mean
 #: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 #: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 #: version now says why.
+#: Also in 0.62 (WP-2073, the maintainer's acceptance of 2026-11-17):
+#: ``PhaseQuantity.support_sigma`` and ``PhaseQuantity.conditional_on``, what a
+#: fraction rests on, ``QuantitativePhaseAnalysis.esd_basis`` (where an esd came
+#: from when ``Refinement.qpa`` was handed a covariance), and
+#: ``QPATrajectory.support_sigma`` /
+#: ``.conditional_on`` / ``.unconstrained`` per point.  Additive and defaulted
+#: (``None``, empty), the 0.25 → 0.26 rule: every stored result opens with
+#: the fields unmeasured; an older build refuses a document carrying them.
 SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

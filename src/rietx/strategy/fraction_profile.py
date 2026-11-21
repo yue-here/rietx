@@ -280,6 +280,11 @@ def fraction_diagnostics(profile: FractionProfile) -> list[Diagnostic]:
     chosen, not measured: it sat between the synthetic controls (0.79 and
     under) and the one synthetic trace case (about 75).
 
+    When ``fit_admissible`` is false the suggestion names the unmodelled-
+    background reading before "quote the range" (the maintainer, 2026-11-17):
+    a range computed on a fit that did not reach the lowest basin is not a
+    range of the fraction.
+
     Silent when ``excess`` is ``None``: without an esd there is no statistic
     to state, and the range on the profile is the whole answer.
     """
@@ -306,6 +311,12 @@ def fraction_diagnostics(profile: FractionProfile) -> list[Diagnostic]:
             f"{profile.delta_chi2_cut:.3g} of the lowest χ² (95 %, scaled by "
             f"χ²_red and the Bérar-Lelann factor), at FWHM {ends}. The farthest "
             f"is {profile.excess:.3g} times the esd's 95 % half-width.{fit}"),
-        suggestion=("Quote the range and the widths that produced it beside "
-                    "the esd."),
+        suggestion=(
+            "Quote the range and the widths that produced it beside the esd."
+            if profile.fit_admissible else
+            "The fit did not reach the lowest basin, so this is not a range of "
+            "the fraction. Read the lower-χ² refit first as an unmodelled "
+            "background or broad feature carrying intensity that this phase's "
+            "scale and width took, and fix the model; quote the range and the "
+            "widths that produced it only from a fit that is admissible."),
     )]

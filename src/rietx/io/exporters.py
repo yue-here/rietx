@@ -255,6 +255,19 @@ def _qpa_caveats(qpa: QuantitativePhaseAnalysis) -> list[str]:
             + "; ".join(f"{n} not measured ({unmeasured_reason(qpa, n)}, so "
                         "no weight_fraction)" for n in qpa.unmeasured_phases)
             + ".")
+    if qpa.esd_basis is not None:
+        lines.append(f"weight_fraction_esd: {qpa.esd_basis}")
+    resting = [q for q in qpa.phases if q.conditional_on]
+    if resting:
+        # WP-2073: what the fraction rests on, from the record (never a
+        # threshold: the number is stated and the reader judges it)
+        lines.append(
+            "Fractions conditional on paths held at a handed-in value or on a "
+            "bound at the answer, so not measured there: "
+            + "; ".join(f"{q.name} ({', '.join(q.conditional_on)}"
+                        + ("" if q.support_sigma is None else
+                           f"; scale at most {q.support_sigma:.2g} sigma from zero")
+                        + ")" for q in resting) + ".")
     if qpa.microabsorption is not None:
         m = qpa.microabsorption
         lines.append(
