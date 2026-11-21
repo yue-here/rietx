@@ -457,13 +457,48 @@ class PhaseQuantity(Base):
     off it would be the caller's start.  Absent rather than zero, the rule its
     esd already followed; :attr:`QuantitativePhaseAnalysis.unmeasured_phases`
     names it.
+
+    **Mole fractions** (WP-1340), on two bases that each say which in their
+    name.  ``mole_fraction`` is per **unit cell**, from S·V renormalised over
+    the measured phases, so it needs no formula unit and is reported wherever
+    ``weight_fraction`` is.  ``mole_fraction_formula_unit`` is per **formula
+    unit**, from Z·S·V, and is reported only when every measured phase's Z is
+    established: otherwise it is ``None`` on every row, since one phase on the
+    per-cell basis spoils the comparison for all of them, and
+    :attr:`QuantitativePhaseAnalysis.formula_unit_withheld` says which phase.
+    ``z_source`` is where this row's ``z`` came from: ``"composition"`` (every
+    site full or empty and the occupancy-weighted counts reduce to integers),
+    ``"declared"`` (``Phase.formula_units``, the caller's claim, which
+    ``molar_mass`` then follows), or ``"unresolved"`` (a mixed or partly
+    occupied site, or counts that do not reduce: ``z`` is then 1, the whole
+    cell, or the GCD of counts that happen to be whole, and in neither case a
+    formula unit).  ``mole_fraction`` counts cells, so it is the mol % of
+    formula units only where every phase's cell holds the same number of them.  ``None`` only on a result stored before the field.  Both
+    esds go through the correlated scale block as σ(W) does, and are ``None``
+    wherever σ(W) is, and also where the molar basis is absent (a massless
+    phase, or Σ S·V ≤ 0).  The number divides weight by the cell mass, so it
+    has W's scope: the modelled crystalline content.  Both are on the
+    uncorrected basis: no Brindley-corrected mole fraction is reported beside
+    ``weight_fraction_corrected``.  A phase whose cell has
+    no mass (every site empty) has W = 0 but no mole fraction on either
+    basis: its cell count rides a scale the data cannot move.  Its basis
+    withholds nothing, being out of both sums.  ``z`` from the composition is
+    the GCD of the integer counts, the reduced formula (benzene's Z = 4 cell
+    reads z = 24, CH), so the per-formula-unit column counts reduced formula
+    units unless a ``Phase.formula_units`` says otherwise.
     """
 
     name: str                                       # matches Phase.name / ticks key
     weight_fraction: float | None                   # W over the measured phases; None: unmeasured (WP-1958)
     weight_fraction_stderr: float | None = None     # σ(W); None if scale esds absent
+    # -- mole fractions (WP-1340); None where weight_fraction is, or withheld --
+    mole_fraction: float | None = None              # per unit cell: S·V renormalised
+    mole_fraction_stderr: float | None = None       # its σ, through Cov(S)
+    mole_fraction_formula_unit: float | None = None  # per formula unit: Z·S·V; None unless every Z is established
+    mole_fraction_formula_unit_stderr: float | None = None
     scale: float                                    # S (refined phases.{i}.scale)
     z: int | None = None                            # formula units per cell (display)
+    z_source: Literal["composition", "declared", "unresolved"] | None = None
     molar_mass: float | None = None                 # M, g/mol per formula unit
     cell_mass: float                                # Z·M, g/mol per unit cell
     cell_volume: float                              # V, Å³
@@ -568,6 +603,14 @@ class QuantitativePhaseAnalysis(Base):
     phase still makes them sum to 1.  Internal-standard / amorphous
     quantification is fenced to v2.
 
+    ``formula_unit_withheld`` (WP-1340): why every row's
+    ``mole_fraction_formula_unit`` is ``None``, naming the measured phase
+    whose formula unit is not established; ``None`` when the column is
+    reported (or there was nothing to withhold).  The ``microabsorption_skipped``
+    pattern: the reason travels with the result, in the field and
+    in no diagnostic (an info code would fire on every solid solution and tell
+    one fit from another on nothing).
+
     ``unmeasured_phases`` (WP-1958): the phases with no reflection in the
     fitted range.  Each has no fraction, and the others sum to 1 over the
     phases seen in range, so they are relative to those, not to the modelled
@@ -593,6 +636,7 @@ class QuantitativePhaseAnalysis(Base):
     # Both None ⇔ no phase asked for a correction.
     microabsorption: MicroabsorptionCorrection | None = None
     microabsorption_skipped: str | None = None
+    formula_unit_withheld: str | None = None
 
 
 class PhaseAgreement(Base):

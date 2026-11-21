@@ -1432,6 +1432,14 @@ class Phase(_InheritsDeclaredDefaults):
     # a particle-size analysis; leave None (the default) for no correction.
     # Not a Parameter on purpose: it must never enter the least-squares fit.
     particle_radius_um: float | None = Field(default=None, gt=0.0)
+    # Formula units per cell, declared by the caller (WP-1340), read only by
+    # QPA's per-formula-unit mole fraction and the molar mass it reports.  QPA
+    # finds Z itself wherever the occupancy-weighted counts reduce to integers;
+    # a solid solution such as La0.6Sr0.4FeO3 (Z = 4, counts La 2.4, Sr 1.6)
+    # never does, and its formula unit is a choice the occupancies cannot
+    # express, so it is yours to state.  None (the default): QPA's own answer.
+    # Not a Parameter: it never enters the least-squares fit.
+    formula_units: int | None = Field(default=None, ge=1)
     # Commensurate propagation vector k, in fractional coordinates of the
     # *conventional* reciprocal cell — the basis a CIF, a Bilbao page and
     # ``_parent_propagation_vector`` all speak.  Declaring one adds satellite
