@@ -19,6 +19,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-20 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
+| [1447](1447-a-threshold-each-pattern-sets-for-itself.md) | A threshold each pattern sets for itself | 2026-11-16 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1522](1522-the-gui-says-what-the-read-repaired.md) | The GUI says what reading the project repaired | 2026-11-16 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | 2026-11-17 | P4 | [rigid-bodies](#rigid-bodies) |
@@ -608,7 +609,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1442](1442-a-ghost-search-at-chance.md) | A ghost search at chance: the Kβ flag fires where Kβ cannot exist | ✅ 2026-09-22 | — | — ([1415](1415-a-sigma-column-smaller-than-root-y.md) soft) |
 | [1445](1445-the-optics-nobody-declared.md) | The optics nobody declared: a source that cannot emit the line | ✅ 2026-10-03 | — | — ([1442](1442-a-ghost-search-at-chance.md) soft) |
 | [1446](1446-a-supercell-that-outranks-the-truth.md) | A supercell that outranks the truth, on evidence the panel already has | 🛑 2026-09-22 | — | — ([1442](1442-a-ghost-search-at-chance.md) soft) |
-| [1447](1447-a-threshold-each-pattern-sets-for-itself.md) | A threshold each pattern sets for itself | ⬜ | P3 | — ([1442](1442-a-ghost-search-at-chance.md) soft) |
+| [1447](1447-a-threshold-each-pattern-sets-for-itself.md) | A threshold each pattern sets for itself | 🔄 2026-11-16 | P3 | — ([1442](1442-a-ghost-search-at-chance.md) soft) |
 | [1449](1449-rank-on-what-the-screen-determined.md) | Rank on what the screen determined, not on what the peak list shows | ✅ 2026-09-29 | — | — |
 | [1454](1454-auto-background-choices-survive-the-fit.md) | `auto_background`'s choices survive the fit | ✅ 2026-09-24 | — | — |
 | [1456](1456-an-editable-install-stamps-what-it-runs.md) | An editable install stamps what it runs | ✅ 2026-09-27 | — | — |

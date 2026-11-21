@@ -356,6 +356,264 @@ def test_the_real_wavelength_beats_a_made_up_one():
     assert worst <= 4                       # the number the bar was set above
 
 
+# ----------------------------------------------------------------------
+# WP-1447: a control each pattern draws for itself
+# ----------------------------------------------------------------------
+_EIGHT = np.array([28.44, 33.00, 37.60, 42.10, 47.30, 51.80, 56.12, 62.40])
+
+
+def _companion(two_theta, ratio):
+    return 2.0 * np.degrees(np.arcsin(np.sin(np.radians(two_theta / 2.0)) * ratio))
+
+
+@pytest.mark.parametrize("anode", ["CuKa", "CoKa", "MoKa"])
+def test_the_control_keeps_clear_of_every_line_the_anode_puts_there(anode):
+    """No control ratio can match a line the parent really makes.
+
+    Five positions per parent are real: the parent, its Kα partner either
+    side, its Kβ image and its W Lα image, all read off the anode.  Every
+    control ratio's companion must sit at least one matching window from each
+    of them, for every parent, and the ratios must be the same on every call.
+    The exclusions move with the anode, so W Lα is cut at 0.958 for Cu and at
+    0.825 for Co (its ratio to each Kα1), and a ratio Co forbids Cu keeps.
+    """
+    from rietx.background.diagnostics import (
+        _KBETA,
+        _W_LA1,
+        GHOST_TOL_DEG,
+        _ghost_control_ratios,
+    )
+    from rietx.schemas.instrument import _KA_DOUBLETS
+
+    lam, ka2 = _KA_DOUBLETS[anode]
+    inten = np.linspace(100.0, 30.0, len(_EIGHT))
+    span = (0.70, 1.0)
+    r = _ghost_control_ratios(_EIGHT, inten, None, lam, k=199, span=span)
+    assert len(r) == 199
+    assert np.all((r > span[0]) & (r < span[1])) and np.all(np.diff(r) > 0)
+    np.testing.assert_array_equal(
+        r, _ghost_control_ratios(_EIGHT, inten, None, lam, k=199, span=span))
+    real = (1.0, ka2 / lam, lam / ka2, _KBETA[anode] / lam, _W_LA1 / lam)
+    for p in _EIGHT:
+        for r_real in real:
+            if np.sin(np.radians(p / 2.0)) * r_real >= 1.0:
+                continue
+            gap = np.abs(_companion(p, r) - _companion(p, r_real))
+            assert gap.min() >= GHOST_TOL_DEG - 1e-9, (anode, p, r_real)
+
+    # the exclusions are the anode's: Co's W Lα ratio is a gap, Cu's is not
+    co_lam, cu_lam = _KA_DOUBLETS["CoKa"][0], _KA_DOUBLETS["CuKa"][0]
+    co = _ghost_control_ratios(_EIGHT, inten, None, co_lam, k=199, span=span)
+    cu = _ghost_control_ratios(_EIGHT, inten, None, cu_lam, k=199, span=span)
+    co_wla = _W_LA1 / co_lam
+    assert np.abs(co - co_wla).min() > 0.005
+    assert np.abs(cu - co_wla).min() < 0.002
+
+
+def test_the_control_degenerates_to_nothing_not_to_a_guess():
+    """An unrecognised wavelength draws no control, and a span the
+    exclusions swallow whole draws none either — never a ratio inside them."""
+    from rietx.background.diagnostics import _ghost_control_ratios
+
+    inten = np.linspace(100.0, 30.0, len(_EIGHT))
+    assert _ghost_control_ratios(_EIGHT, inten, None, 1.2345, k=50,
+                                 span=(0.8, 1.0)).size == 0
+    assert _ghost_control_ratios(_EIGHT, inten, None, 1.5405929, k=50,
+                                 span=(0.999, 1.0)).size == 0
+    with pytest.raises(ValueError):
+        _ghost_control_ratios(_EIGHT, inten, None, 1.5405929, k=0, span=(0.8, 1.0))
+    with pytest.raises(ValueError):
+        _ghost_control_ratios(_EIGHT, inten, None, 1.5405929, k=5, span=(1.0, 0.8))
+
+
+@pytest.mark.parametrize("host", ["corundum.prn", "cpd-1c.prn", "zincite.prn"])
+def test_the_control_has_no_wall_near_unity(host):
+    """WP-1442's trap, closed on these patterns (not in general).
+
+    On the fitted list a made-up ratio just under 1 lands its companion in
+    the parent's own neighbourhood, and the chance consensus climbs: swept
+    naively at 0.9900, 0.9925, 0.9950 and 0.9975 they reach 5 or more (the positive arm,
+    so this row can fail).  The control's admitted ratios at or above 0.95
+    gather no more than 2, the bulk's own level (WP-1447, 16 patterns).
+    What feeds the wall here is weak flank lines 0.11-0.18° below their
+    parents, which the parent's own exclusion happens to cover; a list whose
+    flank lines sit further out reopens it (the narrow-band row below).
+    """
+    from rietx.background.diagnostics import (
+        GHOST_MATCH_K,
+        GHOST_TOL_DEG,
+        _ghost_candidates,
+        _ghost_consensus,
+        _ghost_control_ratios,
+    )
+    from rietx.indexing.pick import pick_peaks
+    from tests.test_acceptance_qpa_roundrobin import DATA as QARR
+
+    if not (QARR / host).exists():
+        pytest.skip("IUCr QPA round-robin dataset not present")
+    data = rx.read_pattern(QARR / host)
+    peaks = pick_peaks(data, rx.Instrument.bragg_brentano(radiation="CuKa")).peaks
+    tt = np.array([p.two_theta for p in peaks])
+    inten = np.array([p.intensity for p in peaks])
+    esd = np.array([p.two_theta_esd for p in peaks])
+    lo, hi = float(data.two_theta[0]), float(data.two_theta[-1])
+
+    def support(r):
+        cands, _ = _ghost_candidates(tt, inten, esd, None, r, lo, hi,
+                                     tol_deg=GHOST_TOL_DEG, k_sigma=GHOST_MATCH_K)
+        return _ghost_consensus(cands)[0]
+
+    naive = max(support(r) for r in np.arange(0.990, 0.9995, 0.0025))
+    assert naive >= 5, f"{host}: the wall this row guards is gone ({naive})"
+    ratios = _ghost_control_ratios(tt, inten, esd, 1.54056, k=199, span=(0.80, 1.0))
+    assert max(support(r) for r in ratios if r >= 0.95) <= 2
+
+
+def test_the_p_value_counts_the_observation_as_a_draw():
+    """North, Curtis & Sham (2002): p = (1 + #{control ≥ observed}) / (1 + K),
+    ties against the observation, never 0, and 1 for an empty control."""
+    from rietx.background import ghost_p_value
+
+    assert ghost_p_value(5, [0, 1, 2, 3]) == pytest.approx(1 / 5)
+    assert ghost_p_value(3, [0, 3, 4, 1]) == pytest.approx(3 / 5)
+    assert ghost_p_value(0, [0, 0]) == pytest.approx(1.0)
+    assert ghost_p_value(4, []) == 1.0
+    assert ghost_p_value(9, np.zeros(199, dtype=int)) == pytest.approx(0.005)
+
+
+def test_the_control_is_silent_where_the_screen_is():
+    """No anode, a monochromated beam or neutrons: no control, as no flag."""
+    from rietx.background import ghost_control
+
+    inten = np.linspace(100.0, 30.0, len(_EIGHT))
+    assert ghost_control(_EIGHT, inten, None, 1.2345, k=19, span=(0.8, 1.0)) == []
+    mono = rx.Instrument.bragg_brentano(radiation="CuKa").source.model_copy(
+        update={"kbeta": "monochromator"})
+    assert ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0),
+                         source=mono) == []
+    from rietx.schemas.instrument import NeutronSource
+
+    # 1.5405929 Å is CuKα1 to identify_anode, so only the source can say neutron
+    assert ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0),
+                         source=NeutronSource(wavelength=1.5405929)) == []
+    found = ghost_control(_EIGHT, inten, None, 1.5405929, k=19, span=(0.8, 1.0))
+    assert [g.kind for g in found] == ["kbeta", "tungsten_la"]
+    # one control, each search reading the ratios that asked as many parents
+    for g in found:
+        assert 0 < len(g.ratios) == len(g.control) <= 19
+
+
+def test_the_real_wavelength_is_unremarkable_against_its_own_control():
+    """The negative arm, per pattern: at the real Kβ and W Lα ratios every
+    round-robin pattern's count is one its own coincidences reach often.
+    Measured (census pool, k=199, span 0.80-1.0): smallest p 0.145 (Kβ) and
+    0.210 (W Lα); the fitted lists' smallest is 0.125 (WP-1447)."""
+    from rietx.background import ghost_control
+
+    for path in _monochromated():
+        tt, net, sigma, keep = _ghost_pool(rx.read_pattern(path))
+        for g in ghost_control(tt[keep], net[keep], None, 1.54056, k=199,
+                               span=(0.80, 1.0), intensity_esd=sigma[keep],
+                               tt_range=(float(tt[0]), float(tt[-1]))):
+            assert g.p_value >= 0.1, f"{path.name} {g.kind}: p = {g.p_value}"
+            assert not g.decide(alpha=0.05, floor=1)
+
+
+@pytest.mark.parametrize("host", ["corundum.prn", "zincite.prn"])
+def test_a_leak_is_the_least_likely_count_its_pattern_draws(host):
+    """The positive arm: a Kβ image at 10 % beats every control ratio, so p is
+    the smallest ``k=199`` can return, and the clean pattern does not."""
+    from rietx.background import ghost_control
+    from tests.test_acceptance_qpa_roundrobin import DATA as QARR
+
+    if not (QARR / host).exists():
+        pytest.skip("IUCr QPA round-robin dataset not present")
+    base = rx.read_pattern(QARR / host)
+    doped, _ = _dope_ghost(base, 1.54056, 1.3922340, height=0.10)
+
+    def kbeta(data):
+        tt, net, sigma, keep = _ghost_pool(data)
+        return ghost_control(tt[keep], net[keep], None, 1.54056, k=199,
+                             span=(0.80, 1.0), intensity_esd=sigma[keep],
+                             tt_range=(float(tt[0]), float(tt[-1])))[0]
+
+    leak, clean = kbeta(doped), kbeta(base)
+    assert leak.kind == "kbeta" and leak.observed >= 5
+    assert leak.p_value == pytest.approx(1 / 200)
+    assert leak.decide(alpha=0.01, floor=5)
+    assert not clean.decide(alpha=0.01, floor=1)
+
+
+def test_a_quiet_control_is_why_the_floor_exists():
+    """Zircon with a Kβ image at 10 %: the *W Lα* search gathers 3 parents and
+    its control never more than 2, so p = 0.005 on a line that is not there.
+    A floor of 5 (today's bar) keeps it silent; a floor of 3 would report it."""
+    from rietx.background import ghost_control
+    from rietx.indexing.pick import pick_peaks
+    from tests.test_acceptance_qpa_roundrobin import DATA as QARR
+
+    if not (QARR / "zircon.prn").exists():
+        pytest.skip("IUCr QPA round-robin dataset not present")
+    base = rx.read_pattern(QARR / "zircon.prn")
+    doped, _ = _dope_ghost(base, 1.54056, 1.3922340, height=0.10)
+    peaks = pick_peaks(doped, rx.Instrument.bragg_brentano(radiation="CuKa")).peaks
+    w = [g for g in ghost_control(
+        np.array([p.two_theta for p in peaks]), np.array([p.intensity for p in peaks]),
+        np.array([p.two_theta_esd for p in peaks]), 1.54056, k=199, span=(0.80, 1.0),
+        tt_range=(float(doped.two_theta[0]), float(doped.two_theta[-1])))
+        if g.kind == "tungsten_la"][0]
+    assert 3 <= w.observed < 5 and max(w.control) < w.observed   # measured 3, 2
+    assert w.p_value == pytest.approx(1 / 200)
+    assert not w.decide(alpha=0.01, floor=5)
+    assert w.decide(alpha=0.01, floor=3)
+
+
+def test_flank_lines_outside_the_exclusions_reopen_the_wall():
+    """The known limit, pinned: the near-unity wall is closed on the 16
+    round-robin patterns, not in general (WP-1447 review).
+
+    Eight strong lines between 24° and 33°, each with a weak line (10 %)
+    0.20° below it, then a real Kβ image of every one at 10 %.  The flank
+    lines sit outside each parent's own exclusion, and over so narrow a 2θ
+    band the companion's tan θ scaling barely spreads them, so several
+    admitted control ratios gather all eight parents.  The fixed bar reports
+    the leak; ``decide(alpha=0.01, floor=5)`` does not, p = 3/200 = 0.015.
+    A loss of power, not a false alarm.  If this row starts failing, the
+    control has learned to exclude such lines: update WP-1447 and #1615.
+    """
+    from rietx.background import contamination_flags_from_peaks, ghost_control
+    from rietx.background.diagnostics import _KBETA
+
+    lam = 1.5405929
+    parents = np.array([24.0, 25.3, 26.5, 27.6, 28.9, 30.1, 31.4, 32.6])
+    inten = np.linspace(100.0, 93.0, len(parents))
+    flank = parents - 0.20
+    image = _companion(parents, _KBETA["CuKa"] / lam)
+
+    def kbeta(tt, i):
+        o = np.argsort(tt)
+        return [g for g in ghost_control(tt[o], i[o], None, lam, k=199,
+                                         span=(0.80, 1.0), tt_range=(10.0, 80.0))
+                if g.kind == "kbeta"][0]
+
+    clean = kbeta(np.concatenate([parents, flank]),
+                  np.concatenate([inten, 0.10 * inten]))
+    assert clean.n_parents_searched == 8
+    assert max(clean.control) == 8                    # the wall, at admitted ratios
+    assert sum(c >= 5 for c in clean.control) == 9    # measured: 9 of 199
+
+    tt = np.concatenate([parents, flank, image])
+    i = np.concatenate([inten, 0.10 * inten, 0.10 * inten])
+    o = np.argsort(tt)
+    flags = contamination_flags_from_peaks(tt[o], i[o], None, lam,
+                                           tt_range=(10.0, 80.0))
+    assert any(f.kind == "kbeta" for f in flags)      # the fixed bar finds it
+    leak = kbeta(tt, i)
+    assert leak.observed == 8 and max(leak.control) == 8
+    assert leak.p_value == pytest.approx(3 / 200)
+    assert not leak.decide(alpha=0.01, floor=5)       # the control does not
+
+
 @pytest.mark.parametrize("host", ["corundum.prn", "zincite.prn"])
 def test_an_injected_leak_comes_back_with_its_ratio(host):
     """The other half: the screen still finds a leak that is really there.
