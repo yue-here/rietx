@@ -37,11 +37,20 @@ first keeps the fit's numbers on screen. The second keeps the preview's
 accuracy where it was measured. Both are a reader-output change and go to
 Yue before merge.
 
+**The tier of each rule this WP adds.** One default: which window fraction
+the preview compiles at. It is named practice under either option, since
+every program draws the curve its own calculation made at one peak cut
+(`docs/practice.md` § How far a peak is computed). Its kind of ambiguity is
+"every competent refiner would act" (DESIGN § Rules, 1). It is measured on
+the two shipped examples the preview's tests use, `fap` (lab) and `nac`
+(synchrotron), against a fresh compile at the same values.
+
 ## Tasks
 
-- [ ] Measure the preview's three branches at 2 % windows on `fap` and `nac`
+- [x] Measure the preview's three branches at 2 % windows on `fap` and `nac`
       (the `tests/test_gui_preview.py` cases), and the shift at the base
-      values under each option above.
+      values under each option above. Probes and numbers in
+      `docs/wp/2226-measure/`; the table is the 2026-11-21 handover entry.
 - [ ] Bring the choice to Yue with those numbers.
 - [ ] Implement it, and restore exact agreement at the base values in
       `test_the_residuals_are_the_curves_route_s_at_the_last_fit` and
@@ -55,6 +64,69 @@ Yue before merge.
 ```
 
 ## Handover log
+
+- **2026-11-21** — the preview measured at the fit's 2 % windows (task 1).
+
+  *Measured* (`docs/wp/2226-measure/measure.py` and `measure2.py`, `[dev]`
+  venv, darwin/arm64, this worktree). Both examples were fitted with their
+  default plan, which ends on the `biso` stage at 2 % windows. `fap` is the
+  lab fluorapatite: 5 750 points, strongest peak 20 310 counts. `nac` is the
+  11-BM synchrotron pattern: 22 003 points, strongest peak 264 872 counts.
+  "Status quo" is the preview as it stands (1e-3 windows). "A" points the
+  preview's compiles at the fit's recorded fraction (2 %) and changes
+  nothing else.
+
+  At the fit's own values:
+
+  | | fap | nac |
+  |---|---|---|
+  | status quo against the fit's curve | 26.0 counts, 0.128 % of the strongest peak, 2.05 σ | 9.8 counts, 0.0037 %, 0.68 σ |
+  | Rwp, status-quo preview minus the fit's | +0.130 points (9.380 % against 9.250 %) | −0.025 points (9.292 % against 9.317 %) |
+  | A against the fit's curve and Rwp | 0, bit for bit | 0, bit for bit |
+
+  Per test case, the largest error in σ. "Own" is a fresh compile at the
+  preview's own fraction, which is what the tests assert against. "A-exact"
+  replaces A's frozen branch with a rewindow at the new values. The last
+  column is how far a fresh 2 % compile sits from a fresh 1e-3 one, which is
+  the truncation itself.
+
+  | case | status quo: branch, vs own | A: branch, vs own | A-exact vs own | A vs 1e-3 | fresh 2 % vs 1e-3 |
+  |---|---|---|---|---|---|
+  | fap scale ×0.5, ×2 | frozen, 0 | frozen, 0 | 0 | 1.03, 4.10 | 1.03, 4.10 |
+  | fap zero + 1 FWHM | frozen, 0.0175 | frozen, **1.26** | 0.0175 | 1.78 | 1.92 |
+  | fap W ×4 | rewindowed, 0 | frozen, **1.00** | 0 | 2.19 | 1.90 |
+  | fap zero + 1.0° | recompiled, 0 | recompiled, 0 | — | 1.40 | 1.40 |
+  | nac scale ×0.5, ×2 | frozen, 0 | frozen, 0 | 0 | 0.34, 1.35 | 0.34, 1.35 |
+  | nac zero + 1 FWHM | frozen, 0.036 | frozen, 0.42 | 0 | 0.67 | 0.67 |
+  | nac cell a ×1.0005 | frozen, 0.036 | frozen, 0.43 | 1.7e-13 | 0.68 | 0.68 |
+  | nac Lorentzian size 0.02 | rewindowed, 0 | rewindowed, 0 | 0 | 1.50 | 1.50 |
+  | nac S/L 0.025 | rewindowed, 0 | rewindowed, 0 | 0 | 264 | 264 |
+
+  The WP's "missed by up to 1.3 σ" is the fap zero-shift row (1.26 σ).
+  Against the near-complete curve, A's frozen answer is 0.93-1.15× as far
+  away as a fresh 2 % compile, so it loses nothing the fit's own windows do
+  not. The tests' 1e-9 bar against a fresh compile is what it fails. A-exact
+  meets that bar everywhere the status quo does; the fap zero-shift row's
+  0.0175 σ is the frozen reflection list at the range edge, the same in
+  every arm.
+
+  Time per `preview.evaluate`, 15 repeats, min to median. The load average
+  was 30-35 throughout (other runners on this machine), so these rank the
+  arms and do not time them. fap: status quo 29-58 ms frozen and 66-86 ms
+  recompiled; A 7-11 ms and 36-41 ms. nac: status quo 5-7 ms, the
+  Lorentzian case 18-21 ms, the S/L case 486-521 ms; A 4-6 ms, 7-8 ms and
+  20-25 ms. A-exact's rewindow plus evaluation is 3.5-10 ms. One compile
+  costs 90-98 ms at 1e-3 and 39-45 ms at 2 % on fap, 70-75 and 63-78 ms on
+  nac.
+
+  *Gotchas.* The nac S/L row's 264 σ (7.9 % of the strongest peak) is the
+  declared stages' FCJ node rule (`profiles/fcj.py`), not the window. At
+  1.99 % windows the closing node rule applies, and the gap to 1e-3 falls to
+  0.25 σ (7.3e-5 of the peak). Every reflection sits at the declared rule's
+  64-node cap there. S/L = 0.025 on an 11-BM pattern is the test's stress
+  value and no real synchrotron setting, so this is noted and not filed.
+  Under option A a preview of that slider draws what a declared stage
+  computes.
 
 - **2026-11-19** — filed by WP-2222's session after Yue accepted the shift
   and asked for a follow-up.
