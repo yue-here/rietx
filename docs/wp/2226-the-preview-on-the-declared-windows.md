@@ -1,6 +1,6 @@
 # WP-2226 — The preview on the declared windows
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — measured; the choice of tail cut waits on Yue (§ Question for Yue)
+Milestone: unscheduled · Status: 🔄 2026-11-21 — Yue ruled A (§ Ruling); task 3 is open
 Track: A long run is not one fit
 Depends on: 2222 (the closing stage off by default)
 Priority: P3 2026-11-19 — a visible shift of up to 0.13 % of the strongest peak when a preview starts from a default fit; nothing is wrong with the fit
@@ -133,6 +133,13 @@ it: a hand-fitting use where the tails beyond 2 % matter more than agreement
 with the fit, such as reading weak peaks sitting in a strong peak's tail. I
 have not seen one.
 
+## Ruling
+
+**2026-11-21, Yue: A.** The preview draws each peak's tails to the cut the
+last fit used, so before any move it shows exactly the fit's curve and Rwp.
+The windows are recomputed on each move, since reusing the fit's windows
+drifted up to 1.26σ from a fresh calculation.
+
 ## Tasks
 
 - [x] Measure the preview's three branches at 2 % windows on `fap` and `nac`
@@ -140,8 +147,8 @@ have not seen one.
       values under each option above. Probes and numbers in
       `docs/wp/2226-measure/`; the table is the 2026-11-21 handover entry.
 - [x] Bring the choice to Yue with those numbers: § Question for Yue
-      (2026-11-21). Waiting on the ruling.
-- [ ] Implement it, and restore exact agreement at the base values in
+      (2026-11-21). Yue ruled A the same day (§ Ruling).
+- [ ] Implement A, and restore exact agreement at the base values in
       `test_the_residuals_are_the_curves_route_s_at_the_last_fit` and
       `test_at_the_base_values_the_answer_is_frozen_and_the_last_fit`.
 
@@ -153,6 +160,9 @@ have not seen one.
 ```
 
 ## Handover log
+
+- **2026-11-21 (ruling)** — Yue chose A after the shift's end-of-shift
+  report. Next: task 3, from the 2026-11-21 entry's *Next* (2).
 
 - **2026-11-21** — the preview measured at the fit's 2 % windows; the
   choice is with Yue.
