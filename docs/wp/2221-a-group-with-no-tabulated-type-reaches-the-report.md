@@ -136,7 +136,7 @@ present.
 
 ## Handover log
 
-- **2026-11-21** — the merge recorded, by a ghostshift runner (PR #CLOSEPR). The defect this
+- **2026-11-21** — the merge recorded, by a ghostshift runner (PR #1735). The defect this
   WP was filed for is fixed on `main`. PR #1721 merged at 2026-11-20 18:45Z as merge commit
   21b328f49 and closed #1688. A phase whose group no tabulated setting names now gets its
   report and its nuclear CIF block. The WP stays in flight for Mike's ruling. He answered
