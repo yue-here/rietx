@@ -1656,8 +1656,9 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
     would not.
 
     A measurement is what this model is for.  Holding an estimate is possible
-    but not recommended: a held SNIP curve takes intensity from the tails of
-    the reflections and biases Biso high (:func:`rietx.background.snip`), and
+    but not recommended, whichever estimator made it.  SNIP is the measured
+    case: a held SNIP curve takes intensity from the tails of the reflections
+    and biases Biso high (:func:`rietx.background.snip`), and
     the background-absorption screen cannot see a held curve.  Co-refine a
     :class:`BackgroundChebyshev` or :class:`BackgroundPSpline` instead.
 

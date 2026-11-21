@@ -6,9 +6,9 @@ This chapter gives the background models, how flexible each should be, and the b
 ## Additive background models
 
 The background is part of the model in {eq}`fm-ycalc`, and is never subtracted
-from the data. An estimated baseline is held additively under the refined
-polynomial, or co-refined under a smoothness penalty. Three models refine:
-Chebyshev polynomials, a fixed estimated baseline plus Chebyshev, and a P-spline
+from the data. A measured curve is held additively under the refined
+polynomial, or the background is co-refined under a smoothness penalty. Three
+models refine: Chebyshev polynomials, a fixed curve plus Chebyshev, and a P-spline
 {cite}`eilers1996`. The P-spline is a B-spline basis whose coefficients $c$ are
 disciplined by second-difference penalty rows appended to the residual
 {eq}`fm-rows`:
@@ -73,7 +73,7 @@ keeping one.
 (a-measured-background)=
 ## A measured background
 
-The fixed curve can be a measurement rather than an estimate. An empty vanadium
+The fixed curve is normally a measurement. An empty vanadium
 can, a blank capillary, a matrix-only scan and an empty furnace are all scans of
 everything the specimen is not. Such a curve enters as $f$, sampled onto the
 pattern grid, with one refinable multiplier on it:
@@ -199,8 +199,9 @@ weight, so $z$ comes out stiffer. arPLS {cite}`baek2015` iterates the solve
 with asymmetric reweighting so peaks are progressively excluded from the
 baseline. SNIP {cite}`ryan1988`
 is available as an independent alternative, for a quick look or a comparison.
-It is not recommended as a background held in a fit: the curve rises under
-the tails of the reflections and takes their intensity, which biases Biso high.
+An estimated curve is not recommended as a background held in a fit, and SNIP
+is the measured case: the curve rises under the tails of the reflections and
+takes their intensity, which biases Biso high.
 
 ## Choosing the flexibility
 
