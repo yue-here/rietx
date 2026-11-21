@@ -148,9 +148,12 @@ drifted up to 1.26σ from a fresh calculation.
       `docs/wp/2226-measure/`; the table is the 2026-11-21 handover entry.
 - [x] Bring the choice to Yue with those numbers: § Question for Yue
       (2026-11-21). Yue ruled A the same day (§ Ruling).
-- [ ] Implement A, and restore exact agreement at the base values in
+- [x] Implement A, and restore exact agreement at the base values in
       `test_the_residuals_are_the_curves_route_s_at_the_last_fit` and
       `test_at_the_base_values_the_answer_is_frozen_and_the_last_fit`.
+      `gui/preview.py` reads the cut off the head's nearest stage node
+      (`_cut`), keys its cache on it, and rewindows whenever the sizing rule's
+      windows differ from those at the head's values (`_resized`).
 
 ## Acceptance
 

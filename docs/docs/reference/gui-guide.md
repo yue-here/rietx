@@ -382,9 +382,12 @@ angles and the background are left to the Parameters table.
 
 Moving a slider changes nothing in the project. The graphs redraw at the new
 values through `POST /api/preview`, and the title line says `Preview, not
-refined` with the preview's Rwp beside the last fit's. The values wait in the
-action bar like a Parameters edit. `Apply` writes them as one `set_values`
-history node, `Apply and refine` writes them and runs, and `Revert` drops them.
+refined` with the preview's Rwp beside the last fit's. The preview computes
+each peak's tails as far out as the last fit did. Before a slider moves, it
+draws the fit's own curve and Rwp, so the two Rwps differ only by what the
+slider changed. The values wait in the action bar like a Parameters edit.
+`Apply` writes them as one `set_values` history node, `Apply and refine`
+writes them and runs, and `Revert` drops them.
 When both tabs have edits waiting, the Parameters edits are applied first and
 the sliders second, so a slider wins on a parameter both tabs touched. The
 sliders also start from the head's values, so a typed Parameters edit is not
