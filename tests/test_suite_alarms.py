@@ -41,6 +41,18 @@ def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
         assert n == sum(code in fired for fired in pin["standards"].values()), code
 
 
+def test_the_instrument_width_code_is_pinned_on_exactly_the_standards_whose_plan_frees_a_pair():
+    """WP-2225: ``INSTRUMENT_WIDTH_HELD`` reads ``StageResult.width_twins_held``
+    exactly, so among the eight standards it fires on the four whose QPA plan
+    frees an instrument width beside a specimen width of its shape, and on none of the
+    others.  The slow row below holds the measurement to this pin."""
+    pin = suite_alarms.load_pin()
+    fired = {key for key, codes in pin["standards"].items() if "INSTRUMENT_WIDTH_HELD" in codes}
+    assert fired == {"zincite", "fluorite", "corundum", "brucite"}, sorted(fired)
+    assert {pin["standards"][key]["INSTRUMENT_WIDTH_HELD"] for key in fired} == {"warning"}
+    assert len(pin["standards"]) == 8
+
+
 def test_the_differences_name_the_code_and_the_standard_it_moved_on():
     pin = {"standards": {"fap": {"FLOOR_HIT": "warning"}},
            "n_results": {"FLOOR_HIT": 1}, "warnings_per_result": {"qpa": 1.0}}

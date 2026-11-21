@@ -22,10 +22,13 @@
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
   import Interactive from "./Interactive.svelte";
+  import Background from "./Background.svelte";
+  import Peaks from "./Peaks.svelte";
+  import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
-           type ModelDraft, type PlanDraft, type TextDraft } from "../lib/recovery";
+           type ModelDraft, type TextDraft } from "../lib/recovery";
   import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "../lib/interactive";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import { peakWindows, widestFwhm } from "../lib/peakwin";
@@ -39,6 +42,7 @@
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
+  import Plan from "./Plan.svelte";
   import Pattern from "./Pattern.svelte";
   import { dropsFor, type StatusReadout } from "./readout";
   import Settings from "./Settings.svelte";
@@ -81,9 +85,17 @@
    *  edits as one set, as today's page does. */
   let interactivePanel = $state<any>(null);
   let sliderTouched = $state(0);
+  /** The slider values not yet applied, which the Structure graph draws. */
+  let sliderValues = $state.raw<Record<string, number> | null>(null);
   let previewAnswer = $state.raw<PreviewAnswer | null>(null);
   let previewError = $state("");
-  const touched = $derived(pendingTouched + sliderTouched);
+  /** The Parameters panel's pending holds, shared with the Background
+   *  graph's term chips (WP-2218): one pending set for both. */
+  let pendingHolds = $state.raw<ReadonlyMap<string, boolean>>(new Map());
+  /** The Plan tab (WP-2231): an edited plan is one pending edit in the bar. */
+  let planPanel = $state<any>(null);
+  let planEdited = $state(false);
+  const touched = $derived(pendingTouched + sliderTouched + (planEdited ? 1 : 0));
   /** The curves the Pattern graph last fetched: the sliders' ranges are
    *  measured from its widest peak and its highest angle. */
   let baseCurves = $state.raw<any>(null);
@@ -142,6 +154,9 @@
     limits: (project?.doc?.two_theta_limits ?? null) as [number, number] | null,
     regions: (project?.doc?.excluded_regions ?? []) as [number, number][],
   });
+  /** What changes the background's channels and free set without moving the
+   *  head: the mode, the fit range and the excluded regions (WP-2129). */
+  const protocolKey = $derived(JSON.stringify([project?.doc?.mode ?? null, protocol.limits, protocol.regions]));
   const extent = $derived((project?.data?.two_theta_range ?? null) as [number, number] | null);
   const wavelengths = $derived((project?.data?.wavelengths ?? null) as number[] | null);
   const theme = $derived(resolveTheme(themeChoice, systemDark));
@@ -184,22 +199,20 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
-  /** The kept copy's Plan, Text and Model arms, which today's page wrote and
-   *  this page has no panel for. The copy is one per project and shared by
-   *  both pages, so they ride on every write from here: an edit on this page
-   *  never drops the other page's unapplied edits. The Interactive arm is this
-   *  page's own (WP-2218). The Text and Model arms are not in the action bar's
-   *  count (WP-2213), so they add nothing to `carriedCount`. */
-  const NO_CARRY = { plan: null, text: null, model: null } as const;
-  let carried = $state.raw<{ plan: PlanDraft | null; text: TextDraft | null;
-                             model: ModelDraft | null }>(NO_CARRY);
-  const carriedCount = $derived(carried.plan ? 1 : 0);
+  /** The kept copy's Text and Model arms, which today's page wrote and this
+   *  page has no panel for. The copy is one per project and shared by both
+   *  pages, so they ride on every write from here: an edit on this page never
+   *  drops the other page's unapplied edits. The Interactive arm (WP-2218)
+   *  and the Plan arm (WP-2231) are this page's own. The Text and Model arms
+   *  are not in the action bar's count (WP-2213). */
+  const NO_CARRY = { text: null, model: null } as const;
+  let carried = $state.raw<{ text: TextDraft | null; model: ModelDraft | null }>(NO_CARRY);
   $effect(() => {
     const path = project?.path ?? null;
     const extra = carried;
-    const draft = combine(touched + carriedCount,
+    const draft = combine(touched,
                           { ...extra, params: paramsPanel?.draft(),
-                            interactive: interactivePanel?.draft() });
+                            interactive: interactivePanel?.draft(), plan: planPanel?.draft() ?? null });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -276,6 +289,7 @@
     carried = NO_CARRY;
     paramsPanel?.revert();
     interactivePanel?.revert();
+    planPanel?.leave();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -291,9 +305,8 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
-    carried = draft?.plan || draft?.text || draft?.model
-      ? { plan: draft.plan, text: draft.text, model: draft.model } : NO_CARRY;
-    if (draft?.params || draft?.interactive) {
+    carried = draft?.text || draft?.model ? { text: draft.text, model: draft.model } : NO_CARRY;
+    if (draft?.params || draft?.interactive || draft?.plan) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
       return;
@@ -308,8 +321,9 @@
     offer = null;
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
     if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
+    if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
     recoveryWriter.arm(o.path, o.draft);
-    modelTab = o.draft.params ? "params" : "interactive";
+    modelTab = o.draft.params ? "params" : o.draft.interactive ? "interactive" : "plan";
     say(restoredText(o.draft));
   }
 
@@ -410,12 +424,59 @@
       showModel = true;
       return false;
     }
+    // the plan last: it moves no head, and a refused plan is drawn in its tab
+    const planned = planPanel ? !!(await planPanel.save()) : true;
+    if (!planned) {
+      modelTab = "plan";
+      showModel = true;
+      return false;
+    }
     return true;
   }
 
   function revertPending() {
     paramsPanel?.revert();
     interactivePanel?.revert();
+    planPanel?.revert();
+  }
+
+  /** The Plan tab stored a plan: the document is read again, so the action
+   *  bar's stage count names the plan the project now holds. */
+  async function planSaved() {
+    try {
+      project = await api.project();
+    } catch {
+      // the bar's count catches up on the next read
+    }
+  }
+
+  /** The Plan tab's Run this stage and the `.` key: the stage as it stands on
+   *  screen, from where the model stands. The Parameters and slider edits
+   *  waiting in the bar are applied first, as Refine applies them; the plan's
+   *  own edit is not, since the stage runs as drawn either way. */
+  async function runStage(stage: any, echo: string) {
+    if (refining || busy || noPhases || pendingInvalid || !project) return;
+    refining = true;
+    try {
+      if (pendingTouched + sliderTouched) {
+        if (!(await paramsPanel?.apply())) {
+          modelTab = "params";
+          showModel = true;
+          return;
+        }
+        if (!(await interactivePanel?.apply())) {
+          modelTab = "interactive";
+          showModel = true;
+          return;
+        }
+      }
+      run = await api.run({ kind: "stage", stage });
+      say(echo);
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+    } finally {
+      refining = false;
+    }
   }
 
   /** The action bar's primary: apply the pending edits, then refine. `cycle`
@@ -519,6 +580,9 @@
     step = 0;
   }
 
+  /** The stage `.` runs, for the palette's label. */
+  const planStageName = $derived(planPanel?.selectedName() ?? "");
+
   /** Every command the frame has, each with its key and the Python it runs
    *  where it runs any (WP-2214 rows 241-242). Later pieces add theirs. */
   const commands = $derived<Command[]>([
@@ -537,6 +601,14 @@
       disabled: !touched || busy || !!pendingInvalid, run: () => applyPending() },
     { id: "revert", label: "Revert the edits", echo: "",
       disabled: !touched, run: revertPending },
+    { id: "stage", label: planStageName ? `Run the stage “${planStageName}”` : "Run this stage",
+      echo: "ref.run_stage(Stage(…))", key: ".",
+      disabled: !project || busy || noPhases || !!pendingInvalid || !planStageName,
+      run: () => planPanel?.runStage() },
+    { id: "plan-undo", label: "Undo the plan edit", echo: "",
+      disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
+    { id: "plan-redo", label: "Redo the plan edit", echo: "",
+      disabled: !planPanel?.canRedo(), run: () => planPanel?.redo() },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -564,6 +636,14 @@
       if (layered) return;
       event.preventDefault();
       keysOpen = true;
+      return;
+    }
+    // `.` runs the Plan tab's selected stage (WP-2214 row 232)
+    if (event.key === "." && !event.metaKey && !event.ctrlKey && !event.altKey
+        && isShortcutTarget(event)) {
+      if (layered || !project || busy || noPhases) return;
+      event.preventDefault();
+      planPanel?.runStage();
       return;
     }
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
@@ -708,6 +788,17 @@
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
               preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+          {:else if graphTab === "peaks"}
+            <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
+              rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />
+          {:else if graphTab === "background"}
+            <Background {head} {busy} {theme} {say} protocol={protocolKey} holds={pendingHolds}
+              onhold={(path, held, serverHeld) => paramsPanel?.setHold(path, held, serverHeld)}
+              ondropped={(gone) => paramsPanel?.dropPending(gone)}
+              onmoved={structureMoved} />
+          {:else if graphTab === "structure"}
+            <Structure {head} {busy} {theme} {say} values={sliderValues}
+              projectPath={project?.path ?? null} onreadout={(r) => (reading = r)} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -745,17 +836,26 @@
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
-            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+            anodes={capabilities?.anodes ?? []}
+            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }}
+            onholds={(h) => (pendingHolds = h)} />
         </div>
         <!-- mounted while hidden too: its slider values are pending edits -->
         <div class="pane" class:gone={!!unbuilt || modelTab !== "interactive"}>
           <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
+            onvalues={(v) => (sliderValues = v)}
             onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
+        <!-- mounted while hidden too: an edited plan is a pending edit -->
+        <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
+          <Plan bind:this={planPanel} mode={project?.doc?.mode ?? "rietveld"} {head} {busy}
+            noPhasesReason={blocked} {corpus} {phaseNames} {say} onrun={runStage}
+            onpending={(edited) => (planEdited = edited)} onsaved={planSaved} />
+        </div>
         {#if !unbuilt}
-          {#if modelTab !== "params" && modelTab !== "interactive"}
+          {#if modelTab === "text"}
             <div class="pane"><p class="unbuilt">Not built yet.</p></div>
           {/if}
           <ActionBar bind:mode={refineMode} {touched} invalid={pendingInvalid}

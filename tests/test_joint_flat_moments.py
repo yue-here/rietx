@@ -26,6 +26,7 @@ import rietx as rx
 from rietx.crystallography.magnetic.operators import moment_to_cartesian
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import MagneticSymmetry, Moment
 
 LAM_X, LAM_N = 1.5406, 2.4
@@ -74,7 +75,10 @@ def _joint(space_group: str, truth, start, *, moment_globs=None):
     plan = rx.RefinementPlan(stages=[
         rx.Stage("scale", base),
         rx.Stage("moment", base + (moment_globs
-                                   or ["phases.*.atoms.*.moment.dof*"]))])
+                                   or ["phases.*.atoms.*.moment.dof*"]))],
+        # declared, not inherited: off by default since WP-2222, and the
+        # noise-free truth is drawn on compile_model's closing windows
+        closing_window_tol=CLOSING_WINDOW_TOL)
     joint = rx.MultiHistogramRefinement(
         rx.Structure(phases=[_phase(space_group, start)]), _instruments())
     return joint, joint.fit(data, plan=plan)
