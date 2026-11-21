@@ -58,7 +58,7 @@ prototype at 1440 × 900:
 | R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
 | R6 | — | the peaks-and-indexing workflow in four steps |
-| R7 | — | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it (§ R7 carries the series scrubber) |
+| R7 | — | the series workflow in four steps, with Trends and Map, and the scrubbing of WP-1317 redesigned into it, from loading the patterns to the output (§ R7 carries the series scrubber, § R7 is designed from loading to output) |
 | Swap | — | `/` serves the new page; today's shell and the panels nothing imports are deleted; the manual's GUI chapters rewritten and their screenshots retaken; File › Export gains the structure image (inventory row 79), which R3 offers only on the canvas's menus while the File menu is today's panel. Its PR waits on the maintainer, since it deletes |
 
 The maintainer reviews whole screens beside the prototype at each piece's end, and never single
