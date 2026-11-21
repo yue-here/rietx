@@ -83,7 +83,7 @@ measured into the docstring.
       is orthogonal to the discarded subspace keeps its propagated esd. Test on a synthetic
       `zero_shift = za + zb + zc` tie.
 - [x] The same test in `model/geometry.py` for a geometry row.
-- [ ] The quadrature sum (magnetic path, Mike's to rule): the pair's esd from gᵀ·Cov·g when g is
+- [x] The quadrature sum (magnetic path, Mike's to rule): the pair's esd from gᵀ·Cov·g when g is
       orthogonal to the discarded subspace; the strict xfail becomes a pass.
 - [ ] Probe: list the 535 intensities by reflection and phase over the slow selection, and say
       whether each is a cross-phase coincidence, a missed near-overlap or neither.

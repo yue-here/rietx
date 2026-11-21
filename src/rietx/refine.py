@@ -7171,6 +7171,9 @@ class Refinement:
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
+        live = self._answer_covariance
+        kw.setdefault("covariance", live if live is not None
+                      and live[0] is self.result_ else None)
         return build_report(self.result_, model=self._model,
                             values=answer["values"], plan=plan,
                             structure=answer["structure"],
