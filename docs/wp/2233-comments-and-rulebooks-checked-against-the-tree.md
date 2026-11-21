@@ -1,6 +1,6 @@
 # WP-2233 — Comments and rulebooks checked against the tree, and their size limits held from main
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by @yue-here
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-21 — a cost-only item with no user at the wall: every session reads the comments and rulebooks this keeps true, and pays for the rulebooks' size on every request

@@ -66,6 +66,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | 2026-11-21 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-21 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | 2026-11-21 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -884,7 +885,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
-| [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | ⬜ | P3 | — |
+| [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | 🔄 2026-11-21 | P3 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
