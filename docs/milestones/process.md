@@ -1024,6 +1024,21 @@ that catches one of five is the next format's template.  The three lines name
 `rasx.MEMBER_READ_ERRORS` and the exceptions it converts; the measurement is
 in the issue and the tests.  575 landed, no headroom.
 
+575 -> 591 for the neutron time-of-flight forward model (yue-here/rietx issue
+#193): the *ordinate* becomes the second declared quantity.  Whether a channel
+holds the counts it recorded or those counts divided by its own width is a
+statement no value can settle, and on a bank the wrong answer is a slope in
+flight time that a displacement parameter pays for, so the declare-never-infer
+rule gains its intensity-basis section.  The measurement behind it is
+`io/formats/gsas.py`'s docstring.  590 landed against the 591.
+
+591 -> 597 for the TOPAS time-of-flight bank (issue #193): one standing rule,
+that a `.inp` bank is read by evaluating the laws it states — sampled over d
+and kept only where rietx's reproduces them exactly — and never by matching
+how a macro spells them, plus the one fact a session would otherwise get
+wrong, that the bank angle is not in the file.  The measured laws stay in
+`projects/topas_tof.py` and `tests/data/README.md`.  596 landed against the 597.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`

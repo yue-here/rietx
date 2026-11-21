@@ -1,0 +1,27 @@
+# 7k. The time-of-flight family: a bank, its calibration, and what follows λ along it
+
+Load it when the pattern is a neutron time-of-flight bank (`pattern.tof` is set, the instrument's `source.kind` is `"neutron_tof"`), or when one of the codes below fired.
+
+*A reference file of the `rietx` skill. The body it belongs to is [`SKILL.md`](../SKILL.md); section numbers are the ones the body cites. The signatures are in [`api-tof.md`](api-tof.md).*
+
+**A bank is one histogram on its own axis.** The abscissa is a flight time in µs, and every reflection arrives at the bank's one fixed angle, separated by d. Positions come from T = DIFC·d + DIFA·d² + TZERO + DIFB/d (`instrument.source.difc` …), the peak shape is a back-to-back exponential pair convoluted with a Gaussian or a pseudo-Voigt whose widths are polynomials in d (`instrument.source.profile_tof.*`), and the Lorentz factor is d⁴·sin θ. `Refinement.fit` refines one bank in Rietveld mode; the result carries `tof` and `result.axis == "tof"`, never `two_theta`.
+
+**The calibration is never in the data file.** Read it (`rx.read_gsas_tof_iparm`, or `rx.read_gsas2_instprm` on a `Type: PNT` file) or state it (`rx.Instrument.tof_neutron_bank`). It comes back **held**: a DIFC refined against a standard, freed beside a free cell, reopens the λ-versus-cell flat direction. Free a constant only against a held, certified cell.
+
+**A bank has no constant-wavelength rows.** `instrument.profile.*`, `instrument.zero_shift` and the two sample aberrations are not in its table (issue #442): a glob naming them matches nothing on a bank, and `STAGE_FREED_NOTHING` says so. Free `instrument.source.profile_tof.*` and `instrument.source.tzero` instead. A phase's four sample widths are refinable, but `lor_size` holds K/L in Å⁻¹ there and `gauss_size` its square, because a white beam states no λ.
+
+**What one channel holds is a declaration.** `pattern.intensity_basis` is `"counts"`, `"density"` or `None`. The readers set it only where the file says so, and the two answers differ by the channel width W(T), which is a slope in flight time that a displacement parameter pays for, not a scale. Set it by hand when the reader could not.
+
+**A coarse stage is not the answer.** On a pseudo-Voigt bank every declared stage but the last sizes the Lorentzian tail at `RefinementPlan.intermediate_lorentz_window_tol` (1e-2), and the last and the closing stage at 1e-4; `StageResult.lorentz_window_tol` says what each ran at. Quote only the answer's numbers, which is what `RefinementResult` carries.
+
+**Refused on a bank, by name:** Le Bail and Pawley extraction, several banks as one joint fit (`MultiHistogramRefinement`), `refine_sequential`, the project container, peak picking and indexing, March-Dollase and Stephens (both written in deg 2θ), a spherical-harmonic texture, soft restraints, a magnetic moment, a scalar `Geometry.mu_r` or `Geometry.mu_t`, an all-zero `ProfileTOF`, a σ²(d) or γ(d) polynomial that goes negative over the fitted range, and a P-spline air term. Absorption and extinction are **not** refused: they are applied per reflection at λ_hkl = 2·d·sin θ_bank, from `capillary_radius_mm` and the composition.
+
+## Codes
+
+| code | what you must not assume, and what to do |
+|---|---|
+| `TOF_INTENSITY_BASIS_ASSUMED` | (warning) Quote a displacement parameter from this fit. Nothing said whether a channel holds counts or counts per channel width, so `pattern.intensity_basis` is `None` and the fit ran as `'density'` — no width factor. If it is counts (Mantid's `SaveGSS` multiplies Y by the bin widths **by default**), the missing W(T) is a smooth rise across the bank that Biso absorbs. Declare the basis and refit |
+| `TOF_CHANNEL_WIDTH_APPLIED` | (info) Read a displacement parameter without knowing whether the channel width was in the model. It was: the pattern declares `intensity_basis='counts'`, so the Bragg sum was multiplied by W(T), the W of GSAS's I_o = I'_o/(W·I_i), measured from the pattern's **own** abscissa; the message quotes W at both ends. If the export already divided by the bin width, declare `'density'`: W applied twice biases Biso the other way |
+| `SPECIMEN_ABSORPTION_TOF` | (info) Read a displacement parameter from a flight-time fit without knowing whether specimen absorption was in the model. It was, over the µR range quoted — from the refined composition and the declared `capillary_radius_mm` via the Sears cross-sections, never refined, since it is indistinguishable from thermal motion. Absent means no capillary radius was declared and there is **no** absorption correction, which biases Biso on a strong absorber. No `AbsorptionCorrection` record on this arm: it holds one µR at one wavelength, and a bank has neither |
+| `ABSORPTION_MU_R_OUT_OF_RANGE` | (on a bank) Read the **pair** the message quotes: µ follows the 1/v law, so one specimen can be inside the Rouse domain at the short-wavelength end and outside it at the long-d end, where the transmission factor is an extrapolation. The constant-wavelength row is in §7 |
+| `BACKGROUND_PEAK_WIDTH_UNAVAILABLE` | (info) Read a declared hump as checked against the resolution. The hump-width guard compares a hump's FWHM with the Caglioti FWHM in deg 2θ; a bank's resolution is `profile_tof`'s σ(d) and γ(d) and its hump is in µs, so the guard did not run. Judge the hump's width yourself against the narrowest reflection near it |

@@ -63,6 +63,10 @@ from .plan import PlanSpec
 #: ``1.6`` (WP-2030): the stored indexing controls gained ``formula`` and
 #: ``temperature``, keys an older build's ``extra="forbid"`` refuses, written
 #: as null when unset.  Minor, as 1.4 was for ``lebail_passes``.
+#: Also in 1.6 (issue #193): the persisted plan gained
+#: ``intermediate_lorentz_window_tol``, a bank's Lorentzian window tolerance in
+#: every declared stage but the last, and its stages ``lorentz_window_tol``,
+#: unreleased beside it.
 PROJECT_FORMAT_VERSION = "1.6"
 
 

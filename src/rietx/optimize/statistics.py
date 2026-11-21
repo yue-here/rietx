@@ -1346,6 +1346,16 @@ def _reflection_peaks(model: "CompiledModel", values: dict[str, float]):
     same reflection's intensity, and an interval around the primary line alone
     would cut it off.  With one emission line this is exactly the paper's
     interval.
+
+    **Axis-blind, and it has to be**: the census is a count of resolved
+    reflections and an integral of one profile against its neighbours, neither
+    of which is a statement about an angle.  So the position is read as slot 0,
+    the intensity as the last slot and *everything between* as the shape's own
+    width parameters — two on the constant-wavelength pseudo-Voigt, four on a
+    time-of-flight bank's back-to-back pair — and handed straight back to the
+    model's own ``peak_fwhm`` and ``profile_at``.  Nothing here knows how many
+    there are, which is what stops this function acquiring a second opinion
+    about the profile.
     """
     out = []
     alpha = EFFECTIVE_OBS_ALPHA
@@ -1366,22 +1376,22 @@ def _reflection_peaks(model: "CompiledModel", values: dict[str, float]):
             lines = [*lines, *model.phase_peaks(ip, values, component=1)]
         seen: np.ndarray | None = None
         cooked = []
-        for pos, w1, w2, intensity in lines:
-            pos = np.asarray(pos, dtype=np.float64)
-            fwhm = model.peak_fwhm(w1, w2)
-            ok = measured_mask(model.tt, pos, fwhm)
+        for line in lines:
+            pos = np.asarray(line[0], dtype=np.float64)
+            widths = [np.asarray(w, dtype=np.float64) for w in line[1:-1]]
+            fwhm = model.peak_fwhm(*widths)
+            ok = measured_mask(model.grid, pos, fwhm)
             seen = ok if seen is None else (seen | ok)
-            cooked.append((pos, np.asarray(w1, dtype=np.float64),
-                           np.asarray(w2, dtype=np.float64),
-                           np.asarray(intensity, dtype=np.float64), fwhm))
+            cooked.append((pos, widths,
+                           np.asarray(line[-1], dtype=np.float64), fwhm))
         if seen is None:
             continue
         for k in np.flatnonzero(seen):
             peaks, edges = [], []
-            for p, a, b, i, f in cooked:
+            for p, ws, i, f in cooked:
                 if not (np.isfinite(p[k]) and np.isfinite(f[k])):
                     continue
-                peaks.append((float(p[k]), float(a[k]), float(b[k]),
+                peaks.append((float(p[k]), tuple(float(w[k]) for w in ws),
                               float(i[k])))
                 edges.append((float(p[k]) - alpha * float(f[k]),
                               float(p[k]) + alpha * float(f[k])))
@@ -1453,7 +1463,7 @@ def effective_observations(model: "CompiledModel", values: dict[str, float]
 def _effective_from_census(model: "CompiledModel", census) -> float | None:
     """:func:`effective_observations` on a census already taken — so
     :func:`data_support` pays for one pass rather than two."""
-    tt = np.asarray(model.tt, dtype=np.float64)
+    tt = np.asarray(model.grid, dtype=np.float64)
     if not census or not len(tt):
         return None
 
@@ -1494,9 +1504,9 @@ def _peak_sum(model: "CompiledModel", x: np.ndarray, peaks) -> np.ndarray:
     the primary lobe does.
     """
     out = np.zeros(x.shape, dtype=np.float64)
-    for pos, w1, w2, intensity in peaks:
+    for pos, widths, intensity in peaks:
         out = out + intensity * np.asarray(
-            model.profile_at(x - pos, w1, w2), dtype=np.float64)
+            model.profile_at(x - pos, *widths), dtype=np.float64)
     return out
 
 

@@ -1,0 +1,65 @@
+' Written by rietx.io.projects.topas_tof.from_tof; bank angle 2θ = 90.0° (TOPAS states none)
+iters 0
+xdd "flat.xye" xye_format
+   Out_X_Ycalc(type3_ycalc.txt)
+   neutron_data
+   prm !alpha0_b0 0.1
+   prm !alpha1_b0 0.45
+   prm !beta0_b0 0.03
+   prm !beta1_b0 0.004
+   prm !sig0_b0 2.0
+   prm !sig1_b0 40.0
+   prm !sig2_b0 1.5
+   prm !gam0_b0 0.5
+   prm !gam1_b0 1.2
+   prm !gam2_b0 0.3
+   TOF_LAM(0.001)
+   convolution_step 4
+   start_X 8000.0
+   finish_X 12000.0
+   extra_X_left 279.82193464108224
+   extra_X_right 90.60373838235823
+   bkg 10.0 -2.0 0.5
+   TOF_x_axis_calibration(!tzero_b0, 7.5, !difc_b0, 10000.0, !difa_b0, -3.25)
+   scale_pks = D_spacing^4;
+   str
+     phase_name "NiO"
+     space_group "F m -3 m"
+     scale ! 176.77669529663686
+      peak_type pv
+      local !gG_b0_0 = Sqrt(8 Ln(2) (sig0_b0 + sig1_b0 D_spacing^2 + sig2_b0 D_spacing^4));
+      local !gL_b0_0 = (gam0_b0 + gam1_b0 D_spacing + gam2_b0 D_spacing^2);
+      local !fw_b0_0 = (gG_b0_0^5 + 2.69269 gG_b0_0^4 gL_b0_0 + 2.42843 gG_b0_0^3 gL_b0_0^2 + 4.47163 gG_b0_0^2 gL_b0_0^3 + 0.07842 gG_b0_0 gL_b0_0^4 + gL_b0_0^5)^0.2;
+      local !q_b0_0 = gL_b0_0 / fw_b0_0;
+      pv_fwhm = fw_b0_0;
+      pv_lor = 1.36603 q_b0_0 - 0.47719 q_b0_0^2 + 0.11116 q_b0_0^3;
+      exp_conv_const = Ln(0.001) / (alpha0_b0 + alpha1_b0 / D_spacing);
+      exp_conv_const = -Ln(0.001) / (beta0_b0 + beta1_b0 / D_spacing^4);
+     a ! 4.177
+     b ! 4.177
+     c ! 4.177
+     al ! 90.0
+     be ! 90.0
+     ga ! 90.0
+     site Ni1 x ! 0.0 y ! 0.0 z ! 0.0 occ Ni ! 1.0 beq ! 0.5
+     site O1 x ! 0.5 y ! 0.5 z ! 0.5 occ O ! 1.0 beq ! 0.7
+   str
+     phase_name "Si"
+     space_group "F d -3 m:2"
+     scale ! 84.85281374238569
+      peak_type pv
+      local !gG_b0_1 = Sqrt(8 Ln(2) (sig0_b0 + sig1_b0 D_spacing^2 + sig2_b0 D_spacing^4));
+      local !gL_b0_1 = (gam0_b0 + gam1_b0 D_spacing + gam2_b0 D_spacing^2);
+      local !fw_b0_1 = (gG_b0_1^5 + 2.69269 gG_b0_1^4 gL_b0_1 + 2.42843 gG_b0_1^3 gL_b0_1^2 + 4.47163 gG_b0_1^2 gL_b0_1^3 + 0.07842 gG_b0_1 gL_b0_1^4 + gL_b0_1^5)^0.2;
+      local !q_b0_1 = gL_b0_1 / fw_b0_1;
+      pv_fwhm = fw_b0_1;
+      pv_lor = 1.36603 q_b0_1 - 0.47719 q_b0_1^2 + 0.11116 q_b0_1^3;
+      exp_conv_const = Ln(0.001) / (alpha0_b0 + alpha1_b0 / D_spacing);
+      exp_conv_const = -Ln(0.001) / (beta0_b0 + beta1_b0 / D_spacing^4);
+     a ! 5.431
+     b ! 5.431
+     c ! 5.431
+     al ! 90.0
+     be ! 90.0
+     ga ! 90.0
+     site Si1 x ! 0.125 y ! 0.125 z ! 0.125 occ Si ! 1.0 beq ! 0.4

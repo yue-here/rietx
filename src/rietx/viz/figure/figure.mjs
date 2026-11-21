@@ -94,6 +94,11 @@ for (const entry of spec.legend) {
   };
 }
 
+/** The abscissa as the readout prints it, in the result's own quantity and unit. */
+function xText(v) {
+  return `${spec.labels.x} ${num(v, spec.labels.xdigits)}${spec.labels.xunit}`;
+}
+
 // The pointer's reach onto a tick, in CSS px.
 const PICK = 6;
 
@@ -108,14 +113,14 @@ function tickText(at) {
   const j = nearest(row, at.x, (v) => u.valToPos(v, 'x'), PICK);
   if (j < 0) return '';
   const hkl = curves.header.tick_hkl?.[name]?.[j];
-  return `${name}  ${hkl ? `${hklLabel(hkl)}  ` : ''}2θ ${num(row[j], 4)}°`;
+  return `${name}  ${hkl ? `${hklLabel(hkl)}  ` : ''}${xText(row[j])}`;
 }
 
 fig.onCursor = (at) => {
   if (!at) { readout.textContent = ''; return; }
   if (at.key === 'ticks') { readout.textContent = tickText(at); return; }
   const a = curves.arrays, i = at.idx;
-  readout.textContent = `2θ ${num(a.two_theta[i], 4)}°   obs ${num(a.y_obs[i], 1)}   `
+  readout.textContent = `${xText(a.two_theta[i])}   obs ${num(a.y_obs[i], 1)}   `
     + `calc ${num(a.y_calc?.[i], 1)}   ${spec.labels.resid} ${num(a[residKey]?.[i], 2)}`;
 };
 

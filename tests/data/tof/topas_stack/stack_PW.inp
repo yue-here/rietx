@@ -1,0 +1,23 @@
+' Fable stack kit 2026-10-01: is push_peak+two exp_conv_const a pulse or a sum?  iters 0.
+iters 0
+
+xdd flat.xye xye_format
+   Out_X_Ycalc(stack_PW_stack_w3.txt)
+   neutron_data
+   convolution_step 4
+   TOF_LAM(0.0000001)
+   TOF_x_axis_calibration(!t0, 0, !t1, 10000, !t2, 0)
+   d_Is
+      phase_name PW_stack_w3
+      scale 1
+      d 2 I 1000
+      peak_type pv
+      pv_lor 0
+      pv_fwhm 23.5482004503095
+      push_peak
+      exp_conv_const -34.538776394911
+      bring_2nd_peak_to_top
+      exp_conv_const 230.258509299405
+      scale_top_peak 3
+      add_pop_1st_2nd_peak
+

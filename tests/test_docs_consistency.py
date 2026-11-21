@@ -303,6 +303,14 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-16  src/rietx/io/CLAUDE.md        572 -> 575  for the container member-read rule (issue #1593):
 #                                                          the exceptions `zipfile` raises that are not a
 #                                                          ValueError; landed 575, no headroom
+#   2026-11-17  src/rietx/io/CLAUDE.md        575 -> 591  for the time-of-flight forward model (issue
+#                                                          #193): § The intensity basis is never
+#                                                          inferred, the ordinate's twin of the axis
+#                                                          rule; landed 590 (rebased onto #1593's 575;
+#                                                          first landed 586 on WP-2079's 571, 2026-11-06)
+#   2026-11-17  src/rietx/io/CLAUDE.md        591 -> 597  for the TOPAS time-of-flight bank (issue #193):
+#                                                          one rule, read by evaluating a law and not its
+#                                                          spelling; landed 596 (592 on 587 first, 2026-11-06)
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -806,7 +814,19 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 575,
+    # 575 -> 591 (issue #193, the time-of-flight forward model): the ordinate
+    # becomes a declared quantity beside the axis — whether a channel holds
+    # counts or counts per µs — so § The intensity basis is never inferred
+    # states the rule the next reader must follow (set it only from a
+    # declaration, measure W from the abscissa).  The evidence is in
+    # `io/formats/gsas.py`'s docstring.  Landed at 590 on #1593's 575 (586 on WP-2079's
+    # 571 first); the +1 is headroom.
+    # 591 -> 597 (issue #193, the TOPAS time-of-flight bank): a `.inp` bank is
+    # read by evaluating the laws it states, so the rule a session needs is that
+    # one and the bank angle the file cannot carry; the measured laws are in
+    # `projects/topas_tof.py` and `tests/data/README.md`.  Landed at 596 (592
+    # before the rebase onto WP-1952's 572); the +1 is headroom.
+    "src/rietx/io/CLAUDE.md": 597,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

@@ -84,7 +84,13 @@ def assess_background(result: RefinementResult,
     """
     if not result.y_background:
         return None
-    tt = np.asarray(result.two_theta, dtype=np.float64)
+    # The result's own abscissa.  Every number this function computes is a
+    # residual statistic or a ratio of sums over channels, so the *quantity* on
+    # the axis never enters — only the region bounds have to be quoted in it,
+    # and the caller supplies those from the same array.  Nothing this section
+    # reports carries an axis, which is why it speaks on a flight-time fit
+    # while the region and unmatched-peak sections cannot.
+    tt = result.x()
     y_obs = np.asarray(result.y_obs, dtype=np.float64)
     y_bkg = np.asarray(result.y_background, dtype=np.float64)
     if tt.size == 0 or y_bkg.size != tt.size:

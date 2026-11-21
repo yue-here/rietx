@@ -443,7 +443,7 @@ and solves the end in the logarithm of its distance from $\hat p$, where the
 quartic profile of a dead column is a straight line.
 
 A bound the data press against is not a stationary point of $\chi^2$. There
-$\chi^2$ rises from the bound with a slope as well as a curvature, and the
+$\chi^2$ rises from the bound with a slope and a curvature, and the
 one-sided end lies inside $\sqrt{c}$ esd. On the BT-1 neutron fit in the test
 suite the Lorentzian $Y$ refines to 0 ± 0.0181. Its 95 % end lies at 0.0166,
 0.56 of the $\sqrt{2.71}$ esd a stationary bound would give.

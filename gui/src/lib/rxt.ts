@@ -47,7 +47,8 @@ export const PAIRS = ["min", "max", "esd"];
 /** The words a `stage` line carries: `free`, then `textdoc.STAGE_KEYS` — which
  * is derived from `StageSpec`, so a new field lands here and nowhere else. */
 export const STAGE_WORDS = ["free", "max_iter", "ftol", "lebail_cycles", "lebail_tol",
-  "seed", "strain_seed", "restraint_weight_scale", "window_slack_deg"];
+  "seed", "strain_seed", "restraint_weight_scale", "window_slack_deg",
+  "lorentz_window_tol"];
 
 /** The clause a stage line writes its fixes as (`fix <globs>`, `StageSpec.turn_off`):
  * `textdoc.STAGE_FIX_WORD`, pinned from python like the arrays (WP-2208). It is not a
@@ -61,7 +62,8 @@ export const STAGE_INT_WORDS = ["max_iter", "lebail_cycles"];
  * these and a refusal for the rest, which is what lets the plan editor offer
  * every stage field the `.rxt` document already carries (WP-1208). All three
  * arrays are pinned to `StageSpec` from python by `tests/test_textdoc.py`. */
-export const STAGE_NULLABLE_WORDS = ["ftol", "window_slack_deg"];
+export const STAGE_NULLABLE_WORDS = ["ftol", "window_slack_deg",
+  "lorentz_window_tol"];
 
 export interface Span {
   /** column offsets into the line, `from` inclusive and `to` exclusive */
