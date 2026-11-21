@@ -1165,8 +1165,10 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
             level="warning", code="EXTINCTION_SCREENS_DISAGREE",
             message=(f"the screen after the cell-free Le Bail fit names "
                      f"{mine.symbol}, and a second screen at the same cell, "
-                     "held, from the declared instrument (an all-zero "
-                     f"background seeded first) names {theirs.symbol}.  The two "
+                     "held, from the declared instrument"
+                     + (" (an all-zero background seeded first)"
+                        if held.background_seeded else "")
+                     + f" names {theirs.symbol}.  The two "
                      "classes share no space group, so at most one is right, and "
                      "best_or_none() abstains.  The screens differ in the "
                      "profile every class is compared at, not in the cell.  "

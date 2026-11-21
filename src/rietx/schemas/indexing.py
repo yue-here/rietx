@@ -241,7 +241,7 @@ from .structure import Cell
 #: 1.12 → 1.13 (WP-1910, ruled on #1178, the first change to what this string
 #: stamps since 1.12.0): with ``refine_cell=True`` a screen that names a class
 #: is checked by a second screen at the prefit's cell, held, from the declared
-#: instrument (an all-zero background seeded first, as the prefit seeds it), and
+#: instrument (an all-zero background seeded first when the declared background is the preset's all-zero start, as the prefit seeds it), and
 #: ``best_or_none()`` abstains when the two name different classes
 #: (``EXTINCTION_SCREENS_DISAGREE``).  No threshold moves: a screen's answer
 #: does, so the same stamp must not cover both.
@@ -2616,6 +2616,12 @@ class ExtinctionScreen(Base):
     #: the two differ, :meth:`screens_disagree` is True and :meth:`best_or_none`
     #: abstains; a held screen naming no class is recorded and changes nothing
     held_screen: ExtinctionScreen | None = None
+    #: on a :attr:`held_screen` only: whether its declared background was the
+    #: preset's all-zero start and so was seeded before the fit (the prefit's
+    #: seed, ``_seeded_instrument``); ``False`` when the caller's own
+    #: background was kept.  ``None`` on any screen that is not a held
+    #: second screen, where nothing was asked
+    background_seeded: bool | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 

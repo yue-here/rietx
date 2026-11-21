@@ -1224,8 +1224,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
 
     **A class from the prefit is checked by a second screen** (WP-1910, ruled
     on #1178): when ``refine_cell=True`` names a class, the screen runs again
-    at the prefit's cell, **held**, from the declared ``instrument``, its all-zero background seeded as the
-    prefit's is (``ExtinctionScreen.held_screen``; without the seed a poor held
+    at the prefit's cell, **held**, from the declared ``instrument``, its background seeded as the
+    prefit's is when it is the preset's all-zero start, which the held screen
+    records in ``background_seeded`` (``ExtinctionScreen.held_screen``; without the seed a poor held
     fit refutes every class with an absence and the lattice class wins by
     elimination, #1286 round 2).  The two fail differently — the
     prefit's widths and zero against the declared ones — so
@@ -1616,12 +1617,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         # against the declared ones — so two decisive answers that differ cannot both be right, and
         # ``best_or_none`` then names neither.  ``candidate`` is already at the
         # prefit's cell; ``instrument`` is the caller's.
+        held_ins = _seeded_instrument(data, instrument, two_theta_limits)
         screen.held_screen = determine_extinction_symbol(
-            data, candidate,
-            _seeded_instrument(data, instrument, two_theta_limits), peaks=peaks,
+            data, candidate, held_ins, peaks=peaks,
             two_theta_limits=two_theta_limits, k_sigma=k_sigma,
             max_classes=max_classes, refine_cell=False, restrict=prior,
             cancel=cancel)
+        screen.held_screen.background_seeded = held_ins is not instrument
         if screen.held_screen.status == "cancelled":
             screen.status = "cancelled"
     screen.diagnostics = extinction_diagnostics(screen, fit_errors) + prefit_capped

@@ -180,6 +180,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
 | `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |
 | `ExtinctionScreen.z_candidates` | with a density and no `z`, every whole Z within the density's tolerance; several is an ambiguity, none a contradiction |
+| `ExtinctionScreen.background_seeded` | on the held screen only: `True` when its declared background was the preset's all-zero start and was seeded before the fit, `False` when the declared background was kept, `None` on any other screen |
 | `ExtinctionScreen.held_screen` | the second screen, at `cell` held from the declared instrument, with its own ranking; `None` when the cell was held or the screen named no class |
 | `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened), `"unreliable"` (ranked, but the reference fit failed its gate) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |

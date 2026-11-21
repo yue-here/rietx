@@ -259,6 +259,15 @@ def test_two_screens_that_name_disjoint_classes_abstain_and_say_so(patterns):
 
     corundum.held_screen = mono
     assert corundum.screens_disagree() and corundum.best_or_none() is None
+    # the parenthesis states what was done: print it only when the held screen's
+    # background was seeded (Yue's round 4, item 3)
+    mono.background_seeded = False
+    assert "all-zero background" not in codes(corundum)[
+        "EXTINCTION_SCREENS_DISAGREE"].message
+    mono.background_seeded = None
+    assert "all-zero background" not in codes(corundum)[
+        "EXTINCTION_SCREENS_DISAGREE"].message
+    mono.background_seeded = True
     split = codes(corundum)
     found = split["EXTINCTION_SCREENS_DISAGREE"]
     assert own.symbol in found.message and theirs.symbol in found.message

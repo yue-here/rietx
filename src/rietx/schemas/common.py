@@ -698,9 +698,6 @@ from .._nearmiss import did_you_mean
 #: ``.tested_two_theta``, the testable forbidden positions a class was scored
 #: on.  Additive and defaulted to empty, the 0.25 → 0.26 rule; an older build
 #: refuses a screen carrying either key.
-#: Also in 0.61 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
-#: second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
-#: Additive and defaulted to ``None``, the same rule.
 #: Also in 0.61 (WP-2118): ``TieSpec.expression``, a user tie declared as a
 #: formula over named variables (``Refinement.tie(path, expression=...)``).
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
@@ -720,7 +717,18 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-SCHEMA_VERSION = "0.61"
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: Also in 0.62 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
+#: second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule; an older build
+#: refuses a screen carrying the key.  It moves no stored value.
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated

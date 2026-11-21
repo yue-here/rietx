@@ -5,6 +5,7 @@ This page gives what a `RefinementResult` carries beside the refined values: the
 `Refinement.fit` and `refine` return a `RefinementResult`.
 [API: everyday calls](api.md#results) lists every field.
 The refined values are `RefinementResult.parameters`, one row per parameter with its esd, and `RefinementResult.parameter` looks one up by path.
+A row's esd is `None` where the data do not determine the parameter: it measured nothing, or it lies on a combination the covariance discards ([Why a direction the data do not move has no esd](../concepts/correlations.md#why-a-direction-the-data-do-not-move-has-no-esd)).
 [Derived quantities](derived.md) gives the distances, angles, cell volumes, sizes and strains a fit computes from them.
 
 The IUCr guidelines rank this evidence differently from a table of R values.
@@ -440,7 +441,7 @@ A series prints its own view.
 
 The fourth deliverable is the series' own, because no single pattern carries a `SEQUENTIAL_*` row.
 `series.summary(deliverable="series")` adds the rows that decide a parameter measured against the series axis.
-They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not), and name the widths that grew with a worsening fit.
+They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not).
 They give each step with what an independent cold pair reproduced, and the phases held for want of support.
 They also ask for the two things no diagnostic can supply: a stated 2θ-scale anchor and the split between precision and accuracy.
 The other three purposes are refused there by name, and `Refinement.summary(deliverable="series")` answers with where the series rows live:
