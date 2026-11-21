@@ -20,6 +20,7 @@ Every object on this page refuses a field it does not know, and checks its bound
 | `Instrument.profile` | `ProfileTCHZ` | see [Peak width](#peak-width) | the instrument's contribution to every peak's width |
 | `Instrument.background` | `BackgroundChebyshev`, `BackgroundPSpline` or `BackgroundFixedPlusChebyshev` | four Chebyshev terms, fixed at 0 | the curve under the peaks |
 | `Instrument.extra_components` | list of `HumpComponent` and `PeakComponent` | `[]` | declared peaks added on top of the background |
+| `Instrument.peak_equations` | `list[PeakEquation]` | `[]` | a position term in the angle, added to every phase's peaks ([Peak equations](data.md#peak-equations)) |
 
 A source and a correction derived for the other radiation are refused together.
 `Geometry.surface_roughness` on a neutron source raises, because a thermal neutron beam penetrates centimetres of the specimen where an X-ray beam penetrates microns.
