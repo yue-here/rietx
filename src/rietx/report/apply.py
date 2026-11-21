@@ -198,6 +198,10 @@ def api_call(stage: StageSpec, *, plan=None) -> str:
     # since WP-2222), so the tooltip and the node's line agree
     return NodeAction(kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                       max_iter=stage.max_iter, window_area_tol=WINDOW_AREA_TOL,
+                      # what the stage will write, so the line names them only
+                      # where it runs other than the default (WP-1947)
+                      lebail_cycles=stage.lebail_cycles,
+                      lebail_tol=stage.lebail_tol,
                       **settings).api_call()
 
 

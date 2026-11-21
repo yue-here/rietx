@@ -124,10 +124,15 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "stage's `turn_on` glob frees whatever it matches. Say it with "
         "`ref.hold(globs)`, which outranks the glob, survives a save and "
         "reopen, and makes the stage report what it could not free "
-        "(§8.25, §7 `HOLD_BLOCKED_PLAN`).",
+        "(§8.25, §7 `HOLD_BLOCKED_PLAN`). Before any fit, "
+        "`ref.evaluate(data)`, `ref.reflection_table(data)` and "
+        "`ref.background(data)` read the model at its values and write "
+        "nothing; a stage takes `max_iter` ≥ 1.",
         ("rx.Refinement", "rx.Refinement.fit", "rx.Refinement.report",
          "rx.Refinement.summary", "rx.Refinement.suggest",
-         "rx.Refinement.predict", "rx.Refinement.run_stage",
+         "rx.Refinement.predict", "rx.Refinement.evaluate",
+         "rx.Refinement.reflection_table", "rx.Refinement.background",
+         "rx.Refinement.run_stage",
          "rx.Refinement.parameters", "rx.Refinement.set_vary",
          "rx.Refinement.set_values", "rx.Refinement.tie",
          "rx.Refinement.tie_equal", "rx.Refinement.untie",

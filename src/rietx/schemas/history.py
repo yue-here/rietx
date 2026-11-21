@@ -35,6 +35,7 @@ from .instrument import Instrument
 # pre-freeze (WP-1003), so import both from there.
 from .params import TieSpec
 from .plan import CORRELATION_GUARD, PHASE_SUPPORT_SIGMA, PlanSpec
+from .plan import StageSpec as _StageSpec
 from .results import Statistics
 from .structure import Structure
 
@@ -166,6 +167,14 @@ class NodeAction(Base):
                  ("restraint_weight_scale", self.restraint_weight_scale, 1.0),
                  ("ftol", self.ftol, None),
                  ("window_slack_deg", self.window_slack_deg, None),
+                 # the partition's budget and test, against the Stage's own
+                 # defaults, read off its mirror, rather than this class's 3
+                 # and 0.0, which are an old node's (WP-1947): a node that ran
+                 # other values renders a call that runs them
+                 ("lebail_cycles", self.lebail_cycles,
+                  _StageSpec.model_fields["lebail_cycles"].default),
+                 ("lebail_tol", self.lebail_tol,
+                  _StageSpec.model_fields["lebail_tol"].default),
                  # the stage's fixes (WP-2208), a stage's own as of that WP
                  ("turn_off", list(self.turn_off), []))
                 if v != off)

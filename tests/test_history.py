@@ -63,6 +63,42 @@ def test_action_records_the_equivalent_api_call(fitted):
     assert "run_stage" in call and "cell" in call
 
 
+def test_a_stage_call_carries_its_partition_settings(pattern):
+    """A node's call runs the stage the node ran (WP-1947, from WP-1986).
+
+    It dropped ``lebail_cycles`` and ``lebail_tol``, so a Le Bail stage run
+    with its own budget rendered a call that ran the defaults.  A default
+    stage's line is unchanged, and an old node's 3 and 0.0 now render too,
+    since that is what it ran.
+    """
+    from rietx.schemas.history import NodeAction
+
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins)
+    ref.fit(pattern, mode="lebail", telemetry=False, plan=rx.RefinementPlan(
+        stages=[rx.Stage("cell", ["phases.*.cell.*"], lebail_cycles=40,
+                         lebail_tol=1e-5)]))
+    node = next(n for n in ref.history.nodes.values() if n.action.name == "cell")
+    call = node.action.api_call()
+    assert "lebail_cycles=40" in call and "lebail_tol=1e-05" in call
+    # and the call runs it: evaluated against a stand-in that keeps the stage
+    seen = []
+
+    class _Ref:
+        def run_stage(self, data, stage, **settings):
+            seen.append(stage)
+
+    eval(call, {"rx": rx, "ref": _Ref(), "data": None})
+    assert (seen[0].lebail_cycles, seen[0].lebail_tol) == (40, 1e-5)
+
+    default = NodeAction(kind="stage", name="s", turn_on=["a"],
+                         lebail_cycles=rx.Stage("s", []).lebail_cycles,
+                         lebail_tol=rx.Stage("s", []).lebail_tol)
+    assert "lebail" not in default.api_call()
+    assert "lebail_cycles=3, lebail_tol=0.0" in NodeAction(
+        kind="stage", name="s").api_call()
+
+
 # ---------------------------------------------------------- restore fidelity
 def test_checkout_restores_every_parameter_exactly(pattern):
     """The load-bearing invariant: a checkpoint loses no state.
@@ -657,8 +693,13 @@ def test_a_cherry_pick_replays_the_plan_settings_the_stage_ran_at(pattern):
 def test_the_hold_switched_off_is_recorded_and_rendered():
     """``None`` is a setting, not an absence: the node says the hold was off
     and the rendered call switches it off again."""
+    # the partition settings a stage writes today (WP-1542), so the line
+    # carries neither (WP-1947)
+    stage = rx.Stage("cell", ["phases.*.cell.*"])
     action = rx.NodeAction(kind="stage", name="cell", turn_on=["phases.*.cell.*"],
-                           phase_support_sigma=None)
+                           phase_support_sigma=None,
+                           lebail_cycles=stage.lebail_cycles,
+                           lebail_tol=stage.lebail_tol)
     assert action.api_call() == (
         "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], "
         "max_iter=100), phase_support_sigma=None)")

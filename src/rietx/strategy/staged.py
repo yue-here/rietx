@@ -204,6 +204,19 @@ class Stage:
     #: the fields, so a stage built positionally reads as it always did.
     turn_off: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # Refused where the stage is built, so before any compile, history
+        # write or run directory, and on either driver alike (WP-1947).  Both
+        # cap evaluations at max_iter x NFEV_PER_ITERATION, so a budget under
+        # one iteration reached them as max_nfev <= 0 and was refused mid-fit
+        # in scipy's words, naming neither max_iter nor what the caller wanted.
+        if self.max_iter < 1:
+            raise ValueError(
+                f"Stage {self.name!r}: max_iter={self.max_iter} leaves the "
+                "solver no evaluation to make; a stage takes at least one "
+                "iteration. To read the model at its current values without "
+                "fitting it, call ref.evaluate(data).")
+
     def __getattr__(self, name: str):
         if name in _PYDANTIC_SURFACE:
             raise _ask_the_mirror(name, "Stage",

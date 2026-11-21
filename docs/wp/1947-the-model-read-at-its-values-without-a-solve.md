@@ -1,9 +1,8 @@
 # WP-1947 — the model read at its values, without a solve
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-17 — PR #1640; `Refinement.evaluate`, `reflection_table(data)` and `background` read the model at its values without a fit or a write, and a stage refuses `max_iter < 1`; two follow-ups in issue #1652
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-10-11 — an application reads statistics, ticks and the background before a fit through an undocumented empty stage or by mutating its own refinement; each has a workaround
 
 ## Goal
 
@@ -90,26 +89,20 @@ differ.
 is in question. A verb that reports must not write: no history node and no
 run directory unless asked, because an evaluation is not a fit.
 
-### Inherited
-
-- **2026-11-06, from the issue triage (issue #1381): the `api.md` row "a
-  reflection table without a fit" is now this WP's alone.** WP-1532 dropped
-  it, so the skill task here writes the row new for the documented call
-  rather than changing an existing one. Nothing under `docs/skill/rietx/`
-  teaches the `run_stage` spelling today (checked at `a84379aac`).
-
-- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: two `lebail_cycles` slips.** A node's `api_call` drops `lebail_cycles` (`schemas/history.py:126-135`), so a stage run with a non-default value renders a call that runs a different stage; this WP's replay already reads `lebail_cycles or 3`. And `rietx.help`'s `lebail_cycles` text, shown on `docs/docs/reference/settings.md`, says Pawley mode ignores it, where `refine.py:3916-3920` uses it to seed the Pawley intensities.
-
-- **2026-10-11, from WP-1938 (PR #883): LM refuses `max_iter=0` now, in
-  scipy's words.** `lm.minimize` raises "`max_nfev` must be None or positive
-  integer." for a budget under one evaluation, on the single and the joint
-  fit (`tests/test_lm_solver.py`, both drivers). So the refusal this WP
-  rewords is the same on either driver. Two findings from that change's
-  review are this WP's. `Refinement.cherry_pick` rebuilds a stage with
-  `max_iter=node.action.max_iter or 100` (`refine.py`, the `Stage(...)` call),
-  so a node recorded with `max_iter=0` replays as 100 iterations, silently;
-  `lebail_cycles or 3` has the same shape. And `Stage.max_iter` has no
-  `ge=1`, so a plan with 0 is stored and fails only mid-fit, after compile.
+**Superseded in part, 2026-11-17 (checked at `6f704aaa5`).** The four call
+sites above moved; what changed: `predict` is now `predict(two_theta=None)`, a
+grid or a `PatternData` (`refine.py:6749`), and still refuses Le Bail and
+Pawley before a fit (`:6823`). `reflection_table()` is at `:7233` and reads the
+answer frozen with the result (WP-1421, ✅). The empty stage now runs the
+plan's appended closing stage too: on the synthetic LaB6 it returns
+`converged`, stages `evaluate` and `closing` at 0 iterations, nothing moved,
+no esds, and three history nodes. Under Pawley each of the two stages ran 2
+iterations on the intensity block (19 intensities), not 10. LM is the default
+driver (WP-1938 landed): a freeing stage with `max_iter=0` raises scipy's
+`max_nfev` wording on both drivers, and an empty one with `max_iter=0` is
+still accepted. `cherry_pick` now passes `max_iter` and `lebail_cycles`
+through unchanged, an explicit 0 included (`refine.py:4895`). The
+displacement tick defect is fixed (WP-1908, ✅).
 
 ## Non-goals
 
@@ -120,29 +113,88 @@ run directory unless asked, because an evaluation is not a fit.
 
 ## Tasks
 
-- [ ] Decide the spelling, and record it here as `Decided YYYY-MM-DD:`. One
+- [x] Decide the spelling, and record it here as `Decided YYYY-MM-DD:`. One
       option is a named verb, `Refinement.evaluate(data, mode=...)`,
       returning a `RefinementResult` with no esds, no history node and no
       run directory, and keeping the Le Bail and Pawley extraction. The
       other documents the empty stage as the spelling, with a test pinning
       what its result holds. Read the four call sites above before choosing.
-- [ ] `max_iter=0`: a refusal rietx owns, naming `max_iter` and the
+      **Decided 2026-11-17: the named verb.** The empty stage writes three
+      history nodes and a run directory unless told not to, which the rule
+      above refuses for a verb that reports, and the acceptance asks for none.
+      `Refinement.evaluate(data, *, mode="rietveld", two_theta_limits=None)`
+      runs exactly the empty stage, on the private history-free working tree
+      `Refinement._trial(record=False)` already builds for the package's own
+      discarded fits, with `telemetry=False`. So it returns the object the
+      empty-stage fit returns, by construction rather than by a second
+      implementation, keeps the Le Bail and Pawley extraction, and leaves the
+      caller's values, history, `result_` and compiled model untouched.
+      `reflection_table(data)` takes the same route, so its rows are the
+      empty-stage fit's in every mode. `background(two_theta)` is
+      `predict`'s twin over `CompiledModel.background`: one compile, no fit,
+      no extraction, so it serves Le Bail and Pawley before a fit too.
+- [x] `max_iter=0`: a refusal rietx owns, naming `max_iter` and the
       evaluation spelling, on both drivers (`ge=1` on the field, or a check
       in the runner). Coordinate with WP-1938 if its LM default has landed.
-- [ ] Reflections before a fit: `Refinement.reflection_table(data)` (or the
+      (It has. `Stage.max_iter` still has no lower bound, so a plan holding
+      0 is built and fails only mid-fit, after compile.) **Landed
+      2026-11-17:** `Stage.__post_init__` refuses `max_iter < 1` where the
+      stage is built, naming `max_iter` and `ref.evaluate(data)`, so a stored
+      `StageSpec` holding 0 is refused when `fit` or `refine_multi` converts
+      it, before any compile or history write, on either driver. The empty
+      stage with 0 is refused too, since it has the verb now. `rietx.help`'s
+      `max_iter` entry says so. `StageSpec.max_iter` carries `ge=1` too (the
+      review's finding 1): without it the GUI stored a plan holding 0 and
+      then answered 500 on every read of it, and the mirror accepted what
+      the dataclass refuses. Now the plan route answers 4xx at
+      `plan.stages.0.max_iter` (probed on the `fap` example).
+- [x] Reflections before a fit: `Refinement.reflection_table(data)` (or the
       verb's result) built on `phase_peaks`, the same rows as after a fit.
       Test: the rows before a fit equal the rows of an empty-stage fit.
-- [ ] Background without mutation: an accessor over
+      **Landed 2026-11-17:** `reflection_table(data, *, mode=None,
+      two_theta_limits=None)`; with no pattern it is the last fit's rows as
+      before, and the refusal now names the pattern form. Rows equal the
+      empty-stage fit's in all three modes
+      (`test_reflections_before_a_fit_are_the_empty_stage_rows`).
+- [x] Background without mutation: an accessor over
       `CompiledModel.background` (`predict(data, component="background")`
       or `Refinement.background(data)`). Test: it equals the scale-zero
       `predict`, and the history and values are unchanged.
-- [ ] Manual (`using/refining.md` or `using/exports.md`) and the generated
+      **Landed 2026-11-17:** `Refinement.background(two_theta=None)`, with
+      `predict`'s two forms; bit-equal to the scale-zero `predict`, the
+      phase-free twin's `predict` and, after a fit in each mode,
+      `result.y_background` (`test_background_without_mutation`). The
+      no-phase refusal now names it.
+- [x] Manual (`using/refining.md` or `using/exports.md`) and the generated
       skill API index: the three calls, with the phase-free `predict` named
-      as the workaround it replaces.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
-      pattern.
-- [ ] Skill: WP-1532's `api.md` row (a reflection table without a fit)
-      changes to the new call. Nothing else expected.
+      as the workaround it replaces. **Landed 2026-11-17:** the manual tree
+      moved (WP-1986), so `docs/docs/reference/exports.md` § Evaluating the
+      model gains "The result at the current values" and "The background
+      alone", and § The reflection list the pattern form;
+      `reference/history.md` says the stage line now carries the two
+      partition settings. `make_api_index.py` lists the three methods.
+- [x] Tests + obs/calc/diff PNGs to `tests/output/` for the evaluated
+      pattern. **Landed 2026-11-17:** five tests (nine cases) in
+      `tests/test_refine_synthetic.py` § the model read at its values;
+      `tests/output/evaluate_before_any_fit.png` (looked at: the perturbed
+      start, peaks offset in the difference curve, as expected).
+- [x] Skill: the `api.md` row "a reflection table without a fit", written
+      new for the documented call (WP-1532 dropped it, issue #1381; nothing
+      under `docs/skill/rietx/` teaches the `run_stage` spelling). Nothing
+      else expected. **Landed 2026-11-17:** generated rows for
+      `Refinement.evaluate`, `.reflection_table` (its first docstring line
+      now says "after a fit or from a pattern") and `.background`, and one
+      sentence in the Refinement section's prose; `api.md` 35 780 → 36 558 B
+      of the 39 000 B ceiling; both committed copies re-synced.
+- [x] `NodeAction.api_call` renders `lebail_cycles` and `lebail_tol` when
+      they differ from the `Stage` default (from WP-1986): today a stage run
+      with a non-default value renders a call that runs a different stage
+      (`schemas/history.py`, the `extras` tuple). **Landed 2026-11-17:**
+      compared with `StageSpec`'s field defaults, never `NodeAction`'s 3 and
+      0.0 (an old node's, which now render, since they are what it ran).
+      `report.apply.api_call` passes the stage's two values, so an Apply
+      tooltip and the node's line still agree
+      (`test_a_stage_call_carries_its_partition_settings`).
 
 ## Acceptance
 
@@ -162,6 +214,83 @@ fit reports.
 - Issues #890, #891, #894.
 
 ## Handover log
+
+- **2026-11-17** — closed (ghostshift runner, PR #1640). An application
+  can now ask rietx three things before any fit, each in one documented call
+  that changes nothing: what a fit would report at the values as they stand
+  (`Refinement.evaluate`), which reflections the model draws
+  (`reflection_table(data)`), and the background alone (`background`). The
+  undocumented empty stage still works, but it writes history and a run
+  directory; the new verb runs that same stage on a private copy, so its
+  answer is the empty stage's by construction rather than by a second
+  implementation, Le Bail and Pawley extraction included. A stage asked for
+  zero iterations is refused where it is built, naming the verb, instead of
+  failing mid-fit in scipy's words. Nothing in a fit's numbers moved.
+
+  *Done.* All seven tasks plus the inherited `api_call` slip (see each
+  task's *Landed* note). On arrival the `### Inherited` entries were pruned:
+  #1381's skill row and the `max_iter` lower bound folded into Tasks; of
+  WP-1986's two `lebail_cycles` slips the help text and `cherry_pick` had
+  already been fixed on `main`, and `api_call`'s became a task; WP-1938's
+  `max_iter or 100` replay was already fixed. Context's stale call sites are
+  superseded in part, dated, in place. Review (a read-only subagent in this
+  worktree; `/code-review` is not run by runners) found one bug and three
+  smaller points, all taken: (1) a GUI plan holding `max_iter` 0 was stored
+  and then every plan read answered 500, so `StageSpec.max_iter` gained
+  `ge=1` and the plan route now answers 4xx at `plan.stages.0.max_iter`
+  (probed on the `fap` example); (2) a node recorded before this change from
+  an empty stage with `max_iter=0` now renders a line that raises, and
+  `cherry_pick` of it raises, which is the intended refusal; (3) `evaluate`
+  and `reflection_table(data)` now default to the refinement's own mode, so
+  a Le Bail refinement is read in Le Bail and, on an unrestricted fit, the
+  two `reflection_table` forms agree (corrected 2026-11-17, PR #1640's
+  second review: after `fit(..., two_theta_limits=(9, 21))` they listed 12
+  and 19 rows, because only the mode was inherited; `evaluate` and
+  `reflection_table(data)` now also default to the last fit's
+  `two_theta_limits`, as `run_stage` and `suggest` do, and both list 12;
+  `background(data)` equals `y_background` only on the fitted grid, which
+  `exports.md` now says; phase-free refusals name the verb called); (4) one test comment overclaimed what an assertion could see,
+  reworded. Follow-ups filed as issue #1652: the Plan panel's iteration
+  field has no `min` (needs a dist rebuild), and
+  `docs/docs/reference/exports.md` says `predict()` and `predict(grid)`
+  differ on 36 of 4200 channels where `predict`'s docstring (WP-1421) says
+  they agree bit for bit.
+
+  *Measured* (macOS arm64, `[dev]`, this worktree's venv, unless marked).
+  On the synthetic LaB6 with a non-zero background: `evaluate` equals the
+  empty-stage fit on statistics, `y_calc`, `y_background`, ticks and codes
+  in all three modes (Pawley: 19 intensities free, 2 iterations each in the
+  evaluate and closing stages); 18-45 ms an evaluation against 18-31 ms for
+  the empty-stage fit. `background` is bit-equal to the scale-zero
+  `predict`, the phase-free twin's `predict` and, after a fit in each mode,
+  `y_background`. With recording forced on and an empty working directory,
+  `evaluate` wrote no `.rietx` (the positive arm, a plain fit there, did).
+  Tests added: nine cases in `tests/test_refine_synthetic.py`, one in
+  `tests/test_history.py`; `tests/test_lm_solver.py`'s two `max_iter=0`
+  tests rewritten (the single-fit one now parametrised over 0 and -4), and
+  two expectations each in `test_report_apply.py` and
+  `test_history.py` updated for the partition settings. Workstation runs
+  (Linux, the shared py3.12 venv + PYTHONPATH to the tree): canary
+  `wp1947c` on `e01bf80df`, 213 passed in 40 s; fast `wp1947f` on the
+  main-merged `7b458d0da`, 14871 passed, 280 skipped, 32 xfailed, 0 failed in 698 s on 8 cores beside another job (one memory pause), 6.6 GB peak; the added cases cost 1.45 s in that run. `python -m tests.reader_output`:
+  exit 0, unchanged against the merge-base. Vale (the CI step): 0 errors.
+  Manual `sphinx -W`: exit 0. Full suite not run: nothing here moves a
+  fitted number.
+
+  *Generality.* No row in `rietx._audit` changed and no threshold, default
+  action or diagnostic was added, so the judge was not dispatched. The
+  `max_iter >= 1` refusal is arithmetic (a budget under one evaluation runs
+  nothing), and `mode=None` reading the refinement's own mode decides
+  nothing for the user. Two module-level copies of `StageSpec`'s partition
+  defaults tripped `test_audit_table` and were inlined instead.
+
+  *Gotchas.* `evaluate` is a whole fit's machinery on a copy, so it is not a
+  per-evaluation objective (WP-1948 inherits that). A stage mutated past its
+  constructor (`plan.stages[0].max_iter = 0`) still reaches the driver's own
+  `max_nfev` refusal; `test_lm_solver.py` keeps that backstop.
+
+  *Next:* none here. WP-1948 (its Priority back to P3) builds the outside
+  optimiser's objective; issue #1652 holds the two follow-ups.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issues #890,
   #891, #894). Checked against the tree at `d80ca5f4`: `max_iter=0` raises
