@@ -46,8 +46,9 @@
     corpus = null,
     phaseNames = [],
     say = (_line: string) => {},
-    onrun = (_stage: any) => {},
+    onrun = (_stage: any, _echo: string) => {},
     onpending = (_edited: boolean) => {},
+    onsaved = () => {},
   }: {
     mode?: string;
     head?: string | null;
@@ -57,9 +58,12 @@
     corpus?: HelpCorpus | null;
     phaseNames?: readonly string[];
     say?: (line: string) => void;
-    onrun?: (stage: any) => void;
+    /** run `stage`; `echo` is its Python, for the shell to print once the run starts */
+    onrun?: (stage: any, echo: string) => void;
     /** whether the plan on screen differs from the one the project holds */
     onpending?: (edited: boolean) => void;
+    /** the project now holds another plan (Apply, or a preset picked) */
+    onsaved?: () => void;
   } = $props();
 
   /** Every `StageSpec` field a stage's settings hold: all but its globs. */
@@ -241,6 +245,7 @@
     preset = payload.preset;
     error = "";
     clampSelected();
+    onsaved();
     try {
       resolved = await api.planResolve();
       resolvedFor = structuredClone(payload.plan.stages);
@@ -282,6 +287,22 @@
     clampSelected();
   }
 
+  /** Another project is opening: drop the edit and the undo stack, which
+   *  hold this project's plan and would put it on the next one's screen. */
+  export function leave() {
+    stages = $state.snapshot(saved) as Stage[];
+    guard = savedGuard;
+    error = "";
+    history.clear();
+    typing = "";
+    undoTick += 1;
+    open = new Set();
+    selected = 0;
+    picker = null;
+    settings = null;
+    menu = null;
+  }
+
   /** The action bar's Revert: the plan the project holds, back on screen. */
   export function revert() {
     if (!edited) return;
@@ -308,7 +329,8 @@
     remember();
     stages = stages.filter((_, i) => i !== index);
     open = new Set([...open].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)));
-    selected = Math.min(selected, stages.length - 1);
+    // the selected stage keeps its selection when one above it goes
+    selected = Math.min(selected > index ? selected - 1 : selected, stages.length - 1);
   }
 
   async function addStage() {
@@ -410,8 +432,9 @@
     if (!stage || busy || noPhasesReason) return;
     selected = index;
     const off = stage.turn_off?.length ? `, turn_off=${JSON.stringify(stage.turn_off)}` : "";
-    say(`ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
-    onrun($state.snapshot(stage));
+    // the shell prints it once the run starts: it can still refuse
+    onrun($state.snapshot(stage),
+          `ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
   }
 
   /** The stage `.` would run, for the palette's label: "" when there is none. */
@@ -488,7 +511,8 @@
   }
 
   /** The stage's settings, or the plan's (`index` null), in a small form. */
-  let settings = $state<{ index: number | null; at: MenuAt; values: Record<string, string>;
+  let settings = $state<{ index: number | null; at: MenuAt;
+                          values: Record<string, string | number | null>;
                           error: string } | null>(null);
   let settingsEl: HTMLFormElement | undefined = $state();
 
@@ -500,13 +524,20 @@
     void tick().then(() => settingsEl?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true }));
   }
 
+  /** A box's text: `bind:value` on a number input holds a number once typed
+   *  into, and `null` once emptied, where the form opened on strings. */
+  function boxText(value: string | number | null | undefined): string {
+    return value == null ? "" : String(value).trim();
+  }
+
   function submitSettings(event: SubmitEvent) {
     event.preventDefault();
     const s = settings;
     if (!s) return;
     if (s.index === null) {
-      const value = Number(s.values.correlation_guard);
-      if (s.values.correlation_guard === "" || !Number.isFinite(value) || value < 0 || value > 1) {
+      const raw = boxText(s.values.correlation_guard);
+      const value = Number(raw);
+      if (raw === "" || !Number.isFinite(value) || value < 0 || value > 1) {
         s.error = "The correlation guard is a number from 0 to 1.";
         return;
       }
@@ -519,7 +550,7 @@
     }
     const next: Record<string, unknown> = {};
     for (const key of FIELDS) {
-      const raw = s.values[key].trim();
+      const raw = boxText(s.values[key]);
       if (raw === "") {
         if (!STAGE_NULLABLE_WORDS.includes(key)) {
           s.error = `${titleOf(key)} needs a value.`;
@@ -571,11 +602,20 @@
     pickerEl?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
   }
 
+  /** Every option for the picker's stage and side, before the search: kept
+   *  apart so a keystroke filters them rather than matching every glob again. */
+  const unfiltered = $derived.by(() => {
+    const index = picker?.index;
+    const side = picker?.side;
+    if (index === undefined || !side) return null;
+    const pool = side === "fix" ? freeBy(stages, index) : null;
+    return pickOptions(rows, corpus, phaseNames, pool);
+  });
+
   const options = $derived.by(() => {
     const p = picker;
-    if (!p) return { typed: [] as PickOption[], groups: [] as PickOption[], parameters: [] as PickOption[] };
-    const pool = p.side === "fix" ? freeBy(stages, p.index) : null;
-    const all = pickOptions(rows, corpus, phaseNames, pool);
+    const all = unfiltered;
+    if (!p || !all) return { typed: [] as PickOption[], groups: [] as PickOption[], parameters: [] as PickOption[] };
     const groups = all.groups.filter((o) => matchesQuery(o, p.query));
     const parameters = all.parameters.filter((o) => matchesQuery(o, p.query));
     // a typed dot-path glob is offered as itself, so a glob no group names can
@@ -829,7 +869,7 @@
       {#each options.typed as option (option.glob)}
         {@const n = noteFor(option)}
         <p class="og">Glob</p>
-        <button class="op" title={option.glob} onclick={() => choose(option)}>
+        <button class="op" disabled={n.here} title={option.glob} onclick={() => choose(option)}>
           <span class="mono">{option.glob}</span><span class="w">{n.note}</span>
         </button>
       {/each}

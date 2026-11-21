@@ -289,7 +289,7 @@
     carried = NO_CARRY;
     paramsPanel?.revert();
     interactivePanel?.revert();
-    planPanel?.revert();
+    planPanel?.leave();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -440,25 +440,38 @@
     planPanel?.revert();
   }
 
+  /** The Plan tab stored a plan: the document is read again, so the action
+   *  bar's stage count names the plan the project now holds. */
+  async function planSaved() {
+    try {
+      project = await api.project();
+    } catch {
+      // the bar's count catches up on the next read
+    }
+  }
+
   /** The Plan tab's Run this stage and the `.` key: the stage as it stands on
    *  screen, from where the model stands. The Parameters and slider edits
    *  waiting in the bar are applied first, as Refine applies them; the plan's
    *  own edit is not, since the stage runs as drawn either way. */
-  async function runStage(stage: any) {
+  async function runStage(stage: any, echo: string) {
     if (refining || busy || noPhases || pendingInvalid || !project) return;
     refining = true;
     try {
       if (pendingTouched + sliderTouched) {
         if (!(await paramsPanel?.apply())) {
           modelTab = "params";
+          showModel = true;
           return;
         }
         if (!(await interactivePanel?.apply())) {
           modelTab = "interactive";
+          showModel = true;
           return;
         }
       }
       run = await api.run({ kind: "stage", stage });
+      say(echo);
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
     } finally {
@@ -590,7 +603,7 @@
       disabled: !touched, run: revertPending },
     { id: "stage", label: planStageName ? `Run the stage “${planStageName}”` : "Run this stage",
       echo: "ref.run_stage(Stage(…))", key: ".",
-      disabled: !project || busy || noPhases || !planStageName,
+      disabled: !project || busy || noPhases || !!pendingInvalid || !planStageName,
       run: () => planPanel?.runStage() },
     { id: "plan-undo", label: "Undo the plan edit", echo: "",
       disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
@@ -839,7 +852,7 @@
         <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
           <Plan bind:this={planPanel} mode={project?.doc?.mode ?? "rietveld"} {head} {busy}
             noPhasesReason={blocked} {corpus} {phaseNames} {say} onrun={runStage}
-            onpending={(edited) => (planEdited = edited)} />
+            onpending={(edited) => (planEdited = edited)} onsaved={planSaved} />
         </div>
         {#if !unbuilt}
           {#if modelTab === "text"}

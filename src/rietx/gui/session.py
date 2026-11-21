@@ -1404,11 +1404,14 @@ class GuiSession:
                      if row.vary and row.refinable and row.path not in reached]
         # what a person could free and no stage does (WP-2231, the Plan tab's
         # "Never freed" row): the refinable rows outside every stage's frees.
-        # A stage's ``held`` paths are not refinable or not freeable here, so
-        # they are absent from both sides; the closing stage frees only what
-        # the stages above it named
+        # A stage's ``held`` paths are absent from both sides: most are not
+        # refinable, and the rest (a column the mode fixes through a tie) a
+        # stage matched and could not free, which no plan edit changes. The
+        # closing stage frees only what the stages above it named
+        held = {row["path"] for entry in stages for row in entry["held"]}
         never_freed = [row.path for row in rows.values()
-                       if row.refinable and row.path not in reached]
+                       if row.refinable and row.path not in reached
+                       and row.path not in held]
         return {"mode": mode, "n_parameters": len(rows),
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
                 "set_aside": set_aside, "never_freed": never_freed,

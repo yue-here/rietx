@@ -120,4 +120,54 @@ describe("the Plan tab", () => {
     await settle();
     expect(document.querySelectorAll('.stg[data-stage="1"] .stg2')[0].querySelectorAll(".pt")).toHaveLength(1);
   });
+
+  it("takes a typed stage setting, which a number box holds as a number", async () => {
+    app = mount(Plan, { target: document.body, props: {} });
+    await settle();
+    document.querySelector('.stg[data-stage="1"]')!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 10, clientY: 10 }));
+    await settle();
+    const item = [...document.querySelectorAll('[role="menuitem"]')]
+      .find((b) => text(b) === "Stage settings…") as HTMLButtonElement;
+    item.click();
+    await settle();
+    // the fixture's stages carry max_iter alone; the server's carry every field
+    const boxes = [...document.querySelectorAll<HTMLInputElement>("form.settings input")];
+    for (const box of boxes) {
+      const typed = box.id === "stage-max_iter" ? "7" : !box.value && !box.placeholder ? "1" : null;
+      if (typed === null) continue;
+      box.value = typed;
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await settle();
+    (document.querySelector("form.settings") as HTMLFormElement).requestSubmit();
+    await settle();
+    expect(document.querySelector("form.settings")).toBeNull();
+    expect(await app.save()).toBe(true);
+    expect(putPlan.mock.calls[0][0].plan.stages[1].max_iter).toBe(7);
+  });
+
+  it("keeps the selected stage when a stage above it is deleted", async () => {
+    const run = vi.fn();
+    app = mount(Plan, { target: document.body, props: { onrun: run } });
+    await settle();
+    (document.querySelector('.stg[data-stage="1"] input.sn') as HTMLInputElement)
+      .dispatchEvent(new FocusEvent("focus"));
+    await settle();
+    (document.querySelector('[aria-label="Delete stage 1"]') as HTMLButtonElement).click();
+    await settle();
+    expect(app.selectedName()).toBe("cell");
+  });
+
+  it("forgets the undo stack when another project opens", async () => {
+    app = mount(Plan, { target: document.body, props: {} });
+    await settle();
+    (document.querySelectorAll(".pt .x")[0] as HTMLButtonElement).click();
+    await settle();
+    expect(app.canUndo()).toBe(true);
+    app.leave();
+    await settle();
+    expect(app.canUndo()).toBe(false);
+    expect(app.draft()).toBeNull();
+  });
 });
