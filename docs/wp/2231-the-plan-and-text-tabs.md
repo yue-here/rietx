@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — filed; the Plan tab is the first PR
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Plan tab in review (#PRNUM); the Text tab is next
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -111,6 +111,7 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   Apply is refused until Revert. Fix: run `dropPending` against the current rows at the end of
   `restoreDraft`. Put it in `Params.svelte`, never in `Frame.svelte`'s `restoreKept` block,
   which this WP edits.
+  Fixed in the first PR (#PRNUM).
 - **A glob hold matching nothing refuses the band (same review, finding 2, low).**
   `src/rietx/gui/background.py` (about :214-219) answers `GET /api/background` with 400 "no
   parameter to hold" for a pending glob matching no row, while `Refinement.hold` takes the same
@@ -118,11 +119,12 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   accepts. Today's `/next` makes such a glob only through a restored draft. Fix: skip globs
   that match nothing and refuse only literal paths, as `Refinement.hold` does. Probe:
   `phases.0.atoms.*.adp.*` on `fap`.
+  Fixed in the first PR (#PRNUM).
 
 ## Tasks
 
 - [x] File the WP; the milestone's R4 row names it.
-- [ ] The Plan tab at `/next` (rows 104-117), from `panels/Plan.svelte`, and `never_freed` on
+- [x] The Plan tab at `/next` (rows 104-117), from `panels/Plan.svelte`, and `never_freed` on
   `GET /api/plan/resolve`. The plan menu (presets, Revert, Plan settings… with the correlation
   guard); `+ Stage`; each stage's grip, badge, name, ⋯ menu and context menu (Run this stage,
   Stage settings…, Delete), delete icon; the Free and Fix rows of named chips; `+ Add` with the
@@ -212,9 +214,40 @@ The Plan tab (the first PR), most consequential first:
    (`tests/test_gui_palette.py`, WP-2200).
 8. **"Rwp" is set in sans and its number in mono**, as the Pattern graph's title line sets it.
 9. **The picker is 320 px wide and scrolls past 380 px**; its search box is 30 px high.
+10. **A typed dot-path glob is offered as itself** at the top of the picker, when no group
+    or parameter carries that glob, and Enter takes it. Grounds: today's panel took a typed
+    glob (WP-2208), and a picker of named options alone would lose it. The alternative is
+    the prototype's picker, which offers named options only.
 
 ## Handover log
 
+- **2026-11-21** — the Plan tab at `/next`, the first of R4's two PRs (#PRNUM). The rebuilt page
+  now shows the plan as the prototype draws it: one block per stage with its Free and Fix rows
+  of named chips, a grouped picker behind `+ Add`, the closing stage, and the parameters no
+  stage frees. Editing the plan counts as one pending edit in the action bar, survives a crash
+  in the recovery copy, and is stored by Apply, as every other edit on the page is. The server
+  gained one field for this, `never_freed`, so the page does not guess which parameters a plan
+  leaves fixed. The two low findings inherited from the review of #1683 are fixed too: a
+  restored draft no longer brings back an edit on a path the project has lost, and the
+  background band no longer refuses a glob hold that Apply accepts. The Text tab is still "not
+  built yet" on `/next`.
+  - *Done*: `GET /api/plan/resolve` returns `never_freed`. `gui/src/next/Plan.svelte` carries
+    today's panel's logic (load, preset pick, drag and arrow reorder, undo and redo, run one
+    stage, the draft for recovery) under the new markup. `gui/src/next/plan.ts` names chips
+    and builds the picker. The iteration field has `min="1"` on both pages (#1652 item 1).
+    § Settled by Claude lists ten values. `restoreDraft` in `gui/src/next/Params.svelte` ends
+    with the reload's drop of pending edits on unknown paths, skipped while no rows are
+    loaded. `GET /api/background` refuses only a literal path the table lacks
+    (`params.vector.is_literal_path`), as `Refinement.hold` does. Each fix's new case was
+    run red without the fix first. main (with #1741) is merged in and the dist rebuilt.
+  - *Measured* (`[dev]` venv, darwin/arm64, on the merged tree): MEASURED
+  - *Gotchas*: on this case-insensitive disk `plan.test.ts` and `Plan.test.ts` are one file,
+    so the logic cases are `planwords.test.ts`. A Svelte element drops a trailing space, so
+    the Rwp label is spelled `{"Rwp "}` to keep the words apart in `textContent`. The picker
+    stays open after a choice, so a test clicking `+ Add` again shuts it.
+  - *Next*: the Text tab at `/next`, the second PR (drafts in the runner's scratch), then the
+    screenshots and the feature inventory, which wait on the maintainer's look. WP-2227's
+    three questions stay open.
 - **2026-11-21** — filed by a ghostshift runner, on the milestone's R4 row and WP-2214's
   inventory rows 104-117 and 139-146. No open WP owned R4: the milestone's row read "—", and
   WP-2227 names R4 as where its feedback lands without filing it. Issue #1652's first item is
