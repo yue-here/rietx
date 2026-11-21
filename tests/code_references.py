@@ -136,6 +136,12 @@ class Block:
 
 
 def blocks(path: Path) -> Iterator[Block]:
+    """Every comment block and string statement in one file of this tree."""
+    yield from source_blocks(path.relative_to(ROOT).as_posix(),
+                             path.read_text(encoding="utf-8"), _tree(path))
+
+
+def source_blocks(rel: str, source: str, tree: ast.Module | None = None) -> Iterator[Block]:
     """Every comment block and string statement in one source file.
 
     Consecutive ``#`` lines join into one block with the markers stripped, so
@@ -143,8 +149,6 @@ def blocks(path: Path) -> Iterator[Block]:
     expression statement that is a string literal: docstrings and attribute
     docstrings alike.
     """
-    rel = path.relative_to(ROOT).as_posix()
-    source = path.read_text(encoding="utf-8")
     run: list[str] = []
     start = prev = 0
     for tok in tokenize.generate_tokens(io.StringIO(source).readline):
@@ -161,7 +165,7 @@ def blocks(path: Path) -> Iterator[Block]:
         prev = row
     if run:
         yield Block(rel, start, "\n".join(run))
-    for node in ast.walk(_tree(path)):
+    for node in ast.walk(tree if tree is not None else ast.parse(source)):
         if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
                 and isinstance(node.value.value, str)):
             yield Block(rel, node.lineno, node.value.value)

@@ -200,7 +200,7 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
       Resolve `module.attr` forms with the resolver. Measure the real misses first. Fix a
       pointer here. Where the clause around it is one WP-2009 rewrites, add the miss to 2009's
       Inherited entry.
-- [ ] **Narration counted.** A stdlib script that runs on any revision (`git show <rev>:<path>`)
+- [x] **Narration counted.** A stdlib script that runs on any revision (`git show <rev>:<path>`)
       and counts, per top-level package, the blocks matching `until WP-\d{4}`,
       `since WP-\d{4}`, `before WP-\d{4}` and `(was|were) .{0,60} until`. On 2026-11-21, 56
       blocks matched the "until" pattern. Record today's counts in the handover. No CI step:
