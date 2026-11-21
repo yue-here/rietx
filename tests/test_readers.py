@@ -2783,7 +2783,9 @@ def test_the_real_v4_fixture_withholds_sigma_because_no_scale_verifies():
     d = rx.read_pattern(RAW4, diagnostics=diagnostics)
 
     assert d.sigma is None
-    assert [x.code for x in diagnostics] == ["PATTERN_INTENSITY_SCALED"]
+    # a third of its scrambled values are negative, which no count is (WP-1952)
+    assert [x.code for x in diagnostics] == ["PATTERN_INTENSITY_SCALED",
+                                             "PATTERN_INTENSITY_NOT_COUNTS"]
 
 
 def test_the_range_count_is_walked_not_counted_from_the_drive_names():
@@ -3097,7 +3099,9 @@ def test_v2_counts_are_the_files_with_none_raised_to_one(tmp_path):
     scaled = write_raw2(tmp_path / "scaled.raw", [0.25, -2.0, 4.5, 9.0] * 20)
     d = rx.read_pattern(scaled, diagnostics=notes)
     assert d.intensity[:4] == [0.25, -2.0, 4.5, 9.0]
-    assert [n.code for n in notes] == ["PATTERN_INTENSITY_SCALED"]
+    # 0.25 and -2.0 are no count, and the Poisson floor holds them (WP-1952)
+    assert [n.code for n in notes] == ["PATTERN_INTENSITY_SCALED",
+                                       "PATTERN_INTENSITY_NOT_COUNTS"]
 
 
 def _set_header_length(p, value):
@@ -3430,6 +3434,17 @@ def test_an_xydata_heading_carries_its_temperature(tmp_path):
     assert "temperature_k" not in silent.metadata
     plain = write_xy(tmp_path / "plain.xy", [10.0, 10.1, 10.2], [1.0, 2.0, 3.0])
     assert "temperature_k" not in rx.read_pattern(plain).metadata
+
+
+def test_a_d1b_temp_line_of_three_values_reads_its_first():
+    """ILL's D1B writes three values on ``TEMP``; the manual names one,
+    ``tsamp``, and the reader keeps that one and surfaces no other (WP-1952).
+    The third is a round value on every tracked file, and the empty
+    cryostat's first value, 330 K at a 120 K set point, is still what is read:
+    there was no sample to measure, and the reader does not choose."""
+    d1b = DATA / "d1b_co3o4_quench"
+    assert rx.read_pattern(d1b / "873q-300K.dat").metadata["temperature_k"] == "298.377"
+    assert rx.read_pattern(d1b / "vanadium_can_120K.dat").metadata["temperature_k"] == "330.0"
 
 
 def test_an_xydata_heading_line_is_never_read_as_a_point(tmp_path):
