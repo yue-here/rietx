@@ -36,21 +36,36 @@ future session toward reproducing the mechanism that found it. The pass: for eve
 carrying a number, is the number the *rule* (a cap, a floor, a cited band) or the
 *evidence*? Evidence compresses to a pointer at the WP or record that holds it.
 
-**The caps.** Every always-loaded rulebook is capped (`tests/test_docs_consistency.py`,
-diary in `docs/milestones/process.md`). Moving findings out lowers the landed count; the
-cap then lands at the new count plus the headroom the diary records, in a commit that says
-so. Never delete a fact to fit a cap: it moves to the WP or record.
+**The evidence is paid for on every request** (maintainer, 2026-10-30, via the
+claude-config workflow harvest). On `origin/main` at d35ffeda7 root CLAUDE.md was
+86 001 B (12 700 words, about 21k tokens), loaded on every request of every session;
+`gui/` 77 677 B, `src/rietx/io/` 51 398 B, `src/rietx/indexing/` 26 202 B and `tests/`
+19 428 B load with their subtree, so an `io/` session carried about 34k, re-read by the
+cache on each request. The ruling: a rulebook carries the rule and a one-clause reason;
+incidents, shas and measurements go where a session reads them on demand. So the findings
+pass covers every clause that is evidence, numbered or not, and the handover reports each
+rulebook's bytes before and after beside the word counts. claude-config's
+`workflow/LESSONS.md` took the same split that day, with an `EVIDENCE.md` beside it.
+
+**The limits** (WP-2233, landed 2026-11-21). `tests/rulebook_limits.py` `LIMITS` holds a
+(budget, ceiling) in bytes for all eight always-loaded documents, every budget pinned at
+that day's bytes, so each rulebook is closed to growth; the line caps it replaced had
+taken 35 raises and 2 cuts on root in eleven weeks. The re-landing lowers each budget to
+the landed bytes and each ceiling by the same amount, in the same change as the cut: a
+lowering is not a raise and needs no change of its own. A re-pin adds a paragraph to
+`docs/milestones/process.md` § The caps diary. Never delete a fact to fit a limit: it
+moves to the WP or record. `test_rulebook_paths_and_names_resolve` checks every path,
+test and rietx `module.attr` name in the rulebooks, so a rewrite names live ones only.
+
+**Outside PRs write findings into the rulebooks** (from WP-2014's filing, 2026-10-20):
+four of twelve open outside PRs touching `_audit.py` edited a CLAUDE.md, some with
+one-dataset findings stated as rules (#941, #1048). An outside PR never reaches
+`/wp-handover` step 7, so the rule's wording goes into `/pr-review`'s list of what
+outsiders miss as well as into the handover's audit.
 
 **The register.** These files are agent-facing and may compress (the `yue-prose` skill
 says so); the rewritten rules keep that register. A rule's *reason* stays as one clause
 plus a pointer.
-
-### Inherited
-
-- **2026-11-21, from [2233](2233-comments-and-rulebooks-checked-against-the-tree.md)'s close: the byte limits landed, pinned at that day's bytes.** `SIZE_CAPS` is gone. `tests/rulebook_limits.py` `LIMITS` holds a (budget, ceiling) in bytes for all eight always-loaded documents, `AGENTS.md` and `src/rietx/gui/CLAUDE.md` among them. Every budget equals the file's size on 2026-11-21, so each rulebook is closed to growth. This WP's "caps re-landed" task is now: lower each budget to the landed bytes and each ceiling by the same amount, in the same change as the cut. Lowering a limit is not a raise, so it needs no change of its own. The diary is `docs/milestones/process.md` § The caps diary; a re-pin adds a paragraph there. `test_rulebook_paths_and_names_resolve` now checks every path, test and rietx `module.attr` name in all thirteen rulebooks, so a rewrite that names a file or function must name a live one.
-- **2026-11-21, from [2233](2233-comments-and-rulebooks-checked-against-the-tree.md)'s filing: the caps become byte limits held from main.** The line caps do not hold: the root CLAUDE.md's diary has 35 raises and 2 cuts between 2026-08-14 and 2026-10-31 (600 → 995 lines), each raise made by the session that needed the room, in the same change. 2233 replaces `SIZE_CAPS` with a byte budget and ceiling per rulebook, compared against the base's table, so a change cannot raise its own limit. The maintainer ruled on 2026-11-21 that no hook asks them before a raise. If 2233 lands first, this WP's "caps re-landed" task re-pins 2233's budgets at the landed bytes. That can be the same change, since only a raise needs a change of its own. If this WP lands first, 2233 pins at whatever `main` holds. 2233 also checks every rulebook's paths and dotted names against the tree, so the content pass will meet that check.
-- **2026-10-30, from the maintainer, via the claude-config workflow harvest: the evidence is paid for on every request.** Sizes on `origin/main` at d35ffeda7: root CLAUDE.md 86 001 B (12 700 words, about 21k tokens at 4 B a token), loaded on every request of every session. `gui/` 77 677 B, `src/rietx/io/` 51 398 B, `src/rietx/indexing/` 26 202 B and `tests/` 19 428 B load with their subtree, so an `io/` session carries about 34k. The cache re-reads all of it on each request: root alone is about 2.1M tokens per 100 requests. The maintainer's ruling: a rulebook carries the rule and a one-clause reason; incidents, shas and measurements go where a session reads them on demand. The findings pass therefore covers every clause that is evidence, numbered or not, and the handover reports each rulebook's bytes before and after beside the word counts. claude-config's `workflow/LESSONS.md` took the same split on 2026-10-30, with an `EVIDENCE.md` beside it.
-- **2026-10-20, from [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s filing: outside PRs write findings into the rulebooks.** Four of the twelve open outside PRs that touch `_audit.py` edit a CLAUDE.md (three `src/rietx/indexing/`, one `src/rietx/io/`), some with one-dataset findings stated as rules: #941 adds "magnetite's wrong P description bought a negative background and read 0 of 163 absent", #1048 a NAC line count. After this WP's findings pass, only `/wp-handover` step 7 audits a rulebook edit, and an outside PR never reaches it. 2014 adds the class to `/pr-review`'s list of what outsiders miss; this WP owns the rule's wording, so word it for `/pr-review` as well as for the handover.
 
 ## Non-goals
 
