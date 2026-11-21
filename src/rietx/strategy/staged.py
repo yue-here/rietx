@@ -2628,5 +2628,9 @@ def check_guards(table, outcome, threshold: float,
     if pressed and sd_internal is not None:
         report.at_bounds += tied_bound_findings(
             table, pressed,
-            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
+            # the result's own esds, a tie the data determine included
+            # (WP-2230), as the joint fit's per-histogram build reads them
+            table.stderr_physical(
+                outcome.theta, sd_internal, outcome.correlation,
+                discarded=getattr(outcome, "discarded_subspace", None)))
     return report

@@ -2469,14 +2469,19 @@ class MultiHistogramRefinement:
         # The slices are kept for the loop: with a correlation matrix each is
         # a dense copy, taken once per histogram.
         per_stderr, per_corr, per_esds = [], [], []
+        # a tie the data determine keeps its esd (WP-2230), per histogram's
+        # columns as the esds are
+        sub = outcome.discarded_subspace
         for h_table, h_theta, cm in zip(mt.tables, thetas,
                                         map(mt.col_map, range(n))):
             s_h = stderr[cm] if stderr is not None else None
             corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
             per_stderr.append(s_h)
             per_corr.append(corr_h)
-            per_esds.append(h_table.stderr_physical(h_theta, s_h, corr_h)
-                            if s_h is not None else {})
+            per_esds.append(h_table.stderr_physical(
+                h_theta, s_h, corr_h,
+                discarded=None if sub is None else sub.take(cm))
+                if s_h is not None else {})
         # one bound test, three consumers: the rows' at_bound flag, the
         # BOUND_HIT/FLOOR_HIT diagnostics (WP-1076, WP-1929) and the
         # declared-peak diagnostics (WP-2141)
@@ -2700,8 +2705,8 @@ class MultiHistogramRefinement:
         # is exactly 1.0.  With a correlation matrix this is a dense n x n, so
         # a second build here would double the cost for the same dict.
         esd_hist0 = per_esds[0] if per_esds else {}
-        parameters = self._parameters(thetas, stderr, corr, at_bounds, esd_hist0,
-                                      answer_runaway, outcome.esd_inflation)
+        parameters = self._parameters(at_bounds, per_esds, answer_runaway,
+                                      outcome.esd_inflation)
         diagnostics = list(opening_diags) + self._top_diagnostics(
             outcome, correlation_guard, top_bg, at_bounds, models)
         # what a parametric declaration did to each pattern's dependent that
@@ -2955,9 +2960,13 @@ class MultiHistogramRefinement:
                         vary=bool(e.vary), unit=table._units.get(path), reference=None))
         return rows
 
-    def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
-                    answer_runaway=(), esd_inflation=None) -> list[RefinedParameter]:
+    def _parameters(self, at_bounds, per_esds, answer_runaway=(),
+                    esd_inflation=None) -> list[RefinedParameter]:
+        """The result's rows; ``per_esds[h]`` is histogram ``h``'s
+        :meth:`~rietx.params.vector.ParameterTable.stderr_physical` map, built
+        once by the caller (a dense build per histogram with a correlation)."""
         mt = self.mtable
+        esd0 = per_esds[0] if per_esds else {}
         params: list[RefinedParameter] = []
         # The single-histogram rule (``refine._build_result``): a cell the
         # answer-producing stage's CELL_RUNAWAY names has its esd withheld,
@@ -2998,10 +3007,7 @@ class MultiHistogramRefinement:
                     at_bound=(e.path in on_bound) if e.path in tested else None,
                     equations=equations.get(e.path, [])))
         for h, table in enumerate(mt.tables):
-            cm = mt.col_map(h)
-            esd = (table.stderr_physical(thetas[h], stderr[cm],
-                                         corr[np.ix_(cm, cm)] if corr is not None else None)
-                   if stderr is not None else {})
+            esd = per_esds[h] if per_esds else {}
             for e in table.entries:
                 if not _row_shared(mt, e) and e.path in moving[h]:
                     row = f"hist.{h}.{e.path}"
