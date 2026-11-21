@@ -303,6 +303,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-11-16  src/rietx/io/CLAUDE.md        572 -> 575  for the container member-read rule (issue #1593):
 #                                                          the exceptions `zipfile` raises that are not a
 #                                                          ValueError; landed 575, no headroom
+#   2026-11-16  src/rietx/io/CLAUDE.md        575 -> 576  for the zip of patterns (WP-1315, #134): one
+#                                                          per-format row, its staging rule inside it;
+#                                                          landed 576
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -806,7 +809,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 575,
+    "src/rietx/io/CLAUDE.md": 576,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs
