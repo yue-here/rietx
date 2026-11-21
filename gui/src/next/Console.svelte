@@ -13,12 +13,14 @@
    * pane and keeps only what is about the log: following the end, the dropped
    * frames, and Copy, the prototype's way to take the session into a script.
    */
+  import type { Line } from "./console";
+
   let {
     lines,
     dropped,
     shown = true,
   }: {
-    lines: string[];
+    lines: readonly Line[];
     dropped: number;
     /** Whether the pane is on screen. A hidden pane has no scroll height, so
      *  lines that arrived while it was hidden are followed when it shows. */
@@ -46,7 +48,7 @@
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(lines.join("\n") + "\n");
+      await navigator.clipboard.writeText(lines.map((l) => l.text).join("\n") + "\n");
       copied = true;
       setTimeout(() => (copied = false), 1500);
     } catch {
@@ -73,7 +75,7 @@
         title="Copy the session as text"><span class="slot"><span
           class:gone={copied}>Copy</span><span class:gone={!copied}>Copied</span></span></button>
     </div>
-    <pre>{lines.join("\n")}</pre>
+    <pre>{lines.map((l) => l.text).join("\n")}</pre>
   </div>
 </section>
 
