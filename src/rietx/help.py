@@ -2192,8 +2192,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The data do not constrain one combination of several parameters. The solver "
             "discards that direction, and each parameter on it has no esd: the result, "
-            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
-            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the CIF and the GUI show it as undetermined. A tie or a derived quantity "
+            "built on them has none either, unless the data determine that combination: "
+            "a zero shift tied to the sum of three such parameters keeps its esd, as do "
+            "a bond, a cell volume or a moment pair's quadrature sum built that way. "
+            "Free fewer of "
             "the parameters in one stage, hold the ones you know independently, or widen "
             "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
