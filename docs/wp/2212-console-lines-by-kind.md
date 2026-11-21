@@ -1,6 +1,6 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — claimed by @yue-here (ghostshift runner)
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
