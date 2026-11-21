@@ -102,6 +102,18 @@ async function arrays(path: string, body?: unknown): Promise<ArrayBuffer> {
   throw new ApiError(response.status, payload);
 }
 
+/** `PATCH /api/instrument`'s answer: the new instrument, and what the edit
+ *  did to the hold and free registers. `ended` names each path whose old
+ *  parameter the edit removed or redefined (a Chebyshev `c3` under a
+ *  P-spline), where a pending edit no longer applies. */
+export interface InstrumentEdit {
+  node_id: string | null;
+  instrument: any;
+  released: string[];
+  freed: string[];
+  ended: string[];
+}
+
 export const api = {
   capabilities: () => call("GET", "/api/capabilities"),
   /** The whole help corpus plus `docs_url` (WP-1202/1203).  Fetched once at
@@ -255,11 +267,12 @@ export const api = {
    *  changes what the parameter table *contains* (WP-1008).  One history node. */
   patchStructure: (structure: unknown, label?: string) =>
     call("PATCH", "/api/structure", { structure, label }),
-  /** `unhold` paths are released before the edit and `free` ones freed after
-   *  it, all or nothing (`GuiSession.instrument_patch`, WP-2218 review). */
-  patchInstrument: (instrument: unknown, label?: string,
-                    arms: { unhold?: string[]; free?: string[] } = {}) =>
-    call("PATCH", "/api/instrument", { instrument, label, ...arms }),
+  /** The server works out what the edit asks of the hold and free registers
+   *  and answers it beside the instrument (`GuiSession.instrument_patch`,
+   *  WP-2229): `released`, `freed`, and the `ended` paths whose pending edits
+   *  a client drops. */
+  patchInstrument: (instrument: unknown, label?: string): Promise<InstrumentEdit> =>
+    call("PATCH", "/api/instrument", { instrument, label }),
   /** Opt one atom into anisotropic ADPs.  Its own verb because both directions
    *  are physics (the isotropic tensor is not Uiso·δ, and U_eq weights by the
    *  metric) and a client that computed either would get non-orthogonal cells

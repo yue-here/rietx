@@ -24,6 +24,7 @@
  * would silently revert every field it did not touch.
  */
 
+import type { InstrumentEdit } from "../api";
 import { formatValue, num, type ParamRow } from "./table";
 // the two geometry fields both forms offer: one wording, so the wizard and the
 // editor cannot explain the same quantity two ways (WP-1032)
@@ -262,6 +263,18 @@ export function splitEdits(
  */
 export function clone<T>(model: T): T {
   return JSON.parse(JSON.stringify(model));
+}
+
+/** The console lines for an instrument edit (`PATCH /api/instrument`), the
+ *  registers' part the server answered included (WP-2229): a release runs
+ *  before the edit and a free after it. */
+export function registerEcho(answer: Partial<InstrumentEdit>, edit: string): string[] {
+  const released = answer.released ?? [], freed = answer.freed ?? [];
+  return [
+    ...(released.length ? [`ref.unhold(${JSON.stringify(released)})`] : []),
+    edit,
+    ...(freed.length ? [`ref.set_vary(${JSON.stringify(freed)}, True)`] : []),
+  ];
 }
 
 /** A deep copy of a model with the non-parameter edits written into it. */
