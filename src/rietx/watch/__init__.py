@@ -65,7 +65,7 @@ import urllib.parse
 from pathlib import Path
 
 from .. import runs as runs_mod
-from .._about import DIST_NAME, PROJECT_SUFFIX
+from .._about import DIST_NAME, PROJECT_SUFFIX, RUNS_DIR_NAME, STATE_DIR_NAME
 from ..viz import theme as theme_mod
 from ..viz.chart import CHART_DIR, CHART_FILES
 
@@ -800,6 +800,38 @@ def _launch_gui(project: Path) -> dict:
                      f"{GUI_BOOT_TIMEOUT:.0f} s"}
 
 
+def _configured_root_elsewhere(directory: Path) -> Path | None:
+    """The process's configured runs root, when it lies outside ``directory``.
+
+    With :data:`~rietx._about.RUNS_DIR_ENV` set (or :func:`runs.set_root
+    <rietx.runs.set_root>` called), a plain fit records there and not under
+    the working directory, so a ``watch`` that defaulted to the working
+    directory would list none of it (WP-1950). The banner names it rather
+    than the default moving: a project in the working directory still
+    records into its own ``live/``, and silently swapping which directory is
+    scanned would hide those.
+
+    Quiet only where the scan is sure to list the root: the directory itself,
+    or its ``.rietx/runs``. Anywhere else under it may sit below a dotted or
+    pruned directory, or past the depth bound, which ``discover`` never
+    enters, so the line is printed. A root that cannot even be resolved is
+    no reason to stop a viewer, and prints nothing; nor does a process with
+    recording switched off, where a fit records nowhere.
+    """
+    if not runs_mod.enabled():
+        return None
+    try:
+        root = runs_mod.configured_root()
+        if root is None:
+            return None
+        resolved = root.resolve()
+    except (RuntimeError, OSError):
+        return None
+    if resolved in (directory, directory / STATE_DIR_NAME / RUNS_DIR_NAME):
+        return None
+    return root
+
+
 def serve(directory: str | Path | None = None, *, port: int = 8899,
           open_browser: bool = False, block: bool = True,
           allow_cancel: bool = True, allow_gui: bool = True):
@@ -825,6 +857,7 @@ def serve(directory: str | Path | None = None, *, port: int = 8899,
     really about: a reader who is not the person who should be stopping things,
     which is a situation you know about beforehand.
     """
+    defaulted = directory is None
     directory = Path.cwd() if directory is None else Path(directory)
     if not directory.is_dir():
         raise FileNotFoundError(f"{directory} is not a directory")
@@ -843,6 +876,10 @@ def serve(directory: str | Path | None = None, *, port: int = 8899,
     found = index.runs()
     print(f"rietx watch: {len(found)} run(s) under {directory}")
     print(f"             {url}  (Ctrl-C to stop)")
+    elsewhere = _configured_root_elsewhere(directory) if defaulted else None
+    if elsewhere is not None:
+        print(f"             a fit here records under {elsewhere} "
+              f"({DIST_NAME} watch {elsewhere} lists those)")
     # Read off both flags, because they are two. `--read-only` clears the pair
     # and this line then reads as it always did; a caller that declines one of
     # them gets a banner that is true rather than one that names the other.

@@ -484,9 +484,12 @@ def test_only_refine_asks_the_metadata_for_this_distribution():
 
     The pattern is the call's shape: ``version(``, ``metadata(`` or
     ``distribution(`` taking this distribution's name, spelled, imported or
-    reached through ``_about``, so a renamed alias still matches.
+    reached through ``_about``, so a renamed alias still matches. A word
+    ending in one of them is another call: the PyInstaller hook's
+    ``copy_metadata(DIST_NAME)`` copies the dist-info into a freeze and reads
+    no version (WP-1950).
     """
-    shape = re.compile(r"(?:version|metadata|distribution)\(\s*(?:(?:_about\.)?DIST_NAME|"
+    shape = re.compile(r"(?<!\w)(?:version|metadata|distribution)\(\s*(?:(?:_about\.)?DIST_NAME|"
                        rf"[\"']{re.escape(DIST_NAME)}[\"'])\s*\)")
     package = Path(_refine.__file__).parent
     readers = {path.relative_to(package).as_posix() for path in package.rglob("*.py")
