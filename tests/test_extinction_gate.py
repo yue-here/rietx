@@ -440,24 +440,21 @@ def test_a_prefit_whose_widths_left_no_reflection_reads_unreliable(nudge):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(strict=True, reason=(
-    "known miss: PbSO4 X-ray at x0.99 of its index cell; the prefit stops about "
-    "0.3 % short, the reference reads 0.45 (below 1/sqrt(2)) and the screen "
-    "returns P c - - confidently, where the specimen is P c - n; belongs to "
-    "WP-1910's open task (re-screen at the prefit's cell, held, flag a "
-    "disagreement between the two screens, ruled 2026-10-26), which may not "
-    "flag it either, since a held re-screen with no decisive class is "
-    "recorded, not flagged: strict until a run shows it does"))
 def test_the_gate_misses_pbso4_at_one_percent_short():
     """The counter-example to "every cell outside the basin reads ≥ 1.6": an
     out-of-basin cell inside the 0.36-1.6 gap.  The prefit moves 6.895 Å to
     6.935 (the specimen's is 6.959), short on every axis, and the reference
-    fit's widths absorb the rest.  Pinned strict, so a fix shows up as a pass."""
+    fit's widths absorb the rest.  The gate still passes it, and the wrong
+    class P c - a still leads, but the right one, P c - n, trails by ΔBIC 16.6
+    and the two differ at two tested positions, under 2·ln N + 2 = 19.3, so the
+    screen abstains (WP-2076, ruled 2026-11-13).  Until then this was a strict
+    xfail: the screen named P c - a.  Pinned at None, so a change shows up."""
     data, instrument, limits, peaks, candidate = _pbso4_inputs(0.99)
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
-    best = screen.best_or_none()
-    assert best is None or best.symbol == "P c - n"
+    assert screen.status != "unreliable"
+    assert [c.symbol for c in screen.candidates[:2]] == ["P c - a", "P c - n"]
+    assert screen.best_or_none() is None
 
 
 # ----------------------------------------------------------------------
