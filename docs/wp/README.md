@@ -58,6 +58,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-16 | P2 | [series](#series) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | 2026-11-18 | P2 | [series](#series) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | 2026-11-20 | P2 | [parametric](#parametric) |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 2026-11-16 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2149](2149-a-reduced-panel-names-the-systems-searched.md) | INDEX_PANEL_REDUCED names the systems the run searched | 2026-11-17 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -84,7 +85,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) | [parametric](#parametric) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2110](2110-a-trial-error-unit-stays-inside-its-memory.md) | A trial_error unit stays inside its memory under a raised budget | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2148](2148-a-held-standard-cell-pins-the-wavelength.md) | A held standard's cell pins the wavelength, and a skipped λ is said | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | P2 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | [gui-overhaul](#gui-overhaul) |
 | [2228](2228-a-reflection-past-the-range-end-keeps-its-tail.md) | A reflection centred past the range end keeps its tail | P2 | [2222](2222-the-closing-stage-off-by-default.md) ([2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -695,7 +695,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
 | [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
-| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | 🔄 2026-11-16 | P2 | — |
 | [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ✅ 2026-11-13 | — | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
 | [2144](2144-the-anti-bump-same-body-skip-under-a-torsion.md) | The anti-bump same-body skip, now that a torsion moves the pair | ✅ 2026-11-13 | — | — |
 | [2147](2147-the-weak-line-retry-on-a-superlattice-with-a-trace.md) | The weak-line retry on a superlattice that also carries a trace phase | ✅ 2026-11-18 | — | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) |
