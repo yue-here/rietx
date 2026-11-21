@@ -724,6 +724,10 @@ from .._nearmiss import did_you_mean
 #: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 #: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 #: version now says why.
+#: Also in 0.62 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
+#: second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule; an older build
+#: refuses a screen carrying the key.  It moves no stored value.
 SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
