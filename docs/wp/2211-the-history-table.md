@@ -99,8 +99,17 @@ prototype with the changed region boxed, on a private page.
   open (question 5).
 - **Question 5, opened 2026-11-21 by the maintainer: the git words.** A person who has never
   used git may not know Checkout, Tag or Branch. Teach the words, or rename them in the window?
-  Tooltips are the maintainer's first thought, with a link into the manual. Brought back to the
-  maintainer with options the same day; the ruling goes here.
+  Tooltips are the maintainer's first thought, with a link into the manual.
+  **Ruled 2026-11-21, the maintainer: plain words in the menu** (option B of two; A kept the git
+  words and taught them). Checkout reads **Make current**, matching the table's "current" mark.
+  Tag reads **Name…** and Label reads **Note…**, which also tells the two apart. Branch reads
+  **Branch from here**. Restore keeps its word. Each tooltip says what the click does, with the
+  Python call (`ref.checkout`, `history.tag`, `history.annotate`, `ref.branch`) on its second
+  line, and the console still echoes the call. The tab's `?` box links to the GUI chapter's
+  History section, rewritten in this WP, and no separate GUI how-to is written. Practice, from
+  recall and not checked: TOPAS, GSAS-II and FullProf have no history tree; Google Docs, Overleaf
+  and Figma say "Restore this version" and "Name this version"; "Branch" reaches non-programmers
+  in Onshape and Figma, while "Checkout" and "Tag" stay in programmers' tools.
 
 ### Seams
 
@@ -148,7 +157,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 - [x] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
   here (§ Rulings, 2026-11-21).
-- [ ] Question 5, the git words: the maintainer's ruling recorded in § Rulings.
+- [x] Question 5, the git words: ruled 2026-11-21 (§ Rulings).
 - [ ] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
   the node menu shared by both views. Vitest over a branched tree's lanes.
 - [ ] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
@@ -192,5 +201,5 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   it; nothing waits on the maintainer before then. Next: once PR #1521 merges, bring questions 1
   and 2 to the maintainer.
 - **2026-11-21** — the maintainer ruled questions 1 and 2 from drawn options (§ Rulings) and
-  opened question 5, the git words. Nothing is built yet. Next: record question 5's ruling, then
+  ruled question 5, the git words, plain words in the menu. Nothing is built yet. Next:
   measure questions 3 and 4.
