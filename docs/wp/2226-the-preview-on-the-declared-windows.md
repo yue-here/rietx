@@ -1,6 +1,6 @@
 # WP-2226 — The preview on the declared windows
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by @yue-here
 Track: A long run is not one fit
 Depends on: 2222 (the closing stage off by default)
 Priority: P3 2026-11-19 — a visible shift of up to 0.13 % of the strongest peak when a preview starts from a default fit; nothing is wrong with the fit
