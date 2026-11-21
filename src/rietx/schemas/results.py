@@ -811,7 +811,10 @@ class GeometryDistance(Base):
     information, not σ = 0.  The two causes deliberately share one ``None``
     (WP-1003): a consumer never needs σ's *reason* to use the number, and if
     one ever does, a per-row cause field is the additive fix — never a
-    reinterpreted zero.
+    reinterpreted zero.  ``stderr_diagonal`` alone is ``None`` when the row
+    draws on a parameter a discarded direction touched while the data still
+    determine the row (WP-2230): that parameter's own variance is not
+    measured, so a diagonal sum would quote it.
     """
 
     phase_index: int
