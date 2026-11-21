@@ -13,6 +13,7 @@ import math
 from _lamno3 import BACKGROUND, LIMITS, REST, SCALE, instrument, nuclear_plan, pattern, structure
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 data = pattern()
 nuclear = rx.Refinement(structure(), instrument())
@@ -32,10 +33,11 @@ model = rx.Structure.model_validate(model.model_dump())   # re-runs the whole st
 # guide: fit start
 # the modulus and the polar angle; the azimuth stays at 0, which keeps the moment in the a-c plane
 moment = [f"phases.0.atoms.{site}.moment.dof0", f"phases.0.atoms.{site}.moment.dof1"]
+# the modulus's interval is the number to quote, so the plan ends with the closing stage
 plan = rx.RefinementPlan(stages=[
     rx.Stage("moment", [SCALE, *BACKGROUND, *moment], max_iter=200),
     rx.Stage("everything", [SCALE, *BACKGROUND, *moment, *REST], max_iter=200)],
-    intermediate_ftol=1e-6)
+    intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL)
 
 ref = rx.Refinement(model, nuclear.fitted_instrument.model_copy(deep=True))
 result = ref.fit(data, plan=plan, two_theta_limits=LIMITS)
