@@ -52,7 +52,12 @@ class ParameterCandidate(Base):
 
     ``gain`` is the Rao-score / Gauss-Newton predicted Δχ² from freeing this
     parameter alone (weighted SSR units, **not** reduced — compare against
-    ``SuggestionResult.noise_floor``).  ``gradient`` is ∂χ²/∂p in the
+    ``SuggestionResult.noise_floor``), **as far as its bounds let it move**
+    (WP-1998): the exact linearised drop at the step clipped to the solver's
+    box, which is 0 for a parameter on its floor whose gradient points
+    through it.  ``gain_unbounded`` is the same prediction with the box
+    ignored; the two are equal whenever the bound is farther than the step.
+    ``gradient`` is ∂χ²/∂p in the
     parameter's physical units, sign included, so a consumer sees which way
     the parameter wants to move.  ``absorption`` is the R² of the candidate's
     column on the span of the currently-free block (0.0 when nothing is
@@ -74,6 +79,10 @@ class ParameterCandidate(Base):
     path: str
     gain: float
     gradient: float
+    #: the predicted Δχ² with the parameter's bounds ignored, ≥ ``gain``.
+    #: ``None`` where the candidate was not built by ``suggest`` (written by
+    #: ``build_suggestion``).
+    gain_unbounded: float | None = None
     absorption: float = 0.0
     seeded: bool = False
     seed_value: float | None = None
@@ -147,7 +156,10 @@ class SuggestionResult(Base):
     (their ``absorption`` says why), ``skipped`` the paths whose columns have
     zero norm at this state (no leverage either way), and ``n_evaluated`` how
     many candidates were scored in total, so "no suggestion" is
-    distinguishable from "nothing was looked at".
+    distinguishable from "nothing was looked at".  ``bound_limited`` holds the
+    separable candidates whose leverage clears the floor only with their
+    bounds ignored (``gain_unbounded`` above ``noise_floor``, ``gain`` at or
+    below it): the data would move them, and their box will not (WP-1998).
 
     ``noise_floor`` is the applied ``SUGGEST_MIN_GAIN · max(chi2_red, 1)``,
     stored so the serialized result explains its own gate.
@@ -155,6 +167,7 @@ class SuggestionResult(Base):
 
     groups: list[CandidateGroup] = Field(default_factory=list)
     non_separable: list[ParameterCandidate] = Field(default_factory=list)
+    bound_limited: list[ParameterCandidate] = Field(default_factory=list)
     skipped: list[str] = Field(default_factory=list)
     n_evaluated: int = 0
     chi2_red: float
@@ -169,11 +182,18 @@ class SuggestionResult(Base):
     def best_or_none(self) -> ParameterCandidate | None:
         """The one defensible winner, or ``None``.
 
-        ``None`` whenever there is nothing above the noise floor, or the top
-        group is an unresolved tie — never a confident singleton the gates
-        cannot defend.  A caller who wants the full evidence reads
-        ``groups`` directly.
+        ``None`` whenever there is nothing above the noise floor, the top
+        group is an unresolved tie, or the top group's own ``delta_bic`` is
+        at or below zero (WP-1998) — never a confident singleton the gates
+        cannot defend, and never a parameter the same result's ΔBIC refuses.
+        The ΔBIC gate is Schwarz's (1978) criterion, which the summary
+        already applied to the same group ("ΔBIC refuses it"); it is read on
+        the **leader** only, so a lower-ranked group ΔBIC admits is not
+        promoted — the groups are ranked by Δχ², and choosing among them on
+        a second statistic is the caller's.  A caller who wants the full
+        evidence reads ``groups`` directly.
         """
-        if not self.groups or not self.groups[0].resolved:
+        if (not self.groups or not self.groups[0].resolved
+                or self.groups[0].delta_bic <= 0.0):
             return None
         return self.groups[0].members[0]
