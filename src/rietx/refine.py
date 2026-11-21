@@ -2609,9 +2609,8 @@ class Refinement:
         The least-squares driver: ``"lm"``, a bounded Levenberg-Marquardt, or ``"trf"``,
         scipy's Trust Region Reflective.
     history
-        Where the history of stages and edits is kept. ``True`` keeps it in memory; a
-        path also writes it to that file, which must not hold one already; a
-        ``RefinementTree`` continues that tree; ``False`` keeps none.
+        Where the stage and edit history is kept: ``True`` in memory, a path also in
+        that new file, a ``RefinementTree`` continues that tree, ``False`` none.
 
     Notes
     -----
