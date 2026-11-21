@@ -1,8 +1,7 @@
 # WP-1965 — a parametric equation declared by condition and glob
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: ✅ 2026-11-16 — a subset by condition (`where=`) and a glob target land in PR #1619; leftovers in #1621
 Depends on: 1325 (the declaration this lowers onto); 1964 soft (an expression as what a glob expands)
-Priority: P3 2026-11-04 — writing the lists by hand is the workaround, and no user has asked yet; last in the milestone's order
 
 ## Goal
 
@@ -62,66 +61,24 @@ one declaration per matched path, each with its own coefficients.
   as a target today. A blocked glob is reported, never silent (root
   CLAUDE.md § A hold), so the expansion skips them and says which.
 
-### Inherited
+### Carried from 1325 (folded from § Inherited on 2026-11-16)
 
-- **2026-11-12, from [1325](1325-parametric-series.md) (closed): `rietx events`
-  could print one line per parametric equation of a joint fit.** 1325 held this
-  in its own § Inherited since 1322 closed without it, and moved it here at its
-  close, because the line reports this WP's subset and detectors. This is
-  @mustachefeeling's point from the PR #977 comments. A joint fit keeps no
-  history (`multi.py`), but it has emitted events since #926, and `rietx events`
-  (`history.aggregate.summarize_events`) shipped in PR #902. The line would
-  carry the subset size, the form verdict, and whether a detector fired inside
-  the subset. Two rules for whoever builds it:
-  - Pair events in file order, never by `(series_index, series_pass)`, since
-    indices recur on reseeds and restarted segments. The aggregator already
-    clears its open stages at each `fit_start` (`aggregate.py:185`).
-  - A segmented chain's summed fit time is not its wall time: 700 s against
-    148 s on one chain, as reported and not re-measured.
-
-- **2026-10-15, from [1325](1325-parametric-series.md), from @mustachefeeling's comments on PR #977: where a subset's boundary goes.** Numbers as
-  reported, not re-measured. Since 2026-10-15 the declaration is
-  `ParametricEquation` and the resolved one `RefinedParametricEquation`
-  (1325 decision 7), so read the entry below in those names.
-  - Their draft's default for equations per phase field: a phase transition
-    breaks cell, Biso, profile and composition equations; a gas switch
-    breaks composition only; isothermal ↔ ramp breaks nothing. Biso is
-    never tied across a transition. Each default is overridable per path and
-    boundary, with the override recorded. Boundaries are physical, declared
-    or detected, never "every N patterns".
-  - A misplaced edge is the expensive error: 1325's kink row covers its gap
-    0.66 of the time.
-  - Their blind event detector (Le Bail, one high-symmetry model along the
-    chain): a cell discontinuity did not fire, since a high-symmetry cell
-    fitted to lower-symmetry patterns wanders and the jump was 3× the median
-    step against `SEQUENTIAL_DISCONTINUITY`'s 5×. What held: the GoF step
-    (30× the median), a sustained Rwp regime shift (ratio 1.87), and the
-    tallest unmatched peak collapsing (h/σ 510 to 24). The null control fired
-    nothing. At a real transition the two directions disagree by one step,
-    so agreement is corroboration rather than a test.
-  - A ΔBIC symmetry test needs a negative control: a cubic null once
-    "required" R-3m at ΔBIC +1.4 × 10⁶ before a cell-window guard.
-  - A continuous reaction needs another detector: a reduction onset showed
-    as an agreement shift of 1.2σ, and the abrupt logic fired only at the
-    gas switch.
-  - **The detector's calibration inverted in seven weeks** (their addendum,
-    re-run on 1.9.0.dev0): the positive series is now missed, the null
-    control now fires, and a subgroup screen gives one false "lower symmetry
-    required" per run on a different compound each time. So a detector that
-    proposes a boundary is calibrated inside the test suite, against a
-    seeded planted-events series (#141, which still owes its generator;
-    [1317](1317-series-scrubber.md)).
-  - A cheap first step they propose: report, beside each equation, whether
-    any detector on main (`SeriesResult.discontinuities`, `moved_paths`,
-    the `MagneticOnset` bracket, `split_localisation`) fired inside its
-    subset.
-
-- **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
-  PR #977): a result now carries each equation as resolved.**
-  `RefinementResult.parametric`'s resolved equation is the declaration with its
-  reference and scale filled in, the form a refit passes back. A condition
-  or glob spelling should resolve to that same `ParametricEquation`,
-  so a result read back can be refitted whichever spelling declared it.
+- **A resolved spelling is refittable.** `RefinementResult.parametric` carries each
+  declaration as resolved, the form a refit passes back (1325's seventh session, PR #977).
+  A condition or glob spelling resolves to that same `ParametricEquation`, so a result read
+  back refits whichever spelling declared it.
+- **Where a boundary goes is a physical fact, declared or detected, never "every N
+  patterns"** (@mustachefeeling, PR #977 comments, numbers as reported). A condition
+  is how a declared boundary is written. A detector that *proposes* one is not this
+  WP's: their own detector's calibration inverted within seven weeks, so it is
+  calibrated inside the suite against a seeded planted-events series first (#141,
+  [1317](1317-series-scrubber.md)).
+- **Not this WP's tasks, still true:** a `rietx events` line per parametric equation of a
+  joint fit (subset size, form verdict, any detector firing inside the subset), and the
+  report of which detector on main fired inside each subset. Both go to an issue at
+  this WP's close, with 1325's two rules for the events line: pair events in file order,
+  never by `(series_index, series_pass)`, and a segmented chain's summed fit time is
+  not its wall time.
 
 ## Non-goals
 
@@ -131,12 +88,36 @@ one declaration per matched path, each with its own coefficients.
 
 ## Tasks
 
-- [ ] A subset by condition, or by label. Decide what is stored, and pin a
+- [x] A subset by condition, or by label. Decide what is stored, and pin a
   dropped pattern by test: the equation covers the same specimens afterwards.
-- [ ] A glob target, expanded at resolution, with skipped paths reported.
-- [ ] Manual: `reference/parametric.md` § Declaration shows the new forms beside
-  the data form.
-- [ ] Skill: the series reference's parametric row, or "none" and why.
+  *(2026-11-16: `ParametricEquation.where`, a condition in the expression
+  grammar's condition syntax over the coordinate columns. The condition is the
+  key, not a label: a phase field is a region of the coordinates, and a label
+  column would be a second key a pattern must be given by hand. The condition is
+  stored and re-evaluated at each resolution (`params.parametric.subset_of`), the
+  reference and scale still frozen at the first; refused beside `patterns` and on
+  a `design` basis, whose rows stay positional.
+  `test_a_condition_keeps_its_specimens_when_a_pattern_is_dropped` pins the drop.)*
+- [x] A glob target, expanded at resolution, with skipped paths reported.
+  *(2026-11-16: a linear basis's `target` may be a glob. `MultiParameterTable`
+  expands it before any of its tables exist (`_expand_globs`, matched on a scratch
+  table of the subset's first pattern, since a target decides the sharing map)
+  through `params.parametric.expand_glob`: one declaration per drivable path, named
+  `{name}_{tail}` (`glob_member_name`, the path past the glob's literal segments),
+  so the stored declaration keeps its data form with bare targets. Skipped paths
+  are `_target_refusal`'s, recorded in `glob_expansions` and reported as
+  `PARAMETRIC_GLOB_SKIPPED` (info, tier 1). An expression basis refuses a glob: its
+  variables are shared, so every matched path would take one value.)*
+- [x] Manual: `reference/parametric.md` § Declaration shows the new forms beside
+  the data form. *(2026-11-16: the field table's `target` and `where` rows, and
+  § A subset by condition and § A target glob, each with an executed example;
+  `reference/expressions.md` § Conditions names `where` as a second place a
+  condition appears.)*
+- [x] Skill: the series reference's parametric row, or "none" and why.
+  *(2026-11-16: the row names both spellings, "(`where=` subset, glob target)",
+  paid for in the same row so `series.md` stays inside its budget (34 597 of
+  34 600 B); `PARAMETRIC_GLOB_SKIPPED` joined the parametric codes' row in
+  `diagnostics.md`.)*
 
 ## Acceptance
 
@@ -151,6 +132,60 @@ one declaration per matched path, each with its own coefficients.
 - WP-1325 § Prior art and § The shape.
 
 ## Handover log
+
+- **2026-11-16** — A parametric equation can now say which patterns it covers by a
+  condition on the coordinates, `where="T < 800"`, and drive a whole family of
+  parameters with one glob target, `phases.0.cell.*`. The condition is stored and
+  evaluated again whenever the declaration is resolved, so dropping a bad pattern from
+  a library no longer silently re-points an index list at other specimens, and a
+  pattern that joins inside a phase field joins its equation. A glob becomes one
+  ordinary declaration per path it can drive, so what a result stores is unchanged
+  in shape. Paths it cannot drive (tied, locked, held) are skipped and reported.
+  The schema gains one optional field, which is the maintainer's to accept.
+  - *Done:* all four tasks (commits per task, ticked above), plus a review pass.
+    `params.parametric.subset_of` is now the one authority for a declaration's
+    subset (resolution, the expression path and the clash check all read it).
+    `ParametricEquation.where` is new (schema 0.61 note, additive). `expression.py`
+    gains `parse_condition` and `Condition` (`holds`, `undecided`), a condition
+    being the grammar's own, so `GRAMMAR_VERSION` does not move. A glob is expanded
+    in `MultiParameterTable._expand_globs` before the sharing map is built, on
+    scratch tables of every pattern of the subset (1.4 ms a table on the Mac), into
+    members named `{name}_{tail}`. New info code `PARAMETRIC_GLOB_SKIPPED` (audit
+    row tier 1, help entry, skill row, `DIAGNOSTIC_SCOPES` row).
+  - *Review (read-only agent, Opus):* five findings, all taken. A missing
+    `DIAGNOSTIC_SCOPES` row (failed `test_multi_diagnostics.py`); a NaN inside a
+    condition read as "not in the subset" (now refused as undecided); a glob and a
+    bare declaration could share a name (names are now checked before expansion); the
+    skip message advised declaring on a source the glob already drove (it now says
+    which); a size-across-λ refusal of one member did not name its glob (it now
+    does; skipping it instead is in #1621).
+  - *Generality (agent, Opus, unedited verdicts):* `PARAMETRIC_GLOB_SKIPPED` **weak**:
+    "the grounds cover only skipped paths that still follow a driven source" — the
+    reasons `_target_refusal` gives for a rigid body's increment and a moment DOF
+    were skipped at info though nothing follows them. *Author:* those two now refuse
+    the glob, and the evidence says so. Matching on the first pattern **weak**: "a
+    concrete silent gap" for a background with more terms on a later pattern.
+    *Author:* now matched on the union, refused by name, tested
+    (`test_a_glob_is_matched_on_every_pattern_of_its_subset`). Member naming
+    **holds**; skip-then-refuse **holds**; `where` **holds** with "a record field
+    naming each equation's selected patterns" as what would change it (in #1621);
+    expression glob refusal **holds**, message could name the tie route (in #1621).
+  - *Measured:* reader_output exit 0 ("unchanged against the merge-base"). Sphinx
+    `-W` build of `docs/docs` exit 0. Linux-workstation canary (f2b581c48, `[dev]` venv
+    rietx-py312): 557 passed, 80 skipped, 68 s, 479 MB, 4 cores at 211 %.
+    Fast suite on that workstation (b3a1fd92d, same venv, `-m "not slow" -n 8 --dist
+    loadgroup`): 14 870 passed, 280 skipped, 32 xfailed, 2 failed, 601 s, 5.4 GB,
+    755 % on 8 cores. Both failures were the manual's 50 000-character page cap on
+    `reference/parametric.md`, which the new sections pushed over; they moved to
+    `reference/parametric-spellings.md` (ba6ffb371), and `tests/test_manual.py` then
+    passed on the Mac (arm64, `[dev]`, py3.12; fast selection, 65 passed). A rerun of
+    the whole fast suite on ba6ffb371 was memory-starved there and stopped. Vale
+    (`rietx_vale.sh`, whole manual): 0 errors.
+  - *Gotchas:* `tests/test_gui_help.py` rewrites `tests/data/gui/help_keys.json` when
+    a code is added; commit the rewrite. `series.md` in the skill sits 3 B under its
+    budget after this branch.
+  - *Next:* nothing in this WP. #1621 holds the events line per equation, the
+    detectors-inside-a-subset report, and four review points for the maintainer.
 
 - **2026-11-04** — The maintainer's track ruling moved this WP into the `parametric`
   milestone and dropped the formula, so the file and title were renamed. Next: the

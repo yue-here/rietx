@@ -3611,6 +3611,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the form holds."
         ),
     ),
+    "PARAMETRIC_GLOB_SKIPPED": HelpEntry(
+        title="Equation glob skipped paths",
+        description=(
+            "A parametric equation whose target is a glob was expanded into one "
+            "equation per matched path, each with its own coefficients. A path the "
+            "glob matched was held for the floating origin, which no stage frees, so "
+            "it was skipped and left out of the equation. Paths the space group "
+            "ties or locks are skipped without a message, since the symmetry that "
+            "fixes them is no news to whoever wrote the glob. Nothing needs doing "
+            "unless the skipped path was meant to be driven: then declare it on its "
+            "own."
+        ),
+    ),
     "PARAMETRIC_OUT_OF_RANGE": HelpEntry(
         title="An equation put a parameter outside its bounds",
         description=(

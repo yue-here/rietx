@@ -724,6 +724,13 @@ from .._nearmiss import did_you_mean
 #: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 #: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 #: version now says why.
+#: Also in 0.62 (WP-1965), the first change after 1.12.0 shipped 0.61:
+#: ``ParametricEquation.where``, a subset stated as a
+#: condition on the coordinate columns, stored as written and re-evaluated at
+#: every resolution.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule;
+#: an older build refuses a declaration carrying the key.  A glob ``target`` is
+#: expanded at resolution into one declaration per matched path, so a result
+#: stores bare targets and nothing new.
 SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

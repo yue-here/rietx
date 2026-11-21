@@ -19,8 +19,10 @@ fence (WP-1119).
 
 from __future__ import annotations
 
+import fnmatch
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -130,6 +132,176 @@ def _term_unit(target_unit: str | None, term: list[str],
             else f"{target_unit}/({'*'.join(below)})")
 
 
+#: fnmatch's metacharacters, which make a target a glob
+_GLOB_CHARS = frozenset("*?[")
+
+
+def is_glob(target: str | None) -> bool:
+    """Whether ``target`` is a glob, expanded at resolution (WP-1965)."""
+    return target is not None and bool(_GLOB_CHARS & set(target))
+
+
+def glob_member_name(name: str, glob: str, path: str) -> str:
+    """The name of the declaration a glob ``name`` expands to on ``path``.
+
+    ``{name}_{tail}``, ``tail`` being ``path`` past the glob's leading literal
+    segments, its dots written ``_``: a declaration ``cell`` on
+    ``phases.0.cell.*`` has the member ``cell_c`` on ``phases.0.cell.c``, and
+    one ``s`` on ``phases.*.scale`` the member ``s_1_scale`` on
+    ``phases.1.scale``.  Those segments match
+    every path literally, so two matched paths differ in their tails.  A
+    member's coefficients are then ``vars.{name}_{tail}_{j}``, which no other
+    member's can be, since the trailing ``_{j}`` is all digits.
+    """
+    lead = 0
+    for seg in glob.split("."):
+        if _GLOB_CHARS & set(seg):
+            break
+        lead += 1
+    return f"{name}_{'_'.join(path.split('.')[lead:])}"
+
+
+@dataclass
+class GlobExpansion:
+    """What one glob target expanded to (WP-1965).
+
+    ``members`` are the declarations' names, one per matched path an equation
+    can drive, in table order; ``skipped`` each matched path no equation can
+    drive with the reason, ``_target_refusal``'s wording.
+    """
+
+    name: str
+    glob: str
+    members: list[str]
+    skipped: list[tuple[str, str]] = field(default_factory=list)
+
+
+def expand_glob(equation: ParametricEquation, paths: list[str],
+                refusal: Callable[[str], str | None]
+                ) -> tuple[list[ParametricEquation], GlobExpansion]:
+    """One declaration per path of ``paths`` that ``equation``'s glob target matches.
+
+    ``paths`` are a model's parameter paths in table order and
+    ``refusal(path)`` the reason a path cannot be a target, or ``None``.  A
+    matched path that is refused is **skipped and recorded**, never silent
+    (root CLAUDE.md § A hold): ``phases.0.cell.*`` on a cubic phase drives
+    ``a`` and skips ``b`` and ``c`` (tied to ``a``) and the three locked
+    angles.  Each member is the declaration with its own name
+    (:func:`glob_member_name`) and one bare target, so the declaration as
+    resolved, and a result read back, holds bare targets only.
+
+    Refused: a glob matching no path, or only paths no equation can drive
+    (each named with why); and a member name that is not an identifier, or
+    that two matched paths share.
+    """
+    glob = equation.target
+    matched = [p for p in paths if fnmatch.fnmatchcase(p, glob)]
+    if not matched:
+        raise ValueError(
+            f"parametric equation {equation.name!r}: target glob {glob!r} matches no "
+            "parameter of the model")
+    members: list[ParametricEquation] = []
+    skipped: list[tuple[str, str]] = []
+    seen: dict[str, str] = {}
+    for path in matched:
+        why = refusal(path)
+        if why:
+            skipped.append((path, why))
+            continue
+        member = glob_member_name(equation.name, glob, path)
+        if not member.isidentifier():
+            raise ValueError(
+                f"parametric equation {equation.name!r}: target glob {glob!r} matches "
+                f"{path}, whose member name {member!r} is not an identifier; narrow "
+                "the glob, or declare that path on its own")
+        if member in seen:
+            raise ValueError(
+                f"parametric equation {equation.name!r}: target glob {glob!r} matches "
+                f"{seen[member]} and {path}, which would both be named {member!r}; "
+                "declare them separately")
+        seen[member] = path
+        members.append(equation.model_copy(update={"name": member, "target": path}))
+    if not members:
+        reasons = "; ".join(f"{p} {why}" for p, why in skipped[:3])
+        more = f"; and {len(skipped) - 3} more" if len(skipped) > 3 else ""
+        raise ValueError(
+            f"parametric equation {equation.name!r}: target glob {glob!r} matches only "
+            f"parameters no equation can drive: {reasons}{more}")
+    return members, GlobExpansion(name=equation.name, glob=glob,
+                                  members=[m.name for m in members], skipped=skipped)
+
+
+def subset_of(equation: ParametricEquation, coordinates: CoordinateTable | None,
+              n_patterns: int) -> list[int]:
+    """The patterns ``equation`` applies to, in the order passed (WP-1965).
+
+    ``patterns`` as given, every pattern when it is ``None``, or the patterns
+    at which ``where`` holds, evaluated over the coordinate columns **now**:
+    the condition is what is stored, so membership follows the campaign while
+    the reference and scale stay where the first resolution froze them.
+
+    Refusals, each a ``ValueError`` naming its fix: an index out of range; a
+    condition with no coordinate table, or a table of the wrong length; a
+    condition naming a column the table lacks; a pattern with no value for a
+    column the condition reads, or at which a comparison meets a value that is
+    not finite (its membership would be undecided); and a condition that holds
+    at no pattern.
+    """
+    name = equation.name
+    if equation.where is None:
+        patterns = (list(range(n_patterns)) if equation.patterns is None
+                    else list(equation.patterns))
+        bad = [k for k in patterns if k >= n_patterns]
+        if bad:
+            raise ValueError(
+                f"parametric equation {name!r}: pattern index {bad[0]} is out of range for "
+                f"{n_patterns} patterns (indices 0…{n_patterns - 1})")
+        return patterns
+    from .expression import Condition
+
+    condition = Condition(equation.where)
+    if coordinates is None:
+        raise ValueError(
+            f"parametric equation {name!r}: its subset is where={equation.where!r}, "
+            "which needs a CoordinateTable (coordinates=…) giving each pattern's values")
+    if coordinates.n_patterns != n_patterns:
+        raise ValueError(
+            f"the coordinate table has {coordinates.n_patterns} rows for "
+            f"{n_patterns} patterns: one row per pattern, in the order passed")
+    columns = coordinates.columns
+    missing = [c for c in condition.names if c not in columns]
+    if missing:
+        from .._nearmiss import did_you_mean
+
+        hint = did_you_mean(missing[0], columns)
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} names "
+            f"{missing[0]!r}, which is not a coordinate column (the table has "
+            f"{sorted(columns)})" + (f"; {hint}" if hint else ""))
+    for c in condition.names:
+        holes = [k for k, v in enumerate(columns[c]) if v is None]
+        if holes:
+            raise ValueError(
+                f"parametric equation {name!r}: pattern {holes[0]} has no value for "
+                f"coordinate {c!r}, which where={equation.where!r} reads, so whether "
+                "it is in the subset is undecided; give it a value")
+    env = {c: np.asarray(columns[c], dtype=np.float64) for c in condition.names}
+    nan = np.flatnonzero(np.broadcast_to(condition.undecided(env), (n_patterns,)))
+    if nan.size:
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} compares a value "
+            f"that is not finite at pattern {int(nan[0])} (a NaN or an infinity from "
+            "the coordinates there), so whether it is in the subset is undecided; "
+            "rewrite the condition so every comparison is defined there")
+    held = np.broadcast_to(condition.holds(env), (n_patterns,))
+    patterns = [int(k) for k in np.flatnonzero(held)]
+    if not patterns:
+        raise ValueError(
+            f"parametric equation {name!r}: where={equation.where!r} holds at no "
+            f"pattern of the {n_patterns}, so the equation has nothing to drive")
+    return patterns
+
+
 def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTable | None,
                        n_patterns: int, *, target_unit: str | None = None
                        ) -> ResolvedParametric:
@@ -140,8 +312,8 @@ def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTabl
     declaration: a refit passing it back reproduces Φ exactly, and a pattern
     that joins later never redefines a coefficient.
 
-    Refusals, each a ``ValueError`` naming its fix: a subset index out of
-    range; a polynomial with no coordinate table, a table of the wrong length,
+    Refusals, each a ``ValueError`` naming its fix: every refusal of
+    :func:`subset_of`; a polynomial with no coordinate table, a table of the wrong length,
     a term naming a column the table lacks, a subset pattern with no value
     for a coordinate it needs, a coordinate taking one value across the
     subset with no scale given; design rows not matching the subset; fewer
@@ -155,12 +327,7 @@ def resolve_parametric(equation: ParametricEquation, coordinates: CoordinateTabl
         raise ValueError(
             f"the coordinate table has {coordinates.n_patterns} rows for "
             f"{n_patterns} patterns: one row per pattern, in the order passed")
-    patterns = list(range(n_patterns)) if equation.patterns is None else list(equation.patterns)
-    bad = [k for k in patterns if k >= n_patterns]
-    if bad:
-        raise ValueError(
-            f"parametric equation {name!r}: pattern index {bad[0]} is out of range for "
-            f"{n_patterns} patterns (indices 0…{n_patterns - 1})")
+    patterns = subset_of(equation, coordinates, n_patterns)
     n_sub = len(patterns)
     resolved = equation
     divisors: list[float]

@@ -183,6 +183,7 @@
   "diagnostics:ORIGIN_FIXED_ON_POLAR_AXIS",
   "diagnostics:ORIGIN_NOT_FIXED",
   "diagnostics:PARAMETRIC_FORM_REJECTED",
+  "diagnostics:PARAMETRIC_GLOB_SKIPPED",
   "diagnostics:PARAMETRIC_OUT_OF_RANGE",
   "diagnostics:PARAMETRIC_TARGET_UNSEEN",
   "diagnostics:PARENT_STRAIN_HELD",

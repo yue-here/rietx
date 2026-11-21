@@ -39,7 +39,15 @@ from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
-from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
+from .parametric import (
+    GlobExpansion,
+    ResolvedParametric,
+    expand_glob,
+    is_glob,
+    least_squares_start,
+    resolve_parametric,
+    subset_of,
+)
 from .vector import (
     AffineTie,
     ParameterTable,
@@ -214,7 +222,8 @@ def _display_unit(path: str) -> str | None:
     return None if entry is None else entry.unit
 
 
-def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) -> None:
+def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int,
+                                  coordinates: CoordinateTable | None = None) -> None:
     """Two declarations may share no name, nor a target on one pattern (WP-1325).
 
     A name is its coefficients' paths, so two of one name would be one set of
@@ -233,7 +242,7 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
         names.add(equation.name)
         if equation.target is None:          # an intermediate drives nothing
             continue
-        mine = set(range(n)) if equation.patterns is None else set(equation.patterns)
+        mine = set(subset_of(equation, coordinates, n))
         for other, theirs in targets.get(equation.target, []):
             both = sorted(mine & theirs)
             if both:
@@ -242,7 +251,8 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
                     f"{equation.target} on pattern{'' if len(both) == 1 else 's'} "
                     f"{', '.join(map(str, both[:5]))}{' …' if len(both) > 5 else ''}: "
                     "a target follows one function per pattern. Give the two "
-                    "declarations disjoint subsets (patterns=…), or combine them "
+                    "declarations disjoint subsets (patterns=… or where=…), or "
+                    "combine them "
                     "into one")
         targets.setdefault(equation.target, []).append((equation.name, mine))
 
@@ -495,8 +505,15 @@ class MultiParameterTable:
         declared = list(parametric or [])
         variables = dict(variables or {})
         self.sharing = sharing or SharingMap()
+        #: what each glob target expanded to, in declaration order (WP-1965);
+        #: empty when no target is a glob
+        self.glob_expansions: list[GlobExpansion] = []
+        if any(is_glob(e.target) for e in declared):
+            # the names as given are checked before the expansion renames them
+            _refuse_clashing_declarations(declared, len(instruments), coordinates)
+            declared = self._expand_globs(declared, starts, instruments, coordinates)
         if declared:
-            _refuse_clashing_declarations(declared, len(instruments))
+            _refuse_clashing_declarations(declared, len(instruments), coordinates)
             # a private copy: the targets (and, below, what follows them)
             # become per-histogram, which is the caller's map plus this fit's
             # declarations and never an edit of the caller's object
@@ -563,13 +580,88 @@ class MultiParameterTable:
             if scale:
                 table.apply_value_scale(scale)
         if declared or variables:
-            self._install_parametric(declared, coordinates, variables)
+            try:
+                self._install_parametric(declared, coordinates, variables)
+            except ValueError as exc:
+                # a member's refusal names the member: say which glob made it
+                text = str(exc)
+                for record in self.glob_expansions:
+                    hit = next((m for m in record.members
+                                if f"parametric equation {m!r}" in text), None)
+                    if hit is not None:
+                        raise ValueError(
+                            f"{text} ({hit!r} is a member of glob {record.name!r} on "
+                            f"{record.glob}; narrow the glob to leave that path out)"
+                        ) from exc
+                raise
         if len({id(s) for s in starts}) > 1:
             self._check_starts_agree(starts)
         self._check_moment_frames_shared()
         self._rebuild_columns()
 
     # -- per-pattern starting values and parametric equations (WP-1325) -----
+    def _expand_globs(self, declared: list[ParametricEquation], starts: list[Structure],
+                      instruments: list[Instrument],
+                      coordinates: CoordinateTable | None) -> list[ParametricEquation]:
+        """Each glob target expanded into one declaration per path (WP-1965).
+
+        Matched against the models of **every** pattern of the declaration's
+        subset, on scratch tables built before any of this fit's own, since
+        what a target is decides the sharing map those are built under.  The
+        union is matched, so a path one pattern's model has and another's lacks
+        (a background with more terms) becomes a member, and the bare-target
+        refusal names the pattern without it, rather than the path going
+        unmatched there in silence.
+
+        A matched path that is tied, locked or held follows something else or
+        nothing that any stage moves, so no equation can drive it: it is
+        skipped.  Only a skip the caller could not foresee (the floating
+        origin's hold) is recorded in :attr:`glob_expansions`; a symmetry tie
+        or lock is silent.  A path refused for
+        any other reason (a rigid body's increment, a moment DOF) is one the
+        caller may have meant to drive, so the glob is refused, as a bare
+        target on it would be.
+        """
+        n = len(instruments)
+        scratch: dict[int, ParameterTable] = {}
+        out: list[ParametricEquation] = []
+        for equation in declared:
+            if not is_glob(equation.target):
+                out.append(equation)
+                continue
+            owner: dict[str, tuple[ParameterTable, object]] = {}
+            for h in subset_of(equation, coordinates, n):
+                if h not in scratch:
+                    scratch[h] = ParameterTable(starts[h].model_copy(deep=True),
+                                                instruments[h].model_copy(deep=True),
+                                                joint=True)
+                for e in scratch[h].entries:
+                    owner.setdefault(e.path, (scratch[h], e))
+
+            def skip_reason(path: str, eq=equation, owner=owner) -> str | None:
+                table, e = owner[path]
+                why = _target_refusal(table, e)
+                if why is None or e.locked or e.held or e.tie is not None:
+                    return why
+                raise ValueError(
+                    f"parametric equation {eq.name!r}: target glob {eq.target!r} "
+                    f"matches {path}, which {why}. Narrow the glob to leave it out")
+
+            members, record = expand_glob(equation, list(owner), skip_reason)
+            # Only a skip the caller could not foresee is kept on the record
+            # (the maintainer's ruling on #1619, 2026-11-17): a symmetry tie or
+            # lock is not news to whoever wrote the glob, and a cubic
+            # ``phases.0.cell.*`` would say the same five lines on every fit.
+            # The joint table has no tie or hold verb and its mode is not known
+            # here, so the one skip left is the floating origin's hold, which
+            # the package puts on a path the caller did not name.
+            record.skipped = [
+                (path, "is held (Phase.floating_origin fixes it)")
+                for path, _ in record.skipped if owner[path][1].held]
+            out.extend(members)
+            self.glob_expansions.append(record)
+        return out
+
     def _check_starts_agree(self, starts: list[Structure]) -> None:
         """Refuse per-pattern starts that are not one model, or that disagree
         on a shared path.
@@ -778,13 +870,7 @@ class MultiParameterTable:
             # an intermediate has no patterns of its own: it is evaluated at
             # each later equation's, whose coordinate values are checked there
             patterns = ([] if equation.target is None
-                        else list(range(n)) if equation.patterns is None
-                        else list(equation.patterns))
-            bad = [k for k in patterns if k >= n]
-            if bad:
-                raise ValueError(
-                    f"parametric equation {name!r}: pattern index {bad[0]} is out of "
-                    f"range for {n} patterns (indices 0…{n - 1})")
+                        else subset_of(equation, coordinates, n))
             names_v: list[str] = []
             names_c: list[str] = []
             for nm in expr.names:
