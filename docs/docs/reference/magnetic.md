@@ -381,6 +381,9 @@ A moment stage over several sites is not convex, and an equal-magnitude start ca
 Compared at such points, the ranking would measure the start.
 So every class with more than one magnetic site is refined from each one-site start, the other sites' moments absent, then released, and the best converged minimum is reported.
 `MagneticTrial.n_starts`, `MagneticTrial.n_minima` and `MagneticTrial.start` show that sweep, and a multimodal class says so in `MagneticSolution.caveats`.
+`MagneticTrial.minima` lists every distinct minimum the starts reached, with the starts that ended there, its χ² and each site's |m|.
+Minima are told apart by their moduli, not their Rwp.
+Two sites related by a translation that leaves the magnetic intensity unchanged at equal Biso can swap moduli for about one unit of χ², so the pattern measures their sum and difference but not which site carries which, and both assignments are on the record.
 Every start frees the moduli before the directions.
 A small moment's direction barely moves the pattern, and the default driver scales every column to the same size, so with both free it took its largest steps along the direction and stopped far from the minimum.
 
@@ -471,8 +474,12 @@ The nuclear model it starts from is the one in the refinement you hand it, fitte
 | `MagneticTrial.supported` | whether any site's moment, or any degenerate pair's quadrature sum, passed the support test | false disqualifies the trial |
 | `MagneticTrial.anti_translation_drift` | how far a supercell refinement left its own group, μ<sub>B</sub> | zero is the pass; `None` for k = 0 |
 | `MagneticTrial.n_starts` | the starts the moment stage ran from | one per magnetic site plus the equal-magnitude one; 1 for a single site |
-| `MagneticTrial.n_minima` | distinct minima those starts found | more than one means one start would have reported another answer |
+| `MagneticTrial.n_minima` | distinct minima those starts found, counted by moduli | more than one means one start would have reported another answer |
+| `MagneticTrial.minima` | one `MomentMinimum` per distinct minimum, lowest χ² first | the first is the one `moments` comes from; `None` on a refused trial |
 | `MagneticTrial.start` | which start won | `"flat"` or `"<site> only, then released"` |
+| `MomentMinimum.starts` | the starts that ended in this minimum, lowest χ² first | |
+| `MomentMinimum.chi2` | the weighted residual sum of squares at the ranking's windows | two minima's difference is their ΔBIC: one model, one free count |
+| `MomentMinimum.moduli` | each moment-carrying site's \|m\| in μ<sub>B</sub>, at the best of the starts | a minimum differing only in directions or relative signs is the same entry |
 | `MomentRow.label`, `MomentRow.ion` | the site and its form-factor key | |
 | `MomentRow.magnitude`, `MomentRow.esd` | \|m\| in μ<sub>B</sub> and the modulus's esd | the components carry none |
 | `MomentRow.sigma` | \|m\| over its own esd | `None` without an esd |
