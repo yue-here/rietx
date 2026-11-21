@@ -52,6 +52,18 @@ its tier.
 
 ### Inherited
 
+- **2026-11-19, from WP-2017 groups E and F (PR #1577, Q11): `AIR_SCATTER_UNDECLARED` fired where
+  declaring the term moved nothing, and its row is still `unaudited`.** The groups fitted Si SRM
+  640c, cpd-1a and qarr corundum, and cpd-1c with the air term off and on. The code fired on
+  every arm with the term off and on none with it on, including the shipped pick on Si SRM 640c
+  and on cpd-1c, where declaring the term moved the answer 4e-6 and 0.049 esd. Its thresholds
+  are owed a measurement as one of this WP's codes. **Flag:** it has the shape of
+  `EXTINCTION_UNDECLARED`, a warning that a term was not declared, read off the residual,
+  which the maintainer removed on 2026-11-04 (WP-1944, ruling 3: findable through the
+  documentation, never detected from the residual; `342daf5ed`). Read that ruling before
+  re-measuring. Routed by the maintainer's walk on #1577 (comment 6963408737), settled under the
+  WP-filing rule.
+
 - **From WP-2003 (2026-11-02, fifth session, PR #1310): every `error`-level code now drives a
   chain action.** Batch C2 question 5 landed `schemas.sequential._rejected`: a kept attempt
   that diverged *or carries any diagnostic at level `error`* escalates the series ladder and,

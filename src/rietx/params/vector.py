@@ -1140,6 +1140,13 @@ def _magnetic_component_drawn(phase, instrument) -> bool:
         return False
 
 
+#: :data:`FLOOR_SEEDS`' size for a width in deg 2θ, and through its square for
+#: a Gaussian variance in deg².
+FLOOR_SEED_DEG = 1e-3
+
+#: :data:`FLOOR_SEEDS`' size for an extinction coefficient in µm².
+FLOOR_SEED_UM2 = 1e-3
+
 #: A typical size for a width-like row, keyed by the unit its
 #: :class:`Parameter` declares.  One reader: the forward-difference step of a
 #: row bounded below at 0 is sized by it (``optimize.least_squares._fd_typicals``,
@@ -1157,7 +1164,12 @@ def _magnetic_component_drawn(phase, instrument) -> bool:
 #: below its neighbours.  WP-1938 refines every row in its own units, so the
 #: column at a floor is the physical one and that seed is gone; the sizes
 #: stayed, being the step's.  A new width unit belongs here.
-FLOOR_SEEDS: dict[str, float] = {"deg": 1e-3, "deg^2": 1e-3 ** 2, "um^2": 1e-3}
+#:
+#: The two sizes are the named numbers above, so the audit walk sees them (it
+#: cannot see into a dict); the deg² entry is the deg one squared by
+#: construction (WP-2017 Q22b).
+FLOOR_SEEDS: dict[str, float] = {"deg": FLOOR_SEED_DEG, "deg^2": FLOOR_SEED_DEG ** 2,
+                                 "um^2": FLOOR_SEED_UM2}
 
 
 @dataclass(frozen=True)

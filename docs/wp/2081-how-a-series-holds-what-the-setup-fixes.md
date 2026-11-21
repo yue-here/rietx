@@ -323,6 +323,17 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 ### Inherited
 
+- **2026-11-19, from WP-2017 task 5 (PR #1577): a blank frame against a missed phase is a
+  number in a field, with no threshold.** WP-2017 measured the Durbin-Watson d of the residual
+  on blank frames with structure (0.34-1.49) and on a weak missed phase (0.14-1.85): the ranges
+  overlap, so a cut would be tuned. The maintainer folded it here with no threshold, under
+  series rule 5 (PR #1631's `series.md`: a detectable failure mode is a number in a field, with
+  no threshold, code or action; #1577, comment 6963408737). **Checked against the tree
+  (2026-11-19): the series already stores it.** Every `SeriesEntry` carries `statistics`, a
+  `Statistics` whose `durbin_watson` is that d per pattern (`optimize.statistics`, written by
+  every fit). No new field is owed; what is left is the reading, in the series' help, of a
+  blank frame's d beside a missed phase's.
+
 - **2026-11-15, from the issue triage (issue #1556 § 5): a held setup value's error
   moves every later cell together, and the series has no row for it.** The reporter ran a
   synthetic LaB₆ ramp, 7 patterns × 150 noise replicates, and held zero and profile from

@@ -76,9 +76,14 @@ now passes; whether its two arms were in these two minima was not measured.
 The harmonic weight seed is measured on a synthetic constant-wavelength neutron
 corundum with a known λ/2 line, the one family a harmonic has (the held-out
 Nd₂Ru₂O₇ pair stays unused).  Seeds 0.001 and 0.3 against the shipped 0.01
-agree to 0.003 esd at a true weight of 0.003 and to 0.001 at 0.05 (0.1 was
+agreed to 0.003 esd at a true weight of 0.003 and to 0.001 at 0.05 (0.1 was
 measured too, at 0.001), and at a true weight of 0, the case a caller who
-declares a harmonic to look for one meets.
+declares a harmonic to look for one meets.  Re-read on 2026-11-16 (WP-2017
+group M, Linux x86_64; the first two repeated on macOS arm64): 0.015 at 0.003,
+0.004 at 0.05 and 0.014 at 0, each on the 0.3 seed and still inside the bar; without the closing
+stage the same seeds move 0.26-1.44 esd.  A bisect of the 0.003 case (PR #1577's Q21) puts the
+move at 879fb1bcc, WP-2002's removal of the U, V and Y width floors: 0.0009 before it, 0.0148
+after, the worst row moving from an atom to the second line's weight.
 """
 
 from __future__ import annotations

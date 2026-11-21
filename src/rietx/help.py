@@ -324,8 +324,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "cosθ shape is close to the constant shape of `zero_shift`, so freeing both "
             "on one pattern usually reports a correlation. It has no default bound. "
             "Where the scan cannot separate it from the zero and the cell, the fit "
-            "reports `FLAT_DIRECTION` and the cell's esd grows to show it. Set a bound if "
-            "you know your mount."
+            "reports `FLAT_DIRECTION`, though the cell's esd does not reliably grow to show "
+            "it: the cell walked 3.6-6.6 esds on three of six flat-plate fits. Set a bound "
+            "if you know your mount."
         ),
         unit="mm", default="0.0",
         typical="|s| < 0.05 mm on a carefully packed flat plate",

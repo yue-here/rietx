@@ -1232,7 +1232,14 @@ class Geometry(_InheritsDeclaredDefaults):
     #: same two ``FLAT_DIRECTION`` findings naming the cell and an offset
     #: (``tests/test_capillary_displacement.py``).  The bound acted as a
     #: prior that the mount is aligned, true on 11-BM and so nearer the
-    #: reference there, without narrowing the esd.  A prior about the mount
+    #: reference there, without narrowing the esd.  On three laboratory flat
+    #: plates (FAP, SRM 660c, SRM 1976a; WP-2017 group I) with the zero freed
+    #: beside the displacement, the old bounds never bound (|zero| ≤ 0.34°,
+    #: |displacement| ≤ 0.69 mm) and the fits agreed to 5e-6 esd either way;
+    #: the cell walked 48-1000 ppm from the zero-held fit, within three of its
+    #: reported esds (the NAC test's bar) on SRM 1976a and on FAP over 15-71°,
+    #: past it on FAP's full range (4.5), SRM 660c's (3.6) and SRM 660c over
+    #: 20-85° (6.6, 1000 ppm).  A prior about the mount
     #: is the caller's: the bounds had one family behind them and a named
     #: dissenter (a recessed holder), and neither GSAS-II nor FullProf sets
     #: one.  A caller who knows the mount states a bound; ``BOUND_HIT``
