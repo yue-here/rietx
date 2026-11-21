@@ -88,7 +88,7 @@ measured into the docstring.
 - [ ] Probe: list the 535 intensities by reflection and phase over the slow selection, and say
       whether each is a cross-phase coincidence, a missed near-overlap or neither.
 - [ ] Tests, and the reader-output diff (`python -m tests.reader_output`) for the maintainer.
-- [ ] Skill: the `COVARIANCE_DIRECTION_DISCARDED` reference row says which derived numbers keep
+- [x] Skill: the `COVARIANCE_DIRECTION_DISCARDED` reference row says which derived numbers keep
       their esd, or "none" and why.
 
 ## Acceptance
