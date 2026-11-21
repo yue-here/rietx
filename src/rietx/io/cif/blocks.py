@@ -182,17 +182,66 @@ def block_name(name: str, index: int, taken: set[str]) -> str:
 # the parts
 # ---------------------------------------------------------------------------
 
-def cell_pairs(phase) -> list[tuple[str, str]]:
-    """The six cell items, each through the number rule with its su."""
+def cell_pairs(phase, undetermined: frozenset[str] = frozenset()
+               ) -> list[tuple[str, str]]:
+    """The six cell items, each through the number rule with its su.
+
+    A length or angle in ``undetermined`` (a path below the phase, ``cell.a``)
+    was refined and has no su, so its own su item follows it as ``?``
+    (:func:`_undetermined_su` says why)."""
     c = phase.cell
-    return ([(f"_cell_length_{n}", _parameter(f"_cell_length_{n}", getattr(c, n)))
-             for n in ("a", "b", "c")]
-            + [(f"_cell_angle_{n}", _parameter(f"_cell_angle_{n}", getattr(c, n)))
-               for n in ("alpha", "beta", "gamma")])
+    out = []
+    for kind, names in (("length", ("a", "b", "c")),
+                        ("angle", ("alpha", "beta", "gamma"))):
+        for n in names:
+            tag = f"_cell_{kind}_{n}"
+            out.append((tag, _parameter(tag, getattr(c, n))))
+            if f"cell.{n}" in undetermined:
+                out.append((f"{tag}_su", "?"))
+    return out
 
 
 def _parameter(tag: str, p, where: str | None = None) -> str:
     return number(tag, p.value, p.stderr, where=where)
+
+
+def _su_of(written: str) -> str:
+    """The su a ``value(su)`` string states, as its own ``_su`` value: the same
+    digits at the same decimal place, so the two spellings of one su agree.
+    ``.`` for a value written without one."""
+    if not written.endswith(")") or "(" not in written:
+        return "."
+    value, su = written[:-1].split("(")
+    ndp = len(value.split(".")[1]) if "." in value else 0
+    return f"{int(su) * 10.0 ** -ndp:.{ndp}f}" if ndp else su
+
+
+def _undetermined_su(columns: list[str], rows: list[list[str]],
+                     keys: dict[str, list[str]], undetermined: frozenset[str]
+                     ) -> None:
+    """Append a ``<column>_su`` column wherever a row's value is undetermined
+    (WP-2219).
+
+    A refined value whose su the fit could not determine (its parameter lies
+    on a direction the data do not constrain, or measured nothing) is written
+    as its value with ``?``, *unknown*, in its su item.  The ``Measurand``
+    type of ``cif_core.dic`` lets an su travel inside the value or in its own
+    ``_su`` item, the two equivalent, and only the second can state an su that
+    is unknown: ``?`` inside ``value(su)`` is no CIF number, and a bare value
+    reads as a fixed one.  ``keys`` maps a column to each row's path below the
+    phase.  A column with no undetermined row gets no su column, so a fit
+    with every su determined writes the file it wrote before.  The other
+    rows' su items repeat the su their ``value(su)`` states, and ``.``,
+    *inapplicable*, for a value with none (the convention of
+    :func:`~rietx.io.cif.numbers.su_or_dot`).
+    """
+    for col, row_keys in keys.items():
+        if not any(k in undetermined for k in row_keys):
+            continue
+        at = columns.index(col)
+        columns.append(f"{col}_su")
+        for row, k in zip(rows, row_keys, strict=True):
+            row.append("?" if k in undetermined else _su_of(row[at]))
 
 
 def symmetry_items(phase) -> tuple[list[tuple[str, str]], list[str]]:
@@ -311,7 +360,8 @@ def _reduces(counts: dict[str, float], tol: float = 0.02) -> bool:
     return all(round(n) > 0 and abs(n - round(n)) <= tol for n in counts.values())
 
 
-def site_rows(phase, *, adp: str, types: list[str] | None = None
+def site_rows(phase, *, adp: str, types: list[str] | None = None,
+              undetermined: frozenset[str] = frozenset()
               ) -> tuple[list[str], list[list[str]], list[list[str]]]:
     """The ``_atom_site`` columns and rows, and the ``_atom_site_aniso`` rows.
 
@@ -320,7 +370,9 @@ def site_rows(phase, *, adp: str, types: list[str] | None = None
     import was measured on B).  An anisotropic site's isotropic column carries
     U_eq of its tensor (Fischer & Tillmanns 1988, *Acta Cryst.* **C44**, 775),
     so a reader ignoring the aniso loop still sees its magnitude.  The two
-    disorder columns appear only when a site declares one.
+    disorder columns appear only when a site declares one.  ``undetermined``
+    names the refined values with no su, as paths below the phase
+    (``atoms.3.x``), whose su items :func:`_undetermined_su` writes.
     """
     from ...crystallography.adp import U_NAMES, u_equivalent
 
@@ -355,17 +407,42 @@ def site_rows(phase, *, adp: str, types: list[str] | None = None
              + [_parameter(f"_atom_site_aniso_U_{n[1:]}", getattr(a.aniso, n), a.label)
                 for n in U_NAMES]
              for a in phase.atoms if a.aniso is not None]
+    if undetermined:
+        n_atoms = range(len(phase.atoms))
+        # an anisotropic site's isotropic column is U_eq, which states no su
+        _undetermined_su(columns, rows, {
+            **{f"fract_{n}": [f"atoms.{j}.{n}" for j in n_atoms] for n in "xyz"},
+            "occupancy": [f"atoms.{j}.occ" for j in n_atoms],
+            f"{adp}_iso_or_equiv": [
+                f"atoms.{j}.biso" if a.aniso is None else ""
+                for j, a in enumerate(phase.atoms)]}, undetermined)
     return columns, rows, aniso
 
 
+def aniso_columns(phase, aniso: list[list[str]],
+                  undetermined: frozenset[str] = frozenset()) -> list[str]:
+    """The ``_atom_site_aniso`` columns for :func:`site_rows`' aniso rows, with
+    an su column appended (and filled) where a component is undetermined."""
+    from ...crystallography.adp import U_NAMES
+
+    columns = ["label", *(f"U_{n[1:]}" for n in U_NAMES)]
+    if undetermined:
+        atoms = [j for j, a in enumerate(phase.atoms) if a.aniso is not None]
+        _undetermined_su(columns, aniso, {
+            f"U_{n[1:]}": [f"atoms.{j}.{n}" for j in atoms] for n in U_NAMES},
+            undetermined)
+    return columns
+
+
 def write_sites(block, columns: list[str], rows: list[list[str]],
-                aniso: list[list[str]]) -> None:
-    """Set :func:`site_rows`' loops on ``block``."""
+                aniso: list[list[str]], u_columns: list[str] | None = None) -> None:
+    """Set :func:`site_rows`' loops on ``block``; ``u_columns`` from
+    :func:`aniso_columns`, the six components when not given."""
     loop = block.init_loop("_atom_site_", columns)
     for row in rows:
         loop.add_row(row)
     if aniso:
-        uloop = block.init_loop("_atom_site_aniso_", [
+        uloop = block.init_loop("_atom_site_aniso_", u_columns or [
             "label", "U_11", "U_22", "U_33", "U_12", "U_13", "U_23"])
         for row in aniso:
             uloop.add_row(row)
@@ -381,7 +458,8 @@ def write_structure_block(block, phase, *, kind: str = "structure",
                           created: str | None = None,
                           composition: bool = True,
                           cell_volume_su: float | None = None,
-                          dispersion: dict[str, tuple[float, float, str]] | None = None
+                          dispersion: dict[str, tuple[float, float, str]] | None = None,
+                          undetermined: frozenset[str] = frozenset()
                           ) -> None:
     """Write one phase's structure block into a gemmi CIF ``block``.
 
@@ -398,7 +476,9 @@ def write_structure_block(block, phase, *, kind: str = "structure",
     (:func:`~rietx.model.geometry.cell_volumes`), which a refinement has and a
     structure does not (decision 6).  ``dispersion`` maps each site's species to
     the (f′, f″, source) a fit computed with, written into the ``_atom_type``
-    loop.  A
+    loop.  ``undetermined`` names the refined values the fit gave no su, as
+    paths below the phase (``cell.a``, ``atoms.3.x``), each written with ``?``
+    in its su item (WP-2219, :func:`_undetermined_su`).  A
     magnetic phase adds the magCIF half (:mod:`rietx.crystallography.magcif`)
     and ``cif_mag.dic``.  The module docstring says what is written and why;
     the references are there.
@@ -422,11 +502,13 @@ def write_structure_block(block, phase, *, kind: str = "structure",
     conform = [[text("_audit_conform_dict_name", name),
                 text("_audit_conform_dict_version", version)]
                for name, version in dictionaries]
-    cell = cell_pairs(phase)
+    cell = cell_pairs(phase, undetermined)
     types, notes = _types(phase)
     # the site values are refused before an orbit is asked of them: a NaN
     # coordinate is the number rule's to name, not the orbit's
-    columns, rows, aniso = site_rows(phase, adp="U", types=types)
+    columns, rows, aniso = site_rows(phase, adp="U", types=types,
+                                     undetermined=undetermined)
+    u_columns = aniso_columns(phase, aniso, undetermined)
     symmetry, triplets = symmetry_items(phase)
     multiplicities = _multiplicities(phase)
     at = columns.index("adp_type") + 1
@@ -443,6 +525,8 @@ def write_structure_block(block, phase, *, kind: str = "structure",
                      for a in phase.atoms], multiplicities=multiplicities)
     after_cell.append(("_cell_volume",
                        number("_cell_volume", zmv.cell_volume, cell_volume_su)))
+    if cell_volume_su is None and any(p.startswith("cell.") for p in undetermined):
+        after_cell.append(("_cell_volume_su", "?"))
     # WP-1810: a phase with a rigid body states which coordinates the body
     # placed, cif_core's _atom_site_refinement_flags_posn ``G`` (rigid group)
     # or ``R`` (riding), and _atom_site_calc_flag ``calc`` for a riding H.
@@ -513,7 +597,7 @@ def write_structure_block(block, phase, *, kind: str = "structure",
                               "scat_dispersion_source"] if anomalous else [])])
         for row in type_rows:
             tloop.add_row(row)
-    write_sites(block, columns, rows, aniso)
+    write_sites(block, columns, rows, aniso, u_columns)
     # The magnetic half, when the phase carries one: the operator and centring
     # loops, the BNS/OG metadata and the moments with their esds
     # (``crystallography.magcif``).  Not the parent k: a supercell phase is
