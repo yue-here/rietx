@@ -37,6 +37,7 @@ from fractions import Fraction as F
 import numpy as np
 import pytest
 
+from rietx.crystallography.lattice import direct_metric_tensor
 from rietx.crystallography.representation.irreps import (
     canonical_kvector,
     equivalent_kvectors,
@@ -175,9 +176,12 @@ def test_each_stratum_order_is_the_little_groups_at_every_member(symbol, n):
             lg = little_group(sg, k)
             assert lg.order == st.little_group_order, (st, k)
             assert lg.indices == st.operation_indices, (st, k)
-        # the locus is what P_k fixes: a fixed component never moves along the
-        # stratum, it sits at a zone-centre or zone-boundary value (0, 1/2, 1;
-        # the same whatever n), so a component that ran over the grid fails
+        # the locus is what P_k fixes: a fixed component never moves along a
+        # line or plane, it sits at a zone-centre or zone-boundary value (0, 1/2,
+        # 1 in these three groups, whatever n; hexagonal K has 1/3), so a
+        # component that ran over the grid fails.  One value per component is
+        # not the claim: a stratum is one co-group, and on P n m a the co-group
+        # of (0, y, 0) is also (0, y, 1/2)'s, (1/2, y, 0)'s and (1/2, y, 1/2)'s
         for c, fixed in enumerate(st.fixed_components):
             if fixed:
                 assert {k[c] for k in st.kvectors} <= {F(0), F(1, 2), F(1)}, (st.kind, c)
@@ -586,6 +590,83 @@ def test_minus_k_rows_appear_only_without_inversion():
     assert not [r for r in with_inv.rows if r.relation == "-k"]
     assert len([r for r in without.rows if r.relation == "-k"]) == 4
     assert not with_inv.minus_k_is_k
+
+
+# a pseudo-cubic triclinic cell: its near-symmetries include 3- and 4-fold maps,
+# where W and W⁻¹ differ, and its reduced basis is the conventional one up to signs
+PSEUDO_CUBIC = KParent("P -1", (5.00, 5.03, 5.07, 90.4, 89.7, 90.2), LAMBDA, 10.0, 140.0)
+
+
+def _relative_deviation(e, g):
+    d = np.sqrt(np.diag(g))
+    return float(np.max(np.abs(e) / np.outer(d, d)))
+
+
+def test_a_partners_deviation_is_that_of_the_map_it_stores():
+    """#1549's review: the stored map A takes k to the partner; it is the action
+    on reciprocal components of the basis change B = A⁻¹, it carries the
+    reciprocal metric to (B·G·Bᵀ)⁻¹ exactly, and ``metric_deviation`` is B's.
+    On a 3-fold, A read as a basis change of its own (A·G·Aᵀ) gives another
+    number, which describes the inverse map and here lies outside ``tol``."""
+    tol = 0.0278
+    eq = kvector_equivalents(PSEUDO_CUBIC, (F(1, 8), F(1, 4), F(3, 8)), tol=tol)
+    g = np.asarray(direct_metric_tensor(*PSEUDO_CUBIC.cell))
+    partners = [r for r in eq.rows if r.relation == "partner"]
+    assert partners
+    other_reading = []
+    for r in partners:
+        a = np.array(r.operation, dtype=np.float64)
+        b = np.linalg.inv(a)
+        np.testing.assert_allclose(a.T @ np.linalg.inv(g) @ a, np.linalg.inv(b @ g @ b.T),
+                                   rtol=1e-12, atol=1e-15)
+        assert r.metric_deviation == pytest.approx(_relative_deviation(b @ g @ b.T - g, g),
+                                                   rel=1e-9)
+        assert r.metric_deviation <= tol
+        if np.allclose(np.linalg.matrix_power(a, 3), np.eye(3)):
+            other_reading.append(_relative_deviation(a @ g @ a.T - g, g))
+    # the 3-folds are listed, and there the other reading crosses tol
+    assert other_reading and max(other_reading) > tol
+
+
+# :R → :H on reciprocal components, k_H = Q·k_R (obverse: a_H = a_R − b_R,
+# b_H = b_R − c_R, c_H = a_R + b_R + c_R)
+_R_TO_H = ((1, -1, 0), (0, 1, -1), (1, 1, 1))
+
+
+def _to_hexagonal(k):
+    return tuple(sum(F(_R_TO_H[i][j]) * k[j] for j in range(3)) for i in range(3))
+
+
+def test_a_rhombohedral_setting_lists_what_the_hexagonal_one_does():
+    """#1549's review: a ``:R`` group is primitive on its rhombohedral cell.
+    One pseudo-cubic structure (α = 89°) in ``:R`` and ``:H`` lists the same
+    partner classes at the same deviations for every k of the 1/4 grid; read as
+    R-centred, the ``:R`` cell named a lattice of a third its volume and listed a
+    partner of k = (0, 0, 1/8) whose satellites are not k's."""
+    a_r, alpha, tol = 5.0, 89.0, 0.03
+    half = np.radians(alpha) / 2
+    a_h = 2 * a_r * np.sin(half)
+    c_h = a_r * np.sqrt(3 * (1 + 2 * np.cos(np.radians(alpha))))
+    rh = KParent("R -3 m:R", (a_r, a_r, a_r, alpha, alpha, alpha), 1.5, 5.0, 150.0)
+    hx = KParent("R -3 m:H", (a_h, a_h, c_h, 90.0, 90.0, 120.0), 1.5, 5.0, 150.0)
+    k = (F(0), F(0), F(1, 8))
+    # the map is right: one satellite set in either setting
+    d_r = satellite_d_spacings(rh.space_group, rh.cell, 1.5, 150.0, [k], 5.0)[0]
+    d_h = satellite_d_spacings(hx.space_group, hx.cell, 1.5, 150.0, [_to_hexagonal(k)], 5.0)[0]
+    np.testing.assert_allclose(np.sort(d_r), np.sort(d_h), rtol=1e-9)
+
+    def listed(parent, kk, to_h):
+        rows = [r for r in kvector_equivalents(parent, kk, tol=tol).rows
+                if r.relation == "partner"]
+        classes = {frozenset(canonical_kvector(hx.group, to_h(c))
+                             for c in _structural_class(parent.space_group, r.k)) for r in rows}
+        return classes, sorted(round(r.metric_deviation, 9) for r in rows)
+
+    assert listed(rh, k, _to_hexagonal) == listed(hx, _to_hexagonal(k), lambda c: c)
+    for t in itertools.product(range(4), repeat=3):
+        kk = tuple(F(x, 4) for x in t)
+        if any(kk):
+            assert listed(rh, kk, _to_hexagonal) == listed(hx, _to_hexagonal(kk), lambda c: c), kk
 
 
 # ============================== V4/V5 the 1/64 grid: planted k against the null
