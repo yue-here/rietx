@@ -166,6 +166,37 @@ Filled in by the session that builds each PR. Question 1 is carried from WP-2227
 
 Filled in as each PR settles a value under `gui/STYLE.md` and the prototype.
 
+The Plan tab (the first PR), most consequential first:
+
+1. **A chip carries no count.** The prototype's chips read "Background (6)". Counting needs a
+   matcher, and the client's matcher is a preview only (`lib/fnmatch.ts`, WP-1011), while what
+   a stage frees is the server's (WP-1208). The stage's free count at the row's right is the
+   server's number. The alternative is the prototype's count, previewed by the client's
+   matcher over the refinable rows, as the picker's group counts are.
+2. **A chip's words are a group's name or the help corpus's title, and its tooltip is the
+   glob.** Grounds: a chip's words are the corpus's (WP-1209). A small table in
+   `gui/src/next/plan.ts` (`GROUPS`) names the globs that span several families, such as
+   `phases.*.cell.*` ("Cell"). A glob with neither shows itself in mono. One phase of several
+   is prefixed with the phase's name. The alternative is the prototype's own short words
+   ("Scale", "All Biso"), which the corpus does not hold.
+3. **The plan menu has no "Save as new plan" or "Delete plan".** No store of named plans
+   exists, so either item would be a verb without a route. The menu holds the presets as
+   radio rows, Revert to the saved plan, and Plan settings….
+4. **The picker's Fix side offers only what is free by that stage**, previewed from the stages
+   above it and its own. A free glob another stage already frees says "moves from stage N",
+   and choosing it moves it, so a plan frees each glob once. The stage's own glob is listed
+   disabled, "in this stage".
+5. **The closing stage is a block of its own** with a dashed ✓ badge, "Free Everything above",
+   and its Rwp while the facts are current. **Never freed** follows it with a dashed – badge,
+   family names with counts, from the route's new `never_freed`.
+6. **Stage settings open as a floating form** from the stage's ⋯ menu or context menu. Each
+   label is the field's help title, and a field with a default says `default` (WP-1206). The
+   value column is 96 px, wide enough for that word.
+7. **The edited mark is a 6 px dot in `--accent-ink`.** `--accent` may not fill
+   (`tests/test_gui_palette.py`, WP-2200).
+8. **"Rwp" is set in sans and its number in mono**, as the Pattern graph's title line sets it.
+9. **The picker is 320 px wide and scrolls past 380 px**; its search box is 30 px high.
+
 ## Handover log
 
 - **2026-11-21** — filed by a ghostshift runner, on the milestone's R4 row and WP-2214's

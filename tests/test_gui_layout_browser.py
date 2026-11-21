@@ -1758,3 +1758,122 @@ def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browse
         page.close()
     finally:
         httpd.shutdown()
+
+
+#: A five-stage plan, as acceptance row 8 asks, on the synthetic project.
+FIVE_STAGES = [
+    {"name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5},
+    {"name": "background", "turn_on": ["instrument.background.*"], "max_iter": 5},
+    {"name": "cell", "turn_on": ["phases.*.cell.*"], "max_iter": 5},
+    {"name": "zero", "turn_on": ["instrument.zero_shift"], "max_iter": 5},
+    {"name": "biso", "turn_on": ["phases.*.atoms.*.biso"], "max_iter": 5},
+]
+
+
+@pytest.fixture(scope="module")
+def next_plan(tmp_path_factory):
+    """A project whose stored plan has five stages, served as ``rietx gui`` serves it."""
+    httpd, client = _serve(tmp_path_factory, "next-plan")
+    status, body = client.put("/api/plan", {"plan": {"stages": FIVE_STAGES}})
+    assert status == 200, body
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+def _open_next_plan(browser, url: str):
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs").get_by_role("tab", name="Plan", exact=True).click()
+    page.wait_for_selector("section[aria-label=plan] .stg .badge")
+    _frames(page)
+    return page
+
+
+def _next_names(page) -> list[str]:
+    return page.locator("section[aria-label=plan] input.sn").evaluate_all(
+        "els => els.map(e => e.value)")
+
+
+def test_the_rebuilt_plan_reorders_by_a_real_drag_and_moves_nothing_else(browser, next_plan):
+    """WP-2231 on a five-stage plan. A press on the grip with no drag moves
+    nothing. A real drag drops the stage where its centre crossed and is one
+    pending edit in the action bar, whose slot is reserved, so no landmark
+    moves. ⌘Z takes it back, ⇧⌘Z redoes it, and the bar's Revert restores
+    the stored plan."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    names = _next_names(page)
+    assert names == [s["name"] for s in FIVE_STAGES]
+
+    box = page.locator('[data-handle="2"]').bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == names
+    assert not _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    top = page.locator('[data-handle="0"]').bounding_box()
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x, top["y"] - 12, steps=8)
+    page.mouse.up()
+    _frames(page)
+    assert _next_names(page) == [names[2], names[0], names[1], *names[3:]]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+
+    page.keyboard.press("ControlOrMeta+z")
+    _frames(page)
+    assert _next_names(page) == names
+    page.keyboard.press("ControlOrMeta+Shift+z")
+    _frames(page)
+    assert _next_names(page)[0] == names[2]
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert _next_names(page) == names
+    assert page.locator(".actions .pending").text_content().strip() == ""
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_plan):
+    """`+ Add` opens the grouped picker. The stage's own glob is offered
+    disabled, and a glob another stage frees says it moves from there. The
+    chosen one becomes a chip in the stage's Free row, one pending edit, and
+    neither the picker nor the chip moves a landmark."""
+    url, _ = next_plan
+    page = _open_next_plan(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    zero = page.locator('section[aria-label=plan] .stg[data-stage="3"]')
+    zero.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 4", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    own = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert own.is_disabled() and "in this stage" in own.text_content()
+    page.keyboard.press("Escape")
+    _frames(page)
+    assert not dialog.count()
+
+    stage = page.locator('section[aria-label=plan] .stg[data-stage="2"]')
+    stage.get_by_role("button", name="+ Add", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Add to stage 3", exact=True)
+    dialog.get_by_role("textbox", name="Search parameters", exact=True).fill("zero")
+    choice = dialog.locator('button.op[title="instrument.zero_shift"]')
+    assert "moves from stage 4" in choice.text_content()
+    choice.click()
+    _frames(page)
+    free = stage.locator(".stg2").first.locator(".pt")
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift"]
+    assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.get_by_role("button", name="Revert", exact=True).click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
