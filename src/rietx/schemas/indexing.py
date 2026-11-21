@@ -1349,7 +1349,10 @@ class LeBailValidation(Base):
     #: Q of the 20th usable line, where a true cell's lines are strong enough
     #: to be detected.  The ``predicted_but_absent`` caveat fires on this one.
     predicted_but_absent_uncancellable_in_window: int | None = None
-    #: which detector produced the count
+    #: which detector produced the count.  "line_screen" with
+    #: n_lines_screened None means the screen was asked and measured
+    #: nothing (a peak list with no usable line): predicted_but_absent is
+    #: then its default 0, not a count, and every absence count below is None
     absent_source: Literal["line_screen", "fitted_background"] = "fitted_background"
     #: the screen's denominator: predicted lines merged at the resolution in
     #: the peak list's range.  ``n_reflections`` is the fit's and counts every
@@ -2218,9 +2221,12 @@ class IndexingResult(Base):
             lines.append(f"      found by {', '.join(c.found_by)};  indexed "
                          f"{c.n_indexed}/{c.n_lines} lines;  chi2_red {c.chi2_red:.2f}"
                          + (f";  {_MODE_NAMES[c.lebail.mode]} Rwp {c.lebail.rwp:.4f}, "
-                            f"{c.lebail.predicted_but_absent} of "
-                            + (f"{c.lebail.n_lines_screened} lines absent"
+                            + (f"{c.lebail.predicted_but_absent} of "
+                               f"{c.lebail.n_lines_screened} lines absent"
                                if c.lebail.n_lines_screened is not None else
+                               "absences not screened (no usable line)"
+                               if c.lebail.absent_source == "line_screen" else
+                               f"{c.lebail.predicted_but_absent} of "
                                f"{c.lebail.n_reflections} reflections absent")
                             if c.lebail is not None else ""))
             if c.confidence_caveats:
