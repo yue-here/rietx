@@ -134,6 +134,12 @@ PARAMETER_GROUPS = (
        "These are named apart from the background curve, "
        "so a stage that frees the background does not free them too.",
        ("instrument.extra_components.*",)))),
+    ("Peak equations",
+     "A peak equation adds a term you write to each reflection's width or position, "
+     "or multiplies its intensity. "
+     "Its coefficients are named in the equation and refine like any other parameter. "
+     "The instrument's equation moves every phase's peaks.",
+     ((None, None, ("phases.*.peak_equations.*", "instrument.peak_equations.*")),)),
     ("Named variables",
      "A named variable is a parameter you declare yourself, outside the model. "
      "Model parameters follow it through ties.",
@@ -146,7 +152,7 @@ PARAMETER_GROUPS = (
 #: so the phase side and the instrument side are two pages.
 PARAMETER_PAGES = {
     "parameters.md": ("Cell and structure", "Phase amount and intensity corrections",
-                      "Microstructure", "Named variables"),
+                      "Microstructure", "Peak equations", "Named variables"),
     "parameters-instrument.md": ("Instrument", "Time of flight", "Background"),
 }
 

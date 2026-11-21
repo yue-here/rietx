@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-20 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082), #1197's right-handed magnetic cell (PR #1296), M-8's K1a (PR #1549) and its review follow-ups (PR #1703); M-8's K1b, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -158,7 +158,9 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   candidates and `magnetic_supercell` refuses all 4 by this guard; `I m -3 m` gives 6 and it
   refuses 5. The same guard blocks NiO and MnO on `R -3 m:R` at k = (½ ½ ½) (#757); that
   route's report-side raise is WP-2221 (#1688). Which route is a magnetic-path design call, so
-  Mike's (#1075).
+  Mike's (#1075). **Update 2026-11-21, from WP-2221:** the raise is fixed (PR #1721, merged
+  2026-11-20), so the NiO child reports and writes its CIF. Mike's ruling on #1688 states such
+  a child's magnetic group and directions in the parent's frame; WP-2221 carries that work.
 
 - **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
   chooses between two site assignments by a χ² gap smaller than its own stop scatter, and
@@ -1019,6 +1021,81 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-20 — K1a's review follow-ups merged from outside (PR #1703)
+
+`kvector_equivalents` now reads a parent on rhombohedral axes (`:R`) as the primitive lattice it is. Before, it took the centring from the symbol's first letter. A `:R` cell was then read as R-centred, a lattice of a third its volume, and partners were listed that its hexagonal twin (`:H`) does not list. On a pseudo-cubic R -3 m cell at α = 89°, 453 of 511 k on the 1/8 grid gave different partners or deviations. With the fix, the two settings agree on all 511.
+
+*Done.* PR #1703 (outside contributor, head `f7d2f7c60`) merged as `20255ddfa` on 2026-11-20. It closes three of the #1549 review's open points. Follow-up 3 of the 2026-11-19 entry (the {0, ½, 1} comment) is now a corrected comment. The `metric_deviation` question became a test that pins the number to the map stored in `operation`, and the code was already right. The `:R` centring fix is the one code change. Follow-ups 1 and 2 of that entry (the repeated shuffle null, the 100-shuffle percentile) are not in this PR. Follow-up 2 stays K1b's. No issue closed. M-8 stays unticked, so the WP stays 🔄.
+
+*Checked in review.* Both of the PR's revert checks reproduced. Only gemmi's 7 `:R` settings disagree between `xhm()[0]` and `centring_type()`. The three other places that read a centring from the symbol's letter are safe: `irreps.primitive_basis` falls back to the Hermite normal form, `superspace.generation._holohedry` sees only standard settings, and `superspace.symbols._positions` refuses `:R`. Full suite on the merged tree `5ee5012bd` (main `6c3a2db5e` plus head `f7d2f7c60`; arm64 Mac, `[dev]`, Python 3.12): 15 898 passed, 444 skipped, 52 xfailed and 1 failed, in 2654 s, slow tier included, with nothing else holding the suite lock. The failure is `test_suite_alarms.py::test_the_standards_fire_what_the_pin_says`: the acceptance standards' diagnostics no longer match `tests/data/suite_alarms.json`. It fails identically on bare main `6c3a2db5e` on this Mac, and `kvector_equivalents` has no caller on the fit path, so I count it against main, not this PR. The venv has no jax, which accounts for the extra skips. `tests.audit_delta`: no change. `tests.reader_output`: no change.
+
+*Next.* Follow-ups 1 and 2 of the 2026-11-19 entry stay Michael's to take or leave, follow-up 2 inside K1b. K1b itself waits on #795's decisions 3 and 4. The alarm-pin failure on this Mac is main's, and the Linux nightly of 2026-11-19 passed it.
+
+This entry was written by a ghostshift runner in PR #1729, which changes only the WP files and the index.
+
+### 2026-11-19 — M-8's K1a merged from outside (PR #1549)
+
+Michael's K1a is on main. An agent can now score a rational k-grid against a pattern's
+unexplained peaks and compare each score with a shuffle null, passing every setting by hand.
+Nothing yet ranks the grid or picks a k. That is K1b. The review left three follow-ups for
+Michael, none blocking, and one bears on K1b's defaults.
+
+*Done.* PR #1549 (outside contributor, head `ac10ceb5c`) merged as `1ea22b302` on
+2026-11-19. Its round-2 push answered all three asks of the round-1 review (posted
+2026-11-17). The PR closes no issue, since K1a is one part of #795 and of this WP. M-8 stays
+unticked: the ranking, `best_or_none()`, the default radius and the two warnings are K1b's.
+This entry was written by a ghostshift runner in PR #1701, which changes only this file.
+
+*Measured.* Full suite on the merged tree `e13d968a9` (main `efb3cd005` plus head
+`ac10ceb5c`; arm64 Mac, `[dev,jax]`, Python 3.12, run alone): 16 002 passed, 262 skipped,
+50 xfailed and 1 failed, in 2445 s. The failure is #1424's two-site row. It fails the same
+way on bare main `efb3cd005` and on the Linux nightly. `tests/test_indexing_kvector.py`
+alone: 50 passed. Ruff was clean. `tests.audit_delta` listed 11 added rows, none of them
+unaudited. `tests.reader_output` showed no change against `efb3cd005`.
+
+*Follow-ups, Michael's to take or leave.*
+
+1. The negative-arm test builds the same shuffle null 21 times. The null depends only on
+   the peak count. Built once, the test would drop from 7.4 s on the CI Python 3.11 leg to
+   about 1 s.
+2. A 99th percentile taken from 100 shuffles is a noisy threshold. Against a 2000-shuffle
+   null its true exceedance rate was 0.9-7.5 % over five seeds, where 1 % was meant. This
+   bears on K1b's default shuffle count and percentile, and those are Michael's call.
+3. A test comment says a fixed k component takes the values {0, ½, 1}. That holds for the
+   groups the test uses. P6/mmm gives 1/3 (its K point) and R-3m gives 3/2.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor) is
+Michael's, once #795's decisions 3 and 4 are ruled. The #1424 two-site row stays red on main
+until its own decision is made on that issue.
+
+### 2026-11-12 (2nd session) — M-8's machinery half, K1a (`indexing/kvector.py`, #795)
+
+Under the maintainer's 2026-11-11 rulings on #795 (decision 1: `indexing/kvector.py` under
+the indexing rulebook; decision 2: the rational grid now, through the existing generator),
+K1a lands the calls an agent composes by hand and nothing that ranks or chooses:
+`kgrid_strata` (rational k of step 1/n, n ≤ `K_MAX_DENOMINATOR`, one representative per
+class modulo the centred L*, strata from the little co-group), `kgrid_positions`,
+`score_kvector` and `score_kgrid` (the local Poisson-binomial score), `kgrid_null` (the
+per-pattern shuffle null, whole sample reported) and `kvector_equivalents` (star, −k,
+G − k, and the metric's near-symmetric partners, with `K_SEARCH_PARTNER`). The radius,
+denominator, strata, band, exclusion windows, shuffle count, percentile, seed and partner
+tolerance are required arguments. Per the maintainer's condition, every grid record carries
+its grid step, the strata searched and left, and a `coverage` sentence claiming nothing
+about k off the grid. M-8 stays unticked: the ranking, `best_or_none()`, the default
+radius and the two warnings are K1b's.
+
+*Measured.* arm64 Mac, `.venv-test` `[dev]`: `tests/test_indexing_kvector.py` and the
+audit, help and docs-consistency files green (counts in the PR). On the 1/64 Pnma grid
+(35 936 k = 33³ − 1, Γ excluded) a planted (0, 18/64, 0) with ten clean satellites scores
+9.61 against a 100-shuffle 99th percentile of 5.09 (+4.52 decades); positions build in
+14 s and the null costs 7 s more per pattern. Without satellites, a 10 % profile misfit put
+0 of 200 grid maxima above their thresholds at about four unexplained peaks each, and 2 of
+40 at about 26 (binomial expectation 0.4): shoulders just outside the exclusion windows
+are not uniform, which the exclusion half-width the caller passes decides.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor)
+once this merges and #795's decisions 3 and 4 are ruled.
 
 ### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
 

@@ -584,6 +584,7 @@ def test_two_phase_synthetic_qpa():
     # refine from perturbed scales (both start equal) and a slightly-off cell
     start, start_ins = _two_phase_truth(la_scale=1e-3, caf2_scale=1e-3)
     start.phases[0].cell.a.value += 0.01
+    start.phases[0].cell.b.value = start.phases[0].cell.c.value = start.phases[0].cell.a.value  # the cell's ties follow a
     ref = Refinement(start, start_ins)
     result = ref.fit(data, plan="mccusker_default")
 
