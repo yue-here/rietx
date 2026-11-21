@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Text tab in review (#PRNUM); the maintainer's look at both tabs waits
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Text tab in review (#1763); the maintainer's look at both tabs waits
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -283,7 +283,7 @@ The Text tab (the second PR), most consequential first:
 
 ## Handover log
 
-- **2026-11-21** — the Text tab at `/next`, the second of R4's two PRs (#PRNUM), and the
+- **2026-11-21** — the Text tab at `/next`, the second of R4's two PRs (#1763), and the
   screenshots and inventory for both tabs. The rebuilt page now shows the project as `.rxt`
   text. A typed change is one pending edit in the action bar beside the Parameters panel's,
   so the window has one Apply, and the editor marks each line that differs from the stored
