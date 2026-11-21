@@ -167,15 +167,79 @@ export function formatParts(s: Pick<Slider, "exp" | "decimals">, v: number):
            exp: s.exp == null ? "" : String(s.exp).replace("-", "−") };
 }
 
-/** The value as a person would type it back: no slot, no typographic minus. */
-export function editText(v: number): string {
+const SUPER = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
+/**
+ * A range end as the range pop-up's From and To write it: the value box's
+ * decimals and power of ten, with a hyphen-minus a person can type back
+ * (WP-2218). Where those digits would not read back as the value itself, as for
+ * a range a person typed with more of them, the decimals grow until they do, so
+ * the field never shows a number that is not the range's.
+ */
+export function rangeText(s: Pick<Slider, "exp" | "decimals">, v: number): string {
+  if (!Number.isFinite(v)) return "";
+  let text = "";
+  for (let d = s.decimals; d <= 15; d++) {
+    text = fixedText(s.exp, v, d);
+    if (readNumber(text) === v) break;
+  }
+  return text;
+}
+
+/** `v` at `d` decimals of its mantissa under the power `exp`, as typed. */
+function fixedText(exp: number | null, v: number, d: number): string {
+  const m = (exp == null ? v : v / 10 ** exp).toFixed(d);
+  const text = /^-0\.?0*$/.test(m) ? m.slice(1) : m;
+  if (exp == null) return text;
+  const e = String(Math.abs(exp)).split("").map((c) => SUPER[+c]).join("");
+  return `${text}×10${exp < 0 ? "⁻" : ""}${e}`;
+}
+
+/**
+ * A computed range rounded outward to the value box's digits, so the range
+ * pop-up's From and To read as the box does: Caglioti U's ×¼ to ×4 opens on
+ * 0.2773×10⁻³ to 4.4362×10⁻³, never 0.000277258872224 (WP-2218). An end that
+ * rounding would push past the row's bound rounds inward instead. Where
+ * rounding would leave the range empty, off the last fit, or a logarithmic
+ * track at zero, the range stays as computed.
+ */
+export function roundRange<S extends Pick<Slider, "lo" | "hi" | "ref" | "bound" | "track" | "exp" | "decimals">>(s: S): S {
+  const d = s.decimals, q = 10 ** d, scale = s.exp == null ? 1 : 10 ** s.exp;
+  const at = (n: number) => readNumber(fixedText(s.exp, (n / q) * scale, d));
+  const down = (v: number) => at(Math.floor(Number(((v / scale) * q).toPrecision(12))));
+  const up = (v: number) => at(Math.ceil(Number(((v / scale) * q).toPrecision(12))));
+  let lo = down(s.lo), hi = up(s.hi);
+  if (lo < s.bound[0]) lo = up(s.lo);
+  if (hi > s.bound[1]) hi = down(s.hi);
+  const held = s.ref >= s.lo && s.ref <= s.hi;
+  if (!(hi > lo) || (held && !(s.ref >= lo && s.ref <= hi)) || (s.track === "log" && !(lo > 0))) return s;
+  return { ...s, lo, hi, ...fixFormat(lo, hi, s.ref) };
+}
+
+/** A typed number, plain, as `1e-3`, or as `1.5×10⁻³` (also `x10^-3`); NaN otherwise. */
+export function readNumber(text: string): number {
+  const t = text.trim().replaceAll("−", "-");
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*(?:[×x*]\s*10(?:\^\s*([+-]?\d+)|([⁺⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)))?$/i.exec(t);
+  if (!m) return NaN;
+  const mantissa = Number(m[1]);
+  if (m[2] == null && m[3] == null) return mantissa;
+  const exp = m[2] != null ? Number(m[2])
+    : Number(m[3].replace("⁺", "").replace("⁻", "-").split("").map((c) => (c === "-" ? c : SUPER.indexOf(c))).join(""));
+  return mantissa * 10 ** exp;
+}
+
+/** A value at 12 significant figures with no slot and no typographic minus:
+ *  the old page's "Last fit" line and its range fields draw this. An editor
+ *  opens on `editText` instead, the value to its last digit (WP-2223). */
+export function plainText(v: number): string {
   return Number.isFinite(v) ? String(Number(v.toPrecision(12))) : "";
 }
 
-/** Read a typed value, or say why it is refused (not a number, out of the row's bounds). */
+/** Read a typed value, or say why it is refused (not a number, out of the
+ *  row's bounds). It reads what the range fields read (`readNumber`): plain,
+ *  `1.5e-3`, `1.5×10⁻³` or `1.5x10^-3` (WP-2223). */
 export function parseTyped(s: Pick<Slider, "bound">, text: string): { value: number } | { why: string } {
-  const t = text.trim().replaceAll("−", "-");
-  const v = t === "" ? NaN : Number(t);
+  const v = text.trim() === "" ? NaN : readNumber(text);
   if (!Number.isFinite(v)) return { why: "not a number" };
   if (v < s.bound[0]) return { why: `below the lower bound ${s.bound[0]}` };
   if (v > s.bound[1]) return { why: `above the upper bound ${s.bound[1]}` };

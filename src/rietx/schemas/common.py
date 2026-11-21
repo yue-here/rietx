@@ -717,7 +717,14 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (WP-2073, the maintainer's acceptance of 2026-11-17):
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: Also in 0.62 (WP-2073, the maintainer's acceptance of 2026-11-17):
 #: ``PhaseQuantity.support_sigma`` and ``PhaseQuantity.conditional_on``, what a
 #: fraction rests on, ``QuantitativePhaseAnalysis.esd_basis`` (where an esd came
 #: from when ``Refinement.qpa`` was handed a covariance), and
@@ -725,7 +732,7 @@ from .._nearmiss import did_you_mean
 #: ``.conditional_on`` / ``.unconstrained`` per point.  Additive and defaulted
 #: (``None``, empty), the 0.25 → 0.26 rule: every stored result opens with
 #: the fields unmeasured; an older build refuses a document carrying them.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated

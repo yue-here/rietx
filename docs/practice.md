@@ -27,7 +27,7 @@ The Lorentzian column is the area a pure Lorentzian loses to the default cut.
 | Program | Default cut | Lorentzian area lost | When the window is set |
 |---|---|---|---|
 | rietx | `WINDOW_AREA_TOL`, 2 % of each peak's own area | 2 % | once per stage, at the stage's start (checked (source)) |
-| TOPAS | `ymin_on_ymax` 0.001 of the strongest line's height | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
+| TOPAS | `ymin_on_ymax` 0.001 of each peak's own height (a property of the emission profile, TR v5 §5.3.2 p.48; corrected 2026-11-19 from "the strongest line's") | 2.0 % | peak buffer rebuilt when a width moves past `aberration_range_change_allowed`, and per derivative for width parameters (§7.4, §7.7, checked (manual)) |
 | MAUD | ±30 HWHM (±15 FWHM) | 2.1 % | every evaluation, finite-difference columns included (checked (source)) |
 | RIETAN-FP | `PC` 0.002 of each peak's own height, in three of four shipped examples; no default | 2.8 % | every evaluation (ran) |
 | FullProf | `Wdt` × FWHM each side; no default, floored at 3; examples 3-15, PbSO₄ 6 | 5.3 % at 6 (10.5 % at 3, 2.1 % at 15) | once per run, at the starting widths (`Ias = 0`, ran); `Ias = 1` lags one cycle |
@@ -85,11 +85,38 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 | EasyDiffraction | 4° in 2θ each side of the included points (checked (source)) |
 | BGMN | about the Kα₁-Kα₂ split, 0.05° at 30° to 0.6° at 150° (ran) |
 
+The two cuts agree only for a pure Lorentzian. For a mixed peak, the height cut keeps more
+tail than rietx's area cut. At 0.001 of the peak's height the window is ±1.6 FWHM at η = 0,
+±4.2 at η = 0.1 and ±11.2 at η = 0.6. rietx's 2 % of the area gives ±1.0, ±1.6 and ±9.5,
+before its 0.3° movement slack (`WINDOW_MIN_DEG`). Computed 2026-11-19 for WP-2228.
+
+### A reflection centred past the range end
+
+Surveyed 2026-11-19 for WP-2228, one agent, the GSAS-II lines from its source. The case: the
+range ends inside the tail of a strong reflection centred just outside it. In a Le Bail or
+Pawley fit, a neighbour's free intensity can absorb an unmodelled tail and drag the cell.
+
+| Program | Its in-range tail | Le Bail or Pawley handling | Warning or guidance |
+|---|---|---|---|
+| rietx | the reflection's own window, which can hold no channel (WP-2228) | Pawley ridges an off-data intensity toward zero (`PAWLEY_OFF_DATA_RIDGED`, WP-1459); Le Bail nothing | none |
+| GSAS-II 5.8.4 | not modelled: the reflection is not generated (`GSASIIstrIO.py:3177`) | the Pawley upper limit is clipped to the Pawley dmin (`GSASIIstrIO.py:3019-3025`) | the Pawley help page advises against reflections beyond the limits (checked (source), checked (manual)) |
+| TOPAS (TR v5) | an ordinary peak, generated within `extra_X_right` | a free intensity like any other (inferred, not run); p.111 warns that low-d-edge Pawley intensities can be badly wrong | none found (checked (manual)) |
+| FullProf | an ordinary peak, generated within 3 × `Wdt` × FWHM | none in the fit; `Dum = 3` leaves reflections near a limit out of R_Bragg and the hkl files | the manual warns a small `Wdt` leaves "discontinuities in the edges" (checked (manual)) |
+| RIETAN-FP | not modelled: the reflection is dropped with its tails | none in the fit; the `.lst` marks `H` a reflection whose profile passes 2θmax, left out of R_B and R_F (§17.8.10) | §11.1 advises widening Le Bail profile ranges step by step (checked (manual)) |
+| MAUD, BGMN, EasyDiffraction | not checked | not checked | not checked |
+
+What practice adds up to: no program windows or restrains such a reflection specially. Either
+it is generated and gets a free intensity on a sliver of data (TOPAS, FullProf, rietx), or it
+is left out and its tail is unmodelled (GSAS-II, RIETAN-FP). FullProf and RIETAN-FP flag edge
+reflections in their output. The literature read (McCusker et al. 1999 §5 and §12.4; Hill
+1992; Le Bail 2005; Toby 2006) treats each peak's own cut-off and says nothing about a peak
+centred outside the data. Pawley (1981) was not read.
+
 ## Staging and what a stage holds
 
 | Program | Staging | Held during a fit |
 |---|---|---|
-| rietx | plans of cumulative stages; a stage may also fix (WP-2208); the closing stage re-solves the declared stages' end state | reflection list, windows, FCJ nodes: per stage |
+| rietx | plans of cumulative stages for a first fit; a stage may also fix (WP-2208); the closing stage re-solves the declared stages' end state. A re-fit of a model its last fit converged runs the plan collapsed into one stage, falling back to the stages when that stage is rejected (WP-2224, as a series' warm patterns have since v0.5) | reflection list, windows, FCJ nodes: per stage |
 | RIETAN-FP | `NAUTO = 2`: early cycles refine subsets (background and scale; widths; asymmetry; widths and asymmetry; cell; atoms), then everything together to convergence. `NAUTO = 1`: the user lists the early cycles | windows follow every evaluation; Le Bail intensities per cycle |
 | BGMN | automatic: isotropic models first, anisotropic ones added, then a closing run with everything free restarted from the answer; a weak anisotropic term is switched off | the ray-traced instrument function for the whole fit |
 | MAUD | the refinement wizard: cumulative stages (scales and background; cell, zero, B; size and strain; atoms), no final all-free cycle | windows follow every evaluation; texture, strain, Le Bail intensities and structure factors per iteration |
@@ -100,6 +127,27 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 
 None of the seven tests whether its answer depends on the path or the start, and none of
 their manuals discusses it.
+
+Surveyed 2026-11-19 for WP-2224. The three programs without staging run one solve of whatever
+is free from the current values, so a re-fit in one stage is what their users do.
+
+### When a fit stops
+
+| Program | Stopping rule | Default |
+|---|---|---|
+| rietx | the solver's `ftol` on the relative change in cost; intermediate stages at 1e-6 (`intermediate_ftol`), the last stage at the solver's 1e-9 | checked (source) |
+| GSAS-II 5.8.4 | `min dM/M` 0.001 on the relative change in the minimised function, and `max cyc` 3 cycles a `Refine` call (`GSASIIobj.py:20`; `GSASIImath.HessianLSQ`, `GSASIImath.py:164-432`) | checked (source) |
+| FullProf | every shift under `Eps` times its esd, from `NCY, Eps` on line 9 of the control file; the manual calls `Eps = 0.2` "or lower" reasonable | checked (manual) |
+| TOPAS | the change in χ² under `chi2_convergence_criteria` for three consecutive cycles (Technical Reference v9 § 20.12) | checked (manual); the default value is not stated in the text |
+
+### How far one iteration may move a parameter
+
+TOPAS limits the move of each parameter type in one iteration, to "stabilize refinement"
+(Technical Reference v9 § 2.18 and Table 2-1, read 2026-11-19). A cell length may move between
+0.995·Val − 0.05 and 1.005·Val + 0.05 Å, and a Beq by ±10 Å². Part of its reach from a far start
+rests on these limits. rietx, GSAS-II and FullProf take the damped Gauss-Newton step with no
+limit per type (checked (source) for rietx and GSAS-II, (manual) for FullProf's relaxation
+factors, which scale a shift rather than bound it).
 
 ## A site's multiplicity during a fit
 
@@ -183,6 +231,24 @@ off. Three readers checked every citation above in the source or manual on 2026-
 scratch copies were not kept. The claims they marked inferred are TOPAS's quadrature/linear
 combination rule (not stated in the reference), the scope of `force_positive_fwhm`, and
 FullProf's constant-wavelength combination rule with an IRF.
+
+### When one twin reaches its limit, and a re-run
+
+Read 2026-11-19 (WP-2225), one session, GSAS-II source only. rietx holds the instrument half of
+a twin pair for the stage whenever the specimen half is free. Its test reads no bound. A
+specimen width that lands on its floor of 0 therefore leaves its instrument partner held where an
+earlier stage put it, and no free parameter in the stage can narrow that part of the width.
+
+| Program | A refined parameter that reaches a limit | A re-run of a converged refinement |
+|---|---|---|
+| rietx | the step lands it on its box bound and it stays free; its instrument twin stays held (`refine._width_twin_flats` reads C and no bound, checked (source)) | `fit` runs the plan's stages again. The stage that frees the instrument widths and no twin re-solves them, so each staged re-fit moves them once (measured, WP-2225). WP-2224 makes a re-fit one stage, which applies the hold again and moves nothing |
+| GSAS-II 5.8.4 | limits are the user's (`Controls['parmMinDict']`, set in the GUI; none by default). After a refinement, a variable outside its limit is reset to the limit, its esd set to 0, and frozen for later refinements with a printed warning. Its partner keeps refining (`GSASIIstrMain.py:573-599`, `dropOOBvars` at `:1198`, checked (source)) | the frozen list is removed from the vary list at the start of every refinement (`:530-542`, checked (source)); each refinement starts from the stored values (inferred) |
+| TOPAS | `min`/`max` on a `prm`; not checked this session | `num_runs` re-reads the INP (§ A stage that fixes a parameter) |
+| FullProf | not checked | the program rewrites the PCR and a re-run continues from it with the same codes (§ A stage that fixes a parameter) |
+
+In the one program read, the parameter that crossed its limit is the one taken out, and its
+partner keeps refining. No program holds an instrument width because its specimen twin is free
+(the table above), so none meets this case in the form rietx does.
 
 ## Extinction
 
@@ -395,8 +461,8 @@ during the chain. The behaviours with no program default behind them are rietx's
 restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
 median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 its gap list; the step list and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
-counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`) and the per-pattern code
+counts.
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
@@ -868,6 +934,39 @@ user setting with no stated derivation. No program found reports a correlation a
 undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
+
+## The esd of a parameter on a direction the data does not determine
+
+Read 2026-11-18 for WP-2028 (PR #1668's open question). Several parameters can trade along a
+direction that leaves χ² unchanged. The Gaussian width is one case: Γ_G² = W + size/cos²θ +
+strain·tan²θ, and 1/cos²θ = 1 + tan²θ. Should each such parameter still get a finite esd from
+the directions the data did measure, or none? rietx keeps the finite esd and warns with
+`COVARIANCE_DIRECTION_DISCARDED` (WP-1535). That esd is at least √2 short by construction,
+and WP-2028 measured one 140× short. Which esd a fit gets is itself set by
+rounding. On that width triple the smallest eigenvalue sat at 2.2e-16 to 1.6e-15 of the largest,
+against a cut of 1e-15. A cut direction read ± 3.9e-7 on W, and a kept one ± 5.5 (WP-2028).
+
+| Source | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | A column with a zero diagonal is a "hard" singularity. The parameter is dropped from the refinement and reported as "Parameter(s) dropped" (`GSASIImath.HessianLSQ`, `:264-266`; `GSASIIstrMain.ReportProblems`, `:54-139`). A combination direction is "soft". The Hessian is scaled to unit diagonal and inverted by an SVD that zeroes every singular value under 1e-6 of the largest (`setHcorr`, `GSASIImath.py:131-148`). Every parameter keeps the finite esd that inverse gives. The count of zeroed values and the parameters most involved are reported as "soft (SVD) Hessian singularities" (`setSVDwarn`, `:150-162`) | checked (source) |
+| TOPAS 5 and v9 | `do_errors` gives errors and `C_matrix_normalized` from the A matrix (TOPAS 5 Technical Reference §3.7). v9 takes them from an SVD by default (§5.10); its cut is not stated. `bootstrap_errors` refits resampled data and quotes the spread of the refined values (TOPAS 5 Technical Reference, keyword `bootstrap_errors`; Efron & Tibshirani 1986). Nothing marks an esd as undetermined | checked (manuals) |
+| FullProf | A singular matrix stops the run. The manual advises starting from the scale factors alone and refining separately any pair correlated above about 50 % (FullProf manual, Trouble shooting and p. 14) | checked (manual) |
+| Prince (2004), *Mathematical Techniques in Crystallography and Materials Science*, § Correlation | An exactly singular Hessian "has no inverse". A variance computed while leaving out variables correlated with the one of interest is too small, and "the apparent precision will be illusory". The book's remedy is a constraint that removes the indeterminacy (§ Constraints, p. 127) | checked (text) |
+| Linear-models theory (Searle 1971, *Linear Models*, p. 169; summarised in the SAS/STAT guide, "Finding the Least Squares Estimators") | In a rank-deficient model a parameter that is not estimable has no unique estimate. A generalized inverse gives one solution of infinitely many, and a variance built from it depends on which inverse was taken. Standard errors are quoted for estimable combinations only, which no choice of inverse moves | checked (secondary) |
+| R `lm` | A pivoted QR drops each column that depends on the earlier ones. Its coefficient and standard error print as `NA`, "not defined because of singularities", and the others are conditional on it being zero (R-help, Ripley 2008; `?alias`) | checked (secondary) |
+| SAS PROC GLM | Estimates from a generalized inverse are flagged "B", "not uniquely estimable". A coefficient set to zero by the inverse shows a missing standard error (SAS usage note 22585; SAS/IML blog 2018-11-28) | checked (secondary) |
+| scipy 1.18.1 `curve_fit` | No treatment. On y = (a + b)x + c, the same data from two starts gave a and b esds of 5.0e6 and 9.1e6 (`lm`), or 4.3e4 and 1.5e5 (`trf`), with c's esd near 6.4e-3 in all four fits and no warning (run 2026-11-18) | measured |
+| SHELXL, Jana, MAUD, BGMN, RIETAN-FP | not checked | |
+
+**The practice.** Statistics is settled: a parameter the data cannot estimate has no standard
+error, and software that meets one prints none (R, SAS). Both then quote the other parameters
+conditional on a stated choice: R fixes the later column at zero. The crystallographic textbook
+agrees and asks for a constraint. The two crystallographic programs that report errors through
+a singular matrix (GSAS-II, TOPAS) do what rietx does today. They quote the finite esd of a
+truncated SVD, and GSAS-II adds a warning naming the parameters. GSAS-II drops a parameter only
+when its own column has no gradient. A truncated SVD is an unstated constraint: the minimum-norm
+solution in the units the matrix was scaled to. So its esd is conditional on a choice nobody
+made, and it changes with the scaling.
 
 ## Stephens anisotropic strain: the width's shape and its clamp
 

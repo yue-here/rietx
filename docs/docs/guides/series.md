@@ -24,13 +24,13 @@ SeriesResult: 7 pattern(s), rietveld, direction=forward
   trajectory (T (K)):
     largest step phases.0.cell.a 504.8σ at p001→p002 (series.steps)
     most frequent per-pattern codes: CAPILLARY_OFFSET_UNAVAILABLE on instrument.geometry.goniometer_radius_mm 7 of 7, PATTERN_UNDERSAMPLED 7 of 7 (series.code_counts)
-    [1/7] p000 x=300 converged Rwp=0.0409
-    [2/7] p001 x=400 converged Rwp=0.0409
-    [3/7] p002 x=500 converged Rwp=0.0399
-    [4/7] p003 x=600 converged Rwp=0.0405
-    [5/7] p004 x=700 converged Rwp=0.0406
-    [6/7] p005 x=800 converged Rwp=0.0402
-    [7/7] p006 x=900 converged Rwp=0.0404
+    [1/7] p000 x=300 converged Rwp=0.0412
+    [2/7] p001 x=400 converged Rwp=0.0411
+    [3/7] p002 x=500 converged Rwp=0.0400
+    [4/7] p003 x=600 converged Rwp=0.0407
+    [5/7] p004 x=700 converged Rwp=0.0408
+    [6/7] p005 x=800 converged Rwp=0.0405
+    [7/7] p006 x=900 converged Rwp=0.0406
 ```
 
 `labels=` names the patterns, and without it they are `p000` to `p006`.
@@ -66,13 +66,13 @@ Each pattern's own diagnostics are in `series[k].diagnostics`.
 ```text
 Trajectory: phases.0.cell.a, 7 point(s)
   label  T (K)  value
-  p000   300    4.1565938(43)
-  p001   400    4.1586732(43)
+  p000   300    4.1565938(44)
+  p001   400    4.1586732(44)
   p002   500    4.1607616(41)
-  p003   600    4.1628387(42)
-  p004   700    4.1649106(43)
-  p005   800    4.1669853(43)
-  p006   900    4.1690659(42)
+  p003   600    4.1628387(43)
+  p004   700    4.1649106(44)
+  p005   800    4.1669853(44)
+  p006   900    4.1690659(43)
 ```
 
 Each value lies within 2 esd of the cell edge its pattern was made from.
@@ -90,17 +90,17 @@ A pattern that did not refine the parameter has no point in the trajectory, so `
 
 <!-- output of examples/guides/series.py -->
 ```text
-p000  cold   38 evaluations
-p001  warm   15 evaluations
-p002  warm   15 evaluations
-p003  warm   15 evaluations
-p004  warm   15 evaluations
-p005  warm   15 evaluations
-p006  warm   15 evaluations
+p000  cold   35 evaluations
+p001  warm   12 evaluations
+p002  warm   12 evaluations
+p003  warm   12 evaluations
+p004  warm   12 evaluations
+p005  warm   12 evaluations
+p006  warm   12 evaluations
 ```
 
 The first pattern runs the whole plan from your starting model.
-Every later one starts from its neighbour's answer and runs the plan as a single stage, then the closing stage, about two-fifths of the work here.
+Every later one starts from its neighbour's answer and runs the plan as a single stage, about a third of the work here.
 When a warm fit diverges or its Rwp rises well above the series median, the pattern is fitted again from the neighbour's answer with the whole plan, and then from your starting model.
 `entry.rung` says which of the three attempts gave its values: `warm`, `warm_staged` or `cold`.
 

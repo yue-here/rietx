@@ -49,6 +49,7 @@ import pytest
 import rietx as rx
 from rietx.crystallography.magnetic.isotropy import candidates
 from rietx.crystallography.magnetic.supercell import anti_translation_ties, magnetic_supercell
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 from rietx.schemas.structure import Atom, Cell, Parameter, Phase
 from rietx.strategy.staged import PLAN_INFO, PLAN_PRESETS, RefinementPlan
 
@@ -147,8 +148,12 @@ def test_the_preset_frees_the_moduli_then_the_moments_then_the_structure():
     assert [s.turn_on for s in plan.stages[3:]] == [
         s.turn_on for s in RefinementPlan.mccusker_structural().stages[1:]]
     # staging is cumulative and the closing stage frees every glob, so the
-    # moments are free to the end
-    assert "phases.*.atoms.*.moment.dof*" in plan.closing_stage().turn_on
+    # moments are free to the end (the closing stage declared, since WP-2222
+    # turned it off by default)
+    import dataclasses
+
+    closed = dataclasses.replace(plan, closing_window_tol=CLOSING_WINDOW_TOL)
+    assert "phases.*.atoms.*.moment.dof*" in closed.closing_stage().turn_on
     assert PLAN_INFO["magnetic_structural"].modes == ("rietveld",)
 
 

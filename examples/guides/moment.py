@@ -14,6 +14,7 @@ import tempfile
 from _cr2wo6_pair import BACKGROUND, CELL, ZERO, instrument, nuclear_plan, pattern, trirutile
 
 import rietx as rx
+from rietx.schemas.plan import CLOSING_WINDOW_TOL
 
 ordered, paramagnetic = pattern(4), pattern(150)
 
@@ -61,12 +62,13 @@ with tempfile.TemporaryDirectory() as folder:
 structure.phases[0].scale.value = blind.fitted_structure.phases[0].scale.value
 fitted_instrument = blind.fitted_instrument
 
-# every nuclear term, and the moment, free in one stage
+# every nuclear term, and the moment, free in one stage; the rounds are compared,
+# so each ends with the closing stage
 everything = rx.RefinementPlan(stages=[rx.Stage("all", [
     "phases.0.scale", *BACKGROUND, "phases.0.atoms.*.moment.dof*",
     "instrument.zero_shift", "phases.0.cell.*", "phases.0.atoms.*.dof.*",
     "phases.0.atoms.*.biso", *(f"instrument.profile.{k}" for k in "uvwx")],
-    max_iter=200)], intermediate_ftol=1e-6)
+    max_iter=200)], intermediate_ftol=1e-6, closing_window_tol=CLOSING_WINDOW_TOL)
 
 ROUNDS = 5
 previous = moment.magnitude
@@ -100,12 +102,15 @@ assert abs(shift) < scale.stderr
 # 2026-10-23), so the page prints one decimal and quotes the range
 blind_m = solution.best.moments[0]
 assert 2.015 < blind_m.magnitude < 2.04 and abs(blind_m.esd - 0.05) < 0.005, (blind_m.magnitude, blind_m.esd)
-assert abs(reference.best.moments[0].magnitude - 2.09) < 0.005 and abs(reference.best.moments[0].esd - 0.03) < 0.005
+assert abs(reference.best.moments[0].magnitude - 2.11) < 0.005 and abs(reference.best.moments[0].esd - 0.03) < 0.005
 assert abs(row.magnitude - 2.12) < 0.01 and abs(row.magnitude_esd - 0.04) < 0.006, (row.magnitude, row.magnitude_esd)
-# "the blind moment is 0.05 to 0.07 and 0.09 to 0.11 μB below the other two, which agree
+# "the blind moment is 0.07 to 0.09 and 0.09 to 0.11 μB below the other two, which agree
 # within their esds"
+# Moved with WP-2222 (closing stage off by default, 2026-11-19): the reference moment
+# 2.09 -> 2.11, so the first gap 0.06 -> 0.08 (the band moves, its width stays); lattice
+# held 2.07 -> 2.10; profile freed Rwp 0.107 -> 0.105 and 2.10 -> 2.13.
 ref_m = reference.best.moments[0]
-assert 0.045 < ref_m.magnitude - blind_m.magnitude < 0.075
+assert 0.065 < ref_m.magnitude - blind_m.magnitude < 0.095
 assert 0.085 < row.magnitude - blind_m.magnitude < 0.115
 assert abs(row.magnitude - ref_m.magnitude) < row.magnitude_esd + ref_m.esd
 # "about half its esd": the rounds stop at one of two points, 0.41 or 0.47 esd, and rounding
@@ -131,7 +136,7 @@ lattice_held = rx.solve_magnetic(frozen, ordered, sites=["Cr1"], ion="Cr3+", pla
 print(f"lattice held: Rwp {lattice_held.best.rwp:.2f}, |m| = {lattice_held.best.moments[0].magnitude:.2f}")
 print(f"lattice freed: Rwp {reference.best.rwp:.2f}")
 assert abs(lattice_held.best.rwp - 0.23) < 0.005 and abs(reference.best.rwp - 0.115) < 0.005
-assert abs(lattice_held.best.moments[0].magnitude - 2.07) < 0.03
+assert abs(lattice_held.best.moments[0].magnitude - 2.10) < 0.03
 assert abs(lattice_held.best.moments[0].magnitude - reference.best.moments[0].magnitude) < 0.05
 
 # Freeing the profile too, as the page says.
@@ -146,4 +151,4 @@ freed = rx.solve_magnetic(profiled, ordered, sites=["Cr1"], ion="Cr3+", plan=rx.
     rx.Stage("moment", ["phases.*.atoms.*.moment.dof*", *wide])]))
 fm = freed.best.moments[0]
 print(f"profile freed: Rwp {freed.best.rwp:.3f}, |m| = {fm.magnitude:.2f} ± {fm.esd:.2f}")
-assert abs(freed.best.rwp - 0.107) < 0.005 and abs(fm.magnitude - 2.10) < 0.03 and fm.esd < 0.04
+assert abs(freed.best.rwp - 0.105) < 0.005 and abs(fm.magnitude - 2.13) < 0.03 and fm.esd < 0.04
