@@ -140,6 +140,47 @@ transcriptions were deliberately not copied. TOPAS is a black box.
 
 - 2026-10-26 issue triage: #1063 (mustachefeeling, 2026-10-20), three FullProf-mCIF refusals on k = 0 files, independent of I-c. Checked against the tree at c0e32ab29, from `tests/test_magcif.py`'s Cr₂WO₆ fixture: (1) an empty `data_global` block ahead of the structure block, or one holding only `_audit_*` tags, raises "single data block expected, got 2 — this file does not read as a CIF (an empty, truncated or non-CIF file reaches here)" (`crystallography/cif.py:206-209`); (2) `_parent_space_group.name_H-M` without `_alt` raises `MagCifError` naming only the `_alt` tag (`magcif.py:683-690`); `cif_mag.dic` 0.9.9 defines only `name_h-m_alt` (`tests/data/cif_dictionaries/cif_mag.dic:3320`); (3) pre-2016 `_magnetic_atom_site_*`/`_magnetic_cell_*` tags raise "no atom sites found". Two real mCIFs from FullProf's example distribution (held locally, never to be committed) write `_parent_space_group.name_H-M` and both raise (2); with the tag renamed to `_alt`, both read. GSAS-II 5.8.4 falls back to `name_H-M` when `_alt` is absent (`imports/G2phase_CIF.py:242-244`, read 2026-10-26). Proposed: read `name_H-M` where `_alt` is absent, with an info diagnostic naming the non-dictionary tag, and refuse when both are present and disagree; read the one block holding an `_atom_site_` loop when every other block is empty or `_audit_*` only, with an info diagnostic naming the skipped blocks, while two structure blocks stay refused with a message that counts them and names `block=`; refuse the pre-2016 tag set by name. Item (1) edits the same reader lines as WP-1933's C-e (`structure_from_cif(block=)`), whose Inherited already records the wrong-cause message; build them together or land this rule first and let C-e generalise it. Each new code needs its `_audit` row (tier 1: the format's definition) and its `help.py`/skill row.
 
+- **2026-11-19, from the issue triage (PR #1697; issue #1688): a phase whose group gemmi cannot name
+  raises in `report()` and in the nuclear CIF writer.** I-d sets `parent_cell` where
+  `_closest_type` is `None`, so every phase it reads is this kind. On a `magnetic_supercell`
+  child (`R-3m [unnamed in 2a,a+b,a+c]`) the fit completes, then `report()` raises at
+  `crystallography/satellites.py:746` and `write_structure_block` at `io/cif/blocks.py:217`,
+  both through `OperatorGroup.closest_type`. Checked against the tree at 7a4a6cd20. WP-2221
+  owns the fix. I-d's acceptance run reaches the same raise until it lands.
+  **Update 2026-11-19, from WP-2221 (PR #1721):** both now return.
+  `OperatorGroup.crystal_system_str` reads the operators in any cell
+  (`symmetry.crystal_system_of`). `hm`, `ext`, `number`, `monoclinic_unique_axis` and
+  `cell_constraints` on such a list still raise, so an I-d phase states its cell through
+  `parent_cell`. Its satellite candidates omit the hexagonal (⅓, ⅓, ·) points, and its GUI
+  symmetry row stays an error row.
+
+- **2026-11-19, from the issue triage (PR #1697; issues #1689, #1691): the 4d ions past M⁺ have no
+  form-factor row, and computed rows are offered.** Folded here beside I-e because both add
+  rows to one table in `crystallography/magnetic/form_factor.py`, with an `ATTRIBUTION.md` row
+  and the table's fingerprint test, and because #1691's first question is I-e's own (which
+  analytic form the computed rows share). I-e as written covers 5d only, so this widens it.
+  - #1689: `magnetic_form_factor("Ru4+", s)` raises `KeyError`, as do `Ru3+` and `Rh4+`; the
+    table carries `Ru`, `Ru1+`. The refusal is #202's rule and stays. The reporter found no
+    held reference tabulating Ru²⁺-Ru⁴⁺ (Brown 2004 stops at M⁺ for every 4d element;
+    Kobayashi et al. 2011 is 5d). One MAGNDATA file among #757's 51 form-factor refusals is
+    Ru⁴⁺, so this row moves I-e's count.
+  - #1691: ten computed ⟨j₀⟩/⟨j₂⟩ rows (Ru³⁺-Ru⁶⁺, Rh⁴⁺, Tc⁴⁺, Mo³⁺-Mo⁵⁺, Nb⁴⁺), free-ion
+    Hartree-Fock from Cowan's RCN in Kobayashi's HFR footing, fitted to Brown's 7-parameter
+    form, with the reporter's controls (Brown's Fe³⁺ and Ru⁺, Kobayashi's Ir⁴⁺, a Dirac-Fock
+    check). It also proposes a user-supplied form factor with a required source string, and
+    leaves five questions open: which form ships, which ions, evaluation past s = 1.5 Å⁻¹,
+    where the input decks live, and where a user-supplied form factor is declared.
+  - #1691's comment of 2026-11-19: the shipped bare `"Mo"`, `"Tc"`, `"Ru"`, `"Rh"` rows are
+    Brown's fits to singly charged M⁺ 4dⁿ⁻³5s² curves under a neutral label, and the reporter
+    asks for a note on the rows or true neutral rows.
+  - Checked against the tree at 7a4a6cd20: the three `KeyError`s reproduce; the bare and `1+`
+    rows differ (`Ru` 0.4907 against `Ru1+` 0.4268 at s = 0.2 Å⁻¹). The configuration claims
+    in the comment were not re-derived.
+  - Who decides: every question above is a magnetic-path design call, so Mike's (#1075). Two
+    touch the maintainer's side and are named for the maintainer: computed coefficients would ship in the
+    wheel, where the data fence asks each file to state its status (root CLAUDE.md
+    § Licensing), and question 4 decides whether the input decks enter the repository.
+
 ## Non-goals
 
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.

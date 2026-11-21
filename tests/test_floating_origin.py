@@ -430,12 +430,12 @@ def test_zincite_stays_in_the_cell_and_quotes_the_honest_esd(zincite_fits,
     free = {p.path for p in result.parameters if p.vary}
     assert "phases.0.atoms.1.dof.0" in free
     assert "phases.0.atoms.0.dof.0" not in free
-    # unheld, each z of the flat pair is quoted at half the uncertainty of
-    # their difference, which is what the held O carries
+    # unheld, neither z of the flat pair has an esd: only their difference is
+    # measured, and the held O carries it (WP-2219; before, each z quoted half
+    # of it, the pseudo-inverse's minimum-norm share)
     loose_ref, loose = zincite_fits["lm", None]
     assert "FLAT_DIRECTION" in {d.code for d in loose.diagnostics}
-    half = loose_ref.fitted_structure.phases[0].atoms[1].z.stderr
-    assert o.z.stderr == pytest.approx(2 * half, rel=0.05)
+    assert all(a.z.stderr is None for a in loose_ref.fitted_structure.phases[0].atoms)
     # and the CIF quotes Zn without an esd and O with the honest one
     path = tmp_path / "zincite.cif"
     ref.write_cif(path)

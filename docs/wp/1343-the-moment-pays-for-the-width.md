@@ -679,6 +679,16 @@ the cheaper of the two at the time; the skill row is required either way.
     separable, as the WP expected: size 0.0337 ± 0.0164, strain on its
     floor, both declared unmeasured. The in-suite round trip is MnF₂ at 2σ
     and 5 % bars rather than 1σ, and its docstring argues why.
+  - **2026-11-18, the bar and the offset on file** (maintainer's answer 3e
+    on #193, 2026-11-17, who asked for the note:
+    <https://github.com/yue-here/rietx/issues/193#issuecomment-6963319037>).
+    The bar is 2σ and 5 % of the planted value, as
+    `tests/test_magnetic_width.py` asserts, because a 1σ bar on one draw
+    fails about one time in three on the seed alone. The freed width came
+    back low in all three draws of the Pbcm measurement above: 0.2466-0.2471
+    against a planted 0.25°, which is 1.16-1.36 % low (the per-draw values
+    were not tabulated). The "1.2 %" in the entry above is the pooled
+    figure. The 2σ and 5 % bar holds on all three draws.
   - **What it deliberately does not do.** No real k ≠ 0 dataset
     (Ba₂FeSbSe₅ is not vendored and its licence is unchecked), and no PNGs
     to `tests/output/`. `multi.py`'s joint report emits none of the four
