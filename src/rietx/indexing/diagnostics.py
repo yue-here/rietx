@@ -176,11 +176,16 @@ def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
 
     tails = [p for p in peaks.peaks if "axial_tail" in p.flags]
     if tails:
+        # WP-2120: the ones also on their position bound are already excluded
+        n_out = sum("tail_shoulder" in p.flags for p in tails)
         out.append(Diagnostic(
             level="info", code="PEAK_AXIAL_TAIL",
             message=(f"{len(tails)} weak component(s) sit on the "
                      "axial-divergence tail side of a much stronger "
-                     "group-mate."),
+                     "group-mate."
+                     + (f" {n_out} of them also sit on their position bound "
+                        "(tail_shoulder) and are excluded from usable()."
+                        if n_out else "")),
             where=[f"{p.two_theta:.4f}°" for p in tails],
             suggestion=("Check each group's fit, then exclude the flagged "
                         "components with use_for_indexing=False on a "
