@@ -389,7 +389,7 @@ Filled in by the session that builds each PR.
     - The register guard over `gui/src/next/`: issue #1656, WP-2215's leftover.
     - PR #1683's Structure graph code reached `main` without a `/code-review` pass (its entry
       of 2026-11-18). This close changes no code and did not run one.
-  - *Measured*: docs only, so no test count moved. The close PR is CLOSE_PR.
+  - *Measured*: docs only, so no test count moved. The close PR is #1739.
 
   Next: none in this WP. R4, the Plan and Text tabs, has no WP yet.
 
