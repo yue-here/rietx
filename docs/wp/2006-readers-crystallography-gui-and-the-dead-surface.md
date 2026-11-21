@@ -88,6 +88,8 @@ promise stages every break).
 - [ ] The batch to the maintainer: tier-3 rows with grounds, plus the unreached-entry
       table with a recommendation per row.
 - [ ] Approved demotions (expected few); rulings dated into the table.
+- [ ] `read_pattern` refuses a multi-scan file read with no `scan=`, listing the scans, in
+      place of `PATTERN_MULTISCAN_DEFAULTED`'s scan 0 (ruled by Yue 2026-11-21, § Rulings 23).
 - [ ] The import wizard's scan picker for a file holding several scans (ruled by Yue
       2026-11-21, § Rulings 23). It may move to a gui-overhaul WP if the rebuilt page
       owns the wizard by then.
@@ -188,9 +190,10 @@ brief is in the 2026-11-21 handover entry).
 
 - `PATTERN_MULTISCAN_DEFAULTED`: "we do need a scan picker for the gui". The import wizard
   gains a scan picker, so a person chooses the scan rather than receiving scan 0. Owed as a
-  task. Claude's reading, for Yue to correct: `read_pattern` with no `scan=` keeps reading
-  scan 0 and warning, under the principle of the next ruling. The refusal option is not
-  taken.
+  task. And "scan: refuse" (Yue, 2026-11-21, correcting Claude's first reading that python
+  kept scan 0 with a warning): `read_pattern` with no `scan=` on a file of more than one
+  scan refuses, listing each scan's range and step. A one-scan file reads as before. This
+  changes reader output, so it lands with a release note.
 - `SPACE_GROUP_SETTING_ASSUMED`: "this shouldn't be statistical—if unknown, warn the user".
   No count of which origin the files in the corpora mean decides the pick. Where a bare
   symbol leaves the origin unknown, the reader keeps today's pick, origin choice 1, and
