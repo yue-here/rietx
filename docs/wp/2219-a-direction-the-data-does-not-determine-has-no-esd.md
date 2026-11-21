@@ -164,7 +164,7 @@ discarded-direction test names gets no esd.
 
 ## Handover log
 
-- **2026-11-21** — closed, by a ghostshift runner (PR #CLOSEPR). The no-esd rule is on
+- **2026-11-21** — closed, by a ghostshift runner (PR #1735). The no-esd rule is on
   `main`. PR #1718 merged at 2026-11-20 20:50Z as merge commit 8112e3b09, on the
   maintainer's ruling (a) of the same day. A parameter on a direction the data do not
   determine now reports no esd in a single fit, a joint fit and a Pawley fit. The CIF writes
