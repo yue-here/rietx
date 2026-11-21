@@ -111,6 +111,8 @@ export interface InstrumentEdit {
   instrument: any;
   released: string[];
   freed: string[];
+  /** built paths the free register still named and the new model fixes */
+  fixed: string[];
   ended: string[];
 }
 

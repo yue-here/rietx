@@ -1790,16 +1790,18 @@ class GuiSession:
         Whatever sent the instrument, this verb therefore works out the
         registers' part itself (:func:`_register_arms`, WP-2229): it releases
         the holds on the paths the edit removes, redefines or rebuilds (one
-        ``set_hold`` node, before the edit) and frees each path it builds
-        whose new model says ``vary`` (one ``set_vary`` node, after it). Every
-        client gets this, and so does a hold no row shows, such as one left on
-        a path an earlier cut removed. All the verbs run on a history-free
-        copy first (:func:`rehearse`), so a refusal from any leaves the holds,
-        the model and the history as they were.
+        ``set_hold`` node, before the edit). Each path it builds then takes
+        its new model's ``vary``: freed where that says so (one ``set_vary``
+        node, after it), and fixed where it does not and the free register
+        still names the path from its old parameter (one more). Every client
+        gets this, and so does a hold no row shows, such as one left on a path
+        an earlier cut removed. All the verbs run on a history-free copy first
+        (:func:`rehearse`), so a refusal from any leaves the holds, the model
+        and the history as they were.
 
-        The answer carries ``released`` and ``freed`` for the console, and
-        ``ended``: the paths whose old parameter the edit removed or
-        redefined, so a client drops its pending edits on them.
+        The answer carries ``released``, ``freed`` and ``fixed`` for the
+        console, and ``ended``: the paths whose old parameter the edit removed
+        or redefined, so a client drops its pending edits on them.
         """
         self._require_idle()
         p = self._need_project()
@@ -1811,7 +1813,7 @@ class GuiSession:
         def apply(ref) -> str | None:
             if arms is None:  # no table: the edit's own refusal says why
                 return _edit_on(ref, instrument=instrument, label=label)
-            release, free, _ = arms
+            release, free, fix, _ = arms
             try:
                 if release:
                     ref.unhold(release)
@@ -1819,16 +1821,19 @@ class GuiSession:
                 if free:
                     ref.set_vary(free, True)
                     node = ref._head_id
+                if fix:
+                    ref.set_vary(fix, False)
+                    node = ref._head_id
             except ValueError as exc:  # a register verb's refusal, in its words
-                raise GuiError(str(exc), where=release + free) from None
+                raise GuiError(str(exc), where=release + free + fix) from None
             return node
 
-        if arms and (arms[0] or arms[1]):
+        if arms and (arms[0] or arms[1] or arms[2]):
             rehearse(p.refinement, apply)
         node = apply(p.refinement)
-        release, free, ended = arms or ([], [], [])
-        return {"node_id": node, "released": release, "freed": free, "ended": ended,
-                **self.instrument()}
+        release, free, fix, ended = arms or ([], [], [], [])
+        return {"node_id": node, "released": release, "freed": free, "fixed": fix,
+                "ended": ended, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
         """Move one atom to a typed position (WP-1215).
@@ -3857,18 +3862,19 @@ _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
 
 
 def _register_arms(refinement, instrument: Instrument
-                   ) -> tuple[list[str], list[str], list[str]] | None:
+                   ) -> tuple[list[str], list[str], list[str], list[str]] | None:
     """What replacing the instrument asks of the hold and free registers (WP-2229).
 
-    Returns ``(release, free, ended)``, or ``None`` when the new instrument
+    Returns ``(release, free, fix, ended)``, or ``None`` when either model
     builds no parameter table, whose refusal ``Refinement.edit`` gives.
 
     The two tables are compared by path. A path the old one has and the new
-    one lacks is *removed*. A background coefficient whose family changes is
+    one lacks is *removed*. A background coefficient whose basis changes is
     *redefined*: P-spline ``c3`` is a basis function at a knot, Chebyshev
-    ``c3`` a polynomial order, and they share only the name. A path the new
-    table has and the old one lacked, or redefined, is *built*: its parameter
-    starts with the edit.
+    ``c3`` a polynomial order, and they share only the name. So is a
+    P-spline's ``c3`` over other breakpoints, a function at another knot. A
+    path the new table has and the old one lacked, or redefined, is *built*:
+    its parameter starts with the edit.
 
     - ``release``: every path in the hold register that the edit removes or
       builds, read off the register and not off the rows, so a hold left on
@@ -3877,6 +3883,9 @@ def _register_arms(refinement, instrument: Instrument
       has declared the free set, a path outside it is built fixed whatever
       its ``vary`` says, and the client that built ``Parameter(value=0.0,
       vary=True)`` asked for it free.
+    - ``fix``: every built path whose new model says fixed and that the free
+      register still names, from the old parameter of that name or from one
+      an earlier cut removed. Kept, it would come back free.
     - ``ended``: every path whose old parameter the edit removed or
       redefined, where a pending edit typed against the old model no longer
       applies.
@@ -3893,15 +3902,18 @@ def _register_arms(refinement, instrument: Instrument
         new = {e.path: e for e in ParameterTable(refinement.structure, instrument).entries}
     except ValueError:
         return None
+    before, after = refinement.instrument.background, instrument.background
     redefined: set[str] = set()
-    if refinement.instrument.background.kind != instrument.background.kind:
+    if (before.kind != after.kind
+            or getattr(before, "breakpoints", None) != getattr(after, "breakpoints", None)):
         redefined = {p for p in old if p.startswith("instrument.background.")}
     ended = (old - new.keys()) | redefined
     built = {p for p in new if p not in old or p in redefined}
-    held = set(refinement.snapshot().holds)
-    release = sorted(held & (ended | built))
+    release = sorted(refinement._user_holds & (ended | built))
     free = sorted(p for p in built if new[p].vary)
-    return release, free, sorted(ended)
+    declared = set(refinement._free_paths)
+    fix = sorted(p for p in built if not new[p].vary and p in declared)
+    return release, free, fix, sorted(ended)
 
 
 def rehearse(refinement, apply: Callable[[Any], Any]) -> None:

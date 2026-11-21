@@ -270,10 +270,12 @@ export function clone<T>(model: T): T {
  *  before the edit and a free after it. */
 export function registerEcho(answer: Partial<InstrumentEdit>, edit: string): string[] {
   const released = answer.released ?? [], freed = answer.freed ?? [];
+  const fixed = answer.fixed ?? [];
   return [
     ...(released.length ? [`ref.unhold(${JSON.stringify(released)})`] : []),
     edit,
     ...(freed.length ? [`ref.set_vary(${JSON.stringify(freed)}, True)`] : []),
+    ...(fixed.length ? [`ref.set_vary(${JSON.stringify(fixed)}, False)`] : []),
   ];
 }
 

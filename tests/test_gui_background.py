@@ -417,9 +417,50 @@ def test_an_edit_that_changes_no_path_asks_nothing_of_the_registers(tmp_path_fac
     nodes = len(project.refinement.history.nodes)
     answer = session.instrument_patch({"instrument": {**ins, "zero_shift": {
         **ins["zero_shift"], "value": 0.01}}})
-    assert (answer["released"], answer["freed"], answer["ended"]) == ([], [], [])
+    assert (answer["released"], answer["freed"], answer["fixed"], answer["ended"]) == (
+        [], [], [], [])
     assert project.refinement.snapshot().holds == ["instrument.background.c2"]
     assert len(project.refinement.history.nodes) == nodes + 1
+
+
+def test_a_spline_over_other_breakpoints_is_redefined(tmp_path_factory, tmp_path):
+    """A P-spline's ``c2`` over other breakpoints is a basis function at
+    another knot, so a profile of the same kind but another range releases
+    the hold on it and ends every old coefficient (WP-2229)."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    ins = session.instrument()["instrument"]
+    spline = BackgroundPSpline.for_range(20.0, 120.0).model_dump(mode="json")
+    session.instrument_patch({"instrument": {**ins, "background": spline}})
+    project.refinement.hold("instrument.background.c2")
+    other = BackgroundPSpline.for_range(30.0, 110.0, knot_step_deg=10.0).model_dump(mode="json")
+    answer = session.instrument_patch({"instrument": {
+        **session.instrument()["instrument"], "background": other}})
+    assert answer["released"] == ["instrument.background.c2"]
+    assert answer["ended"] == sorted(
+        f"instrument.background.c{k}" for k in range(len(spline["coefficients"])))
+    assert project.refinement.snapshot().holds == []
+
+
+def test_a_built_path_the_model_fixes_leaves_the_free_register(tmp_path_factory, tmp_path):
+    """A built path takes its new model's ``vary`` both ways (WP-2229). A
+    Chebyshev cut under a declared free set leaves ``c4`` and ``c5`` in the
+    register, so an extension sent with them fixed would bring them back
+    free: the verb fixes them, and the answer says so."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    project.refinement.set_vary("instrument.background.*", True)
+    ins = session.instrument()["instrument"]
+    session.instrument_patch({"instrument": _with_terms(ins, 4)})
+    ins = session.instrument()["instrument"]
+    fixed = {**ins, "background": {**ins["background"], "coefficients":
+                                   ins["background"]["coefficients"]
+                                   + [{"value": 0.0, "vary": False}] * 2}}
+    answer = session.instrument_patch({"instrument": fixed})
+    assert answer["freed"] == []
+    assert answer["fixed"] == ["instrument.background.c4", "instrument.background.c5"]
+    rows = _coefficients(project)
+    assert [rows[f"instrument.background.c{k}"][0] for k in range(6)] == [True] * 4 + [False] * 2
 
 
 #: Fit ranges the rebuilt graph's Type switch builds a P-spline over: round
