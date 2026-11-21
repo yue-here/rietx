@@ -1505,10 +1505,12 @@ class SplitLocalisation(Base):
     won every global statistic while the reflections it splits carried none of
     its gain: the improvement lived elsewhere.
 
-    **Report-only, no threshold** (decided 2026-09-03): how far above the
+    **Report-only, no threshold**: how far above the
     point share is far enough depends on the profile, the range and the
     counting statistics, so the package reports the share with the
     reflections behind it (``families``) and the reader judges.
+    *(Chosen: WP-1339, 2026-09-03 — a reported share over a thresholded
+    diagnostic)*
     ``split_share`` is ``None`` when the lower fit splits nothing in range,
     for instance a refined distortion of exactly zero.
     """
