@@ -1,6 +1,6 @@
 # WP-2225 — A held instrument width stops a staged fit short of its own plan's point
 
-Milestone: generality · Status: ✅ 2026-11-20 — option 3, ruled by the maintainer 2026-11-20: `WIDTH_TWIN_HELD` reports the held width twins; PR #1722
+Milestone: generality · Status: ✅ 2026-11-20 — option 3, ruled by the maintainer 2026-11-20 and named 2026-11-21: `INSTRUMENT_WIDTH_HELD` reports the held instrument widths; PR #1722
 Track: The audits
 Depends on: 2002 (the width twin hold); 2017 soft (its row R measures the same hold); 2224 soft (a one-stage re-fit hides this)
 
@@ -329,7 +329,8 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
 - [x] Brief the maintainer with those numbers: the choice among options 0-4.
       *Written 2026-11-20 in the handover entry; the choice waits on the maintainer.*
 - [x] Build the chosen option, with its record field or code and its `_audit` row.
-      *Done 2026-11-20: option 3, `WIDTH_TWIN_HELD` (`refine._width_twin_diagnostics`, single,
+      *Done 2026-11-20: option 3, `INSTRUMENT_WIDTH_HELD` (renamed 2026-11-21;
+      `refine._instrument_width_held_diagnostics`, single,
       `run_stage` and joint fits), its code and suggestion rows, help entry and silence pair.*
 - [x] Tests: the four standards' staged re-fit of the shipped first fit moves no reported
       parameter by more than 0.1 esd (or, under option 3 alone, the code fires on all four and on
@@ -341,7 +342,7 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
 - [x] Skill: under option 3, the code's reference row; otherwise a line in §3's degeneracy table
       that a plan freeing an instrument width and its specimen twin on an uncalibrated instrument
       gives an answer that depends on the stage order.
-      *Done 2026-11-20: `WIDTH_TWIN_HELD`'s row in `references/diagnostics.md`, beside
+      *Done 2026-11-20: `INSTRUMENT_WIDTH_HELD`'s row in `references/diagnostics.md`, beside
       `RESOLUTION_UNCONSTRAINED`, whose remedy it shares; copies re-synced.*
 
 ## Acceptance
@@ -349,14 +350,15 @@ Both fits underfit the tops of their strongest peaks (LaB₆ at 8°, 11.5° and 
 Under option 3, as ruled by the maintainer on 2026-11-20:
 
 ```sh
-.venv/bin/python -m pytest -n auto --dist loadgroup tests/test_width_twin_hold.py tests/test_suite_alarms.py tests/test_silence.py tests/test_compare_ui.py
+.venv/bin/python -m pytest -n auto --dist loadgroup tests/test_width_twin_hold.py tests/test_suite_alarms.py tests/test_silence.py tests/test_compare_ui.py tests/test_summary_deliverables.py
 ```
 
-`WIDTH_TWIN_HELD` fires on exactly zincite, fluorite, corundum and brucite among the eight
+`INSTRUMENT_WIDTH_HELD` fires on exactly zincite, fluorite, corundum and brucite among the eight
 comparison standards, and on none of the other four. The pin in `tests/data/suite_alarms.json`
 says so, and the slow row `test_the_standards_fire_what_the_pin_says` holds the measurement to it.
 The code fires on a synthetic fit whose last stage held U, and stays silent on the same plan with
-no specimen width free. The earlier bar, a staged re-fit moving no reported parameter by more than
+no specimen width free. While it fires, `summary(deliverable="microstructure")` prints the
+size and strain as not quotable (`tests/test_summary_deliverables.py`). The earlier bar, a staged re-fit moving no reported parameter by more than
 0.1 esd, belonged to options 1 and 2 and is dropped. Option 3 moves no number.
 `2225-batch/eight.py` and `shifts.py` still measure that bar, for a follow-up such as option 4.
 
@@ -367,6 +369,30 @@ no specimen width free. The earlier bar, a staged re-fit moving no reported para
 - IUCr CPD quantitative phase analysis round robin, `tests/data/qarr/` (`tests/data/README.md`).
 
 ## Handover log
+
+- **2026-11-21, decision 8 applied** — Decided 2026-11-21 by Yue: no 'twin' in the name; code
+  INSTRUMENT_WIDTH_HELD (name picked by Claude over INSTRUMENT_PROFILE_HELD: WIDTH is rietx's
+  peak-width code family, PROFILE belongs to the GSAS reader codes; Yue did not object); the
+  microstructure summary prints a 'not quotable' line when it fires. The declined review findings
+  (run_stage names the start not the node; a vars. column called 'instrument width') stand as
+  declined. PR #1722.
+
+  *Done*: `WIDTH_TWIN_HELD` renamed `INSTRUMENT_WIDTH_HELD` in the code, its two `_audit` rows,
+  the help entry (moved to its alphabetical place), the silence pair, the skill row (copies
+  re-synced), the release fragment, the v1.13 record, WP-2017's `### Inherited` line, the tests,
+  the GUI's help-key fixture and the alarm pin. The builder is
+  `refine._instrument_width_held_diagnostics`. No "twin" is left in the code's message,
+  suggestion, help entry, skill row or release note. The message names each held term by its
+  letter: "The last stage, 'widths', held the instrument width term U fixed because a specimen
+  width with the same angular shape was free beside it: U with phases.0.gauss_strain. …". A
+  column that is not `instrument.profile.<letter>`, such as a `vars.` one, keeps its path.
+  `_microstructure_lines` adds "size and strain: not quotable (INSTRUMENT_WIDTH_HELD); the
+  specimen widths are a split the plan chose, conditional on held instrument widths" by the
+  `RESOLUTION_UNCONSTRAINED` line's mechanism; both lines print when both codes fire. The older
+  entries below keep the old name as they were written, and the generality judge's text stays
+  unedited. Pre-existing names stay: `StageResult.width_twins_held`, `_hold_width_twins`,
+  `_width_twin_flats`, `tests/test_width_twin_hold.py` and `docs/practice.md`'s section titles.
+  Main merged in at `02d105ba1` (#1717 and #1736), without conflicts at that base.
 
 - **2026-11-20, option 3 built** — a fit whose last stage held an instrument width beside its
   specimen twin now says so. The new warning `WIDTH_TWIN_HELD` names the held widths, their
