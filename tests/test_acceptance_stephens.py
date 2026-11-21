@@ -327,6 +327,39 @@ def test_brucite_improvement_is_justified_but_leaves_the_physical_cone(
 
 
 @pytest.mark.slow
+@pytest.mark.xdist_group("stephens-brucite")
+def test_the_refined_surface_is_the_module_sum_and_shows_the_cone(brucite_aniso_trf):
+    """WP-1318's bar on a refined block: the surface along every fitted
+    reflection is ``sigma2_m``'s own value over M², and the figure of this
+    out-of-cone block draws its region beside the guard's finding."""
+    import matplotlib.pyplot as plt
+
+    from rietx.crystallography.lattice import d_spacings
+    from rietx.crystallography.stephens import directional_sigma2, reciprocal_frame
+    from rietx.viz import plot_strain_surface
+
+    ref, result = brucite_aniso_trf
+    phase = ref.fitted_structure.phases[0]
+    s = np.array(phase.microstrain.values())
+    cell = phase.cell.lengths_angles()
+    hkl = np.asarray(ref._model.phases[0].reflections.hklm, dtype=float)[:, :3]
+    q = (reciprocal_frame(cell) @ hkl.T).T
+    surface = directional_sigma2(s, cell, q / np.linalg.norm(q, axis=1)[:, None])
+    # d from the lattice, not from the frame, so a wrong frame cannot cancel
+    sigma2 = _sigma2_of(ref)
+    assert np.allclose(surface, sigma2 * d_spacings(hkl, *cell) ** 4, rtol=1e-10,
+                       atol=1e-10 * np.abs(sigma2).max() * d_spacings(hkl, *cell).max() ** 4)
+
+    fig = plot_strain_surface(phase, result.diagnostics,
+                              path=str(OUT / "stephens_brucite_aniso_surface.png"))
+    text = " ".join(" ".join(t.get_text() for t in fig.texts).split())
+    assert "σ²(M) < 0 over" in text
+    fired = [d for d in result.diagnostics if d.code == "STEPHENS_STRAIN_NOT_POSITIVE"]
+    assert " ".join(fired[-1].message.split()) in text
+    plt.close(fig)
+
+
+@pytest.mark.slow
 @pytest.mark.xdist_group("stephens-corundum")
 def test_corundum_is_reported_isotropic(corundum_plain):
     """The control: a well-crystallised specimen on the same instrument and

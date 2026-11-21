@@ -295,3 +295,54 @@ pattern with two phases the start at the carried strain reached a lower χ² und
 LM (1.112 against 1.170) with the two phase fractions swapped, and a higher one
 under TRF (1.476 against 1.156). The measurements disagree, so the default is
 unchanged.
+
+## The strain surface
+
+The fifteen coefficients describe a shape, and nobody reads them as numbers.
+`rietx.viz.plot_strain_surface` draws the shape. Along a unit direction
+$\hat{\mathbf u}$ of reciprocal space, with $B$ the reciprocal basis in a
+Cartesian frame ($B^\top B = G^*$), the $hkl$ with $M = 1$ Å⁻² is
+$B^{-1}\hat{\mathbf u}$. The sum of {eq}`ms-sigma` evaluated there is
+
+```{math}
+:label: ms-surface
+
+\varepsilon^2(\hat{\mathbf u}) \;=\; 10^{12}\,\frac{\sigma^2(M)}{M^2}
+\;=\; \sum_{HKL} S_{HKL}\, h^H k^K l^L
+\Big|_{\mathbf h = B^{-1}\hat{\mathbf u}},
+```
+
+{source}`rietx.crystallography.stephens.directional_sigma2`
+
+because the quartic is homogeneous of degree 4 and $M$ of degree 2, so the
+value does not depend on how far along $\hat{\mathbf u}$ it is read. The
+surface is that sum, the same one the width law evaluates, never a second
+copy of it. Along a reflection $\mathbf h$ it equals the reflection's own
+$10^{12}\,\sigma^2(M)\cdot d^4_{hkl}$.
+$\varepsilon(\hat{\mathbf u})$ is the FWHM of ΔM/M along $\hat{\mathbf u}$ in
+ppm, a FWHM and not a standard deviation, as in {eq}`ms-lambda`. The figure
+draws it as the distance from the origin and repeats it in colour, with
+$a^*$, $b^*$ and $c^*$ drawn from the origin. An isotropic block,
+$S = \varepsilon^2\,[M^2]$, is a sphere of radius $\varepsilon$.
+
+A direction where $\varepsilon^2 < 0$ is outside the physical cone. The
+figure draws it at $\sqrt{|\varepsilon^2|}$ in red rather than clipping it to
+zero, because a clipped region reads as a narrow direction rather than an
+impossible one. Pass the fit's `RefinementResult.diagnostics` and the guard's
+`STEPHENS_STRAIN_NOT_POSITIVE` finding is printed under the figure. The two
+can disagree. The guard tests the fitted reflections, and the figure tests
+the whole sphere. A block the default LM driver held on the cone at every
+reflection can still dip below zero between them, where the pattern measured
+nothing, and the figure then says that the guard reported nothing. No confidence
+band is drawn: a band needs the coefficients' covariance propagated direction
+by direction, and a diagonal shortcut is wrong in both directions.
+
+```{image} ../figures/strain-surface-light.png
+:class: only-light
+:alt: The refined Stephens strain surface of brucite under the TRF driver, drawn over reciprocal-space directions with the a*, b* and c* axes, the region outside the physical cone in red, and the guard's finding printed beneath
+```
+
+```{image} ../figures/strain-surface-dark.png
+:class: only-dark
+:alt: The refined Stephens strain surface of brucite under the TRF driver, drawn over reciprocal-space directions with the a*, b* and c* axes, the region outside the physical cone in red, and the guard's finding printed beneath
+```

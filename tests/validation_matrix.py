@@ -1339,6 +1339,25 @@ CLAIMS: tuple[Claim, ...] = (
         diagnostics=("STEPHENS_STRAIN_NOT_POSITIVE",),
     ),
     Claim(
+        "test_acceptance_stephens",
+        "test_the_refined_surface_is_the_module_sum_and_shows_the_cone",
+        "qarr", ("identity",),
+        "the strain surface drawn over every direction is the module's own "
+        "strain variance, and the figure of the out-of-cone brucite block "
+        "draws its negative region beside the guard's finding (WP-1318)",
+        reference="sigma2_m itself: along every fitted reflection the surface "
+                  "equals sigma^2(M) d^4, with d from the lattice rather than "
+                  "the reciprocal frame, so a wrong frame cannot cancel; the "
+                  "figure's text carries the guard's own message",
+        measured="agrees to rtol 1e-10 on every fitted reflection; the "
+                 "figure states the negative region and quotes "
+                 "STEPHENS_STRAIN_NOT_POSITIVE word for word.  The block is "
+                 "the brucite_aniso_trf fixture the unconstrained control "
+                 "row swept, out of the cone at all four seeds (19/19/19/17)",
+        starts=4,
+        diagnostics=("STEPHENS_STRAIN_NOT_POSITIVE",),
+    ),
+    Claim(
         "test_acceptance_stephens", "test_corundum_is_reported_isotropic",
         "qarr", ("characterisation", "ceiling"),
         "the control: an isotropic specimen must be reported isotropic, and "

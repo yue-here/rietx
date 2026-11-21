@@ -474,6 +474,26 @@ def pattern_figure(data) -> None:
         _save(data.plot(style=style, wavelength=WAVELENGTH), "nac-pattern", style)
 
 
+def strain_surface() -> None:
+    """The refined brucite Stephens block as a surface (WP-1318).
+
+    Drawn from `tests/test_acceptance_stephens.py`'s brucite fit under
+    `solver="trf"`, the fit whose leaving the physical cone that file asserts,
+    so the figure and the claim it illustrates are one computation.
+    """
+    from tests.test_acceptance_qpa_roundrobin import brucite_phase
+    from tests.test_acceptance_stephens import _fit, _plan, _with_block
+
+    print("strain-surface")
+    ref, result = _fit("brucite", _with_block(brucite_phase(textured=True)),
+                       _plan(texture=True, stephens=True), "brucite_aniso",
+                       solver="trf")
+    for style in STYLES:
+        _save(rx.viz.plot_strain_surface(ref.fitted_structure, result.diagnostics,
+                                         style=style),
+              "strain-surface", style)
+
+
 if __name__ == "__main__":
     angular_signatures()
     hump()
@@ -482,3 +502,4 @@ if __name__ == "__main__":
     geometry_esds(data, ref)
     effective_observations()
     restraint_schedule()
+    strain_surface()

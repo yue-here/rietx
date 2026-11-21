@@ -753,7 +753,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 🔄 2026-10-21 | P3 | — |
-| [1318](1318-strain-surface.md) | The Stephens strain surface, rendered | ⬜ | P3 | — |
+| [1318](1318-strain-surface.md) | The Stephens strain surface, rendered | ✅ 2026-11-16 | — | — |
 | [1322](1322-events-aggregator.md) | The run is instrumentable, and nothing says so | ✅ 2026-10-23 | — | — |
 | [1339](1339-where-the-improvement-lives.md) | Where the improvement lives | ✅ 2026-11-02 | — | — |
 | [1340](1340-qpa-on-a-molar-basis.md) | QPA on a molar basis, and the basis travels with the number | ⬜ | P3 | — ([1320](1320-qpa-multimodal-fraction.md) soft) |
