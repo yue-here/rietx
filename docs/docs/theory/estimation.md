@@ -263,8 +263,8 @@ the IUCr convention {cite}`schwarzenbach1989`.
 | TOPAS (Technical Reference, Version 9) | from the least-squares matrix, or by bootstrap, with no correlation factor described | `stderr_uncorrected` |
 | XND 1.42 | multiplied by Bérar's factor | `stderr` |
 
-GSAS-II multiplies the inverse normal matrix by GOF² (`GSASIIstrMain.py`,
-line 397, in 5.8.4, read on 2026-10-20), and GOF² is $\chi^2_{\mathrm{red}}$.
+GSAS-II multiplies the inverse normal matrix by GoF² (`GSASIIstrMain.py`,
+line 397, in 5.8.4, read on 2026-10-20), and GoF² is $\chi^2_{\mathrm{red}}$.
 It computes the Durbin-Watson statistic and applies no correlation factor.
 
 FullProf computes Bérar and Lelann's correction and leaves its own esds as they
