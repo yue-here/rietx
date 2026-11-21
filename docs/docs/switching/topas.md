@@ -163,12 +163,46 @@ print([row.path for row in joint.parameters() if row.path.endswith("vars.b")])
 
 `joint.fit(patterns, plan=plan)` then refines one `b` per pattern and keeps the boron coordinate where it started.
 
-Four things a TOPAS input does have no rietx spelling yet:
+Three things a TOPAS input does have no rietx spelling yet:
 
 - A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
 - A restraint or a `penalty` in a joint fit, which refuses soft restraints.
-- An equation over a reflection or a point: `th2_offset` written in `Xo`, a phase's own TCHZ V and W, or a width, position or intensity written in `Th` or `D_spacing`. An overall B and a height written in `Cos(Th)` are the exceptions, through the rows above.
 - `fit_obj`, a term added to the calculated pattern.
+
+An equation over a reflection, such as `th2_offset` written in `Xo` or `lor_fwhm` written in `H` and `Th`, is a peak equation (next section).
+
+### Peak equations
+
+TOPAS writes an equation on a peak with a keyword at the level it acts on.
+rietx declares it as a `PeakEquation` on `Phase.peak_equations`, or on `Instrument.peak_equations` for a position term the whole pattern shares.
+[How to write a peak's width or position as an equation](../guides/peak_equation.md) runs one.
+
+| TOPAS | rietx target | Note |
+|---|---|---|
+| `lor_fwhm` | `lor_fwhm` | the same FWHM in degrees 2θ |
+| `gauss_fwhm` | `gauss_fwhm` | added in quadrature, as two Gaussian widths combine |
+| `th2_offset` in a `str` | `shift` on the phase | |
+| `th2_offset` at the pattern level | `shift` on the instrument | reads `theta` and `two_theta` only |
+| `scale_pks` | `intensity_factor` | |
+| TCHZ `pv_fwhm`'s U, V and W per phase | `gauss_fwhm_squared` | `u*tan(theta)^2 + v*tan(theta) + w`, signed |
+
+The names differ as well.
+
+| TOPAS | rietx |
+|---|---|
+| `H`, `K`, `L` | `h`, `k`, `l` |
+| `M` | `m` |
+| `D_spacing` | `d` |
+| `Th` (radians) | `theta` (radians) |
+| `Xo` | `two_theta` (degrees, before the phase's own shift) |
+| `If(L==0, a, b)` | `if(l == 0, a, b)` |
+| `Max(x, 0)` | `max(x, 0)` |
+
+rietx refuses an equation that gives two symmetry images of one reflection different values, and TOPAS does not.
+A port of `If(L==0, ...)` to a cubic phase meets that refusal, and `orbit_mean(...)` or a symmetric condition is the way through.
+A condition reads `h`, `k`, `l` and `m` only, where TOPAS lets it read anything.
+`spherical_harmonics_hkl` is a sum of `harmonic(l, n)` terms.
+rietx's harmonics are the texture's symmetrised ones, normalised as in {eq}`corr-sh`, so a port converts TOPAS's coefficients to that normalisation.
 
 ### Coordinates are refined along the symmetry directions
 

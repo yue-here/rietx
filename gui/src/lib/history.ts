@@ -394,6 +394,8 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "instrument.geometry.surface_roughness.b": 4,
   "instrument.geometry.surface_roughness.c": 4,
   "instrument.geometry.surface_roughness.tau": 5,
+  // WP-2107: see the phase's peak equation family below
+  "instrument.peak_equations.*.*": "exp",
   "instrument.polarization": 4,
   "instrument.profile.u": 6,
   "instrument.profile.v": 6,
@@ -463,6 +465,9 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "phases.*.microstrain.s*": 3,
   // WP-1419: a parent-cell strain is a dimensionless amplitude of 1e-4 to 1e-2
   "phases.*.parent_cell.strain.*": 5,
+  // WP-2107: a peak equation's coefficient takes whatever unit its expression
+  // gives it, so, like a named variable, it has no natural place count
+  "phases.*.peak_equations.*.*": "exp",
   "phases.*.preferred_orientation.r": 4,
   "phases.*.texture.*": 4,
   // WP-1805: a rigid body's origin is fractional like an atom's x, y, z, and

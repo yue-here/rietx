@@ -29,6 +29,7 @@ from typing import ClassVar, Literal
 from pydantic import Field, field_validator, model_validator
 
 from .common import Base, Parameter, _InheritsDeclaredDefaults
+from .peak_equation import PeakEquation, check_level
 
 
 def _declared_extinction() -> Parameter:
@@ -1615,6 +1616,18 @@ class Phase(_InheritsDeclaredDefaults):
     # atom a mode moves has its x, y, z derived from the record's base and the
     # absolute amplitudes, which are what refine.
     distortion_modes: DistortionModes | None = None
+    # Peak equations (WP-2107): a term on each reflection's Lorentzian or
+    # Gaussian width or its position, or a factor on its intensity, written in
+    # the reflection's hkl and angle.  At most one per target; coefficients are
+    # entries at ``phases.<i>.peak_equations.<j>.<name>``, freed only by a
+    # stage the caller writes (no preset's glob reaches the path).  Empty is
+    # exactly off: a phase declaring none builds the model it always built.
+    peak_equations: list[PeakEquation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _peak_equations_fit_the_phase(self) -> "Phase":
+        check_level(self.peak_equations, "phase", type(self).model_fields)
+        return self
 
     @model_validator(mode="after")
     def _modes_cover_the_atoms(self) -> "Phase":

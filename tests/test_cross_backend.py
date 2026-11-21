@@ -1467,7 +1467,64 @@ def _state_distortion_modes():
     return model, table, {}
 
 
+def _state_peak_equations():
+    """A peak equation of every target, with the cell and a coordinate free
+    beside them (WP-2107).
+
+    Each phase coefficient takes the exact branch
+    (``least_squares._peak_equation_column``), the instrument's the scalar
+    chain.  The coordinate sits under the intensity factor, so the two
+    hand-folded intensity builders must apply it; the cell moves every
+    equation's ``d``, θ and harmonic.  ``P -3`` lets ``harmonic(2, 0)`` and an
+    ``l``-conditioned branch through the orbit check.
+    """
+    from rietx.schemas.peak_equation import PeakEquation
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure
+
+    p = Parameter
+
+    def eq(target, expression, **coefficients):
+        return PeakEquation(target=target, expression=expression,
+                            coefficients={k: p(value=v)
+                                          for k, v in coefficients.items()})
+
+    cell = Cell(a=p(value=3.147), b=p(value=3.147), c=p(value=4.769),
+                alpha=p(value=90.0), beta=p(value=90.0), gamma=p(value=120.0))
+    structure = Structure(phases=[Phase(
+        name="equations", space_group="P -3", cell=cell, scale=p(value=1e-3),
+        atoms=[Atom(label="Mg", species="Mg", x=p(value=0.0), y=p(value=0.0),
+                    z=p(value=0.0), biso=p(value=0.5)),
+               Atom(label="O", species="O", x=p(value=1 / 3), y=p(value=2 / 3),
+                    z=p(value=0.22), biso=p(value=0.8))],
+        peak_equations=[
+            eq("shift", "s0*cos(theta) + s1*harmonic(2, 0)", s0=0.02, s1=0.01),
+            eq("lor_fwhm", "if(l == 0, la, lb)*tan(theta)", la=0.05, lb=0.03),
+            eq("gauss_fwhm", "g*d", g=0.02),
+            eq("gauss_fwhm_squared", "q/cos(theta)^2", q=4e-4),
+            eq("intensity_factor", "exp(-f*(1/(2*d))^2)*(1 + e*orbit_mean(l^2)/10)",
+               f=0.3, e=0.2),
+        ])])
+    ins = Instrument.bragg_brentano()
+    ins.source.dispersion = None
+    ins.peak_equations = [eq("shift", "z1*(two_theta - 50)/100", z1=0.01)]
+    tt = np.arange(15.0, 95.0, 0.02)
+    rng = np.random.default_rng(2107)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for path in ("phases.0.scale", "phases.0.cell.a", "phases.0.cell.c",
+                 "phases.0.atoms.1.dof.0", "phases.0.peak_equations.*",
+                 "instrument.peak_equations.*"):
+        assert table.set_vary([path], True), path
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
+           "peak_equations": _state_peak_equations,
            "distortion_modes": _state_distortion_modes,
            "texture": _state_texture,
            "bodies": _state_bodies,
@@ -1519,6 +1576,7 @@ CONFIG_PARAMS = [
     _config("families"),
     _config("families_voigt"),
     _config("texture"),
+    _config("peak_equations"),
     _config("axial_one_zero"),
     _config("sharp_widths"),
     _config("families_tied"),

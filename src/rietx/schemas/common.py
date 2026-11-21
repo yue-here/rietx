@@ -717,14 +717,21 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: 0.61 → 0.62 (WP-1814): ``RigidBody.zmatrix``, a list of ``ZLine`` (an atom
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: 0.62 → 0.63 (WP-1814): ``RigidBody.zmatrix``, a list of ``ZLine`` (an atom
 #: label or ``None`` for a dummy, its reference lines and its ``r``, ``angle``
 #: and ``dihedral`` as refinable ``Parameter``s), and ``RigidBody.zmatrix_origin``
 #: (c₀, the Z-frame point the template is measured from).  Additive and
 #: defaulted to an empty list and the Z-frame origin, the 0.25 → 0.26 rule, so
 #: every stored body loads as the constant template it was; an older build
 #: refuses a body carrying either key.
-SCHEMA_VERSION = "0.62"
+SCHEMA_VERSION = "0.63"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
