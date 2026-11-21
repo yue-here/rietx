@@ -41,15 +41,15 @@ def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
         assert n == sum(code in fired for fired in pin["standards"].values()), code
 
 
-def test_the_width_twin_code_is_pinned_on_exactly_the_standards_whose_plan_frees_a_pair():
-    """WP-2225: ``WIDTH_TWIN_HELD`` reads ``StageResult.width_twins_held``
+def test_the_instrument_width_code_is_pinned_on_exactly_the_standards_whose_plan_frees_a_pair():
+    """WP-2225: ``INSTRUMENT_WIDTH_HELD`` reads ``StageResult.width_twins_held``
     exactly, so among the eight standards it fires on the four whose QPA plan
-    frees an instrument width beside its specimen twin, and on none of the
+    frees an instrument width beside a specimen width of its shape, and on none of the
     others.  The slow row below holds the measurement to this pin."""
     pin = suite_alarms.load_pin()
-    fired = {key for key, codes in pin["standards"].items() if "WIDTH_TWIN_HELD" in codes}
+    fired = {key for key, codes in pin["standards"].items() if "INSTRUMENT_WIDTH_HELD" in codes}
     assert fired == {"zincite", "fluorite", "corundum", "brucite"}, sorted(fired)
-    assert {pin["standards"][key]["WIDTH_TWIN_HELD"] for key in fired} == {"warning"}
+    assert {pin["standards"][key]["INSTRUMENT_WIDTH_HELD"] for key in fired} == {"warning"}
     assert len(pin["standards"]) == 8
 
 

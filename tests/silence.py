@@ -631,32 +631,32 @@ def _not_freed_silent() -> list:
     return _not_freed(["vars.B", "vars.b_0", "vars.b_1"])
 
 
-def _width_twins(*held: dict[str, list[str]]) -> list:
-    """``WIDTH_TWIN_HELD``'s builder on a two-stage plan whose stages held the
-    width twins ``held`` names, the last entry the answer's stage
+def _width_held(*held: dict[str, list[str]]) -> list:
+    """``INSTRUMENT_WIDTH_HELD``'s builder on a two-stage plan whose stages held the
+    instrument widths ``held`` names, the last entry the answer's stage
     (``tests/test_width_twin_hold.py``)."""
-    from rietx.refine import _width_twin_diagnostics
+    from rietx.refine import _instrument_width_held_diagnostics
     from rietx.schemas.results import StageResult
 
     stages = [StageResult(name=f"s{k}", status="converged", n_iterations=1,
                           cost_initial=1.0, cost_final=1.0,
-                          freed=["instrument.profile.y"] if not twins else [],
-                          width_twins_held=twins)
-              for k, twins in enumerate(held)]
-    return _width_twin_diagnostics(stages)
+                          freed=["instrument.profile.y"] if not beside else [],
+                          width_twins_held=beside)
+              for k, beside in enumerate(held)]
+    return _instrument_width_held_diagnostics(stages)
 
 
-def _width_twins_fires() -> list:
+def _width_held_fires() -> list:
     """The last stage held Y against a free Lorentzian strain."""
-    return _width_twins({}, {"instrument.profile.y": ["phases.0.lor_strain"]})
+    return _width_held({}, {"instrument.profile.y": ["phases.0.lor_strain"]})
 
 
-def _width_twins_silent() -> list:
-    """No stage held a twin; an earlier stage held one and the last did not;
+def _width_held_silent() -> list:
+    """No stage held a width; an earlier stage held one and the last did not;
     a result stored before the field."""
-    return (_width_twins({}, {})
-            + _width_twins({"instrument.profile.y": ["phases.0.lor_strain"]}, {})
-            + _width_twins({}, None))
+    return (_width_held({}, {})
+            + _width_held({"instrument.profile.y": ["phases.0.lor_strain"]}, {})
+            + _width_held({}, None))
 
 
 def _reseed(**escalation) -> list:
@@ -1293,8 +1293,8 @@ SILENCE: dict[str, Pair] = {
     "VARIABLE_NOT_FREED": Pair(
         _not_freed_fires, _not_freed_silent,
         "tests/test_tie_expression.py, tests/test_parametric_expression.py"),
-    "WIDTH_TWIN_HELD": Pair(
-        _width_twins_fires, _width_twins_silent, "tests/test_width_twin_hold.py"),
+    "INSTRUMENT_WIDTH_HELD": Pair(
+        _width_held_fires, _width_held_silent, "tests/test_width_twin_hold.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
     "PATTERN_SIGMA_NONPOSITIVE": Pair(

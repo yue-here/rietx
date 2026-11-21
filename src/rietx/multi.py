@@ -113,6 +113,7 @@ from .refine import (
     _guard_diagnostics,
     _harmonic_diagnostics,
     _held_scale_phases,
+    _instrument_width_held_diagnostics,
     _judge_magnetic_groups,
     _lineless_phases,
     _low_angle_diagnostics,
@@ -157,7 +158,6 @@ from .refine import (
     _vars_driven_cell_escapes,
     _wavelength_calibration_diagnostics,
     _width_census_diagnostics,
-    _width_twin_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
     mode_fixed_column,
@@ -388,8 +388,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
-    "_width_twin_diagnostics": (
-        (FIT,), "the width twin hold is one test over every histogram's sums "
+    "_instrument_width_held_diagnostics": (
+        (FIT,), "the instrument width hold is one test over every histogram's sums "
                 "(_hold_width_twins_multi), so the held widths are the fit's, "
                 "read off the answer's stage (WP-2225)"),
     # -- deliberately not computed ---------------------------------------------
@@ -2816,7 +2816,7 @@ class MultiHistogramRefinement:
             self.mtable.structures[0])
         # the held instrument widths of the answer's stage, which hold one
         # sum across every histogram (WP-2225)
-        diagnostics = diagnostics + _width_twin_diagnostics(stage_results)
+        diagnostics = diagnostics + _instrument_width_held_diagnostics(stage_results)
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(

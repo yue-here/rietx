@@ -3356,6 +3356,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`n_unindexed` forbids both retries."
         ),
     ),
+    "INSTRUMENT_WIDTH_HELD": HelpEntry(
+        title="Instrument width terms held beside specimen widths",
+        description=(
+            "The plan freed an instrument width and a specimen width with the same "
+            "angular shape: U with the Gaussian strain or size, X with the Lorentzian "
+            "size, Y with the Lorentzian strain or a Stephens anisotropic strain "
+            "block. The data fix only each pair's sum, so "
+            "the last stage held the instrument width at the value an earlier stage "
+            "left, or at its start. The message names that stage. The specimen widths "
+            "are the remainder of a split that the plan's stage order chose. Two starts "
+            "can disagree on them by several of their own esds, so they are not a "
+            "measurement of the specimen. To measure them, calibrate the instrument on a "
+            "standard with the `lab_calibrate` plan, load it with "
+            "`load_instrument_profile`, and refine the sample with `lab_sample_refine`."
+        ),
+    ),
     "K_SEARCH_PARTNER": HelpEntry(
         title="The cell's metric pairs this propagation vector with another",
         description=(
@@ -5026,22 +5042,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "modelling error, such as an unmodelled harmonic or a zero shift traded "
             "against the wavelength. Compare it with the calibration history before you "
             "quote the cell."
-        ),
-    ),
-    "WIDTH_TWIN_HELD": HelpEntry(
-        title="Instrument widths held beside their specimen twins",
-        description=(
-            "The plan freed an instrument width and a specimen width with the same "
-            "angular shape: U with the Gaussian strain or size, X with the Lorentzian "
-            "size, Y with the Lorentzian strain or a Stephens anisotropic strain "
-            "block. The data fix only each pair's sum, so "
-            "the last stage held the instrument width at the value an earlier stage "
-            "left, or at its start. The message names that stage. The specimen widths "
-            "are the remainder of a split that the plan's stage order chose. Two starts "
-            "can disagree on them by several of their own esds, so they are not a "
-            "measurement of the specimen. To measure them, calibrate the instrument on a "
-            "standard with the `lab_calibrate` plan, load it with "
-            "`load_instrument_profile`, and refine the sample with `lab_sample_refine`."
         ),
     ),
     "XRDML_ATTENUATOR_APPLIED": HelpEntry(
