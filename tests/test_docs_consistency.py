@@ -25,6 +25,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -1030,62 +1031,130 @@ def test_every_handover_entry_is_in_a_form_the_session_hook_can_read():
                 )
 
 
-GUI_RULEBOOK = "gui/CLAUDE.md"
-# Where a path the GUI rulebook writes may be rooted: `lib/plot.ts` is under
-# gui/src, `gui/session.py` under src/rietx.  A path under a runtime directory
-# names something a run writes, never a file in the tree.
-_RULEBOOK_BASES = ("", "gui", "gui/src", "src/rietx", "src/rietx/gui")
-_RUNTIME_DIRS = ("live/", "state_dir/")
+#: Every committed rulebook: each `CLAUDE.md`, `AGENTS.md`, and each skill
+#: under `.claude/skills/` (`pr-review` names code).
+RULEBOOKS = sorted(subprocess.run(
+    ["git", "-C", str(ROOT), "ls-files", "*CLAUDE.md", "AGENTS.md",
+     ".claude/skills/*/SKILL.md"],
+    capture_output=True, encoding="utf-8", check=True).stdout.split())
+# Where a path a rulebook writes may be rooted, beside the rulebook's own
+# directory and each parent: `lib/plot.ts` is under gui/src, `gui/session.py`
+# under src/rietx.  A path under a runtime directory names something a run
+# writes, never a file in the tree.
+_RULEBOOK_BASES = ("", "gui", "gui/src", "src/rietx", "src/rietx/gui", "src", "tests",
+                   "docs", "docs/docs", "docs/skill/rietx", ".claude")
+_RUNTIME_DIRS = ("live/", "state_dir/", "tests/output/", ".rex/", "exports/", "site/",
+                 "dev/", "refs/")
+# A template rather than a path: `docs/milestones/vX.Y.md`, `refs/pr/N`.
+_RULEBOOK_PLACEHOLDER = re.compile(r"X\.Y|NNNN|(?:^|/)[A-Z](?:/|$)|[*<]")
 _RULEBOOK_PATH = re.compile(
     r"^((?:[\w.-]+/)+[\w.-]*(?:\{[\w.,-]+\})?[\w.-]*"
     r"\.(?:ts|svelte|py|mjs|cjs|js|json|jsonl|css|md|html|yml|yaml|toml|rs))"
     r"(?:::?([\w.]+))?$"
 )
 # A directory: written with a trailing slash, or three segments deep with no
-# extension (`src/rietx/gui/static`), which no route or prose token is.
-_RULEBOOK_DIR = re.compile(r"^(?:(?:[\w.-]+/)+|(?:[\w.-]+/){2,}[\w-]+)$")
+# extension (`src/rietx/gui/static`), which no route or prose token is.  A
+# leading `/` is a GUI route or a slash command, never a path, and the first
+# segment must be a word, so neither form matches.
+_RULEBOOK_DIR = re.compile(r"^(?:(?:\.?[\w-]+/)+|(?:\.?[\w-]+/){2,}[\w-]+)$")
+# A module and an attribute: `projects/gsas.split_records`, `refine.replay`,
+# `rietx.io.read_pattern`.  Checked by `tests/code_references.py`'s resolver
+# when the first segment is rietx or one of its modules.
+_RULEBOOK_NAME = re.compile(r"^((?:[a-z_]\w*/)*[a-z_]\w*(?:\.[A-Za-z_]\w*)+)(?:\(\))?$")
 
 
-def test_gui_rulebook_paths_resolve():
-    """Every path the GUI rulebook writes with a directory exists (WP-2134).
+def _rulebook_bases(rel: str) -> list[str]:
+    here = Path(rel).parent
+    own = [str(d) for d in (here, *here.parents) if str(d) != "."]
+    return [*own, *_RULEBOOK_BASES]
 
-    The rulebook is rules keyed by the files they govern, so a renamed file
-    leaves a rule pointing at nothing and nothing goes red.  A bare file name
-    is ambiguous and is not checked; `lib/plot.ts` is, and so is a directory
-    such as `gui/scripts/`.  A `file:symbol` (or a pytest `file::test`) also
-    asks that the symbol is still in that file as a whole word, so a comment
-    saying "cloned" does not keep `lib/model.ts:clone` alive.
-    """
-    text = (ROOT / GUI_RULEBOOK).read_text(encoding="utf-8")
+
+def rulebook_problems(rel: str, text: str | None = None) -> list[str]:
+    """Every path, test and module name in one rulebook the tree does not have."""
+    from tests import code_references as cr
+
+    if text is None:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+    bases = _rulebook_bases(rel)
+    package = "rietx" if not rel.startswith("src/rietx/") else ".".join(
+        Path(rel).parent.parts[1:])
     problems = []
     for token in sorted(set(re.findall(r"`([^`\n]+)`", text))):
-        if token.startswith(_RUNTIME_DIRS):
+        if (token.startswith(_RUNTIME_DIRS) or _RULEBOOK_PLACEHOLDER.search(token)
+                or token in cr.ALLOWLIST):
             continue
         if _RULEBOOK_DIR.match(token):
-            if not any((ROOT / b / token).is_dir() for b in _RULEBOOK_BASES):
-                problems.append(f"`{token}`: no directory under {_RULEBOOK_BASES}")
+            if not any((ROOT / b / token).is_dir() for b in bases):
+                problems.append(f"`{token}`: no directory of that name")
             continue
         m = _RULEBOOK_PATH.match(token)
         if not m:
+            n = _RULEBOOK_NAME.match(token)
+            if n:
+                name = n.group(1).replace("/", ".")
+                parts = name.split(".")
+                if (parts[0] in cr.rietx_top_names() and parts[-1] not in cr.PATH_EXTS
+                        and not cr.resolve(name, package)
+                        and not (parts[0] not in ("rietx", "rx")
+                                 and set(parts[1:]) <= cr.class_attribute_names())):
+                    problems.append(f"`{token}`: no such rietx name")
             continue
         path, symbol = m.groups()
         brace = re.search(r"\{([^}]+)\}", path)
         paths = ([path[:brace.start()] + alt + path[brace.end():]
                   for alt in brace.group(1).split(",")] if brace else [path])
         for p in paths:
-            hits = [ROOT / b / p for b in _RULEBOOK_BASES if (ROOT / b / p).is_file()]
+            hits = [ROOT / b / p for b in bases if (ROOT / b / p).is_file()]
             if not hits:
-                problems.append(f"`{token}`: no file {p} under {_RULEBOOK_BASES}")
+                problems.append(f"`{token}`: no file {p}")
             elif symbol and not any(
                 all(re.search(rf"\b{re.escape(part)}\b", h.read_text(encoding="utf-8"))
                     for part in symbol.split("."))
                 for h in hits
             ):
                 problems.append(f"`{token}`: {symbol} is not in {p}")
+    return problems
+
+
+@pytest.mark.parametrize("rel", RULEBOOKS)
+def test_rulebook_paths_and_names_resolve(rel):
+    """Every path, test and rietx name a rulebook writes exists (WP-2134, WP-2233).
+
+    A rulebook is rules keyed by the files and names they govern, so a renamed
+    file leaves a rule pointing at nothing and nothing goes red.  A bare file
+    name is ambiguous and is not checked; `lib/plot.ts` is, and so is a
+    directory such as `gui/scripts/`.  A `file:symbol` (or a pytest
+    `file::test`) also asks that the symbol is still in that file as a whole
+    word, so a comment saying "cloned" does not keep `lib/model.ts:clone`
+    alive.  A `module.attr` whose first segment is rietx or one of its modules
+    goes through `tests/code_references.py`'s resolver.  A GUI route or a slash
+    command starts with `/` and is skipped by form.
+    """
+    problems = rulebook_problems(rel)
     assert not problems, (
-        f"{GUI_RULEBOOK} names what the tree no longer has; rewrite the rule "
-        "against the code it governs:\n  " + "\n  ".join(problems)
+        f"{rel} names what the tree no longer has. Rewrite the rule against the "
+        "code it governs now, and put the history in the WP file:\n  "
+        + "\n  ".join(problems)
     )
+
+
+@pytest.mark.parametrize("token, problem", [
+    ("`tests/test_deleted_long_ago.py`", "no file tests/test_deleted_long_ago.py"),
+    ("`gui/scripts_gone/`", "no directory of that name"),
+    ("`refine.no_such_verb`", "no such rietx name"),
+    ("`tests/test_bccg.py::test_renamed_away`", "test_renamed_away is not in"),
+])
+def test_a_planted_rulebook_break_fails(token, problem):
+    found = rulebook_problems("src/rietx/io/CLAUDE.md", f"A rule about {token}.")
+    assert len(found) == 1 and problem in found[0], found
+
+
+@pytest.mark.parametrize("token", [
+    "`/api/params`", "`/pr-review`", "`docs/milestones/vX.Y.md`", "`refine.replay`",
+    "`projects/gsas2.py`", "`report.regions`",
+])
+def test_a_rulebook_route_command_or_live_name_passes(token):
+    assert rulebook_problems("src/rietx/io/CLAUDE.md", f"A rule about {token}.") == []
 
 
 def test_template_declares_both_handover_entry_forms():

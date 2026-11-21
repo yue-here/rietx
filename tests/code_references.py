@@ -83,6 +83,7 @@ ALLOWLIST: dict[str, str] = {
     "powderline/topas/conversions.py": "a file of the upstream powderline repository",
     "easydiff/conversions.py": "a file of the upstream easydiff repository",
     "``background.single_peaks``": "a key of the powderline recipe JSON, not rietx code",
+    "bin/serial.py": "ghostshift's queue script, in the claude-config repository",
 }
 
 ROLE = re.compile(

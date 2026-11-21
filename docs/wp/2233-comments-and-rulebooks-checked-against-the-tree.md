@@ -194,7 +194,7 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
       an allowlist name absent at the base, read from the base by `git show` and AST,
       as `audit_delta.py` does. It runs in the fast suite. Quote its duration from
       `--durations`.
-- [ ] **Rulebook references.** Generalise `test_gui_rulebook_paths_resolve` to every
+- [x] **Rulebook references.** Generalise `test_gui_rulebook_paths_resolve` to every
       `CLAUDE.md`, `AGENTS.md` and `.claude/skills/*/SKILL.md` (`pr-review` names code).
       Skip GUI routes and slash commands by form: a leading `/` and no file extension.
       Resolve `module.attr` forms with the resolver. Measure the real misses first. Fix a
