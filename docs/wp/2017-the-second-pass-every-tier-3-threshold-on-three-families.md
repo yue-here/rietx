@@ -227,6 +227,14 @@ and have no free factor to measure, so this file's old list named them without c
   each twin pair's sum. The hold's design is WP-2225's. Reproduce the trigger arms with
   `2017-batch/trigger_twin_hold.py` (about 10 s, macOS arm64, worktree `[dev]` venv).
 
+- **From WP-2064 (2026-11-16, PR #1601).** Once #1601 merges, CI's audit delta fails a pull
+  request that changes the value of a row carrying `approved` and leaves it at any tier but 1
+  or `invariant`, until the maintainer writes a later date. A group whose measurement moves a
+  tier-3 value therefore waits on that ruling before CI passes. A value demoted to tier 1 or
+  `invariant` passes; one demoted to tier 2 or `unaudited` still waits, since the demotion is
+  itself a ruling. An evidence-only change, which every group so far has been, reads exactly
+  as before (measured on #1577's head 539ef7fc7: 24 changed, no failure).
+
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.

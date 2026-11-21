@@ -24,7 +24,7 @@ and a renamed code never pairs.  A constant moved between modules is therefore
 a rename, and a constant or code given a new leaf is a new name.  Pairs are made
 one to one, in sorted order.
 
-**It fails on one thing**: a name new to `ROWS` at ``unaudited``.  A count
+**It fails on two things.**  The first is a name new to `ROWS` at ``unaudited``.  A count
 would fail honest growth, a row the judge returns to ``unaudited``.  A count
 would also let a change delete one unaudited row to buy room for another.  Three
 new names are exempt: the added half of a rename, a constant in a file the
@@ -32,7 +32,30 @@ base's `WALKED` did not cover, and a default at a seat new to `DEFAULT_SEATS`.
 Opening a walk over existing code enters its rows for the audit that owns them.
 So the last two hold only where the base already defined the constant, or the
 seat's function or class.  A module new in the change is placed in `WALKED`,
-and its numbers still need their tiers.  Every other delta is a report.
+and its numbers still need their tiers.
+
+**The second is a retune under an old approval** (WP-2064).  An ``approved``
+date is the maintainer's ruling on one value, and the table test holds a row's
+value to the tree's, so a retune edits the value and leaves the date.  A row
+whose value differs from its base row's, where the base row carries
+``approved``, fails unless the head's date is later; a date on the same day
+fails too.  A new name pairs with a deleted one of the same kind and leaf for
+this check alone, so a row renamed and retuned in one change is caught too; a
+plain rename keeps its value and is no retune.  The exact renames are placed
+first, over every new name, so the retune pairing sees only what they leave
+and its result does not hang on which name sorts first.  The pairing is by
+leaf, so it can join two unrelated rows that share one; a later date on the
+new row, which a new tier-3 row needs anyway, passes it.  Only a head tier
+that needs no approval at all passes without a later date: tier 1 or
+``invariant`` (`NEEDS_NO_APPROVAL`).  Any other head tier meets the rule, so a
+retune that demotes the row to tier 2 or ``unaudited`` still owes the ruling,
+since the demotion is itself one.  A tier-2 action meets it as a tier-3 row
+does, which is vacuous today: the table test holds every action's value at
+None.
+The maintainer writes the date (CONTRIBUTING.md § A heuristic needs its tier),
+so the failure says a ruling is owed and never tells the author to write one;
+the check sees only that the date moved, never who moved it.  Every other
+delta is a report.
 
 Stdlib only, like `skill_caps`, whose base revision and git helpers it reuses
 (`RIETX_CAPS_BASE` overrides the base for both).
@@ -41,6 +64,7 @@ Stdlib only, like `skill_caps`, whose base revision and git helpers it reuses
 from __future__ import annotations
 
 import ast
+import datetime
 import os
 import sys
 from collections.abc import Callable, Mapping
@@ -176,8 +200,10 @@ def opened_by(row: Row, before: Table, after: Table,
 
 NEW_UNAUDITED, ADDED, OPENED = "new at 'unaudited'", "added", "opened"
 RENAMED, CHANGED, DELETED = "renamed", "changed", "deleted"
+RETUNED = "retuned under an earlier approval"
 _TITLES = {
     NEW_UNAUDITED: "New to the table at 'unaudited' (FAILS)",
+    RETUNED: "Retuned under an approval given to another value (FAILS)",
     ADDED: "Added",
     OPENED: "Entered with a walk entry or seat new to the table",
     RENAMED: "Renamed",
@@ -196,12 +222,35 @@ class Delta:
 
     @property
     def fails(self) -> bool:
-        return self.why == NEW_UNAUDITED
+        return self.why in (NEW_UNAUDITED, RETUNED)
 
 
 def changed_fields(old: Row, new: Row) -> list[str]:
     """The fields other than the name that differ between two rows."""
     return [f for f in FIELDS[1:] if repr(getattr(old, f)) != repr(getattr(new, f))]
+
+
+#: The head tiers a retune passes at without a later date (WP-2064): the
+#: tiers that need no approval at all.
+NEEDS_NO_APPROVAL = (1, "invariant")
+
+
+def _date(text: object) -> datetime.date | None:
+    try:
+        return datetime.date.fromisoformat(str(text))
+    except ValueError:
+        return None
+
+
+def retuned_under_old_approval(old: Row, new: Row) -> bool:
+    """Whether ``new`` changed ``old``'s value, sits at a tier other than
+    `NEEDS_NO_APPROVAL`, and carries no approval later than the one ``old``
+    carried (module docstring)."""
+    if (not old.approved or repr(old.value) == repr(new.value)
+            or new.tier in NEEDS_NO_APPROVAL):
+        return False
+    was, now = _date(old.approved), _date(new.approved)
+    return was is None or now is None or now <= was
 
 
 def _always(row: Row) -> bool:
@@ -213,22 +262,41 @@ def deltas(before: Table, after: Table,
     """Every row the change added, renamed, changed or deleted.  ``existed``
     says whether the base defined the code a row names (`defined_at`)."""
     deleted = sorted(before.rows.keys() - after.rows.keys())
+    added = sorted(after.rows.keys() - before.rows.keys())
     out = []
-    for name in sorted(after.rows.keys() - before.rows.keys()):
+    # Exact renames first, over every new name, then the retune pairing over
+    # what they leave, so neither depends on which name sorts first.
+    paired: dict[str, Delta] = {}
+    for name in added:
         row = after.rows[name]
         pair = next((d for d in deleted
                      if _rename_key(before.rows[d]) == _rename_key(row)), None)
         if pair is not None:
             deleted.remove(pair)
-            out.append(Delta(RENAMED, row, before.rows[pair]))
+            paired[name] = Delta(RENAMED, row, before.rows[pair])
+    for name in added:
+        row = after.rows[name]
+        retuned = None if name in paired else next(
+            (d for d in deleted if _rename_key(before.rows[d])[:2] == _rename_key(row)[:2]
+             and retuned_under_old_approval(before.rows[d], row)), None)
+        if retuned is not None:
+            deleted.remove(retuned)
+            paired[name] = Delta(RETUNED, row, before.rows[retuned])
+    for name in added:
+        row = after.rows[name]
+        if name in paired:
+            out.append(paired[name])
         elif via := opened_by(row, before, after, existed):
             out.append(Delta(OPENED, row, via=via))
         else:
             out.append(Delta(NEW_UNAUDITED if row.tier == UNAUDITED else ADDED, row))
     out += [Delta(DELETED, before.rows[name]) for name in deleted]
-    out += [Delta(CHANGED, after.rows[name], before.rows[name])
-            for name in sorted(before.rows.keys() & after.rows.keys())
-            if changed_fields(before.rows[name], after.rows[name])]
+    for name in sorted(before.rows.keys() & after.rows.keys()):
+        old, new = before.rows[name], after.rows[name]
+        if retuned_under_old_approval(old, new):
+            out.append(Delta(RETUNED, new, old))
+        elif changed_fields(old, new):
+            out.append(Delta(CHANGED, new, old))
     return sorted(out, key=lambda d: (_ORDER[d.why], d.row.name))
 
 
@@ -269,7 +337,7 @@ def _describe(row: Row, code: Callable[[str], str]) -> str:
 
 def _how_it_moved(d: Delta, code: Callable[[str], str]) -> list[str]:
     out = []
-    if d.why == RENAMED:
+    if d.old is not None and d.old.name != d.row.name:
         out.append(f"from {code(d.old.name)}")
     if d.via:
         where = "the walk's new entry" if d.row.kind == "constant" else "the new seat"
@@ -295,10 +363,11 @@ def report(found: list[Delta], declared: list[tuple[str, str, list[str]]], how: 
     if not found and not declared:
         return f"{head}, measured against {how}: no row or declaration changed."
     n = {why: sum(d.why == why for d in found) for why in _TITLES}
+    retuned = f", {n[RETUNED]} retuned under an earlier approval" if n[RETUNED] else ""
     lines = [f"{head}, measured against {how}: "
              f"{n[NEW_UNAUDITED] + n[ADDED] + n[OPENED]} added, {n[RENAMED]} renamed, "
-             f"{n[CHANGED]} changed, {n[DELETED]} deleted, "
-             f"{n[NEW_UNAUDITED]} new at 'unaudited'."]
+             f"{n[CHANGED] + n[RETUNED]} changed, {n[DELETED]} deleted, "
+             f"{n[NEW_UNAUDITED]} new at 'unaudited'{retuned}."]
     for why, title in _TITLES.items():
         group = [d for d in found if d.why == why]
         if group:
@@ -319,12 +388,23 @@ def report(found: list[Delta], declared: list[tuple[str, str, list[str]]], how: 
     return "\n".join(lines)
 
 
-def failures(found: list[Delta]) -> list[str]:
-    return [f"{d.row.name} ({d.row.kind}) is new to rietx._audit.ROWS and arrives at "
+def _failure(d: Delta) -> str:
+    if d.why == RETUNED:
+        moved = f", renamed from {d.old.name}," if d.old.name != d.row.name else ""
+        return (f"{d.row.name} ({d.row.kind}, tier {d.row.tier}){moved} changed value from "
+                f"{d.old.value!r} to {d.row.value!r} ({TABLE}:{d.row.line}), and its "
+                f"approval, dated {d.old.approved} at the base, was given to "
+                f"{d.old.value!r}.  The maintainer's ruling on the new value is owed: the "
+                f"row passes once it carries an approved date later than {d.old.approved}, "
+                "which the maintainer writes (CONTRIBUTING.md § A heuristic needs its tier)")
+    return (f"{d.row.name} ({d.row.kind}) is new to rietx._audit.ROWS and arrives at "
             f"'unaudited' ({TABLE}:{d.row.line}).  Give it a tier and the evidence for "
             "it (CONTRIBUTING.md § A heuristic needs its tier); a name new to the table "
-            "may not enter at 'unaudited'"
-            for d in found if d.fails]
+            "may not enter at 'unaudited'")
+
+
+def failures(found: list[Delta]) -> list[str]:
+    return [_failure(d) for d in found if d.fails]
 
 
 # -- the tree and the base (impure) --------------------------------------
@@ -394,9 +474,13 @@ def main() -> int:
             fh.write(report(found, declared, how, markdown=True) + "\n")
     if os.environ.get("GITHUB_ACTIONS"):
         for d in found:
-            if d.fails:
+            if d.why == NEW_UNAUDITED:
                 print(f"::error file={TABLE},line={d.row.line}::{d.row.name} is new to "
                       "the audit table at 'unaudited'; give it a tier and its evidence")
+            elif d.why == RETUNED:
+                print(f"::error file={TABLE},line={d.row.line}::{d.row.name} changed value "
+                      f"under the approval dated {d.old.approved}; the maintainer's "
+                      "ruling on the new value is owed")
     bad = failures(found)
     for f in bad:
         print(f, file=sys.stderr)
