@@ -292,6 +292,12 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
       maintainer's memory rule that a spread under perturbation is carried by the bar or
       removed from the minimum, and this WP's goal of quoting only what the platforms
       share.*
+- [x] The Le Bail wander row's cost (issue #1733's fold): the `full` job's longest row,
+      5586 s on 11-21 and 8230 s on 11-20, in a job at 4:00:43 of its 5 h guard. *Both
+      halves of the test declare `closing_window_tol = 1e-3`, as its `worse` fixture
+      declares its own setting. The loop then keeps pass 1 of 2, and the hand fit
+      continues to the loop's pass 2. The row pins no number, so its question is
+      unchanged.*
 
 ## Acceptance
 

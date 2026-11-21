@@ -233,7 +233,7 @@ def test_the_cap_is_a_cap_and_says_it_truncated(pattern):
     assert "Pass 2 of 2 was kept" in stop.message
 
 
-@pytest.mark.slow       # ~40-80 s: the +2 % start wanders through four passes
+@pytest.mark.slow       # the +2 % start wanders; the declared closing stage stops it at two passes
 def test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from(pattern):
     """Restoring the best pass must not hand the next ``fit`` a start the hand
     loop never had.  Seeding the restored intensities does exactly that: the
@@ -248,9 +248,16 @@ def test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from(p
     start rather than clamped at the edge, and the cell stage here does run
     away (``CELL_RUNAWAY``), so the wander kept pass 2 of 3 where it kept
     pass 3 of 4.  What is asserted is the invariant: the result is the kept
-    pass, and the next fit continues from it as the hand loop would."""
+    pass, and the next fit continues from it as the hand loop would.
+
+    Both halves declare the closing stage (WP-2036), as ``worse`` declares
+    its own setting.  Since WP-2222 turned it off by default, the default
+    loop ran four passes from 888 % and its Le Bail partitions settled for
+    minutes each: 1604 s alone on an arm64 Mac and 5586-8230 s on the Linux
+    nightly.  With it the loop kept pass 1 of 2 on an arm64 Mac (103.09 %,
+    then 434.03 %), and the hand fit read 434.03 %."""
     ref = _refinement(1.02)
-    result = _fit(ref, pattern, 8, limits=WIDE_LIMITS)
+    result = _fit(ref, pattern, 8, limits=WIDE_LIMITS, closing_window_tol=1e-3)
     stop = _stop(result)
     kept, ran = (int(v) for v in re.search(
         r"Pass (\d+) of (\d+) was kept", stop.message).groups())
@@ -258,7 +265,7 @@ def test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from(p
     per_pass = [float(v) / 100.0 for v in re.search(
         r"Rwp % per pass: ([\d., ]+)\)", stop.message).group(1).split(", ")]
     assert result.statistics.rwp == pytest.approx(per_pass[kept - 1], abs=1e-5)
-    nxt = ref.fit(pattern, mode="lebail", plan="profile_only",
+    nxt = ref.fit(pattern, mode="lebail", plan=_plan(1, closing_window_tol=1e-3),
                   two_theta_limits=WIDE_LIMITS, telemetry=False)
     assert nxt.statistics.rwp == pytest.approx(per_pass[kept], abs=1e-5)
     _plot(result, "lebail_alternation_wander_kept.png")
