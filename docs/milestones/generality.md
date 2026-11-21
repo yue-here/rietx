@@ -83,7 +83,12 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    is either **demoted** or **kept on two grounds together**:
    - the mechanical ground: it holds across at least three unrelated dataset families,
      counted by laboratory, instrument and material rather than by file (a 1 213-record
-     archive from one source is one family), with a stated case where it fails. *Holds*
+     archive from one source is one family), with a stated case where it fails. Whether
+     two datasets are unrelated is judged for each row, by whether they differ in what
+     that row depends on (ruled 2026-11-21, WP-2017 questions 36 and 38). For a profile
+     row, three chemically different materials with similar peak profiles from one
+     beamline are one family. For a row about the specimen, they can be three. The row
+     names what its families differ in. *Holds*
      is measured against each family's reference (DESIGN.md § Rules, 2). For a number
      the reference is a certified or independently measured value, which validates, or a
      published refinement and the cross-code envelope under their protocol, which only
