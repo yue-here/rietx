@@ -105,7 +105,173 @@ promise stages every break).
 - `docs/milestones/generality.md`; `src/rietx/io/CLAUDE.md`; WP-1028, 1047, 1117 (the
   derived surface).
 
+## Rulings
+
+From the rulings triage of 2026-11-21, over this file and PR #1636's batch
+(`2006-batch/tiers.md` and `surface.md` on that branch). Nothing here is the maintainer's
+approval, and no tier-3 row is recorded as approved.
+
+**Settled by Claude, 2026-11-21.**
+
+1. *"The gate ruling" in the status line* is stale. Yue ruled on 2026-11-16 that 2005 to 2007
+   run now (`generality.md` § The order), and PR #1636 ran part 2 under it.
+2. *The 29 unreached surface entries and the three indexing evidence exports* are kept.
+   Settled under the reading that a keyword constructor uses its fields by construction and
+   a return type is surface whether or not anyone spells it. Keeping deletes nothing. The
+   alternative was to list them for removal.
+3. *`PhaseMicrostructure.separable` and `.size_strain_collinearity`* stay `None` on the
+   result and are documented. Settled under the root CLAUDE.md WP-1076 invariant: `None` is
+   the honest empty state and cannot read as an answer. The alternative was to write them on
+   the result or retire them from it.
+4. *`magnetic.supercell.CHILD_SITE_TOL`* takes `SITE_TOL`'s tier. Settled under
+   `generality.md` § The rule: a threshold derived with no free factor inherits its source's
+   tier. The alternative was to route it to Mike as a magnetic row.
+5. *`bruker_raw.py:346`'s `np.isclose`* passes `rtol=0` when its closing test is written.
+   Settled under a measurement: on the one real v4 file every tolerance from 0 to under 5°
+   picks the same drive, so the change moves nothing. The alternative was to keep numpy's
+   default `rtol`.
+6. *The inherited pdCIF weight-column note* is stale, as PR #1636 found. Yue ruled the
+   whole-column fallback on 2026-10-26 (`PATTERN_WEIGHT_UNUSABLE`, issue #1181).
+
+**Consent lines, awaiting Yue.** Each is "I will X, unless you object". A rule sends it to
+him: a tier-3 keep needs his dated approval, and a reader-output change or a deletion is his.
+
+7. `fullprof._OCCUPANCY_RTOL`: tighten its nuclear use to the file's printed rounding, so a
+   site at Occ × 0.996 is refused rather than built full with no record. The magnetic
+   Scale × f² use goes to Mike.
+8. `FULLPROF_OCCUPANCY_UNCHECKED`: fire only for a one-atom phase whose symbol has a second
+   origin setting (clause 1 of *Attention is a cost*).
+9. The three writer notices that fire on every write (`GSAS2_CIF_FIELD_NOT_WRITTEN`,
+   `GSAS2_INSTPRM_FIELD_NOT_WRITTEN`, `GSAS_PRM_FIELD_NOT_WRITTEN`): the fixed part moves to
+   each writer's docstring and help entry, and a code stays only for a dropped item that
+   varies with the model (clause 1).
+10. `RECIPE_FIELD_DROPPED`: split into one code per level (clause 2).
+11. The recipe hump's `0.0 if pos is None`: refuse a background peak with no position, under
+    the 2026-11-02 ruling that made `HumpComponent.position` required.
+12. A symmetry-fixed angle within 1e-3° of its value (`cif.py:98`): snap it and record
+    `CIF_CELL_ANGLE_CORRECTED`, as the reader already does from 1e-3° to 0.1°.
+13. `gui.imports.WAVELENGTH_RTOL`: match a header to the rounding of its own printed digits,
+    so 0.71 Å reads as Mo and 0.56 Å as Ag.
+14. `ProjectFormat.refuses`: retire it. No member has set it since WP-2013 (Rule 5). It is a
+    deletion, staged in the release notes.
+15. `CIF_STATED_MULTIPLICITY_SNAP_TOL`, `DUPLICATE_U_TOLERANCE`, `OCCUPANCY_TOLERANCE`: take
+    `CIF_PRINTED_ROUNDING`'s per-file printed-digit rule and become tier 1 (Rule 5,
+    convention).
+16. Keep at tier 3 as written: `TWIN_DISTANCE`, `CIF_ANGLE_CORRECT_MAX_DEG` (the WP-1028 band
+    in the root CLAUDE.md), `SYMMETRY_ANGLE_TOL_DEG`, `MAX_HKL_GRID_POINTS` (the shape of the
+    approved memory caps), `LINE_DISPERSION_TOL`, `NEAR_EDGE_EV` (an XAFS citation would move
+    it to tier 2), `GSAS_EXP_REFINE_FLAG_MERGED` and `PATTERN_ROWS_DROPPED` sites 2 and 3.
+17. Keep at tier 3 under the rare-feature clause, each naming its one family:
+    `GSAS_BANK_COMMENTED`, `RECIPE_BACKGROUND_PEAK_DEGENERATE`,
+    `RECIPE_ENGINE_DEFAULT_DECLINED`, `RECIPE_PLAN_STAGED`, `TOPAS_PHASE_TERM_READ`.
+18. `SITE_TOL`: widen to GSAS-II's reach (2e-4 per coordinate) at tier 2 if the 564-setting
+    orbit sweep and the rigid-body tilt case pass at it, else keep it at tier 3 with the
+    four-decimal case named.
+19. `HEAD_BYTES` and `gsas._GSAS_TIME_MAP_SCAN_BYTES`: one 64 kB sniff window, dropping the
+    two escalations it makes redundant. The 2026-11-17 probe found no change in which reader
+    claims any of the 210 files in `tests/data`.
+20. The phase-scale start of 1e-3 (`GSAS2_GPX_SCALE_NOT_COMPARABLE`,
+    `GSAS_EXP_SCALE_NOT_COMPARABLE`): a start-invariance test from 1e-3 and from a
+    data-seeded scale. If both answers agree, the start is answer-invariant. If not, it
+    stays at tier 3 with the case named.
+21. `RECIPE_BACKGROUND_RESEEDED`: compare GSAS-II 5.8.4's Chebyshev basis with rietx's. If
+    they are equal, carry the coefficients (tier 1). If not, refuse a held background
+    rather than zero it.
+22. `GSAS_PRM_GEOMETRY_ASSUMED`: adopt GSAS-II's rule (one wavelength is Debye-Scherrer, a
+    doublet is Bragg-Brentano) at tier 2, keeping the warning.
+
+**Awaiting Yue, with a brief.** 23. Two reader picks where careful refiners differ:
+`PATTERN_MULTISCAN_DEFAULTED` and `SPACE_GROUP_SETTING_ASSUMED`. The brief is in the
+2026-11-21 handover entry.
+
+**Mike's** (#1075): the nine other magnetic tier-3 candidates in `tiers.md`,
+`_OCCUPANCY_RTOL`'s Scale × f² use, `_MAGNETIC_MATCH_ATOL`, the two-level
+`CIF_MAGNETIC_SYMMFORM` and `GSAS2_GPX_PHASE_MAGNETIC`, and the judge's three magnetic
+reading defaults.
+
 ## Handover log
+
+- **2026-11-21** — A rulings triage, docs only (PR #PENDING), over this file and PR #1636's
+  batch. The gate ruling this WP waited on was made on 2026-11-16, and PR #1636 has since
+  tiered 218 rows under it. So what waits now is that PR's batch. Of its items, six are
+  settled by a written rule or a measurement, 16 are consent lines Yue can wave through,
+  one is a brief, and the magnetic ones are Mike's. § Rulings above lists each. Nothing was
+  built, and PR #1636 needs no change for these rulings to stand.
+
+  #### Brief for the maintainer: two reader picks where careful refiners differ
+
+  **The decision.** For two readers that must choose for the caller, whether each keeps
+  choosing and warning (you approve the tier-3 row), or refuses and lists the alternatives
+  (Rule 1's third kind). It comes to you for three reasons. Both sit on the main reading
+  surface. Two written rules point different ways on the second. And the cost of refusing
+  depends on what scientists' files look like, which I have not measured.
+
+  **Why it matters.**
+
+  1. *A file with several scans* (`PATTERN_MULTISCAN_DEFAULTED`). Bruker, PANalytical and
+     Rigaku files can hold more than one scan. With no `scan=`, `read_pattern` reads scan 0
+     and warns "scan 0 of N". The scans may be repeats, and then scan 0 is fine. They may
+     be adjacent ranges, and then scan 0 is part of the measurement. Or the file is a map:
+     `panalytical_mesh.xrdml` holds 101 scans, and slice 0 refines as if it were the
+     sample. The GUI's import wizard has no scan picker, so it always takes scan 0. If the
+     default is wrong, every refined number is a fit to the wrong data, and the warning is
+     the only signal. Importance: moderate.
+  2. *A bare space-group symbol with two settings* (`SPACE_GROUP_SETTING_ASSUMED`). A
+     symbol such as `F d -3 m` with no origin choice and no operator list names two
+     settings. The reader takes gemmi's first (origin choice 1) and warns, quoting the cell
+     contents each setting implies. A file that lists its operators never reaches this
+     code. The wrong origin swaps a spinel's A and B sites: A2BO4 in place of AB2O4, and
+     wrong weight fractions. Importance: moderate.
+
+  **Aim.** I read the aim as Rule 1: a default acts only where every competent refiner
+  would act the same way, and nobody fits the wrong pattern or structure without being
+  told. Correct me if convenience on the common file should weigh more.
+
+  **Options.**
+
+  - Multi-scan file. (keep) Read scan 0 and warn, with the tier-3 row approved. Nothing
+    changes, and a mesh can still be fitted as one slice under the warning. (refuse)
+    Refuse when there is more than one scan and no `scan=`, listing each scan's range and
+    step. A python caller pays one rerun with the list in hand. The GUI needs a scan
+    picker, about a day. It changes reader output and is undoable. Dropped: returning
+    every scan, as GSAS-II imports each as its own pattern, because `read_pattern` returns
+    one pattern and the series reader serves many.
+  - Bare symbol. (keep) Origin choice 1 with both settings quoted: tier 3 approved, or
+    tier 2 on TOPAS's and gemmi's default with GSAS-II named as the dissenter. (origin 2)
+    Origin choice 2 for a centrosymmetric group, as GSAS-II does. Published structures
+    mostly state origin 2 (issue #217). A TOPAS `.inp` keeps origin 1, which is that
+    format's own rule. It changes reader output. (refuse) Refuse a bare two-setting symbol
+    and list both settings with their contents, so the caller adds `:1` or `:2`.
+
+  **Practice.** For multi-scan files, GSAS-II 5.8.4 imports every scan as its own pattern
+  (`G2pwd_Panalytical.py:50-76`, `G2pwd_rigaku.py:222-250`, read on 2026-11-17). The other
+  six programs were not checked, and `docs/practice.md` has no section on this. For bare
+  symbols, GSAS-II 5.8.4 takes origin choice 2 (`G2phase_CIF.py:729-783`), and TOPAS and
+  gemmi take origin choice 1. FullProf was not checked. The rule conflict is in
+  `generality.md` § The rule's tier 2: a program's default stays at tier 2 despite a
+  dissenter, while for an action a named dissenter outweighs the default. Reading a symbol
+  is both a default and an action.
+
+  **Recommendation.**
+
+  - Multi-scan: refuse, as a lean, and a close call. The pick is right only when the scans
+    are repeats. For ranges and maps the warning forces the same rerun a refusal would, but
+    only after a fit to the wrong data. A mesh user and GSAS-II would both choose
+    otherwise, so Rule 1's unanimity test fails. Keep loses on that. Its one advantage is
+    the GUI, which needs a picker anyway before it can read anything but scan 0. Finding
+    that most multi-scan files on users' disks are repeats would flip me.
+  - Bare symbol: keep origin choice 1, as a lean with low confidence. Nobody has counted
+    which files reach this code. Formats that state their operators never do, and TOPAS
+    files mean origin 1. The crux is whether the files that do reach it are mostly typed
+    from papers (origin 2) or written by programs that mean origin 1. A count of bare
+    two-setting symbols in the corpora by source would settle it. A majority typed from
+    papers would flip me to origin 2. Refuse loses to both, because the warning already
+    quotes both settings' contents, which is the ranking Rule 1's second kind asks for.
+
+  *Next.* Yue answers the consent lines and the brief, and Mike answers the magnetic rows.
+  Then PR #1636's successor dates the approved rows into `_audit.py`, builds the consent
+  lines' changes with their tests, and writes the closing tests for the 36 rows left at
+  `unaudited`.
 
 - **2026-10-24** — PR #1101 merged (`50bc4555`, review round 4), by `/pr-review`.
   *Done*: part 1, which removes and rules on nothing.
