@@ -9906,7 +9906,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # T² off the same final covariance, for geometry's reason.  Quantities only.
     distortion_totals = _distortion_totals(table, theta, structure, values,
                                            stderr_internal=stderr_internal,
-                                           correlation=correlation)
+                                           correlation=correlation,
+                                           discarded=discarded)
 
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
