@@ -418,6 +418,201 @@ def test_a_name_described_twice_is_indexed_once(monkeypatch):
 
 
 # ----------------------------------------------------------------------
+# A Parameters list under each call (WP-2024): the parser, the rendering and
+# the both-ways gate with its shrink-only baseline
+# ----------------------------------------------------------------------
+
+def _undocumented_baseline() -> tuple[frozenset[str], int]:
+    spec = importlib.util.spec_from_file_location(
+        "_undocumented_parameters", DOCS_DIR / "undocumented_parameters.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.UNDOCUMENTED_PARAMETERS, module.UNDOCUMENTED_CAP
+
+
+def _documented(a, b=2, *rest, **kw):
+    """Summary line.
+
+    Parameters
+    ----------
+    a
+        The first, over
+        two lines.
+    b : int
+        The second, with a ``code`` span and :meth:`Refinement.fit`.
+    *rest, **kw
+        Passed on.
+
+    Notes
+    -----
+    unindented prose under a heading of its own is not an argument
+    """
+
+
+def test_a_parameters_section_is_one_entry_per_name_and_stops_at_a_heading():
+    entries = reference_pages.parameter_entries(_documented)
+    assert [name for name, _ in entries] == ["a", "b", "*rest", "**kw"]
+    assert entries[0][1] == "The first, over two lines."
+    assert reference_pages.call_arguments(_documented) == ["a", "b", "*rest", "**kw"]
+    assert reference_pages.parameter_entries(reference_pages.parameter_entries) == []
+
+
+def test_a_call_with_no_summary_line_keeps_its_fields_out_of_the_options():
+    """MyST reads `:name: value` lines straight under the directive as options,
+    so a body that opens on a doc field is set off by a blank line."""
+    text = reference_pages._directive("function", "f(a)", ":param a: A.",
+                                      options={"module": "rx"})
+    assert text.splitlines()[1:4] == [":module: rx", "", ":param a: A."]
+
+
+def test_an_entry_renders_as_a_doc_field_with_its_markup_as_code():
+    """The Python domain draws `:param:` fields as the Parameters list; a
+    variadic name's stars are escaped, or they would open emphasis."""
+    fields = reference_pages._parameter_fields(reference_pages._api_index(), _documented)
+    assert fields.splitlines() == [
+        ":param a: The first, over two lines.",
+        ":param b: The second, with a `code` span and `Refinement.fit`.",
+        r":param \*rest: Passed on.",
+        r":param \*\*kw: Passed on.",
+    ]
+    entry = reference_pages._api_entry(reference_pages._api_index(), "rx.Refinement.fit")
+    assert "\n:param data: " in entry
+
+
+def test_unindented_prose_inside_the_section_reads_as_a_name_the_gate_refuses():
+    """The failure the heading rule in CONTRIBUTING.md prevents, made on purpose."""
+    def stray(a):
+        """Summary.
+
+        Parameters
+        ----------
+        a
+            The one argument.
+
+        A paragraph of rationale with no heading above it.
+        """
+    names = [name for name, _ in reference_pages.parameter_entries(stray)]
+    assert set(names) - set(reference_pages.call_arguments(stray)) == {
+        "A paragraph of rationale with no heading above it."}
+
+
+def _api_calls() -> dict:
+    """Every name the API pages draw with a signature, once, in reading order."""
+    index = reference_pages._api_index()
+    calls = {}
+    for name, _ in _api_names():
+        obj = index._resolve(name)
+        if name not in calls and reference_pages.documented_call(obj):
+            calls[name] = obj
+    return calls
+
+
+def _stray_entries(calls: dict) -> list[str]:
+    """Entries naming no argument of their call, or saying nothing."""
+    return [f"{name}: {arg!r}" for name, obj in calls.items()
+            for arg, text in reference_pages.parameter_entries(obj)
+            if arg not in reference_pages.call_arguments(obj) or not text]
+
+
+def _baseline_problems(calls: dict, baseline: frozenset[str], cap: int) -> list[str]:
+    """Both ways, the shape of `test_help.py`, plus the size: an argument with
+    no entry and no baseline line, a baseline line whose argument is now
+    documented or gone, and a baseline larger than its cap."""
+    missing = {f"{name}({arg})" for name, obj in calls.items()
+               for arg in reference_pages.call_arguments(obj)
+               if arg not in {a for a, _ in reference_pages.parameter_entries(obj)}}
+    problems = []
+    if missing - baseline:
+        problems.append(
+            "arguments with no Parameters entry (CONTRIBUTING.md § A Parameters section "
+            "under each call):\n" + "\n".join(sorted(missing - baseline)))
+    if baseline - missing:
+        problems.append(
+            "documented or gone, so delete their lines from docs/undocumented_parameters.py:\n"
+            + "\n".join(sorted(baseline - missing)))
+    if len(baseline) > cap:
+        problems.append(
+            f"docs/undocumented_parameters.py holds {len(baseline)} lines against its cap "
+            f"of {cap}: the baseline only shrinks, so a new argument gets an entry")
+    return problems
+
+
+def test_every_parameters_entry_names_an_argument_of_its_call():
+    """An entry for an argument the signature lacks describes nothing."""
+    calls = _api_calls()
+    assert len(calls) > 90
+    stray = _stray_entries(calls)
+    assert not stray, ("Parameters entries naming no argument, or saying nothing:\n"
+                       + "\n".join(stray))
+
+
+def test_every_argument_on_the_api_pages_has_an_entry_or_a_baseline_line():
+    """An argument with no entry fails unless the shrink-only
+    `UNDOCUMENTED_PARAMETERS` holds it, a line there whose argument is now
+    documented or gone fails, and the set may not pass `UNDOCUMENTED_CAP`, so
+    it only shrinks."""
+    baseline, cap = _undocumented_baseline()
+    problems = _baseline_problems(_api_calls(), baseline, cap)
+    assert not problems, "\n\n".join(problems)
+
+
+def _empty_entry(a, b):
+    """Summary.
+
+    Parameters
+    ----------
+    a
+    b
+        The second.
+    """
+
+
+def _undocumented_b(a, b):
+    """Summary.
+
+    Parameters
+    ----------
+    a
+        The first.
+    """
+
+
+def test_the_gate_refuses_an_entry_that_says_nothing():
+    assert _stray_entries({"f": _empty_entry}) == ["f: 'a'"]
+
+
+@pytest.mark.parametrize("baseline, cap, fragment", [
+    # an argument documented nowhere
+    (frozenset(), 0, "arguments with no Parameters entry"),
+    # a stale line: `a` is documented, so its line must go
+    (frozenset({"f(a)", "f(b)"}), 2, "delete their lines"),
+    # growth: a new undocumented argument, its line added beside it, past the cap
+    (frozenset({"f(b)"}), 0, "against its cap of 0"),
+])
+def test_the_baseline_gate_refuses(baseline, cap, fragment):
+    problems = _baseline_problems({"f": _undocumented_b}, baseline, cap)
+    assert len(problems) == 1 and fragment in problems[0], problems
+
+
+def test_the_baseline_gate_passes_a_baseline_at_or_under_its_cap():
+    assert _baseline_problems({"f": _undocumented_b}, frozenset({"f(b)"}), 1) == []
+
+
+def test_the_refinement_section_is_documented_in_full():
+    """WP-2024's pilot: no call of the everyday page's Refinement section is
+    left in the baseline."""
+    index = reference_pages._api_index()
+    names = dict((title, names) for title, _, names in index.SECTIONS)["Refinement"]
+    left = sorted(line for line in _undocumented_baseline()[0]
+                  if line.split("(")[0] in names)
+    assert not left, left
+    calls = _api_calls()
+    drawn = [name for name in names if name in calls]
+    assert len(drawn) >= 19, drawn
+    assert all(reference_pages.parameter_entries(calls[name]) for name in drawn)
+
+
+# ----------------------------------------------------------------------
 # The foreign-name map: hand-written, and checked against the code that reads
 # and writes each format
 # ----------------------------------------------------------------------

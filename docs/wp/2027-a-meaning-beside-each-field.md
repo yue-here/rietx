@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: The repo's own process
 Depends on: 2024 soft (its register and gate are the pattern; fields render by `py:fields`, not `:param:`)
-Priority: P4 2026-10-23 — a scoping decision with ~1 270 fields behind it, nobody blocked; P3 once WP-2024 has set the register
+Priority: P3 2026-11-16 — WP-2024 set the register (CONTRIBUTING.md § A Parameters section under each call, PR #1622)
 
 ## Goal
 
