@@ -1,9 +1,9 @@
 # WP-2221 — A phase whose group has no tabulated type still gets its report and its CIF
 
-Milestone: unscheduled · Status: 🔄 2026-11-20 — implemented, PR #1721 in review; one magnetic-path question for Mike
+Milestone: unscheduled · Status: 🔄 2026-11-21 — the raise fixed, PR #1721 merged 2026-11-20; Mike ruled on #1688 (R-group k-points, parent-frame wording) and the two tasks from that ruling remain
 Track: What fires, and what stays silent
 Depends on: — (1918 soft: its I-d reads phases of this kind)
-Priority: P2 2026-11-19 — a fit completes and then `report()` raises, so no section of the FitReport can be read; the NiO and MnO rhombohedral magnetic children reach it, a path few fits run
+Priority: P2 2026-11-21 — the raise is fixed (PR #1721); what remains is Mike's ruling: every R group's satellite candidates include two k-points that are not points of symmetry, and a child's moment note prints a direction that sits 2.19° off its axis when read as a lattice direction; a path few fits run
 
 ## Goal
 
@@ -89,6 +89,37 @@ place D24's ruled action writes) is a magnetic-path decision, and those are Mike
       (`tests/test_unnamed_group_report.py`; `wp2221_nio_child.png`, `wp2221_pnma_child.png`).
 - [x] Skill: none. No section is skipped, so nothing new reaches a reader.
 
+**Ruled by Mike, 2026-11-20 on #1688** (issuecomment-7038491624; the magnetic path is his
+under #1075). PR #1721 merged without these, as the ruling allowed ("this PR or a
+follow-up"). The ruling's measurements are on the issue.
+
+- [ ] (b) Satellite k-points by lattice. (⅓, ⅓, 0) and (⅓, ⅓, ½) are the K and H points of
+      the hexagonal P lattice only (Bradley & Cracknell 1972, Table 3.6; Hinuma et al. 2017,
+      Tables 84–86). Drop them from every R group in both settings, so `:H`, `:R` and the NiO
+      child list T, L and F alone and agree as sets of stars. Keep them on a hexagonal P
+      group, and carry them through (P, p) to a child whose `parent_cell` names a hexagonal P
+      parent. The gate is the lattice read from the tabulated setting (the parent's when
+      `parent_cell` is set), never the crystal system. The code comment "(⅓, ⅓, ·) is K/H only
+      on a tabulated setting's axes" becomes "on a hexagonal P lattice". Tests: `R -3 m:H`
+      gets exactly (0, 0, 3/2), (½, 0, ½), (½, ½, 0) and `R -3 m:R` exactly (0, 0, ½),
+      (0, ½, ½), (½, ½, ½), which changes the `R -3 m:H` row of `CENTRED_SETS` and the
+      primitive-setting identity test's literal in `tests/test_satellites.py`; setting
+      invariance as stars on all seven R groups (146, 148, 155, 160, 161, 166, 167), and the
+      NiO child's set equal to the `:R` set mapped by (2a,a+b,a+c;0,0,0); `P 6/m m m` and
+      `P -3 m 1` keep both points, and a hexagonal P child with `parent_cell` gets them mapped.
+- [ ] (a) The magnetic sections state a `parent_cell` phase in the parent's frame. The phase
+      is named by the parent's setting, the transform and its BNS number ("child of
+      `R -3 m:R` by (2a,a+b,a+c;0,0,0), magnetic group BNS 2.7"), saying which crystal system
+      belongs to which. Every direction a magnetic note names is a lattice direction [uvw] of
+      the parent first, with this cell's beside it. One rule covers `MomentEvidence.note`,
+      the direction in `MOMENT_ANGLE_STATIONARY` and #1576's warning when it lands. A phase
+      without `parent_cell` keeps its own cell. Tests on the NiO `R -3 m:R` child with
+      moments: the note names [1, 1, 1] of the parent and [-0.5, 1, 1] in this cell; the
+      printed child vector, taken through the direct-lattice matrix, lies on the stage's
+      recorded flat axis to < 1e-6°; `MomentEvidence.phase` names the parent setting, the
+      transform and BNS 2.7; #599's named control keeps its own-cell wording and numbers. This
+      changes what a fit prints, so the texts go to the maintainer before merge.
+
 ## Acceptance
 
 The issue's script runs to the end, and `report()` returns a FitReport whose sections are all
@@ -104,6 +135,31 @@ present.
 - Issue #1688; related #614, #612 (both closed), #757.
 
 ## Handover log
+
+- **2026-11-21** — the merge recorded, by a ghostshift runner (PR #CLOSEPR). The defect this
+  WP was filed for is fixed on `main`. PR #1721 merged at 2026-11-20 18:45Z as merge commit
+  21b328f49 and closed #1688. A phase whose group no tabulated setting names now gets its
+  report and its nuclear CIF block. The WP stays in flight for Mike's ruling. He answered
+  the question the last entry left for him at 11:33Z the same day, before the merge, and
+  ruled on two points. On an R lattice the two ⅓ k-points are not points of symmetry in
+  either setting, so they leave every R group's candidate list. A child with `parent_cell`
+  states its magnetic group and its directions in the parent's frame. Nothing in the package
+  changed in this session.
+
+  *Done.* Status and `Priority:` rewritten. The ruling's two parts are now the WP's two open
+  tasks, each with the tests Mike named. WP-1418's Inherited note on the NiO route now
+  records that the report-side raise is fixed.
+
+  *Settled by Claude.* (1) The ruling's work stays in this WP rather than a new one. Grounds:
+  the fold-first rule in `docs/wp/TEMPLATE.md`, and the ruling answers this WP's own open
+  question on its own issue. Alternative: a new WP for the parent-frame wording, which
+  reaches `MomentEvidence` beyond this WP's report fix. (2) The WP stays P2 with its reason
+  rewritten. Grounds: the rubric's P2 row for a defect that fires wrongly; a candidate list
+  that names two non-special points is one. Alternative: P3, since a reader can discard the
+  two candidates by hand.
+
+  Next: task (b) first. It is self-contained in `crystallography/satellites.py` with pinned
+  test changes. Task (a) changes reader output, so its texts go to Yue before merge.
 
 - **2026-11-20** — implemented, by a ghostshift runner (PR #1721). A phase whose space group
   is an operation list that no tabulated setting names can now be reported and written to a
