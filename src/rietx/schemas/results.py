@@ -1415,7 +1415,9 @@ class StageResult(Base):
     #: each row this stage lifted before solving, and the value it started at
     #: in column units (WP-1930).  Three writers put a row here.  The runner
     #: itself starts an FCJ axial ratio the stage newly frees on zero at
-    #: :data:`~rietx.model.forward.AXIAL_SIZING_FLOOR`
+    #: :data:`~rietx.model.forward.AXIAL_SL_START` (S/L) or
+    #: :data:`~rietx.model.forward.AXIAL_HL_START` (H/L), never at its
+    #: partner's value
     #: (:func:`~rietx.model.forward.apertures_to_lift`, WP-1955), on every
     #: stage and in both runners.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through

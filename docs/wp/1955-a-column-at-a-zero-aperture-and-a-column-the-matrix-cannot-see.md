@@ -181,9 +181,9 @@ when U and V are both zero beside W on its floor. It is the only other
       jax at S/L and H/L from 0.001 to 0.005 and at a low-angle reflection
       under the ξ cap. The start-invariance test now moves the start alone
       (`AXIAL_SL_START`/`AXIAL_HL_START`, not the sizing floor). The rows for
-      both starts and for `AXIAL_NODE_STEP` (tier 3, written 2026-11-05) and
-      the amended `StageResult.seeded` row wait for Yue's approval; the
-      `AXIAL_SIZING_FLOOR` row is left alone.
+      both starts and for `AXIAL_NODE_STEP` (tier 3) carry Yue's
+      `approved="2026-11-17"` since ec7cbd49b; the `AXIAL_SIZING_FLOOR` row is
+      left alone.
 - [ ] The Gaussian-width floor (Context, from WP-1467): the FD width column
       at `caglioti._MIN_GAMMA_G2` and the strict xfails that cite this WP
       (`test_fd_columns_hold_at_every_protocol_answer` on lab6 and cpd1a,
@@ -332,9 +332,11 @@ alone.
     exchanged.
   - Tests: `tests/test_cross_backend.py` 241 passed, 36 skipped, 2 xfailed
     (the two numpy zero-aperture rows now pass, xfailed → passed). Against
-    main the fast selection gains 6 tests: the gap test's 2 rows (back with
-    task 2) and 4 in `test_lab_instrument.py` (the lift's three starts and
-    the no-relift row).
+    main the fast selection gains 11 tests (collected, `-m "not slow"`, `.venv-test`
+    Mac, `test_cross_backend.py` 305 → 307, `test_lab_instrument.py` 59 → 68, no
+    other touched file moves): the gap test's 2 rows (back with task 2) and 9 in
+    `test_lab_instrument.py` (the lift's starts, the no-relift row, and the
+    equal-line, hand-freed and joint-runner rows of the 2026-11-05 round).
     Fast and full counts on the merged tree: the PR body.
   - Re-measured after merging `origin/main` at 5d7622d60, whose WP-2012
     has `lab_bragg_brentano` free S/L alone with H/L held. #1075 repro 1
