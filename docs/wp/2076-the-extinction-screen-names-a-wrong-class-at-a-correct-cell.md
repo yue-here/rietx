@@ -370,7 +370,7 @@ The question and its measurements are in the handover entry of 2026-11-08 (secon
       *Measured 2026-11-08 (handover entry of that day, second session): the
       allowance is d, the count of tested positions where the two leading classes
       differ. The row is Question 3 below; no margin moved.*
-- [ ] Ruled by Yue 2026-11-13: option (a). Land the margin in
+- [x] Ruled by Yue 2026-11-13: option (a). Land the margin in
       `ExtinctionScreen.best_or_none` with its `_audit` row, flip PbSO₄'s pinned
       row to `None`, and rewrite the acceptance clause to match. The row carries
       `approved="2026-11-13"` and the grounds quoted in the handover entry of 2026-11-13.
@@ -387,9 +387,10 @@ On P 6₃/m m c, P 6/m c c, P n -3 n, P 4/n m m and F m -3 m, with the true
 background declared and the cell within 600 ppm, `best_or_none()` returns a
 class containing the true group or `None` with a finding naming the undecided
 position. It never returns a class that excludes the true group. The certified
-corundum and NAC rows keep their classes, FAP and Si abstain with the undecided
-position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling of
-2026-11-07 accepts at margin 10 (handover log), pinned so a tightening shows.
+corundum and NAC rows keep their classes, and FAP, Si and PbSO₄ abstain with the
+undecided positions named: the leading class's lead over the runner-up must
+strictly exceed max(`DECISIVE_DELTA_BIC`, 2·ln N + d), as ruled 2026-11-13
+(handover log). A lead of exactly 2·ln N + d abstains.
 
 ## References
 

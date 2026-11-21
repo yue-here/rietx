@@ -38,7 +38,7 @@ here, re-measured 2026-11-07 on macOS arm64:
   refuted.
 * FAP abstains at every factor, held or not.  ``P 63 - -`` leads unrefuted on
   one testable position, (0 0 5) at 68.0°, and one position buys ΔBIC ln N = 8.2 at most,
-  under the margin of 10.  Ruled by the maintainer on 2026-11-07 (WP-2076's
+  under the margin of 10 (and since 2026-11-13 under 2·ln N + d = 17.5).  Ruled by the maintainer on 2026-11-07 (WP-2076's
   handover log).
 """
 

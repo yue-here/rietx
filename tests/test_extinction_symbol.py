@@ -590,7 +590,8 @@ def test_fap_leads_with_the_p63_class_and_abstains_on_one_position(fap_screen):
     one line the data can test, (0 0 5) at 68.0° ((0 0 3) sits in a stronger
     neighbour's tail), and since WP-2076 its score is a nested
     comparison: removing one line buys ΔBIC ln N = 8.2 at most, under
-    ``DECISIVE_DELTA_BIC`` = 10.  Before WP-2076 the Le Bail screen read −84 on
+    ``DECISIVE_DELTA_BIC`` = 10 and under the ruled bar of 2·ln N + d = 17.5
+    (WP-2076, 2026-11-13).  Before WP-2076 the Le Bail screen read −84 on
     that one position, more than its count can buy, so the answer rested on a
     fit-path difference rather than on the absence.  Ruled by the maintainer on
     2026-11-07 (WP-2076's handover log): the screen abstains here, and says
