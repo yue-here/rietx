@@ -31,7 +31,7 @@ than to converge harder:
 
 With no active bounds and ``removal=False`` this reduces to textbook CG, and so
 must reproduce a direct solve — the anchor
-``tests/test_bccg.py::test_unconstrained_matches_direct_solve``.
+``tests/test_bccg.py::test_cg_core_matches_direct_solve``.
 
 **The LM driver no longer takes this step** (WP-1953).  Above
 :data:`.lm.BVLS_MAX_COLUMNS` it took it until then, and on the Pawley blocks
