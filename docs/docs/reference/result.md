@@ -310,6 +310,10 @@ That makes its `AbsorptionCorrection.equivalent_delta_biso` a lower bound.
 The projection behind it is unweighted, while a refinement finds a weighted compromise.
 Measured against synthetic refits, the bias a fit absorbs runs 1.06 to 1.5 times the predicted one, tracking `AbsorptionCorrection.unabsorbed_fraction`.
 
+## Fit range
+
+A result holds only the channels it fitted. `RefinementResult.fit_range` is a `FitRange` record that says what the limits and excluded regions cut, and its fields are on [The fit range record](fit-range.md).
+
 ## Diagnostics
 
 `RefinementResult.diagnostics` carries the findings that say an answer is wrong although Rwp is fine.
@@ -363,7 +367,7 @@ It stays under 80 lines on a five-stage fit.
 
 `Refinement.summary()`, called after `Refinement.fit` on the session that ran it, prints more, because a session holds the compiled model.
 It shows the same stage and diagnostic rows, then the report's misfit summary: the worst regions by χ² share, the unmatched-peak count, and the serial correlation as Durbin-Watson with the esd inflation it causes.
-Then come the next parameter to free, and the protocol run: the plan, every held path grouped by why, the excluded ranges, N points against N reflections and the σ source.
+Then come the next parameter to free, and the protocol run: the plan, every held path grouped by why, the excluded ranges, the fit range against the file's (`RefinementResult.fit_range`), N points against N reflections and the σ source.
 The agreement indices come last, with a named visual check:
 
 <!-- api-doc: no-exec — continues the earlier session, needs a completed fit -->

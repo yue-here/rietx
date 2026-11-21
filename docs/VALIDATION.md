@@ -718,6 +718,16 @@ A correction that provably cannot improve the fit, on real data. The whole of it
 
 **Measured:** Delta Rwp -3.4e-14, Delta a +2.0e-14 A, every Biso +0.016875 against a predicted 0.016875 (to 3e-9); 1.9.0 read 4.0e-9, -1.8e-11 A and +0.01687, before WP-2002's closing stage (#1085)
 
+#### `test_the_result_records_both_cuts_and_the_lines_above_60_degrees`
+
+`identity` · dataset `srm660a_capillary`
+
+**Claims:** the result's fit_range restates the suite's own limits against the file's range, and the stretch above the upper limit is reported with its share of the counts and its largest excess (WP-2075)
+
+**Referenced to:** the file's own first and last channels and the suite's limits (identity); the fitted count against len(result.two_theta)
+
+**Measured:** 116001 of 132992 points; above 60 deg: share 0.030, an 11.6 sigma excess at 62.82 deg
+
 #### `test_fit_quality_and_the_circular_cell`
 
 `characterisation` `ceiling` · dataset `srm660a_capillary`
@@ -1631,6 +1641,16 @@ The second moment dataset, and the k = 0 case: LaMnO3 at 50 K on BT-1, from the 
 ### `tests/test_acceptance_srm1976a_texture.py`
 
 The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a corundum plate, against the solved TOPAS refinement committed beside the pattern, coefficient by coefficient (#131).  TOPAS states no normalisation, so the conversion is measured: the n = 0 terms close at ratio 1 and two other readings are excluded.  The one n != 0 term is zero in both codes, so its factor, sign and azimuth wait for a forward TOPAS run (WP-1973).
+
+#### `test_the_result_records_the_range_cut_below_20_degrees`
+
+`identity` · dataset `srm1976a_plate`
+
+**Claims:** the result's fit_range restates the suite's limits (the upper one clipped to the scan's end) and reports the stretch below 20 deg with its share of the counts and its level at the cut (WP-2075)
+
+**Referenced to:** the file's own first and last channels and the suite's limits (identity); statistics.n_points
+
+**Measured:** 11793 of 13528 points; below 20 deg: share 0.225, level at the cut 2.80x the fitted median
 
 #### `test_the_protocol_matches_before_any_number_is_compared`
 

@@ -248,3 +248,24 @@ def test_without_texture_the_plate_fits_measurably_worse(textured, untextured):
     t, u = textured.statistics, untextured.statistics
     assert u.rwp - t.rwp > 0.15, (u.rwp, t.rwp)
     assert u.chi2 / t.chi2 > 5.0, (u.chi2, t.chi2)
+
+
+def test_the_result_records_the_range_cut_below_20_degrees(textured):
+    """WP-2075 on real data: the suite's own limits, a file starting at
+    5.50°, and the stretch below 20° reported with its share of the counts
+    and its level (issue #1219's C7 case, measured here)."""
+    data = rx.read_pattern(PATTERN)
+    fr = textured.fit_range
+    assert fr.file_range == (data.two_theta[0], data.two_theta[-1])
+    assert fr.n_file == len(data.two_theta)
+    assert fr.limits_requested == LIMITS
+    # the upper limit lies past the scan's end, so it is clipped there
+    assert fr.limits_applied == (LIMITS[0], data.two_theta[-1])
+    assert fr.n_fitted == len(textured.two_theta) == textured.statistics.n_points
+    [below] = fr.outside
+    assert below.kind == "below"
+    assert below.lo == data.two_theta[0] and below.hi < LIMITS[0]
+    assert below.count_share > 0.0
+    assert below.level_ratio_at_cut is not None and below.level_ratio_at_cut > 1.0
+    # corundum's first reflection is above 25°: nothing predicted below the cut
+    assert all(r.fraction_outside < 0.5 for r in below.reflections)

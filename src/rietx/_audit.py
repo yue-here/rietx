@@ -2169,6 +2169,17 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
                   "Acta Cryst. A26, 682 (docstring)")),
+    Row("rietx.schemas.results.RefinementResult.fit_range", "action", tier="caller", ambiguity=1,
+        evidence=("restates the caller's own act (WP-2075, #1219): two_theta_limits handed to "
+                  "fit and PatternData.excluded_regions, both off by default; n_fitted and "
+                  "counts_fitted are read through project.fitted_mask, the authority "
+                  "compile_model is pinned to (WP-1033), which also drops WP-1952's default "
+                  "sigma <= 0 channels, but the outside spans are built from the limits and "
+                  "regions alone, so a package default is never reported as the caller's "
+                  "cut (sigma_rule.n_nonpositive_excluded counts those channels); "
+                  "the record moves no value and gates nothing. The file's range, the limits "
+                  "and regions as asked and as applied, and each unfitted span's share of "
+                  "the file's counts are arithmetic on the pattern")),
     Row("rietx.schemas.results.RefinementResult.qpa", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a phase's scale is not measured where its column is zero at the "
                   "answer (no reflection in the fitted range), or where the last stage held it "
@@ -4236,6 +4247,37 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: a mode with a first-order term moves the pattern linearly, so "
                   "lambda = sum((dy/sigma)^2) ~ A^2 (WP-1419); tests/"
                   "test_distortion_totals.py::test_a_det_meets_the_bisected_crossing")),
+    Row("rietx.report.fit_range.CUT_WINDOW_DEG", "constant", tier=3, value=1.0,
+        evidence=("reporting window (WP-2075, #1219): the width beside a cut over which "
+                  "OutsideSpan's level, far level and slopes are read; gates nothing and acts "
+                  "on nothing. Chosen on the issue's two synthetic families (rietx's own forward "
+                  "model, one source under the generality rule) and read on SRM 1976a and 11-BM "
+                  "LaB6 660a; untested beyond them. No program's default reports a level past "
+                  "a cut, so none is a precedent"),
+        grounds=("A reporting width of ours, with no null to calibrate it: the level, far "
+                 "level and slopes beside each cut are read over 1 degree, the width rides on "
+                 "the record (fit_range.cut_window_deg), and it gates nothing and moves no "
+                 "refined value, so no action is on trial. Read on the issue's synthetic "
+                 "perovskite families (each fact checked against the same fit without the "
+                 "planted rise), SRM 1976a and 11-BM LaB6 660a. Where it fails: on a broad "
+                 "pattern (neutron, nanocrystalline) 1 degree is only 1-3 FWHM, so one "
+                 "reflection's flank can set the level and slope read beside the cut."),
+        approved="2026-11-17"),
+    Row("rietx.report.fit_range.STRADDLE_FWHM", "constant", tier=3, value=3.0,
+        evidence=("reporting window (WP-2075, #1219): a reflection centred within this many "
+                  "of its own FWHM of a cut is listed with the share of its profile past it; "
+                  "gates nothing. At 3 FWHM a pseudo-Voigt's share past the cut is under 6 % "
+                  "for a pure Lorentzian (arithmetic); the issue's families and the two public "
+                  "patterns as for CUT_WINDOW_DEG; untested beyond them"),
+        grounds=("A reporting distance of ours: a reflection centred within 3 of its own FWHM "
+                 "of a cut is listed with the share of its profile past the cut, the distance "
+                 "rides on the record (fit_range.straddle_fwhm), and it gates nothing. "
+                 "Arithmetic bounds what it leaves out: at 3 FWHM a pure Lorentzian puts 5.3 % "
+                 "of its area past the cut and any Gaussian share less, so an unlisted "
+                 "reflection has at most that share outside. Read on the issue's synthetic "
+                 "families, SRM 1976a and 11-BM LaB6 660a. Where it fails: a reflection past "
+                 "the model's generation margin is not listed (#1481), and "
+                 "reflections_searched is approximate.")),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
