@@ -390,6 +390,32 @@ def _structure_factors_ab(h, stol, sites, xyz, occ, biso, uaniso, astar):
     return A, B
 
 
+def structure_factors_ab(
+    hkl: np.ndarray,
+    d: np.ndarray,
+    sites: PhaseSites,
+    xyz: np.ndarray,
+    occ: np.ndarray,
+    biso: np.ndarray,
+    uaniso: np.ndarray | None = None,
+    astar: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """The complex pair (A, B) of the module docstring, one entry per row of ``hkl``.
+
+    The public face of the sum :func:`structure_factors_squared` squares,
+    for a caller that needs the **phase** and not only ⟨|F|²⟩: a Fourier map
+    (``rietx.solve.fourier``, WP-1901).  ``A`` carries every real amplitude
+    (f₀ + f′, or b_coh) and ``B`` the f″ part, so F(h) = A + i·B, and the
+    powder intensity is |A|² + |B|².  ``B`` is ``None`` without dispersion,
+    when F = A exactly.  Same arguments, same arithmetic, same order as
+    :func:`structure_factors_squared`: nothing here is a second expansion.
+    """
+    xp = get_backend()
+    stol = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))  # s = sinθ/λ = 1/(2d)
+    h = xp.asarray(hkl, dtype=np.float64)
+    return _structure_factors_ab(h, stol, sites, xyz, occ, biso, uaniso, astar)
+
+
 def _abs2(z) -> np.ndarray:
     xp = get_backend()
     return xp.real(z * xp.conj(z))
