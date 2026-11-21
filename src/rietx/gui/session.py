@@ -1402,9 +1402,17 @@ class GuiSession:
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]
+        # what a person could free and no stage does (WP-2231, the Plan tab's
+        # "Never freed" row): the refinable rows outside every stage's frees.
+        # A stage's ``held`` paths are not refinable or not freeable here, so
+        # they are absent from both sides; the closing stage frees only what
+        # the stages above it named
+        never_freed = [row.path for row in rows.values()
+                       if row.refinable and row.path not in reached]
         return {"mode": mode, "n_parameters": len(rows),
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
-                "set_aside": set_aside, "stages": stages,
+                "set_aside": set_aside, "never_freed": never_freed,
+                "stages": stages,
                 "closing": closing_entry,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}

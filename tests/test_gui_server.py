@@ -2276,6 +2276,29 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
                 == stage["n_matched"]), stage["name"]
 
 
+def test_plan_resolve_names_what_no_stage_frees(blank, tmp_path, pattern_file):
+    """``never_freed`` (WP-2231, the Plan tab's last row) is every refinable row
+    outside every stage's frees, and nothing a stage frees or a row that cannot
+    be freed."""
+    session, client = blank
+    _open(session, tmp_path / "never.rex", pattern_file)
+    plan = {"stages": [{"name": "one", "turn_on": ["phases.*.scale"]},
+                       {"name": "two", "turn_on": ["phases.*.cell.*"]}],
+            "closing_window_tol": CLOSING_WINDOW_TOL}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    ladder = _ladder(client)
+    status, params = client.get("/api/params")
+    assert status == 200
+    refinable = {row["path"] for row in params["parameters"] if row["refinable"]}
+    freed = {path for stage in ladder["stages"] for path in stage["frees"]}
+    assert freed == {"phases.0.scale", "phases.0.cell.a"}
+    assert set(ladder["never_freed"]) == refinable - freed
+    assert "instrument.zero_shift" in ladder["never_freed"]
+    # the cubic cell's tied lengths are held, never offered as unfreed
+    assert "phases.0.cell.b" not in ladder["never_freed"]
+
+
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,
                                                            pattern_file):
     """The route's matcher is the corpus's, over the corpus's own globs.
