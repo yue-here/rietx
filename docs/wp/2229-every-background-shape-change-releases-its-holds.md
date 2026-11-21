@@ -55,6 +55,26 @@ WP-2218's handover (2026-11-19, the review-fix bullet) recorded three cases it l
 case 1 on today's page is worth doing only if the swap is far off; the first task records
 which.
 
+**Case 1 checked against the tree, 2026-11-21 (at 8e100829b).** Three findings change the
+list above.
+
+- The `.rxt` document cannot change the background's shape. `textdoc.apply` runs
+  `set_values`, `set_vary`, the plan, three settings and the peak editor, and no model edit.
+  It is dropped.
+- The old Background tab is clean. `lib/background.ts:withLambda` sets `lambda_smooth` alone,
+  which changes no path. Dropped.
+- Today's instrument form (`applyFields` in `Model.svelte`) reaches no background field:
+  `lib/model.ts:instrumentFields` builds none. It is dropped as a background surface. Two
+  surfaces the list missed do change the shape: **Replace from file** on both pages
+  (`Model.svelte:replaceFrom`, `next/Instrument.svelte:loadProfile`) sends a whole instrument,
+  whose background may be of another kind or length. The rebuilt dialog's anode choice also
+  changes the number of emission lines, so a hold on `instrument.source.lines.1.weight` has
+  the same defect in another family.
+- So the arms move to the server: `GuiSession.instrument_patch` derives them from the two
+  tables, for every client and every positional family in the instrument. Today's page
+  then needs only its added terms built free. The swap is three pieces off (R5 to R7 after
+  R4), so that one-line fix is worth making.
+
 **The tier of each rule this WP adds.** None. A release or a free follows from the edit the
 person asked for, and the edit's console line says so.
 
@@ -66,7 +86,7 @@ person asked for, and the edit's console line says so.
 
 ## Tasks
 
-- [ ] Confirm each surface in case 1 against the tree; drop the ones that cannot change the
+- [x] Confirm each surface in case 1 against the tree; drop the ones that cannot change the
       background's shape, and say whether the swap makes today's page's fix moot.
 - [ ] Case 1: every surface left sends `unhold` and `free` built by `next/background.ts`, or
       the arms move to the server so no client can omit them.
