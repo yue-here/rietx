@@ -147,6 +147,12 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   `crystallography/satellites.py:746` and `write_structure_block` at `io/cif/blocks.py:217`,
   both through `OperatorGroup.closest_type`. Checked against the tree at 7a4a6cd20. WP-2221
   owns the fix. I-d's acceptance run reaches the same raise until it lands.
+  **Update 2026-11-19, from WP-2221 (PR #1721):** both now return.
+  `OperatorGroup.crystal_system_str` reads the operators in any cell
+  (`symmetry.crystal_system_of`). `hm`, `ext`, `number`, `monoclinic_unique_axis` and
+  `cell_constraints` on such a list still raise, so an I-d phase states its cell through
+  `parent_cell`. Its satellite candidates omit the hexagonal (⅓, ⅓, ·) points, and its GUI
+  symmetry row stays an error row.
 
 - **2026-11-19, from the issue triage (PR #1697; issues #1689, #1691): the 4d ions past M⁺ have no
   form-factor row, and computed rows are offered.** Folded here beside I-e because both add
