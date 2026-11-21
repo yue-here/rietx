@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from rietx import MultiHistogramRefinement, Refinement, Stage, runs
@@ -287,6 +288,18 @@ def test_each_histogram_gets_its_own_report(two_patterns):
         assert (result.for_histogram(h).identifiability.background_absorption
                 == mine)
         assert report.background.worst_absorption == max(mine.values())
+        # the joint solve's one matrix, on every histogram's view (WP-1990)
+        assert (result.for_histogram(h).identifiability.correlation
+                == result.identifiability.correlation)
+    # ... over the joint free paths, symmetric with a unit diagonal, and the
+    # entry each HIGH_CORRELATION row quotes (ruled on #1475, 2026-11-17)
+    corr = result.identifiability.correlation
+    assert corr is not None and corr.paths == list(ref.mtable.free_paths)
+    full = corr.matrix()
+    assert full.shape == (len(corr.paths),) * 2
+    assert np.allclose(np.diag(full), 1.0) and np.allclose(full, full.T)
+    for pair in corr.paths[:1]:
+        assert corr.rho(pair, pair) == pytest.approx(1.0)
 
 
 def test_a_cancelled_second_fit_leaves_the_first_report_alone(two_patterns):
