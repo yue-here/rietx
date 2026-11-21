@@ -224,6 +224,17 @@ def test_a_magnetic_family_outgrown_is_recompiled():
     assert preview._choose(base, values) == "recompiled"
 
 
+def test_a_magnetic_family_shrunk_or_shifted_is_recompiled():
+    """A frozen window a peak has moved inside, or one wider than its peak
+    now needs, is cut off-centre or too wide, and only a compile resizes the
+    magnetic family (WP-2226)."""
+    base = _magnetic_base(0.01)
+    zero = base.values["instrument.zero_shift"]
+    for edit in ({"phases.0.magnetic_lor_size": 0.001},
+                 {"instrument.zero_shift": zero + 0.05}):
+        assert preview._choose(base, {**base.values, **edit}) == "recompiled"
+
+
 # ---------------------------------------------------------------- the answer
 def test_the_phases_and_background_sum_to_the_total(nac):
     answer = preview.evaluate(nac, {"values": {}})

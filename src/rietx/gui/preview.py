@@ -9,7 +9,9 @@ were; the values pass through the working table and the table is put back.
 
 **Every compile is at the last fit's peak cut** (WP-2226): the window area
 fraction and window slack its last stage recorded, read off the nearest stage
-node at or above the head as ``refine.replay`` reads them. A fit that ended
+node at or above the head as ``refine.replay`` reads a stage node's. Replay
+compiles any other node at the defaults; the preview walks up to the stage
+instead, so an applied slider keeps the cut the fit ran at. A fit that ended
 on a closing stage (``lab_calibrate``, a Pawley series) draws at its 0.1 %,
 a default fit at the declared stages' 2 %, and a tree with no stage at the
 2 % a default fit will use. So at the head's values the preview draws the
@@ -116,7 +118,8 @@ _CACHE_LOCK = threading.Lock()
 def _cut(refinement) -> tuple[float, float | None]:
     """The window area fraction and window slack the last fit's last stage
     ran at: the nearest stage node at or above the head, through
-    :func:`recorded_window_tol` as ``refine.replay`` reads it. A head with
+    :func:`recorded_window_tol` as ``refine.replay`` reads a stage node's
+    (replay itself compiles a non-stage node at the defaults). A head with
     no stage above it takes ``WINDOW_AREA_TOL``, the cut a default fit will
     use, and the default slack."""
     tree, head = refinement.history, refinement._head_id
