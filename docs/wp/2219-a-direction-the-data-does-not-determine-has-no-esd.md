@@ -1,9 +1,8 @@
 # WP-2219 — A direction the data does not determine has no esd
 
-Milestone: unscheduled · Status: 🔄 2026-11-20 — PR #1718 in review; ruled to merge as it stands, the two calls moved to WP-2230
+Milestone: unscheduled · Status: ✅ 2026-11-21 — shipped, PR #1718 merged 2026-11-20; the width-triple hold declined on measurement; estimable combinations and the 535 Pawley intensities moved to WP-2230
 Track: What fires, and what stays silent
 Depends on: 2028 soft (its joint-fit covariance fix, PR #1668)
-Priority: P2 2026-11-19 — a quoted esd too small by up to 140×, and the CIF that carries it says nothing; a path few fits run
 
 ## Goal
 
@@ -79,10 +78,6 @@ discarded-direction test names gets no esd.
 - Tier: the statistics rule is physics-of-estimation (named practice above). The triple hold
   is the WP-2002 rule extended to a member it left out; its ambiguity kind is "every
   competent refiner would act" (DESIGN § Rules, 1).
-
-### Inherited
-
-(none yet)
 
 ## Non-goals
 
@@ -168,6 +163,26 @@ discarded-direction test names gets no esd.
 - `docs/practice.md`, the row on esds along undetermined directions (WP-2028, PR #1668).
 
 ## Handover log
+
+- **2026-11-21** — closed, by a ghostshift runner (PR #CLOSEPR). The no-esd rule is on
+  `main`. PR #1718 merged at 2026-11-20 20:50Z as merge commit 8112e3b09, on the
+  maintainer's ruling (a) of the same day. A parameter on a direction the data do not
+  determine now reports no esd in a single fit, a joint fit and a Pawley fit. The CIF writes
+  `?` in its su item. Nothing in the package changed in this session.
+
+  *Done.* Status set to ✅. The `Priority:` line and the empty `### Inherited` section were
+  deleted. The narrative moved to `docs/milestones/v1.13.md` § How v1.13 is getting here.
+  Forward references: WP-2062's Inherited note on the Pawley guard now records the fix, and
+  WP-2220 gains an Inherited note naming where a missing esd now comes from. WP-2230's
+  `Priority:` line was rewritten, since its hard dependency has shipped. The first task, the
+  width-triple hold, stays unticked: it was built, measured and reverted (its note says why).
+
+  *Settled by Claude.* WP-2230 stays P3 after its blocker shipped. Grounds: the rubric's "up
+  a rung" move is for a remainder that is small against what is paid, and WP-2230 still
+  builds a per-row estimability test and investigates a possible grouping defect.
+  Alternative: P2.
+
+  Next: none in this WP. WP-2230 carries the two calls the maintainer moved there.
 
 ### 2026-11-20 (2nd session) — the maintainer's ruling, main merged, the follow-up filed
 
