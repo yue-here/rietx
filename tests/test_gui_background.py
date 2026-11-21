@@ -238,8 +238,9 @@ def test_a_pending_hold_is_held_for_that_answer_alone(tmp_path_factory, tmp_path
 
 def test_a_pending_glob_hold_is_held_as_the_hold_verb_resolves_it(tmp_path_factory, tmp_path):
     """A pending hold may be a glob, as the hold verb takes one (WP-2218 review):
-    the band is the one every matching path held gives, and a glob matching
-    nothing is refused by name, as a missing path is."""
+    the band is the one every matching path held gives. A glob matching
+    nothing is an empty sweep, as ``Refinement.hold`` takes it, so the band
+    accepts what Apply accepts (review of #1683, finding 2)."""
     project = _unfitted(tmp_path_factory)
     session = GuiSession(project, state_dir=tmp_path)
     paths = ["instrument.background.c4", "instrument.background.c5"]
@@ -247,9 +248,11 @@ def test_a_pending_glob_hold_is_held_as_the_hold_verb_resolves_it(tmp_path_facto
     by_paths = session.background(paths)
     np.testing.assert_array_equal(by_glob.arrays["band_esd"], by_paths.arrays["band_esd"])
     assert by_glob.header["pending_holds"] == ["instrument.background.c[45]"]
-    with pytest.raises(GuiError, match="phases.9") as excinfo:
-        session.background(["phases.9.*"])
-    assert excinfo.value.where == ["phases.9.*"]
+    swept = session.background(["phases.0.atoms.*.adp.*"])  # fap has no aniso atom
+    np.testing.assert_array_equal(swept.arrays["band_esd"],
+                                  session.background().arrays["band_esd"])
+    assert swept.header["pending_holds"] == ["phases.0.atoms.*.adp.*"]
+    assert project.refinement.hold("phases.0.atoms.*.adp.*") == []  # the verb's sweep
 
 
 def test_releasing_a_pending_hold_reuses_the_unheld_answer(tmp_path_factory, tmp_path, monkeypatch):

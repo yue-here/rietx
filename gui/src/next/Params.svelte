@@ -263,8 +263,7 @@
       // apply, and would get every Apply refused (and the Background band, a
       // hold): the head moved under it, by a checkout, the text editor or a
       // structural edit (WP-2218 review)
-      const known = rows.map((r) => r.path);
-      dropPending((key) => !known.some((path) => fnmatch(path, key)));
+      dropUnknown();
       structure = s.structure;
       sites = s.sites ?? [];
       symmetry = s.symmetry ?? [];
@@ -418,6 +417,15 @@
     return dropped;
   }
 
+  /** Drop the pending edits on paths the loaded rows no longer have: the
+   *  reload's question, asked also of a restored draft. Before the first
+   *  load the rows are empty and say nothing about any path. */
+  function dropUnknown() {
+    if (!rows.length) return;
+    const known = rows.map((r) => r.path);
+    dropPending((key) => !known.some((path) => fnmatch(path, key)));
+  }
+
   /** The pending edits as plain data, for the recovery copy (WP-2209), or
    *  `null` when nothing is pending.  Reading the six maps here is what lets
    *  the shell's writer follow every change, a retyped value included. */
@@ -434,7 +442,8 @@
     };
   }
 
-  /** Put recovered edits back as pending edits, in place of any on screen. */
+  /** Put recovered edits back as pending edits, in place of any on screen,
+   *  less those on a path the rows no longer have. */
   export function restoreDraft(d: ParamsDraft) {
     closeEditor(false);
     edits = new Map(Object.entries(d.edits ?? {}));
@@ -443,6 +452,10 @@
     limitEdits = new Map(Object.entries(d.limits ?? {})) as Map<string, Limits>;
     restraintEdits = new Map(Object.entries(d.restraints ?? {})) as Map<string, Restraint>;
     positionEdits = new Map(Object.entries(d.positions ?? {}));
+    // a draft kept across a head move can name a path the head no longer
+    // has, such as a hold on a cut background term; left pending, it gets
+    // the band and every Apply refused (review of #1683, finding 1)
+    dropUnknown();
   }
 
   /** A hold or release on one path from another panel: the Background graph's

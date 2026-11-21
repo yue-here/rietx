@@ -65,6 +65,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2221](2221-a-group-with-no-tabulated-type-reaches-the-report.md) | A phase whose group has no tabulated type still gets its report and its CIF | 2026-11-21 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | 2026-11-21 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2230](2230-an-estimable-combination-keeps-its-esd.md) | An estimable combination keeps its esd | 2026-11-21 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 2026-11-21 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -531,6 +532,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2223](2223-a-clicked-value-opens-on-its-full-stored-value.md) | A clicked value opens on its full stored value, and an unchanged one is no edit | ✅ 2026-11-19 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 | [2227](2227-the-gui-shows-how-a-refine-ran.md) | The GUI shows how a refine ran: in one stage or in stages | ⬜ | P2 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) |
 | [2229](2229-every-background-shape-change-releases-its-holds.md) | Every change to the background's shape releases its holds, and no pending edit outlives its path | ✅ 2026-11-21 | — | [2218](2218-hand-fitting-and-the-other-graphs.md) |
+| [2231](2231-the-plan-and-text-tabs.md) | The Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar | 🔄 2026-11-21 | P2 | [2218](2218-hand-fitting-and-the-other-graphs.md) |
 
 ## <a id="series"></a>series — a series a scientist can predict and drive
 
@@ -882,6 +884,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2143](2143-a-case-only-rename-works-on-windows.md) | A case-only rename works on Windows, and its recovery copy follows the folder | ✅ 2026-11-12 | — | — |
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
+| [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | ⬜ | P3 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
