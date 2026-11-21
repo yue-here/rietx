@@ -180,11 +180,11 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
       - Grep `tests/`, `docs/` and `.claude/` for every other reader of the comments first.
       - Add a test that each file's newest entry names its constant's current value, so a
         bump without a note fails.
-- [ ] **The resolver, as a stdlib-plus-import script** (`tests/code_references.py`).
+- [x] **The resolver, as a stdlib-plus-import script** (`tests/code_references.py`).
       It covers role targets, dotted `rietx` literals, and repo paths and test IDs
       (a token with a `/` or `::`, resolved against the repo root, `src/rietx` and
       `tests/`), by the order in Context. It prints every miss.
-- [ ] **The sweep.** Fix every miss the script prints, including the pointers listed in
+- [x] **The sweep.** Fix every miss the script prints, including the pointers listed in
       Context. Fix a resolver gap in the resolver. Foreign vocabulary goes on an allowlist
       in the script, each entry with a reason.
 - [ ] **`tests/test_code_references.py`**, landing green after the sweep. Every

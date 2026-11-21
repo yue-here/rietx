@@ -4290,7 +4290,7 @@ class ParameterTable:
         phase's cell, and the only free *name* is then the variable's.
 
         One column-wise read of the same **C** that :attr:`moving_paths` reads
-        row-wise and that ``optimize._column_extras`` reads for the Jacobian's
+        row-wise and that ``optimize.least_squares._column_extras`` reads for the Jacobian's
         own reach gate — never a second derivation, which could disagree with
         the matrix the residual is actually built from.  An explicitly stored
         zero coefficient is not reach, matching ``moving_paths``' test rather

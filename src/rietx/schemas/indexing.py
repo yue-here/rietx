@@ -509,7 +509,7 @@ IndexCaveat = Literal[
 #: positive evidence against the cell, or evidence that the data cannot choose,
 #: so any one of them puts the candidate at ``"low"``.  The others cap it at
 #: ``"medium"``.  The split is the whole content of the gate, so it is one
-#: constant read by :func:`rietx.indexing.consensus.confidence_for` rather than
+#: constant read by :func:`rietx.indexing.consensus.grade` rather than
 #: a chain of conditions.
 INDEX_REFUTING_CAVEATS: frozenset[str] = frozenset({
     "geometric_ambiguity", "fom_panel_disagrees",
@@ -646,7 +646,7 @@ PEAK_AXIAL_TAIL_MAX_FWHM = 3.5
 #:
 #: ``not_separable`` **is** here, and it is the one flag that marks a component
 #: the fitter believes in as a *shape* and disbelieves as a *line* — see
-#: :data:`PEAK_SEPARABLE_MAX_CHI2`.  It stays in ``peaks`` (a report must be able
+#: :func:`rietx.indexing.pick._not_separable`.  It stays in ``peaks`` (a report must be able
 #: to say why a line went, and the component genuinely improves the group's fit,
 #: so removing it from the *model* would bias the position of the line it sits
 #: on) while never being offered as evidence of a lattice.

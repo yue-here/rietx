@@ -1551,8 +1551,8 @@ class HistogramResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
@@ -2189,8 +2189,8 @@ class RefinementResult(Base):
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
     #: shape: :attr:`ticks` has four readers that want a list of positions and
-    #: none of them wants this, so the pairing is by index and
-    #: ``tests/test_ticks.py`` pins the two lengths equal per phase.
+    #: none of them wants this, so the pairing is by index, one entry per
+    #: position for each phase.
     #:
     #: Absent for a phase's key rather than empty when there is nothing to
     #: say, which is the case the reserved declared-peaks key is in: a peak
