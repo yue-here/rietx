@@ -717,14 +717,21 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (WP-1998): ``ParameterCandidate.gain_unbounded`` and
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: Also in 0.62 (WP-1998): ``ParameterCandidate.gain_unbounded`` and
 #: ``SuggestionResult.bound_limited``, both additive and defaulted (``None``
 #: and an empty list).  0.26 → 0.27 recorded the same kind of change on the
 #: same types (``delta_bic_raw_n``, ``n_effective``).  ``gain`` itself now
 #: means the gain the candidate's bounds let it reach, so a saved number does
 #: not compare with 1.12.0's.  An older build refuses a document carrying
 #: either new key.
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
