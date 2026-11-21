@@ -1191,6 +1191,44 @@ def _qpa_factor_silent() -> list:
     return _qpa_factor(0.7, [1])
 
 
+# ------------------------------------------------------------ a nested comparison
+
+
+def _comparison(status_r: str, status_f: str, cost_r: float, cost_f: float) -> list:
+    """``COMPARISON_UNCONVERGED`` on a nested pair, as ``compare_freed``,
+    ``predict_then_verify`` and ``rigid_body_misfit`` build it: the ordering
+    read off each fit's last ``cost_final``, then the diagnostic.  Stub
+    results stand in for the two fits, which take seconds each in
+    ``tests/test_compare_freed.py``'s #1685 fixture."""
+    from types import SimpleNamespace as NS
+
+    from rietx.report.layer2 import _chi2_ordered, _comparison_unconverged
+
+    def fit(status, cost):
+        return NS(status=status, stages=[NS(cost_final=cost)])
+
+    restricted, full = fit(status_r, cost_r), fit(status_f, cost_f)
+    found = _comparison_unconverged(
+        restricted.status, full.status, cost_r, cost_f,
+        _chi2_ordered(restricted, full), where=["phases.0.atoms.0.biso"])
+    return [] if found is None else [found]
+
+
+def _comparison_fires() -> list:
+    """#1685's budget stop, 4365 above the restricted cost; a converged
+    fuller fit just past the margin of 2; a short restricted fit."""
+    return (_comparison("converged", "max_iter", 5886.2, 10251.4)
+            + _comparison("converged", "converged", 5886.2, 5888.201)
+            + _comparison("max_iter", "converged", 5886.2, 5800.0))
+
+
+def _comparison_silent() -> list:
+    """Both converged: the fuller fit below, level, or just inside the margin."""
+    return (_comparison("converged", "converged", 5886.2, 5622.1)
+            + _comparison("converged", "converged", 5886.2, 5886.2)
+            + _comparison("converged", "converged", 5886.2, 5888.199))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_CELL_TIE_CORRECTED": Pair(
         _cell_tie_fires, _cell_tie_silent, "tests/test_cell_ties.py"),
@@ -1200,6 +1238,9 @@ SILENCE: dict[str, Pair] = {
         _multiplicity_fires, _multiplicity_silent, "tests/test_cif_stated_columns.py"),
     "CIF_SITE_TWINS_MERGED": Pair(
         _twins_fires, _twins_silent, "tests/test_cif_sites_coincide.py"),
+    "COMPARISON_UNCONVERGED": Pair(
+        _comparison_fires, _comparison_silent,
+        "tests/test_compare_freed.py (stub fits: the #1685 pair's fits take seconds)"),
     "EXTINCTION_SCREEN_UNRELIABLE": Pair(
         _screen_unreliable_fires, _screen_unreliable_silent,
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
