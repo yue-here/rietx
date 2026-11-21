@@ -85,6 +85,23 @@ visual questions go to him first).
    mode a node's extracted intensities live in the node (`ReflectionState`), so its curve comes
    from replay as well.
 
+### Rulings
+
+Questions 1 and 2 went to the maintainer on 2026-11-21 as drawn options: whole windows of the
+prototype with the changed region boxed, on a private page.
+
+- **Question 1, 2026-11-21, the maintainer: a Table | Graph toggle in the tab, defaulting to
+  Graph.** The table is the design above. The graph is today's lanes view, rebuilt in the new
+  front end, and a branch leaves its lane with a rounded corner, never an angled step. Checkout,
+  Tag, Branch and Label stay reachable from a node's context menu in both views.
+- **Question 2, 2026-11-21, the maintainer: both verbs.** Restore loads values as pending edits;
+  Checkout moves the head at once and sits in the node's menu. The words a person reads are
+  open (question 5).
+- **Question 5, opened 2026-11-21 by the maintainer: the git words.** A person who has never
+  used git may not know Checkout, Tag or Branch. Teach the words, or rename them in the window?
+  Tooltips are the maintainer's first thought, with a link into the manual. Brought back to the
+  maintainer with options the same day; the ruling goes here.
+
 ### Seams
 
 - **Routes.** `GET /api/history` (`tree_payload` in `src/rietx/gui/session.py`) already serves
@@ -129,8 +146,11 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
-  here with their dates.
+- [x] Questions 1 and 2 drawn as options and brought to the maintainer; the rulings recorded
+  here (§ Rulings, 2026-11-21).
+- [ ] Question 5, the git words: the maintainer's ruling recorded in § Rulings.
+- [ ] The Graph view with rounded branch corners, the Table | Graph toggle defaulting to Graph,
+  the node menu shared by both views. Vitest over a branched tree's lanes.
 - [ ] Questions 3 and 4 measured on the shipped examples: how many nodes differ from their head
   by more than values, and the replay cost of a node's curve. The decision written here.
 - [ ] The tab label carries `n_nodes`; `BOTTOM_TABS` and the panel corpus follow. Vitest.
@@ -171,3 +191,6 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   and WP-1012 and WP-1217 are closed. The four questions above are for the session that builds
   it; nothing waits on the maintainer before then. Next: once PR #1521 merges, bring questions 1
   and 2 to the maintainer.
+- **2026-11-21** — the maintainer ruled questions 1 and 2 from drawn options (§ Rulings) and
+  opened question 5, the git words. Nothing is built yet. Next: record question 5's ruling, then
+  measure questions 3 and 4.

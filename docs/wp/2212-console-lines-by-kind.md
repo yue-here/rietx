@@ -69,6 +69,20 @@ The prototypes are not published, so the design is restated here.
    cap drops a long session's start, so the script is built from a store of calls that is not
    capped, or says at its head that it is partial.
 
+### Rulings
+
+Questions 1 and 2 went to the maintainer on 2026-11-21 as drawn options: whole windows of the
+prototype with the changed region boxed, on a private page.
+
+- **Question 1, 2026-11-21, the maintainer: events fold under their call.** Under a run's call,
+  one muted line sums the events ("42 engine events, 5 stages, 30 evaluations" on the options
+  page), closed by default. A click opens it, and the events list indented and muted under
+  their call. Events stay out of Copy and the script.
+- **Question 2, 2026-11-21, on no objection: one string token**, `#2f6f3e` in the light theme
+  and `#8fc79d` in the dark, as drawn on the options page. It goes into
+  `src/rietx/viz/theme.py`. It was offered as "this lands unless you object", and the
+  maintainer answered the other questions without objecting.
+
 ### Seams
 
 - **One tagged line type.** `say()` and `consoleLine` write `{kind, text}` with kind one of
@@ -113,8 +127,8 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
-  their dates.
+- [x] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
+  their dates (§ Rulings, 2026-11-21).
 - [ ] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
   echoes spelled with one receiver per name, and each `…` echo made runnable or marked. Vitest
   over the kinds and over every writer's spelling.
@@ -153,3 +167,5 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   the Console: a search of the open WPs for console lines and a script export found none. WP-2133
   named the missing writer and is closed. Next: once PR #1521 merges, bring
   questions 1 and 2 to the maintainer.
+- **2026-11-21** — the maintainer ruled question 1 from drawn options, and question 2 closed on
+  no objection (§ Rulings). Nothing is built yet. Next: the tagged line type.
