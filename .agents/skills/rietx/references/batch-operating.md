@@ -74,7 +74,13 @@ default) is a factor times the dearest *converged* first rung, never a fixed
 wall (WP-1127); a job several times the median converged job is a flat
 direction or a degeneracy to read in its trajectory, not a fit to wait for.
 Time the jobs that raise as well, in a `finally`, and count them beside the
-ones that returned. One screen of 204 independent cold fits on 10 worker
+ones that returned. For runs the package recorded, `rietx runs --label
+'screen-1/*'` prints that count by state, the wall from first start to last
+end, and the slowest run against the median of every timed run, failed ones
+included rather than converged ones alone
+(`rietx.runs.job_summary` in Python; 9c.32 names the runs). Run mid-screen,
+it adds the longest a live run has gone against that median, so a runaway
+shows before it ends. One screen of 204 independent cold fits on 10 worker
 processes had a median job of 54 s and a slowest of 4559 s, 84× the median,
 and that job was a cell runaway. 43 jobs raised and carried no time, so the
 agent's summary printed a `nan` median, it never saw the 4559 s job, and it
@@ -270,7 +276,8 @@ list, and the reader tells the runs apart by start time alone. `label=` is on
 every verb that records a run (`fit`, `run_stage`, `refine`,
 `refine_sequential`, `Project.fit`) and costs one keyword at the call. Pass the
 candidate, the phase, the specimen: the fact that makes this fit the one you
-will want to reopen. It is telemetry, so it changes no number the fit produces
+will want to reopen. Put the job first, `screen-1/zincite`, so
+`rietx runs --label 'screen-1/*'` gathers the job (9c.5). It is telemetry, so it changes no number the fit produces
 and appears in no result. On a chain `label=` names the job while `labels=`
 names the patterns, and the list shows the pattern. *(Hypothesis: the limit it
 removes is measured, WP-1424 having made the rows tell apart by start second
@@ -303,14 +310,14 @@ Hypothesis: whole fits behave the same on threads, not timed; and on a machine
 the screen has to itself, the summed job time, 1.17× in the one pair run at
 load 9-13, bounds the gap when every worker stays busy.)*
 
-**9c.34 Switch the closing stage off for a screening batch with
-`plan.closing_window_tol = None`, and keep it on for the fits you report.**
-Every plan ends in a closing stage that refines everything again on windows
-dropping 1e-3 of each peak, and it costs **1.2-2.3×** a fit on the four
-acceptance patterns. Off, each answer lands 0.15-0.96 esd from the closing
-one and depends on the start values (0.75 esd apart on cpd-1a from two Biso
-starts, 0.07 with it on). Refit with it on the units a screen keeps and those
-near its cut, which a shift that size can carry across it, and say which
-setting each number came from: `result.stages[-1].name == "closing"`
-when it ran. *(Measured: WP-2002 on SRM 660c LaB6, the GSAS-II
-fluorapatite, CPD cpd-1a and 11-BM NAC, one fit each; no batch has timed it.)*
+**9c.34 A screening batch runs without a closing stage, the default since
+1.13; ask for one on the fits you report, with `plan.closing_window_tol =
+CLOSING_WINDOW_TOL` (1e-3, from `rietx.schemas.plan`).** It refines
+everything again on windows dropping 1e-3 of each peak, at **1.2-1.9×** the
+fit. Without it, answers land 0.16-2.0 esd from the closing one and can
+depend on the start values. Refit with it on the units a screen keeps and
+those near its cut, which a shift that size can carry across it, and say
+which setting each number came from: `result.stages[-1].name == "closing"`
+when it ran. *(Measured: WP-2222 on 11-BM NAC, CPD cpd-1a and cpd-2 and the
+bench's simulated trigger case, one fit each; WP-2002 on SRM 660c LaB6 and the
+GSAS-II fluorapatite; no batch has timed it.)*

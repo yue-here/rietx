@@ -3014,7 +3014,7 @@ START_DEPENDENCE_RULE = 3
 INTERMEDIATE_FTOL_DEFAULT = 1e-6
 
 
-#: **The closing stage every acceptance number is produced with** (WP-2002, the
+#: **The closing stage's default, and the acceptance suites' declared 1e-3** (WP-2002, the
 #: sixth round's Q1 and Q2, ruled 2026-10-21).
 #:
 #: After the declared stages, a plan recompiles at the answer with peak windows
@@ -3036,7 +3036,12 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #:   the shipped package reproduces, and each names the setting.
 #: * *Where it is declined.*  ``closing_window_tol = None`` reproduces every
 #:   fit before it, bit for bit.
-CLOSING_WINDOW_TOL_DEFAULT = 1e-3
+#: * *Off by default since WP-2222* (ruled 2026-11-19: users found the fit time
+#:   too high, and TOPAS's 2 % windows give accuracy its users find sufficient).
+#:   ``None`` is the live default recorded here.  The suites that pin numbers
+#:   at the closing stage name ``1e-3`` on their plans, so their numbers did
+#:   not move with the default.
+CLOSING_WINDOW_TOL_DEFAULT = None
 
 
 #: **The one default WP-1001 was chartered to decide, and how it went.**

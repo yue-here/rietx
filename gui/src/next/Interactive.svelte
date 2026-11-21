@@ -40,18 +40,22 @@
     PreviewQueue,
     buildSliders,
     defaults,
-    editText,
     fixFormat,
     formatParts,
     maxDecimals,
     parseTyped,
     posFrac,
+    rangeText,
+    readNumber,
+    roundRange,
     valueAt,
     type PreviewAnswer,
     type RangeContext,
     type Slider,
     type Track,
   } from "../lib/interactive";
+  // the box opens as a Parameters cell does: one editor rule (WP-2223)
+  import { editText } from "../lib/numslot";
   import type { InteractiveDraft } from "../lib/recovery";
   import { normalize, type ParamRow } from "../lib/table";
   import { unitText } from "./words";
@@ -65,6 +69,7 @@
     say = () => {},
     onpending = () => {},
     onpreview = () => {},
+    onvalues = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
@@ -77,6 +82,8 @@
     onpending?: (n: number) => void;
     /** the preview to draw, or null when nothing is pending; `error` is a refusal */
     onpreview?: (answer: PreviewAnswer | null, error: string) => void;
+    /** the unapplied slider values, or null: the Structure graph draws them */
+    onvalues?: (values: Record<string, number> | null) => void;
   } = $props();
 
   let rows = $state<ParamRow[]>([]);
@@ -91,6 +98,8 @@
   /** the slider whose number is being typed, and the text so far */
   let typing = $state<string | null>(null);
   let typed = $state("");
+  /** the text the box opened on: Enter on it records nothing (WP-2223) */
+  let opened = "";
 
   const decimals = $derived(maxDecimals(sliders));
   const groups = $derived.by(() => {
@@ -136,7 +145,8 @@
     untrack(() => {
       const ctx = context, names = phaseNames;
       const prior = new Map(sliders.map((s) => [s.path, s]));
-      sliders = buildSliders(r, c, ctx, names, prior);
+      // a computed range reads in the value box's digits (WP-2218)
+      sliders = buildSliders(r, c, ctx, names, prior).map((s) => (s.custom ? s : roundRange(s)));
       const next = new Map(edits);
       for (const [path, v] of edits) {
         const row = r.find((x) => x.path === path);
@@ -149,6 +159,7 @@
 
   $effect(() => {
     onpending(edits.size);
+    onvalues(edits.size ? Object.fromEntries(edits) : null);
   });
 
   // the chart module is a chunk off the boot path (gui/CLAUDE.md), so its
@@ -204,7 +215,7 @@
 
   function startTyping(s: Slider) {
     typing = s.path;
-    typed = editText(current(s));
+    typed = opened = editText(current(s));
   }
 
   const typedCheck = $derived.by(() => {
@@ -216,6 +227,9 @@
     if (event.key === "Escape") {
       typing = null;
       event.stopPropagation();
+    } else if (event.key === "Enter" && typed.trim() === opened) {
+      // the text as it opened is no edit, whatever the value's digits (WP-2223)
+      typing = null;
     } else if (event.key === "Enter" && typedCheck && "value" in typedCheck) {
       set(s, typedCheck.value);
       typing = null;
@@ -230,6 +244,20 @@
   // -- the range-and-scale pop-up -----------------------------------------
   let rangeLo = $state("");
   let rangeHi = $state("");
+  // what the fields were filled with, so an end left as shown keeps its value
+  let shownLo = "";
+  let shownHi = "";
+
+  function showRange(s: Pick<Slider, "lo" | "hi" | "exp" | "decimals">) {
+    rangeLo = shownLo = rangeText(s, s.lo);
+    rangeHi = shownHi = rangeText(s, s.hi);
+  }
+
+  /** The range the fields say: an end as shown is the slider's own value. */
+  function typedRange(s: Slider | null): [number, number] {
+    return [s && rangeLo === shownLo ? s.lo : readNumber(rangeLo),
+            s && rangeHi === shownHi ? s.hi : readNumber(rangeHi)];
+  }
 
   function openPop(s: Slider, event: MouseEvent) {
     if (popFor === s.path) return closePop();
@@ -238,8 +266,7 @@
     popAt = { left: Math.max(8, Math.min(box.left, window.innerWidth - 300)),
               top: below ? box.bottom + 6 : Math.max(8, box.top - 250) };
     popFor = s.path;
-    rangeLo = editText(s.lo);
-    rangeHi = editText(s.hi);
+    showRange(s);
   }
 
   function closePop() {
@@ -256,12 +283,12 @@
   }
 
   const rangeWhy = $derived.by(() => {
-    const lo = Number(rangeLo), hi = Number(rangeHi);
+    const s = popSlider;
+    const [lo, hi] = typedRange(s);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return "not a number";
     if (!(hi > lo)) return "the end must be above the start";
     // a range past the row's bounds would let a drag reach a value the
     // preview and Apply both refuse, as a typed one is refused here
-    const s = popSlider;
     if (s && lo < s.bound[0]) return `below the lower bound ${s.bound[0]}`;
     if (s && hi > s.bound[1]) return `above the upper bound ${s.bound[1]}`;
     return "";
@@ -269,9 +296,12 @@
 
   function setRange(s: Slider) {
     if (rangeWhy) return;
-    const lo = Number(rangeLo), hi = Number(rangeHi);
+    const [lo, hi] = typedRange(s);
     if (lo === s.lo && hi === s.hi) return;
     replace(s, { lo, hi, custom: true, track: s.track === "log" && !(lo > 0) ? "lin" : s.track });
+    // the fields now show the new ends, so typing the old text back is a change
+    shownLo = rangeLo;
+    shownHi = rangeHi;
   }
 
   function setTrack(s: Slider, track: Track) {
@@ -280,10 +310,10 @@
   }
 
   function restoreDefault(s: Slider) {
-    const d = defaults(s.kind, s.ref, s.bound, context);
-    replace(s, { ...d, custom: false });
-    rangeLo = editText(d.lo);
-    rangeHi = editText(d.hi);
+    const raw = defaults(s.kind, s.ref, s.bound, context);
+    const d = roundRange({ ...s, ...raw, ...fixFormat(raw.lo, raw.hi, s.ref) });
+    replace(s, { lo: d.lo, hi: d.hi, track: d.track, custom: false });
+    showRange(d);
   }
 
   function clickAway(event: MouseEvent) {
