@@ -2238,7 +2238,7 @@ class FitRange(Base):
     Every angle is in degrees 2θ (``fit`` is a 2θ-only entry).  ``None`` on
     the result for anything not built by :meth:`Refinement.fit
     <rietx.refine.Refinement.fit>` or ``run_stage``: a joint multi-histogram
-    fit, a replay, a result written before schema 0.61.
+    fit, a replay, a result written before schema 0.62.
     """
 
     file_range: tuple[float, float]
@@ -2547,7 +2547,7 @@ class RefinementResult(Base):
     #: (WP-2075) — see :class:`FitRange`.  Written by ``Refinement.fit`` and
     #: ``run_stage``, the places the whole
     #: :class:`~rietx.schemas.pattern.PatternData` is at hand; ``None`` for
-    #: any other result and for one written before 0.61.
+    #: any other result and for one written before 0.62.
     fit_range: FitRange | None = None
 
     # Per-histogram slices of a multi-histogram joint refinement (WP-0308);
