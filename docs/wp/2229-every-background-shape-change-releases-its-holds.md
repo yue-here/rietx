@@ -93,9 +93,9 @@ person asked for, and the edit's console line says so.
 - [x] Case 2: a hold on a background path the model lacks is released when an extension
       rebuilds that path.
 - [x] Case 3: `dropPending` drops pending positions and restraints on a gone path.
-- [ ] Tests: `tests/test_gui_background.py` for the server arms; vitest for `dropPending` and
+- [x] Tests: `tests/test_gui_background.py` for the server arms; vitest for `dropPending` and
       for each client surface; a browser case by real clicks for any surface still mounted.
-- [ ] Skill: none. The skill drives the python API, which keeps holds by path on purpose.
+- [x] Skill: none. The skill drives the python API, which keeps holds by path on purpose.
 
 ## Acceptance
 
