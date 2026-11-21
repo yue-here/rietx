@@ -100,6 +100,20 @@ def _bodied_structure() -> rx.Structure:
         phase.model_copy(update={"rigid_bodies": [body]}))])
 
 
+def _no_su_rows(structure: rx.Structure) -> list:
+    """A row with no esd for every cell and site value of phase 0."""
+    from rietx.crystallography.adp import U_NAMES
+    from rietx.schemas.results import RefinedParameter
+
+    phase = structure.phases[0]
+    paths = [f"cell.{n}" for n in ("a", "b", "c", "alpha", "beta", "gamma")]
+    for j, a in enumerate(phase.atoms):
+        paths += [f"atoms.{j}.{n}" for n in ("x", "y", "z", "occ")]
+        paths += ([f"atoms.{j}.biso"] if a.aniso is None
+                  else [f"atoms.{j}.{n}" for n in U_NAMES])
+    return [RefinedParameter(path=f"phases.0.{p}", value=0.0) for p in paths]
+
+
 def _lab_variant(result, ref):
     """(result, structure, instrument) for the items a lab fit reaches."""
     from rietx.schemas.results import AbsorptionCorrection
@@ -152,6 +166,12 @@ def written(fitted_lab6, tmp_path_factory) -> dict[str, set[str]]:  # noqa: F811
     # a Cu doublet, an applied absorption and a refined extinction: the
     # wavelength loop and the items 11-BM LaB6 never needs
     out["refinement"] |= _tags(refinement_cif_doc(*_lab_variant(result, ref)))
+    # every value refined and none with an su (WP-2219): each su item ``?``
+    for structure in plain:
+        out["refinement"] |= _tags(refinement_cif_doc(
+            no_geometry.model_copy(update={"parameters": _no_su_rows(structure),
+                                           "cell_volumes": None}),
+            structure, instrument))
     # a Le Bail result: its scaffold sites are marked as dummies
     out["refinement"] |= _tags(refinement_cif_doc(
         no_geometry.model_copy(update={"mode": "lebail"}), ref.fitted_structure,

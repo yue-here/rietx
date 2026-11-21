@@ -226,14 +226,14 @@ def test_a_failed_eigensolve_leaves_the_esds_absent_not_raised(monkeypatch):
     assert ref[3] is None
 
     monkeypatch.setattr(statistics.np.linalg, "eigh", _eigh_fails)
-    stderr, _, _, error = least_squares._guarded_covariance(jac, resid, 4, 400)
+    stderr, _, _, error, _ = least_squares._guarded_covariance(jac, resid, 4, 400)
     assert error is None
     np.testing.assert_allclose(stderr, ref[0], rtol=1e-10)
 
     monkeypatch.setattr(lapack.scipy.linalg, "eigh", _eigh_fails)
-    stderr, corr, factor, error = least_squares._guarded_covariance(
+    stderr, corr, factor, error, discards = least_squares._guarded_covariance(
         jac, resid, 4, 400)
-    assert stderr is None and corr is None and factor is None
+    assert stderr is None and corr is None and factor is None and discards is None
     assert "Eigenvalues did not converge" in error
 
 

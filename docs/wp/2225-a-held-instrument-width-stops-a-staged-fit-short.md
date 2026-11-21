@@ -171,6 +171,58 @@ A choice among 1, 2 and 4 changes fit answers and revisits the maintainer's deci
 WP-2002, so it goes to the maintainer with task 1's numbers. Option 3 changes what a fit prints,
 so it goes too.
 
+### Inherited
+
+- **From WP-2036 (2026-11-20, PR #1723): the reorder moved three standards' diagnostics, and
+  fluorite's now depend on rounding.** Bisected: #1707 alone moved the slow suite alarm pin
+  (`tests/data/suite_alarms.json`). `lines_axial` now runs before the hold freezes U, X and
+  Y, so U keeps moving through it. Measured on macOS arm64, worktree `[dev]`, against the
+  merge before #1707 (8aaaf54c3):
+
+  | Standard | What moved | Code change |
+  |---|---|---|
+  | zincite | U +0.0021 → −0.00097; Γ_G² < 0 on 658 of 7251 points, −7.5e-3 deg² at 150° | `RESOLUTION_NOT_POSITIVE` (warning) and `CONSTRAINT_ACTIVE` (info, 12 cone steps in `biso`) appear |
+  | brucite | U +0.00057 → −0.0074, total Γ_G² held positive by V | `CONSTRAINT_ACTIVE` (info, 4 cone steps) appears |
+  | fluorite | `gauss_size`, `gauss_strain` leave the floor (1.5e-5, 2.9e-5) | `FLOOR_HIT` → `COVARIANCE_DIRECTION_DISCARDED` |
+
+  Under 1e-14 nudges to the start W (k = 0, ±1, ±3, 7, 20) fluorite gives three code sets:
+  `COVARIANCE_DIRECTION_DISCARDED` at k = 0, `FLOOR_HIT` at five starts, neither at k = 20.
+  Rwp agrees to 7 digits and the cell to 1e-6 Å. Only the split of about 4.3e-5 between
+  `gauss_size` and `gauss_strain` moves. Before #1707 all seven starts gave one set, and
+  zincite and brucite give one set after it. So the twin split this WP's last entry names
+  now also picks which finding a reader gets on fluorite, and the suite alarm pin carries
+  the k = 0 reading, which Linux may not reproduce. A design that makes the split single
+  should leave that row stable; `tests/data/suite_alarms.json` is the check. Zincite's
+  negative instrument U is the second new fact for the options.
+
+- **From WP-2017 (2026-11-19): the QPA plan now refines `lines_axial` before
+  `sample_broadening`, and most of the effect above is gone.** A side investigation traced
+  the simulated `trigger` bench case's Rwp rise (0.0200 on v1.9.0, 0.0276 on main) to this
+  hold. Its `profile` stage fitted U, X and Y with the axial ratio still wrong, and the hold
+  froze the bias. The maintainer kept a reorder (2026-11-19): `qpa_plan` in the tests, in
+  `viz.compare` and in the Stephens acceptance plan now runs the Kα2 ratio and S/L before
+  the specimen widths, as `lab_bragg_brentano` does. `eight.py` re-run on the merged tree
+  (macOS arm64, worktree `[dev]`, compiled tier on, closing stage off, which merged main now
+  ships by default): [`eight_summary_axial_first.txt`](2225-batch/eight_summary_axial_first.txt).
+
+  | Standard | Re-fit's largest shift, before → after | First fit Rwp, before → after | Chain limit, after | Hold off |
+  |---|---|---|---|---|
+  | zincite | V +3.32 → +0.07 esd | 0.110169 → 0.109726 | 0.109669 | 0.109274 |
+  | fluorite | V +1.18 → 0.01 | 0.181695 → 0.181309 | 0.181303 | 0.181309 |
+  | corundum | V +0.23 → 0.04 | 0.145752 → 0.145745 | 0.145745 | 0.848 (walks) |
+  | brucite | `lor_size` −0.10 → 0.02 | 0.469465 → 0.469477 | 0.469481 | 0.469378 |
+
+  So a staged re-fit now moves no reported parameter by more than 0.1 esd on all four. This
+  WP's acceptance bar is met without a code change (zincite's `shipped+1` reads V +0.10, at
+  the bar). One thing is left. Zincite's chain now settles at Rwp 0.109669, 0.7 % in χ²
+  above the hold-off point (0.109274). Before the reorder the chain reached that point. The
+  hold still fixes a split the data do not determine, and the reorder only changed which
+  split. That is the start dependence behind cpd-1a's Biso-start xfail (15.68 esd), which
+  the reorder leaves as it was. Re-read options 0-4 with that in mind: the stopping-short
+  defect is now small, and the open question is what a sample-only plan should report for
+  a twin pair. The maintainer asked for that question to have a WP (2026-11-19). It is folded
+  here because this WP already carries it.
+
 ## Non-goals
 
 - The closing stage's own re-fit movement on SRM 660c (`u` −0.19 esd, no twin held).

@@ -717,14 +717,21 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
-#: Also in 0.61 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: 0.61 → 0.62 (WP-2107, the maintainer's ruling of 2026-11-19):
+#: ``Phase.peak_equations`` and ``Instrument.peak_equations``, lists of
+#: ``PeakEquation`` (``target``, ``expression``, ``coefficients``).  Additive and
+#: defaulted to empty, the 0.25 → 0.26 rule, so every stored document loads and
+#: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
+#: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
+#: version now says why.
+#: Also in 0.62 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
 #: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
 #: document that omits the key (or the whole geometry) reads at the old
 #: ``"debye_scherrer"`` through the same readers.  Every writer here writes
 #: the key, so only a hand-written file meets this.  The new field
 #: ``RefinementResult.assumed_instrument`` is additive and defaults to
 #: ``None``, "a result stored before the field".
-SCHEMA_VERSION = "0.61"
+SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
