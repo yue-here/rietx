@@ -224,6 +224,11 @@ roughly the shift (+1400 ppm).
   (dropping made the GUI's add verb silently do nothing). Removing the two took
   the corundum row to 50 of 52 lines from 51 of 55 — `indexed_fraction`
   0.927 → 0.962, since a line that was never a line could never be indexed.
+  **The same holds at a significance** (WP-1909, #718): a component under
+  `PEAK_NO_INTENSITY_SIGMA` (1) of its own esd is `no_intensity` too, since
+  detection's 5σ is on the net above `_debiased_envelope` and a steep flank the
+  envelope under-tracks clears it at I/σ_I ≈ 0.35. **Repair at the flag, never the
+  envelope**, which also feeds the width census, `screen.py` and `extinction.py`.
 
 - **A filter inside a search fails with a wrong *answer*, so a silence indicts the
   filters before the tolerance.** `engines.solution_key` is the one dedup authority —
