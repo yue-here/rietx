@@ -120,6 +120,10 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 
 ## Handover log
 
+### 2026-11-21 — review round on #1700 (the per-unit share, #1374)
+
+Yue's review of 2026-11-21 accepted the share rule and the reworded `INDEX_SEARCH_INCOMPLETE` remedy for a shared unit. The accepted rule adds one sentence to `INDEX_BUDGET_EXHAUSTED`; the remedy rewrite is reader text beyond that sentence, so it went to Yue under the 2026-11-01 ruling, and **Yue accepted it on 2026-11-21**. The two `slow` rows' margins are now stated in their docstrings (macOS arm64, CPU seconds; pearl was unreachable, so Linux x86_64 is not shown).
+
 ### 2026-10-31 — dichotomy's memory bounded when the unit limit is lifted, and a stop honoured inside the dedup and inside one trial_error base
 
 A caller who raises the per-system time limit can no longer drive dichotomy into an out-of-memory kill. The grid now stops at 1 GiB of stored survivor lists, and one crystal system stops after 20 000 accepted cells. Either limit returns what the search has, marked incomplete, where the reporter's runs reached 18.4 GB and 7 GB and returned nothing. A stop request no longer waits minutes on the final dedup, and the dedup stops only where the rest could not change the ranked list, so a run that hits the `quick` ceiling ranks exactly what it ranked before. trial_error now reads its time limit between the solutions of one base, so a 60 s unit stops at 60 s instead of minutes later. Every finished search returns the same candidates bit for bit. Nothing here was re-run on the reporter's private pattern.

@@ -403,8 +403,9 @@ class SearchSpec:
     #: ``budget_seconds`` is **per (engine × system)** — an unbounded run is
     #: 3 × 7 × 30 s of search before the probe and the validation fits, and
     #: nothing used to state that.  Under this ceiling a unit runs at most
-    #: :func:`unit_share_seconds`, the search's time over the engines (#1374).  This is the bound a caller actually means:
-    #: ``index_pattern`` wraps it in a :class:`Deadline` that every existing
+    #: :func:`unit_share_seconds`, the search's time over the engines (#1374).
+    #: This is the bound a caller actually means: ``index_pattern`` wraps it in
+    #: a :class:`Deadline` that every existing
     #: cooperative check reads, the run returns a complete
     #: :class:`~rietx.schemas.indexing.IndexingResult` over whatever was
     #: reached, and ``INDEX_BUDGET_EXHAUSTED`` names what was not.
