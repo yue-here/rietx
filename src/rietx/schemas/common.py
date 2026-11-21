@@ -724,6 +724,13 @@ from .._nearmiss import did_you_mean
 #: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 #: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 #: version now says why.
+#: Also in 0.62 (WP-1419 C3b, Yue's review of #1533): the first change after
+#: v1.12.0 shipped 0.61.  ``Phase`` refuses a phase whose ``distortion_modes``
+#: and ``parent_cell`` name different parent groups, or whose two transforms
+#: differ by more than a parent lattice vector (``_one_parent_in_both_records``).
+#: A construction that used to succeed and now doesn't is a bump (the 0.17
+#: rule): a stored document whose two records disagree no longer opens.
+#: ``displacive_statement`` never writes such a pair.  No field is added.
 SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
