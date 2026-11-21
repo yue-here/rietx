@@ -307,7 +307,6 @@ def discarded_directions(jac: np.ndarray, *, basis: bool = False
     return n_gone, touched, to_eq[:, None] * vec[:, gone] / np.sqrt(cut)
 
 
-
 @dataclass(frozen=True)
 class DiscardedSubspace:
     """What a derived number needs from a covariance solve that discarded a
@@ -362,8 +361,11 @@ def estimable(grad: np.ndarray, cov: np.ndarray, lost: np.ndarray) -> np.ndarray
     """
     g = np.atleast_2d(np.asarray(grad, dtype=np.float64))
     lost_var = ((g @ lost) ** 2).sum(axis=1)
-    kept_var = np.einsum("ra,ab,rb->r", g, cov, g)
+    # one matrix product, never einsum's unblocked m·n² loop: a Pawley
+    # table's identity has a row per entry
+    kept_var = ((g @ cov) * g).sum(axis=1)
     return lost_var < kept_var
+
 
 def resolved_correlation(corr: np.ndarray, jac: np.ndarray
                          ) -> tuple[np.ndarray, np.ndarray]:

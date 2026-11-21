@@ -4918,10 +4918,17 @@ class ParameterTable:
         # rows with any free source, read off the declared reach: a derived
         # row whose Jacobian is zero at this θ still has its sources
         touched = np.diff(self._reach.indptr) > 0
-        blind = self.unmeasured_rows(theta, stderr_internal,
-                                     correlation=correlation, discarded=discarded)
-        kept = self._estimable_rows(theta, stderr_internal, blind,
-                                    correlation, discarded)
+        blind = self.unmeasured_rows(theta, stderr_internal)
+        kept = np.zeros_like(blind)
+        if discarded is not None and correlation is not None and blind.any():
+            # only the blind rows are asked, each as its own function
+            idx = np.flatnonzero(blind)
+            still = self.unmeasured_functions(
+                theta, stderr_internal, idx,
+                sparse.identity(len(idx), format="csr"),
+                correlation=correlation, discarded=discarded)
+            kept[idx] = ~still
+            blind = blind & ~kept
         if kept.any():
             # only those rows re-read, through the pseudo-inverse's own esds:
             # every other row keeps its bits
@@ -5073,15 +5080,6 @@ class ParameterTable:
         ok = estimable(c, cov, discarded.lost) & ((c != 0.0).sum(axis=1) > 1)
         blind[np.flatnonzero(cand)[ok]] = False
         return blind
-
-    def _estimable_rows(self, theta: np.ndarray, stderr_internal: np.ndarray,
-                        blind: np.ndarray, correlation: np.ndarray | None,
-                        discarded: DiscardedSubspace | None) -> np.ndarray:
-        """``C``'s rows that draw on a touched column and keep their esd:
-        unmeasured without ``discarded``, not ``blind`` with it."""
-        if discarded is None or correlation is None:
-            return np.zeros(self._C.shape[0], dtype=bool)
-        return self.unmeasured_rows(theta, stderr_internal) & ~blind
 
     def physical_covariance(self, theta: np.ndarray, stderr_internal: np.ndarray,
                             correlation: np.ndarray | None,

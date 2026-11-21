@@ -661,9 +661,9 @@ def _guarded_covariance(jac, fun, n_free: int, n_data: int
                                    DiscardedSubspace | None]:
     """:func:`covariance_estimates`, with an eigensolver failure made absent.
 
-    Returns ``(stderr, corr, factor, None, discards)``, ``factor`` the
-    Bérar-Lelann factor ``stderr`` carries (:func:`_covariance_and_inflation`),
-    or ``(None, None, None, repr(exc), None)`` when
+    Returns ``(stderr, corr, factor, None, discards, subspace)``, ``factor``
+    the Bérar-Lelann factor ``stderr`` carries (:func:`_covariance_and_inflation`),
+    or ``(None, None, None, repr(exc), None, None)`` when
     ``np.linalg.LinAlgError`` escapes the pseudo-inverse.  Issue #225 met it
     at a converged fit, pattern 78 of a 182-pattern chain, as ``Eigenvalues
     did not converge`` out of ``eigh``, and the raise discarded the answer the

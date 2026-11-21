@@ -2943,8 +2943,11 @@ class Refinement:
                                    n_free=len(table.free_paths) + _pawley_n(model),
                                    y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
-        stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
-                                        outcome.correlation)
+        # the node records the esds the stage's result reports, a tie the
+        # data determine included (WP-2230)
+        stderr = (table.stderr_physical(
+            outcome.theta, outcome.stderr_internal, outcome.correlation,
+            discarded=getattr(outcome, "discarded_subspace", None))
                   if outcome.stderr_internal is not None else {})
         metrics = NodeMetrics(
             statistics=stats, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -6794,10 +6797,15 @@ class Refinement:
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
             phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
+        # the stage's own covariance, so a moment pair on a discarded
+        # direction folds here as it does in ``report()`` (WP-2230)
+        covariance = (result, table, outcome.theta, outcome.stderr_internal,
+                      outcome.correlation, outcome.discarded_subspace)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
-                              free_paths=list(table.free_paths))
+                              free_paths=list(table.free_paths),
+                              covariance=covariance)
         return report.for_stage(name)
 
     def run_stage(self, data: PatternData, stage: Stage, *,

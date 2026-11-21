@@ -2705,9 +2705,8 @@ class MultiHistogramRefinement:
         # is exactly 1.0.  With a correlation matrix this is a dense n x n, so
         # a second build here would double the cost for the same dict.
         esd_hist0 = per_esds[0] if per_esds else {}
-        parameters = self._parameters(thetas, stderr, corr, at_bounds, esd_hist0,
-                                      answer_runaway, outcome.esd_inflation,
-                                      discarded=outcome.discarded_subspace)
+        parameters = self._parameters(at_bounds, per_esds, answer_runaway,
+                                      outcome.esd_inflation)
         diagnostics = list(opening_diags) + self._top_diagnostics(
             outcome, correlation_guard, top_bg, at_bounds, models)
         # what a parametric declaration did to each pattern's dependent that
@@ -2961,10 +2960,13 @@ class MultiHistogramRefinement:
                         vary=bool(e.vary), unit=table._units.get(path), reference=None))
         return rows
 
-    def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
-                    answer_runaway=(), esd_inflation=None, *,
-                    discarded=None) -> list[RefinedParameter]:
+    def _parameters(self, at_bounds, per_esds, answer_runaway=(),
+                    esd_inflation=None) -> list[RefinedParameter]:
+        """The result's rows; ``per_esds[h]`` is histogram ``h``'s
+        :meth:`~rietx.params.vector.ParameterTable.stderr_physical` map, built
+        once by the caller (a dense build per histogram with a correlation)."""
         mt = self.mtable
+        esd0 = per_esds[0] if per_esds else {}
         params: list[RefinedParameter] = []
         # The single-histogram rule (``refine._build_result``): a cell the
         # answer-producing stage's CELL_RUNAWAY names has its esd withheld,
@@ -3005,12 +3007,7 @@ class MultiHistogramRefinement:
                     at_bound=(e.path in on_bound) if e.path in tested else None,
                     equations=equations.get(e.path, [])))
         for h, table in enumerate(mt.tables):
-            cm = mt.col_map(h)
-            esd = (table.stderr_physical(
-                thetas[h], stderr[cm],
-                corr[np.ix_(cm, cm)] if corr is not None else None,
-                discarded=None if discarded is None else discarded.take(cm))
-                   if stderr is not None else {})
+            esd = per_esds[h] if per_esds else {}
             for e in table.entries:
                 if not _row_shared(mt, e) and e.path in moving[h]:
                     row = f"hist.{h}.{e.path}"

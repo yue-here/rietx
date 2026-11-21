@@ -588,15 +588,16 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
     ``functions``, :meth:`~rietx.params.vector.ParameterTable.unmeasured_functions`
     over these entries, and a row whose blind sources are only columns a
     discarded direction touched is asked whether its combination is
-    estimable.  Kept, it reports σ through the pseudo-inverse's covariance and
-    no diagonal-only σ, since a touched column's own variance is not
+    estimable.  Kept, it reports σ through the pseudo-inverse's covariance
+    (``cov``'s last element, which sets that row's cancellation floor too)
+    and no diagonal-only σ, since a touched column's own variance is not
     measured and a sum of diagonal terms would quote it.
     """
     if not items:
         return []
     if cov is None:
         return [(None, None)] * len(items)
-    cov_full, cov_diag, blind, functions = cov
+    cov_full, cov_diag, blind, functions, cov_kept = cov
     compiled = CompiledRestraints(items=items)
     gross_rows = np.zeros((compiled.n_rows, len(table.entries)), dtype=np.float64)
     rows = restraint_partials(compiled, values, table, gross=gross_rows)
@@ -617,6 +618,13 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
     if functions is not None and touches_blind.any():
         kept = touches_blind & ~functions(g)
         touches_blind = touches_blind & ~kept
+        if kept.any():
+            # only the kept rows read the pseudo-inverse's covariance, and
+            # their floor with them: every other row keeps its bits
+            gk, gross_k = g[kept], gross[kept]
+            var_full[kept] = np.einsum("ra,ab,rb->r", gk, cov_kept, gk)
+            floor[kept] = VARIANCE_CANCELLATION_FLOOR * np.einsum(
+                "ra,ab,rb->r", gross_k, np.abs(cov_kept), gross_k)
     return [(None, None) if (b or f <= max(fl, 0.0)) else
             (math.sqrt(f), None if k else math.sqrt(max(float(d), 0.0)))
             for f, d, fl, b, k in zip(var_full, var_diag, floor, touches_blind,
@@ -625,24 +633,26 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
 
 def _covariance(table, theta, ip: int, n_atoms: int, stderr_internal,
                 correlation, discarded=None):
-    """``(full, diagonal-only, blind, functions)`` over phase ``ip``'s
-    entries, or None.  ``functions`` is ``None`` without a discarded subspace
-    (WP-2230; :func:`_sigmas`)."""
+    """``(full, diagonal-only, blind, functions, kept)`` over phase ``ip``'s
+    entries, or None.  ``functions`` and ``kept``, the pseudo-inverse's
+    covariance a kept row is read through, are ``None`` without a discarded
+    subspace (WP-2230; :func:`_sigmas`)."""
     if stderr_internal is None:
         return None
     paths = _phase_paths(ip, n_atoms)
     rows = [table._paths[q] for q in paths]
-    functions = None
+    functions = cov_kept = None
     if discarded is not None and correlation is not None:
         def functions(g):
             return table.unmeasured_functions(
                 theta, stderr_internal, rows, g, correlation=correlation,
                 discarded=discarded)
-    return (table.physical_covariance(theta, stderr_internal, correlation, paths,
-                                      discarded=discarded),
+        cov_kept = table.physical_covariance(theta, stderr_internal, correlation,
+                                             paths, discarded=discarded)
+    return (table.physical_covariance(theta, stderr_internal, correlation, paths),
             table.physical_covariance(theta, stderr_internal, None, paths),
             table.unmeasured_rows(theta, stderr_internal, rows),
-            functions)
+            functions, cov_kept)
 
 
 def _torsion_row(ip: int, labels, item: _Torsion, codes, values, sigma):
@@ -794,9 +804,10 @@ def cell_volumes(table, theta: np.ndarray, structure, *,
             var = float(g @ full @ g)
             floor = VARIANCE_CANCELLATION_FLOOR * float(np.abs(g) @ np.abs(full) @ np.abs(g))
             uses_blind = bool((np.abs(g[blind]) > 0.0).any())
-            kept = uses_blind and not table.unmeasured_functions(
-                theta, stderr_internal, rows, g[None, :], correlation=correlation,
-                discarded=discarded)[0]
+            kept = (uses_blind and discarded is not None
+                    and not table.unmeasured_functions(
+                        theta, stderr_internal, rows, g[None, :],
+                        correlation=correlation, discarded=discarded)[0])
             if (kept or not uses_blind) and var > max(floor, 0.0):
                 sig = math.sqrt(var)
                 sig_d = None if kept else math.sqrt(max(float(g @ diag @ g), 0.0))
