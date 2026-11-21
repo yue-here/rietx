@@ -1,6 +1,6 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -69,6 +69,20 @@ The prototypes are not published, so the design is restated here.
    cap drops a long session's start, so the script is built from a store of calls that is not
    capped, or says at its head that it is partial.
 
+### Rulings
+
+Questions 1 and 2 went to the maintainer on 2026-11-21 as drawn options: whole windows of the
+prototype with the changed region boxed, on a private page.
+
+- **Question 1, 2026-11-21, the maintainer: events fold under their call.** Under a run's call,
+  one muted line sums the events ("42 engine events, 5 stages, 30 evaluations" on the options
+  page), closed by default. A click opens it, and the events list indented and muted under
+  their call. Events stay out of Copy and the script.
+- **Question 2, 2026-11-21, on no objection: one string token**, `#2f6f3e` in the light theme
+  and `#8fc79d` in the dark, as drawn on the options page. It goes into
+  `src/rietx/viz/theme.py`. It was offered as "this lands unless you object", and the
+  maintainer answered the other questions without objecting.
+
 ### Seams
 
 - **One tagged line type.** `say()` and `consoleLine` write `{kind, text}` with kind one of
@@ -113,8 +127,8 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
-  their dates.
+- [x] Questions 1 and 2 drawn and brought to the maintainer; the rulings recorded here with
+  their dates (§ Rulings, 2026-11-21).
 - [ ] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
   echoes spelled with one receiver per name, and each `…` echo made runnable or marked. Vitest
   over the kinds and over every writer's spelling.
@@ -148,6 +162,15 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   (the bottom panel).
 
 ## Handover log
+
+- **2026-11-21** — The maintainer has ruled the console's two open visual questions from drawn
+  options, so the session that builds it can start on the code. A fit's engine events fold
+  into one muted summary line under the call that started it, closed by default, and a click
+  lists them. String literals take one green token in each theme. Nothing is built yet.
+  *Done*: § Rulings written; the questions task ticked. The string token was offered as
+  "lands unless you object" and drew no objection, which § Rulings says. Next: the tagged line
+  type in `say()` and `consoleLine`, since the fold, Copy and the script export all read the
+  kind it carries.
 
 - **2026-11-10** — created by a ghostshift runner from WP-2206's follow-ups. No open WP owns
   the Console: a search of the open WPs for console lines and a script export found none. WP-2133
