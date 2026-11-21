@@ -1,4 +1,4 @@
-"""Distinct solutions, under the equivalences of the group (#562 S2a; WP number pending).
+"""Distinct solutions, under the equivalences of the group (#562 S2a; WP-1997).
 
 Two coordinate sets describe one crystal structure when an isometry that maps
 the space group onto itself takes one onto the other: the **Euclidean

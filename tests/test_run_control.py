@@ -124,14 +124,16 @@ def test_a_new_kind_is_what_the_version_is_for():
 
     ``"3"`` is WP-1322's run header, which is *not* a kind — the kind set is
     unchanged — but a line a version-2 ``EventRecord`` reader refuses, so it
-    moved the constant on the same rule.
+    moved the constant on the same rule.  ``"4"`` is #562 S2b's three solve
+    kinds.
     """
     from typing import get_args
 
     kinds = set(get_args(EventKind))
     assert {"index_start", "index_end"} <= kinds
+    assert {"solve_start", "solve_step", "solve_end"} <= kinds
     assert "run" not in kinds
-    assert EVENT_SCHEMA_VERSION == "3"
+    assert EVENT_SCHEMA_VERSION == "4"
 
 
 def test_readers_validate_the_envelope_not_the_payload(tmp_path):
