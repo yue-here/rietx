@@ -206,6 +206,35 @@ def test_each_radiation_reports_what_actually_differs(caps):
                for r in caps.radiations)
 
 
+def test_each_radiation_says_whether_a_fit_estimates_its_absorption(
+        caps, monkeypatch):
+    """Which source kinds turn a declared radius into a µR (#1467, item 2).
+
+    The authority is ``LINEAR_ATTENUATION_BY_SOURCE``, the table the fit's
+    estimator dispatches on: a kind missing from it declines with
+    ``refine._NO_ATTENUATION_TABLE_ESTIMATE``.  Both arms are pinned, since a
+    flag that read ``False`` everywhere would pass the membership check for a
+    table that had emptied.  The flip at the end is the derivation itself:
+    taking a kind out of the live table takes it out of the next answer, which
+    a hand-copied list could not do.
+    """
+    from rietx.optimize import qpa
+
+    by_kind = {r.kind: r for r in caps.radiations}
+    for kind, arm in by_kind.items():
+        assert arm.absorption_estimable == (
+            kind in qpa.LINEAR_ATTENUATION_BY_SOURCE)
+    assert by_kind["xray_cw"].absorption_estimable is True
+    assert by_kind["neutron_cw"].absorption_estimable is True
+    # a bank spans a range of λ, so one µ per histogram is not defined there
+    assert by_kind["neutron_tof"].absorption_estimable is False
+
+    monkeypatch.delitem(qpa.LINEAR_ATTENUATION_BY_SOURCE, "neutron_cw")
+    flipped = {r.kind: r for r in capabilities().radiations}
+    assert flipped["neutron_cw"].absorption_estimable is False
+    assert flipped["xray_cw"].absorption_estimable is True
+
+
 def test_the_anode_arm_says_nothing_about_a_neutron_source(caps):
     """``anodes`` is a sub-vocabulary of one radiation, which is why both arms
     exist: a client reading ``anodes`` alone would conclude this build does

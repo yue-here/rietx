@@ -68,6 +68,7 @@ from .indexing.engines import (
 from .io.projects import PROJECT_FORMATS
 from .io.readers import PATTERN_FORMATS, READER_OPTIONS
 from .optimize.least_squares import SOLVERS
+from .optimize.qpa import LINEAR_ATTENUATION_BY_SOURCE
 from .params.expression import GRAMMAR_VERSION as EXPRESSION_GRAMMAR_VERSION
 from .refine import _VERSION
 from .report.schemas import THRESHOLDS_VERSION
@@ -186,6 +187,22 @@ class RadiationCapability(Base):
     #: ``model.forward.magnetic_wanted`` dispatches on, so it cannot claim a
     #: term the forward model does not build
     magnetic_scattering: bool
+    #: ``True`` where a fit turns a declared capillary radius or flat-plate
+    #: thickness into an estimated µR or µt from the composition, when
+    #: ``Geometry.mu_r``/``mu_t`` is left unset (X-ray µR since WP-0501 and µt
+    #: since WP-0508, constant-wavelength neutron since WP-1132).  Read off
+    #: ``optimize.qpa.LINEAR_ATTENUATION_BY_SOURCE``, the table the estimator
+    #: dispatches on, so a source kind joining that table flips its own flag.
+    #: The same table gives the µ of the Brindley microabsorption correction in
+    #: phase quantification, so ``False`` also means a QPA with
+    #: ``Phase.particle_radius_um`` skips that correction on this source.
+    #: ``False`` means the fit does not estimate µR or µt and says so; an explicit
+    #: ``mu_r``/``mu_t`` is still honoured wherever the source can be fitted
+    #: (a time-of-flight source cannot be fitted yet).
+    #: ``True`` is not a promise for every specimen, since the estimate still
+    #: declines for an absorption edge, an untabulated species or a resonant
+    #: neutron absorber
+    absorption_estimable: bool
 
 
 class ReaderCapability(Base):
@@ -504,6 +521,7 @@ def _radiation(cls: type) -> RadiationCapability:
         polarization_refinable="polarization" in cls.model_fields,
         harmonic_contamination=harmonics,
         magnetic_scattering=kind in MAGNETIC_SOURCE_KINDS,
+        absorption_estimable=kind in LINEAR_ATTENUATION_BY_SOURCE,
     )
 
 
