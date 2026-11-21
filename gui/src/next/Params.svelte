@@ -391,23 +391,29 @@
     refusal = "";
   }
 
-  /** Drop the pending values, flags, holds and limits whose key `gone`
-   *  names: an edit on another surface removed or redefined those paths
-   *  (the Background graph's Type and Terms, WP-2218 review), so Apply
-   *  would be refused on them, or land on the new model's path of the same
-   *  name. Returns the keys dropped. */
+  /** Drop every pending edit whose key `gone` names: an edit on another
+   *  surface removed or redefined those paths (the Background graph's Type
+   *  and Terms, WP-2218 review; any instrument edit's `ended`, WP-2229), so
+   *  Apply would be refused on them, or land on the new model's path of the
+   *  same name. All six kinds go: values, flags, holds, limits, restraints,
+   *  and positions, which are keyed by atom and asked about by the
+   *  coordinate paths they set. Returns the keys dropped. */
   export function dropPending(gone: (key: string) => boolean): string[] {
     const dropped: string[] = [];
-    const keep = <V,>(m: Map<string, V>): Map<string, V> => {
-      const hit = [...m.keys()].filter(gone);
+    const keep = <V,>(m: Map<string, V>, ended = (key: string, _v: V) => gone(key)
+                     ): Map<string, V> => {
+      const hit = [...m].filter(([k, v]) => ended(k, v)).map(([k]) => k);
       if (!hit.length) return m;
       dropped.push(...hit);
-      return new Map([...m].filter(([k]) => !gone(k)));
+      return new Map([...m].filter(([k]) => !hit.includes(k)));
     };
     edits = keep(edits);
     varyEdits = keep(varyEdits);
     holdEdits = keep(holdEdits);
     limitEdits = keep(limitEdits);
+    restraintEdits = keep(restraintEdits);
+    positionEdits = keep(positionEdits,
+                         (atom, fields) => Object.keys(fields).some((axis) => gone(`${atom}.${axis}`)));
     if (dropped.length) say(`# pending edits dropped: ${[...new Set(dropped)].sort().join(", ")}`);
     return dropped;
   }
@@ -1366,7 +1372,7 @@
 {/if}
 
 {#if instrumentOpen}
-  <Instrument {rows} {anodes} {busy} {say} onlanded={landed}
+  <Instrument {rows} {anodes} {busy} {say} onlanded={landed} ondropped={dropPending}
     onclose={() => (instrumentOpen = false)} />
 {/if}
 
