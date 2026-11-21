@@ -316,6 +316,10 @@ roughly the shift (+1400 ppm).
 - **A candidate is reported in its conventional setting, at `to_cell_candidate`**
   (WP-1923): `engines.conventional_fit` re-sets af, `cov_af`, cell and esds in one map. A
   new surface showing an engine's cell goes through it too, or one search speaks two.
+- **A metric direction no line constrains is refused, never marked** (#1232,
+  WP-1915): a dead *cross* term looks like one unmeasured angle, but G = (G\*)⁻¹
+  puts it into every length (Q bit-identical while a, b, c move), so its finite
+  first-order esds are confident wrong numbers and no `cov_af` holds an inf.
 - **An assumed precision may never refuse to index** (`from_positions` lists get no
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
 - **This package is not slow at indexing, it is silent** — DICVOL04 reaches 3770 s
