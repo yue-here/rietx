@@ -300,6 +300,15 @@ object and the $\lambda_i$ are $N$ separate ones, so the family
 fixes $s$, and the other $N-1$ become measurable against the shared lattice. One
 wavelength is held, and at most $N-1$ are free.
 
+A held cell breaks the family in the same way. In a mixture every phase's
+reciprocal lattice scales with the same $s$, so one phase whose cell is held, a
+certified standard, fixes $s$ for the pattern, and $\lambda$ refines beside the
+other phases' free cells. Across histograms a free cell carries $s$ from each
+histogram to every other sharing it, so a histogram's $\lambda$ may be free when
+the set it is linked to contains a held wavelength or a held cell.
+
+{source}`rietx.params.vector.wavelength_pins`
+
 ## Aberration shifts
 
 rietx models additive $2\theta$ shifts that have distinct angular signatures.

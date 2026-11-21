@@ -165,10 +165,11 @@ Several patterns of one specimen share one cell, and that breaks the degeneracy 
 Holding one wavelength pins the cell's scale.
 The remaining N − 1 are then over-determined by the shared cell and measurable, each against the same lattice.
 Holding all of them forces every monochromator's calibration error into the shared cell, and freeing all of them puts the flat direction back.
-So a free wavelength requires its pattern's cell to be shared with at least one pattern whose wavelength is held.
+A held cell pins the scale the same way, so a standard held in the mixture lets every wavelength refine.
+The rule is connectivity ({func}`~rietx.params.vector.wavelength_pins`): a free cell carries the scale between the patterns that share it, and a pattern's wavelength may be free when the patterns it is linked to that way include a held wavelength or a phase with a held cell.
 
-"Exactly one held, at most N − 1 free" is that rule when every pattern shares one cell, which is the `SharingMap` default.
-Un-share the cell and the single-pattern degeneracy is back, per pattern, inside a joint fit where it looks solved, so that combination is refused too.
+"Exactly one held, at most N − 1 free" is that rule when every pattern shares one free cell, which is the `SharingMap` default.
+Un-share the cell and the single-pattern degeneracy is back, per pattern, inside a joint fit where it looks solved, so that combination is refused too unless a phase in that pattern has a held cell.
 Each refusal names its cause and states the count: "2 of 2 wavelengths are free; hold one".
 
 Hold the wavelength of the pattern that determines the cell.

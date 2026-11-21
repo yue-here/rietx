@@ -83,7 +83,6 @@ from .refine import (
     _DISPLACEMENT_PATH,
     _PHASE_PREFIX,
     _VERSION,
-    _WAVELENGTH_PINNED_BY_HELD_HISTOGRAM,
     SCALE_B_SEPARATION_FLOOR,
     SCALE_B_STEP,
     CellReset,
@@ -156,6 +155,7 @@ from .refine import (
     _utcnow,
     _vars_driven_cell_escapes,
     _wavelength_calibration_diagnostics,
+    _wavelength_pinned_by,
     _width_census_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
@@ -398,6 +398,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                    "carry is the floating origin's, which HOLD_BLOCKED_PLAN "
                    "leaves to _origin_diagnostics, so it would report "
                    "nothing"),
+    "_wavelength_not_freed_diagnostics": (
+        (ABSENT,), "a joint fit never declines a wavelength by glob: the joint "
+                   "fence refuses an unpinned one when the columns are rebuilt "
+                   "(WP-2148), so there is no declined λ to report"),
     "_pawley_unresolved_diagnostics": (
         (HISTOGRAM,), "each histogram keeps its own Pawley intensity block "
                       "and overlap groups (WP-2104)"),
@@ -1658,8 +1662,11 @@ class MultiHistogramRefinement:
         seen: set[str] = set()
         for h, table in enumerate(mt.tables):
             by_path = {e.path: e for e in table.entries}
+            # the joint fence's predicate, asked as a free λ here would ask
+            # it (WP-2148), so the row and the refusal agree
             blocked = (table._wavelength_paths()
-                       if table._cell_is_free() else frozenset())
+                       if mt.wavelength_pins(freed=h)[h] is None
+                       else frozenset())
             reach = table.entry_reach()
             owned = table.body_rows()
             origin = table.origin_holds
@@ -2615,7 +2622,9 @@ class MultiHistogramRefinement:
                 unsupported_resolution=check_resolution_supported(table, model))))
             diags.extend(_wavelength_calibration_diagnostics(
                 self._declared_wavelengths[h], table, values, esd_h,
-                pinned_by=_WAVELENGTH_PINNED_BY_HELD_HISTOGRAM, h=h))
+                # the clause names what pins this histogram's d scale: the
+                # fence's own answer (WP-2148)
+                pinned_by=_wavelength_pinned_by(mt.wavelength_pins()[h]), h=h))
             # The two tier-2 flags, per histogram — without which a joint fit
             # gets the tier-1 bound (``_freeze_strain_cap_multi`` /
             # ``_freeze_size_cap_multi``) and none of the interpretation the
