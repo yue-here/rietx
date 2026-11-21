@@ -151,8 +151,10 @@ npm --prefix gui test && npm --prefix gui run check
     edits. A stale entry left in the free register by a cut before this WP still warns
     "restored parameter path(s) no longer exist" on a checkout.
   - *Measured* (venv `[dev]` + playwright, darwin/arm64, on main e1f6d1ac4 merged in):
-    vitest 867 passed (47 files), svelte-check 0 errors in 461 files; `tests/*_browser.py` and
-    the fast suite below. `tests/test_gui_background.py` gained 8 tests and lost 1 (a rename);
+    vitest 867 passed (47 files), svelte-check 0 errors in 461 files; every `tests/*_browser.py`
+    174 passed; fast suite 15218 passed, 433 skipped, 32 xfailed (playwright installed, so the
+    browser files run in it). The added tests cost 4.80 s in that run, 4.26 s of it the browser
+    case; the eight server tests 0.55 s. `tests/test_gui_background.py` gained 8 tests and lost 1 (a rename);
     `tests/test_gui_layout_browser.py` gained 1, which skips in CI (no playwright there).
     `tests.reader_output` exit 0, unchanged. ruff clean; vale 0 errors.
   - *Generality.* Not dispatched: `_audit.py` untouched, and the release and free follow from
