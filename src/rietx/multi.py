@@ -52,7 +52,6 @@ from .optimize.least_squares import (
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
-    covariance_jacobian,
     rechart_outcome,
     run_multi_least_squares,
     stationary_columns,
@@ -198,12 +197,13 @@ from .strategy.staged import (
     bound_findings,
     check_adp_positive_definite,
     check_biso_negative,
-    check_discarded_directions,
     check_hump_width,
+    check_peak_width_positive,
     check_resolution_positive,
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    outcome_discarded_directions,
     pressed_tied_paths,
     resolve_plan,
     tied_bound_findings,
@@ -296,6 +296,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "histogram's scales"),
     "_qpa_unavailable_diagnostics": (
         (HISTOGRAM,), "through _quantify_phases, as above"),
+    "_qpa_intensity_factor_diagnostics": (
+        (HISTOGRAM,), "through _quantify_phases, as above"),
     # -- both: a converter ----------------------------------------------------
     "_guard_diagnostics": (
         (HISTOGRAM, FIT), "a GuardReport converter: background absorption and "
@@ -349,6 +351,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "per histogram and its displacement parameters shared (WP-1534)"),
     "_size_sharing_diagnostics": (
         (FIT,), "joint-only: what the sharing map did to a size across λ"),
+    "_peak_equation_sharing_diagnostics": (
+        (FIT,), "joint-only (WP-2107): a peak equation's coefficient shared "
+                "across patterns of different λ"),
     "_unreached_histogram_diagnostics": (
         (FIT,), "joint-only, and the plan's (WP-1414): a stage's reach is "
                 "decided before any histogram is compiled"),
@@ -472,10 +477,15 @@ GUARD_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (SPECIMEN,), "one coefficient set, sampled at each histogram's own ψ: "
                      "a phase is named once, from the first histogram where "
                      "P leaves the physical set (WP-1960)"),
+    "nonpositive_peak_width": (
+        (SPECIMEN,), "a phase's width equations, evaluated at each histogram's "
+                     "own reflections and angles: an equation is named once, "
+                     "from the first histogram where its width goes below zero "
+                     "(WP-2107)"),
     "high_correlations": ((FIT,), "one correlation matrix, of the joint solve"),
     "flat_directions": ((FIT,), "read off the same matrix, beside the correlation"),
     "discarded_directions": ((FIT,), "the joint normal matrix's own cut, read "
-                                     "off the joint Jacobian"),
+                                     "off the joint solve's covariance"),
     "at_bounds": ((FIT,), "the joint θ's bounds"),
 }
 
@@ -3018,6 +3028,8 @@ class MultiHistogramRefinement:
         report.negative_biso = _specimen_once(mt, models, check_biso_negative)
         report.nonpositive_strain = _stephens_once(mt, models)
         report.nonpositive_texture = _texture_once(mt, models)
+        report.nonpositive_peak_width = _first_per_path(
+            mt, models, check_peak_width_positive)
         if outcome.correlation is not None and len(free) > 1:
             # the single fit's loop (``check_guards``' rule), on the joint
             # correlation matrix
@@ -3027,14 +3039,14 @@ class MultiHistogramRefinement:
         if outcome.jac is not None and len(free) > 1:
             try:
                 # the matrix the covariance cut (``check_guards``' rule)
-                report.discarded_directions = check_discarded_directions(
-                    covariance_jacobian(outcome, free), free,
-                    report.flat_directions)
+                report.discarded_directions = outcome_discarded_directions(
+                    outcome, free, report.flat_directions)
             except np.linalg.LinAlgError:
                 if getattr(outcome, "covariance_error", None) is None:
                     raise
         report.at_bounds = at_bounds
-        return _guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+        return (_guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+                + _peak_equation_sharing_diagnostics(mt))
 
 
 def _refuse_joint_mode(mtable, mode: str) -> None:
@@ -3275,6 +3287,16 @@ def _texture_once(mtable, models) -> list[GuardFinding]:
     return list(seen.values())
 
 
+def _first_per_path(mtable, models, check) -> list[GuardFinding]:
+    """``check(table, model)`` on every histogram, one finding per path tuple:
+    :func:`_texture_once`'s shape for a guard that reads the compile."""
+    seen: dict[tuple[str, ...], GuardFinding] = {}
+    for table, model in zip(mtable.tables, models, strict=True):
+        for finding in check(table, model):
+            seen.setdefault(tuple(finding.paths), finding)
+    return list(seen.values())
+
+
 def _size_sharing_diagnostics(mtable) -> list[Diagnostic]:
     """``SIZE_NORMALISED_ACROSS_WAVELENGTHS`` — what a joint fit did to a size.
 
@@ -3325,6 +3347,69 @@ def _size_sharing_diagnostics(mtable) -> list[Diagnostic]:
                 "λ. To refine an independent size per histogram, use "
                 'SharingMap(per_histogram=["phases.*.lor_size", '
                 '"phases.*.gauss_size"]).'),
+        ))
+    return out
+
+
+def _peak_equation_sharing_diagnostics(mtable) -> list[Diagnostic]:
+    """``PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS`` — a peak equation's
+    coefficient is one number in degrees across patterns of different λ
+    (WP-2107, the maintainer's ruling of 2026-11-20, option a).
+
+    A peak equation's width and position targets are in degrees 2θ.  A
+    size-like term, (180/π)·K·λ/(L·cosθ), needs coefficients in the ratio of
+    the wavelengths for one specimen, while a strain-like term, 2ε·tanθ,
+    reads no λ.  The package cannot tell which one the user wrote, so where
+    :data:`~rietx.params.multi.SIZE_LAMBDA_POWER` converts the built-in size
+    terms, this one warns.  TOPAS's practice is to write such a term per
+    pattern, or with its ``Lam`` in the expression.
+
+    Fires once per equation whose coefficients are shared (one column of the
+    joint fit, :func:`~rietx.params.multi.row_shared`, and no parametric
+    equation's target), whose target carries degrees, in a joint fit whose
+    patterns declare at least two different wavelengths.  Silent with one
+    wavelength, with a source that declares no line, and for an
+    ``intensity_factor``, a pure number.
+    """
+    lams = [_longest_wavelength(ins) for ins in mtable.instruments]
+    if any(lam is None for lam in lams) or len(set(lams)) < 2:
+        return []
+    driven = set().union(*(mtable.parametric_targets(h) for h in range(len(lams))))
+    shared: dict[str, list[str]] = {}
+    for e in mtable.tables[0].entries:
+        m = re.fullmatch(r"((?:phases\.\d+|instrument)\.peak_equations\.\d+)\.(\w+)",
+                         e.path)
+        if m and _row_shared(mtable, e) and e.path not in driven:
+            shared.setdefault(m.group(1), []).append(m.group(2))
+    out: list[Diagnostic] = []
+    for prefix, names in shared.items():
+        base, _, index = prefix.rpartition(".peak_equations.")
+        if base == "instrument":
+            eq = mtable.instruments[0].peak_equations[int(index)]
+            owner = "The instrument"
+        else:
+            phase = mtable.structures[0].phases[int(base.split(".")[1])]
+            eq = phase.peak_equations[int(index)]
+            owner = f"Phase {base.split('.')[1]} ({phase.name})"
+        if eq.target == "intensity_factor":
+            continue
+        unit = "deg²" if eq.target == "gauss_fwhm_squared" else "degrees"
+        noun = "its coefficient" if len(names) == 1 else "its coefficients"
+        out.append(Diagnostic(
+            level="warning", code="PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS",
+            where=[prefix], value=float(max(lams) / min(lams)),
+            message=(
+                f"{owner}'s peak equation {eq.target} = {eq.expression} "
+                f"({prefix}) shares {noun} {', '.join(names)} in {unit} across "
+                f"patterns at λ = {min(lams):.5g}-{max(lams):.5g} Å. The right "
+                f"value in {unit} can differ with wavelength: a size-like term "
+                "scales with λ, and a strain-like one does not."),
+            suggestion=(
+                "For a wavelength-dependent term, give each pattern its own "
+                "coefficient: SharingMap(per_histogram=["
+                + ", ".join(f'"{prefix}.{n}"' for n in names) + "]). "
+                "A term that reads no λ, such as a strain's tan(theta), can "
+                "stay shared."),
         ))
     return out
 
