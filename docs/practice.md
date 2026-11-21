@@ -1481,6 +1481,96 @@ pinned to one thread in both. So rietx keeps its default in a pool and does not 
 `OMP_NUM_THREADS`: under loky, or under the BLAS pinning `batch-operating.md` 9c.31 advises,
 that variable is 1, the setting measured slower.
 
+## What a refined parameter is: the physical quantity or a model coefficient
+
+Surveyed 2026-11-21 for the sample-broadening parametrisation question, one session, all seven
+programs. The question is whether a program refines the quantity a scientist reports (a
+crystallite size, a microstrain, Uiso, a cell edge) or a coefficient that enters the calculated
+pattern linearly, converting to the reported quantity after the fit. § Peak-width limits holds
+each program's limits on widths, and § Instrument and specimen widths refined together holds the
+twin pairs and each width formula. This section does not repeat them.
+
+rietx refines sample broadening as coefficients. `gauss_size` and `gauss_strain` are Gaussian
+variance terms in deg², and `lor_size` and `lor_strain` are Lorentzian FWHM terms in deg. All four
+start at 0 with a bound at 0. `model/microstructure.py` converts each one to a size or a strain
+after the fit, with a one-parameter esd (checked (source)).
+
+One fact governs how the start value matters. Gaussian variances add under convolution, and
+Lorentzian FWHMs add. A Gaussian term written as a FWHM, or as a size or a strain, therefore enters
+the variance squared. Its first derivative at zero is zero, so a fit started there cannot leave
+it. A Lorentzian term written as a FWHM, a strain or an inverse size enters linearly and has no
+such point (inferred, from the convolution rules).
+
+The mark after each cell says how it was read. "Manual" for TOPAS is the online Technical
+Reference, fetched 2026-11-21. The page heads itself "Version X". The RIETAN-FP rows are
+paraphrased, since its licence forbids copying.
+
+### A. Sample broadening
+
+| Program | Refined variable and unit | How it enters the width | Start value and bounds | Reported size or strain, and its esd |
+|---|---|---|---|---|
+| rietx | four coefficients, deg² (Gaussian) and deg (Lorentzian) | linear in the Gaussian variance, linear in the Lorentzian FWHM | 0, bound at 0 | converted after the fit; esd from one variance (checked (source)) |
+| GSAS-II 5.8.4 | crystallite size in µm, microstrain in units of 10⁻⁶, and a mixing coefficient for each | FWHM ∝ 1/size and ∝ strain; a fraction mx goes to the Lorentzian width linearly and 1 − mx to the Gaussian variance squared (`GSASIIstrMath.py:3228-3333`, checked (source)) | size 1 µm, strain 1000, mx 1 (all Lorentzian), refine flags off, no bounds (`GSASIImath.py:6295-6298`, checked (source)) | the refined variable is the reported one; its esd is read off the refined variable (`GSASIIstrIO.py:3530-3549`, checked (source)) |
+| FullProf 8.20 | coefficients: IG (Gaussian size), Y (Lorentzian size), U (Gaussian strain), X (Lorentzian strain), in the instrument's units | IG/cos²θ and U·tan²θ linear in the Gaussian FWHM²; Y/cosθ and X·tanθ linear in the Lorentzian FWHM (manual p. 21, p. 51, checked (manual)) | the user's `.pcr` values; no bounds (§ Peak-width limits) | the `.mic` file lists an apparent size and strain per reflection, written only with a resolution file (manual pp. 21, 25). Its "standard deviation" is the spread over directions, a measure of anisotropy and not an esd (manual p. 25, checked (manual)) |
+| TOPAS v9 | `CS_L` and `CS_G`: crystallite size in nm. `Strain_L` and `Strain_G`: a coefficient c | FWHM = 0.1·(180/π)·λ/(CS·cosθ) and FWHM = c·tanθ, each a separate convolution (§22.1 macro list, checked (manual)). The Gaussian ones therefore enter the variance squared (inferred) | the start is the macro's argument. `CS_L` carries limits of 0.3 and 10 000 nm (§2.18, checked (manual)). Strain limits not checked | strain ε₀ comes from the macro `e0_from_Strain`, the Voigt FWHM of the two strain terms (§20.9.5, checked (manual)). A dependent parameter's esd is GOF·J·Cov·Jᵀ over the full covariance (§2.17, checked (manual)) |
+| RIETAN-FP 3.12 | coefficients U, V, W, P (Gaussian) and X, Y (Lorentzian), plus anisotropic ones | linear in the Gaussian variance; linear in the Lorentzian FWHM (manual p. 35, eqs 3.69-3.71, checked (manual)) | not checked | size and strain are computed by hand after the fit, subtracting the instrument's U and Y measured on a standard (manual pp. 106-107, checked (manual)). The manual offers Williamson-Hall and Halder-Wagner plots of integral breadths as the better route (p. 107). Esd not checked |
+| BGMN 4.2.23 | B1 in nm⁻¹ (a Lorentzian width that goes as 1/size), k1 (size-distribution shape, 0 to 1), k2 (the squared rms microstrain) | B1 linear in a Lorentzian width; k2·(1/d)² linear in a squared width (manual pp. 20, 101, 110, checked (manual)) | the manual's examples start at 0 with a lower bound at 0 (`PARAM=B1=0_0`, p. 20, checked (manual)) | `GrainSize(h,k,l)` converts B1 and k1 to a volume-weighted diameter (eq. 5.29, p. 41) and prints it with an esd (p. 81, checked (manual)). How the esd is formed is not stated (not checked) |
+| MAUD 3.07 | crystallite size in Å and r.m.s. microstrain | Delft model: Lorentzian breadth ∝ 1/size, Gaussian breadth ∝ strain (`SizeStrainDelf.java`, checked (source)). The Gaussian part therefore enters the variance squared (inferred) | size 1000 Å, limits 50 and 5000; strain 0.0006, limits 0 and 0.005 (`SizeStrainSymIso.java:88-99`, checked (source)). Neither limit is enforced (§ Peak-width limits) | the refined variable is the reported one (inferred) |
+| EasyDiffraction 0.21.1 / cryspy 0.13.0 | EasyDiffraction exposes no constant-wavelength sample term (§ Instrument and specimen widths). cryspy's phase carries `igsize`, `u`, `v`, `w`, `x`, `y`, coefficients like FullProf's | added to the instrument's: linear in H_G², linear in H_L (`cryspy/C_item_loop_classes/cl_1_phase.py:25`, `A_functions_base/powder_diffraction_const_wavelength.py:114-122`, checked (source)) | not set by default (checked (source)); H_G² floored at machine ε | no conversion (inferred) |
+
+Anisotropic broadening follows each program's isotropic choice. GSAS-II refines an ellipsoidal or
+uniaxial size in µm and Stephens S_HKL terms under a square root. Its Stephens terms start at 0.01
+each, not at 0 (`GSASIImath.py:6297`, checked (source)). FullProf adds DST² to the Gaussian FWHM²
+and DST to the Lorentzian FWHM, and its size models refine a coefficient SZ (manual pp. 21, 27-28,
+checked (manual)). RIETAN-FP adds coefficients Xe, Ye, σa and γa (manual p. 35, checked
+(manual)). BGMN puts a quadratic form, or the square root of one, on B1 or k2 (`ANISOLIN`,
+`ANISOSQR`, manual p. 100, checked (manual)).
+
+**The practice.** The programs split. FullProf, RIETAN-FP, BGMN and cryspy refine coefficients that
+enter the width linearly, and leave the size and strain to a conversion. GSAS-II and MAUD refine
+the physical size and strain. TOPAS refines a physical size and a strain coefficient. Every
+program that refines a physical size enters it as 1/size and starts it large, near no broadening.
+GSAS-II starts at 1 µm, MAUD at 1000 Å, and TOPAS bounds the size at 10 000 nm. The two that refine
+a physical strain start it away from zero, GSAS-II at 0.1 % and MAUD at 0.06 %. Their Gaussian
+part enters the variance squared, so a start at zero would not move. Among the defaults read, no
+term that starts at zero enters the variance squared. TOPAS's Gaussian terms start where the user
+puts them. rietx's coefficients, linear and starting at 0, follow FullProf, RIETAN-FP and BGMN.
+TOPAS propagates a derived quantity's esd through the full covariance. GSAS-II needs no
+propagation for size and strain, since it refines them. FullProf's per-reflection table carries no
+esd. BGMN prints one without saying how it is formed.
+
+### B. Other parameters
+
+Each cell says whether the program refines the physical quantity (**phys**) or a coefficient
+(**coef**), and how it enters.
+
+| Family | rietx | GSAS-II 5.8.4 | FullProf 8.20 | TOPAS v9 | RIETAN-FP 3.12 | BGMN 4.2.23 | MAUD 3.07 | EasyDiffraction / cryspy |
+|---|---|---|---|---|---|---|---|---|
+| Cell | phys a, b, c, α, β, γ (checked (source)) | coef: reciprocal metric terms A0-A5 and strain terms D11-D23 (`GSASIIlattice.py:144`, `GSASIIstrMath.py:2933`, checked (source)) | phys a, b, c, α, β, γ in the `.pcr` (manual p. 107, checked (manual)); converted to an internal metric for limits (§ Limits a control file declares) | phys a, b, c, al, be, ga, with default limits (§2.18, checked (manual)) | phys (recall) | phys, in nm (recall) | phys `_cell_length_a` etc. (`Phase.java:64`, checked (source)) | phys (recall) |
+| Displacement | phys Biso in Å²; aniso U^ij in Å² (checked (source)) | phys Uiso and U_ij in Å² (`GSASIIstrMath.py:1120, 1274`, checked (source)) | phys Biso in Å² (manual p. 102); aniso β_ij (manual p. 36, checked (manual)) | phys `beq` in Å², limits −10 to 20 about the value; `u11`-`u23` (§2.18, checked (manual)) | phys B; aniso coef β_ij, dimensionless, refined and printed as such, with U_ij advised for papers (manual p. 24, checked (manual)) | phys `TDS`, in nm² by default (manual p. 20, checked (manual)) | phys B_iso and aniso B_ij (`AtomSite.java:65-67`, checked (source)) | phys Biso or Uiso, the user's choice (`atom_sites/enums.py:13-14`, checked (source)) |
+| Scale | linear, bound at 0 (checked (source)) | linear, floored at 1e-12 (`GSASIIstrMath.py:3178-3180`, checked (source)) | linear (manual p. 33, checked (manual)) | linear, minimum 1e-11 (§2.18, checked (manual)) | linear (recall) | `GEWICHT`, linear, bound at 0; carries the texture too (manual pp. 20, 94, checked (manual)) | volume fraction (recall) | linear (cryspy `cl_1_phase.py:25`, checked (source)) |
+| Weight fraction esd | full covariance (`qpa.weight_fractions`, per CLAUDE.md) | full covariance, J·Cov·Jᵀ (`GSASIIstrMath.py:5205-5268`, checked (source)) | formula on p. 31; esd method not checked | full covariance through a dependent parameter (§2.17, inferred) | not checked | not printed by default; a GOAL gives one (manual p. 109, checked (manual)) | not checked | not checked |
+| Occupancy | phys, bound at 0 (checked (source)) | phys site fraction (recall) | coef: chemical occupancy × site multiplicity (manual p. 102, checked (manual)) | phys, limits 0 to 2·value + 1 (§2.18, checked (manual)) | phys (recall) | not checked | phys `_atom_site_occupancy` (`AtomSite.java:63`, checked (source)) | phys (recall) |
+| Preferred orientation | phys March-Dollase r, with a floor above its pole (checked (source)) | phys March-Dollase ratio, default 1.0, or spherical-harmonic coefficients (`GSASIImath.py:6293`, `GSASIIstrMath.py:3066-3079`, checked (source)) | March (Nor = 1) or exponential (Nor = 0) parameters G1, G2 (manual pp. 54-55, checked (manual)) | March parameter, or spherical-harmonic coefficients (§22.1, checked (manual)) | March-Dollase r (manual pp. 30-31, checked (manual)) | spherical harmonics inside `GEWICHT`; the manual calls March unsuitable (manual pp. 12, 28, checked (manual)) | March-Dollase coefficient, default 1 (`MarchDollaseComponent.java:86`, checked (source)); harmonic and WIMV models too (recall) | not checked |
+| Extinction | coef: Sabine D² in µm², bound at 0, opt-in (checked (source)) | coef: one coefficient multiplying x linearly, default 0 (`GSASIIstrMath.py:3135`, checked (source)) | coef `Extinc` (manual p. 110, checked (manual)) | a user `prm` in `scale_pks`, linear inside 1/√(1 + x) (Extinction entry, checked (manual)) | not checked | not checked | coef `_refine_ls_extinction_coef`, default 1 (`ExtinctionSabineModel.java:40, 81`, checked (source)) | not checked |
+| Absorption | phys µR or µt, not refinable (CLAUDE.md, checked (source)) | phys µR, refinable (`GSASIIstrMath.py:3105`, checked (source)) | not checked | phys µ in the `Absorption` macro (recall) | not checked | not checked | not checked | not checked |
+| Zero and displacement | phys: zero in deg, displacement and transparency in mm (checked (source)) | phys: zero in deg, `Shift` in µm, transparency in 1/µeff cm (`GSASIIstrMath.py:3560-3567`, checked (source)) | coef: `SyCos` = −2s/R and `SySin` in deg; the user computes s (manual pp. 56-57, checked (manual)) | phys: zero error, specimen displacement (§22.1.7, checked (manual)); units not checked | coef: Z + Ds·cosθ + Ts·sin2θ (manual p. 40, eq. 3.94, checked (manual)) | coef EPS1-EPS3 (manual pp. 24, 39, checked (manual)); units not checked | not checked | coef `offset_sysin` for transparency (`calculators/cryspy.py:840`, checked (source)) |
+| Background | coef: Chebyshev or P-spline (checked (source)) | coef: Chebyshev and others (`GSASIIpwd.py:978-1023`, checked (source)) | coef (recall) | coef (recall) | coef: Legendre polynomial (recall) | coef (recall) | coef (recall) | coef (recall) |
+| Instrument U V W X Y | coef: variance in deg², FWHM in deg | coef: variance in centideg², FWHM in centideg (`GSASIIstrMath.py:3891-3904`, `GSASIIpwd.py:818`, checked (source)) | coef: FWHM² and FWHM (manual p. 21, checked (manual)) | coef: TCHZ u, v, w, z, x, y (§7.2, checked (manual)) | coef: variance in deg², FWHM in deg (manual p. 106, checked (manual)) | none; ray-traced (§ Instrument and specimen widths) | coef: FWHM² polynomial in tanθ (`InstrumentBroadeningPVCaglioti.java:577-580`, checked (source)) | coef: deg² and deg (`peak/cwl_mixins.py`, checked (source)) |
+
+**The practice.** Structural quantities are refined as the physical quantity in every program.
+Cell edges and angles, Biso or Uiso, occupancies and March-Dollase ratios refine as reported, with
+two exceptions. GSAS-II refines the reciprocal metric tensor, and RIETAN-FP refines dimensionless
+β_ij. Both convert for the report. GSAS-II's cell esds go through the covariance
+(`GSASIIlattice.py:363`, checked (source)). Every program refines a scale linearly, with a floor at
+or near zero; none refines log scale. Every program refines instrument widths and background as
+coefficients. Positional aberrations divide. GSAS-II and TOPAS refine a displacement in a length
+unit, and FullProf, RIETAN-FP and BGMN refine the coefficient of an angular term. Positional
+aberrations and sample broadening (table A) are the two families where practice splits. rietx matches the majority in every
+row but one. It refines a displacement and a transparency in mm, as GSAS-II and TOPAS do, while
+four programs refine angular coefficients. Its physical cell and Biso follow TOPAS, FullProf and
+MAUD.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
