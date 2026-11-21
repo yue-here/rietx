@@ -102,6 +102,7 @@ def _components(model: CompiledModel, values: dict[str, float], ip: int
     line.  Recomputed here rather than read off ``phase_peaks``, which returns
     only the *combined* pair.
     """
+    from ..model.peak_equations import WIDTH_TARGETS
     from ..model.profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
 
     cp = model.phases[ip]
@@ -123,13 +124,18 @@ def _components(model: CompiledModel, values: dict[str, float], ip: int
     for lam in model.line_wavelengths:
         with np.errstate(invalid="ignore"):
             theta = np.degrees(np.arcsin(np.clip(lam / (2.0 * d), -1.0, 1.0)))
+        # a phase's width equations add where the forward adds them (WP-2107)
+        extra_g2 = extra_l = None
+        if cp.peq is not None and cp.peq.has(*WIDTH_TARGETS):
+            extra_g2, extra_l = model._width_terms(ip, values, 2.0 * theta, d)
         gam_g.append(np.asarray(gaussian_fwhm(
             theta, values["instrument.profile.u"], values["instrument.profile.v"],
             values["instrument.profile.w"], values[f"phases.{ip}.gauss_size"],
-            values[f"phases.{ip}.gauss_strain"])))
-        gam_l.append(np.asarray(lorentzian_fwhm(
+            values[f"phases.{ip}.gauss_strain"], extra_squared=extra_g2)))
+        lor = np.asarray(lorentzian_fwhm(
             theta, values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-            values["instrument.profile.y"] + iso, aniso)))
+            values["instrument.profile.y"] + iso, aniso))
+        gam_l.append(lor if extra_l is None else lor + np.asarray(extra_l))
         tan_theta.append(np.tan(np.radians(theta)))
     return d, np.array(gam_g), np.array(gam_l), np.array(tan_theta), strain_total
 
