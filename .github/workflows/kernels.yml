@@ -48,6 +48,9 @@ name: Kernels
 # solve engine's three kernels (1.4.0), which tests/test_solve_kernels.py holds
 # to numpy oracles written in the test, and the fogged rasteriser (1.5.0),
 # whose cases test_raster_kernels.py skips without it.
+# On the macOS x86_64 runner numpy and SciPy are swapped for the same
+# versions built on OpenBLAS before the checks: under Accelerate the numpy
+# path does not reproduce itself there (WP-1987).
 # The numpy path itself lives in
 # src/rietx/model/forward.py.  ci.yml's fast suite tests a change there
 # against the published wheel, so it is not a trigger here.
@@ -146,6 +149,36 @@ jobs:
         # A path on the command line is a direct requirement, so uv takes the
         # file even where the index holds the same version for rietx's pin.
         run: uv pip install --python "$PY" -e ".[dev]" dist/*.whl
+      - name: numpy and SciPy on OpenBLAS, the macOS x86_64 runner only
+        # WP-1987: on this runner the numpy path does not reproduce itself
+        # under Accelerate, the BLAS numpy's and SciPy's macOS 14 wheels are
+        # built on, with one Accelerate thread or several (fork run
+        # 43874967910).  The same versions' pre-macOS-14 wheels (for python
+        # 3.11 numpy's macosx_10_9 and SciPy's macosx_10_14) are built on
+        # OpenBLAS, and there five fits of each case came out bit-identical.
+        # So the gate holds the twins to the numpy path here as it does on the
+        # other four platforms.  The bench reads the BLAS
+        # (bench_aot_kernels.NONDETERMINISTIC), so a swap that did not take
+        # would turn that check back into a report; the assert fails instead.
+        # No source builds: a version with no such wheel fails here at once,
+        # naming the package, rather than building against whatever BLAS the
+        # runner image holds.
+        if: matrix.platform == 'macos-x86_64'
+        run: |
+          V=$("$PY" -c "import numpy, scipy; print(f'numpy=={numpy.__version__} scipy=={scipy.__version__}')")
+          echo "$V"
+          MACOSX_DEPLOYMENT_TARGET=13.0 uv pip install --python "$PY" \
+            --python-platform x86_64-apple-darwin \
+            --reinstall-package numpy --reinstall-package scipy \
+            --only-binary numpy --only-binary scipy $V
+          "$PY" - <<'PY'
+          import numpy, scipy
+
+          blas = [lib.show_config(mode="dicts")["Build Dependencies"]["blas"]["name"]
+                  for lib in (numpy, scipy)]
+          print("BLAS numpy, SciPy:", blas)
+          assert all("openblas" in b.lower() for b in blas), blas
+          PY
       - name: The wheel imports, and is this run's
         # before the tests, which skip at module level without it; a wheel
         # from the index has no file URL in its direct_url.json
