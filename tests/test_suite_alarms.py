@@ -25,6 +25,8 @@ from rietx.schemas.results import _NAMED_PURPOSES
 from rietx.viz.compare import STANDARD_BY_KEY
 from tests import suite_alarms
 
+FLAT_TRIPLE = suite_alarms.FLAT_TRIPLE
+
 
 def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
     pin = suite_alarms.load_pin()
@@ -68,6 +70,35 @@ def test_the_differences_name_the_code_and_the_standard_it_moved_on():
     ]
 
 
+def test_only_the_findings_rounding_decides_leave_the_table():
+    """WP-2036: fluorite's floor and discarded-direction findings on the flat
+    width triple, and zincite's floor finding there, depend on a 1e-14 nudge
+    to the start, so the pin leaves them out.  The same codes elsewhere, and
+    other codes on the triple, stay in."""
+    from types import SimpleNamespace
+
+    from rietx.schemas.common import Diagnostic
+
+    def diag(code, *where):
+        return Diagnostic(level="warning", code=code, message=code, where=list(where))
+
+    size, strain, w = FLAT_TRIPLE
+    fluorite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w),
+                diag("FLOOR_HIT", "phases.0.atoms.0.biso"), diag("HIGH_CORRELATION", size, w)]
+    zincite = [diag("FLOOR_HIT", strain), diag("COVARIANCE_DIRECTION_DISCARDED", size, strain, w)]
+    corundum = [diag("FLOOR_HIT", strain)]
+    table = suite_alarms.firing_table({key: SimpleNamespace(diagnostics=d) for key, d in
+                                       (("fluorite", fluorite), ("zincite", zincite),
+                                        ("corundum", corundum))})
+    assert table["standards"] == {
+        "fluorite": {"FLOOR_HIT": "warning", "HIGH_CORRELATION": "warning"},
+        "zincite": {"COVARIANCE_DIRECTION_DISCARDED": "warning"},
+        "corundum": {"FLOOR_HIT": "warning"},
+    }
+    assert table["n_results"]["FLOOR_HIT"] == 2
+    assert set(suite_alarms.ROUNDING) <= set(STANDARD_BY_KEY)
+
+
 @pytest.mark.slow
 @pytest.mark.xdist_group("brucite-nudge")
 def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
@@ -91,11 +122,6 @@ def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
         seen.append(sorted((d.code, tuple(d.where)) for d in fit.diagnostics
                            if d.level == "warning"))
     assert seen[0] == seen[1] == seen[2]
-
-
-#: The exactly degenerate width triple of the round-robin protocol
-#: (1/cos²θ = 1 + tan²θ): Gaussian size, Gaussian strain and Caglioti W.
-FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profile.w")
 
 
 @pytest.mark.slow
