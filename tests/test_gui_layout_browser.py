@@ -1760,6 +1760,57 @@ def test_the_background_graph_s_edits_leave_no_stale_hold_or_pending_edit(browse
         httpd.shutdown()
 
 
+def test_today_s_terms_box_leaves_no_stale_hold(browser, tmp_path_factory):
+    """WP-2229 case 1, on today's page: its Model tab's Terms box sends the
+    instrument alone, and the server releases the hold on a term the cut
+    removes and frees the terms the extension adds. Before, the box sent no
+    arms and built an added term fixed, so the hold came back with the term.
+    Typed and committed with the keyboard, as a person does. A project of its
+    own, since the edits are written."""
+    httpd, client = _serve(tmp_path_factory, "today-terms")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        status, body = client.patch("/api/params", {"hold": {"instrument.background.c2": True}})
+        assert status == 200, body
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errors: list[str] = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        page.goto(url)
+        page.locator("nav.tabs").get_by_role("button", name="Model", exact=True).click()
+
+        def rows():
+            return {r["path"]: r for r in client.get("/api/params")[1]["parameters"]
+                    if r["path"].startswith("instrument.background.c")}
+
+        def terms(n: int) -> None:
+            box = page.locator("label.inline", has_text="terms").locator("input")
+            box.click()
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.type(str(n))
+            page.keyboard.press("Enter")
+            for _ in range(100):
+                if len(rows()) == n:
+                    return
+                page.wait_for_timeout(50)
+            raise AssertionError(f"the background never reached {n} terms: {sorted(rows())}")
+
+        before = len(rows())
+        assert rows()["instrument.background.c2"]["held"]
+        terms(2)
+        assert sorted(rows()) == ["instrument.background.c0", "instrument.background.c1"]
+        terms(before + 1)
+        back = rows()
+        assert not back["instrument.background.c2"]["held"], back["instrument.background.c2"]
+        assert all(back[f"instrument.background.c{k}"]["vary"]
+                   for k in range(2, before + 1)), back
+        assert not errors, errors
+        page.close()
+    finally:
+        httpd.shutdown()
+
+
 #: A five-stage plan, as acceptance row 8 asks, on the synthetic project.
 FIVE_STAGES = [
     {"name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5},
