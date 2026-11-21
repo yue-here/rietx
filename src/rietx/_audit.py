@@ -2950,6 +2950,23 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.trial_error.DOMINANT_ZONE_PROBE_LADDER", "constant", value=(3, 5, 9)),
     Row("rietx.indexing.trial_error.DOMINANT_ZONE_PROBE_SECONDS", "constant", value=30.0),
     Row("rietx.indexing.trial_error.MAX_ASSIGN_PER_BASE", "constant", value=4000000),
+    Row("rietx.indexing.trial_error.MAX_SEEN", "constant", tier=3,
+        evidence="reaching it ends the unit as a size cap does, reported as "
+                 "INDEX_SEARCH_INCOMPLETE 'outgrew a size cap'; finished units replay to "
+                 "their digests (tests.unit_replay); "
+                 "tests/test_indexing_engines.py::test_a_trial_error_unit_stops_at_its_seen_cap",
+        grounds="The cap is rietx's own choice, a memory bound on a laptop: on #1376's list "
+                "the process peaked at about 1.7 GB at the cap, of which the solution keys "
+                "are about 1.4 GB (the same run without them sat at 0.25-0.30 GB). The "
+                "largest finished trial_error units measured hold 38 076 (the acceptance "
+                "suite) and 254 344 (bethanechol set Ab, manual mode), so it sits about 16 "
+                "times above them. #1376's unit would hold about 12 M at its finish and is "
+                "reported incomplete instead; nothing is ranked by it. The cap is shared "
+                "across the centring loop, so a unit capped in its first centring never "
+                "searches the later ones (C for monoclinic; C, I and F for orthorhombic), "
+                "and a centred truth cannot be among its candidates.",
+        approved="2026-11-17",
+        value=4000000),
     Row("rietx.indexing.trial_error.SOLVE_CHUNK", "constant", value=200000),
     Row("rietx.indexing.workflow.ABSENT_SIGMA", "constant", value=3.0),
     Row("rietx.indexing.workflow.ABSENT_WINDOW_FWHM", "constant", value=0.5),

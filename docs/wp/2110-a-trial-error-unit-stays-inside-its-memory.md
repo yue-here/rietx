@@ -1,6 +1,6 @@
 # WP-2110 — A trial_error unit stays inside its memory under a raised budget
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — every task done in PR #1586; `MAX_SEEN`'s tier-3 audit row waits on the maintainer's dated approval, and with it whether 4 000 000 is the bound
 Track: A long run is not one fit
 Depends on: —
 Priority: P2 2026-11-05 — a run killed for memory returns nothing, and the skill's own advice for a unit cut by time (raise `budget_seconds`) is the route to it; the default 30 s slice cuts it short since #1244, which is why it is not P1
@@ -122,24 +122,24 @@ on …"), and returns every candidate it had already built.
 
 ## Tasks
 
-- [ ] A repro for the case, on `tests/repro_780.py`'s pattern (a
+- [x] A repro for the case, on `tests/repro_780.py`'s pattern (a
   `--case`/`--engines trial_error` arm there, or `tests/repro_1376.py`
   importing its `memory_bytes` and `cpu_clock`). It builds the list from
   `cod_1567181.cif`'s cell at Cu Kα1 over 5–34° 2θ, searches monoclinic only,
   with a raised `budget_seconds`, and prints the wall, the peak footprint,
   the unit's clock and completeness, candidate 0, and the sampled curve on
   `--trace`. Record the line count it builds against the reporter's 49.
-- [ ] Profile one unit on main under a raised budget (§ Context, *How to
+- [x] Profile one unit on main under a raised budget (§ Context, *How to
   profile*). Name the allocation that grows, its size as a function of
   bases walked and solutions scored, and whether it is released. If no
   allocation grows on main, say so with the curve, and close the WP with a
   test pinning the bound that holds.
-- [ ] The bound: a named constant on what the profile names. Reaching it
+- [x] The bound: a named constant on what the profile names. Reaching it
   ends the unit `complete = False` through the existing `capped` path, keeps
   `found`, and records the count in `stats`. Add the audit row (tier 3,
   `grounds`, approval asked in the PR). Finished units replay to their
   digests (`tests.unit_replay`).
-- [ ] Tests in `tests/test_indexing_engines.py`, beside
+- [x] Tests in `tests/test_indexing_engines.py`, beside
   `test_a_dichotomy_unit_stops_at_its_harvest_cap`. On a small synthetic case
   whose uncapped unit finishes with at least two candidates (assert it, so the
   test cannot go quiet), monkeypatch the constant low and assert:
@@ -152,10 +152,10 @@ on …"), and returns every candidate it had already built.
   the bounded structure's entries, a deterministic count with an exact
   margin, not an RSS figure, which would be a load sensor. Make each new test
   fail once on purpose (`tests/CLAUDE.md` § Guards that go quiet).
-- [ ] `tests/test_acceptance_indexing.py` before closing
+- [x] `tests/test_acceptance_indexing.py` before closing
   (`src/rietx/indexing/CLAUDE.md`: an engine change is not closed on the fast
   indexing tests alone).
-- [ ] Skill: likely none. The `INDEX_SEARCH_INCOMPLETE` row already limits
+- [x] Skill: likely none. The `INDEX_SEARCH_INCOMPLETE` row already limits
   "raise `budget_seconds`" to the "within … s per system" message, and a cap
   reads "outgrew a size cap". Confirm that, and say so in the handover.
 
@@ -183,6 +183,116 @@ on …"), and returns every candidate it had already built.
   #1373); WP-1519 (`tests.unit_replay`).
 
 ## Handover log
+
+- **2026-11-16** — A trial_error unit's memory now has a ceiling. The profile
+  found what grows: the set of solutions the unit has already scored, about
+  0.4 KB an entry and never pruned, while the candidates it keeps stay in the
+  hundreds. A unit that reaches 4 000 000 entries (about 1.7 GB) now stops,
+  says it outgrew a size cap, and returns every candidate it had built.
+  Searches that finish today are untouched. #1376's list still finds its
+  true cell at rank 1 before the cap. The number is a proposal: the
+  maintainer approves it or picks another, and the audit test stays red
+  until he dates the row. PR #1586.
+  - *Done.* `tests/repro_1376.py` (item 1): the list from
+    `cod_1567181.cif` at Cu Kα1 over 5–34° 2θ has **63** lines against the
+    reporter's 49. The reporter's builder is not recorded, and merging lines
+    within 0.08° gives 48, so the two lists differ. It has `--trace` (the
+    per-base counters, read by wrapping the module's functions) and
+    `--max-gb` (exit 3 on a shared machine). `trial_error.MAX_SEEN`
+    stops a unit before it adds an entry past the cap (stop-at-cap, the
+    default #1376 asks for). It goes through the existing `capped` path,
+    and `<system>.seen` rides in `stats` beside `solves` and `seconds`.
+    Two tests sit beside the harvest-cap test: the prefix/`same_lattice`
+    test and an exact-count guard at caps 1, 7 and 300. Each failed once on
+    purpose (`>` for `>=`; cap removed). The `_audit` row is tier 3 with
+    `grounds`, `approved` None. Skill: unchanged, confirmed. The
+    `INDEX_SEARCH_INCOMPLETE` row limits "raise `budget_seconds`" to the
+    "within … s per system" message, and a cap reads "outgrew a size cap".
+  - *Measured, profile* (a Linux x86-64 workstation, `--cpu-clock`, at
+    `2e4e4304d` = main + the repro). At 1 800 CPU s there were 2.24 M
+    entries in `seen`, the peak was 1.14 GB RSS, `found` held 196, and
+    41 bases had been walked. At 4 000 CPU s: 5.03 M entries, 2.31 GB, 200
+    found, 60 of 140 bases walked, still unfinished. Linear, about 0.43 KB
+    an entry, so a finish is about 12 M entries and about 5 GB, the
+    reporter's scale. The true cell was candidate 0 in both runs. Confirmed
+    by a scratch tree with `seen.add` removed: 0.25–0.30 GB flat at
+    600 CPU s, against 0.58 GB on main at equal CPU. Form chosen:
+    stop-at-cap, not eviction, because eviction lets a re-scored duplicate
+    change which member dedup keeps, so finished searches would no longer
+    replay.
+  - *Measured, sizing*: `len(seen)` of every trial_error unit, counted by a
+    plugin wrapping `_score`/`_search_system`. The acceptance suite: 61
+    finished units, largest **38 076** (three-phase mixture, tetragonal).
+    The bethanechol benchmark as it runs (both modes, 30 s a unit): 80 units,
+    45 finished, largest finished 65 588 (orthorhombic). One unfinished
+    triclinic unit there held 43 944 candidates in `found`. Bethanechol in manual mode, trial_error alone,
+    CPU budget 3 600 s: Ab finished at **254 344** in 1 216 CPU s, and Aa
+    at 127 310 in 410 CPU s. The other eight manual sets were still
+    running at handover on the same workstation. The cap sits about 16× above
+    the largest finished unit measured.
+  - *Measured, equivalence* (macOS arm64, `tests.unit_replay`, units
+    captured on this tree): every trial_error unit replays to main's digest
+    with the cap in place. Brucite hexagonal and trigonal `f14bfc55`.
+    Corundum cubic `e3b0c442`, hexagonal `6f277e25`, trigonal `397c20a8`,
+    tetragonal `77c695ae`. Synthetic monoclinic (`synthmono_ip`)
+    `0b4a059e`. **Corundum tetragonal moved on main** since WP-1924's
+    `e8addc35`, before this branch; the branch did not move it.
+  - *Gates* (Linux x86-64 workstation, a `[dev]` venv, tree `a62aeb87b`):
+    `test_indexing_engines.py` 101 passed;
+    `test_acceptance_indexing.py -m ""` 45 passed (also 45 on main);
+    the fast suite (`-m "not slow" -n 8`) 14 853 passed, 280 skipped, 32 xfailed and 1 failed, 10:39 beside other runners' jobs. The four cases added (one test, one parametrised three ways) are the whole intended delta; main was not re-measured. Their cost on that run: 7.10 s for the prefix test and 0.17 s for the three guards, so neither joins the slow tail. `test_audit_table.py`: 22 passed and 1 failed,
+    `test_an_audited_row_carries_its_evidence` on `MAX_SEEN`'s missing
+    `approved`, the documented waiting state. `tests.audit_delta`: 1 added,
+    0 new at `unaudited`. `tests.reader_output`: exit 0, unchanged. ruff
+    clean. The acceptance repro on the final tree: `repro_1376 4000 --cpu-clock` (same workstation) stopped at the cap after 3 412 CPU s. It held 4 000 000 entries and `found` 200, peaked at **1.70 GB**, `search_complete` was False with `INDEX_SEARCH_INCOMPLETE` and no `INDEX_BUDGET_EXHAUSTED` (so filed as a cap, not a clock), and candidate 0 was the published cell. Main's run on the same arithmetic reached 2.31 GB at 4 000 CPU s and was still growing.
+  - *Review*: a read-only review agent found no blockers. Two low fixes
+    were applied (the prefix test asserts the in-loop dedup never ran;
+    `--max-gb` refuses without a memory reading). Declined: a unit that
+    reaches the cap within one score of its clock is filed as out of time.
+    That is the same race the index-table cap already has, and it is less
+    than one solution wide.
+  - *Gotchas.* In bethanechol's manual mode `found` grows too: on set F,
+    4 980 distinct candidates after dedup at 600 CPU s, with the in-loop
+    dedup running every base on up to 17 000 raw ones, and the unit clock
+    reaching 617 s on a 600 s budget. That is its dedup step, not a
+    `_score`. Memory stayed at 0.66 GB, so `MAX_SEEN` bounds it only by
+    count. The `INDEX_SEARCH_INCOMPLETE` message is shared with the
+    index-table cap; `seen == MAX_SEEN` in `stats` tells them apart.
+  - Next: (1) the maintainer approves `MAX_SEEN` or names another value,
+    dating its `_audit` row, which turns `test_audit_table` green. (2) The
+    eight manual-mode bethanechol units still running: if one finishes above
+    about 1 M, the margin narrows and the value should be revisited. (3) Open
+    question for the maintainer: whether `found`'s growth in manual mode
+    (with the dedup-every-base overrun) wants its own bound, as dichotomy's
+    `MAX_HARVEST`, or belongs to #1374's time work. (4) Generality judge's
+    verdict on the row: see *Generality* below.
+  - *Generality* (the generality judge, Opus, its sections unedited):
+
+    #### rietx.indexing.trial_error.MAX_SEEN
+
+    **weak**: the case for stopping is stronger, since a run killed for memory returns nothing. The number itself rests on one case where it fires and two dataset families where it stays silent, and nine of the ten bethanechol manual sets have not finished.
+
+    | Q | Author's answer (where) | Found | Verdict |
+    |---|---|---|---|
+    | 1 Decides | stop a unit at 4 M distinct solutions and keep `found` (trial_error.py comment) | The caller has no way to raise the cap: it is not a `SearchSpec` field. The cap can bind only under a raised `budget_seconds`: at #1376's rate (about 1 250 entries per CPU s) it is reached after about 3 200 CPU s. Under the default 30 s slice it cannot fire there. | holds |
+    | 2 Kind | none given (no `ambiguity` field; none is required on a constant) | Kind 1: Rule 1's protection, "keep the best attempt", instead of an OS kill | holds |
+    | 3 Against | none given | A refiner on a 32 GB+ machine who raises `budget_seconds` to finish #1376 exhaustively: about 12 M entries at finish, about 5 GB of keys, which fits there. Once capped, the message says more time changes nothing and offers only narrowing. Whether the true cell is in `found` before 4 M: **none given** (the old 9.2 GB run reached it at rank 1 after about 16 min). GSAS-II, FullProf, TOPAS defaults: not checked here. TREOR/N-TREOR are not among the seven programs. | weak |
+    | 4 For | "reported incomplete instead" (grounds); repro: 1.14 GB at 2.24 M entries, 2.31 GB at 5.03 M. Scratch run without `seen`: flat at 0.25–0.30 GB | An OOM kill loses every candidate already built. The footprint tracking `len(seen)` is measured, and dropping `seen` confirms it is the structure that grows. | holds |
+    | 5 Tier | 3, "rietx's own choice, a memory bound on a laptop" (grounds) | Correct, and the same shape as the approved `MAX_HARVEST` and `MAX_GRID_BYTES`. `approved` is None, as it should be. The 0.43 KB per entry is a Linux x86-64 figure on one case; the macOS footprint was not measured. `found` is a second route that grows (set F: 4 980 distinct at 600 CPU s), and this cap bounds it by count, not by bytes. | weak |
+    | 6 Families | acceptance suite max 38 076; bethanechol set Ab 254 344; 16× margin (grounds) | Silent on two families: IUCr round-robin plus synthetic, and bethanechol (probably development data). The firing case, #1376, is synthetic from a COD cell. The reference is the unit's own replay digest (cell + n_indexed), which only verifies. Bethanechol manual mode is unfinished, so "largest finished unit" is provisional. | weak |
+    | 7 Field | `INDEX_SEARCH_INCOMPLETE` "outgrew a size cap", `search_complete=False`, `stats["<system>.seen"]` | Present and tested (`test_a_trial_error_unit_stops_at_its_seen_cap`, `…never_holds_more_than_max_seen`). The message is shared with the index-table cap (`allowed < len(rows_all)`), so the reader can only tell which cap fired from `seen == MAX_SEEN`. | holds |
+
+    Would change the verdict: the nine bethanechol manual sets' finished `seen` counts; a third unrelated family; whether #1376's true cell is held at 4 M; the per-entry cost on macOS arm64.
+
+    Author: the true cell is held before 4 M. It was candidate 0 at 2.24 M entries (1 800 CPU s) and in the scratch run at 600 CPU s, and it is candidate 0 of the capped run on the final tree (1.70 GB at 4 M). The other three remain open, and are why the value is put to the maintainer.
+
+    #### Names on UNAUDITED_BASELINE / OTHER_RECORD_FIELDS / NOT_WALKED / WALKED / DEFAULT_SEATS
+
+    **holds**: the diff touches none of them, and `tests.audit_delta` reports 1 added, 0 at `unaudited`.
+
+    #### `<system>.seen` in EngineResult.stats
+
+    **holds**: it is a count that reports, not a heuristic, and it is the visible statistic behind item 1. (7 Field, weak on wording: the early return for a pool smaller than n_dof records no `seen` key, as it records no `seconds` key; the claim is narrowed to units that search.)
 
 - **2026-11-05** — created from issue #1376 (planning only, no code). No
   open WP owns it: WP-1924 bounded dichotomy, filed #1376 as a follow-up it

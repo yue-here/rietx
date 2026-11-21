@@ -131,6 +131,24 @@ MAX_ASSIGN_PER_BASE = 4_000_000
 #: Rows solved per batched ``np.linalg.solve`` call.  Memory, not speed: the batch
 #: is (chunk, n, n) float64 plus the same again for the solution.
 SOLVE_CHUNK = 200_000
+#: Distinct solutions one (system) unit may hold in its ``seen`` set before it
+#: stops (WP-2110, #1376).  ``seen`` is what grows: it takes one
+#: ``engines.solution_key`` per distinct exact solution scored, spans the
+#: centring loop and is never pruned, about 0.4 KB an entry, while ``found``
+#: stays in the hundreds.  Measured on #1376's glutaric acid–isonicotinamide
+#: list (``tests/repro_1376.py``), the footprint tracks ``len(seen)``: 2.24 M
+#: entries and 1.14 GB at 1 800 CPU seconds, the unit still unfinished.  The
+#: count is of held entries, which are distinct by construction.  Reaching it
+#: ends the unit as a size cap does, ``complete = False``, and ``found`` is
+#: returned as it stands.  The cap is shared across the centring loop, as
+#: ``seen`` is: a unit that reaches it in its first centring never searches
+#: the later ones (a monoclinic unit capped in ``P`` never reaches ``C``; an
+#: orthorhombic one capped in ``P`` never reaches ``C``, ``I`` or ``F``), so a
+#: centred truth cannot be among a capped unit's candidates.  About 1.7 GB peak
+#: at the cap (the keys about 1.4 GB of it), some 16 times the largest
+#: finished unit measured (254 344, bethanechol set Ab in manual mode); its
+#: grounds are its ``rietx._audit`` row.
+MAX_SEEN = 4_000_000
 
 
 def index_table(basis: np.ndarray, centring: str, max_index: int, *,
@@ -416,8 +434,7 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
             if budget.expired():
                 # the clock rides the cut return too: a reader telling a clock
                 # cut from a cap reads it (WP-1449)
-                return found, {"solves": float(n_solved),
-                               "seconds": round(budget.elapsed, 3)}, False
+                return found, _unit_stats(n_solved, budget, seen), False
             lines = pool[list(base)]
             combos = _combos([per_line[int(i)] for i in lines])
             if not len(combos):
@@ -438,8 +455,12 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
                 # ran one unit 282 s on a 60 s budget.  The read changes no
                 # arithmetic, so a finished search is the same bits
                 if budget.expired():
-                    return found, {"solves": float(n_solved),
-                                   "seconds": round(budget.elapsed, 3)}, False
+                    return found, _unit_stats(n_solved, budget, seen), False
+                # the memory bound (WP-2110): ``seen`` is the structure that
+                # grows, so a unit holding MAX_SEEN stops before adding one more.
+                # ``found`` returns as it stands, every candidate already built
+                if len(seen) >= MAX_SEEN:
+                    return found, _unit_stats(n_solved, budget, seen), False
                 seen.add(key)
                 cand = _score(basis, system, centring, spec, af, hkl_full,
                               dm_full, index_full, q_all, sigma,
@@ -450,8 +471,15 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
                     found.append(cand)
             if len(found) > 2000:
                 found = dedup_candidates(found)
-    return (found, {"solves": float(n_solved), "seconds": round(budget.elapsed, 3)},
-            complete)
+    return found, _unit_stats(n_solved, budget, seen), complete
+
+
+def _unit_stats(n_solved: int, budget: Budget, seen: set) -> dict[str, float]:
+    """A unit's counters: assignments solved, its clock, and ``len(seen)``, the
+    count :data:`MAX_SEEN` bounds (as ``dichotomy``'s ``harvest`` rides beside
+    ``MAX_HARVEST``)."""
+    return {"solves": float(n_solved), "seconds": round(budget.elapsed, 3),
+            "seen": float(len(seen))}
 
 
 def _scoring_index(spec: SearchSpec, q_all: np.ndarray,
