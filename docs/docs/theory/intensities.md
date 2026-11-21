@@ -59,6 +59,14 @@ another Rietveld code attributable. The Kissel & Pratt high-energy-limit
 correction {cite}`kissel1990` is applied on top of it, and reaches −1.3 e at
 uranium.
 
+The tabulation stops at 70 keV, and high-energy synchrotron sources run above it. From
+70 to 200 keV, $f''$ is the same Cromer-Liberman calculation, computed by
+gemmi, and $f'$ is computed from that $f''$ by the dispersion relation, plus
+one constant taken from the tabulated $f'$ so the two join. The same
+computation, anchored on 35-55 keV alone, reproduces the tabulated $f'$ from 55
+to 70 keV to 0.01 e away from edges. Elements past uranium keep the 70 keV
+limit.
+
 Absorption edges are never interpolated across, since $f''$ jumps by nearly an
 order of magnitude across one grid interval at the Fe K edge. Within
 {{ NEAR_EDGE_EV }} eV of an edge the request is refused outright, because the

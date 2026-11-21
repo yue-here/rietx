@@ -57,6 +57,15 @@ The row needs that check before it is written.
 
 ### Inherited
 
+- **2026-11-17, from [1925](1925-anomalous-scattering-above-70-kev.md):
+  the f′/f″ lookup now reaches 200 keV** (rows above the bundled 70 keV are
+  computed), so the 0.1665 Å Si model above no longer raises, and the
+  "above 70 keV and `dispersion = None`" row only matters above 200 keV or
+  for Np-Cf above 70 keV. The out-of-band raise already names
+  `Source.dispersion = None` and `Dispersion.overrides` in its own message,
+  which is this WP's second task; tick it when the PR (#1664) merges, and
+  re-check the row against what then remains.
+
 - **2026-11-06, from the issue triage (issue #1381): the reflection-table
   row is WP-1947's, so this WP places thirteen rows.** The row documented
   `run_stage` with `turn_on=[]` and `max_iter=0`, a spelling WP-1947 replaces
