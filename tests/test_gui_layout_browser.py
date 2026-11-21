@@ -1871,6 +1871,18 @@ def test_the_rebuilt_plan_picker_adds_a_chip_and_moves_nothing(browser, next_pla
     assert free.evaluate_all("els => els.map(e => e.title)") == [
         "phases.*.cell.*", "instrument.zero_shift"]
     assert page.locator(".actions .pending").text_content().strip() == "1 pending"
+
+    # a glob no group names is typed and entered as itself
+    stage.get_by_role("button", name="+ Add", exact=True).click()
+    search = page.get_by_role("dialog", name="Add to stage 3", exact=True).get_by_role(
+        "textbox", name="Search parameters", exact=True)
+    search.fill("phases.*.atoms.0.*")
+    search.press("Enter")
+    _frames(page)
+    assert free.evaluate_all("els => els.map(e => e.title)") == [
+        "phases.*.cell.*", "instrument.zero_shift", "phases.*.atoms.0.*"]
+    page.keyboard.press("Escape")
+    _frames(page)
     moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
     page.get_by_role("button", name="Revert", exact=True).click()
     _frames(page)

@@ -573,12 +573,28 @@
 
   const options = $derived.by(() => {
     const p = picker;
-    if (!p) return { groups: [] as PickOption[], parameters: [] as PickOption[] };
+    if (!p) return { typed: [] as PickOption[], groups: [] as PickOption[], parameters: [] as PickOption[] };
     const pool = p.side === "fix" ? freeBy(stages, p.index) : null;
     const all = pickOptions(rows, corpus, phaseNames, pool);
-    return { groups: all.groups.filter((o) => matchesQuery(o, p.query)),
-             parameters: all.parameters.filter((o) => matchesQuery(o, p.query)) };
+    const groups = all.groups.filter((o) => matchesQuery(o, p.query));
+    const parameters = all.parameters.filter((o) => matchesQuery(o, p.query));
+    // a typed dot-path glob is offered as itself, so a glob no group names can
+    // still be added, as the old panel's typed field allowed (WP-2208)
+    const q = p.query.trim();
+    const typed = /^[\w*?.]+$/.test(q) && /[.*]/.test(q)
+      && ![...groups, ...parameters].some((o) => o.glob === q)
+      ? [{ glob: q, name: q, detail: "", count: 0 }] : [];
+    return { typed, groups, parameters };
   });
+
+  /** Enter in the search box takes the first option that can be chosen. */
+  function pickFirst(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const first = [...options.typed, ...options.groups, ...options.parameters]
+      .find((o) => !noteFor(o).here);
+    if (first) choose(first);
+  }
 
   function noteFor(option: PickOption): { here: boolean; note: string } {
     const p = picker!;
@@ -808,8 +824,15 @@
         onclick={() => (picker && (picker.side = "fix"))}>Fix</button>
     </div>
     <input class="q" placeholder="Search, for example biso or cell" aria-label="Search parameters"
-      bind:value={picker.query} />
+      bind:value={picker.query} onkeydown={pickFirst} />
     <div class="opts">
+      {#each options.typed as option (option.glob)}
+        {@const n = noteFor(option)}
+        <p class="og">Glob</p>
+        <button class="op" title={option.glob} onclick={() => choose(option)}>
+          <span class="mono">{option.glob}</span><span class="w">{n.note}</span>
+        </button>
+      {/each}
       {#if options.groups.length}
         <p class="og">Groups</p>
         {#each options.groups as option (option.glob)}
@@ -828,7 +851,7 @@
           </button>
         {/each}
       {/if}
-      {#if !options.groups.length && !options.parameters.length}
+      {#if !options.typed.length && !options.groups.length && !options.parameters.length}
         <p class="og">{p.side === "fix" && !p.query.trim() ? "Nothing is free yet at this stage." : "Nothing matches."}</p>
       {/if}
     </div>
