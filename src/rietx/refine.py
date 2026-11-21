@@ -6025,6 +6025,10 @@ class Refinement:
         progress
             A text stream or a path that gets one line per stage boundary. ``None``
             writes none.
+        refit
+            What a re-fit of a pattern this model already converged on runs:
+            ``"single"`` collapses the plan into one stage, ``"stages"`` runs the plan
+            as a first fit does. A first fit always runs the plan.
 
         Notes
         -----
@@ -13420,6 +13424,10 @@ def refine(data: PatternData, structure: Structure, instrument: Instrument,
         What the run is called in ``rietx watch``: the phase, the sample or the
         candidate it fits. ``None`` names it after its directory or its project. It
         changes no number the fit produces.
+    refit
+        ``"single"`` or ``"stages"``, as in ``Refinement.fit``. It acts only when
+        ``history`` is a tree whose head is an accepted fit of ``data`` at these
+        models' values.
 
     Notes
     -----
