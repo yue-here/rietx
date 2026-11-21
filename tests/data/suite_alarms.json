@@ -26,7 +26,6 @@
    "SITE_SNAPPED_TO_SPECIAL_POSITION": "warning"
   },
   "fluorite": {
-   "COVARIANCE_DIRECTION_DISCARDED": "warning",
    "DISPERSION_NEGLECTED": "info",
    "FLAT_DIRECTION": "warning",
    "HIGH_CORRELATION": "warning",
@@ -61,7 +60,6 @@
   "BOUND_HIT": 1,
   "CAPILLARY_OFFSET_UNAVAILABLE": 2,
   "CONSTRAINT_ACTIVE": 3,
-  "COVARIANCE_DIRECTION_DISCARDED": 1,
   "DISPERSION_NEGLECTED": 7,
   "FLAT_DIRECTION": 4,
   "FLOOR_HIT": 4,
@@ -74,12 +72,12 @@
   "SPACE_GROUP_SETTING_ASSUMED": 1
  },
  "warnings_per_result": {
-  "phase_id": 7.75,
-  "qpa": 8.125,
-  "structure": 8.125,
-  "cell": 8.0,
-  "microstructure": 9.5,
-  "calibration": 9.625,
-  "magnetic": 8.125
+  "phase_id": 7.625,
+  "qpa": 8.0,
+  "structure": 8.0,
+  "cell": 7.875,
+  "microstructure": 9.375,
+  "calibration": 9.5,
+  "magnetic": 8.0
  }
 }

@@ -136,66 +136,8 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
-- **2026-11-21, from the issue triage (issue #1733): the Le Bail wander test has recurred,
-  as a cost.** Context names
-  `test_lebail_alternation.py::test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from`
-  as out of scope unless it recurs. Since #1708 (WP-2222, the closing stage off by default)
-  it is the `full` job's longest row by far. Read off the nightly logs: 1008.75 s on 2026-11-19
-  (`6bcd9a161`, job 3:36:59) and 8230.09 s on 2026-11-20 (`20255ddfa`, job 4:00:17 against the
-  300-min `timeout-minutes`). The job was already at 3:37 before #1708, so its margin over
-  that guard is down to 1.25× from task 1's 2.3×, and this row is now most of the critical
-  path. The test file is unchanged since WP-2002.
-
-  Checked against the tree at `8112e3b09` on an arm64 Mac (`[dev]`, single-threaded BLAS,
-  alone under the suite lock, one run each). The test alone passed in 1604 s. Its docstring
-  marker still says "~40-80 s". Its first fit (+2 % cells, 5.1-50°, `lebail_passes=8`) took
-  1168 s as written and 66 s with `closing_window_tol=1e-3` added to its plan. The two arms
-  take different paths. With the closing stage, pass 2 reads 434 % against pass 1's 103 %, so
-  the loop stops after 2 passes and keeps pass 1. Without it, pass 1 reads 888 % and the loop
-  runs 4 passes (148.8, 147.0, 1359 %), keeping pass 3. So the test's own assertions hold
-  either way (kept < ran). Pass 2 alone took 963 s of the 1168 s for 302 evaluations. The time
-  sits between evaluations, in the Le Bail partitions: 253 s before stage 3, 484 s inside
-  stage 3 for 14 evaluations, 187 s inside stage 4 for 6. That matches the stack the issue
-  dumped (`forward._settled_partition`). A partition settles to `lebail_tol` 1e-7 with a cap
-  of 25 000 cycles (`schemas/plan.py`), and from a wandered model at Rwp ~140 % it runs for
-  minutes. Probe: `~/.cache/ghostshift/rietx/issue-1733/probe.py` (maintainer-local).
-
-  Two things for the session that works this. (1) The test: declaring the closing stage, as
-  the module's `worse` fixture already declares its own setting, restores the cost the marker
-  quotes. Its hand-loop half (`ref.fit(..., plan="profile_only")`) would then need the same
-  declaration to continue from the same state, and the docstring's pass counts change. Whether
-  that keeps the row asking its question is this WP's call; the row pins no number.
-  (2) The package: a default Le Bail fit from a cell 2 % off now spends minutes per partition
-  where it spent seconds. Le Bail is not being developed further (Pawley is the direction,
-  WP-2062), so a WP for the partition cost is warranted only if a user meets it. This fold
-  does not file one. Priority unchanged at P2, since the `full` job has not failed on this row.
-
-- **2026-11-06, from WP-2045 (closed in PR #1440): this WP's dependency on 2045 is met.**
-  The `full` job completed green on `main` twice on 2026-11-04: run 41837816600
-  (`ba3719f06`, 1:35:41) and run 41874118202 (`b1741da64`, 2:47:18). WP-2045 counted the
-  2026-11-05 red row as this WP's, as the bullet below does.
-
-- **2026-11-05, from the issue triage (issue #1424, its wavelength row): the row is a stale
-  pin on every platform, so the nightly is red on main.** The issue reads it as Mac-only, by
-  contrast with the two nightlies of 2026-11-04. Both of those predate the cause. The
-  2026-11-05 nightly (run 42037632923, `d4839e02e`) failed its `full` job on this one row,
-  with `1 failed, 14933 passed, 171 skipped, 53 xfailed` on Linux, `[dev,jax]`. Its value
-  there is 0.010354633004, and an arm64 Mac reads 0.010354633028.
-
-  Bisected over main's merges: passes at `c2da9ae93`, fails from `85ce3f287`, which merged
-  #1391 (WP-1944, extinction opt-in). WP-1944's handover predicted this move: "a pinned width
-  goes from 0.0102922 to 0.0103546". The fast selection does not run the row, so #1391 merged
-  without the repin.
-
-  `tests/test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
-  needs three pins and its docstring, read on an arm64 Mac at `541f0daf7`, four starts:
-  x's esd 0.0103546 (was 0.0102922), y −0.0216150 (was −0.0210949), y's esd 0.0192658 (was
-  0.0190970). The spread of x's esd across starts is 2.8e-9, so that bar still holds. The
-  test stops at its first assert, so only the first of the three shows in the log.
-
-  PR #1425 closes this WP on the reading that both rows are Mac-only. That reading does not
-  hold for this row. PR #1429 carries the same three pins, and holds for the maintainer
-  because it moves an acceptance number.
+None open. The three notes of 2026-11-05, 2026-11-06 and 2026-11-21 were consumed on
+2026-11-21 (handover entry of that date).
 
 ## Non-goals
 
@@ -338,6 +280,18 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
       maintainer: declare it in `viz.compare` (moves the example projects and every
       test that builds on the standards), or record that the standards follow
       the package default.
+
+**Added 2026-11-21** (ghostshift runner), from the 2026-11-20 and 2026-11-21 nightlies
+(runs 44754238414 and 44910841692), each red on the alarm pin's row alone.
+
+- [x] Fluorite's alarm row, which rounding decides (WP-2225 closed under option 3, so the
+      split stays). *The pin leaves out the findings a 1e-14 start nudge turns on or off:
+      fluorite's `COVARIANCE_DIRECTION_DISCARDED` and `FLOOR_HIT`, and zincite's
+      `FLOOR_HIT`, each only where it names members of the flat width triple
+      (`tests.suite_alarms.ROUNDING`). Settled by Claude under WP-2225's option 3, the
+      maintainer's memory rule that a spread under perturbation is carried by the bar or
+      removed from the minimum, and this WP's goal of quoting only what the platforms
+      share.*
 
 ## Acceptance
 

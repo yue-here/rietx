@@ -19,6 +19,10 @@ truth where it must fire and one where it must not, and re-levels nothing by
 itself (DESIGN.md § Rules 3).  What the pin buys is that a change moving
 these numbers is seen.
 
+**The pin holds what the platforms share** (WP-2036).  A finding that a 1e-14
+nudge to the start turns on or off is not a change anyone made, so the
+findings :data:`ROUNDING` lists are left out of every count.
+
 Every fit writes its obs/calc/diff figure to ``tests/output/`` (gitignored),
 as every test refinement does.
 """
@@ -31,6 +35,7 @@ import platform
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import rietx as rx
 from rietx._about import DIST_NAME
@@ -40,6 +45,32 @@ TESTS_DIR = Path(__file__).resolve().parent
 PIN = TESTS_DIR / "data" / "suite_alarms.json"
 OUTPUT = TESTS_DIR / "output"
 REPIN = "python -m tests.suite_alarms --write"
+
+#: The exactly degenerate width triple of the round-robin protocol
+#: (1/cos²θ = 1 + tan²θ): Gaussian size, Gaussian strain and Caglioti W.
+FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profile.w")
+
+#: Per standard, the codes whose findings on :data:`FLAT_TRIPLE` rounding
+#: decides (WP-2036).  The triple's split is not determined by the data, so a
+#: 1e-14 nudge to the start W moves which of its members sits on its floor.
+#: Measured at k = 0, ±1, ±3, 7, 20 on macOS arm64: fluorite gives
+#: ``COVARIANCE_DIRECTION_DISCARDED`` at k = 0, ``FLOOR_HIT`` on one member at
+#: five starts and neither at k = 20, which is the set Linux read on
+#: 2026-11-20 and 2026-11-21; zincite adds a ``FLOOR_HIT`` row on
+#: ``gauss_strain`` at four starts.  Corundum and brucite gave one set at all
+#: seven.  The pin holds what the platforms share, so :func:`firing_table`
+#: leaves these findings out, and every other finding on these standards is
+#: still pinned.
+ROUNDING = {"fluorite": frozenset({"COVARIANCE_DIRECTION_DISCARDED", "FLOOR_HIT"}),
+            "zincite": frozenset({"FLOOR_HIT"})}
+
+
+def decided_by_rounding(key: str, diagnostic) -> bool:
+    """Whether ``diagnostic`` on standard ``key`` is a :data:`ROUNDING` finding:
+    one of the standard's listed codes, naming members of the triple only."""
+    where = set(diagnostic.where)
+    return (diagnostic.code in ROUNDING.get(key, ())
+            and bool(where) and where <= set(FLAT_TRIPLE))
 
 
 def unavailable(data_dir: Path | None = None) -> dict[str, list[str]]:
@@ -79,13 +110,17 @@ def collect(data_dir: Path | None = None, *, plots: bool = True) -> dict[str, rx
 def firing_table(results: dict[str, rx.RefinementResult]) -> dict:
     """The numbers the pin holds: per standard, each code and the levels it
     was raised at (``"info, warning"`` where it was raised at both); over the batch, each code's count of standards fired on
-    and the mean warning rows a fit carries per purpose."""
-    summary = rx.diagnostics_summary(list(results.values()))
+    and the mean warning rows a fit carries per purpose.  The findings
+    rounding decides (:data:`ROUNDING`) are left out of all three."""
+    kept = {key: SimpleNamespace(diagnostics=[d for d in r.diagnostics
+                                              if not decided_by_rounding(key, d)])
+            for key, r in results.items()}
+    summary = rx.diagnostics_summary(list(kept.values()))
     return {
         "standards": {key: {code: ", ".join(sorted({d.level for d in r.diagnostics
                                                     if d.code == code}))
                             for code in sorted({d.code for d in r.diagnostics})}
-                      for key, r in sorted(results.items())},
+                      for key, r in sorted(kept.items())},
         "n_results": {t.code: t.n_results for t in sorted(summary.codes, key=lambda t: t.code)},
         "warnings_per_result": summary.warnings_per_result,
     }
