@@ -102,6 +102,22 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   learns it only from the error. R4's Stage settings… popover gives the field `min="1"`, and
   today's panel takes the same attribute in the same rebuilt dist. Item 2 of #1652 (a manual
   paragraph on `predict`) is not GUI work and stays with the issue.
+- **A restored draft can carry a stale hold (review of #1683, 2026-11-21, finding 1, low).**
+  `restoreDraft` in `gui/src/next/Params.svelte` (about :438-446) restores pending edits without
+  the reload-time `dropPending` (about :262-267), which runs only when the head moves. A draft
+  marked "moved" that holds an edit on a path the head no longer has, such as a hold on
+  `instrument.background.c7` after the terms were cut to six, survives Restore. The background
+  band sends every pending hold, so it then reads "Band refused: no parameter to hold", and
+  Apply is refused until Revert. Fix: run `dropPending` against the current rows at the end of
+  `restoreDraft`. Put it in `Params.svelte`, never in `Frame.svelte`'s `restoreKept` block,
+  which this WP edits.
+- **A glob hold matching nothing refuses the band (same review, finding 2, low).**
+  `src/rietx/gui/background.py` (about :214-219) answers `GET /api/background` with 400 "no
+  parameter to hold" for a pending glob matching no row, while `Refinement.hold` takes the same
+  glob as an empty sweep (`refine.py` about :4293), so the band refuses a hold that Apply
+  accepts. Today's `/next` makes such a glob only through a restored draft. Fix: skip globs
+  that match nothing and refuse only literal paths, as `Refinement.hold` does. Probe:
+  `phases.0.atoms.*.adp.*` on `fap`.
 
 ## Tasks
 
