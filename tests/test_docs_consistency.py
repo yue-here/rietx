@@ -330,7 +330,8 @@ def rulebook_problems(rel: str, text: str | None = None) -> list[str]:
                 or token in cr.ALLOWLIST):
             continue
         if _RULEBOOK_DIR.match(token):
-            if not any((ROOT / b / token).is_dir() for b in bases):
+            if (not any(cr.in_tree(ROOT / b / token) == "dir" for b in bases)
+                    and not cr.generated(token)):
                 problems.append(f"`{token}`: no directory of that name")
             continue
         m = _RULEBOOK_PATH.match(token)
@@ -350,7 +351,9 @@ def rulebook_problems(rel: str, text: str | None = None) -> list[str]:
         paths = ([path[:brace.start()] + alt + path[brace.end():]
                   for alt in brace.group(1).split(",")] if brace else [path])
         for p in paths:
-            hits = [ROOT / b / p for b in bases if (ROOT / b / p).is_file()]
+            hits = [ROOT / b / p for b in bases if cr.in_tree(ROOT / b / p) == "file"]
+            if not hits and cr.generated(p):
+                continue
             if not hits:
                 problems.append(f"`{token}`: no file {p}")
             elif symbol and not any(
@@ -397,10 +400,30 @@ def test_a_planted_rulebook_break_fails(token, problem):
 
 @pytest.mark.parametrize("token", [
     "`/api/params`", "`/pr-review`", "`docs/milestones/vX.Y.md`", "`refine.replay`",
-    "`projects/gsas2.py`", "`report.regions`",
+    "`projects/gsas2.py`", "`report.regions`", "`docs/docs/_generated`",
 ])
 def test_a_rulebook_route_command_or_live_name_passes(token):
     assert rulebook_problems("src/rietx/io/CLAUDE.md", f"A rule about {token}.") == []
+
+
+def test_a_path_is_judged_by_what_a_commit_holds_never_the_disk(monkeypatch):
+    """A build output exists in a working checkout and not in CI's, so a disk
+    check passed here and failed there (`docs/docs/_generated`, PR #1757).
+    The check reads git: a path ``.gitignore`` covers is generated and passes
+    in both, and a file on disk that a commit would not hold fails in both."""
+    from tests import code_references as cr
+
+    stray = ROOT / "docs" / "docs" / "_generated" / "planted_stray.md"
+    assert cr.generated("docs/docs/_generated/planted_stray.md")
+    monkeypatch.setattr(cr, "generated", lambda rel: False)
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        stray.write_text("x", encoding="utf-8")
+        found = rulebook_problems(
+            "src/rietx/io/CLAUDE.md", "A rule about `docs/docs/_generated/planted_stray.md`.")
+    finally:
+        stray.unlink()
+    assert len(found) == 1 and "no file" in found[0], found
 
 
 def test_template_declares_both_handover_entry_forms():

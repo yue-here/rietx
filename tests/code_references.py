@@ -60,6 +60,7 @@ import builtins
 import importlib
 import io
 import re
+import subprocess
 import sys
 import tokenize
 from collections.abc import Iterator
@@ -440,6 +441,40 @@ def _path_bases(citing: str) -> list[Path]:
 
 
 @cache
+def _committable() -> tuple[frozenset[str], frozenset[str]]:
+    """The files and directories a commit of this tree would hold.
+
+    Read from git, never the disk: a build output or a run's file exists in a
+    working checkout and not in CI's, so a disk check passes here and fails
+    there.  Untracked files that are not ignored count, as a commit would
+    take them."""
+    files = frozenset(subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard"],
+        capture_output=True, encoding="utf-8", check=True).stdout.splitlines())
+    dirs = frozenset(str(p) for f in files for p in Path(f).parents if str(p) != ".")
+    return files, dirs
+
+
+def in_tree(path: Path) -> str | None:
+    """``"file"`` or ``"dir"`` if a commit of this tree holds ``path``."""
+    try:
+        rel = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return None
+    files, dirs = _committable()
+    return "file" if rel in files else "dir" if rel in dirs else None
+
+
+@cache
+def generated(rel: str) -> bool:
+    """Whether ``.gitignore`` covers ``rel``: something a build or a run writes,
+    named by a rule rather than cited as a file in the tree."""
+    return subprocess.run(
+        ["git", "-C", str(ROOT), "check-ignore", "-q", "--no-index", rel.rstrip("/")],
+        capture_output=True).returncode == 0
+
+
+@cache
 def _test_nodes(path: Path) -> frozenset[str]:
     """``name`` and ``Class::name`` for every function and class in a file."""
     try:
@@ -460,9 +495,9 @@ def resolve_path(path: str, node: str | None, citing: str) -> bool:
     for base in _path_bases(citing):
         for found in (base / path, (base / path).with_suffix(".md")):
             # a manual page is cited by its built name, ``theory/x.html``
-            if found.exists() and (found == base / path or path.endswith(".html")):
+            if in_tree(found) and (found == base / path or path.endswith(".html")):
                 return node is None or node in _test_nodes(found)
-    return False
+    return generated(path) and node is None
 
 
 def _checked_path(path: str) -> bool:
