@@ -152,6 +152,9 @@
   /** depth cueing (WP-1548): off by default, a drawing choice like the rest of
    *  the drawer, so session-local and never stored in the project */
   let depthCue = $state(false);
+  /** ambient occlusion (WP-1538): off by default, and session-local like the
+   *  depth cue; the renderer builds its depth maps once a scene */
+  let ambientOcclusion = $state(false);
   /** fill the drawing's planar rings (WP-1548): the server finds them
    *  (`geometry.rings`), off by default like the depth cue */
   let planarRings = $state(false);
@@ -204,6 +207,7 @@
     renderer = createRenderer(canvas);
     unsupported = renderer === null;
     renderer?.setDepthCue(untrack(() => depthCue));
+    renderer?.setAmbientOcclusion(untrack(() => ambientOcclusion));
     const observer = typeof ResizeObserver === "undefined"
       ? null : new ResizeObserver(() => schedule());
     observer?.observe(canvas);
@@ -707,6 +711,15 @@
               schedule();
             }} />
           depth cue
+        </label>
+        <label class="inline">
+          <input type="checkbox" checked={ambientOcclusion}
+            onchange={(e) => {
+              ambientOcclusion = (e.currentTarget as HTMLInputElement).checked;
+              renderer?.setAmbientOcclusion(ambientOcclusion);
+              schedule();
+            }} />
+          ambient occlusion
         </label>
         <label class="inline">
           <input type="checkbox" checked={planarRings}

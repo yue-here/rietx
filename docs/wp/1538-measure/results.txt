@@ -1,0 +1,96 @@
+WP-1538 measure.py, run 2026-11-17 on an arm64 Mac ([dev] venv, rietx-kernels wheel loaded, so 'plain' is the compiled path).
+
+--- measure.py CACHE --maps
+1 - A in %, mean (p95), over a 400 px id plane of the opening view
+phase                           ball atoms   ball sticks    ell. atoms   ell. sticks
+LaB6                           23.1 (57.1)   36.1 (64.6)   13.6 (43.5)   29.2 (57.6)
+                             ball atoms by map size/bias  256/0.01: 23.1  512/0.01: 23.1  1024/0.01: 23.1  512/0.005: 23.3  512/0.02: 22.6
+NAC                            18.7 (43.1)   24.4 (48.8)   11.6 (30.6)   14.9 (32.8)
+                             ball atoms by map size/bias  256/0.01: 18.8  512/0.01: 18.7  1024/0.01: 18.8  512/0.005: 19.1  512/0.02: 18.2
+fluorapatite                   14.5 (37.1)   22.8 (44.3)    5.6 (17.8)    7.6 (20.1)
+                             ball atoms by map size/bias  256/0.01: 14.6  512/0.01: 14.5  1024/0.01: 14.5  512/0.005: 14.8  512/0.02: 14.1
+spinel MgAl2O4                 11.3 (28.1)      -           7.2 (20.6)   11.4 (26.8)
+                             ball atoms by map size/bias  256/0.01: 11.3  512/0.01: 11.3  1024/0.01: 11.3  512/0.005: 11.4  512/0.02: 11.3
+perovskite SrTiO3              14.0 (40.7)   30.1 (49.1)    7.2 (23.0)   12.8 (31.2)
+                             ball atoms by map size/bias  256/0.01: 14.1  512/0.01: 14.0  1024/0.01: 14.0  512/0.005: 14.2  512/0.02: 13.9
+garnet grossular               25.1 (54.2)   32.2 (59.2)   10.2 (26.7)   12.5 (28.7)
+                             ball atoms by map size/bias  256/0.01: 25.1  512/0.01: 25.1  1024/0.01: 25.1  512/0.005: 25.4  512/0.02: 24.8
+rutile TiO2                     8.8 (23.9)      -           3.2 (11.1)    3.7 (11.7)
+                             ball atoms by map size/bias  256/0.01:  8.8  512/0.01:  8.8  1024/0.01:  8.8  512/0.005:  8.9  512/0.02:  8.8
+olivine forsterite             10.1 (24.9)      -           6.2 (18.0)    7.0 (18.5)
+                             ball atoms by map size/bias  256/0.01: 10.1  512/0.01: 10.1  1024/0.01: 10.1  512/0.005: 10.1  512/0.02: 10.1
+zircon ZrSiO4                  13.2 (33.1)   18.0 (36.2)    5.5 (16.3)    6.5 (17.5)
+                             ball atoms by map size/bias  256/0.01: 13.2  512/0.01: 13.2  1024/0.01: 13.2  512/0.005: 13.4  512/0.02: 12.8
+corundum Al2O3                 10.3 (25.5)      -           5.0 (17.4)    6.0 (16.7)
+                             ball atoms by map size/bias  256/0.01: 10.3  512/0.01: 10.3  1024/0.01: 10.3  512/0.005: 10.3  512/0.02: 10.3
+fluorite CaF2                  15.1 (35.9)   19.0 (41.2)    6.1 (19.1)   10.8 (26.7)
+                             ball atoms by map size/bias  256/0.01: 15.1  512/0.01: 15.1  1024/0.01: 15.1  512/0.005: 15.4  512/0.02: 14.5
+wurtzite ZnO                    3.1 (10.7)      -           3.1 (12.2)    3.3 ( 9.6)
+                             ball atoms by map size/bias  256/0.01:  3.2  512/0.01:  3.1  1024/0.01:  3.1  512/0.005:  3.2  512/0.02:  3.1
+quartz SiO2                     5.0 (16.2)      -           3.1 (11.4)    3.3 (10.6)
+                             ball atoms by map size/bias  256/0.01:  5.0  512/0.01:  5.0  1024/0.01:  5.0  512/0.005:  5.0  512/0.02:  5.0
+calcite CaCO3                   9.1 (24.1)   14.9 (25.9)    7.2 (19.9)    8.6 (20.6)
+                             ball atoms by map size/bias  256/0.01:  9.1  512/0.01:  9.1  1024/0.01:  9.2  512/0.005:  9.2  512/0.02:  9.0
+gypsum CaSO4.2H2O              10.0 (25.9)   15.4 (30.9)    5.8 (17.4)    6.3 (17.4)
+                             ball atoms by map size/bias  256/0.01: 10.0  512/0.01: 10.0  1024/0.01: 10.0  512/0.005: 10.3  512/0.02:  9.5
+pyrite FeS2                    12.0 (30.5)   21.2 (35.6)    5.9 (18.4)    7.3 (19.4)
+                             ball atoms by map size/bias  256/0.01: 12.0  512/0.01: 12.0  1024/0.01: 12.0  512/0.005: 12.0  512/0.02: 12.0
+baryte BaSO4                   12.4 (34.8)   21.9 (41.2)    8.4 (24.1)   10.4 (25.7)
+                             ball atoms by map size/bias  256/0.01: 12.4  512/0.01: 12.4  1024/0.01: 12.4  512/0.005: 12.7  512/0.02: 12.1
+andalusite Al2SiO5              9.1 (24.2)      -           7.1 (20.2)    8.3 (20.8)
+                             ball atoms by map size/bias  256/0.01:  9.1  512/0.01:  9.1  1024/0.01:  9.1  512/0.005:  9.2  512/0.02:  9.1
+CsCl                           13.1 (35.7)   18.7 (43.0)    3.7 (14.3)    8.6 (24.4)
+                             ball atoms by map size/bias  256/0.01: 13.1  512/0.01: 13.1  1024/0.01: 13.1  512/0.005: 13.3  512/0.02: 12.7
+high cristobalite SiO2         22.8 (64.8)   38.4 (79.4)   24.5 (64.1)   38.7 (81.0)
+                             ball atoms by map size/bias  256/0.01: 22.8  512/0.01: 22.8  1024/0.01: 22.7  512/0.005: 23.0  512/0.02: 21.2
+olivine (Mg0.9Fe0.1)2SiO4      10.1 (24.9)      -           6.3 (17.5)    7.0 (18.6)
+                             ball atoms by map size/bias  256/0.01: 10.1  512/0.01: 10.1  1024/0.01: 10.1  512/0.005: 10.1  512/0.02: 10.1
+
+--- measure.py CACHE --pairs --cost (darkening rows repeated, then the cost lines)
+1 - A in %, mean (p95), over a 400 px id plane of the opening view
+phase                           ball atoms   ball sticks    ell. atoms   ell. sticks
+LaB6                           23.1 (57.1)   36.1 (64.6)   13.6 (43.5)   29.2 (57.6)
+                             cost: 1000 px 0.04 s plain, 1.97 s occluded; 3000 px 0.14 s, 15.28 s; maps 0.53 s
+NAC                            18.7 (43.1)   24.4 (48.8)   11.6 (30.6)   14.9 (32.8)
+                             cost: 1000 px 0.05 s plain, 1.42 s occluded; 3000 px 0.17 s, 10.76 s; maps 0.22 s
+fluorapatite                   14.5 (37.1)   22.8 (44.3)    5.6 (17.8)    7.6 (20.1)
+                             cost: 1000 px 0.03 s plain, 0.71 s occluded; 3000 px 0.06 s, 4.74 s; maps 0.16 s
+spinel MgAl2O4                 11.3 (28.1)      -           7.2 (20.6)   11.4 (26.8)
+                             cost: 1000 px 0.05 s plain, 1.11 s occluded; 3000 px 0.20 s, 9.13 s; maps 0.15 s
+perovskite SrTiO3              14.0 (40.7)   30.1 (49.1)    7.2 (23.0)   12.8 (31.2)
+                             cost: 1000 px 0.04 s plain, 1.56 s occluded; 3000 px 0.12 s, 11.43 s; maps 0.29 s
+garnet grossular               25.1 (54.2)   32.2 (59.2)   10.2 (26.7)   12.5 (28.7)
+                             cost: 1000 px 0.15 s plain, 2.51 s occluded; 3000 px 0.31 s, 15.68 s; maps 0.33 s
+rutile TiO2                     8.8 (23.9)      -           3.2 (11.1)    3.7 (11.7)
+                             cost: 1000 px 0.03 s plain, 1.13 s occluded; 3000 px 0.10 s, 6.52 s; maps 0.11 s
+olivine forsterite             10.1 (24.9)      -           6.2 (18.0)    7.0 (18.5)
+                             cost: 1000 px 0.04 s plain, 0.99 s occluded; 3000 px 0.12 s, 7.15 s; maps 0.10 s
+zircon ZrSiO4                  13.2 (33.1)   18.0 (36.2)    5.5 (16.3)    6.5 (17.5)
+                             cost: 1000 px 0.02 s plain, 0.76 s occluded; 3000 px 0.08 s, 5.67 s; maps 0.13 s
+corundum Al2O3                 10.3 (25.5)      -           5.0 (17.4)    6.0 (16.7)
+                             cost: 1000 px 0.03 s plain, 0.80 s occluded; 3000 px 0.12 s, 6.28 s; maps 0.09 s
+fluorite CaF2                  15.1 (35.9)   19.0 (41.2)    6.1 (19.1)   10.8 (26.7)
+                             cost: 1000 px 0.02 s plain, 0.83 s occluded; 3000 px 0.07 s, 6.10 s; maps 0.21 s
+wurtzite ZnO                    3.1 (10.7)      -           3.1 (12.2)    3.3 ( 9.6)
+                             cost: 1000 px 0.01 s plain, 0.39 s occluded; 3000 px 0.06 s, 2.39 s; maps 0.06 s
+quartz SiO2                     5.0 (16.2)      -           3.1 (11.4)    3.3 (10.6)
+                             cost: 1000 px 0.01 s plain, 0.36 s occluded; 3000 px 0.05 s, 2.68 s; maps 0.07 s
+calcite CaCO3                   9.1 (24.1)   14.9 (25.9)    7.2 (19.9)    8.6 (20.6)
+                             cost: 1000 px 0.04 s plain, 0.60 s occluded; 3000 px 0.09 s, 4.05 s; maps 0.11 s
+gypsum CaSO4.2H2O              10.0 (25.9)   15.4 (30.9)    5.8 (17.4)    6.3 (17.4)
+                             cost: 1000 px 0.07 s plain, 1.27 s occluded; 3000 px 0.09 s, 4.34 s; maps 0.14 s
+pyrite FeS2                    12.0 (30.5)   21.2 (35.6)    5.9 (18.4)    7.3 (19.4)
+                             cost: 1000 px 0.03 s plain, 1.13 s occluded; 3000 px 0.12 s, 9.20 s; maps 0.13 s
+baryte BaSO4                   12.4 (34.8)   21.9 (41.2)    8.4 (24.1)   10.4 (25.7)
+                             cost: 1000 px 0.02 s plain, 1.13 s occluded; 3000 px 0.10 s, 8.95 s; maps 0.15 s
+andalusite Al2SiO5              9.1 (24.2)      -           7.1 (20.2)    8.3 (20.8)
+                             cost: 1000 px 0.03 s plain, 0.72 s occluded; 3000 px 0.09 s, 7.12 s; maps 0.12 s
+CsCl                           13.1 (35.7)   18.7 (43.0)    3.7 (14.3)    8.6 (24.4)
+                             cost: 1000 px 0.02 s plain, 1.02 s occluded; 3000 px 0.07 s, 7.80 s; maps 0.24 s
+high cristobalite SiO2         22.8 (64.8)   38.4 (79.4)   24.5 (64.1)   38.7 (81.0)
+                             cost: 1000 px 0.06 s plain, 1.45 s occluded; 3000 px 0.14 s, 11.57 s; maps 0.36 s
+olivine (Mg0.9Fe0.1)2SiO4      10.1 (24.9)      -           6.3 (17.5)    7.0 (18.6)
+                             cost: 1000 px 0.08 s plain, 1.25 s occluded; 3000 px 0.16 s, 9.29 s; maps 0.17 s
+1000 px: plain 0.01-0.15 s, occluded 0.36-2.51 s
+3000 px: plain 0.05-0.31 s, occluded 2.39-15.68 s
+maps: 0.06-0.53 s

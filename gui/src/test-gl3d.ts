@@ -19,6 +19,8 @@ export interface Frame {
   background: number[];
   /** whether depth cueing was on when this frame was drawn (WP-1548) */
   depthCue: boolean;
+  /** whether ambient occlusion was on when this frame was drawn (WP-1538) */
+  ambientOcclusion: boolean;
 }
 
 /** Every frame any stand-in renderer drew, oldest first, and every export. */
@@ -35,6 +37,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   if (dead.has(canvas)) lifecycle.onDeadCanvas += 1;
   let scene: Scene | null = null;
   let depthCue = false;
+  let ambientOcclusion = false;
   return {
     setScene(next: Scene) {
       scene = next;
@@ -42,8 +45,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     setDepthCue(on: boolean) {
       depthCue = on;
     },
+    setAmbientOcclusion(on: boolean) {
+      ambientOcclusion = on;
+    },
     draw(view: View, background: number[]) {
-      if (scene) frames.push({ scene, view, background, depthCue });
+      if (scene) frames.push({ scene, view, background, depthCue, ambientOcclusion });
     },
     async exportPng(view: View, options: ExportOptions) {
       exports.push({ view, options });

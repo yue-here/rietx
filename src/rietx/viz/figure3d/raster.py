@@ -320,12 +320,15 @@ def _ipow(x, n):
     return out
 
 
-def _shade(base, n0, n1, n2, look):
+def _shade(base, n0, n1, n2, look, occ=None):
+    """``base·(ambient + diffuse·d) + specular·s^shininess``; with ``occ``,
+    the unoccluded share of ambient light at each sample, the ambient term
+    is ``ambient·occ`` (WP-1538 D3) and the key light keeps its own."""
     ndl = n0 * look[0] + n1 * look[1] + n2 * look[2]
     d = np.maximum(ndl, 0.0)
     rz = -look[2] + 2.0 * ndl * n2
     spec = _ipow(np.maximum(rz, 0.0), int(look[6]))
-    k = look[3] + look[4] * d
+    k = look[3] + look[4] * d if occ is None else look[3] * occ + look[4] * d
     return np.stack([base[0] * k + look[5] * spec, base[1] * k + look[5] * spec,
                      base[2] * k + look[5] * spec], axis=-1)
 
@@ -353,9 +356,25 @@ def _outline_numpy(ext0, sr0, hs, ws, total, ow, otau, ocol, zb, pm, fog=None):
     pm[rows] = np.where(edge[..., None], ink, pm[rows])
 
 
-def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None):
+def _occluded(occ, R, iy, ix, pxs, x0, y0, z, n0, n1, n2, hit):
+    """The unoccluded share at each hit sample of a box (:func:`occlusion`),
+    1 elsewhere: the sample's point and normal taken back from the view
+    frame to the structure's by ``Rᵀ``."""
+    share = np.ones(hit.shape)
+    if not hit.any():
+        return share
+    sy = np.broadcast_to(y0 - (iy + 0.5) / pxs, hit.shape)[hit]
+    sx = np.broadcast_to(x0 + (ix + 0.5) / pxs, hit.shape)[hit]
+    view_p = np.stack([sx, sy, z[hit]], axis=1)
+    view_n = np.stack([n0[hit], n1[hit], n2[hit]], axis=1)
+    share[hit] = occlusion(occ, view_p @ R, view_n @ R)
+    return share
+
+
+def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None, occ=None):
     """Rows ``r0`` to ``r1`` of ``out``: each primitive's per-sample
-    expressions, evaluated over its whole box at once."""
+    expressions, evaluated over its whole box at once.  ``occ`` is
+    ``(maps, rotation)`` for ambient occlusion (WP-1538), or ``None``."""
     hs, ws, sr0 = (r1 - r0) * s, frame.width * s, r0 * s
     total = frame.height * s
     ow, otau, ocol = outline
@@ -396,7 +415,9 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None):
         n2 = e0 * u0 + e1 * u1 + e2 * u2
         nn = np.sqrt(n0 * n0 + n1 * n1 + n2 * n2)
         nn = np.where(hit, nn, 1.0)
-        col = _shade(atom_col[i], n0 / nn, n1 / nn, n2 / nn, look)
+        share = None if occ is None else _occluded(
+            occ[0], occ[1], iy, ix, pxs, x0, y0, z, n0 / nn, n1 / nn, n2 / nn, hit)
+        col = _shade(atom_col[i], n0 / nn, n1 / nn, n2 / nn, look, share)
         if atom_ring[i]:
             ring = np.minimum(np.abs(u0), np.minimum(np.abs(u1), np.abs(u2))) < look[8]
             ink = col + look[10] * (1.0 - col) if atom_lum[i] < look[9] else col * look[11]
@@ -435,8 +456,10 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None):
         n2 = q2 + z * f2
         nn = np.sqrt(n0 * n0 + n1 * n1 + n2 * n2)
         nn = np.where(hit, nn, 1.0)
+        share = None if occ is None else _occluded(
+            occ[0], occ[1], iy, ix, pxs, x0, y0, z, n0 / nn, n1 / nn, n2 / nn, hit)
         col = _fogged(np.minimum(np.maximum(_shade(half_col[i], n0 / nn, n1 / nn, n2 / nn,
-                                                   look), 0.0), 1.0), z, fog)
+                                                   look, share), 0.0), 1.0), z, fog)
         zb[rows, cols] = np.where(hit, z, zb[rows, cols])
         pm[rows, cols] = np.where(hit[..., None], col, pm[rows, cols])
         al[rows, cols] = np.where(hit, 1.0, al[rows, cols])
@@ -492,7 +515,8 @@ def _band_numpy(r0, r1, s, frame, pk, alpha, bg, outline, out, fog=None):
 
 def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
          background=(1.0, 1.0, 1.0), text: list | None = None,
-         outline: tuple | None = None, fog: tuple | None = None) -> np.ndarray:
+         outline: tuple | None = None, fog: tuple | None = None,
+         occlusion: OcclusionMaps | None = None) -> np.ndarray:
     """The picture, ``frame.height × frame.width × 4`` ``uint8``, straight alpha.
 
     ``background`` is three channels in 0..1, or ``None`` for transparent.
@@ -505,6 +529,11 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
     ``render_rows_cued`` (``rietx-kernels`` from 1.5.0, WP-1548) is
     ``render_rows`` with the fog, held to :func:`_band_numpy`'s bits like it,
     and a picture without fog calls ``render_rows`` as before.
+
+    ``occlusion`` is the scene's :func:`occlusion_maps`, for ambient
+    occlusion (WP-1538), or ``None``.  No kernel draws it yet, so a picture
+    with it runs :func:`_band_numpy` on either path; the maps themselves are
+    built by :func:`id_plane`, on the process's path.
     """
     s = int(supersample)
     pk = _pack(scene, rotation, frame, s, text)
@@ -525,9 +554,12 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
         if colour.shape != (3,):
             raise ValueError(f"fog colour has {colour.size} entries, not 3")
         fog = (float(z_start), float(z_end), float(f_max), colour)
-    kernel = _kernel("render_rows" if fog is None else "render_rows_cued")
+    kernel = (None if occlusion is not None
+              else _kernel("render_rows" if fog is None else "render_rows_cued"))
     if kernel is None:
         cue = {} if fog is None else {"fog": fog}
+        if occlusion is not None:
+            cue["occ"] = (occlusion, np.asarray(rotation, dtype=np.float64))
         for r0 in range(0, frame.height, rows):
             _band_numpy(r0, min(frame.height, r0 + rows), s, frame, pk, POLY_ALPHA,
                         background, (ow, otau, ocol), out, **cue)
@@ -714,3 +746,176 @@ def id_plane(pk: dict, frame: Frame) -> IdPlane:
                 pk["half_r"], half_box), ids, seen)
     front = np.bincount(ids[ids >= 0], minlength=len(atom_box) + len(half_box))[:len(atom_box)]
     return IdPlane(ids=ids, seen=seen, front=front, index=pk["index"])
+
+
+# ----------------------------------------------------------------------
+# ambient occlusion (WP-1538)
+# ----------------------------------------------------------------------
+
+#: Ambient occlusion's constants (WP-1538 D2), ``scene.LOOK``'s and so the
+#: GUI's: how many directions the ambient light comes from, the side of each
+#: direction's depth map in texels, and the depth bias as a share of the map's
+#: width.  ChimeraX's are 64, 1024 and 0.01 (its ``lighting`` documentation);
+#: 512 texels gave the 1024 map's mean darkening to 0.1 % on the 21 phases
+#: (``docs/wp/1538-measure/results.txt``) at a quarter of its memory.
+OCCLUSION_DIRECTIONS = LOOK["occlusion_directions"]
+OCCLUSION_MAP_SIZE = LOOK["occlusion_map_size"]
+OCCLUSION_BIAS = LOOK["occlusion_bias"]
+
+#: Samples looked up in one go: :func:`occlusion` holds about seven
+#: (samples × directions) float64 arrays at once, some 60 MB at this size.
+_OCCLUSION_CHUNK = 1 << 14
+
+
+def occlusion_directions(n: int = OCCLUSION_DIRECTIONS) -> np.ndarray:
+    """``n`` unit vectors spread evenly over the sphere: the Fibonacci
+    lattice, ``z = 1 − (2i + 1)/n`` and a turn of the golden angle
+    ``π(3 − √5)`` from one to the next, in the structure's Cartesian frame."""
+    i = np.arange(n, dtype=np.float64)
+    z = 1.0 - (2.0 * i + 1.0) / n
+    r = np.sqrt(1.0 - z * z)
+    phi = i * (math.pi * (3.0 - math.sqrt(5.0)))
+    return np.stack([r * np.cos(phi), r * np.sin(phi), z], axis=1)
+
+
+def _light_basis(d: np.ndarray) -> np.ndarray:
+    """A rotation whose third row is ``d``: the view looking back along a
+    light from direction ``d``, so a depth map's z grows toward the light.
+    Its first row is ``x̂ × d`` normalised, or ``ŷ × d`` where ``d`` is within
+    about 25° of the x axis, and its second ``d ×`` the first."""
+    helper = np.array([1.0, 0.0, 0.0]) if abs(d[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    u = np.cross(helper, d)
+    u = u / math.sqrt(float(u @ u))
+    v = np.cross(d, u)
+    return np.stack([u, v, d])
+
+
+@dataclass
+class OcclusionMaps:
+    """A scene's depth maps from every ambient direction (WP-1538 D1, D5).
+
+    ``depth[k]`` is the depth toward the light of what is nearest it at each
+    texel of direction ``k``'s map, in Å, ``-inf`` where nothing is.
+    ``basis[k]`` is that direction's rotation (:func:`_light_basis`) and
+    ``origin[k]`` the map's top-left corner in its view coordinates, the
+    maps being ``size`` texels a side at ``ppa`` texels per Å.  ``bias`` is
+    the depth bias in Å.  Nothing here depends on the view or the framing.
+    """
+    directions: np.ndarray
+    basis: np.ndarray
+    origin: np.ndarray
+    ppa: float
+    size: int
+    bias: float
+    depth: np.ndarray
+
+
+def _depths(pk: dict, frame: Frame, ids: np.ndarray) -> np.ndarray:
+    """The depth of the primitive in front at each pixel of an id plane,
+    from :func:`_ids_numpy`'s own ray arithmetic, ``-inf`` where it is empty.
+
+    Computed from the ids rather than kept from the pass, so the maps are the
+    same on either path: the wheel's ``id_plane`` returns ids alone, and they
+    are the numpy path's to the bit."""
+    out = np.full(ids.shape, -np.inf)
+    iy, ix = np.nonzero(ids >= 0)
+    k = ids[iy, ix].astype(np.intp)
+    na = len(pk["atom_c"])
+    y_px = frame.y0 - (iy + 0.5) / frame.ppa
+    x_px = frame.x0 + (ix + 0.5) / frame.ppa
+    on = k < na
+    if on.any():
+        i = k[on]
+        m, c, a = pk["atom_m"][i], pk["atom_c"][i], pk["atom_a"][i]
+        e0, e1, e2 = m[:, 0, 2], m[:, 1, 2], m[:, 2, 2]
+        y = y_px[on] - c[:, 1]
+        x = x_px[on] - c[:, 0]
+        q0 = m[:, 0, 0] * x + m[:, 0, 1] * y
+        q1 = m[:, 1, 0] * x + m[:, 1, 1] * y
+        q2 = m[:, 2, 0] * x + m[:, 2, 1] * y
+        b = q0 * e0 + q1 * e1 + q2 * e2
+        cc = q0 * q0 + q1 * q1 + q2 * q2 - 1.0
+        disc = np.maximum(b * b - a * cc, 0.0)
+        out[iy[on], ix[on]] = c[:, 2] + (-b + np.sqrt(disc)) / a
+    off = ~on
+    if off.any():
+        i = k[off] - na
+        A, w, f = pk["half_a"][i], pk["half_w"][i], pk["half_e"][i]
+        a, r = pk["half_ea"][i], pk["half_r"][i]
+        o1 = y_px[off] - A[:, 1]
+        o0 = x_px[off] - A[:, 0]
+        o2 = -A[:, 2]
+        oa = o0 * w[:, 0] + o1 * w[:, 1] + o2 * w[:, 2]
+        q0 = o0 - oa * w[:, 0]
+        q1 = o1 - oa * w[:, 1]
+        q2 = o2 - oa * w[:, 2]
+        b = q0 * f[:, 0] + q1 * f[:, 1] + q2 * f[:, 2]
+        disc = np.maximum(b * b - a * (q0 * q0 + q1 * q1 + q2 * q2 - r * r), 0.0)
+        out[iy[off], ix[off]] = (-b + np.sqrt(disc)) / a
+    return out
+
+
+def occlusion_maps(scene: dict, *, directions: int = OCCLUSION_DIRECTIONS,
+                   size: int = OCCLUSION_MAP_SIZE, bias: float = OCCLUSION_BIAS
+                   ) -> OcclusionMaps:
+    """The depth maps ambient occlusion reads, one a direction (WP-1538).
+
+    Each is an :func:`id_plane` of the scene's atoms and bond halves seen
+    along the light, orthographic, over the square of side ``2·depth`` round
+    ``scene["center"]`` (``depth`` bounds every atom the scene can draw, so
+    every caster falls inside each map).  The cell
+    frame and the polyhedron faces cast nothing (D4, D5): a frame line's
+    width is in CSS px, so in Å it would follow the framing, and a face at
+    ``POLY_ALPHA`` would darken its own centre atom.  The maps hold no view,
+    so one set serves every view of a scene; anything that rebuilds the scene
+    builds them again.
+    """
+    arrays = scene_arrays(scene)
+    dirs = occlusion_directions(directions)
+    center = np.asarray(scene["center"], dtype=np.float64)
+    reach = float(scene["depth"])
+    ppa = size / (2.0 * reach)
+    basis = np.stack([_light_basis(d) for d in dirs])
+    origin = np.zeros((directions, 2))
+    depth = np.empty((directions, size, size), dtype=np.float32)
+    for k in range(directions):
+        R = basis[k]
+        x0 = float(R[0] @ center) - reach
+        y0 = float(R[1] @ center) + reach
+        origin[k] = (x0, y0)
+        frame = Frame(width=size, height=size, x0=x0, y0=y0, ppa=ppa, px_scale=1.0)
+        pk = pack_ids(arrays, R)
+        depth[k] = _depths(pk, frame, id_plane(pk, frame).ids)
+    return OcclusionMaps(directions=dirs, basis=basis, origin=origin, ppa=ppa, size=size,
+                         bias=bias * 2.0 * reach, depth=depth)
+
+
+def occlusion(maps: OcclusionMaps, points: np.ndarray, normals: np.ndarray) -> np.ndarray:
+    """The unoccluded share of ambient light at each of ``points`` (Å, the
+    structure's Cartesian frame) with unit outward ``normals``.
+
+    Each direction above a point's tangent plane is weighed by its cosine
+    with the normal, as a light from it would be, and counts where the
+    point's depth toward it, plus the bias, is no nearer the light than its
+    map's texel (nearest texel).  The share is the lit weight over the whole
+    weight, so a surface nothing else faces is 1 everywhere, its own far side
+    being below the tangent plane of every point it would shadow.
+    """
+    out = np.ones(len(points))
+    d, B, o = maps.directions, maps.basis, maps.origin
+    last = maps.size - 1
+    for s0 in range(0, len(points), _OCCLUSION_CHUNK):
+        p = points[s0:s0 + _OCCLUSION_CHUNK]
+        n = normals[s0:s0 + _OCCLUSION_CHUNK]
+        w = np.maximum(n @ d.T, 0.0)                              # (m, k)
+        pu = p @ B[:, 0, :].T
+        pv = p @ B[:, 1, :].T
+        pz = p @ B[:, 2, :].T
+        col = np.clip(np.floor((pu - o[:, 0]) * maps.ppa), 0, last).astype(np.intp)
+        row = np.clip(np.floor((o[:, 1] - pv) * maps.ppa), 0, last).astype(np.intp)
+        k = np.broadcast_to(np.arange(len(d)), col.shape)
+        lit = ~(pz + maps.bias < maps.depth[k, row, col])
+        total = w.sum(axis=1)
+        out[s0:s0 + len(p)] = np.where(total > 0.0, (w * lit).sum(axis=1)
+                                       / np.where(total > 0.0, total, 1.0), 1.0)
+    return out
