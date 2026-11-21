@@ -1,1 +1,1 @@
-import{t as e}from"./vendor-uplot.js";import{pattern as t,trajectory as n,unpack as r}from"./rxplot.js";function i(t,r,i){return n(e,t,r,i)}function a(n,r,i){return t(e,n,r,i)}export{a as mountMember,i as mountTrajectory,r as unpack};
+import{t as e}from"./vendor-uplot.js";import{pattern as t,trace as n,trajectory as r,unpack as i}from"./rxplot.js";function a(t,n,i){return r(e,t,n,i)}function o(n,r,i){return t(e,n,r,i)}function s(t,r,i){return n(e,t,r,i)}export{o as mountMember,s as mountTrace,a as mountTrajectory,i as unpack};
