@@ -600,7 +600,7 @@ Each kind has one constructor, so each format string is written once:
 |---|---|---|---|
 | `GuardFinding.correlation` | `HIGH_CORRELATION` | two free parameters correlate above the plan's `correlation_guard` | ρ |
 | `GuardFinding.flat_direction` | `FLAT_DIRECTION` | a correlated pair reaches \|ρ\| = 1.000 to the three decimals the message prints, so the data do not separate them | ρ |
-| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so each esd is at least √2 too small | the number of directions |
+| `GuardFinding.discarded_direction` | `COVARIANCE_DIRECTION_DISCARDED` | three or more parameters share a direction the covariance solve discards, which no pairwise correlation shows, so none of them has an esd | the number of directions |
 | `GuardFinding.at_bound`, `GuardFinding.tied_at_bound` | `BOUND_HIT`, or `FLOOR_HIT` on a lower bound at 0 | a bound carried load at the answer, on a free or a tied parameter | the residual's cosine with the column, or `None` |
 | `GuardFinding.background_absorption` | `BACKGROUND_ABSORPTION` | the background could largely reproduce a structural parameter's column | the block R² |
 | `GuardFinding.roughness_absorption` | `ROUGHNESS_ABSORPTION` | the surface-roughness correction could | the block R² |
