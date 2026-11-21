@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from ..theme import TOKENS
-from . import cut, glyphs, raster, rings, views
+from . import cut, glyphs, raster, rings, scene3d, views
 from . import report as rp
 from . import scene as sc
 from .report import FigureReport
@@ -60,6 +60,9 @@ NOTEBOOK_COLOURS = 256
 #: held equal by the same test.
 NOTEBOOK_DARK_GROUND = "#1d1813"
 MODES = ("ball", "ellipsoid")
+#: What ``path=`` writes, by suffix: the picture, or the scene for a ray
+#: tracer (:mod:`.scene3d`, WP-1537).
+WRITERS = (".png", ".pov", ".glb")
 #: The places tried for a site label, in order, as (right, up) signs: up and
 #: to the right first, which is where every label went before #666.
 LABEL_ANCHORS = ((1, 1), (1, 0), (0, 1), (-1, 1), (-1, 0), (1, -1), (0, -1), (-1, -1))
@@ -799,8 +802,13 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     other as its convex hull (``rings.face_fill``).  ``atom_labels=True`` writes each site
     label beside its atom, in the first of eight places around it clear of
     atoms, bonds and the labels before it.  The report counts what each label
-    still meets.  ``path`` writes a PNG, with ``dpi`` only in its ``pHYs``
-    chunk.
+    still meets.  ``path`` writes the file its suffix names: ``.png`` the
+    picture, with ``dpi`` only in its ``pHYs`` chunk; ``.pov`` a POV-Ray 3.7
+    scene and ``.glb`` a glTF 2.0 binary, each with the figure's camera and
+    light, for a ray tracer to draw with shadows (:mod:`.scene3d`).  Render
+    the ``.pov`` at the figure's size, ``povray +W<width> +H<height>``; a
+    ``.glb`` opens in Blender with its camera.  ``outline`` and ``depth_cue``
+    are the PNG's alone and are refused with a scene.
     """
     from ...gui import structure3d as s3
 
@@ -812,9 +820,16 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     s = int(supersample)
     if not 1 <= s <= MAX_SUPERSAMPLE:
         raise ValueError(f"supersample {supersample!r}: 1 to {MAX_SUPERSAMPLE}")
-    if path is not None and Path(path).suffix.lower() != ".png":
-        raise ValueError("render_structure writes PNG only: JPEG's block artifacts "
-                         "smear the thin rings and lines a structure figure is read by")
+    suffix = None if path is None else Path(path).suffix.lower()
+    if suffix is not None and suffix not in WRITERS:
+        raise ValueError(f"path {str(path)!r}: render_structure writes "
+                         f"{', '.join(WRITERS)}; not JPEG, whose block artifacts smear "
+                         "the thin rings and lines a structure figure is read by")
+    if suffix in (".pov", ".glb") and (outline or depth_cue):
+        raise ValueError(f"outline= and depth_cue= are the PNG renderer's own and a "
+                         f"{suffix} scene does not carry them: leave them off, and let "
+                         "the ray tracer draw edges and depth (POV-Ray's fog, "
+                         "Blender's mist)")
     if (isinstance(pad, bool) or not isinstance(pad, (int, float, np.integer, np.floating))
             or not 0 <= pad < 0.5):
         raise ValueError(f"pad {pad!r}: the share of each side left empty, from 0 "
@@ -964,7 +979,12 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     written = None
     if path is not None:
         target = Path(path)
-        _png(target, image, dpi)
+        if suffix == ".pov":
+            target.write_text(scene3d.pov(scene, R, frame, strokes, bg), encoding="utf-8")
+        elif suffix == ".glb":
+            target.write_bytes(scene3d.glb(scene, R, frame, strokes))
+        else:
+            _png(target, image, dpi)
         written = str(target)
     seen = rp.look(probe, R)
     warnings = list(fill_warnings)

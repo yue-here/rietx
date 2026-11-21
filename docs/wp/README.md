@@ -417,7 +417,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1505](1505-rietview-the-figure-leaves-the-package.md) | rietview: the figure leaves the package | ⬜ | P3 | [1504](1504-the-figure-surface-measured-with-real-agents.md) |
 | [1529](1529-what-round-b-found-in-the-figure-surface.md) | What round B found in the figure surface: the skill names figures, a cell draws no bare centre, the report counts every stub | ✅ 2026-10-01 | — | — |
 | [1536](1536-the-structure-figure-as-an-svg.md) | The structure figure as an SVG | ⬜ | P3 | — |
-| [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | ⬜ | P3 | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
+| [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | ✅ 2026-11-17 | — | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
 | [1538](1538-ambient-occlusion-in-the-structure-figure.md) | Ambient occlusion in the structure figure | ⬜ | P3 | — |
 | [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | ✅ 2026-11-13 | — | — ([2111](2111-what-the-structure-figure-still-misleads.md) soft) |
 

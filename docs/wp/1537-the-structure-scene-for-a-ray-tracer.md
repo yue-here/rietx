@@ -1,8 +1,7 @@
 # WP-1537 — the structure scene for a ray tracer: POV-Ray and glTF
 
-Milestone: rietview · Status: ⬜
+Milestone: rietview · Status: ✅ 2026-11-17 — the .pov and .glb writers (PR #1666); the GUI menu, the one-off renders and the validator run moved to #1667
 Depends on: 1536 soft (the GUI menu lists SVG once it lands)
-Priority: P3 2026-10-02 — a workaround covers it: a CIF opened in Blender's atomic add-on or in VESTA, which loses rietx's bond rules, polyhedra and colours
 
 ## Goal
 
@@ -151,26 +150,32 @@ change.
 
 ## Tasks
 
-- [ ] The `.pov` writer: atoms, rings, halves, faces, lines, letters,
+- [x] The `.pov` writer: atoms, rings, halves, faces, lines, letters,
   camera and light. Test: the handedness check on a chiral phase, an
   unrendered text comparison against a committed small case, and each
   atom's `matrix`, read in POV-Ray's column order, mapping the unit sphere
   onto `pos + M·u` on an ellipsoid whose M is not symmetric.
-- [ ] The `.glb` writer. Test: the file parses as GLB (magic, version,
+- [x] The `.glb` writer. Test: the file parses as GLB (magic, version,
   chunk lengths), node transforms reproduce each atom's `shape` to 1e-12,
-  and the validator reports no errors on the corpus.
+  and the validator reports no errors on the corpus. *2026-11-17: built and
+  tested; the Khronos validator's own run moved to #1667.*
 - [ ] Render the fluorapatite and NAC figures once with POV-Ray and once in
   Blender (Cycles, the imported camera). Commit each beside the PNG under
   `docs/wp/1537-renders/` and record the commands in the handover.
+  *Moved to #1667, 2026-11-17: neither program was installed.*
 - [ ] The GUI: the route, the export menu (PNG, SVG once 1536 lands,
   POV-Ray, glTF), the manual chapter and a browser test that downloads a
-  `.glb` and checks its header. Rebuild the dist.
-- [ ] Docs: `docs/manual/using/exports.md` gains a section on ray-tracer
+  `.glb` and checks its header. Rebuild the dist. *Moved to #1667,
+  2026-11-17.*
+- [x] Docs: `docs/manual/using/exports.md` gains a section on ray-tracer
   input, with the POV-Ray command and the Blender import steps. The
-  `render_structure` docstring names each suffix.
-- [ ] Tests + the render pictures to `tests/output/figure3d/`.
-- [ ] Skill: one clause in `api-figure.md` naming `.pov` and `.glb`, tagged
-  with what was rendered.
+  `render_structure` docstring names each suffix. *2026-11-17: that page is
+  now `docs/docs/reference/figures.md`, § A scene for a ray tracer.*
+- [x] Tests + the render pictures to `tests/output/figure3d/`. *2026-11-17:
+  the tests write NAC's `.pov`, `.glb` and PNG there; the ray-traced
+  pictures are #1667's.*
+- [x] Skill: one clause in `api-figure.md` naming `.pov` and `.glb`, tagged
+  with what was rendered (from `docs/skill/make_api_index.py`).
 
 ## Acceptance
 
@@ -197,6 +202,51 @@ camera and renders it in Cycles.
   `mesh2`.
 
 ## Handover log
+
+### 2026-11-17 — the .pov and .glb writers; closed (PR #1666, rest to #1667)
+
+A structure figure can now leave rietx for a ray tracer: `render_structure`
+with a `.pov` path writes a POV-Ray scene and with a `.glb` path a glTF
+file Blender opens, each framed as the PNG is, with its light. The
+mirror-image trap the filing warned about is closed and tested: a chiral
+structure's atoms, carried through the written camera as POV-Ray reads it,
+land on the PNG's pixels at the PNG's depths, and the test fails without
+the mirror. Nothing was ray-traced, because neither POV-Ray nor Blender was
+installed on any machine the runner could use, and the GUI menu was not
+started; both moved to issue #1667 with the validator run, and the WP closes
+on the writers.
+
+- **Done**: `viz/figure3d/scene3d.py` (`pov`, `glb`, `ring_sphere`, `trs`);
+  `render.py`'s suffix dispatch (`WRITERS`), refusing `outline`/`depth_cue`
+  with a scene; `docs/docs/reference/figures.md` § A scene for a ray tracer
+  (the WP's `docs/manual/using/exports.md` no longer exists); the skill clause,
+  from `docs/skill/make_api_index.py`, tagged Hypothesis; 8 tests (11 items)
+  in `tests/test_render_structure.py` and the committed small case
+  `tests/data/figure3d_one_ellipsoid.pov` (provenance in its README).
+- **Decided here**: glTF colours are linear factors of the sRGB values and
+  POV-Ray's are `srgb`, so unlit ink matches the PNG exactly; a lit surface
+  shades in linear light and differs. The glTF light is in lux, `diffuse·π·683`,
+  which Blender's importer converts back to `diffuse·π` W/m². Roughness 0.5 is a
+  look value. The ringed unit sphere lays its triangles on the ring edges
+  (octant patches, strips, pole caps), so the band is exact, not sampled.
+- **Reviewed** (a read-only review agent, standing in for `/code-review`,
+  which a runner may not run): no bug found in either writer. Applied: a
+  mirroring sheared shape is folded before baking (it drew inside out);
+  accessors are written on first use; normals get their own accessor; glTF
+  letter strokes are rounded at their ends; `KHR_materials_unlit` is listed
+  only when used; tests now pin both lights, a bond half's ends and the
+  letters' plane. Its note that a one-object `union` draws a POV-Ray parse
+  warning is left, being harmless.
+- **Measured**: the new tests, 11 passed (arm64 Mac, `[dev]` venv); lint and Vale clean; `tests.reader_output` exit 0. The fast suite was running when the shift paused (2026-11-17T16:25Z) and is not quoted: the next session runs it, then marks the PR ready.
+- **Gotchas**: `npx gltf-validator` does not run, since the npm package has
+  no command-line entry point; it needs a Node script calling
+  `validateBytes` (#1667). Homebrew is not on this Mac and pearl has neither
+  program.
+- **Next** (#1667): run the validator on `tests/output/figure3d/nac_*.glb`;
+  render NAC and fluorapatite once in POV-Ray and in Blender to confirm the
+  hand by eye; then the GUI route, which must carry the panel's client-side
+  drawing state (hidden species, polyhedra switches, exaggeration, stick)
+  besides its `View`.
 
 ### 2026-10-02 — filed
 

@@ -137,6 +137,11 @@ rectangle closed by two half-ellipses.
   agent task an SVG answers.** 1504's tasks are in `docs/wp/1504-eval/`. Task 6, fluorapatite
   for print, is the one an agent could answer with an SVG once this lands. A later round that
   re-runs it measures this WP's surface. 1504 runs no further round itself.
+- **2026-11-17, from [1537](1537-the-structure-scene-for-a-ray-tracer.md) (closed): the
+  suffix dispatch is now a tuple.** `render.WRITERS` lists the suffixes `path=` accepts
+  (`.png`, `.pov`, `.glb`) and `render_structure` branches on it where it writes; `.svg` joins
+  that tuple and that branch. `outline=` and `depth_cue=` are refused with a scene suffix, so
+  decide whether the SVG draws them. The GUI's export menu, which lists SVG, is issue #1667.
 
 ## Non-goals
 
