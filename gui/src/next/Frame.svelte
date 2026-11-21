@@ -26,9 +26,10 @@
   import Peaks from "./Peaks.svelte";
   import Structure from "./Structure.svelte";
   import Recovery from "../panels/Recovery.svelte";
+  import { projectStem } from "../lib/filemenu";
   import type { HelpCorpus } from "../lib/help";
   import { RecoveryWriter, combine, readDraft, restoredText, type Draft,
-           type ModelDraft, type TextDraft } from "../lib/recovery";
+           type ModelDraft } from "../lib/recovery";
   import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "../lib/interactive";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import { peakWindows, widestFwhm } from "../lib/peakwin";
@@ -43,6 +44,7 @@
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
   import Plan from "./Plan.svelte";
+  import Text from "./Text.svelte";
   import Pattern from "./Pattern.svelte";
   import { dropsFor, type StatusReadout } from "./readout";
   import Settings from "./Settings.svelte";
@@ -95,7 +97,17 @@
   /** The Plan tab (WP-2231): an edited plan is one pending edit in the bar. */
   let planPanel = $state<any>(null);
   let planEdited = $state(false);
-  const touched = $derived(pendingTouched + sliderTouched + (planEdited ? 1 : 0));
+  /** The Text tab (WP-2231): an edited buffer is one pending edit in the bar,
+   *  and why it cannot be applied when it cannot. */
+  let textPanel = $state<any>(null);
+  let textEdited = $state(false);
+  let textWhy = $state("");
+  /** What the recovery copy counts as waiting at Apply: its words name the
+   *  Text document apart (`lib/recovery.ts:keptParts`). */
+  const counted = $derived(pendingTouched + sliderTouched + (planEdited ? 1 : 0));
+  const touched = $derived(counted + (textEdited ? 1 : 0));
+  /** Why Apply and Refine are refused: the Parameters panel's reason first. */
+  const invalid = $derived(pendingInvalid || textWhy);
   /** The curves the Pattern graph last fetched: the sliders' ranges are
    *  measured from its widest peak and its highest angle. */
   let baseCurves = $state.raw<any>(null);
@@ -199,20 +211,20 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
-  /** The kept copy's Text and Model arms, which today's page wrote and this
-   *  page has no panel for. The copy is one per project and shared by both
-   *  pages, so they ride on every write from here: an edit on this page never
-   *  drops the other page's unapplied edits. The Interactive arm (WP-2218)
-   *  and the Plan arm (WP-2231) are this page's own. The Text and Model arms
-   *  are not in the action bar's count (WP-2213). */
-  const NO_CARRY = { text: null, model: null } as const;
-  let carried = $state.raw<{ text: TextDraft | null; model: ModelDraft | null }>(NO_CARRY);
+  /** The kept copy's Model arm, which today's page wrote and this page has
+   *  no panel for. The copy is one per project and shared by both pages, so
+   *  it rides on every write from here: an edit on this page never drops the
+   *  other page's unapplied edits. The Interactive arm (WP-2218), and the
+   *  Plan and Text arms (WP-2231), are this page's own. */
+  const NO_CARRY = { model: null } as const;
+  let carried = $state.raw<{ model: ModelDraft | null }>(NO_CARRY);
   $effect(() => {
     const path = project?.path ?? null;
     const extra = carried;
-    const draft = combine(touched,
+    const draft = combine(counted,
                           { ...extra, params: paramsPanel?.draft(),
-                            interactive: interactivePanel?.draft(), plan: planPanel?.draft() ?? null });
+                            interactive: interactivePanel?.draft(), plan: planPanel?.draft() ?? null,
+                            text: textPanel?.draft() ?? null });
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -290,6 +302,7 @@
     paramsPanel?.revert();
     interactivePanel?.revert();
     planPanel?.leave();
+    textPanel?.forget();
   }
 
   /** Offer the open project's kept edits, or start keeping new ones. */
@@ -305,8 +318,8 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
-    carried = draft?.text || draft?.model ? { text: draft.text, model: draft.model } : NO_CARRY;
-    if (draft?.params || draft?.interactive || draft?.plan) {
+    carried = draft?.model ? { model: draft.model } : NO_CARRY;
+    if (draft?.params || draft?.interactive || draft?.plan || draft?.text) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
       return;
@@ -322,8 +335,10 @@
     if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
     if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
     if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
+    if (o.draft.text) textPanel?.restoreDraft(o.draft.text);
     recoveryWriter.arm(o.path, o.draft);
-    modelTab = o.draft.params ? "params" : o.draft.interactive ? "interactive" : "plan";
+    modelTab = o.draft.params ? "params" : o.draft.interactive ? "interactive"
+      : o.draft.plan ? "plan" : "text";
     say(restoredText(o.draft));
   }
 
@@ -405,11 +420,25 @@
     await loadResult();
   }
 
-  /** Apply the pending edits. A refusal is drawn in the Parameters panel,
-   *  so a refused apply brings that tab, and the model panel, forward. The
-   *  result is not refetched: a `set_values` keeps the last fit (today's
-   *  `App.svelte:moved` says why). */
+  /** Apply the pending edits. A refusal is drawn in the panel that made
+   *  the edit, so a refused apply brings that tab, and the model panel,
+   *  forward. The result is not refetched: a `set_values` keeps the last fit
+   *  (today's `App.svelte:moved` says why). */
   async function applyPending(): Promise<boolean> {
+    // a second Apply or ⌘⏎ while one is in flight would find each panel
+    // mid-apply, read that as a refusal and pull its tab forward
+    if (applying) return false;
+    applying = true;
+    try {
+      return await applyAll();
+    } finally {
+      applying = false;
+    }
+  }
+  let applying = false;
+
+  async function applyAll(): Promise<boolean> {
+    if (!(await applyText())) return false;
     const ok = !!(await paramsPanel?.apply());
     if (!ok) {
       modelTab = "params";
@@ -434,7 +463,25 @@
     return true;
   }
 
+  /** The Text buffer first: it carries the revision it was typed against,
+   *  and any other apply moves the head under it, which would leave it stale
+   *  (WP-1013: no merge). A path both the text and Parameters change takes
+   *  the Parameters value, applied after it. */
+  async function applyText(): Promise<boolean> {
+    if (!textPanel || !textEdited) return true;
+    if (await textPanel.apply()) return true;
+    modelTab = "text";
+    showModel = true;
+    return false;
+  }
+
+  /** ⌘⏎ inside the Text editor: the bar's Apply, under the bar's own rule. */
+  function applyFromText() {
+    if (touched && !busy && !invalid) void applyPending();
+  }
+
   function revertPending() {
+    textPanel?.revert();
     paramsPanel?.revert();
     interactivePanel?.revert();
     planPanel?.revert();
@@ -451,13 +498,14 @@
   }
 
   /** The Plan tab's Run this stage and the `.` key: the stage as it stands on
-   *  screen, from where the model stands. The Parameters and slider edits
-   *  waiting in the bar are applied first, as Refine applies them; the plan's
+   *  screen, from where the model stands. The Text, Parameters and slider
+   *  edits waiting in the bar are applied first, as Refine applies them; the plan's
    *  own edit is not, since the stage runs as drawn either way. */
   async function runStage(stage: any, echo: string) {
-    if (refining || busy || noPhases || pendingInvalid || !project) return;
+    if (refining || busy || noPhases || invalid || !project) return;
     refining = true;
     try {
+      if (!(await applyText())) return;
       if (pendingTouched + sliderTouched) {
         if (!(await paramsPanel?.apply())) {
           modelTab = "params";
@@ -482,7 +530,7 @@
   /** The action bar's primary: apply the pending edits, then refine. `cycle`
    *  is one stage on what is ticked; `plan` is the project's plan. */
   async function refine(mode: "cycle" | "plan" = refineMode) {
-    if (refining || busy || noPhases || pendingInvalid || !project) return;
+    if (refining || busy || noPhases || invalid || !project) return;
     refining = true;
     try {
       if (touched && !(await applyPending())) return;
@@ -596,14 +644,14 @@
       disabled: !busy, run: stop },
     { id: "refine", label: touched ? "Apply the edits and refine" : "Refine",
       echo: "ref.fit(data, plan=…)", key: `${mod}Enter`,
-      disabled: !project || busy || noPhases || !!pendingInvalid, run: () => refine() },
+      disabled: !project || busy || noPhases || !!invalid, run: () => refine() },
     { id: "apply", label: "Apply the edits", echo: "ref.set_values(…)",
-      disabled: !touched || busy || !!pendingInvalid, run: () => applyPending() },
+      disabled: !touched || busy || !!invalid, run: () => applyPending() },
     { id: "revert", label: "Revert the edits", echo: "",
       disabled: !touched, run: revertPending },
     { id: "stage", label: planStageName ? `Run the stage “${planStageName}”` : "Run this stage",
       echo: "ref.run_stage(Stage(…))", key: ".",
-      disabled: !project || busy || noPhases || !!pendingInvalid || !planStageName,
+      disabled: !project || busy || noPhases || !!invalid || !planStageName,
       run: () => planPanel?.runStage() },
     { id: "plan-undo", label: "Undo the plan edit", echo: "",
       disabled: !planPanel?.canUndo(), run: () => planPanel?.undo() },
@@ -648,7 +696,8 @@
     }
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
     if (event.key === "Enter") {
-      if (layered) return;
+      // the Text editor's ⌘⏎ is its Apply (`lib/editor.ts`), never a Refine
+      if (layered || (event.target as Element | null)?.closest?.(".cm-editor")) return;
       event.preventDefault();
       void refine();
       return;
@@ -854,11 +903,16 @@
             noPhasesReason={blocked} {corpus} {phaseNames} {say} onrun={runStage}
             onpending={(edited) => (planEdited = edited)} onsaved={planSaved} />
         </div>
+        <!-- mounted while hidden too: an edited buffer is a pending edit -->
+        <div class="pane" class:gone={!!unbuilt || modelTab !== "text"}>
+          <Text bind:this={textPanel} {head} {busy} {say} dark={theme === "dark"}
+            active={!unbuilt && showModel && modelTab === "text"}
+            name={project?.path ? projectStem(project.path) : "project"}
+            onmoved={structureMoved} onapply={applyFromText}
+            onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
+        </div>
         {#if !unbuilt}
-          {#if modelTab === "text"}
-            <div class="pane"><p class="unbuilt">Not built yet.</p></div>
-          {/if}
-          <ActionBar bind:mode={refineMode} {touched} invalid={pendingInvalid}
+          <ActionBar bind:mode={refineMode} {touched} {invalid}
             {busy} {blocked} stats={barStats} stages={project?.doc?.plan?.stages?.length ?? null} onapply={() => applyPending()}
             onrevert={revertPending} onrefine={() => refine()} />
         {/if}
