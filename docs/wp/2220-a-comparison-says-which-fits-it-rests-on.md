@@ -76,6 +76,15 @@ The first two are this WP's. The extinction screen is fenced below.
 go to the maintainer before merge (the maintainer's standing rule). Their names sit on `rietx.report`'s
 public surface.
 
+### Inherited
+
+- **2026-11-21, from WP-2219 (PR #1718, merged): a second source of a missing esd.** Context
+  above lists WP-2219 as not started; it has shipped. A free column on a direction the data do
+  not determine now gets an esd of `inf` in `least_squares._guarded_covariance`, and
+  `unmeasured_rows` reads an infinite esd as absent. So a freed column can lack an esd for two
+  reasons: it carries no gradient, or it lies on a discarded direction
+  (`COVARIANCE_DIRECTION_DISCARDED` names it). A `t_reason` quotes whichever applies.
+
 ## Non-goals
 
 - **The extinction screen.** WP-2076 measured that its class fit sits below the absence-free
