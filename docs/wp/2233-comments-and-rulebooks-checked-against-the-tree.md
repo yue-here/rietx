@@ -207,7 +207,7 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
       because it runs on any revision, the follow-up can compute the trend from history. At
       close, file a P4 WP dated six weeks on that runs it over weekly commits and decides
       whether to gate or drop.
-- [ ] **Byte limits held from the base.**
+- [x] **Byte limits held from the base.**
       - Move the limits to a stdlib module as a table read by AST: a budget and a ceiling per
         always-loaded document. That is every `CLAUDE.md`, `AGENTS.md` and `docs/ROADMAP.md`,
         which adds the two that `SIZE_CAPS` lacks.
