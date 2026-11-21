@@ -117,6 +117,18 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   console line `ref.set_vary([...], True)` then names a path that stayed fixed. A console that
   exports itself as a script inherits that line; take the verb's return in the answer before
   the export trusts it.
+- **2026-11-21, from WP-2229** (its review's finding 5, left open; settled by Claude under
+  WP-2229's own rule, at the maintainer's word "settle it yourself"). `_register_arms`
+  (`src/rietx/gui/session.py`) returns `None` when either model builds no parameter table, and
+  `instrument_patch` then edits with no register work. A failing *new* table is harmless: the
+  edit is refused. A failing *old* table with a working new one lands the edit untidied. The
+  one instrument-side way found is a free capillary offset with no `goniometer_radius_mm`
+  (`ParameterTable`'s refusal in `params/vector.py`); structure-side refusals fail both
+  tables. A hold left that way can reattach to a background term of the same name. Fix: when
+  only the old table fails, work from the registers. Release every held `instrument.` path
+  the new table lacks, and every held background path when the kind or breakpoints changed.
+  Leave the free arm to the new model's `vary` as now. One server test that breaks the old
+  model this way. Folded here beside finding 8 because both live in `instrument_patch`.
 
 ## Non-goals
 
