@@ -55,7 +55,7 @@ prototype at 1440 × 900:
 | R1 | [WP-2215](../wp/2215-the-frame.md), merged 2026-11-11 (#1534) | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
 | R2 | [WP-2216](../wp/2216-the-refinement-window.md), merged 2026-11-11 (#1537), polish 2026-11-17 (#1538) | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
 | R3 | [WP-2218](../wp/2218-hand-fitting-and-the-other-graphs.md), in flight | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
-| R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
+| R4 | [WP-2231](../wp/2231-the-plan-and-text-tabs.md), in flight | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
 | R6 | — | the peaks-and-indexing workflow in four steps |
 | R7 | — | the series workflow in four steps, with Trends and Map |
