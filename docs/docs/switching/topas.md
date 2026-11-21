@@ -62,9 +62,9 @@ rietx has three calls for the same jobs, `tie` taking either a source or an expr
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
 
 ```text
-site O5 x O5_x 0.32467 y O5_y 0.484898 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O6 x O6_x 0.591092 y O6_y 0.469105 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
-site O7 x O7_x 0.339828 y O7_y 0.257684 z O7_z 0.0705402 occ O ! 1.0 beq O5_biso 0.366488
+site O5 x O5_x 0.324668 y O5_y 0.484847 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O6 x O6_x 0.591016 y O6_y 0.468991 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382804
+site O7 x O7_x 0.33985 y O7_y 0.257709 z O7_z 0.0704391 occ O ! 1.0 beq O5_biso 0.382804
 ```
 
 In rietx it is one call:
@@ -163,12 +163,46 @@ print([row.path for row in joint.parameters() if row.path.endswith("vars.b")])
 
 `joint.fit(patterns, plan=plan)` then refines one `b` per pattern and keeps the boron coordinate where it started.
 
-Four things a TOPAS input does have no rietx spelling yet:
+Three things a TOPAS input does have no rietx spelling yet:
 
 - A command that holds, ties or sets a joint fit's parameters. `hold`, `tie` and `set_values` take a single refinement only. The `turn_off` stage above holds, and one formula variable read by several targets ties them.
 - A restraint or a `penalty` in a joint fit, which refuses soft restraints.
-- An equation over a reflection or a point: `th2_offset` written in `Xo`, a phase's own TCHZ V and W, or a width, position or intensity written in `Th` or `D_spacing`. An overall B and a height written in `Cos(Th)` are the exceptions, through the rows above.
 - `fit_obj`, a term added to the calculated pattern.
+
+An equation over a reflection, such as `th2_offset` written in `Xo` or `lor_fwhm` written in `H` and `Th`, is a peak equation (next section).
+
+### Peak equations
+
+TOPAS writes an equation on a peak with a keyword at the level it acts on.
+rietx declares it as a `PeakEquation` on `Phase.peak_equations`, or on `Instrument.peak_equations` for a position term the whole pattern shares.
+[How to write a peak's width or position as an equation](../guides/peak_equation.md) runs one.
+
+| TOPAS | rietx target | Note |
+|---|---|---|
+| `lor_fwhm` | `lor_fwhm` | the same FWHM in degrees 2θ |
+| `gauss_fwhm` | `gauss_fwhm` | added in quadrature, as two Gaussian widths combine |
+| `th2_offset` in a `str` | `shift` on the phase | |
+| `th2_offset` at the pattern level | `shift` on the instrument | reads `theta` and `two_theta` only |
+| `scale_pks` | `intensity_factor` | |
+| TCHZ `pv_fwhm`'s U, V and W per phase | `gauss_fwhm_squared` | `u*tan(theta)^2 + v*tan(theta) + w`, signed |
+
+The names differ as well.
+
+| TOPAS | rietx |
+|---|---|
+| `H`, `K`, `L` | `h`, `k`, `l` |
+| `M` | `m` |
+| `D_spacing` | `d` |
+| `Th` (radians) | `theta` (radians) |
+| `Xo` | `two_theta` (degrees, before the phase's own shift) |
+| `If(L==0, a, b)` | `if(l == 0, a, b)` |
+| `Max(x, 0)` | `max(x, 0)` |
+
+rietx refuses an equation that gives two symmetry images of one reflection different values, and TOPAS does not.
+A port of `If(L==0, ...)` to a cubic phase meets that refusal, and `orbit_mean(...)` or a symmetric condition is the way through.
+A condition reads `h`, `k`, `l` and `m` only, where TOPAS lets it read anything.
+`spherical_harmonics_hkl` is a sum of `harmonic(l, n)` terms.
+rietx's harmonics are the texture's symmetrised ones, normalised as in {eq}`corr-sh`, so a port converts TOPAS's coefficients to that normalisation.
 
 ### Coordinates are refined along the symmetry directions
 
@@ -306,19 +340,19 @@ rx.write_topas_inp(ref.fitted_structure, "refined.inp", free=ref, scale="topas",
 The file names each free parameter after its path, which in TOPAS is also its refine flag.
 This file comes from the refinement above that held the zero shift at 0.
 It holds the zero shift with `!`, and states the specimen displacement that took its place as an equation in `th2_offset`.
-The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 111 ppm lower.
+The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 110 ppm lower.
 These lines are an excerpt, with each number cut to six significant figures:
 
 ```text
 xdd "refined.xye" xye_format
   weighting = 1 / SigmaYobs^2;
-  bkg @ 152.446 -171.263 124.821 -73.5215 36.6909 -16.1333
+  bkg @ 154.768 -172.223 123.708 -71.9987 35.2492 -15.3107
   th2_offset ! 0
-  th2_offset = -2*Rad*(0.0629551)*Cos(Th)/217.5;
+  th2_offset = -2*Rad*(0.0632254)*Cos(Th)/217.5;
 str
-  scale p0_scale 0.000469265 min 0
-  a p0_cell_a 9.37332
-  b p0_cell_a 9.37332
+  scale p0_scale 0.000470097 min 0
+  a p0_cell_a 9.37331
+  b p0_cell_a 9.37331
 ```
 
 The data go beside it as `refined.xye`, with the esd rietx weights by.

@@ -672,6 +672,17 @@ ROWS: tuple[Row, ...] = (
         responds=("note that the sites' tensors were read as U_eq, and pass aniso=True if "
                   "the anisotropy is wanted")),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
+    Row("CIF_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("check the named cell parameter against the source before quoting it: "
+                  "the phase is refined with it equal to its source"),
+        evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule: a tied "
+                  "cell entry (cell_constraints' ties) is read as its source where the two "
+                  "printed numbers lie within half a last digit each of one value, or within "
+                  "the table's own tolerance (SYMMETRY_LENGTH_RTOL, SYMMETRY_ANGLE_TOL_DEG) "
+                  "where that is wider; a move within the entry's own rounding is not "
+                  "reported. Past the band the value is left and the table refuses it "
+                  "(WP-2150, issue #1669; tests/test_cell_ties.py)")),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
                   "AUDIT category and its children under PUBLICATION, recording the data "
@@ -709,6 +720,21 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
     Row("CIF_SITE_TWINS_MERGED", "code"),
     Row("CIF_SPECIES_NORMALISED", "code"),
+    Row("COMPARISON_UNCONVERGED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
+                  "fit it names on to convergence and compare again"),
+        evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
+                  "status other than 'converged', or the fuller fit's minimised cost "
+                  "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
+                  "restricted one's by more than report.layer2.NESTED_COST_MARGIN (a model that "
+                  "contains another can reproduce it, so at both optima S_full <= "
+                  "S_restricted; the data chi2 alone carries no such bound; "
+                  "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
+                  "the margin is tiered on its own row; flags and refuses nothing, since a budget stop can "
+                  "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
+                  "converged chi2); raised by compare_freed, predict_then_verify's "
+                  "comparison and rigid_body_misfit (WP-2220)")),
     Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
         response="info",
         responds=("note which width the floor held; the next fit's start decides whether it "
@@ -721,7 +747,11 @@ ROWS: tuple[Row, ...] = (
     Row("COVARIANCE_DIRECTION_DISCARDED", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: names the parameters sharing a direction the covariance build "
                   "dropped under PINV_RCOND (tier 1), a set no FLAT_DIRECTION pair already "
-                  "holds (staged.check_discarded_directions)")),
+                  "holds, whose esds the solve left absent (WP-2219; "
+                  "least_squares._guarded_covariance, staged.outcome_discarded_directions); "
+                  "a parameter that is not estimable has no standard error (Searle 1971 p. 169; "
+                  "R lm prints NA), where GSAS-II and TOPAS quote the truncated-SVD esd "
+                  "(docs/practice.md)")),
     Row("COVARIANCE_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when the esd calculation raised after the "
                   "solver returned (refine.py _covariance_diagnostics), so the stage's "
@@ -864,6 +894,13 @@ ROWS: tuple[Row, ...] = (
                   "_harmonic_diagnostics); the harmonic is the caller's declaration")),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
+    Row("HISTORY_CELL_TIE_CORRECTED", "code", tier=1, ambiguity=1,
+        response="info",
+        responds="nothing to do: every fit of the stored model built the entry this way",
+        evidence=("arithmetic: ParameterTable has always built a tied cell entry from its "
+                  "source, so a stored node holding another value is read as the source and "
+                  "no number the history produced moves; fires past the table's own "
+                  "tolerance only, the size it now refuses (WP-2150)")),
     Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
         response="warning",
         responds=("check that the loaded tree is the run you meant before quoting a cell, a "
@@ -1252,6 +1289,29 @@ ROWS: tuple[Row, ...] = (
                  "is info everywhere (Yue's ruling, #993 round 2, 2026-10-21: of the "
                  "19 usable above-bar components freed on 16 Oct, 12 moved away from "
                  "the lattice's line and 7 towards it)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS", "code", tier=1, ambiguity=2,
+        evidence=("physics: a size-like width coefficient in degrees is (180/pi)K lambda/L, "
+                  "so one specimen needs coefficients in the ratio of the wavelengths, while "
+                  "a strain-like one reads no lambda (Scherrer; params/multi.py "
+                  "SIZE_LAMBDA_POWER); the package cannot tell which term the user wrote, so "
+                  "it warns rather than converts. Fires exactly where a degree-valued peak "
+                  "equation's coefficient is one column across patterns declaring two or more "
+                  "wavelengths (multi._peak_equation_sharing_diagnostics; maintainer's ruling "
+                  "of 2026-11-20, option a, WP-2107)"),
+        response="warning",
+        responds=("do not quote the named equation's coefficients as one size or width "
+                  "for every pattern; unshare a wavelength-dependent term's coefficient with "
+                  "SharingMap(per_histogram=...) and refit, and keep a term that reads no "
+                  "wavelength shared")),
+    Row("PEAK_WIDTH_NOT_POSITIVE", "code", tier=1, ambiguity=1,
+        evidence=("physics: a Gaussian variance and a Lorentzian FWHM cannot be negative; "
+                  "fires exactly where a phase's width peak equations take Γ_G² or Γ_L "
+                  "below zero at a fitted reflection (staged.check_peak_width_positive, "
+                  "WP-2107)"),
+        response="warning",
+        responds=("bound the named equation's coefficients or rewrite its term so it "
+                  "cannot go negative, refit, and do not quote the widths or coefficients "
+                  "until it is silent")),
     Row("PEAK_POSITION_PRECISION", "code"),
     Row("PEAK_SHOULDER_SEEDED", "code"),
     Row("PEAK_SIGMA_ASSUMED", "code"),
@@ -1293,6 +1353,15 @@ ROWS: tuple[Row, ...] = (
                   "with no threshold (B12 3(a), ruled 2026-10-19, replacing "
                   "QPA_FRACTION_UNDETERMINED); states the range and excess the profile "
                   "computed, whose cut is FRACTION_PROFILE_DCHI2's row")),
+    Row("QPA_INTENSITY_FACTOR", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: W_p reads S_p·(ZMV)_p as the phase's whole intensity, and "
+                  "intensity = scale × factor, so the fitted scale absorbs 1/mean factor "
+                  "and the fraction moves with it; fires exactly where a measured phase of two or more carries "
+                  "an intensity_factor equation that is not 1 everywhere in range "
+                  "(WP-2107)"),
+        response="warning",
+        responds=("read the named phase's weight fraction as scaled by its mean factor, "
+                  "or normalise the factor and refit, before quoting a fraction")),
     Row("QPA_UNAVAILABLE", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: weight fractions divide by the sum of the weighted scales, "
                   "which is zero or less; fires exactly then (refine.py "
@@ -1658,6 +1727,31 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_PHASE_TERM_READ", "code"),
     Row("TOPAS_SPECIES_NORMALISED", "code"),
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
+    Row("VARIABLE_NOT_FREED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("quote no value the named variable sets, nor the variable itself: it "
+                  "kept its start; add a stage that frees it and refit, or read it as a "
+                  "constant the caller chose"),
+        evidence=("arithmetic: fires exactly when a vars. row that other parameters "
+                  "follow (single fit: ParameterTable.entry_reach) or that a parametric "
+                  "equation declares as a coefficient (joint fit) is in no stage's "
+                  "StageResult.freed or held; no threshold; gates nothing (WP-2101, "
+                  "ruled 2026-11-19)")),
+    Row("WARM_REFIT_REJECTED", "code", tier=3, ambiguity=1,
+        response="info",
+        responds=("nothing: the result is the staged plan's answer, and the message names "
+                  "why the one-stage re-fit was discarded"),
+        evidence=("info at one site (refine.py _warm_refit_rejected, appended by "
+                  "Refinement._fit_refit); fires exactly when a re-fit's one-stage fit was "
+                  "rejected by schemas/sequential.py _rejected (diverged, or an error-level "
+                  "diagnostic) and the staged plan ran in its place, so it reports the "
+                  "package's own act and gates nothing. On the eight comparison standards "
+                  "it fires on none from a converged start (WP-2224 § Measured); its one firing is injected, tests/test_refit_single.py::test_a_rejected_one_stage_fit_falls_back_to_the_plan patching _rejected"),
+        grounds=("Says out loud that the package ran a second fit, as SEQUENTIAL_RESEED "
+                 "does for the series' ladder; the trigger is the series' own _rejected "
+                 "(ruled by the maintainer 2026-11-03) and the fallback is the 2026-11-19 "
+                 "ruling (WP-2224 § Context, design 3)."),
+        approved="2026-11-19", scope=("all",)),
     Row("WAVELENGTH_CALIBRATION", "code", tier=1, ambiguity=1,
         response="info",
         responds="nothing: the message states the ppm shift of the free wavelength",
@@ -1749,7 +1843,9 @@ ROWS: tuple[Row, ...] = (
                   "1/cos, Y with lor_strain in tan; gauss_size (1/cos^2 = 1 + tan^2) is flat with "
                   "U and W together and holding U alone removes it, so W, the constant width, is "
                   "never held (holding W too moved three CPD acceptance answers; the generality "
-                  "judge, WP-2002 9th session); "
+                  "judge, WP-2002 9th session; holding it on the triple W, gauss_size and "
+                  "gauss_strain alone moved the cpd-1 chain, WP-2219, so that triple is left "
+                  "to COVARIANCE_DIRECTION_DISCARDED and has no esd); "
                   "refine._width_twin_flats holds the instrument "
                   "terms on the null space of those totals read off C, so one seen phase with its "
                   "specimen width held holds nothing; a free Stephens block is Y's twin by rule "
@@ -2538,6 +2634,16 @@ ROWS: tuple[Row, ...] = (
                   "this fractional tolerance itself until #1226's finding, refusing a CO2-like "
                   "body on the P n m a mirror whose atoms all passed the site check")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
+    Row("rietx.crystallography.symmetry.SYMMETRY_LENGTH_RTOL", "constant", tier=1, value=1e-05,
+        evidence=("arithmetic on its consequence, as SYMMETRY_ANGLE_TOL_DEG was sized: the table "
+                  "builds a tied length from its source, so a stored length a relative eps off "
+                  "moves every d-spacing by at most eps from the caller's; 1e-5 bounds that at "
+                  "10 ppm, under SRM 660c's 48 ppm certificate band, and clears an indexing "
+                  "candidate's round-off (tied lengths equal to 1e-12 relative, "
+                  "test_an_indexing_candidate_still_builds). Measured 2026-11-19: 25351 tie "
+                  "checks over the fast suite, round-off at most 1e-14 relative and real "
+                  "disagreements 1e-4 and up; indexing acceptance candidates at most 1.9e-16, "
+                  "so any value from 1e-12 to 1e-4 refuses the same inputs (WP-2150)")),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
                   "whether atoms that would overfill one place are the same place, so the "
@@ -3165,6 +3271,15 @@ ROWS: tuple[Row, ...] = (
         evidence=("numerical floor: eps^(1/3) = 6e-6 is the central-difference optimum; truncation "
                   "~1e-10 of the curvature (docstring); only the weights a_n, hence the covariance,"
                   " depend on it")),
+    Row("rietx.model.peak_equations.ORBIT_RTOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: images of a single-valued equation agree to rounding "
+                  "(order 1e-16 relative), and a branch on an index differs at the size of "
+                  "its own terms, so 1e-9 sits orders of magnitude from both (WP-2107)")),
+    Row("rietx.model.peak_equations.ORBIT_TRIALS", "constant", tier=1, value=3,
+        evidence=("numerical setting: random coefficient sets beside the stored one, since "
+                  "if(l == 0, a, b) at a = b agrees on every image; a branch-dependent "
+                  "equation agrees on a random set with probability zero, so one trial "
+                  "decides and three guard a coincidence (WP-2107)")),
     Row("rietx.model.preferred_orientation.TEXTURE_POSITIVITY_TOL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: roundoff of a quantity of order 1; lm stopped at min P -2.2e-16"
                   " on the face, trf at -0.45 (WP-1960 D4)")),
@@ -4124,6 +4239,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
+    Row("rietx.report.layer2.NESTED_COST_MARGIN", "constant", tier=2, value=2.0,
+        evidence=("Kass & Raftery (1995) J. Am. Stat. Assoc. 90, 773: 2 ln B from 2 to 6 is "
+                  "'positive' evidence, so 2 is the band's lower edge and an excess of the "
+                  "fuller fit's minimised cost under it cannot move a delta_bic verdict; "
+                  "absolute, in the cost units delta_bic is read in; measured stopping noise "
+                  "between two converged fits of one nested pair is 1.1e-7 relative, about "
+                  "0.0006 cost units on issue #1685's fixture, so the margin holds until a "
+                  "cost near 1e7 (the docstring's known limit); replaces optimize.lm.FTOL "
+                  "(1e-9 relative, below that noise) and was chosen over GSAS-II 5.8.4's 1e-3 "
+                  "relative stop (about 6 cost units there, already 'strong'); ruled by the "
+                  "maintainer 2026-11-20 (WP-2220)")),
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
@@ -4880,8 +5006,16 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
-        evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
+    Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None, no closing stage, since WP-2222 (2026-11-19): TOPAS cuts each peak at "
+                  "0.001 of its own height, 2 % of a Lorentzian, as the declared "
+                  "stages' WINDOW_AREA_TOL does, and has no closing run (docs/practice.md); "
+                  "measured 2026-11-19 (macOS arm64, [dev], three interleaved rounds) the "
+                  "closing stage cost 1.2-1.3x on 11-BM NAC, 1.7x on CPD cpd-1a and cpd-2 "
+                  "and 1.9x on the bench's simulated trigger case, and moved those answers "
+                  "0.16, 0.92, 2.0 and 1.24 plain esd; a closing stage at 2e-2 equalled none "
+                  "in Rwp on cpd-1a and trigger, so its effect is the tail, not the recompile. "
+                  "The opt-in, CLOSING_WINDOW_TOL: BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
                   "Cryst. 48, 1573, 2); RIETAN-FP's NAUTO = 2 ends with everything refining "
                   "together, its windows moving each evaluation; MAUD's wizard has no final "
@@ -4898,10 +5032,12 @@ ROWS: tuple[Row, ...] = (
                   "declared stages leave fixed (a turn_off whose glob matched last, "
                   "staged.fixed_at_end), which it keeps fixed and records in its "
                   "StageResult.fixed"),
-        grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
-                 "plan ends with a closing stage at tight windows, which removes the 2 % "
-                 "window's error from the answer and most of a staged plan's start dependence; "
-                 "None runs the declared stages alone, bit-identical to before.")),
+        grounds=("The maintainer's ruling of 2026-11-19 (WP-2222), after users complained of "
+                 "fit time: codes such as TOPAS are fast, with accuracy their users consider "
+                 "very sufficient; turn the closing stage off by default. It reverses the "
+                 "sixth round's Q2 default (option 3, 2026-10-21), which stays the opt-in "
+                 "at CLOSING_WINDOW_TOL for an answer to publish."),
+        approved="2026-11-19"),
     Row("rietx.schemas.plan.PlanSpec:lebail_passes", "default", tier="caller", ambiguity=1, value=1,
         evidence="opt-in: lebail_passes > 1, default 1 (one run, bit-identical to pre-WP-1323)"),
     Row("rietx.schemas.plan.PlanSpec:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
@@ -5048,6 +5184,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.Refinement.fit:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.Refinement.fit:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -5083,18 +5238,24 @@ ROWS: tuple[Row, ...] = (
                   "checked"
                   "; seven programs, 2026-10-21 (docs/practice.md): the full range in GSAS-II, FullProf, RIETAN-FP, MAUD and EasyDiffraction, BGMN the instrument function's range, TOPAS's default not stated")),
     Row("rietx.refine.Refinement.run_stage:correlation_guard", "default", value=0.98),
-    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=1, ambiguity=1, value=None,
-        evidence=("None resolves to schemas.plan.CLOSING_WINDOW_TOL, the windows an answer is "
-                  "measured on, and inherits that row's tier and domain test; the stage records "
-                  "the fraction it ran at"),
-        grounds=("No closing stage follows a stage driven by hand (the GUI's Run this stage "
-                 "among them), so its own windows compute its answer; at the declared stages' "
-                 "2 % that answer carried up to 0.97 esd on lab data. A caller wanting the fast "
-                 "stage passes WINDOW_AREA_TOL, and cherry_pick passes a recorded node's "
-                 "through forward.recorded_window_tol. Ruled 2026-10-21 (the seventh round's "
-                 "Q1, evaluation outside a fit at the closing windows, which the brief extended "
-                 "to this seat)."),
-        approved="2026-10-21"),
+    Row("rietx.refine.Refinement.run_stage:window_area_tol", "default", tier=2, ambiguity=1, value=None,
+        evidence=("None resolves to forward.WINDOW_AREA_TOL since WP-2222, the windows a default "
+                  "fit's declared stages measure its answer on: TOPAS's cut, 2 % of a Lorentzian, "
+                  "inside the seven programs' range (docs/practice.md, How far a peak is "
+                  "computed), as PlanSpec:closing_window_tol's row cites; until WP-2222 it "
+                  "resolved to schemas.plan.CLOSING_WINDOW_TOL; nothing follows a stage run by "
+                  "hand, so its answer keeps the declared windows' error (up to 0.97 esd on lab "
+                  "data, WP-2002); the stage records the fraction it ran at"),
+        grounds=("A stage driven by hand (the GUI's Run this stage among them) runs on the "
+                 "windows a default fit's stages run on, so it costs what the same stage in a "
+                 "plan costs: the maintainer's 2026-11-19 ruling that TOPAS-level accuracy is "
+                 "sufficient and the closing stage goes off by default (WP-2222), which "
+                 "supersedes the seventh round's Q1 extension to this seat (2026-10-21); "
+                 "approved for this seat at tier 2 on TOPAS's cut by the maintainer "
+                 "2026-11-19 (WP-2228). A Le Bail stage at a range end is WP-2228's. A "
+                 "caller wanting near-complete tails passes CLOSING_WINDOW_TOL, and "
+                 "cherry_pick passes a recorded node's through forward.recorded_window_tol."),
+        approved="2026-11-19"),
     Row("rietx.refine.Refinement.run_stage:phase_support_sigma", "default", tier=3, ambiguity=1, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -5133,6 +5294,25 @@ ROWS: tuple[Row, ...] = (
                  "geometry-specific, which the ruling keeps for an unstated geometry, and WP-2015 "
                  "picks by declared geometry (B7, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.refine.refine:refit", "default", tier=2, ambiguity=1, value="single",
+        evidence=("TOPAS, GSAS-II and FullProf run one solve of whatever is free from the "
+                  "current values and stage nothing; a user stages a first approach by hand "
+                  "(docs/practice.md § Staging and what a stage holds), so a re-fit in one "
+                  "stage is what their users do. Acts only on a re-fit (the start is an "
+                  "accepted fit's answer on the same pattern, mode and channels, no value "
+                  "written since; refine.py _refit_key; and the plan frees nothing that "
+                  "fit's plan left fixed, Refinement._plan_frees), and a rejected one-stage fit falls "
+                  "back to the plan (WARM_REFIT_REJECTED). Measured from a converged start "
+                  "on the eight comparison standards (SRM 660c, corundum, zincite, "
+                  "fluorite, brucite, fluorapatite, 11-BM NAC, 11-BM LaB6: seven materials from four instruments, all development data, against rietx's own staged answer): "
+                  "8 of 8 reach the staged answer, within 0.41 esd, at 0.35-0.50 of its "
+                  "time; from a cold start one stage reaches 20 of 48, which is why a first "
+                  "fit stays staged (WP-2224 § Measured). Against: McCusker et al. (1999) free "
+                  "cumulatively and BGMN and MAUD stage by default; a parameter the converged "
+                  "fit held starts cold, and one stage freeing brucite's March-Dollase "
+                  "block ended 2.25 esd off the staged answer, so a plan releasing one runs "
+                  "staged (ruled by the maintainer 2026-11-19, 'it is a cold start'). Ruled "
+                  "by the maintainer 2026-11-19, 'Yes, by default'")),
     Row("rietx.refine.refine:two_theta_limits", "default", tier=2, ambiguity=1, value=None,
         evidence=("GSAS-II 5.8.4 GSASIIdataGUI.py:2192-2201: a histogram's Limits default to the "
                   "full data range on import (checked)"
@@ -5520,6 +5700,9 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED.suggestion", "suggestion", value=1),
     Row("CIF_CELL_ANGLE_CORRECTED.suggestion", "suggestion", value=1),
+    Row("CIF_CELL_TIE_CORRECTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one way a real difference can be kept, a space "
+                  "group that leaves the parameter free; picks no group")),
     Row("CIF_MAGNETIC_CENTERING_ASSUMED.suggestion", "suggestion", value=1),
     Row("CIF_MAGNETIC_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED.suggestion", "suggestion", value=1),
@@ -5531,6 +5714,10 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", value=1),
     Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
     Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
+    Row("COMPARISON_UNCONVERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one remedy for a fit short of its optimum, running "
+                  "it on, and the two ways to start it (more iterations, or the other "
+                  "fit's values)")),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
     Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names three levers, fewer free, held known values, a wider "
@@ -5720,6 +5907,14 @@ ROWS: tuple[Row, ...] = (
                  "far past the bound the fit would have moved. It says nothing "
                  "of the line's true position, which the 16 Oct re-solve showed the "
                  "bound does not predict (Yue, #993 round 2, 2026-10-21)."),
+    Row("PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS.suggestion", "suggestion", tier=1,
+        ambiguity=3, value=1,
+        evidence=("arithmetic: names the SharingMap glob that gives each pattern its own "
+                  "coefficient, and says a term reading no wavelength can stay shared; "
+                  "picks neither")),
+    Row("PEAK_WIDTH_NOT_POSITIVE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names a bound, a square or max(x, 0) as ways to keep the "
+                  "width positive; picks none")),
     Row("PEAK_POSITION_PRECISION.suggestion", "suggestion", value=1),
     Row("PEAK_SHOULDER_SEEDED.suggestion", "suggestion", value=1),
     Row("PEAK_SIGMA_ASSUMED.suggestion", "suggestion", value=1),
@@ -5738,6 +5933,10 @@ ROWS: tuple[Row, ...] = (
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
                   " Appl. Statist. 37, 87; Hamilton (1965) (docstring)")),
+    Row("QPA_INTENSITY_FACTOR.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: a factor averaging 1 leaves the scale the phase's amount; "
+                  "multiplying the scale by the mean factor is the same correction after "
+                  "the fit; picks neither")),
     Row("QPA_UNAVAILABLE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the model and the start, and at the run's other "
                   "findings; picks no cause")),
@@ -5872,6 +6071,10 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_MOMENT_G_HELD.suggestion", "suggestion", value=1),
     Row("TOPAS_MOMENT_ION_UNCHARGED.suggestion", "suggestion", value=1),
     Row("TOPAS_PHASE_TERM_READ.suggestion", "suggestion", value=1),
+    Row("VARIABLE_NOT_FREED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
+        evidence=("arithmetic: names the stage turn_on that frees the variable, the only "
+                  "route a plan has, and picks nothing: holding it may be the caller's "
+                  "intent")),
     Row("WAVELENGTH_CALIBRATION.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence="arithmetic: points at the instrument's own record; picks no verdict"),
     Row("rietx.crystallography.scattering.written_neutral_diagnostics.suggestion", "suggestion", value=1),

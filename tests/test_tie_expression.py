@@ -372,6 +372,50 @@ def test_a_debye_formula_recovers_its_temperature_within_two_esd():
     assert target.value == pytest.approx(debye_b(thd.value, 300.0), rel=1e-12)
     assert target.stderr is not None and target.stderr > 0.0
     assert math.isfinite(result.statistics.rwp) and result.statistics.gof < 2.0
+    # the plan's last stage freed the variable, so nothing reports it idle
+    assert not [d for d in result.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+
+
+def test_a_variable_no_stage_frees_is_named_with_what_follows_it():
+    """WP-2101, ruled 2026-11-19: a plan frees a single fit's variable only where a
+    stage names it, so without the ``vars.*`` stage the formula and the linear tie
+    both follow a start the data never moved.  One warning names the variable,
+    its start and its followers; a variable nothing follows is not named."""
+    ref = rx.Refinement(*perturbed_models())
+    ref.add_variable("thD", 800.0, vary=True, min=200.0, max=3000.0)
+    ref.add_variable("spare", 1.0, vary=True)
+    ref.tie(B_BISO, expression=debye_text(300.0))
+    ref.tie(LA_BISO, "vars.thD", scale=1e-3)
+    result = ref.fit(synthesize_at(300.0, 7),
+                     plan=rx.RefinementPlan(stages=PLAN.stages[:-1]))
+    found = [d for d in result.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+    assert len(found) == 1
+    d = found[0]
+    assert (d.level, d.where, d.value) == ("warning", ["vars.thD"], 1.0)
+    assert d.message == (
+        "No stage freed a variable that other parameters follow: vars.thD (start 800; "
+        f"sets {LA_BISO}, {B_BISO}). It kept its starting value, so the parameters "
+        "that follow it are set from that start and the data did not measure them.")
+    assert "vars.*" in d.suggestion
+    rows = {p.path for p in result.parameters}
+    assert "vars.thD" not in rows and B_BISO not in rows
+
+
+def test_a_held_variable_is_not_named_and_an_unheld_fixed_one_still_is():
+    """WP-2101, ruled by the maintainer 2026-11-19, option (a): a hold says the
+    start is meant, so the warning leaves a held variable out.  A variable at
+    ``vary=False`` without a hold is no such statement and is still named."""
+    ref = rx.Refinement(*perturbed_models())
+    ref.add_variable("thD", 800.0, vary=False, min=200.0, max=3000.0)
+    ref.add_variable("k", 1e-3, vary=False)
+    ref.tie(B_BISO, expression=debye_text(300.0))
+    ref.tie(LA_BISO, expression="k * 500")
+    assert ref.hold("vars.thD") == ["vars.thD"]
+    result = ref.fit(synthesize_at(300.0, 7),
+                     plan=rx.RefinementPlan(stages=PLAN.stages[:-1]))
+    (d,) = [d for d in result.diagnostics if d.code == "VARIABLE_NOT_FREED"]
+    assert d.where == ["vars.k"]
+    assert "vars.thD" not in d.message
 
 
 def test_a_series_redeclares_the_formula_at_each_pattern_s_temperature():
