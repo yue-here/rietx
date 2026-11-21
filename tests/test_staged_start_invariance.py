@@ -69,9 +69,19 @@ the split, and the Y floor settled it.  No shipped plan frees an instrument widt
 with its specimen twin, so only a plan written this way meets it.  LaB6's
 axial-floor row is the other.  With H/L held, the NIST protocol still has two
 minima in u, v and w, 0.24 % apart in χ², and the 0.05 floor's arm reaches the
-deeper while the shipped arm stays in the shallower (WP-2084).  LaB6's Biso row,
-1.156 plain esd on ``u`` before WP-2012 and read then as the S/L and H/L mirror,
-now passes; whether its two arms were in these two minima was not measured.
+deeper while the shipped arm stays in the shallower (WP-2084).  The two are one
+row of the Γ_G² ≥ 1e-8 cone: the (333)/(511) Kα2 image at 149.71°, which the
+closing stage keeps when it starts feasible (the shipped floor, slack +1.6e-8) and
+drops when it starts past its face by more than ``lm._ON_FACE`` (the 0.05 floor,
+−5.7e-9), walking on to the Kα1 image at 148.68°.  The row drop is not the
+floor's only effect: floor 0.03 keeps the Kα2 row yet lands 0.442 plain esd on
+w from the shipped answer, at a χ² higher than the shipped arm's, so on the
+Kα2 face itself the answer moves with the floor past the 0.1 bar without a row
+dropped.  Both arms keep their
+minimum for nudges of the w start from 1e-14 to 1e-6 relative, on macOS arm64 and
+Linux x86_64 alike (2026-11-16), so the row is a strict xfail.
+LaB6's Biso row, 1.156 plain esd on ``u`` before WP-2012 and read then as the S/L
+and H/L mirror, now passes at 0.009, both arms on the Kα2 face.
 
 The harmonic weight seed is measured on a synthetic constant-wavelength neutron
 corundum with a known λ/2 line, the one family a harmonic has (the held-out
@@ -114,8 +124,13 @@ OUT = Path(__file__).parent / "output"
 ESD_BAR = 0.1
 
 _WIDTH_MINIMA = ("LaB6's NIST protocol has two minima in u, v and w, 0.24 % apart in "
-                 "chi2, and the 0.05 floor's arm reaches the deeper: 0.582 plain esd on "
-                 "u (WP-2084, 2026-11-02, macOS arm64; non-strict, one platform measured)")
+                 "chi2: the 0.05 floor's closing stage starts past the (333)/(511) "
+                 "K-alpha-2 row of the Gamma_G^2 cone, drops it and reaches the deeper: "
+                 "0.582 plain esd on u.  The row drop is not the floor's only effect: "
+                 "floor 0.03 keeps the K-alpha-2 row yet lands 0.442 plain esd on w from "
+                 "the shipped answer at a higher chi2, so the floor moves the answer past "
+                 "the 0.1 bar without dropping a row (WP-2084; macOS arm64 and Linux "
+                 "x86_64, 2026-11-16)")
 
 
 def _plotted(result, tag: str) -> dict:
@@ -202,7 +217,7 @@ def test_the_intermediate_tolerance_does_not_change_the_answer(family):
 
 
 @pytest.mark.parametrize("family", [
-    pytest.param("lab6", marks=pytest.mark.xfail(strict=False, reason=_WIDTH_MINIMA)),
+    pytest.param("lab6", marks=pytest.mark.xfail(strict=True, reason=_WIDTH_MINIMA)),
     "fap",
     pytest.param("cpd1a", marks=pytest.mark.xfail(strict=False, reason=(
         "the width twin hold keeps the X/Y split cpd-1a's instrument-only stage "

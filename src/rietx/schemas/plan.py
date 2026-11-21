@@ -63,7 +63,7 @@ from .common import Base
 #: stage, with the last declared stage converged (WP-2045,
 #: ``docs/wp/2045-batch/probe7.py``): 1.06-1.58× fewer evaluations on the
 #: fluorapatite, 11-BM NAC and cpd-1a protocols, answers within 0.0004 esd;
-#: 1.29× on SRM 660c, whose 8.82 esd is its mirrored axial minima (WP-2012).
+#: 1.33× on SRM 660c at 0.000 esd since WP-2012 held its H/L (WP-2084).
 #: **The bound is for one fit**: in a warm *chain*
 #: each pattern seeds the next, and the effect there is unbounded and not even
 #: fixed in sign.  Looser is a real choice and not a silly one — 1e-5 and 1e-4
