@@ -168,6 +168,71 @@ source column still reports none. The 535 are accounted for by cause.
     inside the 5800, and its probe could not see the joint fit's block, so it counted that
     fit's 958 as neither. 958 − 423 = 535.
 
+  *Generality* (the `generality-review` judge, pasted unedited; `_audit.py` untouched, second
+  trigger). The judge's one doc gap, the `stderr_diagonal` docstring, is fixed in
+  `schemas/results.py`. The moment-pair ruling stays open for Mike, as *Settled by Claude* 3
+  says.
+
+  ## `statistics.estimable` (the esd test for a combination)
+
+  **holds**: the case for is stronger. A linear combination whose gradient is orthogonal to every discarded direction is estimable (Searle 1971 p. 169), and no program withholds the esd of such a combination.
+
+  | Q | Author (where) | Found | Verdict |
+  |---|---|---|---|
+  | 1 | Keeps an esd on a tie or derived number built on touched columns (docstring) | Agreed. "Touched" means a column that a discarded direction loads on. | ok |
+  | 2 | none given (no row) | Kind 1, arithmetic | — |
+  | 3 Against | — | none found. GSAS-II and TOPAS quote a truncated-SVD esd for every parameter (docs/practice.md § esds). They dissent only toward quoting more. | — |
+  | 4 For | "1.0002× the esd of the combination fitted alone" (handover) | Measured in both Rietveld and Pawley mode. Without the test the zero shift had no esd although the data determine it. | strong |
+  | 5 | "no tolerance is new" (docstring) | Tier 1. The factor-1 cut (lost ≥ kept, about √2 short) is WP-2219's inline touched test. Neither has an audit row. | weak point |
+  | 6 | lost/kept 5e-19 to 1.5e-18 for the sum, 2.3e14 for each source | One family: a synthetic three-way zero shift, plus a synthetic LaB6 cell split. The reference is a fit of the combination alone, which verifies only. The 32-decade gap makes the cut's exact position immaterial on this case. | narrow |
+  | 7 | none given | No field says the esd was kept. Only the source rows' absent esds show it. | gap |
+
+  Would change: a real fit whose lost/kept ratio falls between 1e-6 and 1e6.
+
+  ## `ParameterTable.unmeasured_functions` (one-column rule, dead columns)
+
+  **holds**: the case for is stronger. Both clauses restate rules already in force.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 1 | "A function that moves one column alone is that column" (docstring) | Agreed. | ok |
+  | 2 | — | Kind 1 | — |
+  | 3 | — | none found | — |
+  | 4 | WP-2219's column rule; WP-1110's dead-column rule | The test is scale-invariant, so for k·eᵢ the clause is redundant with it. It only guards against rounding. The dead-column clause is the existing rule that consumers mark rather than clamp. | ok |
+  | 5 | — | Tier 1. No test isolates the `> 1` clause. | minor |
+  | 6 | — | not applicable | — |
+  | 7 | — | The absent esd | ok |
+
+  Would change: a case where `c != 0` counts a rounding-level entry as a second column.
+
+  ## Kept row: `stderr_diagonal = None`
+
+  **holds**: the case for is stronger. A diagonal sum over sources that are not estimable depends on which inverse was taken (docs/practice.md, Searle row).
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 1 | "a sum of diagonal terms would quote" unmeasured variances (geometry `_sigmas` docstring) | Agreed. | ok |
+  | 3 Against | — | none found | — |
+  | 4 For | WP-1072: an unmeasured number is absent (handover, settled 2) | Agreed. | ok |
+  | 5 | — | Tier 1. Pinned by `test_a_cell_tied_to_a_sum_keeps_its_volume_and_bonds`. | ok |
+  | 7 | — | `stderr` set while `stderr_diagonal` is None. The schema docstring (`schemas/results.py` ~l.730) still names only two causes of None. | doc gap |
+
+  Would change: none foreseen.
+
+  ## `report/magnetic._estimable_pair_esd` (moment-pair fold)
+
+  **holds** on the arithmetic, which is linearised estimability at the answer. The ruling is open: decisions on the magnetic path are Mike's (#1075, the magnetic-path ruling). The handover settles this one by Claude, citing no ruling of his.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 1 | Fold "only when the sum is estimable" (docstring) | Agreed. A result read back without its fit does not fold. | ok |
+  | 3 Against | — | none found | — |
+  | 4 For | "1.0002× … one site carrying the quadrature modulus" (handover) | `test_two_starting_splits_report_the_same_quadrature_number` now passes. It was a strict xfail. | strong |
+  | 6 | — | One synthetic degenerate pattern. It verifies only. | narrow |
+  | 7 | — | The pair's note text | ok |
+
+  Would change: a ruling from Mike.
+
   *Settled by Claude.*
   1. The estimability tolerance is WP-2219's touched test asked of the gradient, under
      Searle 1971 p.169 and the measured ratios above. The alternative was a new tolerance on
