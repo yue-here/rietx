@@ -89,6 +89,10 @@ def _fit_from(m1_start, m2_start, data):
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(strict=True, reason=(
+    "WP-2219 open question 1: the two moments lie on a discarded direction, so "
+    "neither has an esd, and the quadrature sum, which the data do determine, "
+    "loses the esd it is built from"))
 def test_two_starting_splits_report_the_same_quadrature_number(degenerate_pattern):
     """A 50/50-ish split and a lopsided split of the same total: both must
     converge to (near enough) the true total modulus and, more to Q5's

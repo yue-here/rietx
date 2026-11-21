@@ -97,10 +97,28 @@ def test_a_wrong_body_fires_and_names_its_bond(wrong):
 def test_the_right_body_does_not_fire(right):
     right, _ = right
     (row,) = right.rows
-    assert not row.fires
+    # a judged silence, not a "not judged" (WP-2220)
+    assert row.fires is False
+    assert (row.status_body, row.status_released) == ("converged", "converged")
+    assert row.chi2_ordered
     assert right.diagnostics == []
     # the released atoms stay within their restraint widths of the template
     assert max(abs(d[3]) for d in row.deviations) < 2.0
+
+
+def test_a_silence_from_a_short_refit_is_not_judged():
+    """One iteration per arm: a released arm stopped on its budget has not
+    shown the body fits, so the row reads ``None`` and says why (WP-2220)."""
+    ref, pattern = _fitted(0.0)
+    out = ref.check_rigid_bodies(pattern, max_iter=1)
+    (row,) = out.rows
+    # a silence stays open only where the released arm stopped short
+    assert row.status_released == "max_iter" or not row.chi2_ordered
+    assert row.fires is None
+    (diag,) = out.diagnostics
+    assert diag.code == "COMPARISON_UNCONVERGED"
+    assert diag.message.startswith("Rigid body") and "'max_iter'" in diag.message
+    assert len(diag.where) == 7
 
 
 def test_the_statistics_are_the_packages_own(wrong):
