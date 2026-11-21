@@ -25,6 +25,8 @@ from rietx.schemas.results import _NAMED_PURPOSES
 from rietx.viz.compare import STANDARD_BY_KEY
 from tests import suite_alarms
 
+FLAT_TRIPLE = suite_alarms.FLAT_TRIPLE
+
 
 def test_the_pin_parses_and_names_only_live_codes_standards_and_purposes():
     pin = suite_alarms.load_pin()
@@ -120,9 +122,6 @@ def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
         seen.append(sorted((d.code, tuple(d.where)) for d in fit.diagnostics
                            if d.level == "warning"))
     assert seen[0] == seen[1] == seen[2]
-
-
-FLAT_TRIPLE = suite_alarms.FLAT_TRIPLE
 
 
 @pytest.mark.slow

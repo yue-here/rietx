@@ -73,6 +73,14 @@ def decided_by_rounding(key: str, diagnostic) -> bool:
             and bool(where) and where <= set(FLAT_TRIPLE))
 
 
+def shared(results: dict[str, rx.RefinementResult]) -> dict[str, SimpleNamespace]:
+    """Each result's diagnostics without the findings rounding decides
+    (:data:`ROUNDING`): what :func:`firing_table` counts and :func:`main` prints."""
+    return {key: SimpleNamespace(diagnostics=[d for d in r.diagnostics
+                                              if not decided_by_rounding(key, d)])
+            for key, r in results.items()}
+
+
 def unavailable(data_dir: Path | None = None) -> dict[str, list[str]]:
     """Each standard whose files are missing under ``data_dir``, with the
     files, so a caller can name what it could not fit."""
@@ -112,9 +120,7 @@ def firing_table(results: dict[str, rx.RefinementResult]) -> dict:
     was raised at (``"info, warning"`` where it was raised at both); over the batch, each code's count of standards fired on
     and the mean warning rows a fit carries per purpose.  The findings
     rounding decides (:data:`ROUNDING`) are left out of all three."""
-    kept = {key: SimpleNamespace(diagnostics=[d for d in r.diagnostics
-                                              if not decided_by_rounding(key, d)])
-            for key, r in results.items()}
+    kept = shared(results)
     summary = rx.diagnostics_summary(list(kept.values()))
     return {
         "standards": {key: {code: ", ".join(sorted({d.level for d in r.diagnostics
@@ -170,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     started = time.perf_counter()
     results = collect(args.data_dir)
     seconds = time.perf_counter() - started
-    print(rx.diagnostics_summary(list(results.values())))
+    print(rx.diagnostics_summary(list(shared(results).values())))
     print(f"{len(results)} standard(s) fitted in {seconds:.0f} s")
     if not args.write:
         return 0
