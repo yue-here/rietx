@@ -616,7 +616,7 @@ def _not_freed(freed: list[str]) -> list:
                                   path=f"vars.b_{j}", value=0.4 * (1 - j), esd=None,
                                   vary=False, unit=None, reference=None)
             for j, term in enumerate(("1", "T"))]
-    mtable = SimpleNamespace(parametric=[line], expressions=[])
+    mtable = SimpleNamespace(parametric=[line], expressions=[], held_by=lambda path: None)
     return (_variable_not_freed_diagnostics([stage], ref._working_table())
             + _parametric_not_freed_diagnostics(mtable, rows, [stage]))
 

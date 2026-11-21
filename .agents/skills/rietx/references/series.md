@@ -34,18 +34,16 @@ puts a scan's own temperature in `data.metadata["temperature_k"]`, and
 `rx.io.readers.list_scans(path)` reports the same number per scan before any of
 them is read.  Today only the Bruker `.raw` v3 range header has such a field,
 and none is guessed from an axis named for something else.  A missing key is a
-file that recorded nothing — **refuse rather than substitute an ambient value**, because
-an invented coordinate makes the trajectory a fiction while every fit in it
-stays perfectly good.
+file that recorded nothing: **refuse rather than substitute an ambient value**,
+or the trajectory is a fiction made of good fits.
 
 What an operator must know, all measured:
 
 - **Chaining is worth ~3x in iterations, not in accuracy.**  On the eight
   round-robin sample-1 mixtures: 1826 iterations unchained, 627 chained,
-  weight fractions within 0.15 wt %.  Use it to make a long series
-  affordable, never to make an individual fit better.
-- **What licenses a chain is physical continuity, and a *tray* has none** — so
-  of the three cases above, the tray is the one to think twice about.  Chaining
+  weight fractions within 0.15 wt %.  It makes a long series affordable,
+  never a fit better.
+- **What licenses a chain is physical continuity, and a *tray* has none**.  Chaining
   eight ex-situ YBaCo₄O₇ specimens that shared only a method *created* the
   disagreement it was then used to measure: refitting them as independent cold
   points shrank the referenced pattern's Rwp gap by **13×** and its cell-*a* gap
@@ -69,6 +67,8 @@ What an operator must know, all measured:
   `vary` False, no code**: `mccusker_default` frees scales, background,
   zero, cell, U-Y. *(Measured: WP-1325, synthetic, ZrMo₂O₈; WP-2104;
   WP-2101.)*
+  Steer it like a single fit: `hold`, `tie`/`tie_equal`, `set_values`;
+  `refit()` reruns it in one stage.  *(Measured: WP-2103.)*
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early
   stages conditioned from a *poor* starting model; a converged neighbour is not
