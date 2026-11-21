@@ -40,6 +40,16 @@ built with `tests.test_indexing_engines.synthetic_peaks`.
 **Tier.** A reserved seat per engine would be a new rule of rietx's own: tier 3, new judgement, with the
 known-cell corpus as its family and each row's truth as its reference. Nothing has measured its cost.
 
+### Inherited
+
+- **2026-11-16, from [2007](2007-indexing-codes-constants-and-gates.md) (part 1, PR #1591): the cap's
+  neighbours.** WP-2007's clash K5 (`docs/wp/2007-batch/clashes.md`) measured a default `quick` run on
+  qarr corundum listing 12 candidates and validating and checking only 4 (`CONSENSUS_CHECK_TOP`), so ranks
+  5-12 are never validated or enumerated. Corroborated cells sort first, which is how a single-finder
+  first cell drops out of the twelve. A reserved seat changes what K5 reads; the proposed tiers of
+  `DEFAULT_MAX_CANDIDATES`, `ENGINE_POOL_MULTIPLE` and `CONSENSUS_CHECK_TOP` are in that batch's
+  `judgements.json`.
+
 ## Non-goals
 
 - How a ceiling shares among units: that question is with the maintainer in issue 1374, which has no WP yet.

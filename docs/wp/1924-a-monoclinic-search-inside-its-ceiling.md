@@ -60,6 +60,14 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 
 ### Inherited
 
+- **2026-11-16, from [2007](2007-indexing-codes-constants-and-gates.md) (part 1, PR #1591): the
+  default-mode benchmark this WP owed.** `python -m tests.bethanechol_benchmark`, whole protocol, on
+  `bc77a934e` (a shared Linux x86_64 workstation, one pinned core, Python 3.12): default **−3** (Bb, E, F
+  rank 1; Db rank 2), manual −2, global −5 over 20 runs, ceiling +8, 3735 s. Against the 2026-10-13
+  default −6 on the same machine class it is no worse, so this WP's 2026-10-31 verdict stands. It was
+  not alone: the machine carried load 12-23 from other sessions, another bethanechol run until about 12:35Z
+  and a test suite, and the budgets are wall-clock, so a quiet machine can only find more.
+
 - 2026-10-31, from the issue triage (issue #780): the reporter answered the
   2026-10-30 decision's two requests (reporter, 2026-10-31, on d35ffeda7,
   corrected the same day). (1) 49 dichotomy units overflowed `MAX_GRID_CELLS`,
