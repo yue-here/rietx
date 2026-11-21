@@ -1,6 +1,6 @@
 # WP-2009 — The rulebooks: findings out, and the rules that generate overfit rewritten
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-21 — claimed by @yue-here
 Track: The prose
 Depends on: 2001 (2008 soft)
 Priority: P3 2026-10-30 — was P4: the 2026-10-30 Inherited entry measures a cost every session pays (root alone about 21k tokens a request); a cost-only item with no user at the wall
