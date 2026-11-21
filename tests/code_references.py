@@ -44,9 +44,10 @@ on purpose, and any comment's reasoning or quoted numbers.
 **The allowlist** (`ALLOWLIST`) holds names a comment cites that are not rietx
 code: foreign vocabulary, a field of another program's file, a name in a
 quoted message.  Each entry carries its reason.  It is read by AST at the base
-by ``--delta``, which fails a change adding a name the base lacked: an entry
-needs review by name, since a count would let a change delete one to buy room
-for another (`tests/audit_delta.py`'s rule).
+by ``--delta``, which fails a change that adds a name the base lacked and
+edits anything else: an entry is reviewed by name in a change of its own,
+since a count would let a change delete one to buy room for another
+(`tests/audit_delta.py`'s rule).
 
 The module imports nothing outside the stdlib at load; resolution imports
 rietx on first use.
@@ -538,7 +539,14 @@ REL = "tests/code_references.py"
 
 
 def delta_main() -> int:
-    from tests.skill_caps import _git, base, rev_exists
+    """Fail an allowlist entry new against the base that shares its change.
+
+    An entry exempts a citation from this check, so one added beside the
+    comment it exempts could silence a stale rietx name with nobody reading
+    it.  An addition is therefore a change of its own: it passes when the
+    change touches no file but this one, and prints a warning either way.
+    """
+    from tests.skill_caps import _git, base, changed_files, rev_exists
 
     rev, how = base()
     if rev is None:
@@ -549,7 +557,11 @@ def delta_main() -> int:
               "the checkout needs fetch-depth: 2", file=sys.stderr)
         return 1
     shown = _git("show", f"{rev}:{REL}")
-    before = allowlist_names(shown.stdout) if shown.returncode == 0 else set()
+    if shown.returncode != 0:
+        # the change that adds this file is read whole in its own diff
+        print(f"code references: {REL} is new against {how}; every entry is in the diff")
+        return 0
+    before = allowlist_names(shown.stdout)
     added = sorted(set(ALLOWLIST) - before)
     if not added:
         print(f"code references: no allowlist entry new against {how}")
@@ -557,14 +569,20 @@ def delta_main() -> int:
     for name in added:
         print(f"::warning file={REL}::allowlist entry new against the base: {name} "
               f"({ALLOWLIST[name]})")
-    print(f"{len(added)} allowlist entries are new against {how}:", file=sys.stderr)
+    others = sorted(changed_files(rev) - {REL})
+    if not others:
+        print(f"code references: {len(added)} allowlist entries new against {how}, "
+              "in a change of their own")
+        return 0
+    print(f"{len(added)} allowlist entries are new against {how}, in a change that "
+          f"also edits {len(others)} other files ({', '.join(others[:5])}"
+          f"{', …' if len(others) > 5 else ''}):", file=sys.stderr)
     for name in added:
         print(f"  {name}: {ALLOWLIST[name]}", file=sys.stderr)
     print("An allowlist entry exempts a citation from the check that it names live "
-          "code. Where the name was rietx code, rewrite the comment against the code "
-          "it describes instead. Where it is foreign vocabulary, the entry stays and "
-          "a reviewer reads it by name; set RIETX_CAPS_BASE to this change to pass "
-          "locally.", file=sys.stderr)
+          "code, so it lands in a change that touches only tests/code_references.py. "
+          "Where the name was rietx code, rewrite the comment against the code it "
+          "describes instead of allowlisting it.", file=sys.stderr)
     return 1
 
 

@@ -223,6 +223,13 @@ def rev_exists(rev: str) -> bool:
     return _git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}").returncode == 0
 
 
+def changed_files(rev: str) -> set[str]:
+    """Every path the working tree changes against ``rev``, both sides of a
+    rename (WP-2233: a raise or an exemption must be a change of its own)."""
+    out = _git("diff", "--name-only", "--no-renames", rev)
+    return set(out.stdout.split()) if out.returncode == 0 else set()
+
+
 @dataclass(frozen=True)
 class Row:
     cap: Cap

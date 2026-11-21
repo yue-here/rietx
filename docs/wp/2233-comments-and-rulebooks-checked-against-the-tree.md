@@ -187,7 +187,7 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
 - [x] **The sweep.** Fix every miss the script prints, including the pointers listed in
       Context. Fix a resolver gap in the resolver. Foreign vocabulary goes on an allowlist
       in the script, each entry with a reason.
-- [ ] **`tests/test_code_references.py`**, landing green after the sweep. Every
+- [x] **`tests/test_code_references.py`**, landing green after the sweep. Every
       reference resolves or sits on the allowlist. The failure message says: a comment
       names code that is gone, so rewrite it against the code it describes, and put
       history in the WP or the release notes. A lint-job step fails a change that adds

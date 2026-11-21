@@ -189,6 +189,13 @@ jobs:
         # judge's item list.
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: .venv/bin/python -m tests.audit_delta
+      - name: Code-reference allowlist entries
+        # Each entry new against the base in tests/code_references.py's
+        # ALLOWLIST, printed as a warning.  An entry exempts a comment's
+        # citation from the check that it names live code, so it fails unless
+        # the change touches no other file (WP-2233).  Same base as above.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: .venv/bin/python -m tests.code_references --delta
 
   changes:
     # Which suite this run needs, as `scope`: `docs` when every file the PR
