@@ -720,6 +720,21 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_MULTIPLICITY_DISAGREES", "code"),
     Row("CIF_SITE_TWINS_MERGED", "code"),
     Row("CIF_SPECIES_NORMALISED", "code"),
+    Row("COMPARISON_UNCONVERGED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the comparison's delta_bic and t-ratios as not quotable, run the "
+                  "fit it names on to convergence and compare again"),
+        evidence=("arithmetic: fires exactly when either fit of a nested comparison has a "
+                  "status other than 'converged', or the fuller fit's minimised cost "
+                  "(the last stage's cost_final: data chi2 plus restraint and penalty rows) sits above the "
+                  "restricted one's by more than report.layer2.NESTED_COST_MARGIN (a model that "
+                  "contains another can reproduce it, so at both optima S_full <= "
+                  "S_restricted; the data chi2 alone carries no such bound; "
+                  "report.layer2._chi2_ordered, on distortion.py's restart precedent); "
+                  "the margin is tiered on its own row; flags and refuses nothing, since a budget stop can "
+                  "sit on the optimum (issue #1685: max_iter=2 from Biso 8 stops at the "
+                  "converged chi2); raised by compare_freed, predict_then_verify's "
+                  "comparison and rigid_body_misfit (WP-2220)")),
     Row("CONSTRAINT_ACTIVE", "code", tier=1, ambiguity=1,
         response="info",
         responds=("note which width the floor held; the next fit's start decides whether it "
@@ -4246,6 +4261,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),
+    Row("rietx.report.layer2.NESTED_COST_MARGIN", "constant", tier=2, value=2.0,
+        evidence=("Kass & Raftery (1995) J. Am. Stat. Assoc. 90, 773: 2 ln B from 2 to 6 is "
+                  "'positive' evidence, so 2 is the band's lower edge and an excess of the "
+                  "fuller fit's minimised cost under it cannot move a delta_bic verdict; "
+                  "absolute, in the cost units delta_bic is read in; measured stopping noise "
+                  "between two converged fits of one nested pair is 1.1e-7 relative, about "
+                  "0.0006 cost units on issue #1685's fixture, so the margin holds until a "
+                  "cost near 1e7 (the docstring's known limit); replaces optimize.lm.FTOL "
+                  "(1e-9 relative, below that noise) and was chosen over GSAS-II 5.8.4's 1e-3 "
+                  "relative stop (about 6 cost units there, already 'strong'); ruled by the "
+                  "maintainer 2026-11-20 (WP-2220)")),
     Row("rietx.report.layer2.TEXTURE_AXIS_AMBIGUITY", "constant", value=0.8),
     Row("rietx.report.localisation.SPLIT_TOLERANCE_DEG", "constant", value=1e-06),
     Row("rietx.report.magnetic._MAGNETIC_WIDTH_FLOOR_DEG", "constant", value=1e-12),
@@ -5710,6 +5736,10 @@ ROWS: tuple[Row, ...] = (
     Row("CIF_SITE_LISTED_TWICE.suggestion", "suggestion", value=1),
     Row("CIF_SITE_MULTIPLICITY_DISAGREES.suggestion", "suggestion", value=1),
     Row("CIF_SITE_TWINS_MERGED.suggestion", "suggestion", value=1),
+    Row("COMPARISON_UNCONVERGED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one remedy for a fit short of its optimum, running "
+                  "it on, and the two ways to start it (more iterations, or the other "
+                  "fit's values)")),
     Row("CONSTRAINT_ACTIVE.suggestion", "suggestion", value=1),
     Row("COVARIANCE_DIRECTION_DISCARDED.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names three levers, fewer free, held known values, a wider "

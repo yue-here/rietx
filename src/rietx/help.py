@@ -2159,6 +2159,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "but the species spelling in the model now differs from the file."
         ),
     ),
+    "COMPARISON_UNCONVERGED": HelpEntry(
+        title="A comparison rests on a fit short of its optimum",
+        description=(
+            "ΔBIC and the t-ratios beside it compare two optima. One of the two fits "
+            "stopped before its convergence test passed, or the fuller fit ended with a "
+            "cost more than 2 above the fit it contains. The cost is the data χ² plus any "
+            "restraint and penalty rows. A model that contains another cannot fit worse at "
+            "its optimum, so that fit had not reached its minimum. The margin of 2 is the "
+            "lower edge of Kass and Raftery's (1995) \"positive evidence\" band, so an "
+            "excess inside it cannot change a ΔBIC verdict. The ΔBIC can "
+            "then have either sign. Run the named fit on to convergence and compare again. "
+            "A fit stopped on its budget can sit on its optimum, so the comparison is "
+            "flagged and not refused."
+        ),
+    ),
     "CONSTRAINT_ACTIVE": HelpEntry(
         title="A constraint held the optimum on its edge",
         description=(
@@ -2177,8 +2192,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The data do not constrain one combination of several parameters. The solver "
             "discards that direction, and each parameter on it has no esd: the result, "
-            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
-            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the CIF and the GUI show it as undetermined. A tie or a derived quantity "
+            "built on them has none either, unless the data determine that combination: "
+            "a zero shift tied to the sum of three such parameters keeps its esd, as do "
+            "a bond, a cell volume or a moment pair's quadrature sum built that way. "
+            "Free fewer of "
             "the parameters in one stage, hold the ones you know independently, or widen "
             "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."

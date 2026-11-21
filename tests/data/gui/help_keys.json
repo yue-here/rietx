@@ -52,6 +52,7 @@
   "diagnostics:CIF_SITE_MULTIPLICITY_DISAGREES",
   "diagnostics:CIF_SITE_TWINS_MERGED",
   "diagnostics:CIF_SPECIES_NORMALISED",
+  "diagnostics:COMPARISON_UNCONVERGED",
   "diagnostics:CONSTRAINT_ACTIVE",
   "diagnostics:COVARIANCE_DIRECTION_DISCARDED",
   "diagnostics:COVARIANCE_UNAVAILABLE",

@@ -1,6 +1,6 @@
 # WP-2220 — A nested comparison says which fits it rests on, and which freed columns carried information
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-20 — both rulings made and built; PR #1717 waits on CI
 Track: What fires, and what stays silent
 Depends on: — (2076 soft: its extinction-screen nesting finding fences that caller out; 2053 soft: the same stationary-point t)
 Priority: P2 2026-11-19 — a ΔBIC of the wrong sign is quoted beside a fit that stopped on its budget, and nothing on the comparison says so; a path few fits run
@@ -98,20 +98,20 @@ public surface.
 
 ## Tasks
 
-- [ ] `FreedComparison` records both fits' `status` and a χ² ordering flag (full ≤ restricted
+- [x] `FreedComparison` records both fits' `status` and a χ² ordering flag (full ≤ restricted
       within the solver's ftol). Pin both rows of #1685's table.
-- [ ] A diagnostic on the comparison when either fit is not `converged` or the ordering fails,
+- [x] A diagnostic on the comparison when either fit is not `converged` or the ordering fails,
       with its `_audit` row (tier: named practice for the ordering, since a nested optimum
       cannot rise), `help.py` and skill rows.
-- [ ] `FreedParameter.at_bound`, projected from the fuller fit's `RefinedParameter.at_bound`
+- [x] `FreedParameter.at_bound`, projected from the fuller fit's `RefinedParameter.at_bound`
       and pinned set-equal; a reason string where `t_ratio` is `None`. Pin both seeds of
       #1686's table.
-- [ ] `n_identified` beside `n_added`: freed columns that are live and off their bounds.
-- [ ] `predict_then_verify` and `rigid_body_misfit` take the same fields. A trial that stopped
+- [x] `n_identified` beside `n_added`: freed columns that are live and off their bounds.
+- [x] `predict_then_verify` and `rigid_body_misfit` take the same fields. A trial that stopped
       on its budget reads as not judged, never as a rejection (#1685 proposal 3).
-- [ ] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
+- [x] Tests (unit, on the two synthetic scripts from the issues) + obs/calc/diff PNGs to
       `tests/output/`
-- [ ] Skill: the `compare_freed` reference row says to read the status and ordering fields
+- [x] Skill: the `compare_freed` reference row says to read the status and ordering fields
       before quoting a ΔBIC.
 
 ## Acceptance
@@ -134,6 +134,173 @@ at its bound. Every existing `compare_freed` number is unchanged.
 - Issues #1685, #1686; related #270 (WP-1417), #222, #538, #831, #1008, #1010 (WP-2053).
 
 ## Handover log
+
+- **2026-11-20** — both rulings made; the ordering margin is now 2 cost units (ghostshift
+  runner). Main merged in at 8112e3b09 with no conflicts.
+
+  *Ruled by Yue, 2026-11-20.* (A) Approved: every new field
+  (`FreedComparison.status_restricted`/`status_full`/`chi2_ordered`/`n_identified`/
+  `diagnostics`, `FreedParameter.at_bound`/`t_reason`, `VerificationOutcome.accepted:
+  bool | None`, `BodyMisfitRow.status_body`/`status_released`/`chi2_ordered`, `fires:
+  bool | None`) and the `COMPARISON_UNCONVERGED` warning belong, as PR #1717 describes them.
+  (B) The ordering margin is option (iii): an absolute margin of 2, in units of the minimised
+  cost (data χ² plus any restraint and penalty rows), replacing the relative
+  `optimize.lm.FTOL` = 1e-9. `chi2_ordered` is True when the fuller fit's minimised cost is at
+  most the restricted fit's plus 2. Grounds: the margin is then in the units ΔBIC is read in,
+  and 2 is the lower edge of the "positive evidence" band of Kass & Raftery (1995, J. Am.
+  Stat. Assoc. 90, 773), so an excess the margin hides cannot change a verdict. It sits far
+  above measured stopping noise (1.1e-7 relative, about 0.0006 χ² units on the #1685
+  fixture) until χ² reaches about 10⁷, the known limit. Rejected: 1e-9 relative (below the
+  measured stopping noise between independently fitted arms); 1e-3 relative (GSAS-II's stop;
+  about 6 χ² units on that fixture, already "strong" evidence, so it can hide a verdict
+  flip); dropping the ordering warning.
+
+  *Done.* `report.layer2.NESTED_COST_MARGIN = 2.0`, its docstring citing Kass & Raftery and
+  stating the known limit; `_chi2_ordered` adds it to the restricted cost, and
+  `compare_freed`, `predict_then_verify` and `rigid_body_misfit` all reach it there. Its
+  `_audit` row is tier 2 (quoted from the literature), and `COMPARISON_UNCONVERGED`'s row no
+  longer names FTOL. The warning now reads "ended at a cost more than 2 above the restricted
+  fit's" in place of "ended at a higher cost than the restricted fit". Docstrings
+  (`FreedComparison`, `BodyMisfitRow`, the 1.15 → 1.16 note), the `help.py` entry, the
+  `diagnostics.md` skill row (copies re-synced) and the manual rows in
+  `reference/comparison.md` say 2 in place of FTOL. One test added,
+  `test_the_ordering_margin_is_two_cost_units_at_any_scale`: an excess of 1.999 and 2.0 is
+  ordered, 2.001 is not, at a cost of 100 and of 10⁶, and on the stage-less fallback.
+
+  *Measured* (macOS arm64, this worktree's `[dev]` venv, Python 3.12). #1685's script reads
+  as before: ΔBIC +264.1 converged, −1941.3 on the `max_iter` arm, which sits 4365 cost units
+  above the restricted fit and still reads unordered. Gates on the final tree: the touched-area
+  selection (`tests/test_compare_freed.py`, `tests/test_body_misfit.py`,
+  `tests/test_audit_table.py`, `tests/test_help.py`, `tests/test_skill.py`,
+  `tests/test_docs_consistency.py`, `tests/test_manual_api.py`, `-n 4 --dist loadgroup`) 320
+  passed; ruff clean; `ruff format --check examples/tutorials` clean; `tests.skill_caps`
+  exit 0 (`diagnostics.md` +275 bytes, 1633 under its budget); Vale 0 errors, no warning on a
+  line written here; `tests.reader_output` exit 0. The fast selection was not run locally.
+
+  *Not generalised.* `distortion_block_tests` still compares at `FTOL` relative
+  (`report/distortion.py`), a restart test outside this WP's diff; WP-2220's ruling names
+  only `chi2_ordered`.
+
+  Next: CI on PR #1717, then merge.
+
+- **2026-11-19** — all seven tasks landed, PR #1717 (ghostshift runner). A reader of a ΔBIC
+  comparison can now tell when it rests on a fit that stopped short. The comparison carries
+  both fits' statuses, says whether the fuller fit's χ² sits at or below the restricted one,
+  and adds a warning when either test fails. Each freed parameter says whether it ended on a
+  bound and why its t-ratio is missing, and a count of the measured columns sits beside the
+  count charged. The two experiments built on the same comparison, trying a suggestion and
+  testing a rigid body, now answer "not judged" where a short fit could flip their verdict,
+  instead of a rejection. Nothing is refused, and no number on a pair of converged fits moved.
+  The PR waits on the maintainer: it changes what a comparison returns.
+
+  *Done.* `FreedComparison.status_restricted`/`status_full`/`chi2_ordered`/`n_identified`/
+  `diagnostics`; `FreedParameter.at_bound`/`t_reason`; `COMPARISON_UNCONVERGED` with its
+  `_audit` rows, `help.py` entry, skill rows (`diagnostics.md`, `judging.md`) and manual rows
+  (`reference/comparison.md`); `VerificationOutcome.accepted` and `BodyMisfitRow.fires` become
+  `bool | None`; `BodyMisfitRow` gains both arms' status and `chi2_ordered`;
+  `THRESHOLDS_VERSION` 1.15 → 1.16. Helpers `layer2._chi2_ordered`, `_comparison_unconverged`
+  and `_judged` are the one authority for all three callers.
+
+  *Measured* (macOS arm64, this worktree's `[dev]` venv, Python 3.12). The issues' scripts no
+  longer reproduce digit for digit: main moved after 7a4a6cd20, and #1685's converged arm now
+  reads ΔBIC +264.1 (was +269.1), its `max_iter` arm −1941.3 with χ² 4365 above the restricted
+  one. The shape is unchanged. #1686 seed 1: `n_identified` 0 of 3 (centre and fwhm "no
+  gradient", area on its zero bound); seed 7: centre on its bound at 46.5 with t +28.1 (was
+  +8.5), `n_identified` 2. Ordering tolerance probe: refitting a converged fit's own free set
+  from its answer moved χ² by 0 on four LaB₆ seeds and by −1.1e-7 relative on the correlated
+  fixture, never upward, so `FTOL` (1e-9) does not fire on converged pairs there.
+  Gates: touched-area selection (`tests/test_compare_freed.py`, `tests/test_body_misfit.py`, `tests/test_audit_table.py`, `tests/test_help.py`, `-n 4 --dist loadgroup`) 91 passed on the final code; earlier the same plus `test_skill.py`, `test_skill_cli.py`, `test_docs_consistency.py` all passed; ruff clean; Vale 0 errors (one warning on line 225 of `reference/comparison.md`, not written here); `tests.reader_output` exit 0. Eight tests added (seven in `test_compare_freed.py`, one in `test_body_misfit.py`), none marked slow. The local fast selection did not run: it queued 25 min behind another runner's slow suite on the machine lock and was cancelled, so CI's fast matrix is the first full fast run.
+
+  *Review* (`/code-review high --fix`, 8 findings). Fixed: a diverged trial now stays a
+  rejection rather than "not judged"; `BodyMisfitRow`'s new fields are required, not defaulted
+  to an answer; the warning's last sentence no longer claims the ΔBIC "can have either sign"
+  where the verdict stands; a zero esd no longer counts towards `n_identified`; the rigid-body
+  test asserts which arm was short. Declined: the FTOL tolerance (probed above, no drift
+  upward); `distortion.py` calling `_chi2_ordered` (outside this diff, its algebra is the same
+  test); "rolled back" wording on an in-place trial (predates this WP); `n_identified`
+  counting an untested bound (`at_bound` None) as off its bound, since every freed row of a fit
+  with a guard report is tested and the alternative zeroes the count on every replayed result.
+
+  *Settled for you* (each could have gone the other way):
+  - The new diagnostic is tier 1 (arithmetic), not tier 2 as task 2 proposed. Settled by
+    Claude under `docs/milestones/generality.md` § The rule, tier 1: "deterministic from the
+    model"; a model containing another cannot fit worse at its optimum. Alternative: tier 2,
+    citing `distortion.py`'s restart as practice.
+  - "Not judged" is `None` on the existing verdict field (`accepted`, `fires`), not a new
+    `judged` flag beside a `False`. Settled by Claude under root CLAUDE.md's WP-1076 rule ("the
+    honest empty state is `None`") and `RefinedParameter.at_bound`'s precedent. Alternative:
+    keep `bool` and add a field, which leaves `False` reading as a rejection.
+  - The verdict rule follows the bias direction: a short fuller fit leaves a pass standing, a
+    short restricted fit leaves a fail standing. Settled by Claude under the nested-optimum
+    argument; the WP named only the first half. Alternative: every short fit gives `None`.
+  - `COMPARISON_UNCONVERGED` fires on any short fit, even where the verdict stands. Settled by
+    Claude on one rule over a rule with exceptions (DESIGN.md Rule 5). Alternative: fire only
+    where the verdict is `None`.
+
+  *After the judge.* The ordering test first read the data χ²; the judge showed that a fuller
+  model with restraint or penalty rows can trade data misfit against them, so two true optima
+  can sit in either order there. It now reads the last stage's `StageResult.cost_final`, what the solver
+  minimised, for which the nested inequality is exact. Settled by Claude under arithmetic
+  (generality tier 1); the alternative, skipping the test where restraints are active, loses
+  the check on restrained fits.
+
+  *Generality* (the `generality-review` judge, 2026-11-19, on the branch before the
+  ordering moved to the minimised cost. Verdicts and their one-line grounds are the judge's
+  words; its seven-question tables are condensed here by the author, so read a summary as
+  the author's):
+
+  - **`COMPARISON_UNCONVERGED` (code row, tier 1, ambiguity 1, warning): weak.** For the
+    status test, the case for acting is stronger. For the χ² ordering test, the evidence does
+    not carry the row's "arithmetic" claim or its tolerance, and the author's own probe points
+    against the tolerance. Ambiguity: "a model that contains another cannot fit worse at its
+    optimum" is true of the minimised objective S (data plus restraint and penalty rows); the
+    test read the data χ² alone, so with soft restraints, a P-spline background or Pawley's
+    equal-split rows two true optima can have data χ²_full above χ²_restricted. Tier: the
+    tolerance is FTOL × 1 and FTOL's row is tier 3, so the threshold part inherits tier 3,
+    untiered. Families: two synthetic materials from one source. Would change the verdict:
+    independently fitted nested pairs with a dead freed parameter, with and without active
+    restraints, silent; or a row that limits the claim and tiers its tolerance.
+    *Author:* the ordering now reads `cost_final`, the minimised S, so the restraint route is
+    closed by construction; the row's evidence now names the tolerance as inherited tier 3
+    and waiting on the maintainer.
+  - **`COMPARISON_UNCONVERGED.suggestion` (tier 1, ambiguity 1): holds.** The remedy is cheap,
+    and starting the fuller fit from the restricted fit's values guarantees the ordering.
+  - **`report.layer2._judged` (not visible to the table): holds.** The bias-direction argument
+    is arithmetic, every branch checked against the nested-optimum argument, and withholding
+    costs one rerun. Its converged-but-unordered branch inherits the FTOL weakness; there the
+    reason text "more iterations could still gain" fits a restart from the other fit's values
+    better than more iterations.
+  - **`optimize.lm.FTOL` as the ordering tolerance (1e-9 relative): weak.** FTOL bounds the
+    per-iteration relative decrease, not the gap to the optimum; the probe's −1.1e-7 shows a
+    converged fit stopped at least 1.1e-7 above its optimum, 110× the tolerance, and "never
+    upward" holds by construction for a refit started at the answer, so it tests the
+    `predict_then_verify` shape and not independently fitted arms. GSAS-II's default stop is
+    1e-3 relative (`docs/practice.md:139`). No test asserts the margin. Tier 3, unapproved for
+    this use. Would change the verdict: independently fitted pairs across three families
+    silent at 1e-9, or a tolerance in esd or χ²_red units with its own evidence.
+    *Author:* not settled; it is a threshold over a fit metric, the family the 2026-11-16
+    reversal escalates, so it is the maintainer's question below.
+  - **Skill rows (`judging.md`, `diagnostics.md`): holds.** They name a code and a field; the
+    boundary rule has a source in the repository (Self & Liang 1987, cited at
+    `optimize/statistics.py:488`). They are stricter than the manual ("quote neither number").
+
+  *Questions for the maintainer* (reader output, waits before merge). (1) The new fields and
+  the warning, in PR #1717's "What a reader receives". The 2026-11-16 reversal ("a field, and
+  the caller decides") is about tuned thresholds over fit metrics; the status half has none, so
+  the warning was kept as task 2 asked. (2) The ordering margin. It is the solver's stopping
+  tolerance, 1e-9 relative, reused unvaried; the judge rated it weak, since a converged fit was
+  measured stopping 1.1e-7 above its own optimum. Inside `compare_freed`'s usual shape (fuller
+  fit branched from the restricted answer) it cannot fire falsely, because the solver accepts
+  only downhill steps. Between independently fitted arms it could. Options: keep 1e-9; take
+  GSAS-II's 1e-3 stop; or state it in χ²_red units. If you prefer fields only, delete the
+  diagnostic and its rows.
+
+  *Not generalised.* `distortion_block_tests` and the magnetic search's ΔBIC
+  (`strategy/magnetic.py`) also read no solver status; the extinction screen stays fenced to
+  WP-2076. Magnetic-path decisions are Mike's.
+
+  Next: the maintainer reads the reader-output section of PR #1717 and rules on the warning;
+  then merge.
 
 - **2026-11-19** — created, from the 2026-11-19 issue triage (PR #1697; issues #1685, #1686). A reader of
   a ΔBIC comparison cannot yet tell when it rests on a fit that never finished, or when it
