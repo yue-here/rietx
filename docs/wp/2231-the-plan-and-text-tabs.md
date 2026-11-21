@@ -120,6 +120,21 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   that match nothing and refuse only literal paths, as `Refinement.hold` does. Probe:
   `phases.0.atoms.*.adp.*` on `fap`.
   Fixed in the first PR (#1755).
+- **2026-11-21, issue triage (#1656 item 2): the register guard does not read `/next`.**
+  `styledFiles()` in `gui/src/lib/style.test.ts` lists `App.svelte` and `panels/*.svelte`
+  only. So the milestone's acceptance row 3 ("R1, then every piece", measured by
+  `lib/style.test.ts`) is not measured on the new page at all. Checked at `c1033a0e8` with a
+  python copy of the guard's second assertion over the 17 files in `gui/src/next/`: 4 hits
+  under today's `REGISTERS`, 6 with `.ib` and `.mbtn` added. Five are in this WP's
+  `next/Plan.svelte`: `.ib.words` sets padding and font-size, and `button.op` sets padding,
+  radius and font-size. The sixth is `.jump .link { padding }` in `next/Params.svelte`.
+  `gui/STYLE.md` settles half of the issue's question. Its Components table lists the icon
+  button as a kind, so `.ib` is a register under principle 3 ([Yue, WP-1201]). It has no
+  menu-button row, so `.mbtn` is not yet settled. It also says the drawings live in
+  `app.css`, while the rebuild draws `.ib` and `.mbtn` in `next/next.css`. Fix: extend
+  `styledFiles()` to `next/*.svelte`, add `.ib` (and `.mbtn` once STYLE.md gains its row) to
+  `REGISTERS`, name `next.css` as the rebuild's home for a register's geometry, and move the
+  six overrides there as named variants. Moving them changes no pixel.
 
 ## Tasks
 
