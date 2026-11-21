@@ -191,7 +191,7 @@ reading defaults.
 
 ## Handover log
 
-- **2026-11-21** — A rulings triage, docs only (PR #PENDING), over this file and PR #1636's
+- **2026-11-21** — A rulings triage, docs only (PR #1759), over this file and PR #1636's
   batch. The gate ruling this WP waited on was made on 2026-11-16, and PR #1636 has since
   tiered 218 rows under it. So what waits now is that PR's batch. Of its items, six are
   settled by a written rule or a measurement, 16 are consent lines Yue can wave through,

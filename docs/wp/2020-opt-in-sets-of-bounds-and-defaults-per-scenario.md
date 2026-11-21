@@ -155,7 +155,7 @@ rules. Nothing here is the maintainer's approval.
 
 ## Handover log
 
-- **2026-11-21** — A rulings triage, docs only (PR #PENDING). It
+- **2026-11-21** — A rulings triage, docs only (PR #1759). It
   read the 2026-11-15 brief against the design rules and settled what a rule settles. One
   half of that brief's lean is ruled out: DESIGN.md Rule 2 keeps a "tested on" line out of
   the help text an agent reads while choosing a preset. So one small question is left for
