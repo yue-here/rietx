@@ -563,7 +563,7 @@ def test_the_documented_feature_keys_are_present(caps):
     expected = {
         "anisotropic_adp", "preferred_orientation", "spherical_harmonics_texture",
         "stephens_strain",
-        "primary_extinction", "restraints", "satellites", "magnetic_moments",
+        "primary_extinction", "restraints", "peak_equations", "satellites", "magnetic_moments",
         "magnetic_interchange", "surface_roughness",
         "capillary_absorption", "flat_plate_absorption", "anomalous_dispersion",
         "anomalous_dispersion_default_on", "extra_components",

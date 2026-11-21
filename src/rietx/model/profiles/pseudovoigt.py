@@ -49,6 +49,39 @@ def tch_gamma_eta(gamma_g: np.ndarray, gamma_l: np.ndarray) -> tuple[np.ndarray,
     return gamma, eta
 
 
+def tch_gamma_eta_partials(gamma_g: np.ndarray, gamma_l: np.ndarray
+                           ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """(∂Γ/∂Γ_G, ∂Γ/∂Γ_L, ∂η/∂Γ_G, ∂η/∂Γ_L) of :func:`tch_gamma_eta`, numpy.
+
+    Differentiated from TCH eq. 4 and 5 (Thompson, Cox & Hastings, 1987,
+    J. Appl. Cryst. 20, 79): 5Γ⁴·dΓ = dP for the quintic P, q = Γ_L/Γ so
+    dq = (dΓ_L − q·dΓ)/Γ, and dη = (e₁ + 2e₂q + 3e₃q²)·dq.  Zero where Γ is
+    zero, as the forward's q is.  The analytic peak-equation columns chain
+    through it (WP-2107); ``tests/test_peak_equations.py`` holds it to a
+    complex step.
+    """
+    gg = np.asarray(gamma_g, dtype=np.float64)
+    gl = np.asarray(gamma_l, dtype=np.float64)
+    c1, c2, c3, c4 = _TCH_GAMMA
+    gamma5 = (gg**5 + c1 * gg**4 * gl + c2 * gg**3 * gl**2
+              + c3 * gg**2 * gl**3 + c4 * gg * gl**4 + gl**5)
+    dp_dg = (5.0 * gg**4 + 4.0 * c1 * gg**3 * gl + 3.0 * c2 * gg**2 * gl**2
+             + 2.0 * c3 * gg * gl**3 + c4 * gl**4)
+    dp_dl = (c1 * gg**4 + 2.0 * c2 * gg**3 * gl + 3.0 * c3 * gg**2 * gl**2
+             + 4.0 * c4 * gg * gl**3 + 5.0 * gl**4)
+    gamma = gamma5 ** 0.2
+    live = gamma > 0.0
+    g_safe = np.where(live, gamma, 1.0)
+    d_gamma_g = np.where(live, dp_dg / (5.0 * g_safe**4), 0.0)
+    d_gamma_l = np.where(live, dp_dl / (5.0 * g_safe**4), 0.0)
+    q = np.where(live, gl / g_safe, 0.0)
+    e1, e2, e3 = _TCH_ETA
+    de_dq = e1 + 2.0 * e2 * q + 3.0 * e3 * q * q
+    d_eta_g = np.where(live, de_dq * (-q * d_gamma_g) / g_safe, 0.0)
+    d_eta_l = np.where(live, de_dq * (1.0 - q * d_gamma_l) / g_safe, 0.0)
+    return d_gamma_g, d_gamma_l, d_eta_g, d_eta_l
+
+
 def pseudo_voigt(x: np.ndarray, gamma: np.ndarray, eta: np.ndarray) -> np.ndarray:
     """Unit-area pseudo-Voigt evaluated at offsets ``x`` (same units as Γ).
 
