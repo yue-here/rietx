@@ -44,35 +44,6 @@ every program draws the curve its own calculation made at one peak cut
 the two shipped examples the preview's tests use, `fap` (lab) and `nac`
 (synchrotron), against a fresh compile at the same values.
 
-### Inherited
-
-- **2026-11-21, issue triage (#1652 item 2): `Refinement.predict(grid)` is
-  this WP's mechanism in the public API, and two paragraphs describe it
-  wrongly.** A grid compiles at `compile_model`'s default windows (1e-3 of
-  each peak's area left out), while a default fit measures its answer at the
-  declared stages' 2 % windows. Checked at `c1033a0e8` on the fluorapatite
-  tutorial (`FAP.XRA`, limits 15-130°, `[dev]`, darwin arm64), under both
-  `mccusker_structural` (11 stages) and `mccusker_default` (5):
-  `predict()` equals `result.y_calc` bit for bit, and `predict(result.two_theta)`
-  differs from it on 5751 of 5751 channels. The largest difference is
-  1.5-1.6e-3 of the strongest peak and the median 9e-5. `predict`'s own
-  recipe, `compile_model(..., window_area_tol=recorded_window_tol(result.stages[-1].window_area_tol))`,
-  reproduces `predict()` exactly (0 of 5751 channels differ), so the window
-  cut is the whole cause. Two texts are stale:
-  `docs/docs/reference/exports.md` § Evaluating the model ("36 of 4200
-  channels … 8×10⁻⁶ of the peak height", and a cause about windows sized at a
-  stage's start values), and the docstring's bold paragraph "After a default
-  fit the two forms agree bit for bit" in `refine.py` `Refinement.predict`.
-  The docstring's last paragraph, on the 2 % windows, is right. Ruling A
-  above is about the GUI preview. Whether `predict(grid)` follows it is a
-  reader-output change and comes to Yue. Today's docstring says the grid form
-  is deliberately independent of what the object has fitted, so a
-  never-fitted twin returns the same array, and that property is what
-  following A would give up. Rewrite both paragraphs to whatever ships.
-  The probe is the tutorial's own fit followed by `ref.predict()`,
-  `ref.predict(result.two_theta)` and that recipe, compared channel by
-  channel. Sibling: WP-1949's Context quotes the stale 36-of-4200 figure.
-
 ## Question for Yue: how much of each peak's tail the preview draws
 
 **The decision.** When a person drags a slider in the Interactive tab, should

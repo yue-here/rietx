@@ -67,7 +67,7 @@ can reach the caller's callback and skip the recorder.
   and `predict(grid)` differs from it on every channel by up to 1.6e-3 of the
   strongest peak. The cause is the window cut: a grid compiles at 1e-3 of
   each peak's area, and the fit measured at the declared stages' 2 %
-  (WP-2222). The measurement and the docs fix sit in WP-2226 § Inherited. So
+  (WP-2222). The measurement and the docs fix sit in WP-2235. So
   the Acceptance's comparison of an `eval` event's curve with `predict` at
   the event's values compiles at the window the stage ran at, with the recipe
   in `predict`'s docstring (`compile_model(..., window_area_tol=...)`). A bar
