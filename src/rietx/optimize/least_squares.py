@@ -3098,6 +3098,59 @@ def _free_values(table, theta: np.ndarray) -> list[float]:
     return table.free_values(theta)
 
 
+def _wants_preview(events) -> bool:
+    """Did the caller's stream ask for a preview on accepted ``eval`` events?
+
+    An attribute of the stream, never a ``fit`` argument (WP-1949): the
+    stream is what reaches the solver through every entry point, and it is
+    the one object that knows whether a callback is there to receive one.
+    """
+    return events is not None and bool(getattr(events, "preview", False))
+
+
+def _refuse_joint_preview(events) -> None:
+    """A joint fit refuses a preview rather than skipping it, so a viewer
+    waiting on one is told why none comes: its data rows are several
+    histograms', and no one grid draws them (WP-1949)."""
+    if _wants_preview(events):
+        raise ValueError(
+            "EventStream(preview=True) is not supported on a joint fit: its "
+            "residual stacks several histograms, and no one grid draws them. "
+            "Pass a stream without preview=True.")
+
+
+def _preview_builder(model: CompiledModel, table: ParameterTable):
+    """A function of (θ, r) returning one accepted ``eval``'s preview (WP-1949).
+
+    ``y_calc`` is read off the residual the driver already measured: the data
+    block leads the row layout (``model.rows``) and is ``(y_obs − y_calc)/σ``,
+    so ``y_obs − r·σ`` is the curve without a second evaluation.  ``values``
+    is every *moving* path, a decode of θ that holds the tied coordinates and
+    the cell as absolute values, so a viewer draws the atoms with no reset.
+    The grid and the path list are taken once, here, since both are frozen for
+    the stage.  In Le Bail mode the curve is the one the solve minimises, at
+    the intensities extracted before it (``_lebail_snapshot``); ``predict()``
+    reads the ones re-extracted after it, so the two differ by that update
+    (2.6e-4 of the maximum on the synthetic fixture, against 4.4e-6 in
+    Rietveld and 5e-20 in Pawley mode).
+    """
+    data_rows = row_layout.block(model, "data")
+    sigma = model.sigma
+    y_obs = model.y_obs
+    grid = model.tt.view()
+    grid.flags.writeable = False
+    moving = table.moving_paths
+    n_table = len(table.free_paths)
+
+    def build(theta: np.ndarray, r: np.ndarray) -> dict:
+        decoded = table.decode(np.asarray(theta[:n_table], dtype=np.float64))
+        y_calc = y_obs - np.asarray(r[data_rows.start:data_rows.stop]) * sigma
+        return {"two_theta": grid, "y_calc": y_calc,
+                "values": {p: decoded[p] for p in moving}}
+
+    return build
+
+
 def _cancel_check(cancel, stage: str):
     """A function raising :class:`RefinementCancelled` once ``cancel`` is set.
 
@@ -3131,14 +3184,17 @@ def _cancellable(residual, cancel, stage: str):
     return checked
 
 
-def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
+def _tracked(residual, tracker: _StepTracker, events, stage: str, table,
+             preview=None):
     """``residual`` as the TRF path's accepted-point hook.
 
     Two jobs in a fixed order per call: emit the ``eval`` event measured
     against the incumbent, then let ``tracker`` accept.  ``table`` is what
-    :func:`_free_values` reads the event's ``values`` off.  One wrapper for
-    :func:`run_least_squares` and :func:`run_multi_least_squares`, and
-    ``__wrapped__`` lets ``inspect.unwrap`` reach the guard underneath.
+    :func:`_free_values` reads the event's ``values`` off.  ``preview`` is a
+    :func:`_preview_builder`, called on accepted evaluations only, or ``None``
+    (WP-1949).  One wrapper for :func:`run_least_squares` and
+    :func:`run_multi_least_squares`, and ``__wrapped__`` lets
+    ``inspect.unwrap`` reach the guard underneath.
     """
     counter = {"n": 0}
 
@@ -3147,13 +3203,17 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
         cost = 0.5 * float(r @ r)
         if events is not None:
             counter["n"] += 1
+            accepted = bool(cost < tracker.best_cost)
             data = {"stage": stage, "n_eval": counter["n"], "cost": cost,
-                    "accepted": bool(cost < tracker.best_cost)}
+                    "accepted": accepted}
             if tracker.best is not None:
                 data["step_norm"] = float(np.linalg.norm(
                     np.asarray(theta, dtype=np.float64) - tracker.best))
             data["values"] = _free_values(table, theta)
-            events.emit("eval", **data)
+            if preview is not None and accepted:
+                events.emit("eval", preview=preview(theta, r), **data)
+            else:
+                events.emit("eval", **data)
         tracker.accept(theta, cost)
         return r
 
@@ -3163,7 +3223,7 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                 inequalities, events, stage: str, track=None, table=None,
-                normal_equations=None, cancel=None):
+                normal_equations=None, cancel=None, preview=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -3182,7 +3242,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
     derivative information, like scipy's finite-difference Jacobian calls, so
     they emit nothing and ``nfev`` leaves them out (WP-1953).
     ``normal_equations`` is the driver's own (:func:`.lm.minimize`), and
-    ``cancel`` is also read inside each step's bounded solve.
+    ``cancel`` is also read inside each step's bounded solve.  ``preview`` is
+    :func:`_tracked`'s, fed the residual the driver hands ``on_trial``.
     """
     from . import lm as lm_mod
 
@@ -3192,13 +3253,16 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
         track.accept(theta, cost)
 
     def trial_cb(theta: np.ndarray, cost: float, accepted: bool,
-                 lam: float, step_norm: float) -> None:
+                 lam: float, step_norm: float, r: np.ndarray) -> None:
         counter["n"] += 1
         data = {"stage": stage, "n_eval": counter["n"], "cost": cost,
                 "accepted": accepted, "step_norm": step_norm, "lam": lam}
         if table is not None:
             data["values"] = _free_values(table, theta)
-        events.emit("eval", **data)
+        if preview is not None and accepted:
+            events.emit("eval", preview=preview(theta, r), **data)
+        else:
+            events.emit("eval", **data)
 
     return lm_mod.minimize(residual, jacobian, x0, lo=lo, hi=hi,
                            max_nfev=max_nfev, ftol=ftol,
@@ -3494,7 +3558,7 @@ def _check_magnetic_width_compiled(model: CompiledModel,
 def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobian,
                   x0: np.ndarray, lo: np.ndarray, hi: np.ndarray, *, n_table: int,
                   n_aux: int, max_nfev: int, ftol: float, events, stage: str,
-                  tracker, backend: str, solver: str, cancel=None):
+                  tracker, backend: str, solver: str, cancel=None, preview=None):
     """One driver run of :func:`run_least_squares`, either driver's result
     shape; a function of its own so that one ``try`` covers both drivers
     (WP-2048)."""
@@ -3523,7 +3587,8 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol, inequalities=ineqs, events=events, stage=stage,
                           track=tracker, table=table,
-                          normal_equations=normal_equations, cancel=cancel)
+                          normal_equations=normal_equations, cancel=cancel,
+                          preview=preview)
     else:
         with lapack.scipy_trf():
             res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
@@ -3580,6 +3645,10 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     # check, so a stop requested during the test is honoured like any other
     probe = residual
     tracker = _StepTracker()
+    # what an accepted ``eval`` carries when the caller's stream asked for it
+    # (WP-1949); ``None`` leaves both drivers' emission exactly as it was
+    preview = (_preview_builder(model, table) if _wants_preview(events)
+               else None)
     if solver == "trf":
         # One wrapper, two jobs in a fixed order per call: emit the eval event
         # *measured against the incumbent*, then let the tracker accept.  scipy
@@ -3591,7 +3660,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         # exceeds the radius, and rejections shrink it (WP-1113).  The LM
         # driver reports its trials through a real callback instead
         # (``_lm_outcome``), so it does not wrap the residual.
-        residual = _tracked(residual, tracker, events, stage, table)
+        residual = _tracked(residual, tracker, events, stage, table,
+                            preview=preview)
     n_table = len(table.free_paths)
     x0 = table.x0()
     lo, hi = table.bounds()
@@ -3635,7 +3705,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                             n_table=n_table, n_aux=n_aux, max_nfev=max_nfev,
                             ftol=ftol, events=events, stage=stage,
                             tracker=tracker, backend=backend, solver=solver,
-                            cancel=cancel)
+                            cancel=cancel, preview=preview)
     except _NonFiniteJacobian as stop:
         return stopped("jacobian", stop.columns)
     if solver == "lm":
@@ -3907,6 +3977,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     """
     if solver not in SOLVERS:
         raise ValueError(f"unknown solver {solver!r}; available: {', '.join(SOLVERS)}")
+    _refuse_joint_preview(events)   # the backstop; the fit refuses first
     lapack_start = lapack.retries()
     # dense below a size, blocked above it (WP-1325, ``blocked.choose_layout``)
     n_table = len(mtable.free_paths)

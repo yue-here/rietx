@@ -434,8 +434,8 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
              ftol: float = FTOL,
              inequalities: list[LinearInequality] | None = None,
              callback: Callable[[np.ndarray, float], None] | None = None,
-             on_trial: Callable[[np.ndarray, float, bool, float, float],
-                                None] | None = None,
+             on_trial: Callable[[np.ndarray, float, bool, float, float,
+                                 np.ndarray], None] | None = None,
              normal_equations: Callable[[np.ndarray, np.ndarray],
                                         tuple] | None = None,
              check: Callable[[], None] | None = None,
@@ -502,12 +502,13 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     a step that crosses nothing is the box-only step bit for bit (WP-1938 D8).
 
     ``callback(x, cost)`` fires on each *accepted* point; ``on_trial(x_try,
-    cost, accepted, lam, step_norm)`` fires once per trial the residual
+    cost, accepted, lam, step_norm, r_try)`` fires once per trial the residual
     actually measured (WP-1113), with ``cost = ½·rᵀr`` at the trial, the λ
-    that produced the step, and the norm of the *taken* step, after the box
-    clamp.  A trial the linear model discards unevaluated (no descent
-    promised, or a promise under the fp64 floor) never reaches the residual
-    and never fires it.
+    that produced the step, the norm of the *taken* step, after the box
+    clamp, and the residual itself, which a preview reads ``y_calc`` off
+    (WP-1949; the driver's own array, not to be written into).  A trial the
+    linear model discards unevaluated (no descent promised, or a promise
+    under the fp64 floor) never reaches the residual and never fires it.
 
     ``normal_equations(J, r)`` returns ``(A, b) = (JᵀJ, −Jᵀr)`` in place of
     :func:`_normal_equations`.  It may return A as a ``scipy.sparse`` matrix,
@@ -642,7 +643,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             ds = s_try - s
             if on_trial is not None:
                 on_trial(x_try, 0.5 * s_try, bool(ds < 0.0), float(lam),
-                         float(np.linalg.norm(step)))
+                         float(np.linalg.norm(step)), r_try)
             if ds < 0.0:
                 # ΔS_t = −Δθᵀb (see module docstring — the paper drops this sign)
                 ds_t = -float(step @ b)

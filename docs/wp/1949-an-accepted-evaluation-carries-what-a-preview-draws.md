@@ -1,6 +1,6 @@
 # WP-1949 — an accepted evaluation carries what a preview draws
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — built in #1623; the spelling waits on Yue's ruling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-11 — a live preview keeps a shadow refinement and re-predicts every frame (about 0.7 s a frame on a large framework); the workaround works and costs a throttle
@@ -59,6 +59,20 @@ per-stage charge is judged on the shortest fit (WP-1413). The recorder is
 attached beside a caller's stream, never inside it (WP-1403), so a payload
 can reach the caller's callback and skip the recorder.
 
+**Superseded in part, 2026-11-16 (checked at `bc77a934e`).** The default
+driver is now LM (`DEFAULT_SOLVER`), so the TRF wrapper is the selectable
+path and `trial_cb` the common one. The two emitters are `_tracked`
+(`optimize/least_squares.py:3024`) and `_lm_outcome.trial_cb` (`:3084`), and
+the LM driver calls `on_trial` from one site (`optimize/lm.py:643`), still
+without the residual. The recorder is chained *into* the caller's stream as
+its first callback (`runs.attach`, `_combined`), not beside it, so a payload
+reaching the caller's callback reaches `RunRecorder.record` too, which must
+drop it. The re-measured costs are under Task 1 below.
+
+**The tier of each rule this WP adds.** One switch, off by default, that
+decides nothing for the caller: `caller` (an opt-in the user asks for; no
+threshold, no automatic action). No number is added.
+
 ## Non-goals
 
 - The per-stage `snapshot.json` and `rietx watch` (unchanged).
@@ -67,28 +81,100 @@ can reach the caller's callback and skip the recorder.
 
 ## Tasks
 
-- [ ] Measure first, on a model whose evaluation is dear (the reporter's
+- [x] Measure first, on a model whose evaluation is dear (the reporter's
       MFU-4l class, or the largest structure in `tests/data`): evaluations
       per fit, accepted share, and the per-event cost of (a) the moving-path
       values, (b) an ndarray `y_calc` handed to a callback, (c) a decimated
       JSON `y_calc`. Record the numbers here.
+
+      **Measured 2026-11-16** at `bc77a934e`, `[dev]` venv, macOS arm64,
+      default LM driver, `mccusker_structural`, `RIETX_TELEMETRY=0`; each
+      cost is the best of three `timeit` repeats on the last stage's model.
+      HKUST-1 is `tests/data/cod_4002052.cif` (Cu₃(BTC)₂, Fm-3m,
+      a = 26.3 Å, V = 18 132 Å³, the largest cell in `tests/data` and the
+      reporter's MOF class), fitted to its own synthetic Cu Kα pattern
+      (4-60° 2θ, 0.01° step, Poisson noise, cell started 0.05 % long).
+
+      | | FAP.XRA | HKUST-1 |
+      |---|---|---|
+      | fitted points | 5753 | 5600 |
+      | stages / `eval` events / accepted | 12 / 124 / 124 | 12 / 45 / 45 |
+      | free / moving paths (last stage) | 34 / 47 | 32 / 51 |
+      | one residual evaluation | 3.4 ms | 0.30 ms |
+      | fit wall (solve) | 2.9 s (2.1 s) | 9.5 s (3.4 s) |
+      | today's accepted `eval` line | 988 B | 954 B |
+      | (a) moving-path values, decode + pick | 0.014 ms, 2150 B as JSON | 0.019 ms, 2320 B as JSON |
+      | (b) ndarray `y_calc = y_obs − r·σ` | 0.006 ms | 0.005 ms |
+      | (c) JSON `y_calc` at `MAX_POINTS` (step 2), full / 3 dp | 1.38 / 0.75 ms, 55.7 / 24.8 kB | 1.16 / 0.63 ms, 55.0 / 24.9 kB |
+      | the reporter's shadow `predict(grid)`, one frame | 21.6 ms | 548 ms |
+
+      Every LM `eval` was accepted on both fits (the driver's linear model
+      discards most rejected steps unevaluated), so "accepted only" thins
+      nothing here. (a)+(b) cost 0.02 ms an event, 2.5 ms over FAP's whole
+      fit (0.1 % of its solve) and over 20 000× under one shadow frame on
+      HKUST-1. (c) costs 171 ms and 6.9 MB a FAP fit at full precision (8 %
+      of the solve), 93 ms and 3.1 MB at 3 dp, on every sink the stream
+      writes. `y_obs − r·σ` agrees with `model.evaluate` at the event's
+      values to 1.4e-18 of the curve's maximum on FAP and exactly on
+      HKUST-1. A residual evaluation of the MOF is cheap: what costs the
+      reporter 0.5-0.7 s a frame is the compile `predict` does, which the
+      preview removes.
 - [ ] Decide the spelling and record it as `Decided YYYY-MM-DD:`. The
       options are a `fit(..., eval_payload=...)` flag, or a property of the
       callback the caller passes. Decide too whether `y_calc` reaches only
       an in-process callback (ndarray, never the file sink) or also the file
       at `MAX_POINTS`.
-- [ ] Carry the moving-path values (coordinates and cell, absolute) on
+
+      **Proposed 2026-11-16, built as proposed; the ruling is Yue's**
+      (it adds a key to the event dict a callback receives). A property of
+      the stream: `EventStream(callback=cb, preview=True)`, refused without a
+      callback. No `fit` argument, because the stream already reaches the
+      solver through every entry point (`fit`, `run_stage`, `refine`, a
+      series) and is the one object that knows a callback is there. Each
+      accepted `eval` then reaches the callback with a top-level `preview`
+      key beside `data`: `two_theta` (the stage's fitted grid, a read-only
+      view), `y_calc` (an ndarray, `y_obs − r·σ`) and `values` (every
+      moving path, absolute). **`y_calc` reaches the in-process callback
+      only**, never a file at `MAX_POINTS`: the JSON form costs 8 % of a
+      FAP solve and 6.9 MB a fit on every sink (Task 1), and the per-stage
+      `snapshot.json` already writes the curve to disk. The moving values
+      ride the same way, so the opt-in changes no file at all. A joint fit
+      refuses the option with a `ValueError` (its data rows are several
+      histograms'); that is left for a follow-up issue.
+- [x] Carry the moving-path values (coordinates and cell, absolute) on
       accepted `eval` events under the opt-in, on both drivers. The LM path
       needs the residual plumbed to `trial_cb`.
-- [ ] Carry `y_calc` under the decided form. Test: on accepted events it
+      *Done 2026-11-16:* `lm.minimize`'s `on_trial` takes the trial
+      residual as a sixth argument; `_preview_builder`
+      (`optimize/least_squares.py`) decodes θ and picks `moving_paths`,
+      fixed once a stage.
+- [x] Carry `y_calc` under the decided form. Test: on accepted events it
       equals `y_obs − r/sqrt_w` and lands within the documented 8e-6 of
       `predict()` at the event's values. The recorder's `events.jsonl` is
       byte-identical with the option on and off.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
-- [ ] Manual (`using/refining.md` § events) and the event table in the
+      *Done 2026-11-16:* the last accepted preview sits 4.38e-6 of the
+      curve's maximum from `predict()` on both drivers (synthetic fixture);
+      `RunRecorder.record` drops the key, and
+      `test_a_preview_leaves_every_log_byte_identical` fails with the drop
+      removed (checked once: the recorder latched on the ndarray).
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`.
+      *Done 2026-11-16:* six in `tests/test_events_viz_history.py` (both
+      drivers, off, refused without a callback, a series, a joint fit) and
+      one in `tests/test_telemetry.py`;
+      `tests/output/wp1949_preview_obs_calc_diff.png` is drawn from one
+      preview alone.
+- [x] Manual (`using/refining.md` § events) and the event table in the
       skill's API index.
-- [ ] Skill: one row in the reference that documents `events=`. Nothing in
+      *Done 2026-11-16, superseded in part:* the manual's events section is
+      now `docs/docs/guides/watch.md` § Read the events yourself, and the new
+      § Draw the fit as it runs sits under it. The skill's API index has no
+      event table (`make_api_index.py` renders call signatures, and
+      `EventStream` is not among them), so the row went to the reference
+      below instead.
+- [x] Skill: one row in the reference that documents `events=`. Nothing in
       the body.
+      *Done 2026-11-16:* `references/watching.md` § 9d.11, synced to both
+      committed copies.
 
 ## Acceptance
 
@@ -109,6 +195,62 @@ today's.
 
 ## Handover log
 
+- **2026-11-17** — review fix-ups on PR #1623. Task 4's "on accepted
+  events it equals `y_obs − r/sqrt_w`" is now a test:
+  `test_a_previewed_curve_is_its_own_events_residual` checks every
+  preview against its own event's residual on a toy model, on both
+  drivers. It fails when LM hands `on_trial` the incumbent residual, and
+  when the preview lags one accepted evaluation, where the `predict()` bar
+  still passes (checked once each). The manual, skill 9d.11 and the events
+  docstring now say a magnetic fit's moment components are not in
+  `values` (#1626). The 8e-6 bar's margin (7.45e-6 with an excluded
+  region) is noted in the test as a property of `predict()`.
+- **2026-11-16** — built, in PR #1623 (ghostshift runner). A program
+  watching a fit can now draw the current curve, the atom positions and the
+  cell from the event stream alone. It asks once, with
+  `EventStream(callback=..., preview=True)`, and nothing written to disk
+  changes. The reporter's alternative, a second refinement re-predicted every
+  frame, costs about half a second a frame on a large MOF cell. Carrying the
+  preview costs 0.02 ms an accepted evaluation. What is not settled is the
+  spelling, which touches the event dict a callback receives. That is Yue's
+  call, so Task 2 stays open with the proposal written into it.
+  *Done:* Tasks 1 and 3-7 (each ticked with its note). Read-only review
+  agent, four findings, all answered:
+  - the joint-fit refusal now fires before a run is recorded;
+  - the flag is a read-only property;
+  - Pawley and Le Bail are tested, and the Le Bail step is documented;
+  - magnetic moment components are not in `values`, which went to issue
+    #1626 together with joint fits.
+  *Measured:* Task 1's table. The last accepted preview sits from
+  `predict()` by 4.38e-6 of the curve maximum in Rietveld mode (both
+  drivers), 4.8e-20 in Pawley mode and 2.6e-4 in Le Bail mode. Le Bail's
+  residual uses intensities frozen per solve. Gates:
+  - fast suite on a Linux workstation: 14859 passed, 280 skipped, 32 xfailed, 0 failed,
+    in 1130 s (`[dev]`-equivalent venv, Linux x86_64, `-n 4`, at
+    `91cf502c1`, beside another job). The 7 added tests (9 cases) cost
+    2.4 s together on that run;
+  - canary (touched files + audit_table + help +
+    docs_consistency + lm_solver, `-n 4`): 234 passed, 1 skipped in 38 s,
+    436 MB;
+  - `python -m tests.reader_output`: exit 0;
+  - Vale (whole-manual CI step): 0 errors;
+  - ruff clean.
+
+  9 cases added: 8 in `test_events_viz_history.py` and 1 in
+  `test_telemetry.py`. The telemetry test fails when the recorder's drop is
+  removed (checked once). No generality judge: no `_audit.py` change and no
+  heuristic (one off-by-default switch, tier `caller`).
+  *Gotchas:* the recorder sits *inside* the caller's callback chain, despite
+  the WP's original Context, so any new sink chained there must drop the key
+  too (`events._without_preview`). The WP's manual path
+  (`using/refining.md`) and "event table in the API index" are stale. The
+  manual section is now `docs/docs/guides/watch.md`, and the index has no
+  event table.
+  *Next:* Yue rules on the spelling (PR body § Decision). If he keeps it,
+  tick Task 2 as `Decided` and close the WP at merge. If he moves the key,
+  the change is local to `events._with_preview`/`_without_preview` and the
+  two emit sites in `optimize/least_squares.py`. Issue #1626 holds the
+  joint-fit and magnetic-moment follow-ups.
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #892).
   Checked against the tree at `d80ca5f4`: an `eval` event carries only the
   free values on both drivers, the decode it filters already holds the
