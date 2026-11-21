@@ -886,6 +886,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2145](2145-the-gui-boot-test-waits-as-long-as-the-boot.md) | The `rietx watch` GUI boot test waits as long as the watcher does | ✅ 2026-11-13 | — | — |
 | [2217](2217-source-read-records.md) | Records of what was read in another program's source | ✅ 2026-11-13 | — | — |
 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) | Comments and rulebooks checked against the tree, and their size limits held from main | 🔄 2026-11-21 | P3 | — |
+| [2234](2234-narration-trend-decides-gate-or-drop.md) | The narration trend, measured over six weeks, decides a gate or a drop | ⬜ | P4 | [2233](2233-comments-and-rulebooks-checked-against-the-tree.md) |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
