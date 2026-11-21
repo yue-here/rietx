@@ -117,6 +117,23 @@ describe("the Parameters panel's pending edits (WP-2229 case 3)", () => {
   });
 });
 
+describe("a restored draft (review of #1683, finding 1)", () => {
+  it("drops a pending edit on a path the head no longer has", async () => {
+    const lines: string[] = [];
+    app = mount(Params, { target: document.body, props: {
+      head: "n1", onmoved: () => {}, say: (line: string) => lines.push(line) } });
+    await settle();
+    const panel = app as any;
+    // kept while the background had eight terms; the head now has c4 and c5
+    panel.restoreDraft({ edits: {}, vary: {}, limits: {}, restraints: {}, positions: {},
+                         hold: { "instrument.background.c7": true,
+                                 "instrument.background.c4": true } });
+    flushSync();
+    expect(panel.draft().hold).toEqual({ "instrument.background.c4": true });
+    expect(lines.at(-1)).toContain("instrument.background.c7");
+  });
+});
+
 describe("the Instrument dialog's Load profile (WP-2229 case 1)", () => {
   it("echoes the registers' part and drops the pending edits on the paths it ended", async () => {
     const lines: string[] = [];
