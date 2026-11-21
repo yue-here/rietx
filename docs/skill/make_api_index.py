@@ -142,9 +142,12 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "None nests inside another. An `rx.IndexingResult` "
         "carries no `cell` key by design: `best_or_none()` is the only way to "
         "one cell, and it returns `None` more often than not (§6). "
-        "`RefinedParameter.at_bound` is three-valued — test `is True`.",
+        "`RefinedParameter.at_bound` is three-valued — test `is True`. "
+        "`rx.geometry_table` is `result.geometry`'s table for any "
+        "coordinates, with no fit.",
         ("rx.RefinementResult", "rx.StageResult", "rx.Statistics",
-         "rx.RefinedParameter", "rx.Diagnostic", "rx.SeriesResult",
+         "rx.RefinedParameter", "rx.Diagnostic", "rx.geometry_table",
+         "rx.SeriesResult",
          "rx.SeriesResult.trajectory", "rx.SeriesResult.to_table",
          "rx.SeriesResult.write_csv", "rx.SeriesResult.summary",
          "rx.SeriesEntry", "rx.IndexingResult", "rx.IndexingResult.best_or_none",

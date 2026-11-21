@@ -29,11 +29,11 @@ Past the slack a pair is still listed, as a contact, out to `GeometryTable.conta
 The guidelines ask for both kinds: "interatomic distances (both bonding and nonbonding) should be reasonable" {cite}`mccusker1999`.
 The slack and the search radius are conventions rather than physical constants, and the table records the values it used.
 
-Four limits write a note.
+Four limits write a note at fit close.
 Each atom keeps its 24 nearest contacts, and a note counts the contacts the cap dropped.
 Each atom keeps 36 torsions about the bonds it starts, and a note counts the torsions that cap dropped.
 A chain with a straight bond angle has no torsion, and a note counts those chains.
-A phase with more than 200 asymmetric-unit atoms is not searched, and a note names it.
+At fit close a phase with more than 200 asymmetric-unit atoms is not searched, and a note names it; `rietx.geometry_table` lifts that cap.
 
 A row's value is `GeometryDistance.distance` in ångströms, or `GeometryAngle.angle` in degrees.
 Each row names its atoms twice.
@@ -106,6 +106,37 @@ Geometry is computed for a Rietveld fit only.
 In Le Bail and Pawley mode `RefinementResult.geometry` is `None`, because the dummy atom those modes require is not a structure to measure.
 The table is computed when the fit closes.
 The covariance it needs comes from the final Jacobian, and the Jacobian is not stored.
+
+### Without a fit
+
+`rietx.geometry_table` returns the same table for a `Structure` or a single `Phase`, with no refinement, pattern or instrument.
+Its search and its assembly are the fit's, so it equals `Refinement.geometry()` before a fit, row for row, and every esd is `None`.
+`coordinates=` replaces the stored fractional coordinates: an array of shape (atoms, 3) for a one-phase structure, or one entry per phase, `None` keeping that phase's own.
+The coordinates follow the order of `Phase.atoms`, and the structure itself is not changed.
+A search loop that moves atoms calls it in place of contact code of its own.
+Every image is first brought next to the atom it is measured from, so a contact across a cell face is found from an atom on either side of it.
+
+```python
+import rietx as rx
+from rietx.examples import examples_dir
+
+structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+table = rx.geometry_table(structure)
+xyz = [[a.x.value, a.y.value, a.z.value] for a in structure.phases[0].atoms]
+xyz[0][2] += 0.01
+moved = rx.geometry_table(structure, coordinates=xyz)
+```
+
+The limits are the table's, and each writes a note where it applies.
+The orbit of each atom is decided at the coordinates given, so an atom moved off a special position has its whole orbit.
+Before measuring, it does to the model what a fit does first.
+A space group that fixes an angle the cell disagrees with is refused, as a fit refuses it.
+The cell takes the ties its space-group setting imposes, such as b = a, and a site within a few 10⁻⁴ of a special position is moved onto it, with a note saying so.
+Occupancy is read once, at that step.
+A site whose occupancy marks it as one half of a split pair is left where it is, and the note gives both readings.
+Its two halves are then listed at whatever distance they sit, and as a bond when that is within the radii.
+A half-occupied O atom 3·10⁻⁴ off a mirror lists its own image 0.004 Å away as bonded.
+Coordinates handed in are merged in the same way.
 
 ### Esds of distances and angles
 

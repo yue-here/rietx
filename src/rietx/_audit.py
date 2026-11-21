@@ -3241,7 +3241,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): a phase past it is "
                   "skipped whole and GeometryTable.notes says so, tests/test_geometry_table.py; "
                   "the structure CIFs in tests/data reach 32 atoms. The search time at 200 is "
-                  "unmeasured and a caller cannot raise it, a cost question rather than one of "
+                  "unmeasured; the explicit rx.geometry_table call lifts it (tests/test_geometry_table.py), a cost question rather than one of "
                   "completeness (WP-2002)")),
     Row("rietx.model.geometry.MAX_CONTACTS_PER_ATOM", "constant", tier=1, value=24,
         evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): the note counts "
