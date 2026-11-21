@@ -299,8 +299,9 @@ def _equivalent(a: tuple[int, int, int], b: tuple[int, int, int], gstar,
 #: *unpartitioned* values, is above this (absolute, since the scaling already
 #: makes it a surviving fraction for a column orthogonal to the rest;
 #: collinearity among visible terms also makes small ones).  ``tests/test_texture.py`` records the gap it
-#: sits in over six Laue classes at orders 2-8: dropped columns at roundoff,
-#: kept ones orders of magnitude above it.
+#: sits in over six Laue classes and a short-range P -1 phase at orders 2-8:
+#: dropped columns at roundoff, kept ones at least 2e-4, so any value from
+#: 1e-14 to 1e-4 gives the same ranks there.  With no gap the tolerance decides.
 _ORDER_RANK_TOL = 1e-8
 
 
@@ -431,7 +432,12 @@ def _order_screen(model: CompiledModel, values: dict[str, float], *,
     its R² has the axis score's baseline (the weighted mean), so the two
     compare directly.  Each order is compared with the one below by the F
     statistic and ΔBIC on the rank it adds, and with the best March-Dollase
-    axis by ΔBIC at one shape parameter.  The axis's r is polished off the
+    axis by ΔBIC at one shape parameter.  The basis is the symmetrised
+    spherical-harmonics expansion of the orientation distribution, one term
+    per Laue-allowed harmonic (Von Dreele 1997, J. Appl. Cryst. 30, 517) and
+    ΔBIC = n·ln(SS_hi/SS_lo) + Δp·ln n (negative favours the higher order), the
+    Bayesian information criterion of Schwarz (1978, Ann. Statist. 6, 461).
+    The axis's r is polished off the
     axis screen's grid (a bounded solve in ln r between the grid's neighbours
     of its best r), since the order solve is exact and the grid's step would
     otherwise charge the axis its quantisation: on a −3m1 specimen built with
