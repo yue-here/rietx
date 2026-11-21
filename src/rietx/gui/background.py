@@ -43,8 +43,9 @@ component's position and width take an ordinary second-order difference.
 The answer is absent rather than zero where the chapter's rule says so: with no
 free column reaching the background (``band_absent = "no free background
 term"``), and where such a column is one the data do not constrain, 1/d = 0
-(``"unmeasured"``). The band is linearised at the current values, so before a
-fit converges it describes the curvature there and nothing more.
+or a direction the covariance discards (``"unmeasured"``, WP-2219). The band
+is linearised at the current values, so before a fit converges it describes
+the curvature there and nothing more.
 
 The answers are cached per working state on ``gui.preview``'s key, one per
 set of pending holds, so a hold, a vary change or a λ edit, each of which moves
@@ -74,7 +75,11 @@ import numpy as np
 
 from ..model import rows as row_layout
 from ..optimize.least_squares import _make_jacobian, _make_residual, fd_step
-from ..optimize.statistics import berar_lelann_factor, normal_factors
+from ..optimize.statistics import (
+    berar_lelann_factor,
+    discarded_directions,
+    normal_factors,
+)
 from ..viz.packed import Packed
 from . import preview
 
@@ -177,6 +182,15 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
                    ) / (2.0 * h)
     scales = inv_d[touches]
     if np.any((scales == 0.0) & np.any(g != 0.0, axis=0)):
+        facts["band_absent"] = "unmeasured"
+        return None, facts
+    # a column on a direction the covariance discards has no esd either
+    # (WP-2219, ``least_squares._guarded_covariance``), so neither has a band
+    # it moves: the pseudo-inverse's spread there is short by a factor nothing
+    # bounds
+    _, discarded = discarded_directions(jac)
+    if set(discarded.tolist()) & {k for k, c in zip(touches, g.T, strict=True)
+                                  if np.any(c != 0.0)}:
         facts["band_absent"] = "unmeasured"
         return None, facts
     a = g * scales  # g·diag(1/d)
