@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -195,11 +195,25 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
 
 ## Handover log
 
+- **2026-11-21** — The maintainer has ruled the History panel's shape from drawn options, so
+  the session that builds it now knows what to build. The tab shows the nodes as a graph by
+  default, with a switch to the table, and branches turn with rounded corners. Both Restore
+  (values as pending edits) and Checkout (move to the node at once) stay. The menu speaks plain
+  words, Make current, Name…, Note… and Branch from here, with the Python call in each tooltip.
+  Nothing is built yet.
+  *Done*: § Rulings written (questions 1, 2 and 5); tasks ticked and two added (the Graph view,
+  question 5). The options were drawn on a copy of the private workshop prototype and shown as a
+  private page; menus, the Restore press and the fold were real clicks, while tooltips, the Graph
+  view and the console sessions were drawn by script. *Gotchas*: the practice line under question
+  5 is from recall, not checked against any program's documentation. Today's GUI chapter
+  (§ History, "When to branch") still describes today's graph and git verbs; this WP's chapter
+  task rewrites it with the new words. Next: measure questions 3 and 4 on the shipped examples
+  (how many nodes differ from their head by more than values, and what a node's curve costs
+  through replay), because their answer decides whether Restore needs the Checkout offer and
+  whether Compare needs a new route. Then build the table.
+
 - **2026-11-10** — created by a ghostshift runner from WP-2206's follow-ups. No open WP owns the
   History panel: a search of the open WPs for History, Restore and pending edits found none,
   and WP-1012 and WP-1217 are closed. The four questions above are for the session that builds
   it; nothing waits on the maintainer before then. Next: once PR #1521 merges, bring questions 1
   and 2 to the maintainer.
-- **2026-11-21** — the maintainer ruled questions 1 and 2 from drawn options (§ Rulings) and
-  ruled question 5, the git words, plain words in the menu. Nothing is built yet. Next:
-  measure questions 3 and 4.

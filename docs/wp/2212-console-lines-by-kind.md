@@ -1,6 +1,6 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the maintainer's rulings recorded (§ Rulings); nothing built
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -163,9 +163,16 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
 
 ## Handover log
 
+- **2026-11-21** — The maintainer has ruled the console's two open visual questions from drawn
+  options, so the session that builds it can start on the code. A fit's engine events fold
+  into one muted summary line under the call that started it, closed by default, and a click
+  lists them. String literals take one green token in each theme. Nothing is built yet.
+  *Done*: § Rulings written; the questions task ticked. The string token was offered as
+  "lands unless you object" and drew no objection, which § Rulings says. Next: the tagged line
+  type in `say()` and `consoleLine`, since the fold, Copy and the script export all read the
+  kind it carries.
+
 - **2026-11-10** — created by a ghostshift runner from WP-2206's follow-ups. No open WP owns
   the Console: a search of the open WPs for console lines and a script export found none. WP-2133
   named the missing writer and is closed. Next: once PR #1521 merges, bring
   questions 1 and 2 to the maintainer.
-- **2026-11-21** — the maintainer ruled question 1 from drawn options, and question 2 closed on
-  no objection (§ Rulings). Nothing is built yet. Next: the tagged line type.
