@@ -2063,12 +2063,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Magnetic group number contradicts the operators",
         description=(
             "The group number stated in the file names a different magnetic group from "
-            "the one that the file's operator lists make. The operators are what is "
-            "refined, so their numbers are stored and the stated name is dropped. Either "
+            "the one that the file's operator lists make, so the file is refused. Either "
             "side can be wrong. A typing error in the number leaves the operators right. "
             "A missing centring translation makes the operators a smaller group, and the "
-            "moments then refine under the wrong symmetry. Check the loops against the "
-            "source."
+            "moments would then refine under the wrong symmetry. The message names both "
+            "groups and how many operations each has per cell. Correct the one line that "
+            "disagrees with the file's source, and read the file again."
         ),
     ),
     "CIF_MAGNETIC_PARENT_TAG_UNDEFINED": HelpEntry(
