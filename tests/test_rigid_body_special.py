@@ -40,7 +40,7 @@ from rietx.io.projects.gsas2 import read_gsas2_gpx, to_structure
 from rietx.io.readers import read_pattern
 from rietx.model.forward import compile_model
 from rietx.optimize.qpa import phase_zmv
-from rietx.params.bodies import RigidBodyBlock, site_reach
+from rietx.params.bodies import RigidBodyBlock, compose_rotation, site_reach
 from rietx.params.derived import cartesian_frame
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -993,6 +993,70 @@ def test_a_linear_body_tilted_past_the_bound_is_refused_naming_its_atom(scale, o
         with pytest.raises(ValueError, match=(
                 r"RIGID_BODY_IMAGE_OVERLAP: rigid body 'CO2' has the image of its atom 'O1'")):
             _build_co2(_mirror_co2(b, dy, -dy))
+
+
+# ------- #1551's review, follow-up 2: no site_reach, no typed site, no axis test
+def _typed_exactly(direction: np.ndarray, labels=("O1", "C", "O2"), **kw) -> RigidBodyBlock:
+    """A CO2-like linear body called directly, its axis typed exactly along
+    ``direction`` on a site whose one turn axis is n = (1, 1, 1)/√3.  R₀ is
+    read back from its quaternion record, so the axis is off by rounding."""
+    x = np.array([1.0, 0.0, 0.0])
+    w = np.cross(x, direction)
+    w *= math.acos(float(np.clip(x @ direction, -1.0, 1.0))) / np.linalg.norm(w)
+    q0 = rotation.canonical_quaternion(rotation.quaternion_from_matrix(
+        compose_rotation(w, np.eye(3))))
+    return RigidBodyBlock(phase_base="p", body_base="b", atom_bases=["a0", "a1", "a2"],
+                          template=np.array([[-CO, 0.0, 0.0], [0.0, 0.0, 0.0], [CO, 0.0, 0.0]]),
+                          q0=np.asarray(q0, dtype=np.float64),
+                          site_axes=_N111.reshape(3, 1), labels=labels, **kw)
+
+
+_N111 = np.ones(3) / math.sqrt(3.0)
+_IN_PLANE = (np.array([1.0, -1.0, 0.0]) / math.sqrt(2.0),
+             np.array([1.0, 1.0, -2.0]) / math.sqrt(6.0))   # ⊥ n, orthonormal
+
+
+def test_a_direct_caller_with_no_site_reach_builds_a_body_typed_exactly():
+    """#1551's review: ``site_reach=0.0`` held the axis to the bit, and a tilt
+    computed in floating point is rarely zero, so a body typed exactly was
+    refused (5.5e-17 rad on Linux in the polar-law test).  ``None``, now the
+    default, means no typed site: the axis test does not apply, the nearer case
+    is taken, perpendicular (one turn about n) or along n (none), and a commit
+    after a turn, which re-runs the test, keeps it."""
+    tilts = []
+    for k in range(12):
+        t = math.radians(7.0 + 30.0 * k)
+        block = _typed_exactly(math.cos(t) * _IN_PLANE[0] + math.sin(t) * _IN_PLANE[1])
+        u = block.r0 @ np.cross(block.body_axes[:, 0], block.body_axes[:, 1])
+        tilts.append(abs(float(_N111 @ u)))
+        assert block.axis_tol is None and block.n_rot == 1
+        assert np.array_equal(block.axes[:, 0], _N111)
+        assert block.commit_rotation(np.array([math.radians(3.0)])) is not None
+        block.settle_anchor()
+        assert block.n_rot == 1
+    along = _typed_exactly(_N111)
+    u = along.r0 @ np.cross(along.body_axes[:, 0], along.body_axes[:, 1])
+    tilts.append(float(np.linalg.norm(u - (_N111 @ u) * _N111)))
+    assert along.axis_tol is None and along.n_rot == 0
+    # the precondition, on this platform: rounding tilted some axis, which a
+    # bound of 0 refuses (every tilt here is a few ulps)
+    assert 0.0 < max(tilts) < 1e-14, tilts
+
+
+@pytest.mark.parametrize("reach", [0.0, 1e-4])
+def test_an_explicit_site_reach_still_refuses_a_tilted_body(reach):
+    """The other arm: a number keeps #1551's test and its refusal.  The body
+    tilted 0.01 rad out of the plane ⊥ n is past the bound for a reach of 0
+    and of 1e-4 Å (8.6e-5 rad), refused naming an O; with no reach given it
+    builds with its one turn about n, the axis test not applying."""
+    tilted = math.cos(0.01) * _IN_PLANE[0] + math.sin(0.01) * _N111
+    with pytest.raises(ValueError, match=(
+            r"RIGID_BODY_NOT_INVARIANT: a linear body on this site must lie along its "
+            r"one allowed turn axis or perpendicular to it; its axis is tilted 0\.573° "
+            r"from perpendicular, more than the .*° that atoms within the site "
+            r"tolerance allow, and its atom 'O[12]' lies furthest off")):
+        _typed_exactly(tilted, site_reach=reach)
+    assert _typed_exactly(tilted).n_rot == 1
 
 
 def test_add_body_refuses_a_torsion_naming_an_atom_it_dropped():

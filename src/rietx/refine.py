@@ -87,6 +87,7 @@ from .model.forward import (
 from .model.geometry import cell_volumes, fit_geometry_table
 from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
+from .model.peak_equations import WIDTH_TARGETS
 from .model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
@@ -1027,7 +1028,10 @@ def _hold_scale_b_ridges(model: CompiledModel, table: ParameterTable,
 #: δW + δsize·(1 + tan²θ) = 0 at every angle forces both to zero.  W's total
 #: stays a row of the test, so a held W pins the size and nothing is held.
 #: Holding W as well moved three acceptance answers (the generality judge,
-#: WP-2002 9th session).
+#: WP-2002 9th session).  Holding it only on the triple W, ``gauss_size`` and
+#: ``gauss_strain`` still moved the cpd-1 chain and the standards' diagnostics
+#: (WP-2219), so that flat direction is left to the covariance, where its
+#: three parameters have no esd.
 WIDTH_TERMS: tuple[tuple[str, tuple[str, ...], bool], ...] = (
     ("instrument.profile.u", ("gauss_strain", "gauss_size"), True),  # tan²θ in Γ_G²
     ("instrument.profile.w", ("gauss_size",), False),                # 1 in Γ_G²
@@ -2939,8 +2943,11 @@ class Refinement:
                                    n_free=len(table.free_paths) + _pawley_n(model),
                                    y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
-        stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
-                                        outcome.correlation)
+        # the node records the esds the stage's result reports, a tie the
+        # data determine included (WP-2230)
+        stderr = (table.stderr_physical(
+            outcome.theta, outcome.stderr_internal, outcome.correlation,
+            discarded=getattr(outcome, "discarded_subspace", None))
                   if outcome.stderr_internal is not None else {})
         metrics = NodeMetrics(
             statistics=stats, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -6371,7 +6378,8 @@ class Refinement:
                 stage_results=stage_results, diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -6393,7 +6401,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -6781,16 +6790,22 @@ class Refinement:
             stage_results=[], diagnostics=list(stage_diagnostics),
             structure=self.structure, stderr_internal=outcome.stderr_internal,
             esd_inflation=outcome.esd_inflation,
-            correlation=outcome.correlation, backend=self._backend,
+            correlation=outcome.correlation,
+            discarded=outcome.discarded_subspace, backend=self._backend,
             solver=self._solver, mu_r_source=self._mu_r_source,
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
             phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
+        # the stage's own covariance, so a moment pair on a discarded
+        # direction folds here as it does in ``report()`` (WP-2230)
+        covariance = (result, table, outcome.theta, outcome.stderr_internal,
+                      outcome.correlation, outcome.discarded_subspace)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
-                              free_paths=list(table.free_paths))
+                              free_paths=list(table.free_paths),
+                              covariance=covariance)
         return report.for_stage(name)
 
     def run_stage(self, data: PatternData, stage: Stage, *,
@@ -7005,7 +7020,8 @@ class Refinement:
                 stage_results=[stage_result], diagnostics=diagnostics,
                 structure=self.structure, stderr_internal=outcome.stderr_internal,
                 esd_inflation=outcome.esd_inflation,
-                correlation=outcome.correlation, backend=self._backend,
+                correlation=outcome.correlation,
+                discarded=outcome.discarded_subspace, backend=self._backend,
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
@@ -7021,7 +7037,8 @@ class Refinement:
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
-                                       outcome.correlation)
+                                       outcome.correlation,
+                                       outcome.discarded_subspace)
             self._answer = self._freeze_answer()
             self._stamp(self.result_, tree)
             if self._auto_intervals:
@@ -7162,6 +7179,9 @@ class Refinement:
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
+        live = self._answer_covariance
+        kw.setdefault("covariance", live if live is not None
+                      and live[0] is self.result_ else None)
         return build_report(self.result_, model=self._model,
                             values=answer["values"], plan=plan,
                             structure=answer["structure"],
@@ -7556,7 +7576,7 @@ class Refinement:
                 and live[0] is self.result_ and self._answer is not None):
             if self._model.mode != "rietveld" or not self._model.phases:
                 return None
-            _result, table, theta, stderr_internal, correlation = live
+            _result, table, theta, stderr_internal, correlation, discarded = live
             structure = self._answer["structure"]
             sites_of = [cp.sites for cp in self._model.phases]
         else:
@@ -7565,14 +7585,16 @@ class Refinement:
             structure = self.structure
             table = ParameterTable(structure, self.instrument)
             theta, stderr_internal, correlation = table.x0(), None, None
+            discarded = None
             sites_of = [compile_phase_sites(p) for p in structure.phases]
         if request is None:
             return geometry_from_sites(sites_of, table, theta, structure,
                                        stderr_internal=stderr_internal,
-                                       correlation=correlation)
+                                       correlation=correlation,
+                                       discarded=discarded)
         return request_table(request, sites_of, table, theta, structure,
                              stderr_internal=stderr_internal,
-                             correlation=correlation)
+                             correlation=correlation, discarded=discarded)
 
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
@@ -7812,7 +7834,8 @@ _REVISABLE_CODES = ("BOUND_HIT", "FLOOR_HIT", "RESOLUTION_NOT_POSITIVE",
                     "BISO_UNUSUALLY_LARGE", "BISO_NEGATIVE",
                     "COVARIANCE_DIRECTION_DISCARDED",
                     "ADP_NOT_POSITIVE_DEFINITE", "STEPHENS_STRAIN_NOT_POSITIVE",
-                    "TEXTURE_NOT_POSITIVE", "HUMP_TOO_NARROW")
+                    "TEXTURE_NOT_POSITIVE", "PEAK_WIDTH_NOT_POSITIVE",
+                    "HUMP_TOO_NARROW")
 
 
 #: ``FLOOR_HIT``'s advice: the limit that carried load is a lower bound of
@@ -7899,6 +7922,18 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "no strain width; the share says how much of the "
                        "phase's m·|F|² they carry.",
         ))
+    for finding in guard.nonpositive_peak_width:
+        out.append(Diagnostic(
+            level="warning", code="PEAK_WIDTH_NOT_POSITIVE",
+            where=list(finding.paths), value=finding.value,
+            message=f"The peak equation {finding} takes a width below zero.",
+            suggestion="Bound the coefficients, or write the term so that it "
+                       "cannot go negative, as a square or with max(x, 0). "
+                       "The forward model floors a negative Γ_G², and a "
+                       "negative Γ_L is no peak shape, so those reflections "
+                       "do not carry the equation's width. Do not report the "
+                       "coefficients as measured.",
+        ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)
         out.append(Diagnostic(
@@ -7936,10 +7971,10 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
         out.append(Diagnostic(
             level="warning", code="COVARIANCE_DIRECTION_DISCARDED",
             where=list(finding.paths), value=finding.value,
-            message=f"{finding.message}.",
+            message=f"{finding.message}, so these parameters have no esd.",
             suggestion="Free fewer of these parameters in one stage, hold the "
-                       "ones known independently, or widen the fitted range. "
-                       "Do not quote their esds as measured from this fit.",
+                       "ones known independently, or widen the fitted range, "
+                       "and refit for their esds.",
         ))
     for finding in guard.large_biso:
         msg = str(finding)
@@ -9742,6 +9777,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
                   stderr_internal=None, correlation=None,
+                  discarded=None,
                   esd_inflation: float | None = None,
                   backend: str = "numpy", solver: str = DEFAULT_SOLVER,
                   mu_r_source: str = "given",
@@ -9765,7 +9801,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # is the one writer); an evaluate-only caller leaves the honest None
     stats.max_shift_over_esd = max_shift_over_esd
 
-    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation)
+    # ``discarded``: a tie the data determine keeps its esd (WP-2230)
+    stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation,
+                                         discarded=discarded)
                    if stderr_internal is not None else {})
     # at_bound is the BOUND_HIT and FLOOR_HIT findings projected onto the
     # rows, never a second bound test (WP-1076).  Only the free set was
@@ -9866,16 +9904,18 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # of a rung's result build (WP-1335)
     geometry = (fit_geometry_table(model, table, theta, structure,
                                stderr_internal=stderr_internal,
-                               correlation=correlation)
+                               correlation=correlation, discarded=discarded)
                 if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
-                           stderr_internal=stderr_internal, correlation=correlation)
+                           stderr_internal=stderr_internal, correlation=correlation,
+                           discarded=discarded)
 
     # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
     # T² off the same final covariance, for geometry's reason.  Quantities only.
     distortion_totals = _distortion_totals(table, theta, structure, values,
                                            stderr_internal=stderr_internal,
-                                           correlation=correlation)
+                                           correlation=correlation,
+                                           discarded=discarded)
 
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
@@ -10332,12 +10372,15 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
             h = reflection_label(model.phases[ip].reflections.hklm[k])
             labels.append(f"{structure.phases[ip].name} {h}")
         total = float(np.sum(inten))
+        # a split on a direction the covariance discards has no esd (WP-2219)
+        worst = (f"the relative esd of an individual value reaches "
+                 f"{float(np.max(rel)):.0%}." if np.all(np.isfinite(rel))
+                 else "an individual value has no esd.")
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
             message=(f"{len(g)} reflections overlap too strongly to split. "
                      f"Their summed intensity ({total:.4g}) is determined, and "
-                     f"the relative esd of an individual value reaches "
-                     f"{float(np.max(rel)):.0%}."),
+                     f"{worst}"),
             suggestion="Use the group's summed intensity as the datum.",
         ))
     return out
@@ -11537,10 +11580,72 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
     diagnostics = microabsorption_diagnostics(qpa, structure)
+    diagnostics = diagnostics + _qpa_intensity_factor_diagnostics(
+        structure, values, model, unmeasured, where_of or (lambda p: p))
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))
     return qpa, diagnostics
+
+
+def _qpa_intensity_factor_diagnostics(structure: Structure,
+                                      values: dict[str, float],
+                                      model: CompiledModel, unmeasured,
+                                      where_of: Callable[[str], str],
+                                      ) -> list[Diagnostic]:
+    """``QPA_INTENSITY_FACTOR``: a phase's intensities carry a peak equation's
+    factor, which its weight fraction does not read (WP-2107).
+
+    W_p ∝ S_p·(ZMV)_p reads the scale as the phase's whole intensity.  An
+    ``intensity_factor`` equation multiplies each reflection's intensity
+    (scale × factor × ..., ``CompiledModel._intensity_factor``), so for the
+    same peaks the fitted scale is the factor-free one divided by the
+    factor's mean f̄: at f̄ = 0.83 the scale, and the fraction relative to
+    the other phases, come out 1/0.83 = 1.2× too high, and at f̄ > 1 too
+    low.  The finding quotes the factor's range and mean over the phase's
+    reflections in the fitted range on the primary line.  Silent with one
+    phase in the analysis, whose fraction is 1 whatever its scale.
+    """
+    import numpy as np
+
+    measured = [ip for ip in range(len(structure.phases))
+                if ip not in set(unmeasured)]
+    if len(measured) < 2:
+        return []
+    lo, hi = float(np.min(model.tt)), float(np.max(model.tt))
+    out: list[Diagnostic] = []
+    for ip in measured:
+        cp = model.phases[ip]
+        if cp.peq is None or not cp.peq.has("intensity_factor"):
+            continue
+        cell = model._phase_cell(ip, values)
+        d, tt_lines = model._cell_block(cp, cell, model.line_lambdas(values))
+        tt = np.asarray(tt_lines[0], dtype=np.float64)
+        on = np.isfinite(tt) & (tt >= lo) & (tt <= hi)
+        f = np.broadcast_to(np.asarray(model._intensity_factor(
+            ip, values, tt_lines[0], d), dtype=np.float64), tt.shape)[on]
+        if not f.size or (f.min() == 1.0 and f.max() == 1.0):
+            continue
+        path = cp.peq.equations["intensity_factor"].prefix
+        mean = float(f.mean())
+        # intensity = scale × factor, so the scale absorbs 1/mean
+        bias = (f"too high by about 1/{mean:.2g} = {1.0 / mean:.2g}×"
+                if mean < 1.0 else f"too low by about {mean:.2g}×")
+        out.append(Diagnostic(
+            level="warning", code="QPA_INTENSITY_FACTOR",
+            where=[where_of(path)], value=mean,
+            message=(f"Phase {ip} ({structure.phases[ip].name})'s peak equation "
+                     "multiplies its reflection intensities by "
+                     f"{f.min():.2g} to {f.max():.2g} (mean {mean:.2g}). Its "
+                     "weight fraction is computed from the phase's scale, which "
+                     f"absorbs that factor, so the fraction is {bias} relative "
+                     "to the other phases."),
+            suggestion=("Write the factor so it averages 1 over the phase's "
+                        "reflections, for example by dividing by its mean, or "
+                        f"multiply this phase's scale by {mean:.2g} before "
+                        "reading its fraction."),
+        ))
+    return out
 
 
 def _qpa_esd_unavailable_diagnostics(structure: Structure,
@@ -12301,8 +12406,9 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     :func:`~rietx.indexing.diagnostics.refinement_width_diagnostics`'s; this
     gathers the two numbers.  Declines, rather than guessing, where the model's
     width is not one number per angle: a phase with a Stephens ``microstrain``
-    block (its width is per reflection, and the isotropic law alone would
-    under-read it), or a width law that is not finite and positive on the grid.
+    block or a width peak equation (its width is per reflection, and the
+    isotropic law alone would under-read it; WP-2107), or a width law that is
+    not finite and positive on the grid.
     Only phases the data can see (``significance`` at or above
     :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA`, with a line in range)
     take part: an invisible phase's width explains no line of the census.
@@ -12314,8 +12420,10 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     from .indexing.diagnostics import refinement_width_diagnostics
     from .indexing.peaks import width_census
 
-    if not model.phases or any(ph.microstrain is not None
-                               for ph in structure.phases):
+    if not model.phases or any(
+            ph.microstrain is not None
+            or any(eq.target in WIDTH_TARGETS for eq in ph.peak_equations)
+            for ph in structure.phases):
         return []
     tt = np.asarray(model.tt, dtype=np.float64)
     fwhm_inst = np.asarray(model.instrument_fwhm_deg(tt, values), dtype=np.float64)

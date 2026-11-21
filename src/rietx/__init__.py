@@ -109,6 +109,7 @@ from .schemas.parametric import (
     RefinedParametricEquation,
 )
 from .schemas.params import ParameterRow, TieSpec
+from .schemas.peak_equation import PeakEquation
 from .schemas.plan import PlanSpec, StageSpec
 from .schemas.project import DataRef, ProjectDoc
 from .schemas.sequential import (
@@ -176,6 +177,7 @@ __all__ = [
     "ParameterRow",
     "ParametricCoefficient",
     "ParametricEquation",
+    "PeakEquation",
     "ParametricFormReading",
     "ParametricFormTest",
     "ParametricValue",
