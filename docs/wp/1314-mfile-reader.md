@@ -1,6 +1,6 @@
 # WP-1314 — a Jana2020 project reader: .m50/.m40/.m41
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-16 — first slice in #1627: reader and refusals; registry, manual and writer to come
 Track: Coming from another code
 Depends on: — (1118 closed ✅ 2026-09-16 and delivered what this waited on: the
 model-format registry, `io/projects/registry.py`, and the answer's shape)
@@ -202,13 +202,18 @@ flipping).
 
 ## Tasks
 
-- [ ] Spec tables for `.m50`/`.m40`/`.m41` from the Jana documentation
+- [x] Spec tables for `.m50`/`.m40`/`.m41` from the Jana documentation
       (source files closed; `ATTRIBUTION.md` row), with the refusal list
       (modulation, composites, an incommensurate magnetic phase) written
       first; a commensurate magnetic phase reads through 1327's model, as
-      the TOPAS and `.pcr` readers do (1328).
-- [ ] The reader: triplet → model + refine flags under the 1118 contract,
-      every uncarried construct named in diagnostics.
+      the TOPAS and `.pcr` readers do (1328). *2026-11-16: the tables are
+      `jana.M50_STANCES` and the module docstring; the documentation
+      describes no magnetic keyword, so a commensurate magnetic phase is
+      refused too (Handover log).*
+- [x] The reader: triplet → model + refine flags under the 1118 contract,
+      every uncarried construct named in diagnostics. *2026-11-16:
+      `io/projects/jana.py` (`read_jana`, `to_structure`), not yet in the
+      registry (Handover log).*
 - [ ] Fixtures: Jana-distributed examples licence-checked per file, else
       synthetic; perturbation fuzz in `test_readers_robust.py`'s arm;
       cross-check against at least one published Jana refinement's numbers.
@@ -244,6 +249,121 @@ The shipping PR carries `Closes #147`.
 
 ## Handover log
 
+- **2026-11-17** — review fix-ups on PR #1627 (ghostshift). An anisotropic
+  tensor whose symmetry tie misses only in its last printed digit (U12 =
+  U11/2 on P6₃/mmc 2c, printed 0.012347 / 0.006174) is moved onto the site's
+  form within the print, as the CIF reader does, and named in
+  `JANA_NOT_CARRIED`; one off by more is still refused. `.m41` phase blocks are
+  matched to the `.m50` phases by name where both name them, and two lists of
+  names that differ are refused naming both files. A command on the REFINE
+  section's own line (`refine restric O1 1`) is read. `where` points a snapped
+  ai at `.occ`. `tests/test_reader_mfile.py`: 53 passed.
+- **2026-11-16** — first slice, ghostshift runner, PR #1627. **What it means:** rietx
+  can now read a Jana powder project (the `.m50`/`.m40`/`.m41` trio) into the
+  file's own model and build a `Structure` from it with Jana's refine keys on
+  `vary`, its space-group setting taken from the operators the file lists, and
+  each site's occupancy recovered from Jana's `ai` through the site multiplicity.
+  The honest cost, found first: **Jana publishes no description of its modern
+  files.** The only layouts in print are the Jana98 manual (keyword grammar,
+  `.m40` in symbolic form) and the Jana2000 manual part 1 (the multiphase
+  organisation and one annotated `.m41`); neither states a column or a Fortran
+  format, and nothing at all describes a magnetic keyword. So this reader is the
+  Jana98/2000 grammar and refuses everything outside it by name, and no real
+  Jana2020 file has been through it.
+  - *Done:* `io/projects/jana.py` (`read_jana`, `to_structure`, `JanaModel`,
+    `M50_STANCES` — one stance per Table 9 keyword); refusals by name for
+    modulation (`ndim`>3, `qi`/`qr`, `commen`/`tzero`, superspace symbol, wave
+    counts, the `.m40` commands section), composites, twins, rigid bodies,
+    anharmonic/TLS ADPs, the beta form, any keyword outside Table 9, a missing
+    part-I `end`, run-together positive values, an occupancy past one;
+    `ATTRIBUTION.md` row; three codes (`JANA_KEYS_MAY_BE_IGNORED`,
+    `JANA_CONSTRAINTS_NOT_CARRIED` at read, `JANA_NOT_CARRIED` at build) with
+    help, audit and skill rows, and silence pairs for the two warnings (`JANA_` joins
+    `FOREIGN_FILE_PREFIXES`). Fixtures are **synthesized** from the manuals
+    (`tests/test_reader_mfile.py`, 48 tests incl. a truncation arm): the Jana2020
+    licence covers the program and documentation and says nothing of example
+    data, and the Jana2000 example archives state no terms, so nothing is vendored.
+  - *Deviations from the WP text:* (1) a **commensurate magnetic phase is
+    refused**, not read through 1327's model, because no document says how Jana
+    writes one; (2) the setting comes from `gemmi.find_spacegroup_by_ops` on the
+    expanded group (an equality, and a stated number that disagrees is refused),
+    which covers what `setting_from_operators` would; (3) the fuzz arm lives in
+    the new test file, not `test_readers_robust.py`, which open PR #1607 edits.
+  - *Not done:* registry member in `PROJECT_FORMATS` (claiming a trio by its
+    `.m50`), the `capabilities()` arm, the top-level `rx.` export, the manual
+    section and the routing row (item 4 — the registry change fires
+    `test_capabilities.py`, which #1607 also edits, so land it after #1607);
+    a cross-check against a published Jana refinement (needs a real file);
+    the writer (item 5).
+  - *Measured* (`[dev]` venv): Linux-workstation canary on d14bb4c4a,
+    1 failed / 176 passed (the skill-row gate, fixed in 0372ef598), 35 s, 435 MB,
+    4 pinned cores, 166 % CPU; fast suite (`-n 8`, Linux): on 0372ef598, 14899 passed / 280 skipped / 32 xfailed / 1 failed in 452 s (5.8 GB, 760 % CPU on 8 pinned cores); the failure was `test_portability` (three test-file `write_text` calls without `encoding=`), fixed in the next commit and re-run alone with `test_reader_mfile.py`: 64 passed.
+    `python -m tests.reader_output`: exit 0, unchanged.
+  - *Review:* a read-only reviewer found 11 issues; fixed in d14bb4c4a: positive
+    run-together values read as plausible wrong cells, non-finite values escaping
+    unnamed, `formtab` tables misread as keywords, repeated operators refused, rows
+    after the declared atoms ignored (now counted and named), a missing `.m41`
+    `end` silently dropping part II, keywords before the first `phase` dropped,
+    no-operator phase built as P1, occupancy past one, `x1 x2 x3` operators, and
+    the `ParameterTable` refusals now raised at build naming the file.
+  - *Questions for the maintainer (not decided here):* (a) a `.m50` that
+    **states** `autkeys 1` is read with a definite warning that the keys are not
+    the refined set; should it refuse instead? (b) an occupancy within `ai`'s
+    printed precision of 1 is snapped to 1 and reported; is that repair wanted, or
+    keep the arithmetic value? (c) is refusing commensurate magnetic Jana phases
+    acceptable until a real Jana2020 magnetic file is in hand?
+  - *Generality* (the judge's verdicts, condensed from its report; the
+    author's answers in italics):
+    - JANA_CONSTRAINTS_NOT_CARRIED (code): **holds**, with a detection gap.
+      Reporting rather than acting matches GSAS2_GPX_CONSTRAINT_NOT_CARRIED;
+      tier 1 right for a record. Against: detection was `head.startswith(...)`
+      inside a section headed exactly `refine`, so an abbreviated header or
+      command dropped its ties silently; it fires only into
+      `read_jana(diagnostics=)`. Would change it: a test that abbreviated forms
+      fire. *Author: fixed in d14bb4c4a — header and commands match by
+      three-letter-or-more abbreviation, tested.*
+    - JANA_KEYS_MAY_BE_IGNORED (code): **weak**. Treats "autkeys absent" and
+      "autkeys 1 stated" as one case, but the file settles the second; under
+      WP-1118's stated-key rule a stated 1 should be refused or given a definite
+      message. The absent case: warning is the cheapest honest answer; the
+      firing rate on real Jana2020 files is unmeasured. *Author: the stated-1
+      case now has its own definite message (d14bb4c4a); refuse-or-warn is
+      question (a) above, for the maintainer.*
+    - JANA_KEYS_MAY_BE_IGNORED.suggestion: **holds**.
+    - JANA_NOT_CARRIED (code): **weak**. Missing from the record: the `.m50`'s
+      f′/f″/fneutron and the discarded `.m50` cell; the merged-key case shares
+      an info with the scale, `where=` the scale only. *Author: fixed in
+      d14bb4c4a — f′/f″/fneutron, the `.m50` cell when it differs, trailing
+      `.m40` rows and snapped occupancies are named, and `where` carries the
+      affected atoms; the merged case stays in this code, naming
+      `Phase.floating_origin`.*
+    - JANA_NOT_CARRIED.suggestion: **holds**.
+    - (a) scale seeded at 1e-3: **holds** (convention, as gsas/gsas2; recorded
+      with the file's own value).
+    - (b) one-flag coordinate merge: **holds** on the action (ParameterTable
+      frees a site's DOFs together, params/vector.py:1688), **weak** on the
+      record: a polar group's held axis is freed and the message did not name
+      `floating_origin`. *Author: now named (d14bb4c4a).*
+    - (c) inert biso from the trace/3: **holds**; `adp.u_equivalent` is exact.
+      *Author: switched to `u_equivalent` (d14bb4c4a).*
+    - (d) occupancy not snapped: **weak** — rounding to `ai`'s printed six
+      decimals is arithmetic and can be reported; a full site read 0.999984.
+      *Author: snapped to 1 within the printed precision and reported
+      (d14bb4c4a); question (b) above.*
+    - (e) `.m41` cell preferred: **cannot tell** without a manual page; nothing
+      recorded the `.m50` cell. *Author: the `.m50` cell is now named when it
+      differs; the preference stays (the keys exist only in the `.m41`).*
+    - (f) autkeys absent read as 1: **holds** for the absent case.
+    - (g) unknown keywords refused, unique prefix accepted: **holds** on the
+      refusal, **weak** on abbreviation — uniqueness is against this reader's
+      vocabulary, not Jana2020's. *Author: an ambiguous-prefix refusal is now
+      tested; a minimum prefix length is not in M98.*
+
+  - **Next:** (1) after #1607 merges, the registry member and its gates (item 4);
+    (2) obtain one real Jana2020 powder set with a stated licence (or ask the
+    Jana authors for a format note) and run it through, since every layout here
+    is from 2000-era manuals; (3) the published-refinement cross-check; (4) the
+    writer.
 - **2026-09-01** — created, from issue #147 (2026-09-01 triage). Settled:
   the contract and the refusal list; blocked on 1118's first task for the
   answer's shape; first own item is sourcing the distributed examples and

@@ -202,6 +202,43 @@ def _rhombohedral_axes_silent() -> list:
     return _pcr_r_phase(_R_PHASE_HEXAGONAL_CELL)
 
 
+# --------------------------------------------------- the Jana m-file reader
+
+
+def _jana_read(**m50_kw) -> list:
+    """Read one synthetic Jana set (tests/test_reader_mfile.py's writer)."""
+    from rietx.io.projects import jana
+    from tests.test_reader_mfile import m40, m41, m50
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        for suffix, text in ((".m50", m50(**m50_kw)), (".m40", m40()), (".m41", m41())):
+            (root / f"set{suffix}").write_text(text, encoding="utf-8")
+        jana.read_jana(root / "set.m50", diagnostics=found)
+    return found
+
+
+def _jana_autkeys_fires() -> list:
+    """autkeys 1 stated, and a REFINE section stating none (the manual's default)."""
+    return _jana_read(refine="autkeys 1") + _jana_read(refine="")
+
+
+def _jana_autkeys_silent() -> list:
+    """autkeys 0 stated: the .m40 keys are the refined set."""
+    return _jana_read(refine="autkeys 0")
+
+
+def _jana_constraints_fires() -> list:
+    """A restric and an equation command in the REFINE section."""
+    return _jana_read(refine="autkeys 0\nrestric O1 1\nequation : x[O1]=x[O2]")
+
+
+def _jana_constraints_silent() -> list:
+    """A REFINE section with no constraint command."""
+    return _jana_read(refine="autkeys 0")
+
+
 # --------------------------------------------------- the instrument-file readers
 
 
@@ -1255,6 +1292,10 @@ SILENCE: dict[str, Pair] = {
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
     "HISTORY_EARLIER_TREE_SKIPPED": Pair(
         _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
+    "JANA_CONSTRAINTS_NOT_CARRIED": Pair(
+        _jana_constraints_fires, _jana_constraints_silent, "tests/test_reader_mfile.py"),
+    "JANA_KEYS_MAY_BE_IGNORED": Pair(
+        _jana_autkeys_fires, _jana_autkeys_silent, "tests/test_reader_mfile.py"),
     "LEBAIL_CYCLES_AT_CAP": Pair(
         functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
         "tests/test_lebail_cycles.py"),

@@ -13,6 +13,7 @@ names hard dependencies, and *soft* marks a preferred order.
 
 | WP | Title | Since | Priority | Section |
 |---|---|---|---|---|
+| [1314](1314-mfile-reader.md) | A Jana2020 project reader: .m50/.m40/.m41 | 2026-11-16 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
@@ -547,7 +548,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1119](1119-named-variables.md) | Named variables and equations: a `prm` of one's own | ✅ 2026-09-04 | — | — |
-| [1314](1314-mfile-reader.md) | A Jana2020 project reader: .m50/.m40/.m41 | ⬜ | P3 | — |
+| [1314](1314-mfile-reader.md) | A Jana2020 project reader: .m50/.m40/.m41 | 🔄 2026-11-16 | P3 | — |
 | [1319](1319-structure-interchange.md) | The CIF writer on one registry: tags, numbers and the structure block, checked by checkCIF | ✅ 2026-10-09 | — | — |
 | [1433](1433-the-inp-grammar-still-refused.md) | The `.inp` grammar the reader still refuses: `STR(...)` and `#if` | ✅ 2026-10-03 | — | — |
 | [1455](1455-a-topas-tchz-profile-reads-in.md) | A TOPAS TCHZ profile reads in | ⬜ | P3 | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
