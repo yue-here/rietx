@@ -96,6 +96,13 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   what it says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI,
   which the new page replaces at the swap. WP-2214's inventory gives the homes this WP must
   keep reachable.
+- **2026-11-21, from WP-2229** (its review's finding 8, left open). `PATCH /api/instrument`
+  answers `freed` and `fixed` as the lists it offered `ref.set_vary`, not what the verb
+  returned (`GuiSession.instrument_patch` in `src/rietx/gui/session.py`). `set_vary` can refuse
+  a locked or force-fixed path and returns what it changed (root CLAUDE.md § A hold). The
+  console line `ref.set_vary([...], True)` then names a path that stayed fixed. A console that
+  exports itself as a script inherits that line; take the verb's return in the answer before
+  the export trusts it.
 
 ## Non-goals
 
