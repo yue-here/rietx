@@ -2825,6 +2825,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines._INDEX_MIN_DEFECT", "constant", value=1e-06),
     Row("rietx.indexing.engines._INDEX_MIN_ROWS", "constant", value=15000),
     Row("rietx.indexing.extinction.DECISIVE_DELTA_BIC", "constant", value=10.0),
+    Row("rietx.indexing.extinction.SILENT_POSITIONS_UNDECIDED", "constant", tier=3, value=2,
+        evidence=("best_or_none() names the leading class only when the runner-up's ΔBIC exceeds "
+                  "it by more than max(DECISIVE_DELTA_BIC, value·ln N + d), d the tested positions "
+                  "where the two differ. Under nested Pawley scoring each such position moves ΔBIC "
+                  "by z² − ln N, so a silent one buys ln N and nothing else (Schwarz 1978), and d "
+                  "is the mean of the χ²_d chance gives d silent positions: arithmetic. The value is "
+                  "ours: PbSO4 X-ray (Hill 1992) names P c - a over P c - n on two silent positions "
+                  "(17.0 at N 5800). Rebuilt WP-2076 sweep, 974 rows within 600 ppm: right/none/"
+                  "wrong 858/105/11 at 10, 634/339/1 here. Real: PbSO4 wrong -> None; Si 640c (11-BM, N 40 001) right -> None; corundum (SRM 676a), "
+                  "NAC keep. Measured on one synthetic family (rietx forward model, Cu Bragg-Brentano, "
+                  "Ca/Si/O) and thirteen real patterns, untested beyond."),
+        grounds="Ruled by Yue 2026-11-13: 2·ln N + d, strictly exceeded, as max(DECISIVE_DELTA_BIC, 2·ln N + d)",
+        approved="2026-11-13"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "

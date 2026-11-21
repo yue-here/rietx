@@ -313,7 +313,7 @@ def _pbso4_inputs(factor: float = 1.0):
 
 
 @pytest.mark.slow
-def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
+def test_pbso4_xray_abstains_on_two_silent_positions():
     """The X-ray histogram of ``tests/data/gsas2_pbso4.gpx`` (Hill 1992) at the
     cell ``index_pattern`` returned for its neutron twin, 0.1-0.2 % long, on the
     preset instrument — the issue's reproducer.
@@ -323,23 +323,27 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     the same prefit from the preset's all-zero background returns ``P - - n``,
     confidently and wrongly, which is why the prefit seeds it.
 
-    **A known wrong answer since WP-2076, accepted by ruling.**  The nested
-    screen names ``P c - a``, the specimen being ``P c - n``.  The two classes'
-    scores differ by 0.8 in χ², and ``P c - a`` has eight testable positions to
-    ``P c - n``'s six, so its margin of 17 is the count of silent positions alone.
-    The maintainer ruled on 2026-11-07 (WP-2076's handover log) to land the
-    repair at the margin of 10 with this row wrong, and to measure a margin
-    derived from the count of silent positions before tightening.  The
-    assertion pins today's answer so that tightening shows here.
+    **Abstains since the margin WP-2076 landed.**  The nested screen leads
+    with ``P c - a``, the specimen being ``P c - n``.  The two classes' scores
+    differ by 0.8 in χ², and ``P c - a`` has eight testable positions to
+    ``P c - n``'s six, so its lead of 17 is the count of silent positions
+    alone.  At the margin of 10 that named the wrong class (accepted by the
+    ruling of 2026-11-07); the maintainer ruled on 2026-11-13 that the lead
+    must strictly exceed max(10, 2·ln N + d), here 2·ln 5800 + 2 = 19.3, so
+    the screen abstains and names the two positions where the classes differ.
     """
     data, instrument, limits, peaks, candidate = _pbso4_inputs()
 
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
-    best = screen.best_or_none()
-    assert best is not None, [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
-    assert best.symbol == "P c - a"          # wrong: the specimen is P c - n
+    ranked = [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
+    assert screen.best_or_none() is None, ranked
+    assert screen.candidates[0].symbol == "P c - a", ranked
     assert screen.status == "converged"
+    ambiguous = next(d for d in screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert "2·ln N + d with d = 2" in ambiguous.message, ambiguous.message
+    assert "tested position" in ambiguous.message, ambiguous.message
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                        two_theta_limits=limits, refine_cell=False)
@@ -436,24 +440,21 @@ def test_a_prefit_whose_widths_left_no_reflection_reads_unreliable(nudge):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(strict=True, reason=(
-    "known miss: PbSO4 X-ray at x0.99 of its index cell; the prefit stops about "
-    "0.3 % short, the reference reads 0.45 (below 1/sqrt(2)) and the screen "
-    "returns P c - - confidently, where the specimen is P c - n; belongs to "
-    "WP-1910's open task (re-screen at the prefit's cell, held, flag a "
-    "disagreement between the two screens, ruled 2026-10-26), which may not "
-    "flag it either, since a held re-screen with no decisive class is "
-    "recorded, not flagged: strict until a run shows it does"))
 def test_the_gate_misses_pbso4_at_one_percent_short():
     """The counter-example to "every cell outside the basin reads ≥ 1.6": an
     out-of-basin cell inside the 0.36-1.6 gap.  The prefit moves 6.895 Å to
     6.935 (the specimen's is 6.959), short on every axis, and the reference
-    fit's widths absorb the rest.  Pinned strict, so a fix shows up as a pass."""
+    fit's widths absorb the rest.  The gate still passes it, and the wrong
+    class P c - a still leads, but the right one, P c - n, trails by ΔBIC 16.6
+    and the two differ at two tested positions, under 2·ln N + 2 = 19.3, so the
+    screen abstains (WP-2076, ruled 2026-11-13).  Until then this was a strict
+    xfail: the screen named P c - a.  Pinned at None, so a change shows up."""
     data, instrument, limits, peaks, candidate = _pbso4_inputs(0.99)
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
-    best = screen.best_or_none()
-    assert best is None or best.symbol == "P c - n"
+    assert screen.status != "unreliable"
+    assert [c.symbol for c in screen.candidates[:2]] == ["P c - a", "P c - n"]
+    assert screen.best_or_none() is None
 
 
 # ----------------------------------------------------------------------
