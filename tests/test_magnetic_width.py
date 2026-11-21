@@ -251,7 +251,10 @@ def test_naming_a_width_in_moving_paths_builds_the_family_from_zero():
     assert model.mag_split(0) and cp.batch_mag is not None
     wide = cp.win_mag[0, :, 1] - cp.win_mag[0, :, 0]
     narrow = cp.win[0, :, 1] - cp.win[0, :, 0]
-    live = narrow > 0
+    # the rows the family covers: (2 0 0) and (0 0 2) are forbidden by the
+    # magnetic group and carry no magnetic window at all
+    live = (narrow > 0) & cp.mag_rows
+    assert live.sum() == (narrow > 0).sum() - 2
     assert np.all(wide[live] > narrow[live]), "the family was sized at zero"
     assert MAGNETIC_SIZING_FLOOR > 0.0
 
@@ -1343,8 +1346,11 @@ def _window_loss(model, values, cp_win):
     k = 2.0 * np.sqrt(np.log(2.0))
     tt = np.asarray(model.tt)
     worst = (0.0, None)
+    # a row the magnetic group forbids is not in the family: its intensity is
+    # zero by symmetry and floating-point residue (~1e-28) is not a peak
+    covered = model.phases[0].mag_rows
     for il, (pos, gam, eta, inten) in enumerate(model.phase_peaks(0, values, component=1)):
-        for j in np.flatnonzero(np.asarray(inten) > 0.0):
+        for j in np.flatnonzero((np.asarray(inten) > 0.0) & covered):
             c = float(pos[j])
             if not (tt[0] <= c <= tt[-1]):
                 continue
