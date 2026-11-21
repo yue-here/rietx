@@ -1,9 +1,8 @@
 # WP-2233 — Comments and rulebooks checked against the tree, and their size limits held from main
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-21 — comment, docstring and rulebook citations checked against the tree; rulebook byte limits held from the base
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-11-21 — a cost-only item with no user at the wall: every session reads the comments and rulebooks this keeps true, and pays for the rulebooks' size on every request
 
 ## Goal
 
@@ -150,8 +149,6 @@ signatures, and `src` has none, so it cannot apply. Name allowlists checked agai
 are `audit_delta.py`'s pattern. History belongs in version control and decision records (Martin
 2008, *Clean Code*, ch. 4, "journal comments"). No dataset is involved.
 
-### Inherited
-
 ## Non-goals
 
 - The rulebooks' content pass (findings out, rules rewritten): WP-2009. This WP builds the
@@ -255,6 +252,102 @@ alongside any other edit fails, and a pull request with no base fails.
   renders.
 
 ## Handover log
+
+- **2026-11-21** — closed, every task ticked. A comment, docstring or rulebook that cites
+  code, a file or a test the tree no longer has now fails CI with the citing file and line.
+  The always-loaded rulebooks have byte budgets read from the base, so a change cannot raise
+  the limit it is measured against, and a raise is a change of its own that CI warns about.
+  The four version histories (1199 lines, 64 % of `schemas/common.py`) now live in
+  `docs/contracts/`, with a test that fails a bump carrying no note. The sweep found 36 stale
+  citations in `src` and 2 in the rulebooks, and fixed every one. What still passes unseen: a
+  plain backtick name that is not a module path (``FooError``), and any comment whose
+  reasoning or quoted number has gone stale while its names resolve.
+
+  *Done*, in task order:
+  1. The histories moved word for word (a word-level comparison of the removed comment text
+     against each new file matched exactly) to `docs/contracts/{schema,report-thresholds,
+     indexing-thresholds,project-format}.md`. The rule above each constant names its file.
+     `tests/test_capabilities.py::test_every_contract_bump_carries_its_note` fails when the
+     highest version an entry's lead names is not the constant's value. The manual's
+     compatibility chapter and `/pr-review`'s sync paragraph point at the files. The
+     events, textdoc and grammar contracts keep their few-line notes beside the constant.
+  2. `tests/code_references.py`: role targets, dotted rietx literals, repo paths and test
+     IDs, over every `#` block and string statement in `src/rietx`. Two resolution steps
+     beyond the Context's four, each a measured gap: a top-level name of any rietx module
+     (a role in a module that does not import the class it names), and a variable-style
+     literal (``model.y_obs``) whose parts are all rietx class attributes. A relative lookup
+     now tries the submodule import before the namespace, because `rietx.refine` the
+     function shadows `rietx.refine` the module: that one gap was 72 of the first run's 111
+     literal misses.
+  3. The sweep. First run 193 misses; resolver gaps fixed to 49; 36 rewritten in `src`, 9
+     foreign paths and one recipe key allowlisted with reasons. Every Context pointer is
+     fixed, including the plain-name ones the resolver does not cover (`AgentError.details`,
+     `_known_plan`, `MultiRefinement.fit`, `_disagreement`, `_outline`,
+     `test_moment_path_is_clean_by_design`, the wrapped `SEED_TILT` role).
+  4. `tests/test_code_references.py` and the lint step `python -m tests.code_references
+     --delta`.
+  5. `test_gui_rulebook_paths_resolve` became `test_rulebook_paths_and_names_resolve`, over
+     13 rulebooks. Measured before fixing: 24 misses, of which 2 were real
+     (`profiles/fcj.py` in the root rulebook, my own renamed test in `gui/CLAUDE.md`), both
+     pointer fixes, neither in a clause WP-2009 rewrites. The other 22 were checker gaps
+     (placeholders such as `vX.Y`, runtime directories, `report.regions`-style names).
+  6. `tests/narration_count.py`; no CI step.
+  7. `tests/rulebook_limits.py` replaces `SIZE_CAPS`; the table and its line diary moved
+     verbatim to `docs/milestones/process.md` § The caps diary.
+  8. Planted breaks for each check, in the three test files.
+
+  *Settled by Claude* (each listed in the PR for the maintainer):
+  - An allowlist entry new against the base fails unless the change touches nothing else,
+    under task 7's raise rule. The WP said "fails" and named no route for a legitimate
+    entry. The alternative, a report only, would let a stale rietx name be allowlisted
+    inside the change that stales it.
+  - The change that adds `code_references.py` or `rulebook_limits.py` passes its own lint
+    step, because the base has no table to compare with. The diff shows every entry.
+  - Ceilings use the last 30 days of `main`'s merges, the window `skill_caps` measured its
+    gap over. The whole history's worst days (6 781 B on CLAUDE.md, 14 463 B on
+    `gui/CLAUDE.md`) were consolidation days with no cap in force. Files no merge grew in
+    the window (AGENTS.md, `src/rietx/gui/CLAUDE.md`) take `REFERENCE_GAP_BYTES`, 2 000 B.
+  - A new rulebook enters at budget 8 000 B and ceiling 10 000 B.
+  - Plain backtick names were left unchecked: 193 on 2026-11-21, mostly TOPAS keywords,
+    GSAS-II functions, vendor fields and formulas, so a check needs an allowlist of about
+    150 foreign names first.
+
+  *Measured* (`[dev]` venv, macOS arm64):
+  - `test_every_comment_citation_resolves`: 12-14 s alone and 28 s in the loaded fast run
+    below, most of it importing every rietx module. It stays in the fast tier, because a
+    stale citation is caught on the push that makes it; the reason is in its docstring.
+  - Narration at this branch's HEAD, blocks per pattern: until WP 38, since WP 56, before
+    WP 61, was … until 13; 158 blocks in all (159 at `origin/main` before the branch).
+  - Rulebook bytes pinned as budgets: CLAUDE.md 86 787, ROADMAP 52 042, `gui/CLAUDE.md`
+    45 159, io 55 732, indexing 27 747, tests 19 733, AGENTS.md 2 009,
+    `src/rietx/gui/CLAUDE.md` 155. 30-day worst days of growth: 418, 1 636, 693, 1 344,
+    1 503, 306 B.
+  - Fast suite on the final tree: 15112 passed, 442 skipped, 32 xfailed, in 34:52, while two
+    other sessions ran suites. The 28 added test functions are 62 cases, and they replace 2
+    (`test_gui_rulebook_paths_resolve` and the old line-cap test), so the net is +60 cases.
+    `added_test_times` gives 101.9 s over the added tests in this one loaded run:
+    `test_code_references.py` 57.7 s, `test_docs_consistency.py` 43.4 s (the rulebook checks),
+    `test_rulebook_limits.py` 0.7 s. No full suite: nothing here moves a measured number.
+
+  *Review* (`/code-review high --fix`): five findings, four fixed in one commit. Three source
+  comments still pointed at the moved histories and now name their `docs/contracts/` file.
+  `skill_caps.changed_files` returned an empty set when `git diff` failed, which would have let a
+  raise pass as a change of its own; it now raises. The narration counter now survives a file
+  that will not tokenize. A wall clock quoted as one figure became a range. Skipped: for a rietx
+  module that will not import (an optional backend), the resolver accepts any attribute after
+  the first; walking class bodies by AST is more code than that case earns.
+
+  *Generality*: not dispatched. `_audit.py` is untouched and nothing here is a heuristic that
+  acts on a fit.
+
+  *Gotchas*: a budget at today's bytes closes every rulebook to growth, so the next rule
+  added anywhere pays with a cut. That is the WP's intent, and WP-2009 re-pins downward.
+  `docs/contracts/` is outside the reference check on purpose, since its notes name
+  removed things.
+
+  Next: none here. WP-2234 (filed at close, P4, not before 2027-01-02) runs the narration
+  counter over six weeks of `main` and brings a gate-or-drop decision. WP-2009 re-pins the
+  budgets when its content pass lands.
 
 - **2026-11-21** — created. Fold check: WP-2009 owns the rulebooks' *content* (findings out,
   rules rewritten), and an Inherited entry there points here. No open WP owns a check on code
