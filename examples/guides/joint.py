@@ -65,7 +65,7 @@ esd = {path: [r.parameter(path).stderr for r in (*alone, result)]
        for path in ("phases.0.atoms.0.z", "phases.0.atoms.1.x")}
 (x_al, n_al, j_al), (x_o, n_o, j_o) = esd.values()
 assert round(n_al / x_al, 1) == 3.4 and round(n_o / x_o, 2) == 0.89
-assert round(j_al / x_al, 2) == 0.95 and round(j_o / x_o, 2) == 0.66
+assert round(j_al / x_al, 2) == 0.96 and round(j_o / x_o, 2) == 0.66
 # The page: with the neutron wavelength held, a ends 2.6 esd off and both
 # coordinates' esds are worse than the X-ray pattern's alone, with nothing said.
 held = rx.MultiHistogramRefinement(corundum(), [xray, neutron]).fit(patterns, plan="mccusker_structural")

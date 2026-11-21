@@ -59,6 +59,7 @@ from ..crystallography.symmetry import (
     OperatorGroup,
     cell_constraints,
     check_cell_angles,
+    check_phase_cell_ties,
     expand_positions,
     free_cell_names,
     get_spacegroup,
@@ -470,14 +471,21 @@ def _strain_causes(causes: dict, base: str, sg, phase) -> None:
     from ..crystallography.stephens import S_NAMES, strain_basis
 
     basis = strain_basis(rotation_matrices(sg))
-    laue = sg.laue_str()
+    # An operation list has no laue_str of its own; its closest type has the
+    # same point group, and where no tabulated setting has these axes the
+    # operators are the subject instead (issue #1688).
+    try:
+        laue = (sg.closest_type if isinstance(sg, OperatorGroup) else sg).laue_str()
+        subject, allow, force = f"Laue class {laue}", "allows", "forces"
+    except ValueError:
+        subject, allow, force = f"the operators of {sg.xhm()}", "allow", "force"
     for v, name in enumerate(S_NAMES):
         path = f"{base}.microstrain.{name}"
         if basis.size and np.any(basis[:, v]):
-            causes[path] = (f"Laue class {laue} allows {len(basis)} Stephens "
+            causes[path] = (f"{subject} {allow} {len(basis)} Stephens "
                             f"pattern(s), so {name} follows {base}.microstrain.dof.*")
         else:
-            causes[path] = f"Laue class {laue} forces {name} to zero"
+            causes[path] = f"{subject} {force} {name} to zero"
 
 
 # ----------------------------------------------------------------------
@@ -639,7 +647,7 @@ def _refusals(candidate: Structure, instrument, phase: int) -> list[dict]:
     """Every incompatible item, in the package's own words.
 
     A ``ParameterTable`` stops at the **first** refusal, so this probes the phase
-    once (cell angles, the texture block and the Stephens block, which are
+    once (cell angles and ties, the texture block and the Stephens block, which are
     collected before any atom) and then once per atom, each against a real
     table.  The alternative —
     reading the message and neutralising what it names — would be a parser for
@@ -647,10 +655,12 @@ def _refusals(candidate: Structure, instrument, phase: int) -> list[dict]:
     """
     block = candidate.phases[phase]
     try:
-        check_cell_angles(resolve_group(block.space_group,
-                                        block.symmetry_operations),
-                          {n: getattr(block.cell, n).value
-                           for n in ("alpha", "beta", "gamma")})
+        group = resolve_group(block.space_group, block.symmetry_operations)
+        check_cell_angles(group, {n: getattr(block.cell, n).value
+                                  for n in ("alpha", "beta", "gamma")})
+        # the cell the table ties: a parent's, under the parent's group, for a
+        # phase stating its cell through one (constrained_cell)
+        check_phase_cell_ties(block, prefix=f"phases.{phase}")
     except ValueError as exc:
         # the cell itself cannot carry the symbol: no atom probe would add
         # anything, because every one of them would report the same sentence

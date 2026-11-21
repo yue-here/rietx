@@ -130,9 +130,14 @@ def _default_models() -> tuple[Structure, Instrument]:
         # `dof.k` paths, since the subspace is derived from the operators.
         microstrain=StephensStrain(),
         extinction=0.0,  # opt-in since WP-1944, declared at its default
+        peak_equations=[rx.PeakEquation(target="lor_fwhm", expression="w*tan(theta)",
+                                        coefficients={"w": p(0.0)})],
     )
-    instrument = Instrument(source=Source(lines=[
-        EmissionLine(wavelength=1.540598), EmissionLine(wavelength=1.544426)]))
+    instrument = Instrument(
+        source=Source(lines=[EmissionLine(wavelength=1.540598),
+                             EmissionLine(wavelength=1.544426)]),
+        peak_equations=[rx.PeakEquation(target="shift", expression="z*cos(theta)",
+                                        coefficients={"z": p(0.0)})])
     return Structure(phases=[phase]), instrument
 
 
@@ -487,6 +492,10 @@ NOT_OPT_IN: dict[str, str] = {
         "a parent-cell child's: magnetic_supercell builds it from a parent and a "
         "transform, never one assignment",
     "vars.*": "a named variable: Refinement.add_variable declares it, outside the model",
+    "phases.*.peak_equations.*.*":
+        "a peak equation's coefficient: named by the user's own expression",
+    "instrument.peak_equations.*.*":
+        "a peak equation's coefficient: named by the user's own expression",
 }
 
 
@@ -498,6 +507,8 @@ def _undeclared_models() -> tuple[Structure, Instrument]:
     phase = structure.phases[0]
     phase.extinction = phase.preferred_orientation = phase.microstrain = None
     phase.atoms[0].aniso = None
+    phase.peak_equations = []
+    instrument.peak_equations = []
     return structure, instrument
 
 
