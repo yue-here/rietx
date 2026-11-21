@@ -754,8 +754,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "holds, `y_bkg = Σ c_n T_n(x) + s·f(2θ)`. In TOPAS terms, `bkg_file(\"f.xy\", "
             "@, s)` refines s and `bkg_file(\"f.xy\")` holds it at 1. The number is "
             "comparable to TOPAS's digit for digit because it scales the curve as "
-            "stored. Hold it at 1 for an estimated baseline, which has no scale to get "
-            "wrong. Free it for a measured blank. A blank is never on the specimen's "
+            "stored. Free it for a measured blank. A blank is never on the specimen's "
             "scale, because the two scans differ in monitor normalisation and counting "
             "time, and the specimen attenuates the container's own scattering. The "
             "polynomial on top cannot correct this, because it is additive and the "
@@ -769,9 +768,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "correction."
         ),
         unit=None, default="1.0",
-        typical="1 for an estimated baseline; within 20-40 % "
-                "of 1 for a measured blank; the phase scale, tied, for a "
-                "computed curve",
+        typical="within 20-40 % of 1 for a measured blank; the phase "
+                "scale, tied, for a computed curve",
         anchor="theory/background.html#a-measured-background",
     ),
     "instrument.background.air": HelpEntry(
