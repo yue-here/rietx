@@ -1194,6 +1194,40 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="a few degrees to a few tens of degrees from a sensible start",
         anchor="theory/parameterisation.html#rigid-bodies",
     ),
+    "phases.*.rigid_bodies.*.zmatrix.*.r": HelpEntry(
+        title="Z-matrix bond length",
+        description=(
+            "The distance, in Å, at which one line of a rigid body's Z-matrix places "
+            "its atom from the line it names first. Refined as the length itself, not "
+            "a step, and moves only the atoms the line reaches. Bounded below by zero."
+        ),
+        unit=None, default=None,
+        typical="within a few hundredths of an Å of the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
+    "phases.*.rigid_bodies.*.zmatrix.*.angle": HelpEntry(
+        title="Z-matrix bond angle",
+        description=(
+            "The angle, in degrees, between a Z-matrix line's atom and the second "
+            "line it names, seen from the first. Refined as the angle itself and "
+            "bounded to [0, 180]."
+        ),
+        unit=None, default=None,
+        typical="within a few degrees of the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
+    "phases.*.rigid_bodies.*.zmatrix.*.dihedral": HelpEntry(
+        title="Z-matrix dihedral angle",
+        description=(
+            "The dihedral angle, in degrees, of a Z-matrix line's atom about the bond "
+            "from its first to its second named line, measured from the third. "
+            "Refined as the angle itself; unbounded, it is wrapped into (−180, 180] "
+            "at every stage's commit."
+        ),
+        unit=None, default=None,
+        typical="a few degrees to a few tens of degrees from the template",
+        anchor="theory/parameterisation.html#rigid-bodies",
+    ),
     "phases.*.distortion_modes.modes.*.amplitude": HelpEntry(
         title="Distortion-mode amplitude",
         description=(
@@ -4368,7 +4402,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "changes the quantity when it turns some of the restrained atoms, other than its "
             "two axis atoms, and not the others; whether the torsion is free in a stage does "
             "not matter. A restraint across two bodies, between a body atom and a free "
-            "atom, or between two copies of a body is not reported. Drop the restraint, declare "
+            "atom, or between two copies of a body is not reported, nor one on a body built "
+            "from a Z-matrix, whose bond lengths, bond angles and dihedral angles can change it. "
+            "Drop the restraint, declare "
             "a torsion that changes it, take the atoms out of the body and restrain them "
             "as free atoms, or keep the row."
         ),
@@ -6685,6 +6721,13 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.dihedral_paths": HelpEntry(
+        title="Z-matrix dihedral paths",
+        description=(
+            "The Z-matrix dihedral angles (degrees), whose differences across patterns are "
+            "taken modulo 360°. Recorded as `angle_paths` is, and `None` means the same."
         ),
     ),
     "SeriesResult.phase_names": HelpEntry(

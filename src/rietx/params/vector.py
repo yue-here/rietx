@@ -37,6 +37,7 @@ from pydantic import ValidationError
 from scipy import sparse
 
 from ..crystallography.adp import U_NAMES
+from ..crystallography.fragments import ZMATRIX_ANGLE_EDGE, ZMATRIX_R_FLOOR
 from ..crystallography.magnetic.moments import (
     canonical_dofs,
     dofs_from_moment,
@@ -75,7 +76,7 @@ from ..schemas.instrument import (
     Instrument,
     ProfileTOF,
 )
-from ..schemas.structure import MOMENT_COMPONENTS, Structure
+from ..schemas.structure import MOMENT_COMPONENTS, Structure, zmatrix_template
 from .derived import DerivedBlock
 
 #: Dot-path suffix of a source line's wavelength row.  One authority for the
@@ -1357,6 +1358,13 @@ class ParameterTable:
         #: same anchored-rotation kind about one named axis each, composed
         #: into the torsion's ``angle`` and zeroed at every :meth:`commit`
         self._anchored_torsions: dict[str, tuple[str, ...]] = {}
+        #: body base path → its Z-matrix internals' paths (WP-1814): absolute
+        #: entries, in the block's column order; empty for a constant template
+        self._zmatrix_paths: dict[str, tuple[str, ...]] = {}
+        #: body base path → (the schema body, its member atoms on a special
+        #: position): what the stage-start refusals of a free internal read
+        #: (:meth:`refuse_free_internals`)
+        self._zmatrix_bodies: dict[str, tuple[object, frozenset[str]]] = {}
         #: a body origin's displacement DOFs (they are in ``_anchored_dofs``
         #: too, being an atom-like site): with the rotations, the increments
         #: that restart at every build while the record moves, which is what
@@ -1482,7 +1490,8 @@ class ParameterTable:
                 self._add(f"{base}.magnetic_lor_strain",
                           phase.magnetic_lor_strain, force_fixed=off)
             self._collect_microstrain(base, sg, phase)
-            owner = {label: (body.name, f"{base}.rigid_bodies.{b}")
+            owner = {label: (body.name, f"{base}.rigid_bodies.{b}",
+                             f", {base}.rigid_bodies.{b}.zmatrix.*" if body.zmatrix else "")
                      for b, body in enumerate(phase.rigid_bodies)
                      for label in body.atoms}
             moved = self._collect_distortion_modes(base, phase)
@@ -1999,7 +2008,7 @@ class ParameterTable:
             mode=phase.floating_origin, sites=site_info)
 
     def _collect_body_atom_coords(self, base: str, atom, body: str,
-                                  bbase: str) -> None:
+                                  bbase: str, zmatrix: str = "") -> None:
         """A body atom's x, y, z: locked rows its body's block writes (WP-1805).
 
         No displacement DOF, no affine row: the coordinates are outputs of a
@@ -2013,7 +2022,7 @@ class ParameterTable:
                 f"{base} ({atom.label!r}) is placed by rigid body {body!r}; its "
                 "coordinates are the body's — refine the body's origin, "
                 f"rotation and torsions ({bbase}.origin.dof.*, {bbase}.rotation.*, "
-                f"{bbase}.torsions.*.twist) and set vary=False here")
+                f"{bbase}.torsions.*.twist{zmatrix}) and set vary=False here")
         for c in ("x", "y", "z"):
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
@@ -2046,7 +2055,7 @@ class ParameterTable:
         xyz = np.array(body.origin.values(), dtype=np.float64)
         origin = site_orbit(sg, xyz)
         index = {a.label: j for j, a in enumerate(phase.atoms)}
-        self._refuse_body_off_its_sites(sg, phase, body, index, origin)
+        on_site = self._refuse_body_off_its_sites(sg, phase, body, index, origin)
         self._refuse_body_image_overlap(sg, phase, body, index)
         # W, the axial directions the origin's site fixes, carried into the
         # Cartesian frame at the stored cell: cell-independent in every
@@ -2059,6 +2068,14 @@ class ParameterTable:
             site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
             reach = site_reach(m)
         member = {label: i for i, label in enumerate(body.atoms)}
+        zmap = None
+        if body.zmatrix:
+            from .bodies import ZMatrixMap
+            zmap = ZMatrixMap(
+                [z.refs() for z in body.zmatrix],
+                [i for i, z in enumerate(body.zmatrix) if z.atom is not None],
+                body.zmatrix_origin, [z.atom or "dummy" for z in body.zmatrix],
+                [tuple(p.value for _, p in z.internals()) for z in body.zmatrix])
         try:
             block = RigidBodyBlock(
                 phase_base=base, body_base=bbase,
@@ -2069,7 +2086,7 @@ class ParameterTable:
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
                 names=[t.name for t in body.torsions], site_axes=site_axes,
-                site_reach=reach, labels=list(body.atoms))
+                site_reach=reach, labels=list(body.atoms), zmatrix=zmap)
         except ValueError as exc:
             code, sep, rest = str(exc).partition(": ")
             if sep and code.startswith("RIGID_BODY_"):
@@ -2094,9 +2111,33 @@ class ParameterTable:
             self.entries.append(Entry(path=path, value=0.0, vary=torsion.vary,
                                       lo=-np.inf, hi=np.inf))
         self._anchored_torsions[bbase] = twists
+        # the Z-matrix internals (WP-1814): absolute entries, each in its own
+        # units (Å, degrees), boxed to the coordinate's domain as
+        # ``fragments.zmatrix_points`` defines it, so no step lands on a value
+        # it or the schema refuses: r above 0, the angle inside (0, 180); the
+        # dihedral keeps the box its parameter declares (unboxed, it wraps at
+        # commit)
+        zpaths = block.zmatrix_paths(bbase)
+        for path, (i, name) in zip(zpaths, () if zmap is None else zmap.columns,
+                                   strict=True):
+            p = getattr(body.zmatrix[i], name)
+            lo, hi = p.min, p.max
+            # the box stops short of the values zmatrix_points refuses
+            # mid-solve: r ≤ 0 and, for a bend, an angle at the edge, where a
+            # later line over this one's triple is collinear.  An anchor
+            # already on the floor or the edge keeps its own value in the box.
+            if name == "r":
+                lo = max(lo, min(ZMATRIX_R_FLOOR, p.value))
+            elif name == "angle":
+                lo = max(lo, min(ZMATRIX_ANGLE_EDGE, p.value))
+                hi = min(hi, max(180.0 - ZMATRIX_ANGLE_EDGE, p.value))
+            self._add(path, p.model_copy(update={"min": lo, "max": hi}))
+        self._zmatrix_paths[bbase] = zpaths
+        if zpaths:
+            self._zmatrix_bodies[bbase] = (body, on_site)
         self._bodies.append((bbase, body.name, block))
 
-    def _refuse_body_off_its_sites(self, sg, phase, body, index, origin) -> None:
+    def _refuse_body_off_its_sites(self, sg, phase, body, index, origin) -> frozenset[str]:
         """``RIGID_BODY_NOT_INVARIANT``: the invariance rule (WP-1807, D4a, D7, D8).
 
         Every member atom's site symmetry G_i must lie inside its origin's
@@ -2179,6 +2220,9 @@ class ParameterTable:
                 "rhombohedral axes, where the site's symmetry directions turn "
                 "with the refined α and the body would leave its site inside a "
                 "stage — state the phase in hexagonal axes (:H)")
+        # the members on a special position, which a free Z-matrix internal
+        # may not move either (``refuse_free_internals``, WP-1814)
+        return frozenset(lab for lab, o in sites.items() if len(o.stabilizer_ops) > 1)
 
     def _refuse_body_image_overlap(self, sg, phase, body, index) -> None:
         """``RIGID_BODY_IMAGE_OVERLAP``: a body that straddles a symmetry element.
@@ -2317,11 +2361,15 @@ class ParameterTable:
         body's name is unique only in its phase, read off the same data."""
         return {p: bbase for p, bbase, _ in self._body_dof_owners()}
 
+    def body_has_zmatrix(self, bbase: str) -> bool:
+        """Whether the body at ``bbase`` refines a Z-matrix's internals (WP-1814)."""
+        return bool(self._zmatrix_paths.get(bbase))
+
     def _body_dof_owners(self) -> Iterator[tuple[str, str, str]]:
         """(DOF path, body base path, body name) for every body's own DOF."""
         for bbase, name, block in self._bodies:
             for p in (*block.rotation_paths(bbase), *self._anchored_torsions[bbase],
-                      *self._body_origin_dofs[bbase]):
+                      *self._body_origin_dofs[bbase], *self._zmatrix_paths[bbase]):
                 yield p, bbase, name
 
     def body_bond_errors(self) -> dict[str, float]:
@@ -3759,6 +3807,13 @@ class ParameterTable:
                             for p in paths)))
 
     @property
+    def dihedral_paths(self) -> frozenset[str]:
+        """Every Z-matrix dihedral (degrees, WP-1814): compared across fits
+        modulo 360°, the sibling of :attr:`angle_dof_paths`' 2π."""
+        return frozenset(q for paths in self._zmatrix_paths.values() for q in paths
+                         if q.endswith(".dihedral"))
+
+    @property
     def angle_dof_paths(self) -> frozenset[str]:
         """The moment DOFs that are angles, compared across fits modulo a turn.
 
@@ -4601,6 +4656,9 @@ class ParameterTable:
         self._refresh_moment_components()
         charts = self._compose_bodies(values) if self._bodies else {}
         twisted = self._compose_torsions(values) if self._bodies else False
+        # an unboxed Z-matrix dihedral wraps into (−180, 180] as a torsion's
+        # record does (WP-1814): a whole turn, so the chart moves by a translation
+        twisted = self._wrap_dihedrals() or twisted
         # held-source contributions to d follow the new values, and the
         # derived rows the composed anchors
         self._rebuild()
@@ -4676,6 +4734,28 @@ class ParameterTable:
             for q in paths:
                 self.entries[self._paths[q]].value = 0.0
         return charts
+
+    def _wrap_dihedrals(self) -> bool:
+        """Each unboxed Z-matrix dihedral taken into (−180, 180], at a commit (WP-1814).
+
+        ``bodies.wrap_degrees``, the rule a torsion's record follows: a value
+        inside is kept bit for bit, one outside moves by whole turns, which
+        moves no atom beyond rounding.  A dihedral with a box of its own is
+        stored as the solver left it (a box straddling ±180 included).
+        Returns whether any value moved.
+        """
+        from .bodies import wrap_degrees
+
+        moved = False
+        for paths in self._zmatrix_paths.values():
+            for q in paths:
+                e = self.entries[self._paths[q]]
+                if not q.endswith(".dihedral") or np.isfinite(e.lo) or np.isfinite(e.hi):
+                    continue
+                v = wrap_degrees(e.value)
+                if v != e.value:
+                    e.value, moved = v, True
+        return moved
 
     def _compose_torsions(self, values: Mapping[str, float]) -> bool:
         """φ₀ ← φ₀ + δφ and δφ ← 0 for every torsion, at a commit (WP-1808).
@@ -4834,6 +4914,113 @@ class ParameterTable:
                 "A commit composes the turn into the body's orientation, and two "
                 "turns compose into the third, so the stage cannot keep the "
                 f"directions it was given. {remedy}")
+
+    def refuse_free_internals(self, *, joint: bool = False) -> None:
+        """The refusals of a free Z-matrix internal, at stage start (WP-1814).
+
+        Read where :meth:`refuse_partial_turns` is, once the stage's globs, the
+        caller's holds and ties and the mode's force-fix have settled what
+        moves (:meth:`moving_paths`, so a tie freeing an internal counts).
+        Each states a fact about the construction, and names the body, the
+        line and the path:
+
+        * ``RIGID_BODY_RIDING_INTERNAL``: an internal of a riding H's own line.
+          A riding H adds no parameter: its point is fixed relative to its
+          parent (``crystallography.riding``), and the CIF flags it ``R``.
+        * ``RIGID_BODY_LINEAR_BEND``: an angle or a dihedral of a linear body
+          (inertia rank 2).  Bent, it lies in the half-plane the Z-matrix's
+          frame fixes, and the body has no third turn to choose that plane.
+        * ``RIGID_BODY_INERT_DIHEDRAL``: a dihedral on a line whose angle is
+          exactly 0° or 180°, where it moves nothing.
+        * ``RIGID_BODY_TORSION_REACH``: a dihedral beside a free
+          ``BodyTorsion`` about the same bond.  Equal reach does not make the
+          two columns independent (a dihedral does not turn its atoms as one
+          rigid set), so both free is refused whatever atoms each reaches.
+        * ``RIGID_BODY_NOT_INVARIANT``: on a body whose origin sits on a
+          special position, an internal that moves a member on a special
+          position (1807's rule for a torsion).
+        * ``RIGID_BODY_COLLINEAR_ANGLE``: a free angle over a collinear
+          reference triple (above).
+        * ``RIGID_BODY_INERT_INTERNAL``: an internal that moves no atom (only
+          dummies): its column is zero.
+        """
+        moving = set(self.moving_paths)
+        for bbase, (body, on_site) in self._zmatrix_bodies.items():
+            free = [q for q in self._zmatrix_paths[bbase] if q in moving]
+            if not free:
+                continue
+            block = next(b for base, _, b in self._bodies if base == bbase)
+            values = {q: self.entries[self._paths[q]].value
+                      for q in self._zmatrix_paths[bbase]}
+            pattern = block.reach_pattern()
+
+            def reach(path):
+                col = block.inputs.index(path)
+                return {body.atoms[i] for i in np.flatnonzero(pattern[0::3, col])}
+
+            for q in free:
+                k, name = int(q.split(".")[-2]), q.rsplit(".", 1)[1]
+                line = body.zmatrix[k]
+                who = (f"rigid body {body.name!r}: Z-matrix line {k} "
+                       f"({line.atom or 'dummy'})'s {name} ({q}) is free")
+                fix = ("drop it from the stage's turn_on: a joint fit has no hold verb"
+                       if joint else f"hold it (Refinement.hold({q!r}))")
+                if line.atom in body.riding:
+                    raise ValueError(
+                        f"RIGID_BODY_RIDING_INTERNAL: {who}, and line {k} places "
+                        f"riding H {line.atom!r}. A riding H adds no parameter: its "
+                        "point is fixed relative to its parent atom, and the CIF "
+                        f"flags it calculated. Set its length with "
+                        f"crystallography.riding.set_riding_lengths, and {fix}")
+                if name != "r" and block.body_axes.shape[1] == 2:
+                    raise ValueError(
+                        f"RIGID_BODY_LINEAR_BEND: {who}, and the body is linear. A "
+                        "bend puts it in the half-plane the Z-matrix's frame fixes, "
+                        "and a linear body has no third turn to choose that plane; "
+                        f"free only its lengths, and {fix}")
+                angle = values.get(f"{bbase}.zmatrix.{k}.angle")
+                if name == "dihedral" and angle in (0.0, 180.0):
+                    raise ValueError(
+                        f"RIGID_BODY_INERT_DIHEDRAL: {who}, and its angle is "
+                        f"exactly {angle:g}°, where the dihedral moves nothing; "
+                        f"{fix}")
+                if name == "angle" and k in block.zmatrix.on_line:
+                    raise ValueError(
+                        f"RIGID_BODY_COLLINEAR_ANGLE: {who}, but its reference atoms (lines "
+                        f"{', '.join(map(str, line.refs()))}) are collinear, so no "
+                        f"angle but {angle:g}° places line {k}; place it from a "
+                        f"dummy atom off the line, or {fix}")
+                if name == "dihedral":
+                    pair = {body.zmatrix[line.b].atom, body.zmatrix[line.c].atom}
+                    for t, torsion in enumerate(body.torsions):
+                        twist = f"{bbase}.torsions.{t}.twist"
+                        if set(torsion.axis) != pair or twist not in moving:
+                            continue
+                        mine, theirs = reach(q), reach(twist)
+                        diff = sorted(mine ^ theirs)
+                        raise ValueError(
+                            f"RIGID_BODY_TORSION_REACH: {who}, and so is torsion "
+                            f"{torsion.name!r} ({twist}) about the same bond "
+                            f"{'–'.join(torsion.axis)}. "
+                            + (f"They reach different atoms ({', '.join(diff)} in one "
+                               "and not the other)" if diff else
+                               "They reach the same atoms, but a dihedral does not "
+                               "turn them as one rigid set")
+                            + ", so the two columns are not two directions the "
+                            "data can tell apart. Free one of them: hold the "
+                            f"torsion's twist or the dihedral ({fix})")
+                reached = reach(q)
+                if reached & on_site:
+                    raise ValueError(
+                        f"RIGID_BODY_NOT_INVARIANT: {who}, and it moves "
+                        f"{sorted(reached & on_site)[0]!r}, which sits on a special "
+                        "position; the internal takes it off the site. An internal "
+                        "of a site body may move only atoms in general positions; "
+                        f"{fix}")
+                if not reached:
+                    raise ValueError(
+                        f"RIGID_BODY_INERT_INTERNAL: {who}, and it moves nothing: every line it places is a "
+                        f"dummy, so its column is zero; {fix}")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.
@@ -5128,6 +5315,11 @@ class ParameterTable:
             for b, body in enumerate(phase.rigid_bodies):
                 for c in ("x", "y", "z"):
                     put(getattr(body.origin, c), f"{base}.rigid_bodies.{b}.origin.{c}")
+                # the Z-matrix internals (WP-1814), absolute entries; the
+                # template they build is rewritten once every value is written
+                for k, line in enumerate(body.zmatrix):
+                    for name, p in line.internals():
+                        put(p, f"{base}.rigid_bodies.{b}.zmatrix.{k}.{name}")
             if phase.distortion_modes is not None:
                 # the amplitudes; the coordinates they derive are written with
                 # the atoms below, from their rows
@@ -5198,6 +5390,13 @@ class ParameterTable:
                 _refuse(path, v)
         for p, path in pending:
             _write(p, path)
+        # a Z body's template is the record of its internals, Z(ζ) − c₀
+        # (WP-1814), written after them and before any other body field, since
+        # an assignment re-runs the body's validator, which compares the two
+        for bbase in self._zmatrix_bodies:
+            ip, b = (int(t) for t in bbase.split(".")[1::2][:2])
+            rb = structure.phases[ip].rigid_bodies[b]
+            rb.template = zmatrix_template(rb.zmatrix, rb.zmatrix_origin)
         # a body's orientation record: R₀ as the commit composed it, which is
         # the record itself, since a commit leaves δω = 0 (WP-1805).  A value
         # set by hand and not committed (``set_values``, a series carry) is a

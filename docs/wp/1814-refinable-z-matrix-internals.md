@@ -1,6 +1,6 @@
 # WP-1814 — refinable internal geometry: Z-matrix lengths, angles and dihedrals
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-09 — the placement's exact tangent built; design adjudicated (four chunks); chunk C1, the restraint refusal on bodies with no Z-matrix, is on branch `wp1814/c1-restrain-or-refine`; the table, block and refusals wait on #1388
+Milestone: rigid-bodies · Status: 🔄 2026-11-18 — Z-matrix bodies refine, with every stage-start refusal; C1's restraint warning (#1510) is merged and leaves Z bodies alone; acceptance on acridine and the skill row remain
 Depends on: 1815 (the derived-geometry table its esds are reported through); 1805
 Priority: P3 2026-10-16 — TOPAS users expect it, and a refined bond with its esd is what a paper reports; nothing is wrong without it
 
@@ -48,10 +48,11 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 ## Tasks
 
 - [ ] `ZLine`/`PointLine` on `RigidBody`, the frozen c₀, and the dot-paths.
-- [ ] The tangent-propagation Jacobian; the six placement partials checked against complex step.
-- [ ] The restrain-or-refine refusals and the torsion-reach refusal.
+- [x] The tangent-propagation Jacobian; the six placement partials checked against complex step.
+- [x] The restrain-or-refine refusals and the torsion-reach refusal.
 - [ ] Tests: placement partials vs complex step < 1e-12; the map's Jacobian vs FD < 1e-9; a freed C–C on acridine IX (COD 2242872) within its published esd
 - [ ] Skill: the routing row for refining a Z-matrix body
+- [ ] Theory tab: the section for the Z(ζ) − c₀ equation, deferred from the refine chunk to the acceptance chunk (a WP that adds physics adds its equation there)
 
 ## Acceptance
 
@@ -67,6 +68,79 @@ The proposal (#759 § 1), taken as the plan on 2026-10-16:
 - Issue #759.
 
 ## Handover log
+
+### 2026-11-18 — a restraint on a Z-matrix body is not reported
+
+C1 (#1510) merged with the maintainer's ruling, a warning that keeps the
+row, so this chunk now meets it: `_fixed_body_findings` returns nothing for a
+body with a Z-matrix, whose lines' lengths, angles and dihedrals can change
+any quantity a restraint over its atoms measures (the design review's M20,
+"Z bodies: no structural refusal"). The third task is complete with it.
+
+- *Done*: the guard in `model.restraints._fixed_body_findings`; its
+  docstring, the `help.py` entry, the audit row's evidence and the skill's
+  diagnostics row say so; one line in the release-note fragment. C1's tests
+  renamed from refuse to warn (the maintainer's #1510 round 2, follow-up 2):
+  `tests/test_restraint_body_warning.py`, `_warned`,
+  `test_the_rule_warns_on_exactly_what_the_body_holds_fixed`.
+- *Measured*: a bond (line 1's r) and an angle (line 2's angle) restraint on
+  #759's branched fragment as a Z body raise nothing; the same restraints on
+  the same template with the Z-matrix dropped warn. With the guard removed
+  both cases fail.
+- *Next*: unchanged, the acceptance chunk (T7, T8) and the routing row.
+
+### 2026-11-17 — Z-matrix bodies refine
+
+A body built from a Z-matrix now refines its bond lengths, angles and
+dihedrals as ordinary parameters with esds, and a stage refuses at its start
+every free internal the construction cannot carry.
+
+- *Done*: `ZLine` and `RigidBody.zmatrix`/`zmatrix_origin` (c₀, frozen at
+  declaration; `template` is the record Z(ζ) − c₀, checked at construction);
+  the paths `phases.i.rigid_bodies.b.zmatrix.k.{r,angle,dihedral}`, absolute
+  entries boxed to r ≥ 0 and the angle in [0, 180]; the block reads the
+  internals after the twists and seeds `zmatrix_points`' tangent into the
+  torsion loop, with a traced twin; an unboxed dihedral wraps at commit; the
+  write-back stores the internals, then the template.  Stage-start refusals
+  (`ParameterTable.refuse_free_internals`, beside `refuse_partial_turns`):
+  `RIGID_BODY_TORSION_REACH`, `RIGID_BODY_INERT_DIHEDRAL`,
+  `RIGID_BODY_RIDING_INTERNAL`, `RIGID_BODY_LINEAR_BEND`,
+  `RIGID_BODY_NOT_INVARIANT` for a site body, an angle over a collinear
+  triple, and an internal that moves only dummies.  Builders:
+  `add_body(zmatrix=)` and `zmatrix_body_from_atoms(..., tree=)`.  A riding
+  H on a Z body rides on its line's b.  The misfit check's body arm frees the
+  internals the model frees.  A series compares the dihedrals modulo 360°
+  (`SeriesResult.dihedral_paths`).  Task 2's block half; task 1 lacks
+  `PointLine`, which waits on the maintainer (the review asks to defer it).
+- *Measured* (`tests/test_zmatrix_body.py`, numpy, arm64 macOS, a dev venv):
+  σ of each line's own bond, angle and torsion equals σ of its internal to
+  1e-9 relative through the real table; the composed block against central
+  differences under 1e-9 at three states (two chained torsions, a turned
+  anchor, triclinic), its reach covering every nonzero at 20; a planted
+  r 1.51 → 1.56 Å and a dihedral across ±180° recovered on a simulated
+  pattern.  An expression tie on an internal is refused by `add_derived`
+  (declaration order).
+- *Gotcha*: the numpy fit's columns come from `_peak_chain_column`, which
+  decodes through the block, so a wrong Z tangent moves the esds and the
+  geometry table, not the fit: test the esds, never only a recovery.
+- *Next*: the acceptance chunk (T7 simulated acridine, T8 the real-data
+  record against WP-1806 Part 2's free-atom control) and the skill's routing
+  row; the restraint rule on bodies with no Z-matrix is #1510.
+
+### 2026-11-19 — review round 1 (Yue on #1665)
+
+- *Done*: the box of a refined internal stops short of what `zmatrix_points`
+  refuses mid-solve (a length at 0 raises, and an angle at 0° or 180° makes a
+  later line's reference triple collinear): `ZMATRIX_R_FLOOR` (1e-6 Å) and
+  `ZMATRIX_ANGLE_EDGE` (the angle whose sine is twice `COLLINEAR_TOL`), an
+  anchor already past one keeping its own value in the box; `zmatrix_body_from_atoms`
+  reads 0° for the dihedral of an exactly linear group instead of 0/0; the
+  misfit check's body arm frees a Z body's torsions only where `vary` is set,
+  as it does the internals; the two stage-start refusals without a code
+  now carry `RIGID_BODY_COLLINEAR_ANGLE` and `RIGID_BODY_INERT_INTERNAL`; the
+  theory page's "a distance has no esd" qualified for a Z body.
+- *Next*: unchanged, the acceptance chunk (T7, T8), the routing row and the
+  Theory-tab section (Tasks).
 
 ### 2026-11-09 — the placement and its exact tangent
 

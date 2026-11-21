@@ -479,6 +479,10 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "phases.*.rigid_bodies.*.rotation.*": 4,
   // WP-1808: a torsion's increment is degrees, like a cell angle
   "phases.*.rigid_bodies.*.torsions.*.twist": 3,
+  // WP-1814: a Z-matrix length is Å like a cell edge; its angles are degrees
+  "phases.*.rigid_bodies.*.zmatrix.*.r": 5,
+  "phases.*.rigid_bodies.*.zmatrix.*.angle": 3,
+  "phases.*.rigid_bodies.*.zmatrix.*.dihedral": 3,
   "phases.*.scale": "exp",
   // WP-1981: a named variable is whatever quantity its caller declared, a Biso
   // or a cell edge, so it has no natural place count

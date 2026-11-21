@@ -279,9 +279,12 @@ def _fixed_body_findings(phase, k: int, kind: str, atoms: list,
     The rule reads the declaration, never ``vary``: a stage that holds a
     torsion keeps the restraint as a constant row, as rietx keeps any row of
     a held parameter, which is also the scope: the structural reading, on
-    bodies with no Z-matrix.  Only the two axis atoms count as on the axis, not an
-    atom that happens to sit on the line, so any error lands on accepting a
-    restraint.  The body's pose (origin, rotation) and the cell move a copy
+    bodies with no Z-matrix.  A body with a Z-matrix is never reported: its
+    lines' lengths, angles and dihedrals are declared parameters of its
+    geometry, which can change the quantity, as a declared torsion can (the
+    WP-1814 design review's M20).  Only the two axis atoms count as on the
+    axis, not an atom that happens to sit on the line, so any error lands on
+    accepting a restraint.  The body's pose (origin, rotation) and the cell move a copy
     as a whole and change none of these quantities (the template is in Å).
     A Tether or anti-bump row is one-sided and is not checked.
     """
@@ -295,7 +298,7 @@ def _fixed_body_findings(phase, k: int, kind: str, atoms: list,
     labels = [phase.atoms[j].label for j in atoms]
     named = set(labels)
     body = next((b for b in phase.rigid_bodies if named <= set(b.atoms)), None)
-    if body is None:
+    if body is None or body.zmatrix:
         return []
     for t in body.torsions:
         off_axis = named - set(t.axis)

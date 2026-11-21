@@ -91,6 +91,21 @@ DUMMY: str = "X"
 #: less than 2e-4° is a typing error, not a geometry.
 COLLINEAR_TOL: float = 1e-6
 
+#: A refined Z-matrix bond length stops this far (Å) above 0, where
+#: :func:`zmatrix_points` refuses a line (r ≤ 0), so a step that lands on the
+#: box's edge, as the default LM driver's does, still places every line.  A
+#: bond this short is no geometry, and its angle and dihedral columns are
+#: near zero too; the value is the March-Dollase floor's (``MARCH_R_MIN``).
+ZMATRIX_R_FLOOR: float = 1e-6
+
+#: A refined Z-matrix angle stops this many degrees short of 0° and 180°,
+#: where a later line that takes this line as a reference triple finds it
+#: collinear.  It is the angle whose sine is twice :data:`COLLINEAR_TOL`, so
+#: a triple whose bend is this line's angle clears the collinearity test with
+#: a factor of two.  A line that is exactly on the line (0° or 180°) at its
+#: anchor stays there: its angle is not refined.
+ZMATRIX_ANGLE_EDGE: float = math.degrees(2.0 * COLLINEAR_TOL)
+
 #: An eigenvalue of the inertia tensor below this fraction of the largest is a
 #: null rotation.  I's eigenvalues scale as the squared distance from an axis,
 #: so 1e-6 counts a fragment as linear when its atoms sit within ~1e-3 of its

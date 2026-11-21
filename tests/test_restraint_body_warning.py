@@ -117,14 +117,14 @@ def _quantity(x: np.ndarray, idx: tuple[int, ...]) -> float:
     return math.degrees(math.atan2(np.linalg.norm(b2) * (b1 @ n2), n1 @ n2))
 
 
-def _refused(phase: Phase, idx: tuple[int, ...]) -> bool:
+def _warned(phase: Phase, idx: tuple[int, ...]) -> bool:
     images = [(np.eye(3), np.zeros(3))] * len(idx)
     found = _fixed_body_findings(phase, 0, "test", [i + 1 for i in idx], images)
     assert all(d.code == CODE for d in found) and len(found) <= 1
     return bool(found)
 
 
-def test_the_rule_refuses_exactly_what_the_body_holds_fixed():
+def test_the_rule_warns_on_exactly_what_the_body_holds_fixed():
     """Every bond, angle and torsion over the chain body's atoms: reported if and
     only if it stays put while every torsion twists and the pose and cell move.
 
@@ -140,7 +140,7 @@ def test_the_rule_refuses_exactly_what_the_body_holds_fixed():
     moved = _cartesian(phase, angles=rng.uniform(20.0, 70.0, size=3).tolist(),
                        orientation=tuple(q), origin=(0.11, 0.62, 0.43),
                        cell=(8.4, 9.0, 10.7, 88.0, 97.0, 99.0))
-    counts = {"refused": 0, "accepted": 0}
+    counts = {"warned": 0, "accepted": 0}
     for n in (2, 3, 4):
         for idx in itertools.permutations(range(7), n):
             if n > 2 and idx[0] > idx[-1]:
@@ -152,10 +152,10 @@ def test_the_rule_refuses_exactly_what_the_body_holds_fixed():
                 delta = min(delta, 360.0 - delta)
             fixed = delta < 1e-9
             assert fixed or delta > 1e-3, (idx, delta)   # nothing in between
-            assert _refused(phase, idx) == fixed, (idx, delta)
-            counts["refused" if fixed else "accepted"] += 1
+            assert _warned(phase, idx) == fixed, (idx, delta)
+            counts["warned" if fixed else "accepted"] += 1
     # both arms are populated, or the check above certifies nothing
-    assert counts == {"refused": 45, "accepted": 501}, counts
+    assert counts == {"warned": 45, "accepted": 501}, counts
 
 
 # ------------------------------------------------------- the seat: compile
@@ -250,3 +250,43 @@ def test_a_fit_runs_and_the_warning_reaches_the_result():
     found = [d for d in result.diagnostics if d.code == CODE]
     assert len(found) == 1 and found[0].level == "warning"
     assert "Drop the restraint" in found[0].suggestion
+
+
+# ------------------------------------------------------- a Z-matrix body
+@pytest.mark.parametrize("labels, kind", [
+    (("C0", "C1"), "bond"),          # line 1's r
+    (("O2", "C1", "C0"), "angle"),   # line 2's angle
+], ids=["bond", "angle"])
+def test_a_z_body_is_not_reported_and_the_same_template_without_its_zmatrix_is(
+        labels, kind):
+    """A restraint on a Z-matrix body's freed internal raises no finding: the
+    line's length or angle changes it, as a declared torsion would (the design
+    review's M20: no structural finding on a Z body).  The same restraint on
+    the same template with the Z-matrix dropped, a body with no Z-matrix and
+    no torsion, still warns."""
+    from rietx.schemas.structure import RigidBody
+    from tests.test_zmatrix_body import zbody_structure
+
+    zphase = zbody_structure(vary=True).phases[0]
+    zbody = zphase.rigid_bodies[0]
+    assert zbody.zmatrix and not zbody.torsions
+    plain = RigidBody.model_validate(
+        {**zbody.model_dump(), "zmatrix": [], "zmatrix_origin": (0.0, 0.0, 0.0)})
+    assert plain.template == zbody.template
+    idx = [[a.label for a in zphase.atoms].index(lab) for lab in labels]
+    restraint = (BondRestraint(atom_i=idx[0], atom_j=idx[1], target=1.51, sigma=0.01)
+                 if kind == "bond" else
+                 AngleRestraint(atom_i=idx[0], atom_j=idx[1], atom_k=idx[2],
+                                target_deg=109.5, sigma=1.0))
+    tt = np.arange(10.0, 40.0, 0.05)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+
+    def findings(body):
+        phase = zphase.model_copy(update={"rigid_bodies": [body],
+                                          "restraints": [restraint]})
+        model = compile_model(Structure(phases=[phase]), INS, blank, mode="rietveld")
+        assert model.restraints.n_rows >= 1
+        return [d.code for d in model.restraints.findings]
+
+    assert findings(zbody) == []
+    assert findings(plain) == [CODE]

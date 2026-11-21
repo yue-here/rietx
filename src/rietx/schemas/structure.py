@@ -761,6 +761,63 @@ class BodyTorsion(Base):
         return self
 
 
+#: the internal coordinates a Z-matrix line holds, in column order
+ZLINE_INTERNALS = ("r", "angle", "dihedral")
+
+
+class ZLine(Base):
+    """One line of a rigid body's Z-matrix (WP-1814): an atom placed from earlier lines.
+
+    Line i is placed from the earlier lines ``b``, ``c`` and ``d`` (0-based
+    line indices, not atom labels, since a dummy has no label) at distance
+    ``r`` (Å) from b, bond angle ``angle`` A–b–c (degrees) and dihedral
+    ``dihedral`` A–b–c–d (degrees), the convention of
+    ``crystallography.fragments.from_zmatrix`` (Coelho, *TOPAS-Academic V6
+    Technical Reference*, § 10.22.1).  Line 0 has none of them, line 1 ``b``
+    and ``r``, line 2 adds ``c`` and ``angle``, and every later line has all
+    six.  ``atom`` is the member atom's label, or ``None`` for a dummy, which
+    is placed (a later line may refer to it) and is no atom of the body.
+
+    Each internal is a ``Parameter`` that refines as an **absolute** entry,
+    ``phases.i.rigid_bodies.b.zmatrix.k.{r,angle,dihedral}`` (unlike a
+    torsion's twist, an increment): the value is the internal itself.
+    """
+
+    #: the member atom's label; ``None`` for a dummy
+    atom: str | None = None
+    b: int | None = None
+    c: int | None = None
+    d: int | None = None
+    r: Parameter | None = None
+    angle: Parameter | None = None
+    dihedral: Parameter | None = None
+
+    def refs(self) -> tuple[int, ...]:
+        """The reference lines, (), (b,), (b, c) or (b, c, d)."""
+        return tuple(k for k in (self.b, self.c, self.d) if k is not None)
+
+    def internals(self) -> list[tuple[str, Parameter]]:
+        """(name, parameter) for each internal this line holds, in column order."""
+        return [(n, p) for n in ZLINE_INTERNALS if (p := getattr(self, n)) is not None]
+
+
+def zmatrix_template(zmatrix: list[ZLine], origin) -> list[tuple[float, float, float]]:
+    """The body-frame template a Z-matrix gives: Z(ζ) − c₀ over its atoms (WP-1814).
+
+    Every line placed by ``fragments.zmatrix_points``, the dummies dropped, and
+    the frozen point c₀ (``RigidBody.zmatrix_origin``) subtracted, so the
+    template is the record ``RigidBody.template`` must hold.
+    """
+    from ..crystallography.fragments import zmatrix_points
+
+    pos = zmatrix_points([z.refs() for z in zmatrix],
+                         [tuple(p.value for _, p in z.internals()) for z in zmatrix],
+                         names=[z.atom or "dummy" for z in zmatrix])
+    c0 = [float(v) for v in origin]
+    return [tuple(float(p[k] - c0[k]) for k in range(3))
+            for p, z in zip(pos, zmatrix, strict=True) if z.atom is not None]
+
+
 class RigidBody(Base):
     """A set of a phase's atoms that moves as one rigid template (WP-1805, #561).
 
@@ -813,6 +870,66 @@ class RigidBody(Base):
     #: points are computed from a parent and a tabulated X–H length
     #: (``crystallography.riding``), and a CIF writes them ``R``/``calc``
     riding: list[str] = Field(default_factory=list)
+    #: the Z-matrix that builds the template (WP-1814), one line per member
+    #: atom in ``atoms`` order plus any dummies; empty for a constant template
+    zmatrix: list[ZLine] = Field(default_factory=list)
+    #: c₀, the Z-frame point (Å) the template is measured from, frozen at
+    #: declaration: ``template`` = Z(ζ) − c₀, so an internal moves only what
+    #: it reaches and never shifts every atom by a recentring
+    zmatrix_origin: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    @model_validator(mode="after")
+    def _zmatrix(self) -> "RigidBody":
+        """The Z-matrix's shape, its atoms, and ``template`` = Z(ζ) − c₀ (WP-1814)."""
+        if not self.zmatrix:
+            return self
+        who = f"rigid body {self.name!r}"
+        for i, line in enumerate(self.zmatrix):
+            want = min(i, 3)
+            refs = (line.b, line.c, line.d)
+            vals = tuple(getattr(line, n) for n in ZLINE_INTERNALS)
+            if (any(k is None for k in refs[:want]) or any(k is not None for k in refs[want:])
+                    or any(p is None for p in vals[:want])
+                    or any(p is not None for p in vals[want:])):
+                raise ValueError(
+                    f"{who}, Z-matrix line {i}: line {i} takes "
+                    f"{', '.join(('b', 'c', 'd')[:want]) or 'no references'} and "
+                    f"{', '.join(ZLINE_INTERNALS[:want]) or 'no internals'}, and nothing else")
+            for name, p in line.internals():
+                if not math.isfinite(p.value):
+                    raise ValueError(f"{who}, Z-matrix line {i}: {name} is not finite")
+        labels = [z.atom for z in self.zmatrix if z.atom is not None]
+        if labels != list(self.atoms):
+            raise ValueError(
+                f"{who}: the Z-matrix's atoms {labels} must be the body's atoms "
+                f"{list(self.atoms)}, in order (a dummy line has atom=None)")
+        if not all(math.isfinite(v) for v in self.zmatrix_origin):
+            raise ValueError(f"{who}: zmatrix_origin is not finite")
+        try:
+            placed = zmatrix_template(self.zmatrix, self.zmatrix_origin)
+        except ValueError as exc:
+            raise ValueError(f"{who}: {exc}") from None
+        if len(placed) != len(self.template):
+            return self     # ``_consistent`` names the count mismatch
+        worst = max(math.dist(p, t) for p, t in zip(placed, self.template, strict=True))
+        if worst > RIGID_BODY_DRIFT_TOL:
+            raise ValueError(
+                f"RIGID_BODY_TEMPLATE_DRIFT: {who}'s template is {worst:.3g} Å from "
+                "its Z-matrix's (Z(ζ) − zmatrix_origin): the template is the "
+                "Z-matrix's record, so write it from the Z-matrix "
+                "(rietx.schemas.structure.zmatrix_template)")
+        line_of = {z.atom: i for i, z in enumerate(self.zmatrix) if z.atom is not None}
+        for h in (h for h in self.riding if h in line_of):
+            b = self.zmatrix[line_of[h]].b
+            parent = None if b is None else self.zmatrix[b].atom
+            if parent is None or parent in self.riding:
+                raise ValueError(
+                    f"{who}: riding H {h!r} is placed from "
+                    + ("no earlier line" if b is None else
+                       f"line {b} ({'a dummy' if parent is None else repr(parent) + ', itself riding'})")
+                    + "; a riding H rides on its parent, so its Z-matrix line's b "
+                    "must be the parent atom's line")
+        return self
 
     @model_validator(mode="after")
     def _consistent(self) -> "RigidBody":
