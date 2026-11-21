@@ -734,6 +734,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2222](2222-the-closing-stage-off-by-default.md) | The closing stage off by default | ✅ 2026-11-19 | — | — |
 | [2224](2224-a-refit-of-a-converged-model-runs-one-stage.md) | A re-fit of a converged model runs one stage | ✅ 2026-11-19 | — | — ([2222](2222-the-closing-stage-off-by-default.md) soft) |
 | [2226](2226-the-preview-on-the-declared-windows.md) | The preview on the declared windows | ✅ 2026-11-21 | — | [2222](2222-the-closing-stage-off-by-default.md) |
+| [2235](2235-predict-on-a-grid-says-which-peak-cut-it-draws.md) | Predict on a grid says which peak cut it draws | ⬜ | P3 | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
@@ -781,13 +782,14 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1971](1971-a-returned-figure-survives-a-zoom-and-a-pickle.md) | A returned figure survives a caller's zoom and a pickle | ✅ 2026-10-15 | — | — |
 | [1972](1972-the-indexing-figures-take-a-dark-palette.md) | The indexing figures take a dark palette | ✅ 2026-10-15 | — | — |
 | [1985](1985-report-and-diagnostic-text-in-one-voice.md) | Report and diagnostic text, rewritten in one voice | ✅ 2026-10-16 | — | — ([1133](1133-diagnostic-names-its-view.md) soft) |
-| [1990](1990-the-correlation-matrix-reaches-the-result.md) | The correlation matrix reaches the result | ⬜ | P3 | — |
+| [1990](1990-the-correlation-matrix-reaches-the-result.md) | The correlation matrix reaches the result | ⬜ | P3 | — ([1318](1318-strain-surface.md) soft) |
 | [2031](2031-a-history-log-holds-one-tree.md) | A history log holds one tree, and a stage is timed in one place | ✅ 2026-11-03 | — | — ([1322](1322-events-aggregator.md) soft) |
 | [2042](2042-a-result-names-its-radiation.md) | A result names its radiation | ✅ 2026-10-24 | — | — |
 | [2073](2073-the-qpa-record-says-what-its-fraction-rests-on.md) | The QPA record says what its fraction rests on, and QPA at given values has a route | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2074](2074-the-report-says-where-the-residual-is-structured.md) | The report says where the residual is structured: a coherent-residual scan, the background's bulge, a replica scan on isolated lines | ⬜ | P3 | — ([2004](2004-the-fitreport-reasons-for-the-caller.md), [1931](1931-the-background-order-scan-runs-to-its-cap.md) soft) |
 | [2111](2111-what-the-structure-figure-still-misleads.md) | What the structure figure still misleads a reader with, and the ORTEP controls asked for | ⬜ | P3 | [1468](1468-what-the-polyhedra-still-miss.md) |
 | [2124](2124-the-gui-port-server-defects.md) | The indexing routes the GUI port needs: an ungated screen, any cell adopted, the pick's options | ✅ 2026-11-09 | — | — |
+| [2234](2234-the-strain-surface-in-the-gui.md) | The strain surface in the GUI | ⬜ | P4 | [1318](1318-strain-surface.md) |
 
 ### <a id="unscheduled-data-and-metadata-in-a-structure-out"></a>Data and metadata in, a structure out
 

@@ -129,6 +129,15 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   the new table lacks, and every held background path when the kind or breakpoints changed.
   Leave the free arm to the new model's `vary` as now. One server test that breaks the old
   model this way. Folded here beside finding 8 because both live in `instrument_patch`.
+- **2026-11-21, issue triage (#1656 item 1): the Console always says 0 frames dropped.**
+  Checked at `c1033a0e8`. `gui/src/next/Console.svelte` prints "N frames dropped" when
+  `dropped > 0`. `Frame.svelte` (line 57) and `App.svelte` (line 86) each declare
+  `let dropped = $state(0)` and never assign it. `follow()` in `gui/src/lib/stream.ts` keeps
+  a `Cursor` whose `dropped` count `advance()` grows on the polling path, then never hands
+  it to a caller. The SSE path moves `cursor.seq` on each event without checking for a gap,
+  so it counts nothing. WP-2214's inventory keeps the line (row 150, "N frames dropped").
+  Fix: `follow()` reports its losses on both paths through a callback or its state, and the
+  Console reads it. One vitest case per path, with a batch whose `oldest` skips ahead.
 
 ## Non-goals
 
