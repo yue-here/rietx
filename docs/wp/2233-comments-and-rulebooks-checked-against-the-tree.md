@@ -226,10 +226,10 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
       - **Pins and diary**: pin each budget at today's bytes. WP-2009's landing re-pins it
         downward, and a cut needs no separate change. `SIZE_CAPS` and its line diary retire to
         `docs/milestones/process.md` beside the existing one.
-- [ ] Tests. Show each check failing once against a planted break: a renamed function, a
+- [x] Tests. Show each check failing once against a planted break: a renamed function, a
       deleted test file, a grown rulebook, a raise inside a content change, and a pull
       request with no base.
-- [ ] Skill: none. The skill is for driving rietx, and this changes only how the package's own
+- [x] Skill: none. The skill is for driving rietx, and this changes only how the package's own
       prose is checked.
 
 ## Acceptance
