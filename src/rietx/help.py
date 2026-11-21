@@ -466,7 +466,11 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "`gauss_strain` adds to it, because variances add under convolution. "
             "Instrument and specimen therefore stack here, and neither replaces the "
             "other. Refining U while the specimen's `gauss_strain` is also free fits "
-            "one quantity twice."
+            "one quantity twice. In TOPAS it is the first value of `TCHZ_Peak_Type`. "
+            "That macro's fourth value adds Z/cos²θ to the variance, and "
+            "Z/cos²θ = Z·tan²θ + Z, so Z adds to U and to W exactly. In GSAS-II it is "
+            "`U`, the coefficient of the Gaussian variance σ² in centidegrees², which "
+            "is this U × 10⁴/(8 ln 2)."
         ),
         unit="deg² 2θ", default="0.0",
         typical="0-0.05 on a laboratory diffractometer",
@@ -482,7 +486,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "both widths at every reflection. W and X are bounded below and cannot go "
             "negative. The width curve has its "
             "minimum at tanθ = −V/(2U). No specimen term adds to V, so V belongs to the "
-            "instrument. A phase's `gauss_strain` adds to U instead."
+            "instrument. A phase's `gauss_strain` adds to U instead. In TOPAS it is the "
+            "second value of `TCHZ_Peak_Type`. In GSAS-II it is `V`, in the variance's "
+            "centidegrees², this V × 10⁴/(8 ln 2)."
         ),
         unit="deg² 2θ", default="0.0",
         typical="−0.05 to 0",
@@ -495,7 +501,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "pattern would have at zero angle. Its lower bound is a small positive "
             "variance (1e-8 deg²) and is not 0. Below that clamp the width stops "
             "responding to U, V and W, and the fit stalls. Freeing W together with a "
-            "free `gauss_size` fits the same constant twice at low angle."
+            "free `gauss_size` fits the same constant twice at low angle. In TOPAS it is "
+            "the third value of `TCHZ_Peak_Type` plus its fourth, the Z of a Z/cos²θ "
+            "term, which adds to U and W alike. In GSAS-II it is `W`, in the variance's "
+            "centidegrees², this W × 10⁴/(8 ln 2)."
         ),
         unit="deg² 2θ", default="0.001",
         typical="0.001-0.02 on a laboratory diffractometer",
@@ -507,7 +516,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "The 1/cosθ term of the Lorentzian FWHM, `Γ_L = X/cosθ + Y·tanθ`. The "
             "1/cosθ shape is Scherrer size broadening. A phase's `lor_size` adds to X, "
             "because Lorentzian FWHMs add under convolution. GSAS and FullProf swap the "
-            "X and Y labels. Identify the term by its shape: 1/cosθ is size broadening."
+            "X and Y labels. Identify the term by its shape: 1/cosθ is size broadening. "
+            "In TOPAS it is the sixth value of `TCHZ_Peak_Type`, which the TOPAS "
+            "formula calls Y. In GSAS-II it is `X`, in centidegrees, this X × 100."
         ),
         unit="deg 2θ", default="0.001",
         typical="0.001-0.05 on a laboratory diffractometer",
@@ -521,7 +532,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "block replaces the specimen part of this term with an hkl-dependent width. "
             "It locks `lor_strain`, and the width then reads zero for it whatever value "
             "it stores. The instrumental Y stays as it was. Y can go "
-            "negative while X keeps the total width at or above zero."
+            "negative while X keeps the total width at or above zero. In TOPAS it is "
+            "the fifth value of `TCHZ_Peak_Type`, which the TOPAS formula calls X. In "
+            "GSAS-II it is `Y`, in centidegrees, this Y × 100."
         ),
         unit="deg 2θ", default="0.0",
         typical="0-0.05 on a laboratory diffractometer",

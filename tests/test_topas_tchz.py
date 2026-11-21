@@ -1,0 +1,401 @@
+"""A TOPAS ``TCHZ_Peak_Type(…)`` profile and radius read into an ``Instrument``
+(WP-1455, issue #732): ``topas.read_topas_inp`` then ``topas.to_instrument``.
+
+Two kinds of evidence. What TOPAS **computes** from a TCHZ call is checked
+against TOPAS-64 v6's own Y_calc at zero cycles for two inputs of ours
+(``tests/data/topas_tchz_nacl_xray_run1[01]*``, the case of
+``tests/topas_export_cases.py::case_nacl_xray`` with the profile written as a
+TCHZ call): the profile this reader builds must reproduce it, and the reading
+that follows the Technical Reference's printed signature must not. The slot-4
+fold into U and W is algebra, so it is checked as an identity across the 2θ
+axis, to 1e-12.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+import rietx as rx
+from rietx.io.projects import topas
+from rietx.model.profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
+from tests.topas_export_cases import case_nacl_xray
+
+DATA = Path(__file__).parent / "data"
+#: As ``test_topas_whole_input.ORACLE_TOL``: TOPAS against rietx at zero
+#: cycles, the largest |ΔY| over the largest Y. Measured 2.1e-3 (run 10) and
+#: 2.5e-3 (run 11), the case's own floor (2.4e-3 with the pv equations).
+ORACLE_TOL = 1e-2
+RUN10 = (DATA / "topas_tchz_nacl_xray_run10.inp").read_text(encoding="utf-8")
+TCHZ_LINE = re.compile(r"TCHZ_Peak_Type\([^)]*\)")
+
+
+def _inp(tmp_path, text, name="case.inp"):
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    return topas.read_topas_inp(path)
+
+
+def _with_call(tmp_path, call, extra=""):
+    """Run 10's input with its TCHZ call replaced, and ``extra`` cards added to
+    the dataset."""
+    text = TCHZ_LINE.sub(call, RUN10)
+    if extra:
+        text = text.replace("  convolution_step 3\n", f"  convolution_step 3\n{extra}\n")
+    return _inp(tmp_path, text)
+
+
+def _oracle(run, instrument):
+    ref, _ = case_nacl_xray()
+    x, y_topas = np.loadtxt(DATA / f"topas_tchz_nacl_xray_run{run}_ycalc.txt",
+                            unpack=True)
+    y = np.asarray(rx.Refinement(ref.fitted_structure, instrument,
+                                 history=False).predict(x))
+    return float(np.abs(y_topas - y).max() / y.max())
+
+
+def _read(run):
+    ref, _ = case_nacl_xray()
+    model = topas.read_topas_inp(DATA / f"topas_tchz_nacl_xray_run{run}.inp")
+    return model, topas.to_instrument(model, ref.fitted_instrument)
+
+
+def _signature_reading(instrument, values):
+    """The Technical Reference's printed ``(u, v, w, x, y, z)`` taken by
+    position, with its formula's letters: slot 4 the tanθ Lorentzian, slot 5
+    the 1/cosθ one, slot 6 the Z/cos²θ Gaussian. TOPAS 6 does not do this."""
+    out = instrument.model_copy(deep=True)
+    s1, s2, s3, s4, s5, s6 = values
+    for name, value in dict(u=s1 + s6, v=s2, w=s3 + s6, y=s4, x=s5).items():
+        param = getattr(out.profile, name)
+        param.max = max(param.max, value + 1.0)
+        param.value = value
+    return out
+
+
+@pytest.mark.parametrize("run", [10, 11])
+def test_the_tchz_profile_is_what_topas_computes(run):
+    """Slots 1-3 → U, V, W; slot 4 (Z/cos²θ) → U and W; slot 5 → Y (tanθ);
+    slot 6 → X (1/cosθ), measured against TOPAS 6's own Y_calc. Run 11 swaps
+    slots 4 and 5, so a reading that mixed them up passes at most one run."""
+    model, inst = _read(run)
+    err = _oracle(run, inst)
+    assert err < ORACLE_TOL
+    # positive arm: the printed signature's order is not what TOPAS computes
+    arm = _oracle(run, _signature_reading(inst, model.tchz[0].values))
+    assert arm > 4 * err          # measured 0.41 and 0.087 against 2.1e-3, 2.5e-3
+
+
+def test_the_swap_arm_moves_the_answer():
+    """Each run's own slots match its own Y_calc; run 10's slots do not match
+    run 11's, so the comparison can see slots 4 and 5."""
+    _, inst10 = _read(10)
+    _, inst11 = _read(11)
+    own = _oracle(11, inst11)
+    assert _oracle(11, inst10) > 4 * own
+
+
+def test_the_slots_map_by_position():
+    model, inst = _read(10)
+    (call,) = model.tchz
+    assert call.phase == "NaCl"
+    assert call.values == (0.004, -0.002, 0.003, 0.03, 0.008, 0.0015)
+    assert call.vary == (False,) * 6
+    got = {k: getattr(inst.profile, k).value for k in "uvwxy"}
+    assert got == pytest.approx(dict(u=0.034, v=-0.002, w=0.033, x=0.0015, y=0.008),
+                                rel=0, abs=1e-15)
+    assert not any(getattr(inst.profile, k).vary for k in "uvwxy")
+    # the names are user labels: renaming the pairs moves nothing
+    assert topas.tchz_widths(call.values) == pytest.approx(got, abs=1e-15)
+
+
+def test_names_are_labels_and_flags_are_read(tmp_path):
+    model = _with_call(tmp_path, "TCHZ_Peak_Type(pkz, 0.004, @, -0.002, !pkw, 0.003, "
+                                 "pkx, 0.03, pky, 0.008`_0.0001, pku, 0.0015)")
+    (call,) = model.tchz
+    assert call.values == (0.004, -0.002, 0.003, 0.03, 0.008, 0.0015)
+    assert call.vary == (True, True, False, True, True, True)
+    ref, _ = case_nacl_xray()
+    inst = topas.to_instrument(model, ref.fitted_instrument)
+    assert inst.profile.u.value == pytest.approx(0.034)
+    assert inst.profile.x.value == pytest.approx(0.0015)
+    assert not inst.profile.u.vary     # a calibration reads frozen
+
+
+def test_a_slot_may_name_a_declared_parameter(tmp_path):
+    text = TCHZ_LINE.sub("TCHZ_Peak_Type(!pku, u0, !pkv, -0.002, !pkw, 0.003, "
+                         "!pkx, 0.03, !pky, 0.008, !pkz, 0.0015)", RUN10)
+    text = text.replace("iters 0\n", "iters 0\nprm !u0 0.004\n")
+    model = _inp(tmp_path, text)
+    assert model.tchz[0].values[0] == pytest.approx(0.004)
+
+
+def test_the_z_fold_is_exact(tmp_path):
+    """Z/cos²θ = Z·tan²θ + Z: Γ_G and Γ_L by TOPAS's TCHZ formula and by
+    rietx's Caglioti and Lorentzian laws agree across 5-150° 2θ."""
+    s = (0.012, -0.007, 0.004, 0.0021, 0.013, 0.0042)
+    model = _with_call(tmp_path, "TCHZ_Peak_Type(!a, {}, !b, {}, !c, {}, !d, {}, "
+                                 "!e, {}, !f, {})".format(*s))
+    ref, _ = case_nacl_xray()
+    inst = topas.to_instrument(model, ref.fitted_instrument)
+    p = inst.profile
+    theta = np.linspace(5.0, 150.0, 2901) / 2.0
+    t, c = np.tan(np.radians(theta)), np.cos(np.radians(theta))
+    topas_g = np.sqrt(s[0] * t * t + s[1] * t + s[2] + s[3] / (c * c))
+    topas_l = s[4] * t + s[5] / c
+    rietx_g = gaussian_fwhm(theta, p.u.value, p.v.value, p.w.value)
+    rietx_l = lorentzian_fwhm(theta, p.x.value, p.y.value)
+    assert np.max(np.abs(rietx_g / topas_g - 1.0)) < 1e-12
+    assert np.max(np.abs(rietx_l / topas_l - 1.0)) < 1e-12
+    # positive arm: the same values with Z dropped are not the same widths
+    dropped = gaussian_fwhm(theta, s[0], s[1], s[2])
+    assert np.max(np.abs(dropped / topas_g - 1.0)) > 1e-3
+
+
+def test_the_secondary_radius_is_read(tmp_path):
+    ref, _ = case_nacl_xray()
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", "Rp 217.5 Rs 200"))
+    assert model.secondary_radii == [200.0]
+    inst = topas.to_instrument(model, ref.fitted_instrument)
+    assert inst.geometry.goniometer_radius_mm == 200.0
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", "Radius(240)"))
+    assert model.goniometer_radius_mm == 240.0
+    # an equation using Rs is not a statement of it
+    assert "/217.5;" in RUN10
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", "").replace(
+        "/217.5;", "/Rs;"))
+    assert model.secondary_radii == [] and model.goniometer_radius_mm is None
+    inst = topas.to_instrument(model, ref.fitted_instrument)
+    assert (inst.geometry.goniometer_radius_mm
+            == ref.fitted_instrument.geometry.goniometer_radius_mm)
+
+
+@pytest.mark.parametrize("cards, match", [
+    ("Rs 200\n  Radius(217.5)", "secondary radius two ways"),
+    ("Radius(217.5, 200)", "not read as one secondary radius"),
+    ("Radius(rr)", "not read as one secondary radius"),
+    ("Rs -5", "not a radius"),
+])
+def test_a_radius_stated_two_ways_or_not_a_radius_is_refused(tmp_path, cards, match):
+    ref, _ = case_nacl_xray()
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
+    assert model.goniometer_radius_mm is None
+    with pytest.raises(ValueError, match=match):
+        topas.to_instrument(model, ref.fitted_instrument)
+
+
+@pytest.mark.parametrize("cards, radii", [
+    ("Rp 217.5 Rs\n    200", [200.0]),                 # a line break is space
+    ("Radius(200.)", [200.0]),
+    ("Radius(2 * 100)", [200.0]),
+    # an equation using Rs, with a term after it, states nothing
+    ("Rs 200\n  th2_offset = -2*Rad*(0.05)*Cos(Th)/Rs -0.002;", [200.0]),
+])
+def test_the_secondary_radius_spellings(tmp_path, cards, radii):
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
+    assert model.secondary_radii == radii
+    assert model.goniometer_radius_mm == radii[0]
+
+
+@pytest.mark.parametrize("call, match", [
+    ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, 0.03, !e, 0.008)",
+     "10 arguments"),
+    ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, -0.01, !e, 0.008, "
+     "!f, 0.0015)", "W = slot 3 \\+ slot 4"),
+    ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, 0.0, !e, 0.008, "
+     "!f, -0.001)", "X = slot 6"),
+    ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, 0.0, !e, -0.05, "
+     "!f, 0.001)", "negative above 2θ"),
+    ("TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.003, !d, 0.0, !e, nope, "
+     "!f, 0.001)", "slot 5 value 'nope'"),
+    ("TCHZ_Peak_Type(!a, 1e999, !b, -0.002, !c, 0.003, !d, 0.0, !e, 0.008, "
+     "!f, 0.001)", "slot 1 value '1e999' does not resolve to a finite"),
+])
+def test_a_profile_this_package_cannot_hold_is_refused(tmp_path, call, match):
+    model = _with_call(tmp_path, call)
+    # the structure import does not depend on the profile
+    assert topas.to_structure(model).phases[0].name == "NaCl"
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match=match) as info:
+        topas.to_instrument(model, ref.fitted_instrument)
+    assert "case.inp" in str(info.value)
+
+
+def test_no_call_is_refused(tmp_path):
+    model = _with_call(tmp_path, "peak_type pv")
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="states no TCHZ_Peak_Type"):
+        topas.to_instrument(model, ref.fitted_instrument)
+
+
+def test_two_phases_stating_two_profiles_need_a_choice(tmp_path):
+    second = RUN10[RUN10.index("str\n"):].replace('"NaCl"', '"KCl"').replace(
+        "!pkx, 0.03", "!pkx, 0.02")
+    text = RUN10.replace("Out_X_Ycalc", "' Out_X_Ycalc") + second
+    model = _inp(tmp_path, text)
+    assert [c.phase for c in model.tchz] == ["NaCl", "KCl"]
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="2 different profiles .*phase="):
+        topas.to_instrument(model, ref.fitted_instrument)
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="KCl")
+    assert inst.profile.u.value == pytest.approx(0.004 + 0.02)
+    with pytest.raises(ValueError, match="phase='LiF' names no phase"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
+
+
+def test_a_dataset_level_call_applies_to_every_phase(tmp_path):
+    call = TCHZ_LINE.search(RUN10).group(0)
+    text = RUN10.replace(f"  {call}\n", "").replace(
+        "  convolution_step 3\n", f"  convolution_step 3\n  {call}\n")
+    model = _inp(tmp_path, text)
+    assert [c.phase for c in model.tchz] == [""]
+    ref, _ = case_nacl_xray()
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="NaCl")
+    assert inst.profile.w.value == pytest.approx(0.033)
+
+
+def test_each_profile_entry_names_its_topas_and_gsas2_equivalent():
+    """The help entries carry the translation a session otherwise reads the
+    source for: the TCHZ slot by position, the GSAS-II letter, and on U and W
+    how TOPAS's Z folds in."""
+    from rietx.help import PARAMETER_HELP
+
+    slots = dict(u="first", v="second", w="third", x="sixth", y="fifth")
+    for name, slot in slots.items():
+        text = PARAMETER_HELP[f"instrument.profile.{name}"].description
+        assert f"{slot} value of `TCHZ_Peak_Type`" in text, name
+        assert f"In GSAS-II it is `{name.upper()}`" in text, name
+    for name in ("u", "w"):
+        assert "Z/cos²θ" in PARAMETER_HELP[f"instrument.profile.{name}"].description
+    # the slots the entries name are the ones the reader maps
+    for name, slot in slots.items():
+        index = ["first", "second", "third", "fourth", "fifth", "sixth"].index(slot)
+        assert name in topas.TCHZ_SLOT_TERMS[index]
+
+
+def test_a_call_in_a_pawley_phase_is_that_phase_s(tmp_path):
+    """An ``hkl_Is`` phase is a phase too: its call is selectable by its
+    name, and is not a dataset-level call applying to every phase."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    pawley = ('hkl_Is\n  phase_name "LiF"\n  space_group "F m -3 m"\n'
+              '  a 4.03 b 4.03 c 4.03 al 90 be 90 ga 90\n  '
+              + call.replace("0.03", "0.02") + "\n")
+    model = _inp(tmp_path, RUN10 + pawley)
+    assert [c.phase for c in model.tchz] == ["NaCl", "LiF"]
+    assert [c.dataset for c in model.tchz] == [0, 0]
+    ref, _ = case_nacl_xray()
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
+    assert inst.profile.u.value == pytest.approx(0.024)
+
+
+def test_a_phase_call_against_a_dataset_level_one_is_refused(tmp_path):
+    call = TCHZ_LINE.search(RUN10).group(0)
+    text = RUN10.replace("  convolution_step 3\n", "  convolution_step 3\n  "
+                         + call.replace("0.03", "0.02") + "\n")
+    model = _inp(tmp_path, text)
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="The call in phase 'NaCl' and a dataset-level"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NaCl")
+
+
+def test_the_caller_box_opens_no_further_than_the_value(tmp_path):
+    """A caller's own box narrower than the file's value widens to take it;
+    W and X never open past their floors, and the caller's copy is untouched."""
+    model = _with_call(tmp_path, "TCHZ_Peak_Type(!a, 0.004, !b, -0.002, !c, 0.0, "
+                                 "!d, 0.0, !e, 0.008, !f, 0.0)")
+    ref, _ = case_nacl_xray()
+    base = ref.fitted_instrument.model_copy(deep=True)
+    base.profile.x.value = 0.01
+    base.profile.x.min = 0.002
+    base.profile.w.value = 0.01
+    base.profile.w.min = 0.005
+    inst = topas.to_instrument(model, base)
+    assert inst.profile.x.min == 0.0 and inst.profile.x.value == 0.0
+    assert inst.profile.w.min == inst.profile.w.value > 0.0
+    assert base.profile.x.min == 0.002 and base.profile.x.value == 0.01
+
+
+def _dataset_level(text):
+    """``text`` with run 10's call moved from the phase to the dataset."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    return text.replace(f"  {call}\n", "").replace(
+        "  convolution_step 3\n", f"  convolution_step 3\n  {call}\n")
+
+
+def _second_dataset(radius="Rs 240", call=None):
+    call = call or TCHZ_LINE.search(RUN10).group(0).replace("0.03", "0.02")
+    return f'xdd "b.xye" xye_format\n  {radius}\n  {call}\n'
+
+
+def test_two_datasets_are_chosen_by_dataset_not_phase(tmp_path):
+    """Two ``xdd`` blocks, each with its own dataset-level call and radius
+    (review of #1646): the refusal names the datasets and ``dataset=``, and
+    ``dataset=`` or a phase of one dataset reads that dataset's profile and
+    radius. ``phase=`` was the only advice, and it could not help."""
+    model = _inp(tmp_path, _dataset_level(RUN10) + _second_dataset())
+    assert [(c.phase, c.dataset) for c in model.tchz] == [("", 0), ("", 1)]
+    assert model.secondary_radii == [217.5, 240.0]
+    assert model.secondary_radius_datasets == [0, 1]
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="datasets 0, 1.*pass dataset=") as info:
+        topas.to_instrument(model, ref.fitted_instrument)
+    assert "phase=" not in str(info.value)
+    for kw, u, radius in ((dict(dataset=0), 0.034, 217.5),
+                          (dict(phase="NaCl"), 0.034, 217.5),
+                          (dict(dataset=1), 0.024, 240.0)):
+        inst = topas.to_instrument(model, ref.fitted_instrument, **kw)
+        assert inst.profile.u.value == pytest.approx(u), kw
+        assert inst.geometry.goniometer_radius_mm == radius, kw
+    with pytest.raises(ValueError, match="opens 2 dataset"):
+        topas.to_instrument(model, ref.fitted_instrument, dataset=2)
+    with pytest.raises(ValueError, match="'NaCl' sits in dataset"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NaCl", dataset=1)
+
+
+def test_two_datasets_radii_are_not_one_radius_stated_two_ways(tmp_path):
+    """One profile, and a radius per dataset: the refusal says so and names
+    both ways past it, rather than "states the secondary radius two ways"."""
+    call = TCHZ_LINE.search(RUN10).group(0)
+    model = _inp(tmp_path, _dataset_level(RUN10) + _second_dataset(call=call))
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="different secondary radius in datasets "
+                                         "0, 1 .*dataset=.*radius_mm="):
+        topas.to_instrument(model, ref.fitted_instrument)
+    inst = topas.to_instrument(model, ref.fitted_instrument, dataset=1)
+    assert inst.geometry.goniometer_radius_mm == 240.0
+
+
+def test_a_phase_that_names_no_phase_is_refused(tmp_path):
+    """With only a dataset-level call, a ``phase=`` naming no phase returned
+    that call's profile without complaint (review of #1646). A Pawley phase
+    with no call of its own is still a phase."""
+    pawley = ('hkl_Is\n  phase_name "LiF"\n  space_group "F m -3 m"\n'
+              '  a 4.03 b 4.03 c 4.03 al 90 be 90 ga 90\n')
+    model = _inp(tmp_path, _dataset_level(RUN10) + pawley)
+    assert model.phase_datasets == {"NaCl": (0,), "LiF": (0,)}
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="phase='NoSuchPhase' names no phase "
+                                         "of the file .*'NaCl', 'LiF'"):
+        topas.to_instrument(model, ref.fitted_instrument, phase="NoSuchPhase")
+    inst = topas.to_instrument(model, ref.fitted_instrument, phase="LiF")
+    assert inst.profile.u.value == pytest.approx(0.034)
+
+
+@pytest.mark.parametrize("cards", ["Radius(217.5, 200)", "Rs 200\n  Radius(217.5)"])
+def test_radius_mm_reads_the_profile_past_a_radius_refusal(tmp_path, cards):
+    """A radius this reader refuses blocked the whole profile, and the advice
+    to set the radius on the instrument could not be followed: there was no
+    instrument (review of #1646). The refusal names ``radius_mm=``, and that
+    reads the profile with the caller's radius."""
+    model = _inp(tmp_path, RUN10.replace("Rp 217.5 Rs 217.5", cards))
+    ref, _ = case_nacl_xray()
+    with pytest.raises(ValueError, match="Pass radius_mm="):
+        topas.to_instrument(model, ref.fitted_instrument)
+    inst = topas.to_instrument(model, ref.fitted_instrument, radius_mm=200)
+    assert inst.geometry.goniometer_radius_mm == 200.0
+    assert inst.profile.u.value == pytest.approx(0.034)
+    with pytest.raises(ValueError, match="radius_mm=-1 is not a radius"):
+        topas.to_instrument(model, ref.fitted_instrument, radius_mm=-1)

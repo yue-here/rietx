@@ -10,7 +10,7 @@ Most of them are built from the code that owns their facts, so they match the ve
 - [The instrument](instrument.md) gives the fields of `Instrument`: its constructors, the X-ray, neutron and time-of-flight sources, the geometry, the peak width, the background and declared extra peaks.
 - [Pattern files](pattern-files.md) gives the formats `read_pattern` opens, where each takes its esds, and what each reader repairs, reports or refuses, time-of-flight banks included.
 - [Structure files](structure-files.md) gives what a CIF and a magnetic CIF read and write, and how a magnetic phase crosses to and from TOPAS and FullProf.
-- [Instrument files](instrument-files.md) gives the instrument profile, the GSAS-I `.prm` and `.iparm` and the GSAS-II `.instprm`, with what each reader converts and refuses.
+- [Instrument files](instrument-files.md) gives the instrument profile, the GSAS-I `.prm` and `.iparm`, the GSAS-II `.instprm` and a TOPAS `TCHZ_Peak_Type` profile, with what each reader converts and refuses.
 - [Refinement files from other programs](foreign-files.md) gives what `read_project_model` reads from a GSAS-II, GSAS, TOPAS or FullProf refinement, how it recognises each format, and which TOPAS constructs it carries.
 - [Files written for other programs](foreign-writers.md) gives what the TOPAS, FullProf, GSAS and GSAS-II writers put in a file, and what each refuses.
 - [Models of other programs' files](foreign-models.md) gives the fields of `TopasModel`, `FullProfModel`, `GsasModel` and `Gsas2Model`.

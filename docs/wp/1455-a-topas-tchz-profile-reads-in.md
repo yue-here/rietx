@@ -1,9 +1,8 @@
 # WP-1455 — a TOPAS TCHZ profile reads in
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-17 — `TCHZ_Peak_Type` and `Rs` read into an `Instrument` (PR #1646); three measurements left are issue #1650
 Track: Coming from another code
 Depends on: — (1433 soft: the `.inp` grammar the reader still refuses)
-Priority: P3 2026-09-24 — a hand translation works; it cost an agent six source reads, and nothing checks the letters
 
 ## Goal
 
@@ -63,61 +62,34 @@ named `prm` lines, which is what this session had. The fragment has no fixed
 grammar, since the names are the user's. So the first cut is probably the
 macro, with the fragment left to the caller and the help entries.
 
-### Inherited
+### The measurement and the two reviews (folded from Inherited, 2026-11-17)
 
-**From the 2026-09-25 review of a second session on the same series.** A
-second agent session read the same instrument file and made the same
-translation. It folded Z into U and W, set the file's 1/cosθ Lorentzian term
-as rietx X and dropped the tanθ one as about zero. It replaced the Gaussian
-terms with (0, 0, 10⁻⁶), because the folded variance is non-positive below
-2θ ≈ 62°, which covers the whole fitted range. It got there with one
-`help_for` call over the profile paths, against the first session's six source
-reads. It also took `Rs` as the goniometer radius. `CAPILLARY_OFFSET_UNAVAILABLE`
-then fired on 0 of 48 final results, against 48 of 48 in the first session.
-That is consistent with the guess about `Rs` above, and it does not verify it.
-Two sessions have now zeroed the Gaussian by hand, so what TOPAS does with a
-negative variance is still the open question.
-
-- **2026-10-08, from the issue triage (issue #732, step 3): the reader half
-  of a whole TOPAS input.** #732 asks for `read_topas_inp(...).to_instrument()`
-  for the parts the writer states, so that an instrument can round-trip
-  through a `.inp` as it already does through `.instprm`, `.prm` and the
-  profile JSON. This WP's task "Read `TCHZ_Peak_Type(…)` from an `.inp` into
-  an `Instrument`" is that reader. The writer half went to WP-1911 with the
-  rest of the issue. *Checked against the tree at 5d1f5f67*: `to_structure`
-  builds no `Instrument`. `read_gsas_prm`, `read_gsas2_instprm` and
-  `load_instrument_profile` each return one. Two facts move the work here:
-  - The contributor reports measuring the X ↔ Y letter swap against TOPAS 6
-    (#732's "M3"). That is the measurement this WP's first task asks for.
-    The run's output is not in the tree, so it is evidence to ask for, not
-    a constant to adopt.
-  - PR #815 (open) writes the profile as `peak_type pv` with `pv_fwhm` and
-    `pv_lor` equations, never as `TCHZ_Peak_Type`. A reader that reads only
-    the macro would not read back what rietx writes. The reader task should
-    say which forms it reads: the macro (what users bring), the writer's
-    equations (what a round trip needs), or both.
-  - *2026-10-11, from the issue triage (#732):* the first bullet is
-    superseded. The reporter wrote at 07:41 that "M3" was a reading of the
-    TCHZ macro and no TOPAS run, so it cannot be an oracle under their
-    clean-room rule. At 08:09 they posted a black-box TOPAS 6 run instead:
-    `case_nacl_xray` from #815, written with `TCHZ_Peak_Type`, every value
-    distinct and fixed, Y_calc at zero cycles, LP canary 18/18. TOPAS 6
-    accepts only the 12-argument form, and by position its six value slots
-    are (u, v, w, z, x, y): slots 1-3 are Γ_G² += u tan²θ + v tanθ + w,
-    slot 4 is Γ_G² += s4/cos²θ (no rietx term; it folds into U and W),
-    slot 5 is Γ_L += s5 tanθ (`profile.y`), slot 6 is Γ_L += s6/cosθ
-    (`profile.x`), each with factor 1. Rewritten as #815's equations under
-    that reading, the runs reproduce TOPAS's Y_calc to 2.5e-9 and 1.1e-7. A
-    second run swapping slots 4 and 5 swaps the inferred map. The Technical
-    Reference's printed signature, taken by position, misses by 0.69 and
-    0.091. So a reader maps by position, never by the file's names, which
-    are user labels (`pkx` in some tutorial inputs, `pkz` in others). The
-    reporter offers the inputs, outputs with SHA-256, scripts and provenance
-    as fixtures, which is this WP's first task. No reply on the thread yet.
-    Checked against the tree at 7d9be3cb: no file under `tests/data/`
-    mentions TCHZ (the same session's X-ray extinction run is there, as
-    `topas_export_nacl_xray_ext20_ycalc.txt` from #839), and `to_structure`
-    still builds no `Instrument`.
+- **The second review (2026-09-25)** read the same instrument file and made the
+  same translation in one `help_for` call: Z folded into U and W, the file's
+  1/cosθ Lorentzian term as rietx X, the tanθ one dropped as about zero, and
+  `Rs` taken as the goniometer radius, after which
+  `CAPILLARY_OFFSET_UNAVAILABLE` fired on 0 of 48 results against 48 of 48 in
+  the first session. Both sessions zeroed the Gaussian by hand because the
+  folded W + Z was negative, so **what TOPAS does with a negative Gaussian
+  variance is still unmeasured**; the reader refuses it (Tasks, item 4).
+- **The letters are measured** (issue #732, 2026-10-08): a black-box TOPAS 6
+  run of our own `case_nacl_xray` written with `TCHZ_Peak_Type`, every value
+  distinct and fixed, `iters 0`. By position the six value slots act as (U, V,
+  W, Z, X, Y) in the formula's letters: Γ_G² += v1·tan²θ + v2·tanθ + v3 +
+  v4/cos²θ, Γ_L += v5·tanθ + v6/cosθ, each factor 1. Rewritten as `pv_fwhm`/
+  `pv_lor` equations under that reading, TOPAS reproduces its own TCHZ Y_calc
+  to 2.5e-9 and 1.1e-7; the Technical Reference's printed signature
+  `(u, uv, v, vv, w, wv, x, xv, y, yv, z, zv)` by position misses by 0.69 and
+  0.091. TOPAS 6 refuses the ten-argument form. A reader maps by position,
+  never by the file's names (`pkx` in some tutorial inputs, `pkz` in others).
+  The run's inputs and outputs are this WP's fixtures
+  (`tests/data/topas_tchz_nacl_xray_run1[01]*`, README rows); the report is in
+  the maintainer-local planning tree.
+- **#732's reader half is this WP; its writer half is WP-1911.** #815 writes
+  the profile as `peak_type pv` with `pv_fwhm`/`pv_lor` equations, so this
+  reader does not read back what rietx writes; it reads the macro, which is
+  what users bring. Reading the writer's equations back is left to WP-1911's
+  round trip.
 
 ## Non-goals
 
@@ -127,22 +99,59 @@ negative variance is still the open question.
 
 ## Tasks
 
-- [ ] Measure the letters and units against TOPAS's own output. Archive
+- [x] Measure the letters and units against TOPAS's own output. Archive
       file 8 in the private corpus map is a TCHZ `.inp`; cite it by number
       (WP-1450). Where the archive holds no TOPAS output, say so and measure
       against the published TCHZ definition instead.
-- [ ] Verify what `Rs` means against the TOPAS Technical Reference, and read
+      *Done 2026-11-17 against TOPAS 6's own output, a better bar than either:
+      the #732 black-box runs of our own synthetic case (Context, the
+      measurement), committed as fixtures with README rows. Archive file 8 was
+      not needed: its own TOPAS output would measure the same slots on private
+      numbers, and a synthetic input can be shipped.*
+- [x] Verify what `Rs` means against the TOPAS Technical Reference, and read
       it into `goniometer_radius_mm` if it is that radius.
-- [ ] Help entries: each `instrument.profile.*` entry names its TOPAS and
+      *Done: the v6 TR (2015) names `Rs` the secondary radius (§ 2.11, p. 15;
+      keyword `[Rp #] [Rs #]`, p. 139, default 217.5 mm) and divides a
+      specimen displacement by it (`th2_offset = -2 Rad (c) Cos(Th) / Rs;`,
+      p. 144), which is what `goniometer_radius_mm` does. Read from `Rs`,
+      `Radius(r)` and `Radius(r, r)` into `TopasModel.secondary_radii`; one
+      value is the radius, two different ones are refused by `to_instrument`.
+      `Radius(a, b)` with a ≠ b is not read: its printed order is
+      `(rp, rs)`, but the TCHZ macro's printed order proved wrong, and no run
+      measures this one (`TopasModel.radius_unordered`). The old reader took
+      `Radius`'s first argument, which is `Rp` by the printed order.*
+- [x] Help entries: each `instrument.profile.*` entry names its TOPAS and
       GSAS-II equivalent, and U and W say how a Z term folds into them.
       `tests/test_help.py` crosses the vocabulary both ways.
-- [ ] Read `TCHZ_Peak_Type(…)` from an `.inp` into an `Instrument`, beside
+      *Done: the TCHZ slot by position and the GSAS-II letter with its unit
+      factor (`instprm_factor`), pinned against `TCHZ_SLOT_TERMS` by
+      `test_topas_tchz.py::test_each_profile_entry_names_its_topas_and_gsas2_equivalent`.*
+- [x] Read `TCHZ_Peak_Type(…)` from an `.inp` into an `Instrument`, beside
       the GSAS readers or through `read_topas_inp`. Decide which, and write it
       here.
-- [ ] Tests: a synthetic `.inp` with a nonzero Z round-trips to the same
+      *Decided: through `read_topas_inp`, which already parses the file's
+      symbols, blocks and phases. It records every call on `TopasModel.tchz`
+      (`TopasTCHZ`: args, six values by position, refine flags, owning phase)
+      and judges nothing, so a structure import never fails on a profile;
+      `rietx.io.projects.topas.to_instrument(model, instrument, *, phase=None)`
+      maps and refuses, beside `to_structure`. The caller's `instrument`
+      supplies the source and geometry kind (as `TopasModel.geometry` already
+      advises); the five profile terms come back `vary=False`. Refused by
+      name: no call, a call without twelve arguments, a slot that does not
+      resolve, differing calls without `phase=`, W = v3 + v4 < 0 or X < 0
+      (the GSAS-II reader's rule; TOPAS's behaviour is unmeasured), a
+      Lorentzian negative below 180°, two secondary radii. Reads the macro
+      only: the writer's `pv_fwhm`/`pv_lor` equations stay WP-1911's.*
+- [x] Tests: a synthetic `.inp` with a nonzero Z round-trips to the same
       Γ_G(θ) to 1e-12 across 5-150°. The Z fold is algebra, so this tolerance
       is exactness, not a measured spread.
-- [ ] Skill: one line in `references/api.md`'s reader list, generated.
+      *Done: `tests/test_topas_tchz.py`. Γ_G and Γ_L to 1e-12 over 2901
+      angles, Z dropped misses by > 1e-3; and against TOPAS's own Y_calc,
+      runs 10 and 11 at 2.1e-3 and 2.5e-3 with the signature-order arm at
+      0.41 and 0.087, and run 10's slots against run 11 missing.*
+- [x] Skill: one line in `references/api.md`'s reader list, generated.
+      *Done in `api-io.md`, where the readers moved: one sentence in the
+      instrument-files row and `to_instrument`'s generated entry (+571 B).*
 
 ## Acceptance
 
@@ -151,7 +160,7 @@ A TCHZ `.inp` reads to an `Instrument` whose Γ_G and Γ_L match the bar task
 definition otherwise. The WP says which bar was used.
 
 ```sh
-.venv/bin/python -m pytest tests/test_help.py tests/test_projects_topas.py -q
+.venv/bin/python -m pytest tests/test_help.py tests/test_projects_topas.py tests/test_topas_tchz.py -q
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
 ```
@@ -166,6 +175,64 @@ definition otherwise. The WP says which bar was used.
   (the diagnostic flood that hid the radius finding).
 
 ## Handover log
+
+- **2026-11-17** — closed. A TOPAS input that states its instrument profile
+  as one `TCHZ_Peak_Type(…)` call now reads into an `Instrument` with no hand
+  translation: the six values map by the position TOPAS 6 actually computes,
+  the Z/cos²θ term folds exactly into U and W, and the secondary radius `Rs`
+  becomes the goniometer radius. Two agent sessions spent their effort on
+  that translation, and the printed macro signature, which a careful reader
+  would have trusted, is wrong by position; the reader follows TOPAS's own
+  output instead. What TOPAS does with a negative Gaussian variance, which both
+  sessions hit, is still unmeasured, so that profile is refused rather than
+  clamped.
+
+  *Done* (ghostshift runner, PR #1646): fixtures 37bf551ee (two black-box TOPAS
+  6 runs from #732, inputs and zero-cycle Y_calc with sha256 and README rows);
+  reader, help and manual 68dcc6645; skill index 5820eaf5d; review fixes
+  f6ad0af01. `read_topas_inp` records every call (`TopasModel.tchz`,
+  `TopasTCHZ`) and every secondary radius (`secondary_radii`,
+  `radius_unread`) and judges nothing; `topas.to_instrument(model, instrument,
+  *, phase=None)` maps and refuses. The caller's instrument supplies the
+  source and geometry kind. `goniometer_radius_mm` changed meaning: it was
+  `Radius(…)`'s first argument, which is `Rp` by the printed order, and is now
+  the one positive secondary radius the file states (`Rs`, `Radius(r)`,
+  `Radius(r, r)`). A file with only `Rp 217.5 Rs 217.5` now reads 217.5 where
+  it read `None`.
+  lanes: keep fixtures ~6 · keep reader ~25 · keep help ~4 · keep tests ~10 ·
+  keep skill ~4 (no lane dispatched; context under 150K at each start).
+  *Review*: a read-only subagent in the worktree (in place of `/code-review`,
+  which a runner may not run) found seven problems, all fixed in f6ad0af01
+  with eleven new cases, each failing on the previous reader: an `Rs` inside
+  an equation read as a radius (`/Rs -0.002;` gave −0.002); `Rs` before a line
+  break missed; a non-positive radius accepted; a `Radius(…)` call with an
+  equation or `200.` silently dropped; a caller's narrower box widened below
+  the W and X floors; a call in an `hkl_Is`/`xo_Is` phase treated as dataset
+  level, so `phase=` could not select it; a non-finite slot accepted. Nothing
+  declined. No audit row moved (`tests.audit_delta`), no heuristic added, so no
+  generality judge.
+  *Measured* (`[dev]` venv, darwin/arm64 unless said): rietx `predict()`
+  against TOPAS's own Y_calc 2.1e-3 (run 10) and 2.5e-3 (run 11), the case's
+  floor; the printed signature's order 0.41 and 0.087 (largest |ΔY| over the
+  largest Y of that reading); run 10's slots against run 11 missing; Γ_G and
+  Γ_L by the TCHZ formula and by rietx's laws equal to 1e-12 over 5-150°, Z
+  dropped > 1e-3. `tests/test_topas_tchz.py`: 29 passed, 3.9 s. The workstation (Linux
+  x86_64, the workstation's rietx-py312 venv with the tree on PYTHONPATH),
+  f6ad0af01, before the manual fix: canary gs1455c (the touched files + audit_table, help, skill,
+  docs_consistency, manual_api, `-n 4`) 1042 passed in 36 s, 435 MB, 230 % on
+  4 cores; fast gs1455f `1 failed, 14879 passed, 280 skipped, 32 xfailed in 663.33s` (5.6 GB, 744 % on 8 cores; a
+  co-tenant on a loaded workstation). The one failure was mine: bold in the new manual
+  section, which `test_manual.py::test_the_manual_keeps_its_register` forbids, fixed in 553007390
+  (`tests/test_manual.py` then 65 passed on the Mac). No base run was made for a count
+  delta; the new file adds 29 tests. Vale (the CI step, whole manual) 0
+  errors; `tests.reader_output` exit 0, unchanged; ruff clean.
+  *Gotchas*: TOPAS names the tanθ Lorentzian term X and the 1/cosθ one Y, the
+  reverse of rietx's letters; the help entries now say which slot is which.
+  The names in a TCHZ call are user labels (`pkx`/`pkz` for the fourth pair).
+  Next: issue #1650 holds the three measurements left (a negative Gaussian
+  variance, `Radius(a, b)`'s order, building the source from the file);
+  reading back the writer's `pv_fwhm`/`pv_lor` equations went to WP-1911's
+  Inherited.
 
 - **2026-09-24** — created from the review of an agent session on a private
   series. The readers and the absent TCHZ handling were checked against the

@@ -1,0 +1,45 @@
+' Written by rietx.io.projects.topas.write_topas_inp
+' scale: TOPAS convention (LP_Factor, |F|^2 in electrons^2) = rietx Phase.scale x 0.5 (x K, measured against TOPAS 6 at K = 0.5)
+r_wp 0 r_exp 0 r_p 0 gof 0
+iters 0
+chi2_convergence_criteria 1e-07
+xdd "nacl_xray.xye" xye_format
+  Out_X_Ycalc(11_tchz_yx_ycalc.txt)
+  weighting = 1 / SigmaYobs^2;
+  Rp 217.5 Rs 217.5
+  convolution_step 3
+  bkg ! 50.0 -10.0 4.0
+  lam ymin_on_ymax 1e-06
+    la 1.0 lo 1.5405929 lh 1e-06
+    la 0.5 lo 1.5444274 lh 1e-06
+  LP_Factor(0)
+  th2_offset ! 0
+  th2_offset = -2*Rad*(0.05)*Cos(Th)/217.5;
+str
+  phase_name "NaCl"
+  space_group "F m -3 m"
+  scale ! 5e-05
+  a ! 5.6402
+  b ! 5.6402
+  c ! 5.6402
+  al ! 90.0
+  be ! 90.0
+  ga ! 90.0
+  TCHZ_Peak_Type(!pku, 0.004, !pkv, -0.002, !pkw, 0.003, !pkx, 0.008, !pky, 0.03, !pkz, 0.0015)
+  site Na x ! 0 y ! 0 z ! 0 occ Na ! 1.0 beq ! 1.1
+  site Cl x ! 0.5 y ! 0.5 z ! 0.5 occ Cl ! 1.0 beq ! 0.9
+  phase_out 11_tchz_yx_hkl.txt load out_record out_fmt out_eqn
+  {
+     "%4.0f" = H;
+     " %4.0f" = K;
+     " %4.0f" = L;
+     " %4.0f" = M;
+     " %14.8f" = D_spacing;
+     " %14.8f" = Th;
+     " %18.10e" = A01;
+     " %18.10e" = A11;
+     " %18.10e" = B01;
+     " %18.10e" = B11;
+     " %18.10e" = I_no_scale_pks;
+     " %18.10e\n" = I_after_scale_pks;
+  }
