@@ -81,9 +81,9 @@ MAGNETIC_WIDTH_PURITY = 0.05
 #: diagnostic fires.  3.0 is this package's standing significance bar
 #: (``MIN_COEF_SIGNIFICANCE`` one layer over) and the noise is *measured* —
 #: the scatter of the nuclear-only channels actually read, which the magnetic
-#: misfit under test cannot inflate (``magnetic_width_findings``; 1.13 in
-#: the version history above) — so a fit with GoF 3 is judged against its
-#: own residual rather than an assumed unit variance.
+#: misfit under test cannot inflate (``magnetic_width_findings``; the 1.13
+#: note in ``docs/contracts/report-thresholds.md``) — so a fit with GoF 3 is
+#: judged against its own residual rather than an assumed unit variance.
 MAGNETIC_WIDTH_SIGMA = 3.0
 #: Magnetic-only reflections needed before the statistic is quoted at all.
 #: Two, because one reflection's centre-vs-tails split is one number with no

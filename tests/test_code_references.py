@@ -13,7 +13,7 @@ from tests import code_references as cr
 
 
 def test_every_comment_citation_resolves():
-    """About 12 s locally, most of it importing every rietx module.  Fast tier
+    """12-14 s locally, most of it importing every rietx module.  Fast tier
     rather than ``slow``: a stale citation is written by an ordinary change,
     and the nightly is too late to name the change that wrote it."""
     misses = cr.unallowed(cr.find_misses())

@@ -364,9 +364,9 @@ class Identifiability(Base):
     a new field on an existing shape not being a new shape.  **That is no
     longer the rule.**  Since WP-1117 the only question is whether a consumer
     could *notice*, and a new field on a result is noticeable, so an addition
-    of this shape now bumps the version like any other: the comment beside
-    :data:`~rietx.schemas.common.SCHEMA_VERSION` is the changelog, and three of
-    its entries are additive defaulted fields.  Corrected here rather than
+    of this shape now bumps the version like any other: the notes for
+    :data:`~rietx.schemas.common.SCHEMA_VERSION` in ``docs/contracts/schema.md``
+    are the changelog, and three of them are additive defaulted fields.  Corrected here rather than
     deleted because this is the sentence that talked a later reader out of a
     bump it owed.
 
@@ -1241,7 +1241,7 @@ class StageResult(Base):
     #: and 0 only means this particular stage never reached one.
     #: Additive field, defaulted to 0 (the honest "never happened" state);
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
-    #: changelog entry in ``schemas/common.py``).
+    #: note in ``docs/contracts/schema.md``).
     n_degenerate_cell_probes: int = 0
     #: decompositions this stage's solve and esds repeated with LAPACK's
     #: QR-iteration driver because the divide-and-conquer driver stopped

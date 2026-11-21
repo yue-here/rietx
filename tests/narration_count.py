@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tokenize
 from collections import Counter
 
 from tests.code_references import ROOT, source_blocks
@@ -46,7 +47,7 @@ def _files_at(rev: str) -> dict[str, str]:
     for name in names:
         header_end = batch.index(b"\n", pos)
         size = int(batch[pos:header_end].split()[2])
-        out[name] = batch[header_end + 1:header_end + 1 + size].decode("utf-8")
+        out[name] = batch[header_end + 1:header_end + 1 + size].decode("utf-8", errors="replace")
         pos = header_end + 1 + size + 1
     return out
 
@@ -64,7 +65,7 @@ def count(rev: str) -> dict[str, Counter]:
         row = table.setdefault(package_of(rel), Counter())
         try:
             found = list(source_blocks(rel, source))
-        except (SyntaxError, ValueError):
+        except (SyntaxError, ValueError, tokenize.TokenError):
             row["unparsed files"] += 1
             continue
         for block in found:
