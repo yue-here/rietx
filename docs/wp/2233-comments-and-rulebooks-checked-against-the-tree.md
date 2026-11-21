@@ -170,7 +170,7 @@ are `audit_delta.py`'s pattern. History belongs in version control and decision 
 
 ## Tasks
 
-- [ ] **The version histories leave the source** (ruling 5).
+- [x] **The version histories leave the source** (ruling 5).
       - Move each of the four histories, byte for byte, to one file per contract outside
         `src`, for example `docs/contracts/schema.md`. Leave a one-line pointer above each
         constant.
