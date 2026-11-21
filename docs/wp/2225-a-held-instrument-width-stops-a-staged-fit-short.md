@@ -178,29 +178,29 @@ the three families that miss it, and on LaB₆ + cBN it drops the specimen width
 not converge in 8 rounds on the multi-phase families. The brief in the handover entry of
 2026-11-20 carries the choice that is left.
 
-### Inherited
+### The reorder's effect on the alarm pin (from WP-2036, 2026-11-20)
 
-- **From WP-2036 (2026-11-20, PR #1723): the reorder moved three standards' diagnostics, and
-  fluorite's now depend on rounding.** Bisected: #1707 alone moved the slow suite alarm pin
-  (`tests/data/suite_alarms.json`). `lines_axial` now runs before the hold freezes U, X and
-  Y, so U keeps moving through it. Measured on macOS arm64, worktree `[dev]`, against the
-  merge before #1707 (8aaaf54c3):
+Folded from `### Inherited` (PR #1723). The reorder moved three standards' diagnostics, and
+fluorite's now depend on rounding. Bisected: #1707 alone moved the slow suite alarm pin
+(`tests/data/suite_alarms.json`). `lines_axial` now runs before the hold freezes U, X and
+Y, so U keeps moving through it. Measured on macOS arm64, worktree `[dev]`, against the
+merge before #1707 (8aaaf54c3):
 
-  | Standard | What moved | Code change |
-  |---|---|---|
-  | zincite | U +0.0021 → −0.00097; Γ_G² < 0 on 658 of 7251 points, −7.5e-3 deg² at 150° | `RESOLUTION_NOT_POSITIVE` (warning) and `CONSTRAINT_ACTIVE` (info, 12 cone steps in `biso`) appear |
-  | brucite | U +0.00057 → −0.0074, total Γ_G² held positive by V | `CONSTRAINT_ACTIVE` (info, 4 cone steps) appears |
-  | fluorite | `gauss_size`, `gauss_strain` leave the floor (1.5e-5, 2.9e-5) | `FLOOR_HIT` → `COVARIANCE_DIRECTION_DISCARDED` |
+| Standard | What moved | Code change |
+|---|---|---|
+| zincite | U +0.0021 → −0.00097; Γ_G² < 0 on 658 of 7251 points, −7.5e-3 deg² at 150° | `RESOLUTION_NOT_POSITIVE` (warning) and `CONSTRAINT_ACTIVE` (info, 12 cone steps in `biso`) appear |
+| brucite | U +0.00057 → −0.0074, total Γ_G² held positive by V | `CONSTRAINT_ACTIVE` (info, 4 cone steps) appears |
+| fluorite | `gauss_size`, `gauss_strain` leave the floor (1.5e-5, 2.9e-5) | `FLOOR_HIT` → `COVARIANCE_DIRECTION_DISCARDED` |
 
-  Under 1e-14 nudges to the start W (k = 0, ±1, ±3, 7, 20) fluorite gives three code sets:
-  `COVARIANCE_DIRECTION_DISCARDED` at k = 0, `FLOOR_HIT` at five starts, neither at k = 20.
-  Rwp agrees to 7 digits and the cell to 1e-6 Å. Only the split of about 4.3e-5 between
-  `gauss_size` and `gauss_strain` moves. Before #1707 all seven starts gave one set, and
-  zincite and brucite give one set after it. So the twin split this WP's last entry names
-  now also picks which finding a reader gets on fluorite, and the suite alarm pin carries
-  the k = 0 reading, which Linux may not reproduce. A design that makes the split single
-  should leave that row stable; `tests/data/suite_alarms.json` is the check. Zincite's
-  negative instrument U is the second new fact for the options.
+Under 1e-14 nudges to the start W (k = 0, ±1, ±3, 7, 20) fluorite gives three code sets:
+`COVARIANCE_DIRECTION_DISCARDED` at k = 0, `FLOOR_HIT` at five starts, neither at k = 20.
+Rwp agrees to 7 digits and the cell to 1e-6 Å. Only the split of about 4.3e-5 between
+`gauss_size` and `gauss_strain` moves. Before #1707 all seven starts gave one set, and
+zincite and brucite give one set after it. So the twin split this WP's last entry names
+now also picks which finding a reader gets on fluorite, and the suite alarm pin carries
+the k = 0 reading, which Linux may not reproduce. A design that makes the split single
+should leave that row stable; `tests/data/suite_alarms.json` is the check. Zincite's
+negative instrument U is the second new fact for the options.
 
 ### The axial-first reorder (2026-11-19), re-measured with staged re-fits
 
@@ -464,6 +464,14 @@ no specimen width free. The earlier bar, a staged re-fit moving no reported para
   *Next*: none in this WP. A possible follow-up, not filed: rietx's own comparison and acceptance
   plans calibrate the instrument first (the brief's option 4), which first needs a standard for
   the round robin's diffractometer.
+
+  *Steward, 2026-11-21*: #1723 merged first, so this branch merged main and re-ran
+  `python -m tests.suite_alarms --write` (macOS arm64, worktree `[dev]`). The new pin differs
+  from main's only by this code's rows: `WIDTH_TWIN_HELD` on zincite, fluorite, corundum and
+  brucite, its count of 4, and warnings per result under microstructure 9.0 → 9.5 and
+  calibration 9.125 → 9.625. It equals this branch's pin before the merge. The pins are
+  reconciled. Main had added WP-2036's note under `### Inherited`; this WP is closed, so the
+  note is folded into Context as its own section.
 
 - **2026-11-20, decision** — ruled by the maintainer 2026-11-20: option 3. Given in chat to the
   shift lead. A diagnostic fires on every fit whose last stage held a width twin. It names the
