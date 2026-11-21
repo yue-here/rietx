@@ -790,6 +790,21 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
                 "rise; 1e-3 as a seed where they do",
         anchor="theory/background.html#additive-background-models",
     ),
+    "instrument.peak_equations.*.*": HelpEntry(
+        title="Instrument peak equation coefficient",
+        description=(
+            "A coefficient of the instrument's position equation, which adds a shift "
+            "in degrees 2θ to every phase's peaks as a function of the angle alone, "
+            "such as a calibration curve in `two_theta`. Its unit is whatever makes "
+            "the expression come out in degrees. In a joint fit it is per pattern "
+            "unless the sharing map shares it, like every instrument parameter. No "
+            "preset plan frees it, so a stage names `instrument.peak_equations.*` "
+            "itself."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a shift of hundredths of a degree",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
+    ),
     "instrument.extra_components.*.position": HelpEntry(
         title="Background-peak position",
         description=(
@@ -1075,6 +1090,25 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="0.6-1.4; a value outside 0.5-2 describes a texture few powder "
                 "mounts produce",
         anchor="theory/corrections.html#preferred-orientation-march-dollase",
+    ),
+    "phases.*.peak_equations.*.*": HelpEntry(
+        title="Peak equation coefficient",
+        description=(
+            "A coefficient of one of the phase's peak equations, named in its "
+            "`coefficients` and read by its expression. The equation adds a term to "
+            "each reflection's Lorentzian or Gaussian width or to its position, or "
+            "multiplies its intensity, as its `target` says. Its unit is whatever "
+            "makes the expression come out in the target's unit: degrees 2θ for a "
+            "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
+            "intensity factor. No preset plan frees it, so a stage names "
+            "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
+            "its own unit refines better rescaled near 1, by writing its factor into "
+            "the expression."
+        ),
+        unit=None, default=None,
+        typical="set by the expression; a Lorentzian tanθ coefficient near "
+                "lor_strain's",
+        anchor="guides/peak_equation.html#declare-the-equations-and-fit",
     ),
     "phases.*.texture.*": HelpEntry(
         title="Texture coefficient",
@@ -2145,6 +2179,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "but the species spelling in the model now differs from the file."
         ),
     ),
+    "COMPARISON_UNCONVERGED": HelpEntry(
+        title="A comparison rests on a fit short of its optimum",
+        description=(
+            "ΔBIC and the t-ratios beside it compare two optima. One of the two fits "
+            "stopped before its convergence test passed, or the fuller fit ended with a "
+            "cost more than 2 above the fit it contains. The cost is the data χ² plus any "
+            "restraint and penalty rows. A model that contains another cannot fit worse at "
+            "its optimum, so that fit had not reached its minimum. The margin of 2 is the "
+            "lower edge of Kass and Raftery's (1995) \"positive evidence\" band, so an "
+            "excess inside it cannot change a ΔBIC verdict. The ΔBIC can "
+            "then have either sign. Run the named fit on to convergence and compare again. "
+            "A fit stopped on its budget can sit on its optimum, so the comparison is "
+            "flagged and not refused."
+        ),
+    ),
     "CONSTRAINT_ACTIVE": HelpEntry(
         title="A constraint held the optimum on its edge",
         description=(
@@ -2162,10 +2211,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A combination of parameters is not measured",
         description=(
             "The data do not constrain one combination of several parameters. The solver "
-            "discards that direction, so each esd in the group comes out too small, by "
-            "at least a factor of the square root of two. Do not quote these esds as "
-            "measured. Free fewer of the parameters in one stage, hold the ones you know "
-            "independently, or widen the fitted range. Esds of other parameters are "
+            "discards that direction, and each parameter on it has no esd: the result, "
+            "the CIF and the GUI show it as undetermined. A parameter tied to one of "
+            "them, and a derived quantity built on one, has none either. Free fewer of "
+            "the parameters in one stage, hold the ones you know independently, or widen "
+            "the fitted range, and refit for their esds. Esds of other parameters are "
             "unaffected."
         ),
     ),
@@ -2365,7 +2415,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two parameters are correlated so completely that the data measure only one "
             "combination of them. This is a statement about the rank of the problem and "
             "not about a strong correlation. Each esd is conditional on the other "
-            "parameter being right. Fix one at an independently known value and refine "
+            "parameter being right. Where the data do not move their difference at "
+            "all, neither has an esd. Fix one at an independently known value and refine "
             "the other, or free them in separate stages. A wider range or a second "
             "histogram can separate them."
         ),
@@ -4000,6 +4051,31 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PEAK_EQUATION_SHARED_ACROSS_WAVELENGTHS": HelpEntry(
+        title="A peak equation's coefficient is shared across wavelengths",
+        description=(
+            "In a joint fit of patterns at different wavelengths, a peak equation's "
+            "coefficient is one number in degrees for every pattern. The right value "
+            "in degrees can differ with wavelength. A size-like term scales with λ, "
+            "and a strain-like one, such as a tan θ term, does not. The package "
+            "converts its own size terms, but cannot tell which kind an equation "
+            "holds. For a wavelength-dependent term, give each pattern its own "
+            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
+            "such a term per pattern, or with Lam in the expression."
+        ),
+    ),
+    "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
+        title="A peak equation takes a width below zero",
+        description=(
+            "A phase's width peak equation makes the Gaussian variance Γ_G² or the "
+            "Lorentzian FWHM Γ_L negative at some reflections in the fitted range. A "
+            "term in an equation may be negative, as a TCHZ v or w often is, but the "
+            "total width may not. The forward model floors a negative Γ_G², and a "
+            "negative Γ_L is no peak shape, so those reflections do not carry the "
+            "equation's width. Bound the coefficients, or write the term so that it "
+            "cannot go negative, and refit."
+        ),
+    ),
     "PHASE_HELD_IN_PATTERNS": HelpEntry(
         title="A phase was held in some patterns of a joint fit",
         description=(
@@ -4072,6 +4148,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "its width, and the data do not choose. Then quote the range and the "
             "widths that produced it. A width the specimen justifies, a background "
             "that takes the broad hump, or longer counting can narrow the range."
+        ),
+    ),
+    "QPA_INTENSITY_FACTOR": HelpEntry(
+        title="A weight fraction ignores an intensity factor",
+        description=(
+            "A phase carries an `intensity_factor` peak equation, so each of its "
+            "reflections' intensities is multiplied by a number. The weight fraction "
+            "is computed from the phase's scale, which absorbs that factor. A factor "
+            "that averages 0.83 makes the scale, and so the fraction relative to the "
+            "other phases, about 1/0.83 = 1.2× too high. A factor averaging above 1 "
+            "makes it too low. The message quotes the factor's range and mean over the "
+            "phase's reflections in range. Write the factor so it averages 1, or "
+            "multiply the phase's scale by the mean factor before reading its "
+            "fraction."
         ),
     ),
     "QPA_UNAVAILABLE": HelpEntry(
