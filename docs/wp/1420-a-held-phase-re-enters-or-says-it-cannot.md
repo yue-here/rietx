@@ -1,6 +1,6 @@
 # WP-1420 — a held phase re-enters, or the chain says it cannot
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-04 — docs landed (#1401); tasks 2-5 wait on #1402
 Track: A long run is not one fit
 Depends on: — (1301 shipped, the hold this is about; 1333 soft, the same
 chain's other silent shape; 1342 soft, the freeze's blind tie; 1419 soft,
@@ -122,6 +122,36 @@ died reading as passed); this one is a pattern that converged to the wrong
 basin reading as right. 1342 is the hold's blind tie, the freeze one rank
 down.
 
+**Superseded in part, 2026-11-04: the hold no longer takes part.** The
+issue's construction re-run at `origin/main` `dd55ec4f` (`[dev]`, darwin
+arm64), at its own noise draw and six more, three fractions, both
+directions: 42 chains. In **none** was the subgroup held at or after its
+onset, so the table above, taken under the 1σ rule, no longer describes the
+tree, and neither the deadlock nor the 1.03×/1.11×/1.26× fence readings
+reproduce. What survives is the saddle, and it is worse than the table says.
+A cold single fit of a present pattern (p004 or p007) started at the
+identity point ended on the wrong side (c/(a√2) − 1 ≈ −6.6e-3) in **42 of 42**
+fits; the chains ended on the wrong side in 17 of 21 forward and 21 of 21
+backward, and both directions agreed on it in 17 of 21 series, so
+`SEQUENTIAL_PATH_DEPENDENT` named nothing on the subgroup cell there. At the
+issue's own draw the forward chain is right (+6.2e-3 at p004, 9.2σ), so the
+Acceptance line's "f = 0.15 forward ends in the right basin" holds on that
+draw and fails on six others. With the distortion's sign reversed in the
+data (`TET_TRUE = -4e-3`), the identity-point start ended on the wrong side
+(+) in 42 of 42 again, so it is pulled away from the truth, not left to
+chance; the two-start pick was right in 42 of 42 there too (wrong/right Rwp
+1.017-1.034×, 1.053-1.077×, 1.139-1.171×). Two cold fits started ±2e-3 off the identity
+point (the construction's `tet`) kept their sides in 42 of 42 pairs, and the
+lower Rwp was the true side in 42 of 42, the wrong side's Rwp 1.021-1.031×,
+1.058-1.076× and 1.151-1.170× the right one at 0.15, 0.25 and 0.40. The same
+two starts handed to a forward chain's first pattern kept both sides in only
+10 of 21 series, because the subgroup is refined in some absent patterns and
+its cell drifts there. In the absent patterns of the issue's draw the
+subgroup carried no `PHASE_UNCONSTRAINED`; `HIGH_CORRELATION` and
+`FLAT_DIRECTION` on the two scales (ρ = −1.000) were what named it. The
+construction is `tests/test_identity_point_seed.py`'s; the 2026-11-04
+handover entry says where the probe scripts are and what each ran.
+
 ### Inherited
 
 - **2026-11-06, from the issue triage (issue #1439): a proposal to fix the
@@ -173,66 +203,16 @@ down.
   issue #481's sweep the change moved 1 of 64 weak real fits from refined to
   held (planted 1.2e-7, `mccusker_structural`, 2.46σ), so a re-entry count
   taken before 2026-10-12 can move by that much.
-- **2026-10-04, from WP-1523: the hold's threshold moved, so re-measure
-  before quoting.** A phase is now seen when its scale is 3σ from zero by its
-  marginal esd against counting noise (`refine._answer_significance`). The old
-  test was one point at 1σ. The stage-start hold reads the screen
-  ‖y_p/σ‖₂ ≥ 3, and the release reads the marginal with the held columns freed
-  for the measurement. A weak phase now re-enters later than it did: at scale
-  3e-8 on issue #481's frame, 1 of 8 fits saw it, against 6 of 8 before. Any
-  re-entry count in this file was taken under the old rule.
-- **2026-10-03, from a cleanup session: the guard is 300 s.** This WP's own
-  commit `b333ca09` (2026-09-30) had widened `RAMP_RUNAWAY_GUARD_S` to 300 s
-  and fixed the root CLAUDE.md's count of λ-scaled size terms, but was never
-  pushed from its tree. It is cherry-picked as `6336c65c` (CLAUDE.md rewrapped
-  to hold its line cap) and closes issue #539. The ramp-guard halves of the
-  three entries below are discharged; the iteration bar's name (#538,
-  WP-1334) is not.
-- **2026-10-02, from WP-1534: a fifth trip of the ramp guard.**
-  `test_the_ramp_reproduction_no_longer_runs_away` measured 81.6 s on
-  WP-1534's branch and 81.9 s on its untouched base, against the 60 s guard.
-  Both ran under `-n auto` in a 15-file selection, `[dev]`, Linux x86-64,
-  4 cores. Alone it took 16.6 and 17.2 s. The chain ran the same 1609
-  iterations with WP-1534's new scale–B probe on and off, so the probe adds
-  nothing to this fixture.
-- **2026-09-30, from the issue triage (issue #539, which is this note's
-  fourth trip): the ramp guard fails on every loaded 4-core run.**
-  `RAMP_RUNAWAY_GUARD_S` is still 60 s at `tests/test_held_phase.py:685`
-  (*checked at `e3e6486a`*). The reporter's table: 76.2, 138.3, 96.9 and
-  135.1 s under `-n auto` (load 9-11) against 18.85 s alone, `[dev,jax]`,
-  Linux x86-64, 4 vCPU; every other assertion passed, `iterations <
-  RAMP_MAIN_UNBOUNDED_ITERATIONS` included. That is 3.2× serial, under
-  `tests/CLAUDE.md` § Budgets' "several times". The suggested fix is the one
-  already written below: keep the iteration bar, widen the guard to the
-  runaway (300-600 s, the `REAL_DATA_BUDGET_SECONDS` precedent). **One
-  caution from issue #538:** `n_iterations` holds scipy's `nfev`, so the
-  2164 bar is an evaluation count. It still separates 1609/1659 from a
-  runaway, but the name is wrong until #538 is settled (WP-1334 holds it).
-  Because it is a required-check-shaped flake on merges, consider taking the
-  guard change now rather than with the rest of this WP.
-- **2026-09-29, from [1469](1469-what-the-series-fences-cannot-see.md): a
-  phase fitted to noise can pass the support test, which is this WP's hold.**
-  Issue #481's blank frame, fitted alone, released its held cell after the
-  `cell` stage and reported it with no `PHASE_UNCONSTRAINED`: the phase's
-  support at the answer was 2.14σ on a scale 1.3σ from zero. It needs no
-  chain, so it is filed as
-  [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md); read it
-  before relying on the hold's release rule here, since a fix there changes
-  which phases this WP sees held. **And the ramp guard below tripped a third
-  time**: 112 s against its 60 s `RAMP_RUNAWAY_GUARD_S` while a second
-  selection ran beside a `-n 4` run on four cores, 17.1 s alone (`[dev]`,
-  Linux x86-64). The runaway it guards ran past 13 minutes, so a guard of
-  300-600 s still separates the two; this WP remains the one to widen it or
-  move the claim to the iteration count, as the WP-1333 note says. (Briefly
-  filed as its own WP from 1469's session, then folded back here.)
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): `references/diagnostics.md` is closed to growth.**
-  Every skill file now has a ceiling and a budget below it
-  (`tests/skill_caps.py`), and the budget fails a change that grows a file
-  past it. `diagnostics.md` (35 111 B) and `diagnostics-indexing.md`
-  (35 124 B) sit over their 34 600 B budget, so a row this WP adds there
-  comes with an equal cut in the same change, or goes to the file a reader
-  meets the code in (the criterion in the `REFERENCE_MAX_BYTES` comment).
-  CI's lint job reports each changed file's headroom on the draft PR.
+- **2026-10-04, from WP-1523: the hold's threshold moved.** A phase is seen
+  when its scale is 3σ from zero by its marginal esd against counting noise
+  (`refine._answer_significance`); the stage-start hold reads the screen
+  ‖y_p/σ‖₂ ≥ 3. Every count in § Context's table was taken under the old 1σ
+  rule; the 2026-11-04 re-measurement above is the one taken under this one.
+- **2026-09-28, from [1338](1338-the-skills-own-gates.md), re-measured
+  2026-11-04: the skill's series codes live in `references/series.md`, not
+  `diagnostics.md`.** `series.md` stood at 34 570 B against its 34 600 B
+  budget (`tests/skill_caps.py`), so a row this WP adds there comes with an
+  equal cut in the same change.
 
 **From WP-1463 (2026-09-28): the 16-of-48 side effect below is resolved.** A
 leaving phase whose scale ends anywhere down to about 1e-300 now keeps every
@@ -305,19 +285,6 @@ this WP's question. This session shows a caller can, at about 336 fits. One
 side effect belongs elsewhere. On 16 of the 48 results a leaving phase's scale
 at zero withheld every weight-fraction esd, which is WP-1463.
 
-**From WP-1333 (2026-09-23): the ramp reproduction's wall-clock guard is a
-load sensor.** `tests/test_held_phase.py::test_the_ramp_reproduction_no_longer_runs_away`
-failed in WP-1333's full run (`[dev]`, Linux x86-64, 4 cores, 1:24:44). It
-passed alone, and in that session's slow-series run. Measured serially, the
-chain takes 9.1 s compiled and 11.2 s on the numpy path, against its 60 s
-`RAMP_RUNAWAY_GUARD_S`, with 1609 and 1659 iterations against the 2164 bar. So
-every deterministic assertion holds on both paths, and only the guard can
-move with load, on a run whose fixtures were up to 3.4× slower than CI's
-nightly. About 6× margin is under what `tests/CLAUDE.md` § Budgets calls
-several times, and this WP will add rows to that file, so it is the one to
-widen the guard or move the claim to the iteration count, which already
-carries it.
-
 **From WP-1333 (2026-09-22).** The chain now says one of this WP's silences
 out loud. `SEQUENTIAL_PATH_CHECK_INCOMPLETE` at `info` names every path some
 chain measured that no pattern could judge in the `direction="both"`
@@ -374,9 +341,14 @@ respect that split, because lifting a user hold is not this WP's to do.
 
 ## Tasks
 
-- [ ] Docs: the collinear-seed paragraph in `using/series.md` and the
+- [x] Docs: the collinear-seed paragraph in `using/series.md` and the
       `references/series.md` row (Measured: issue #267's three fractions),
-      paid for by a cut if the reference is at its cap.
+      paid for by a cut if the reference is at its cap. *2026-11-04: landed
+      as `guides/series.md` § Start a subgroup off its parent's cell, since
+      `reference/series.md` sat 45 characters under its 50 000 page cap; the
+      skill row paid for itself by rewriting the stale "`fit()` is
+      all-or-nothing" paragraph (WP-1333 made `on_error="carry"` the
+      default). Pinned by `tests/test_identity_point_seed.py`.*
 - [ ] The series-level finding: a phase held over a run of patterns with the
       chain's Rwp rising across the run, naming the pattern where the hold
       stopped being right; `GuardFinding` constructor, `help.py` entry,
@@ -411,6 +383,92 @@ series golden is bit-identical.
   a bet), WP-1043 (never a confident singleton), WP-1333, WP-1342, WP-1419.
 
 ## Handover log
+
+- **2026-11-04** — **The hold no longer takes part; the saddle does, and
+  the docs now say how to beat it.** Re-running the issue's construction on
+  today's tree, across seven noise draws, showed that no chain holds the
+  subgroup once it is present, so the deadlock this WP was written around is
+  gone. What remains is the identity-point start, and it is worse than the
+  WP's table said. A fit started there lands on the wrong side every time,
+  whichever sign the true distortion has, and in most series both chain
+  directions agree on that wrong side, so the path-dependence check is
+  silent. Two fits, started either side of the identity point, with the lower
+  Rwp kept, always chose the true side. That recipe is now in the series
+  guide and the skill, and a test pins it for both signs. The finding and
+  the probe rung were not built: their trigger, a held phase with Rwp
+  rising, fires in none of the 42 chains. What they should be keyed on
+  instead is a question for the maintainer, filed as issue #1402. PR #1401.
+  *Done:* Inherited was pruned. The five ramp-guard notes are discharged,
+  since the guard is now 300 s. The WP-1523 threshold note was shortened, and
+  the skill-cap note was re-measured. § Context gained a dated "superseded in
+  part" paragraph. Task 1 landed as `guides/series.md` § Start a subgroup
+  off its parent's cell. It could not go in `reference/series.md`, which
+  sits 45 characters under its 50 000-character page cap
+  (`tests/test_manual.py`). The skill row sits in `references/series.md` by
+  the `SEQUENTIAL_RESEED` row. It paid for itself by rewriting the
+  "`fit()` is all-or-nothing" paragraph, stale since WP-1333 made
+  `on_error="carry"` the default (34 570 → 34 460 B, budget 34 600). New
+  test: `tests/test_identity_point_seed.py`, 6 items: three tests × two true
+  signs, at the 0.15 case, one draw, two cold fits each, with PNGs written to
+  `tests/output/`. New: `tests/repro_1420.py` (`cold`/`chains`,
+  `--sign`, `--start`), which re-runs every count below from the test's
+  construction. Those counts were re-run from it and reproduced exactly.
+  *Measured* (`[dev]`, darwin arm64, `dd55ec4f` + this branch, draws 20260904
+  and 1–6, fractions 0.15/0.25/0.40, start at the identity point unless
+  stated):
+  - The subgroup was held at or after onset in 0 of 42 chains.
+  - Wrong side at p004–p007: 17 of 21 forward chains and 21 of 21 backward
+    ones.
+  - Both directions agreed on the wrong side in 17 of 21 series, and none
+    of those 17 had a `SEQUENTIAL_PATH_DEPENDENT` on `phases.1.cell.*`.
+  - Cold single fit of p004/p007 from the identity point: wrong side in 42
+    of 42, and in 42 of 42 again with the true sign reversed.
+  - Cold fits from ±2e-3 (the construction's `tet`): each kept its side in
+    42 of 42 per sign, and the lower Rwp was the true side in 84 of 84.
+    The wrong side's Rwp was 1.017–1.034×, 1.053–1.077× and 1.139–1.171× the
+    true side's.
+  - The two starts handed to a forward chain's first pattern: both sides
+    kept in 10 of 21 series, and the lower Rwp was the true side in 13 of 21.
+  - Gates at `24c69cde`: fast suite 13759 passed, 318 skipped, 34 xfailed
+    (`[dev]`, darwin arm64, via serial.py; +6 items from the new test). The
+    docs, skill and manual files: 319 passed. Vale: 0 errors.
+    `tests.reader_output` exit 0 (unchanged). No fit number moves (docs and
+    tests only), so the full suite was not run.
+  *Review* (`/code-review high --fix`): 10 findings, 5 fixed by the review
+  itself. Those five: an `xdist_group` mark, `Dispersion()` declared, dead
+  `vary`/`transform` keywords removed, and a pointer that said "below" when
+  it meant "above". Three more were fixed here: the "data do not choose"
+  claim, contradicted by the sign-reversed run; a `LinAlgError` sentence
+  that read as contradicting the 1846-pair claim, now re-attributed; and a
+  one-draw observation stated for all 21 series, now scoped. The missing
+  probe scripts became `tests/repro_1420.py`. One was declined: sharing
+  `test_phase_significance.RIDGE_PLAN` would tie this test's protocol to
+  another file's constant, and the helpers differ (background, strain).
+  *Generality* (judge, item: the two-start rule as skill and guide prose):
+  verdict **weak** on generality, strong on its one construction. Its
+  conditions: a negative-truth run, which is done (84 of 84); the scripts
+  committed, which is done; and the skill row narrowed to a one-direction
+  distortion with two distinct sides, "untested beyond it", which is done.
+  Still open from it: one family only, a second unrelated parent–subgroup
+  pair or a smaller fraction (0.05) unmeasured, and no outside source for
+  the multi-start remedy beyond generic least-squares practice. Its note
+  that domain-equivalent sides (a↔b) give equal Rwp is now in the guide.
+  *Not done, and why:* tasks 2–5, which are the question in #1402. Its
+  options: (A) retire them as written; (B) key the finding, and then the
+  probe, on a starting cell at a metric symmetry point, which needs
+  WP-1419's `MetricConstraints` (in flight under another runner, so its file
+  was not edited from here); (C) build the held-run finding for real data at
+  a tier-3 threshold. The recommendation is A, then B once 1419 lands. The
+  task-3 run on a real held-phase series was not made, because the series is
+  in the private corpus. The 2026-10-13 Inherited item (`cherry_pick` and
+  `run_stage` replaying a stage without its hold reading) is untouched.
+  *Gotchas:* the manual moved: `using/series.md` is now
+  `docs/docs/{guides,reference}/series.md`, and the reference page is full.
+  Vale reads `R<sub>wp</sub>` as the word "wp" and does not know "fcc" or
+  "bct", so the prose spells those out.
+  *Next:* the maintainer's ruling on #1402. If it is B, wait for 1419's
+  metric symmetry point, then build the start-state finding with the
+  two-start suggestion, then the probe, keyed on a present pattern.
 
 - **2026-10-03** — **The ramp test's timeout is 300 s.** This WP's own
   commit from 2026-09-30 had widened it and was never pushed; a cleanup
