@@ -11,13 +11,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from rietx import Refinement
+from rietx.multi import MultiHistogramRefinement
 from rietx.optimize.statistics import discarded_directions
 from rietx.refine import _REVISABLE_CODES, _guard_diagnostics
 from rietx.strategy.staged import (
     GuardFinding,
     GuardReport,
+    RefinementPlan,
+    Stage,
     check_discarded_directions,
 )
+from tests.test_refine_synthetic import perturbed_models, synthesize
 
 pytestmark = pytest.mark.xdist_group("discarded-direction")
 
@@ -95,3 +100,155 @@ def test_the_code_is_retaken_on_the_answer_stage_not_accumulated():
     """An earlier stage's cut is not the matrix the result's esds came from, and
     an unkeyed code is appended once per stage."""
     assert "COVARIANCE_DIRECTION_DISCARDED" in _REVISABLE_CODES
+
+
+# ------------------------------------------------------------ WP-2219 -----
+# A parameter a discarded direction touches reports no esd, in every runner.
+
+def _three_way_zero(mode: str):
+    """``zero_shift = za + zb + zc``, all three free: two exact directions, and
+    pairwise |ρ| = 0.5, so no ``FLAT_DIRECTION`` covers them."""
+    structure, ins = perturbed_models()
+    ref = Refinement(structure, ins)
+    for name in ("za", "zb", "zc"):
+        ref.add_variable(name, 0.0, vary=True)
+    ref.tie("instrument.zero_shift", {"vars.za": 1.0, "vars.zb": 1.0, "vars.zc": 1.0})
+    plan = RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*",
+                                         "vars.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.profile.w"]),
+    ])
+    return ref.fit(synthesize(), plan=plan, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["rietveld", "pawley"])
+def test_a_combination_the_data_cannot_see_has_no_esd(mode):
+    """The three variables, and the tie built on them, report no esd; the cell
+    beside them keeps its own.  A Pawley solve's intensity block is in the
+    matrix the guard reads, so its finding is named too."""
+    result = _three_way_zero(mode)
+    rows = {p.path: p for p in result.parameters}
+    for path in ("vars.za", "vars.zb", "vars.zc", "instrument.zero_shift"):
+        assert rows[path].stderr is None, path
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    (d,) = [d for d in result.diagnostics if d.code == "COVARIANCE_DIRECTION_DISCARDED"]
+    assert set(d.where) == {"vars.za", "vars.zb", "vars.zc"}
+    assert "no esd" in d.message
+
+
+def test_a_refined_value_with_no_esd_writes_an_unknown_su(tmp_path):
+    """The CIF states the value with ``?`` in its su item, never a bare value
+    a reader would take as fixed, and the file reads back to the same value."""
+    import gemmi
+
+    import rietx as rx
+
+    structure, ins = perturbed_models()
+    ref = Refinement(structure, ins)
+    for name in ("ba", "bb", "bc"):
+        ref.add_variable(name, 0.15, vary=True)
+    ref.tie("phases.0.atoms.0.biso", {"vars.ba": 1.0, "vars.bb": 1.0, "vars.bc": 1.0})
+    result = ref.fit(synthesize(), plan=RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "vars.*"])]))
+    rows = {p.path: p for p in result.parameters}
+    assert rows["phases.0.atoms.0.biso"].stderr is None
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    ref.write_cif(tmp_path / "r.cif")
+    block = gemmi.cif.read(str(tmp_path / "r.cif"))[0]
+    labels = list(block.find_values("_atom_site_label"))
+    su = dict(zip(labels, block.find_values("_atom_site_U_iso_or_equiv_su"), strict=True))
+    assert su[structure.phases[0].atoms[0].label] == "?"
+    # the other site's B was not refined: inapplicable, not unknown
+    assert su[structure.phases[0].atoms[1].label] == "."
+    # nothing else in the file lost its su
+    assert block.find_value("_cell_length_a_su") is None
+    back = rx.Structure.from_cif(str(tmp_path / "r.cif")).phases[0].atoms[0]
+    assert back.biso.value == pytest.approx(ref.structure.phases[0].atoms[0].biso.value,
+                                            rel=1e-12)
+
+
+def test_a_joint_fit_gives_an_exact_pair_no_esd():
+    """Two identical phases: each pattern's two scales are one quantity."""
+    structure, ins = perturbed_models()
+    twin = structure.phases[0].model_copy(deep=True)
+    twin.name = "LaB6 twin"
+    structure.phases.append(twin)
+    data = synthesize()
+    mr = MultiHistogramRefinement(structure, [ins, ins.model_copy(deep=True)])
+    result = mr.fit([data, data], plan=RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"])]))
+    rows = {p.path: p for p in result.parameters}
+    for h in (0, 1):
+        for ip in (0, 1):
+            assert rows[f"hist.{h}.phases.{ip}.scale"].stderr is None
+        assert rows[f"hist.{h}.instrument.background.c0"].stderr > 0.0
+
+
+def test_an_overlap_split_with_no_esd_says_so_rather_than_inf_percent():
+    """A Pawley intensity on a discarded direction carries ``inf``; the
+    overlap report states it has no esd, never "reaches inf%"."""
+    from types import SimpleNamespace
+
+    from rietx.refine import _pawley_unresolved_diagnostics
+
+    pb = SimpleNamespace(stderr=np.array([1.0, np.inf, 2.0]), groups=[(0, 1)],
+                         phase_slices=[(0, 3)])
+    hklm = np.array([[1, 0, 0, 0], [1, 1, 0, 0], [1, 1, 1, 0]])
+    model = SimpleNamespace(
+        pawley=pb, pawley_x0=lambda: np.array([10.0, 20.0, 30.0]),
+        phases=[SimpleNamespace(reflections=SimpleNamespace(hklm=hklm))])
+    structure = SimpleNamespace(phases=[SimpleNamespace(name="P")])
+    (d,) = _pawley_unresolved_diagnostics(model, structure)
+    assert "inf" not in d.message
+    assert d.message.endswith("an individual value has no esd.")
+
+
+_TRIPLE = ["instrument.profile.w", "phases.*.gauss_size", "phases.*.gauss_strain"]
+_TRIPLE_PATHS = ("instrument.profile.w", "phases.0.gauss_size", "phases.0.gauss_strain")
+
+
+def _triple_plan() -> RefinementPlan:
+    return RefinementPlan(stages=[
+        Stage(name="scale+bkg", turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*", "instrument.zero_shift"]),
+        Stage(name="widths", turn_on=_TRIPLE, seed=1e-4),
+    ])
+
+
+@pytest.mark.parametrize("w_start", [5e-4, 1.5e-4])
+def test_the_lab6_width_triple_has_no_esd_from_either_start(w_start):
+    """WP-2028's case: synthetic LaB6 with W, ``gauss_size`` and
+    ``gauss_strain`` free.  (δW, δsize, δstrain) = (1, −1, 1) changes no width
+    at any angle; two starts landed 140 esd apart in W, each quoting ± 6.3e-7.
+    None of the three now quotes an esd."""
+    structure, ins = perturbed_models()
+    ins.profile.w.value = w_start
+    result = Refinement(structure, ins).fit(synthesize(), plan=_triple_plan())
+    rows = {p.path: p for p in result.parameters}
+    assert [rows[p].stderr for p in _TRIPLE_PATHS] == [None, None, None]
+    assert rows["phases.0.cell.a"].stderr > 0.0
+    assert not result.stages[2].width_twins_held
+
+
+def test_the_lab6_width_triple_has_no_esd_in_a_joint_fit():
+    """Three patterns at one wavelength, W shared and each pattern's own
+    Gaussian widths: every pattern's triple is the same flat direction.  Its
+    eigenvalue lands on either side of the cut as rounding falls, so each
+    parameter has no esd or one thousands of times its value, never a short
+    one (measured 2026-11-20: W 2.5e-4 ± 1.56)."""
+    from rietx.params.multi import SharingMap
+
+    structure, ins = perturbed_models()
+    data = [synthesize(noise_seed=s) for s in (7, 8, 9)]
+    mr = MultiHistogramRefinement(
+        structure, [ins.model_copy(deep=True) for _ in data],
+        sharing=SharingMap(shared=["instrument.profile.w"],
+                           per_histogram=["phases.*.gauss_*"]))
+    result = mr.fit(data, plan=_triple_plan())
+    rows = {p.path: p for p in result.parameters}
+    paths = ["instrument.profile.w",
+             *(f"hist.{h}.phases.0.gauss_{t}" for h in range(3) for t in ("size", "strain"))]
+    for path in paths:
+        row = rows[path]
+        assert row.stderr is None or row.stderr > 1e3 * abs(row.value), (path, row)
