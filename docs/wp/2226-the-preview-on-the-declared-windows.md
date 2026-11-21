@@ -45,13 +45,97 @@ every program draws the curve its own calculation made at one peak cut
 the two shipped examples the preview's tests use, `fap` (lab) and `nac`
 (synchrotron), against a fresh compile at the same values.
 
+## Question for Yue: how much of each peak's tail the preview draws
+
+**The decision.** When a person drags a slider in the Interactive tab, should
+the preview draw each peak's tail as far out as the last fit did (2 % of the
+peak's area left out), or as far as it does today (0.1 % left out)? It comes
+to you because the WP says so: either choice changes the curve and the Rwp
+the GUI shows a reader.
+
+**Why it matters.** The Interactive tab is for fitting by hand. A person
+moves a value, the plot redraws the calculated curve and the residual, and
+the header shows the preview's Rwp beside "last fit". Its whole use is that
+comparison: did my move help? So with the slider barely moved, the preview
+must draw the fit's own curve. Today it does not. Since WP-2222 (the closing
+stage off by default, 19 Nov) a default fit computes every peak out to the
+point where 2 % of its area is left, as TOPAS does. The preview still
+computes out to 0.1 %. The extra tail changes the curve by up to 0.13 % of
+the strongest peak on the fluorapatite example (26 counts on 20 310).
+
+What a user sees: on fluorapatite, nudge the scale by 1 %. The header reads
+"Rwp 9.444 %, last fit 9.250 %", a jump of 0.19 points. The nudge itself
+costs 0.03 points; the other 0.16 is the tail. On the NAC example the offset
+runs the other way: the same nudge shows +0.014 points where it truly costs
++0.037. A person fine-tuning by hand is steered by a number that is mostly
+the offset. A large move (a zero shift of a tenth of a peak width, +6 points)
+swamps it. No fit's answer changes either way. Importance: minor.
+
+**Aim.** Hand fitting in the GUI, for a user who watches the Rwp while
+dragging: the number beside "last fit" should change only because of what
+they moved.
+
+**Options.** Measured on `fap` and `nac` (table in the 2026-11-21 handover
+entry).
+
+- *A. The preview draws at the last fit's tail cut.* It reads the fraction
+  the fit's last stage recorded, so a fit that ended on a closing stage
+  (`lab_calibrate`, a Pawley series) still draws at 0.1 %. With no fit yet,
+  it uses 2 %, the cut a default fit will use. At the fit's values the curve
+  and Rwp match the fit's bit for bit on both examples. The preview gets
+  faster: 7-11 ms an answer on fap instead of 29-58 ms, and 20-25 ms
+  instead of 0.49-0.52 s when the S/L slider is switched on for NAC
+  (machine heavily loaded, so these rank the options and do not time them).
+  The cost is in code. At 2 % the preview's cheapest branch, which reuses the
+  fit's peak windows unchanged, drifts up to 1.26 σ from a fresh calculation
+  at the moved values. It is no further than a fresh 2 % calculation from
+  the full-tail curve (0.93-1.15× as far), but it fails the tests' bar of
+  exact agreement. Recomputing the windows on every move removes the drift
+  (exact to 1.7e-13 σ, 3.5-10 ms). I would settle that part myself. Undoable
+  by reverting one change.
+- *B. The preview stays at 0.1 %, and the fit's curve is redrawn at 0.1 %
+  too.* The pane stops jumping, but the GUI then shows a curve and an Rwp the
+  fit never computed. On fap the "last fit" Rwp would read 9.380 % in the
+  GUI, while the result, its printed report, the history and any script or
+  agent say 9.250 %. Either the header disagrees with the curve under it, or
+  the GUI disagrees with every other surface. Each redraw also costs a
+  compile, 70-98 ms. Undoable, but it adds a second calculated curve beside
+  the result's.
+- *C. Do nothing.* The 0.13 %-of-peak jump and the offset in the header
+  stay, as you accepted on 19 Nov for the interim.
+
+Dropped: making the preview always recompile from scratch. It gives A's
+exactness at 36-98 ms an answer.
+
+**Practice.** No refinement program offers live sliders (`docs/practice.md`
+§ A pattern recalculated while a control moves, recall). TOPAS, GSAS-II and FullProf each
+draw the calculated curve from the same calculation, at the same peak cut,
+that their refinement used (recall, not re-read). TOPAS cuts at
+`ymin_on_ymax` 0.001 of each peak's height. For a Lorentzian that leaves out the same 2 % of area
+(`docs/practice.md` § How far a peak is computed, checked against the
+manual). So practice draws what the fit computed. A follows it; B departs
+from it. In rietx itself, `compile_model`'s docstring already says that
+redrawing a fit's own curve uses the fraction its last stage recorded, and
+the curves route draws the result's own numbers and computes none. A keeps
+both conventions; B breaks the second.
+
+**Recommendation.** A, a clear call. The crux is what the preview is for. It
+exists to compare a moved value against the last fit, so it must agree with
+that fit at zero movement. A does that on every surface at once. B buys 0.1 %
+tails that the fit itself does not have. You ruled TOPAS's 2 % sufficient
+on 19 Nov. B pays for them with two Rwps for one fit. What would flip
+it: a hand-fitting use where the tails beyond 2 % matter more than agreement
+with the fit, such as reading weak peaks sitting in a strong peak's tail. I
+have not seen one.
+
 ## Tasks
 
 - [x] Measure the preview's three branches at 2 % windows on `fap` and `nac`
       (the `tests/test_gui_preview.py` cases), and the shift at the base
       values under each option above. Probes and numbers in
       `docs/wp/2226-measure/`; the table is the 2026-11-21 handover entry.
-- [ ] Bring the choice to Yue with those numbers.
+- [x] Bring the choice to Yue with those numbers: § Question for Yue
+      (2026-11-21). Waiting on the ruling.
 - [ ] Implement it, and restore exact agreement at the base values in
       `test_the_residuals_are_the_curves_route_s_at_the_last_fit` and
       `test_at_the_base_values_the_answer_is_frozen_and_the_last_fit`.
