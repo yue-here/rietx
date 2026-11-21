@@ -1,8 +1,8 @@
 """WP-2226 task 1, second pass.
 
-(1) Option A with the frozen branch replaced by a rewindow whenever a window
-    sized at the new values differs from the frozen one at all ("A-exact"):
-    its error against a fresh 2 % compile, and its cost.
+(1) Option A with the frozen branch replaced by an unconditional rewindow at
+    the new values ("A-exact"): its error against a fresh 2 % compile, and
+    its cost.  A rule that rewindows only when a window moved costs no more.
 (2) The nac axial case split into window and quadrature: a fresh compile at
     2 % (declared FCJ node rule), at 1.99 % (closing node rule, ~2 % windows)
     and at 1e-3, as fractions of the strongest peak and in σ.

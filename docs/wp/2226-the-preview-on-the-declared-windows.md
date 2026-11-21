@@ -1,6 +1,6 @@
 # WP-2226 — The preview on the declared windows
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-21 — measured; the choice of tail cut waits on Yue (§ Question for Yue)
 Track: A long run is not one fit
 Depends on: 2222 (the closing stage off by default)
 Priority: P3 2026-11-19 — a visible shift of up to 0.13 % of the strongest peak when a preview starts from a default fit; nothing is wrong with the fit
@@ -84,15 +84,18 @@ entry).
   it uses 2 %, the cut a default fit will use. At the fit's values the curve
   and Rwp match the fit's bit for bit on both examples. The preview gets
   faster: 7-11 ms an answer on fap instead of 29-58 ms, and 20-25 ms
-  instead of 0.49-0.52 s when the S/L slider is switched on for NAC
-  (machine heavily loaded, so these rank the options and do not time them).
+  instead of 0.49-0.52 s when the S/L slider (axial divergence) is switched
+  on for NAC (machine heavily loaded, so these rank the options and do not
+  time them).
   The cost is in code. At 2 % the preview's cheapest branch, which reuses the
   fit's peak windows unchanged, drifts up to 1.26 σ from a fresh calculation
-  at the moved values. It is no further than a fresh 2 % calculation from
-  the full-tail curve (0.93-1.15× as far), but it fails the tests' bar of
-  exact agreement. Recomputing the windows on every move removes the drift
-  (exact to 1.7e-13 σ, 3.5-10 ms). I would settle that part myself. Undoable
-  by reverting one change.
+  at the moved values. It sits about as far from the full-tail curve as a
+  fresh 2 % calculation does (0.93-1.15× as far). It fails three of the
+  preview's tests. The zero-shift and cell-edit tests allow 0.05 σ, and A
+  drifts 0.42-1.26 σ there. The peak-width test expects a recomputed window,
+  and A keeps the frozen one. Recomputing the windows whenever they move
+  removes the drift (exact to 1.7e-13 σ, 3.5-10 ms, 18-24 ms with S/L on).
+  I would settle that part myself. Undoable by reverting one change.
 - *B. The preview stays at 0.1 %, and the fit's curve is redrawn at 0.1 %
   too.* The pane stops jumping, but the GUI then shows a curve and an Rwp the
   fit never computed. On fap the "last fit" Rwp would read 9.380 % in the
@@ -105,7 +108,8 @@ entry).
   stay, as you accepted on 19 Nov for the interim.
 
 Dropped: making the preview always recompile from scratch. It gives A's
-exactness at 36-98 ms an answer.
+exactness, but a compile at 2 % alone costs 39-45 ms on fap and 63-78 ms on
+nac, against A's 4-11 ms an answer.
 
 **Practice.** No refinement program offers live sliders (`docs/practice.md`
 § A pattern recalculated while a control moves, recall). TOPAS, GSAS-II and FullProf each
@@ -116,7 +120,8 @@ that their refinement used (recall, not re-read). TOPAS cuts at
 manual). So practice draws what the fit computed. A follows it; B departs
 from it. In rietx itself, `compile_model`'s docstring already says that
 redrawing a fit's own curve uses the fraction its last stage recorded, and
-the curves route draws the result's own numbers and computes none. A keeps
+the curves route (the server call that sends the GUI the fit's curve) draws
+the result's own numbers and computes none. A keeps
 both conventions; B breaks the second.
 
 **Recommendation.** A, a clear call. The crux is what the preview is for. It
@@ -149,7 +154,29 @@ have not seen one.
 
 ## Handover log
 
-- **2026-11-21** — the preview measured at the fit's 2 % windows (task 1).
+- **2026-11-21** — the preview measured at the fit's 2 % windows; the
+  choice is with Yue.
+
+  A preview drawn at the last fit's own tail cut reproduces that fit's curve
+  and Rwp exactly, on both shipped examples, and answers 1.2-21× faster than
+  today's preview (median to median: 1.2-1.5× on nac's frozen cases, 2-7× on
+  fap, 21× with S/L switched on). Today's preview jumps by up to 0.13 % of the strongest
+  peak the moment a slider moves. That jump is most of what a fine-tuning
+  nudge shows in the Rwp header: on fluorapatite a 1 % scale nudge reads
+  +0.194 points, of which +0.029 is the nudge. The one cost found is that
+  the preview's cheapest branch drifts up to 1.26 σ from a fresh calculation
+  at 2 %, and recomputing the windows on every move removes it for a few
+  milliseconds. Nothing was implemented: § Question for Yue asks which
+  option to build.
+
+  *Done.* Tasks 1 and 2. Probes `measure.py` (both options, every test case),
+  `measure2.py` (the rewindow variant, timings, the S/L split) and
+  `nudge.py` (what a small nudge shows) in `docs/wp/2226-measure/`, with
+  their JSON and text output. The run's load averages are saved beside them.
+  `/code-review high --fix` ran over the branch. It corrected the speed-up
+  range, the tests' bars A fails, the always-recompile cost and the
+  rewindow timing in this entry and the brief, and pointed *Next* at the
+  head node's record.
 
   *Measured* (`docs/wp/2226-measure/measure.py` and `measure2.py`, `[dev]`
   venv, darwin/arm64, this worktree). Both examples were fitted with their
@@ -189,8 +216,10 @@ have not seen one.
   The WP's "missed by up to 1.3 σ" is the fap zero-shift row (1.26 σ).
   Against the near-complete curve, A's frozen answer is 0.93-1.15× as far
   away as a fresh 2 % compile, so it loses nothing the fit's own windows do
-  not. The tests' 1e-9 bar against a fresh compile is what it fails. A-exact
-  meets that bar everywhere the status quo does; the fap zero-shift row's
+  not. What it fails is the tests' bars against a fresh compile: 0.05 σ in
+  the zero-shift and cell-edit tests (A gives 0.42-1.26 σ), and on fap W ×4
+  the branch itself, which the test expects to be `rewindowed`. A-exact
+  meets every bar the status quo meets; the fap zero-shift row's
   0.0175 σ is the frozen reflection list at the range edge, the same in
   every arm.
 
@@ -199,7 +228,8 @@ have not seen one.
   arms and do not time them. fap: status quo 29-58 ms frozen and 66-86 ms
   recompiled; A 7-11 ms and 36-41 ms. nac: status quo 5-7 ms, the
   Lorentzian case 18-21 ms, the S/L case 486-521 ms; A 4-6 ms, 7-8 ms and
-  20-25 ms. A-exact's rewindow plus evaluation is 3.5-10 ms. One compile
+  20-25 ms. A-exact's rewindow plus evaluation is 3.5-10 ms, and 18-24 ms
+  in the S/L case. One compile
   costs 90-98 ms at 1e-3 and 39-45 ms at 2 % on fap, 70-75 and 63-78 ms on
   nac.
 
@@ -211,6 +241,40 @@ have not seen one.
   value and no real synchrotron setting, so this is noted and not filed.
   Under option A a preview of that slider draws what a declared stage
   computes.
+
+  A small nudge (`nudge.py`), the preview's Rwp minus the last fit's:
+
+  | | status quo | A |
+  |---|---|---|
+  | fap scale ×1.01 | +0.194 points | +0.029 |
+  | fap zero + 0.1 FWHM | +6.237 | +6.134 |
+  | nac scale ×1.01 | +0.014 | +0.037 |
+  | nac zero + 0.1 FWHM | +9.359 | +9.370 |
+
+  *Checks.* PR #1740. `tests/test_docs_consistency.py` and
+  `tests/test_gui_preview.py`: 66 passed (`-n 4`, load average 29). The fast
+  suite did not run: the branch changes only `docs/wp/`, and nothing imports
+  the probes. Ruff and CI's vale steps: no errors. `tests.reader_output`:
+  unchanged. No generality judge: the branch adds no heuristic, and the one
+  default the brief proposes waits on the ruling.
+
+  *Next.* (1) Yue rules on § Question for Yue. (2) Under A: read the cut
+  from the head node's record, `recorded_window_tol(node.action.window_area_tol)`
+  as `refine.replay` does, since the preview's base is keyed on
+  `_head_id`. `result_` is `None` on a reopened project and stale after a
+  checkout, so a reopened `lab_calibrate` project would otherwise preview at
+  2 % against a 0.1 % curve. A head that is no stage (an applied slider is a
+  `set_value` node) takes the nearest stage node above it, and a tree with
+  none takes `WINDOW_AREA_TOL`. Add the cut to the preview's cache key. Make the
+  frozen branch rewindow whenever a window sized at the new values differs
+  from the frozen one. The "A-exact" column measured an unconditional
+  rewindow, which bounds that rule's cost from above. Then task 3's two
+  tests go back to exact agreement, and the other branch tests keep their
+  bars against a fresh compile at the same cut. The zero-shift and cell-edit
+  tests assert `frozen`, and under that rule they take `rewindowed`, so
+  their branch assertions change with the code. Under B the curves route and the
+  Rwp badge both change, and the brief's two-Rwp problem needs a design
+  first. Under C, close the WP as no-go with the ruling.
 
 - **2026-11-19** — filed by WP-2222's session after Yue accepted the shift
   and asked for a follow-up.

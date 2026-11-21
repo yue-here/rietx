@@ -14,16 +14,19 @@ sys.argv = ["x", tempfile.mkdtemp()]
 from measure import fitted, set_tol  # noqa: E402
 
 from rietx.gui import preview  # noqa: E402
+from rietx.model.forward import recorded_window_tol  # noqa: E402
 
 for name in ("fap", "nac"):
     p = fitted(name)
-    fit = p.refinement.result_.statistics.rwp
+    res = p.refinement.result_
+    fit = res.statistics.rwp
+    last_tol = recorded_window_tol(res.stages[-1].window_area_tol)
     set_tol(p, None)
     v = preview._base(p).values
     fwhm = float(np.median(preview._base(p).model.phase_peaks(0, v)[0][1]))
     nudges = {"scale x1.01": {"phases.0.scale": v["phases.0.scale"] * 1.01},
               "zero +0.1 FWHM": {"instrument.zero_shift": v["instrument.zero_shift"] + 0.1 * fwhm}}
-    for arm, tol in (("status quo", None), ("A", 0.02)):
+    for arm, tol in (("status quo", None), ("A", last_tol)):
         set_tol(p, tol)
         for label, edits in nudges.items():
             rwp = preview.evaluate(p, {"values": edits}).header["rwp"]
