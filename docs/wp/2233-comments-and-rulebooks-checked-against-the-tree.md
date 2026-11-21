@@ -345,7 +345,7 @@ alongside any other edit fails, and a pull request with no base fails.
   `docs/contracts/` is outside the reference check on purpose, since its notes name
   removed things.
 
-  Next: none here. WP-2234 (filed at close, P4, not before 2027-01-02) runs the narration
+  Next: none here. WP-2236 (filed at close, P4, not before 2027-01-02) runs the narration
   counter over six weeks of `main` and brings a gate-or-drop decision. WP-2009 re-pins the
   budgets when its content pass lands.
 

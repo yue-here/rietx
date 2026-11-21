@@ -1,4 +1,4 @@
-# WP-2234 — The narration trend, measured over six weeks, decides a gate or a drop
+# WP-2236 — The narration trend, measured over six weeks, decides a gate or a drop
 
 Milestone: unscheduled · Status: ⬜
 Track: The repo's own process
