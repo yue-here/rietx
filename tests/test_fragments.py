@@ -12,6 +12,7 @@ placement written here.
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -658,3 +659,247 @@ def test_zmatrix_points_refuses_by_line_with_or_without_names():
     assert fr.zmatrix_points([], []).shape == (0, 3)
     pos, tan = fr.zmatrix_points([()], [()], tangents=True)
     assert pos.shape == (1, 3) and tan.shape == (0, 1, 3)
+
+
+# --- XYZ read (WP-1813) -------------------------------------------------------
+
+
+def _xyz_text(fragment, comment="a comment line, ignored"):
+    """The bare XYZ text of ``fragment``, written here at repr precision."""
+    rows = [f"{s} {x!r} {y!r} {z!r}" for s, (x, y, z) in
+            zip(fragment.species, fragment.xyz.tolist(), strict=True)]
+    return "\n".join([str(len(fragment)), comment, *rows]) + "\n"
+
+
+def test_an_ideal_benzene_round_trips_through_xyz_with_its_bonds_declared(tmp_path):
+    """The file's coordinates come back bit for bit, in file order; its bonds
+    are the caller's, and a read without them declares none."""
+    ring = _ideal_ring(6, 1.39, 1.09)
+    path = tmp_path / "benzene.xyz"
+    path.write_text(_xyz_text(ring) + "\n\n", encoding="utf-8")
+    back = fr.read_xyz(path, bonds=ring.bonds)
+    assert back.species == ring.species
+    assert np.array_equal(back.xyz, ring.xyz)
+    assert back.bonds == ring.bonds
+    assert fr.read_xyz(path).bonds is None
+    assert fr.from_xyz(_xyz_text(ring)).body_frame().rotation_dofs == 3
+
+
+def test_an_xyz_element_reads_as_its_standard_symbol():
+    """An atomic number or a symbol in any case is stored as the standard
+    spelling; CRLF line ends and a byte-order mark read like plain ones."""
+    f = fr.from_xyz("\ufeff3\r\n\r\n8 0 0 0\r\n1 0.96 0 0\r\nh -.24 +.93 0e0\r\n")
+    assert f.species == ("O", "H", "H")
+    assert fr.from_xyz("1\nc\nfe 1.5E-1 0. 0\n").species == ("Fe",)
+    assert fr.from_xyz("1\nc\nCA 0 0 0\n").species == ("Ca",)
+    assert fr.from_xyz("0\nempty\n").xyz.shape == (0, 3)
+
+
+@pytest.mark.parametrize("text, match", [
+    ("", r"^XYZ text: line 1 must hold the atom count; it is empty"),
+    ("two\nc\n", r"line 1 must hold the atom count, a non-negative integer; "
+                 r"it reads 'two'"),
+    ("-1\nc\n", r"non-negative integer; it reads '-1'"),
+    ("3\nc\nC 0 0 0\nC 1 0 0\n", r"line 1 counts 3 atoms but the file has 2 atom lines"),
+    ("1\nc\nC 0 0\n", r"line 3: an atom line holds an element and three coordinates "
+                      r"\(4 fields\); it has 3"),
+    ("1\nc\nC 0 0 0 0.5\n", r"line 3: .* it has 5"),
+    ("1\nc\nC 0 zero 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 0 inf 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 0 nan 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 1_0 0 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1\nc\nC 1.0D0 0 0\n", r"line 3: a coordinate is not a decimal number"),
+    ("1_0\nc\n", r"non-negative integer; it reads '1_0'"),
+    ("1\nc\nC 1e400 0 0\n", r"line 3: a coordinate overflows a double"),
+    ("1\nc\nC1 0 0 0\n", r"line 3: 'C1' is not an element symbol"),
+    # gemmi reads a token's leading letters, so each of these would be an
+    # element (Ca, Ni, Fe, Cl, Ca, He, Na) if the whole token went unchecked
+    *[(f"1\nc\n{tok} 0 0 0\n", rf"line 3: '{re.escape(tok)}' is not an element symbol")
+      for tok in ("Carbon", "Nitrogen", "Fe3", "Cl1", "Ca2", "He2+", "Na+")],
+    ("1\nc\nX 0 0 0\n", r"line 3: 'X' is not an element symbol \(it is the Z-matrix dummy\)"),
+    ("1\nc\n119 0 0 0\n", r"line 3: atomic number 119 is not 1–118"),
+    ("1\nc\n0 0 0 0\n", r"line 3: atomic number 0 is not 1–118"),
+    ("1\nc\nC 0 0 0\n1\nc\nC 1 0 0\n", r"line 4: text after the 1 atoms of line 1's "
+                                       r"count .* this reader takes one frame"),
+])
+def test_an_xyz_file_that_is_not_one_bare_frame_is_refused_by_line(text, match):
+    with pytest.raises(ValueError, match=match):
+        fr.from_xyz(text)
+
+
+def test_an_xyz_refusal_names_the_file(tmp_path):
+    bom = tmp_path / "bom.xyz"
+    bom.write_text("1\nc\nC 0 0 0\n", encoding="utf-8-sig")
+    assert fr.read_xyz(bom).species == ("C",)
+    path = tmp_path / "short.xyz"
+    path.write_text("2\nc\nC 0 0 0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"short\.xyz: line 1 counts 2 atoms"):
+        fr.read_xyz(path)
+
+
+# --- Z-matrix write (WP-1813) -------------------------------------------------
+
+
+def _volumes(y):
+    """Signed volumes of every ordered quadruple i < a < b < c; a mirror image
+    negates all of them, a rigid motion keeps them."""
+    y = np.asarray(y)
+    n = len(y)
+    return np.array([np.linalg.det(np.array([y[a] - y[i], y[b] - y[i], y[c] - y[i]]))
+                     for i in range(n) for a in range(i + 1, n)
+                     for b in range(a + 1, n) for c in range(b + 1, n)])
+
+
+def _rotated(xyz, seed):
+    """``xyz`` under a random proper rotation and shift, so no line of the
+    written Z-matrix can lean on the template's own frame."""
+    q, r = np.linalg.qr(np.random.default_rng(seed).normal(size=(3, 3)))
+    q = q @ np.diag(np.sign(np.diag(r)))
+    if np.linalg.det(q) < 0:
+        q[:, 0] = -q[:, 0]
+    return np.asarray(xyz) @ q.T + np.array([3.1, -0.7, 12.4])
+
+
+def _chiral_chain():
+    """The non-planar chain of the round-trip test above, torsions +60°, −90°
+    and +150°, with two hydrogens on its second carbon to branch it."""
+    x = np.array([[0.0, 0.0, 0.0], [1.5, 0.0, 0.0], [2.0, 1.4, 0.0],
+                  [3.4, 1.6, 0.9], [3.9, 0.4, 1.8], [2.9, -0.6, 2.4],
+                  [3.3, -2.0, 1.9], [1.9, -0.5, -0.9], [1.6, -0.6, 0.9]])
+    bonds = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (1, 7), (1, 8)]
+    return fr.Fragment(("C",) * 7 + ("H", "H"), x, bonds)
+
+
+@pytest.mark.parametrize("make", [lambda: _ideal_ring(6, 1.39, 1.09),
+                                  lambda: _ideal_ring(5, 1.40, 1.08), _chiral_chain],
+                         ids=["benzene", "cyclopentadienyl", "chiral-chain"])
+@pytest.mark.parametrize("with_bonds", [True, False])
+def test_a_fragment_round_trips_through_its_written_z_matrix(make, with_bonds):
+    """to_zmatrix → from_zmatrix rebuilds the fragment up to a proper rigid
+    motion: every distance to 1e-12 Å and every signed volume to 1e-11 Å³
+    (a mirror image would negate them), from a frame the writer never saw."""
+    f = make()
+    moved = fr.Fragment(f.species, _rotated(f.xyz, 3), f.bonds if with_bonds else None)
+    lines = fr.to_zmatrix(moved)
+    assert [line[0] for line in lines] == list(f.species)
+    assert [len(line) for line in lines] == [1, 3, 5] + [7] * (len(f) - 3)
+    back = fr.from_zmatrix(lines, bonds=moved.bonds)
+    assert back.bonds == moved.bonds
+    assert np.max(np.abs(_distances(back.xyz) - _distances(f.xyz))) < 1e-12
+    np.testing.assert_allclose(_volumes(back.xyz), _volumes(f.xyz), rtol=0, atol=1e-11)
+
+
+def test_the_written_internals_are_the_ones_read():
+    """from_zmatrix(lines) → to_zmatrix with the same references returns the
+    same internal coordinates: the angle and the dihedral sign are the
+    reader's convention, not a mirror of it."""
+    lines = [("N",), ("C", 0, 1.47), ("C", 1, 1.53, 0, 110.0),
+             ("O", 2, 1.21, 1, 121.0, 0, -37.5), ("O", 2, 1.31, 1, 113.0, 3, 179.0),
+             ("H", 0, 1.01, 1, 109.0, 2, 62.0), ("H", 0, 1.01, 1, 109.0, 5, -118.0)]
+    f = fr.from_zmatrix(lines)
+    refs = [tuple(line[1::2]) for line in lines]
+    got = fr.to_zmatrix(f, refs=refs)
+    for want, have in zip(lines, got, strict=True):
+        assert have[0] == want[0] and have[1::2] == want[1::2]
+        np.testing.assert_allclose(have[2::2], want[2::2], rtol=0, atol=1e-10)
+
+
+def test_declared_bonds_choose_the_references():
+    """With bonds declared, each benzene H is written from its own carbon even
+    where another atom is nearer in index; without them the nearest earlier
+    atom is chosen, which for a ring H is its carbon too."""
+    ring = _ideal_ring(6, 1.39, 1.09)
+    for f in (ring, fr.Fragment(ring.species, ring.xyz, None)):
+        lines = fr.to_zmatrix(f)
+        assert [line[1] for line in lines[6:]] == [0, 1, 2, 3, 4, 5]
+    # an ordering where the nearest earlier atom is not the bonded one
+    x = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.5, 0.9, 0.0], [0.3, 0.2, 1.4]])
+    near = fr.to_zmatrix(fr.Fragment(("C", "C", "C", "H"), x))
+    far = fr.to_zmatrix(fr.Fragment(("C", "C", "C", "H"), x, [(0, 1), (1, 2), (2, 3)]))
+    assert near[3][1] == 0 and far[3][1] == 2
+
+
+def test_acetylene_is_written_at_exactly_180_degrees():
+    """A linear molecule in a tilted frame: every angle is written as exactly
+    180° (the sine is ~1e-16, under COLLINEAR_TOL), which from_zmatrix accepts
+    with an inert dihedral, so the round trip needs no dummy."""
+    x = _rotated([[0, 0, 0], [0, 0, 1.06], [0, 0, 2.26], [0, 0, 3.32]], 5)
+    lines = fr.to_zmatrix(fr.Fragment(("H", "C", "C", "H"), x))
+    assert lines[2][4] == 180.0 and lines[3][4] == 180.0 and lines[3][6] == 0.0
+    back = fr.from_zmatrix(lines)
+    np.testing.assert_allclose(back.xyz[:, 2], [0, 1.06, 2.26, 3.32], rtol=0, atol=1e-12)
+
+
+def test_the_writer_refuses_what_from_zmatrix_cannot_read():
+    """An atom off a line every earlier atom lies on has no dihedral reference
+    without a dummy; a dummy species would be dropped on the way back; a
+    given reference that is collinear or not earlier is refused with the
+    placement's words."""
+    line_then_off = fr.Fragment(("C", "C", "C", "H"),
+                                [[0, 0, 0], [0, 0, 1.2], [0, 0, 2.4], [1.0, 0, 2.6]])
+    with pytest.raises(ValueError, match=r"atom 3 \(H\) is off the line that atoms "
+                       r"0–2 lie on"):
+        fr.to_zmatrix(line_then_off)
+    # the same atoms with the off-line atom earlier write and read back
+    reordered = fr.Fragment(("C", "H", "C", "C"),
+                            line_then_off.xyz[[0, 3, 1, 2]])
+    back = fr.from_zmatrix(fr.to_zmatrix(reordered))
+    assert np.max(np.abs(_distances(back.xyz) - _distances(reordered.xyz))) < 1e-12
+    with pytest.raises(ValueError, match=r"atom 1 has species 'X', the Z-matrix dummy"):
+        fr.to_zmatrix(fr.Fragment(("C", fr.DUMMY), [[0, 0, 0], [0, 0, 1]]))
+    with pytest.raises(ValueError, match=r"line 3 \(H\): reference atoms 2 \(C\), "
+                       r"1 \(C\), 0 \(C\) are collinear"):
+        fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0), (2, 1, 0)])
+    with pytest.raises(ValueError, match=r"line 2 \(C\) takes 2 earlier atom indices"):
+        fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 2), (2, 1, 0)])
+    with pytest.raises(ValueError, match=r"line 1 \(C\) takes 1 earlier atom indices"):
+        fr.to_zmatrix(line_then_off, refs=[(), (None,), (1, 0), (2, 1, 0)])
+    for k in (float("inf"), float("nan")):
+        with pytest.raises(ValueError, match=r"line 3 \(H\) takes 3 earlier atom indices"):
+            fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0), (2, 1, k)])
+    with pytest.raises(ValueError, match="3 reference rows for 4 atoms"):
+        fr.to_zmatrix(line_then_off, refs=[(), (0,), (1, 0)])
+    assert fr.to_zmatrix(fr.Fragment((), np.zeros((0, 3)))) == []
+
+
+def test_the_writer_never_takes_a_triple_its_own_write_made_collinear():
+    """Atom 2 is 0.8e-6 of a radian off the line 0–1 at atom 0, so it is
+    written at exactly 0°, onto that line.  The triple 0, 2, 1 has a sine of
+    1.2e-6 at atom 2 on the positions as given, but is collinear as written:
+    the chooser must not take it for atom 3, and with no other triple it
+    refuses with advice to_zmatrix can follow (no dummy, which it refuses).
+    The same atoms with the H first write and read back."""
+    x = np.array([[0, 0, 0], [0, 0, 3], [8e-7, 0, 1], [0.9, 0.5, -0.2]])
+    f = fr.Fragment(("C", "C", "C", "H"), x)
+    with pytest.raises(ValueError, match=r"atom 3 \(H\) is off the line that atoms "
+                       r"0–2 lie on.*earlier in the order$"):
+        fr.to_zmatrix(f)
+    # the triple given by hand is refused by the placement, with the writer's advice
+    with pytest.raises(ValueError, match=r"^to_zmatrix: Z-matrix line 3 \(H\): "
+                       r"reference atoms 0 \(C\), 2 \(C\), 1 \(C\) are collinear.*"
+                       r"pass refs .* or put an atom off that line earlier in the order$"):
+        fr.to_zmatrix(f, refs=[(), (0,), (0, 1), (0, 2, 1)])
+    first = fr.Fragment(("H", "C", "C", "C"), x[[3, 0, 1, 2]])
+    back = fr.from_zmatrix(fr.to_zmatrix(first))
+    assert np.max(np.abs(_distances(back.xyz) - _distances(first.xyz))) < 1e-12
+
+
+def test_the_writer_takes_the_best_conditioned_dihedral_reference():
+    """Atom 4 sits 1e-6 of a radian off the line 1–0 and is written at exactly
+    180°, which moves it ~1e-6 Å; the triple 2, 3, 4 is then barely off its
+    line (sine ~1e-6), so a dihedral measured from it would turn by O(1) on the
+    way back (0.22 Å in the distances).  The chooser takes the triple furthest
+    from a line, and the round trip keeps only the write's own ~r·1e-6 Å."""
+    h, a = 0.99e-6, 3.05e-6
+    x = np.array([[-2, 0, -h], [-1, 0, -h], [0, -1.5, 0], [0, -3, 0], [a, 0, 0],
+                  [0.3, -1.2, 1.1]])
+    f = fr.Fragment(("C",) * 6, x)
+    lines = fr.to_zmatrix(f)
+    assert lines[4][4] == 180.0
+    back = fr.from_zmatrix(lines)
+    assert np.max(np.abs(_distances(back.xyz) - _distances(x))) < 5 * fr.COLLINEAR_TOL
+    # the same line written from the ill-conditioned triple, as a caller may
+    refs = [tuple(line[1::2]) for line in lines]
+    refs[5] = (2, 3, 4)
+    bad = fr.from_zmatrix(fr.to_zmatrix(f, refs=refs))
+    assert np.max(np.abs(_distances(bad.xyz) - _distances(x))) > 0.1
