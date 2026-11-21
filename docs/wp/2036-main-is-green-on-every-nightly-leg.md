@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-21 — claimed by ghostshift MacBook-Air-9db21f (fluorite's rounding-dependent alarm row)
+Milestone: unscheduled · Status: 🔄 2026-11-21 — the alarm pin leaves out the findings rounding decides and the Le Bail wander row declares its closing stage (PR #1756); waits on a green nightly
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
@@ -318,6 +318,75 @@ gh run list --workflow nightly.yml --branch main --limit 1
   (the two degeneracies); WP-1930 (the 1e-14 nudge).
 
 ## Handover log
+
+- **2026-11-21** — The nightly `full` job was red on 11-20 and 11-21 on one row, and that row
+  was rounding's, not anyone's change. A 1e-14 nudge to the start turns two of fluorite's
+  findings on or off, and one of zincite's. Linux's 11-21 reading is exactly one of the
+  nudged sets. The alarm pin now leaves out those findings and pins everything else, so it
+  should hold on both platforms. The job's longest row, the Le Bail wander test, had grown to
+  5586-8230 s since the closing stage went off by default. It now declares the closing stage
+  and ran in 358 s on a loaded Mac. Nothing in the package changed.
+
+  *Done* (ghostshift runner, PR #1756). Two items, ticked above. (1) `tests/suite_alarms.py`
+  gains `FLAT_TRIPLE` (moved from the test file), `ROUNDING` and `decided_by_rounding`.
+  `firing_table` drops a listed code on a listed standard only where every path it names is a
+  triple member, before counting. The pin is re-written, and a fast test holds which findings
+  leave (`test_only_the_findings_rounding_decides_leave_the_table`). (2)
+  `test_the_state_the_loop_keeps_is_the_state_a_hand_loop_would_continue_from` declares
+  `closing_window_tol = 1e-3` in both halves, and its docstring says why. The hand half needs
+  it too: without it, the next fit would not continue to the loop's pass 2. Inherited pruned:
+  the 11-21 note (issue #1733) is consumed by item 2, the 11-06 note was already task 1's
+  record, and the 11-05 wavelength pin was re-pinned by PR #1429 on 2026-11-05.
+
+  *Settled by Claude* under three grounds, as the shift lead relayed: WP-2225's option 3 (the
+  split stays, report only), the maintainer's memory rule that a spread under perturbation
+  is carried by the bar or removed from the minimum, and this WP's goal of quoting only what
+  the platforms share. The pin may accept either outcome, narrowed to what the probe shows.
+  The lead's brief said fluorite only. Zincite is added because the probe shows the same
+  mechanism there, and Linux's 11-21 diff needs it (below). The alternative was a pin listing
+  each standard's alternative code sets. It was not taken: it pins which sets were seen,
+  and a new nudge set would need another re-pin. Second call: the wander row declares the
+  closing stage rather than taking a lighter start. The issue-triage fold handed this WP that
+  call and named the declaration. The row pins no number, and its assertions held in both
+  arms.
+
+  *Measured* (macOS arm64, worktree `[dev]` venv, compiled tier on, main at `05409a7b9`).
+  1e-14 nudges to the start W, k = 0, ±1, ±3, 7, 20, findings compared with their paths.
+  Fluorite gave three sets: `COVARIANCE_DIRECTION_DISCARDED` on the triple at k = 0,
+  `FLOOR_HIT` on `gauss_size` or `gauss_strain` at five starts, and neither at k = 20.
+  Zincite added a `FLOOR_HIT` row on `gauss_strain` at k = −1, ±3 and 7. Its code set did not
+  change, but its warning rows went 14 → 15. Corundum and brucite gave identical findings at
+  all seven starts. Linux's 11-21 diff decomposes exactly into these two. Fluorite read
+  "neither", which costs one warning under every purpose. Zincite read the extra row, a
+  warning under microstructure and calibration only. That is why Linux's list moved five
+  purposes by −0.125 and left those two alone. After the filter, Linux's reading and this
+  Mac's give the new pin. Slow pin row: 1 passed, 21 s. The wander row: 1 passed, 358 s.
+  A timing probe: the loop 196 s keeping pass 1 of 2 (103.09 %, 434.03 %), the hand fit
+  144 s at 434.03 %. All three ran under a load average of 26-29 from other runners. The
+  same row took 1604 s alone at `8112e3b09` before this change (issue #1733's fold). Probes
+  in `~/.cache/ghostshift/rietx/wp-2036/` (`probe_nudge.py`, `read_nudge.py`,
+  `probe_wander.py`), outside the tree. `tests.reader_output`: exit 0, unchanged.
+  Fast selection on the tree with main merged in (`e792720ab`): 15058 passed, 442 skipped, 32 xfailed, 0 failed, in 11:19 beside another session's pytest. The branch adds one fast test and no skip; the added test took 0.01 s (local junit).
+
+  *Review* (`/code-review high --fix 7eb3dd838..HEAD`, 7 findings, 5 fixed in `570aee6af`).
+  The printed summary of `python -m tests.suite_alarms` now drops what the pin drops
+  (`shared`). The wander docstring no longer names a pass 4. The mark's comment credits the
+  worse-pass rule, not the closing stage, for the stop. Both halves use `CLOSING_WINDOW_TOL`.
+  The alias sits by the imports. Declined: moving the exclusion into the guard, as WP-2050
+  did for correlations, since that changes package output and WP-2225 ruled report-only.
+  Also declined: a Linux reading of the wander row before merge. The row's `kept < ran` was
+  as unmeasured on Linux before this change, and the next nightly reads it.
+
+  *Not done.* The full suite was not run: the branch changes tests only (`tests/CLAUDE.md`
+  § Running, rung 3). The acceptance needs a green nightly after this merges. It also needs
+  a full suite on an arm64 Mac. PR #1425 recorded one Mac-only row there, which stays with
+  issue #1424.
+
+  Next: read the first nightly after the merge. If it is green, write the closing entry against
+  that day's nightlies and the Mac full suite, as #1425's closing comment asks. The one open task
+  above, the standards' closing stage, still waits on the maintainer and can close separately.
+  If a standard's findings move by rounding again, extend `ROUNDING` only after the same
+  nudge sweep shows it.
 
 - **2026-11-20** — The suite alarm pin went red on main the moment #1707 merged. #1707 is
   the QPA plan's stage reorder, which the maintainer ruled for on 2026-11-19. Its own
