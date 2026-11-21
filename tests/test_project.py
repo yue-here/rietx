@@ -17,6 +17,7 @@ import pytest
 
 import rietx as rx
 from rietx import Parameter
+from rietx.history.store import fingerprint
 from rietx.project import PROJECT_JSON, fitted_mask
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -100,8 +101,8 @@ def test_a_hold_survives_reopening_the_project(tmp_path, pattern_file):
     # and it is still enforced, not merely remembered
     result = reopened.fit(plan=SHORT)
     blocked = {s.name: s.blocked_by_hold for s in result.stages if s.blocked_by_hold}
-    # the closing stage frees every glob the plan freed, the cell's too
-    assert blocked == {"cell": ["phases.0.cell.a"], "closing": ["phases.0.cell.a"]}
+    # no closing stage by default since WP-2222, so the cell stage alone
+    assert blocked == {"cell": ["phases.0.cell.a"]}
     assert reopened.refinement.structure.phases[0].cell.a.value == \
         project.refinement.structure.phases[0].cell.a.value
 
@@ -274,6 +275,35 @@ def test_same_bytes_parsed_differently_is_reported_as_a_reader_change(
 
     with pytest.raises(ValueError, match="parses them differently"):
         rx.Project.open(project.path)
+
+
+def test_a_project_on_a_gsas_file_from_before_wp_1952_still_opens(
+        tmp_path, tmp_path_factory, pattern):
+    """The ``gsas`` reader dropped channels whose esd is zero or below until
+    WP-1952 and now keeps them, so a project made before records a shorter
+    pattern's fingerprint. It opens: the fit excludes those channels anyway.
+    """
+    from tests.test_readers import write_gsas_esd
+
+    esd = pattern.sig().copy()
+    esd[[100, 2000]] = 0.0
+    tt = np.asarray(pattern.two_theta)
+    path = write_gsas_esd(tmp_path_factory.mktemp("gsas") / "a.gsas",
+                          pattern.intensity, esd.tolist(),
+                          start=tt[0] * 100.0, step=(tt[1] - tt[0]) * 100.0)
+    project = _create(tmp_path / "s.rex", path)
+    assert len(project.data.two_theta) == len(tt)
+    keep = np.ones(len(tt), dtype=bool)
+    keep[[100, 2000]] = False
+    old = fingerprint(np.asarray(project.data.x())[keep],
+                      np.asarray(project.data.intensity)[keep])
+    doc_path = project.path / PROJECT_JSON
+    raw = json.loads(doc_path.read_text(encoding="utf-8"))
+    raw["patterns"][0]["fingerprint"] = old
+    doc_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    reopened = rx.Project.open(project.path)
+    assert reopened.data.in_range_mask().sum() == len(tt) - 2
 
 
 def test_history_recorded_against_another_pattern_is_refused(
@@ -744,7 +774,7 @@ def test_settings_drive_the_convenience_verbs(tmp_path, pattern_file):
                       two_theta_limits=(4.0, 20.0))
     result = project.fit()
 
-    assert [s.name for s in result.stages] == ["scale_bkg", "closing"]
+    assert [s.name for s in result.stages] == ["scale_bkg"]   # no closing stage (WP-2222)
     assert project.refinement._two_theta_limits == (4.0, 20.0)
 
 

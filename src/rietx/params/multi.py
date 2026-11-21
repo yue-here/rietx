@@ -318,7 +318,8 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     patterns: a rigid body's increment, which restarts at zero at every commit
     while its record moves (WP-1805), and a moment DOF, read in a frame rebuilt
     from the cell at every stage start (#598).  The intensity modes'
-    force-fix does not arise: a joint fit is Rietveld-only.
+    force-fix is refused at fit, where the mode is known
+    (``multi._refuse_joint_mode``, WP-2104).
     """
     if e.locked:
         return ("is structurally fixed by symmetry or by the model (locked), so "
@@ -828,8 +829,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {name!r}: {r.target} in "
@@ -938,8 +940,9 @@ class MultiParameterTable:
                 if i is None:
                     raise ValueError(
                         f"parametric equation {r.name!r}: target {r.target!r} is not a "
-                        f"parameter of histogram {h}'s model; list them with "
-                        f"[e.path for e in mtable.tables[{h}].entries]")
+                        f"parameter of histogram {h}'s model. To list them, build the "
+                        "refinement without parametric= and read the paths from its "
+                        ".parameters(), dropping any 'hist.<h>.' prefix")
                 why = _target_refusal(table, table.entries[i])
                 if why:
                     raise ValueError(f"parametric equation {r.name!r}: {r.target} in "

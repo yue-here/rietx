@@ -20,7 +20,7 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import POISSON_FLOOR_COUNTS, _floor_sigma
+from .pattern import POISSON_FLOOR_COUNTS, SigmaRule, _poisson_where_nonpositive
 
 
 class RefinedParameter(Base):
@@ -732,7 +732,10 @@ class GeometryDistance(Base):
     information, not σ = 0.  The two causes deliberately share one ``None``
     (WP-1003): a consumer never needs σ's *reason* to use the number, and if
     one ever does, a per-row cause field is the additive fix — never a
-    reinterpreted zero.
+    reinterpreted zero.  ``stderr_diagonal`` alone is ``None`` when the row
+    draws on a parameter a discarded direction touched while the data still
+    determine the row (WP-2230): that parameter's own variance is not
+    measured, so a diagonal sum would quote it.
     """
 
     phase_index: int
@@ -1571,6 +1574,10 @@ class HistogramResult(Base):
     restraints: "RestraintReport | None" = None
     #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
     phase_agreement: list[PhaseAgreement] = Field(default_factory=list)
+    #: which σ rule weighted this histogram's channels, counted (WP-1952);
+    #: :meth:`RefinementResult.for_histogram` swaps it in.  ``None`` on a
+    #: result written before the field existed.
+    sigma_rule: SigmaRule | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
@@ -2112,7 +2119,7 @@ _LEGACY_COUNT_FIELD = "n_background_peaks"
 #: reader of any one pattern must see.  ``for_histogram`` copies each once.
 FINDINGS_IN_EVERY_VIEW = frozenset({
     "SCALE_B_INSEPARABLE", "PARAMETRIC_OUT_OF_RANGE",
-    "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN"})
+    "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN", "VARIABLE_NOT_FREED"})
 
 
 def _names_histogram(d: Diagnostic, h: int) -> bool:
@@ -2339,6 +2346,14 @@ class RefinementResult(Base):
     #: a ``replay`` carries it.  ``None`` means nothing counted, never "none
     #: declared", which is ``0``.
     n_background_components: int | None = None
+    #: Which σ rule weighted the fitted channels, counted (WP-1952; WP-2002
+    #: B14): the file's esd, the Poisson fallback √max(y, 1), and the channels
+    #: inside the range whose σ ≤ 0 left the fit.  Written from
+    #: ``CompiledModel.sigma_rule``, which :meth:`PatternData.sigma_rule` built
+    #: at compile with the fit's own window, so a ``replay`` carries it too.
+    #: ``None`` means nothing here counted: a joint fit (each histogram has its
+    #: own), or a result recorded before the field existed.
+    sigma_rule: SigmaRule | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -2439,21 +2454,21 @@ class RefinementResult(Base):
         * results recorded before v0.2 carry no σ at all, and get the same
           Poisson ``√max(y,1)`` fallback the fit itself would have used
           (CLAUDE.md, Weights);
-        * non-positive entries are floored by :meth:`PatternData.sig`'s own
-          rule, so a zero esd is a small σ rather than an ``inf`` that loses
-          the whole trace.
+        * non-positive entries take :meth:`PatternData.sig`'s own rule,
+          √max(y, 1), so a zero esd is a finite σ rather than an ``inf`` that
+          loses the whole trace.  A fit never stores one (WP-1952 leaves such a
+          channel out, or weights it so), so only a hand-built result has any.
 
         Note this says nothing about *where* σ came from: by the time a result
         exists, a file esd column and a Poisson estimate are the same array of
         floats.  ``DataRef.has_sigma`` is the fact that survives, and it is what
         the GUI and the text document both label the residual from.
         """
+        y = np.asarray(self.y_obs, dtype=np.float64)
         if self.sigma:
-            s = np.asarray(self.sigma, dtype=np.float64)
-        else:
-            s = np.sqrt(np.maximum(np.asarray(self.y_obs, dtype=np.float64),
-                                   POISSON_FLOOR_COUNTS))
-        return _floor_sigma(s)
+            return _poisson_where_nonpositive(
+                np.asarray(self.sigma, dtype=np.float64), y)
+        return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
     def for_histogram(self, h: int) -> "RefinementResult":
         """A single-histogram-shaped view of histogram ``h`` for reporting/plots.
@@ -2503,6 +2518,8 @@ class RefinementResult(Base):
         view.y_calc = list(hr.y_calc)
         view.y_background = list(hr.y_background)
         view.sigma = list(hr.sigma)
+        view.sigma_rule = (hr.sigma_rule.model_copy()
+                           if hr.sigma_rule is not None else None)
         view.ticks = dict(hr.ticks)
         view.radiation = (hr.radiation.model_copy(deep=True)
                           if hr.radiation is not None else None)

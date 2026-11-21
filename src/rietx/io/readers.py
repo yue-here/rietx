@@ -16,12 +16,12 @@ by the Poisson fallback (review finding M5).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import numpy as np
 
 from ..schemas.common import Diagnostic
-from ..schemas.pattern import PatternData
+from ..schemas.pattern import NonPositiveSigma, PatternData
 from .formats import (
     PATTERN_FORMATS,
     READER_OPTIONS,
@@ -33,6 +33,7 @@ from .formats import (
     read_pdcif,
     reader_options_for,
 )
+from .formats.base import _point_runs
 
 __all__ = [
     "PATTERN_FORMATS",
@@ -101,20 +102,93 @@ def read_pattern(path: str | Path, *, diagnostics: list[Diagnostic] | None = Non
     ``PATTERN_SIGMA_CONSTANT`` is here for the dead-channel reason: a σ
     identical on every point makes the fit unweighted whichever reader
     produced it, so it is a property of the answer and not of one format.
-    Issue #266 met it in ``xy``, which adopts any positive third column; on
+    Issue #266 met it in ``xy``, which adopts any third column; on
     this hook it also reaches a GSAS esd column, a pdCIF weight loop and a
     ``.chi`` third column.  The σ is kept, because a uniform σ is legal.
+
+    **A σ of zero or below is ruled here, for every format** (WP-1952, WP-2002
+    B5).  Such an esd states no weight: zero claims an exact intensity and a
+    negative one has no meaning.  So by default the channel leaves the fit
+    (``PatternData.nonpositive_sigma = "exclude"``) and
+    ``PATTERN_SIGMA_NONPOSITIVE`` counts it and names where it sits.  The values
+    stay the file's.  ``nonpositive_sigma="poisson"`` weights such channels by
+    √max(y, 1) instead, one count at a zero count, for a file that wrote √0 for
+    a channel that counted nothing; the caller asked, so nothing is reported,
+    and ``RefinementResult.sigma_rule`` counts them.  A column with no positive
+    σ at all states no weight anywhere and is not read, and the same code says
+    so.  The ``xy`` and ``chi`` readers declined one in silence until WP-1952;
+    they now hand it here.
     """
     p = Path(path)
     fmt = identify_format(p)
     kwargs = reader_options_for(fmt, options, diagnostics=diagnostics)
+    # ruled here rather than in each reader: every format's σ meets it
+    rule = kwargs.pop("nonpositive_sigma", "exclude")
+    if rule not in NONPOSITIVE_SIGMA_RULES:
+        raise ValueError(f"reader option nonpositive_sigma= takes one of "
+                         f"{list(NONPOSITIVE_SIGMA_RULES)}, got {rule!r}")
     data = fmt.read(p, diagnostics=diagnostics, **kwargs)
+    sigma_notes = _apply_nonpositive_sigma(data, rule, p.name)
     axis = _axis_diagnostics(data, fmt, p.name)
     if diagnostics is not None:
+        diagnostics.extend(sigma_notes)
         diagnostics.extend(axis)
         diagnostics.extend(_constant_sigma_diagnostics(data, fmt, p.name))
         diagnostics.extend(_dead_channel_diagnostics(data, p.name))
     return data
+
+
+#: The spellings ``nonpositive_sigma=`` takes, ``PatternData``'s own.
+NONPOSITIVE_SIGMA_RULES: tuple[str, ...] = get_args(NonPositiveSigma)
+
+
+def _apply_nonpositive_sigma(data: PatternData, rule: str,
+                             name: str) -> list[Diagnostic]:
+    """Set ``data``'s σ ≤ 0 rule and report it — :func:`read_pattern` says why
+    it is here.  Applied whether or not a caller passed the list."""
+    data.nonpositive_sigma = rule  # type: ignore[assignment]
+    if data.sigma is None:
+        return []
+    sigma = np.asarray(data.sigma, dtype=np.float64)
+    bad = sigma <= 0
+    if not bad.any():
+        return []
+    n_zero, n_neg = int((sigma == 0).sum()), int((sigma < 0).sum())
+    parts = ([f"{n_zero} zero"] if n_zero else []) + (
+        [f"{n_neg} negative"] if n_neg else [])
+    what = " and ".join(parts)
+    if bad.all():
+        data.sigma = None
+        return [Diagnostic(
+            level="warning", code="PATTERN_SIGMA_NONPOSITIVE",
+            message=(f"{name}: every one of its {sigma.size} σ values is zero "
+                     f"or negative ({what}), so the column states no weight "
+                     f"and was not read. The Poisson σ = √max(y, 1) is used "
+                     f"instead."),
+            where=["sigma"], value=float(sigma.size),
+            suggestion=("If the file's intensities are not raw counts, the "
+                        "Poisson σ is not theirs: supply σ yourself, or quote "
+                        "χ² and esds knowing the weights are assumed."))]
+    if rule != "exclude":
+        return []
+    unit = "°" if data.axis == "two_theta" else " µs"
+    label = "2θ" if data.axis == "two_theta" else "flight time"
+    spans, shown = _point_runs(data.x(), np.flatnonzero(bad), unit)
+    n = int(bad.sum())
+    has = "has" if n == 1 else "have"
+    n_y0 = int((data.y()[bad] == 0).sum())
+    return [Diagnostic(
+        level="warning", code="PATTERN_SIGMA_NONPOSITIVE",
+        message=(f"{name}: {n} of {sigma.size} points {has} a σ of zero or "
+                 f"below ({what}), at {label} {shown}. {n_y0} of them "
+                 f"record an intensity of zero. Such a σ states no weight, so "
+                 f"these points are left out of the fit."),
+        where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans],
+        value=float(n),
+        suggestion=("If these are channels that counted zero and the file "
+                    "wrote σ = √0, read it with nonpositive_sigma='poisson' "
+                    "to weight them at σ = √max(y, 1), one count at a zero "
+                    "count."))]
 
 
 def _constant_sigma_diagnostics(data: PatternData, fmt: PatternFormat,
@@ -210,8 +284,14 @@ def _dead_channel_diagnostics(data: PatternData, name: str) -> list[Diagnostic]:
 
     if data.sigma is None or data.axis != "two_theta":
         return []  # the run and window lengths are degrees of 2θ
+    # a channel the σ ≤ 0 rule left out of the fit is not a dead cell to
+    # exclude: PATTERN_SIGMA_NONPOSITIVE has named it.  Under "poisson" it is
+    # fitted at its stand-in σ, and the fit's own check (refine) reads that
+    # weight, so this one does too and the two agree (WP-1952)
+    keep = (~data.nonpositive_sigma_mask() if data.nonpositive_sigma == "exclude"
+            else np.ones(len(data.intensity), dtype=bool))
     out = []
-    for run in dead_channels(data.tt(), data.y(), data.sig()):
+    for run in dead_channels(data.tt()[keep], data.y()[keep], data.sig()[keep]):
         lo, hi = _dead_interval(run)
         out.append(Diagnostic(
             level="warning", code="PATTERN_DEAD_CHANNELS",

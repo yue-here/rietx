@@ -243,7 +243,7 @@ indices int32, so a browser reads each array without copying it.
 | Route | Is |
 |---|---|
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
-| `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
+| `GET /api/project` · `POST /api/project` | the project document; a merge into its settings. The document carries `data_diagnostics` and `history_diagnostics`, what the pattern reader and the history reader repaired or assumed when this session read the project (a reversed scan, a declared range restored or left off), as diagnostics with `code`, `level`, `message` and `where`; empty for a project that needed nothing |
 | `POST /api/project/save` | write the settings file |
 | `POST /api/project/copy` | copy the `.rex` folder, history included, to a `directory` under a `name`; the session stays on the original |
 | `POST /api/project/rename` · `POST /api/project/move` | rename the folder in place; move it into another `directory` |
@@ -258,6 +258,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/structure/symmetry` | the Wyckoff letter per atom, which costs a search per atom |
 | `POST /api/structure/symmetry/preview` · `POST /api/structure/symmetry` | what a space-group change would invalidate; the change |
 | `GET /api/structure3d` | the model as the geometry the 3D view draws |
+| `POST /api/structure3d` | the same geometry at values sent in the body and never applied, as `POST /api/preview` takes them; writes nothing |
 | `GET /api/instrument` · `PATCH /api/instrument` | the instrument, and edits to it |
 | `GET /api/textdoc` · `PUT /api/textdoc` | render the `.rxt` document; apply one |
 
@@ -269,7 +270,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
 | `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
-| `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; writes nothing |
+| `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; `?hold=` names paths held for that answer alone, so the band shows what a pending hold would give; writes nothing |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 
 ### Peaks and indexing

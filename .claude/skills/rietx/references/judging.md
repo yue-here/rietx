@@ -72,7 +72,7 @@ it writes beside them.
 
 **Seed the background first.** `auto_background` starts every coefficient at **0.0**, and the first `lebail_update` runs before the background is fitted, so the reflections get the whole pedestal: **571×** their true intensity under a background 5× the strongest peak. `seed=True` starts at a low count percentile.
 
-**Under a broad hump, hold SNIP.** Each stage partitions against its starting background, so a co-refined one stops short and the reflections keep the rest. Hold `rx.BackgroundFixedPlusChebyshev.from_pattern(rx.PatternData(two_theta=tt, intensity=rx.background.snip(y, w)), source="snip")`, half-window `w` ≈ 3 FWHMs in points. (Measured, one synthetic fixture, WP-1542: background/truth at the hump 0.83 seeded; held, 0.97 at `w` = 3 FWHMs, 0.87 at 6, 0.62 at the hump's σ, which clips it.)
+**Under a broad hump, co-refine the background too**, seeded as above: a Chebyshev or `auto_background`'s P-spline. Each stage partitions against its starting background, so it stops short under the hump and the reflections keep the rest (Measured: WP-1542, background/truth 0.83 there). A held `rx.background.snip` curve rides up into every line's tails, and the absorption screen cannot see it. (Measured: #1569, synthetic LaB₆, SNIP held at 3 FWHMs: La Biso 0.475(14) against a true 0.355, 8.8 esd high; co-refined, 0.379. Same sign on repeats, corundum and FAP.)
 
 **The cell is the weaker half.** Peterson (2005, *Powder Diffr.* **20**, 14)
 fitted triclinic tricalcium silicate at NSLS X7A. Le Bail won on χ² (16.46 against 22.81) and R_p (2.34 against
@@ -223,11 +223,11 @@ c = rx.report.compare_freed(ref, trial)
 [(p.path, p.t_ratio) for p in c.freed], c.delta_bic, c.delta_bic_raw_n
 ```
 
-Read the t-ratios first. A disagreement between the pair is information. A
-block of several parameters can carry a positive joint ΔBIC while no member's
-|t| reaches 2, which says the block moves the fit and no single member is
-measured. A ΔBIC far from t² − ln N_eff for one parameter means f moved between
-the two fits. `predict_then_verify` carries the same record on
+Read `c.diagnostics` first: after `COMPARISON_UNCONVERGED`, quote neither
+number. Then the t-ratios; an `at_bound` row's t is no Wald number. A block can
+carry a positive ΔBIC while no member's |t| reaches 2, so the block moves the
+fit and none is measured. A ΔBIC far from t² − ln N_eff for one parameter means
+f moved between the two fits. `predict_then_verify` carries the same record on
 `VerificationOutcome.comparison`, beside its 1 % χ² rule.
 
 By hand, for a pair `compare_freed` refuses as not nested, remember that

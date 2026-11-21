@@ -174,11 +174,11 @@ def qpa_plan(*, texture: bool = False) -> RefinementPlan:
         Stage("profile_w", ["instrument.profile.w"]),
         Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                           "instrument.profile.x", "instrument.profile.y"]),
+        Stage("lines_axial", ["instrument.source.lines.*.weight",
+                              "instrument.geometry.axial_sl"]),
         Stage("sample_broadening",
               ["phases.*.lor_size", "phases.*.lor_strain",
                "phases.*.gauss_size", "phases.*.gauss_strain"], seed=1e-4),
-        Stage("lines_axial", ["instrument.source.lines.*.weight",
-                              "instrument.geometry.axial_sl"]),
         Stage("biso", ["phases.*.atoms.*.biso"]),
     ]
     if texture:
@@ -1074,7 +1074,7 @@ def run(standard_key: str, variant_key: str, *,
     y_bkg = np.asarray(result.y_background, dtype=float)
     # the package's authority for both, so the page's Δχ² (a subtraction of
     # two records' cumulatives) is report.cumulative_delta_chi2 (WP-1339).
-    # σ is result.sig(): it floors σ ≤ 0 at a thousandth of the median where
+    # σ is result.sig(): it puts √max(y, 1) at a σ ≤ 0 (WP-1952) where
     # this line used to floor at 1.0, so a record differs from its
     # predecessors only on a pattern with a non-positive σ.
     delta = weighted_residual(result)

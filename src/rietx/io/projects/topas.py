@@ -169,6 +169,7 @@ from ...crystallography.symmetry import (
     get_spacegroup,
     refuse_distortion_modes,
     refuse_operation_list,
+    refuse_parent_cell,
     setting_diagnostics,
     site_orbit,
 )
@@ -4537,7 +4538,9 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
                 **_reserved_phase_terms(model, len(phases), RESERVED_PHASE_TERMS,
                                         reserved_read)))
             from ...crystallography.magnetic.scattering import check_group_is_structure_symmetry
+            from ...crystallography.symmetry import check_phase_cell_ties
             check_group_is_structure_symmetry(phases[-1])
+            check_phase_cell_ties(phases[-1], prefix=f"phases.{len(phases) - 1}")
         except TopasInpError:
             raise
         except Exception as exc:
@@ -5096,6 +5099,7 @@ def from_structure(structure: Structure, *,
                 f"writer's `write_record` refuses one format over")
         refuse_operation_list(phase, "a TOPAS `.inp`")
         refuse_distortion_modes(phase, "a TOPAS `.inp`")
+        refuse_parent_cell(phase, "a TOPAS `.inp`")
         magnetic_number = _magnetic_group_line(phase)
         lines.append("str")
         lines.append(f'  phase_name "{phase.name}"')

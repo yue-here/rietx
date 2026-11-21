@@ -524,6 +524,20 @@ class GuiSession:
             # it is a summary rather than a second authority — the phases live
             # in the history like every other model fact.
             "n_phases": len(p.refinement.structure.phases),
+            # What the readers repaired or assumed on the read this session
+            # holds (WP-1522): the pattern reader's (a reversed scan, dropped
+            # rows, a scaled intensity) and the history reader's (a declared
+            # range restored or left off, an earlier tree skipped).  A repair
+            # that changes how the next fit moves must be readable where that
+            # fit is started, and these are its only carrier: `Project` keeps
+            # them in memory, never in project.json.  On the document rather
+            # than on the open route's answer alone, so a reload's
+            # `GET /api/project` still says it; in the readers' order, as
+            # `Diagnostic` dumps, the order to show them being the panel's.
+            "data_diagnostics": [d.model_dump(mode="json")
+                                 for d in p.data_diagnostics],
+            "history_diagnostics": [d.model_dump(mode="json")
+                                    for d in p.history_diagnostics],
         }
 
     def project_patch(self, body: dict) -> dict:
@@ -1668,8 +1682,15 @@ class GuiSession:
     def structure3d(self, phase: int = 0, *, probability: float = 0.5,
                     bond_tolerance: float | None = None, disorder: str = "all",
                     centres: list[str] | None = None,
-                    ligands: list[str] | None = None) -> dict:
+                    ligands: list[str] | None = None,
+                    body: dict | None = None) -> dict:
         """The current model as drawable geometry (WP-1015).
+
+        ``body`` is that of ``POST /api/structure3d``: the same ``values`` map
+        ``POST /api/preview`` takes, so the Structure graph draws a person's
+        unapplied slider values as the Pattern graph does (WP-2218). Writing
+        nothing, and idle-only like that preview, since it reads the compiled
+        table the preview keeps.
 
         A route beside ``/api/structure`` rather than an arm of it, on WP-1008's
         test for a new one: it returns what the model does **not** already say —
@@ -1680,8 +1701,9 @@ class GuiSession:
         symmetry search may live that ``/api/structure`` refused (that route
         refetches on every head move; this one is opened deliberately).
 
-        Not idle-gated: it reads the model, like ``/api/structure``, and a fit in
-        flight does not move the values the working state holds.
+        Without a ``body`` it is not idle-gated: it reads the model, like
+        ``/api/structure``, and a fit in flight does not move the values the
+        working state holds. With one it is, as said above.
         """
         from . import structure3d as geometry
 
@@ -1694,9 +1716,15 @@ class GuiSession:
                     geometry.element_list(values, what)
             except ValueError as exc:
                 raise GuiError(str(exc), where=[what]) from None
-        structure = self._need_project().refinement.structure
+        if body is not None:
+            from . import preview
+
+            self._require_idle()
+            structure = preview.structure_at(self._need_project(), body)
+        else:
+            structure = self._need_project().refinement.structure
         try:
-            return geometry.build(
+            built = geometry.build(
                 structure, int(phase), probability=float(probability),
                 bond_tolerance=(geometry.BOND_TOLERANCE if bond_tolerance is None
                                 else float(bond_tolerance)), disorder=disorder,
@@ -1706,6 +1734,13 @@ class GuiSession:
                            where=["phase"]) from None
         except ValueError as exc:
             raise GuiError(str(exc), where=["probability"]) from None
+        # the planar rings ride with the drawing they were found on, for the
+        # drawer's "fill planar rings" (WP-1548); a ring is the server's to find
+        # as a polyhedron is, and the walk is bounded (rings.MAX_RING_DEGREE)
+        from ..viz.figure3d import rings
+
+        built["rings"] = rings.ring_fills(built)
+        return built
 
     def instrument(self) -> dict:
         return {"instrument": self._need_project().refinement.instrument.model_dump(
@@ -1745,12 +1780,49 @@ class GuiSession:
         return {"node_id": node, **self.structure()}
 
     def instrument_patch(self, body: dict) -> dict:
+        """Replace the instrument: one ``edit_model`` node.
+
+        Two optional arms carry the Background graph's Type switch and Terms
+        change (WP-2218 review), because the hold and free registers are
+        declarations about a *path* and an edit keeps them: ``Refinement``
+        reapplies both by name to whatever the new model calls ``c3``.
+        ``unhold`` lists held paths or globs to release before the edit (one
+        ``set_hold`` node), or a Chebyshev ``c3`` held would hold the new
+        P-spline's ``c3``, and a cut ``c5`` the ``c5`` a later extension adds.
+        ``free`` lists paths or globs to free after it (one ``set_vary``
+        node), since a coefficient the old background did not have, or had
+        fixed, is otherwise built fixed whatever its ``vary`` says. All the
+        verbs run on a history-free copy first (:func:`rehearse`), so a refusal
+        from any leaves the holds, the model and the history as they were.
+        """
         self._require_idle()
-        node = self._edit(
-            instrument=_as_instrument(_with_file_optics(
-                _need(body, "instrument"),
-                lambda: self._need_project().data.metadata), self.uploads),
-            label=body.get("label") or "instrument edited")
+        p = self._need_project()
+        unhold = body.get("unhold") or []
+        free = body.get("free") or []
+        for arm, globs in (("unhold", unhold), ("free", free)):
+            if not isinstance(globs, list) or not all(isinstance(g, str) for g in globs):
+                raise GuiError(f"'{arm}' is a list of dot-paths or globs", where=[arm])
+        instrument = _as_instrument(_with_file_optics(
+            _need(body, "instrument"), lambda: p.data.metadata), self.uploads)
+        label = body.get("label") or "instrument edited"
+
+        def apply(ref) -> str | None:
+            arm = "unhold"
+            try:
+                if unhold:
+                    ref.unhold(unhold)
+                node = _edit_on(ref, instrument=instrument, label=label)
+                arm = "free"
+                if free:
+                    ref.set_vary(free, True)
+                    node = ref._head_id
+            except ValueError as exc:
+                raise GuiError(str(exc), where=[arm]) from None
+            return node
+
+        if unhold or free:
+            rehearse(p.refinement, apply)
+        node = apply(p.refinement)
         return {"node_id": node, **self.instrument()}
 
     def structure_position(self, body: dict) -> dict:
@@ -2070,7 +2142,11 @@ class GuiSession:
             plan = self._effective_plan(body.get("plan"))
 
             def call(stream, token):
-                return p.fit(plan=plan, events=stream, cancel=token)
+                # staged until the stage ladder has a view of a one-stage
+                # re-fit: after one, no run on record matches the plan on
+                # screen and the Rwp column goes blank (WP-2224, with Yue)
+                return p.fit(plan=plan, events=stream, cancel=token,
+                             refit="stages")
 
             label = ""
             n_stages = len(plan.run_stages())   # the closing stage counts
@@ -3119,14 +3195,18 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
-    def background(self) -> Packed:
+    def background(self, hold: list[str] | None = None) -> Packed:
         """The background curve and the band it may move in, writing nothing
         (WP-2129). Idle-only, like every verb that compiles;
-        :mod:`rietx.gui.background` has the band's derivation."""
+        :mod:`rietx.gui.background` has the band's derivation. ``hold`` names
+        paths held for this answer alone, a person's pending holds (WP-2218)."""
         from . import background
 
         self._require_idle()
-        return background.answer(self._need_project())
+        try:
+            return background.answer(self._need_project(), hold)
+        except background.UnknownHold as exc:
+            raise GuiError(str(exc), where=exc.missing) from exc
 
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
@@ -3927,6 +4007,40 @@ def _stored_param(tree: dict, path: str) -> dict:
     return node
 
 
+def _follow_cell_ties(tree: dict, path: str, value: float) -> None:
+    """Move every cell entry its space group ties to ``path`` along with it.
+
+    ``set_values`` does this through ``ParameterTable.refresh_ties``.  A value
+    written into the dumped model has no table behind it, and since WP-2150
+    the table refuses a tied entry left behind its source, so b follows a here
+    as it does there.  A parent's cell (``phases.0.parent_cell.cell.a``) is
+    tied under the parent's group, as the table ties it.
+    """
+    from ..crystallography.symmetry import cell_constraints, resolve_group
+
+    match = re.fullmatch(r"phases\.(\d+)\.(parent_cell\.)?cell\.(\w+)", path)
+    if match is None:
+        return
+    phase = tree["phases"][int(match.group(1))]
+    declared = phase.get("parent_cell")
+    try:
+        if match.group(2):
+            if declared is None:
+                return
+            sg, cell = resolve_group(declared["space_group"]), declared["cell"]
+        elif declared is not None:
+            return                   # the child's own cell is derived and locked
+        else:
+            sg = resolve_group(phase["space_group"], phase.get("symmetry_operations"))
+            cell = phase["cell"]
+        ties = cell_constraints(sg).ties
+    except (RuntimeError, ValueError):
+        return                       # the table's own refusal names the group
+    for name, source in ties.items():
+        if source == match.group(3):
+            cell[name]["value"] = value
+
+
 def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
                               values: dict) -> tuple[Structure | None,
                                                      Instrument | None]:
@@ -3970,6 +4084,7 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         stored["min"], stored["max"] = lo, hi
         if value is not None:
             stored["value"] = value
+            _follow_cell_ties(tree, path, value)
         touched["instrument" if path.startswith("instrument.") else "structure"] = True
     if restraints:
         from ..schemas.structure import ValueRestraint
