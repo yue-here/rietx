@@ -110,6 +110,7 @@ from .refine import (
     _fixed_literal_diagnostics,
     _flat_moment_scan,
     _frozen_compile_diagnostics,
+    _geometry_unstated_diagnostics,
     _guard_diagnostics,
     _harmonic_diagnostics,
     _held_scale_phases,
@@ -258,6 +259,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (HISTOGRAM,), "µR/µt is per wavelength and geometry"),
     "_capillary_offset_diagnostics": (
         (HISTOGRAM,), "each histogram has its own geometry and locked entries"),
+    "_geometry_unstated_diagnostics": (
+        (HISTOGRAM,), "each histogram's instrument states its own geometry, "
+                      "or none (WP-2015)"),
     "_roughness_regime_diagnostics": (
         (HISTOGRAM,), "a roughness model is declared on one instrument and "
                       "judged over that histogram's range"),
@@ -1736,7 +1740,10 @@ class MultiHistogramRefinement:
         _refuse_joint_mode(self.mtable, mode)
         # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
         # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
-        plan = resolve_plan(plan, mode)
+        # the geometry the histograms share; none where they differ, which
+        # claims nothing and swaps nothing (WP-2015)
+        kinds = {ins.geometry.kind for ins in self.mtable.instruments}
+        plan = resolve_plan(plan, mode, kinds.pop() if len(kinds) == 1 else None)
         if not plan.stages:
             # refused before an event is emitted or a run recorded, as
             # ``Refinement.fit`` refuses it (WP-1110 item 6)
@@ -1853,7 +1860,9 @@ class MultiHistogramRefinement:
             raise IndexError(f"histogram {histogram} of a {n}-histogram fit")
         if plan is not None:
             # read as the fit that made the result read it (WP-2102)
-            plan = resolve_plan(plan, self.result_.mode)
+            kinds = {m.geometry_kind for m in self._models}
+            plan = resolve_plan(plan, self.result_.mode,
+                                kinds.pop() if len(kinds) == 1 else None)
         answer = self._answer[histogram]
         return build_report(
             self.result_.for_histogram(histogram),
@@ -2598,6 +2607,9 @@ class MultiHistogramRefinement:
             # Per histogram, like the absorption and wavelength diagnostics
             # above: each has its own geometry and locked-entry table.
             diags.extend(_capillary_offset_diagnostics(model, table))
+            # an instrument stating no geometry has every geometry-specific
+            # correction off, per histogram like the line above (WP-2015)
+            diags.extend(_geometry_unstated_diagnostics(model))
             # A declared background peak narrowing toward the resolution is a
             # disguised Bragg peak here exactly as in a single fit — and the
             # joint path is the only one that never ran the check.  Per

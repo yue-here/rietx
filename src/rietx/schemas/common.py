@@ -724,6 +724,13 @@ from .._nearmiss import did_you_mean
 #: refines as before.  A bump rather than "also in 0.61" because 1.12.0 shipped
 #: 0.61: a 1.12 build refuses a phase or instrument carrying the key, and the
 #: version now says why.
+#: Also in 0.62 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
+#: document that omits the key (or the whole geometry) reads at the old
+#: ``"debye_scherrer"`` through the same readers.  Every writer here writes
+#: the key, so only a hand-written file meets this.  The new field
+#: ``RefinementResult.assumed_instrument`` is additive and defaults to
+#: ``None``, "a result stored before the field".
 SCHEMA_VERSION = "0.62"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

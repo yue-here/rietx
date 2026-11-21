@@ -875,8 +875,56 @@ _MODE_SUBSTITUTES: dict[tuple[str, str], str] = {
     ("mccusker_default", "pawley"): "pawley_default",
 }
 
+#: (preset name, geometry kind) -> (globs freed, globs held) in the stage that
+#: frees the zero, under every mode the name runs as (WP-2015; Yue's ruling of
+#: 2026-11-16 on question 7 replaced the maintainer's B7 of 2026-10-19, which
+#: freed both).  Data for the same reason as :data:`_MODE_SUBSTITUTES`: the
+#: plan page says what each name runs as.
+#:
+#: A Bragg-Brentano specimen's displacement moves every peak by -(2s/R)*cos(theta)
+#: (Wilson 1963), the dominant lab-goniometer error, and the zero is a constant
+#: shift that, refined with it, is a near-exact degeneracy (Rowles 2021,
+#: J. Appl. Cryst. 54, §3.4.1; McCusker et al. 1999, §5): on SRM 660c the pair
+#: gave the cell a 2.7x larger esd and ``HIGH_CORRELATION``, on fluorapatite and
+#: SRM 1976a 11-13x and ``FLAT_DIRECTION``.  So the default frees the
+#: displacement *in place of* the zero, which stays at the instrument's stated
+#: value (a calibrated zero is measured outside the sample, Cline et al. 2015,
+#: J. Res. NIST 120, §6), and never both.  Nothing else of
+#: ``lab_bragg_brentano`` comes with it: the Ka2 ratio and the axial ratios
+#: stay at the caller's values.  An unstated geometry, a capillary and a
+#: transmission plate swap nothing, so they run the name as it stands.
+_GEOMETRY_SWAPS: dict[tuple[str, str], tuple[tuple[str, ...], tuple[str, ...]]] = {
+    ("mccusker_default", "bragg_brentano"): (
+        ("instrument.geometry.sample_displacement",), ("instrument.zero_shift",)),
+}
 
-def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> RefinementPlan:
+#: The glob naming the stage a geometry's swap acts in.
+_ZERO_GLOB = "instrument.zero_shift"
+
+
+def _with_geometry_swap(plan: RefinementPlan, freed: tuple[str, ...],
+                        held: tuple[str, ...]) -> RefinementPlan:
+    """``plan`` with ``freed`` in the stage that frees the zero and ``held`` out.
+
+    The stage is renamed ``displacement`` once the zero has left it.  Every
+    preset a name in :data:`_GEOMETRY_SWAPS` runs as frees the zero in a stage
+    of its own, and a test holds each of them to it, so a preset without one
+    is a ``ValueError`` here rather than a swap that went nowhere.
+    """
+    for i, stage in enumerate(plan.stages):
+        if _ZERO_GLOB in stage.turn_on:
+            stages = list(plan.stages)
+            turn_on = [g for g in stage.turn_on if g not in held]
+            turn_on += [g for g in freed if g not in turn_on]
+            stages[i] = dataclasses.replace(
+                stage, name="displacement", turn_on=turn_on)
+            return dataclasses.replace(plan, stages=stages)
+    raise ValueError(f"no stage of this plan frees {_ZERO_GLOB!r}, so the "
+                     f"geometry's {list(freed)} has no stage to join")
+
+
+def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode,
+                 geometry: str | None = None) -> RefinementPlan:
     """A preset name, a plan or its serializable mirror, as a concrete plan.
 
     ``"mccusker_default"`` is the name every caller passes without thinking, and
@@ -898,6 +946,14 @@ def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> Refinem
     types agreeing, not a contract, and it ends the first time a stage grows a
     field or a consumer calls a method; converting states it instead.
     ``PlanSpec._accept_the_dataclass`` is this crossing in the other direction.
+
+    **The declared geometry picks too** (WP-2015).  ``geometry`` is the
+    instrument's ``Geometry.kind``; a name in :data:`_GEOMETRY_SWAPS`
+    under that kind frees its globs in the zero's stage *in place of* the
+    zero, after the mode's substitution, so a Le Bail or Pawley run of
+    ``"mccusker_default"`` swaps too.  ``None`` makes no claim and swaps nothing, which is what a
+    caller without an instrument passes.  A plan object or a ``PlanSpec`` is
+    run as given: only a name is resolved.
     """
     if isinstance(plan, PlanSpec):
         return plan.to_plan()
@@ -905,10 +961,12 @@ def resolve_plan(plan: "RefinementPlan | PlanSpec | str", mode: Mode) -> Refinem
         return plan
     name = _MODE_SUBSTITUTES.get((plan, mode), plan)
     try:
-        return PLAN_PRESETS[name]()
+        built = PLAN_PRESETS[name]()
     except KeyError:
         raise ValueError(f"unknown plan preset {plan!r}; "
                          f"available: {sorted(PLAN_PRESETS)}") from None
+    swap = _GEOMETRY_SWAPS.get((plan, geometry)) if geometry else None
+    return _with_geometry_swap(built, *swap) if swap else built
 
 
 @dataclass(frozen=True)
@@ -994,9 +1052,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "A lab pattern where something outside the fit pins the zero shift "
             "or the specimen displacement, such as a calibrated goniometer or "
             "an internal standard. This plan frees both in one stage. Unpinned, "
-            "they are collinear with the lattice parameters. On one "
-            "uncalibrated pattern, use `mccusker_default` or "
-            "`mccusker_structural`, which free the zero shift alone. This plan "
+            "they are collinear with the lattice parameters. "
+            "`mccusker_default` frees the zero shift, and on a stated "
+            "Bragg-Brentano geometry the specimen displacement in its place, "
+            "never both and never the emission-line weights or S/L. This plan "
             "refines specimen and instrument effects together, so read the "
             "correlation guards before quoting a width."),
     ),

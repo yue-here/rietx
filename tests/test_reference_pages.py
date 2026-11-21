@@ -190,6 +190,25 @@ def test_the_mode_substitutions_are_what_resolve_plan_runs():
         assert f"Under `{mode}`, `{name}` runs as `{twin}`." in text
 
 
+def test_the_geometry_swaps_are_what_resolve_plan_runs():
+    """WP-2015: the page states each swap, and resolve_plan makes it."""
+    from rietx.strategy.staged import _GEOMETRY_SWAPS, resolve_plan
+
+    text = reference_pages.plan_ladder()
+    for (name, kind), (freed, held) in _GEOMETRY_SWAPS.items():
+        freed_text = ", ".join(f"`{g}`" for g in freed)
+        held_text = ", ".join(f"`{g}`" for g in held)
+        assert (f"On a `{kind}` geometry, `{name}` frees {freed_text} in place "
+                f"of {held_text} in the stage that frees the zero, under "
+                "every mode.") in text
+        for mode in ("rietveld", "lebail", "pawley"):
+            plan = resolve_plan(name, mode, kind)
+            stage = next(s for s in plan.stages
+                         if set(freed) <= set(s.turn_on))
+            assert not set(held) & set(stage.turn_on)
+            assert not set(held) & {g for s in plan.stages for g in s.turn_on}
+
+
 # ----------------------------------------------------------------------
 # The diagnostic index
 # ----------------------------------------------------------------------

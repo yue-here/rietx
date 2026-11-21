@@ -155,7 +155,13 @@ from pydantic import ValidationError
 
 from ..model.tof_spectrum import _coefficient_count
 from ..schemas.common import Diagnostic, Parameter
-from ..schemas.instrument import IncidentSpectrum, Instrument, ProfileTOF, TOFSource
+from ..schemas.instrument import (
+    Geometry,
+    IncidentSpectrum,
+    Instrument,
+    ProfileTOF,
+    TOFSource,
+)
 from .projects.gsas import split_records
 
 #: Documented coefficient names, in the manual's "respectively" order (p. 144,
@@ -216,6 +222,17 @@ _INSTPRM_PROFILE = {"alpha": "alpha1", "beta-0": "beta0", "beta-1": "beta1",
 #: Named in the documentation but with no d-law (or no TOF meaning) published.
 _INSTPRM_ZERO_ONLY = ("beta-q", "sig-q", "Z", "X", "Y", "SH/L", "Polariz.", "Lam")
 _INSTPRM_METADATA = ("Bank", "fltPath", "Azimuth")
+
+
+def _bank(source: TOFSource) -> Instrument:
+    """A read bank, in the geometry ``Instrument.tof_neutron_bank`` states.
+
+    A TOF bank is a can of powder in a white beam, which is the preset's
+    reason for ``debye_scherrer``; a reader building the bank by hand would
+    otherwise get the hand-built default, ``unstated`` (WP-2015), and every fit
+    on it would ask for a geometry the file format has no field for.
+    """
+    return Instrument(source=source, geometry=Geometry(kind="debye_scherrer"))
 
 
 def _note(diagnostics, level, code, message, where=()):
@@ -740,7 +757,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
                                profile_tof=profile, incident_spectrum=spectrum)
         except ValidationError as exc:
             raise ValueError(f"{path}: bank {b}: {exc}") from None
-        out[b] = Instrument(source=source)
+        out[b] = _bank(source)
         for key in dropped:
             if key not in dropped_all:
                 dropped_all.append(key)
@@ -887,4 +904,4 @@ def read_tof_instprm(path: str | Path, *,
         _note(diagnostics, "info", "GSAS2_INSTPRM_FIELD_DROPPED",
               f"{path.name}: {', '.join(dropped)} were read and not carried.",
               where=dropped)
-    return Instrument(source=source)
+    return _bank(source)

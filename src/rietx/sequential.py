@@ -1395,7 +1395,7 @@ class SequentialRefinement:
         xs = [None] * len(patterns) if x is None else [float(v) for v in x]
         if x is not None and x_label == "index":
             x_label = "x"
-        base_plan = resolve_plan(plan, mode)
+        base_plan = resolve_plan(plan, mode, self.instrument.geometry.kind)
         if (mode == "pawley" and self.carry_hkl_intensities
                 and base_plan.closing_window_tol is None):
             # Ruled 2026-11-19 (WP-2222) on a drift along a carried chain:
