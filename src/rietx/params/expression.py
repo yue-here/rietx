@@ -52,7 +52,7 @@ from .._nearmiss import did_you_mean
 
 #: the grammar's version, quoted by ``capabilities()``; a change to what any
 #: expression means, or to what is accepted, moves it
-GRAMMAR_VERSION = "1"
+GRAMMAR_VERSION = "2"
 
 #: the longest expression accepted, in characters
 MAX_LENGTH = 4096
@@ -64,7 +64,11 @@ FUNCTIONS: dict[str, int | None] = {
     "exp": 1, "expm1": 1, "log": 1, "log1p": 1, "sqrt": 1,
     "sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1,
     "abs": 1, "min": None, "max": None, "if": 3, "debye": 1,
+    "orbit_mean": 1, "harmonic": 2,
 }
+#: the functions that read a reflection, bound only inside a peak equation
+#: (WP-2107, ``schemas.peak_equation``); version 2 added both
+REFLECTION_FUNCTIONS = frozenset({"orbit_mean", "harmonic"})
 #: named constants
 CONSTANTS: dict[str, float] = {"pi": math.pi}
 #: words that are operators
@@ -640,6 +644,32 @@ def names_in(node) -> list[str]:
     return list(out)
 
 
+def _refuse_reflection_functions(text: str, tree) -> None:
+    """Refuse ``orbit_mean`` and ``harmonic`` outside a peak equation (WP-2107).
+
+    Both read the reflection a peak equation is evaluated on.  A tie, a
+    variable or a parametric equation has none, so the call could only fail
+    later, when something evaluates it.  The peak equation's compile passes
+    ``reflection=True``; every other expression is built without it.
+    """
+    stack = [tree]
+    while stack:
+        n = stack.pop()
+        if isinstance(n, Neg | Not):
+            stack.append(n.arg)
+        elif isinstance(n, BinOp | Compare | BoolOp):
+            stack.extend((n.right, n.left))
+        elif isinstance(n, Call):
+            if n.func in REFLECTION_FUNCTIONS:
+                at = text.find(n.func)
+                raise ExpressionError(
+                    "unbound", f"{n.func}() reads a reflection's hkl, and only a "
+                    "peak equation (rx.PeakEquation) is evaluated on one. "
+                    "Write it in a peak equation's expression.",
+                    text, at if at >= 0 else None)
+            stack.extend(reversed(n.args))
+
+
 def rewrite(node):
     """``exp(u) - 1`` → ``expm1(u)``, ``log(1 + u)``/``log(u + 1)`` → ``log1p(u)``.
 
@@ -773,11 +803,24 @@ class _Eval:
     partials too, on numpy (a traced backend differentiates the values).
     """
 
-    def __init__(self, xp, env: Mapping[str, Any], wrt: Sequence[str]):
+    def __init__(self, xp, env: Mapping[str, Any], wrt: Sequence[str],
+                 reflection=None, images: bool = False):
         self.xp = xp
         self.env = env
         self.wrt = frozenset(wrt)
         self.numpy = getattr(xp, "name", "") == "numpy"
+        #: the reflection a peak equation is evaluated on (WP-2107), or None;
+        #: ``images`` says the bindings are its orbit images, not its
+        #: representatives (``model.peak_equations.ReflectionFrame``)
+        self.reflection = reflection
+        self.images = images
+
+    def _frame(self, func: str):
+        if self.reflection is None:
+            raise ExpressionError(
+                "unbound", f"{func}() reads a reflection, and only a peak "
+                "equation (rx.PeakEquation) is evaluated on one")
+        return self.reflection
 
     def __call__(self, node, live=None):
         if isinstance(node, Num):
@@ -874,6 +917,25 @@ class _Eval:
     def _call(self, node, live):
         xp = self.xp
         f = node.func
+        if f == "orbit_mean":
+            # the argument on every image of the reflection's Laue orbit, then
+            # each orbit's mean; the partials are averaged the same way, since
+            # the mean is linear
+            frame = self._frame(f)
+            if self.images:
+                v, d = self(node.args[0], live)
+                return (frame.to_images(frame.orbit_mean(v)),
+                        {k: frame.to_images(frame.orbit_mean(g)) for k, g in d.items()})
+            sub = _Eval(xp, frame.image_bindings(self.env), self.wrt, frame,
+                        images=True)
+            v, d = sub(node.args[0], frame.to_images(live))
+            return frame.orbit_mean(v), {k: frame.orbit_mean(g) for k, g in d.items()}
+        if f == "harmonic":
+            degree, n = (_int_literal(a) for a in node.args)
+            if degree is None or n is None:
+                raise ExpressionError("type", "harmonic(l, n) takes two integer "
+                                      "literals, as in harmonic(4, -4)")
+            return self._frame(f).harmonic(degree, n, self.images), {}
         if f == "if":
             c = self.cond(node.args[0], live)
             live_a = c if live is None else _and(xp, live, c)
@@ -941,6 +1003,16 @@ class _Eval:
         return v, ({k: g * h for k, h in dx.items()} if dx else {})
 
 
+def _int_literal(node) -> int | None:
+    """The integer a literal (with an optional sign) spells, or None."""
+    sign = 1
+    if isinstance(node, Neg):
+        sign, node = -1, node.arg
+    if isinstance(node, Num) and float(node.value).is_integer():
+        return sign * int(node.value)
+    return None
+
+
 class Expression:
     """One parsed expression: its text, its tree, its names, and how to run it.
 
@@ -950,9 +1022,11 @@ class Expression:
     (:func:`rewrite`).
     """
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, *, reflection: bool = False):
         self.text = text
         self.tree = parse(text)
+        if not reflection:
+            _refuse_reflection_functions(text, self.tree)
         self._compiled = rewrite(self.tree)
         #: the free names, first use first, ``pi`` left out
         self.names: tuple[str, ...] = tuple(names_in(self.tree))
@@ -994,30 +1068,38 @@ class Expression:
 
         return Expression(to_text(walk(self.tree)))
 
-    def evaluate(self, bindings: Mapping[str, Any], xp=None):
+    def evaluate(self, bindings: Mapping[str, Any], xp=None, *, reflection=None,
+                 images: bool = False):
         """The value, element-wise over whatever ``bindings`` hold.
 
         ``xp`` is a backend namespace (``backend.get_backend()``); ``None``
         is numpy.  A name with no binding raises with code ``unbound``.
+        ``reflection`` is the frame ``orbit_mean`` and ``harmonic`` read
+        (``model.peak_equations.ReflectionFrame``), and ``images`` says the
+        bindings are on its orbit images; without one, either function raises
+        with code ``unbound``.
         """
         xp = _numpy_xp() if xp is None else xp
+        ev = _Eval(xp, bindings, (), reflection, images)
         if xp.name == "numpy":
             with np.errstate(all="ignore"):
-                v, _ = _Eval(xp, bindings, ())(self._compiled)
+                v, _ = ev(self._compiled)
             return v
-        v, _ = _Eval(xp, bindings, ())(self._compiled)
+        v, _ = ev(self._compiled)
         return v
 
-    def gradient(self, bindings: Mapping[str, Any], wrt: Sequence[str]
+    def gradient(self, bindings: Mapping[str, Any], wrt: Sequence[str], *,
+                 reflection=None, images: bool = False
                  ) -> tuple[np.ndarray, list[np.ndarray]]:
         """The value and ∂/∂name for each of ``wrt``, numpy, exact.
 
         A name the expression does not use has a zero partial.  Each partial
-        has the value's shape.
+        has the value's shape.  ``reflection`` and ``images`` are
+        :meth:`evaluate`'s.
         """
         xp = _numpy_xp()
         with np.errstate(all="ignore"):
-            v, d = _Eval(xp, bindings, wrt)(self._compiled)
+            v, d = _Eval(xp, bindings, wrt, reflection, images)(self._compiled)
         v = np.asarray(v)
         out = [np.array(np.broadcast_to(np.asarray(d.get(k, 0.0)), v.shape),
                         dtype=v.dtype) for k in wrt]

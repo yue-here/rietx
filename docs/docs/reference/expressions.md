@@ -12,7 +12,8 @@ Two calls take one.
 The grammar is rietx's own.
 It reads no TOPAS or GSAS-II file, and a translation from either program's spelling is in [Switching](../switching/index.md).
 
-The grammar has a version, and this page describes version 1.
+The grammar has a version, and this page describes version 2.
+Version 2 added `orbit_mean` and `harmonic`, which read a reflection.
 A change to what an expression means, or to what is accepted, moves the version.
 
 ## Numbers and names
@@ -77,9 +78,18 @@ GSAS-II's expressions read `sin`, `cos` and `tan` in degrees (GSAS-II 5.8.4, `GS
 
 `debye(x)` follows Abramowitz and Stegun § 27.1.
 A Debye temperature $\theta_D$ enters as `debye(theta_D / T)`.
+
 Below |x| = 10 it is a 32-point Gauss-Legendre rule on $\int_0^1 g(xu)\,du$, with $g(s) = s/(e^s - 1)$.
 From x = 10 up it is the tail series (π²/6 − Σ e⁻ᵏˣ(x/k + 1/k²))/x.
 Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
+
+Two functions read a reflection, so they work only inside a peak equation (`PeakEquation`).
+Anywhere else, such as in a tie or a `ParametricEquation`, the expression is refused where it is parsed, with code `unbound`.
+
+| Function | Value | Derivative used |
+|---|---|---|
+| `orbit_mean(x)` | the mean of `x` over the images of the reflection's Laue orbit | the mean of the derivatives |
+| `harmonic(l, n)` | the symmetrised spherical harmonic $K_l^n$ of the reflection's direction, with `l` and `n` integer literals | none: it reads no coefficient |
 
 ## Conditions
 
@@ -196,6 +206,8 @@ The table is the test: `tests/test_expression.py` reads it from this page.
 | `debye(20)` | none | 0.08224670117820002 |
 | `debye(-1)` | none | 1.2775046341122482 |
 | `debye(-30)` | none | 15.05483113556151 |
+| `orbit_mean(x)` | x=1 | error: `unbound` |
+| `harmonic(4, 0)` | none | error: `unbound` |
 | `zero_a + grad / (exp(theta / T) - 1)` | zero_a=7.29, grad=1e-5, theta=150, T=300 | 7.290015414940825 |
 | `a * (1 - T / Tc) ^ beta` | a=2, T=100, Tc=300, beta=0.3 | 1.7709349865911121 |
 | `x^y^z` | x=1, y=2, z=3 | error: `power_chain` |
