@@ -473,6 +473,143 @@ def test_axial_free_at_zero_nodes_do_not_change_the_pattern(monkeypatch):
     assert np.max(np.abs(y_free - y_fixed)) <= 1e-14 * np.max(y_fixed)
 
 
+_SL, _HL = "instrument.geometry.axial_sl", "instrument.geometry.axial_hl"
+_AXIAL = (_SL, _HL)
+
+
+@pytest.mark.parametrize("start, lifted", [
+    ((0.0, 0.0), {_SL: 0.02, _HL: 0.01}),
+    ((0.0, 0.015), {_SL: 0.02}),
+    # H/L's own start is 0.01 = S/L's value: it takes S/L's number instead
+    ((0.01, 0.0), {_HL: 0.02}),
+    # and S/L's 0.02 = H/L's value: S/L takes H/L's number
+    ((0.0, 0.02), {_SL: 0.01})])
+def test_a_stage_lifts_an_aperture_freed_on_zero(start, lifted):
+    """WP-1955: a stage starts an aperture it frees on zero at
+    ``AXIAL_SL_START`` / ``AXIAL_HL_START`` (never at its partner's value),
+    records it in ``StageResult.seeded``, and touches neither a positive
+    aperture nor a held one.
+
+    The FCJ profile is quadratic in an aperture at zero, so its exact column
+    there is nearly zero and Gauss-Newton stays put: before the lift, #1075's
+    repro 1 ended ``converged`` with both on zero at Rwp 0.0834, where one
+    TRF stage reached 0.0454 (``forward.apertures_to_lift``).  Here the data
+    carry 0.03 on both, and from every start the stage leaves zero.
+    """
+    from rietx.model.forward import AXIAL_PATHS
+    tt = np.arange(15.0, 80.0, 0.02)
+    truth = _rutile_axial(0.03, False)
+    y = np.asarray(truth.predict(tt)) * 1e4 + 50.0
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(y).tolist())
+    ref = _rutile_axial(0.0, False)
+    g = ref.instrument.geometry
+    g.axial_sl.value, g.axial_hl.value = start
+    ref.structure.phases[0].scale.value *= 1e4
+    ref.instrument.background.coefficients[0].value = 50.0
+    stage = rx.Stage("axial", list(AXIAL_PATHS), max_iter=3)
+    res = ref.run_stage(data, stage, telemetry=False)
+    assert res.stages[-1].seeded == lifted
+    assert all(ref.instrument.geometry.model_dump()[p.rsplit(".", 1)[1]]["value"] > 0.0
+               for p in AXIAL_PATHS)
+    held = _rutile_axial(0.0, False)
+    held.hold("instrument.geometry.axial_hl")
+    res = held.run_stage(data, stage, telemetry=False)
+    assert res.stages[-1].seeded == {AXIAL_PATHS[0]: 0.02}
+    assert held.instrument.geometry.axial_hl.value == 0.0
+
+
+def _noisy_rutile_pair(truth, seed):
+    """Lab-count rutile (strongest line about 68 000) carrying ``truth`` as
+    (S/L, H/L), and a model with both on zero."""
+    tt = np.arange(15.0, 80.0, 0.02)
+    ref = _rutile_axial(0.0, False)
+    g = ref.instrument.geometry
+    g.axial_sl.value, g.axial_hl.value = truth
+    base = np.asarray(ref.predict(tt))
+    k = 6.8e4 / base.max()
+    y = np.random.default_rng(seed).poisson(base * k + 50.0).astype(float)
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(np.maximum(y, 1.0)).tolist())
+    start = _rutile_axial(0.0, False)
+    start.structure.phases[0].scale.value *= k
+    start.instrument.background.coefficients[0].value = 50.0
+    return start, data
+
+
+@pytest.mark.parametrize("truth, seed", [((0.05, 0.01), 0), ((0.035, 0.025), 2)])
+def test_two_lifted_apertures_do_not_stop_on_the_equal_line(truth, seed):
+    """WP-1955, the review of #1372: the pattern is symmetric in S/L and H/L,
+    so a pair lifted to one value has identical columns and stays on the line
+    S/L = H/L.  A stage freeing only the two ratios, on data whose ratios
+    differ, must reach the true pair (in either order).  Both ratios started
+    at 0.02, it ended ``converged`` at 0.0332/0.0332 for (0.05, 0.01) and at
+    0.0303/0.0303 for (0.035, 0.025), 0.005 to 0.017 from the truth.
+    """
+    start, data = _noisy_rutile_pair(truth, seed)
+    start.run_stage(data, rx.Stage("axial", list(_AXIAL), max_iter=60),
+                    telemetry=False)
+    g = start.instrument.geometry
+    got = sorted((g.axial_sl.value, g.axial_hl.value))
+    assert got == pytest.approx(sorted(truth), abs=2e-3), got
+
+
+def test_an_aperture_the_caller_freed_by_hand_is_lifted_too():
+    """WP-1955, the review of #1372: the lift is gated on an earlier stage of
+    this fit having refined the row, not on its being in the free set, so
+    ``set_vary`` then ``run_stage`` lifts it as naming it in the stage does.
+    On #1075's repro that stage stayed at Rwp 0.0831 with ``seeded == {}``.
+    """
+    start, data = _noisy_rutile_pair((0.04, 0.03), 0)
+    start.set_vary(list(_AXIAL), True)
+    res = start.run_stage(data, rx.Stage("axial", list(_AXIAL), max_iter=3),
+                          telemetry=False)
+    assert res.stages[-1].seeded == {_SL: 0.02, _HL: 0.01}
+
+
+def test_the_lift_starts_off_the_partners_value_in_a_joint_fit():
+    """WP-1955, the review of #1372: the joint runner writes the same lift,
+    one row per histogram, and records all four.  By the symmetry of the pair
+    the two histograms of one instrument may end on opposite orders of the
+    pair, where main had them the same.
+    """
+    from tests import test_multi_histogram as tm
+    patterns = [
+        tm.synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
+                      bkg=[40.0, -6.0, 1.5], seed=1),
+        tm.synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
+                      bkg=[70.0, 5.0, -2.0], seed=2)]
+    structure, instruments = tm.perturbed_inputs()
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("axial", list(_AXIAL), max_iter=3)])
+    res = rx.refine_multi(patterns, structure, instruments, plan=plan)
+    assert res.stages[0].seeded == {
+        f"hist.{h}.{p}": v for p, v in ((_SL, 0.02), (_HL, 0.01))
+        for h in (0, 1)}
+
+
+def test_an_aperture_an_earlier_stage_refined_is_not_lifted_again():
+    """WP-1955: within a fit the lift starts only an aperture no earlier stage
+    refined.  One an earlier stage left on zero is where its data put it, and
+    a later stage naming it again (a plan's closing stage does) leaves it
+    there.  ``run_stage`` has no earlier stage, so it lifts a hand-freed row
+    (``test_an_aperture_the_caller_freed_by_hand_is_lifted_too``).
+    """
+    tt = np.arange(15.0, 80.0, 0.02)
+    y = np.asarray(_rutile_axial(0.03, False).predict(tt)) * 1e4 + 50.0
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(y).tolist())
+    ref = _rutile_axial(0.0, False)
+    ref.structure.phases[0].scale.value *= 1e4
+    ref.instrument.background.coefficients[0].value = 50.0
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("axial", list(_AXIAL), max_iter=2),
+        rx.Stage("axial again", list(_AXIAL), max_iter=2)])
+    res = ref.fit(data, plan=plan, telemetry=False)
+    assert res.stages[0].seeded == {_SL: 0.02, _HL: 0.01}
+    assert res.stages[1].seeded == {}
+
+
 # ---------------------------------------------------------------------------
 # FCJ quadrature error over the claimed domain (WP-2002, B10)
 # ---------------------------------------------------------------------------
