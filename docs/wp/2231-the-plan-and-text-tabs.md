@@ -1,6 +1,6 @@
 # WP-2231 — the Plan and Text tabs at `/next`: a plan read as a recipe with Free and Fix rows, and a text buffer whose edits ride the action bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Plan tab in review (#PRNUM); the Text tab is next
+Milestone: gui-overhaul · Status: 🔄 2026-11-21 — the Plan tab in review (#1755); the Text tab is next
 Depends on: 2218 (hand fitting and the other graphs)
 Priority: P2 2026-11-21 — a feature the open milestone was opened for: R4, the next piece after R3
 
@@ -111,7 +111,7 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   Apply is refused until Revert. Fix: run `dropPending` against the current rows at the end of
   `restoreDraft`. Put it in `Params.svelte`, never in `Frame.svelte`'s `restoreKept` block,
   which this WP edits.
-  Fixed in the first PR (#PRNUM).
+  Fixed in the first PR (#1755).
 - **A glob hold matching nothing refuses the band (same review, finding 2, low).**
   `src/rietx/gui/background.py` (about :214-219) answers `GET /api/background` with 400 "no
   parameter to hold" for a pending glob matching no row, while `Refinement.hold` takes the same
@@ -119,7 +119,7 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   accepts. Today's `/next` makes such a glob only through a restored draft. Fix: skip globs
   that match nothing and refuse only literal paths, as `Refinement.hold` does. Probe:
   `phases.0.atoms.*.adp.*` on `fap`.
-  Fixed in the first PR (#PRNUM).
+  Fixed in the first PR (#1755).
 
 ## Tasks
 
@@ -221,7 +221,7 @@ The Plan tab (the first PR), most consequential first:
 
 ## Handover log
 
-- **2026-11-21** — the Plan tab at `/next`, the first of R4's two PRs (#PRNUM). The rebuilt page
+- **2026-11-21** — the Plan tab at `/next`, the first of R4's two PRs (#1755). The rebuilt page
   now shows the plan as the prototype draws it: one block per stage with its Free and Fix rows
   of named chips, a grouped picker behind `+ Add`, the closing stage, and the parameters no
   stage frees. Editing the plan counts as one pending edit in the action bar, survives a crash
@@ -240,7 +240,26 @@ The Plan tab (the first PR), most consequential first:
     loaded. `GET /api/background` refuses only a literal path the table lacks
     (`params.vector.is_literal_path`), as `Refinement.hold` does. Each fix's new case was
     run red without the fix first. main (with #1741) is merged in and the dist rebuilt.
-  - *Measured* (`[dev]` venv, darwin/arm64, on the merged tree): MEASURED
+  - *Measured* (`[dev]` venv, darwin/arm64, on the merged tree): fast suite 15233 passed, 433
+    skipped, 32 xfailed (9:28, alone on the machine, through `serial.py`); the three added
+    python tests cost 4.36 s locally, 4.28 s of it the two browser cases; vitest 889 passed
+    (49 files); svelte-check 0 errors in 465 files; every `tests/*_browser.py` 176 passed; the
+    GUI python files plus `test_gui_background.py` and `test_docs_consistency.py` 316 passed;
+    ruff, the tutorials' format check, skill caps, skill surface and audit delta clean; Vale
+    0 errors (281 warnings, none on a file this branch touches); `tests.reader_output`
+    unchanged (exit 0).
+  - *Review*: `/code-review high --fix` found nine defects in the Plan tab and its route,
+    all fixed in one commit with three new vitest cases: Stage settings threw on a typed
+    number and took an emptied guard as 0; opening another project kept the old plan on
+    the undo stack; the action bar's stage count went stale after a store; Run this stage
+    echoed before it could refuse and hid the refusal's panel; deleting a stage above the
+    selection moved the selection; `never_freed` listed a stage's held paths; the typed
+    glob already in the stage was not disabled; the picker rebuilt its options per
+    keystroke. Declined, as outside this diff or as previews by design: the Rwp
+    percentage formatter written in four files; two phases of one name hiding the second's
+    groups; the Fix list ignoring earlier stages' fixes (labelled a preview); `.` running
+    the stage while a Plan menu item has focus; the `pct` docstring's "thin space".
+    No heuristic, audit-table row or CLAUDE.md line was added, so no generality review.
   - *Gotchas*: on this case-insensitive disk `plan.test.ts` and `Plan.test.ts` are one file,
     so the logic cases are `planwords.test.ts`. A Svelte element drops a trailing space, so
     the Rwp label is spelled `{"Rwp "}` to keep the words apart in `textContent`. The picker
