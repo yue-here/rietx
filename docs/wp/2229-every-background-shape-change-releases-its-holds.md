@@ -90,7 +90,7 @@ person asked for, and the edit's console line says so.
       background's shape, and say whether the swap makes today's page's fix moot.
 - [ ] Case 1: every surface left sends `unhold` and `free` built by `next/background.ts`, or
       the arms move to the server so no client can omit them.
-- [ ] Case 2: a hold on a background path the model lacks is released when an extension
+- [x] Case 2: a hold on a background path the model lacks is released when an extension
       rebuilds that path.
 - [ ] Case 3: `dropPending` drops pending positions and restraints on a gone path.
 - [ ] Tests: `tests/test_gui_background.py` for the server arms; vitest for `dropPending` and

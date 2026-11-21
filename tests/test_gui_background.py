@@ -270,32 +270,156 @@ def test_releasing_a_pending_hold_reuses_the_unheld_answer(tmp_path_factory, tmp
     assert len(calls) == 3
 
 
-def test_a_type_switch_can_release_the_holds_it_redefines(tmp_path_factory, tmp_path):
-    """The instrument edit's ``unhold`` and ``free`` arms (WP-2218 review): the
-    Background graph's Type switch releases the Chebyshev's holds first and
-    frees the new coefficients after, so the P-spline's ``c2`` starts free
-    instead of held at zero under the old name, and so do the ``c6`` and up
-    the Chebyshev never had. One refusal leaves everything as it was."""
+def _coefficients(project) -> dict[str, tuple[bool, bool]]:
+    """Each background coefficient's (vary, held), as the parameter rows say."""
+    return {r.path: (r.vary, r.held) for r in project.parameters()
+            if r.path.startswith("instrument.background.c")}
+
+
+def _with_terms(ins: dict, n: int) -> dict:
+    """``ins`` with its Chebyshev cut or extended to ``n`` terms, an added term
+    built at zero and free, as both pages' Terms controls build one."""
+    coefficients = ins["background"]["coefficients"]
+    extra = [{"value": 0.0, "vary": True}] * max(0, n - len(coefficients))
+    return {**ins, "background": {**ins["background"],
+                                  "coefficients": coefficients[:n] + extra}}
+
+
+def _declared(project) -> None:
+    """Declare the free set as a stage would: past this, a path outside it is
+    built fixed whatever its model ``vary`` says (``Refinement.set_vary``)."""
+    project.refinement.set_vary("instrument.background.c0", True)
+
+
+def test_a_type_switch_releases_the_holds_it_redefines(tmp_path_factory, tmp_path):
+    """The verb works out the registers' part itself (WP-2229): a Type switch
+    sent with no arms releases the Chebyshev's holds and frees the new
+    coefficients, so the P-spline's ``c2`` starts free instead of held at zero
+    under the old name, and so do the ``c6`` and up the Chebyshev never had.
+    The answer names what it released and freed, and every old path it ended."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    _declared(project)
+    project.refinement.hold("instrument.background.c2")
+    ins = session.instrument()["instrument"]
+    spline = BackgroundPSpline.for_range(20.0, 120.0).model_dump(mode="json")
+    answer = session.instrument_patch({"instrument": {**ins, "background": spline}})
+    assert project.refinement.snapshot().holds == []
+    rows = _coefficients(project)
+    assert len(rows) == len(spline["coefficients"])
+    assert all(vary and not held for vary, held in rows.values()), rows
+    assert answer["released"] == ["instrument.background.c2"]
+    assert answer["freed"] == sorted(rows)
+    assert answer["ended"] == [f"instrument.background.c{k}" for k in range(6)]
+
+
+def test_a_cut_releases_the_holds_it_removes_and_an_extension_frees(tmp_path_factory,
+                                                                    tmp_path):
+    """Today's Model tab sends a Terms change with no arms, so the verb is
+    where it is handled (WP-2229 case 1): a cut releases the held term it
+    removes and keeps the hold on a term it keeps, and an extension frees the
+    terms it adds rather than building them fixed."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    _declared(project)
+    project.refinement.hold(["instrument.background.c1", "instrument.background.c5"])
+    ins = session.instrument()["instrument"]
+    cut = session.instrument_patch({"instrument": _with_terms(ins, 4)})
+    assert cut["released"] == ["instrument.background.c5"]
+    assert cut["freed"] == []
+    assert cut["ended"] == ["instrument.background.c4", "instrument.background.c5"]
+    assert project.refinement.snapshot().holds == ["instrument.background.c1"]
+    more = session.instrument_patch({"instrument": _with_terms(
+        session.instrument()["instrument"], 7)})
+    assert more["released"] == [] and more["ended"] == []
+    assert more["freed"] == [f"instrument.background.c{k}" for k in (4, 5, 6)]
+    rows = _coefficients(project)
+    assert [rows[f"instrument.background.c{k}"] for k in (1, 4, 5, 6)] == [
+        (False, True), (True, False), (True, False), (True, False)]
+
+
+def test_an_extension_releases_a_hold_no_row_shows(tmp_path_factory, tmp_path):
+    """WP-2229 case 2: a hold left on a path the model lacks, as a cut made
+    before WP-2218's fix left one, is in the register and in no row. An
+    extension that rebuilds the path releases it, so the new ``c5`` is free."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    _declared(project)
+    project.refinement.hold("instrument.background.c5")
+    ins = session.instrument()["instrument"]
+    # the package's own edit keeps the hold, for a checkout to restore
+    with pytest.warns(UserWarning, match="hold nothing here"):
+        project.refinement.edit(instrument=type(project.refinement.instrument)
+                                .model_validate(_with_terms(ins, 4)))
+    assert project.refinement.snapshot().holds == ["instrument.background.c5"]
+    assert "instrument.background.c5" not in _coefficients(project)
+    answer = session.instrument_patch({"instrument": _with_terms(
+        session.instrument()["instrument"], 6)})
+    assert answer["released"] == ["instrument.background.c5"]
+    assert project.refinement.snapshot().holds == []
+    assert _coefficients(project)["instrument.background.c5"] == (True, False)
+
+
+def test_an_emission_line_removed_takes_its_hold_with_it(tmp_path_factory, tmp_path):
+    """The rule is about paths, so it holds for every positional family in the
+    instrument, not only the background's (WP-2229): a source cut to one line
+    releases the hold on the second line's weight, so a later two-line source
+    does not inherit it."""
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    project.refinement.hold("instrument.source.lines.1.weight")
+    ins = session.instrument()["instrument"]
+    single = {**ins, "source": {**ins["source"], "lines": ins["source"]["lines"][:1]}}
+    answer = session.instrument_patch({"instrument": single})
+    assert answer["released"] == ["instrument.source.lines.1.weight"]
+    assert answer["ended"] == ["instrument.source.lines.1.wavelength",
+                               "instrument.source.lines.1.weight"]
+    assert project.refinement.snapshot().holds == []
+    session.instrument_patch({"instrument": ins})
+    held = {r.path for r in project.parameters() if r.held}
+    assert "instrument.source.lines.1.weight" not in held
+
+
+def test_a_refused_register_verb_leaves_everything_as_it_was(tmp_path_factory, tmp_path,
+                                                             monkeypatch):
+    """All or nothing (WP-2126's rule): the release, the edit and the free run
+    on a history-free copy first, so a refusal from the last of them leaves
+    the holds, the model and the history as they were."""
+    from rietx.refine import Refinement
+
+    project = _unfitted(tmp_path_factory)
+    session = GuiSession(project, state_dir=tmp_path)
+    _declared(project)
+    project.refinement.hold("instrument.background.c2")
+    ins = session.instrument()["instrument"]
+    head = project.refinement._head_id
+
+    def refuse(self, globs, flag):
+        raise ValueError("refused for the test")
+
+    monkeypatch.setattr(Refinement, "set_vary", refuse)
+    spline = BackgroundPSpline.for_range(20.0, 120.0).model_dump(mode="json")
+    with pytest.raises(GuiError, match="refused for the test"):
+        session.instrument_patch({"instrument": {**ins, "background": spline}})
+    assert project.refinement._head_id == head
+    assert project.refinement.snapshot().holds == ["instrument.background.c2"]
+    assert project.refinement.instrument.background.kind == "chebyshev"
+
+
+def test_an_edit_that_changes_no_path_asks_nothing_of_the_registers(tmp_path_factory,
+                                                                   tmp_path):
+    """A value or λ edit, the old Background tab's one edit, keeps every
+    path and every hold, and records one node."""
     project = _unfitted(tmp_path_factory)
     session = GuiSession(project, state_dir=tmp_path)
     project.refinement.hold("instrument.background.c2")
     ins = session.instrument()["instrument"]
-    spline = BackgroundPSpline.for_range(20.0, 120.0).model_dump(mode="json")
-    head = project.refinement._head_id
-    with pytest.raises(GuiError) as excinfo:
-        session.instrument_patch({"instrument": {**ins, "background": spline},
-                                  "unhold": ["instrument.background.c9"]})
-    assert excinfo.value.where == ["unhold"]
-    assert project.refinement._head_id == head
-    assert project.refinement._user_holds == {"instrument.background.c2"}
-    session.instrument_patch({"instrument": {**ins, "background": spline},
-                              "unhold": ["instrument.background.*"],
-                              "free": ["instrument.background.*"]})
-    assert project.refinement._user_holds == set()
-    # every coefficient free, c2 and those the Chebyshev never had alike
-    rows = [r for r in project.parameters() if r.path.startswith("instrument.background.c")]
-    assert len(rows) == len(spline["coefficients"])
-    assert all(r.vary and not r.held for r in rows), [r.path for r in rows if not r.vary]
+    nodes = len(project.refinement.history.nodes)
+    answer = session.instrument_patch({"instrument": {**ins, "zero_shift": {
+        **ins["zero_shift"], "value": 0.01}}})
+    assert (answer["released"], answer["freed"], answer["ended"]) == ([], [], [])
+    assert project.refinement.snapshot().holds == ["instrument.background.c2"]
+    assert len(project.refinement.history.nodes) == nodes + 1
 
 
 #: Fit ranges the rebuilt graph's Type switch builds a P-spline over: round
