@@ -24,6 +24,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -413,16 +414,23 @@ def test_a_path_is_judged_by_what_a_commit_holds_never_the_disk(monkeypatch):
     in both, and a file on disk that a commit would not hold fails in both."""
     from tests import code_references as cr
 
-    stray = ROOT / "docs" / "docs" / "_generated" / "planted_stray.md"
-    assert cr.generated("docs/docs/_generated/planted_stray.md")
+    # a directory-only rule over a directory absent from the disk, as
+    # `docs/docs/_generated/` is in CI's clean checkout
+    assert not (ROOT / "kernels" / "target").exists()
+    assert cr.generated("kernels/target") and rulebook_problems(
+        "src/rietx/io/CLAUDE.md", "A rule about `kernels/target`.") == []
+    # a file on disk that no commit holds: under an ignored `*.rex/`, in a
+    # directory of its own, so no other test sees it
+    stray = ROOT / "planted_stray.rex" / "x.md"
+    assert cr.generated("planted_stray.rex/x.md")
     monkeypatch.setattr(cr, "generated", lambda rel: False)
-    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.parent.mkdir()
     try:
         stray.write_text("x", encoding="utf-8")
-        found = rulebook_problems(
-            "src/rietx/io/CLAUDE.md", "A rule about `docs/docs/_generated/planted_stray.md`.")
+        found = rulebook_problems("src/rietx/io/CLAUDE.md",
+                                  "A rule about `planted_stray.rex/x.md`.")
     finally:
-        stray.unlink()
+        shutil.rmtree(stray.parent)
     assert len(found) == 1 and "no file" in found[0], found
 
 

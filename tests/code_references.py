@@ -468,10 +468,15 @@ def in_tree(path: Path) -> str | None:
 @cache
 def generated(rel: str) -> bool:
     """Whether ``.gitignore`` covers ``rel``: something a build or a run writes,
-    named by a rule rather than cited as a file in the tree."""
-    return subprocess.run(
-        ["git", "-C", str(ROOT), "check-ignore", "-q", "--no-index", rel.rstrip("/")],
-        capture_output=True).returncode == 0
+    named by a rule rather than cited as a file in the tree.
+
+    Asked with a trailing slash too: git matches a directory-only rule such as
+    ``docs/docs/_generated/`` against a bare path only when that directory is
+    on the disk, so a bare query passes here and fails in a clean checkout."""
+    bare = rel.rstrip("/")
+    return any(subprocess.run(
+        ["git", "-C", str(ROOT), "check-ignore", "-q", "--no-index", form],
+        capture_output=True).returncode == 0 for form in (bare, bare + "/"))
 
 
 @cache
