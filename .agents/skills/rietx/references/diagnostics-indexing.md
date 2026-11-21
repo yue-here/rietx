@@ -221,6 +221,9 @@ Six things about that sequence are load-bearing:
    lab data at all — the engines widen their matching window by an *assumed*
    allowance and say so — and the fix is evidence (an internal standard, a
    calibrated `shift_allowance_deg`), not a bigger constant.
+   A candidate you choose yourself after reading the caveats is screened the
+   same way: `determine_extinction_symbol(data, idx.candidates[i], instrument)`
+   takes any `CellCandidate`. The field is `.candidates`; there is no `.classes`.
 3. **Go through `structure_from_candidate`.** It supplies the mandatory dummy
    atom and, more importantly, defaults the space group to the **absence-free
    lattice group**. A plausible-looking space group would hide exactly the
