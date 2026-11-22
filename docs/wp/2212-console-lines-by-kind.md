@@ -156,15 +156,15 @@ Pruned 2026-11-21 at start: all four entries still hold on `origin/main` (`d76e4
 - [x] The tagged line type in `say()` and `consoleLine`, every writer passing its kind; the
   echoes spelled with one receiver per name, and each `…` echo made runnable or marked. Vitest
   over the kinds and over every writer's spelling.
-- [ ] `Console.svelte` draws by kind: the prompt gutter, the timestamp per entry, the muted and
+- [x] `Console.svelte` draws by kind: the prompt gutter, the timestamp per entry, the muted and
   faint registers, the string token. Copy copies the calls. Vitest and the layout browser test.
-- [ ] The script: a preamble, the uncapped calls, the export kind on the server and in the
+- [x] The script: a preamble, the uncapped calls, the export kind on the server and in the
   Export submenu. A test drives a short session on a copy of a shipped example (a value set, a
   stage run), runs the exported script on a second copy, and asserts the two heads hold the
   same parameter values.
 - [ ] The GUI chapter on the Console and the File menu's Export, the screenshot driver, the
   screenshots retaken, each beside the prototype's at 1440 by 900 in the PR (milestone row 11).
-- [ ] `follow()` reports the frames it lost on both paths, and the Console reads the count
+- [x] `follow()` reports the frames it lost on both paths, and the Console reads the count
   (#1656 item 1, folded above). One vitest case per path.
 - [ ] `instrument_patch` answers what `set_vary` returned (WP-2229 finding 8), and works from
   the registers when only the old table fails (finding 5). One server test each.
