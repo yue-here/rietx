@@ -7,9 +7,13 @@
 //
 // - the reflection ticks sit at the foot, under the difference, and carry the
 //   2θ labels; each tick is a lens, as rietx's figures draw them;
-// - the difference pane is a fixed 76 px, over a ±3 esd band under Δ/σ;
+// - the difference pane is a fixed height (`RESID_HEIGHT`), over a ±3 esd
+//   band under Δ/σ;
 // - observed points are crosses, smaller where they sit densely;
-// - no gridlines (`gui/STYLE.md` § Plots), and tick labels in the mono face;
+// - horizontal gridlines on the intensity pane alone, as the prototype draws
+//   them (`gui/STYLE.md` § Plots), and tick labels in the mono face;
+// - no y axis title strip on screen: the GUI marks each scale over its top
+//   tick label, in room each pane keeps above its plot (`MARK_ROOM`);
 // - intensity tick labels abbreviate thousands (20k), and a √ or log axis
 //   takes 1, 2 and 5 times a power of ten, 22 px apart at least.
 //
@@ -1133,7 +1137,7 @@ export function pattern(uPlot, host, curves, spec) {
     x: curves.arrays.two_theta,
     panes: [
       { key: "main", share: 1, y: state.y, auto: spec.ranges?.main, label: () => spec.labels?.y?.() ?? "",
-        padTop: MARK_ROOM, titled: spec.titled,
+        grid: true, padTop: MARK_ROOM, titled: spec.titled,
         series: [markers("obs"), markers("masked"),
                  { show: !state.hidden.has("calc"), stroke: ink("calc"), width: 1.2 },
                  { show: !state.hidden.has("bkg"), stroke: ink("bkg"), width: 1, dash: [3, 3] }],
