@@ -23,6 +23,14 @@ Branch, Label) and a two-node compare table (`⇄`). The tab strip is `BOTTOM_TA
 `gui/src/lib/tabs.ts`, and its label carries no count. Read WP-2206's handover entry on `main`
 once it lands; its open visual question 1 is this WP's subject.
 
+That plan changed on 2026-11-11 (WP-2214, the rebuild's plan): the maintainer ruled to rebuild
+the GUI's front end beside today's instead of porting it piece by piece. PR #1521 (WP-2206,
+WP-2207) closed as a source and never merged, so this WP builds in the new front end at `/next`,
+on the bottom panel its piece R1 built, as part of piece R5. The design below stands; what it
+says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI, which the
+new page replaces at the swap. WP-2214's inventory rows 152-160 give the homes this WP keeps
+reachable.
+
 ### The design, and the rulings it rests on
 
 The prototypes are not published, so the design is restated here.
@@ -169,14 +177,6 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ### Inherited
 
-- **2026-11-11, from WP-2214** (the rebuild's plan). The maintainer ruled the same night to
-  rebuild the GUI's front end beside today's instead of porting it piece by piece. PR #1521
-  (WP-2206, WP-2207) closes as a source and never merges, so this WP builds in the new front
-  end, on the bottom panel its piece R1 builds, as part of piece R5. The design above stands;
-  what it says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI,
-  which the new page replaces at the swap. WP-2214's inventory gives the homes this WP must
-  keep reachable.
-
 ## Non-goals
 
 - Console lines tagged by kind and the console exported as a script: WP-2212.
@@ -197,14 +197,18 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   keeps the word, and the panel corpus waits for the swap (WP-2214 § Tests and the manual).
 - [x] `panels/History.svelte` as the table, with the verbs placed as ruled. Vitest over the
   rows a branched tree produces.
-  Built as `gui/src/next/History.svelte`, the rebuild's page (§ Inherited, 2026-11-11).
+  Built as `gui/src/next/History.svelte`, the rebuild's page (§ Where it starts).
 - [x] Compare: the dashed curve on the Pattern graph, its legend entry, its token. A browser
   test that Compare draws the node's curve and moves no element.
 - [x] Restore: the node's values into the action bar's pending edits, the refusal or the
   Checkout offer for a node that is more than values, the console echo. Vitest and a browser
   pass: Restore, then Apply, reaches the node's values; Restore, then Revert, changes nothing.
-- [ ] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
+- [x] The GUI chapter on History, the screenshot driver, the screenshots retaken, each beside
   the prototype's at 1440 by 900 in the PR (milestone row 11).
+  The pictures are `2211-screenshots/` (its README maps WP-2214's rows 152-160). The chapter and
+  `docs/docs/make_screenshots.py` stay as they are, under WP-2214 § Tests and the manual
+  ("unchanged until the swap"). Ruling 5 says the chapter is rewritten in this WP: the two
+  rules conflict, so the timing is a question for the maintainer (handover entry, 2026-11-22).
 - [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
 
 ## Acceptance
