@@ -343,7 +343,7 @@ class NeutronSource(Base):
         degenerate with the phase scales in any case.  A harmonic's weight is
         the *stored* :class:`Parameter` off :attr:`harmonics`, passed by
         reference rather than copied, which is what makes a refined value
-        survive the write-back (``params.vector.ParameterTable.write_back``
+        survive the write-back (``params.vector.ParameterTable.apply_to_models``
         reaches it as ``instrument.source.lines.i.weight``).
 
         Building the list here rather than materialising the extra lines into a
@@ -905,8 +905,8 @@ class Source(_InheritsDeclaredDefaults):
     """
 
     kind: Literal["xray_cw"] = "xray_cw"
-    #: The *declared* lines.  Harmonics are appended by :attr:`spectrum`, not
-    #: stored here — see :attr:`harmonics`.
+    #: The *declared* lines.  Harmonics are refused on this radiation — see
+    #: :attr:`harmonics`.
     lines: list[EmissionLine]
     polarization: Parameter = Field(
         default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)

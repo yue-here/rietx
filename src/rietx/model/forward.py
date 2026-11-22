@@ -619,7 +619,7 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
 
     sin θ_l = (λ_l/λ_0)·sin θ_0, which is the same ghost transform
     ``background.diagnostics`` uses and the same one
-    ``indexing.peakfit._line_pos`` applies to a fitted position.  Written in
+    ``indexing.peakfit._GroupModel._line_pos`` applies to a fitted position.  Written in
     ``xp`` ops because ``tt_primary`` is θ-derived: this is on the traced path
     for every backend.
 
@@ -1087,7 +1087,7 @@ class CompiledModel:
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
     # everywhere else, and then no row exists.  Written by the stage runner
-    # (``refine._attach_origin``) once the stage's free set is final, since
+    # (``model.origin.compile_origin``) once the stage's free set is final, since
     # the rows depend on it and ``compile_model`` sees only what may move; so
     # frozen per solve, never per evaluation.  Its own block below the soft
     # restraints, and deliberately NOT scaled by ``restraint_weight_scale``:

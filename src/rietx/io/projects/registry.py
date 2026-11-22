@@ -467,7 +467,7 @@ def read_project_model(path: str | Path, *,
     ``diagnostics`` collects what the reader **repaired or assumed** — a rewritten
     species spelling, a translated origin suffix — the same opt-in channel
     :func:`~rietx.io.read_pattern` and
-    :func:`~rietx.structure_from_cif` take, and for a caller accumulating across
+    :func:`~rietx.crystallography.cif.structure_from_cif` take, and for a caller accumulating across
     several files.  Whatever the read reports lands on
     :attr:`ProjectModel.diagnostics` too, list or no list, so the answer always
     carries what its own file needed; a format reporting at build

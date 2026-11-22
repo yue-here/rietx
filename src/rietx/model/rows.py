@@ -26,8 +26,8 @@ So the layout is data here, and the builders are consumers:
 
 **Adding a row block is one edit here** — a name in :data:`BLOCK_ORDER`, a
 size in :func:`block_sizes`, a producer in :data:`_PRODUCERS` — and every
-backend and the Jacobian offsets follow.  ``tests/test_row_layout.py`` asserts
-the three stay in step and that no builder re-derives the order locally.
+backend and the Jacobian offsets follow.  ``tests/test_backend_conformance.py``
+holds every backend's residual to the length :func:`n_rows` gives.
 
 Conventions this module has to honour (CLAUDE.md → Conventions):
 

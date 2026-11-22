@@ -674,6 +674,7 @@
               <label>
                 <Help for="stage_fields:{key}">{FIELD_LABEL[key] ?? key}</Help>
                 <input type="number" step="any" disabled={busy}
+                  min={key === "max_iter" ? 1 : undefined}
                   value={(stage[key] ?? "") as string | number}
                   onblur={() => (typing = "")}
                   oninput={(event) =>
