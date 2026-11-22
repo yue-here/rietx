@@ -39,6 +39,7 @@
    * Nothing a click here changes may move the layout (interaction rule 8):
    * the controls keep their rows, and a refusal is the title's state.
    */
+  import { instrumentScript, type Say } from "./console";
   import { ApiError, api } from "../api";
   import {
     BAND_MULTIPLIERS,
@@ -66,7 +67,7 @@
     theme = "light",
     protocol = "",
     holds = new Map(),
-    say = (_line: string) => {},
+    say = () => {},
     onhold = (_path: string, _held: boolean, _serverHeld: boolean) => {},
     ondropped = (_gone: (path: string) => boolean) => {},
     onmoved = () => {},
@@ -79,7 +80,7 @@
     protocol?: string;
     /** the Parameters panel's pending holds and releases, path → held */
     holds?: ReadonlyMap<string, boolean>;
-    say?: (line: string) => void;
+    say?: Say;
     /** a chip pressed: hold or release one term, pending until Apply */
     onhold?: (path: string, held: boolean, serverHeld: boolean) => void;
     /** an instrument edit removed or redefined these paths: the pending
@@ -151,8 +152,10 @@
     pending = true;
     try {
       const { instrument } = await api.instrument();
-      const answer = await api.patchInstrument(build(instrument), label);
-      for (const line of registerEcho(answer, echo)) say(line);
+      const next = build(instrument);
+      const answer = await api.patchInstrument(next, label);
+      for (const line of registerEcho(answer, echo))
+        say("call", line, line === echo ? instrumentScript(next) : undefined);
       error = "";
       const ended = endedBy(answer);
       if (ended) ondropped(ended);

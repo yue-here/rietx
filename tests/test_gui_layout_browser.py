@@ -1794,7 +1794,11 @@ def test_today_s_terms_box_leaves_no_stale_hold(browser, tmp_path_factory):
             box.click()
             page.keyboard.press("ControlOrMeta+A")
             page.keyboard.type(str(n))
-            page.keyboard.press("Enter")
+            # wait for the answer: the edit's node lands before the free arm's
+            # set_vary in one request, so a row count alone can read between
+            with page.expect_response(lambda r: r.url.endswith("/api/instrument")
+                                      and r.request.method == "PATCH"):
+                page.keyboard.press("Enter")
             for _ in range(100):
                 if len(rows()) == n:
                     return

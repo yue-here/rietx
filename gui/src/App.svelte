@@ -1311,7 +1311,7 @@
         }
         seen = key;
       },
-      { poll: (since) => api.events(since) },
+      { poll: (since) => api.events(since), onDropped: (n) => (dropped = n) },
     );
   });
 </script>
