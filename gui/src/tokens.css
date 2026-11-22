@@ -27,6 +27,7 @@
   --ok: #2a7d2a;
   --warn: #7d5f00;
   --bad: #b4271f;
+  --code-string: #2f6f3e;
   /* The pattern plot's curves (WP-1029, redrawn in the site's palette by
      WP-2200): observed points in the ink, the calculated curve in the
      accent, the background dashed in the figures' brown, the difference in
@@ -118,6 +119,7 @@
     --ok: #5fd45f;
     --warn: #e3c25b;
     --bad: #ff8f86;
+    --code-string: #8fc79d;
     --plot-obs: #d2c9bd;
     --plot-calc: #ff9d4d;
     --plot-bkg: #c99a6a;
@@ -151,6 +153,7 @@
   --ok: #5fd45f;
   --warn: #e3c25b;
   --bad: #ff8f86;
+  --code-string: #8fc79d;
   --plot-obs: #d2c9bd;
   --plot-calc: #ff9d4d;
   --plot-bkg: #c99a6a;
