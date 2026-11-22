@@ -11,10 +11,16 @@ Issue #1219's two cases run on its family A, a cubic perovskite ABO3 in a
 capillary at λ 1.5406 Å drawn by rietx's own forward model: C7, a planted
 low-angle rise cut away at each of the issue's lower limits, and C8, the
 upper limit on the centre of (420) and half a FWHM below it (a fraction of a
-second per fit).
+second per fit).  ``STRADDLE_FWHM``'s listing is held complete on family A and
+the synthetic LaB6, with cuts placed one channel either side of 3 FWHM of each
+reflection and exactly at it (no fit: the truth's reflections are described
+directly).
 """
 
 from __future__ import annotations
+
+import dataclasses
+import math
 
 import numpy as np
 import pytest
@@ -22,12 +28,16 @@ import pytest
 import rietx as rx
 from rietx.model.forward import compile_model
 from rietx.params.vector import ParameterTable
-from rietx.report.fit_range import fit_range_record, model_reflections
+from rietx.report.fit_range import (
+    describe_outside,
+    fit_range_record,
+    model_reflections,
+)
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.results import RefinementResult
 from tests.planted_series import _perovskite
-from tests.test_refine_synthetic import synthesize
+from tests.test_refine_synthetic import synthesize, truth
 from tests.test_termination_view import _instrument, make_lab6
 
 pytestmark = pytest.mark.xdist_group("fit-range")
@@ -174,10 +184,9 @@ def _family_a_structure(true: bool) -> rx.Structure:
 
 
 @pytest.fixture(scope="module")
-def family_a():
-    """Family A's truth on a 5-130 degree file: the noise-free pattern, the
-    truth's (420), and a function drawing Poisson counts with or without
-    C7's rise."""
+def family_a_truth():
+    """Family A's truth compiled on a 5-130 degree file: the model, its
+    values and every (line, reflection) it generates there."""
     structure, ins = _family_a_structure(True), _family_a_instrument(True)
     tt = np.arange(5.0, 130.0, FILE_STEP)
     grid = rx.PatternData(two_theta=tt.tolist(),
@@ -185,9 +194,17 @@ def family_a():
     model = compile_model(structure, ins, grid, mode="rietveld")
     table = ParameterTable(structure, ins)
     values = table.decode(table.x0())
+    return model, values, model_reflections(model, values, ["ABO3"])
+
+
+@pytest.fixture(scope="module")
+def family_a(family_a_truth):
+    """Family A's truth on a 5-130 degree file: the truth's (420), and a
+    function drawing Poisson counts from the noise-free pattern with or
+    without C7's rise."""
+    model, values, reflections = family_a_truth
     y = model.evaluate(values)
-    r420 = next(r for r in model_reflections(model, values, ["ABO3"])
-                if r.hkl == [4, 2, 0])
+    r420 = next(r for r in reflections if r.hkl == [4, 2, 0])
 
     def draw(rise: bool) -> rx.PatternData:
         extra = (RISE_AT_START * BKG_TRUE[0]
@@ -282,6 +299,138 @@ def test_c8_half_of_420_is_outside_at_its_centre_and_more_below_it(c8):
     assert 0.4 < at_centre.fraction_outside < 0.6
     assert below.fraction_outside > at_centre.fraction_outside
     assert below.fraction_outside > 0.75
+
+
+# -- the straddle window: complete at 3 FWHM, and nothing beyond ------------
+
+#: The grounds' 3 FWHM, written out rather than imported, so a changed
+#: ``STRADDLE_FWHM`` fails these tests instead of moving their oracle with it.
+STRADDLE = 3.0
+
+
+def _cuts(tt, span):
+    """A span's two cuts in 2θ as ``OutsideSpan.reflections`` reads them: half
+    a step past its first and last channel, open where it runs to the file's
+    end."""
+    i0, i1 = int(np.searchsorted(tt, span.lo)), int(np.searchsorted(tt, span.hi))
+    lo = -math.inf if i0 == 0 else 0.5 * (tt[i0 - 1] + tt[i0])
+    hi = math.inf if i1 == tt.size - 1 else 0.5 * (tt[i1] + tt[i1 + 1])
+    return lo, hi
+
+
+def _described(data, limits, regions, reflections):
+    """Every span of ``data`` cut by ``limits`` and ``regions``, described
+    against ``reflections``, each with its two cuts."""
+    data = data.model_copy(update={"excluded_regions": list(regions)})
+    record = describe_outside(fit_range_record(data, limits), data, limits,
+                              [], reflections, None)
+    assert record.straddle_fwhm == STRADDLE
+    return [(span, _cuts(data.tt(), span)) for span in record.outside]
+
+
+def _key(r):
+    return (tuple(r.hkl), r.line, r.two_theta)
+
+
+def _placements(tt, r):
+    """Cuts placed beside reflection ``r``: ``(where, limits, regions, cut,
+    side)`` for an upper limit and an excluded band above it (``side`` +1),
+    a lower limit and an excluded band below it (-1), each with its cut on
+    the last channel boundary within 3 FWHM of the centre (``"inside"``) and
+    on the next one out (``"outside"``), one channel apart."""
+    step = float(tt[1] - tt[0])
+    mid = 0.5 * (tt[:-1] + tt[1:])
+    reach = STRADDLE * r.fwhm
+    up = np.flatnonzero((mid > r.two_theta) & (mid - r.two_theta <= reach))[-1]
+    down = np.flatnonzero((mid < r.two_theta) & (r.two_theta - mid <= reach))[0]
+    out = []
+    for where, k in (("inside", up), ("outside", up + 1)):
+        out.append((where, (tt[0], tt[k] + step / 4), [], mid[k], +1))
+        out.append((where, None, [(tt[k + 1] - step / 4, tt[k + 1] + 1.0)],
+                    mid[k], +1))
+    for where, k in (("inside", down), ("outside", down - 1)):
+        out.append((where, (tt[k + 1] - step / 4, tt[-1] + 1.0), [], mid[k], -1))
+        out.append((where, None, [(tt[k] - 1.0, tt[k] + step / 4)], mid[k], -1))
+    return out
+
+
+@pytest.fixture(scope="module", params=["family A", "LaB6"])
+def straddle_case(request, family_a, family_a_truth):
+    """A pattern drawn from a known truth, the truth's reflections, and those
+    a placed cut and a 1 degree band beside them keep inside the file: family
+    A (Cu Kα1, 0.01 degree step), and the synthetic LaB6 the fits above use
+    (0.4139 Å, 0.005 degree step, a zero shift)."""
+    if request.param == "family A":
+        draw, _r420 = family_a
+        data = draw(rise=False)
+        *_, reflections = family_a_truth
+    else:
+        data = synthesize()
+        structure, ins = truth()
+        model = compile_model(structure, ins, data, mode="rietveld")
+        table = ParameterTable(structure, ins)
+        reflections = model_reflections(model, table.decode(table.x0()), ["LaB6"])
+    tt = data.tt()
+    placed = [r for r in reflections if tt[0] + 2.0 < r.two_theta < tt[-1] - 2.0]
+    assert len(placed) >= 10
+    return data, reflections, placed
+
+
+def test_every_reflection_within_3_fwhm_of_a_cut_is_listed_and_none_beyond(
+        straddle_case):
+    """Each reflection gets a cut just inside 3 FWHM of its centre and one a
+    channel further (5 to 10 % of 3 FWHM on these two families), above
+    and below it, as a range end and as an excluded band's edge.  The
+    reflection is listed exactly when the cut is inside, and every span's
+    list is the whole set the definition names: each model reflection
+    centred in the span or within 3 of its own FWHM of either cut, and no
+    other."""
+    data, reflections, placed = straddle_case
+    tt = data.tt()
+    step = float(tt[1] - tt[0])
+    for r in placed:
+        reach = STRADDLE * r.fwhm
+        for where, limits, regions, cut, side in _placements(tt, r):
+            gap = side * (cut - r.two_theta)
+            if where == "inside":
+                assert reach - step < gap <= reach
+            else:
+                assert reach < gap <= reach + step
+            spans = _described(data, limits, regions, reflections)
+            [span] = [s for s, c in spans if cut in c]
+            assert (_key(r) in {_key(x) for x in span.reflections}) == (
+                where == "inside"), (r.hkl, where, limits, regions)
+            for s, (lo, hi) in spans:
+                expected = {_key(x) for x in reflections
+                            if lo <= x.two_theta <= hi
+                            or min(abs(x.two_theta - lo), abs(x.two_theta - hi))
+                            <= STRADDLE * x.fwhm}
+                assert {_key(x) for x in s.reflections} == expected
+
+
+def test_a_reflection_exactly_3_fwhm_from_a_cut_is_listed_and_one_ulp_past_is_not(
+        straddle_case):
+    """The boundary itself, at each cut of the test above: a copy of the
+    reflection with its FWHM rounded to 1/1024 degree, so that 3 FWHM and the
+    centre's distance to the cut are exact in binary, centred exactly 3 FWHM
+    from the cut is listed ("within" is inclusive), and the same copy one ulp
+    further out is not."""
+    data, _reflections, placed = straddle_case
+    tt = data.tt()
+    for r in placed:
+        fwhm = round(r.fwhm * 1024) / 1024
+        for where, limits, regions, cut, side in _placements(tt, r):
+            if where != "inside":
+                continue
+            at = cut - side * STRADDLE * fwhm
+            assert abs(at - cut) == STRADDLE * fwhm
+            past = float(np.nextafter(at, -side * math.inf))
+            pair = [dataclasses.replace(r, two_theta=at, fwhm=fwhm),
+                    dataclasses.replace(r, two_theta=past, fwhm=fwhm)]
+            spans = _described(data, limits, regions, pair)
+            [span] = [s for s, c in spans if cut in c]
+            assert [x.two_theta for x in span.reflections] == [at], (
+                r.hkl, limits, regions)
 
 
 def test_the_record_carries_the_widths_its_facts_were_read_with(uncut, cut):
