@@ -545,6 +545,171 @@ flag reprints the saved numbers without fitting.
 
 ## Handover log
 
+- **2026-11-22** — the 2026-11-22 rulings applied (a ghostshift runner, one session;
+  package code changed). PR #1778.
+
+  A hold declared in a series' `constrain` hook now keeps its value on every rung. Before,
+  a pattern restarted from the caller's models (the cold rung, and a `verify_steps` refit)
+  held the caller's value, which on the cold-restart fixture was 0.0° where the calibrated
+  zero shift was 0.00797°. That moved the cell 546 ppm on the restarted frame. Now every
+  frame holds 0.00797° and the cell sits within 2 ppm of the truth. Each `SeriesEntry`
+  records what was held in a new field, `held_values`. The series plan's audit row carries
+  the maintainer's ruling: ambiguity 3, tier 3, the plan kept. The remaining rulings are
+  filed as two WPs, each with a naming question left open for the maintainer.
+
+  *Done.* `caf7c3701`: the `SequentialRefinement.fit:plan` row moves to ambiguity 3,
+  approved 2026-11-22, its grounds and evidence citing this WP's measurements.
+  `d5acfb2a7`: question 4's option A. `sequential._keep_held_values` writes the last
+  accepted pattern's value onto each held path after the hook runs, on the cold rung and
+  on a verify refit (the pattern's own fitted value there). It skips a path the carry
+  globs leave out, an anchored site-coordinate DOF (a relative step), a locked or tied
+  path, and a path `prepare` or the hook set to something other than the declared value.
+  New field `SeriesEntry.held_values: dict[str, float] | None` (writer
+  `sequential._held_values`, `None` where nothing was held and in a series saved before
+  the field), its `help.py` entry, manual row, schema note (0.62) and release note. The
+  skill's `references/series.md` says the hold survives the cold rung. `4a2b7d857`: rules
+  1 and 2 on the series call filed as WP-2300; the typical-temperature preset, the one
+  documented route and the Switching page filed as WP-2301; the stale Context lines here
+  superseded with dated notes (PR #1310 merged, the plan row audited); the milestone
+  record, ROADMAP and the index updated. `79a776343` and `b4764d011`: review and judge
+  fixes (below). `97d9fc01e`: the help and manual text trimmed after the blind reader
+  check.
+
+  *Measured.* macOS arm64, the worktree's own venv `[dev]`, Python 3.12.10.
+  `docs/wp/2081-batch/measure_cold_rung.py` reran: `hooks_forced` holds 0.00797 on frames
+  0 to 3, cold or warm, with the cell 1.9 to 2.0 ppm off (`cold_rung.json`).
+  `tests/test_sequential.py` 211 passed. `tests/test_audit_table.py` 23 passed.
+  Fast selection (`-m "not slow"`, through `serial.py`): 15127 passed, 443 skipped,
+  32 xfailed, 2 failed, in 708 s. Both failures were the manual's 50 000-character page
+  cap, which the new row pushed `reference/series.md` over (50 066). The row was cut to
+  the field's meaning (the page is now 49 987), and a rerun of `test_manual.py`,
+  `test_help.py`, `test_gui_help.py`, `test_docs_consistency.py`, `test_skill.py` and
+  `test_manual_api.py` passed 357. The five added tests take 4.8 s together
+  (`tests.added_test_times`).
+  Five tests added in `test_sequential.py`; the cold-hold test's plots
+  (`tests/output/sequential_cold_hold_p2*.png`) were looked at and are clean.
+
+  *Review.* `/code-review` found that a verify refit held the chain's fitted models but
+  dropped held named variables (`vars.*`). Fixed in `79a776343` (`fitted_vars`). Declined:
+  ADP and Stephens basis DOFs are not renumbered into the series numbering, which predates
+  this branch; a per-pattern held variable is overwritten the way a warm carry overwrites
+  it.
+
+  *Generality* (judge's report, unedited, on the branch before `b4764d011`; author's answers follow it):
+
+  **`rietx.sequential.SequentialRefinement.fit:plan` (default, `mccusker_default`), retiered: ambiguity 1 → 3, grounds rewritten, approved 2026-11-03 → 2026-11-22**
+
+  **holds.** The case against calling this default unanimous is stronger, and the maintainer ruled the tier and kept the plan. The `evidence` field is still thin: the measurements that make the case for keeping the plan are in WP-2081 (the series design discussion) and not in the row.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide that the caller did not ask for? | `evidence`: "the first pattern's plan and, collapsed, every warm refit's" (`_audit.py`, row) | With no plan given, every pattern refines the zero shift, U, V, W, X, Y, the background, the scale and the cell. Later patterns get this plan merged into one stage. A *warm refit* is a pattern started from its neighbour's answer. The package therefore decides that the setup may move from frame to frame (WP-2081 § The crux, preset table row 1). | answered |
+  | 2. Which kind of ambiguity, and does the row agree? | `grounds`: "a named dissent … so the unanimity gate fails; whether the setup held still is a fact outside the pattern (series rule 4)" | Kind 3 is right. Whether the instrument held still is a fact about the experiment, and series rule 4 (`docs/milestones/series.md` § The rules) files series strategy under kind 3. The ambiguity change was "Settled by Claude 2026-11-22, checked blind". The tier and keeping the plan are "Ruled by Yue 2026-11-22" (§ Open decisions). The row merges the two into "ruled 2026-11-22". | agrees |
+  | 3. Case against acting | `grounds`: "The traditional sequential, which calibrates the instrument and holds it through the series, is a named dissent (WP-2081 § How a human expert runs a series)" | Strong. The maintainer's own account says "A full refit is very unusual without a good reason" (WP-2081 lines 23-28). In practice the series in GSAS-II and EasyDiffraction fit every pattern with the user's own vary list (checked in source), and FullProf's cyclic mode does the same (inferred). The user picks the flags, and no program ships a default plan (`docs/practice.md` lines 455-457, 477-486). Kind 3 asks the package to report the number and stop. This row keeps an action (freeing the setup), and the number it leaves is each pattern's setup value in the trajectories. WP-2081 question 1 measured that number to say little: no setup path moved more than 1.9 of its own esds, yet freezing the width moved the transition by tens of kelvin. No help text tells a reader how to read a setup trajectory (none found in the diff). | strong against unanimity; the kind-3 report is weak |
+  | 4. Case for acting | none given in the row. The milestone record § Ruled after the open gives the reason: "It assumes nothing about the experiment" | The WP does measure it. Synthetic LaB6 ramp (WP-2081 routes table): default cell error −0.59 ppm mean. The held routes sit at −1.83 ppm, frame 0's calibration error carried to every frame, and no esd contains it. Issue #1556 (synthetic LaB6, 150 noise replicates): pull std 0.79-0.93 with the setup free against 2.30-2.43 held, so held esds are about 2.4× too small. Real CuCr2O4 ramp: the default closes b − c between 111 and 123 K. Routes that hold every width put the transition near 60 K, near 230 K, or nowhere. A default must be some plan. The only alternative to keeping one is to make the caller state a plan, as FullProf and TOPAS users do. Leaving it to the caller costs one more required argument per call. Holding the setup by default costs confident wrong esds and, on the real ramp, false transitions. | strong, but not in the row |
+  | 5. Tier, with source | tier 3. `evidence`: "no program ships a default plan" | Tier 3 is right. I checked practice in this repository (`docs/practice.md` § Sequential refinement): every program uses one vary list per series, and the user sets it. The row's evidence points to `Refinement.fit:plan`, which stays ambiguity 1. The two rows ask different questions: the single fit asks which order to refine in, the series asks whether to free the setup again on every frame. The split is coherent, but the series row borrows evidence that is not about the series. | holds |
+  | 6. Dataset families | none given in the row | WP-2081 has measurements on about two families. (1) Synthetic LaB6 thermal ramp, rietx's own, constant instrument by construction, against the known truth, development data. Issue #1556's synthetic LaB6 is the same material and model, so the same family. (2) CuCr2O4 + CuO, APS 11-BM, 17 patterns, development data (WP-2003). Its reference is Suchomel et al. 2012, a published refinement under another protocol, so it measures drift only (Rule 2). That is short of the three families, and the row rests on the maintainer's ruling, not on the mechanical ground. | below three; rests on the ruling |
+  | 7. Which field says it fired? | none given | No `SeriesResult` field names the plan (grep of `schemas/sequential.py` for "plan" finds docstrings only). Each kept result's `stages` (`StageResult`, one per stage run) shows what ran. Freed setup values appear in each entry's `parameters` and in the trajectories. | adequate, indirect |
+
+  Evidence that would change the verdict: a real series that no one who changes the package has run (with an independent cell or transition temperature) where the free-setup default lands further from the reference than a calibrated-and-held route with sample widths free. Separately, the row's `evidence` should cite WP-2081's routes, real-ramp and issue #1556 numbers, and its `grounds` should quote why a kind-3 default still acts ("It assumes nothing about the experiment").
+
+  **`rietx.schemas.sequential.SeriesEntry.held_values` (action), new: tier 2, ambiguity 1, approved 2026-11-16**
+
+  **weak.** The action holds: series rule 6 settles it, and the case against it found nothing beyond the two blind spots in the last section. The tier-2 label fails, because the WP and `docs/practice.md` both say no program faces this choice. The approval date is rule 6's, not this row's.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide that the caller did not ask for? | `evidence`: "a cold rung and a verify_steps refit hold the last accepted pattern's value (the pattern's own on a verify refit), limited by carry, where they held the caller's start before" | The caller asked for a hold (`ref.hold` inside the `constrain` hook, the per-pattern hook that declares holds and ties). The package now picks the value the hold fixes on two kinds of fit. One is the *cold rung*, the last retry, restarted from the caller's models. The other is a `verify_steps` refit, the cold re-measurement of the largest steps. Before, both held the caller's starting value. Now they hold the value a warm rung would have held. | answered |
+  | 2. Which kind of ambiguity, and does the row agree? | `ambiguity=1`. `grounds`: "a retry does not change what value a fixed parameter has" | Kind 1 is defensible. Given the approved `carry` row (each warm pattern starts from the last accepted pattern's values, held paths included), rule 6 leaves one value consistent with the warm rung. | agrees |
+  | 3. Case against acting | none given | Searched for a dissent. Practice gives one in a different form: EasyDiffraction holds a fixed parameter at the template's value on every file, and GSAS-II at each histogram's own stored value (`docs/practice.md` lines 387, 480). Both are the caller's value. They differ from option A (the WP's name for "hold the last accepted pattern's value") only where a path was free on an earlier pattern or a hook moved it. That situation needs a manual copy step in those programs, and there the user writes in the refined value. So the dissent does not reach the case this fixes. The two real gaps are the hook test and the source choice, in the last section. | none found for the action |
+  | 4. Case for acting | `evidence`: "zero shift 0.00797 on every frame and the cell within 2 ppm, against 0.0 and 546 ppm off before (2081-batch/measure_cold_rung.py)" | Strong. Before the change, the forced-cold frame held 0.0, its cell sat 546 ppm short, and the next frame carried the error (−547 ppm) after climbing all three rungs (WP-2081 § The surface as it stands, cold-rung table). Since WP-2003 no diagnostic names that frame. Without the action, the caller's only route is the three-hook workaround (`on_result` keeps pattern 0's value, `prepare` writes it in, `constrain` holds it). The fix moves the cell back toward a known truth. One detail: the WP says 1.9-2.0 ppm, the acceptance row asks "within 2 ppm", and `test_a_hold_keeps_its_value_across_the_cold_rung` asserts 3 ppm. | strong |
+  | 5. Tier, with source | tier 2: "GSAS-II, FullProf, TOPAS and EasyDiffraction keep a fixed parameter fixed on every pattern of a series, and none restarts a pattern from the initial models (docs/practice.md § Sequential refinement)" | The cited source contradicts the tier. `docs/practice.md` line 488-490: "the cold rung restarts a pattern from the initial models, which no other program does …, so what a held value is on that rung is a question only rietx has". WP-2081 § Context, "Tier": "Any default the discussion chooses for the cold rung is new judgement (tier 3 …), because no program surveyed has a cold rung." Tier 2 needs the same choice made by default in a program, and no program makes this choice. I checked this in the repository, not from recall. Tier 3 on the judgement ground (rule 6 plus the `carry` row) fits. `caller` is correctly not claimed: the package picks the value. The `approved` date, 2026-11-16, is rule 6's acceptance. The row's own `grounds` say the option was "Settled by Claude 2026-11-22", and I found no record that this settlement was checked blind. | fails as tier 2; approval borrowed |
+  | 6. Dataset families | one, in `evidence` | One family: the synthetic LaB6 thermal ramp from `tests/test_sequential.py`, rietx's own. Its instrument is constant by construction and its reference is the planted truth (zero shift 0.008°, cell). It is development data: the acceptance row was written on it. No real series with a cold rung and a hold is on disk. Issue #224's runaway neighbour is cited and was not run. A cold rung with a hold is rare, so `generality.md` § "Where three families do not exist" may apply, and the row would then need to say so. | one family, development data |
+  | 7. Which field says it fired? | `SeriesEntry.held_values`, written by `sequential._held_values` | The field records the value held, not whether `_keep_held_values` wrote it. Together with `entry.rung == "cold"` a reader can infer the act. A declined write (hook value kept, path outside `carry`) shows as a value that differs from its neighbours, which the help text explains. `None` where nothing was held is the honest empty state. No diagnostic was added, as series rule 5 asks. | adequate |
+
+  Evidence that would change the verdict: a program that restarts a pattern by itself and holds a fixed value there by default (that would support tier 2). Or the maintainer's own approval of option A, which would make the `approved` date this row's.
+
+  **Not in the table: the "a hook set it on purpose" test in `sequential._keep_held_values`**
+
+  **weak.** The case against is stronger. Comparing the value with the caller's declared value cannot see a hook that writes the declared value. In that case the warm and cold rungs hold different values, which breaks rule 6, the rule the change implements.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide that the caller did not ask for? | docstring: "a held path whose value no longer equals declared's (the caller's models) was moved by prepare or by constrain, and is left alone" | It guesses the caller's intent: a value equal to the declared one is taken to mean "no hook touched it" and is overwritten with the kept value. | answered |
+  | 2. Which kind of ambiguity, and does the row agree? | no row | Intent is a fact the code cannot see, so this is not a kind-1 test. The code infers intent from equality of two floats. | no row |
+  | 3. Case against acting | docstring: "A hook that writes the caller's own value cannot be told from one that wrote nothing, so that value is replaced as if no hook had run" | Concrete consequence, read from the code and not run. In `_fit_one`, `prepare` runs after `_carry_into` (lines 2086-2089). Take a `prepare` that resets the zero shift to the declared, certified value on chosen patterns (a recalibration after a beam refill). On a warm rung that reset wins. On the cold rung the same write equals the declared value, so it is overwritten with the neighbour's value. The same pattern then holds a different value depending on the rung. No test covers this. A path that `prepare` adds (a new atom) has no declared value, so it always counts as hook-set. That is benign. | strong |
+  | 4. Case for acting | test `test_a_value_a_hook_sets_on_the_cold_rung_wins_over_the_kept_hold` | The common cases work: no hook touches the path, or a hook sets a different value (the test gets 0.005, which wins and carries on). | moderate |
+  | 5. Tier, with source | none given | rietx's own, so tier 3 if tabled. No program has the situation. | — |
+  | 6. Dataset families | none given | One synthetic test, no data family. | — |
+  | 7. Which field says it fired? | `held_values` | It shows the value held, not that the overwrite was declined. A reader sees a value that differs from its neighbours, and in the equal-value case sees nothing unusual. | partial |
+
+  Evidence that would change the verdict: a test where `prepare` writes the declared value on one pattern, run both warm and cold, showing the same held value on both. One way to close the gap without guessing intent: on a cold rung, write the kept values for paths held on the last accepted pattern before `prepare` runs, as the warm rung's `_carry_into` does.
+
+  **Not in the table: the source of the held value (last accepted pattern's fitted models; the pattern's own on a verify refit; kept across `on_error="skip"`)**
+
+  **weak.** For the cold rung and the verify refit, the case for this source is stronger, since it is the warm rung's own source. Keeping it across a skip extends rule 6 past its text, contradicts the documented meaning of `"skip"`, and has no test.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What does it decide that the caller did not ask for? | `_chain` comment: "unlike it never cleared by on_error="skip", since a skip stops a warm start and leaves a fixed value fixed". `_verify_steps` docstring: "a refit holding the caller's value instead would be a different model too" | Three choices. (a) A quarantined pattern never supplies the value (set only in the accepted branch, line 2024). (b) A verify refit holds its own pattern's chain value. (c) After a pattern on which every rung raised, under `"skip"` the successor is fitted cold for every free path but holds the last accepted value on held paths. | answered |
+  | 2. Which kind of ambiguity? | no row | (a) and (b) are kind 1: they follow from rule 6 plus `carry`. (c) is not covered: rule 6 is about retries, and the successor after a skip is not a retry of anything. | (c) unsettled |
+  | 3. Case against acting | none given | On (c): the docstrings still say `"skip"` "fits the successor **cold**, for a caller who reads the failure as evidence against the warm state too" (`ON_ERROR_POLICIES`, lines 280-281) and "starts the successor cold" (`fit` docstring, line 1407). Neither was updated. The `on_error` audit row's evidence says "'skip' starts it cold". No test runs skip with a hold. A second gap, read from the code and not run: the warm rung starts from the moment-floored copy (`previous = (carried, …)`), while the cold rung's source is the unfloored `models[k]` (line 2024). A held magnetic modulus that the last accepted pattern did not support would therefore hold different values warm and cold. That is narrow, since it needs a magnetic series plus a hold. | moderate |
+  | 4. Case for acting | the comment above | For (a) and (b) it is strong: the warm start's own source, and a verify refit that compares the same model. For (c) it is plausible: a held value is usually a calibration, not something the failed pattern fitted, so a skip's distrust of the warm state need not reach it. No measurement exists. The verify test (`test_verification_refits_hold_what_the_chain_held_on_their_pattern`) is a stub that checks only which arguments are passed. No real verify refit with a hold runs. | (a), (b) strong; (c) none measured |
+  | 5. Tier, with source | none given | rietx's own. No program restarts a pattern by itself (`docs/practice.md` line 445). | — |
+  | 6. Dataset families | none given | (a) and (b): the one synthetic ramp, cold rung only. (c): none. | — |
+  | 7. Which field says it fired? | `held_values` | It shows the value. Under skip the successor's `rung` is `"cold"` and its `held_values` equals the neighbours', which reads exactly like a corrected cold rung. Nothing says the skip happened except `SeriesResult.failures`. | partial |
+
+  Evidence that would change the verdict: the two `"skip"` docstrings and the `on_error` row's evidence updated to say held paths keep the last accepted value, plus a test of skip with a hold. And either the floored copy used as the cold source, or a statement of why the floored and unfloored values may differ.
+
+  *Author's answers.* `SeriesEntry.held_values`, **weak**: retiered to tier 3, approved
+  2026-11-18, the date the maintainer approved the acceptance row "a fixed value stays
+  fixed" (0.00797° on every pattern and attempt). The grounds now say no program has a
+  cold rung, and mark the source choice settled by Claude as option A (`b4764d011`). The
+  "hook set it on purpose" test, **weak**: kept, and its limit is written in
+  `_keep_held_values`' docstring (`79a776343`). The judge's alternative writes the kept
+  value before `prepare`, for paths held on the last accepted pattern. In the route that
+  calibrates on frame 0 and holds from frame 1, a cold rung on frame 1 would then hold the
+  caller's 0.0°, because frame 0 held nothing. The source, **weak**: the cold source is
+  now the floored carry source, the warm rung's own; the two `"skip"` docstrings and the
+  `on_error` row's evidence say a skip keeps held values; a test covers skip with a hold
+  (`b4764d011`). The plan row, **holds**: the evidence line gained this WP's routes and
+  real-ramp numbers.
+
+  *Reader output.* `python -m tests.reader_output` reports reader output unchanged
+  against the merge-base. The new field reaches a reader in a `model_dump`, so a blind
+  subagent read it. It kept the field and asked for three things. Applied: the mechanism
+  clause cut from the help text and the manual row; the site-DOF exception stated; the
+  help title "Values you held", so the name does not read as the package's own
+  phase-unseen holds (`StageResult.held`). Declined: a rename to `user_held_values`,
+  since the title carries the distinction and the schema's other `held` fields are
+  per-stage. A quarantined entry records the holds of its own best attempt, never a
+  stale one.
+
+  *Settled by Claude* (each a competent reviewer could have made the other way):
+  1. Option A's source is the last accepted pattern's floored carry source, under rule 6
+     (a fixed value stays fixed) and the warm rung's own source. Alternative: the
+     declared models, which is today's cold behaviour.
+  2. A hold keeps its value across `on_error="skip"`, under rule 6. Alternative: a
+     skipped successor starts entirely from the caller's models, as "cold" reads.
+  3. A path whose value `prepare` or the hook changed from the declared models wins over
+     the kept value, under rule 4 (the caller's strategy is the caller's). Alternative:
+     the judge's write-before-prepare (answer above).
+  4. `held_values` as one field with a `None` empty state, and no derived "differs from
+     neighbours" field, under series rule 5 (a field, never a code) and WP-1076.
+     Alternatives: `{}` for nothing held; a second boolean field.
+  5. The field's row at tier 3 approved 2026-11-18, resting on the maintainer's approval
+     of the acceptance row. Alternative: bring the row to the maintainer.
+  6. Rules 1 and 2 combined into WP-2300, and the preset, route and Switching page into
+     WP-2301, both P3, under the WP-filing rule (one seam, one decision). Alternative: four
+     WPs, or folding the declaration into WP-2103.
+
+  *Next.* The maintainer's two naming questions, both on the main user surface: the
+  declaration's vocabulary (WP-2300 § Context, three candidates) and the preset's name
+  (WP-2301). This WP's two `### Inherited` entries (#1556 § 5, #1439) still need an owner
+  or a close. `docs/docs/reference/series.md` sits 13 characters under the manual's page
+  cap, so the next row added there splits the page. The WP stays 🔄 until the maintainer
+  closes the discussion.
+
 - **2026-11-21** — the milestone's open decisions triaged (a ghostshift runner, one
   session; docs only, no package code changed).
 
