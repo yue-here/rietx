@@ -104,6 +104,11 @@ describe("the Text tab", () => {
     expect(text(document.querySelector(".bar .sync"))).toBe("stale");
     const reread = [...document.querySelectorAll(".notice button")];
     expect(reread.map((b) => text(b))).toEqual(["Re-read"]);
+    // an action, so a Button and never a Link (the maintainer's look, 2026-11-21)
+    expect(reread[0].classList.contains("ghost")).toBe(true);
+    expect(reread[0].classList.contains("link")).toBe(false);
+    expect(text(document.querySelector(".notice.stale p")))
+      .toContain("make your edit again");
     (reread[0] as HTMLButtonElement).click();
     await settle();
     expect(document.querySelector(".notice button")).toBeNull();

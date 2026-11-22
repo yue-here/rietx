@@ -74,12 +74,16 @@
   const buffer = $derived(sync.buffer);
   /** A comment does not survive a re-render (WP-1009), so say so before Apply
    *  replaces the buffer. */
+  /** The stale notice's words (the maintainer's look, 2026-11-21: today's
+   *  `STALE_NOTICE` read unclearly). Re-read beside it discards the edit. */
+  const STALE_WORDS =
+    "The project changed after this text was read. Re-read it, then make your edit again.";
   const addedComments = $derived(
     Math.max(0, commentLines(buffer) - commentLines(base)));
   const edited = $derived(loaded && buffer !== base);
   const editedMarks = $derived(edited ? editedLines(base, buffer) : []);
   const why = $derived(!edited ? ""
-    : sync.stale ? "The text is stale: re-read it in the Text tab."
+    : sync.stale ? "The project changed after this text was read. Re-read it in the Text tab."
     : sync.phase === "invalid"
       ? (problems.length
         ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
@@ -289,8 +293,11 @@
   </div>
 
   {#if sync.stale}
-    <p class="notice bad">{sync.notice}
-      <button class="link" onclick={() => revert()}>Re-read</button></p>
+    <div class="notice bad stale">
+      <p>{STALE_WORDS}</p>
+      <button class="ghost" onclick={() => revert()}
+        title="Read the project's text again, discarding your edit">Re-read</button>
+    </div>
   {:else if sync.notice}
     <p class="notice">{sync.notice}</p>
   {/if}
@@ -360,6 +367,24 @@
 
   .notice.bad {
     color: var(--bad);
+  }
+
+  /* Words and the Re-read button on one row, the button kept clear of the
+     words and never wrapped under them while the row has room. */
+  .notice.stale {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .notice.stale p {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .notice.stale button {
+    flex: none;
   }
 
   .editor {
