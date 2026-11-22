@@ -95,8 +95,9 @@ takes no TOPAS spelling as one.
   name, and the names are the schema's. Settled by Claude under those two written rules.
 - [ ] Bring the warning's silence question to the maintainer with its options, or record
   that it was left firing.
-- [ ] Manual: the guide's name list and practice paragraph, `reference/data.md`, the
-  Theory equation. Help entries. Skill row.
+- [x] Manual: the guide's name list and practice paragraph, `reference/data.md`, the
+  Theory equation. Help entries. Skill row. Also `switching/topas.md`'s name table
+  (`Lam` → `wavelength`). The instrument help entry is unchanged, since it cannot read λ.
 
 ## Acceptance
 
