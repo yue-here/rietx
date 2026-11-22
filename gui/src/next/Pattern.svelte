@@ -71,6 +71,7 @@
     previewError = "",
     compared = null,
     oncurves = () => {},
+    howText = "",
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -105,6 +106,8 @@
     /** the History tab's compared node: its step's name and its curve on its
      *  own channels (WP-2211), or null */
     compared?: { label: string; tt: Float64Array; y: Float64Array } | null;
+    /** how the last fit ran, in words (`./howran.ts`, WP-2227), said beside its Rwp */
+    howText?: string;
   } = $props();
 
   /** The difference axis's choices: the three today's page draws
@@ -192,6 +195,9 @@
     loadError ? "The pattern could not be drawn"
     : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
 
+  /** Whether the title line describes the last fit, its Rwp and GoF. */
+  const fitShown = $derived(!!held && !(held as Window).raw && !!stats);
+
   /** Whether a preview is in hand: values nobody has applied (WP-2128). */
   const hasPreview = $derived(!!preview && !!held && !loadError);
   /** Which of the two the graph draws while a preview is in hand: a view
@@ -218,7 +224,8 @@
    *  (B1); a refused preview's reason is said there, in the route's words. */
   const titleTip = $derived(previewing ? "Preview, not refined"
     : previewError ? `${title}. Preview refused: ${previewError}`
-    : (held as Window | null)?.stale ? `${title}, fitted over other channels` : title);
+    : (held as Window | null)?.stale ? `${title}, fitted over other channels`
+    : fitShown && howText ? `${title}. ${howText}` : title);
 
   // -- the chart ---------------------------------------------------------
 
@@ -815,8 +822,8 @@
 
   /** Each label's top, beside its pane: the main pane's curves from its top,
    *  the difference at its pane's middle, one tick row per phase. */
-  const legend = $derived.by(() => {
-    if (!geom) return [];
+  const layout = $derived.by(() => {
+    if (!geom) return { rows: [], end: 0 };
     const out: { id: string; label: string; top: number; absent?: string; reserved?: boolean }[] = [];
     let main = geom.main.top, tick = 0;
     const phases = toggles.filter((t) => t.id.startsWith("ticks:")).length;
@@ -844,10 +851,16 @@
       }
     }
     // the compared node last, under every other label of the pane, so one
-    // appearing moves none of them
-    if (compared) out.push({ id: "compare", label: compared.label, top: main });
-    return out;
+    // appearing moves none of them; the Show choice sits under it
+    if (compared) {
+      out.push({ id: "compare", label: compared.label, top: main });
+      main += LEGEND_ROW;
+    }
+    return { rows: out, end: main };
   });
+  const legend = $derived(layout.rows);
+  /** Where the main pane's labels end, which the Show choice sits under. */
+  const legendEnd = $derived(layout.end);
 
   function swatchColor(id: string): string {
     const c = colors;
@@ -878,25 +891,17 @@
       {:else}
       {#if title}<b>{title}</b>{/if}
       {#if previewError}<span class="bad">Preview refused</span>{/if}
-      {#if held && !held.raw && stats}
+      {#if fitShown}
         <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : `${(stats.rwp * 100).toFixed(2)} %`}</span></span>
         <span class="stat">GoF <span class="num">{stats.gof?.toFixed(2)}</span></span>
+        <!-- how the fit ran (WP-2227): one stage, or in stages and why -->
+        {#if howText}<span class="how">{howText}</span>{/if}
       {/if}
       {#if held && !held.raw && immature}<span class="bad">Not a fit yet</span>{/if}
       {#if held?.stale}<span>fitted over other channels</span>{/if}
       {/if}
     </div>
     <div class="gctl">
-      <!-- laid out while no preview is in hand, unseen, so a preview
-           appearing moves no control (as the legend keeps the Preview slot) -->
-      <span class="vg" class:reserved={!hasPreview} aria-hidden={hasPreview ? undefined : "true"}>Show
-        <span class="segmented" role="group" aria-label="Show">
-          {#each SHOWN as s (s.id)}
-            <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
-              disabled={!hasPreview} onclick={() => (shown = s.id)}>{s.label}</button>
-          {/each}
-        </span>
-      </span>
       <button class="ghost" disabled={!zoomed} onclick={showAll}
         title="Show the whole pattern">Show all</button>
       <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
@@ -981,6 +986,20 @@
             </svg><span class="t">{l.label}</span>
           </button>
         {/each}
+        {#if hasPreview && geom}
+          <!-- the choice between the preview and the last fit, under the
+               curves it chooses between, so the title line keeps its room for
+               the fit's words (WP-2227; the maintainer's fallback of
+               2026-11-22). Placed by the legend, it moves nothing as it comes -->
+          <span class="vg" style:top="{legendEnd + LEGEND_ROW / 2}px">Show
+            <span class="segmented" role="group" aria-label="Show">
+              {#each SHOWN as s (s.id)}
+                <button class:on={shown === s.id} aria-pressed={shown === s.id} title={s.title}
+                  onclick={() => (shown = s.id)}>{s.label}</button>
+              {/each}
+            </span>
+          </span>
+        {/if}
       </div>
       {#if arm}
         <div class="armnote" role="status">Drag across the plot to {arm === "limits" ? "set the fitted range" : "exclude a region"}. Esc cancels.</div>
@@ -1213,9 +1232,21 @@
     cursor: default;
   }
 
-  /* the Show choice's slot while no preview is in hand: laid out, unseen */
-  .vg.reserved {
-    visibility: hidden;
+  /* the Show choice in the legend: its word over the two views, stacked to
+     the gutter's width, the labels' left edge its own */
+  .gutter .vg {
+    position: absolute;
+    left: 8px;
+    right: 4px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .gutter .vg .segmented {
+    flex-direction: column;
   }
 
   /* the Preview label's slot while no preview is drawn: laid out, unseen */

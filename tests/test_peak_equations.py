@@ -10,6 +10,7 @@ refusals to the message a user meets.  The derivative columns themselves are
 
 from __future__ import annotations
 
+from fnmatch import fnmatch
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +80,9 @@ def _rocksalt(**kw) -> Phase:
     (lambda: _eq("lor_fwhm", "h*tan(theta)", h=0.1), "that name is the reflection's"),
     (lambda: _eq("intensity_factor", "scale", scale=1.0), "phase scale"),
     (lambda: _eq("lor_fwhm", "if(d > 2, a, 0)", a=0.1), "frozen for the stage"),
+    (lambda: _eq("lor_fwhm", "if(wavelength > 1, a, 0)", a=0.1), "frozen for the stage"),
+    (lambda: _eq("lor_fwhm", "wavelength/cos(theta)", wavelength=0.1),
+     "that name is the reflection's"),
     (lambda: _eq("lor_fwhm", "if(h == 0, a, 0)*tan(th)", a=0.1), "reflection names are"),
     (lambda: _eq("lor_fwhm", "a*harmonic(3, 0)", a=0.1), "l is even and at least 2"),
     (lambda: _eq("lor_fwhm", "a*orbit_mean(orbit_mean(l^2))", a=0.1),
@@ -93,6 +97,7 @@ def test_a_malformed_equation_is_refused_at_construction(build, fragment):
 @pytest.mark.parametrize("equations, fragment", [
     ([_eq("lor_fwhm", "a*tan(theta)", a=0.1)], "belongs to a phase"),
     ([_eq("shift", "a*l", a=0.1)], "belong to a phase's reflections"),
+    ([_eq("shift", "a*wavelength", a=0.1)], "in hkl or wavelength goes on Phase"),
     ([_eq("shift", "a*cos(theta)", a=0.1), _eq("shift", "b", b=0.0)], "two equations"),
 ])
 def test_the_instrument_level_takes_a_shift_in_the_angle_alone(equations, fragment):
@@ -291,6 +296,71 @@ def test_a_coefficient_shared_across_wavelengths_is_a_warning():
     # a pure number reads no wavelength
     assert _shared_across_wavelengths(
         [_eq("intensity_factor", "if(l == 0, 1, p)", p=0.7)], [cu, _mo(cu)]) == []
+
+
+#: two single-line sources, so each pattern has one λ and the built-in size
+#: twin, which takes one number of degrees per pattern, is exact
+LAMS = (0.41390, 0.71070)
+
+
+def _joint_ycalc(phase, moved=None) -> list[np.ndarray]:
+    """Each pattern's curve under one joint table at :data:`LAMS`, the
+    coefficients shared.  ``moved`` overrides entries of pattern 1's values
+    after the decode, on the model compiled at :data:`LAMS`."""
+    from rietx.params.multi import MultiParameterTable
+
+    instruments = []
+    for lam in LAMS:
+        ins = rx.Instrument.debye_scherrer(wavelength=lam)
+        ins.source.dispersion = None
+        ins.profile.w.value = 2e-3
+        instruments.append(ins)
+    structure = Structure(phases=[phase])
+    mt = MultiParameterTable(structure, instruments)
+    values = mt.decode(mt.x0())
+    values[1].update(moved or {})
+    tt = np.arange(4.0, 60.0, 0.005)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    # each pattern compiles from its own structure, as the joint fit does, so
+    # the twin's windows are sized at its converted size
+    return [np.asarray(compile_model(s, ins, blank).evaluate(v))
+            for s, ins, v in zip(mt.structures, instruments, values, strict=True)]
+
+
+def test_a_size_term_reading_wavelength_is_lor_size_at_two_wavelengths():
+    """WP-2152: ``y*wavelength/cos(theta)`` with one shared ``y`` is the
+    built-in ``lor_size`` shared across the two patterns, which the joint
+    table converts by λ_h/λ_0 (``params.multi.SIZE_LAMBDA_POWER``).  Written
+    in degrees instead, one shared number is the wrong width at the second
+    wavelength by the ratio of the two."""
+    size = 0.05
+    twin = brucite()
+    twin.lor_size.value = size
+    eq = brucite(peak_equations=[_eq("lor_fwhm", "y*wavelength/cos(theta)",
+                                     y=size / LAMS[0])])
+    for got, want in zip(_joint_ycalc(eq), _joint_ycalc(twin), strict=True):
+        assert _rel(got, want) < 1e-12
+    degrees = brucite(peak_equations=[_eq("lor_fwhm", "x/cos(theta)", x=size)])
+    assert _rel(_joint_ycalc(degrees)[1], _joint_ycalc(twin)[1]) > 1e-2
+
+
+def test_a_free_wavelength_moves_the_term_it_reads():
+    """λ is a table entry (WP-1134), and the equation reads it from the
+    values, never from the compile's copy.  Pattern 1's λ moved by 1 % in
+    its values widens the equation's term with it: the twin is ``lor_size``
+    at the moved λ's share, on the same compiled model."""
+    size, lam = 0.05, LAMS[1] * 1.01
+    path = "instrument.source.lines.0.wavelength"
+    eq = brucite(peak_equations=[_eq("lor_fwhm", "y*wavelength/cos(theta)",
+                                     y=size / LAMS[0])])
+    got = _joint_ycalc(eq, {path: lam})[1]
+    twin = brucite()
+    twin.lor_size.value = size
+    want = _joint_ycalc(twin, {path: lam, "phases.0.lor_size": size * lam / LAMS[0]})[1]
+    assert _rel(got, want) < 1e-12
+    # a term frozen at the compile's λ would stay at the old width
+    frozen = _joint_ycalc(twin, {path: lam})[1]
+    assert _rel(got, frozen) > 1e-3
 
 
 @pytest.mark.parametrize("build", [
@@ -525,3 +595,252 @@ def test_a_calibration_curve_and_per_phase_tchz_are_recovered_jointly():
     z = {path: (rows[path].value - truth) / rows[path].stderr
          for path, truth in truths.items()}
     assert all(abs(v) < 2.0 for v in z.values()), z
+
+
+# --- a width equation inside LM's width rows (WP-2153) -------------------------
+
+#: the floor test's synthetic LaB₆ (``tests/test_gaussian_width_floor.py``),
+#: its Gaussian width carried by a phase TCHZ equation; U, V and W held, W on
+#: its floor, so before WP-2153 no row held the width at all
+ROW_TCHZ = "1e-3*(u*tan(theta)^2 + v*tan(theta) + w)"
+ROW_LOR = "1e-3*(x/cos(theta) + y*tan(theta))"
+ROW_TRUE = {"u": 0.9, "v": -0.2, "w": 0.025}
+_ROW_B = ["phases.0.scale", "instrument.background.*"]
+_ROW_EQ = "phases.0.peak_equations.0."
+_ROW_TT = np.arange(3.0, 24.0, 0.005)
+
+
+def _row_models(gauss: str, coefficients: dict, true: bool, **profile):
+    from rietx.model.profiles.caglioti import _MIN_GAMMA_G2
+    from tests.test_schemas import make_lab6
+
+    s = make_lab6()
+    s.phases[0].scale.value = 5e-4
+    s.phases[0].peak_equations = [_eq("gauss_fwhm_squared", gauss, **coefficients)]
+    ins = rx.Instrument.debye_scherrer(wavelength=0.4139)
+    ins.profile.u.value = ins.profile.v.value = 0.0
+    ins.profile.w.value = _MIN_GAMMA_G2
+    for name, value in profile.items():
+        getattr(ins.profile, name).value = value
+    if true:
+        ins.profile.x.value = 2e-3
+        ins.background = rx.BackgroundChebyshev(coefficients=[Parameter(value=40.0)])
+    else:
+        ins.background = rx.BackgroundChebyshev.with_terms(1)
+    return s, ins
+
+
+def _row_pattern(gauss, coefficients, **profile) -> rx.PatternData:
+    s, ins = _row_models(gauss, coefficients, True, **profile)
+    model, table = _compiled(s.phases, ins, tt=_ROW_TT)
+    y = np.asarray(model.evaluate(table.decode(table.x0())))
+    y = np.random.default_rng(7).poisson(np.maximum(y, 1.0)).astype(float)
+    return rx.PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+
+
+def _row_fits(stem, pattern, gauss, plan, start, truth):
+    """LM from ``start``, and the reference: TRF from ``truth``.
+
+    Each is ``(equation coefficients, instrument profile values)``.  The
+    reference starts at the truth because TRF from the bad start is no
+    oracle here: nothing holds the total width inside its step either, and
+    under rounding-level nudges of w's start (``1 + k·1e-14``) it stalled
+    under the floor in 5 of 7 (Rwp 0.191-0.195, every esd ``None``, the case
+    Linux CI met), where LM landed in 7 of 7 ([dev] macOS arm64, 2026-11-22).
+    """
+    from rietx.viz.plots import plot_result
+
+    out = {}
+    for solver, (coefficients, profile) in (("lm", start), ("trf", truth)):
+        s, ins = _row_models(gauss, coefficients, False, **profile)
+        out[solver] = rx.Refinement(s, ins, solver=solver, history=False).fit(
+            pattern, plan=plan)
+    OUT.mkdir(exist_ok=True)
+    plot_result(out["lm"], path=OUT / f"{stem}_lm.png")
+    ref = {p.path: p for p in out["trf"].parameters}
+    assert all(p.stderr is not None for p in ref.values()), "the reference stalled"
+    return {p.path: p for p in out["lm"].parameters}, ref, out["lm"]
+
+
+@pytest.mark.parametrize("k", [0, -1, 3])
+def test_a_free_equation_is_held_above_the_floor_and_lm_lands_on_the_minimum(k):
+    """The stall the rows were built for, reached through an equation.
+
+    Without the equation's term (main before WP-2153) w stepped to -0.150,
+    Γ_G² sat under the floor at 19 of 19 reflections, and the fit stopped at
+    Rwp 0.195 against 0.0416 at the minimum, u, v and w 27-427 esd from it.
+    With it LM lands within 0.0025 esd of a fit started at the truth ([dev]
+    macOS arm64, 2026-11-22); the bar is the WP's 0.1 esd.  ``k`` nudges the
+    start by k·1e-14, two of the starts where TRF stalled (:func:`_row_fits`).
+    """
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage(name="scale", turn_on=_ROW_B),
+        rx.Stage(name="eq_w", turn_on=_ROW_B + [_ROW_EQ + "w"]),
+        rx.Stage(name="eq", turn_on=_ROW_B + [_ROW_EQ + "*", "instrument.profile.x"])])
+    pattern = _row_pattern(ROW_TCHZ, ROW_TRUE)
+    lm, ref, result = _row_fits(
+        "peak_equation_width_rows", pattern, ROW_TCHZ, plan,
+        start=({"u": 0.0, "v": 0.0, "w": 1.0 * (1 + k * 1e-14)}, {}),
+        truth=(ROW_TRUE, {"x": 2e-3}))
+    for c in "uvw":
+        path = _ROW_EQ + c
+        assert lm[path].stderr is not None, path
+        assert abs(lm[path].value - ref[path].value) < 0.1 * ref[path].stderr, path
+    assert result.stages[1].n_constraint_truncations >= 1
+    assert not any(d.code == "PEAK_WIDTH_NOT_POSITIVE" for d in result.diagnostics)
+
+
+def test_a_held_positive_term_lets_the_built_in_width_dip_where_the_total_does_not():
+    """Direction 2: the built-in Γ_G² dips to -1.4e-5 deg² at the truth, and a
+    held equation term of 3e-5 keeps the total above it.  Without the term in
+    the row LM held the built-in sum at ε and ended at Rwp 0.143 against
+    TRF's 0.0418, U, V, W and X 5-115 esd from TRF's.  With it LM lands
+    within 3e-5 esd ([dev] macOS arm64, 2026-11-22)."""
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage(name="scale", turn_on=_ROW_B),
+        rx.Stage(name="w", turn_on=_ROW_B + ["instrument.profile.w"]),
+        rx.Stage(name="profile", turn_on=_ROW_B + [f"instrument.profile.{k}"
+                                                    for k in "uvwx"])])
+    truth = {"u": 9e-4, "v": -2.4e-4, "w": 2e-6}
+    pattern = _row_pattern("s", {"s": 3e-5}, **truth)
+    lm, ref, _result = _row_fits("peak_equation_width_rows_held", pattern, "s", plan,
+                                 start=({"s": 3e-5}, {"w": 1e-3}),
+                                 truth=({"s": 3e-5}, {**truth, "x": 2e-3}))
+    for k in "uvwx":
+        path = f"instrument.profile.{k}"
+        assert abs(lm[path].value - ref[path].value) < 0.1 * ref[path].stderr, path
+    assert lm["instrument.profile.v"].value < 0.0
+
+
+def _row_stage(gauss: str, coefficients: dict, free: list[str], lor=None):
+    s, ins = _row_models(gauss, coefficients, False, u=1e-4, w=4e-5)
+    if lor is not None:
+        s.phases[0].peak_equations.append(_eq("lor_fwhm", ROW_LOR, **lor))
+    model, table = _compiled(s.phases, ins, tt=_ROW_TT)
+    table.set_vary(free, True)
+    free_paths = set(table.free_paths)
+    assert all(any(fnmatch(p, g) for p in free_paths) for g in free), free
+    return model, table
+
+
+def _total_widths(model, table, x):
+    """Γ_G² before the floor (reflections on the data) and Γ_L (every
+    finite reflection), summed from the forward model's own width terms."""
+    v = table.decode(x)
+    cp = model.phases[0]
+    d, (tt,) = model._cell_block(cp, model._phase_cell(0, v), model.line_lambdas(v))
+    tt = np.asarray(tt, dtype=np.float64)
+    th = np.radians(0.5 * tt)
+    t, sec = np.tan(th), 1.0 / np.cos(th)
+    g2 = ((v["instrument.profile.u"] + v["phases.0.gauss_strain"]) * t * t
+          + v["instrument.profile.v"] * t + v["instrument.profile.w"]
+          + v["phases.0.gauss_size"] * sec * sec)
+    gl = ((v["instrument.profile.x"] + v["phases.0.lor_size"]) * sec
+          + (v["instrument.profile.y"] + v["phases.0.lor_strain"]) * t)
+    extra_g2, extra_l = model._width_terms(0, v, tt, d)
+    g2 = g2 + (0.0 if extra_g2 is None else np.asarray(extra_g2))
+    gl = gl + (0.0 if extra_l is None else np.asarray(extra_l))
+    on = (cp.win[0][:, 1] > cp.win[0][:, 0]) & np.isfinite(tt)
+    return g2[on], gl[np.isfinite(tt)]
+
+
+def _assert_rows_read(block, x, values, floor=0.0):
+    np.testing.assert_allclose(np.sort(block.slack(x)),
+                               np.sort(np.unique(values - floor)), rtol=1e-9, atol=1e-15)
+
+
+def test_each_row_is_the_total_width_exactly_at_a_full_step():
+    """The block is exact, not linearised: at a step of 100 % of every free
+    coefficient the rows still read the forward model's total, the oracle
+    for a map affine in its parameter (root CLAUDE.md, WP-1121)."""
+    import rietx.optimize.least_squares as ls
+    from rietx.model.profiles.caglioti import _MIN_GAMMA_G2
+
+    model, table = _row_stage(ROW_TCHZ, ROW_TRUE,
+                              [_ROW_EQ + "*", "phases.0.peak_equations.1.*"],
+                              lor={"x": 2.0, "y": -0.5})
+    x0 = table.x0()
+    (g_block,) = ls.gaussian_width_inequalities(model, table, x0)
+    (l_block,) = ls.lorentzian_width_inequalities(model, table, x0)
+    # the coefficients' columns alone: the cell moves the angles, which the
+    # rows freeze for the stage as they do for the built-in terms
+    step = np.array([".peak_equations." in p for p in table.free_paths])
+    assert step.sum() == 5
+    for x in (x0, np.where(step, 2.0 * x0, x0)):
+        g2, gl = _total_widths(model, table, x)
+        _assert_rows_read(g_block, x, g2, _MIN_GAMMA_G2)
+        _assert_rows_read(l_block, x, gl)
+
+
+@pytest.mark.parametrize("expression, coefficients", [
+    ("1e-3*u^2*tan(theta)", {"u": 0.5}),
+    ("1e-3*abs(w)", {"w": 0.02}),
+    ("1e-3*max(w, 0.01)", {"w": 0.02}),
+    ("1e-3*w*w/(1 + w)", {"w": 0.02}),
+])
+def test_a_term_not_affine_in_a_free_coefficient_leaves_the_built_in_row(
+        expression, coefficients, monkeypatch):
+    """Not exact, so left out: the row is the built-in terms' alone, as it
+    was before WP-2153, and ``PEAK_WIDTH_NOT_POSITIVE`` reports the total.
+    Held, the same term is a constant at the frozen angles, and is in."""
+    import rietx.optimize.least_squares as ls
+    from rietx.model.peak_equations import is_affine
+    from rietx.model.profiles.caglioti import _MIN_GAMMA_G2
+
+    (name,) = coefficients
+    model, table = _row_stage(expression, coefficients,
+                              ["instrument.profile.w", _ROW_EQ + name])
+    assert not is_affine(model.phases[0].peq.equations["gauss_fwhm_squared"])
+    (with_eq,) = ls.gaussian_width_inequalities(model, table, table.x0())
+    with monkeypatch.context() as m:
+        m.setattr(ls, "_equation_width_rows", lambda *a, **k: None)
+        (without,) = ls.gaussian_width_inequalities(model, table, table.x0())
+    np.testing.assert_array_equal(with_eq.T, without.T)
+    np.testing.assert_array_equal(with_eq.c, without.c)
+
+    model, table = _row_stage(expression, coefficients, ["instrument.profile.w"])
+    (held,) = ls.gaussian_width_inequalities(model, table, table.x0())
+    g2, _gl = _total_widths(model, table, table.x0())
+    _assert_rows_read(held, table.x0(), g2, _MIN_GAMMA_G2)
+
+
+@pytest.mark.parametrize("expression, affine", [
+    (ROW_TCHZ, True),
+    (ROW_LOR, True),
+    ("-(a - 2*b)/cos(theta)^2", True),
+    ("orbit_mean(a*h^2*l^2)/d^2 + b", True),
+    ("if(l == 0, a, b)*tan(theta)", True),
+    ("a*b*tan(theta)", False),
+    ("a^2", False),
+    ("1/a", False),
+    ("sqrt(a) + b", False),
+    ("if(l == 0, a*b, b)", False),
+])
+def test_affinity_is_read_off_the_tree_and_agrees_with_the_gradient(expression, affine):
+    """The structural test against its numeric reading: an affine equation's
+    coefficient gradient is the same at the stored and at a far coefficient
+    set.  The test is sufficient only, so a False is not checked numerically."""
+    from rietx.model.peak_equations import compile_equation, gradient, is_affine
+    from rietx.params.expression import Expression, names_in
+
+    names = [n for n in names_in(Expression(expression, reflection=True).tree)
+             if n in set("abuvwxy")]
+    eq = _eq("lor_fwhm", expression, **{n: 0.3 + 0.1 * i for i, n in enumerate(names)})
+    assert is_affine(compile_equation(eq, "phases.0", 0)) is affine
+    if not affine:
+        return
+    model, table = _compiled([brucite(peak_equations=[eq])], _instrument())
+    cp = model.phases[0]
+    compiled = cp.peq.equations["lor_fwhm"]
+    v = table.decode(table.x0())
+    d, (tt, *_rest) = model._cell_block(cp, model._phase_cell(0, v),
+                                        model.line_lambdas(v))
+    far = dict(v)
+    far.update({p: 7.0 * float(v[p]) - 3.0 for _n, p in compiled.paths})
+    with np.errstate(all="ignore"):
+        g0 = gradient(compiled, v, cp.peq.frame, d=d, theta=np.radians(0.5 * tt),
+                      two_theta=tt)[1]
+        g1 = gradient(compiled, far, cp.peq.frame, d=d, theta=np.radians(0.5 * tt),
+                      two_theta=tt)[1]
+    for a, b in zip(g0, g1, strict=True):
+        np.testing.assert_allclose(a, b, rtol=1e-12, atol=1e-15)

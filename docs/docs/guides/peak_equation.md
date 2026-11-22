@@ -50,7 +50,8 @@ A coefficient of 2.4 × 10⁻⁵ in its own units works too, but its esd is then
 | `shift` | degrees 2θ | adds to the peak position |
 | `intensity_factor` | 1 | multiplies the reflection's intensity |
 
-The expression reads `h`, `k`, `l`, `m` (the multiplicity), `d` in Å, `theta` (the Bragg angle in radians) and `two_theta` in degrees.
+The expression reads `h`, `k`, `l`, `m` (the multiplicity), `d` in Å, `theta` (the Bragg angle in radians), `two_theta` in degrees and `wavelength` in Å.
+`wavelength` is the emission line the peak is drawn at, so a Kα2 image reads its own λ.
 `tan(theta)` is therefore the strain law, and `1/cos(theta)` the size law.
 An equation on the instrument takes `shift` alone and reads only `theta` and `two_theta`.
 [Peak equations](../reference/data.md#peak-equations) lists the refusals, and [Switching from TOPAS](../switching/topas.md#peak-equations) maps TOPAS's keywords onto these targets.
@@ -92,8 +93,12 @@ A shared coefficient is one number in degrees for every pattern.
 Across patterns at different wavelengths, the right value in degrees can differ.
 A size-like term, such as `x/cos(theta)`, scales with λ.
 A strain-like term, such as `w*tan(theta)`, does not.
-For a wavelength-dependent term, give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.peak_equations.0.w"])`.
-TOPAS writes such a term per pattern, or with `Lam` in the expression.
+There are two ways to write a wavelength-dependent term.
+Give each pattern its own coefficient with `SharingMap(per_histogram=["phases.0.peak_equations.0.w"])`.
+Or write the λ into the expression, as `y*wavelength/cos(theta)`, and keep `y` shared.
+`y` is then in degrees per Å, one number for one crystallite size at every wavelength.
+TOPAS does the same two ways: a term per pattern, or `Lam` in the expression.
+The fit still warns about a shared coefficient in an equation that reads `wavelength`, since such an equation can carry a term that does not scale with λ.
 
 ## Read what the fit says
 

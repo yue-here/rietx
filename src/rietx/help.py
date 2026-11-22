@@ -1100,7 +1100,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "multiplies its intensity, as its `target` says. Its unit is whatever "
             "makes the expression come out in the target's unit: degrees 2θ for a "
             "width or a shift, deg² for `gauss_fwhm_squared`, and none for an "
-            "intensity factor. No preset plan frees it, so a stage names "
+            "intensity factor. An expression may read `wavelength`, the emission "
+            "line's λ in Å, so a size term written as `y*wavelength/cos(theta)` is "
+            "one coefficient, in degrees per Å, at every wavelength. No preset plan "
+            "frees it, so a stage names "
             "`phases.*.peak_equations.*` itself. A coefficient that is very small in "
             "its own unit refines better rescaled near 1, by writing its factor into "
             "the expression."
@@ -1330,9 +1333,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "isotropic limit with `Stage.strain_seed`, because at S = 0 the square root "
             "in the width has unbounded slope. Positivity of σ²(M) couples all fifteen "
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
-            "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
-            "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "default Levenberg-Marquardt solver holds it as a linear inequality, in a "
+            "joint fit too. Under `solver=\"trf\"`, `STEPHENS_STRAIN_NOT_POSITIVE` "
+            "reports it instead. Read that flag as 'these coefficients are not quotable, and the "
             "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
@@ -4057,8 +4060,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "and a strain-like one, such as a tan θ term, does not. The package "
             "converts its own size terms, but cannot tell which kind an equation "
             "holds. For a wavelength-dependent term, give each pattern its own "
-            "coefficient with SharingMap(per_histogram=[...]) and refit. TOPAS writes "
-            "such a term per pattern, or with Lam in the expression."
+            "coefficient with SharingMap(per_histogram=[...]) and refit. Or write the "
+            "λ into the expression, as y*wavelength/cos(theta), and keep y shared. The "
+            "warning still fires on such an equation, since it can carry a term that "
+            "does not scale with λ."
         ),
     ),
     "PEAK_WIDTH_NOT_POSITIVE": HelpEntry(
@@ -4814,9 +4819,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
             "on those reflections too. A negative value is not evidence of large "
             "anisotropy. Under `solver=\"trf\"`, refit with the default "
-            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
-            "joint fit holds it under neither driver, so fit each pattern alone or drop "
-            "the block from the joint fit. That "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero, in "
+            "a joint fit too. That "
             "makes the coefficients admissible, not measured, so compare a few starts. "
             "Do not quote the coefficients."
         ),

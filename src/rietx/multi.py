@@ -884,6 +884,21 @@ def _joint_reach_beyond_self(columns: list[str], reach: dict[str, list[str]]
     return out
 
 
+def _seeded_values(mtable, columns: list[str]) -> dict[str, float]:
+    """Each seeded column at the value its seed wrote, read off the entry.
+
+    ``StageResult.seeded``'s second writer, as in ``refine._run_stage``: the
+    isotropic ray gives every Stephens DOF its own coefficient.  A shared
+    column holds one value in every histogram, so histogram 0's is read.
+    """
+    out: dict[str, float] = {}
+    for c in columns:
+        h = mtable._owner(c) or 0
+        table = mtable.tables[h]
+        out[c] = table.entries[table._paths[mtable._unscope(h, c)]].value
+    return out
+
+
 def _joint_phases_reached(columns: list[str], reach: dict[str, list[str]]) -> set[int]:
     """Every phase a column names or moves (``refine._phases_reached``, scoped)."""
     return {int(m.group(1)) for c in columns for name in (c, *reach.get(c, ()))
@@ -2061,6 +2076,14 @@ class MultiHistogramRefinement:
                 if stage.seed:
                     seeded = dict.fromkeys(
                         self.mtable.seed_floored(freed, stage.seed), stage.seed)
+                if stage.strain_seed:
+                    # the single runner's second seed (``_run_stage``): the
+                    # Stephens DOFs are unbounded below, so the seed above
+                    # never sees them; each enters ``seeded`` at the value
+                    # written, before the support hold reads it
+                    seeded.update(_seeded_values(
+                        self.mtable,
+                        self.mtable.seed_stephens(freed, stage.strain_seed)))
                 self.mtable.apply_to_models()
                 # the single-histogram runner's rule (``_run_stage``, #598): the
                 # moment frames follow the cell this stage starts from, and the
