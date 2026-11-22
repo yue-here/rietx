@@ -67,11 +67,12 @@ the same date):
 
 - [x] Draw the options in the workshop and take them to Yue. Drawn 2026-11-22 over the real
       `/next` page rather than in the frozen workshop (`2227-screenshots/`); not decided.
-- [ ] Serve how the last run went on the run and result routes, from one authority.
-- [ ] Build the chosen view at `/next`, and drop `refit="stages"` from the run route.
-- [ ] A vitest per state (one stage, staged for a released parameter, fallback) and a browser
+- [x] Serve how the last run went on the run and result routes, from one authority.
+- [x] Build the chosen view at `/next`, and drop `refit="stages"` from the run route.
+- [x] A vitest per state (one stage, staged for a released parameter, fallback) and a browser
       screenshot of each, light and dark.
-- [ ] The GUI chapter names the view.
+- [x] The GUI chapter names the view: listed in WP-2214 § Tests and the manual, for the swap,
+      since the manual stays unchanged until then (Yue, 2026-11-22, on WP-2211).
 
 ## Acceptance
 

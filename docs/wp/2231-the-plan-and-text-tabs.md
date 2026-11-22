@@ -213,6 +213,8 @@ memory as reversals in one area (leaving out an affordance a sibling panel has).
     graph's title line and in a Console comment after each fit; after a one-stage re-fit the
     Plan tab draws one stand-in row after the stages; a staged run names what the last fit held.
     WP-2227 builds them, so the title line carries both the toggle and the re-fit's words.
+    The maintainer's fallback, the same day: if either is cut, the toggle moves to the legend.
+    WP-2227 measured both cut at 1440 px and moved it (its `2227-screenshots/README.md`).
 
 ## Questions
 
