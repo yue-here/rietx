@@ -158,6 +158,9 @@ drawing them today (`Frame.svelte`'s `carried`); R4 makes both arms this page's 
   prototype's at the same size in the runner's scratch, with an inventory of where each of
   today's Plan and Text features lives. The last PR waits on the maintainer's look.
   Taken in the second PR; the inventory is the folder's README.
+- [x] The maintainer's look at R4 (§ Rulings, eight items), built in the third PR in the order
+  7, 5, 6, 1, 2, 3, 8, 4, with the graph strip's `?` box beside the model strip's. The
+  toggle's place and words wait for the maintainer (§ Questions 2).
 
 ## Acceptance
 
@@ -222,6 +225,18 @@ Filled in by the session that builds each PR. Question 1 is carried from WP-2227
      parameter on screen.
    Until they are answered, `/next` keeps `refit="stages"`, so every Refine on the staged plan
    runs in stages, as today's page does.
+2. **Where the toggle between the preview and the last fit sits, and what it says** (§ Rulings
+   item 4). No design gives either. The third PR builds the most conventional form: a
+   segmented choice `Show [Preview | Last fit]` on the Pattern graph's title line, drawn only
+   while a preview is in hand, as the Peaks graph's `Show` is. Last fit draws the fit whole,
+   as with no preview, so the difference strip, the ticks and the title's Rwp are the fit's.
+   The choice returns to Preview when the preview goes. The alternative already on the page
+   is the legend's own switches: a click on Last fit hides the grey curve, while the
+   difference strip keeps the preview's residual. The cost of the built form is width. At
+   1440 px the title line elides the last fit's Rwp to "9.2…" (its tooltip keeps the whole
+   line). Pictures: `toggle-preview`, `toggle-last` and `toggle-legend` under
+   `2231-screenshots/`. "Last fit" is the page's existing word for the curve, where the
+   maintainer wrote "last refined".
 
 ## Settled by Claude
 
@@ -264,7 +279,8 @@ The Plan tab (the first PR), most consequential first:
 
 The Text tab (the second PR), most consequential first:
 
-11. **The `?` box is not built here.** The task line names it, and no panel on `/next` has
+11. **Reversed by the maintainer on 2026-11-21** (§ Rulings item 6); the third PR built the
+    box. As first settled: **The `?` box is not built here.** The task line names it, and no panel on `/next` has
     one yet. WP-2215 settled that the tab strips' `?` boxes (WP-2214 row 246) wait for a
     help piece, and no WP owns that piece yet. A box drawn for the Text tab alone would put
     a control on the strip that the other three tabs lack. The footer's words are removed from the tab and kept here for that
@@ -274,7 +290,9 @@ The Text tab (the second PR), most consequential first:
     as in Parameters. Edited values are highlighted; a line rietx cannot read is
     underlined." The alternative is a `?` button on the model strip now, drawn only on the
     Text tab.
-12. **The whole buffer is one pending edit, and a text edit draws no preview.** The
+12. **Reversed by the maintainer on 2026-11-21** (§ Rulings item 8); the third PR previews a
+    typed number. As first settled: **The whole buffer is one pending edit, and a text edit
+    draws no preview.** The
     prototype turns each changed value into an entry of the Parameters panel's pending set,
     so the Pattern graph previews it. Grounds: this WP's task line counts "a typed change"
     as one pending edit, and the document applies as one delta through the verbs a form
@@ -307,6 +325,25 @@ The Text tab (the second PR), most consequential first:
     counts.
 18. **The tab's title names the file after the project**, `<name>.rxt`, from the project's
     path (`lib/filemenu.ts:projectStem`), as the File menu names the project.
+
+The maintainer's look (the third PR), most consequential first:
+
+19. **While both the Interactive tab and the Text tab hold a preview, the graphs draw the
+    Text tab's.** The frame keeps the two answers apart, and the text is the wider
+    statement, since it can carry every value a slider moves. The alternative is the later
+    answer of the two, which would flip the plot between them as each panel's queue lands.
+20. **A buffer whose changes are only refine flags, settings or peak moves previews
+    nothing**, and takes down a preview it had. Grounds: none of them moves a curve, and
+    `POST /api/preview` takes values only. The values come from the validation route's own
+    diff (`delta.values`), so the client parses no `.rxt`.
+21. **The graph strip has a `?` box too**, at its right, in the prototype's words cut to what
+    the page does: the Background box drops the Points family the page does not draw, and
+    the Pattern box names the new Show choice. Grounds: item 6 gave the model strip one,
+    and the prototype draws one on each strip. The alternative was listing it as remaining.
+22. **A scale mark sits 12 px over its top labelled tick's centre, in 28 px each pane keeps
+    above its plot** (`LABEL_HALF`, `next/rxplot.mjs:MARK_ROOM`). The room keeps a tick at the
+    plot's top edge clear of the mark on every scale and at the narrow floor
+    (`pattern-*.png`).
 
 ## Handover log
 
