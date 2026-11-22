@@ -7190,13 +7190,7 @@ class Refinement:
                             structure=answer["structure"],
                             instrument=answer["instrument"],
                             held=list(answer["held"]),
-                            free_paths=list(answer["free_paths"]),
-                            covariance=self._covariance_block(), **kw)
-
-    def _covariance_block(self):
-        """``paths → physical covariance`` of the last fit's answer, or ``None``
-        (:func:`_answer_covariance_block` on :attr:`result_`)."""
-        return _answer_covariance_block(self, self.result_)
+                            free_paths=list(answer["free_paths"]), **kw)
 
     def check_rigid_bodies(self, data: PatternData, **kw):
         """Test each rigid body against the data (``RIGID_BODY_MISFIT``).
@@ -9878,25 +9872,6 @@ def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | N
     return stderr / esd_inflation
 
 
-def _answer_covariance_block(ref, result):
-    """``paths → physical covariance`` of ``result``'s answer stage, or ``None``.
-
-    The covariance every esd ``result`` quotes was read off, while ``ref``
-    still holds it for that result (after :meth:`Refinement.fit` or
-    :meth:`Refinement.run_stage`, before an edit, checkout or replay); it is
-    never serialized, so a reopened result has none.  The moment arm
-    propagates a mixed-occupancy position's esd through it (issue #1692): the
-    moment per position is a function of every modulus, angle and occupancy
-    of its group, so it needs their whole block, not the moduli's pairwise ρ.
-    """
-    kept = getattr(ref, "_answer_covariance", None)
-    if kept is None or result is None or kept[0] is not result or kept[3] is None:
-        return None
-    _result, table, theta, stderr_internal, correlation = kept
-    return lambda paths: table.physical_covariance(
-        theta, stderr_internal, correlation, list(paths))
-
-
 def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray, *,
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
@@ -10085,8 +10060,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         params, cosited_moments(
             model, values, stderr_phys,
             None if stderr_internal is None else
-            (lambda paths: table.physical_covariance(
-                theta, stderr_internal, correlation, paths))))
+            (None, table, theta, stderr_internal, correlation, discarded)))
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so

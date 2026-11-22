@@ -102,6 +102,41 @@ def fit(truth: Phase, start: Phase):
     return ref
 
 
+class _Paths:
+    """Every path is a row, in the order asked."""
+
+    def __init__(self, paths=None):
+        self.paths = paths
+
+    def __contains__(self, q):
+        return self.paths is None or q in self.paths
+
+    def __getitem__(self, q):
+        return q
+
+
+class _Table:
+    """The three members of ``ParameterTable`` the moment arm reads, over an
+    arbitrary covariance ``block(paths)`` (the answer tuple's shape, WP-2230)."""
+
+    free_paths = ()
+
+    def __init__(self, block, paths=None):
+        self._block = block
+        self._paths = _Paths(paths)
+
+    def unmeasured_functions(self, *args, **kw):
+        return [False]
+
+    def physical_covariance(self, theta, stderr, correlation, paths, **kw):
+        return self._block(paths)
+
+
+def answer_tuple(block, paths=None):
+    """``Refinement._answer_covariance``'s tuple around an arbitrary block."""
+    return (None, _Table(block, paths), None, np.ones(1), None)
+
+
 def compiled(phase: Phase):
     structure = rx.Structure(phases=[phase])
     grid = rx.PatternData(two_theta=GRID.tolist(), intensity=[0.0] * len(GRID))
@@ -195,7 +230,8 @@ def test_the_moment_per_position_is_the_linear_sum_with_its_propagated_esd(m1, m
         idx = [paths.index(p) for p in asked]
         return cov[np.ix_(idx, idx)]
 
-    (c,) = cosited_moments(model, values, {p: 1.0 for p in PAIR}, block)
+    (c,) = cosited_moments(model, values, {p: 1.0 for p in PAIR},
+                           answer_tuple(block, paths))
     assert c.paths == PAIR
     assert c.magnitude == pytest.approx(truth, rel=1e-12)
     assert c.esd == pytest.approx(math.sqrt(g @ cov @ g), rel=1e-6)
@@ -213,7 +249,7 @@ def test_a_modulus_without_an_esd_leaves_the_position_untested():
     tested, never certified."""
     model, values = compiled(mixed(3.0, 2.0))
     (c,) = cosited_moments(model, values, {PAIR[0]: 0.1},
-                           lambda paths: np.eye(len(paths)) * 1e-4)
+                           answer_tuple(lambda paths: np.eye(len(paths)) * 1e-4))
     assert c.esd is None and c.supported is None
 
 
@@ -347,6 +383,6 @@ def test_a_cosited_pair_is_not_quadrature_paired_even_at_rho_one():
     corr = [CorrelationPair(path_a=PAIR[0], path_b=PAIR[1], rho=-0.999)]
     rows = analyse_moments(model, values, esd={p: 0.4 for p in PAIR},
                            correlations=corr,
-                           covariance=lambda paths: np.eye(len(paths)) * 1e-4)
+                           covariance=answer_tuple(lambda paths: np.eye(len(paths)) * 1e-4))
     assert all(r.paired_with == [] for r in rows)
     assert all(r.cosited_magnitude == pytest.approx(2.5) for r in rows)
