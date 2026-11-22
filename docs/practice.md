@@ -1315,6 +1315,24 @@ Surveyed 2026-11-10 for WP-2208, one agent. GSAS-II 5.8.4 source and scripting m
 
 No program has a plan whose steps declare "fix this" as a separate list from "free this". GSAS-II comes closest and is the only one with the shape the maintainer describes: a step dict with both `set` and `clear`, flags kept in the project and carried forward, and `set` applied before `clear` within a step. `once` is its way to make a flag last for one step only. TOPAS, FullProf and RIETAN-FP all keep the recipe outside the program, as an edit of the input file between runs, except that RIETAN-FP's `NAUTO=1` list is a built-in schedule in which each cycle refines only its own group, which fixes the earlier groups. For a series, GSAS-II builds the vary list per histogram and has per-histogram fix lists, FullProf reuses one set of codes for every pattern, and TOPAS rereads the INP each run. For Pawley then Rietveld, the three documented routes are two runs with a file edit between them, with GSAS-II alone doing it as steps of one job.
 
+## How a program reports the way a refinement ran
+
+Gathered 2026-11-22 for WP-2227 (the GUI shows whether a Refine ran in one stage or in stages).
+GSAS-II 5.8.4 source read; the rest is recall or an earlier survey, marked as such.
+
+| Program | What a run reports when it ends | Says how it was staged |
+|---|---|---|
+| GSAS-II 5.8.4 | A dialog titled "Refinement results, Rw=…" with the reduced χ² before and after, the largest shift/σ, and a table of every varied parameter before and after with its σ; the person accepts or discards the result. An accepted run adds one Notebook line, "LS Refinement: Rw = …, GOF = …, Nobs = …, Nvar = …" (checked (source): `GSASIIdataGUI.py:5797-5858`, `:6166`; `GSASIIctrlGUI.G2AfterFit`) | No staging to report; a zero-cycle run says "Zero cycle "refinement" computation completed" (checked (source): `:5838`) |
+| TOPAS | GUI mode's Fit Window prints Rwp per iteration and plots Rwp per cycle (an earlier survey of the TOPAS 5 user manual, not re-read); Launch mode prints the iteration log | No staging to report (§ Staging) |
+| FullProf | The console and the `.out` file list each cycle's shifts and agreement factors; the `.sum` file holds the final ones (recall) | No staging to report (§ Staging) |
+| Profex with BGMN | A docked convergence panel plots Rwp against Rexp while BGMN runs (an earlier survey of the Profex part 3 UI reference, not re-read) | BGMN stages by itself (§ Staging); whether the panel names the step is not checked |
+
+### Practice adds up to
+
+The three programs rietx compares itself with do not stage, so none has a view of how a run was
+staged to copy. Each reports a run as its agreement indices, with the cycle log one step away.
+GSAS-II also records every accepted run as one line in the project's Notebook.
+
 ## Depth cueing, and filled rings and faces, in a structure figure
 
 Surveyed 2026-11-12 for WP-1548, one agent reading each program's user documentation on the
