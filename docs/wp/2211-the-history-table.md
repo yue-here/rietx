@@ -1,6 +1,6 @@
 # WP-2211 — the History table: Compare on the pattern, Restore as pending edits
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-22 — claimed by ghostshift runner (MacBook-Air-9db21f)
+Milestone: gui-overhaul · Status: 🔄 2026-11-22 — in review (#1772); the maintainer's look at its pictures and the chapter's timing wait
 Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
 Priority: P2 2026-11-17 — was P3: R1's bottom panel landed with WP-2215 (#1534), so nothing blocks it; a feature the open milestone was opened for
 
@@ -210,6 +210,12 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   ("unchanged until the swap"). Ruling 5 says the chapter is rewritten in this WP: the two
   rules conflict, so the timing is a question for the maintainer (handover entry, 2026-11-22).
 - [x] Skill: none. The GUI is a human surface, and an agent drives the python API.
+- [ ] WP-2214's inventory row 158: the diff panel (filter, metrics, ranked paths; WP-1217),
+  opened by Compare values… on a node's menu. Where it opens is a placement the prototype
+  never drew, so it goes to the maintainer as drawn options first. Added 2026-11-22: R5 owns
+  rows 152-173, and this WP's tasks predate the inventory.
+- [ ] WP-2214's inventory row 155: a node's details (its diagnostics, notes and action) in the
+  row's disclosure. Same origin and the same placement question as row 158.
 
 ## Acceptance
 
@@ -231,6 +237,42 @@ The browser files skip in CI (no playwright there), so the PR quotes their local
   panel), WP-2209 (edit recovery).
 
 ## Handover log
+
+- **2026-11-22** — The History tab is built at `/next`, in review as PR #1772. A person can
+  now see every fit as a row, in the graph view it opens in or the table, overlay any earlier
+  fit on the pattern, and load an earlier fit's values as pending edits that Apply writes and
+  Revert drops. Measuring first changed the design: offering Make current whenever a node
+  differed by more than values would have offered it on every node of a default fit, so Restore
+  carries values and refuses only a node whose model differs. Compare needed one new route,
+  because only a replay can redraw a node with moved atoms or another 2θ range. Five choices
+  wait on the maintainer's look; none blocks the merge.
+  *Done*: questions 3 and 4 measured and decided (§ Measured); `GET /api/history/curves`; the
+  `--plot-compare` token and the dashed layer with its legend entry; `gui/src/next/History.svelte`
+  (Graph and Table views, Compare, Restore, the node menu in the ruled words, the `?` box);
+  the tab's count; `Params.loadRestore`; three browser cases; the shared menu now opens upward
+  where the window has no room below (a History row's menu showed one item of four, and every
+  menu built on it gains the turn); the pictures in `2211-screenshots/` with an inventory of
+  WP-2214's rows 152-160; § Inherited folded into § Where it starts.
+  *Not built*: WP-2214's inventory rows 155 (a node's details) and 158 (the diff panel, opened
+  by Compare values… on the menu). R5 owns them, but this WP's tasks predate the inventory, so
+  both are added as tasks for a second PR. Each needs a placement the prototype never drew.
+  *Measured* (macOS arm64, `[dev]` venv on Python 3.12): vitest 928 passed in 53 files;
+  svelte-check 0 errors; every `tests/*_browser.py` 180 passed (layout and gui 53, compare
+  and peaks 8, recovery and html 17, rxplot and structure3d 49, watch 53); ruff clean; vale
+  0 errors and no warning on a changed line; `tests.reader_output` exit 0, unchanged.
+  *Gotchas*: macOS folds case, so `History.test.ts` and `history.test.ts` are one file; the
+  mount cases are `historyPanel.test.ts`. PR #1764 (WP-2212) was open throughout; its `say`
+  change may need `History`'s single-string `say` wrapped once it merges.
+  *For the maintainer* (pictures in `2211-screenshots/`, its README § Open):
+  (1) the compared curve's dark ink, `#f5f5f5`, since the prototype's equals the observed
+  points'; (2) the Graph | Table choice and `?` at the strip's right; (3) Graph rows carry Rwp
+  alone; (4) step names are the stage's own (`scale_bkg`), not the prototype's friendly names;
+  (5) **the chapter's timing**: ruling 5 says the GUI chapter's History section is rewritten in
+  this WP, while WP-2214 § Tests and the manual keeps the manual unchanged until the swap. This
+  PR follows WP-2214, so the chapter still describes today's page; say if ruling 5 should win.
+  Next: the maintainer's look at the pictures. Then draw the placements for rows 155 and 158
+  as options for the maintainer and build the chosen one in a second PR. If ruling 5 wins,
+  that PR also rewrites `reference/gui-guide.md` § History against `/next`.
 
 - **2026-11-21** — The maintainer has ruled the History panel's shape from drawn options, so
   the session that builds it now knows what to build. The tab shows the nodes as a graph by
