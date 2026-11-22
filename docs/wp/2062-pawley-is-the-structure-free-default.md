@@ -169,6 +169,11 @@ above, which come from lab and synchrotron single-phase patterns
   parameters carry no esd. Over the full suite, 357 Pawley solves discarded a direction and
   touched 6 758 intensity columns: 5 800 in overlap groups, 423 off the data and 535 in
   neither. WP-2230 owns the 535.
+  **Update 2026-11-21, from WP-2230 (PR #1736):** the 535 were a subtraction artefact, so
+  nothing here grows. The 423 off-data intensities were also inside the 5 800. The other 958
+  came from one joint Pawley fit, whose block the probe could not see. They are the cubic
+  (330)/(411) coincidence, grouped and centred just past the data's end. On the merged tree
+  every touched intensity sits in an overlap group, and none is cross-phase.
 
 - **2026-11-15, from the issue triage (issue #1552): the Le Bail partition clips each
   channel's net count at zero, and that biases the intensities up and the background

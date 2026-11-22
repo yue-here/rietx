@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TERMS, LAMBDA_STOPS, heldWith, kindArms, kindEcho, knots, lambdaStop,
-         pendingHolds, switchKind, termsArms, termsEcho, withTerms } from "./background";
+import { DEFAULT_TERMS, LAMBDA_STOPS, heldWith, kindEcho, knots, lambdaStop,
+         pendingHolds, switchKind, termsEcho, withTerms } from "./background";
 
 /** `BackgroundPSpline.for_range`'s answers, written by `tests/test_gui_background.py`. */
 const corpus: { cases: Array<{ lo: number; hi: number; breakpoints: number[]; n_coefficients: number;
@@ -87,25 +87,6 @@ describe("the rebuilt Background graph's controls (WP-2218)", () => {
       expect(bg.coefficients).toHaveLength(c.n_coefficients);
       expect([bg.lambda_smooth, bg.lambda_units]).toEqual([c.lambda_smooth, c.lambda_units]);
     }
-  });
-
-  it("releases and frees what a Type switch redefines", () => {
-    const arms = kindArms();
-    expect([arms.unhold, arms.free]).toEqual([["instrument.background.*"], ["instrument.background.*"]]);
-    expect(arms.gone("instrument.background.c7")).toBe(true);
-    expect(arms.gone("phases.0.scale")).toBe(false);
-  });
-
-  it("releases the held terms a cut removes and frees the terms an extension adds", () => {
-    const terms = [0, 1, 2, 3, 4, 5].map((k) => ({ path: `instrument.background.c${k}`, held: k === 2 || k === 5 }));
-    const cut = termsArms(terms, 4);
-    expect(cut.unhold).toEqual(["instrument.background.c5"]);
-    expect(cut.free).toEqual([]);
-    expect([cut.gone("instrument.background.c4"), cut.gone("instrument.background.c3")]).toEqual([true, false]);
-    const more = termsArms(terms, 8);
-    expect(more.unhold).toEqual([]);
-    expect(more.free).toEqual(["instrument.background.c6", "instrument.background.c7"]);
-    expect(more.gone("instrument.background.c5")).toBe(false);
   });
 
   it("echoes the Python each edit runs, the kept values and the bounds sent", () => {

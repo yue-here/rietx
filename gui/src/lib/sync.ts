@@ -202,3 +202,60 @@ export function minimalChange(before: string, after: string): DocChange | null {
   }
   return { from: start, to: endBefore, insert: after.slice(start, endAfter) };
 }
+
+/** Past this many cells the line table is not built, and every line between
+ *  the common head and tail counts as edited (4 MB of table). */
+export const EDITED_LINES_MAX_CELLS = 1_000_000;
+
+/**
+ * The buffer's lines that the rendering does not have, 1-based: what the Text
+ * tab marks as edited (WP-2231). A longest common subsequence over lines,
+ * after the common head and tail are trimmed, so a typed value marks its own
+ * line and an inserted line does not mark every line after it.
+ */
+export function editedLines(base: string, buffer: string): number[] {
+  if (base === buffer) return [];
+  const a = base.split("\n");
+  const b = buffer.split("\n");
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head += 1;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > head && endB > head && a[endA - 1] === b[endB - 1]) {
+    endA -= 1;
+    endB -= 1;
+  }
+  const n = endA - head;
+  const m = endB - head;
+  const out: number[] = [];
+  // only deleted lines: nothing left in the buffer to mark
+  if (m === 0) return out;
+  if (n === 0 || (n + 1) * (m + 1) > EDITED_LINES_MAX_CELLS) {
+    for (let j = head; j < endB; j++) out.push(j + 1);
+    return out;
+  }
+  // t[i][j]: the common subsequence's length from a[head+i] and b[head+j] on
+  const w = m + 1;
+  const t = new Int32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      t[i * w + j] = a[head + i] === b[head + j]
+        ? t[(i + 1) * w + j + 1] + 1
+        : Math.max(t[(i + 1) * w + j], t[i * w + j + 1]);
+    }
+  }
+  let i = 0;
+  let j = 0;
+  while (j < m) {
+    if (i < n && a[head + i] === b[head + j]) {
+      i += 1;
+      j += 1;
+    } else if (i < n && t[(i + 1) * w + j] >= t[i * w + j + 1]) {
+      i += 1;
+    } else {
+      out.push(head + j + 1);
+      j += 1;
+    }
+  }
+  return out;
+}
