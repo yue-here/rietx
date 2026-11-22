@@ -58,12 +58,12 @@ DIARY = "docs/milestones/process.md"
 #: and src/rietx/gui/CLAUDE.md.
 LIMITS: dict[str, tuple[int, int]] = {
     "AGENTS.md": (2_009, 4_009),
-    "CLAUDE.md": (77_188, 78_024),
+    "CLAUDE.md": (77_573, 78_409),
     "docs/ROADMAP.md": (52_042, 55_314),
-    "gui/CLAUDE.md": (44_892, 46_278),
+    "gui/CLAUDE.md": (44_972, 46_358),
     "src/rietx/gui/CLAUDE.md": (155, 2_155),
     "src/rietx/indexing/CLAUDE.md": (24_935, 27_941),
-    "src/rietx/io/CLAUDE.md": (49_292, 51_980),
+    "src/rietx/io/CLAUDE.md": (49_324, 52_012),
     "tests/CLAUDE.md": (17_707, 18_319),
 }
 

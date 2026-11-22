@@ -228,6 +228,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   residual used for cost/statistics and the solve stay fp64 on host — `backend/linalg64.py` is
   that boundary. The trust region re-measures each step against an fp64 cost, so fp32 columns
   still land the fp64 answer (v0.4 record).
+- **No pydantic in the hot loop**: `ParameterTable.decode()` returns a plain dict; the forward
+  model consumes floats/arrays only.
 - **An analytic Jacobian branch claims what one parameter *name* reaches** (WP-1070).
   `_make_jacobian` dispatches on the free path's name and each branch computes only its own
   rows, so a tie that moves rows outside that reach returns the column **short**, silently.
@@ -299,9 +301,10 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   histogram h the factor λ_h/λ_0, so **a joint fit shares the size, never the degrees**. The seam
   is `ParameterTable.apply_value_scale`, a factor folded into **C**, so no derivative branch is
   touched (`_peak_chain_column` finite-differences θ *through* `decode`). Sharing happens in
-  **internal** coordinates: shared bounds are **intersected**, not last-write-wins, and a **seed
+  **internal** coordinates, so a writer that touches one entry per histogram inherits nothing:
+  shared bounds are **intersected**, not last-write-wins, and a **seed
   is in column units** (a physical one puts two histograms at different coordinates for one
-  column and the last write wins).
+  column and the last write silently wins).
 - **A derived quantity of one parameter needs no covariance; one of two correlated columns
   does** (WP-1072). `model/microstructure.py` reports each mechanism's Gaussian and Lorentzian
   readings separately with exact single-parameter esds and *compares* them (`size_agreement`),
@@ -535,7 +538,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
 - **A display reads fields and never computes; a designed view is a `__str__` override** (WP-1544;
   the four rules and the figure rule are `_display.py`'s docstring and `viz.plots._pyplot`'s).
 - **A per-stage charge is judged on the shortest fit, never the typical one** (WP-1413), since it
-  is near-constant. **The snapshot's charge is paid** (WP-1438): a ratio is the wrong test for a
+  is near-constant, against a budget of 5 % of the shortest fit (17.7 ms on `nac`). **The
+  snapshot's charge is paid** (WP-1438): a ratio is the wrong test for a
   small absolute charge, and thinning would cost the live view its redraws on the fits somebody
   is watching. A throttle, if the number ever moves, is by time and never by count.
 - **Every fit records itself, and telemetry never breaks a fit** (WP-1403). `runs.py` holds
@@ -548,7 +552,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   unasked, so its every method latches one-shot on `BaseException`, records why in
   `status.json` and warns once a process (`KeyboardInterrupt` re-raises — that is the person at
   the keyboard). `events.py`'s "a monitoring hook that crashes the refinement is a bug you want
-  to see" is the same rule from the other side. Two corollaries: **whatever a recorder needs
+  to see" is the same rule from the other side; both halves stay written down, or someone
+  reconciles them the wrong way. Two corollaries: **whatever a recorder needs
   before it exists is outside its own latch** (a root and a directory are `attach`'s to guard);
   and the status is a **projection**, its stage read off `stage_start.index` and never counted,
   since a released phase emits a second `stage_start` (WP-1301). **An internal trial passes
@@ -661,7 +666,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   6.3.3.1 case (2) under `bragg_brentano`, case (3a) under `flat_plate_transmission`, **off at
   µt = ∞** (thick specimen, ITC (1a)) — so `mu_t` absent ≠ `mu_t = 0`, a specimen of no
   thickness, which raises. It is *not* an exact reparameterisation, so it moves Rwp and Biso, and
-  on a genuinely thick specimen declaring a thickness makes the fit worse. Neither µR nor µt is
+  on a genuinely thick specimen declaring a thickness correctly makes the fit worse. Neither µR nor µt is
   refinable: µR is exactly singular, µt ill-conditioned and knowable from the specimen.
 - **Instrument ⊕ sample profile split**: Gaussian *variances* add (instrument U,V,W + phase
   `gauss_size`/`gauss_strain`), Lorentzian *FWHMs* add (instrument X,Y + phase
@@ -757,8 +762,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   (WP-1306, WP-1996): two engines' answers in one fixture may disagree by more than any bar worth
   setting, so the gate is the span they bracket and the spread itself is reported. **A foreign
   format's unit is measured against that format's own reference output, never adopted from its
-  prose**, and a row the format states two ways is **refused** rather than chosen, exactly as a
-  CIF whose angle contradicts its symbol is.
+  prose**, and a value the format states in two units is **refused**; a bare R symbol the
+  cell puts on rhombohedral axes is read and reported (WP-1911).
 - The **manual** (`docs/docs/`) is one `-W` Sphinx tree in tabs (Start, Guides, Concepts,
   Reference, Theory, Switching), guarded twice because pages fail two ways. **The Theory tab**
   (`docs/docs/theory/`, `tests/test_manual.py`): fenced constants are MyST
@@ -904,5 +909,5 @@ is held to per-column agreement with the analytic Jacobian in `tests/test_cross_
 Apple-GPU execution is *slower* than numpy (launch-latency-bound), so `torch-mps` buys precision
 verification, not speed (v0.4 record). Also since v0.4: true Voigt (`shape="voigt"`, TCHZ still
 the default), soft restraints, the Bérar-Lelann esd inflation. v2 fence: FPA, neutron **TOF** —
-and the **peaks buffer with FPA**, never before, since shape reuse needs several FCJ images a
-window point (WP-1122).
+and the **peaks buffer with FPA**, never before, since shape reuse needs more than 2.8-4.2 FCJ
+images a window point (WP-1122).

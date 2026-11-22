@@ -1,6 +1,6 @@
 # WP-2009 — The rulebooks: findings out, and the rules that generate overfit rewritten
 
-Milestone: generality · Status: 🔄 2026-11-22 — every task landed; the maintainer's read of the reworded rules (PR #1768) is the last acceptance step
+Milestone: generality · Status: 🔄 2026-11-22 — every task landed; the blind check of the reworded rules ran and its findings are fixed (PR #1768)
 Track: The prose
 Depends on: 2001 (2008 soft)
 Priority: P3 2026-10-30 — was P4: the 2026-10-30 Inherited entry measures a cost every session pays (root alone about 21k tokens a request); a cost-only item with no user at the wall
@@ -97,8 +97,10 @@ plus a pointer.
 .venv/bin/python -m pytest tests/test_docs_consistency.py -q
 ```
 
-Plus a read by the maintainer of the rewritten rules, since a rule's wording is a
-decision (`~/.claude/CLAUDE.md`: a plan sent for approval opens with its context).
+Plus a blind check of the rewritten rules: a fresh agent given the diff, not the author's
+reading, names each rewording that changes what a rule tells an agent to do. A rewording
+that amends one of the maintainer's rules or rulings goes to him; the rest are settled
+(his routing rules of 2026-11-22, WP-2237, replacing a read by him of every rewording).
 
 ## References
 
@@ -107,8 +109,9 @@ decision (`~/.claude/CLAUDE.md`: a plan sent for approval opens with its context
 
 ## Moved from the rulebooks, with no other home
 
-The findings pass confirmed each number at its pointer before cutting it. These four
-were absent there, or the target had moved on, so they are kept here verbatim.
+The findings pass confirmed each number at its pointer before cutting it. These seven
+were absent there, or the target had moved on, so they are kept here verbatim (the last
+three found by the blind check).
 
 - Root `CLAUDE.md` (page-directory rule, WP-1461): "`.gitignore`, whose `*.html` has
   swallowed eight committed files." WP-1461 records the seventh only.
@@ -119,9 +122,31 @@ were absent there, or the target had moved on, so they are kept here verbatim.
 - `tests/CLAUDE.md` (measure the spread on the asserted quantity): "sized on `a` at
   2.5e-6, the same bar fired 12 days later on `c`, 7x wider and bit-identical across two
   runs." `tests/test_acceptance_srm676a.py` §3 now describes a different measurement.
+- `tests/CLAUDE.md` (the WP-1059 rival-fit round): "Fitting each rival alone costs
+  seconds; that round cost 1.7 M tokens." Not in `PROTOCOL.md` or WP-1059; WP-1063 has it.
+- Root `CLAUDE.md` (bound test, WP-1434): a distance to the bound was "silent on nine of
+  32 binding cases". WP-1434 records nine in 24.
+- `src/rietx/indexing/CLAUDE.md` (line order, WP-1039): "NAC: 6 of the truth's lines in
+  2θ order, 18 by intensity over a `SEARCH_POOL_MULTIPLE` low-Q pool." WP-1039 has the six
+  only.
 
 ## Handover log
 
+- **2026-11-22** — the blind check (WP-2237's session, under the maintainer's new routing
+  rules). A fresh Opus agent read the diff without the author's reading, about 140
+  rewordings. It found one rule deleted outright and six clauses whose instruction
+  changed, all restored: "No pydantic in the hot loop"; the FPA fence's 2.8-4.2 FCJ images
+  (a threshold, not evidence); the per-stage charge's 17.7 ms budget; "a writer that
+  touches one entry per histogram inherits nothing" and "silently"; "declaring a thickness
+  *correctly*"; "both halves stay written down". It also found the io gsas row now
+  attributing the wrong GSAS-II bug (fixed to the ÷100), the gui pointer to WP-2134's
+  style guide dropped (restored), and three numbers not at their pointers (now in § Moved).
+  It judged "never `k`", "never a default" and io's "every format that states an axis"
+  faithful to the old evidence. Root's refuse sentence was narrowed to a value stated in
+  two units, with the bare-R case read and reported (WP-1911): six of six routing agents
+  had read the old wording as refusing it. Byte pins re-set at the landed bytes: root
+  77 573, gui 44 972, io 49 324, each ceiling moved by the same amount. With these fixes the
+  last acceptance step is met; the WP can close.
 - **2026-11-22** — the findings pass and the generator pass, all five rulebooks.
   The always-loaded rulebooks now carry rules and a short reason, and the one-dataset
   numbers behind them live in the WP or record each rule points at. Together they lost
@@ -170,7 +195,7 @@ were absent there, or the target had moved on, so they are kept here verbatim.
   *Gotcha.* The lane policy's acceptance command carried `-q`, which with `addopts`'s own
   prints no summary; run it bare.
 
-  Next: the maintainer reads the reworded rules in PR #1768. On approval the WP closes:
+  Next (superseded by the blind check above): the maintainer reads the reworded rules in PR #1768. On approval the WP closes:
   delete `Priority:`, move this narrative to the v1.13 record, and mark ✅. If a rule's
   wording is reversed, fix it on the branch and record the reversal in memory.
 

@@ -216,7 +216,8 @@ Each was found in a browser, and jsdom cannot see it.
 
 ## House style and help
 
-`gui/src/app.css`, `gui/src/tokens.css`, `gui/src/Help.svelte`, `lib/help.ts`.
+`gui/src/app.css`, `gui/src/tokens.css`, `gui/src/Help.svelte`, `lib/help.ts`. The visual
+rules in this section are listed in WP-2134 for the GUI style guide.
 
 - **The token values are Python and `gui/src/tokens.css` is generated** (WP-1429;
   root § Conventions). Regenerate with `python -m rietx.viz.theme > gui/src/tokens.css`,
