@@ -2159,6 +2159,8 @@ def test_no_history_control_moves_the_window(browser, tmp_path_factory):
         page.wait_for_selector(".rx-menu")
         names = page.locator(".rx-menu [role^=menuitem]").all_text_contents()
         assert [n.strip() for n in names] == ["Make current", "Branch from here…", "Name…", "Note…"]
+        menu = page.locator(".rx-menu").bounding_box()
+        assert menu["y"] >= 0 and menu["y"] + menu["height"] <= 900, menu
         check("a row's menu")
         page.keyboard.press("Escape")
         page.get_by_role("button", name="About the History tab", exact=True).click()
