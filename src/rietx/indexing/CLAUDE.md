@@ -153,8 +153,7 @@ is read, so a panel-only ranking put candidates the gate refuses to promote abov
 the one it could. Not an aggregation artefact — the displacing candidate *wins*
 the panel on the members, and no re-weighting reaches it (WP-1041 stands).
 **A finder count is not comparable across systems**, measured rather than feared:
-ranking on it sent four bethanechol truths from rank 1 to ranks 5/3/9/8 behind
-orthorhombic cells all three engines found. So the one comparable statement is
+ranking on it sent four bethanechol truths from rank 1 to 5/3/9/8. So the one comparable statement is
 the gate's own boundary — `MIN_AGREEMENT` is read by both, and the panel decides
 within a tier. Inert inside an engine, where `found_by` is empty.
 
@@ -214,7 +213,7 @@ roughly the shift (+1400 ppm).
   `intensity × profile`, so such a component has no gradient on its own position;
   the pre-1110 pseudo-inverse truncated the resulting unmeasurable esd to an
   ordinary-looking 0.06°, and the certified corundum list published **two** of
-  them (I = 2.1e-49 and 5.5e-19) until the covariance was equilibrated.
+  them until the covariance was equilibrated.
   `_max_index` built from one reached a trial index of **3.1e+25**. `_prune`
   cannot reach them — it tests only *shoulder* seeds, by the deliberate
   asymmetry in its docstring — so `no_intensity` is a flag in
@@ -306,20 +305,18 @@ roughly the shift (+1400 ppm).
   ε (`NIGGLI_EPS_RELATIVE`) or one lattice splits into two and denies the gate agreement.
   And **a χ² takes its difference and its covariance in one frame**: an engine's
   `cov_af` is in the setting it refined in, so it meets a reduced A..F only through
-  `reduce.reduction`'s map. Unmapped, it moved groups in all 99 bethanechol dedups (1518).
+  `reduce.reduction`'s map. Unmapped, it moved groups (1518).
   Exact because **a reduced cell is the exact image of its input**: built from M·G·Mᵀ, never
   gemmi's vector, whose ε-picked signs leak into values (#797, WP-1923, WP-2035).
 - **Two reduced cells are compared across the reduction's boundaries** (WP-1932): call
   `equal_reduced`, `equal_reduced_many` or `same_lattice`, never a ΔᵀΣ⁺Δ of your own on
-  two reduced vectors, which split one lattice 4 784 times on bethanechol (#834). The
+  two reduced vectors, which split one lattice (#834). The
   Selling gate selects and the χ² decides; a distance over its esd is not that χ².
 - **A candidate is reported in its conventional setting, at `to_cell_candidate`**
   (WP-1923): `engines.conventional_fit` re-sets af, `cov_af`, cell and esds in one map. A
   new surface showing an engine's cell goes through it too, or one search speaks two.
-- **A metric direction no line constrains is refused, never marked** (#1232,
-  WP-1915): a dead *cross* term looks like one unmeasured angle, but G = (G\*)⁻¹
-  puts it into every length (Q bit-identical while a, b, c move), so its finite
-  first-order esds are confident wrong numbers and no `cov_af` holds an inf.
+- **A metric direction no line constrains is refused, never marked** (#1232, WP-1915): a
+  dead *cross* term is not one unmeasured angle, it enters every length.
 - **An assumed precision may never refuse to index** (`from_positions` lists get no
   `MAX_RELATIVE_SIGMA_Q` vote; the shift-allowance half is above).
 - **This package is not slow at indexing, it is silent** — DICVOL04 reaches 3770 s
@@ -331,8 +328,7 @@ roughly the shift (+1400 ppm).
   `INDEX_BUDGET_EXHAUSTED` names the three states (searched/truncated/not reached),
   and a truncated validation reads `not_validated`, never `validation_failed`
   (1037). And **a Monte Carlo indexer must refine each proposal; raw random cells
-  do not rank** — WP-1023 ranked corundum's truth 29 053 of 200 001 unrefined,
-  where `search_svd`, iterating to a fixed assignment, returns it alone.
+  do not rank** (WP-1023: `search_svd`, iterating to a fixed assignment, returns the truth alone).
 - **Coelho's N_c/N_o gate bounds the *volume*, it is not a per-trial verdict**
   (WP-1040, `svd.volume_window`): N_c ∝ V, so one probe gives κ and the gate is
   V ∈ [N_o/3κ, 4N_o/κ] — it held the truth on all nine corpus datasets and is most
