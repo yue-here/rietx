@@ -95,7 +95,7 @@ def _rows(result):
 
 
 def _rho(ref, a: str, b: str) -> float:
-    _result, table, theta, stderr, corr = ref._answer_covariance
+    _result, table, theta, stderr, corr = ref._answer_covariance[:5]
     cov = table.physical_covariance(theta, stderr, corr, [a, b])
     return float(cov[0, 1] / math.sqrt(cov[0, 0] * cov[1, 1]))
 

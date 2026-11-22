@@ -401,7 +401,7 @@ class TopasPhase:
     #: (``62.448``, ``1.1`` — how the Durham LaMnO₃ tutorial and ISODISTORT's
     #: TOPAS export write it), an OG number (three integers), or a Shubnikov
     #: **symbol**. :func:`to_structure` takes a number as the phase's magnetic
-    #: group (:func:`magnetic_group_number`); a symbol is metadata only,
+    #: group (:func:`_magnetic_group_number`); a symbol is metadata only,
     #: because no dependency here parses one, and the group then has to come
     #: from ``to_structure(magnetic_symmetry=...)``.
     mag_space_group: str | None = None
@@ -4696,7 +4696,7 @@ def _number(value: float) -> str:
 def _operation_set(group) -> frozenset[str]:
     """A nuclear group's operations as a set, translations wrapped into [0, 1).
 
-    ``gemmi.SpaceGroup`` and :class:`~...symmetry.OperatorGroup` both answer
+    ``gemmi.SpaceGroup`` and :class:`~rietx.crystallography.symmetry.OperatorGroup` both answer
     ``operations()``, so a symbol and a list compare as the groups they are,
     never by spelling.
     """
@@ -4727,7 +4727,7 @@ def _magnetic_group_line(phase, *, ion_species_ok: bool = False) -> str | None:
       ``str``'s atoms with the magnetic operators, and TOPAS's own magnetic
       examples comment ``space_group`` out beside ``mag_space_group``, so the
       writer states no ``space_group`` and the reader derives the family group
-      (tier 2 of :func:`~...magcif.resolve_nuclear_symmetry`).  A phase refined
+      (tier 2 of :func:`~rietx.crystallography.magcif.resolve_nuclear_symmetry`).  A phase refined
       under a larger parent (issue #457's tier 1, Cr₂WO₆'s ``Pn'nm`` in
       ``P4₂/mnm``) lists one site per *parent* orbit, which the magnetic group
       splits, so part of each such orbit would vanish from the file;
