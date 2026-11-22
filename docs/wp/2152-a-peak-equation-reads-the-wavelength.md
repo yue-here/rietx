@@ -1,6 +1,6 @@
 # WP-2152 — a peak equation reads the wavelength
 
-Milestone: parametric · Status: ✅ 2026-11-22 — `wavelength` binds per emission line (PR #1785); the shared-across-wavelengths warning is silent on an equation reading it (PR #PRNUM)
+Milestone: parametric · Status: ✅ 2026-11-22 — `wavelength` binds per emission line (PR #1785); the shared-across-wavelengths warning is silent on an equation reading it (PR #1790)
 Depends on: —
 
 ## Goal
@@ -99,7 +99,7 @@ takes no TOPAS spelling as one.
   2026-11-22 handover entry.
 - [x] Act on the answer. The maintainer answered "your call" on 2026-11-22. Option (b):
   silent on an equation whose expression reads `wavelength`, settled by Claude under
-  that answer (PR #PRNUM).
+  that answer (PR #1790).
 - [x] Manual: the guide's name list and practice paragraph, `reference/data.md`, the
   Theory equation. Help entries. Skill row. Also `switching/topas.md`'s name table
   (`Lam` → `wavelength`). The instrument help entry is unchanged, since it cannot read λ.
@@ -123,7 +123,7 @@ backend.
 
 ## Handover log
 
-- **2026-11-22** — Closed by a ghostshift runner, PR #PRNUM. A joint fit no longer warns
+- **2026-11-22** — Closed by a ghostshift runner, PR #1790. A joint fit no longer warns
   about a shared coefficient in a peak equation that reads `wavelength`. Before, a user
   who wrote a size term as `y*wavelength/cos(theta)` fitted correctly and still got a
   warning whose suggestion said to give each pattern its own `y`, which would fit two
