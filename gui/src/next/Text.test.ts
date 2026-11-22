@@ -19,8 +19,11 @@ vi.mock("../api", () => ({
   api: {
     textdoc: () => textdoc(),
     putTextdoc: (t: string, r: string, v: boolean) => putTextdoc(t, r, v),
+    preview: (values: Record<string, number>) => preview(values),
   },
 }));
+const preview = vi.fn(async (values: Record<string, number>) => ({ drawn: values }));
+vi.mock("rxplot", () => ({ unpack: (answer: unknown) => answer }));
 
 let typed: ((text: string) => void) | null = null;
 let applied: (() => void) | null = null;
@@ -52,6 +55,7 @@ afterEach(() => {
   document.body.innerHTML = "";
   putTextdoc.mockClear();
   textdoc.mockClear();
+  preview.mockClear();
   revision = "r1";
   typed = null;
   applied = null;
@@ -104,6 +108,11 @@ describe("the Text tab", () => {
     expect(text(document.querySelector(".bar .sync"))).toBe("stale");
     const reread = [...document.querySelectorAll(".notice button")];
     expect(reread.map((b) => text(b))).toEqual(["Re-read"]);
+    // an action, so a Button and never a Link (the maintainer's look, 2026-11-21)
+    expect(reread[0].classList.contains("ghost")).toBe(true);
+    expect(reread[0].classList.contains("link")).toBe(false);
+    expect(text(document.querySelector(".notice.stale p")))
+      .toContain("make your edit again");
     (reread[0] as HTMLButtonElement).click();
     await settle();
     expect(document.querySelector(".notice button")).toBeNull();
@@ -172,5 +181,32 @@ describe("the Text tab", () => {
     await settle();
     expect(app.draft()).toBeNull();
     expect(text(document.querySelector(".bar .sync"))).toBe("loading…");
+  });
+  it("previews a typed number on the plot, and takes the preview down with the edit", async () => {
+    // the maintainer's look, 2026-11-21, item 8: a text edit previews as a slider move does
+    const onpreview = vi.fn();
+    app = mount(Text, { target: document.body, props: { active: true, name: "fap", onpreview } });
+    await settle();
+    const values = { "phases.0.atoms.0.biso": 2.5 };
+    putTextdoc.mockResolvedValueOnce({ would_change: true, delta: { values } } as any);
+    typed!(DOC + "biso 2.5\n");
+    await new Promise((r) => setTimeout(r, 350));
+    await settle();
+    expect(preview.mock.calls).toEqual([[values]]);
+    const [answer, why] = onpreview.mock.calls.at(-1)!;
+    expect(answer.curves).toEqual({ drawn: values });
+    expect(why).toBe("");
+    // a refine flag alone changes no curve, so the preview comes down
+    putTextdoc.mockResolvedValueOnce({ would_change: true, delta: { values: {} } } as any);
+    typed!(DOC + "@ biso\n");
+    await new Promise((r) => setTimeout(r, 350));
+    await settle();
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(onpreview).toHaveBeenLastCalledWith(null, "");
+    // typed back to the stored text: nothing pending, and nothing said twice
+    onpreview.mockClear();
+    typed!(DOC);
+    await settle();
+    expect(onpreview).not.toHaveBeenCalled();
   });
 });

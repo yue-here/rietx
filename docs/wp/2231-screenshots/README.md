@@ -26,9 +26,11 @@ The Text tab (the second PR):
 - `text-rest-*.png`: the tab at rest. The title line names the file, `fap.rxt`, with the sync
   word "in sync" at the right. The editor fills the tab. There is no Apply in the tab and no
   footer.
-- `text-edited-*.png`: line 35 retyped as `atoms.0.biso 0.5` with real keys. The line's text
+- `text-edited-*.png`: line 35 retyped as `atoms.0.biso 2.5` with real keys. The line's text
   is marked as edited. The sync word reads "edited", and the action bar counts one pending
-  edit and offers Apply and "Apply and refine".
+  edit and offers Apply and "Apply and refine". Since the third PR the Pattern graph previews
+  the typed value: its title reads "Preview, not refined" with the preview's Rwp beside the
+  last fit's.
 - `text-invalid-*.png`: the same line retyped as `atoms.0.biso banana`. The line is underlined
   with a gutter mark, the problem is listed under the editor with its line number, and the sync
   word reads "1 line not read". The bar says "invalid edit", with the reason in its tooltip,
@@ -38,7 +40,35 @@ The Text tab (the second PR):
 - `text-stale-*.png`: that buffer restored. The stale notice carries Re-read, the one place it
   appears. A second one-line notice says the added comment will not survive Apply.
 
-Taken 2026-11-21 on macOS (arm64) with the cached chromium, against the dist this branch
+The maintainer's look (the third PR), each picture re-shot on its tree:
+
+- `pattern-rest-*.png`, `pattern-linear-*.png`, `pattern-log-*.png`, `pattern-square-*.png`:
+  the Pattern graph at rest on each intensity scale. The √ or log mark and the Δ/σ mark sit in
+  the tick-label column over each axis's top labelled tick (item 1). The Difference label sits
+  on the difference strip's zero line (item 2). The horizontal gridlines are back (item 3).
+  Linear intensity has no mark.
+- `pattern-narrow-*.png`: the same at 1000 × 640, the graphs squeezed to their floor. The
+  marks keep their column. The graph strip's tabs and its `?` run off the strip's right edge.
+- `pattern-help-*.png`: the graph strip's `?` box over the Pattern graph, in the prototype's
+  words.
+- `plan-rest-*.png`: "Never freed" drawn as read-only chips in the stage rows' style (item 5).
+- `text-help-*.png`: the model strip's `?` box over the Text tab (item 6). Each model tab has
+  its own box.
+- `text-stale-*.png`: the stale notice reworded, with Re-read as an outlined Button at the
+  notice's right (item 7).
+- `toggle-preview-*.png` and `toggle-last-*.png`: the Pattern graph's toggle between the
+  preview and the last fit (item 4), built as `Show [Preview | Last fit]` on the title line,
+  drawn only while a preview is in hand, in a slot the line keeps unseen at rest so a preview
+  appearing moves no control. Last fit draws the fit whole, with its own
+  difference, ticks and Rwp. The words and the place are Claude's; no design gives them.
+- `toggle-legend-*.png`: the other way, already on the page. The legend's Last fit label is
+  its curve's switch, so a click leaves the preview alone on the plot. The difference strip
+  then still shows the preview's residual.
+
+The `plan-lists`, `plan-picker`, `plan-stagemenu`, `plan-settings`, `plan-menu`,
+`text-invalid` and `text-offer` pictures are the second PR's and predate both `?` buttons.
+
+Taken 2026-11-21 and 2026-11-22 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every click and keystroke
 was a real pointer or key event. In the Text pictures the editor was scrolled back to its left
 edge after typing, because Shift+End had scrolled the long line's comment column into view.
@@ -70,4 +100,4 @@ Rows are WP-2214's inventory rows 104-117 (the Plan tab) and 139-146 (the Text t
 | 143 | The editor | kept, with each edited line's text marked | `text-edited` |
 | 144 | The stale, sync, boot and comments notices | one-line notices over the editor | `text-stale` |
 | 145 | Problems, each linked to its line | the gutter mark and underline, and the list under the editor | `text-invalid` |
-| 146 | The footer's prose (Alt-drag, verbs) | removed; the words wait for the `?` box (§ Settled 11) | `text-rest` |
+| 146 | The footer's prose (Alt-drag, verbs) | in the `?` box at the model strip's right (§ Rulings item 6) | `text-help` |

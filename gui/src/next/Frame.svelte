@@ -42,6 +42,8 @@
   import Console from "./Console.svelte";
   import { eventLine, makeLine, pushLine, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
+  import HelpBox from "./HelpBox.svelte";
+  import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Params from "./Params.svelte";
@@ -93,8 +95,22 @@
   let sliderTouched = $state(0);
   /** The slider values not yet applied, which the Structure graph draws. */
   let sliderValues = $state.raw<Record<string, number> | null>(null);
-  let previewAnswer = $state.raw<PreviewAnswer | null>(null);
-  let previewError = $state("");
+  /** The pattern at the sliders' values and at the Text tab's typed values,
+   *  each its own panel's answer (WP-2231, the maintainer's look of
+   *  2026-11-21, item 8). The graphs draw the panel that answered last, so
+   *  the plot follows what the person touched last, and fall back to the
+   *  other's when that one is taken down. One panel's pair at a time: a
+   *  refusal is never said over the other panel's curves. */
+  let sliderPreview = $state.raw<PreviewAnswer | null>(null);
+  let sliderPreviewError = $state("");
+  let textPreview = $state.raw<PreviewAnswer | null>(null);
+  let textPreviewError = $state("");
+  let previewFrom = $state<"slider" | "text">("slider");
+  const textUp = $derived(!!textPreview || !!textPreviewError);
+  const sliderUp = $derived(!!sliderPreview || !!sliderPreviewError);
+  const fromText = $derived(textUp && (previewFrom === "text" || !sliderUp));
+  const previewAnswer = $derived(fromText ? textPreview : sliderPreview);
+  const previewError = $derived(fromText ? textPreviewError : sliderPreviewError);
   /** The Parameters panel's pending holds, shared with the Background
    *  graph's term chips (WP-2218): one pending set for both. */
   let pendingHolds = $state.raw<ReadonlyMap<string, boolean>>(new Map());
@@ -842,6 +858,10 @@
             <button class="tab" role="tab" aria-selected={graphTab === t.id} disabled={!project}
               onclick={() => (graphTab = t.id)}>{t.label}</button>
           {/each}
+          {#if project}
+            <HelpBox entry={GRAPH_HELP[graphTab]} {docsUrl}
+              label="About the {GRAPH_TABS.find((t) => t.id === graphTab)?.label} graph" />
+          {/if}
         </div>
         <div class="pane">
           {#if graphTab === "pattern"}
@@ -893,6 +913,10 @@
               <button class="tab" role="tab" aria-selected={modelTab === t.id} disabled={!project}
                 onclick={() => (modelTab = t.id)}>{t.label}</button>
             {/each}
+            {#if project}
+              <HelpBox entry={MODEL_HELP[modelTab]} {docsUrl}
+                label="About the {MODEL_TABS.find((t) => t.id === modelTab)?.label} tab" />
+            {/if}
           </div>
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
@@ -907,7 +931,10 @@
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
             onvalues={(v) => (sliderValues = v)}
-            onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
+            onpreview={(answer, why) => {
+              sliderPreview = answer; sliderPreviewError = why;
+              if (answer || why) previewFrom = "slider";
+            }} />
         </div>
         <!-- mounted while hidden too: an edited plan is a pending edit -->
         <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
@@ -921,6 +948,10 @@
             active={!unbuilt && showModel && modelTab === "text"}
             name={project?.path ? projectStem(project.path) : "project"}
             onmoved={structureMoved} onapply={applyFromText}
+            onpreview={(answer, why) => {
+              textPreview = answer; textPreviewError = why;
+              if (answer || why) previewFrom = "text";
+            }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
         {#if !unbuilt}

@@ -16,11 +16,14 @@
    * no rule of its own.
    */
   import { type Say } from "./console";
+  import { untrack } from "svelte";
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
   import { canApply, editedLines, initial, reduce, type Problem,
            type SyncEvent } from "../lib/sync";
   import type { TextDraft } from "../lib/recovery";
+  import { PreviewQueue, type PreviewAnswer } from "../lib/interactive";
+  import type { Curves } from "rxplot";
   // types only: the boot chunk still has no CodeMirror
   import type { EditorHandle, createEditor } from "../lib/editor";
 
@@ -34,6 +37,7 @@
     onmoved = () => {},
     onpending = (_edited: boolean, _why: string) => {},
     onapply = () => {},
+    onpreview = (_answer: PreviewAnswer | null, _error: string) => {},
   }: {
     head?: string | null;
     busy?: boolean;
@@ -49,6 +53,8 @@
     onpending?: (edited: boolean, why: string) => void;
     /** ⌘⏎ in the editor: the bar's Apply */
     onapply?: () => void;
+    /** the pattern at the typed values, or null to take it down */
+    onpreview?: (answer: PreviewAnswer | null, error: string) => void;
   } = $props();
 
   /** Long enough that a burst of typing is one request, short enough that a
@@ -68,11 +74,53 @@
   /** bumped by `forget`, so a read begun for the project left is dropped */
   let generation = 0;
 
+  // -- the preview -----------------------------------------------------------
+  // A typed number previews on the plot as a slider move does (the
+  // maintainer's look, 2026-11-21, item 8, reversing WP-2231 § Settled 12).
+  // The server's validation already diffs the buffer against the project, so
+  // its `delta.values` are the typed values, and `POST /api/preview` draws
+  // them, through one `PreviewQueue` as the Interactive tab's. A refine flag,
+  // a setting or a peak move changes no curve, so a buffer of only those
+  // previews nothing.
+
+  /** Whether this tab has a preview (or a refusal) up, so taking it down is
+   *  said once and never clears another panel's. */
+  let previewUp = false;
+  /** The values last sent, so a check that changes none of them (a comment,
+   *  a refine flag) asks the server for no second identical pattern. */
+  let previewKey = "";
+  const queue = new PreviewQueue<Curves>(
+    async (values) => {
+      const [answer, chart] = await Promise.all([api.preview(values), import("rxplot")]);
+      return chart.unpack(answer);
+    },
+    (curves, _values, sentAt) => {
+      previewUp = true;
+      onpreview({ curves, sentAt }, "");
+    },
+    (exc) => {
+      previewUp = true;
+      onpreview(null, (exc as Error).message);
+    },
+  );
+
+  function dropPreview() {
+    queue.clear();
+    previewKey = "";
+    if (!previewUp) return;
+    previewUp = false;
+    onpreview(null, "");
+  }
+
   const problems = $derived(sync.problems);
   // primitives, so the line diff below reruns only when a text changes and
   // not on every dispatch (checking, checked) that leaves both alone
   const base = $derived(sync.base);
   const buffer = $derived(sync.buffer);
+  /** The stale notice's words (the maintainer's look, 2026-11-21: today's
+   *  `STALE_NOTICE` read unclearly). Re-read beside it discards the edit. */
+  const STALE_CAUSE = "The project changed after this text was read.";
+  const STALE_WORDS = `${STALE_CAUSE} Re-read it, then make your edit again.`;
   /** A comment does not survive a re-render (WP-1009), so say so before Apply
    *  replaces the buffer. */
   const addedComments = $derived(
@@ -80,12 +128,18 @@
   const edited = $derived(loaded && buffer !== base);
   const editedMarks = $derived(edited ? editedLines(base, buffer) : []);
   const why = $derived(!edited ? ""
-    : sync.stale ? "The text is stale: re-read it in the Text tab."
+    : sync.stale ? `${STALE_CAUSE} Re-read it in the Text tab.`
     : sync.phase === "invalid"
       ? (problems.length
         ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
         : sync.notice || "The text was not read.")
       : "");
+
+  // nothing typed, a buffer the server cannot read, or one typed against an
+  // older project: no preview stands for it
+  $effect(() => {
+    if (!edited || sync.stale || sync.phase === "invalid") untrack(dropPreview);
+  });
 
   $effect(() => {
     onpending(edited, why);
@@ -153,6 +207,7 @@
   /** The open project changed: drop this buffer and read the next one afresh. */
   export function forget() {
     if (timer) clearTimeout(timer);
+    dropPreview();
     generation += 1;
     restoring = null;
     sync = initial();
@@ -175,6 +230,17 @@
     try {
       const payload = await api.putTextdoc(text, sync.revision, true);
       dispatch({ kind: "checked", seq, wouldChange: Boolean(payload.would_change) });
+      // a newer keystroke has its own check coming, which previews its values
+      if (seq !== sync.seq) return;
+      const values = (payload.delta?.values ?? {}) as Record<string, number>;
+      if (!Object.keys(values).length) dropPreview();
+      else {
+        const key = JSON.stringify(Object.entries(values).sort(([a], [b]) => (a < b ? -1 : 1)));
+        if (key !== previewKey) {
+          previewKey = key;
+          queue.push(values);
+        }
+      }
     } catch (error) {
       absorb(error, seq);
     }
@@ -290,8 +356,11 @@
   </div>
 
   {#if sync.stale}
-    <p class="notice bad">{sync.notice}
-      <button class="link" onclick={() => revert()}>Re-read</button></p>
+    <div class="notice bad stale">
+      <p>{STALE_WORDS}</p>
+      <button class="ghost" onclick={() => revert()}
+        title="Read the project's text again, discarding your edit">Re-read</button>
+    </div>
   {:else if sync.notice}
     <p class="notice">{sync.notice}</p>
   {/if}
@@ -361,6 +430,24 @@
 
   .notice.bad {
     color: var(--bad);
+  }
+
+  /* Words and the Re-read button on one row, the button kept clear of the
+     words and never wrapped under them while the row has room. */
+  .notice.stale {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .notice.stale p {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .notice.stale button {
+    flex: none;
   }
 
   .editor {

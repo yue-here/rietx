@@ -82,6 +82,13 @@ describe("the Plan tab", () => {
     expect(text(blocks[2])).toContain("Everything above");
     expect(text(blocks[3])).toContain("Never freed");
     expect(text(blocks[3])).toContain("instrument.zero_shift");
+    // read-only chips in the stage rows' style, one per family, each listing
+    // its paths in the tooltip (the maintainer's look, 2026-11-21)
+    const never = [...blocks[3].querySelectorAll(".pt.still")];
+    expect(never.length).toBeGreaterThan(0);
+    expect(blocks[3].querySelector("button")).toBeNull();
+    expect(never.flatMap((c) => c.getAttribute("title")!.split("\n")).sort())
+      .toEqual(["instrument.profile.u", "instrument.profile.v", "instrument.zero_shift"]);
     expect(pending).toHaveBeenLastCalledWith(false);
   });
 
