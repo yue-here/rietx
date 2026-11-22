@@ -1274,8 +1274,8 @@ describe("the parameter table", () => {
     expect(order).toEqual(["/api/params", "/api/run"]);
     expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
-    // one cycle is one stage on the ticked rows: an empty turn_on
-    button("One cycle")!.click();
+    // As ticked is one stage on the ticked rows: an empty turn_on
+    button("As ticked")!.click();
     await flush();
     refineButton()!.click();
     await flush();

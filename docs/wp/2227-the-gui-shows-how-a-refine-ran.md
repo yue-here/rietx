@@ -63,6 +63,16 @@ the same date):
 5. **The status bar during a re-fit reads the title line's words**, not the internal stage name
    `warm_refit (1/1)` (consent line, no objection).
 
+**Yue, 2026-11-22**, two later rulings:
+
+6. **The Refine choice "One cycle" is renamed "As ticked".** It runs
+   `p.run_stage(rx.Stage("cycle", turn_on=[]))`: every ticked parameter together, to
+   convergence. That is a standard refinement, and its behaviour stays. In the field a cycle is
+   one least-squares iteration, so only the words were wrong. Its tooltip reads "Refine every
+   ticked parameter together until it converges.", with the Python call on the second line.
+7. **GUI text never names another program**, such as GSAS-II, TOPAS or FullProf. Code comments
+   and `docs/` are not GUI text.
+
 ## Tasks
 
 - [x] Draw the options in the workshop and take them to Yue. Drawn 2026-11-22 over the real
@@ -159,6 +169,20 @@ words at 1440 px.
 Next: Yue looks at `2227-screenshots/` § As built, the acceptance's last item. If #1775
 (WP-2212's Console) merges first, the Console comment moves to its line kinds. When both are
 settled, close this WP.
+
+*Merged and renamed* (PR #1776, the steward's pass of 2026-11-22). The branch takes #1775's
+branch (WP-2212, with main's History tab), so it stays clean once #1775 lands. The Console
+comment already used #1775's `comment` line kind. Rulings 6 and 7 are built: "As ticked" on both
+action bars and in `/`'s command menu, the tooltip on both bars, `gui/STYLE.md` one line each, and
+a vitest in `lib/style.test.ts` that fails on another program's name or on "One cycle" in any
+non-test source under `gui/src`, comments stripped. One site named a program: the 3D viewer's
+"view down" tooltip on `/` cited VESTA, now cut. The as-built pictures here and in
+`2231-screenshots/` are retaken. The option pictures keep the old label, since they record
+what the rulings were made on.
+Open for Yue: text the server sends and the GUI shows still names programs. These are the
+library's words too: `rietx.help` entries (about 25 name GSAS-II, TOPAS or FullProf), the `fap`
+example's title "GSAS-II LabData — fluorapatite", the reader name "GSAS raw powder data" and the
+`FULLPROF_*` diagnostics. Ruling 7 does not yet say whether it reaches them.
 
 - **2026-11-22** — Task 1 is drawn and nothing is decided. Each option for the three questions
   is drawn over the real rebuilt page on the `fap` example, light and dark, in

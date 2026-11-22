@@ -1041,7 +1041,7 @@
     { id: "side", label: hideModel ? "Show the model panel" : "Hide the model panel",
       echo: "# a layout choice, not a setting", disabled: !project || hideGraphs,
       run: () => toggleSide("model") },
-    { id: "cycle", label: "Refine one cycle on the ticked parameters",
+    { id: "cycle", label: "Refine as ticked",
       echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
       disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => refine("cycle") },
