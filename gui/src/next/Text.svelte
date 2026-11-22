@@ -15,11 +15,14 @@
    * This component owns the debounce timer, the fetches and the DOM, and holds
    * no rule of its own.
    */
+  import { untrack } from "svelte";
   import { ApiError, api } from "../api";
   import { commentLines } from "../lib/rxt";
   import { canApply, editedLines, initial, reduce, type Problem,
            type SyncEvent } from "../lib/sync";
   import type { TextDraft } from "../lib/recovery";
+  import { PreviewQueue, type PreviewAnswer } from "../lib/interactive";
+  import type { Curves } from "rxplot";
   // types only: the boot chunk still has no CodeMirror
   import type { EditorHandle, createEditor } from "../lib/editor";
 
@@ -33,6 +36,7 @@
     onmoved = () => {},
     onpending = (_edited: boolean, _why: string) => {},
     onapply = () => {},
+    onpreview = (_answer: PreviewAnswer | null, _error: string) => {},
   }: {
     head?: string | null;
     busy?: boolean;
@@ -48,6 +52,8 @@
     onpending?: (edited: boolean, why: string) => void;
     /** ⌘⏎ in the editor: the bar's Apply */
     onapply?: () => void;
+    /** the pattern at the typed values, or null to take it down */
+    onpreview?: (answer: PreviewAnswer | null, error: string) => void;
   } = $props();
 
   /** Long enough that a burst of typing is one request, short enough that a
@@ -66,6 +72,40 @@
   let loaded = $state(false);
   /** bumped by `forget`, so a read begun for the project left is dropped */
   let generation = 0;
+
+  // -- the preview -----------------------------------------------------------
+  // A typed number previews on the plot as a slider move does (the
+  // maintainer's look, 2026-11-21, item 8, reversing WP-2231 § Settled 12).
+  // The server's validation already diffs the buffer against the project, so
+  // its `delta.values` are the typed values, and `POST /api/preview` draws
+  // them, through one `PreviewQueue` as the Interactive tab's. A refine flag,
+  // a setting or a peak move changes no curve, so a buffer of only those
+  // previews nothing.
+
+  /** Whether this tab has a preview (or a refusal) up, so taking it down is
+   *  said once and never clears another panel's. */
+  let previewUp = false;
+  const queue = new PreviewQueue<Curves>(
+    async (values) => {
+      const [answer, chart] = await Promise.all([api.preview(values), import("rxplot")]);
+      return chart.unpack(answer);
+    },
+    (curves, _values, sentAt) => {
+      previewUp = true;
+      onpreview({ curves, sentAt }, "");
+    },
+    (exc) => {
+      previewUp = true;
+      onpreview(null, (exc as Error).message);
+    },
+  );
+
+  function dropPreview() {
+    queue.clear();
+    if (!previewUp) return;
+    previewUp = false;
+    onpreview(null, "");
+  }
 
   const problems = $derived(sync.problems);
   // primitives, so the line diff below reruns only when a text changes and
@@ -89,6 +129,12 @@
         ? `The text has ${problems.length} problem${problems.length === 1 ? "" : "s"}.`
         : sync.notice || "The text was not read.")
       : "");
+
+  // nothing typed, a buffer the server cannot read, or one typed against an
+  // older project: no preview stands for it
+  $effect(() => {
+    if (!edited || sync.stale || sync.phase === "invalid") untrack(dropPreview);
+  });
 
   $effect(() => {
     onpending(edited, why);
@@ -156,6 +202,7 @@
   /** The open project changed: drop this buffer and read the next one afresh. */
   export function forget() {
     if (timer) clearTimeout(timer);
+    dropPreview();
     generation += 1;
     restoring = null;
     sync = initial();
@@ -178,6 +225,11 @@
     try {
       const payload = await api.putTextdoc(text, sync.revision, true);
       dispatch({ kind: "checked", seq, wouldChange: Boolean(payload.would_change) });
+      // a newer keystroke has its own check coming, which previews its values
+      if (seq !== sync.seq) return;
+      const values = (payload.delta?.values ?? {}) as Record<string, number>;
+      if (Object.keys(values).length) queue.push(values);
+      else dropPreview();
     } catch (error) {
       absorb(error, seq);
     }

@@ -91,8 +91,16 @@
   let sliderTouched = $state(0);
   /** The slider values not yet applied, which the Structure graph draws. */
   let sliderValues = $state.raw<Record<string, number> | null>(null);
-  let previewAnswer = $state.raw<PreviewAnswer | null>(null);
-  let previewError = $state("");
+  /** The pattern at the sliders' values and at the Text tab's typed values,
+   *  each its own panel's answer. The graphs draw the Text tab's while it has
+   *  one, since a text edit is the later and wider statement (WP-2231, the
+   *  maintainer's look of 2026-11-21, item 8). */
+  let sliderPreview = $state.raw<PreviewAnswer | null>(null);
+  let sliderPreviewError = $state("");
+  let textPreview = $state.raw<PreviewAnswer | null>(null);
+  let textPreviewError = $state("");
+  const previewAnswer = $derived(textPreview ?? sliderPreview);
+  const previewError = $derived(textPreviewError || sliderPreviewError);
   /** The Parameters panel's pending holds, shared with the Background
    *  graph's term chips (WP-2218): one pending set for both. */
   let pendingHolds = $state.raw<ReadonlyMap<string, boolean>>(new Map());
@@ -901,7 +909,7 @@
             context={rangeContext} {phaseNames}
             onpending={(n) => (sliderTouched = n)}
             onvalues={(v) => (sliderValues = v)}
-            onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
+            onpreview={(answer, why) => { sliderPreview = answer; sliderPreviewError = why; }} />
         </div>
         <!-- mounted while hidden too: an edited plan is a pending edit -->
         <div class="pane" class:gone={!!unbuilt || modelTab !== "plan"}>
@@ -915,6 +923,7 @@
             active={!unbuilt && showModel && modelTab === "text"}
             name={project?.path ? projectStem(project.path) : "project"}
             onmoved={structureMoved} onapply={applyFromText}
+            onpreview={(answer, why) => { textPreview = answer; textPreviewError = why; }}
             onpending={(edited, why) => { textEdited = edited; textWhy = why; }} />
         </div>
         {#if !unbuilt}

@@ -50,6 +50,7 @@ export const MODEL_HELP: Record<ModelTab, HelpBoxEntry> = {
     lead: "The model as rietx text, the same file you can edit in any editor.",
     items: [
       "Change a number or a refine flag and it becomes a pending edit, as in Parameters. Apply in the action bar, or ⌘⏎, sends it.",
+      "A changed number previews on the plot, as a slider move does.",
       "Edited lines are highlighted. A line rietx cannot read is underlined.",
       "Rectangular selection: ⌥-drag.",
       "An edit applies through the same verbs the forms call, so it lands as history nodes and a checkout undoes it.",
