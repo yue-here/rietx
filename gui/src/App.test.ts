@@ -1272,7 +1272,7 @@ describe("the parameter table", () => {
     const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
       .map((c) => c.path);
     expect(order).toEqual(["/api/params", "/api/run"]);
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
     // one cycle is one stage on the ticked rows: an empty turn_on
     button("One cycle")!.click();
@@ -2389,7 +2389,7 @@ describe("disclosure and the command palette", () => {
     expect(order).toEqual(["/api/params", "/api/run"]);
     expect(stub.calls.find((c) => c.method === "PATCH")?.body)
       .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
-    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit", refit: "stages" });
 
     // an invalid edit blocks `r` as it disables the button
     await editValue("phases.0.cell.a", "abc");

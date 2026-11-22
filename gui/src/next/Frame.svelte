@@ -43,6 +43,7 @@
   import { eventLine, makeLine, pushLine, sessionScript, sharedSay, stageScript, type Line,
            type LineKind } from "./console";
   import HelpBox from "./HelpBox.svelte";
+  import { howComment, howWords } from "./howran";
   import { GRAPH_HELP, MODEL_HELP } from "./helpbox";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
@@ -177,7 +178,9 @@
 
   const mod = modifier(typeof navigator === "undefined" ? "" : navigator.platform ?? "");
   const busy = $derived(run?.state === "running" || run?.state === "cancelling");
-  const runText = $derived(project && busy ? runWords(run) : "");
+  /** A re-fit's one stage is said in the title line's words, never by the
+   *  stage's internal name (WP-2227, the maintainer's consent of 2026-11-22). */
+  const runText = $derived(project && busy ? howWords(run?.run?.how, corpus) || runWords(run) : "");
   const unbuilt = $derived(workflow(wf).steps ?? null);
   const head = $derived(run?.head ?? project?.head ?? null);
   const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
@@ -837,6 +840,9 @@
         // sends one idle frame with a new status (today's `App.svelte`)
         const key = `${frame.state}:${frame.run?.status ?? ""}:${frame.run?.node_id ?? ""}`;
         if (seen !== null && key !== seen && frame.state === "idle" && frame.run?.status) {
+          // how the fit ran, as `Refinement.summary()` prints it (WP-2227)
+          const comment = howComment(frame);
+          if (comment) say("comment", comment);
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
@@ -918,7 +924,8 @@
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
               {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
               projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi}
-              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)} />
+              preview={previewAnswer} {previewError} oncurves={(c) => (baseCurves = c)}
+              howText={howWords(result?.how, corpus)} />
           {:else if graphTab === "peaks"}
             <Peaks {plotKey} {theme} preview={previewAnswer} {previewError}
               rwp={result?.statistics?.rwp ?? null} oncurves={(c) => (baseCurves = c)} />

@@ -108,6 +108,9 @@
    *  list) describe the plan on screen. */
   const current = $derived(!edited && !planDiffers(resolvedFor, saved));
   const closing = $derived(resolved?.closing ?? null);
+  /** A one-stage re-fit of this plan (WP-2224): its node stands in for the
+   *  stages as one row after them (WP-2227, the maintainer's ruling 2). */
+  const oneStage = $derived(current ? resolved?.one_stage ?? null : null);
   const setAside = $derived((resolved?.set_aside ?? []) as string[]);
   const neverFreed = $derived((resolved?.never_freed ?? []) as string[]);
   const chosen = $derived(presets.find((p) => p.name === preset) ?? null);
@@ -815,6 +818,26 @@
         </div>
       {/each}
     </div>
+
+    {#if oneStage}
+      <!-- a re-fit of a converged model ran the plan in one stage (WP-2224):
+           one row stands in for the stages, drawn like the closing stage, and
+           the stage rows keep their counts with no Rwp of their own (WP-2227) -->
+      <div class="stg out" data-one-stage>
+        <div class="stg1">
+          <span class="gripslot"></span>
+          <span class="badge none">1</span>
+          <b class="title">One stage</b>
+          <span class="facts">
+            <span class="muted">{oneStage.n_free} free</span>
+            {@render rwp(oneStage.rwp)}
+          </span>
+        </div>
+        <div class="stg2">
+          <span class="verb">Free</span><span class="muted">Everything above, at once</span>
+        </div>
+      </div>
+    {/if}
 
     {#if closing}
       <!-- the stage every plan ends with (WP-2002): not editable, and its Rwp
