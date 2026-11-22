@@ -527,6 +527,24 @@ flag reprints the saved numbers without fitting.
 
 ## Handover log
 
+- **2026-11-21** — the milestone's open decisions triaged (a ghostshift runner, one
+  session; docs only, no package code changed).
+
+  Two of the four open decisions are settled and recorded in the milestone record's
+  § Ruled after the open. The width trap stays out of the skill, because no outside source
+  was found for it. Issue #1214 closes with PR #1473, whose rework to a field already says
+  so. Two decisions remain with the maintainer: the audit label on the default plan, with
+  a proposed correction, and `SEQUENTIAL_MOMENT_ONSET`, which is the magnetic path's.
+
+  *Done.* Of the four proposed WP moves, two (1420, 1453) are put to the maintainer with
+  how rules 4 to 6 narrow their tasks. WP-1524 is not moved, since WP-2003 removed the scan
+  it targets and PR #1588 closes it. WP-1317 is not moved, since gui-overhaul § R7 carries
+  it under the maintainer's ruling of 2026-11-21. No WP file's header was edited, because
+  the contributor's open PRs edit those lines. For the same reason no forward reference
+  went into the `### Inherited` of 1420, 1453 or 2080.
+
+  *Next:* the maintainer's answers on the two moves and the audit label.
+
 - **2026-11-18** — the series no longer warns when a phase width grows (one session; package
   code changed).
 

@@ -7,6 +7,19 @@ with the Rwp there. **Nothing is written.**
 The project directory, the history and the refinement's models stay as they
 were; the values pass through the working table and the table is put back.
 
+**Every compile is at the last fit's peak cut** (WP-2226): the window area
+fraction and window slack its last stage recorded, read off the nearest stage
+node at or above the head as ``refine.replay`` reads a stage node's. Replay
+compiles any other node at the defaults; the preview walks up to the stage
+instead, so an applied slider keeps the cut the fit ran at. A fit that ended
+on a closing stage (``lab_calibrate``, a Pawley series) draws at its 0.1 %,
+a default fit at the declared stages' 2 %, and a tree with no stage at the
+2 % a default fit will use. So at the head's values the preview draws the
+fit's own curve and Rwp, bit for bit on both shipped examples, and a slider
+moves the Rwp only by what it moved. The cut is read off the tree, never off
+``result_``, which a reopened project does not have and a checkout leaves
+stale.
+
 A compiled model freezes its reflection list, its point windows and its FCJ
 node counts (root CLAUDE.md, frozen-per-stage discreteness), so an evaluation
 at new values on it is exact only while those still describe the new values.
@@ -15,27 +28,34 @@ says which in the header's ``evaluated``:
 
 - ``recompiled`` when any reflection's drawn position moves by
   ``REFLECTION_MARGIN_DEG`` or more, since the frozen list may then miss a
-  reflection pushed into range. A compile at the new values (13-18 ms on the
-  examples). Also when a magnetic phase's second frozen family (WP-1343)
-  would grow or appear, since ``rewindow`` keeps that family's windows.
-- ``rewindowed`` when a window sized at the new values, its movement slack
-  removed, reaches outside the frozen one, or a node count grows. Through
-  ``forward.rewindow`` (0.6-3.1 ms), which is the compile's own sizing rule
-  and reproduced a fresh compile to 1e-13 σ in every case measured.
+  reflection pushed into range. A compile at the new values (36-41 ms an
+  answer on fluorapatite at 2 %, WP-2226). Also when a magnetic phase's
+  second frozen family (WP-1343) appears or would be sized differently,
+  since ``rewindow`` keeps that family's windows.
+- ``rewindowed`` when the windows or node counts the compile's sizing rule
+  gives at the new values differ from those it gives at the head's values.
+  Through ``forward.rewindow``, which is the compile's own sizing rule and
+  reproduced a fresh compile to 1.7e-13 σ in every case measured (3.5-10 ms
+  with the evaluation, WP-2226).
 - ``frozen`` otherwise: the cached compile, evaluated as it stands.
 
-The window and node branches are the compile's own sizing rule asked at the
-new values. The recompile trigger is looser than a fresh compile's list: a
-reflection that started just past ``REFLECTION_MARGIN_DEG`` and moved inward by
-less than it is missing (WP-2125 § The tier of each rule). The WP's measurements show why all three exist. A frozen window costs
-at most a few hundredths of an esd across the position sliders, because its
-0.3° slack covers them; the width sliders cost up to 0.26 σ; and an axial
-term switched on from zero has no quadrature nodes in the frozen model, so a
-frozen answer there was wrong by 516-834 σ.
+The rewindow test asks whether a window *differs*, never only whether it
+grew. At 2 % a window cuts a tail that still carries counts, so a frozen
+window that a peak has moved inside is cut off-centre. Reusing it drifted
+0.42-1.26 σ from a fresh compile on a zero shift of one FWHM and on a 0.05 %
+cell edit (WP-2226 § Measured). The comparison is against the sizing rule at
+the head's values. The compile's own windows come from its width estimate,
+which agrees with the rule to ~1 % only, so a comparison against them could
+rewindow at the head's values and leave the fit's curve. The recompile
+trigger is looser than a fresh compile's list: a reflection that started just
+past ``REFLECTION_MARGIN_DEG`` and moved inward by less than it is missing
+(WP-2125 § The tier of each rule). An axial term switched on from zero has no
+quadrature nodes in the frozen model, so a frozen answer there was wrong by
+516-834 σ (WP-2125).
 
-The compile is cached per working state, keyed on the history head, the mode,
-the 2θ limits and the excluded regions, so any verb that moves the model or
-the protocol invalidates it. In Le Bail and Pawley mode the head's extracted
+The compile is cached per working state, keyed on the history head, the peak
+cut, the mode, the 2θ limits and the excluded regions, so any verb that moves
+the model or the protocol invalidates it. In Le Bail and Pawley mode the head's extracted
 intensities are restored into it, as ``refine.replay`` does, and stay fixed
 while a slider moves.
 """
@@ -53,7 +73,14 @@ from typing import Any
 import numpy as np
 
 from ..model import forward
-from ..model.forward import REFLECTION_MARGIN_DEG, CompiledModel, compile_model, orbit_split_of
+from ..model.forward import (
+    REFLECTION_MARGIN_DEG,
+    WINDOW_AREA_TOL,
+    CompiledModel,
+    compile_model,
+    orbit_split_of,
+    recorded_window_tol,
+)
 from ..optimize.statistics import compute_statistics
 from ..params.vector import ParameterTable
 from ..viz.packed import Packed
@@ -71,11 +98,15 @@ class _Base:
     model: CompiledModel
     #: per phase, every reflection's drawn position at the base values
     positions: list[np.ndarray]
-    #: per phase, the node counts ``window_sizing`` gives at the base values
-    fcj_n: list[np.ndarray]
+    #: per phase, the (windows, node counts, half-widths) ``window_sizing``
+    #: gives at the base values
+    sized: list
     #: the same for the magnetic family, ``None`` for a phase without one
-    fcj_n_mag: list[np.ndarray | None]
+    sized_mag: list
     lebail: list | None
+    #: the last fit's peak cut, :func:`_cut`'s pair
+    window_area_tol: float = WINDOW_AREA_TOL
+    window_slack_deg: float | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -84,19 +115,36 @@ _CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 _CACHE_LOCK = threading.Lock()
 
 
+def _cut(refinement) -> tuple[float, float | None]:
+    """The window area fraction and window slack the last fit's last stage
+    ran at: the nearest stage node at or above the head, through
+    :func:`recorded_window_tol` as ``refine.replay`` reads a stage node's
+    (replay itself compiles a non-stage node at the defaults). A head with
+    no stage above it takes ``WINDOW_AREA_TOL``, the cut a default fit will
+    use, and the default slack."""
+    tree, head = refinement.history, refinement._head_id
+    if tree is not None and head is not None:
+        for node in reversed(tree.lineage(head)):
+            if node.action.kind == "stage":
+                return (recorded_window_tol(node.action.window_area_tol),
+                        node.action.window_slack_deg)
+    return WINDOW_AREA_TOL, None
+
+
 def _key(project) -> tuple:
     r = project.refinement
-    return (r._head_id, project.doc.mode,
+    return (r._head_id, _cut(r), project.doc.mode,
             None if project.doc.two_theta_limits is None
             else tuple(project.doc.two_theta_limits),
             tuple(map(tuple, project.data.excluded_regions)))
 
 
-def _compile(project, structure, instrument, lebail,
+def _compile(project, structure, instrument, lebail, cut: tuple[float, float | None],
              orbit_split: list | None = None) -> CompiledModel:
     model = compile_model(structure, instrument, project.data,
                           mode=project.doc.mode,
                           two_theta_limits=project.doc.two_theta_limits,
+                          window_area_tol=cut[0], window_slack_deg=cut[1],
                           orbit_split=orbit_split)
     if lebail is not None:
         from ..refine import _restore_lebail
@@ -122,14 +170,14 @@ def _base(project) -> _Base:
     if project.doc.mode in ("lebail", "pawley") and r.history is not None \
             and r._head_id is not None:
         lebail = list(r.history[r._head_id].state.reflections)
-    model = _compile(project, r.structure, r.instrument, lebail)
+    cut = key[1]
+    model = _compile(project, r.structure, r.instrument, lebail, cut)
     values = table.decode(table.x0())
     base = _Base(key=key, table=table, stored=[e.value for e in table.entries],
                  values=values, model=model, positions=_positions(model, values),
-                 fcj_n=[fcj for _, fcj, _ in forward.window_sizing(model, values)],
-                 fcj_n_mag=[None if s is None else s[1] for s in
-                            forward.window_sizing(model, values, component=1)],
-                 lebail=lebail)
+                 sized=forward.window_sizing(model, values),
+                 sized_mag=forward.window_sizing(model, values, component=1),
+                 lebail=lebail, window_area_tol=cut[0], window_slack_deg=cut[1])
     with _CACHE_LOCK:
         _CACHE[project] = base
     return base
@@ -183,32 +231,22 @@ def _moved(base: _Base, edits: dict[str, float]) -> dict[str, float]:
     return moved
 
 
-def _outgrown(model: CompiledModel, values: dict[str, float], component: int,
-              base_fcj: list[np.ndarray | None]) -> bool:
-    """Whether one frozen family's windows or node counts are too small at ``values``."""
-    tt = np.asarray(model.tt, dtype=np.float64)
+def _resized(model: CompiledModel, values: dict[str, float], component: int,
+             base_sized: list) -> bool:
+    """Whether one frozen family's windows or node counts, sized at ``values``
+    by the compile's rule, differ from the same rule's at the base values.
+
+    The comparison is against the rule at the base values, never the
+    compile's own windows, whose width estimate agrees with the drawn widths
+    to ~1 % only, so the answer at the base values is the frozen compile.
+    """
     sized = forward.window_sizing(model, values, component=component)
-    for ip, (cp, family) in enumerate(zip(model.phases, sized)):
-        if family is None:
+    for family, base in zip(sized, base_sized):
+        if family is None or base is None:
             continue
-        _, fcj_n, halves = family
-        win, frozen_fcj = ((cp.win, cp.fcj_n) if component == 0
-                           else (cp.win_mag, cp.fcj_n_mag))
-        # a node count grows against the larger of the compile's and the
-        # sizing rule's own count at the base values, so the ~1 % between the
-        # compile's width estimate and the drawn width cannot flip a count at
-        # the values the compile was built for
-        if (fcj_n > np.maximum(frozen_fcj, base_fcj[ip])).any():
+        if (not np.array_equal(family[0], base[0])
+                or not np.array_equal(family[1], base[1])):
             return True
-        for il, (pos, *_rest) in enumerate(
-                model.phase_peaks(ip, values, component=component)):
-            pos = np.asarray(pos, dtype=np.float64)
-            core = halves[il] - model.window_slack_deg
-            valid = np.isfinite(pos) & np.isfinite(core)
-            i0, i1 = forward._window_bounds(tt, pos, np.where(valid, core, 0.0), valid)
-            live = i1 > i0
-            if ((i0[live] < win[il][live, 0]) | (i1[live] > win[il][live, 1])).any():
-                return True
     return False
 
 
@@ -229,10 +267,10 @@ def _choose(base: _Base, values: dict[str, float]) -> str:
                      or values.get(f"phases.{ip}.magnetic_lor_strain", 0.0) != 0.0)):
             return "recompiled"
     # ``rewindow`` keeps the magnetic family's windows, so only a compile
-    # can grow them
-    if _outgrown(model, values, 1, base.fcj_n_mag):
+    # can resize them
+    if _resized(model, values, 1, base.sized_mag):
         return "recompiled"
-    if _outgrown(model, values, 0, base.fcj_n):
+    if _resized(model, values, 0, base.sized):
         return "rewindowed"
     return "frozen"
 
@@ -251,6 +289,7 @@ def _recompile(project, base: _Base) -> CompiledModel:
     instrument = r.instrument.model_copy(deep=True)
     base.table.apply_to_models(structure, instrument)
     model = _compile(project, structure, instrument, base.lebail,
+                     (base.window_area_tol, base.window_slack_deg),
                      orbit_split=orbit_split_of(base.model))
     base.table.push_moment_frames(model)
     model.sigma = base.model.sigma

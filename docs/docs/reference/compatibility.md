@@ -18,8 +18,8 @@ everything. Three rules make it possible to build on the preview:
   does not offer is an upgrade that is safe unread.
 - Any observable change moves a version string. Each data contract below carries
   one, and the rule, stated beside each constant in the source, is one sentence:
-  any change a consumer could observe bumps the last component by one, and the
-  comment beside the constant says what changed. No safe/minor/breaking
+  any change a consumer could observe bumps the last component by one, and a
+  note in the contract's history file says what changed. No safe/minor/breaking
   classification survives, and the only question left is whether you could have
   noticed.
 - A change to what an existing value means is always a documented event, even
@@ -35,10 +35,15 @@ rebuild.
 
 ## The seven version strings
 
-A moved version string means something you could observe changed, and the
-comment beside the constant says what. Those comments are the changelog. Each
-constant carries its own bump history (what moved, in which change, and why) and
-no separate file restates it. Promoting that record to a hosted page
+A moved version string means something you could observe changed, and a note
+says what. Four contracts keep their bump history (what moved, in which change,
+and why) in one file each, in the repository's
+[`docs/contracts/`](https://github.com/yue-here/rietx/tree/main/docs/contracts)
+directory: the schema, the report thresholds, the indexing thresholds and the
+project format. A test fails when a contract's number moves without a note.
+The other three histories are a few lines each and stay in the comment beside
+the constant.
+Promoting that record to a hosted page
 is part of tightening the promise, when there are users to face it. The strings
 are the seven contracts `capabilities()` reports ([API: everyday calls](api.md));
 `Capabilities.report_thresholds_version` and
