@@ -76,7 +76,7 @@ from .qspace import (
 #: Largest |h|, |k| or |l| a **base line** may be given.  Two, and the bound is a
 #: statement rather than a limit: the base lines are the lowest-Q ones, and a
 #: low-angle line needing an index of 3 or more is a dominant-zone case, which this
-#: engine *reports* (see :data:`DOMINANT_ZONE_PROBE_STEP`) rather than
+#: engine *reports* (see :data:`DOMINANT_ZONE_PROBE_LADDER`) rather than
 #: brute-forcing.  The enumeration goes as (table size)ⁿ, so raising this by one is
 #: not a small change.
 BASE_INDEX_MAX = 2

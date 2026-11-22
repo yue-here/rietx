@@ -1286,7 +1286,7 @@ class SeriesResult(Base):
 
         The one question the two layers outside this class need to put to the
         prefix set: the GUI's forward/backward guard (a derived curve gets no
-        backward chain, since ``_disagreement`` divides by a σ a residual does
+        backward chain, since its gap would divide by a σ a residual does
         not have) and the server test that skips those rows.  They ask this
         rather than reading :attr:`_TRAJECTORY_PREFIXES`, so the tuple stays a
         private detail of the dispatch and this class stays its one authority.
