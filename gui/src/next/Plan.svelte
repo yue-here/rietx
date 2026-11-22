@@ -22,6 +22,7 @@
    * Run this stage and the stage's settings sit on its ⋯ menu and its context
    * menu; the closing stage and "Never freed" end the list.
    */
+  import { type Say } from "./console";
   import { tick } from "svelte";
 
   import Help from "../Help.svelte";
@@ -45,7 +46,7 @@
     noPhasesReason = null,
     corpus = null,
     phaseNames = [],
-    say = (_line: string) => {},
+    say = () => {},
     onrun = (_stage: any, _echo: string) => {},
     onpending = (_edited: boolean) => {},
     onsaved = () => {},
@@ -57,7 +58,7 @@
     noPhasesReason?: string | null;
     corpus?: HelpCorpus | null;
     phaseNames?: readonly string[];
-    say?: (line: string) => void;
+    say?: Say;
     /** run `stage`; `echo` is its Python, for the shell to print once the run starts */
     onrun?: (stage: any, echo: string) => void;
     /** whether the plan on screen differs from the one the project holds */
@@ -264,8 +265,9 @@
 
   async function pick(name: string) {
     const before = snapshot();
-    say(`plan = resolve_plan(${JSON.stringify(name)}, ${JSON.stringify(mode)})`);
     if (await put({ preset: name })) {
+      say("call", `p.doc.plan = rx.PlanSpec.from_plan(resolve_plan(${JSON.stringify(name)}, p.doc.mode))`,
+          `p.doc.plan = rx.PlanSpec.from_plan(rx.strategy.staged.resolve_plan(${JSON.stringify(name)}, p.doc.mode))`);
       history.record(before);
       typing = "";
       undoTick += 1;
@@ -276,8 +278,12 @@
    *  nothing to store or the server took it. */
   export async function save(): Promise<boolean> {
     if (!edited) return true;
-    say(`project.doc.plan = PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`);
-    return put({ plan: { ...extra, stages: $state.snapshot(stages), correlation_guard: guard } });
+    const plan = { ...extra, stages: $state.snapshot(stages), correlation_guard: guard };
+    const echo = `p.doc.plan = rx.PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`;
+    if (!(await put({ plan }))) return false;
+    // echoed once stored: a refused plan ran nothing the script could repeat
+    say("call", echo, `p.doc.plan = rx.PlanSpec.model_validate_json(${JSON.stringify(JSON.stringify(plan))})`);
+    return true;
   }
 
   /** The edited plan, for the recovery copy (WP-2209), or `null`. */
@@ -441,7 +447,7 @@
     const off = stage.turn_off?.length ? `, turn_off=${JSON.stringify(stage.turn_off)}` : "";
     // the shell prints it once the run starts: it can still refuse
     onrun($state.snapshot(stage),
-          `ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
+          `p.run_stage(rx.Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
   }
 
   /** The stage `.` would run, for the palette's label: "" when there is none. */
